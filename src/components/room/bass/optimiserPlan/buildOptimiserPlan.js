@@ -449,7 +449,7 @@ export function buildOptimiserPlan({
   const planNotes = [...notes];
   if (!individualEffectsEvaluated) {
     planNotes.push(
-      "Only the combined candidate was evaluated — individual lever effects were not evaluated.",
+      "Only the combined candidate was evaluated — no individual lever effects were recorded.",
     );
   }
   if (levers[OPTIMISER_LEVER.POLARITY] && !levers[OPTIMISER_LEVER.POLARITY].evaluated) {

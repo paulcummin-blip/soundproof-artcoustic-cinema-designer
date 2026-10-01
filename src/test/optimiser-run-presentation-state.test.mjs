@@ -594,7 +594,7 @@ describe('TEST 9: the card receives the run evidence', () => {
 
     // Polarity states its own case instead of disappearing.
     const polarity = evidence.families.find((family) => family.family === 'polarity');
-    expect(polarity.statusLabel).toBe('Not tested separately');
+    expect(polarity.statusLabel).toBe('No standalone search — evaluated inside the combined candidate');
     expect(polarity.reason).toContain('combined');
 
     // Honest counts: confirmed candidates, not the sum of overlapping counters.

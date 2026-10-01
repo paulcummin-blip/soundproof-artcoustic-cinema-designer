@@ -262,7 +262,7 @@ check('TEST 7 — a combined-only candidate persists that fact', () => {
   assert.ok(plan);
   assert.equal(plan.individualEffectsEvaluated, false);
   assert.equal(plan.levers.polarity.evaluated, false);
-  assert.ok(plan.notes.some((note) => /individual lever effects were not evaluated/i.test(note)));
+  assert.ok(plan.notes.some((note) => /no individual lever effects were recorded/i.test(note)));
   assert.ok(plan.combined.effect, 'the combined candidate keeps its own evaluated effect');
 });
 
@@ -278,7 +278,8 @@ check('TEST 8 — no lever borrows the combined candidate improvement', () => {
   assert.equal(polarityLever.effect, null, 'polarity has no individual evaluation');
   assert.equal(polarityLever.evaluated, false);
   assert.match(resolveOptimiserPlanStatus({ plan, currentDesignFingerprint: DESIGN_FP, instances: instances() })
-    .levers.find((lever) => lever.key === OPTIMISER_LEVER.POLARITY).effectLabel, /not yet evaluated/i);
+    .levers.find((lever) => lever.key === OPTIMISER_LEVER.POLARITY).effectLabel,
+  /no individually evaluated result/i);
 });
 
 check('TEST 9 — the published payload carries the same plan (proposal / history / duplicate)', () => {
@@ -362,14 +363,14 @@ check('TEST 14 — unreadable evidence is reported, never reinterpreted', () => 
   const unsupported = resolveOptimiserPlanStatus({ plan: legacy, currentDesignFingerprint: DESIGN_FP, instances: instances() });
   assert.equal(unsupported.status, OPTIMISER_PLAN_STATUS.UNSUPPORTED);
   assert.equal(unsupported.levers.length, 0, 'no lever fabricated from unreadable evidence');
-  assert.match(unsupported.evidenceMessage, /evidence unavailable/i);
+  assert.match(unsupported.evidenceMessage, /could not be read/i);
 
   const older = resolveOptimiserPlanStatus({ plan: { ...plan, planVersion: 1 }, currentDesignFingerprint: DESIGN_FP, instances: instances() });
   assert.equal(older.status, OPTIMISER_PLAN_STATUS.UNSUPPORTED, 'older schema version is not reinterpreted');
 
   const absent = resolveOptimiserPlanStatus({ plan: null });
   assert.equal(absent.status, OPTIMISER_PLAN_STATUS.ABSENT);
-  assert.equal(absent.evidenceMessage, 'No evaluated optimiser changes are available. Re-run the optimiser.');
+  assert.equal(absent.evidenceMessage, 'No evaluated optimiser changes were found. Re-run the optimiser.');
 });
 
 // Coverage ends here: every check above is a test.

@@ -126,7 +126,7 @@ describe('PHASE TESTED OR CLEARLY MARKED NOT EVALUATED', () => {
 
     expect(phase.crossoverRegion.state).toBe(PHASE_LEVER_STATE.NOT_TESTED_UNSUPPORTED);
     expect(phase.crossoverRegion.stateLabel)
-      .toBe('Not tested — model does not yet evaluate crossover-region phase');
+      .toBe('Not yet supported — crossover-region phase is not modelled');
     expect(phase.statusLabel).toBe(phase.crossoverRegion.stateLabel);
     expect(phase.reason).toBe(CROSSOVER_REGION_NOT_EVALUATED_REASON);
     expect(phase.reason).toMatch(/does not model crossover-region phase between the main speakers and subwoofers/);
@@ -173,10 +173,11 @@ describe('NO UNSAFE APPLY', () => {
     expect(ledger.every((family) => family.applicable === false)).toBe(true);
   });
 
-  it('states in a saved plan that crossover-region phase is not evaluated', () => {
+  it('states in a saved plan that crossover-region phase is not modelled', () => {
     const statement = PLAN_FAMILY_STATEMENTS.find((entry) => entry.key === 'phase');
     expect(statement).toBeTruthy();
-    expect(statement.statement).toMatch(/not yet evaluated/);
+    expect(statement.statement).toMatch(/not yet supported/);
+    expect(statement.statement).toMatch(/does not model phase/);
   });
 
   it('keeps the evidence block free of any Apply control', () => {

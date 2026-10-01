@@ -36,7 +36,7 @@ export const OPTIMISER_LEVER_EVIDENCE = Object.freeze({
 export const OPTIMISER_EVIDENCE_STATUS_LABEL = Object.freeze({
   [OPTIMISER_LEVER_EVIDENCE.EVALUATED]: "Evaluated on its own",
   [OPTIMISER_LEVER_EVIDENCE.COMBINED_ONLY]: "Combined candidate only — no individual evaluation",
-  [OPTIMISER_LEVER_EVIDENCE.NOT_EVALUATED]: "Not evaluated",
+  [OPTIMISER_LEVER_EVIDENCE.NOT_EVALUATED]: "Search did not run in this evaluation",
 });
 
 /** Recorded against polarity: its value comes from the combined candidate only. */
@@ -45,11 +45,11 @@ export const POLARITY_NOT_EVALUATED_REASON =
 
 /** Shown when this version has no evaluated optimiser evidence at all (prose only). */
 export const NO_EVALUATED_OPTIMISER_CHANGES =
-  "No evaluated optimiser changes are available. Re-run the optimiser.";
+  "No evaluated optimiser changes were found. Re-run the optimiser.";
 
 /** Shown when saved evidence is missing its schema version or predates the current one. */
 export const OPTIMISER_EVIDENCE_UNAVAILABLE =
-  "Optimiser evidence unavailable — re-run the optimiser.";
+  "The saved optimiser evidence could not be read — re-run the optimiser.";
 
 /** The lever set in scope for the Optimisation Plan. */
 export const OPTIMISER_LEVER = Object.freeze({
@@ -161,7 +161,8 @@ export const OPTIMISER_LEVER_STATE_LABEL = Object.freeze({
 });
 
 /** Shown whenever a lever's own effect was never evaluated on its own. */
-export const INDIVIDUAL_EFFECT_NOT_EVALUATED = "Individual effect not yet evaluated.";
+export const INDIVIDUAL_EFFECT_NOT_EVALUATED =
+  "This lever has no individually evaluated result.";
 
 /**
  * Match tolerances. These mirror the tolerances already used by the optimiser's

@@ -32,8 +32,8 @@ export const OPTIMISER_LEVER_VERDICT_LABEL = Object.freeze({
   [OPTIMISER_LEVER_VERDICT.TRADE_OFF]: "Trade-off",
   [OPTIMISER_LEVER_VERDICT.REJECTED]: "Rejected — worsens the result",
   [OPTIMISER_LEVER_VERDICT.NO_IMPROVEMENT]: "Tested — no useful improvement",
-  [OPTIMISER_LEVER_VERDICT.NOT_TESTED]: "Not tested",
-  [OPTIMISER_LEVER_VERDICT.NOT_APPLICABLE]: "Not independently evaluated",
+  [OPTIMISER_LEVER_VERDICT.NOT_TESTED]: "Search did not run in this evaluation",
+  [OPTIMISER_LEVER_VERDICT.NOT_APPLICABLE]: "Evaluated inside the combined candidate",
 });
 
 /** A change smaller than 1 dB is not a meaningful user-facing change. */
@@ -108,7 +108,7 @@ export function resolveLeverVerdict({
       ...base,
       verdict: OPTIMISER_LEVER_VERDICT.NOT_TESTED,
       label: OPTIMISER_LEVER_VERDICT_LABEL[OPTIMISER_LEVER_VERDICT.NOT_TESTED],
-      summary: notTestedReason || "This lever was not evaluated in this run.",
+      summary: notTestedReason || "This search did not run in this evaluation.",
     };
   }
 

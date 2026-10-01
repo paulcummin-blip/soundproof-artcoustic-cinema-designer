@@ -223,7 +223,7 @@ test('TEST 9: combined-only polarity cannot be applied separately', () => {
     planStatus: OPTIMISER_PLAN_STATUS.CURRENT,
   });
   assert.equal(state.canApply, false);
-  assert.equal(state.reason, 'Not independently evaluated — cannot apply separately.');
+  assert.equal(state.reason, 'Evaluated only inside the combined candidate — cannot apply separately.');
 });
 
 test('TEST 9b: an already-applied lever is not applyable again', () => {

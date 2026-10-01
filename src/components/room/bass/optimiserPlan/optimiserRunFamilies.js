@@ -71,8 +71,8 @@ export const OPTIMISER_FAMILY_STATUS = Object.freeze({
 export const OPTIMISER_FAMILY_STATUS_LABEL = Object.freeze({
   [OPTIMISER_FAMILY_STATUS.REJECTED]: "Tested — best attempt rejected",
   [OPTIMISER_FAMILY_STATUS.EVALUATED]: "Tested",
-  [OPTIMISER_FAMILY_STATUS.NOT_TESTED]: "Not tested",
-  [OPTIMISER_FAMILY_STATUS.NOT_TESTED_SEPARATELY]: "Not tested separately",
+  [OPTIMISER_FAMILY_STATUS.NOT_TESTED]: "Search did not run in this evaluation",
+  [OPTIMISER_FAMILY_STATUS.NOT_TESTED_SEPARATELY]: "No standalone search — evaluated inside the combined candidate",
   [OPTIMISER_FAMILY_STATUS.FAILED]: "Evaluation failed",
   [OPTIMISER_FAMILY_STATUS.INCOMPLETE]: "Evaluation incomplete",
 });

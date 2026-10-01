@@ -49,7 +49,7 @@ export const LEVER_APPLY_BLOCK_MESSAGE = Object.freeze({
     "This lever cannot be applied on its own.",
   [LEVER_APPLY_BLOCK.NOT_EVALUATED]: INDIVIDUAL_EFFECT_NOT_EVALUATED,
   [LEVER_APPLY_BLOCK.COMBINED_ONLY]:
-    "Not independently evaluated — cannot apply separately.",
+    "Evaluated only inside the combined candidate — cannot apply separately.",
   [LEVER_APPLY_BLOCK.DISABLED]:
     "This lever is disabled for this design.",
   [LEVER_APPLY_BLOCK.NO_CHANGES]:
@@ -58,7 +58,7 @@ export const LEVER_APPLY_BLOCK_MESSAGE = Object.freeze({
     "An affected subwoofer no longer exists in this design.",
   [LEVER_APPLY_BLOCK.ALREADY_APPLIED]: "Already applied to this design.",
   [LEVER_APPLY_BLOCK.SEATING_POSITIONS_UNAVAILABLE]:
-    "The seating positions for this design are not available, so the evaluated movement cannot be applied here.",
+    "The seating positions for this design cannot be read, so the evaluated movement cannot be applied here.",
   [LEVER_APPLY_BLOCK.SEATING_DESTINATION_INVALID]:
     "The evaluated seating movement was not applied: a destination seat position is not a legal position in this room.",
 });

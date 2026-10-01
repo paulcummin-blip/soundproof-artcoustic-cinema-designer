@@ -319,7 +319,7 @@ export default function OptimiserRunEvidenceBlock({
           : "The design was changed during the run."}
         {best && !best.validationPassed ? " The rejected candidate is shown as evidence only and cannot be applied." : ""}
         {families.some((family) => family.status === OPTIMISER_FAMILY_STATUS.NOT_TESTED_SEPARATELY)
-          ? " A family marked not tested separately has no standalone evaluation — its value can only come from a combined candidate."
+          ? " A family with no standalone search was evaluated inside the combined candidate — its value comes from there."
           : ""}
       </div>
     </div>

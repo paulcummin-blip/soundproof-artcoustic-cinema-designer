@@ -98,7 +98,7 @@ export const PLAN_FAMILY_STATEMENTS = Object.freeze([
   {
     key: "phase",
     statement:
-      "Crossover-region phase is not yet evaluated. The optimiser does not model phase between "
+      "Crossover-region phase is not yet supported. The optimiser does not model phase between "
       + "the main speakers and subwoofers through the 80–150 Hz crossover region, so no phase "
       + "change is offered for separate application.",
   },

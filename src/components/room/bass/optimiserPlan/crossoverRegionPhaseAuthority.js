@@ -53,7 +53,7 @@ export const CROSSOVER_REGION_PURPOSE =
 
 /** Stated when the model cannot evaluate the crossover region. Used verbatim. */
 export const CROSSOVER_REGION_NOT_EVALUATED_REASON =
-  "Not yet evaluated. The current optimiser does not model crossover-region phase between the main "
+  "Not yet supported. The current optimiser does not model crossover-region phase between the main "
   + "speakers and subwoofers.";
 
 /**
@@ -86,7 +86,7 @@ export const PHASE_LEVER_STATE_LABEL = Object.freeze({
   [PHASE_LEVER_STATE.TESTED_NO_IMPROVEMENT]: "Tested — no useful improvement",
   [PHASE_LEVER_STATE.TESTED_REJECTED]: "Tested — rejected",
   [PHASE_LEVER_STATE.NOT_TESTED_UNSUPPORTED]:
-    "Not tested — model does not yet evaluate crossover-region phase",
+    "Not yet supported — crossover-region phase is not modelled",
   [PHASE_LEVER_STATE.NOT_APPLICABLE]: "Not applicable",
 });
 

@@ -35,7 +35,7 @@ export default function CrossoverRegionPhaseEvidence({ region = null }) {
       {region.supportReason && (
         <details>
           <summary className="cursor-pointer text-[10px] text-[#8B7F76]">
-            Why the crossover region is not evaluated
+            Why the crossover region is outside the current model
           </summary>
           <div className="mt-0.5 text-[10px] text-[#8B7F76] leading-relaxed">
             {region.supportReason}

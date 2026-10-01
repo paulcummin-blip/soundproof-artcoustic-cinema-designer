@@ -166,16 +166,18 @@ test('the saved run evidence carries a per-family ledger', () => {
   assert.ok(Object.values(ledger).every(Boolean), 'every reported family has a row');
 });
 
-test('a family the run evaluated is never shown as Not evaluated', () => {
+test('no row states "Not tested", "Not evaluated" or "Not available"', () => {
   const summary = summaryFor(terminalPlanView());
   assert.equal(summary.rows.length, 9, 'eight families plus absorption');
+  const forbidden = /not tested|not evaluated|not available/i;
   assert.ok(
-    !summary.rows.some((row) => String(row.status).includes('Not evaluated')),
-    'no false "Not evaluated" row after a run',
+    !summary.rows.some((row) => forbidden.test(`${row.status} ${row.outcome || ''}`)),
+    'no row carries forbidden copy after a run',
   );
-  assert.ok(
-    !summary.rows.some((row) => row.status === ADI_ROW_STATUS.NOT_EVALUATED),
-    'the unevaluated status is not used when evidence exists',
+  assert.deepEqual(
+    Object.values(ADI_ROW_STATUS).filter((status) => forbidden.test(status)),
+    [],
+    'the ledger vocabulary itself contains none of the forbidden phrases',
   );
 });
 
@@ -191,17 +193,20 @@ test('delay, gain and placement state the run’s real outcome', () => {
   assert.deepEqual(tested, ['Delay', 'Gain', 'Placement']);
 });
 
-test('phase states that the crossover-region model is not available', () => {
+test('phase states that the crossover region is not modelled', () => {
   const row = rowFor(summaryFor(terminalPlanView()), 'Phase');
-  assert.equal(row.status, ADI_ROW_STATUS.NOT_YET_EVALUATED);
-  assert.equal(row.outcome, ADI_ROW_OUTCOME.PHASE_UNAVAILABLE);
+  assert.equal(row.status, ADI_ROW_STATUS.NOT_YET_SUPPORTED);
+  assert.equal(row.outcome, ADI_ROW_OUTCOME.PHASE_NOT_MODELLED);
   assert.match(row.outcome, /crossover/i);
 });
 
-test('polarity distinguishes combined-only evidence from a standalone result', () => {
+test('polarity states where its value came from', () => {
+  // No proxy searches were recorded for this run, so there is no standalone
+  // polarity search to apply: the row says exactly that.
   const row = rowFor(summaryFor(terminalPlanView()), 'Polarity');
-  assert.equal(row.status, ADI_ROW_STATUS.COMBINED_ONLY);
-  assert.equal(row.outcome, ADI_ROW_OUTCOME.NO_SAFE_STANDALONE);
+  assert.equal(row.status, ADI_ROW_STATUS.NOT_YET_SUPPORTED);
+  assert.equal(row.outcome, ADI_ROW_OUTCOME.NO_STANDALONE_SEARCH);
+  assert.match(row.outcome, /combined candidate/i);
 });
 
 test('layout is reported as checked inside the placement search', () => {
@@ -213,12 +218,13 @@ test('layout is reported as checked inside the placement search', () => {
 test('sub option and seating state what they are', () => {
   const summary = summaryFor(terminalPlanView());
   const sub = rowFor(summary, 'Sub option');
-  assert.equal(sub.status, ADI_ROW_STATUS.COMPARE_SEPARATELY);
-  assert.match(sub.outcome, /design decision/i);
+  assert.equal(sub.status, ADI_ROW_STATUS.NOT_YET_SUPPORTED_IN_RUN);
+  assert.equal(sub.outcome, ADI_ROW_OUTCOME.COMPARE_SEPARATELY);
+  assert.match(sub.outcome, /compare subwoofer models/i);
 
   const seating = rowFor(summary, 'Seating');
-  assert.equal(seating.status, ADI_ROW_STATUS.LAST_RESORT);
-  assert.equal(seating.outcome, ADI_ROW_OUTCOME.NOT_REQUIRED_YET);
+  assert.equal(seating.status, ADI_ROW_STATUS.NOT_YET_SUPPORTED_IN_RUN);
+  assert.equal(seating.outcome, ADI_ROW_OUTCOME.SEATING_LAST_RESORT);
 });
 
 test('seating reports a tested outcome once the seating search ran', () => {
@@ -235,7 +241,7 @@ test('seating reports a tested outcome once the seating search ran', () => {
   });
   const seating = rowFor(summaryFor(planView), 'Seating');
   assert.equal(seating.status, ADI_ROW_STATUS.TESTED, 'a searched seating family is not "last resort"');
-  assert.notEqual(seating.outcome, ADI_ROW_OUTCOME.NOT_REQUIRED_YET);
+  assert.notEqual(seating.outcome, ADI_ROW_OUTCOME.SEATING_LAST_RESORT);
 });
 
 // ── Plan evidence wins, and both surfaces read the same field ─────────────────
@@ -304,8 +310,9 @@ test('an actionable run records the same family evidence', () => {
   assert.equal(rowFor(summary, 'Placement').status, ADI_ROW_STATUS.RECOMMENDED, 'the recommendation is stated');
   assert.equal(rowFor(summary, 'Delay').status, ADI_ROW_STATUS.TESTED, 'a tested family without a lever row is still stated');
   assert.ok(
-    !summary.rows.some((row) => row.status === ADI_ROW_STATUS.NOT_EVALUATED),
-    'no false "Not evaluated" row after a winning run',
+    !summary.rows.some((row) => /not tested|not evaluated|not available/i
+      .test(`${row.status} ${row.outcome || ''}`)),
+    'no forbidden copy after a winning run',
   );
 });
 
