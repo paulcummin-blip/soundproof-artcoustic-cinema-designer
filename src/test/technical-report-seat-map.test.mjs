@@ -21,6 +21,7 @@ import { renderToStaticMarkup } from 'react-dom/server';
 
 import SeatResultMap from '../components/report/SeatResultMap.jsx';
 import TechnicalSeatGrid from '../components/report/technical/TechnicalSeatGrid.jsx';
+import { isSeatScopedParameterKey } from '../components/utils/rp22ParameterPresentation.js';
 
 const TILE_SOURCE = fs.readFileSync(
   path.resolve('src/components/rp22/RP22ComplianceParameterTile.jsx'),
@@ -126,12 +127,20 @@ test('TEST 5 — no seat identifier label and no per-seat RSP suffix', () => {
 });
 
 test('TEST 6 — P19 is never shown as a per-seat map', () => {
+  // The scope authority decides, not a parameter number: the grid builds a
+  // seat-layout map only for seat-scoped parameters, and P19 is RSP-scoped.
   assert.ok(
-    GRID_SOURCE.includes('Number(param?.id) !== 19'),
-    'the grid excludes P19 from the seat-layout map',
+    GRID_SOURCE.includes('buildSeatGridData'),
+    'the grid still builds the seat-layout map',
   );
   assert.ok(
-    !GRID_SOURCE.includes('isSeatScope ? buildSeatGridData'),
-    'no path builds a seat map for every seat-scoped parameter, P19 included',
+    /param\?\.scope|param\.scope/.test(GRID_SOURCE),
+    'the grid reads the presentation scope, not a parameter number',
   );
+  assert.ok(
+    !GRID_SOURCE.includes('!== 19'),
+    'P19 is no longer special-cased by number anywhere in the grid',
+  );
+  assert.equal(isSeatScopedParameterKey('p19'), false, 'P19 is RSP-scoped, never seat-scoped');
+  assert.equal(isSeatScopedParameterKey('p20'), true, 'P20 stays the seat parameter');
 });

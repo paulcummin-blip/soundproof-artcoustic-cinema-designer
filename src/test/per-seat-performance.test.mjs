@@ -29,7 +29,10 @@ import ClientPerSeatPerformance from '../components/report/client/ClientPerSeatP
 import PrintPerSeatPerformanceContent from '../components/report/client/print/PrintPerSeatPerformanceContent.jsx';
 import { presentSeatMetric } from '../components/room/seatHudPresentation.js';
 import { attachAuthoritativeP20ToSeatSnapshot } from '../components/room/seatHudPresentation.js';
-import { RP22_PRESENTATION_PARAMETERS } from '../components/utils/rp22ParameterPresentation.js';
+import {
+  RP22_PRESENTATION_PARAMETERS,
+  isSeatScopedParameterKey,
+} from '../components/utils/rp22ParameterPresentation.js';
 import { RP22_CATALOG } from '../components/data/rp22Catalog.jsx';
 import { groupSeatsIntoRows } from '../components/report/client/seatRowGrouping.js';
 import { selectClientScreenSeating } from '../components/report/client/selectClientScreenSeating.js';
@@ -210,9 +213,13 @@ test('secondary seats carry the lighter outline', () => {
 test('P19 is excluded — it is assessed at the RSP only', () => {
   // The authority DOES carry a P19 value for every seat …
   assert.equal(SEATS.every((seat) => seatHudById[seat.id].rp22.p19.level === 'L1'), true);
-  // … and the catalogue itself files P19 under seat scope, which is exactly why
-  // the exclusion has to be explicit here.
-  assert.equal(RP22_CATALOG['19'].scope, 'Seat');
+  // … and the canonical catalogue files P19 under RSP scope, never seat scope.
+  // That one declaration is what keeps it off every per-seat surface — no
+  // consumer special-cases P19 by number any more. P20 stays the seat
+  // parameter: it is the seat-to-seat deviation P19 is not.
+  assert.equal(RP22_CATALOG['19'].scope, 'RSP');
+  assert.equal(isSeatScopedParameterKey('p19'), false, 'P19 is not a seat parameter');
+  assert.equal(isSeatScopedParameterKey('p20'), true, 'P20 remains the seat-to-seat parameter');
   // … yet no card states it.
   assert.ok(!SCREEN_TEXT.includes('P19'), 'the rendered section never shows P19');
   assert.ok(!PRINT_TEXT.includes('P19'), 'nor does the PDF page');

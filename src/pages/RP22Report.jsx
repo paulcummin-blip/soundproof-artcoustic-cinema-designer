@@ -50,8 +50,7 @@ import TechnicalPerformanceSummary from '@/components/report/technical/Technical
 import TechnicalAsdrScorecard from '@/components/report/technical/TechnicalAsdrScorecard';
 import TechnicalRp23Rows from '@/components/report/technical/TechnicalRp23Rows';
 import ScopedAsdrSummary from '@/components/report/technical/ScopedAsdrSummary';
-import TechnicalReportRecommendations from '@/components/report/technical/TechnicalReportRecommendations';
-import TechnicalAdiAssessment from '@/components/report/technical/TechnicalAdiAssessment';
+import TechnicalEngineeringSummaryNote from '@/components/report/technical/TechnicalEngineeringSummaryNote';
 import { subscribeAsdrVisibility, getAsdrVisibility } from '@/components/state/asdrVisibilityStore';
 import { useAuth } from '@/lib/AuthContext';
 import { DEFAULT_TERRITORY, getTerritoryConfig } from '@/components/pricing/territoryConfig';
@@ -96,7 +95,6 @@ function RP22ReportInner() {
     const [reportHydrating, setReportHydrating] = useState(true);
     const [reportReadyProjectId, setReportReadyProjectId] = useState(null);
     const showDesignRating = useSyncExternalStore(subscribeAsdrVisibility, getAsdrVisibility);
-    const [includeAdiAssessment, setIncludeAdiAssessment] = useState(true);
 
     // ── ASDR recommendation wiring ───────────────────────────────────────
     // READ-ONLY REPORT: The report does NOT mount DesignRecommendationEngine.
@@ -1098,8 +1096,6 @@ function RP22ReportInner() {
                         setIsPrinting={setIsPrinting}
                         exportDisabled={reportHydrating || (explicitProjectId && reportReadyProjectId !== explicitProjectId) || authorityReportPending || recommendationsPending || !designAssessmentComplete}
                         exportDisabledMessage={!designAssessmentComplete ? "Complete assessment to export PDF" : (authorityReportPending ? "Engineering summary loading" : (recommendationsPending ? "Recommendations evaluating" : "Report loading"))}
-                        includeAdiAssessment={includeAdiAssessment}
-                        onToggleAdiAssessment={showDesignRating ? setIncludeAdiAssessment : null}
                         lcrAngleInfo={(() => {
                             // Compute LCR angles exactly as Plan View does:
                             // lcrAimMode === 'angled' → compute yaw from speaker position to MLP
@@ -1180,15 +1176,12 @@ function RP22ReportInner() {
                         </div>
                     )}
 
-                    {/* ── Screen-only ADI Assessment ── */}
-                    {showDesignRating && includeAdiAssessment && designReviewHandoff && (
-                        <TechnicalAdiAssessment publishedAuthority={designReviewHandoff} />
-                    )}
-
-                    {/* ── Screen-only Recommendations section (NOT in PDF) ── */}
-                    {showDesignRating && (
-                        <TechnicalReportRecommendations recommendations={designRecommendations} />
-                    )}
+                    {/* ── Screen-only neutral engineering summary ──
+                        The Technical Report documents the finished design. It gives
+                        no post-design change advice: design changes are proposed and
+                        applied in the Bass Optimiser workflow, before report
+                        generation. ── */}
+                    <TechnicalEngineeringSummaryNote />
 
                 </div>
                 )}
@@ -1257,12 +1250,12 @@ function RP22ReportInner() {
                                 </div>
                             )}
 
-                            {/* ── Page 3c: ADI Assessment (optional) ── */}
-                            {showDesignRating && includeAdiAssessment && designReviewHandoff && (
-                                <div className="report-page-block report-page-block--summary" data-report-block="adi-assessment" data-report-page-start="true">
-                                    <TechnicalAdiAssessment publishedAuthority={designReviewHandoff} />
-                                </div>
-                            )}
+                            {/* The former Page 3c ADI Assessment page is deliberately
+                                absent: the Technical Report documents the finished
+                                design and carries no post-design change advice.
+                                Advised design changes belong to the Bass Optimiser
+                                workflow, and a limitation shows through the parameter
+                                result itself. */}
                             </section>
 
                         {planEnabled && typeof planImageDataUrl === 'string' && planImageDataUrl.length > 0 && planImageDataUrl !== '__SKIP__' && (

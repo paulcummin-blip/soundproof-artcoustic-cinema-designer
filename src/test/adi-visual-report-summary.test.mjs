@@ -46,7 +46,8 @@ const SUMMARY_BLOCK = read('src/components/report/client/ClientAdiVisualSummary.
 const VISUAL_PAGE = read('src/components/report/client/ClientAdiDesignSummary.jsx');
 const REPORT_PAGE = read('src/pages/RP22ClientReport.jsx');
 const LONG_BLOCK = read('src/components/adi/designGuidance/AdiDesignGuidanceBlock.jsx');
-const TECHNICAL = read('src/components/report/technical/TechnicalAdiAssessment.jsx');
+const TECHNICAL_PAGE = read('src/pages/RP22Report.jsx');
+const SUMMARY_NOTE = read('src/components/report/technical/TechnicalEngineeringSummaryNote.jsx');
 
 /** The published room context the report page hands the block. */
 const CONTEXT = {
@@ -318,8 +319,27 @@ test('the report page still hands the block the version it belongs to', () => {
   expect(REPORT_PAGE).toMatch(/engineeringSummary=\{engineeringSummary\}/);
 });
 
-test('the Technical Report and design workflow keep the full guidance block', () => {
-  expect(TECHNICAL).toMatch(/AdiDesignGuidanceBlock/);
+/**
+ * Reports document the finished design. Bass Optimiser improves the design.
+ *
+ * The Technical Report therefore carries NO post-design design-change advice:
+ * no ADI Assessment, no design guidance, no recommendations list. The guidance
+ * block itself is untouched — the design workflow owns it.
+ */
+test('the Technical Report carries no post-design design-change advice', () => {
+  expect(TECHNICAL_PAGE).not.toMatch(/TechnicalAdiAssessment/);
+  expect(TECHNICAL_PAGE).not.toMatch(/TechnicalReportRecommendations/);
+  expect(TECHNICAL_PAGE).not.toMatch(/adi-assessment/);
+  // None of the advice vocabulary survives on the report surface.
+  expect(TECHNICAL_PAGE).not.toMatch(/Best first change|Expected improvement|What remains limited/);
+  expect(TECHNICAL_PAGE).not.toMatch(/Improvements to Consider|Include Artcoustic Design Intelligence/);
+  // The neutral engineering summary states where design advice lives.
+  expect(TECHNICAL_PAGE).toMatch(/TechnicalEngineeringSummaryNote/);
+  expect(SUMMARY_NOTE).toMatch(/documents the\s+selected cinema design/);
+  expect(SUMMARY_NOTE).toMatch(/Bass Optimiser workflow before report generation/);
+  expect(SUMMARY_NOTE).not.toMatch(/add (a )?(second|another) sub|move (the )?(seat|row)/i);
+  expect(SUMMARY_NOTE).not.toMatch(/expected (improvement|benefit)/i);
+  // The guidance block stays intact, for the workflow that owns it.
   expect(LONG_BLOCK).toMatch(/Best first change/);
   expect(LONG_BLOCK).toMatch(/Expected improvement/);
   expect(LONG_BLOCK).toMatch(/What remains limited/);
