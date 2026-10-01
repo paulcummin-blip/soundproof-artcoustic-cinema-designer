@@ -1,7 +1,8 @@
 // Temporary verification: run the REAL readiness authority over the seven
-// imported Paradigm specifications (values exactly as stored) and print the
+// imported Paradigm specifications (values exactly as stored) and confirm the
 // class the Speaker Database list and the RP22 candidate list will show.
 
+import { test, expect } from 'vitest';
 import { comparisonReadiness, evidenceText, powerBasisText } from '../src/components/admin/speaker-db/comparisonReadiness.js';
 
 const MODELS = [
@@ -14,7 +15,7 @@ const MODELS = [
   { model: 'CI Pro P5 LCR v2', sens: 91, frLow: 84, ampMax: 200 },
 ];
 
-for (const m of MODELS) {
+function readinessFor(m) {
   const product = {
     id: 'p', manufacturer_name: 'Paradigm', model: m.model,
     official_product_url: 'https://www.paradigm.com/en/in-wall-speakers/model',
@@ -35,14 +36,35 @@ for (const m of MODELS) {
     confidence: 'C',
     evidence_quality: 'Manufacturer Calculated',
   };
-  const r = comparisonReadiness({ product, specification });
-  console.log([
-    m.model.padEnd(20),
-    `${r.confidence} ${r.label}`.padEnd(28),
-    evidenceText(r).padEnd(22),
-    powerBasisText(specification).padEnd(38),
-    `eligible=${r.eligible}`,
-    `assumedBasis=${r.sensitivityBasisAssumed}`,
-    `missingCritical=[${r.missingCriticalLabels.join(', ')}]`,
-  ].join(' | '));
+  return comparisonReadiness({ product, specification });
 }
+
+test('Paradigm import: every model is gradeable as an ADI estimate (C)', () => {
+  const lines = [];
+  for (const m of MODELS) {
+    const r = readinessFor(m);
+    lines.push([
+      m.model.padEnd(20),
+      `${r.confidence} ${r.label}`.padEnd(28),
+      evidenceText(r).padEnd(22),
+      powerBasisText({ recommended_amp_max_w: m.ampMax }).padEnd(38),
+      `eligible=${r.eligible}`,
+      `assumedBasis=${r.sensitivityBasisAssumed}`,
+      `powerAuthority=${r.powerAuthority}`,
+      `capability=${r.capabilityBasis}`,
+      `evidence=${r.evidenceQuality}`,
+      `missingCritical=[${r.missingCriticalLabels.join(', ')}]`,
+    ].join(' | '));
+
+    expect(r.confidence, m.model).toBe('C');
+    expect(r.label, m.model).toBe('ADI Estimate');
+    expect(r.eligible, m.model).toBe(true);
+    expect(r.capabilityBasis, m.model).toBe('Calculated');
+    expect(r.powerAuthorityW, m.model).toBe(m.ampMax);
+    // The genuinely unstated fields are named, never silently filled.
+    expect(r.missingCriticalLabels, m.model).toEqual(
+      expect.arrayContaining(['Sensitivity basis', 'Measurement space', 'Evidence quality']),
+    );
+  }
+  console.log('\n' + lines.join('\n'));
+});
