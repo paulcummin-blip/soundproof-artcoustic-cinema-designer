@@ -91,6 +91,42 @@ export const BANNED_WORDS = [
 ];
 
 /**
+ * Neutral professional voice: the mandatory voice rules for every piece of
+ * client-facing proposal and client-summary copy.
+ *
+ * The report writes about the design, not at the reader. It names the subject
+ * directly (the cinema, the room, the screen, the system) and describes
+ * experience through listeners. "Your screen" is always "the screen".
+ *
+ * Exported so the AI client summary prompts and the Key Performance Highlights
+ * prompt use the same rules as this contract, from one authority.
+ */
+export const NEUTRAL_VOICE_RULES = [
+  'NEUTRAL VOICE (mandatory, applies to every sentence):',
+  '- Write in the third person. Address the document, never the reader: no "you", "your", "yours" or "you will".',
+  '- Name the subject directly: "The cinema", "The room", "The screen", "The system", "The design".',
+  '- Describe experience through listeners: "Listeners will hear ...", "Across the seating area ...", "This can be improved ...".',
+  '- "The screen" is always used, never "your screen". "The cinema" replaces "your cinema" and "the room" replaces "your room".',
+  '- Never write "your cinema", "your room", "your screen", "your system", "you will hear", "you can improve" or "where you sit".',
+  '- Keep the tone professional and human. Neutral is not cold: the reader still understands exactly what the design delivers.',
+].join('\n');
+
+/**
+ * Legacy personal phrasings and the neutral wording that replaces them.
+ * Used by the copy audit to measure second-person language in report copy.
+ */
+export const NEUTRAL_VOICE_SUBSTITUTIONS = [
+  ['your cinema', 'the cinema'],
+  ['your room', 'the room'],
+  ['your screen', 'the screen'],
+  ['your system', 'the system'],
+  ['you will hear', 'listeners will hear'],
+  ['you can improve', 'this can be improved'],
+  ['where you sit', 'across the seating area'],
+  ['you hear', 'listeners hear'],
+];
+
+/**
  * The style contract text injected into every client-facing report prompt.
  * @returns {string}
  */
@@ -104,7 +140,8 @@ export function buildWritingStyleContract() {
     '- Write in active voice.',
     '- Give practical, specific advice.',
     '- Include data, numbers, RP22/RP23 levels, dB values, screen sizes, viewing angles, channel counts and concrete examples when they are supplied in the data above.',
-    '- Speak to the reader using "you" and "your" where it feels natural.',
+    '- Write in the neutral professional voice defined below. The design is the subject of the sentence, never the reader.',
+    '- Describe the experience through listeners: what they will hear, and where.',
     '- Explain what the client will experience, not just what the system measures.',
     '- Lead with what the design does well, then explain the trade-offs honestly.',
     '- When a compromise exists, explain it plainly without undermining the design.',
@@ -119,6 +156,8 @@ export function buildWritingStyleContract() {
     '- Keep the tone human, calm and professional.',
     '- Prefer short paragraphs.',
     '- Use tables for key performance highlights and comparisons.',
+    '',
+    NEUTRAL_VOICE_RULES,
     '',
     '=== ROLE AND STRUCTURE ===',
     '- Write as the cinema designer responsible for this project, explaining the design directly to the client.',
@@ -140,6 +179,8 @@ export function buildWritingStyleContract() {
     '- Paragraphs that read like a list of measurements.',
     '- Constructions like "not just X, but Y".',
     '- Metaphors, analogies and cliches.',
+    '- Addressing the reader: "you", "your", "you will hear", "you can improve", "where you sit".',
+    '- "Your cinema", "your room", "your screen" or "your system". Name the cinema, the room, the screen and the system directly.',
     '- Vague or sweeping claims.',
     '- "In conclusion," "to sum up," "closing," or any similar closing phrase.',
     '- Extra adjectives or adverbs.',
@@ -184,6 +225,7 @@ export function buildWritingStyleContract() {
     '12. Check that the report tells the design story first, and that Spatial Resolution, Dynamic Range and Timbre Matching carry the narrative.',
     '13. Check that no result is mentioned only because it exists, and that no level is quoted without explaining what the client hears because of it.',
     '14. Check that no assumed parameter is referenced anywhere.',
+    '15. Check that every sentence is in the third person, that no "your" anything remains, and that "the screen", "the cinema", "the room" and "the system" are used in its place.',
     '',
     '=== OUTPUT FORMAT ===',
     'Return structured report content only, suitable for the app editor.',

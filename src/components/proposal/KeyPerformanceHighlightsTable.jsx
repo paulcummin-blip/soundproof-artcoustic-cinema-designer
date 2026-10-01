@@ -5,7 +5,7 @@ import { REPORT_FONT_HEADING } from '@/components/report/typography/reportTypogr
  * KeyPerformanceHighlightsTable
  * -----------------------------
  * The measured summary table of a System Design Summary:
- * Performance area | Result | What you hear.
+ * Performance area | Result | What listeners hear.
  *
  * The Result column is read verbatim from the calculated Sound Proof rows
  * stored on the section. This component never derives, rounds, regrades or
@@ -15,14 +15,15 @@ import { REPORT_FONT_HEADING } from '@/components/report/typography/reportTypogr
  * exactly the same table. The `kph-table` class is the print stylesheet hook.
  *
  * Props:
- * - rows: Array<{ key, area, result, what_you_hear }>
+ * - rows: Array<{ key, area, result, what_you_hear }> (what_you_hear is the
+ *   stored key for the "What listeners hear" column)
  * - className: optional wrapper class
  */
 
 const COLUMNS = [
   { key: 'area', label: 'Performance area' },
   { key: 'result', label: 'Result' },
-  { key: 'what_you_hear', label: 'What you hear' },
+  { key: 'what_you_hear', label: 'What listeners hear' },
 ];
 
 const CELL = 'px-3 py-2 align-top border-b border-[#EAE8E3]';

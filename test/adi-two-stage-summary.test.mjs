@@ -451,7 +451,7 @@ describe("Stage 2 and the audit trail", () => {
     expect(SYSTEM_SUMMARY_SECTION_PROMPTS.dynamic_range).toMatch(/not simply about playing louder/);
     expect(SYSTEM_SUMMARY_SECTION_PROMPTS.timbre_matching).toMatch(/Never reference P20/);
     expect(buildHighlightsPrompt(evidence, selectHighlightRows(REFERENCE_ROOM)))
-      .toMatch(/Say what the result means for the client, not what the parameter is called/);
+      .toMatch(/Say what the result means for the listeners, not what the parameter is called/);
   });
 
   test("the writer is given the design story ahead of the evidence", () => {

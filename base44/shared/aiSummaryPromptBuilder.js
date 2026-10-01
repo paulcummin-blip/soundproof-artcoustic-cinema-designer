@@ -20,6 +20,8 @@
  * Pure: no React, no side effects, no runtime-specific APIs.
  */
 
+import { NEUTRAL_VOICE_RULES } from './reportWritingStyleContract.js';
+
 const FORBIDDEN_WORDS = [
   "poor", "bad", "needs improvement", "should upgrade",
   "further refinement recommended",
@@ -91,6 +93,7 @@ export function buildSingleSummaryPrompt(payload) {
 
 WRITING RULES (strict):
 - Use factual, professional language.
+${NEUTRAL_VOICE_RULES}
 - Do NOT use these words: ${FORBIDDEN_WORDS.join(", ")}.
 - Structure the summary around the three RP22 performance areas: Spatial Resolution, Dynamic Range, Timbre Matching.
 - Do NOT produce a parameter-by-parameter dump. Explain what the design does well, where performance varies by seat, what trade-offs exist, and what is materially different between Primary and Secondary seats.
@@ -163,6 +166,7 @@ export function buildComparisonSummaryPrompt({ payloads, versionLabels }) {
 
 WRITING RULES (strict):
 - Use factual, professional language.
+${NEUTRAL_VOICE_RULES}
 - Do NOT use these words: ${FORBIDDEN_WORDS.join(", ")}.
 - Do NOT simply choose a "winner". Explain factual differences and the benefit/trade-off of the higher specified version where supported by the data.
 - Structure the comparison around: Spatial Resolution, Dynamic Range, Timbre Matching.

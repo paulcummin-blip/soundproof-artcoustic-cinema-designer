@@ -15,8 +15,9 @@
  *      app, so the AI can never invent, regrade or alter a table value.
  *
  * The AI supplies only prose: the section narrative in body copy, and the
- * "What you hear" cell for the rows selected here. mergeHighlightRows() joins
- * the two, keeping the calculated Result values untouched.
+ * "What listeners hear" cell for the rows selected here (stored under the
+ * existing what_you_hear key). mergeHighlightRows() joins the two, keeping the
+ * calculated Result values untouched.
  *
  * Reads the snapshot passively. Never calculates, grades, regroups or
  * re-interprets an engineering result.
@@ -41,6 +42,7 @@ import {
   resolveBassEvidence,
   splitParameterEvidence,
 } from './adiReportEvidenceRules.js';
+import { NEUTRAL_VOICE_RULES } from './reportWritingStyleContract.js';
 
 function compose(...parts) {
   const clean = parts
@@ -298,7 +300,7 @@ export const HIGHLIGHTS_JSON_SCHEMA = {
 
 /**
  * The prompt that asks the model for the highlights prose: a short section
- * introduction plus the "What you hear" cell for each calculated row.
+ * introduction plus the "What listeners hear" cell for each calculated row.
  *
  * @param {string} evidence — buildEngineeringEvidence() output
  * @param {Array<{ key, area, result }>} rows
@@ -317,15 +319,17 @@ export function buildHighlightsPrompt(evidence, rows) {
     '',
     'Return two things:',
     'a) intro_html: one or two sentences introducing the section as the measured summary of this design, as simple HTML with a <p> tag.',
-    'b) rows: one entry per row above, using its key exactly, giving the "What you hear" cell.',
+    'b) rows: one entry per row above, using its key exactly, giving the "What listeners hear" cell.',
     '',
-    'Each "What you hear" cell must be one short, specific sentence (about 15 words) telling the client what that result means for them, in plain language.',
+    'Each "What listeners hear" cell must be one short, specific sentence (about 15 words) describing what that result means for the listeners, in plain language.',
+    NEUTRAL_VOICE_RULES,
     '',
     'RULES:',
     '- Never change, reorder, add or remove a row. The Result values are calculated by Sound Proof and are already final.',
     '- Never invent a value. If a row needs numbers, use only the numbers shown in that row.',
     '- Reference only the results shown in the table above. Do not mention a parameter, a level or a measurement that is not in it.',
-    '- Say what the result means for the client, not what the parameter is called. The Result column already states the number.',
+    '- Say what the result means for the listeners, not what the parameter is called. The Result column already states the number.',
+    '- Keep the neutral voice above: third person, and no "you" or "your" anywhere in the cell.',
   ].join('\n');
 }
 

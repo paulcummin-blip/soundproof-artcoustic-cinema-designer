@@ -248,7 +248,7 @@ export default async function(req) {
 
     // ── Key Performance Highlights rows ──
     // Read straight out of the frozen Engineering Snapshot. The AI writes the
-    // "What you hear" cells only; it never sets or changes a Result value, and
+    // "What listeners hear" cells only; it never sets or changes a Result value, and
     // it never chooses which rows appear.
     const usesSystemStructure = resolvedType !== 'single';
     const highlightRows = usesSystemStructure ? selectHighlightRows(engineering_snapshot) : [];
