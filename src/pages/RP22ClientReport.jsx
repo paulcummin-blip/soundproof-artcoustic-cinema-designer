@@ -45,6 +45,8 @@ import ClientAdiDesignSummary from "@/components/report/client/ClientAdiDesignSu
 import { selectClientBassPerformance } from "@/components/report/client/selectClientBassPerformance";
 import ClientP2SystemArchitecture from "@/components/report/client/ClientP2SystemArchitecture";
 import { selectClientP2SystemArchitecture } from "@/components/report/client/selectClientP2SystemArchitecture";
+import ClientPerSeatPerformance from "@/components/report/client/ClientPerSeatPerformance";
+import { selectClientPerSeatPerformance } from "@/components/report/client/selectClientPerSeatPerformance";
 import ClientP7FrontWides from "@/components/report/client/ClientP7FrontWides";
 import { selectClientP7FrontWides } from "@/components/report/client/selectClientP7FrontWides";
 import ClientRecommendationFooter from "@/components/report/client/ClientRecommendationFooter";
@@ -247,6 +249,22 @@ export default function RP22ClientReport() {
     return selectClientBassPerformance(engineeringSummary, seatingPositions);
   }, [hydrating, engineeringSummary, seatingPositions]);
 
+  // ── Per-Seat Performance — the seat pop-up, laid out as the seating plan ──
+  // One compact card per assessed seat, carrying the published RP22/RP23 levels
+  // read through the pop-up's own presenters. P19 is deliberately absent: it is
+  // assessed at the reference seating position only, never seat by seat.
+  const perSeatPerformance = useMemo(() => {
+    if (hydrating || !engineeringSummary || !Array.isArray(seatingPositions)) {
+      return { hasAny: false, rows: [] };
+    }
+    return selectClientPerSeatPerformance({
+      engineeringSummary,
+      seatingPositions,
+      bassPerformance,
+      rsp,
+    });
+  }, [hydrating, engineeringSummary, seatingPositions, bassPerformance, rsp]);
+
   // Published geometry/system context for the ADI Design Summary. Read from
   // the saved project, so ADI receives the same inputs here as everywhere else.
   const reportGeometry = useMemo(() => {
@@ -281,6 +299,7 @@ export default function RP22ClientReport() {
     const spatialPages = [];
     const timbrePages = [];
     const bassPages = [];
+    const summaryPages = [];
     const closingPages = [];
     // Design Summary — always first (intro page)
     if (highlights.length > 0) {
@@ -724,6 +743,21 @@ export default function RP22ClientReport() {
         },
       });
     }
+    // Per-Seat Performance — the seat-by-seat summary, after the parameter
+    // pages. Every assessed seat in the seating plan's own shape, read from the
+    // same published authority as the Room Designer seat pop-up.
+    if (perSeatPerformance?.hasAny) {
+      summaryPages.push({
+        id: "per-seat-performance",
+        category: "Per-Seat Performance",
+        visual: <ClientPerSeatPerformance rows={perSeatPerformance.rows} />,
+        printData: {
+          type: "per-seat-performance",
+          // Distinct key: the viewing page owns `rows` for its own print data.
+          seatRows: perSeatPerformance.rows,
+        },
+      });
+    }
     // About Sound Proof — the short brand closing section, always last.
     closingPages.push({
       id: "about-sound-proof",
@@ -748,9 +782,10 @@ export default function RP22ClientReport() {
       ...spatialPages,
       ...timbrePages,
       ...bassPages,
+      ...summaryPages,
       ...closingPages,
     ];
-  }, [p5Snapshot, p5SeatResults, p9Snapshot, p9Overhead, bestListeningArea, timbreConsistency, frontSoundstage, nonScreenSoundstage, highlights, screenSeating, hasSeatingPosition, recommendedSeatingPosition, bassPerformance, roomDims, rsp, rspSourceLabel, screenFrontPlaneM, screenWidthM, screen, placedSpeakers, appState?.acousticTreatmentEnabled, appState?.selectedAbfuserQty, publishedRecommendations, coverageSentence, reportGeometry, reportSystem, projectId]);
+  }, [p5Snapshot, p5SeatResults, p9Snapshot, p9Overhead, bestListeningArea, timbreConsistency, frontSoundstage, nonScreenSoundstage, highlights, screenSeating, hasSeatingPosition, recommendedSeatingPosition, bassPerformance, roomDims, rsp, rspSourceLabel, screenFrontPlaneM, screenWidthM, screen, placedSpeakers, appState?.acousticTreatmentEnabled, appState?.selectedAbfuserQty, publishedRecommendations, coverageSentence, reportGeometry, reportSystem, perSeatPerformance, projectId]);
 
   // Each category heading is printed once. The first page of a category keeps
   // its heading; continuation pages never repeat the major category heading.

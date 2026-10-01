@@ -20,6 +20,7 @@ import ClientP19RspPresentation from "@/components/report/client/ClientP19RspPre
 import PrintP2Content from "@/components/report/client/print/PrintP2Content";
 import PrintP7Content from "@/components/report/client/print/PrintP7Content";
 import AboutSoundProofReportPage from "@/components/report/AboutSoundProofReportPage";
+import PrintPerSeatPerformanceContent from "@/components/report/client/print/PrintPerSeatPerformanceContent";
 import ClientDesignHighlights from "@/components/report/client/ClientDesignHighlights";
 import ClientRecommendedSeatingPosition from "@/components/report/client/ClientRecommendedSeatingPosition";
 import ClientBestListeningArea from "@/components/report/client/ClientBestListeningArea";
@@ -434,6 +435,9 @@ export default function ClientReportPage({ children, isFirst, projectDetails, lo
               />
             </div>
           </>
+        )}
+        {printData?.type === "per-seat-performance" && (
+          <PrintPerSeatPerformanceContent rows={printData.seatRows} />
         )}
         {printData?.type === "about-sound-proof" && (
           <AboutSoundProofReportPage />
