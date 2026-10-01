@@ -7,7 +7,14 @@
  *
  * PASSIVE READ ONLY. Nothing is graded, measured or recomputed here:
  *
- *   · RP23 + P1/P4/P5/P6/P9/P10/P16/P17
+ *   · RP23
+ *       engineeringSummary.viewing.per_seat — the SAME published per-seat
+ *       viewing result the Visual Report's Viewing Experience page reads, so a
+ *       card's RP23 angle and level ARE the viewing result. The seat HUD
+ *       snapshot carries the RP23 angle but no level, so it cannot state an
+ *       RP23 result and is never read for one.
+ *
+ *   · P1/P4/P5/P6/P9/P10/P16/P17
  *       seatHudById[seatId] — the same published per-seat snapshot the Room
  *       Designer pop-up reads, formatted by the SAME presenters
  *       (presentSeatMetric in seatHudPresentation.js), so a card can never
@@ -96,6 +103,14 @@ export function selectClientPerSeatPerformance({
     : [];
   const p20Parameter = parameterFor(20);
 
+  // The published per-seat viewing authority (angle + RP23 level). This is the
+  // authority the Viewing Experience page reads — not the seat HUD snapshot,
+  // whose RP23 entry carries the angle alone.
+  const viewingBySeatId = new Map(
+    (Array.isArray(engineeringSummary?.viewing?.per_seat) ? engineeringSummary.viewing.per_seat : [])
+      .map((result) => [String(result?.seat_id), result]),
+  );
+
   const cards = seats.map((seat, index) => {
     const seatId = String(seat.id || `seat-${index}`);
     const hud = seatHudById[seatId] || {};
@@ -125,13 +140,17 @@ export function selectClientPerSeatPerformance({
       });
     }
 
-    // RP23 horizontal viewing — published per-seat viewing result.
-    const rp23 = hud.rp23 && hud.rp23.level != null
+    // RP23 horizontal viewing — the published per-seat viewing result, stated
+    // exactly as the Viewing Experience page states it (level + angle).
+    const viewing = viewingBySeatId.get(seatId) || null;
+    const viewingAngleDeg = Number(viewing?.horizontal_angle_deg);
+    const viewingLevel = viewing?.rp23_level ? String(viewing.rp23_level) : null;
+    const rp23 = Number.isFinite(viewingAngleDeg)
       ? {
-          valueText: hud.rp23.formatted || "—",
-          level: String(hud.rp23.level),
+          level: viewingLevel || "—",
+          valueText: `${viewingAngleDeg.toFixed(1)}°`,
         }
-      : { valueText: "—", level: "—" };
+      : { level: "—", valueText: "—" };
 
     // Screen-channel SPL at the seat — the pop-up's own Screen group.
     const spl = Object.entries(hud.splAtSeat?.lcr || {})

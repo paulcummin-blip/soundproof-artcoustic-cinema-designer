@@ -11,7 +11,7 @@
 //   TEST 4  Secondary seats carry the lighter outline
 //   TEST 5  P19 is excluded (it is RSP-only, not per seat)
 //   TEST 6  P20 is included, from the canonical P20 authority
-//   TEST 7  RP23 horizontal viewing is included
+//   TEST 7  RP23 is included with level + angle, from the viewing authority
 //   TEST 8  Values match the Room Designer pop-up exactly
 //   TEST 9  The RSP is marked separately, never as the only primary seat
 //   TEST 10 The PDF page carries the same cards and heading
@@ -32,6 +32,8 @@ import { attachAuthoritativeP20ToSeatSnapshot } from '../components/room/seatHud
 import { RP22_PRESENTATION_PARAMETERS } from '../components/utils/rp22ParameterPresentation.js';
 import { RP22_CATALOG } from '../components/data/rp22Catalog.jsx';
 import { groupSeatsIntoRows } from '../components/report/client/seatRowGrouping.js';
+import { selectClientScreenSeating } from '../components/report/client/selectClientScreenSeating.js';
+import { isAssessedLevel } from '../components/report/client/visualReportSeatStyle.js';
 
 const SOURCE = fs.readFileSync('src/components/report/client/selectClientPerSeatPerformance.js', 'utf8');
 const SECTION_SOURCE = fs.readFileSync('src/components/report/client/ClientPerSeatPerformance.jsx', 'utf8');
@@ -66,17 +68,22 @@ const seatHudById = Object.fromEntries(SEATS.map((seat, index) => {
   return [seat.id, {
     seatId: seat.id,
     isPrimary: seat.isPrimary,
-    rp23: { angleDeg: 50 + n, displayDeg: 50 + n, level: n % 2 === 0 ? 'L4' : 'L3', formatted: `${50 + n}°` },
+    // The REAL published shape: the RP23 entry carries the angle only — no
+    // level, no formatted string. A card reading RP23 from here would print a
+    // level-less row, which is exactly the defect this fixture guards against.
+    rp23: { angleDeg: 50 + n },
     // P19 is present in the authority — and must still be absent from the cards.
     rp22: {
-      p1: { valueM: 1.5 + index * 0.1, level: 'L4', formatted: `${(1.5 + index * 0.1).toFixed(2)}m` },
-      p4: { valueDb: 1 + index * 0.2, level: 'L4', formatted: `${Math.floor(1 + index * 0.2)} dB` },
-      p5: { valueDeg: 40 + n, level: 'L4', formatted: `${40 + n}°` },
-      p6: { valueDb: 2 + index * 0.3, level: index < 3 ? 'L3' : 'L2', formatted: `${Math.floor(2 + index * 0.3)} dB` },
-      p9: { valueDeg: 20 + n, level: 'L3' },
-      p10: { value: null, formatted: 'N/A', level: 'N/A', status: 'not_applicable' },
-      p16: { value: null, level: 'L2', formatted: `FL ${20 + n}°` },
-      p17: { valueDb: 1.2, level: 'L4', formatted: '1.2 dB' },
+      // Numeric levels and the published N/A wording, exactly as the live
+      // published summary carries them.
+      p1: { valueM: 1.5 + index * 0.1, level: 4, formatted: `${(1.5 + index * 0.1).toFixed(2)}m` },
+      p4: { valueDb: 1 + index * 0.2, level: 4, formatted: `${Math.floor(1 + index * 0.2)} dB` },
+      p5: { valueDeg: 40 + n, level: 4, formatted: `${40 + n}°` },
+      p6: { valueDb: 2 + index * 0.3, level: index < 3 ? 3 : 2, formatted: `${Math.floor(2 + index * 0.3)} dB` },
+      p9: { valueDeg: 20 + n, level: 3 },
+      p10: { value: null, formatted: 'N/A (insufficient data)', level: 'N/A', status: 'not_applicable' },
+      p16: { value: null, level: 2, formatted: `FL ${20 + n}°` },
+      p17: { valueDb: 1.2, level: 4, formatted: '1.2 dB' },
       p19: { valueDb: 3.4, level: 'L1', formatted: '±3 dB' },
       p20: { valueDb: 9.9, level: 'L1', formatted: '±9 dB' },
     },
@@ -99,8 +106,18 @@ const P20_ROWS = SEATS.map((seat, index) => ({
   worstFrequencyHz: 90,
 }));
 
+// The published per-seat VIEWING authority — the same source the Visual
+// Report's Viewing Experience page reads (engineeringSummary.viewing.per_seat).
+// A card's RP23 level and angle must come from here.
+const VIEWING_ROWS = SEATS.map((seat, index) => ({
+  seat_id: seat.id,
+  priority: seat.priority,
+  horizontal_angle_deg: 51 + index,
+  rp23_level: seat.priority === 'primary' ? 'L4' : 'L3',
+}));
+
 const bassPerformance = { p20: { perSeatResults: P20_ROWS } };
-const engineeringSummary = { seatHudById };
+const engineeringSummary = { seatHudById, viewing: { available: true, per_seat: VIEWING_ROWS } };
 
 const selection = selectClientPerSeatPerformance({
   engineeringSummary,
@@ -232,20 +249,57 @@ test('P20 is included, from the canonical P20 authority', () => {
   assert.equal((SCREEN_TEXT.match(/P20/g) || []).length, 9, 'P20 on every card');
 });
 
-test('RP23 horizontal viewing is included', () => {
+test('RP23 is included with level + angle, from the viewing authority', () => {
   assert.ok(SCREEN_TEXT.includes('RP23'), 'RP23 appears in the cards');
+  // The angle-only HUD snapshot exists for every seat and states no level …
+  assert.equal(
+    SEATS.every((seat) => seatHudById[seat.id].rp23.level === undefined),
+    true,
+    'the HUD RP23 entry carries no level',
+  );
+  // … so RP23 is read from the viewing authority, and nowhere else.
+  assert.ok(SOURCE.includes('engineeringSummary?.viewing?.per_seat'), 'RP23 is read from the viewing authority');
+  assert.ok(!SOURCE.includes('hud.rp23'), 'and never from the angle-only HUD snapshot');
+
   for (const row of selection.rows) {
     for (const seat of row.seats) {
-      const hud = seatHudById[seat.id];
-      assert.equal(seat.rp23.level, hud.rp23.level, `${seat.id} RP23 level is the published one`);
-      assert.equal(seat.rp23.valueText, hud.rp23.formatted, `${seat.id} RP23 angle is the published one`);
+      const authority = VIEWING_ROWS.find((entry) => entry.seat_id === seat.id);
+      assert.equal(seat.rp23.level, authority.rp23_level, `${seat.id} RP23 level is the published one`);
+      assert.equal(
+        seat.rp23.valueText,
+        `${authority.horizontal_angle_deg.toFixed(1)}°`,
+        `${seat.id} RP23 angle is the published one`,
+      );
+      assert.ok(isAssessedLevel(seat.rp23.level), `${seat.id} RP23 carries a real level, not a dash`);
     }
   }
+
+  // The Viewing Experience page reads that same authority: card and viewing
+  // page state the same level and the same angle for every seat.
+  const viewing = selectClientScreenSeating({
+    seatingPositions: SEATS,
+    screenFrontPlaneM: 0.2,
+    screenWidthM: 3.6,
+    aspectRatio: '16:9',
+    engineeringSummary,
+  });
+  assert.equal(viewing.hasAny, true, 'the viewing page has results for this project');
+  assert.equal(viewing.seats.length, 9, 'one viewing result per seat');
+  const viewingBySeat = new Map(viewing.seats.map((seat) => [seat.id, seat]));
+  for (const row of selection.rows) {
+    for (const seat of row.seats) {
+      const fromViewingPage = viewingBySeat.get(seat.id);
+      assert.equal(seat.rp23.level, fromViewingPage.levelLabel, `${seat.id} RP23 level matches the viewing page`);
+      assert.equal(seat.rp23.valueText, fromViewingPage.formatted, `${seat.id} RP23 angle matches the viewing page`);
+    }
+  }
+
   assert.equal(
     SCREEN_CARDS.filter((card) => textOf(card).includes('RP23')).length,
     9,
     'RP23 on every card',
   );
+  assert.ok(SCREEN_TEXT.includes(`${VIEWING_ROWS[0].horizontal_angle_deg.toFixed(1)}°`), 'the angle is printed on the card');
 });
 
 test('per-seat values match the Room Designer pop-up exactly', () => {
