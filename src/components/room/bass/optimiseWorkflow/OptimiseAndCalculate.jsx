@@ -68,10 +68,7 @@ import {
 import { runEngineeringDecisionModel } from "@/components/adi";
 import { buildAdiBassEvidence } from "@/components/adi/adiBassEvidenceBuilder";
 import { buildOptimiserPlan } from "@/components/room/bass/optimiserPlan/buildOptimiserPlan.js";
-import {
-  buildActionableOptimiserRunSummary,
-  buildOptimiserRunEvidence,
-} from "@/components/room/bass/optimiserPlan/buildOptimiserRunEvidence.js";
+import { buildOptimiserResultForSave } from "@/components/room/bass/optimiserPlan/optimiserPlanSave.js";
 import {
   getOptimiserPlanAuthority,
   setOptimiserPlanAuthority,
@@ -417,38 +414,34 @@ export default function OptimiseAndCalculate({
             engineVersion: result.selection?.winner?.algorithmVersion || null,
           },
           instances: subInstancesRef.current || [],
+          seatingPositions,
+          roomDims,
           leverDecisions: getOptimiserPlanAuthority(projectId, versionId)?.leverDecisions || {},
         });
-        const persistedPlan = optimiserPlan
-          ? {
-            ...optimiserPlan,
-            run: buildActionableOptimiserRunSummary({
-              selection: result.selection,
-              diagnostics: result.optimisationDiagnostics || null,
-            }),
-          }
-          : null;
+        // Gated save: an actionable plan only when an independently evaluated,
+        // applyable change clears the 1 dB materiality gate and its destination
+        // geometry is legal. Otherwise the run is saved as terminal evidence.
+        const { actionablePlan: persistedPlan, runEvidence } = buildOptimiserResultForSave({
+          plan: optimiserPlan,
+          selection: result.selection,
+          diagnostics: result.optimisationDiagnostics || null,
+          identity: {
+            projectId,
+            versionId,
+            designFingerprint: currentShared?.cacheKey || null,
+            resultFingerprint: fingerprint,
+            cacheKey: currentShared?.cacheKey || null,
+            baseDesignFingerprint: currentShared?.baseDesignFingerprint || null,
+            engineVersion: result.selection?.winner?.algorithmVersion || null,
+          },
+        });
         if (persistedPlan) {
           setOptimiserPlanAuthority(projectId, versionId, persistedPlan);
-        } else {
+        } else if (runEvidence) {
           // A run that produced no actionable plan keeps its terminal evidence:
           // the same slot holds what the run evaluated, so the card states the
           // outcome after refresh and reopen instead of discarding everything.
-          const runEvidence = buildOptimiserRunEvidence({
-            selection: result.selection,
-            diagnostics: result.optimisationDiagnostics || null,
-            identity: {
-              projectId,
-              versionId,
-              designFingerprint: currentShared?.cacheKey || null,
-              resultFingerprint: fingerprint,
-              cacheKey: currentShared?.cacheKey || null,
-              baseDesignFingerprint: currentShared?.baseDesignFingerprint || null,
-              engineVersion: result.selection?.winner?.algorithmVersion || null,
-            },
-            currentPolarity: (subInstancesRef.current || []).map((instance) => instance?.polarity ?? 1),
-          });
-          if (runEvidence) setOptimiserPlanAuthority(projectId, versionId, runEvidence);
+          setOptimiserPlanAuthority(projectId, versionId, runEvidence);
         }
 
         const recommendationForPublication = {

@@ -28,10 +28,7 @@ import { useCallback, useRef, useState } from "react";
 import { runOptimisation } from "./optimiseWorkflowOrchestrator";
 import { publishRecommendation } from "@/components/recommendationEngine";
 import { buildOptimiserPlan } from "@/components/room/bass/optimiserPlan/buildOptimiserPlan.js";
-import {
-  buildActionableOptimiserRunSummary,
-  buildOptimiserRunEvidence,
-} from "@/components/room/bass/optimiserPlan/buildOptimiserRunEvidence.js";
+import { buildOptimiserResultForSave } from "@/components/room/bass/optimiserPlan/optimiserPlanSave.js";
 import {
   getOptimiserPlanAuthority,
   setOptimiserPlanAuthority,
@@ -131,26 +128,23 @@ export default function useRunOptimisationPlan({
         baseline: result.selection?.currentResult || null,
         identity: planIdentity,
         instances: subInstancesRef.current || [],
+        // The design's own seating and room, so an evaluated seating movement is
+        // persisted with its exact previous/evaluated positions and validity.
+        seatingPositions,
+        roomDims,
         leverDecisions: getOptimiserPlanAuthority(projectId, versionId)?.leverDecisions || {},
       });
 
-      // A winning plan carries the completed run's honest calculation count.
-      // A no-winner run keeps the fuller rejection evidence instead. Both are
-      // saved in the same version slot and survive refresh/reopen.
-      const actionableRun = optimiserPlan
-        ? buildActionableOptimiserRunSummary({
-          selection: result.selection,
-          diagnostics: result.optimisationDiagnostics || null,
-        })
-        : null;
-      const persistedPlan = optimiserPlan
-        ? { ...optimiserPlan, run: actionableRun }
-        : null;
-      const runEvidence = optimiserPlan ? null : buildOptimiserRunEvidence({
+      // A run is only saved as an actionable plan when at least one independently
+      // evaluated change is visible, usable, geometry-safe and clears the 1 dB
+      // materiality gate. Any other run keeps its terminal evidence — with the
+      // actual reason — instead of being called actionable because a winner
+      // happened to exist.
+      const { actionablePlan: persistedPlan, runEvidence } = buildOptimiserResultForSave({
+        plan: optimiserPlan,
         selection: result.selection,
         diagnostics: result.optimisationDiagnostics || null,
         identity: planIdentity,
-        currentPolarity: (subInstancesRef.current || []).map((instance) => instance?.polarity ?? 1),
       });
 
       if (!persistedPlan && !runEvidence) {

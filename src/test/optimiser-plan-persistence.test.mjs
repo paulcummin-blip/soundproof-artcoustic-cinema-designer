@@ -31,6 +31,7 @@ import {
   OPTIMISER_LEVER,
   OPTIMISER_LEVER_STATE,
   OPTIMISER_PLAN_STATUS,
+  OPTIMISER_PLAN_VERSION,
 } from '../components/room/bass/optimiserPlan/optimiserPlanConstants.js';
 
 // Each check is reported as a real test, so the plan save → restore → resolve
@@ -290,7 +291,7 @@ check('TEST 9 — the published payload carries the same plan (proposal / histor
 
 check('TEST 10 — source identity is persisted with the evidence', () => {
   const plan = buildPlan();
-  assert.equal(plan.planVersion, 2, 'evidence schema version persisted');
+  assert.equal(plan.planVersion, OPTIMISER_PLAN_VERSION, 'evidence schema version persisted');
   assert.equal(plan.projectId, 'proj-marquee');
   assert.equal(plan.versionId, 'ver-1');
   assert.equal(plan.baseDesignFingerprint, 'base:fp:zzz');

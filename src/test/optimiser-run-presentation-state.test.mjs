@@ -18,6 +18,7 @@ import {
   OPTIMISER_LEVER,
   OPTIMISER_LEVER_EVIDENCE,
   OPTIMISER_PLAN_STATUS,
+  OPTIMISER_PLAN_VERSION,
   OPTIMISER_TERMINAL_OUTCOME,
 } from '../components/room/bass/optimiserPlan/optimiserPlanConstants.js';
 import { resolveOptimiserPlanStatus } from '../components/room/bass/optimiserPlan/resolveOptimiserPlanStatus.js';
@@ -103,7 +104,7 @@ const marqueePlanView = () => resolveOptimiserPlanStatus({
 
 /** A current plan holding one genuinely evaluated, applicable lever. */
 const planWithEvaluatedDelay = () => ({
-  planVersion: 2,
+  planVersion: OPTIMISER_PLAN_VERSION,
   savedAt: '2026-09-30T10:00:00.000Z',
   recordKind: 'plan',
   projectId: 'marquee-home',
@@ -512,10 +513,14 @@ describe('TEST 7: persistence', () => {
 
   it('states the outcome from the saved record instead of a default empty state', () => {
     const hook = read('components/room/bass/optimiseWorkflow/useRunOptimisationPlan.js');
-    expect(hook.includes('buildOptimiserRunEvidence')).toBe(true);
-    expect(hook.includes('buildActionableOptimiserRunSummary')).toBe(true);
+    // Both save sites go through the one gated authority, which returns either
+    // the actionable plan or the terminal run evidence.
+    expect(hook.includes('buildOptimiserResultForSave')).toBe(true);
+    expect(hook).toMatch(/actionablePlan: persistedPlan/);
     expect(hook).toMatch(/persistedPlan \|\| runEvidence/);
-    expect(read('components/room/bass/optimiseWorkflow/OptimiseAndCalculate.jsx').includes('buildOptimiserRunEvidence')).toBe(true);
+    const workflow = read('components/room/bass/optimiseWorkflow/OptimiseAndCalculate.jsx');
+    expect(workflow.includes('buildOptimiserResultForSave')).toBe(true);
+    expect(workflow).toMatch(/else if \(runEvidence\)/);
     expect(read('components/room/bass/optimiserPlan/optimiserPlanPersistence.js')).toMatch(/terminalOutcome: plan\.terminalOutcome/);
   });
 });
