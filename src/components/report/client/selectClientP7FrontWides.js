@@ -32,7 +32,21 @@ function readIdealSide(side) {
   };
 }
 
-export function selectClientP7FrontWides(engineeringSummary, placedSpeakers, rsp) {
+/**
+ * The engine's published median detail for one front wide (analysisResult.p7Details):
+ * the ideal median angle and the actual angle. The per-side deviation is
+ * deliberately dropped — the page states the deviation from the published P7
+ * result, so a second per-side figure could contradict it.
+ */
+function readMedianDetail(detail) {
+  if (!detail) return null;
+  const targetAngle = Number(detail.targetAngle);
+  const actualAngle = Number(detail.actualAngle);
+  if (!Number.isFinite(targetAngle) || !Number.isFinite(actualAngle)) return null;
+  return { targetAngle, actualAngle };
+}
+
+export function selectClientP7FrontWides(engineeringSummary, placedSpeakers, rsp, analysisResult = null) {
   if (!engineeringSummary || !Array.isArray(placedSpeakers)) return null;
 
   const find = (role) => placedSpeakers.find((speaker) => getCanonicalRole(speaker?.role) === role);
@@ -43,18 +57,38 @@ export function selectClientP7FrontWides(engineeringSummary, placedSpeakers, rsp
   const p7Param = engineeringSummary?.roomResultsByParameter?.[7];
   if (!p7Param || p7Param.status !== "scored") return null;
 
+  // The ideal median position per side — where each front wide aims to be.
+  //
+  // Read from the published P7 result's own per-side angles when the engine
+  // publishes them. When it does not, the engine's median detail travels in the
+  // report snapshot (analysisResult.p7Details): the median between each screen
+  // speaker and its adjacent surround, which is the ideal position this page
+  // describes. Both are published authority — the report reads an angle, it never
+  // measures one.
+  const publishedPerSide = {
+    LW: readIdealSide(p7Param.perSide?.LW),
+    RW: readIdealSide(p7Param.perSide?.RW),
+  };
+  const hasPublishedPerSide = Boolean(publishedPerSide.LW || publishedPerSide.RW);
+  const medianDetail = {
+    LW: readMedianDetail(analysisResult?.p7Details?.LW),
+    RW: readMedianDetail(analysisResult?.p7Details?.RW),
+  };
+  const ideal = hasPublishedPerSide ? publishedPerSide : medianDetail;
+  const idealSource = hasPublishedPerSide
+    ? "p7_result"
+    : medianDetail.LW || medianDetail.RW
+    ? "engine_median"
+    : null;
+
   const rspX = Number(rsp?.x);
   const rspY = Number(rsp?.y);
   return {
     level: p7Param.level || null,
     maxDeviation: Number.isFinite(Number(p7Param.value)) ? Number(p7Param.value) : null,
     perSide: p7Param.perSide || null,
-    // Ideal median position per side — where each front wide aims to be, and how
-    // far the current position deviates from it.
-    ideal: {
-      LW: readIdealSide(p7Param.perSide?.LW),
-      RW: readIdealSide(p7Param.perSide?.RW),
-    },
+    ideal,
+    idealSource,
     lwPos,
     rwPos,
     flPos: getSpeakerPos(find("FL")),

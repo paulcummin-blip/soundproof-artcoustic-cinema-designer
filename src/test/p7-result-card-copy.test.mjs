@@ -7,13 +7,14 @@
 //   TEST 1  Card says "Level 2", never "P7 — L2"
 //   TEST 2  The official RP22 Parameter 7 wording is the card's explanation
 //   TEST 3  The maximum deviation value is preserved
-//   TEST 4  The front wide graphic is preserved, and now shows the ideal median
+//   TEST 4  The drawing shows the ideal front wide position alongside the actual
 //   TEST 5  No RP22 value, grading or selector change
 //   TEST 6  No layout gap: one card, three lines, no empty reserved row
 //   TEST 7  The printed page (PDF) carries the same trimmed card
 //   TEST 8  The repeated "P{n} — L{n}" pattern is gone from every Visual Report page
 //   TEST 9  The page explains where the front wides ideally want to be
 //   TEST 10 The ideal median drawing follows the published angles
+//   TEST 11 With only the engine median detail published, the ideal is still drawn
 // ---------------------------------------------------------------------------
 import { test } from 'vitest';
 import assert from 'node:assert/strict';
@@ -41,6 +42,9 @@ const selectorSource = fs.readFileSync(SELECTOR_PATH, 'utf8');
 
 const RP22_P7_DESCRIPTION =
   'Wide speakers maximum allowable horizontal deviation from median angle';
+
+// The component's own wide-speaker colour, so the drawing can be read back.
+const LW_RW_COLOR = '#213428';
 
 // Published authority: L2, maximum deviation 6.1° from the median angle.
 // perSide carries, per front wide, the ideal (median) angle, the actual angle
@@ -125,7 +129,7 @@ test('the maximum deviation value is preserved', () => {
   assert.ok(SUPPORT_TEXT.includes('Maximum deviation from median: 6.1°'), 'and on the printed page');
 });
 
-test('the front wide graphic is preserved, and now shows the ideal median', () => {
+test('the drawing shows the ideal front wide position alongside the actual', () => {
   // Screen drawing: room, screen, both wides, both screen speakers, the
   // adjacent surrounds and RSP.
   for (const label of ['SCREEN', 'FL', 'FR', 'LW', 'RW', 'SL', 'SR', 'RSP']) {
@@ -133,15 +137,27 @@ test('the front wide graphic is preserved, and now shows the ideal median', () =
   }
   assert.ok(SCREEN.includes('<svg'), 'the plan drawing renders');
   assert.ok(SCREEN.includes('stroke-dasharray="6 4"'), 'the median reference line is unchanged');
-  // The ideal median position is now drawn and named, once per front wide.
-  assert.equal(countOf(SCREEN_TEXT, 'IDEAL'), 2, 'each front wide carries an ideal median marker');
+  // The ideal median position is drawn and named, once per front wide, and the
+  // published deviation is stated on the drawing.
+  assert.equal(countOf(SCREEN_TEXT, 'Ideal FW'), 2, 'each front wide carries an ideal median marker');
+  assert.equal(countOf(SCREEN_TEXT, '6.1° from ideal'), 1, 'the deviation is labelled on the drawing, once');
   assert.ok(SCREEN.includes('<path d="M '), 'the deviation arc is drawn from the RSP');
-  // Legend names the ideal position, the actual positions, the deviation, the
-  // screen speakers and the surrounds.
+  // Ideal and actual markers are visually distinct: the ideal is an outlined,
+  // dashed diamond; the actual keeps the solid filled wide marker.
+  const drawing = SCREEN.slice(SCREEN.indexOf('<svg'), SCREEN.indexOf('</svg>'));
+  assert.ok(
+    drawing.includes('fill="#FFFFFF" stroke="#8A7B6A" stroke-width="2" stroke-dasharray="3 2"'),
+    'the ideal marker is outlined, never filled',
+  );
+  assert.ok(
+    new RegExp(`<circle cx="[\\d.]+" cy="[\\d.]+" r="7" fill="${LW_RW_COLOR}"`).test(drawing),
+    'the actual wide marker stays solid and filled',
+  );
+  // Legend: actual, ideal, median reference, screen speakers, surrounds.
   for (const legend of [
-    'Ideal median position',
     'Front wides (actual)',
-    'Deviation from median',
+    'Ideal front wide position',
+    'Median reference',
     'Screen speakers',
     'Side surrounds',
   ]) {
@@ -154,7 +170,7 @@ test('the front wide graphic is preserved, and now shows the ideal median', () =
     return svg.slice(svg.indexOf('>') + 1);
   };
   assert.equal(drawingOf(DRAWING), drawingOf(SCREEN), 'print and screen render one drawing');
-  assert.ok(drawingOf(SCREEN).includes('IDEAL'), 'the ideal median marker is inside the drawing');
+  assert.ok(drawingOf(SCREEN).includes('Ideal FW'), 'the ideal median marker is inside the drawing');
   assert.ok(!textOf(DRAWING).includes('Level 2'), 'the printed drawing carries no result block');
 });
 
@@ -247,16 +263,16 @@ test('the page explains where the front wides ideally want to be', () => {
   assert.ok(SCREEN_TEXT.includes('Front Wide Placement'), 'the placement guidance is present');
   assert.ok(
     SCREEN_TEXT.includes(
-      'The ideal front wide position is the median angle between the screen speaker and the adjacent surround speaker.',
+      'The outlined markers show the ideal median front wide position. The solid markers show the installed front wide position.',
     ),
-    'the ideal position is defined in words',
+    'the markers are explained in words',
   );
   assert.ok(SCREEN_TEXT.includes('Ideal front wide angle — left 45.0°, right 45.0°'), 'the ideal angle is stated per side');
   assert.ok(SCREEN_TEXT.includes('Actual front wide angle — left 51.1°, right 48.5°'), 'the actual angle is stated per side');
   assert.ok(SCREEN_TEXT.includes('Deviation from median — left 6.1°, right 3.5°'), 'the deviation is stated per side');
   assert.ok(
     SCREEN_TEXT.includes(
-      'In this design, the front wide speakers sit 6.1° from the ideal median position, giving a Level 2 result.',
+      'In this design, the front wides are 6.1° from the ideal median position, giving a Level 2 result.',
     ),
     'the level is explained by the deviation',
   );
@@ -293,7 +309,7 @@ test('without published per-side angles the page degrades gracefully', () => {
   // The drawing keeps its original median reference and legend.
   assert.ok(markup.includes('stroke-dasharray="6 4"'), 'the median reference line still draws');
   assert.ok(text.includes('Median reference'), 'the original legend entry is kept');
-  assert.ok(!text.includes('IDEAL'), 'no ideal marker is invented');
+  assert.ok(!text.includes('Ideal FW'), 'no ideal marker is invented');
   // The placement statement and the published deviation still explain the result.
   assert.ok(text.includes('Front Wide Placement'), 'the guidance block still renders');
   assert.ok(text.includes('giving a Level 2 result'), 'the level is still explained');
@@ -303,7 +319,7 @@ test('the ideal median drawing follows the published angles', () => {
   const drawing = SCREEN.slice(SCREEN.indexOf('<svg'), SCREEN.indexOf('</svg>'));
   const dots = [...drawing.matchAll(/<circle cx="([\d.-]+)" cy="([\d.-]+)" r="7"/g)]
     .map((match) => ({ x: Number(match[1]), y: Number(match[2]) }));
-  const markers = [...drawing.matchAll(/<rect x="([\d.-]+)" y="([\d.-]+)" width="8" height="8"/g)]
+  const markers = [...drawing.matchAll(/<rect x="([\d.-]+)" y="([\d.-]+)" width="9" height="9"/g)]
     .map((match) => ({ x: Number(match[1]), y: Number(match[2]) }));
   assert.equal(dots.length, 2, 'both front wides are drawn');
   assert.equal(markers.length, 2, 'one ideal median marker per front wide');
@@ -312,9 +328,84 @@ test('the ideal median drawing follows the published angles', () => {
   // azimuth were converted with the wrong chirality these would flip.
   assert.ok(markers[0].x > dots[0].x && markers[0].y < dots[0].y, 'the left ideal sits toward the centre line');
   assert.ok(markers[1].x < dots[1].x && markers[1].y < dots[1].y, 'the right ideal sits toward the centre line');
-  // The arcs are labelled with the published per-side deviations.
-  assert.ok(drawing.includes('>6.1°<'), 'the left arc carries its published deviation');
-  assert.ok(drawing.includes('>3.5°<'), 'the right arc carries its published deviation');
+  // The published deviation is stated once on the drawing — never a second,
+  // competing per-side figure that the card would contradict.
+  assert.ok(drawing.includes('>6.1° from ideal<'), 'the drawing states the published deviation');
+  assert.ok(!drawing.includes('>3.5°<'), 'no competing per-side deviation is drawn');
   // The drawing states no result of its own.
   assert.ok(!/Level [1-4]/.test(drawing), 'the drawing states no level');
+});
+
+// ── The live published shape ────────────────────────────────────────────────
+// The P7 result carries the level and the maximum deviation but no per-side
+// angles; the engine's median detail travels in the report snapshot instead
+// (analysisResult.p7Details). The ideal median position must still be drawn, from
+// those published angles, and the drawing must state the published deviation.
+const LIVE_SUMMARY = {
+  roomResultsByParameter: { 7: { status: 'scored', level: 'L2', value: 6.1, unit: 'deg (±)' } },
+};
+const LIVE_ANALYSIS = {
+  p7Details: {
+    LW: { deviation: 3.816575695460946, targetAngle: 250.00233625919896, actualAngle: 246.1857605637382 },
+    RW: { deviation: 3.816575695460754, targetAngle: 109.99766374080104, actualAngle: 113.8142394362618 },
+  },
+};
+const liveSelected = selectClientP7FrontWides(
+  LIVE_SUMMARY,
+  baseProps.p7Data ? [
+    { role: 'LW', position: { x: 0.6, y: 3.2 } },
+    { role: 'RW', position: { x: 3.9, y: 3.2 } },
+    { role: 'FL', position: { x: 1.2, y: 0.4 } },
+    { role: 'FR', position: { x: 3.3, y: 0.4 } },
+    { role: 'SL', position: { x: 0.1, y: 4.0 } },
+    { role: 'SR', position: { x: 4.4, y: 4.0 } },
+  ] : [],
+  { x: 2.5, y: 4.2 },
+  LIVE_ANALYSIS,
+);
+const LIVE_SCREEN = renderToStaticMarkup(
+  React.createElement(ClientP7FrontWides, { ...baseProps, p7Data: liveSelected }),
+);
+const LIVE_PRINT = renderToStaticMarkup(
+  React.createElement(PrintP7Content, { ...baseProps, p7Data: liveSelected }),
+);
+const LIVE_TEXT = textOf(LIVE_SCREEN);
+const LIVE_DRAWING = LIVE_SCREEN.slice(LIVE_SCREEN.indexOf('<svg'), LIVE_SCREEN.indexOf('</svg>'));
+
+test('with only the engine median detail published, the ideal is still drawn', () => {
+  // The result authority is untouched: the level and the maximum deviation are
+  // the published P7 parameter's own values.
+  assert.equal(liveSelected.level, 'L2');
+  assert.equal(liveSelected.maxDeviation, 6.1);
+  // The ideal angles are the engine's published median angles, read verbatim.
+  assert.equal(liveSelected.idealSource, 'engine_median');
+  assert.equal(liveSelected.ideal.LW.targetAngle, LIVE_ANALYSIS.p7Details.LW.targetAngle);
+  assert.equal(liveSelected.ideal.RW.actualAngle, LIVE_ANALYSIS.p7Details.RW.actualAngle);
+  // The per-side deviation is deliberately not carried across: the page states the
+  // deviation from the result, so a second figure could contradict the card.
+  assert.equal(liveSelected.ideal.LW.deviation, undefined);
+
+  // Both ideal positions are drawn and labelled, with the published deviation.
+  assert.equal(countOf(LIVE_TEXT, 'Ideal FW'), 2, 'both ideal median markers are drawn');
+  assert.equal(countOf(LIVE_TEXT, '6.1° from ideal'), 1, 'the published deviation is labelled');
+  assert.ok(LIVE_DRAWING.includes('<path d="M '), 'the deviation arc is drawn from the RSP');
+  // No competing figure: the engine's own per-side deviation never reaches the page.
+  assert.ok(!LIVE_TEXT.includes('Deviation from median —'), 'no per-side deviation row is invented');
+  assert.equal(countOf(LIVE_TEXT, '3.8'), 0, 'the engine median detail never prints as a deviation');
+
+  // The angles read in the report's own frame, off the centre line …
+  assert.ok(LIVE_TEXT.includes('Ideal front wide angle — left 70.0°, right 70.0°'), 'ideal angles are stated');
+  assert.ok(LIVE_TEXT.includes('Actual front wide angle — left 66.2°, right 66.2°'), 'installed angles are stated');
+  // … and the result is explained by the published deviation.
+  assert.ok(
+    LIVE_TEXT.includes(
+      'In this design, the front wides are 6.1° from the ideal median position, giving a Level 2 result.',
+    ),
+    'the result is explained',
+  );
+  // The printed page (PDF) carries the same markers and the same result.
+  const livePrintText = textOf(LIVE_PRINT);
+  assert.ok(livePrintText.includes('Ideal FW'), 'the PDF page draws the ideal markers');
+  assert.ok(livePrintText.includes('Maximum deviation from median: 6.1°'), 'the PDF page keeps the published deviation');
+  assert.ok(livePrintText.includes('Level 2'), 'the PDF page keeps the published level');
 });

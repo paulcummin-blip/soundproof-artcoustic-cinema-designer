@@ -6,7 +6,8 @@
  * why that gives the level it does.
  *
  * Every value is published authority — the ideal and actual angles come from the
- * published per-side P7 result, the maximum deviation and the level from the
+ * published per-side P7 result (or the engine's published median detail when the
+ * result does not carry them), the maximum deviation and the level from the
  * published P7 parameter. Nothing here grades, measures or recomputes.
  *
  * Props:
@@ -60,8 +61,7 @@ export default function P7PlacementGuidance({ level, maxDeviation, ideal, print 
   // reads it straight from the same authority the result card uses.
   const publishedMax = Number(maxDeviation);
   const outcome = Number.isFinite(publishedMax)
-    ? `In this design, the front wide speakers sit ${publishedMax.toFixed(1)}° from the ideal `
-      + "median position"
+    ? `In this design, the front wides are ${publishedMax.toFixed(1)}° from the ideal median position`
       + (heading && heading.startsWith("Level ") ? `, giving a ${heading} result.` : ".")
     : null;
 
@@ -95,8 +95,8 @@ export default function P7PlacementGuidance({ level, maxDeviation, ideal, print 
           Front Wide Placement
         </div>
         <div style={{ fontSize: print ? 9 : 13, color: COLORS.body, lineHeight: 1.5 }}>
-          The ideal front wide position is the median angle between the screen speaker and the
-          adjacent surround speaker.
+          The outlined markers show the ideal median front wide position. The solid markers show the
+          installed front wide position.
         </div>
 
         {hasAngles && (

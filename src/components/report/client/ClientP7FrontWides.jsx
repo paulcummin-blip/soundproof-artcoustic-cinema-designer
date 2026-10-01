@@ -162,7 +162,7 @@ export default function ClientP7FrontWides({
         labelPt,
         arcLabelPt,
         arcPath: `M ${arcStart.x} ${arcStart.y} A ${arcRadiusM * SCALE} ${arcRadiusM * SCALE} 0 ${sweep > 180 ? 1 : 0} 1 ${arcEnd.x} ${arcEnd.y}`,
-        deviationLabel: Number.isFinite(deviation) ? `${deviation.toFixed(1)}°` : null,
+        deviation: Number.isFinite(deviation) ? deviation : null,
         isWorst: Number.isFinite(deviation)
           && Number.isFinite(worstDeviation)
           && Math.abs(deviation - worstDeviation) < 0.001,
@@ -171,6 +171,16 @@ export default function ClientP7FrontWides({
     .filter(Boolean);
 
   const showIdealMedian = placementSides.length > 0;
+
+  // The deviation the drawing states is the published P7 result itself — the same
+  // figure the result card carries — never a re-measurement of the drawn arc. It
+  // is written once, on the arc of the side that sets the result; if the published
+  // authority does not say which side that is, the first drawn side carries it.
+  const publishedMaxDeviation = Number(maxDeviation);
+  const deviationLabel = Number.isFinite(publishedMaxDeviation)
+    ? `${publishedMaxDeviation.toFixed(1)}° from ideal`
+    : null;
+  const deviationSide = placementSides.find((side) => side.isWorst) || placementSides[0] || null;
 
   // The adjacent side surrounds give the median angle its far end.
   const surroundPx = [
@@ -202,26 +212,39 @@ export default function ClientP7FrontWides({
     ? { width: "100%", display: "flex", flexDirection: "column", alignItems: "center", gap: 8, padding: "0 16px", fontFamily: BODY_FONT }
     : { display: "flex", flexDirection: "column", alignItems: "center", gap: 12, padding: "8px 16px", width: "100%", height: "100%", fontFamily: BODY_FONT };
 
-  // Legend reads the same three facts as the drawing: the ideal median
-  // direction, where the front wides actually sit, and the deviation between
-  // them. The fallback keeps the original three entries when no ideal angle was
-  // published.
+  // Legend reads the same facts as the drawing: where the front wides actually
+  // sit, where the ideal median position is, the median reference, the screen
+  // speakers and the surrounds. The ideal entry appears only when an ideal median
+  // direction was published, so the key never explains something the drawing
+  // does not show.
   const legendItems = [
-    {
-      id: "median",
-      label: showIdealMedian ? "Ideal median position" : "Median reference",
-      sample: <line x1={10} y1={10} x2={16} y2={4} stroke={MEDIAN_COLOR} strokeWidth={2} strokeDasharray="3 2" />,
-    },
     {
       id: "wides",
       label: "Front wides (actual)",
       sample: <circle cx={10} cy={10} r={5} fill={LW_RW_COLOR} />,
     },
     ...(showIdealMedian ? [{
-      id: "deviation",
-      label: "Deviation from median",
-      sample: <path d="M 4 14 A 10 10 0 0 1 16 14" fill="none" stroke={MEDIAN_COLOR} strokeWidth={2} />,
+      id: "ideal",
+      label: "Ideal front wide position",
+      sample: (
+        <rect
+          x={5.5}
+          y={5.5}
+          width={9}
+          height={9}
+          fill="#FFFFFF"
+          stroke={MEDIAN_COLOR}
+          strokeWidth={2}
+          strokeDasharray="3 2"
+          transform="rotate(45 10 10)"
+        />
+      ),
     }] : []),
+    {
+      id: "median",
+      label: "Median reference",
+      sample: <line x1={10} y1={10} x2={16} y2={4} stroke={MEDIAN_COLOR} strokeWidth={2} strokeDasharray="3 2" />,
+    },
     {
       id: "screen",
       label: "Screen speakers",
@@ -426,43 +449,49 @@ export default function ClientP7FrontWides({
             </text>
           </g>
 
-          {/* Deviation from the median — the angular span between the actual
-              position and the ideal median position. The side that sets the
-              result carries the level colour. */}
+          {/* Deviation from the ideal median position — the angular span between
+              where each front wide sits and where it ideally wants to be. The side
+              that sets the result carries the level colour. */}
           {placementSides.map((side) => (
-            <g key={`deviation-${side.key}`}>
-              <path
-                d={side.arcPath}
-                fill="none"
-                stroke={side.isWorst ? color : MEDIAN_COLOR}
-                strokeWidth={side.isWorst ? 2.5 : 1.5}
-                strokeOpacity={side.isWorst ? 0.95 : 0.6}
-              />
-              {side.deviationLabel && (
-                <text
-                  x={side.arcLabelPt.x}
-                  y={side.arcLabelPt.y}
-                  fill={side.isWorst ? color : MEDIAN_COLOR}
-                  fontSize={11}
-                  fontWeight={side.isWorst ? 600 : 400}
-                  textAnchor="middle"
-                  fontFamily={BODY_FONT}
-                >
-                  {side.deviationLabel}
-                </text>
-              )}
-            </g>
+            <path
+              key={`deviation-${side.key}`}
+              d={side.arcPath}
+              fill="none"
+              stroke={side.isWorst ? color : MEDIAN_COLOR}
+              strokeWidth={side.isWorst ? 2.5 : 1.5}
+              strokeOpacity={side.isWorst ? 0.95 : 0.6}
+            />
           ))}
 
-          {/* Ideal median position markers — where each front wide aims to be */}
+          {/* The published deviation, stated once — the same figure as the result
+              card, so the drawing and the card can never disagree. */}
+          {deviationLabel && deviationSide && (
+            <text
+              x={deviationSide.arcLabelPt.x}
+              y={deviationSide.arcLabelPt.y}
+              fill={color}
+              fontSize={11}
+              fontWeight={600}
+              textAnchor="middle"
+              fontFamily={BODY_FONT}
+            >
+              {deviationLabel}
+            </text>
+          )}
+
+          {/* Ideal median position — where each front wide aims to be. Outlined,
+              never filled solid, so it can never be read as an installed speaker. */}
           {placementSides.map((side) => (
             <g key={`ideal-marker-${side.key}`}>
               <rect
-                x={side.idealPt.x - 4}
-                y={side.idealPt.y - 4}
-                width={8}
-                height={8}
-                fill={MEDIAN_COLOR}
+                x={side.idealPt.x - 4.5}
+                y={side.idealPt.y - 4.5}
+                width={9}
+                height={9}
+                fill="#FFFFFF"
+                stroke={MEDIAN_COLOR}
+                strokeWidth={2}
+                strokeDasharray="3 2"
                 transform={`rotate(45 ${side.idealPt.x} ${side.idealPt.y})`}
               />
               <text
@@ -470,11 +499,12 @@ export default function ClientP7FrontWides({
                 y={side.labelPt.y}
                 fill={MEDIAN_COLOR}
                 fontSize={9}
+                fontWeight={600}
                 textAnchor="middle"
                 fontFamily={BODY_FONT}
                 letterSpacing="0.06em"
               >
-                IDEAL
+                Ideal FW
               </text>
             </g>
           ))}
