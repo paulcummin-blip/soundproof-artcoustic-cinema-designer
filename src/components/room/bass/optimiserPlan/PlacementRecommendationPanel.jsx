@@ -16,6 +16,7 @@
 import React from "react";
 import { ArrowRight, Check, Loader2, MapPin, RotateCcw, Undo2 } from "lucide-react";
 import { PLACEMENT_KIND } from "./placementRecommendationAuthority.js";
+import { PLACEMENT_PREVIEW_UNAVAILABLE } from "./placementMoveAuthority.js";
 
 const PRIMARY = "inline-flex items-center gap-1.5 rounded-md bg-[#213428] px-4 py-2 text-[12px] font-semibold text-white transition-colors hover:bg-[#3E4349] disabled:opacity-60";
 const SECONDARY = "inline-flex items-center gap-1.5 rounded-md border border-[#D9D5CE] bg-white px-4 py-2 text-[12px] font-semibold text-[#213428] transition-colors hover:border-[#213428] disabled:opacity-60";
@@ -103,7 +104,11 @@ export default function PlacementRecommendationPanel({
         </div>
       )}
 
-      {placement.notice && (
+      {/* The missing on-plan preview is a limitation of the evidence, not a
+          warning about the recommendation: it is stated inside Engineer details
+          instead, so the default card never carries a "Preview not yet
+          available" line. */}
+      {placement.notice && placement.notice !== PLACEMENT_PREVIEW_UNAVAILABLE && (
         <div className="text-[11px] leading-relaxed text-[#8A5A2B]">{placement.notice}</div>
       )}
 

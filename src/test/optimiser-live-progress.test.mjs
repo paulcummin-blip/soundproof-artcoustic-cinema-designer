@@ -164,10 +164,15 @@ describe("the running card is reachable whatever the previous outcome", () => {
   );
 
   it("routes a running optimisation to the journey card", () => {
-    expect(recommendationSource).toContain("const isOptimisationRunning = (optimisationRunStatus || \"idle\") === \"running\";");
-    expect(recommendationSource).toContain("if (!adiDecision?.recommendation && !isOptimisationRunning) {");
-    expect(recommendationSource).toContain("if (isTargetNotAchieved && !isOptimisationRunning) {");
-    expect(recommendationSource).toContain("if ((isNoEngineering || isNoEq) && !isOptimisationRunning) {");
+    // ONE panel: every outcome renders the journey card, so a running
+    // optimisation is routed to it by construction — there is no second
+    // "Recommended Improvement" card or "Optimisation Plan" panel that a
+    // previous outcome could leave standing beside it.
+    expect(recommendationSource).toContain("<AdiOptimisationJourney");
+    expect(recommendationSource).toContain("presentation={optimiserPresentation}");
+    expect(recommendationSource).toContain('runStatus={optimisationRunStatus || "idle"}');
+    expect(recommendationSource).not.toContain("Recommended Improvement");
+    expect(recommendationSource).not.toContain("OptimisationPlanStatus");
   });
 
   it("feeds the engine's live progress into the card", () => {

@@ -159,12 +159,12 @@ describe('TEST 1: generic advice with no saved plan', () => {
 
   it('never renders the ADI recommendation pill outside the available state', () => {
     const source = read('components/room/bass/optimiseWorkflow/AdiRecommendation.jsx');
-    expect(source.includes('OPTIMISER_PRESENTATION_STATE.PLAN_AVAILABLE')).toBe(true);
-    // The generic card (which carries the ADI pill) is only reached when the
-    // canonical resolver says a change is available.
-    expect(source).toMatch(
-      /optimiserPresentation\.state !== OPTIMISER_PRESENTATION_STATE\.PLAN_AVAILABLE[\s\S]{0,400}<AdiOptimisationJourney/,
-    );
+    // ONE card, driven by the canonical resolver: the status pill, the copy, the
+    // evidence and the Apply controls all come from the resolved presentation
+    // state, so no second recommendation pill can be rendered beside it.
+    expect(source).toMatch(/presentation=\{optimiserPresentation\}/);
+    expect((source.match(/<AdiOptimisationJourney/g) || []).length).toBe(1);
+    expect(source).not.toContain('Recommended Improvement');
   });
 });
 
@@ -615,14 +615,13 @@ describe('TEST 9: the card receives the run evidence', () => {
     expect(journey).toMatch(/<OptimiserRunEvidenceBlock evidence=\{runEvidence\} seatCount=\{seatCount\} instances=\{instances\} \/>/);
 
     const card = read('components/room/bass/optimiseWorkflow/AdiRecommendation.jsx');
-    // The resolved presentation is handed to the journey card in both of its
-    // branches, and to the placement recommendation section, so every optimiser
-    // surface states the same resolved state.
-    expect((card.match(/presentation=\{optimiserPresentation\}/g) || []).length).toBe(3);
-    // ...and the two terminal cards that resolve their own copy still show what
-    // the run evaluated, so no no-winner outcome hides the evidence.
-    const evidenceBlock = /<OptimiserRunEvidenceBlock\s+evidence=\{optimiserPresentation\.evidence\}\s+seatCount=\{seatCount\}\s+instances=\{currentInstances\}\s+\/>/g;
-    expect((card.match(evidenceBlock) || []).length).toBeGreaterThanOrEqual(2);
+    // ONE card: the resolved presentation — including its evidence payload — is
+    // handed to the journey card, which renders what the run evaluated inside
+    // Engineer details. No terminal branch renders a second surface, so a
+    // no-winner outcome can never hide the evidence behind another panel.
+    expect((card.match(/presentation=\{optimiserPresentation\}/g) || []).length).toBe(1);
+    expect(card).toMatch(/<AdiOptimisationJourney/);
+    expect(card).not.toContain('OptimiserRunEvidenceBlock');
     expect(card).toMatch(/const optimiserPresentation = resolveOptimiserPresentationState\(\{/);
     expect(card).toMatch(/planView: optimiserPlanView/);
   });

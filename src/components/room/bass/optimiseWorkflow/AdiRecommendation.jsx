@@ -1,30 +1,29 @@
 // AdiRecommendation.jsx
 // ---------------------------------------------------------------------------
-// The unified ADI engineering partner experience.
+// Bass Optimisation — Powered by ADI. ONE panel, whatever the outcome.
 //
-// One card. One recommendation. Four questions:
-//   What should I do?  — specific action
-//   Why?               — dominant physical cause, one sentence
-//   What improves?     — expected RP22 level changes
-//   Apply              — one button, one action
+// This component resolves the ADI decision model, the saved Optimisation Plan
+// and the canonical presentation state, and hands them to the single ADI card.
+// It renders no card of its own: there is no second recommendation surface and
+// no separate plan panel beside the card, so the designer can never be shown two
+// panels that appear to say the same thing.
 //
-// If no improvement is available:
-//   "No further engineering changes are recommended."
-//   No Apply button. No placeholder text.
+//   What did ADI test?    — the fixed-order tested-options table
+//   What did ADI find?    — current result, best result found
+//   What should I do?     — one plain-English recommendation
+//   Can I apply it?       — one Apply action, owned by the plan's own safety
+//   Can I undo it?        — one Undo, once a change has been applied
 //
-// This component consolidates the former BassOptimisationSummary and
-// FurtherImprovements into a single coherent recommendation. The ADI
-// decision model is the reasoning authority; the optimiser is the engineer.
+// Engineer details stay collapsed inside the card. The ADI decision model is the
+// reasoning authority; the optimiser is the engineer.
 // ---------------------------------------------------------------------------
 
 import React, { useCallback, useMemo, useState } from "react";
-import { CheckCircle2, ArrowRight, Loader2, Activity } from "lucide-react";
 import { runEngineeringDecisionModel } from "@/components/adi";
 import { buildAdiDecisionFromPersistedRecommendation } from "@/components/adi/persistedRecommendationAdapter";
 import { buildAdiBassEvidence } from "@/components/adi/adiBassEvidenceBuilder";
 import { RECOMMENDATION_INTENT } from "@/components/room/bass/recommendationAuthority/recommendationAuthority";
 import { ADI_OUTCOME } from "@/components/adi/adiConstants";
-import { buildOptimisedInstances } from "../improveBassV2/improveBassV2Apply";
 import {
   buildLeverApplyInstances,
   buildLeverUndoInstances,
@@ -33,28 +32,11 @@ import {
 } from "../optimiserPlan/optimiserPlanLeverApply.js";
 import { readAuthoritativeP20Headline } from "../optimiserPlan/optimiserPlanMetrics.js";
 import { OPTIMISER_LEVER } from "../optimiserPlan/optimiserPlanConstants.js";
-import { applyCalibrationTuning, isCalibrationApplied } from "../improveBassV2/improveBassV2ApplyCalibration";
-import {
-  computeAppliedCalibrationBasisFingerprint,
-  resolveAppliedCalibrationStatus,
-} from "../appliedCalibrationAuthority/appliedCalibrationAuthority";
-import { resolveAdiAppliedState, ADI_APPLIED_STATE } from "@/components/adi/adiAppliedStateAuthority";
-import { buildProvenance } from "../improveBassV2/appliedProvenance";
-import { computeV2DesignFingerprint } from "../improveBassV2/improveBassV2Fingerprint";
-import { buildAuthoritativeRspPosition } from "../authoritativeRspPosition";
 import { useActiveProjectId } from "@/components/state/project-session";
-import { useAppliedCalibrationAuthority } from "../appliedCalibrationAuthority/appliedCalibrationAuthorityStore";
-import OptimisationPlanStatus from "@/components/room/bass/optimiserPlan/OptimisationPlanStatus.jsx";
-import PlacementRecommendationSection from "@/components/room/bass/optimiserPlan/PlacementRecommendationSection.jsx";
-import { resolvePlacementRecommendation } from "@/components/room/bass/optimiserPlan/placementRecommendationAuthority.js";
 import AdiOptimisationJourney from "@/components/room/bass/optimiserPlan/AdiOptimisationJourney.jsx";
-import OptimiserRunEvidenceBlock from "@/components/room/bass/optimiserPlan/OptimiserRunEvidenceBlock.jsx";
 import { firstSentence } from "@/components/room/bass/optimiserPlan/resolveAdiOptimiserJourney.js";
 import { useOptimiserPlanView } from "@/components/room/bass/optimiserPlan/useOptimiserPlanView.js";
-import {
-  OPTIMISER_PRESENTATION_STATE,
-  resolveOptimiserPresentationState,
-} from "@/components/room/bass/optimiserPlan/resolveOptimiserPresentationState.js";
+import { resolveOptimiserPresentationState } from "@/components/room/bass/optimiserPlan/resolveOptimiserPresentationState.js";
 
 // ── Displacement helpers ──
 
@@ -80,31 +62,7 @@ function computeSubwooferDisplacement(currentInstances, winner) {
   return { distanceMm, direction };
 }
 
-function computeSeatingDisplacement(currentSeating, recommendedSeating) {
-  if (!Array.isArray(currentSeating) || !Array.isArray(recommendedSeating)) return null;
-  const count = Math.min(currentSeating.length, recommendedSeating.length);
-  if (count === 0) return null;
-
-  let totalDeltaY = 0;
-  for (let i = 0; i < count; i++) {
-    const currentY = Number(currentSeating[i]?.y) || Number(currentSeating[i]?.position?.y) || 0;
-    const recommendedY = Number(recommendedSeating[i]?.y) || Number(recommendedSeating[i]?.position?.y) || 0;
-    totalDeltaY += recommendedY - currentY;
-  }
-  const avgDeltaY = totalDeltaY / count;
-  const distanceMm = Math.round(Math.abs(avgDeltaY) * 1000);
-  if (distanceMm < 50) return null;
-
-  const direction = avgDeltaY > 0 ? "backward" : "forward";
-  return { distanceMm, direction };
-}
-
-// ── RP22 evidence formatting ──
-
-function formatRp22Evidence(evidence) {
-  if (Array.isArray(evidence) && evidence.length > 0) return evidence;
-  return null;
-}
+// ── Main component ──
 
 // ── Main component ──
 
@@ -132,53 +90,13 @@ export default function AdiRecommendation({
   onRunOptimisationPlan,
   onCalculateBassPerformance,
 }) {
-  const [applying, setApplying] = useState(false);
-
   // The design's own seat count, so the acoustic estimate spans this design's
   // seats rather than an assumed number.
   const seatCount = Array.isArray(seatingPositions) ? seatingPositions.length : null;
-  const [appliedStage, setAppliedStage] = useState(null);
 
-  // Applied Calibration Authority — persisted per-project+version.
-  // Derive the APPLIED badge from this so it survives a page refresh.
-  // The transient `autoApplied` prop (from workflowState) covers the
-  // in-session workflow; the persisted authority covers cold-load restore.
+  // The open design version this card's optimiser evidence belongs to.
   const projectId = useActiveProjectId();
   const versionId = appState?.activeVersionId || null;
-  const appliedCalibrationAuthority = useAppliedCalibrationAuthority(projectId, versionId);
-  const hasPersistedAppliedCalibration = !!appliedCalibrationAuthority
-    && Array.isArray(appliedCalibrationAuthority.values)
-    && appliedCalibrationAuthority.values.length > 0
-    && !appliedCalibrationAuthority.staleReason;
-
-  // Does the CURRENT design still reflect the persisted calibration? A stale
-  // authority (geometry changed since it was applied) or values that no longer
-  // match the instances means the design does NOT reflect an applied
-  // recommendation — APPLIED must not be claimed.
-  const appliedCalibrationIsStale = useMemo(() => {
-    if (!hasPersistedAppliedCalibration) return false;
-    const basisFingerprint = computeAppliedCalibrationBasisFingerprint({
-      subwooferInstances: currentInstances,
-      roomDims,
-      seatingPositions,
-      rspPosition: null,
-      selectedSubModel,
-    });
-    return resolveAppliedCalibrationStatus(appliedCalibrationAuthority, basisFingerprint).isStale === true;
-  }, [hasPersistedAppliedCalibration, appliedCalibrationAuthority, currentInstances, roomDims, seatingPositions, selectedSubModel]);
-
-  const appliedCalibrationIsInDesign = useMemo(
-    () => (hasPersistedAppliedCalibration
-      ? isCalibrationApplied(currentInstances, appliedCalibrationAuthority?.values || [])
-      : false),
-    [hasPersistedAppliedCalibration, currentInstances, appliedCalibrationAuthority],
-  );
-
-  // Persistent visibility: during calculation with a published result,
-  // the ADI recommendation stays visible (greyed) rather than disappearing.
-  const isCalculating = shared?.calculationInProgress === true;
-  const hasPublishedResult = shared?.hasCurrentResult === true;
-  const isCalculatingWithPublished = isCalculating && hasPublishedResult;
 
   // Run ADI decision model.
   // On cold load / refresh, v2State (transient V2 optimiser memory) is empty.
@@ -243,11 +161,6 @@ export default function AdiRecommendation({
     return computeSubwooferDisplacement(currentInstances, subPositionWinner);
   }, [isSubPositionLever, hasSubPositions, currentInstances, subPositionWinner]);
 
-  const seatingDisplacement = useMemo(() => {
-    if (!isSeatingLever || !hasSeating) return null;
-    return computeSeatingDisplacement(seatingPositions, seatingWinner?.seatingPositions);
-  }, [isSeatingLever, hasSeating, seatingPositions, seatingWinner]);
-
   // The limiting factor in one plain sentence — ADI's own diagnosis, never
   // re-derived. Shown as the lead of the optimiser journey card.
   const limitingFactorSentence = useMemo(
@@ -268,31 +181,6 @@ export default function AdiRecommendation({
   });
 
   // ── Apply handlers (preserved from FurtherImprovements) ──
-
-  const selection = v2State?.winner;
-
-  const handleApplySubPositions = useCallback(() => {
-    if (!hasSubPositions || !commitInstances || !hasCanonicalInstances || !selection) return;
-    const winner = subPositionWinner;
-    if (!winner) return;
-
-    setApplying(true);
-    try {
-      const fingerprint = selection.applyFingerprint;
-      const provenance = buildProvenance("subPositions", winner.candidateId || "further", fingerprint, fingerprint);
-      const next = buildOptimisedInstances(winner, currentInstances, roomDims, selectedSubModel, provenance);
-      commitInstances(next, {
-        front: { placementMode: "manual", isManual: true },
-        rear: { placementMode: "manual", isManual: true },
-      });
-      setAppliedStage("placement");
-      if (typeof onRecalculate === "function") {
-        onRecalculate({ previousCacheKey: shared?.cacheKey || null });
-      }
-    } finally {
-      setApplying(false);
-    }
-  }, [hasSubPositions, commitInstances, hasCanonicalInstances, selection, subPositionWinner, currentInstances, roomDims, selectedSubModel, shared, onRecalculate]);
 
   // ── Individual lever apply / undo ──
   // One lever at a time, through the SAME commit + recalculation path every
@@ -374,99 +262,23 @@ export default function AdiRecommendation({
     return { ...leverOutcome, after: current };
   }, [leverOutcome, completedBassAuthority]);
 
-  const handleApplySeating = useCallback(() => {
-    if (!hasSeating || !commitSeating || !selection) return;
-    const winner = seatingWinner;
-    if (!winner?.seatingPositions) return;
-
-    setApplying(true);
-    try {
-      const fingerprint = selection.applyFingerprint;
-      const tuning = winner.appliedTuning || winner.tuning || [];
-      const provisionalProvenance = buildProvenance(
-        "seating_positions",
-        winner.candidateId || "further",
-        fingerprint,
-        fingerprint,
-      );
-      const nextInstances = Array.isArray(tuning) && tuning.length
-        ? applyCalibrationTuning(currentInstances, tuning, provisionalProvenance)
-        : currentInstances;
-      const rspPosition = buildAuthoritativeRspPosition(roomDims, appState?.mlpY_m, appState?.mlpX_m, appState?.designatedRspSeatId);
-      const postMutationFingerprint = (() => {
-        try {
-          return computeV2DesignFingerprint({
-            subwooferInstances: nextInstances,
-            roomDims,
-            seatingPositions: winner.seatingPositions,
-            rspPosition,
-            selectedSubModel,
-            p14TargetBasis: shared?.authoritative?.requested?.p14TargetBasis || "minimum",
-            p14TargetLevel: shared?.authoritative?.requested?.requestedLevel || 2,
-            p14TargetDb: shared?.authoritative?.requested?.selectedP14TargetDb || 117,
-            p18TargetBasis: shared?.authoritative?.requested?.p18TargetBasis || "minimum",
-            amplifierPowerPerSubW,
-          });
-        } catch {
-          return null;
-        }
-      })();
-      const provenance = buildProvenance("seating_positions", winner.candidateId || "further", fingerprint, postMutationFingerprint);
-      if (Array.isArray(tuning) && tuning.length && commitInstances) {
-        const finalInstances = applyCalibrationTuning(currentInstances, tuning, provenance);
-        commitInstances(finalInstances, {
-          front: { placementMode: "manual", isManual: true },
-          rear: { placementMode: "manual", isManual: true },
-        });
-      }
-      commitSeating(winner.seatingPositions);
-      if (commitSeatingProvenance) commitSeatingProvenance(provenance);
-      setAppliedStage("seating");
-      if (typeof onRecalculate === "function") {
-        onRecalculate({ previousCacheKey: shared?.cacheKey || null });
-      }
-    } finally {
-      setApplying(false);
-    }
-  }, [hasSeating, commitSeating, commitInstances, selection, seatingWinner, currentInstances, roomDims, appState, selectedSubModel, shared, amplifierPowerPerSubW, commitSeatingProvenance, onRecalculate]);
-
   // ── Render ──
-
-  // While a run is in progress the journey card owns the surface: it shows ADI's
-  // live progress through the fixed sequence, whatever the previous outcome was.
-  const isOptimisationRunning = (optimisationRunStatus || "idle") === "running";
-
-  if (!adiDecision?.recommendation && !isOptimisationRunning) {
-    return (
-      <div className="rounded-lg border border-[#E0DCD5] bg-[#F4F1EC] px-4 py-3">
-        <div className="flex items-center gap-2">
-          <Activity className="h-4 w-4 text-[#213428]" />
-          <span className="text-[13px] font-semibold text-[#1B1A1A]">Recommended Improvement</span>
-        </div>
-        <div className="mt-2 text-[12px] text-[#3E4349] leading-relaxed">
-          No further engineering changes are recommended.
-        </div>
-      </div>
-    );
-  }
-
-  const { recommendation, outcome, intent } = adiDecision;
-
-  // No improvement case — first-class outcomes
-  const isNoEngineering = outcome === ADI_OUTCOME.NO_FURTHER_ENGINEERING;
-  const isNoEq = outcome === ADI_OUTCOME.NO_FURTHER_EQ;
-  // FIX 4: Incomplete evaluation — bass evidence exists but the optimiser
-  // could not confirm an improvement. Must NOT show APPLIED or an Apply button.
-  const isIncomplete = outcome === ADI_OUTCOME.INCOMPLETE;
+  // ONE panel — the Bass Optimisation card. Every ADI outcome (no run, running,
+  // stale, no useful improvement, incomplete, failed, or an evaluated change
+  // that is available) renders this same card, and the canonical presentation
+  // state owns its status pill, copy, evidence and actions. A second
+  // recommendation surface and a separate plan panel can therefore never appear
+  // beside it.
+  const { recommendation, outcome, intent } = adiDecision || {};
 
   // The evaluated, applicable action — the ONLY path by which anything becomes
   // available. It requires a confirmed winner whose current and proposed values
-  // are known and whose Apply action is usable. Generic diagnosis text is never
-  // an available recommendation.
+  // are known and whose Apply action is usable.
+  const hasAppliedLever = !!leverOutcomeResolved?.appliedLever;
   const actionableSubPositions = intent === RECOMMENDATION_INTENT.DESIGN
-    && isSubPositionLever && hasSubPositions && hasCanonicalInstances && !appliedStage;
+    && isSubPositionLever && hasSubPositions && hasCanonicalInstances && !hasAppliedLever;
   const actionableSeating = intent === RECOMMENDATION_INTENT.DESIGN
-    && isSeatingLever && hasSeating && !appliedStage;
+    && isSeatingLever && hasSeating && !hasAppliedLever;
   const actionableEvaluation = {
     available: actionableSubPositions || actionableSeating,
     summary: actionableSubPositions && subDisplacement
@@ -486,333 +298,36 @@ export default function AdiRecommendation({
     runBlocked: !!optimisationRunBlockReason,
   });
 
-  // ── The placement recommendation ──
-  // Resolved here only for what this card must know about it: whether the
-  // placement panel is showing its own Apply button, so this card's button never
-  // duplicates it. A plain resolver call, not a hook: it sits after this
-  // component's early returns, and it is a pure read of the saved plan.
-  const placementRecommendation = resolvePlacementRecommendation({
-    planView: optimiserPlanView,
-    roomDims,
-    presentation: optimiserPresentation,
-    appliedLever: leverOutcomeResolved?.appliedLever ?? null,
-    appliedDirection: leverOutcomeResolved?.direction ?? null,
-  });
-  const panelShowsApply = placementRecommendation?.kind === "recommended"
-    && placementRecommendation.canApply === true;
-
-  // FIX 4 (revised): an incomplete evaluation is never a dead end. The card
-  // states the limiting factor, what is incomplete, the next action and what
-  // that action will evaluate — resolved from the saved Optimisation Plan by
-  // the ADI optimiser journey authority. It still shows no Apply button.
-  if (isIncomplete) {
-    return (
-      <AdiOptimisationJourney
-        projectId={projectId}
-        versionId={versionId}
-        completedBassAuthority={completedBassAuthority}
-        currentDesignFingerprint={shared?.cacheKey || null}
-        instances={currentInstances}
-        seatingPositions={seatingPositions}
-        seatCount={seatCount}
-        roomDims={roomDims}
-        limitingFactorSentence={limitingFactorSentence}
-        runBlockReason={optimisationRunBlockReason || null}
-        runStatus={optimisationRunStatus || "idle"}
-        runError={optimisationRunError || null}
-        onRunOptimisationPlan={onRunOptimisationPlan}
-        onCalculateBassPerformance={onCalculateBassPerformance || null}
-        onApplyLever={handleApplyLever}
-        onUndoLever={handleUndoLever}
-        leverApplyBusy={leverApplyBusy}
-        leverOutcome={leverOutcomeResolved}
-        why={recommendation?.why || null}
-        presentation={optimiserPresentation}
-      />
-    );
-  }
-
-  // Target not achieved — the selected bass target is not met and the optimiser
-  // found no winner. Must NOT show "No further engineering changes are
-  // recommended", APPLIED, or an Apply button. Explain the limiting factor and
-  // give practical options instead of reassuring closure.
-  const isTargetNotAchieved = outcome === ADI_OUTCOME.TARGET_NOT_ACHIEVED;
-
-  if (isTargetNotAchieved && !isOptimisationRunning) {
-    return (
-      <div className="rounded-lg border border-[#E0DCD5] bg-[#F4F1EC] px-4 py-3 space-y-3">
-        <div className="flex items-center gap-2">
-          <Activity className="h-4 w-4 text-[#B91C1C]" />
-          <span className="text-[13px] font-semibold text-[#1B1A1A]">Recommended Improvement</span>
-          <span className="ml-auto inline-flex items-center gap-1 rounded-full bg-[#B91C1C] px-2 py-0.5 text-[9px] font-semibold uppercase text-white">
-            Target not achieved
-          </span>
-        </div>
-        {recommendation?.assessment && (
-          <div className="space-y-0.5">
-            <div className="text-[10px] font-semibold uppercase tracking-wide text-[#8A7B6A]">
-              Assessment
-            </div>
-            <div className="text-[12px] font-semibold text-[#1B1A1A] leading-relaxed">
-              {recommendation.assessment}
-            </div>
-          </div>
-        )}
-        <div className="text-[13px] font-semibold text-[#1B1A1A] leading-relaxed">
-          {recommendation?.action}
-        </div>
-        {recommendation?.why && (
-          <div className="space-y-0.5">
-            <div className="text-[10px] font-semibold uppercase tracking-wide text-[#8A7B6A]">
-              Why
-            </div>
-            <div className="text-[11px] text-[#3E4349] leading-relaxed">
-              {recommendation.why}
-            </div>
-          </div>
-        )}
-        {recommendation?.remainingLimitation && (
-          <div className="space-y-0.5">
-            <div className="text-[10px] font-semibold uppercase tracking-wide text-[#8A7B6A]">
-              Remaining Limitation
-            </div>
-            <div className="text-[11px] text-[#3E4349] leading-relaxed">
-              {recommendation.remainingLimitation}
-            </div>
-          </div>
-        )}
-        {/* What the run actually evaluated, saved with this design version. */}
-        <OptimiserRunEvidenceBlock
-          evidence={optimiserPresentation.evidence}
-          seatCount={seatCount}
-          instances={currentInstances}
-        />
-      </div>
-    );
-  }
-
-  if ((isNoEngineering || isNoEq) && !isOptimisationRunning) {
-    const noImprovementText = isNoEq
-      ? recommendation?.action || "No further EQ is recommended."
-      : "No further engineering changes are recommended.";
-    const remainingText = isNoEq
-      ? recommendation?.remainingLimitation || "The remaining limitation requires a physical change."
-      : null;
-    return (
-      <div className="rounded-lg border border-[#E0DCD5] bg-[#F4F1EC] px-4 py-3">
-        <div className="flex items-center gap-2">
-          <Activity className="h-4 w-4 text-[#213428]" />
-          <span className="text-[13px] font-semibold text-[#1B1A1A]">Recommended Improvement</span>
-        </div>
-        <div className="mt-2 text-[12px] text-[#3E4349] leading-relaxed">
-          {noImprovementText}
-        </div>
-        {remainingText && (
-          <div className="mt-1 text-[11px] text-[#625143] leading-relaxed">
-            {remainingText}
-          </div>
-        )}
-        {/* A run that found no improvement still states what it tested. */}
-        <OptimiserRunEvidenceBlock
-          evidence={optimiserPresentation.evidence}
-          seatCount={seatCount}
-          instances={currentInstances}
-        />
-      </div>
-    );
-  }
-
-  // ── The canonical optimiser state owns the card ──
-  // Whenever the resolved state is not an available, evaluated, applicable
-  // change, the card is rendered from that state alone: one pill, one headline,
-  // the run evidence, and no Apply action. Generic ADI diagnosis is shown as
-  // diagnosis — it can never produce an available recommendation.
-  if (optimiserPresentation.state !== OPTIMISER_PRESENTATION_STATE.PLAN_AVAILABLE) {
-    return (
-      <AdiOptimisationJourney
-        projectId={projectId}
-        versionId={versionId}
-        completedBassAuthority={completedBassAuthority}
-        currentDesignFingerprint={shared?.cacheKey || null}
-        instances={currentInstances}
-        seatingPositions={seatingPositions}
-        seatCount={seatCount}
-        roomDims={roomDims}
-        limitingFactorSentence={limitingFactorSentence}
-        runBlockReason={optimisationRunBlockReason || null}
-        runStatus={optimisationRunStatus || "idle"}
-        runError={optimisationRunError || null}
-        onRunOptimisationPlan={onRunOptimisationPlan}
-        onCalculateBassPerformance={onCalculateBassPerformance || null}
-        onApplyLever={handleApplyLever}
-        onUndoLever={handleUndoLever}
-        leverApplyBusy={leverApplyBusy}
-        leverOutcome={leverOutcomeResolved}
-        assessment={recommendation?.assessment || null}
-        why={recommendation?.why || null}
-        presentation={optimiserPresentation}
-      />
-    );
-  }
-
-  // Determine the specific action text
-  let actionText = recommendation.action;
-  if (isSubPositionLever && subDisplacement) {
-    actionText = `Move the subwoofers ${subDisplacement.distanceMm} mm ${subDisplacement.direction}.`;
-  } else if (isSeatingLever && seatingDisplacement) {
-    actionText = `Move the seating row ${seatingDisplacement.distanceMm} mm ${seatingDisplacement.direction}.`;
-  }
-
-  // Format RP22 evidence
-  const rp22Changes = formatRp22Evidence(recommendation.rp22Evidence);
-
-  // Determine if we need an Apply button
-  const isCalibration = intent === RECOMMENDATION_INTENT.CALIBRATION;
-  const isPhysical = intent === RECOMMENDATION_INTENT.DESIGN;
-  const isSpecification = intent === RECOMMENDATION_INTENT.SPECIFICATION;
-
-  const canApplySubPositions = actionableSubPositions;
-  const canApplySeating = actionableSeating;
-  // The Apply action exists only where the canonical presentation state says an
-  // evaluated change is available and applicable.
-  // The placement panel carries its own Apply; this button stays for the
-  // sub-position and seating path, so the two can never duplicate an action.
-  const showApplyButton = optimiserPresentation.showApply
-    && (canApplySubPositions || canApplySeating)
-    && !panelShowsApply;
-  const applyHandler = canApplySubPositions ? handleApplySubPositions : canApplySeating ? handleApplySeating : null;
-
-  // ── Applied state — ONE authority ──
-  // APPLIED requires a specific recommendation to have been applied, the design
-  // to still reflect it, no Apply action waiting, and a complete evaluation.
-  // It is therefore mutually exclusive with an available Apply action.
-  const adiAppliedState = resolveAdiAppliedState({
-    outcome,
-    hasRecommendation: !!recommendation,
-    recommendationAction: actionText,
-    applyActionAvailable: showApplyButton && !!applyHandler,
-    appliedStage,
-    workflowApplied: isCalibration ? autoApplied : null,
-    appliedCalibration: appliedCalibrationAuthority,
-    appliedCalibrationIsStale,
-    appliedCalibrationIsInDesign,
-  });
-  const showAppliedBadge = adiAppliedState.showAppliedBadge;
+  // A design that cannot meet its selected target states the remaining
+  // limitation in one line beside the status, rather than withholding it.
+  const designLimitation = outcome === ADI_OUTCOME.TARGET_NOT_ACHIEVED
+    ? (recommendation?.remainingLimitation || recommendation?.action || null)
+    : null;
 
   return (
-    <div className="rounded-lg border border-[#E0DCD5] bg-[#F4F1EC] px-4 py-3 space-y-3">
-      {/* Header */}
-      <div className="flex items-center gap-2">
-        <Activity className="h-4 w-4 text-[#213428]" />
-        <span className="text-[13px] font-semibold text-[#1B1A1A]">Recommended Improvement</span>
-        {adiAppliedState.state !== ADI_APPLIED_STATE.NOT_APPLIED && (
-          <span className={`ml-auto inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[9px] font-semibold uppercase transition-opacity duration-300 ${isCalculatingWithPublished ? "opacity-60" : ""} ${showAppliedBadge ? "bg-[#213428] text-white" : "bg-[#E7E2DA] text-[#625143]"}`}>
-            {showAppliedBadge && <CheckCircle2 className="h-2.5 w-2.5" />}
-            {adiAppliedState.label}
-          </span>
-        )}
-      </div>
-
-      {/* Assessment — what is happening */}
-      {recommendation?.assessment && (
-        <div className="space-y-0.5">
-          <div className="text-[10px] font-semibold uppercase tracking-wide text-[#8A7B6A]">
-            Assessment
-          </div>
-          <div className="text-[11px] text-[#3E4349] leading-relaxed">
-            {recommendation.assessment}
-          </div>
-        </div>
-      )}
-
-      {/* The action — implicit recommendation, no label needed */}
-      <div className="text-[14px] font-semibold text-[#1B1A1A] leading-relaxed">
-        {actionText}
-      </div>
-
-      {/* Why — what physical behaviour caused this */}
-      {recommendation?.why && (
-        <div className="space-y-0.5">
-          <div className="text-[10px] font-semibold uppercase tracking-wide text-[#8A7B6A]">
-            Why
-          </div>
-          <div className="text-[11px] text-[#3E4349] leading-relaxed">
-            {recommendation.why}
-          </div>
-        </div>
-      )}
-
-      {/* Expected Result — visual before → after transitions */}
-      {rp22Changes && (
-        <div className="space-y-0.5">
-          <div className="text-[10px] font-semibold uppercase tracking-wide text-[#8A7B6A]">
-            Expected Result
-          </div>
-          <div className="space-y-1">
-            {rp22Changes.map((change, i) => (
-              <div key={i} className="flex items-center gap-2 text-[11px]">
-                <span className="font-semibold text-[#1B1A1A] w-8">{change.parameter}</span>
-                <span className="text-[#8A7B6A]">{change.from}</span>
-                <ArrowRight className="h-3 w-3 text-[#213428]" />
-                <span className="font-semibold text-[#213428]">{change.to}</span>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* Remaining Limitation — what still cannot be improved */}
-      {recommendation?.remainingLimitation && (
-        <div className="space-y-0.5">
-          <div className="text-[10px] font-semibold uppercase tracking-wide text-[#8A7B6A]">
-            Remaining Limitation
-          </div>
-          <div className="text-[11px] text-[#3E4349] leading-relaxed">
-            {recommendation.remainingLimitation}
-          </div>
-        </div>
-      )}
-
-      {/* Placement — what physically moves, what it is expected to do in whole
-          dB, and its own Apply placement / Undo placement actions. */}
-      <PlacementRecommendationSection
-        planView={optimiserPlanView}
-        roomDims={roomDims}
-        presentation={optimiserPresentation}
-        leverOutcome={leverOutcomeResolved}
-        busy={applying}
-        onApplyLever={handleApplyLever}
-        onUndoLever={handleUndoLever}
-        onRerun={onRunOptimisationPlan}
-      />
-
-      {/* Optimisation Plan — the SAVED evaluated optimiser result, restored from
-          the design version (or the published result) and never recomputed */}
-      <OptimisationPlanStatus
-        projectId={projectId}
-        versionId={versionId}
-        completedBassAuthority={completedBassAuthority}
-        currentDesignFingerprint={shared?.cacheKey || null}
-        instances={currentInstances}
-        seatingPositions={seatingPositions}
-        onApplyLever={handleApplyLever}
-        onUndoLever={handleUndoLever}
-        leverApplyBusy={leverApplyBusy}
-        leverOutcome={leverOutcomeResolved}
-      />
-
-      {/* Apply button */}
-      {showApplyButton && applyHandler && (
-        <button
-          type="button"
-          onClick={applyHandler}
-          disabled={applying}
-          className={`inline-flex items-center gap-1.5 rounded-md bg-[#213428] px-4 py-2 text-[12px] font-semibold text-white transition-colors hover:bg-[#3E4349] disabled:opacity-50 ${isCalculatingWithPublished ? "opacity-60" : ""}`}
-        >
-          {applying ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <ArrowRight className="h-3.5 w-3.5" />}
-          Apply
-        </button>
-      )}
-    </div>
+    <AdiOptimisationJourney
+      projectId={projectId}
+      versionId={versionId}
+      completedBassAuthority={completedBassAuthority}
+      currentDesignFingerprint={shared?.cacheKey || null}
+      instances={currentInstances}
+      seatingPositions={seatingPositions}
+      seatCount={seatCount}
+      roomDims={roomDims}
+      limitingFactorSentence={limitingFactorSentence}
+      designLimitation={designLimitation}
+      runBlockReason={optimisationRunBlockReason || null}
+      runStatus={optimisationRunStatus || "idle"}
+      runError={optimisationRunError || null}
+      onRunOptimisationPlan={onRunOptimisationPlan}
+      onCalculateBassPerformance={onCalculateBassPerformance || null}
+      onApplyLever={handleApplyLever}
+      onUndoLever={handleUndoLever}
+      leverApplyBusy={leverApplyBusy}
+      leverOutcome={leverOutcomeResolved}
+      assessment={recommendation?.assessment || null}
+      why={recommendation?.why || null}
+      presentation={optimiserPresentation}
+    />
   );
 }

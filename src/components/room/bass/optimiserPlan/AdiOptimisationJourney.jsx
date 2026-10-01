@@ -36,6 +36,7 @@ import AdiTestedOptionsTable from "./AdiTestedOptionsTable.jsx";
 import AdiDesignerActionBar from "./AdiDesignerActionBar.jsx";
 import PlacementRecommendationPanel from "./PlacementRecommendationPanel.jsx";
 import { OPTIMISER_LEVER } from "./optimiserPlanConstants.js";
+import { PLACEMENT_PREVIEW_UNAVAILABLE } from "./placementMoveAuthority.js";
 import { ADI_ENGINEER_DETAILS_TITLE, buildAdiDesignerSummary } from "./adiDesignerSummary.js";
 import { readAuthoritativeP20Headline } from "./optimiserPlanMetrics.js";
 
@@ -120,6 +121,8 @@ export default function AdiOptimisationJourney({
   assessment = null,
   why = null,
   presentation = null,
+  // One short line for a design that cannot meet its selected target.
+  designLimitation = null,
   className = "",
 }) {
   const planView = useOptimiserPlanView({
@@ -260,6 +263,12 @@ export default function AdiOptimisationJourney({
         {journey.message}
       </div>
 
+      {/* A design that cannot meet its selected target states the remaining
+          limitation in one line — never withheld, never a paragraph. */}
+      {designLimitation && (
+        <div className="text-[11px] text-[#8A5A2B] leading-relaxed">{designLimitation}</div>
+      )}
+
       {/* What was tested, what was found, what is recommended */}
       {summary.testedSentence && (
         <div className="text-[11px] text-[#3E4349] leading-relaxed">{summary.testedSentence}</div>
@@ -285,9 +294,12 @@ export default function AdiOptimisationJourney({
               Best result found: <span className="font-semibold text-[#1B1A1A]">{summary.recommendedP20}</span>
             </div>
           )}
-          {summary.recommendation && (
+          {/* The recommendation sentence. While the placement panel is already
+              stating the physical move and its expected result, that panel IS
+              the recommendation — the same sentence is never repeated here. */}
+          {summary.recommendation && !placement && (
             <div className="text-[13px] font-semibold text-[#1B1A1A] leading-relaxed">
-              {summary.recommendation}
+              Recommendation: {summary.recommendation}
             </div>
           )}
         </div>
@@ -322,27 +334,6 @@ export default function AdiOptimisationJourney({
               Reason: {summary.seatingRecommendation.reason}
             </div>
           )}
-          <div className="text-[10px] text-[#8B7F76] leading-relaxed">
-            {summary.seatingRecommendation.worstSeat
-              ? `Worst seat after the move: ${summary.seatingRecommendation.worstSeat}. `
-              : ""}
-            {summary.seatingRecommendation.p19Delta ? `P19 ${summary.seatingRecommendation.p19Delta}. ` : ""}
-            {summary.seatingRecommendation.p14Delta ? `P14 ${summary.seatingRecommendation.p14Delta}. ` : ""}
-            {summary.seatingRecommendation.p18DeltaHz != null
-              && Math.abs(Math.round(summary.seatingRecommendation.p18DeltaHz)) > 0
-              ? `P18 extension ${summary.seatingRecommendation.p18DeltaHz >= 0 ? "+" : "−"}${Math.abs(Math.round(summary.seatingRecommendation.p18DeltaHz))} Hz. `
-              : ""}
-            {summary.seatingRecommendation.destinationsValid === true
-              ? `Every destination seat position checked: valid (${summary.seatingRecommendation.validationBasis}).`
-              : summary.seatingRecommendation.destinationsValid === false
-                ? `Not applied: ${summary.seatingRecommendation.validationReason || "a destination seat position is not legal in this room."}`
-                : "Destination seat positions were validated by the optimiser before evaluation."}
-          </div>
-          {summary.seatingRecommendation.tradeOff && (
-            <div className="text-[11px] text-[#8A5A2B]">
-              Trade-off: {summary.seatingRecommendation.tradeOff}
-            </div>
-          )}
         </div>
       )}
 
@@ -356,27 +347,18 @@ export default function AdiOptimisationJourney({
         onRerun={onRunOptimisationPlan}
       />
 
-      <AdiTestedOptionsTable summary={summary} />
-
-      {/* Low-frequency absorption — ninth in the fixed order, after every
-          practical lever. It is design advice: there is no Apply action, and it
-          is never stated as a requirement or as a calculated result. */}
-      {summary.absorption && (
-        <div className="rounded-md border border-[#E7E5E0] bg-white px-3 py-2 space-y-1">
-          <div className="text-[10px] font-semibold uppercase tracking-wide text-[#8A7B6A]">
-            {summary.absorption.label}
-          </div>
-          <div className="text-[11px] text-[#3E4349] leading-relaxed">{summary.absorption.headline}</div>
-          <div className="text-[11px] text-[#625143] leading-relaxed">{summary.absorption.location}</div>
-        </div>
-      )}
-
       <AdiDesignerActionBar
         summary={summary}
         busy={isRunning}
         onApply={panelShowsApply ? null : handleApplyRecommended}
         onUndo={panelShowsUndo ? null : handleUndoRecommended}
       />
+
+      {/* What ADI tested — every lever in the fixed least-intrusive order, with
+          low-frequency absorption ninth. It replaces the former "Other options
+          tested" panel; the absorption block that used to repeat below it is
+          gone, and its evidence sits in Engineer details. */}
+      <AdiTestedOptionsTable summary={summary} />
 
       {/* How many design options ADI will test, and the acoustic work behind them. */}
       {showEstimate && (
@@ -469,6 +451,12 @@ export default function AdiOptimisationJourney({
               <div className="text-[10px] font-semibold uppercase tracking-wide text-[#8A7B6A]">
                 Low-frequency absorption evidence
               </div>
+              {summary.absorption.headline && (
+                <div>{summary.absorption.headline}</div>
+              )}
+              {summary.absorption.location && (
+                <div>{summary.absorption.location}</div>
+              )}
               {summary.absorption.frequencyText && (
                 <div>Limiting frequency: {summary.absorption.frequencyText}</div>
               )}
@@ -484,6 +472,51 @@ export default function AdiOptimisationJourney({
               {summary.attemptsWithoutGain.length > 0 && (
                 <div>Evaluated without becoming the recommendation: {summary.attemptsWithoutGain.join(", ")}</div>
               )}
+            </div>
+          )}
+
+          {/* The seating recommendation's own evaluation evidence — the worst
+              seat, the other RP22 movements and whether every destination seat
+              position is legal. Kept out of the default card. */}
+          {summary.seatingRecommendation && (
+            <div className="space-y-0.5 text-[11px] text-[#3E4349] leading-relaxed">
+              <div className="text-[10px] font-semibold uppercase tracking-wide text-[#8A7B6A]">
+                Seating recommendation evidence
+              </div>
+              {summary.seatingRecommendation.worstSeat && (
+                <div>Worst seat after the move: {summary.seatingRecommendation.worstSeat}</div>
+              )}
+              {summary.seatingRecommendation.p19Delta && (
+                <div>P19 {summary.seatingRecommendation.p19Delta}</div>
+              )}
+              {summary.seatingRecommendation.p14Delta && (
+                <div>P14 {summary.seatingRecommendation.p14Delta}</div>
+              )}
+              {summary.seatingRecommendation.p18DeltaHz != null
+                && Math.abs(Math.round(summary.seatingRecommendation.p18DeltaHz)) > 0 && (
+                  <div>
+                    P18 extension {summary.seatingRecommendation.p18DeltaHz >= 0 ? "+" : "−"}
+                    {Math.abs(Math.round(summary.seatingRecommendation.p18DeltaHz))} Hz
+                  </div>
+              )}
+              <div>
+                {summary.seatingRecommendation.destinationsValid === true
+                  ? `Every destination seat position checked: valid (${summary.seatingRecommendation.validationBasis}).`
+                  : summary.seatingRecommendation.destinationsValid === false
+                    ? `Destination positions not applied: ${summary.seatingRecommendation.validationReason || "a destination seat position is not legal in this room."}`
+                    : "Destination seat positions were validated by the optimiser before evaluation."}
+              </div>
+              {summary.seatingRecommendation.tradeOff && (
+                <div>Trade-off: {summary.seatingRecommendation.tradeOff}</div>
+              )}
+            </div>
+          )}
+
+          {/* The missing on-plan preview is a limitation of the evidence, not a
+              warning about the recommendation, so it is stated here. */}
+          {placement?.notice === PLACEMENT_PREVIEW_UNAVAILABLE && (
+            <div className="text-[11px] text-[#625143] leading-relaxed">
+              On-plan preview: not yet available for this change.
             </div>
           )}
 
