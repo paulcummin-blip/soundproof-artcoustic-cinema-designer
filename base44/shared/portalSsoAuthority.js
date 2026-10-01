@@ -1,9 +1,16 @@
-const PORTAL_SOURCE = 'ARTCOUSTIC_PARTNER_PORTAL';
-const PORTAL_TARGET = 'SOUND_PROOF';
-const PILOT_EXTERNAL_SUBJECT = 'b9d453e8-3386-4294-bd99-7ad2d80120b2';
-const PILOT_SOUND_PROOF_ACCOUNT_ID = '6a832be3d4e6c6df3df23ee3';
-const PILOT_PARTNER_PROFILE_ID = '42b93780-c13e-40c6-bac3-991c2bcfc938';
-const BRIDGE_URL_SECRET = 'PARTNER_PORTAL_BRIDGE_URL';
+import {
+  BRIDGE_URL_SECRET,
+  PILOT_EXTERNAL_SUBJECT,
+  PILOT_PARTNER_PROFILE_ID,
+  PILOT_SOUND_PROOF_ACCOUNT_ID,
+  PORTAL_SOURCE,
+  PORTAL_TARGET,
+} from './pilotPortalConstants.js';
+import {
+  PORTAL_LAUNCH_DIAGNOSTIC_OUTCOMES,
+  recordPortalLaunchDiagnostic,
+} from './portalLaunchDiagnostics.js';
+import { claimPilotPortalAdministratorSeat } from './pilotSeatClaimAuthority.js';
 
 function hasText(value) {
   return typeof value === 'string' && value.trim().length > 0;
@@ -181,6 +188,18 @@ async function resolveOrClaimPortalAdministratorMembership(
   );
   if (candidates.length !== 1) {
     if (unclaimedAdministrators.length === 1) {
+      await recordPortalLaunchDiagnostic(service, {
+        event: 'PORTAL_MEMBERSHIP_EMAIL_MISMATCH',
+        reason: 'PORTAL_MEMBERSHIP_EMAIL_MISMATCH',
+        base44User,
+        accountId,
+        membershipId: unclaimedAdministrators[0]?.id || null,
+        details: {
+          seat_email: normaliseEmail(unclaimedAdministrators[0]?.email) || null,
+          base44_user_email: email,
+          claim_route: 'invited_email_match',
+        },
+      });
       throw new Error('PORTAL_MEMBERSHIP_EMAIL_MISMATCH');
     }
     throw new Error('PORTAL_ACCOUNT_ASSIGNMENT_REQUIRED');
@@ -253,6 +272,21 @@ export async function consumePilotPortalLaunch(base44, base44User, launchPass, {
     target: PORTAL_TARGET,
   }, bridgeUrl);
 
+  // A binding that identifies a different Partner Portal profile is its own
+  // durable event, recorded before the launch is rejected.
+  if (hasText(binding?.profile_id) && binding.profile_id !== PILOT_PARTNER_PROFILE_ID) {
+    await recordPortalLaunchDiagnostic(service, {
+      event: 'PROFILE_MISMATCH',
+      reason: 'PORTAL_BINDING_INVALID',
+      base44User,
+      binding,
+      details: {
+        expected_profile_id: PILOT_PARTNER_PROFILE_ID,
+        received_profile_id: binding.profile_id,
+      },
+    });
+  }
+
   if (
     binding?.target !== PORTAL_TARGET
     || binding?.user_id !== PILOT_EXTERNAL_SUBJECT
@@ -278,25 +312,103 @@ export async function consumePilotPortalLaunch(base44, base44User, launchPass, {
     throw new Error('PORTAL_ACCOUNT_INACTIVE');
   }
 
-  // Require a live access-token-backed dealer identity before claiming a
+  // Require the dealer identity association attempt before claiming a
   // membership or writing derived PortalIdentity data. The callback is a
   // server-only dependency, never a client-supplied identity.
   if (typeof associateDealerIdentity !== 'function') {
     throw new Error('DEALER_ASSOCIATION_REQUIRED');
   }
   const association = await associateDealerIdentity();
-  if (association?.resolved !== true) {
-    throw new Error(association?.reason || 'DEALER_IDENTITY_UNRESOLVED');
+
+  // The iCubed pilot's authority is the verified launch binding consumed and
+  // validated above: the Partner Portal bridge has already checked the portal
+  // subject, profile, live session and expiry server-side. The pilot therefore
+  // claims its seat from that binding, never from the invited seat email —
+  // whether or not the access-token-backed Dealer Identity resolve answers.
+  const pilotLaunchContext =
+    binding.target === PORTAL_TARGET
+    && binding.user_id === PILOT_EXTERNAL_SUBJECT
+    && binding.profile_id === PILOT_PARTNER_PROFILE_ID
+    && link.account_id === PILOT_SOUND_PROOF_ACCOUNT_ID;
+
+  // A stored dealer identity that disagrees with the live portal identity is a
+  // security failure everywhere — including the pilot. Never silently relink.
+  if (association?.reason === 'DEALER_IDENTITY_MISMATCH') {
+    await recordPortalLaunchDiagnostic(service, {
+      event: 'DEALER_IDENTITY_MISMATCH',
+      outcome: PORTAL_LAUNCH_DIAGNOSTIC_OUTCOMES.FAILURE,
+      reason: 'DEALER_IDENTITY_MISMATCH',
+      base44User,
+      binding,
+      accountId: link.account_id,
+      details: {
+        stored_dealer_account_id: association?.stored_dealer_account_id || null,
+        resolved_dealer_account_id: association?.resolved_dealer_account_id || null,
+      },
+    });
+    throw new Error('DEALER_IDENTITY_MISMATCH');
   }
 
-  // First successful portal launch may claim the one pre-created dealer-admin
-  // seat, but only when account and normalised email both match exactly.
-  // Ambiguous, foreign or already-claimed seats fail closed.
-  await resolveOrClaimPortalAdministratorMembership(
-    service,
-    base44User,
-    link.account_id,
-  );
+  if (association?.resolved !== true) {
+    const associationReason = String(association?.reason || 'DEALER_IDENTITY_UNRESOLVED');
+    await recordPortalLaunchDiagnostic(service, {
+      event: associationReason === 'NO_PORTAL_TOKEN' ? 'NO_PORTAL_TOKEN' : associationReason,
+      outcome: pilotLaunchContext
+        ? PORTAL_LAUNCH_DIAGNOSTIC_OUTCOMES.FALLBACK_PILOT_BINDING
+        : PORTAL_LAUNCH_DIAGNOSTIC_OUTCOMES.FAILURE,
+      reason: associationReason,
+      base44User,
+      binding,
+      accountId: link.account_id,
+      details: {
+        pilot_account: link.account_id === PILOT_SOUND_PROOF_ACCOUNT_ID,
+        access_token_available: associationReason !== 'NO_PORTAL_TOKEN',
+        claim_route: pilotLaunchContext ? 'verified_binding' : 'blocked',
+      },
+    });
+    if (!pilotLaunchContext) {
+      throw new Error(associationReason);
+    }
+  }
+
+  // Claim the one pre-created dealer-administrator seat. The pilot claims it
+  // from the verified portal binding; every other account keeps the existing
+  // email-matched rule unchanged. Ambiguous, foreign or already-claimed seats
+  // fail closed in both routes.
+  let claim;
+  try {
+    claim = pilotLaunchContext
+      ? await claimPilotPortalAdministratorSeat({ service, base44User, binding, link })
+      : await resolveOrClaimPortalAdministratorMembership(service, base44User, link.account_id);
+  } catch (claimError) {
+    await recordPortalLaunchDiagnostic(service, {
+      event: 'MEMBERSHIP_CLAIM_FAILED',
+      reason: String(claimError?.message || 'MEMBERSHIP_CLAIM_FAILED'),
+      base44User,
+      binding,
+      accountId: link.account_id,
+      details: {
+        claim_route: pilotLaunchContext ? 'verified_binding' : 'invited_email_match',
+      },
+    });
+    throw claimError;
+  }
+
+  if (claim?.claimed) {
+    await recordPortalLaunchDiagnostic(service, {
+      event: 'MEMBERSHIP_CLAIMED',
+      outcome: PORTAL_LAUNCH_DIAGNOSTIC_OUTCOMES.SUCCESS,
+      base44User,
+      binding,
+      accountId: link.account_id,
+      membershipId: claim.membership?.id || null,
+      details: {
+        claim_route: pilotLaunchContext ? 'verified_binding' : 'invited_email_match',
+        email_match_used: !pilotLaunchContext,
+        previous_user_id: claim.previousUserId || null,
+      },
+    });
+  }
 
   const identities = await uniqueRows(service.entities.PortalIdentity, {
     base44_user_id: base44User.id,
@@ -330,6 +442,20 @@ export async function consumePilotPortalLaunch(base44, base44User, launchPass, {
   const identity = existing
     ? await service.entities.PortalIdentity.update(existing.id, data)
     : await service.entities.PortalIdentity.create(data);
+
+  await recordPortalLaunchDiagnostic(service, {
+    event: 'PORTAL_IDENTITY_CREATED',
+    outcome: PORTAL_LAUNCH_DIAGNOSTIC_OUTCOMES.SUCCESS,
+    base44User,
+    binding,
+    accountId: identity.account_id,
+    membershipId: claim?.membership?.id || null,
+    details: {
+      operation: existing ? 'updated' : 'created',
+      identity_id: identity.id,
+      identity_authority: 'verified_launch_binding',
+    },
+  });
 
   if (accounts[0].name !== binding.account_name) {
     await service.entities.Account.update(accounts[0].id, { name: binding.account_name });

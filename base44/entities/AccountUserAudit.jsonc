@@ -1,7 +1,7 @@
 {
   "name": "AccountUserAudit",
   "type": "object",
-  "description": "Append-only audit trail for invitations, access changes, removals and invitation acceptance. Written only by trusted backend functions.",
+  "description": "Append-only audit trail for invitations, access changes, removals, invitation acceptance and Partner Portal identity claims. Written only by trusted backend functions.",
   "properties": {
     "account_id": {
       "type": "string"
@@ -20,7 +20,8 @@
         "INVITATION_ACCEPTED",
         "ACCESS_CHANGED",
         "REMOVED",
-        "LEGACY_ADMIN_BOOTSTRAPPED"
+        "LEGACY_ADMIN_BOOTSTRAPPED",
+        "PORTAL_IDENTITY_CLAIMED"
       ]
     },
     "target_user_id": {

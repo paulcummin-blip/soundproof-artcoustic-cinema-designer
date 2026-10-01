@@ -1,0 +1,90 @@
+{
+  "name": "PortalLaunchDiagnostic",
+  "type": "object",
+  "description": "Append-only durable diagnostic trail for Partner Portal launches. One row per launch event, written only by trusted backend functions with the service role. Records why a launch succeeded, failed or continued on the verified pilot binding, so a failed launch can be diagnosed without reproducing it.",
+  "properties": {
+    "event": {
+      "type": "string",
+      "description": "Diagnostic code. Known codes: NO_PORTAL_TOKEN, PROFILE_MISMATCH, PORTAL_MEMBERSHIP_EMAIL_MISMATCH, PORTAL_IDENTITY_CREATED, MEMBERSHIP_CLAIMED, MEMBERSHIP_CLAIM_FAILED. Other association failure reasons are recorded verbatim so nothing is hidden."
+    },
+    "outcome": {
+      "type": "string",
+      "enum": [
+        "success",
+        "failure",
+        "fallback_pilot_binding"
+      ],
+      "default": "failure",
+      "description": "How the event ended the launch: success, failure, or the pilot continuing on the verified launch binding after the access-token-backed dealer identity resolve was unavailable."
+    },
+    "reason": {
+      "type": "string",
+      "nullable": true,
+      "description": "Machine reason reported for this event (e.g. NO_PORTAL_TOKEN, PORTAL_IDENTITY_CONFLICT)."
+    },
+    "account_id": {
+      "type": "string",
+      "nullable": true,
+      "description": "Sound Proof Account id involved in the launch, when resolved."
+    },
+    "base44_user_id": {
+      "type": "string",
+      "nullable": true,
+      "description": "Base44 user who launched Sound Proof from the Partner Portal."
+    },
+    "base44_user_email": {
+      "type": "string",
+      "nullable": true,
+      "description": "Normalised email of the launching Base44 user. Recorded for diagnosis only \u2014 never used as account authority."
+    },
+    "portal_subject": {
+      "type": "string",
+      "nullable": true,
+      "description": "Verified Partner Portal subject (external user id) from the launch binding."
+    },
+    "portal_profile_id": {
+      "type": "string",
+      "nullable": true,
+      "description": "Verified Partner Portal profile id from the launch binding."
+    },
+    "portal_session_id": {
+      "type": "string",
+      "nullable": true,
+      "description": "Verified Partner Portal session id from the launch binding."
+    },
+    "membership_id": {
+      "type": "string",
+      "nullable": true,
+      "description": "AccountMembership seat this event claimed or failed to claim."
+    },
+    "occurred_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "When the event occurred."
+    },
+    "details": {
+      "type": "object",
+      "nullable": true,
+      "description": "Event-specific evidence (claim route, seat email, previous seat user id, identity ids, contract notes)."
+    }
+  },
+  "required": [
+    "event",
+    "outcome",
+    "occurred_at"
+  ],
+  "rls": {
+    "read": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "create": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "update": false,
+    "delete": false
+  }
+}
