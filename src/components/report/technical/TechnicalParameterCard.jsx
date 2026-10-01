@@ -25,6 +25,7 @@ import React from "react";
 import TechnicalLevelBadge from "./TechnicalLevelBadge";
 import TechnicalSeatGrid from "./TechnicalSeatGrid";
 import SeatScopeBadge from "../SeatScopeBadge";
+import { isP8Number, P8_NOTE } from "@/components/utils/rp22/p8Authority";
 
 import {
   REPORT_FONT_HEADING as HEADING_FONT,
@@ -227,6 +228,21 @@ export default function TechnicalParameterCard({
           </div>
         )}
       </div>
+
+      {/* 2b. P8 is a fixed Sound Proof Level 4 rule — stated once, briefly. */}
+      {isP8Number(param?.id) && (
+        <div
+          style={{
+            fontSize: u.fsLabel,
+            color: "#625143",
+            fontFamily: BODY_FONT,
+            marginTop: u.mt1,
+            lineHeight: isScreen ? 1.4 : 1.25,
+          }}
+        >
+          {P8_NOTE}
+        </div>
+      )}
 
       {/* 3. SHORT TECHNICAL EXPLANATION */}
       <div

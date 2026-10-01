@@ -5,6 +5,7 @@ import RP22GradingPill from "@/components/ui/RP22GradingPill";
 import BassRp22ParameterTooltip from "@/components/room/bass/BassRp22ParameterTooltip";
 import SeatScopeBadge from "@/components/report/SeatScopeBadge";
 import SeatResultMap from "@/components/report/SeatResultMap";
+import { isP8Number, P8_NOTE } from "@/components/utils/rp22/p8Authority";
 
 /* ---------- Shared style tokens (mirrored from RP22CompliancePanel) ---------- */
 const card  = { border: "1px solid #DCDBD6", background: "#fff", borderRadius: 8 };
@@ -66,6 +67,12 @@ export default function RP22ComplianceParameterTile({ param, achievedValue, lvl,
         {targetBasisNote && (
           <div style={{ fontSize: 10, color: "#9B8E82", marginTop: 4, fontStyle: "italic" }}>
             {targetBasisNote}
+          </div>
+        )}
+        {/* P8 is a fixed Sound Proof Level 4 rule — stated once, briefly. */}
+        {isP8Number(param?.id) && (
+          <div style={{ fontSize: 10, color: "#9B8E82", marginTop: 4, fontStyle: "italic" }}>
+            {P8_NOTE}
           </div>
         )}
       </div>

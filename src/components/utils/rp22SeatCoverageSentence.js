@@ -30,6 +30,7 @@
  */
 
 import { getPrimarySeats } from "./seatPriorityAuthority";
+import { P8_FIXED_REASON } from "./rp22/p8Authority";
 
 /** Map RP22 level strings to comparable numeric ranks. */
 const LEVEL_RANK = { L4: 4, L3: 3, L2: 2, L1: 1, FAIL: 0 };
@@ -67,7 +68,9 @@ export function computeRp22CoverageFloor({ paramAuthority, seats }) {
 
     // V1-excluded params (P8/P15/P21) are permanently excluded — they do
     // not count against allParametersAuthoritative and are not assessed.
-    if (param.reason === "v1-excluded") continue;
+    // P8 is now presented as an assessed Level 4 result, but it stays excluded
+    // from this coverage floor authority exactly as before.
+    if (param.reason === "v1-excluded" || param.reason === P8_FIXED_REASON) continue;
 
     // N/A params are not applicable to this layout — skip entirely.
     if (param.state === "na") continue;

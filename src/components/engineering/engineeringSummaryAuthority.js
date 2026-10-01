@@ -25,6 +25,7 @@ import { getLowestPerformanceResults } from "@/components/designreview/needsAtte
 import { getCategoryForParam } from "@/components/report/technical/technicalParameterMeta";
 import { buildRp22SeatCoverageResult } from "@/components/utils/rp22SeatCoverageSentence";
 import { getScopedSeatIds, buildSeatPriorityFingerprint } from "@/components/utils/seatScopeAuthority";
+import { P8_NUMBER, buildP8RoomResult } from "@/components/utils/rp22/p8Authority";
 import { rp23LevelForAngleDeg } from "@/components/utils/viewingAngleUtils";
 import {
   BASS_LEVEL_RANK as LEVEL_RANK,
@@ -88,6 +89,12 @@ function buildCanonicalRoomResults(parameters, publishedResults) {
     const match = String(key).match(/^(?:p)?(\d+)$/i);
     if (!match) continue;
     const parameterNumber = Number(match[1]);
+    // P8 is a fixed Sound Proof Level 4 rule. Its room result is published from
+    // the P8 authority so no stale dash or "Not calculated" text can survive.
+    if (parameterNumber === P8_NUMBER) {
+      canonical[P8_NUMBER] = buildP8RoomResult(canonical[P8_NUMBER]);
+      continue;
+    }
     const existing = canonical[parameterNumber] || canonical[String(parameterNumber)] || {};
     canonical[parameterNumber] = {
       ...existing,
@@ -132,8 +139,10 @@ function buildComplianceSummary(parameters) {
     }
 
     const state = parameter?.state || "provisional";
+    // P8 is an assigned Sound Proof authority (always L4) and reads with the
+    // same "Assumed" naming as the other assumed parameters.
     const presentationStatus = state === "scored"
-      ? ((key === "p15" || key === "p21") ? "assumed" : "calculated")
+      ? ((key === "p15" || key === "p21" || key === "p8") ? "assumed" : "calculated")
       : state === "na"
         ? "not_applicable"
         : "not_verified";

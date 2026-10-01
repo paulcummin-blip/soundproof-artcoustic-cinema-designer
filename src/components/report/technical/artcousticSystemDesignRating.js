@@ -32,6 +32,7 @@ import {
 } from "@/components/utils/rp22/levels";
 import { rp23LevelForAngleDeg } from "@/components/utils/viewingAngleUtils";
 import gradeP1Distance from "@/components/utils/rp22/p1LevelAuthority";
+import { buildP8DesignRatingParameter, isP8Key } from "@/components/utils/rp22/p8Authority";
 import { isAuthoritativeBassContract } from "@/components/room/bass/completedBassResultPersistence";
 import { assessP18Extension } from "@/components/utils/p18ExtensionAuthority";
 import { getEffectiveAssumedLevel, normalizeAssumedLevel } from "@/components/utils/assumedParameterAuthority";
@@ -520,6 +521,15 @@ export function buildArtcousticDesignRatingAuthority(input) {
     const weight = PARAM_WEIGHTS[key];
     const scope = PARAM_SCOPE[key];
     const paramInput = input?.[key];
+
+    // P8 is a fixed Sound Proof product rule — always Level 4, never a dash and
+    // never "Not verified". It is presented as an assessed result while staying
+    // outside the rating numerator (V1_EXCLUDED_PARAMS is still consulted by
+    // calculateRoomDesignRatingCore), so no other calculation changes.
+    if (isP8Key(key)) {
+      parameters[key] = buildP8DesignRatingParameter({ weight, scope });
+      continue;
+    }
 
     if (V1_EXCLUDED_PARAMS.has(key)) {
       parameters[key] = {

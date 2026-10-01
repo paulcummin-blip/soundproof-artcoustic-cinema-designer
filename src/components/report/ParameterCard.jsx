@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import RP22GradingPill from '../ui/RP22GradingPill';
+import { P8_NOTE } from '@/components/utils/rp22/p8Authority';
 import {
   resolveAssumedP15Level,
   resolveAssumedP21Level,
@@ -152,6 +153,9 @@ export default function ParameterCard({ parameter, roomResult, seatResults = [],
                                 <div className="text-[9px] mt-1">-</div>
                                 <div className="text-[9px] mt-1">
                                     Absent the ability to install top (overhead) speakers, one solution is to employ upfiring/elevation (e.g., "Atmos Enabled") speakers aimed at a reflective ceiling surface to reproduce immersive content and audio objects. These speakers should have a suitable mechanical and electrical design.
+                                </div>
+                                <div className="text-[9px] mt-1 italic text-[#9B8E82]">
+                                    {P8_NOTE}
                                 </div>
                             </div>
                         ) : parameter.id === 11 ? (

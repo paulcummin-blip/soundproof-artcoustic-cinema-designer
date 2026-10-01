@@ -12,6 +12,7 @@
 import { levelP21_earlyReflections } from "@/components/utils/rp22/levels";
 import { p18ThresholdsForBasis } from "@/components/utils/p18ExtensionAuthority";
 import { resolveAssumedP15Level, resolveAssumedP21Level } from "@/components/utils/assumedParameterAuthority";
+import { P8_LEVEL } from "@/components/utils/rp22/p8Authority";
 
 /* ---------- P12/P13/P14 mode-aware threshold resolver ---------- */
 
@@ -110,6 +111,10 @@ export function resolveRoomParameterLevel(paramId, {
     return bassPresentation?.parameters?.p20?.level ?? "—";
   }
 
+  // P8 is a fixed Sound Proof product rule: always Level 4, never a dash.
+  // Resolved first so no other path can blank it.
+  if (pid === 8) return P8_LEVEL;
+
   const res = analysisResult?.gradedParameters?.primary?.[pid] || null;
 
   // P12/P13: re-grade from raw value using user-selected mode thresholds
@@ -134,7 +139,6 @@ export function resolveRoomParameterLevel(paramId, {
     const p3 = analysisResult?.gradedParameters?.primary?.[3];
     return (p3 && p3.status === "ok") ? p3.level : "—";
   }
-  if (pid === 8) return "L4";
   if (pid === 11) return "L4";
   // P15/P21: the unmeasured canonical authority is always the permanent L2
   // design assumption. A genuine measured result above takes precedence.

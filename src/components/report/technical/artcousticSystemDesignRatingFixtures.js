@@ -267,18 +267,19 @@ function fixtureE() {
 function fixtureF() {
   const checks = [];
 
-  // P8 with any input should be provisional (v1-excluded)
+  // P8 is a fixed Sound Proof product rule: always scored Level 4, whatever the
+  // input, and never a dash / "Not verified".
   const f1 = buildArtcousticDesignRatingAuthority({ seats: SEAT_LIST, p8: { rawValue: 1 } });
-  checks.push(["P8 provisional (v1-excluded)", f1.parameters.p8.state === "provisional"]);
-  checks.push(["P8 reason v1-excluded", f1.parameters.p8.reason === "v1-excluded"]);
-  checks.push(["P8 level null", f1.parameters.p8.level === null]);
+  checks.push(["P8 scored (fixed rule)", f1.parameters.p8.state === "scored"]);
+  checks.push(["P8 reason product-fixed", f1.parameters.p8.reason === "product-fixed"]);
+  checks.push(["P8 level L4", f1.parameters.p8.level === "L4"]);
 
-  // P8 with null input should also be provisional
+  // P8 with null input is still Level 4
   const f2 = buildArtcousticDesignRatingAuthority({ seats: SEAT_LIST, p8: null });
-  checks.push(["P8 null→provisional", f2.parameters.p8.state === "provisional"]);
+  checks.push(["P8 null→scored L4", f2.parameters.p8.state === "scored" && f2.parameters.p8.level === "L4"]);
 
   const failed = checks.filter(([, v]) => !v).map(([label]) => label);
-  return makeResult("F: P8 unscoreable", failed.length === 0, `Failed: ${failed.join(", ")}`);
+  return makeResult("F: P8 fixed Level 4", failed.length === 0, `Failed: ${failed.join(", ")}`);
 }
 
 // ═══════════════════════════════════════════════════════════════
