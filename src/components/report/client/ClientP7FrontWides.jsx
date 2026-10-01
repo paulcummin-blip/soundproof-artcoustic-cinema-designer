@@ -63,7 +63,6 @@ export default function ClientP7FrontWides({
     rwPos,
     flPos,
     frPos,
-    medianPoint,
     rsp,
     ideal,
     slPos,
@@ -113,18 +112,50 @@ export default function ClientP7FrontWides({
   const rwPx = toPx(rwPos.x, rwPos.y);
   const flPx = flPos ? toPx(flPos.x, flPos.y) : null;
   const frPx = frPos ? toPx(frPos.x, frPos.y) : null;
-  const medianPx = medianPoint ? toPx(medianPoint.x, medianPoint.y) : null;
 
   // ── Ideal median position vs the actual front wide position ────────────────
   // The published P7 result carries, per side, the ideal (median) angle, the
-  // actual angle and the deviation between them. The plan draws the ideal median
-  // ray and the deviation arc, so the reader can see both where each front wide
-  // sits and where it ideally wants to be. Drawing only — nothing is recomputed.
-  const polarToSvg = (cx, cy, radiusM, thetaDeg) => {
+  // actual angle and the deviation between them. The report marks the ideal
+  // median direction ON THE SAME WALL the front wide is mounted on, so the reader
+  // sees both positions on the wall and the distance between them — nothing is
+  // projected outside the room and no construction geometry is drawn. Drawing
+  // only: no angle is measured and nothing is recomputed.
+
+  // Which wall the front wide is mounted on — the nearest room boundary.
+  const wallOfPoint = (x, y) => [
+    { axis: "x", value: 0, distance: x },
+    { axis: "x", value: W, distance: W - x },
+    { axis: "y", value: 0, distance: y },
+    { axis: "y", value: L, distance: L - y },
+  ].reduce((nearest, candidate) => (candidate.distance < nearest.distance ? candidate : nearest));
+
+  // Where the ideal median direction meets that wall. Kept inside the room, so
+  // no marker can ever be drawn outside the plan.
+  const projectToWall = (pos, thetaDeg) => {
     const rad = (thetaDeg - 90) * (Math.PI / 180);
+    const dx = Math.cos(rad);
+    const dy = Math.sin(rad);
+    const wall = wallOfPoint(pos.x, pos.y);
+    let x = pos.x;
+    let y = pos.y;
+    if (wall.axis === "x") {
+      if (Math.abs(dx) < 1e-6) return null;
+      const t = (wall.value - rsp.x) / dx;
+      if (!(t > 0)) return null;
+      x = wall.value;
+      y = rsp.y + t * dy;
+    } else {
+      if (Math.abs(dy) < 1e-6) return null;
+      const t = (wall.value - rsp.y) / dy;
+      if (!(t > 0)) return null;
+      y = wall.value;
+      x = rsp.x + t * dx;
+    }
+    const margin = 0.08;
     return {
-      x: cx + radiusM * Math.cos(rad) * SCALE,
-      y: cy + radiusM * Math.sin(rad) * SCALE,
+      x: Math.min(Math.max(x, margin), W - margin),
+      y: Math.min(Math.max(y, margin), L - margin),
+      wall,
     };
   };
 
@@ -137,31 +168,28 @@ export default function ClientP7FrontWides({
     { key: "LW", pos: lwPos, ideal: ideal?.LW },
     { key: "RW", pos: rwPos, ideal: ideal?.RW },
   ]
-    .filter((side) => side.ideal && side.pos && rspPx && rsp)
+    .filter((side) => side.ideal && side.pos && rsp)
     .map((side) => {
       const idealTheta = toPlanTheta(side.ideal.targetAngle);
-      const actualTheta = toPlanTheta(side.ideal.actualAngle);
-      if (idealTheta == null || actualTheta == null) return null;
-      const radiusM = Math.hypot(side.pos.x - rsp.x, side.pos.y - rsp.y) || 1;
-      const idealPt = polarToSvg(rspPx.px, rspPx.py, radiusM, idealTheta);
-      const labelPt = polarToSvg(rspPx.px, rspPx.py, radiusM + 0.4, idealTheta);
-      const arcRadiusM = radiusM * 1.16;
-      const arcStart = polarToSvg(rspPx.px, rspPx.py, arcRadiusM, actualTheta);
-      const arcEnd = polarToSvg(rspPx.px, rspPx.py, arcRadiusM, idealTheta);
-      const sweep = ((idealTheta - actualTheta) % 360 + 360) % 360;
-      const arcLabelPt = polarToSvg(
-        rspPx.px,
-        rspPx.py,
-        arcRadiusM + 0.3,
-        (actualTheta + sweep / 2) % 360,
-      );
+      if (idealTheta == null) return null;
+      const idealM = projectToWall(side.pos, idealTheta);
+      if (!idealM) return null;
+      const actualPx = toPx(side.pos.x, side.pos.y);
+      const idealPx = toPx(idealM.x, idealM.y);
+      // Labels sit just inside the room, off the wall.
+      const labelOffset = idealM.wall.axis === "x"
+        ? { x: idealM.wall.value === 0 ? 13 : -13, y: 0 }
+        : { x: 0, y: idealM.wall.value === 0 ? 14 : -14 };
       const deviation = Number(side.ideal.deviation);
       return {
         key: side.key,
-        idealPt,
-        labelPt,
-        arcLabelPt,
-        arcPath: `M ${arcStart.x} ${arcStart.y} A ${arcRadiusM * SCALE} ${arcRadiusM * SCALE} 0 ${sweep > 180 ? 1 : 0} 1 ${arcEnd.x} ${arcEnd.y}`,
+        actualPx,
+        idealPx,
+        idealLabelPx: { x: idealPx.px + labelOffset.x, y: idealPx.py + labelOffset.y },
+        deviationLabelPx: {
+          x: (actualPx.px + idealPx.px) / 2 + labelOffset.x,
+          y: (actualPx.py + idealPx.py) / 2 + labelOffset.y,
+        },
         deviation: Number.isFinite(deviation) ? deviation : null,
         isWorst: Number.isFinite(deviation)
           && Number.isFinite(worstDeviation)
@@ -178,7 +206,7 @@ export default function ClientP7FrontWides({
   // authority does not say which side that is, the first drawn side carries it.
   const publishedMaxDeviation = Number(maxDeviation);
   const deviationLabel = Number.isFinite(publishedMaxDeviation)
-    ? `${publishedMaxDeviation.toFixed(1)}° from ideal`
+    ? `${publishedMaxDeviation.toFixed(1)}° deviation`
     : null;
   const deviationSide = placementSides.find((side) => side.isWorst) || placementSides[0] || null;
 
@@ -240,11 +268,6 @@ export default function ClientP7FrontWides({
         />
       ),
     }] : []),
-    {
-      id: "median",
-      label: "Median reference",
-      sample: <line x1={10} y1={10} x2={16} y2={4} stroke={MEDIAN_COLOR} strokeWidth={2} strokeDasharray="3 2" />,
-    },
     {
       id: "screen",
       label: "Screen speakers",
@@ -336,37 +359,7 @@ export default function ClientP7FrontWides({
             SCREEN
           </text>
 
-          {/* Median reference — the ideal median direction per side, drawn from
-              the published angles. Falls back to the midpoint of the current
-              front wide positions when the published angles are unavailable. */}
-          {showIdealMedian
-            ? placementSides.map((side) => (
-                <line
-                  key={`ideal-ray-${side.key}`}
-                  x1={rspPx.px}
-                  y1={rspPx.py}
-                  x2={side.idealPt.x}
-                  y2={side.idealPt.y}
-                  stroke={MEDIAN_COLOR}
-                  strokeWidth={2}
-                  strokeDasharray="6 4"
-                  strokeLinecap="round"
-                />
-              ))
-            : rspPx && medianPx && (
-                <line
-                  x1={rspPx.px}
-                  y1={rspPx.py}
-                  x2={medianPx.px}
-                  y2={medianPx.py}
-                  stroke={MEDIAN_COLOR}
-                  strokeWidth={2}
-                  strokeDasharray="6 4"
-                  strokeLinecap="round"
-                />
-              )}
-
-          {/* Adjacent side surrounds — the far end of the median angle */}
+          {/* Screen */}
           {surroundPx.map((surround) => (
             <g key={`surround-${surround.label}`}>
               <circle
@@ -449,17 +442,20 @@ export default function ClientP7FrontWides({
             </text>
           </g>
 
-          {/* Deviation from the ideal median position — the angular span between
-              where each front wide sits and where it ideally wants to be. The side
-              that sets the result carries the level colour. */}
+          {/* Deviation — a short line along the wall between where each front
+              wide sits and where the ideal median position is. The side that
+              sets the result carries the level colour and the published figure. */}
           {placementSides.map((side) => (
-            <path
+            <line
               key={`deviation-${side.key}`}
-              d={side.arcPath}
-              fill="none"
+              x1={side.actualPx.px}
+              y1={side.actualPx.py}
+              x2={side.idealPx.px}
+              y2={side.idealPx.py}
               stroke={side.isWorst ? color : MEDIAN_COLOR}
-              strokeWidth={side.isWorst ? 2.5 : 1.5}
+              strokeWidth={side.isWorst ? 2 : 1.5}
               strokeOpacity={side.isWorst ? 0.95 : 0.6}
+              strokeLinecap="round"
             />
           ))}
 
@@ -467,8 +463,8 @@ export default function ClientP7FrontWides({
               card, so the drawing and the card can never disagree. */}
           {deviationLabel && deviationSide && (
             <text
-              x={deviationSide.arcLabelPt.x}
-              y={deviationSide.arcLabelPt.y}
+              x={deviationSide.deviationLabelPx.x}
+              y={deviationSide.deviationLabelPx.y}
               fill={color}
               fontSize={11}
               fontWeight={600}
@@ -479,50 +475,36 @@ export default function ClientP7FrontWides({
             </text>
           )}
 
-          {/* Ideal median position — where each front wide aims to be. Outlined,
-              never filled solid, so it can never be read as an installed speaker. */}
+          {/* Ideal median position — on the same wall, outlined so it can never
+              be read as an installed speaker. */}
           {placementSides.map((side) => (
             <g key={`ideal-marker-${side.key}`}>
               <rect
-                x={side.idealPt.x - 4.5}
-                y={side.idealPt.y - 4.5}
+                x={side.idealPx.px - 4.5}
+                y={side.idealPx.py - 4.5}
                 width={9}
                 height={9}
                 fill="#FFFFFF"
                 stroke={MEDIAN_COLOR}
                 strokeWidth={2}
                 strokeDasharray="3 2"
-                transform={`rotate(45 ${side.idealPt.x} ${side.idealPt.y})`}
+                transform={`rotate(45 ${side.idealPx.px} ${side.idealPx.py})`}
               />
               <text
-                x={side.labelPt.x}
-                y={side.labelPt.y}
+                x={side.idealLabelPx.x}
+                y={side.idealLabelPx.y}
                 fill={MEDIAN_COLOR}
                 fontSize={9}
                 fontWeight={600}
                 textAnchor="middle"
+                dominantBaseline="middle"
                 fontFamily={BODY_FONT}
                 letterSpacing="0.06em"
               >
-                Ideal FW
+                Ideal
               </text>
             </g>
           ))}
-
-          {/* Median marker (small diamond at median point) — only when the
-              published ideal angles are unavailable */}
-          {!showIdealMedian && medianPx && (
-            <g>
-              <rect
-                x={medianPx.px - 4}
-                y={medianPx.py - 4}
-                width={8}
-                height={8}
-                fill={MEDIAN_COLOR}
-                transform={`rotate(45 ${medianPx.px} ${medianPx.py})`}
-              />
-            </g>
-          )}
 
           {/* RSP marker */}
           {rspPx && (() => {
@@ -624,13 +606,8 @@ export default function ClientP7FrontWides({
             </div>
           )}
 
-          {/* ── Placement guidance — where the wides sit, where they want to be ── */}
-          <P7PlacementGuidance
-            level={level}
-            maxDeviation={maxDeviation}
-            ideal={ideal}
-            print={print}
-          />
+          {/* ── Placement caption — what the markers on the wall mean ── */}
+          <P7PlacementGuidance print={print} />
         </>
       )}
     </div>
