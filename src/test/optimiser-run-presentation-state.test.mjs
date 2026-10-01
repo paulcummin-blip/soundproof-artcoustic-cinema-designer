@@ -418,7 +418,7 @@ describe('TEST 4: current evaluated lever', () => {
 
   it('uses compact winner wording instead of no-improvement wording', () => {
     const block = read('components/room/bass/optimiserPlan/OptimiserRunEvidenceBlock.jsx');
-    expect(block).toContain('before confirming this recommendation');
+    expect(block).toContain('This recommendation was confirmed from that search.');
     expect(block).toContain('No change has been applied.');
     expect(block).toMatch(/if \(evidence\.actionablePlanProduced === true\)/);
   });
@@ -607,15 +607,15 @@ describe('TEST 9: the card receives the run evidence', () => {
   it('reaches the card through the journey and the terminal branches', () => {
     const journey = read('components/room/bass/optimiserPlan/AdiOptimisationJourney.jsx');
     expect(journey).toMatch(/presentation\?\.evidence/);
-    expect(journey).toMatch(/<OptimiserRunEvidenceBlock evidence=\{runEvidence\} \/>/);
+    expect(journey).toMatch(/<OptimiserRunEvidenceBlock evidence=\{runEvidence\} seatCount=\{seatCount\} instances=\{instances\} \/>/);
 
     const card = read('components/room/bass/optimiseWorkflow/AdiRecommendation.jsx');
     // The resolved presentation is handed to the journey card...
     expect((card.match(/presentation=\{optimiserPresentation\}/g) || []).length).toBe(2);
     // ...and the two terminal cards that resolve their own copy still show what
     // the run evaluated, so no no-winner outcome hides the evidence.
-    expect((card.match(/<OptimiserRunEvidenceBlock evidence=\{optimiserPresentation\.evidence\} \/>/g) || []).length)
-      .toBeGreaterThanOrEqual(2);
+    const evidenceBlock = /<OptimiserRunEvidenceBlock\s+evidence=\{optimiserPresentation\.evidence\}\s+seatCount=\{seatCount\}\s+instances=\{currentInstances\}\s+\/>/g;
+    expect((card.match(evidenceBlock) || []).length).toBeGreaterThanOrEqual(2);
     expect(card).toMatch(/const optimiserPresentation = resolveOptimiserPresentationState\(\{/);
     expect(card).toMatch(/planView: optimiserPlanView/);
   });

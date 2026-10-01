@@ -22,8 +22,16 @@ import {
 import { OPTIMISER_FAMILY_SEQUENCE, leverLabel } from "./optimiserLeverOrder.js";
 import { ADI_OPTIMISER_COPY } from "./resolveAdiOptimiserJourney.js";
 
-export default function OptimiserCalculationDetail({ instances = [], className = "" }) {
+export default function OptimiserCalculationDetail({ instances = [], seatCount = null, className = "" }) {
   const estimate = estimateOptimiserCalculations({ instances });
+
+  // The acoustic work underneath the design options. This is counting detail, so
+  // it is explained here and never in the default card.
+  const acoustic = estimateAcousticCalculations({
+    designOptions: estimate.total,
+    seatCount,
+    activeSubwooferCount: estimate.sourceCount,
+  });
 
   // The lever order comes from the one least-intrusive sequence, so this list
   // can never drift from the order ADI actually evaluates.
@@ -57,6 +65,18 @@ export default function OptimiserCalculationDetail({ instances = [], className =
               {ADI_OPTIMISER_COPY.DISCLOSURE_ESTIMATE_LABEL}
             </div>
             <div>{familyCounts}</div>
+          </div>
+        )}
+
+        {acoustic.available && (
+          <div>
+            <div className="text-[10px] font-semibold uppercase tracking-wide text-[#8A7B6A]">
+              {ADI_OPTIMISER_COPY.DISCLOSURE_ACOUSTIC_LABEL}
+            </div>
+            <div>
+              {`${formatCalculationCount(acoustic.raw)} acoustic calculations — shown as over ${formatCalculationCount(acoustic.claim)}.`}
+            </div>
+            <div className="text-[10px] text-[#8B7F76]">{ACOUSTIC_BASIS_NOTE}</div>
           </div>
         )}
 

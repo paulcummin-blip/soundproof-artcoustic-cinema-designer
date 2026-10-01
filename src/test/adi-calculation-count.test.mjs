@@ -17,13 +17,16 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import {
+  ACOUSTIC_ROUNDING_THRESHOLDS,
   ESTIMATE_BASIS_NOTE,
   OPTIMISER_SEARCH_STEPS,
   countActiveSources,
+  estimateAcousticCalculations,
   estimateOptimiserCalculations,
   estimateSentence,
   formatCalculationCount,
   resolveSearchGroupCount,
+  resultSentence,
 } from '@/components/room/bass/optimiserPlan/optimiserCalculationEstimate.js';
 import {
   OPTIMISER_FAMILY_SEQUENCE,
@@ -54,7 +57,10 @@ describe('PRE-RUN ESTIMATED COUNT SHOWN', () => {
     expect(estimate.available).toBe(true);
     expect(estimate.total).toBeGreaterThan(100);
     expect(estimateSentence(estimate)).toBe(
-      `ADI will run approximately ${formatCalculationCount(estimate.total)} design calculations to improve bass consistency across the seats.`,
+      `ADI will test approximately ${formatCalculationCount(estimate.total)} design options, `
+      + `involving over ${formatCalculationCount(
+        estimateAcousticCalculations({ designOptions: estimate.total }).claim,
+      )} acoustic calculations across seats, frequencies and subwoofer settings.`,
     );
   });
 
@@ -75,7 +81,7 @@ describe('PRE-RUN ESTIMATED COUNT SHOWN', () => {
 
   it('states a detailed set below one hundred calculations', () => {
     expect(estimateSentence({ available: true, total: 42 }))
-      .toBe('ADI will run a detailed set of design calculations to improve bass consistency across the seats.');
+      .toBe('ADI will run a detailed set of design options to improve bass consistency across the seats.');
   });
 });
 
@@ -129,13 +135,22 @@ describe('COUNT DERIVED FROM SEARCH SPACE', () => {
 });
 
 describe('NO UNSUPPORTED CLAIMS', () => {
-  it('claims no thousands for any supported quantity', () => {
+  it('states the acoustic claim in a stated tier, never a raw derived figure', () => {
     for (const quantity of [1, 2, 4]) {
       const sentence = estimateSentence(estimateOptimiserCalculations({ instances: subs(quantity) }));
-      expect(sentence).not.toMatch(/thousand/i);
-      expect(sentence).not.toMatch(/hundred/i);
       expect(sentence).not.toMatch(/\d\.\d/);
+      const claimed = ACOUSTIC_ROUNDING_THRESHOLDS
+        .find((tier) => sentence.includes(tier.toLocaleString('en-GB')));
+      expect(claimed, `no stated tier found in: ${sentence}`).toBeDefined();
     }
+  });
+
+  it('states the design option count as design options, never as calculations', () => {
+    const estimate = estimateOptimiserCalculations({ instances: subs(4) });
+    const sentence = estimateSentence(estimate);
+
+    expect(sentence).toContain(`${formatCalculationCount(estimate.total)} design options`);
+    expect(sentence).not.toMatch(/\d+ design calculations/);
   });
 
   it('states that the figure is an estimate from the search space', () => {
@@ -146,9 +161,18 @@ describe('NO UNSUPPORTED CLAIMS', () => {
 });
 
 describe('POST-RUN ACTUAL COUNT SHOWN', () => {
-  it('states the confirmed design calculations the run completed', () => {
+  it('states the confirmed design options and the acoustic work behind them', () => {
     const block = read('components/room/bass/optimiserPlan/OptimiserRunEvidenceBlock.jsx');
+    expect(block).toMatch(/resultSentence\(evidence\.candidatesEvaluated/);
     expect(block).toMatch(/ADI completed \{evidence\.candidatesEvaluated\} confirmed design calculations/);
+  });
+
+  it('states the run headline as design options with the rounded acoustic claim', () => {
+    const options = 361;
+    expect(resultSentence(options, { seatCount: 9, activeSubwooferCount: 4 })).toBe(
+      `ADI tested ${formatCalculationCount(options)} design options, involving over 250,000 acoustic `
+      + 'calculations across seats, frequencies and subwoofer settings.',
+    );
   });
 
   it('replaces the estimate with real evidence rather than showing both', () => {

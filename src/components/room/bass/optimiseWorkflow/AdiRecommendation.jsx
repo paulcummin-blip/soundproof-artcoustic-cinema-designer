@@ -128,6 +128,10 @@ export default function AdiRecommendation({
   onRunOptimisationPlan,
 }) {
   const [applying, setApplying] = useState(false);
+
+  // The design's own seat count, so the acoustic estimate spans this design's
+  // seats rather than an assumed number.
+  const seatCount = Array.isArray(seatingPositions) ? seatingPositions.length : null;
   const [appliedStage, setAppliedStage] = useState(null);
 
   // Applied Calibration Authority — persisted per-project+version.
@@ -459,6 +463,7 @@ export default function AdiRecommendation({
         completedBassAuthority={completedBassAuthority}
         currentDesignFingerprint={shared?.cacheKey || null}
         instances={currentInstances}
+        seatCount={seatCount}
         limitingFactorSentence={limitingFactorSentence}
         runBlockReason={optimisationRunBlockReason || null}
         runStatus={optimisationRunStatus || "idle"}
@@ -524,7 +529,11 @@ export default function AdiRecommendation({
           </div>
         )}
         {/* What the run actually evaluated, saved with this design version. */}
-        <OptimiserRunEvidenceBlock evidence={optimiserPresentation.evidence} />
+        <OptimiserRunEvidenceBlock
+          evidence={optimiserPresentation.evidence}
+          seatCount={seatCount}
+          instances={currentInstances}
+        />
       </div>
     );
   }
@@ -551,7 +560,11 @@ export default function AdiRecommendation({
           </div>
         )}
         {/* A run that found no improvement still states what it tested. */}
-        <OptimiserRunEvidenceBlock evidence={optimiserPresentation.evidence} />
+        <OptimiserRunEvidenceBlock
+          evidence={optimiserPresentation.evidence}
+          seatCount={seatCount}
+          instances={currentInstances}
+        />
       </div>
     );
   }
@@ -569,6 +582,7 @@ export default function AdiRecommendation({
         completedBassAuthority={completedBassAuthority}
         currentDesignFingerprint={shared?.cacheKey || null}
         instances={currentInstances}
+        seatCount={seatCount}
         limitingFactorSentence={limitingFactorSentence}
         runBlockReason={optimisationRunBlockReason || null}
         runStatus={optimisationRunStatus || "idle"}

@@ -1,7 +1,8 @@
 // optimiserCalculationEstimate.js
 // ---------------------------------------------------------------------------
-// How many design calculations ADI will run for this design — estimated BEFORE
-// the run, from the optimiser's own declared search space.
+// How many design options ADI will test for this design, and the acoustic work
+// behind them — estimated BEFORE the run, from the optimiser's own declared
+// search space.
 //
 // Every number here is read from the engine's real search definition, not
 // invented, and nothing is hardcoded as "hundreds" or "thousands":
@@ -128,7 +129,7 @@ function placementBudget(sourceCount) {
 }
 
 /**
- * Estimate the number of design calculations the optimiser will run.
+ * Estimate the number of design options the optimiser will test.
  *
  * @param {object} params
  * @param {Array} [params.instances] - the design's subwoofer instances

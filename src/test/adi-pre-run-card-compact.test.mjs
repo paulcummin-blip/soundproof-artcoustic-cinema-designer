@@ -2,11 +2,11 @@
 // ---------------------------------------------------------------------------
 // Regression tests for the compact pre-run ADI bass optimisation card.
 //
-// Product rule: the default pre-run card sells the value. It shows the
-// calculation count, one short line about what ADI checks first, and a
-// prominent button. Every technical detail — lever order, per-family counts,
-// what ADI compares against, and how the estimate was derived — sits behind a
-// disclosure that is collapsed by default.
+// Product rule: the default pre-run card sells the value. It shows how many
+// design options ADI will test and the acoustic work behind them, one short line
+// about what ADI checks first, and a prominent button. Every technical detail —
+// lever order, per-family counts, what ADI compares against, and how the
+// estimate was derived — sits behind a disclosure that is collapsed by default.
 //
 // Presentation only: no optimiser maths, scoring, grading or apply logic.
 // ---------------------------------------------------------------------------
@@ -85,10 +85,11 @@ describe('PRE-RUN COPY SHORTENED', () => {
 });
 
 describe('CALCULATION COUNT STILL VISIBLE', () => {
-  it('states the count on the default card', () => {
+  it('states the design options and the acoustic claim on the default card', () => {
     const estimate = estimateOptimiserCalculations({ instances: subs(4) });
     expect(estimateSentence(estimate)).toContain('361');
-    expect(estimateSentence(estimate)).toContain('design calculations');
+    expect(estimateSentence(estimate)).toContain('361 design options');
+    expect(estimateSentence(estimate)).toContain('over 250,000 acoustic calculations');
   });
 
   it('is rendered in the pre-run card, before the action', () => {
@@ -111,7 +112,7 @@ describe('DETAILS COLLAPSED BY DEFAULT', () => {
   it('sits below the button, as the optional detail', () => {
     const card = read(`${PLAN}AdiOptimisationJourney.jsx`);
     const actionAt = card.indexOf('{journey.actionLabel}');
-    const detailAt = card.indexOf('<OptimiserCalculationDetail instances={instances} />');
+    const detailAt = card.indexOf('<OptimiserCalculationDetail instances={instances} seatCount={seatCount} />');
     expect(actionAt).toBeGreaterThan(-1);
     expect(detailAt).toBeGreaterThan(actionAt);
   });
@@ -132,7 +133,7 @@ describe('DETAILS COLLAPSED BY DEFAULT', () => {
 
   it('is rendered only before a run, never beside real evidence', () => {
     const card = read(`${PLAN}AdiOptimisationJourney.jsx`);
-    expect(card).toMatch(/\{showEstimate && <OptimiserCalculationDetail instances=\{instances\} \/>\}/);
+    expect(card).toMatch(/\{showEstimate && <OptimiserCalculationDetail instances=\{instances\} seatCount=\{seatCount\} \/>\}/);
     expect(card).toMatch(/const showEstimate = isPreRun && !runEvidence;/);
   });
 });

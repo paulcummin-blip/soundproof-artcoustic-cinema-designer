@@ -12,6 +12,7 @@
 // ---------------------------------------------------------------------------
 
 import React from "react";
+import { countActiveSources, resultSentence } from "./optimiserCalculationEstimate.js";
 import { OPTIMISER_FAMILY_STATUS, OPTIMISER_RUN_FAMILY } from "./optimiserRunFamilies.js";
 import { LEAST_INTRUSIVE_NOTE, leverTitle } from "./optimiserLeverOrder.js";
 import { OPTIMISER_LEVER_VERDICT, resolveLeverVerdict } from "./optimiserLeverVerdict.js";
@@ -148,7 +149,12 @@ function FamilyRow({ family, current }) {
   );
 }
 
-export default function OptimiserRunEvidenceBlock({ evidence = null, className = "" }) {
+export default function OptimiserRunEvidenceBlock({
+  evidence = null,
+  seatCount = null,
+  instances = [],
+  className = "",
+}) {
   if (!evidence) return null;
   const best = evidence.bestAttempted || null;
   const current = evidence.current || null;
@@ -160,7 +166,12 @@ export default function OptimiserRunEvidenceBlock({ evidence = null, className =
   const bestP20 = deviationText(best?.p20VariationDb);
   const bestLevel = levelText(best?.p20Level);
   const delta = deltaText(best?.p20DeltaDb);
-  const calculationCount = evidence.canonicalJobsRun ?? evidence.candidatesEvaluated ?? null;
+  // The design option count the run confirmed. The engine job count is a
+  // separate figure and stays in Engineer details.
+  const resultCopy = resultSentence(evidence.candidatesEvaluated, {
+    seatCount,
+    activeSubwooferCount: countActiveSources(instances),
+  });
 
   // A winning plan already renders its evaluated lever, reason and predicted
   // effect below. Keep its run evidence compact and never reuse the no-winner
@@ -169,8 +180,8 @@ export default function OptimiserRunEvidenceBlock({ evidence = null, className =
     return (
       <div className={`rounded-md border border-[#E7E5E0] bg-[#FAFAF9] px-2.5 py-2 ${className}`}>
         <div className="text-[11px] text-[#3E4349] leading-relaxed">
-          {calculationCount != null
-            ? `ADI tested ${calculationCount} design calculations before confirming this recommendation.`
+          {resultCopy
+            ? `${resultCopy} This recommendation was confirmed from that search.`
             : "ADI completed the optimisation search before confirming this recommendation."}
         </div>
         <div className="mt-0.5 text-[10px] text-[#8B7F76]">
@@ -196,9 +207,7 @@ export default function OptimiserRunEvidenceBlock({ evidence = null, className =
       <div className="text-[10px] font-semibold tracking-wide text-[#3E4349]">BASS OPTIMISATION RESULT</div>
 
       <div className="mt-1 text-[12px] font-semibold text-[#1B1A1A] leading-relaxed">
-        {calculationCount != null
-          ? `ADI tested ${calculationCount} design calculations.`
-          : "ADI completed the optimisation search."}
+        {resultCopy || "ADI completed the optimisation search."}
       </div>
       <div className="mt-0.5 text-[11px] text-[#3E4349] leading-relaxed">
         {baselineFailed || evidence.outcome === "evaluation_incomplete"

@@ -97,6 +97,7 @@ export default function AdiOptimisationJourney({
   completedBassAuthority = null,
   currentDesignFingerprint = null,
   instances = [],
+  seatCount = null,
   limitingFactorSentence = null,
   runBlockReason = null,
   runStatus = "idle",
@@ -154,9 +155,9 @@ export default function AdiOptimisationJourney({
   const showBlocked = !!journey.blockReason && !isRunning;
   const statusMessage = runStatus === "failed" && runError ? runError : journey.blockReason?.message;
 
-  // Before the run, the card states how many design calculations ADI will run.
-  // After the run, the actual confirmed count is stated instead (run evidence),
-  // so an estimate is never shown alongside real evidence.
+  // Before the run, the card states how many design options ADI will test and
+  // the acoustic work behind them. After the run, the confirmed count is stated
+  // instead (run evidence), so an estimate is never shown beside real evidence.
   const isPreRun = journey.state === ADI_OPTIMISER_JOURNEY_STATE.OPTIMISATION_REQUIRED
     || journey.state === ADI_OPTIMISER_JOURNEY_STATE.REEVALUATION_REQUIRED;
   const showEstimate = isPreRun && !runEvidence;
@@ -186,10 +187,11 @@ export default function AdiOptimisationJourney({
         {journey.message}
       </div>
 
-      {/* How many design calculations ADI will run for this design. */}
+      {/* How many design options ADI will test, and the acoustic work behind them. */}
       {showEstimate && (
         <OptimiserCalculationEstimateLine
           instances={instances}
+          seatCount={seatCount}
           className="rounded-md border border-[#E7E5E0] bg-white px-3 py-2"
         />
       )}
@@ -215,7 +217,7 @@ export default function AdiOptimisationJourney({
       )}
 
       {/* What the completed run evaluated, when it produced no actionable plan */}
-      <OptimiserRunEvidenceBlock evidence={runEvidence} />
+      <OptimiserRunEvidenceBlock evidence={runEvidence} seatCount={seatCount} instances={instances} />
 
       {/* The read-only evaluated plan, when a current plan exists */}
       {journey.showPlan && (
@@ -255,7 +257,7 @@ export default function AdiOptimisationJourney({
       {/* Collapsed by default, and below the primary action. Every technical
           detail — lever order, per-family counts, comparison and method — lives
           here, never in the default card. */}
-      {showEstimate && <OptimiserCalculationDetail instances={instances} />}
+      {showEstimate && <OptimiserCalculationDetail instances={instances} seatCount={seatCount} />}
 
       {/* Why the optimiser cannot run yet — always paired with the next step */}
       {showBlocked && (
