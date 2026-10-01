@@ -16,21 +16,20 @@ import React, { useMemo } from "react";
 import { isEligibleP5Surround } from "@/components/utils/p5SurroundGaps";
 import { resolveGradeToken } from "@/components/utils/rp22Colors";
 import { resolveRspLabelPlacement } from "../ClientSpeakerBalance";
+import { parameterResultHeading, parameterResultDescription } from "../parameterResultCopy";
+import P5SeatResultBlock from "../P5SeatResultBlock";
 
-// ── Status copy (frozen — matches ClientSoundAroundListener) ───────────────
-const STATUS_COPY = {
-  L4: { label: "Level 4", explanation: "Maximum horizontal angle between adjacent surround speakers." },
-  L3: { label: "Level 3", explanation: "Maximum horizontal angle between adjacent surround speakers." },
-  L2: { label: "Level 2", explanation: "Maximum horizontal angle between adjacent surround speakers." },
-  L1: { label: "Level 1", explanation: "Maximum horizontal angle between adjacent surround speakers." },
-  Fail: { label: "Does not achieve Level 1", explanation: "Maximum horizontal angle between adjacent surround speakers." },
-  "—": { label: "—", explanation: "Maximum horizontal angle between adjacent surround speakers." },
-};
-
+// ── Result copy (one shared authority with the screen page) ────────────────
 function getStatusInfo(level) {
-  const copy = STATUS_COPY[level] || STATUS_COPY["—"];
   const { token } = resolveGradeToken(level);
-  return { ...copy, color: token.border, tokenBg: token.bg, tokenText: token.text, tokenSolid: token.solid };
+  return {
+    label: parameterResultHeading(level, { failLabel: "Does not achieve Level 1" }),
+    explanation: parameterResultDescription(5),
+    color: token.border,
+    tokenBg: token.bg,
+    tokenText: token.text,
+    tokenSolid: token.solid,
+  };
 }
 
 const ROLE_COLORS = {
@@ -60,7 +59,7 @@ function azimuthToTheta(az) {
   return (az + 360) % 360;
 }
 
-export default function PrintP5Content({ p5Snapshot, roomDims, screen, screenFrontPlaneM }) {
+export default function PrintP5Content({ p5Snapshot, seatResults, roomDims, screen, screenFrontPlaneM }) {
   const W = Number(roomDims?.widthM) || 4.5;
   const L = Number(roomDims?.lengthM) || 6.0;
 
@@ -82,7 +81,10 @@ export default function PrintP5Content({ p5Snapshot, roomDims, screen, screenFro
   const level = p5Snapshot?.level || "—";
   const worstGapDeg = p5Snapshot?.worstGapDeg;
   const geometryWorstGapDeg = p5Snapshot?.geometryWorstGapDeg ?? worstGapDeg;
-  const statusInfo = getStatusInfo(level);
+  // The assessed result is the published project level ACROSS THE SEATING
+  // POSITIONS; the drawing keeps its own RSP design-view level for its arcs.
+  const assessedLevel = seatResults?.level || level;
+  const statusInfo = getStatusInfo(assessedLevel);
 
   const screenViewWm = useMemo(() => {
     const inches = Number(screen?.visibleWidthInches) || 0;
@@ -157,7 +159,26 @@ export default function PrintP5Content({ p5Snapshot, roomDims, screen, screenFro
       {/* ── Heading ── */}
       <div className="client-report-print-heading">
         <h1 className="client-report-print-heading__title">Spatial Resolution</h1>
-        <p className="client-report-print-heading__subtitle">RP22 Parameter 5 — Horizontal speaker spacing</p>
+        <p className="client-report-print-heading__subtitle">
+          RP22 Parameter 5 — {parameterResultDescription(5)}
+        </p>
+      </div>
+
+      {/* ── Drawing label + copy — the graphic is the RSP design view ── */}
+      <div style={{ flexShrink: 0, width: "100%", paddingBottom: "2mm" }}>
+        <div style={{
+          fontSize: "7.5pt",
+          fontWeight: 600,
+          color: "#625143",
+          letterSpacing: "0.08em",
+          textTransform: "uppercase",
+        }}>
+          RSP design view
+        </div>
+        <div style={{ fontSize: "8pt", color: "#625143", lineHeight: 1.45, marginTop: "1mm" }}>
+          The graphic shows the surround geometry from the reference seating position. The seat
+          map below shows the assessed P5 result at each seating position.
+        </div>
       </div>
 
       {/* ── Drawing ── */}
@@ -270,23 +291,26 @@ export default function PrintP5Content({ p5Snapshot, roomDims, screen, screenFro
         </svg>
       </div>
 
-      {/* ── Result ── */}
+      {/* ── Assessed seat results — P5 is assessed at every seating position ── */}
+      <div className="client-report-print-support">
+        <P5SeatResultBlock seatResults={seatResults} print />
+      </div>
+
+      {/* ── Result summary ── */}
       <div className="client-report-print-result" style={{ borderColor: `${statusInfo.color}40` }}>
         <div className="client-report-print-result__badge" style={{
           borderColor: statusInfo.color,
           background: statusInfo.tokenBg,
           color: statusInfo.tokenText,
         }}>
-          {level}
+          {assessedLevel}
         </div>
         <div className="client-report-print-result__content">
           <div className="client-report-print-result__label">{statusInfo.label}</div>
           <div className="client-report-print-result__explanation">{statusInfo.explanation}</div>
-          {Number.isFinite(worstGapDeg) && (
-            <div className="client-report-print-result__supporting">
-              {Math.round(worstGapDeg)}° largest spacing — RP22 Parameter 5
-            </div>
-          )}
+          <div className="client-report-print-result__supporting">
+            Assessed across the seating positions
+          </div>
         </div>
       </div>
     </>

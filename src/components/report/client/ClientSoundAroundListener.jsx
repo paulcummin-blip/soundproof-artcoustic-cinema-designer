@@ -18,39 +18,22 @@ import { getCanonicalRole } from "@/components/utils/surroundRoleMap";
 import { isEligibleP5Surround } from "@/components/utils/p5SurroundGaps";
 import { resolveGradeToken } from "@/components/utils/rp22Colors";
 import { resolveRspLabelPlacement } from "./ClientSpeakerBalance";
+import { parameterResultHeading, parameterResultDescription } from "./parameterResultCopy";
+import P5SeatResultBlock from "./P5SeatResultBlock";
 
-// ── Status copy ────────────────────────────────────────────────────────────
-const STATUS_COPY = {
-  L4: {
-    label: "Level 4",
-    explanation: "Maximum horizontal angle between adjacent surround speakers.",
-  },
-  L3: {
-    label: "Level 3",
-    explanation: "Maximum horizontal angle between adjacent surround speakers.",
-  },
-  L2: {
-    label: "Level 2",
-    explanation: "Maximum horizontal angle between adjacent surround speakers.",
-  },
-  L1: {
-    label: "Level 1",
-    explanation: "Maximum horizontal angle between adjacent surround speakers.",
-  },
-  Fail: {
-    label: "Does not achieve Level 1",
-    explanation: "Maximum horizontal angle between adjacent surround speakers.",
-  },
-  "—": {
-    label: "—",
-    explanation: "Maximum horizontal angle between adjacent surround speakers.",
-  },
-};
-
+// ── Result copy ────────────────────────────────────────────────────────────
+// One shared authority: the level spoken as a word ("Level 3") and the official
+// RP22 Parameter 5 description. Wording is never invented in this component.
 function getStatusInfo(level) {
-  const copy = STATUS_COPY[level] || STATUS_COPY["—"];
   const { token } = resolveGradeToken(level);
-  return { ...copy, color: token.border, tokenBg: token.bg, tokenText: token.text, tokenSolid: token.solid };
+  return {
+    label: parameterResultHeading(level, { failLabel: "Does not achieve Level 1" }),
+    explanation: parameterResultDescription(5),
+    color: token.border,
+    tokenBg: token.bg,
+    tokenText: token.text,
+    tokenSolid: token.solid,
+  };
 }
 
 // ── Role label colours ─────────────────────────────────────────────────────
@@ -83,7 +66,7 @@ function azimuthToTheta(az) {
   return (az + 360) % 360;
 }
 
-export default function ClientSoundAroundListener({ p5Snapshot, roomDims, screen, screenFrontPlaneM }) {
+export default function ClientSoundAroundListener({ p5Snapshot, seatResults, roomDims, screen, screenFrontPlaneM }) {
   const W = Number(roomDims?.widthM) || 4.5;
   const L = Number(roomDims?.lengthM) || 6.0;
 
@@ -108,7 +91,10 @@ export default function ClientSoundAroundListener({ p5Snapshot, roomDims, screen
   const level = p5Snapshot?.level || "—";
   const worstGapDeg = p5Snapshot?.worstGapDeg;
   const geometryWorstGapDeg = p5Snapshot?.geometryWorstGapDeg ?? worstGapDeg;
-  const statusInfo = getStatusInfo(level);
+  // The assessed result is the published project level ACROSS THE SEATING
+  // POSITIONS. The drawing keeps its own RSP design-view level for its arcs.
+  const assessedLevel = seatResults?.level || level;
+  const statusInfo = getStatusInfo(assessedLevel);
 
   // Screen geometry (simplified — just the front wall region)
   const screenViewWm = useMemo(() => {
@@ -252,16 +238,27 @@ export default function ClientSoundAroundListener({ p5Snapshot, roomDims, screen
           letterSpacing: "0.08em",
           textTransform: "uppercase",
         }}>
-          RP22 Parameter 5 — Horizontal speaker spacing
+          RP22 Parameter 5 — {parameterResultDescription(5)}
         </p>
       </div>
 
-      {/* ── SVG canvas ── */}
+      {/* ── Drawing: the RSP design view ── */}
       <div style={{
         display: "flex",
-        justifyContent: "center",
+        flexDirection: "column",
+        alignItems: "center",
+        gap: 10,
         marginBottom: 24,
       }}>
+        <div style={{
+          fontSize: 11,
+          fontWeight: 600,
+          color: "#625143",
+          letterSpacing: "0.08em",
+          textTransform: "uppercase",
+        }}>
+          RSP design view
+        </div>
         <svg
           width="100%"
           viewBox={`0 0 ${SVG_W} ${SVG_H}`}
@@ -471,9 +468,24 @@ export default function ClientSoundAroundListener({ p5Snapshot, roomDims, screen
             })()}
           </g>
         </svg>
+
+        <p style={{
+          margin: 0,
+          maxWidth: 620,
+          textAlign: "center",
+          fontSize: 12,
+          color: "#625143",
+          lineHeight: 1.5,
+        }}>
+          The graphic shows the surround geometry from the reference seating position. The seat
+          map below shows the assessed P5 result at each seating position.
+        </p>
       </div>
 
-      {/* ── Status card ── */}
+      {/* ── Assessed seat results — P5 is assessed at every seating position ── */}
+      <P5SeatResultBlock seatResults={seatResults} />
+
+      {/* ── Result summary ── */}
       <div style={{
         display: "flex",
         alignItems: "center",
@@ -513,18 +525,16 @@ export default function ClientSoundAroundListener({ p5Snapshot, roomDims, screen
             fontSize: 13,
             color: "#3E4349",
             lineHeight: 1.5,
-            marginBottom: 8,
           }}>
             {statusInfo.explanation}
           </div>
-          {Number.isFinite(worstGapDeg) && (
-            <div style={{
-              fontSize: 12,
-              color: "#625143",
-            }}>
-              {Math.round(worstGapDeg)}° largest spacing — RP22 Parameter 5
-            </div>
-          )}
+          <div style={{
+            fontSize: 12,
+            color: "#625143",
+            marginTop: 6,
+          }}>
+            Assessed across the seating positions
+          </div>
         </div>
       </div>
 

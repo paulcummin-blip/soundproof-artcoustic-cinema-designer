@@ -99,6 +99,7 @@ export default function ClientReportPage({ children, isFirst, projectDetails, lo
         {printData?.type === "p5" && (
           <PrintP5Content
             p5Snapshot={printData.p5Snapshot}
+            seatResults={printData.seatResults}
             roomDims={printData.roomDims}
             screen={printData.screen}
             screenFrontPlaneM={printData.screenFrontPlaneM}

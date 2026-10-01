@@ -22,17 +22,19 @@ import { getOfficialRp22Title } from "@/components/utils/rp22OfficialTitles";
 
 /**
  * Level heading for a result card. "L4" / 4 → "Level 4".
- * FAIL and N/A pass through as themselves; null when there is no level to show.
+ * A failure reads as the house phrase by default ("Does not achieve Level 1");
+ * N/A passes through. Null when there is no level to show.
  *
  * @param {number|string|null} level - 1-4, "L1"-"L4", 0/"FAIL", "N/A"
+ * @param {{ failLabel?: string }} [options]
  * @returns {string|null}
  */
-export function parameterResultHeading(level) {
+export function parameterResultHeading(level, { failLabel = "FAIL" } = {}) {
   if (level == null) return null;
   const str = String(level).trim().toUpperCase();
   const match = /^(?:L)?([1-4])$/.exec(str);
   if (match) return `Level ${match[1]}`;
-  if (str === "FAIL") return "FAIL";
+  if (str === "FAIL" || level === 0) return failLabel;
   if (str === "N/A" || str === "NA") return "N/A";
   return null;
 }

@@ -18,6 +18,7 @@ import { useClientReportAuthority } from "@/components/report/client/useClientRe
 import ClientSoundAroundListener from "@/components/report/client/ClientSoundAroundListener";
 import ClientP9Overhead from "@/components/report/client/ClientP9Overhead";
 import { selectClientP9Overhead } from "@/components/report/client/selectClientP9Overhead";
+import { selectClientP5SeatResults } from "@/components/report/client/selectClientP5SeatResults";
 import ClientReportPage from "@/components/report/client/ClientReportPage";
 import ClientReportPrintStyles from "@/components/report/client/ClientReportPrintStyles";
 import ReportTypographyStyles from "@/components/report/typography/ReportTypographyStyles";
@@ -173,6 +174,13 @@ export default function RP22ClientReport() {
       return { seats: [], counts: {}, hasAnyValidResult: false, summary: "" };
     }
     return selectClientP9Overhead({ engineeringSummary, seatingPositions });
+  }, [hydrating, engineeringSummary, seatingPositions]);
+
+  // ── P5 seat results — P5 is assessed at every seating position, so the
+  // RSP-centred drawing is paired with the published per-seat result map.
+  const p5SeatResults = useMemo(() => {
+    if (hydrating || !engineeringSummary || !Array.isArray(seatingPositions)) return null;
+    return selectClientP5SeatResults({ engineeringSummary, seatingPositions });
   }, [hydrating, engineeringSummary, seatingPositions]);
 
   // ── P2 System Architecture — passive read from the canonical summary ──
@@ -381,6 +389,7 @@ export default function RP22ClientReport() {
         visual: (
           <ClientSoundAroundListener
             p5Snapshot={p5Snapshot}
+            seatResults={p5SeatResults}
             roomDims={roomDims}
             screen={screen}
             screenFrontPlaneM={screenFrontPlaneM}
@@ -389,6 +398,7 @@ export default function RP22ClientReport() {
         printData: {
           type: "p5",
           p5Snapshot,
+          seatResults: p5SeatResults,
           roomDims,
           screen,
           screenFrontPlaneM,
@@ -740,7 +750,7 @@ export default function RP22ClientReport() {
       ...bassPages,
       ...closingPages,
     ];
-  }, [p5Snapshot, p9Snapshot, p9Overhead, bestListeningArea, timbreConsistency, frontSoundstage, nonScreenSoundstage, highlights, screenSeating, hasSeatingPosition, recommendedSeatingPosition, bassPerformance, roomDims, rsp, rspSourceLabel, screenFrontPlaneM, screenWidthM, screen, placedSpeakers, appState?.acousticTreatmentEnabled, appState?.selectedAbfuserQty, publishedRecommendations, coverageSentence, reportGeometry, reportSystem, projectId]);
+  }, [p5Snapshot, p5SeatResults, p9Snapshot, p9Overhead, bestListeningArea, timbreConsistency, frontSoundstage, nonScreenSoundstage, highlights, screenSeating, hasSeatingPosition, recommendedSeatingPosition, bassPerformance, roomDims, rsp, rspSourceLabel, screenFrontPlaneM, screenWidthM, screen, placedSpeakers, appState?.acousticTreatmentEnabled, appState?.selectedAbfuserQty, publishedRecommendations, coverageSentence, reportGeometry, reportSystem, projectId]);
 
   // Each category heading is printed once. The first page of a category keeps
   // its heading; continuation pages never repeat the major category heading.
