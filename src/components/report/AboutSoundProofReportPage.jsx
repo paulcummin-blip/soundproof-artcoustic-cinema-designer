@@ -23,9 +23,11 @@ import {
 
 export default function AboutSoundProofReportPage({ variant = "full" }) {
   const { html, loading } = usePublicationContent("about_sound_proof");
-  // compact = the Visual Report's short brand closing section. It keeps the
-  // heading, logo and published copy, laid out in two columns so the section
-  // stays within roughly half a page and never dominates the end of the report.
+  // compact = the Visual Report's brand closing section: logo, heading and the
+  // published copy. The copy is always ONE clean column of simple paragraphs —
+  // never a newspaper-style multi-column block — so it reads as ordinary
+  // professional report text on screen and in the PDF alike. The compact variant
+  // only narrows the column and tightens the heading rhythm.
   const compact = variant === "compact";
 
   return (
@@ -87,24 +89,27 @@ export default function AboutSoundProofReportPage({ variant = "full" }) {
       {/* Body copy — canonical published content */}
       {loading ? (
         <div style={{ fontSize: "10pt", color: "#625143" }}>Loading…</div>
-      ) : compact ? (
+      ) : (
         <div
+          className="about-sound-proof-copy"
           style={{
-            columnCount: 2,
-            columnGap: "8mm",
-            maxWidth: "165mm",
+            maxWidth: compact ? "150mm" : "160mm",
             width: "100%",
-            fontSize: "9pt",
           }}
         >
-          <PublicationContentHtml html={html} variant="print" style={{ width: "100%" }} />
+          {/* Paragraph rhythm. The published copy arrives as plain <p> blocks and
+              the app's base stylesheet zeroes their margins, so the page states
+              them here: one clean column, comfortable measure, generous spacing. */}
+          <style>{`
+            .about-sound-proof-copy p { margin: 0 0 3.6mm 0; }
+            .about-sound-proof-copy p:last-child { margin-bottom: 0; }
+          `}</style>
+          <PublicationContentHtml
+            html={html}
+            variant="print"
+            style={{ width: "100%", lineHeight: 1.75 }}
+          />
         </div>
-      ) : (
-        <PublicationContentHtml
-          html={html}
-          variant="print"
-          style={{ maxWidth: "160mm", width: "100%" }}
-        />
       )}
     </div>
   );
