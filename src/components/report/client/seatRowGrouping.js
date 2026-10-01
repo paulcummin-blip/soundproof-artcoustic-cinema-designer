@@ -27,9 +27,12 @@ function rowLabel(rowIndex, rowCount) {
  * Group seats into physical rows, front to back.
  *
  * @param {Array} seats - seat results carrying x, y (metres) plus their own display fields
- * @returns {Array<{ rowIndex: number, label: string, seats: Array }>}
+ * @returns {Array<{ rowIndex: number, label: string, y: number, seats: Array }>}
  *          One entry per physical row; `label` is the client-facing row name
- *          ("Front row", "Middle row", "Rear row").
+ *          ("Front row", "Middle row", "Rear row") and `y` is the row's own
+ *          depth in metres, so a result block can place a position that sits
+ *          BETWEEN two rows (a free-standing reference position) in its real
+ *          place in the plan.
  */
 export function groupSeatsIntoRows(seats) {
   const list = (Array.isArray(seats) ? seats : []).filter((seat) => {
@@ -54,6 +57,7 @@ export function groupSeatsIntoRows(seats) {
   return clusters.map((cluster, index) => ({
     rowIndex: index + 1,
     label: rowLabel(index, rowCount),
+    y: cluster.y,
     seats: [...cluster.seats].sort((a, b) => Number(a.x) - Number(b.x)),
   }));
 }

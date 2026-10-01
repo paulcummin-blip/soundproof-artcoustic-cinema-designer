@@ -46,6 +46,7 @@ import { selectClientBassPerformance } from "@/components/report/client/selectCl
 import ClientP2SystemArchitecture from "@/components/report/client/ClientP2SystemArchitecture";
 import { selectClientP2SystemArchitecture } from "@/components/report/client/selectClientP2SystemArchitecture";
 import ClientPerSeatPerformance from "@/components/report/client/ClientPerSeatPerformance";
+import { planSeatRowPages } from "@/components/report/client/perSeatCardLayout";
 import { selectClientPerSeatPerformance } from "@/components/report/client/selectClientPerSeatPerformance";
 import ClientP7FrontWides from "@/components/report/client/ClientP7FrontWides";
 import { selectClientP7FrontWides } from "@/components/report/client/selectClientP7FrontWides";
@@ -747,15 +748,26 @@ export default function RP22ClientReport() {
     // pages. Every assessed seat in the seating plan's own shape, read from the
     // same published authority as the Room Designer seat pop-up.
     if (perSeatPerformance?.hasAny) {
-      summaryPages.push({
-        id: "per-seat-performance",
-        category: "Per-Seat Performance",
-        visual: <ClientPerSeatPerformance rows={perSeatPerformance.rows} />,
-        printData: {
-          type: "per-seat-performance",
-          // Distinct key: the viewing page owns `rows` for its own print data.
-          seatRows: perSeatPerformance.rows,
-        },
+      // The cards keep the seating plan's own shape, at a size the system can
+      // carry. A system with more seating rows than one printed page holds is
+      // split BETWEEN rows — never into a numbered seat list — so no card is
+      // clipped and none is printed below its readable size.
+      const seatRowPages = planSeatRowPages(perSeatPerformance.rows);
+      seatRowPages.forEach((pageRows, index) => {
+        const continuation = index > 0;
+        summaryPages.push({
+          id: continuation ? `per-seat-performance-${index + 1}` : "per-seat-performance",
+          category: "Per-Seat Performance",
+          visual: continuation
+            ? <ClientPerSeatPerformance rows={[]} rsp={rsp} continuation />
+            : <ClientPerSeatPerformance rows={perSeatPerformance.rows} rsp={rsp} />,
+          printData: {
+            type: "per-seat-performance",
+            // Distinct key: the viewing page owns `rows` for its own print data.
+            seatRows: pageRows,
+            rsp,
+          },
+        });
       });
     }
     // About Sound Proof — the short brand closing section, always last.

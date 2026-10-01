@@ -8,6 +8,12 @@
  * The report version of the Room Designer seat pop-up — same authority, same
  * presenters — laid out far more tightly because many cards sit side by side.
  *
+ * The card takes its width, padding, type and row rhythm from the section's
+ * layout authority (perSeatCardLayout), so a 4-seat cinema gets large, generous
+ * cards and a 12-seat cinema gets smaller, denser ones — by the same rules, in
+ * the preview and in the PDF alike. At the densest tier the level pills stay
+ * (they ARE the result) while the numeric value beside them is dropped.
+ *
  * Presentation only: every level and value arrives already published. Nothing
  * here grades, measures or recomputes.
  *
@@ -16,14 +22,15 @@
  * own RSP chip and is never presented as a Primary seat.
  *
  * Props:
- *   seat  — { label, priority, isRsp, rp23, parameters, spl } from
- *           selectClientPerSeatPerformance
- *   print — print (PDF) context: tighter type and outline
+ *   seat   — { label, priority, isRsp, rp23, parameters, spl } from
+ *            selectClientPerSeatPerformance
+ *   layout — from resolveSeatRowLayout: card width, gap and tier metrics
+ *   print  — print (PDF) context: slightly tighter outline weight
  */
 
 import React from "react";
 import RP22GradingPill from "@/components/ui/RP22GradingPill";
-import { PRIMARY } from "@/components/utils/seatPriorityAuthority";
+import { CARD_TIERS } from "./perSeatCardLayout";
 
 const FONT_BODY = "Didact Gothic, Century Gothic, sans-serif";
 
@@ -37,7 +44,7 @@ const OUTLINE_COLOR = { primary: "#213428", secondary: "#D9D5CE" };
 
 const PRIORITY_LABEL = { primary: "Primary", secondary: "Secondary" };
 
-function Badge({ text, tone, print }) {
+function Badge({ text, tone, card, print }) {
   const style = tone === "primary"
     ? { background: "#213428", color: "#FFFFFF", border: "1px solid #213428" }
     : tone === "rsp"
@@ -47,8 +54,8 @@ function Badge({ text, tone, print }) {
     <span style={{
       ...style,
       borderRadius: 3,
-      padding: print ? "1px 4px" : "1px 5px",
-      fontSize: print ? 7 : 8,
+      padding: `${card.badgePaddingY}px ${card.badgePaddingX}px`,
+      fontSize: print ? card.badgeSize - 0.5 : card.badgeSize,
       fontWeight: 700,
       letterSpacing: "0.06em",
       textTransform: "uppercase",
@@ -60,11 +67,13 @@ function Badge({ text, tone, print }) {
   );
 }
 
-export default function PerSeatPerformanceCard({ seat, print }) {
+export default function PerSeatPerformanceCard({ seat, layout, print }) {
   if (!seat) return null;
 
+  const tier = layout?.tier || CARD_TIERS.standard;
+  const card = tier.card;
   const outline = OUTLINE[seat.priority] || OUTLINE.secondary;
-  const width = print ? 132 : 148;
+  const lineSize = (size) => (print ? Math.max(7, size - 0.5) : size);
 
   const rows = [
     { key: "rp23", label: "RP23", ...seat.rp23 },
@@ -75,24 +84,27 @@ export default function PerSeatPerformanceCard({ seat, print }) {
     <div
       className="per-seat-performance-card"
       style={{
-        width,
-        maxWidth: "100%",
+        // Every card in the section shares one width, taken from the widest row
+        // — so rows of different lengths still read as one seating plan, and the
+        // row can never overflow the page.
+        width: layout?.cardWidth || "100%",
+        maxWidth: layout?.maxCardWidth || undefined,
         boxSizing: "border-box",
         border: `${print ? outline.print : outline.screen}px solid ${OUTLINE_COLOR[seat.priority] || OUTLINE_COLOR.secondary}`,
-        borderRadius: 8,
+        borderRadius: Math.max(5, card.gap + 4),
         background: "#FFFFFF",
-        padding: print ? "6px 7px 7px" : "8px 9px 9px",
+        padding: `${card.paddingTop}px ${card.paddingX}px ${card.paddingBottom}px`,
         display: "flex",
         flexDirection: "column",
-        gap: print ? 3 : 4,
+        gap: card.gap,
         breakInside: "avoid",
         pageBreakInside: "avoid",
         fontFamily: FONT_BODY,
       }}
     >
-      <div style={{ display: "flex", flexDirection: "column", gap: 3 }}>
+      <div style={{ display: "flex", flexDirection: "column", gap: card.headerGap }}>
         <span style={{
-          fontSize: print ? 8.5 : 9.5,
+          fontSize: lineSize(card.labelSize),
           fontWeight: 700,
           color: "#213428",
           letterSpacing: "0.02em",
@@ -101,23 +113,23 @@ export default function PerSeatPerformanceCard({ seat, print }) {
           {seat.label}
         </span>
         <div style={{ display: "flex", flexWrap: "wrap", gap: 4 }}>
-          <Badge text={PRIORITY_LABEL[seat.priority] || "Secondary"} tone={seat.priority} print={print} />
-          {seat.isRsp && <Badge text="RSP" tone="rsp" print={print} />}
+          <Badge text={PRIORITY_LABEL[seat.priority] || "Secondary"} tone={seat.priority} card={card} print={print} />
+          {seat.isRsp && <Badge text="RSP" tone="rsp" card={card} print={print} />}
         </div>
       </div>
 
-      <div style={{ display: "flex", flexDirection: "column", gap: print ? 1 : 2 }}>
+      <div style={{ display: "flex", flexDirection: "column", gap: card.rowGap }}>
         {rows.map((row) => (
           <div key={row.key} style={{
             display: "flex",
             alignItems: "center",
             gap: 4,
-            minHeight: print ? 13 : 15,
+            minHeight: card.rowMinHeight,
           }}>
             <span style={{
-              width: print ? 26 : 30,
+              width: card.parameterLabelWidth,
               flexShrink: 0,
-              fontSize: print ? 8 : 9,
+              fontSize: lineSize(card.parameterLabelSize),
               fontWeight: 600,
               color: "#3E4349",
               letterSpacing: "0.02em",
@@ -125,26 +137,28 @@ export default function PerSeatPerformanceCard({ seat, print }) {
               {row.label}
             </span>
             <RP22GradingPill level={row.level} variant="compact" />
-            <span style={{
-              marginLeft: "auto",
-              minWidth: 0,
-              overflow: "hidden",
-              textOverflow: "ellipsis",
-              whiteSpace: "nowrap",
-              fontSize: print ? 7.5 : 8.5,
-              color: "#8A7B6A",
-              letterSpacing: "0.01em",
-            }}>
-              {row.valueText && row.valueText !== "—" ? row.valueText : ""}
-            </span>
+            {tier.showValues && (
+              <span style={{
+                marginLeft: "auto",
+                minWidth: 0,
+                overflow: "hidden",
+                textOverflow: "ellipsis",
+                whiteSpace: "nowrap",
+                fontSize: lineSize(card.valueSize),
+                color: "#8A7B6A",
+                letterSpacing: "0.01em",
+              }}>
+                {row.valueText && row.valueText !== "—" ? row.valueText : ""}
+              </span>
+            )}
           </div>
         ))}
       </div>
 
-      {(seat.spl || []).length > 0 && (
+      {tier.showSpl && (seat.spl || []).length > 0 && (
         <div style={{
           borderTop: "1px solid #EFEEE9",
-          paddingTop: print ? 3 : 4,
+          paddingTop: card.splPaddingTop,
           display: "flex",
           flexWrap: "wrap",
           columnGap: 6,
@@ -152,7 +166,7 @@ export default function PerSeatPerformanceCard({ seat, print }) {
         }}>
           {(seat.spl || []).map((entry) => (
             <span key={entry.role} style={{
-              fontSize: print ? 7.5 : 8.5,
+              fontSize: lineSize(card.splSize),
               color: "#625143",
               whiteSpace: "nowrap",
             }}>

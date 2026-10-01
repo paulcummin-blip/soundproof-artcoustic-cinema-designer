@@ -8,6 +8,13 @@
  * screen, exactly as the seats sit in the room. The room plan shows where the
  * seats are; this section shows how each one performs.
  *
+ * The cards SCALE with the system. The card width comes from the widest
+ * seating row (see perSeatCardLayout), so a 4-seat cinema gets large cards, a
+ * 9-seat cinema smaller ones and a 12-seat cinema smaller again — while every
+ * row stays one unbroken line in the plan's own shape, never a numbered list.
+ * The section deliberately sits closer to the page edges than a text page so
+ * the cards can use the width they need.
+ *
  * Every level and value is read from the published engineering authority via
  * selectClientPerSeatPerformance. Nothing is graded, measured or recomputed, and
  * P19 is absent by construction — it is assessed at the reference seating
@@ -18,12 +25,16 @@
  * the key are re-drawn here.
  *
  * Props:
- *   rows  — [{ rowIndex, label, seats: [...] }] from selectClientPerSeatPerformance
- *   print — print (PDF) context
+ *   rows        — [{ rowIndex, label, y, seats: [...] }] from selectClientPerSeatPerformance
+ *   rsp         — the canonical reference position, for a marker between rows
+ *   print       — print (PDF) context
+ *   continuation — this is the on-screen page for the printed section's
+ *                 continuation: the rows themselves are on that printed page
  */
 
-import React from "react";
-import PerSeatPerformanceCard from "./PerSeatPerformanceCard";
+import React, { useMemo } from "react";
+import PerSeatPerformanceRows from "./PerSeatPerformanceRows";
+import { resolveSeatRowLayout } from "./perSeatCardLayout";
 
 const FONT_HEADING = "Futura PT Light, Century Gothic, sans-serif";
 const FONT_BODY = "Didact Gothic, Century Gothic, sans-serif";
@@ -33,20 +44,23 @@ const OUTLINE_KEY = [
   { key: "secondary", label: "Secondary seat", width: 1, color: "#D9D5CE" },
 ];
 
-export default function ClientPerSeatPerformance({ rows, print }) {
-  const seatRows = (Array.isArray(rows) ? rows : []).filter((row) => row?.seats?.length);
-  if (seatRows.length === 0) return null;
+export default function ClientPerSeatPerformance({ rows, rsp, print, continuation = false }) {
+  const layout = useMemo(() => resolveSeatRowLayout(rows), [rows]);
+  if (!continuation && layout.seatRows.length === 0) return null;
 
   return (
     <div
       className="per-seat-performance"
       style={{
         width: "100%",
+        maxWidth: "100%",
         display: "flex",
         flexDirection: "column",
         alignItems: "center",
         gap: print ? 8 : 16,
-        padding: print ? 0 : "32px 36px",
+        // Narrower side padding than a text page: the cards are the content, so
+        // they get the full width rather than a comfortable reading measure.
+        padding: print ? 0 : "26px 14px",
         background: print ? "transparent" : "#FFFFFF",
         borderRadius: print ? 0 : 16,
         border: print ? "none" : "1px solid #DCDBD6",
@@ -80,49 +94,21 @@ export default function ClientPerSeatPerformance({ rows, print }) {
         </div>
       )}
 
-      <div style={{
-        width: "100%",
-        display: "flex",
-        flexDirection: "column",
-        alignItems: "center",
-        gap: print ? 8 : 14,
-      }}>
-        {seatRows.map((row) => (
-          <div key={row.rowIndex} style={{
-            width: "100%",
-            display: "flex",
-            flexDirection: "column",
-            alignItems: "center",
-            gap: print ? 4 : 6,
-            breakInside: "avoid",
-            pageBreakInside: "avoid",
-          }}>
-            {row.label && (
-              <span style={{
-                fontSize: print ? 8 : 10,
-                fontWeight: 700,
-                letterSpacing: "0.08em",
-                textTransform: "uppercase",
-                color: "#8A7B6A",
-              }}>
-                {row.label}
-              </span>
-            )}
-            <div style={{
-              display: "flex",
-              flexWrap: "wrap",
-              justifyContent: "center",
-              alignItems: "flex-start",
-              gap: print ? 6 : 10,
-              width: "100%",
-            }}>
-              {row.seats.map((seat) => (
-                <PerSeatPerformanceCard key={seat.id} seat={seat} print={print} />
-              ))}
-            </div>
-          </div>
-        ))}
-      </div>
+      {continuation ? (
+        <p style={{
+          margin: 0,
+          fontSize: 12,
+          color: "#8A7B6A",
+          textAlign: "center",
+          maxWidth: 620,
+          lineHeight: 1.5,
+        }}>
+          The seating rows continue on this page in the printed report, in the
+          same row-by-row layout.
+        </p>
+      ) : (
+        <PerSeatPerformanceRows layout={layout} rsp={rsp} print={print} />
+      )}
 
       {/* Key — the outline carries the seat's priority; the reference position
           is a separate marker, never a third kind of seat. */}

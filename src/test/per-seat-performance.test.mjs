@@ -38,6 +38,7 @@ import { isAssessedLevel } from '../components/report/client/visualReportSeatSty
 const SOURCE = fs.readFileSync('src/components/report/client/selectClientPerSeatPerformance.js', 'utf8');
 const SECTION_SOURCE = fs.readFileSync('src/components/report/client/ClientPerSeatPerformance.jsx', 'utf8');
 const CARD_SOURCE = fs.readFileSync('src/components/report/client/PerSeatPerformanceCard.jsx', 'utf8');
+const ROWS_SOURCE = fs.readFileSync('src/components/report/client/PerSeatPerformanceRows.jsx', 'utf8');
 const REPORT_PAGE_SOURCE = fs.readFileSync('src/pages/RP22ClientReport.jsx', 'utf8');
 const PRINT_PAGE_SOURCE = fs.readFileSync('src/components/report/client/ClientReportPage.jsx', 'utf8');
 
@@ -366,7 +367,8 @@ test('the PDF page carries the same cards and heading', () => {
   assert.ok(PRINT_TEXT.includes('RP22 and RP23 results by seating position'), 'with its subtitle');
   assert.ok(PRINT_TEXT.includes('Primary seat') && PRINT_TEXT.includes('Reference position'), 'key printed too');
   // Registration: the report page includes it and the print dispatcher renders it.
-  assert.ok(REPORT_PAGE_SOURCE.includes('id: "per-seat-performance"'), 'registered as a report page');
+  assert.ok(REPORT_PAGE_SOURCE.includes('"per-seat-performance"'), 'registered as a report page');
+  assert.ok(REPORT_PAGE_SOURCE.includes('id: continuation'), 'with a continuation page id when it splits by row');
   assert.ok(REPORT_PAGE_SOURCE.includes('type: "per-seat-performance"'), 'with its print type');
   assert.ok(PRINT_PAGE_SOURCE.includes('printData?.type === "per-seat-performance"'), 'print dispatcher handles it');
   assert.ok(PRINT_PAGE_SOURCE.includes('row.label') === false, 'the dispatcher stays declarative');
@@ -388,11 +390,15 @@ test('no RP22/RP23 calculation or authority change', () => {
 test('no layout overflow', () => {
   assert.ok(SECTION_SOURCE.includes('flexWrap: "wrap"'), 'rows and the key wrap');
   assert.ok(SCREEN.includes('flex-wrap:wrap'), 'wrapping is applied in the markup');
-  assert.ok(SECTION_SOURCE.includes('breakInside: "avoid"'), 'a row never splits across pages');
+  assert.ok(ROWS_SOURCE.includes('breakInside: "avoid"'), 'a row never splits across pages');
   assert.ok(SOURCE.includes('width: 148') === false, 'card width lives with the card');
-  assert.ok(SCREEN.includes('width:148px'), 'cards are a fixed, page-safe width');
-  assert.ok(PRINT.includes('width:132px'), 'and smaller in print');
-  assert.ok(SCREEN.includes('text-overflow:ellipsis'), 'long values truncate instead of overflowing');
+  // The card width is the row's own share of the section — the widest row can
+  // never exceed the page, whatever the system size.
+  assert.ok(
+    SCREEN.includes('width:calc((100% - ') && PRINT.includes('width:calc((100% - '),
+    'cards take a computed share of their row on screen and in print',
+  );
   assert.ok(SCREEN.includes('box-sizing:border-box'), 'padding cannot widen a card');
+  assert.ok(SCREEN.includes('text-overflow:ellipsis'), 'long values truncate instead of overflowing');
   assert.ok(SECTION_SOURCE.includes('maxWidth: "100%"'), 'no child can exceed the page width');
 });

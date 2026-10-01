@@ -9,15 +9,18 @@
  *
  * Rows break between seating rows in the PDF, so a card is never split across
  * two pages and the type is never squeezed to force everything onto one page.
+ * A system with more rows than one page holds is split BETWEEN rows at the
+ * report-page level, so each printed page carries whole seating rows.
  *
  * Props:
  *   rows — [{ rowIndex, label, seats: [...] }] from selectClientPerSeatPerformance
+ *   rsp  — the canonical reference position, for a marker between rows
  */
 
 import React from "react";
 import ClientPerSeatPerformance from "@/components/report/client/ClientPerSeatPerformance";
 
-export default function PrintPerSeatPerformanceContent({ rows }) {
+export default function PrintPerSeatPerformanceContent({ rows, rsp }) {
   const seatRows = (Array.isArray(rows) ? rows : []).filter((row) => row?.seats?.length);
   if (seatRows.length === 0) return null;
 
@@ -30,7 +33,7 @@ export default function PrintPerSeatPerformanceContent({ rows }) {
         </p>
       </div>
       <div className="client-report-print-support">
-        <ClientPerSeatPerformance rows={seatRows} print />
+        <ClientPerSeatPerformance rows={seatRows} rsp={rsp} print />
       </div>
     </>
   );

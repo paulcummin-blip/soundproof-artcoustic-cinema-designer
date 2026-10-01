@@ -437,7 +437,7 @@ export default function ClientReportPage({ children, isFirst, projectDetails, lo
           </>
         )}
         {printData?.type === "per-seat-performance" && (
-          <PrintPerSeatPerformanceContent rows={printData.seatRows} />
+          <PrintPerSeatPerformanceContent rows={printData.seatRows} rsp={printData.rsp} />
         )}
         {printData?.type === "about-sound-proof" && (
           <AboutSoundProofReportPage />
