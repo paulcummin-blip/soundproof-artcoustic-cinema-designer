@@ -1,4 +1,5 @@
 import { buildCurveSignature, buildFilterBankSignature, buildCorrectionCurveSignature } from "@/components/room/bass/bassResultAuthority";
+import { buildCorrectionTrace } from "@/components/room/bass/correctionTraceAuthority";
 
 const cloneCurve = (curve) => (Array.isArray(curve) ? curve.map((point) => ({ ...point })) : []);
 
@@ -224,6 +225,22 @@ export function applyAuthorityToCanonicalResult(canonicalResult, authorityBearin
     assessmentEndHz: Number.isFinite(candidate.assessmentEndHz)
       ? Number(candidate.assessmentEndHz)
       : (canonicalResult.assessmentEndHz ?? null),
+    // Persisted correction trace, built ONCE on the final post-alignment
+    // response. Read-only derivation of curves already computed — it changes no
+    // acoustic maths, EQ, smoothing, limits, grading or target.
+    correctionTrace: buildCorrectionTrace({
+      postEqRspCurve: alignedRsp,
+      rawRspCurve: canonicalResult.rspBeforePeqAtOperatingLevel?.length
+        ? canonicalResult.rspBeforePeqAtOperatingLevel
+        : canonicalResult.physicalRawResponseCurve,
+      targetCurve: canonicalResult.canonicalTargetCurve,
+      correctionCurve: canonicalResult.correctionCurve,
+      capabilityLimitedRegions: candidate.capabilityLimitedRegions
+        || canonicalResult.capabilityLimitedRegions,
+      protectedNullRegions: candidate.protectedNullRegions || canonicalResult.protectedNullRegions,
+      initialOperatingAdjustmentDb: canonicalResult.operatingLevelOffsetDb,
+      finalGlobalAlignmentTrimDb: candidate.globalLevelAlignment?.recommendedTrimDb,
+    }),
   };
 }
 

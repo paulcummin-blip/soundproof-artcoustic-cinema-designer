@@ -27,10 +27,37 @@
 //   Below target           -6.2 dB
 //
 //   CALIBRATION
-//   Operating level adjustment -27.0 dB
+//   Operating level adjustment -27 dB   (whole-number; exact values in Expert)
+//
+// RESIDUAL PRESENTATION (design-facing rule)
+//   A residual under 1 dB is not meaningful here and is stated as
+//   "No meaningful deviation". Residuals of 1 dB or more are stated in
+//   whole-number dB ("Below target 1 dB"). No decimal dB appears in the
+//   user-facing tooltip; exact signed values remain in Expert details only.
+//
+// EXPERT DETAIL (Engineering Mode only)
+//   Distinguishes the initial operating-level adjustment, the final global
+//   alignment trim and the final effective adjustment, alongside the correction
+//   smoothing, capability-limit and protected-null flags, the graph smoothing
+//   basis, the official P19 basis, and the persisted per-frequency correction
+//   trace. When the loaded result predates the trace, it says so instead of
+//   inventing values.
 
 import React from "react";
 import { resolveTooltipCurveAuthority } from "./bassTooltipCurveAuthority";
+import { useEngineeringMode } from "@/components/state/useEngineeringMode";
+import { bassSmoothingLabel } from "./bassGraphSmoothing";
+import {
+  buildExpertTraceRows,
+  formatResidualStatement,
+  formatWholeDb,
+  formatWholeSpl,
+} from "./bassResidualPresentation";
+import {
+  CORRECTION_TRACE_UNAVAILABLE_COPY,
+  OFFICIAL_P19_SMOOTHING_BASIS,
+  readCorrectionTraceAtFrequency,
+} from "./correctionTraceAuthority";
 
 const COLORS = {
   green: "#16A34A",
@@ -47,12 +74,9 @@ const COLORS = {
 const isFinite = (v) => v !== null && v !== undefined && v !== "" && Number.isFinite(Number(v));
 
 const formatHz = (v) => isFinite(v) ? `${Number(v).toFixed(1)} Hz` : "—";
-const formatSpl = (v) => isFinite(v) ? `${Number(v).toFixed(1)} dBC` : "—";
-const formatSignedDb = (v) => {
-  if (!isFinite(v)) return "—";
-  const n = Number(v);
-  return `${n >= 0 ? "+" : ""}${n.toFixed(1)} dB`;
-};
+// Design-facing dB is whole-number only. Exact values live in Expert details.
+const formatSpl = (v) => (isFinite(v) ? formatWholeSpl(v) : "—");
+const formatSignedDb = (v) => formatWholeDb(v);
 
 function Divider() {
   return <div style={{ borderTop: `1px solid ${COLORS.border}`, marginTop: 7, paddingTop: 7 }} />;
@@ -118,8 +142,14 @@ export default function BassGraphTooltip({
   viewBox,
   series = [],
   operatingLevelOffsetDb = 0,
+  correctionTrace = null,
+  smoothingMode = "none",
   yDomain = [70, 140],
 }) {
+  // Expert rows appear only in Engineering Mode — never in the simple readout.
+  // The store hook is called before the early return so the hook order is fixed.
+  const { engineeringMode } = useEngineeringMode();
+
   if (!active) return null;
 
   const [yMin, yMax] = yDomain;
@@ -168,21 +198,27 @@ export default function BassGraphTooltip({
   const hasCalibration = !isPlacementPreview && isFinite(operatingLevelOffsetDb) && Number(operatingLevelOffsetDb) !== 0;
   const calibrationDb = hasCalibration ? Number(operatingLevelOffsetDb) : null;
 
-  // Delta label: "Above target" / "Below target" / "Vs target" (when equal)
-  const deltaLabel = aboveTarget === null
-    ? "Vs target"
-    : diffFromTarget > 0
-      ? "Above target"
-      : diffFromTarget < 0
-        ? "Below target"
-        : "Vs target";
-  const deltaColor = aboveTarget === null
+  // Residual statement: a sub-1 dB residual is not a fault and is never shown
+  // as a decimal deviation. 1 dB or more is stated in whole-number dB.
+  const residualStatement = isFinite(diffFromTarget)
+    ? formatResidualStatement(diffFromTarget)
+    : null;
+  const residualColor = aboveTarget === null || residualStatement === "No meaningful deviation"
     ? COLORS.grey
-    : diffFromTarget > 0
-      ? COLORS.orange
-      : diffFromTarget < 0
-        ? COLORS.blue
-        : COLORS.grey;
+    : (diffFromTarget > 0 ? COLORS.orange : COLORS.blue);
+
+  // Expert detail: the persisted correction trace at the cursor frequency.
+  const traceRecord = engineeringMode && freqValue !== null
+    ? readCorrectionTraceAtFrequency(correctionTrace, freqValue)
+    : null;
+  const expertRows = engineeringMode
+    ? buildExpertTraceRows({
+        trace: correctionTrace,
+        record: traceRecord,
+        displaySmoothingLabel: bassSmoothingLabel(smoothingMode),
+        officialBasisLabel: bassSmoothingLabel(OFFICIAL_P19_SMOOTHING_BASIS),
+      })
+    : [];
 
   return (
     <div style={{
@@ -228,12 +264,8 @@ export default function BassGraphTooltip({
           <Divider />
           <SectionLabel color={COLORS.blue}>Target</SectionLabel>
           <Row label="Target SPL" value={formatSpl(houseCurveValue)} valueColor={COLORS.blue} />
-          {isFinite(diffFromTarget) && (
-            <Row
-              label={deltaLabel}
-              value={formatSignedDb(diffFromTarget)}
-              valueColor={deltaColor}
-            />
+          {residualStatement && (
+            <Row label="Target" value={residualStatement} valueColor={residualColor} />
           )}
         </>
       )}
@@ -244,6 +276,22 @@ export default function BassGraphTooltip({
           <Divider />
           <SectionLabel color={COLORS.grey}>Calibration</SectionLabel>
           <Row label="Operating level adjustment" value={formatSignedDb(calibrationDb)} valueColor={COLORS.grey} />
+        </>
+      )}
+
+      {/* ── EXPERT: calculation trace (Engineering Mode only) ── */}
+      {engineeringMode && (
+        <>
+          <Divider />
+          <SectionLabel color={COLORS.brown}>Calculation trace</SectionLabel>
+          {expertRows.map(([label, value], index) => (
+            <Row key={index} label={label} value={value} valueColor={COLORS.brown} />
+          ))}
+          {!traceRecord && (
+            <div style={{ fontSize: 10, lineHeight: 1.45, color: COLORS.muted, marginTop: 3 }}>
+              {CORRECTION_TRACE_UNAVAILABLE_COPY}
+            </div>
+          )}
         </>
       )}
     </div>

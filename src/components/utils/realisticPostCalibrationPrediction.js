@@ -29,8 +29,10 @@ import { isProtectedFrequency, isProtectedSmoothedFrequency } from "@/components
 import { getSourceDomainBoostAllowance } from "@/components/utils/subwooferCapability";
 import { applyBassSmoothing } from "@/components/room/bass/bassGraphSmoothing";
 
-const MAX_BOOST_DB = 6;
-const MAX_CUT_DB = 15;
+// Exported so the persisted correction trace states the real envelope limits
+// instead of declaring a second copy that could drift from the model.
+export const MAX_BOOST_DB = 6;
+export const MAX_CUT_DB = 15;
 const CORRECTION_SMOOTHING_WEIGHTS = Object.freeze([1, 6, 1]);
 
 /**

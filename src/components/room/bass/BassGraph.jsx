@@ -49,6 +49,8 @@ export default function BassGraph({
   renderToken = '',
   p14TotalDb = null,
   operatingLevelOffsetDb = 0,
+  correctionTrace = null,
+  smoothingMode = "none",
   rp22Markers = {
     p18FrequencyHz: null,
     p19StartHz: null,
@@ -327,7 +329,7 @@ export default function BassGraph({
                         tick={{ fill: '#3E4349' }}
                         allowDecimals={false}
                     />
-                    <Tooltip content={(props) => <BassGraphTooltip {...props} series={isMulti ? allMultiSeries : []} operatingLevelOffsetDb={operatingLevelOffsetDb} yDomain={[finalYMin, finalYMax]} />} shared cursor={false} />
+                    <Tooltip content={(props) => <BassGraphTooltip {...props} series={isMulti ? allMultiSeries : []} operatingLevelOffsetDb={operatingLevelOffsetDb} correctionTrace={correctionTrace} smoothingMode={smoothingMode} yDomain={[finalYMin, finalYMax]} />} shared cursor={false} />
 
                     {/* Schroeder frequency line (on-scale only) */}
                     {Number.isFinite(schroederFrequency) && schroederFrequency > 0 && schroederFrequency <= 200 && (

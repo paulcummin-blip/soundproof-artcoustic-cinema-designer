@@ -21,6 +21,7 @@
 //     authoritative (isAuthoritativeBassContract) before calling this adapter.
 
 import { buildCurveSignature, buildFilterBankSignature, buildCorrectionCurveSignature } from "./bassResultAuthority.js";
+import { cloneCorrectionTrace } from "./correctionTraceAuthority.js";
 
 /**
  * Build a synthetic optimisationResult from a compact completed contract's
@@ -79,6 +80,9 @@ export function buildFinishedGraphOptimisationResult(compactContract) {
     filterBankSignature,
     postEqCurveSignature,
     operatingLevelOffsetDb: Number.isFinite(gp.operatingLevelOffsetDb) ? gp.operatingLevelOffsetDb : 0,
+    // Persisted correction trace restored verbatim. Null for results persisted
+    // before the trace existed — the tooltip then says so rather than guessing.
+    correctionTrace: cloneCorrectionTrace(gp.correctionTrace),
     canonicalVerticalOffsetDb: null,
     canonicalHouseCurveShape: null,
     canonicalTargetCurve: productionHouseCurveTarget,

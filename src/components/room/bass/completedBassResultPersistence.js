@@ -13,6 +13,7 @@ import {
   validateCanonicalBassResult,
 } from "@/components/room/bass/canonicalBassResult";
 import { buildCurveSignature } from "@/components/room/bass/bassResultAuthority";
+import { cloneCorrectionTrace } from "@/components/room/bass/correctionTraceAuthority";
 
 export { COMPLETED_BASS_CACHE_VERSION };
 
@@ -368,6 +369,10 @@ function buildGraphPayload(contract) {
     maximumSplSafetyMarginDb: Number.isFinite(finalResponse.maximumSplSafetyMarginDb) ? finalResponse.maximumSplSafetyMarginDb : 0,
     correctionStartHz: Number.isFinite(finalResponse.correctionStartHz) ? finalResponse.correctionStartHz : null,
     correctionEndHz: Number.isFinite(finalResponse.correctionEndHz) ? finalResponse.correctionEndHz : null,
+    // Correction trace persisted verbatim so a cached reopen explains the same
+    // correction shortfall as the live calculation, without needing the raw
+    // curves. Null for results persisted before the trace existed.
+    correctionTrace: cloneCorrectionTrace(finalResponse.correctionTrace),
     designEqFitProfile: candidate?.designEqFitProfile || null,
     // Canonical unsmoothed flat-reference Room Response — carried through
     // compaction so the finished graph restores on cold reopen.

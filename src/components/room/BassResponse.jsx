@@ -1014,6 +1014,8 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, h
               renderToken={qStrategy}
               p14TotalDb={placementPreviewActive ? null : p14PresentationData.targetDb}
               operatingLevelOffsetDb={operatingLevelOffsetDb}
+              correctionTrace={finalBassResponse?.correctionTrace || null}
+              smoothingMode={bassSmoothingMode}
               rp22Markers={placementPreviewActive ? null : rp22GraphMarkers}
               highlightFrequencyHz={placementPreviewActive ? null : (highlightFromInteraction?.frequencyHz ?? null)}
               highlightLabel={placementPreviewActive ? null : (highlightFromInteraction?.label ?? null)}
