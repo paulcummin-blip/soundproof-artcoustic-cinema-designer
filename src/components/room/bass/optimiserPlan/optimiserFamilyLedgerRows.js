@@ -81,9 +81,19 @@ export const ADI_ROW_OUTCOME = Object.freeze({
    * improvement is never withheld, never called "not offered", and never left
    * for the designer to guess at.
    */
-  PREVIOUS_FOUND: "Previous placement improvement found. Re-run ADI on the current design before applying.",
+  PREVIOUS_FOUND: "Previous result found a possible improvement. Re-run ADI on the current design before applying any change.",
   /** The same rule when the design itself has moved on since the evaluation. */
-  PREVIOUS_FOUND_STALE: "Previous placement improvement found, but the design has changed. Re-run ADI before applying.",
+  PREVIOUS_FOUND_STALE: "Previous result found a possible improvement. Re-run ADI on the current design before applying any change. The design has changed since that evaluation.",
+  /**
+   * Gain is a valid lever on any front/rear group layout. A saved run that kept
+   * no gain attempt is stated plainly with the single action that evaluates it —
+   * never as a capability the engine does not have, and never as "not supported
+   * in this run".
+   */
+  GAIN_NOT_EVALUATED:
+    "Gain groups are adjustable on this design, but this saved run did not evaluate them. Re-run Optimisation Plan to test gain.",
+  /** Only where the engine genuinely cannot adjust gain (one source, symmetric pair). */
+  GAIN_NOT_ADJUSTABLE: "Gain cannot be adjusted for this layout.",
   /** Stated for a movement outside the practical, wall-based placement envelope. */
   THEORETICAL_PLACEMENT: "Theoretical option — not offered as default placement.",
   NO_BETTER_LAYOUT: "No better layout found",
@@ -187,16 +197,13 @@ function changeMagnitudeDb(delta) {
  * mandated sentence first, then the measured value, in whole dB. The improvement
  * is stated — it is never withheld.
  */
-function previousImprovementText(entry, attempt) {
+function previousImprovementText(attempt) {
   const parts = [];
   const p20 = changeMagnitudeDb(attempt?.p20DeltaDb);
   const p19 = changeMagnitudeDb(attempt?.p19DeltaDb);
   if (p20) parts.push(`P20 better by ${p20}`);
   if (p19) parts.push(`P19 better by ${p19}`);
-  const noun = entry?.family === OPTIMISER_RUN_FAMILY.PLACEMENT
-    ? "placement"
-    : String(entry?.label || "optimiser").toLowerCase();
-  const sentence = `Previous ${noun} improvement found. Re-run ADI on the current design before applying.`;
+  const sentence = ADI_ROW_OUTCOME.PREVIOUS_FOUND;
   if (!parts.length) return sentence;
   return `${sentence} That evaluation measured ${parts.join(", ")}.`;
 }
@@ -232,7 +239,7 @@ function testedOutcome(entry, baseline) {
     // states the improvement and the one action that makes it available.
     return {
       status: ADI_ROW_STATUS.TESTED,
-      outcome: previousImprovementText(entry, attempt),
+      outcome: previousImprovementText(attempt),
       actionText: null,
     };
   }
@@ -300,6 +307,34 @@ function rowFor(key, entry, families, baseline) {
       return { status: ADI_ROW_STATUS.TESTED, outcome: ADI_ROW_OUTCOME.NO_BETTER_LAYOUT };
     }
     return notSearchedInRun(familyReason(entry));
+  }
+
+  // ── Gain ── a relative level trim between subwoofer groups. Wherever the
+  // sources have independently adjustable groups (any front/rear pair layout)
+  // gain is a basic, valid lever, so the row NEVER reads as a capability the
+  // engine lacks: it states the run's own attempt, or — when the saved run kept
+  // none — that the groups can be trimmed and one re-run evaluates them.
+  if (key === "gain" && !tested) {
+    if (entry?.gainAdjustable === false) {
+      return {
+        status: ADI_ROW_STATUS.NOT_YET_SUPPORTED,
+        outcome: familyReason(entry) || ADI_ROW_OUTCOME.GAIN_NOT_ADJUSTABLE,
+      };
+    }
+    if (entry?.gainAdjustable === true) {
+      return {
+        status: ADI_ROW_STATUS.NOT_YET_SUPPORTED,
+        outcome: ADI_ROW_OUTCOME.GAIN_NOT_EVALUATED,
+        actionText: ADI_ROW_ACTION.RERUN_ADI,
+      };
+    }
+    // No grouping evidence was kept with this saved run: the layout may well be
+    // adjustable, so the row states the one action that answers it.
+    return {
+      status: ADI_ROW_STATUS.NOT_YET_SUPPORTED,
+      outcome: ADI_ROW_OUTCOME.GAIN_NOT_EVALUATED,
+      actionText: ADI_ROW_ACTION.RERUN_ADI,
+    };
   }
 
   // ── Seating ── the last resort, tried only once the practical options are

@@ -38,13 +38,17 @@ export const PLACEMENT_APPLIED_MESSAGE = "Placement applied";
 /** Stated once the previous positions have been restored. */
 export const PLACEMENT_UNDONE_MESSAGE = "Placement undone";
 
-/** The previous-improvement copy: the evaluated positions are not offered now. */
+/**
+ * The previous-improvement copy: a possible improvement was measured, its
+ * evaluated positions are not offered now, and there is exactly ONE action —
+ * re-run the Optimisation Plan on the current design.
+ */
 export const PLACEMENT_PREVIOUS_FOUND =
-  "Previous placement improvement found. Re-run ADI on the current design before applying.";
+  "Previous result found a possible improvement. Re-run ADI on the current design before applying any change.";
 
-/** The previous-improvement copy when the design itself has moved on. */
+/** The same copy when the design itself has moved on since the evaluation. */
 export const PLACEMENT_PREVIOUS_FOUND_STALE =
-  "Previous placement improvement found, but the design has changed. Re-run ADI before applying.";
+  "Previous result found a possible improvement. Re-run ADI on the current design before applying any change. The design has changed since that evaluation.";
 
 /** A subwoofer may not leave the wall it is mounted on by more than this. */
 const WALL_TOLERANCE_M = 0.15;

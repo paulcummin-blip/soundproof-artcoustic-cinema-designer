@@ -6,25 +6,31 @@
 // For two subs: each sub is its own group (unless symmetric same-wall pair).
 // For one sub: no inter-sub gain search.
 //
-// One group is held fixed (0 dB relative trim). The other group is adjusted
-// together in coarse (1 dB) then fine (0.5 dB) steps within safe limits.
+// PRODUCT RULE: gain is a basic, valid lever for any system with more than one
+// independently adjustable subwoofer group. For a front/rear layout the rear
+// group is swept from −6 dB to +6 dB in 0.5 dB steps, and the front group is
+// swept over the same range so relative balance can be found in either
+// direction. Positions, delays and polarity are frozen: only gain changes.
 //
 // This uses the SAME raw transfer (zero-tuning per-source per-seat complex
 // transfers) as the grouped delay search. Gain is applied as amplitude
 // scaling 10^(gainDb/20) — mathematically equivalent to applying trim in
 // the simulation.
 //
-// Safety limits: -10 dB to 0 dB (matching stage2TuningSearch.js LEVEL bounds).
-// One group is always held at 0 dB (the reference); the other group is
-// adjusted DOWN only (negative trim), never up.
+// Every step is scored through the fast proxy (peak-to-peak variation across
+// the seats), and the best attempt per direction/metric is retained for the
+// canonical confirmation — so the best gain attempt is kept even when it is
+// later rejected.
 
 import { resumWithTuning } from "../stage2/stage2TuningSearch.js";
 
 const GEOMETRY_TOLERANCE_M = 0.01;
-const GAIN_MIN_DB = -10;
-const GAIN_MAX_DB = 0;
-const GAIN_COARSE_STEP_DB = 1.0;
-const GAIN_FINE_STEP_DB = 0.5;
+/** The mandated sweep: ±6 dB, in 0.5 dB steps, for each group in turn. */
+const GAIN_MIN_DB = -6;
+const GAIN_MAX_DB = 6;
+const GAIN_STEP_DB = 0.5;
+/** The resolution the product requires. Steps below it add nothing. */
+const GAIN_RESOLUTION_DB = 0.5;
 
 const now = () => performance.now();
 const compare = (a, b) => a.score - b.score || a.adjustmentDb - b.adjustmentDb || a.id.localeCompare(b.id);
@@ -81,7 +87,9 @@ export function createGroupedGainCandidate(grouping, baseline, direction, adjust
 }
 
 /**
- * Generate coarse gain candidates for each group direction.
+ * Generate the gain candidates: the frozen Current control, then the sweep for
+ * each group in turn (±6 dB in 0.5 dB steps). Only the swept group moves, so
+ * every candidate is a relative balance between the groups.
  */
 export function generateGroupedGainCoarseCandidates(grouping, baseline) {
   if (!Array.isArray(baseline) || !baseline.length ||
@@ -95,8 +103,11 @@ export function generateGroupedGainCoarseCandidates(grouping, baseline) {
       groupedIds.some((id) => !baseline.some((t) => t.sourceId === id)))
     throw Error("Group membership does not match effective source identities");
   for (const group of grouping.groups)
-    for (let adj = GAIN_MIN_DB; adj <= GAIN_MAX_DB; adj += GAIN_COARSE_STEP_DB)
-      rows.push(createGroupedGainCandidate(grouping, baseline, group.id, adj));
+    for (let adj = GAIN_MIN_DB; adj <= GAIN_MAX_DB + 1e-9; adj += GAIN_STEP_DB) {
+      // 0 dB is the frozen Current control, already in the list.
+      if (Math.abs(adj) < 1e-9) continue;
+      rows.push(createGroupedGainCandidate(grouping, baseline, group.id, round(adj)));
+    }
   return rows;
 }
 
@@ -118,11 +129,15 @@ export function scoreGroupedGainCandidate(rawTransfer, candidate) {
 }
 
 /**
- * Plan fine refinement around the best coarse candidates.
+ * Plan the retained candidates from the sweep: for each group and each ranking
+ * metric, the best step is retained (the best attempt is never discarded) and,
+ * only when the sweep is coarser than the required resolution, one half-step
+ * between the best step and its neighbour as well.
  */
 export function planGroupedGainRefinement(coarse) {
   const retained = new Set(), intervals = new Map(), reasons = {};
   const keep = (row, reason) => { retained.add(row.id); (reasons[row.id] ||= []).push(reason); };
+  const refine = GAIN_STEP_DB > GAIN_RESOLUTION_DB;
   for (const direction of ["A", "B"]) {
     for (const metric of ["primaryRangeDb", "allSeatRangeDb"]) {
       const rows = coarse.filter((r) => r.direction === direction && !r.isCurrent && Number.isFinite(r.proxy?.[metric]));
@@ -130,8 +145,9 @@ export function planGroupedGainRefinement(coarse) {
       const seed = ranked[0];
       if (!seed) continue;
       keep(seed, direction + " " + metric + " minimum");
+      if (!refine) continue;
       const adjacent = coarse
-        .filter((r) => !r.isCurrent && r.direction === direction && Math.abs(r.adjustmentDb - seed.adjustmentDb) === GAIN_COARSE_STEP_DB && Number.isFinite(r.proxy?.[metric]))
+        .filter((r) => !r.isCurrent && r.direction === direction && Math.abs(r.adjustmentDb - seed.adjustmentDb) === GAIN_STEP_DB && Number.isFinite(r.proxy?.[metric]))
         .map((r) => ({ ...r, score: r.proxy[metric] })).sort(compare)[0];
       if (!adjacent) continue;
       keep(adjacent, "Adjacent to " + seed.id + " by " + metric);
@@ -141,6 +157,11 @@ export function planGroupedGainRefinement(coarse) {
     }
   }
   return { retainedIds: [...retained], intervals: [...intervals.values()], reasons };
+}
+
+/** Keep step arithmetic exact at 0.5 dB increments. */
+function round(value) {
+  return Math.round(value * 100) / 100;
 }
 
 /**

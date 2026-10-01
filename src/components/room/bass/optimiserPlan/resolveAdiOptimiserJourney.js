@@ -46,7 +46,10 @@ export const ADI_OPTIMISER_ACTION = Object.freeze({
 });
 
 export const ADI_OPTIMISER_ACTION_LABEL = Object.freeze({
-  [ADI_OPTIMISER_ACTION.RUN]: "Run Optimisation Plan",
+  // ONE re-run wording, everywhere: before a first run, after a stale result,
+  // after a failed run, and after an incomplete evaluation. There is never a
+  // second re-run button and never a "Re-run to apply".
+  [ADI_OPTIMISER_ACTION.RUN]: "Re-run Optimisation Plan",
   [ADI_OPTIMISER_ACTION.RERUN]: "Re-run Optimisation Plan",
   [ADI_OPTIMISER_ACTION.COMPLETE]: "Complete Optimisation Plan",
 });

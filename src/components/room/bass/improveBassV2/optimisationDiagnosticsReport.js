@@ -410,6 +410,13 @@ export function buildOptimisationDiagnosticsReport(selection, context = {}) {
     // The run's own reason for the gain outcome, when it recorded one, so the
     // family ledger states what actually happened instead of a generic line.
     reason: typeof gainDiag.reason === "string" ? gainDiag.reason : null,
+    // Whether the groups of THIS design are independently adjustable and the
+    // sweep therefore ran, plus the best evaluated attempt (kept even when the
+    // attempt was not material enough to recommend).
+    gainAdjustable: typeof gainDiag.gainAdjustable === "boolean" ? gainDiag.gainAdjustable : null,
+    searchStatus: typeof gainDiag.status === "string" ? gainDiag.status : null,
+    groups: Array.isArray(gainDiag.groups) ? gainDiag.groups : null,
+    bestAttempt: gainDiag.bestAttempt || null,
     candidatesEvaluated: {
       coarse: num(gainDiag.coarseCount) ?? 0,
       fine: num(gainDiag.fineCount) ?? 0,

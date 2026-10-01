@@ -695,6 +695,20 @@ export async function runImproveBassV2(projectId, versionId, params, callbacks) 
     let gainDiagnostics = {status:"incomplete",retained:0,confirmed:0,valid:0,invalid:0,options:[]};
     let savedCurrentRawTransfer = null;
     let savedEffectiveBaseline = null;
+    /** The best evaluated gain attempt: lowest P20 variation, then lowest P19. */
+    function pickBestGainAttempt(pairs) {
+      const ranked = (pairs || [])
+        .filter(pair => pair?.result)
+        .map(pair => ({
+          pair,
+          p20: Number.isFinite(Number(pair.result.achievedP20VariationDb))
+            ? Math.abs(Number(pair.result.achievedP20VariationDb)) : Infinity,
+          p19: Number.isFinite(Number(pair.result.achievedP19VariationDb))
+            ? Math.abs(Number(pair.result.achievedP19VariationDb)) : Infinity,
+        }))
+        .sort((a, b) => (a.p20 - b.p20) || (a.p19 - b.p19));
+      return ranked.length ? ranked[0].pair : null;
+    }
     function bindConfirmation(result, tuning, candidate, kind) {
       const appliedTuning=bindTuningToSourceIds(tuning,snapshot.instanceIds);
       const positions=candidate.coordinates || result.coordinates || snapshot.positions;
@@ -899,7 +913,12 @@ export async function runImproveBassV2(projectId, versionId, params, callbacks) 
     // Search grouped gain with the same raw transfer and effective baseline
     // as the delay search. Delays and polarities are held fixed at the
     // effective baseline; only gain is adjusted.
-    if (savedCurrentRawTransfer && savedEffectiveBaseline && existingAuthority) {
+    //
+    // Gain is a basic, valid lever wherever the sources have independently
+    // adjustable groups (any front/rear pair layout), so the sweep is NEVER
+    // gated on a comparison baseline: a missing Current authority must not stop
+    // a front/rear trim from being tested and reported.
+    if (savedCurrentRawTransfer && savedEffectiveBaseline) {
       try {
         onProgress("calibrating", "Testing grouped gain adjustments", 0, 1);
         const gainStarted = performance.now();
@@ -917,11 +936,17 @@ export async function runImproveBassV2(projectId, versionId, params, callbacks) 
           options: gainRetained.map(f => ({candidateId: f.id, tuning: f.tuning, proxy: f.proxy})),
           status: gainSearch?.status || "incomplete",
           groupingStatus: gainSearch?.status || null,
+          // Whether gain is adjustable for THIS design: the groups were
+          // recognised and the sweep ran. Recorded so the card never presents a
+          // front/rear layout as a system the engine cannot trim.
+          gainAdjustable: gainSearch?.status === "eligible",
+          groups: (gainSearch?.grouping?.groups || []).map(g => ({ id: g.id, label: g.label })),
           reason: gainSearch?.status === "skipped" || gainSearch?.status === "ambiguous"
             ? (gainSearch?.grouping?.reason || null)
             : null,
         });
         const gainCandidates = [];
+        const gainConfirmedPairs = [];
         for (let gi = 0; gi < gainRetained.length; gi++) {
           if (isCancelled()) return {status: "cancelled", snapshot};
           if (isStale()) return {status: "stale", snapshot};
@@ -946,6 +971,7 @@ export async function runImproveBassV2(projectId, versionId, params, callbacks) 
             gainDiagnostics.options[gi].validated = gCheck.result;
             if (gCheck.valid) {
               gainCandidates.push(gCheck.result);
+              gainConfirmedPairs.push({candidate: gainRetained[gi], result: gCheck.result});
               gainDiagnostics.valid++;
             } else {
               gainDiagnostics.invalid++;
@@ -959,8 +985,31 @@ export async function runImproveBassV2(projectId, versionId, params, callbacks) 
           gainMaterial = {material: !!gainResult, reason: gainSelection.materialityReason};
           gainDiagnostics.evaluations = gainSelection.evaluations;
         }
-        const gainVerdict = gainMaterial?.material ? "improvement" :
-          gainDiagnostics.invalid || gainDiagnostics.error || !gainDiagnostics.valid ? "incomplete" : "no_improvement";
+        // Retain the best evaluated gain attempt as evidence, even when it is not
+        // material enough to recommend: the card states what the sweep found.
+        const bestGainPair = pickBestGainAttempt(gainConfirmedPairs);
+        if (bestGainPair) {
+          const adjustmentDb = Number(bestGainPair.candidate?.adjustmentDb);
+          const group = (gainSearch?.grouping?.groups || [])
+            .find(g => g.id === bestGainPair.candidate?.direction) || null;
+          gainDiagnostics.bestAttempt = {
+            candidateId: bestGainPair.result?.candidateId || null,
+            p20VariationDb: bestGainPair.result?.achievedP20VariationDb ?? null,
+            p20Level: bestGainPair.result?.achievedP20Level ?? null,
+            p19VariationDb: bestGainPair.result?.achievedP19VariationDb ?? null,
+            p19Level: bestGainPair.result?.achievedP19Level ?? null,
+            p18Hz: bestGainPair.result?.achievedP18Hz ?? null,
+            p14Db: bestGainPair.result?.p14AchievedDb ?? null,
+            adjustmentDb: Number.isFinite(adjustmentDb) ? adjustmentDb : null,
+            groupLabel: group?.label || null,
+          };
+        }
+        // A searched gain sweep is a TESTED lever, whatever it found: only a
+        // layout with no independently adjustable group is reported as skipped.
+        const gainNotAdjustable = gainDiagnostics.status === "skipped" || gainDiagnostics.status === "ambiguous";
+        const gainVerdict = gainMaterial?.material ? "improvement"
+          : gainNotAdjustable ? "skipped"
+          : "no_improvement";
         if (!gainMaterial?.material && !gainDiagnostics.reason) {
           // Gain was searched and produced no material improvement. That is a
           // tested lever with a result to report — never "not applicable".
@@ -968,18 +1017,17 @@ export async function runImproveBassV2(projectId, versionId, params, callbacks) 
             ? `No useful improvement found${gainMaterial?.reason ? ": " + gainMaterial.reason : "."}`
             : (gainDiagnostics.error || "Tested, but no confirmed gain candidate passed validation.");
         }
-        setStageVerdict(projectId, versionId, "gain", gainDiagnostics.status === "skipped" ? "skipped" : gainVerdict);
+        setStageVerdict(projectId, versionId, "gain", gainVerdict);
       } catch (err) {
         if (isFatalLifecycleError(err)) throw err;
         gainDiagnostics.error = err.message;
         setStageVerdict(projectId, versionId, "gain", "incomplete");
       }
     } else {
-      // Gain is a valid lever wherever sources are independently adjustable.
-      // No comparison baseline is a technical reason for not running it, so it
-      // must never be published as "not applicable".
+      // Nothing to trim against: the frozen Current transfer is not available.
       gainDiagnostics.status = "not_run";
-      gainDiagnostics.reason = "Gain available but not run: no validated Current baseline was available for comparison in this run.";
+      gainDiagnostics.gainAdjustable = null;
+      gainDiagnostics.reason = "Gain could not be searched in this run because the Current subwoofer transfer was not available.";
       setStageVerdict(projectId, versionId, "gain", "incomplete");
     }
     await yieldToUI();

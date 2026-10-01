@@ -47,8 +47,8 @@ export const ADI_ENGINEER_DETAILS_TITLE = "Engineer details";
 export const ADI_ACTION_NONE = "—";
 
 export const ADI_STALE_COPY = Object.freeze({
-  MESSAGE: "This optimisation result belongs to an earlier design state.",
-  INSTRUCTION: "Re-run ADI before applying any change.",
+  MESSAGE: "Previous result found a possible improvement. Re-run ADI on the current design before applying any change.",
+  INSTRUCTION: "The design has changed since that evaluation.",
   PREVIOUS_LABEL: "Previous best result:",
 });
 
@@ -592,7 +592,8 @@ export function buildAdiDesignerSummary({
       // No on-plan preview of a proposed change exists yet — the card never
       // implies that one does.
       canPreview: false,
-      rerunLabel: noRun ? "Run Optimisation Plan" : "Re-run Optimisation Plan",
+      // ONE re-run wording for every state that offers it.
+      rerunLabel: "Re-run Optimisation Plan",
     },
   };
 }

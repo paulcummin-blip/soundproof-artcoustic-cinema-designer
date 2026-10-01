@@ -3,17 +3,21 @@
 // The card's action row. Which buttons exist is decided by the summary
 // authority, never here:
 //
-//   recommendation available → Preview · Apply <lever> · Keep current design
-//   applied                  → Undo change · Re-run optimisation
-//   nothing safe to apply    → Re-run optimisation · Compare subwoofer options
-//                              · Keep current design
+//   recommendation available → Apply <lever> · Keep current design
+//   applied                  → Undo change · Compare subwoofer options
+//   nothing safe to apply    → Compare subwoofer options · Keep current design
+//
+// Re-run is NOT here. The card has exactly ONE re-run control — "Re-run
+// Optimisation Plan" — owned by the optimisation-plan action (or by the
+// placement panel while it states a previous result), so the card can never
+// show two re-run buttons or a "Re-run to apply".
 //
 // Apply is rendered only when the summary says it is safe. There is no path to
 // an Apply button from stale, rejected, incomplete or combined-only evidence.
 // ---------------------------------------------------------------------------
 
 import React from "react";
-import { ArrowRight, Check, RotateCcw, Sparkles, Undo2, X } from "lucide-react";
+import { Check, Sparkles, Undo2, X } from "lucide-react";
 
 const PRIMARY = "inline-flex items-center gap-1.5 rounded-md bg-[#213428] px-4 py-2 text-[12px] font-semibold text-white transition-colors hover:bg-[#3E4349] disabled:opacity-60";
 const SECONDARY = "inline-flex items-center gap-1.5 rounded-md border border-[#D9D5CE] bg-white px-4 py-2 text-[12px] font-semibold text-[#213428] transition-colors hover:border-[#213428]";
@@ -25,7 +29,6 @@ export default function AdiDesignerActionBar({
   onPreview = null,
   onApply = null,
   onKeepCurrent = null,
-  onRerun = null,
   onUndo = null,
   onCompareSubwoofers = null,
   className = "",
@@ -53,19 +56,6 @@ export default function AdiDesignerActionBar({
         <button type="button" className={SECONDARY} onClick={onUndo} disabled={busy}>
           <Undo2 className="h-3.5 w-3.5" />
           {actions.undoLabel || "Undo change"}
-        </button>
-      )}
-
-      {typeof onRerun === "function" && actions.canRerun !== false && (
-        <button
-          type="button"
-          className={hasApply || actions.canUndo ? SECONDARY : PRIMARY}
-          onClick={onRerun}
-          disabled={busy}
-        >
-          <RotateCcw className="h-3.5 w-3.5" />
-          {actions.rerunLabel || "Re-run optimisation"}
-          <ArrowRight className="h-3.5 w-3.5" />
         </button>
       )}
 

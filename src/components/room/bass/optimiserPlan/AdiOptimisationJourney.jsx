@@ -195,8 +195,10 @@ export default function AdiOptimisationJourney({
 
   // ── The placement recommendation owns its own actions ──
   // Placement is the one lever with a physical, wall-based move to describe, so
-  // its panel carries Apply placement / Undo placement / Re-run. The generic
-  // action bar never duplicates what the panel already offers.
+  // its panel carries Apply placement / Undo placement / Re-run. While it states
+  // a previous result it also carries the card's single "Re-run Optimisation
+  // Plan" action, and the card's own primary button stands down — the designer
+  // never sees two re-run buttons.
   const placement = summary.placementRecommendation || null;
   const placementLever = (planView?.levers || [])
     .find((lever) => (lever?.key ?? lever?.lever) === OPTIMISER_LEVER.PLACEMENT) || null;
@@ -357,7 +359,6 @@ export default function AdiOptimisationJourney({
         busy={isRunning}
         onApply={panelShowsApply ? null : handleApplyRecommended}
         onUndo={panelShowsUndo ? null : handleUndoRecommended}
-        onRerun={panelShowsRerun ? null : onRunOptimisationPlan}
       />
 
       {/* How many design options ADI will test, and the acoustic work behind them. */}
@@ -377,10 +378,15 @@ export default function AdiOptimisationJourney({
         </div>
       )}
 
-      {showAction && (
+      {/* The card's ONE re-run control — "Re-run Optimisation Plan" in every
+          state that offers it. It stands down while the placement panel is
+          already stating that same single action, so two re-run buttons can
+          never appear together. */}
+      {showAction && !panelShowsRerun && (
         <button
           type="button"
           onClick={onRunOptimisationPlan}
+          data-adi-rerun-plan="true"
           className="inline-flex items-center gap-1.5 rounded-md bg-[#213428] px-5 py-2.5 text-[13px] font-semibold text-white transition-colors hover:bg-[#3E4349]"
         >
           <Sparkles className="h-3.5 w-3.5" />

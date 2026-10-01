@@ -134,9 +134,14 @@ function attemptScore(score) {
   };
 }
 
-/** The stage's best evaluated attempt, read from its recorded best-after score. */
+/**
+ * The stage's best evaluated attempt: the run's own retained attempt when it
+ * recorded one, otherwise its recorded best-after score.
+ */
 function bestFromStage(stage) {
   if (!stage) return null;
+  const retained = attemptScore({ ...(stage.bestAttempt || {}), candidateId: stage.bestAttempt?.candidateId || null });
+  if (retained) return retained;
   const score = attemptScore({ ...(stage.bestScoreAfter || {}), candidateId: stage.winningCandidate?.candidateId || null });
   return score;
 }
@@ -150,6 +155,7 @@ function confirmedCount(stage) {
 /** Build one family record. */
 function family({
   key, status, candidatesEvaluated = null, bestAttempt = null, reason = null, accepted = false, current = null,
+  gainAdjustable = null,
 }) {
   return {
     family: key,
@@ -169,6 +175,10 @@ function family({
       }
       : null,
     reason,
+    // Whether this design's subwoofer groups can be trimmed independently, as
+    // recorded by the run's own gain grouping. Null for every other family and
+    // null where the run kept no grouping evidence.
+    gainAdjustable,
     // Whether this family was actually evaluated in the run. A family that was
     // never started (or only explored inside another search) is never presented
     // as an evaluated lever.
@@ -191,17 +201,28 @@ function leverFamily({
   current,
   issueStages = [stageName.toLowerCase(), "calibration", "global"],
   reasonFallback = null,
+  searched = false,
 }) {
   const stage = stageByName(diagnostics, stageName);
   const issue = issueFor(selection, issueStages);
-  const attempted = confirmedCount(stage) != null ? confirmedCount(stage) > 0 : !!stage?.winningCandidate;
+  const confirmed = confirmedCount(stage);
+  // A family is "evaluated" when it confirmed a candidate, produced a winner, or
+  // — for gain — when its own sweep ran on a design whose groups are adjustable.
+  // A swept family is never reported as one the engine did not search.
+  const attempted = (confirmed != null ? confirmed > 0 : !!stage?.winningCandidate)
+    || (searched && stage?.gainAdjustable === true);
   const best = bestFromStage(stage);
+  // Whether this design's groups can be trimmed at all, carried onto the record
+  // so the card states the real reason instead of a generic one.
+  const gainAdjustable = key === OPTIMISER_RUN_FAMILY.GAIN
+    ? (typeof stage?.gainAdjustable === "boolean" ? stage.gainAdjustable : null)
+    : null;
 
   if (issue) {
     return family({
       key,
       status: OPTIMISER_FAMILY_STATUS.FAILED,
-      candidatesEvaluated: confirmedCount(stage),
+      candidatesEvaluated: confirmed,
       bestAttempt: best,
       reason: issueText(issue),
       current,
@@ -211,28 +232,31 @@ function leverFamily({
     return family({
       key,
       status: OPTIMISER_FAMILY_STATUS.REJECTED,
-      candidatesEvaluated: confirmedCount(stage),
+      candidatesEvaluated: confirmed,
       bestAttempt: best,
       reason: OPTIMISER_FAMILY_NO_WINNER_REASON,
       current,
+      gainAdjustable,
     });
   }
   if (attempted) {
     return family({
       key,
       status: OPTIMISER_FAMILY_STATUS.EVALUATED,
-      candidatesEvaluated: confirmedCount(stage),
+      candidatesEvaluated: confirmed,
       reason: stageReason(stage) || reasonFallback
         || "Evaluated — no comparison value was kept for this search.",
       current,
+      gainAdjustable,
     });
   }
   return family({
     key,
     status: OPTIMISER_FAMILY_STATUS.NOT_TESTED,
-    candidatesEvaluated: confirmedCount(stage),
+    candidatesEvaluated: confirmed,
     reason: stageReason(stage) || reasonFallback || OPTIMISER_FAMILY_NOT_TESTED_REASON,
     current,
+    gainAdjustable,
   });
 }
 
@@ -268,6 +292,7 @@ export function buildFamilyLedger({ selection = null, diagnostics = null, curren
     selection,
     diagnostics,
     current,
+    searched: true,
   }));
 
   // ── Phase / crossover-region alignment ── lever 3.
