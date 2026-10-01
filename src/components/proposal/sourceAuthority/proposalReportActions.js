@@ -4,10 +4,16 @@
  * The stable per-report action state behind the Proposal Centre "Proposal Source
  * Data" panel and the wizard's Versions step.
  *
- * ONE RULE: a report is presented with its Generate / Regenerate action unless
- * it has actually been read as Current. Every other state — checking, missing,
- * stale, failed, generating, unresolved — keeps its action on screen, so the
- * designer can always produce the report from this screen.
+ * TWO RULES:
+ *
+ * 1. The action is never withdrawn. Checking, missing, stale, failed and
+ *    unresolved all keep it on screen, so the designer can always produce the
+ *    report from this screen.
+ * 2. The label never varies with the state: it is always "Generate <Report>".
+ *    The status text — Current / Missing / Stale / Checking / Unavailable —
+ *    already says whether the report exists, so the button never has to say
+ *    anything more than what it does. The running state alone differs, because
+ *    there the action cannot be run again.
  *
  * WHY THIS EXISTS
  * The source read is asynchronous. While it is in flight — and while the active
@@ -129,34 +135,36 @@ export function resolveReportUiState({ reportState = null, checking = false, gen
   }
 }
 
+/** The one action verb a report button ever uses. */
+export const REPORT_ACTION_VERB = 'Generate';
+
+/** The single button label for a report, identical in every runnable state. */
+export function reportActionLabel(label) {
+  return `${REPORT_ACTION_VERB} ${label}`;
+}
+
 /**
  * The action for a report.
  *
- * Returns a label for EVERY state: the action is never withdrawn because a read
- * settled, a source reloaded, or the status came back unresolved. An unresolved
- * source is offered the safe combined wording.
+ * One label, always: "Generate <Report>", in every state where the report can
+ * be run — missing, stale, failed, checking, unresolved and current. Only a
+ * generation already in flight differs, and there the action is disabled.
+ *
+ * Emphasis is the only thing that softens: a Current report's action is quiet,
+ * because re-running it is optional, while every other state is primary.
  *
  * @returns {{label: string, disabled: boolean, emphasis: 'primary'|'quiet'}}
  */
 export function resolveReportAction({ label, uiState }) {
-  switch (uiState) {
-    case PROPOSAL_REPORT_UI_STATE.CURRENT:
-      return { label: `Regenerate ${label}`, disabled: false, emphasis: 'quiet' };
-    case PROPOSAL_REPORT_UI_STATE.GENERATING:
-      return { label: `Generating ${label}…`, disabled: true, emphasis: 'quiet' };
-    case PROPOSAL_REPORT_UI_STATE.MISSING:
-      return { label: `Generate ${label}`, disabled: false, emphasis: 'primary' };
-    case PROPOSAL_REPORT_UI_STATE.STALE:
-      return { label: `Regenerate stale ${label}`, disabled: false, emphasis: 'primary' };
-    case PROPOSAL_REPORT_UI_STATE.FAILED:
-      return { label: `Regenerate ${label}`, disabled: false, emphasis: 'primary' };
-    default:
-      return {
-        label: `Generate / Regenerate ${label}`,
-        disabled: false,
-        emphasis: 'primary',
-      };
+  if (uiState === PROPOSAL_REPORT_UI_STATE.GENERATING) {
+    return { label: `Generating ${label}…`, disabled: true, emphasis: 'quiet' };
   }
+
+  return {
+    label: reportActionLabel(label),
+    disabled: false,
+    emphasis: uiState === PROPOSAL_REPORT_UI_STATE.CURRENT ? 'quiet' : 'primary',
+  };
 }
 
 /**

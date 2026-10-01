@@ -5,14 +5,14 @@
  *
  * Shows the Visual Report and Technical Report source status, the project
  * version the proposal would be built from, and when those reports were
- * generated. Every report keeps its Generate / Regenerate action on screen
- * unless it has been read as Current, so the designer can always produce the
- * report from this screen — while the status is still being read, after a
- * reload, or when the source comes back unresolved.
+ * generated. Every report keeps its action on screen in every state — while the
+ * status is still being read, after a reload, or when the source comes back
+ * unresolved — and that action is always labelled "Generate <Report>". The
+ * status text carries the condition; the button only says what it does.
  *
  * Presentation only: the status comes from proposalSourceAuthority and the
- * action state from proposalReportActions; the actions simply open the report
- * that has to be generated or regenerated.
+ * action state from proposalReportActions; each action simply opens the report
+ * it produces.
  */
 
 import React, { useState } from 'react';
@@ -26,6 +26,7 @@ import {
   markGenerationRequested,
   resolveReportActionRows,
 } from '@/components/proposal/sourceAuthority/proposalReportActions';
+import { PROPOSAL_REPORT_GATE_READY_COPY } from '@/components/proposal/sourceAuthority/proposalReportReadinessGate';
 import { REPORT_FONT_HEADING, REPORT_FONT_BODY } from '@/components/report/typography/reportTypography';
 
 const STATE_COLOUR = {
@@ -192,7 +193,7 @@ export default function ProposalSourcePanel({ status, loading = false, className
 
       {status.ready && (
         <p className="mt-4 text-[11px] text-[#8A8477]" style={{ fontFamily: REPORT_FONT_BODY }}>
-          The proposal will be generated from these reports only.
+          {PROPOSAL_REPORT_GATE_READY_COPY}
         </p>
       )}
     </section>

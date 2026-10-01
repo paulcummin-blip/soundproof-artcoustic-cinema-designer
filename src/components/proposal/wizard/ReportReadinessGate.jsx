@@ -4,12 +4,12 @@
  * Step 3 (Versions) readiness block.
  *
  * States, per report, whether the selected version has a current Visual and
- * Technical Report, and — unless that report is confirmed current — the one
- * action that produces it. Next stays disabled until both read Current.
+ * Technical Report, and the one action that produces it. Next stays disabled
+ * until both read Current.
  *
- * The action is never withdrawn: while the status is still being read the row
- * reads Checking and keeps its safe action, and a Current report keeps a
- * Regenerate action rather than losing its button.
+ * The action is never withdrawn and its label never varies: every state shows
+ * "Generate <Report>", and the status text says whether the report is current,
+ * missing, stale, checking or unavailable.
  *
  * Presentation only: every value comes from proposalReportReadinessGate.
  */
@@ -17,7 +17,10 @@
 import React from 'react';
 import { Check, AlertTriangle, Loader2 } from 'lucide-react';
 import { REPORT_FONT_HEADING, REPORT_FONT_BODY } from '@/components/report/typography/reportTypography';
-import { PROPOSAL_REPORT_GATE_TITLE } from '@/components/proposal/sourceAuthority/proposalReportReadinessGate';
+import {
+  PROPOSAL_REPORT_GATE_TITLE,
+  PROPOSAL_REPORT_GATE_READY_COPY,
+} from '@/components/proposal/sourceAuthority/proposalReportReadinessGate';
 import { PROPOSAL_REPORT_UI_STATE } from '@/components/proposal/sourceAuthority/proposalReportActions';
 
 const STATE_COLOUR = {
@@ -134,7 +137,7 @@ export default function ReportReadinessGate({ gate, className = '' }) {
 
       {gate.ready && (
         <p className="mt-3 text-[11px] text-[#8A8477]" style={{ fontFamily: REPORT_FONT_BODY }}>
-          Both reports are current for this version. The proposal will be built from them.
+          {PROPOSAL_REPORT_GATE_READY_COPY}
         </p>
       )}
     </section>

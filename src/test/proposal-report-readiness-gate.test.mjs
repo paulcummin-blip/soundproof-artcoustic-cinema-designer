@@ -6,14 +6,15 @@
 //   A proposal is never built from stale project data.
 //
 // Covers the gate derivation (Current / Missing / Stale / Failed / Checking),
-// the exact blocking message, the generate-or-regenerate action per report, the
-// version-scoped action URLs and the wizard wiring.
+// the exact blocking copy, the one Generate action per report — the same label
+// in every state — the version-scoped action URLs and the wizard wiring.
 
 import { test, expect } from 'vitest';
 import fs from 'node:fs';
 import {
   PROPOSAL_REPORT_GATE_MESSAGE,
   PROPOSAL_REPORT_GATE_DETAIL,
+  PROPOSAL_REPORT_GATE_READY_COPY,
   PROPOSAL_REPORT_GATE_STATUS,
   describeGateStatus,
   resolveReportGate,
@@ -46,8 +47,11 @@ test('both reports missing blocks the step and offers both generate actions', ()
   const gate = gateFor({ hasSource: false });
 
   expect(gate.ready).toBe(false);
-  expect(gate.message).toBe('Create Visual and Technical reports in order to continue.');
   expect(gate.message).toBe(PROPOSAL_REPORT_GATE_MESSAGE);
+  expect(gate.message).toBe(
+    'Generate the Visual and Technical Reports before creating a proposal. '
+    + 'This ensures the proposal uses the current project data and RP22 results.',
+  );
   expect(gate.detail).toBe(PROPOSAL_REPORT_GATE_DETAIL);
   expect(gate.detail).toMatch(/uses the current Visual and Technical reports/);
 
@@ -63,14 +67,14 @@ test('both reports missing blocks the step and offers both generate actions', ()
   ]);
 });
 
-test('a stale report blocks the step and asks for a regeneration', () => {
+test('a stale report blocks the step and keeps the Generate action', () => {
   const gate = gateFor({ hasSource: true, designMovedOn: true });
 
   expect(gate.ready).toBe(false);
   expect(gate.rows.map((r) => r.status)).toEqual(['Stale', 'Stale']);
   expect(gate.rows.map((r) => r.actionLabel)).toEqual([
-    'Regenerate stale Visual Report',
-    'Regenerate stale Technical Report',
+    'Generate Visual Report',
+    'Generate Technical Report',
   ]);
 });
 
@@ -88,8 +92,8 @@ test('a failed report reads Unavailable and blocks the step', () => {
   expect(gate.ready).toBe(false);
   expect(gate.rows.map((r) => r.status)).toEqual(['Unavailable', 'Unavailable']);
   expect(gate.rows.map((r) => r.actionLabel)).toEqual([
-    'Regenerate Visual Report',
-    'Regenerate Technical Report',
+    'Generate Visual Report',
+    'Generate Technical Report',
   ]);
 });
 
@@ -117,8 +121,8 @@ test('checking is not presented as Missing and keeps both actions', () => {
     PROPOSAL_REPORT_UI_STATE.CHECKING,
   ]);
   expect(gate.rows.map((r) => r.actionLabel)).toEqual([
-    'Generate / Regenerate Visual Report',
-    'Generate / Regenerate Technical Report',
+    'Generate Visual Report',
+    'Generate Technical Report',
   ]);
   expect(gate.rows.every((r) => r.actionUrl && !r.actionDisabled)).toBe(true);
 });
@@ -132,6 +136,12 @@ test('both reports current enables the step', () => {
   expect(gate.ready).toBe(true);
   expect(gate.rows.map((r) => r.status)).toEqual(['Current', 'Current']);
   expect(gate.rows.map((r) => r.current)).toEqual([true, true]);
+  // The action stays available on a current report, under the same label.
+  expect(gate.rows.map((r) => r.actionLabel)).toEqual([
+    'Generate Visual Report',
+    'Generate Technical Report',
+  ]);
+  expect(gate.rows.every((r) => r.actionUrl && !r.actionDisabled)).toBe(true);
   expect(gate.message).toBeNull();
   expect(gate.detail).toBeNull();
 });
@@ -160,6 +170,43 @@ test('every readiness state keeps a usable action', () => {
   rows.forEach((row) => expect(row.actionLabel.length).toBeGreaterThan(0));
 });
 
+test('the same Generate label is used in every state, with the status carrying the state', () => {
+  const states = [
+    {},
+    { hasSource: true },
+    { hasSource: true, designMovedOn: true },
+    { hasSource: true, unavailable: true },
+  ];
+
+  states.forEach((overrides) => {
+    const gate = gateFor(overrides);
+    expect(gate.rows.map((r) => r.actionLabel)).toEqual([
+      'Generate Visual Report',
+      'Generate Technical Report',
+    ]);
+  });
+
+  const checking = gateFor({ hasSource: false }, true);
+  expect(checking.rows.map((r) => r.actionLabel)).toEqual([
+    'Generate Visual Report',
+    'Generate Technical Report',
+  ]);
+
+  // The status text is what distinguishes the states.
+  expect(gateFor({ hasSource: true }).rows.map((r) => r.status)).toEqual(['Current', 'Current']);
+  expect(gateFor({ hasSource: false }).rows.map((r) => r.status)).toEqual(['Missing', 'Missing']);
+  expect(gateFor({ hasSource: true, designMovedOn: true }).rows.map((r) => r.status)).toEqual(['Stale', 'Stale']);
+  expect(gateFor({ hasSource: true, unavailable: true }).rows.map((r) => r.status)).toEqual(['Unavailable', 'Unavailable']);
+});
+
+test('no Regenerate or Generate / Regenerate wording reaches the gate surfaces', () => {
+  [GATE_UI, GATE_AUTHORITY, ...Object.values(PROPOSAL_REPORT_GATE_STATUS)].forEach((value) => {
+    expect(String(value)).not.toMatch(/Regenerate/i);
+  });
+  expect(GATE_AUTHORITY).not.toMatch(/Generate\s*\/\s*Regenerate/);
+  expect(GATE_UI).not.toMatch(/Generate\s*\/\s*Regenerate/);
+});
+
 /* ── Wiring ───────────────────────────────────────────────────────────── */
 
 test('the Versions step cannot advance without both current reports', () => {
@@ -172,6 +219,23 @@ test('the Versions step renders the readiness block beside the version cards', (
   expect(VERSIONS_STEP).toMatch(/import ReportReadinessGate from '@\/components\/proposal\/wizard\/ReportReadinessGate'/);
   expect(VERSIONS_STEP).toMatch(/<ReportReadinessGate gate=\{reportGate\} \/>/);
   expect(VERSIONS_STEP).toMatch(/reportGate = null/);
+});
+
+test('the copy is exact: the blocking sentence while blocked, the promise once current', () => {
+  expect(PROPOSAL_REPORT_GATE_MESSAGE).toBe(
+    'Generate the Visual and Technical Reports before creating a proposal. '
+    + 'This ensures the proposal uses the current project data and RP22 results.',
+  );
+  expect(PROPOSAL_REPORT_GATE_READY_COPY).toBe('The proposal will be generated from these reports.');
+
+  expect(GATE_UI).toMatch(/PROPOSAL_REPORT_GATE_READY_COPY/);
+  expect(GATE_UI).toMatch(/\{gate\.message\}/);
+
+  // A ready gate carries neither blocking sentence.
+  const ready = gateFor({ hasSource: true });
+  expect(ready.message).toBeNull();
+  expect(ready.detail).toBeNull();
+  expect(PROPOSAL_REPORT_GATE_READY_COPY).not.toMatch(/Regenerate/i);
 });
 
 test('the readiness block states both reports, the message and the actions', () => {

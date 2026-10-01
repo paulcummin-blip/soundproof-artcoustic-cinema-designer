@@ -11,9 +11,10 @@
  * This module adds no new authority: it presents the existing
  * proposalSourceAuthority status per report — Current / Missing / Stale /
  * Failed — and states the one action each condition needs. The action is kept
- * for every state except a confirmed Current report, so the buttons never
- * disappear when the read settles, and an unresolved read is shown as Checking
- * rather than as a definite Missing.
+ * in every state, so the buttons never disappear when the read settles, an
+ * unresolved read is shown as Checking rather than as a definite Missing, and
+ * its label is always "Generate <Report>" — the status text carries the state,
+ * the button only says what it does.
  *
  * Derivation only: recalculates nothing, generates no report content.
  * Pure: no React, no side effects, no runtime APIs.
@@ -36,11 +37,15 @@ export const PROPOSAL_REPORT_GATE_TITLE = 'Proposal source reports';
 
 /** The blocking message, shown verbatim whenever Next is blocked. */
 export const PROPOSAL_REPORT_GATE_MESSAGE =
-  'Create Visual and Technical reports in order to continue.';
+  'Generate the Visual and Technical Reports before creating a proposal. This ensures the proposal uses the current project data and RP22 results.';
 
 /** Why the reports are required, in the designer's own terms. */
 export const PROPOSAL_REPORT_GATE_DETAIL =
-  'The proposal uses the current Visual and Technical reports to describe the actual project, RP22 results, design strengths and limitations. Generate both reports before creating the proposal.';
+  'The proposal uses the current Visual and Technical reports to describe the actual project, RP22 results, design strengths and limitations.';
+
+/** Shown once both reports read Current. */
+export const PROPOSAL_REPORT_GATE_READY_COPY =
+  'The proposal will be generated from these reports.';
 
 /** Canonical display vocabulary for a report's readiness on this step. */
 export const PROPOSAL_REPORT_GATE_STATUS = Object.freeze({
