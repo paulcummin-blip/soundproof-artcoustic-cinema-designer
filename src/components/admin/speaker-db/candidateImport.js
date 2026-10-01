@@ -16,7 +16,7 @@ import {
   mergeExtractionIntoSpec,
   persistModelFirstWarnings,
 } from "./model-first/modelFirstPersistence.js";
-import { candidateExtractionPayload, modelKey } from "./candidateReview.js";
+import { candidateExtractionPayload, candidateReadiness, candidateSourceNote, modelKey } from "./candidateReview.js";
 
 const ROLE_VALUES = ["LCR", "Surround", "Wide", "Height", "Flexible", "Both"];
 
@@ -67,14 +67,32 @@ export async function createDraftProductsFromCandidates({ manufacturer, candidat
 
     const extraction = candidateExtractionPayload(candidate, today);
     const { patch, authority } = mergeExtractionIntoSpec(specification, extraction);
+    // The grade this candidate previewed, stored on the record so the draft can
+    // never claim more evidence than the review did.
+    const readiness = candidateReadiness(candidate, manufacturer.name);
     const updatedSpec = await base44.entities.SpeakerSpecification.update(specification.id, {
       ...patch,
       field_authority: authority,
       primary_source: candidate.product_url || "",
       datasheet_url: candidate.datasheet_url || patch.datasheet_url || "",
+      confidence: readiness.confidence,
     });
 
     await persistModelFirstWarnings(product.id, updatedSpec);
+
+    // The exact sentence each value was read from, stored against the product's
+    // source record so any figure can be traced back to the manufacturer's own
+    // words long after the page was read.
+    const sourceNote = candidateSourceNote(candidate);
+    if (sourceNote) {
+      await base44.entities.SpeakerSource.create({
+        product_id: product.id,
+        source_type: candidate.spec_source_type === "Official PDF" ? "Official PDF" : "Official Product Page",
+        url: candidate.document_url || candidate.datasheet_url || candidate.product_url || "",
+        date_checked: today,
+        notes: sourceNote,
+      });
+    }
 
     existingKeys.add(key);
     created.push({ id: product.id, model: candidate.model });

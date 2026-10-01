@@ -567,22 +567,23 @@ export default async function (req) {
       };
 
       if (digest) {
+        const hz = (value: number | null | undefined) => (
+          value === null || value === undefined ? '?' : value >= 1000 ? `${value / 1000}k` : String(value)
+        );
         digestLines.push([
           model,
           tile.categoryLabel,
           candidate.role_guess,
-          specification.sensitivity_db != null ? `${specification.sensitivity_db} dB @ ${specification.sensitivity_basis}` : 'sensitivity missing',
-          specification.nominal_impedance_ohm != null ? `${specification.nominal_impedance_ohm} Ω` : 'impedance missing',
+          specification.sensitivity_db != null ? `${specification.sensitivity_db}dB@${specification.sensitivity_basis}` : 'no-sens',
+          specification.nominal_impedance_ohm != null ? `${specification.nominal_impedance_ohm}ohm` : 'no-imp',
           specification.recommended_amp_max_w != null
-            ? `${specification.recommended_amp_min_w ?? '?'}-${specification.recommended_amp_max_w} W`
-            : 'power missing',
-          `${specification.frequency_response_low_hz ?? '?'}-${specification.frequency_response_high_hz ?? '?'} Hz ${specification.measurement_space}`,
-          specification.horizontal_dispersion_deg
-            ? `${specification.horizontal_dispersion_deg}x${specification.vertical_dispersion_deg} deg`
-            : 'dispersion not stated',
-          `docs:${documents.length}`,
-          `snips:${Object.keys(snippets).length}`,
-          `flags:${flags.length}`,
+            ? `${specification.recommended_amp_min_w ?? '?'}-${specification.recommended_amp_max_w}W`
+            : 'no-power',
+          `${hz(specification.frequency_response_low_hz)}-${hz(specification.frequency_response_high_hz)}Hz/${specification.measurement_space}`,
+          specification.horizontal_dispersion_deg ? `H${specification.horizontal_dispersion_deg}V${specification.vertical_dispersion_deg}` : 'no-disp',
+          `d${documents.length}`,
+          `s${Object.keys(snippets).length}`,
+          `f${flags.length}`,
         ].join(' | '));
       }
       candidates.push(candidate);
@@ -597,7 +598,7 @@ export default async function (req) {
     };
     if (digest) {
       response.digest_lines = digestLines;
-      response.excluded_lines = excluded.map((row) => `${row.model} | ${row.reason}`);
+      response.excluded_lines = excluded.map((row) => `${row.model} | ${String(row.reason).slice(0, 46)}`);
     } else {
       response.candidates = candidates;
       response.excluded = excluded;

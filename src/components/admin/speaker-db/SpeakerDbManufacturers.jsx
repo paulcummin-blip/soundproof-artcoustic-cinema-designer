@@ -8,6 +8,8 @@ import { base44 } from "@/api/base44Client";
 import SpeakerDbTable from "@/components/admin/speaker-db/SpeakerDbTable";
 import { Plus, Edit2, Trash2, X, SlidersHorizontal, Ban, CheckCircle2, Search } from "lucide-react";
 import CandidateModelFinder from "@/components/admin/speaker-db/CandidateModelFinder";
+import { dedicatedDiscoveryFor, missingDedicatedTargets } from "@/components/admin/speaker-db/manufacturerDiscovery";
+import { ensureManufacturer } from "@/components/admin/speaker-db/model-first/modelFirstPersistence.js";
 
 const BRAND = {
   text: "#1B1A1A",
@@ -53,6 +55,7 @@ function truncate(text, max = 92) {
 export default function SpeakerDbManufacturers() {
   const [rows, setRows] = useState([]);
   const [finderManufacturer, setFinderManufacturer] = useState(null);
+  const [addingRegistered, setAddingRegistered] = useState("");
   const [loading, setLoading] = useState(true);
   const [editing, setEditing] = useState(null); // null | {} for new | existing record
   const [formData, setFormData] = useState({ name: "", website: "", status: "Active", notes: "" });
@@ -126,6 +129,25 @@ export default function SpeakerDbManufacturers() {
       await loadData();
     } catch (err) {
       console.error("[SpeakerDbManufacturers] Status change failed:", err);
+    }
+  };
+
+  // A registered dedicated-discovery manufacturer that is not in the database yet
+  // is created from its own registry entry (name + official domain), so its
+  // identity is never retyped, then its discovery runs immediately.
+  const handleAddRegistered = async (target) => {
+    setAddingRegistered(target.key);
+    try {
+      const manufacturer = await ensureManufacturer({ name: target.manufacturer_name, website: target.website });
+      if (manufacturer?.id && target.notes) {
+        await base44.entities.SpeakerManufacturer.update(manufacturer.id, { notes: target.notes });
+      }
+      await loadData();
+      setFinderManufacturer(manufacturer);
+    } catch (err) {
+      console.error("[SpeakerDbManufacturers] Could not add a registered manufacturer:", err);
+    } finally {
+      setAddingRegistered("");
     }
   };
 
@@ -218,20 +240,44 @@ export default function SpeakerDbManufacturers() {
     },
   ];
 
+  const missingTargets = missingDedicatedTargets(rows.map((row) => row.name));
+
   return (
     <div>
       <div className="flex items-center justify-between mb-4">
         <div className="text-sm" style={{ color: BRAND.subtext }}>
           {rows.length} manufacturer{rows.length !== 1 ? "s" : ""}
         </div>
-        <button
-          onClick={handleNew}
-          className="flex items-center gap-2 px-3 py-2 rounded-md text-sm font-medium transition-colors"
-          style={{ background: BRAND.btn, color: BRAND.btnText }}
-        >
-          <Plus className="w-4 h-4" /> Add Manufacturer
-        </button>
+        <div className="flex items-center gap-2">
+          {missingTargets.map((target) => (
+            <button
+              key={target.key}
+              onClick={() => handleAddRegistered(target)}
+              disabled={addingRegistered === target.key}
+              className="flex items-center gap-2 px-3 py-2 rounded-md text-sm font-medium"
+              style={{ border: `1px solid ${BRAND.green}`, color: BRAND.green, opacity: addingRegistered === target.key ? 0.5 : 1 }}
+              title={`Registered for dedicated discovery at ${target.website}`}
+            >
+              <Plus className="w-4 h-4" />
+              {addingRegistered === target.key ? "Adding…" : `Add ${target.manufacturer_name} & find models`}
+            </button>
+          ))}
+          <button
+            onClick={handleNew}
+            className="flex items-center gap-2 px-3 py-2 rounded-md text-sm font-medium transition-colors"
+            style={{ background: BRAND.btn, color: BRAND.btnText }}
+          >
+            <Plus className="w-4 h-4" /> Add Manufacturer
+          </button>
+        </div>
       </div>
+
+      {missingTargets.length > 0 && (
+        <div className="mb-3 text-xs" style={{ color: BRAND.subtext }}>
+          {missingTargets.map((target) => target.manufacturer_name).join(", ")} {missingTargets.length === 1 ? "is" : "are"} registered
+          for dedicated discovery — the official domain is already recorded, so adding the manufacturer and finding its models is one step.
+        </div>
+      )}
 
       {loading ? (
         <div className="py-12 text-center text-sm" style={{ color: BRAND.subtext }}>Loading…</div>
@@ -404,6 +450,8 @@ export default function SpeakerDbManufacturers() {
       {finderManufacturer && (
         <CandidateModelFinder
           manufacturer={finderManufacturer}
+          discoveryFunction={dedicatedDiscoveryFor(finderManufacturer.name)?.function_name || "discoverCandidateModels"}
+          discoveryLabel={dedicatedDiscoveryFor(finderManufacturer.name)?.scope_label || ""}
           onClose={() => setFinderManufacturer(null)}
           onCreated={loadData}
         />

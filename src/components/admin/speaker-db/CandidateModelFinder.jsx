@@ -20,6 +20,7 @@ import {
   candidateTrustedProposal,
   trustedProposalSummary,
   candidateGapMessage,
+  candidateAssumptionNote,
   modelKey,
   ROLE_LABELS,
 } from "./candidateReview.js";
@@ -45,12 +46,21 @@ function Th({ children }) {
   return <th className={HEAD} style={{ color: BRAND.subtext, borderBottom: `1px solid ${BRAND.border}` }}>{children}</th>;
 }
 
-export default function CandidateModelFinder({ manufacturer, onClose, onCreated }) {
+export default function CandidateModelFinder({
+  manufacturer,
+  onClose,
+  onCreated,
+  // Dedicated, site-specific discovery when the manufacturer has one registered
+  // (see manufacturerDiscovery.js); the generic index crawler otherwise.
+  discoveryFunction = "discoverCandidateModels",
+  discoveryLabel = "",
+}) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [candidates, setCandidates] = useState([]);
   const [excluded, setExcluded] = useState([]);
   const [rejectedCount, setRejectedCount] = useState(0);
+  const [pageFailures, setPageFailures] = useState([]);
   const [authority, setAuthority] = useState({ url: "", regional: "", allowed: [] });
   const [documentStats, setDocumentStats] = useState({ deepChecked: 0, documentsUsed: 0, rejectedDocuments: 0 });
   const [domain, setDomain] = useState("");
@@ -78,7 +88,7 @@ export default function CandidateModelFinder({ manufacturer, onClose, onCreated 
         if (cancelled) return;
         setExistingKeys(existing);
 
-        const response = await base44.functions.invoke("discoverCandidateModels", {
+        const response = await base44.functions.invoke(discoveryFunction, {
           manufacturer_id: manufacturer.id,
           manufacturerName: manufacturer.name,
           manufacturerDomain: manufacturer.website,
@@ -93,7 +103,8 @@ export default function CandidateModelFinder({ manufacturer, onClose, onCreated 
         setCandidates(data.candidates || []);
         setExcluded(data.excluded || []);
         setRejectedCount((data.rejected || []).length);
-        setDomain(data.searched_domain || "");
+        setPageFailures(data.failures || []);
+        setDomain(data.searched_domain || data.official_domain || "");
         setAuthority({
           url: data.authority_url || "",
           regional: data.regional_preference || "",
@@ -113,7 +124,7 @@ export default function CandidateModelFinder({ manufacturer, onClose, onCreated 
     })();
 
     return () => { cancelled = true; };
-  }, [manufacturer?.id]);
+  }, [manufacturer?.id, discoveryFunction]);
 
   const rows = useMemo(() => (candidates || []).map((candidate) => {
     const key = modelKey(candidate.model);
@@ -126,6 +137,7 @@ export default function CandidateModelFinder({ manufacturer, onClose, onCreated 
       source: candidateSourceIndicator(candidate),
       sourceType: candidateSourceType(candidate),
       confidenceLabel: candidateConfidenceLabel(readiness),
+      assumptionNote: candidateAssumptionNote(readiness),
       trusted: candidateTrustedProposal(candidate),
       gapMessage: candidateGapMessage(readiness, candidate),
       added: existingKeys.has(key),
@@ -182,6 +194,9 @@ export default function CandidateModelFinder({ manufacturer, onClose, onCreated 
             {authority.regional && (
               <div className="text-xs mt-1" style={{ color: BRAND.subtext }}>{authority.regional}</div>
             )}
+            {discoveryLabel && (
+              <div className="text-xs mt-1" style={{ color: BRAND.green }}>{discoveryLabel}</div>
+            )}
             <div className="text-xs mt-1" style={{ color: BRAND.subtext }}>
               Nothing is created until you select models. Added models are Draft specifications — not approved, not published.
             </div>
@@ -210,6 +225,11 @@ export default function CandidateModelFinder({ manufacturer, onClose, onCreated 
               )}
               <span><strong>{excluded.length}</strong> excluded by the P12/P13 section rules{excludedReasons.length > 0 ? ` (${excludedReasons.join(", ")})` : ""}</span>
               {rejectedCount > 0 && <span><strong>{rejectedCount}</strong> discarded for not being on {domain}</span>}
+              {pageFailures.length > 0 && (
+                <span style={{ color: BRAND.danger }}>
+                  <strong>{pageFailures.length}</strong> product page{pageFailures.length === 1 ? "" : "s"} could not be read — those models are not listed
+                </span>
+              )}
               {documentStats.rejectedDocuments > 0 && (
                 <span><strong>{documentStats.rejectedDocuments}</strong> document{documentStats.rejectedDocuments === 1 ? "" : "s"} discarded as not official</span>
               )}
@@ -306,6 +326,9 @@ export default function CandidateModelFinder({ manufacturer, onClose, onCreated 
                             tone={row.readiness.tone}
                           />
                           <div className="text-xs mt-1" style={{ color: BRAND.subtext }}>{row.confidenceLabel}</div>
+                          {row.assumptionNote && (
+                            <div className="text-xs mt-1" style={{ color: BRAND.warn, maxWidth: 300 }}>{row.assumptionNote}</div>
+                          )}
                           {row.gapMessage && (
                             <div className="text-xs mt-1" style={{ color: BRAND.danger }}>{row.gapMessage}</div>
                           )}

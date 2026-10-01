@@ -9,6 +9,7 @@ import { SpecInput } from "../add-speaker/StepReview.jsx";
 import { resolveContinuousPower } from "./rp22ComparisonPublish.js";
 import SecondaryEvidenceButton from "../secondaryEvidence/SecondaryEvidenceButton.jsx";
 import { evidenceRowNote, evidenceStatement, isTrustedEvidence } from "../secondaryEvidence/secondaryEvidencePolicy.js";
+import { installedSpaceAssumptionForSpecification, spaceSourceLabel } from "@/components/utils/spl/installedSpaceAssumption.js";
 
 const BRAND = {
   text: "#1B1A1A",
@@ -48,6 +49,9 @@ export default function StepSpecReview({
 }) {
   const approved = specification?.approval_status === "Approved";
   const power = resolveContinuousPower(specification);
+  // The installed-speaker normalisation assumption, stated in full wherever the
+  // comparison's measurement basis is reviewed.
+  const spaceAssumption = installedSpaceAssumptionForSpecification(specification);
 
   return (
     <div style={{ display: "grid", gap: 14 }}>
@@ -118,9 +122,10 @@ export default function StepSpecReview({
             : "Not stated — comparison will record it as unspecified."}
         </Panel>
         <Panel title="Measurement space">
-          {specification?.measurement_space && specification.measurement_space !== "unspecified"
-            ? specification.measurement_space
-            : "Not stated — comparison assumes half space and flags the assumption."}
+          <div>{spaceSourceLabel(specification?.measurement_space)}</div>
+          {spaceAssumption.applied && (
+            <div style={{ marginTop: 4 }}>{spaceAssumption.note}</div>
+          )}
         </Panel>
       </div>
 

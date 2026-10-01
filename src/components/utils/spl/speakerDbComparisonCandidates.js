@@ -26,6 +26,7 @@ import { base44 } from "@/api/base44Client";
 import { buildComparisonRow } from "@/components/admin/speaker-db/model-first/rp22ComparisonPublish.js";
 import { normalizeCompetitor } from "@/components/utils/spl/competitorNormalization";
 import { ASSUMED_SENSITIVITY_BASIS, applySensitivityBasisAssumption } from "@/components/utils/spl/sensitivityBasisAssumption";
+import { installedSpaceAssumptionForRow } from "@/components/utils/spl/installedSpaceAssumption";
 import { competitorIdentityKey } from "@/components/utils/spl/manufacturerIdentity";
 import { RP22_EQ_HEADROOM_LABEL } from "@/components/utils/spl/rp22HeadroomPolicy";
 import {
@@ -83,7 +84,9 @@ export const COMPARISON_PARITY_STATEMENT =
   `Same RP22 P12/P13 engine, distance, amplifier power, 1 W / 1 m normalisation and Sound Proof ${RP22_EQ_HEADROOM_LABEL} headroom as the Artcoustic row.`;
 
 // Controlled assumptions — each one is stated wherever the comparison is shown.
-const ASSUMED_SPACE = "Measurement space not stated — half-space normalisation applied";
+// The installed-speaker normalisation assumption lives in
+// utils/spl/installedSpaceAssumption.js so candidate review, the Speaker Database
+// review list and this comparison panel all state the same thing at confidence C.
 
 const STATUS_RANK = { Published: 0, Approved: 1, "Awaiting Review": 2, Draft: 3, Superseded: 4, Archived: 5, Manual: 6 };
 const CONFIDENCE_RANK = { A: 0, B: 1, C: 2, D: 3 };
@@ -104,9 +107,8 @@ export function classifyComparisonRow(row) {
 
   const assumptions = [];
   if (assumedSensitivityBasis) assumptions.push(ASSUMED_SENSITIVITY_BASIS);
-  if (record.max_spl_space_provenance === "half_space_assumed" || record.sensitivity_space_provenance === "half_space_assumed") {
-    assumptions.push(ASSUMED_SPACE);
-  }
+  const spaceAssumption = installedSpaceAssumptionForRow(record);
+  if (spaceAssumption.applied) assumptions.push(spaceAssumption.note);
 
   const eligible = record.p12_p13_eligible === true;
   const gradedFromPublished = record.halfspace_published_max_continuous_spl_db_1m != null;

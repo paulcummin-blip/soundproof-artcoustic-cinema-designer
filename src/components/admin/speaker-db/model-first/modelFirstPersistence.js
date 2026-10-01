@@ -15,6 +15,14 @@ import { findRp22Gaps } from "./rp22ComparisonPublish.js";
 
 const NUMERIC_KEYS = new Set(ALL_SPEC_FIELDS.filter((f) => f.type === "number").map((f) => f.key));
 
+// A placeholder is the absence of a published value, not a value. A new draft
+// starts with "unknown" / "unspecified" in the basis fields, so an extraction that
+// states a real figure may fill them in. A stated value is never overwritten.
+const PLACEHOLDER_VALUES = new Set(["unknown", "unspecified"]);
+const isPlaceholder = (value) => value === null || value === undefined
+  || String(value).trim() === ""
+  || PLACEHOLDER_VALUES.has(String(value).trim().toLowerCase());
+
 /**
  * Resolve the manufacturer by name, creating it when the admin added one.
  * The website is stored here because it is the official-source authority.
@@ -101,7 +109,7 @@ export function mergeExtractionIntoSpec(specification, extraction) {
     if (value === "" || value === null || Number.isNaN(value)) return;
 
     const current = specification?.[key];
-    if (current !== null && current !== undefined && current !== "") {
+    if (!isPlaceholder(current)) {
       if (String(current) !== String(value)) conflicts.push({ key, current, extracted: value });
       return;
     }

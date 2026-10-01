@@ -72,6 +72,17 @@ export function candidateConfidenceLabel(readiness) {
   return CONFIDENCE_LABELS.C;
 }
 
+/**
+ * The ADI assumption this candidate carries, in full, or "" when its published
+ * values stand on their own. A manufacturer that publishes an "in room" response
+ * and never states the measurement space is normalised on Sound Proof's standard
+ * installed / half-space convention — stated as an assumption at confidence C,
+ * never presented as a confirmed published basis.
+ */
+export function candidateAssumptionNote(readiness) {
+  return readiness?.spaceAssumption?.applied ? readiness.spaceAssumption.note : "";
+}
+
 const show = (value, suffix = "") =>
   value === null || value === undefined || String(value).trim() === "" ? "—" : `${value}${suffix}`;
 
@@ -224,4 +235,53 @@ export function trustedProposalSummary(proposal) {
     .filter(([field, value]) => TRUSTED_FIELD_LABELS[field] && value !== null && value !== undefined && String(value).trim() !== "")
     .map(([field, value]) => `${TRUSTED_FIELD_LABELS[field]} ${value}`)
     .join(" · ");
+}
+
+// --- Per-value source sentences ---------------------------------------------
+// Discovery stores the exact sentence each value was read from. They travel with
+// the record so a reviewer can always trace a figure back to the manufacturer's
+// own words, months after the page was read.
+const SNIPPET_FIELD_LABELS = {
+  sensitivity_db: "Sensitivity",
+  sensitivity_basis: "Sensitivity basis",
+  nominal_impedance_ohm: "Nominal impedance",
+  minimum_impedance_ohm: "Minimum impedance",
+  recommended_amp_min_w: "Recommended amplifier minimum",
+  recommended_amp_max_w: "Recommended amplifier maximum",
+  frequency_response_low_hz: "Frequency response (low)",
+  frequency_response_high_hz: "Frequency response (high)",
+  measurement_space: "Measurement space",
+  horizontal_dispersion_deg: "Horizontal dispersion",
+  vertical_dispersion_deg: "Vertical dispersion",
+  height_mm: "Height",
+  width_mm: "Width",
+  depth_mm: "Depth",
+  weight_kg: "Weight",
+  woofer_count: "Low frequency drivers",
+  woofer_size: "Driver size",
+  cabinet_type: "Enclosure",
+  tweeter_description: "High frequency driver",
+};
+
+/** The stored source sentences, one row per field, in field-label form. */
+export function candidateSnippetRows(candidate) {
+  const snippets = candidate?.source_snippets || {};
+  return Object.entries(snippets).map(([field, quote]) => ({
+    field,
+    label: SNIPPET_FIELD_LABELS[field] || field,
+    quote: String(quote || ""),
+  }));
+}
+
+/**
+ * The source sentences as the note stored against the product's source record —
+ * the evidence trail for every value that was written.
+ */
+export function candidateSourceNote(candidate) {
+  const rows = candidateSnippetRows(candidate).filter((row) => row.quote);
+  if (rows.length === 0) return "";
+  return [
+    `Per-value source sentences read from ${candidate?.product_url || "the official manufacturer page"}:`,
+    ...rows.map((row) => `${row.label}: “${row.quote}”`),
+  ].join("\n");
 }

@@ -26,6 +26,7 @@
 import { buildComparisonRow, resolvePowerAuthority } from "./model-first/rp22ComparisonPublish.js";
 import { normalizeCompetitor } from "@/components/utils/spl/competitorNormalization.js";
 import { applySensitivityBasisAssumption } from "@/components/utils/spl/sensitivityBasisAssumption.js";
+import { installedSpaceAssumptionForSpecification } from "@/components/utils/spl/installedSpaceAssumption.js";
 
 const present = (value) =>
   value !== null && value !== undefined && value !== "" && value !== "unknown" && value !== "unspecified";
@@ -149,6 +150,10 @@ export function comparisonReadiness({ product, specification }) {
     presentCount: presentKeys.length,
     totalCount: COMPARISON_FIELDS.length,
     sensitivityBasisAssumed,
+    // The ADI installed-speaker normalisation assumption travels with the
+    // readiness result, so the product/spec review can state it next to the grade
+    // it produces. It is an assumption at confidence C — never a published basis.
+    spaceAssumption: installedSpaceAssumptionForSpecification(spec),
     powerAuthority: normalized.power_authority,
     powerAuthorityW: normalized.power_authority_w,
     capabilityBasis: normalized.capability_basis,

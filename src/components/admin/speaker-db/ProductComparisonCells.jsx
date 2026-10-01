@@ -6,6 +6,7 @@
 // ---------------------------------------------------------------------------
 
 import React from "react";
+import { INSTALLED_SPACE_ASSUMPTION_SHORT } from "@/components/utils/spl/installedSpaceAssumption.js";
 
 const BRAND = {
   text: "#1B1A1A",
@@ -60,6 +61,10 @@ export function ReadinessCell({ readiness }) {
 /** Evidence: confidence grade plus where the capability figure comes from. */
 export function EvidenceCell({ readiness, text }) {
   if (!readiness) return <span style={{ color: BRAND.subtext }}>—</span>;
+  // The ADI installed-speaker normalisation assumption is stated beside the grade
+  // it produces, so a C can never read as a published basis.
+  const assumption = readiness.spaceAssumption;
+  const showAssumption = Boolean(assumption?.applied) && readiness.eligible;
   return (
     <div style={{ minWidth: 0 }}>
       <span
@@ -70,6 +75,9 @@ export function EvidenceCell({ readiness, text }) {
         {readiness.confidence}
       </span>
       <Muted title={text}>{text}</Muted>
+      {showAssumption && (
+        <Muted title={assumption.note}>{INSTALLED_SPACE_ASSUMPTION_SHORT}</Muted>
+      )}
     </div>
   );
 }
