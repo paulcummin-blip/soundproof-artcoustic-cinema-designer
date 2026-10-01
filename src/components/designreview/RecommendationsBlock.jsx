@@ -17,7 +17,6 @@
 
 import React, { useMemo } from "react";
 import TechnicalAsdrRecommendations from "@/components/report/technical/TechnicalAsdrRecommendations";
-import AdiDesignGuidanceBlock from "@/components/adi/designGuidance/AdiDesignGuidanceBlock";
 
 const COLORS = {
   bg: "transparent",
@@ -67,24 +66,13 @@ export default function RecommendationsBlock({ asdrData, priceData }) {
 
   const hasRecs = recommendations && (recommendations.isSettled || recommendations.isEvaluating);
 
-  // ADI Design Guidance leads this section: the canonical limiting factor is
-  // stated before any generated recommendation, so a generic recommendation
-  // can never outrank the weakest credible parameter.
-  const engineeringSummary =
-    asdrData?.engineeringSummary
-    ?? asdrData?.rating?.engineeringSummary
-    ?? null;
-  const seating = Array.isArray(asdrData?.seatingPositions) ? asdrData.seatingPositions : undefined;
-
+  // The completed design's own results are presented here: the parameter
+  // details above state how the design measures, and this section lists the
+  // published recommendations. Design-change guidance is not restated here —
+  // the engineering assessment and limitations live in the Technical Report,
+  // and improvement advice lives in the Bass Optimiser.
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 16, padding: "4px 0" }}>
-      {/* Part 0: ADI Design Guidance — the limiting factor leads */}
-      <AdiDesignGuidanceBlock
-        engineeringSummary={engineeringSummary}
-        seats={seating}
-        compact
-      />
-
       {/* Part 1: Design Recommendations */}
       <div style={{
         background: COLORS.cardBg,
