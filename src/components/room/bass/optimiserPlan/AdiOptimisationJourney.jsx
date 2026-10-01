@@ -31,6 +31,9 @@ import OptimisationPlanStatus from "./OptimisationPlanStatus.jsx";
 import OptimiserRunEvidenceBlock from "./OptimiserRunEvidenceBlock.jsx";
 import OptimiserCalculationEstimateLine from "./OptimiserCalculationEstimateLine.jsx";
 import OptimiserCalculationDetail from "./OptimiserCalculationDetail.jsx";
+import AdiTestedOptionsTable from "./AdiTestedOptionsTable.jsx";
+import AdiDesignerActionBar from "./AdiDesignerActionBar.jsx";
+import { ADI_ENGINEER_DETAILS_TITLE, buildAdiDesignerSummary } from "./adiDesignerSummary.js";
 
 const STATE_THEME = {
   [ADI_OPTIMISER_JOURNEY_STATE.OPTIMISATION_REQUIRED]: {
@@ -150,6 +153,30 @@ export default function AdiOptimisationJourney({
   const runEvidence = presentation?.evidence || null;
   const journeyStateKey = presentation?.state || resolved.state;
 
+  // ── The designer view ──
+  // The default card is the design decision: what was tested, what it found,
+  // what is recommended and whether it can be applied. Every technical detail —
+  // ids, coordinates, stage counts, proxy searches, rejection reasons — lives
+  // inside the collapsed Engineer details disclosure.
+  const currentP20Deviation = completedBassAuthority?.worstP20Deviation
+    ?? completedBassAuthority?.p20Deviation
+    ?? completedBassAuthority?.rating?.worstP20Deviation
+    ?? null;
+  const summary = buildAdiDesignerSummary({
+    planView,
+    presentation,
+    instances,
+    seatCount,
+    currentP20Deviation,
+    appliedLever: leverOutcome?.appliedLever || null,
+  });
+  const handleApplyRecommended = summary.actions.canApply && typeof onApplyLever === "function"
+    ? () => onApplyLever(summary.recommendedLever)
+    : null;
+  const handleUndoRecommended = summary.actions.canUndo && typeof onUndoLever === "function"
+    ? () => onUndoLever(summary.actions.undoLever || summary.recommendedLever)
+    : null;
+
   const isRunning = runStatus === "running";
   const showAction = !!journey.action && journey.canRun && !isRunning;
   const showBlocked = !!journey.blockReason && !isRunning;
@@ -187,50 +214,55 @@ export default function AdiOptimisationJourney({
         {journey.message}
       </div>
 
+      {/* What was tested, what was found, what is recommended */}
+      {summary.testedSentence && (
+        <div className="text-[11px] text-[#3E4349] leading-relaxed">{summary.testedSentence}</div>
+      )}
+
+      {summary.staleCopy ? (
+        <div className="space-y-1">
+          <div className="text-[11px] text-[#3E4349] leading-relaxed">{summary.staleCopy.MESSAGE}</div>
+          {summary.previousBest && (
+            <div className="text-[12px] font-semibold text-[#1B1A1A]">{summary.previousBest}</div>
+          )}
+          <div className="text-[11px] text-[#8A5A2B] leading-relaxed">{summary.staleCopy.INSTRUCTION}</div>
+        </div>
+      ) : (
+        <div className="space-y-1">
+          {summary.currentP20 && (
+            <div className="text-[12px] text-[#3E4349]">
+              Current result: <span className="font-semibold text-[#1B1A1A]">{summary.currentP20}</span>
+            </div>
+          )}
+          {summary.recommendedP20 && (
+            <div className="text-[12px] text-[#3E4349]">
+              Best result found: <span className="font-semibold text-[#1B1A1A]">{summary.recommendedP20}</span>
+            </div>
+          )}
+          {summary.recommendation && (
+            <div className="text-[13px] font-semibold text-[#1B1A1A] leading-relaxed">
+              {summary.recommendation}
+            </div>
+          )}
+        </div>
+      )}
+
+      <AdiTestedOptionsTable summary={summary} />
+
+      <AdiDesignerActionBar
+        summary={summary}
+        busy={isRunning}
+        onApply={handleApplyRecommended}
+        onUndo={handleUndoRecommended}
+        onRerun={onRunOptimisationPlan}
+      />
+
       {/* How many design options ADI will test, and the acoustic work behind them. */}
       {showEstimate && (
         <OptimiserCalculationEstimateLine
           instances={instances}
           seatCount={seatCount}
           className="rounded-md border border-[#E7E5E0] bg-white px-3 py-2"
-        />
-      )}
-
-      {/* Why it matters — the ADI diagnosis behind the limitation */}
-      {(assessment || why) && (
-        <div className="space-y-0.5">
-          <div className="text-[10px] font-semibold uppercase tracking-wide text-[#8A7B6A]">Why</div>
-          {why && <div className="text-[11px] text-[#3E4349] leading-relaxed">{why}</div>}
-          {assessment && <div className="text-[11px] text-[#3E4349] leading-relaxed">{assessment}</div>}
-        </div>
-      )}
-
-      {/* What the next step does */}
-      {journey.explanation && (
-        <div className="text-[11px] text-[#3E4349] leading-relaxed">{journey.explanation}</div>
-      )}
-
-      {journey.notes.length > 0 && (
-        <div className="space-y-0.5 text-[11px] text-[#625143] leading-relaxed">
-          {journey.notes.map((note) => <div key={note}>{note}</div>)}
-        </div>
-      )}
-
-      {/* What the completed run evaluated, when it produced no actionable plan */}
-      <OptimiserRunEvidenceBlock evidence={runEvidence} seatCount={seatCount} instances={instances} />
-
-      {/* The read-only evaluated plan, when a current plan exists */}
-      {journey.showPlan && (
-        <OptimisationPlanStatus
-          projectId={projectId}
-          versionId={versionId}
-          completedBassAuthority={completedBassAuthority}
-          currentDesignFingerprint={currentDesignFingerprint}
-          instances={instances}
-          onApplyLever={onApplyLever}
-          onUndoLever={onUndoLever}
-          leverApplyBusy={leverApplyBusy}
-          leverOutcome={leverOutcome}
         />
       )}
 
@@ -257,7 +289,52 @@ export default function AdiOptimisationJourney({
       {/* Collapsed by default, and below the primary action. Every technical
           detail — lever order, per-family counts, comparison and method — lives
           here, never in the default card. */}
-      {showEstimate && <OptimiserCalculationDetail instances={instances} seatCount={seatCount} />}
+      {/* Engineer details — collapsed by default. The exact run timestamp,
+          candidate ids, raw coordinates, stage counts, proxy searches, rejection
+          reasons, combined-candidate detail, fingerprints and stale/current
+          diagnostics live here and never in the default view. */}
+      <details className="rounded-md border border-[#E7E5E0] bg-white px-3 py-2" data-adi-engineer-details="true">
+        <summary className="cursor-pointer text-[11px] font-semibold text-[#625143]">
+          {ADI_ENGINEER_DETAILS_TITLE}
+        </summary>
+        <div className="mt-2 space-y-3">
+          {(assessment || why) && (
+            <div className="space-y-0.5">
+              <div className="text-[10px] font-semibold uppercase tracking-wide text-[#8A7B6A]">Diagnosis</div>
+              {why && <div className="text-[11px] text-[#3E4349] leading-relaxed">{why}</div>}
+              {assessment && <div className="text-[11px] text-[#3E4349] leading-relaxed">{assessment}</div>}
+            </div>
+          )}
+
+          {journey.explanation && (
+            <div className="text-[11px] text-[#3E4349] leading-relaxed">{journey.explanation}</div>
+          )}
+
+          {journey.notes.length > 0 && (
+            <div className="space-y-0.5 text-[11px] text-[#625143] leading-relaxed">
+              {journey.notes.map((note) => <div key={note}>{note}</div>)}
+            </div>
+          )}
+
+          <OptimiserRunEvidenceBlock evidence={runEvidence} seatCount={seatCount} instances={instances} />
+
+          {journey.showPlan && (
+            <OptimisationPlanStatus
+              projectId={projectId}
+              versionId={versionId}
+              completedBassAuthority={completedBassAuthority}
+              currentDesignFingerprint={currentDesignFingerprint}
+              instances={instances}
+              onApplyLever={onApplyLever}
+              onUndoLever={onUndoLever}
+              leverApplyBusy={leverApplyBusy}
+              leverOutcome={leverOutcome}
+            />
+          )}
+
+          {showEstimate && <OptimiserCalculationDetail instances={instances} seatCount={seatCount} />}
+        </div>
+      </details>
 
       {/* Why the optimiser cannot run yet — always paired with the next step */}
       {showBlocked && (
