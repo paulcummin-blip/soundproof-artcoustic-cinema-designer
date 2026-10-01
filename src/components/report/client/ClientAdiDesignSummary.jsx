@@ -154,16 +154,6 @@ export default function ClientAdiDesignSummary({
       {/* ── ADI review — the completed design's strengths, never its limits ── */}
       {showGuidance && (
         <div style={{ width: "100%" }}>
-          <div style={{
-            fontSize: 9,
-            fontWeight: 700,
-            letterSpacing: "0.1em",
-            textTransform: "uppercase",
-            color: COLORS.label,
-            marginBottom: 8,
-          }}>
-            Why this design is strong for this room
-          </div>
           <ClientAdiVisualSummary
             engineeringSummary={engineeringSummary}
             seats={seats}

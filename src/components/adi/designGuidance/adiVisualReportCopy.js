@@ -9,11 +9,9 @@
 //   Bass Optimiser   → how to improve the design
 //
 // The Visual Report is produced after the design is complete, so the ADI
-// summary answers one question, in the design's own terms:
+// summary explains the design directly — it never announces that it is about
+// to explain why the design is good, and carries no framing line.
 //
-//   "This is a strong design for this room because…"
-//
-//   Lead     — the framing line
 //   Body     — how the layout suits this room and its seating, one sentence per
 //              genuinely strong parameter (L3 or better), strongest first, then
 //              the balance-with-constraints statement
@@ -39,9 +37,6 @@ import {
   OPTIMISER_RECORD_KIND,
   OPTIMISER_TERMINAL_OUTCOME,
 } from "@/components/room/bass/optimiserPlan/optimiserPlanConstants";
-
-/** The framing line the Visual Report ADI page answers. */
-export const ADI_VISUAL_LEAD = 'This is a strong design for this room because:';
 
 /** Stated in place of strengths when no parameter reaches the strength band. */
 export const ADI_VISUAL_NO_STRENGTHS_FALLBACK =
@@ -188,7 +183,6 @@ export function buildAdiVisualReportSummary({
 
   return {
     heading: "ADI Design Summary",
-    lead: ADI_VISUAL_LEAD,
     body: [
       buildRoomSentence(context),
       ...(sentences.length > 0 ? sentences : [ADI_VISUAL_NO_STRENGTHS_FALLBACK]),

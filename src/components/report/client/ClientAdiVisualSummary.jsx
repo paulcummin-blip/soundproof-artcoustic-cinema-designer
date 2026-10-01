@@ -158,16 +158,6 @@ export default function ClientAdiVisualSummary({
             color: COLORS.primary,
           }}
         >
-          {summary.lead}
-        </p>
-        <p
-          style={{
-            margin: 0,
-            fontSize: compact ? 11.5 : 12.5,
-            lineHeight: 1.6,
-            color: COLORS.body,
-          }}
-        >
           {summary.body.join(" ")}
         </p>
       </div>

@@ -1,13 +1,13 @@
 // adi-visual-report-summary.test.mjs
 // ----------------------------------
-// The Visual Report presents a COMPLETED design and answers one question:
+// The Visual Report presents a COMPLETED design and explains it directly:
 //
-//   "This is a strong design for this room because…"
+//   Body (how the layout suits the room and its seating, then the design's
+//   genuine strengths, then the balance statement) · one Bass Optimiser review
+//   line when a result exists · closing pointer to the Technical Report.
 //
-//   Lead (the framing line) · body (how the layout suits the room and its
-//   seating, then the design's genuine strengths, then the balance statement) ·
-//   one Bass Optimiser review line when a result exists · closing pointer to
-//   the Technical Report.
+//   No framing line: the report never announces that it is about to explain
+//   why the design is good — it just explains it.
 //
 // Short rule: the Visual Report says WHY this design works, the Technical
 // Report says HOW the engineering measures, Bass Optimiser says how to improve
@@ -21,7 +21,6 @@
 import { test, expect } from 'vitest';
 import fs from 'node:fs';
 import {
-  ADI_VISUAL_LEAD,
   ADI_VISUAL_BALANCE,
   ADI_VISUAL_CLOSING,
   ADI_VISUAL_NO_STRENGTHS_FALLBACK,
@@ -84,24 +83,38 @@ const build = (fixture, options = {}) =>
 
 /* ── Shape ────────────────────────────────────────────────────────────── */
 
-test('the Visual Report summary answers why this is a strong design for this room', () => {
+test('the Visual Report summary explains the design without announcing it', () => {
   const summary = build({ room: { 14: 'L4' } });
 
   expect(summary.heading).toBe('ADI Design Summary');
   expect(Object.keys(summary)).toEqual([
     'heading',
-    'lead',
     'body',
     'optimiserStatus',
     'closing',
   ]);
-  expect(summary.lead).toBe(ADI_VISUAL_LEAD);
-  expect(summary.lead).toBe('This is a strong design for this room because:');
+  // No framing line of any kind: the copy starts with the design itself.
+  expect(summary.lead).toBeUndefined();
+  expect(summary.body[0]).toMatch(/^The speaker layout works with this room/);
+  expect(summaryText(summary)).not.toMatch(/strong design for this room/i);
   expect(summary.optimiserStatus).toBeNull();
   expect(summary.closing).toBe(ADI_VISUAL_CLOSING);
   expect(summary.closing).toMatch(/Technical Report/);
   // A summary of the design, not a re-flow of the engineering guidance.
   expect(summaryText(summary).length).toBeLessThan(900);
+});
+
+test('the ADI framing lines are gone from every Visual Report surface', () => {
+  for (const surface of [COPY, SUMMARY_BLOCK, VISUAL_PAGE]) {
+    expect(surface).not.toMatch(/This is a strong design for this room because:/);
+    expect(surface).not.toMatch(/strong design for this room/i);
+  }
+  expect(COPY).not.toMatch(/ADI_VISUAL_LEAD/);
+  expect(SUMMARY_BLOCK).not.toMatch(/summary\.lead/);
+  expect(VISUAL_PAGE).not.toMatch(/Why this design is strong for this room/);
+  // The section heading itself stays.
+  expect(COPY).toMatch(/ADI Design Summary/);
+  expect(SUMMARY_BLOCK).toMatch(/summary\.heading/);
 });
 
 test('no limitations report shape survives on the Visual Report', () => {
@@ -265,7 +278,7 @@ test('a failed or incomplete run tells the client nothing', () => {
 /* ── The copy module carries no design action ─────────────────────────── */
 
 test('the module can no longer name a next step or offer design advice', () => {
-  expect(COPY).toMatch(/ADI_VISUAL_LEAD/);
+  expect(COPY).not.toMatch(/ADI_VISUAL_LEAD/);
   expect(COPY).toMatch(/ADI_VISUAL_OPTIMISER_REVIEWED/);
   expect(COPY).not.toMatch(/ADI_VISUAL_NEXT_STEP/);
   expect(COPY).not.toMatch(/before finalising/);
@@ -281,7 +294,7 @@ test('the module can no longer name a next step or offer design advice', () => {
 test('the Visual Report renders the strength-led summary, not the guidance block', () => {
   expect(VISUAL_PAGE).toMatch(/import ClientAdiVisualSummary from "\.\/ClientAdiVisualSummary"/);
   expect(VISUAL_PAGE).toMatch(/<ClientAdiVisualSummary/);
-  expect(VISUAL_PAGE).toMatch(/Why this design is strong for this room/);
+  expect(VISUAL_PAGE).not.toMatch(/Why this design is strong for this room/);
   expect(VISUAL_PAGE).toMatch(/Where this design is strong/);
   expect(VISUAL_PAGE).toMatch(/seats=\{seats\}/);
   expect(VISUAL_PAGE).toMatch(/geometry=\{geometry\}/);
