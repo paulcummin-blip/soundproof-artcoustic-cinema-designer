@@ -21,7 +21,10 @@ import {
   OPTIMISER_TERMINAL_OUTCOME,
 } from '../components/room/bass/optimiserPlan/optimiserPlanConstants.js';
 import { resolveOptimiserPlanStatus } from '../components/room/bass/optimiserPlan/resolveOptimiserPlanStatus.js';
-import { buildOptimiserRunEvidence } from '../components/room/bass/optimiserPlan/buildOptimiserRunEvidence.js';
+import {
+  buildActionableOptimiserRunSummary,
+  buildOptimiserRunEvidence,
+} from '../components/room/bass/optimiserPlan/buildOptimiserRunEvidence.js';
 import { resolveLeverVerdict } from '../components/room/bass/optimiserPlan/optimiserLeverVerdict.js';
 import { serializeOptimiserPlan } from '../components/room/bass/optimiserPlan/optimiserPlanPersistence.js';
 import {
@@ -387,6 +390,38 @@ describe('TEST 4: current evaluated lever', () => {
     expect(lever.reason).toBeTruthy();
     expect(lever.effect.p20DeltaDb).toBe(-2.44);
   });
+
+  it('persists the honest run count with a winning plan through refresh and reopen', () => {
+    const run = buildActionableOptimiserRunSummary({
+      selection: {
+        winner: { candidateId: 'placement-winner-1' },
+        canonicalJobsRun: 22,
+        confirmedResults: [{ candidateId: 'placement-winner-1' }],
+      },
+      diagnostics: { stages: [{ name: 'Placement', candidatesEvaluated: { confirmed: 1 } }] },
+    });
+    const saved = serializeOptimiserPlan({ ...planWithEvaluatedDelay(), run });
+    const restored = JSON.parse(JSON.stringify(saved));
+    const planView = resolveOptimiserPlanStatus({
+      plan: restored,
+      currentDesignFingerprint: FINGERPRINT,
+      instances: PLAN_INSTANCES,
+    });
+    const state = resolveOptimiserPresentationState({ planView });
+
+    expect(run.actionablePlanProduced).toBe(true);
+    expect(run.canonicalJobsRun).toBe(22);
+    expect(run.winnerCandidateId).toBe('placement-winner-1');
+    expect(state.state).toBe(OPTIMISER_PRESENTATION_STATE.PLAN_AVAILABLE);
+    expect(state.evidence.canonicalJobsRun).toBe(22);
+  });
+
+  it('uses compact winner wording instead of no-improvement wording', () => {
+    const block = read('components/room/bass/optimiserPlan/OptimiserRunEvidenceBlock.jsx');
+    expect(block).toContain('before confirming this recommendation');
+    expect(block).toContain('No change has been applied.');
+    expect(block).toMatch(/if \(evidence\.actionablePlanProduced === true\)/);
+  });
 });
 
 describe('TEST 5: combined-only lever', () => {
@@ -478,7 +513,8 @@ describe('TEST 7: persistence', () => {
   it('states the outcome from the saved record instead of a default empty state', () => {
     const hook = read('components/room/bass/optimiseWorkflow/useRunOptimisationPlan.js');
     expect(hook.includes('buildOptimiserRunEvidence')).toBe(true);
-    expect(hook).toMatch(/optimiserPlan \|\| runEvidence/);
+    expect(hook.includes('buildActionableOptimiserRunSummary')).toBe(true);
+    expect(hook).toMatch(/persistedPlan \|\| runEvidence/);
     expect(read('components/room/bass/optimiseWorkflow/OptimiseAndCalculate.jsx').includes('buildOptimiserRunEvidence')).toBe(true);
     expect(read('components/room/bass/optimiserPlan/optimiserPlanPersistence.js')).toMatch(/terminalOutcome: plan\.terminalOutcome/);
   });
