@@ -3,7 +3,17 @@
 // class the Speaker Database list and the RP22 candidate list will show.
 
 import { test, expect } from 'vitest';
-import { comparisonReadiness, evidenceText, powerBasisText } from '../src/components/admin/speaker-db/comparisonReadiness.js';
+
+// The readiness authority shares the RP22 publish mapping with the app, which
+// touches browser globals on import. Shim them, then load the real modules.
+globalThis.window = {
+  location: { href: 'http://localhost/', search: '', pathname: '/', hash: '' },
+  localStorage: { getItem: () => null, setItem: () => {}, removeItem: () => {} },
+  history: { replaceState: () => {} },
+};
+globalThis.document = globalThis.document || {};
+
+const { comparisonReadiness, evidenceText, powerBasisText } = await import('../src/components/admin/speaker-db/comparisonReadiness.js');
 
 const MODELS = [
   { model: 'CI Elite E3 LCR v2', sens: 89, frLow: 93, ampMax: 200 },
