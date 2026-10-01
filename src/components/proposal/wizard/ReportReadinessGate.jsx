@@ -4,56 +4,103 @@
  * Step 3 (Versions) readiness block.
  *
  * States, per report, whether the selected version has a current Visual and
- * Technical Report, and — when it does not — the one action that fixes it. Next
- * stays disabled until both read Current.
+ * Technical Report, and — unless that report is confirmed current — the one
+ * action that produces it. Next stays disabled until both read Current.
+ *
+ * The action is never withdrawn: while the status is still being read the row
+ * reads Checking and keeps its safe action, and a Current report keeps a
+ * Regenerate action rather than losing its button.
  *
  * Presentation only: every value comes from proposalReportReadinessGate.
  */
 
 import React from 'react';
-import { Check, AlertTriangle } from 'lucide-react';
+import { Check, AlertTriangle, Loader2 } from 'lucide-react';
 import { REPORT_FONT_HEADING, REPORT_FONT_BODY } from '@/components/report/typography/reportTypography';
-import { PROPOSAL_SOURCE_STATE } from '@/components/proposal/sourceAuthority/proposalSourceAuthority';
 import { PROPOSAL_REPORT_GATE_TITLE } from '@/components/proposal/sourceAuthority/proposalReportReadinessGate';
+import { PROPOSAL_REPORT_UI_STATE } from '@/components/proposal/sourceAuthority/proposalReportActions';
 
 const STATE_COLOUR = {
-  [PROPOSAL_SOURCE_STATE.CURRENT]: '#213428',
-  [PROPOSAL_SOURCE_STATE.STALE]: '#7A5A10',
-  [PROPOSAL_SOURCE_STATE.FAILED]: '#7A2E10',
-  [PROPOSAL_SOURCE_STATE.MISSING]: '#7A2E10',
+  [PROPOSAL_REPORT_UI_STATE.CURRENT]: '#213428',
+  [PROPOSAL_REPORT_UI_STATE.STALE]: '#7A5A10',
+  [PROPOSAL_REPORT_UI_STATE.FAILED]: '#7A2E10',
+  [PROPOSAL_REPORT_UI_STATE.MISSING]: '#7A2E10',
+  [PROPOSAL_REPORT_UI_STATE.CHECKING]: '#8A8477',
+  [PROPOSAL_REPORT_UI_STATE.GENERATING]: '#7A5A10',
+  [PROPOSAL_REPORT_UI_STATE.UNRESOLVED]: '#7A5A10',
 };
 
-function ReadinessRow({ row }) {
-  const colour = STATE_COLOUR[row.state] || '#3E4349';
+function RowIcon({ row, colour }) {
+  if (row.current) return <Check className="w-4 h-4 shrink-0" style={{ color: colour }} />;
+  if (row.uiState === PROPOSAL_REPORT_UI_STATE.CHECKING || row.uiState === PROPOSAL_REPORT_UI_STATE.GENERATING) {
+    return <Loader2 className="w-4 h-4 shrink-0 animate-spin" style={{ color: colour }} />;
+  }
+  return <AlertTriangle className="w-4 h-4 shrink-0" style={{ color: colour }} />;
+}
+
+function ReportAction({ row }) {
+  if (!row.actionLabel) return null;
+
+  if (row.actionDisabled) {
+    return (
+      <span
+        className="inline-block mt-2.5 px-4 py-2 text-[11px] uppercase tracking-[0.14em] border border-[#DCDBD6] text-[#8A8477] cursor-default"
+        style={{ fontFamily: REPORT_FONT_BODY }}
+      >
+        {row.actionLabel}
+      </span>
+    );
+  }
+
+  const quiet = row.actionEmphasis === 'quiet';
+
   return (
-    <div className="flex items-start justify-between gap-4 py-2.5 border-b border-[#EAE8E3]">
-      <span className="flex items-center gap-2 text-sm text-[#3E4349]" style={{ fontFamily: REPORT_FONT_BODY }}>
-        {row.current
-          ? <Check className="w-4 h-4 shrink-0" style={{ color: colour }} />
-          : <AlertTriangle className="w-4 h-4 shrink-0" style={{ color: colour }} />}
-        {row.label}
-      </span>
-      <span className="text-right">
-        <span
-          className="text-[11px] uppercase tracking-[0.14em] font-semibold"
-          style={{ color: colour, fontFamily: REPORT_FONT_BODY }}
-        >
-          {row.status}
+    <a
+      href={row.actionUrl}
+      className={`inline-block mt-2.5 px-4 py-2 text-[11px] uppercase tracking-[0.14em] transition-colors ${
+        quiet
+          ? 'border border-[#DCDBD6] text-[#3E4349] hover:border-[#213428] hover:text-[#213428]'
+          : 'text-white hover:bg-[#3E4349]'
+      }`}
+      style={quiet
+        ? { fontFamily: REPORT_FONT_BODY }
+        : { backgroundColor: '#213428', fontFamily: REPORT_FONT_BODY }}
+    >
+      {row.actionLabel}
+    </a>
+  );
+}
+
+function ReadinessRow({ row }) {
+  const colour = STATE_COLOUR[row.uiState] || '#3E4349';
+  return (
+    <div className="py-2.5 border-b border-[#EAE8E3]">
+      <div className="flex items-start justify-between gap-4">
+        <span className="flex items-center gap-2 text-sm text-[#3E4349]" style={{ fontFamily: REPORT_FONT_BODY }}>
+          <RowIcon row={row} colour={colour} />
+          {row.label}
         </span>
-        {!row.current && row.reason && (
-          <span className="block text-[11px] text-[#8A8477] mt-0.5" style={{ fontFamily: REPORT_FONT_BODY }}>
-            {row.reason}
+        <span className="text-right">
+          <span
+            className="text-[11px] uppercase tracking-[0.14em] font-semibold"
+            style={{ color: colour, fontFamily: REPORT_FONT_BODY }}
+          >
+            {row.status}
           </span>
-        )}
-      </span>
+          {row.reason && (
+            <span className="block text-[11px] text-[#8A8477] mt-0.5" style={{ fontFamily: REPORT_FONT_BODY }}>
+              {row.reason}
+            </span>
+          )}
+        </span>
+      </div>
+      <ReportAction row={row} />
     </div>
   );
 }
 
 export default function ReportReadinessGate({ gate, className = '' }) {
   if (!gate?.available) return null;
-
-  const actions = (gate.rows || []).filter((row) => row.actionLabel && row.actionUrl);
 
   return (
     <section className={`mt-6 border border-[#DCDBD6] bg-white p-5 ${className}`}>
@@ -81,20 +128,6 @@ export default function ReportReadinessGate({ gate, className = '' }) {
             <p className="text-sm text-[#625143] leading-relaxed mt-2" style={{ fontFamily: REPORT_FONT_BODY }}>
               {gate.detail}
             </p>
-          )}
-          {actions.length > 0 && (
-            <div className="flex flex-wrap gap-3 mt-4">
-              {actions.map((row) => (
-                <a
-                  key={row.key}
-                  href={row.actionUrl}
-                  className="px-4 py-2 text-[11px] uppercase tracking-[0.14em] text-white transition-colors hover:bg-[#3E4349]"
-                  style={{ backgroundColor: '#213428', fontFamily: REPORT_FONT_BODY }}
-                >
-                  {row.actionLabel}
-                </a>
-              ))}
-            </div>
           )}
         </div>
       )}

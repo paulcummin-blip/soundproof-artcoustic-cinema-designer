@@ -10,18 +10,26 @@
  *
  * This module adds no new authority: it presents the existing
  * proposalSourceAuthority status per report — Current / Missing / Stale /
- * Failed — and states the one action each condition needs.
+ * Failed — and states the one action each condition needs. The action is kept
+ * for every state except a confirmed Current report, so the buttons never
+ * disappear when the read settles, and an unresolved read is shown as Checking
+ * rather than as a definite Missing.
  *
  * Derivation only: recalculates nothing, generates no report content.
  * Pure: no React, no side effects, no runtime APIs.
  */
 
 import {
-  PROPOSAL_SOURCE_STATE,
   PROPOSAL_SOURCE_REPORT,
   PROPOSAL_SOURCE_REPORT_LABEL,
-  buildReportActionUrl,
 } from '@/components/proposal/sourceAuthority/proposalSourceAuthority';
+import {
+  PROPOSAL_REPORT_ORDER,
+  PROPOSAL_REPORT_STATUS_TEXT,
+  PROPOSAL_REPORT_UI_STATE,
+  buildReportActionRow,
+  resolveReportActionRows,
+} from '@/components/proposal/sourceAuthority/proposalReportActions';
 
 /** Panel heading for the Step 3 readiness block. */
 export const PROPOSAL_REPORT_GATE_TITLE = 'Proposal source reports';
@@ -36,37 +44,20 @@ export const PROPOSAL_REPORT_GATE_DETAIL =
 
 /** Canonical display vocabulary for a report's readiness on this step. */
 export const PROPOSAL_REPORT_GATE_STATUS = Object.freeze({
-  [PROPOSAL_SOURCE_STATE.CURRENT]: 'Current',
-  [PROPOSAL_SOURCE_STATE.MISSING]: 'Missing',
-  [PROPOSAL_SOURCE_STATE.STALE]: 'Stale',
-  [PROPOSAL_SOURCE_STATE.FAILED]: 'Failed',
+  [PROPOSAL_REPORT_UI_STATE.CURRENT]: PROPOSAL_REPORT_STATUS_TEXT[PROPOSAL_REPORT_UI_STATE.CURRENT],
+  [PROPOSAL_REPORT_UI_STATE.MISSING]: PROPOSAL_REPORT_STATUS_TEXT[PROPOSAL_REPORT_UI_STATE.MISSING],
+  [PROPOSAL_REPORT_UI_STATE.STALE]: PROPOSAL_REPORT_STATUS_TEXT[PROPOSAL_REPORT_UI_STATE.STALE],
+  [PROPOSAL_REPORT_UI_STATE.FAILED]: PROPOSAL_REPORT_STATUS_TEXT[PROPOSAL_REPORT_UI_STATE.FAILED],
+  [PROPOSAL_REPORT_UI_STATE.CHECKING]: PROPOSAL_REPORT_STATUS_TEXT[PROPOSAL_REPORT_UI_STATE.CHECKING],
+  [PROPOSAL_REPORT_UI_STATE.UNRESOLVED]: PROPOSAL_REPORT_STATUS_TEXT[PROPOSAL_REPORT_UI_STATE.UNRESOLVED],
 });
 
 /** Both reports, always in this order. */
-export const PROPOSAL_REPORT_GATE_ORDER = Object.freeze([
-  PROPOSAL_SOURCE_REPORT.VISUAL,
-  PROPOSAL_SOURCE_REPORT.TECHNICAL,
-]);
+export const PROPOSAL_REPORT_GATE_ORDER = PROPOSAL_REPORT_ORDER;
 
 export function describeGateStatus(state) {
-  return PROPOSAL_REPORT_GATE_STATUS[state] || PROPOSAL_REPORT_GATE_STATUS[PROPOSAL_SOURCE_STATE.MISSING];
-}
-
-/**
- * The action a report's state needs. A report that does not exist is created;
- * one that exists but no longer matches the version is regenerated.
- */
-export function gateActionLabel(label, state) {
-  switch (state) {
-    case PROPOSAL_SOURCE_STATE.MISSING:
-      return `Create ${label}`;
-    case PROPOSAL_SOURCE_STATE.STALE:
-      return `Regenerate stale ${label}`;
-    case PROPOSAL_SOURCE_STATE.FAILED:
-      return `Regenerate ${label}`;
-    default:
-      return null;
-  }
+  return PROPOSAL_REPORT_GATE_STATUS[state]
+    || PROPOSAL_REPORT_GATE_STATUS[PROPOSAL_REPORT_UI_STATE.MISSING];
 }
 
 /**
@@ -76,25 +67,23 @@ export function gateActionLabel(label, state) {
  * @param {Object} params.report     — source authority report status
  * @param {string|null} params.projectId
  * @param {string|null} params.versionId
+ * @param {boolean} [params.checking] — the read has not settled
  * @returns {Object} row
  */
-export function buildReportGateRow({ report, projectId = null, versionId = null }) {
-  const key = report?.report || null;
-  const label = report?.label || PROPOSAL_SOURCE_REPORT_LABEL[key] || 'Report';
-  const state = report?.state || PROPOSAL_SOURCE_STATE.MISSING;
-  const actionLabel = gateActionLabel(label, state);
-  return {
-    key,
-    label,
-    state,
-    status: describeGateStatus(state),
-    current: state === PROPOSAL_SOURCE_STATE.CURRENT,
-    reason: report?.reason || null,
-    actionLabel,
-    actionUrl: actionLabel
-      ? buildReportActionUrl({ route: report?.route, projectId, versionId })
-      : null,
-  };
+export function buildReportGateRow({
+  report,
+  projectId = null,
+  versionId = null,
+  checking = false,
+}) {
+  const key = report?.report || PROPOSAL_SOURCE_REPORT.VISUAL;
+  return buildReportActionRow({
+    reportKey: key,
+    report: report || { report: key },
+    checking,
+    projectId,
+    versionId,
+  });
 }
 
 /**
@@ -102,7 +91,8 @@ export function buildReportGateRow({ report, projectId = null, versionId = null 
  *
  * @param {Object} params
  * @param {Object|null} params.status   — proposalSourceAuthority status for the version
- * @param {boolean} [params.loading]    — the authority read is still in flight
+ * @param {boolean} [params.loading]    — the authority read is still in flight (shown as Checking;
+ *                                        every action stays available)
  * @returns {{available: boolean, checking: boolean, ready: boolean, rows: Array, message: string|null, detail: string|null}}
  */
 export function resolveReportGate({ status = null, loading = false } = {}) {
@@ -118,20 +108,26 @@ export function resolveReportGate({ status = null, loading = false } = {}) {
     };
   }
 
-  const rows = PROPOSAL_REPORT_GATE_ORDER.map((key) => buildReportGateRow({
-    report: status.reports?.[key] || { report: key },
+  const checking = !!loading;
+  const rows = resolveReportActionRows({
+    reports: status.reports || {},
+    checking,
     projectId: status.projectId,
     versionId,
-  }));
+    generatedAt: status.reportGeneratedAt || null,
+  });
 
-  const ready = !loading && status.ready === true && rows.every((row) => row.current);
+  const ready = !checking && status.ready === true && rows.every((row) => row.current);
 
   return {
     available: true,
-    checking: !!loading,
+    checking,
     ready,
     rows,
     message: ready ? null : PROPOSAL_REPORT_GATE_MESSAGE,
     detail: ready ? null : PROPOSAL_REPORT_GATE_DETAIL,
   };
 }
+
+/** Report labels, kept for callers that render the gate outside a row. */
+export const PROPOSAL_REPORT_GATE_LABELS = PROPOSAL_SOURCE_REPORT_LABEL;

@@ -5,8 +5,8 @@
 //
 //   A proposal is never built from stale project data.
 //
-// Covers the gate derivation (Current / Missing / Stale / Failed), the exact
-// blocking message, the correct create/regenerate action per report, the
+// Covers the gate derivation (Current / Missing / Stale / Failed / Checking),
+// the exact blocking message, the generate-or-regenerate action per report, the
 // version-scoped action URLs and the wizard wiring.
 
 import { test, expect } from 'vitest';
@@ -14,13 +14,12 @@ import fs from 'node:fs';
 import {
   PROPOSAL_REPORT_GATE_MESSAGE,
   PROPOSAL_REPORT_GATE_DETAIL,
+  PROPOSAL_REPORT_GATE_STATUS,
+  describeGateStatus,
   resolveReportGate,
-  gateActionLabel,
 } from '../components/proposal/sourceAuthority/proposalReportReadinessGate.js';
-import {
-  PROPOSAL_SOURCE_STATE,
-  resolveProposalSource,
-} from '../components/proposal/sourceAuthority/proposalSourceAuthority.js';
+import { PROPOSAL_REPORT_UI_STATE } from '../components/proposal/sourceAuthority/proposalReportActions.js';
+import { resolveProposalSource } from '../components/proposal/sourceAuthority/proposalSourceAuthority.js';
 
 const read = (path) => fs.readFileSync(new URL(`../../${path}`, import.meta.url), 'utf8');
 
@@ -43,7 +42,7 @@ const gateFor = (overrides = {}, loading = false) => resolveReportGate({
 
 /* ── Blocking ─────────────────────────────────────────────────────────── */
 
-test('both reports missing blocks the step and offers both create actions', () => {
+test('both reports missing blocks the step and offers both generate actions', () => {
   const gate = gateFor({ hasSource: false });
 
   expect(gate.ready).toBe(false);
@@ -55,8 +54,8 @@ test('both reports missing blocks the step and offers both create actions', () =
   expect(gate.rows.map((r) => r.label)).toEqual(['Visual Report', 'Technical Report']);
   expect(gate.rows.map((r) => r.status)).toEqual(['Missing', 'Missing']);
   expect(gate.rows.map((r) => r.actionLabel)).toEqual([
-    'Create Visual Report',
-    'Create Technical Report',
+    'Generate Visual Report',
+    'Generate Technical Report',
   ]);
   expect(gate.rows.map((r) => r.actionUrl)).toEqual([
     '/RP22ClientReport?projectId=p1&versionId=v1',
@@ -83,11 +82,11 @@ test('a report generated for another version is stale, not usable', () => {
   expect(gate.rows[0].reason).toMatch(/different project or version/);
 });
 
-test('a failed report reads Failed and blocks the step', () => {
+test('a failed report reads Unavailable and blocks the step', () => {
   const gate = gateFor({ hasSource: true, unavailable: true });
 
   expect(gate.ready).toBe(false);
-  expect(gate.rows.map((r) => r.status)).toEqual(['Failed', 'Failed']);
+  expect(gate.rows.map((r) => r.status)).toEqual(['Unavailable', 'Unavailable']);
   expect(gate.rows.map((r) => r.actionLabel)).toEqual([
     'Regenerate Visual Report',
     'Regenerate Technical Report',
@@ -100,6 +99,30 @@ test('a pending recalculation is stale, so the step stays blocked', () => {
   expect(gate.rows.map((r) => r.status)).toEqual(['Stale', 'Stale']);
 });
 
+/* ── Checking ─────────────────────────────────────────────────────────── */
+
+test('the gate never enables while the authority is still reading', () => {
+  const gate = gateFor({ hasSource: true }, true);
+  expect(gate.checking).toBe(true);
+  expect(gate.ready).toBe(false);
+  expect(gate.message).toBe(PROPOSAL_REPORT_GATE_MESSAGE);
+});
+
+test('checking is not presented as Missing and keeps both actions', () => {
+  const gate = gateFor({ hasSource: false }, true);
+
+  expect(gate.rows.map((r) => r.status)).toEqual(['Checking…', 'Checking…']);
+  expect(gate.rows.map((r) => r.uiState)).toEqual([
+    PROPOSAL_REPORT_UI_STATE.CHECKING,
+    PROPOSAL_REPORT_UI_STATE.CHECKING,
+  ]);
+  expect(gate.rows.map((r) => r.actionLabel)).toEqual([
+    'Generate / Regenerate Visual Report',
+    'Generate / Regenerate Technical Report',
+  ]);
+  expect(gate.rows.every((r) => r.actionUrl && !r.actionDisabled)).toBe(true);
+});
+
 /* ── Enabling ─────────────────────────────────────────────────────────── */
 
 test('both reports current enables the step', () => {
@@ -108,16 +131,9 @@ test('both reports current enables the step', () => {
   expect(gate.available).toBe(true);
   expect(gate.ready).toBe(true);
   expect(gate.rows.map((r) => r.status)).toEqual(['Current', 'Current']);
-  expect(gate.rows.map((r) => r.actionLabel)).toEqual([null, null]);
+  expect(gate.rows.map((r) => r.current)).toEqual([true, true]);
   expect(gate.message).toBeNull();
   expect(gate.detail).toBeNull();
-});
-
-test('the gate never enables while the authority is still reading', () => {
-  const gate = gateFor({ hasSource: true }, true);
-  expect(gate.checking).toBe(true);
-  expect(gate.ready).toBe(false);
-  expect(gate.message).toBe(PROPOSAL_REPORT_GATE_MESSAGE);
 });
 
 test('with no selected version the gate is inert', () => {
@@ -132,11 +148,16 @@ test('with no selected version the gate is inert', () => {
 
 /* ── Action vocabulary ────────────────────────────────────────────────── */
 
-test('the action per state follows the create / regenerate distinction', () => {
-  expect(gateActionLabel('Visual Report', PROPOSAL_SOURCE_STATE.MISSING)).toBe('Create Visual Report');
-  expect(gateActionLabel('Visual Report', PROPOSAL_SOURCE_STATE.STALE)).toBe('Regenerate stale Visual Report');
-  expect(gateActionLabel('Technical Report', PROPOSAL_SOURCE_STATE.FAILED)).toBe('Regenerate Technical Report');
-  expect(gateActionLabel('Technical Report', PROPOSAL_SOURCE_STATE.CURRENT)).toBeNull();
+test('every readiness state keeps a usable action', () => {
+  expect(describeGateStatus(PROPOSAL_REPORT_UI_STATE.MISSING)).toBe('Missing');
+  expect(describeGateStatus(PROPOSAL_REPORT_UI_STATE.STALE)).toBe('Stale');
+  expect(describeGateStatus(PROPOSAL_REPORT_UI_STATE.FAILED)).toBe('Unavailable');
+  expect(describeGateStatus(PROPOSAL_REPORT_UI_STATE.CURRENT)).toBe('Current');
+  expect(describeGateStatus(PROPOSAL_REPORT_UI_STATE.CHECKING)).toBe('Checking…');
+  expect(Object.values(PROPOSAL_REPORT_GATE_STATUS).length).toBeGreaterThanOrEqual(6);
+
+  const rows = gateFor({ hasSource: false }).rows;
+  rows.forEach((row) => expect(row.actionLabel.length).toBeGreaterThan(0));
 });
 
 /* ── Wiring ───────────────────────────────────────────────────────────── */
@@ -166,6 +187,7 @@ test('the readiness block states both reports, the message and the actions', () 
 
 test('the gate adds no parallel authority and no report generation', () => {
   expect(GATE_AUTHORITY).toMatch(/proposalSourceAuthority'/);
+  expect(GATE_AUTHORITY).toMatch(/proposalReportActions'/);
   expect(/entities\.|base44\.|functions\.invoke/.test(GATE_AUTHORITY)).toBe(false);
   expect(GATE_AUTHORITY).toMatch(/PROPOSAL_REPORT_GATE_TITLE = 'Proposal source reports'/);
 });
