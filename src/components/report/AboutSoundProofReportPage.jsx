@@ -28,6 +28,10 @@ export default function AboutSoundProofReportPage({ variant = "full" }) {
   // never a newspaper-style multi-column block — so it reads as ordinary
   // professional report text on screen and in the PDF alike. The compact variant
   // only narrows the column and tightens the heading rhythm.
+  //
+  // The rhythm is deliberately tight: modest paragraph spacing, a comfortable
+  // line height and collapsed spacer blocks, so the whole article fits one A4
+  // report page instead of drifting down the sheet.
   const compact = variant === "compact";
 
   return (
@@ -39,7 +43,7 @@ export default function AboutSoundProofReportPage({ variant = "full" }) {
         flexDirection: "column",
         alignItems: "center",
         justifyContent: "flex-start",
-        padding: compact ? "0 0 4mm 0" : "10mm 14mm",
+        padding: compact ? "0 0 3mm 0" : "8mm 12mm",
         boxSizing: "border-box",
         background: "#FFFFFF",
         fontFamily: FONT_BODY,
@@ -52,12 +56,12 @@ export default function AboutSoundProofReportPage({ variant = "full" }) {
         src={LOGO_URL}
         alt="Sound Proof"
         style={{
-          maxWidth: compact ? "110mm" : "170mm",
-          width: compact ? "42%" : "55%",
+          maxWidth: compact ? "100mm" : "150mm",
+          width: compact ? "38%" : "50%",
           height: "auto",
-          maxHeight: compact ? "14mm" : "22mm",
+          maxHeight: compact ? "12mm" : "17mm",
           objectFit: "contain",
-          marginBottom: compact ? "3mm" : "6mm",
+          marginBottom: compact ? "2.5mm" : "3.5mm",
         }}
       />
 
@@ -67,7 +71,7 @@ export default function AboutSoundProofReportPage({ variant = "full" }) {
           width: compact ? "40mm" : "55mm",
           height: "1.5px",
           background: BRAND_GREEN,
-          marginBottom: compact ? "4mm" : "8mm",
+          marginBottom: compact ? "3mm" : "3.5mm",
         }}
       />
 
@@ -75,11 +79,11 @@ export default function AboutSoundProofReportPage({ variant = "full" }) {
       <h1
         style={{
           fontFamily: FONT_HEADING,
-          fontSize: compact ? "14pt" : "17pt",
+          fontSize: compact ? "13pt" : "15pt",
           fontWeight: 400,
           color: TEXT_DARK,
           letterSpacing: "0.02em",
-          margin: compact ? "0 0 4mm 0" : "0 0 8mm 0",
+          margin: compact ? "0 0 3mm 0" : "0 0 3.5mm 0",
           textAlign: compact ? "left" : "center",
         }}
       >
@@ -99,15 +103,23 @@ export default function AboutSoundProofReportPage({ variant = "full" }) {
         >
           {/* Paragraph rhythm. The published copy arrives as plain <p> blocks and
               the app's base stylesheet zeroes their margins, so the page states
-              them here: one clean column, comfortable measure, generous spacing. */}
+              them here: one clean column, comfortable measure, the modest
+              spacing of ordinary report body text. */}
           <style>{`
-            .about-sound-proof-copy p { margin: 0 0 3.6mm 0; }
+            .about-sound-proof-copy p { margin: 0 0 2.4mm 0; }
             .about-sound-proof-copy p:last-child { margin-bottom: 0; }
+            /* The published copy carries <p><br></p> spacer blocks between
+               paragraphs. They are blank lines, not content, so they are
+               collapsed here — the page then reads as one continuous piece of
+               report text instead of paragraph / large gap / paragraph. The copy
+               itself is never rewritten. */
+            .about-sound-proof-copy p:empty,
+            .about-sound-proof-copy p:has(> br:only-child) { display: none; }
           `}</style>
           <PublicationContentHtml
             html={html}
             variant="print"
-            style={{ width: "100%", lineHeight: 1.75 }}
+            style={{ width: "100%", fontSize: "9.5pt", lineHeight: 1.55 }}
           />
         </div>
       )}

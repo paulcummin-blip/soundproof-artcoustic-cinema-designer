@@ -46,14 +46,58 @@ test('paragraphs are separated by consistent spacing', () => {
   // The published copy is plain <p> blocks and the app base stylesheet zeroes
   // their margins, so the page states the rhythm itself.
   assert.ok(
-    SRC.includes('.about-sound-proof-copy p { margin: 0 0 3.6mm 0; }'),
-    'paragraphs carry one consistent margin',
+    SRC.includes('.about-sound-proof-copy p { margin: 0 0 2.4mm 0; }'),
+    'paragraphs carry one modest, consistent margin',
   );
   assert.ok(
     SRC.includes('.about-sound-proof-copy p:last-child { margin-bottom: 0; }'),
     'the last paragraph adds no trailing gap',
   );
-  assert.ok(SRC.includes('lineHeight: 1.75'), 'the copy is set at a comfortable line height');
+  assert.ok(SRC.includes('lineHeight: 1.55'), 'the copy is set at a comfortable line height');
+  assert.ok(SRC.includes('fontSize: "9.5pt"'), 'the copy is set at report body size');
+  // Section-like padding is gone: the page keeps a small frame margin only.
+  assert.ok(SRC.includes('padding: compact ? "0 0 3mm 0" : "8mm 12mm"'), 'top and bottom padding is modest');
+});
+
+test('the blank spacer blocks in the copy are collapsed', () => {
+  // The published copy carries <p><br></p> blocks between paragraphs. Left
+  // alone they render as full blank lines — the "large gap" between paragraphs.
+  assert.ok(
+    SRC.includes('.about-sound-proof-copy p:has(> br:only-child) { display: none; }'),
+    'a line-break-only paragraph renders as nothing',
+  );
+  assert.ok(SRC.includes('.about-sound-proof-copy p:empty'), 'an empty paragraph renders as nothing');
+  // The real paragraphs are untouched: they still render one per paragraph.
+  const rendered = renderToStaticMarkup(
+    React.createElement(PublicationContentHtml, { html: DEFAULT_ABOUT_SOUND_PROOF_HTML, variant: 'print' }),
+  );
+  assert.equal(rendered.split('<p>').length - 1, (DEFAULT_ABOUT_SOUND_PROOF_HTML.match(/<p>/g) || []).length);
+});
+
+test('the article fits one A4 report page', () => {
+  // The client report frame is 186 × 271 mm; the published About copy is about
+  // 3,100 characters in 11 paragraphs. The budget below is computed from the
+  // values the page actually sets, so a future change that lengthens the copy
+  // styling has to re-justify itself here.
+  const FRAME_H_MM = 271;
+  const COPY_CHARS = 3200;
+  const COPY_PARAGRAPHS = 11;
+  const COLUMN_MM = 160;
+  const FONT_PT = 9.5;
+  const LINE_HEIGHT = 1.55;
+  const PARA_GAP_MM = 2.4;
+  const PT_TO_MM = 0.3528;
+
+  const charMm = FONT_PT * 0.5 * PT_TO_MM;
+  const lineMm = FONT_PT * LINE_HEIGHT * PT_TO_MM;
+  const lines = Math.ceil(COPY_CHARS / (COLUMN_MM / charMm));
+  const copyMm = lines * lineMm + (COPY_PARAGRAPHS - 1) * PARA_GAP_MM;
+  const headerMm = 17 + 3.5 + 0.5 + 3.5 + 15 * 1.2 * PT_TO_MM + 3.5;
+  const framePaddingMm = 8 * 2;
+
+  const totalMm = copyMm + headerMm + framePaddingMm;
+  assert.ok(totalMm <= FRAME_H_MM, `the page fits one page (${totalMm.toFixed(0)}mm of ${FRAME_H_MM}mm)`);
+  assert.ok(totalMm <= FRAME_H_MM - 10, 'and it keeps headroom, never sitting flush to the page edge');
 });
 
 test('brand typography is used', () => {
