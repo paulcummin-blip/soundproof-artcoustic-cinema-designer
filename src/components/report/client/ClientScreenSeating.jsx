@@ -3,10 +3,16 @@
  * -------------------
  * Client-facing RP23 Screen Size / Seating Position visual report page.
  *
- * Shows banded longitudinal viewing zones (L1|L2|L3|L4|L3|L2|L1) derived
- * from the SAME RP23 angle thresholds used by the live app.
- * Per-seat levels come from selectClientScreenSeating which uses
- * rp23LevelForAngleDeg — the exact same grading authority.
+ * Hierarchy: the seating plan drawing, then the RP23 result itself — seat pills
+ * laid out in the same row/seat arrangement as the plan, with each seat's
+ * viewing angle beneath its pill — then the short interpretation, the projector
+ * light output, and last the level key as a small footnote. The result is the
+ * page's statement; nothing else competes with it.
+ *
+ * Banded longitudinal viewing zones (L1|L2|L3|L4|L3|L2|L1) are drawn from the
+ * SAME RP23 angle thresholds used by the live app. Per-seat levels come from
+ * selectClientScreenSeating which uses rp23LevelForAngleDeg — the exact same
+ * grading authority. This page is presentation only: it re-grades nothing.
  *
  * Uses the SAME room template as P1/P12/P13 pages (same SVG dimensions,
  * padding, coordinate mapping, seat markers, RSP marker).
@@ -22,6 +28,8 @@ import { resolveRspLabelPlacement } from "./ClientSpeakerBalance";
 import { RP22_GRADE_TOKENS } from "@/components/utils/rp22Colors";
 import RP22GradingPill from "@/components/ui/RP22GradingPill";
 import { PROJECTOR_BASIS_COPY } from "@/components/report/projectorLumenRecommendation";
+import ClientSeatResultRows from "./ClientSeatResultRows";
+import { VIEWING_RESULT_HEADING } from "./viewingResultCopy";
 
 const LEGEND_LEVELS = ["L1", "L2", "L3", "L4"];
 
@@ -31,6 +39,7 @@ const ZONE_TOKEN = { l1: "L1", l2: "L2", l3: "L3", l4: "L4" };
 export default function ClientScreenSeating({
   roomDims,
   seats,
+  rows,
   rsp,
   screenFrontPlaneM,
   screenWidthM,
@@ -153,21 +162,6 @@ export default function ClientScreenSeating({
           >
             RP23 — Screen Size &amp; Seating Position
           </p>
-        </div>
-      )}
-
-      {/* ── Descriptive page title (screen only) ── */}
-      {!print && (
-        <div
-          style={{
-            fontSize: 18,
-            fontWeight: 600,
-            color: "#213428",
-            marginBottom: 4,
-            fontFamily: "Futura PT Light, Century Gothic, sans-serif",
-          }}
-        >
-          Screen Size and Seating
         </div>
       )}
 
@@ -345,51 +339,28 @@ export default function ClientScreenSeating({
       )}
 
       {showSupport && (<>
-      {/* ── Compact horizontal legend ── */}
-      <div
-        style={{
-          display: "flex",
-          flexWrap: "wrap",
-          justifyContent: "center",
-          gap: print ? 10 : 14,
-          margin: 0,
-          fontFamily: "Didact Gothic, Century Gothic, sans-serif",
-        }}
-      >
-        {LEGEND_LEVELS.map((lvl) => (
-          <div key={lvl} style={{ display: "flex", alignItems: "center", gap: 6 }}>
-            <RP22GradingPill level={lvl} variant="report" />
-          </div>
-        ))}
-        {/* Below L1 — custom swatch matching the diluted zone fill + dark border */}
-        <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-          <span
-            style={{
-              display: "inline-block",
-              width: 28,
-              height: 14,
-              background: LEVEL_FILLS["below-l1"],
-              border: `1px solid ${RP22_GRADE_TOKENS.FAIL.border}`,
-              borderRadius: 4,
-              boxSizing: "border-box",
-            }}
-          />
-          <span
-            style={{
-              fontSize: print ? 10 : 12,
-              color: LEVEL_LABEL_COLORS["below-l1"],
-              fontFamily: "Didact Gothic, Century Gothic, sans-serif",
-              fontWeight: 600,
-              letterSpacing: "0.01em",
-              whiteSpace: "nowrap",
-            }}
-          >
-            Below L1
-          </span>
-        </div>
-      </div>
+      {/* ── RP23 result — the statement this page exists to make, laid out in
+             the same row/seat arrangement as the seating plan above ── */}
+      <ClientSeatResultRows rows={rows} heading={VIEWING_RESULT_HEADING} print={print} />
 
-      {/* ── Projector light output note (between drawing and seat matrix) ── */}
+      {/* ── Interpretation. On screen it sits with the result; the printed page
+             carries it in the standard result region at the foot of the page. ── */}
+      {!print && explanation && (
+        <div
+          style={{
+            maxWidth: 640,
+            textAlign: "center",
+            fontSize: 13,
+            lineHeight: 1.55,
+            color: "#3E4349",
+            fontFamily: "Didact Gothic, Century Gothic, sans-serif",
+          }}
+        >
+          {explanation}
+        </div>
+      )}
+
+      {/* ── Projector light output — below the viewing result ── */}
       {projectorLumens != null && (
         <div
           style={{
@@ -432,86 +403,47 @@ export default function ClientScreenSeating({
         </div>
       )}
 
-      {/* ── Compact seat matrix ── */}
+      {/* ── Level key — a small footnote beneath the result, never the
+             headline. Kept for reference only. ── */}
       <div
         style={{
           display: "flex",
+          flexWrap: "wrap",
           justifyContent: "center",
-          width: "100%",
+          alignItems: "center",
+          gap: print ? 8 : 12,
           fontFamily: "Didact Gothic, Century Gothic, sans-serif",
         }}
       >
-        <table
-          style={{
-            borderCollapse: "collapse",
-            fontSize: print ? 10 : 12,
-            color: "#3E4349",
-          }}
-        >
-          <thead>
-            <tr>
-              <th
-                style={{
-                  padding: "4px 10px",
-                  textAlign: "left",
-                  fontWeight: 600,
-                  color: "#625143",
-                  borderBottom: "1px solid #DCDBD6",
-                }}
-              />
-              {plotSeats.map((seat, i) => (
-                <th
-                  key={seat.id}
-                  style={{
-                    padding: "4px 12px",
-                    textAlign: "center",
-                    fontWeight: seat.isPrimary ? 700 : 500,
-                    color: seat.isPrimary ? "#213428" : "#625143",
-                    borderBottom: "1px solid #DCDBD6",
-                  }}
-                >
-                  Seat {i + 1}
-                </th>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-            <tr>
-              <td style={{ padding: "4px 10px", textAlign: "left", fontWeight: 600, color: "#625143" }}>
-                RP23 Viewing
-              </td>
-              {plotSeats.map((seat) => (
-                <td
-                  key={seat.id}
-                  style={{
-                    padding: "4px 12px",
-                    textAlign: "center",
-                    fontWeight: seat.isPrimary ? 700 : 500,
-                    color: seat.isPrimary ? "#213428" : "#3E4349",
-                  }}
-                >
-                  {seat.levelLabel ?? "—"}
-                </td>
-              ))}
-            </tr>
-            <tr>
-              <td style={{ padding: "2px 10px 4px" }} />
-              {plotSeats.map((seat) => (
-                <td
-                  key={seat.id}
-                  style={{
-                    padding: "2px 12px 4px",
-                    textAlign: "center",
-                    fontSize: print ? 8.5 : 10,
-                    color: "#625143",
-                  }}
-                >
-                  {seat.formatted ?? "—"}
-                </td>
-              ))}
-            </tr>
-          </tbody>
-        </table>
+        {LEGEND_LEVELS.map((lvl) => (
+          <RP22GradingPill key={lvl} level={lvl} variant="compact" />
+        ))}
+        {/* Below L1 — custom swatch matching the diluted zone fill + dark border */}
+        <div style={{ display: "flex", alignItems: "center", gap: 5 }}>
+          <span
+            style={{
+              display: "inline-block",
+              width: 22,
+              height: 11,
+              background: LEVEL_FILLS["below-l1"],
+              border: `1px solid ${RP22_GRADE_TOKENS.FAIL.border}`,
+              borderRadius: 3,
+              boxSizing: "border-box",
+            }}
+          />
+          <span
+            style={{
+              fontSize: print ? 8.5 : 10,
+              color: LEVEL_LABEL_COLORS["below-l1"],
+              fontFamily: "Didact Gothic, Century Gothic, sans-serif",
+              fontWeight: 600,
+              letterSpacing: "0.01em",
+              whiteSpace: "nowrap",
+            }}
+          >
+            Below L1
+          </span>
+        </div>
       </div>
       </>)}
 

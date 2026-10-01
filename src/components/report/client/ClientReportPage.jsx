@@ -299,6 +299,7 @@ export default function ClientReportPage({ children, isFirst, projectDetails, lo
               <ClientScreenSeating
                 roomDims={printData.roomDims}
                 seats={printData.seats}
+                rows={printData.rows}
                 rsp={printData.rsp}
                 screenFrontPlaneM={printData.screenFrontPlaneM}
                 screenWidthM={printData.screenWidthM}
@@ -313,6 +314,7 @@ export default function ClientReportPage({ children, isFirst, projectDetails, lo
               <ClientScreenSeating
                 roomDims={printData.roomDims}
                 seats={printData.seats}
+                rows={printData.rows}
                 rsp={printData.rsp}
                 screenFrontPlaneM={printData.screenFrontPlaneM}
                 screenWidthM={printData.screenWidthM}
@@ -325,7 +327,7 @@ export default function ClientReportPage({ children, isFirst, projectDetails, lo
             </div>
             <div className="client-report-print-result">
               <div className="client-report-print-result__content">
-                <div className="client-report-print-result__label">Screen Size and Seating</div>
+                <div className="client-report-print-result__label">RP23 Viewing Result</div>
                 <div className="client-report-print-result__explanation">
                   {printData.explanation || "Viewing angle range for each seating position relative to the screen."}
                 </div>

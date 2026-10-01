@@ -321,6 +321,7 @@ export default function RP22ClientReport() {
           <ClientScreenSeating
             roomDims={roomDims}
             seats={screenSeating.seats}
+            rows={screenSeating.rows}
             rsp={rsp}
             screenFrontPlaneM={screenFrontPlaneM}
             screenWidthM={screenWidthM}
@@ -333,6 +334,7 @@ export default function RP22ClientReport() {
           type: "screen-seating",
           roomDims,
           seats: screenSeating.seats,
+          rows: screenSeating.rows,
           rsp,
           screenFrontPlaneM,
           screenWidthM,

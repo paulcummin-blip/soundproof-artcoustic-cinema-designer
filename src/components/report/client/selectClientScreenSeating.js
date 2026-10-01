@@ -6,6 +6,8 @@
  */
 
 import { computeProjectorLumens } from "@/components/report/projectorLumenRecommendation";
+import { groupSeatsIntoRows } from "./seatRowGrouping";
+import { buildViewingInterpretation } from "./viewingResultCopy";
 
 function levelToKey(level) {
   return level ? String(level).toLowerCase() : "below-l1";
@@ -13,19 +15,6 @@ function levelToKey(level) {
 
 function levelToLabel(level) {
   return level || "Below L1";
-}
-
-function buildExplanation(seats) {
-  if (!seats.length) return "";
-  const l4Count = seats.filter((seat) => seat.level === "l4").length;
-  const l3Count = seats.filter((seat) => seat.level === "l3").length;
-  const belowCount = seats.filter((seat) => seat.level === "below-l1").length;
-  if (l4Count === seats.length) return `All ${seats.length} seat${seats.length === 1 ? "" : "s"} are within the Level 4 viewing range.`;
-  if (l4Count > 0 && belowCount === 0) return `${l4Count} of ${seats.length} seats are within the Level 4 viewing range; the remainder are within Level 3.`;
-  if (l4Count > 0) return `${l4Count} of ${seats.length} seats are within the Level 4 viewing range; ${belowCount} are below Level 1.`;
-  if (l3Count > 0 && belowCount === 0) return "All seats are within the Level 3 viewing range.";
-  if (belowCount > 0) return `${belowCount} of ${seats.length} seat${belowCount === 1 ? "" : "s"} are below the Level 1 viewing range.`;
-  return "";
 }
 
 export function selectClientScreenSeating({
@@ -37,7 +26,7 @@ export function selectClientScreenSeating({
 }) {
   const viewing = engineeringSummary?.viewing;
   if (!Array.isArray(seatingPositions) || !viewing?.available) {
-    return { seats: [], zones: [], hasAny: false, explanation: "", projectorLumens: null };
+    return { seats: [], rows: [], zones: [], hasAny: false, explanation: "", projectorLumens: null };
   }
 
   const authorityBySeatId = new Map(
@@ -64,14 +53,19 @@ export function selectClientScreenSeating({
     };
   }).filter(Boolean);
 
+  // The seat-mapped presentation: seats grouped into the physical rows of the
+  // seating plan, so the result block can be laid out in the same arrangement.
+  const rows = groupSeatsIntoRows(seats);
+
   return {
     seats,
+    rows,
     // RP23 zone bands were previously re-derived by re-running the grading
     // function inside the report. They are intentionally omitted: only the
     // canonical published seat results are visualised.
     zones: [],
     hasAny: seats.length > 0,
-    explanation: buildExplanation(seats),
+    explanation: buildViewingInterpretation(rows),
     projectorLumens: computeProjectorLumens(screenWidthM, aspectRatio),
   };
 }
