@@ -277,8 +277,6 @@ export function formatOfficialBassResults(completedBassAuthority, lifecycle = nu
     pills.p14 = { label: "P14 Bass SPL", resultText: officialStateText(authorityStatus, isCalculating), text: `P14 Bass SPL ${officialStateText(authorityStatus, isCalculating)}`, level: "—" };
   }
 
-  const notEvaluatedText = "Not evaluated at requested operating point";
-
   // P18 — dynamically regrade the achieved extension for the current display
   // basis without changing fingerprints, workers, authority or cached curves.
   // The strip states the calculated -3 dB point itself: no greater-than or

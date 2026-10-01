@@ -175,7 +175,7 @@ function StageRow({ stage }) {
       <div className="flex items-start gap-2">
         <Minus className="h-3.5 w-3.5 text-[#B0A89B] mt-0.5 flex-shrink-0" />
         <div className="min-w-0">
-          <div className="text-[11px] text-[#B0A89B]">{label} — Not tested</div>
+          <div className="text-[11px] text-[#B0A89B]">{label} — Waiting</div>
         </div>
       </div>
     );

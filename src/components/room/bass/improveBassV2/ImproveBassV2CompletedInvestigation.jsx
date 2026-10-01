@@ -229,7 +229,7 @@ export function buildStageDetails(selection) {
     } else if (tested > 0) {
       parts.push("No material seating improvement found");
     } else {
-      parts.push("Not tested");
+      parts.push("No seating search ran — listener movement is a last resort");
     }
     if (parts.length) details.seating_positions = parts.join(". ");
   }
@@ -333,7 +333,7 @@ function CompletedStageRow({ stage, detail, applied }) {
         <Minus className="h-3.5 w-3.5 text-[#B0A89B] mt-0.5 flex-shrink-0" />
         <div className="min-w-0">
           <div className="text-[11px] text-[#B0A89B]">
-            {label} — Not tested
+            {label} — Not yet supported in this run
           </div>
         </div>
       </div>
@@ -346,7 +346,7 @@ function CompletedStageRow({ stage, detail, applied }) {
         <AlertTriangle className="h-3.5 w-3.5 text-[#8A7B6A] mt-0.5 flex-shrink-0" />
         <div className="min-w-0">
           <div className="text-[11px] text-[#625143]">
-            {label} — Not available yet
+            {label} — Not yet supported
           </div>
           {detail && (
             <div className="text-[10px] text-[#8A7B6A] mt-0.5 leading-relaxed">

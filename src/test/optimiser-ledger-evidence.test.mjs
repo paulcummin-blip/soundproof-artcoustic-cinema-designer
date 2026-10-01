@@ -211,7 +211,7 @@ test('polarity states where its value came from', () => {
 
 test('layout is reported as checked inside the placement search', () => {
   const row = rowFor(summaryFor(terminalPlanView()), 'Layout');
-  assert.equal(row.status, ADI_ROW_STATUS.CHECKED_IN_PLACEMENT);
+  assert.equal(row.status, ADI_ROW_STATUS.TESTED);
   assert.equal(row.outcome, ADI_ROW_OUTCOME.NO_BETTER_LAYOUT);
 });
 

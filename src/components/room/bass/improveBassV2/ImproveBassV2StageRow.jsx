@@ -81,7 +81,7 @@ function StageVerdictBadge({ verdict }) {
   return (
     <span className="inline-flex items-center gap-1 rounded-md bg-[#F5F4F1] border border-[#D9D5CE] px-2 py-0.5">
       <Minus className="h-3 w-3 text-[#B0A89B]" />
-      <span className="text-[10px] text-[#B0A89B]">Not tested</span>
+      <span className="text-[10px] text-[#B0A89B]">Not yet supported in this run</span>
     </span>
   );
 }
