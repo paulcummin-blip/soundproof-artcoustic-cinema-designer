@@ -141,9 +141,17 @@ describe('DETAILS COLLAPSED BY DEFAULT', () => {
 describe('BUTTON PROMINENT', () => {
   it('keeps the primary action and gives it the larger treatment', () => {
     const card = read(`${PLAN}AdiOptimisationJourney.jsx`);
-    expect(card).toMatch(/onClick=\{onRunOptimisationPlan\}/);
+    // ONE primary control, wired to the optimiser run — and to the bass
+    // calculation only when that calculation is the required action.
+    expect(card).toMatch(/: onRunOptimisationPlan\}/);
+    expect(card).toMatch(/onCalculateBassPerformance/);
     expect(card).toMatch(/px-5 py-2\.5 text-\[13px\]/);
     expect(card).toMatch(/bg-\[#213428\]/);
+    // Running and idle are the SAME control: the wording is shared, and the
+    // spinner states the running state.
+    expect(card).toMatch(/data-adi-optimiser-button="idle"/);
+    expect(card).toMatch(/data-adi-optimiser-button="running"/);
+    expect(card).toMatch(/animate-spin/);
   });
 
   it('labels the one run control Bass Optimiser in every state', () => {
