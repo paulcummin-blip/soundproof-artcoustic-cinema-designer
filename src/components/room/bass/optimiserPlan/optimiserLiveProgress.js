@@ -3,11 +3,10 @@
 // The "What ADI tested" rows WHILE a run is in progress.
 //
 // Product rule this exists to satisfy: the card must prove ADI is working
-// through the full engineering sequence. Every family shown is Waiting, Testing
-// or Tested. Only the families ADI genuinely evaluates appear here at all (see
-// optimiserLiveFamilies.js): a capability that is not live yet is stated once as
-// a future capability in the collapsed Engineer details, never as a row of its
-// own here and never as "Not yet supported" in the tested table.
+// through the full engineering sequence. Every lever in the fixed order is
+// stated — Waiting, Testing or Tested while it is being worked, and "Not yet
+// supported" (with the reason) for a lever the model does not evaluate, so a
+// designer is never left guessing whether an option was considered.
 //
 // The evidence is the engine's OWN live progress, published by
 // improveBassV2Store while it runs:
@@ -30,12 +29,12 @@ export const ADI_LIVE_STATUS = Object.freeze({
   TESTING: "Testing",
   TESTED: "Tested",
   NOT_YET_SUPPORTED: "Not yet supported",
-  NOT_YET_SUPPORTED_IN_RUN: "Not yet supported in this run",
 });
 
-// Crossover-region phase and subwoofer model / quantity are NOT rows here: the
-// optimiser does not evaluate them, so they are stated once as future
-// capabilities in the collapsed Engineer details (optimiserLiveFamilies.js).
+// The crossover-region phase row is constant: the model does not evaluate it, so
+// the row states that once with the reason, in its own place in the order.
+// Subwoofer model / quantity is not a row here — it is stated in Engineer
+// details.
 
 /** The absorption row is advice, and is only resolved after the run. */
 export const ABSORPTION_ROW_KEY = "absorption";
@@ -74,9 +73,9 @@ function row(key, status, outcome = null, label = null) {
 }
 
 /**
- * Build the live rows, in the fixed least-intrusive order, restricted to the
- * families ADI evaluates: delay, gain, polarity, placement, layout, seating —
- * then the absorption advice row. A capability that is not live is not a row.
+ * Build the live rows, in the fixed least-intrusive order: delay, gain, phase,
+ * polarity, placement, layout, seating — then the absorption advice row. Every
+ * lever the table states is present from the first moment of the run.
  *
  * @param {object} live - improveBassV2 store state plus { running }
  * @returns {Array<{key,label,status,outcome,action}>}
@@ -136,6 +135,9 @@ export function buildLiveFamilyRows(live = {}) {
       ? testingOutcome(DELAY_LABEL) : null),
     row("gain", gainStatus, gainStatus === ADI_LIVE_STATUS.TESTING
       ? testingOutcome(GAIN_LABEL) : null),
+    // Phase / crossover-region alignment: stated where it sits in the order,
+    // with the reason it is not evaluated.
+    row("phase", ADI_LIVE_STATUS.NOT_YET_SUPPORTED, ADI_ROW_OUTCOME.PHASE_NOT_MODELLED),
     row("polarity", polarityStatus, null),
     row("placement", placementStatus, null),
     // An alternative layout is searched inside the placement pool, so it moves

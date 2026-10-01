@@ -1,39 +1,40 @@
 // optimiserLiveFamilies.js
 // ---------------------------------------------------------------------------
-// WHICH families the optimiser genuinely evaluates today — the ONE authority the
-// "What ADI tested" table reads.
+// WHICH levers the "What ADI tested" table states — the ONE authority the table
+// reads.
 //
-// Product rule this exists to satisfy: a row appears in the default tested table
-// ONLY when ADI actually evaluates that option in the current run. A capability
-// that is not live yet is never presented as a tested lever and never as "Not
-// yet supported" in the designer's main view — it is stated once, as a future
-// capability, in the collapsed Engineer details.
+// Product rule this exists to satisfy: the table reports EVERY lever in the
+// fixed least-intrusive order, and each row states what happened to that lever.
+// An evaluated lever reports its own outcome (Recommended · Tested · Rejected ·
+// Trade-off). A lever the model does not evaluate is stated as "Not yet
+// supported" WITH its reason in its own row — never left out, never shown as an
+// evaluated lever, and never used to describe a lever the optimiser does search.
 //
-// The engine's own search evidence is unchanged. This module decides only what
-// the DEFAULT TABLE may claim, so the designer never reads a row as something
-// ADI tested for them when the model cannot evaluate it.
+// Phase / crossover-region alignment is therefore a row (third, where it has
+// always sat in the order) reading "Not yet supported — crossover-region model
+// not available". Subwoofer model / quantity is a design decision rather than a
+// searched lever, so it is stated once in the collapsed Engineer details.
+//
+// The engine's own search evidence is unchanged. This module decides only which
+// levers the table states.
 //
 // READ-ONLY presentation metadata: no bass maths, no optimiser scoring, no RP22
 // grading, no P18/P19/P20 definition.
 // ---------------------------------------------------------------------------
 
-import { CROSSOVER_REGION_PHASE_SUPPORTED } from "./crossoverRegionPhaseAuthority.js";
-
 /**
- * The families ADI evaluates in the current run, in least-intrusive order:
+ * The levers the tested table states, in least-intrusive order:
  *
- *   Delay · Gain · Polarity · Placement · Layout · Seating
+ *   Delay · Gain · Phase · Polarity · Placement · Layout · Seating
  *
- * Phase / crossover-region alignment joins this list at position 3 as soon as
- * the engine gains a crossover-region model (CROSSOVER_REGION_PHASE_SUPPORTED is
- * the single switch, and the lever already sits third in the fixed order).
- * Subwoofer model / quantity comparison joins after Layout if the optimiser is
- * ever made to compare models or quantities. Neither is claimed today, and
- * neither may be added here by hand while its capability is absent.
+ * Low-frequency absorption advice is appended after them by the summary.
+ * Subwoofer model / quantity is deliberately NOT here: it is a design decision,
+ * not a lever the optimiser searches.
  */
 export const OPTIMISER_LIVE_FAMILIES = Object.freeze([
   "delay",
   "gain",
+  "phase",
   "polarity",
   "placement",
   "layout",
@@ -69,12 +70,11 @@ export const OPTIMISER_FUTURE_CAPABILITY_KEYS = Object.freeze([
 export const FUTURE_CAPABILITY_TITLE = "Future / not currently evaluated";
 
 /**
- * Whether ADI genuinely evaluates this family in the current run.
- * The crossover-region switch is read from its own authority, never restated
- * here, so the tested table can never claim a capability the model lacks.
+ * Whether the tested table states this lever. A lever that is stated but not
+ * evaluated (phase / crossover-region) still gets its own row, carrying the
+ * "Not yet supported" statement and the reason.
  */
 export function isLiveFamily(key) {
-  if (key === "phase") return CROSSOVER_REGION_PHASE_SUPPORTED === true;
   if (key === "subwoofer_option") return false;
   return OPTIMISER_LIVE_FAMILIES.includes(key);
 }

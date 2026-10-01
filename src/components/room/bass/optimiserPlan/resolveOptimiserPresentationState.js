@@ -198,6 +198,11 @@ export function resolveOptimiserPresentationState({
       evidence,
       showPlan: true,
       showApply: true,
+      // The run control stays available after a result: the designer can always
+      // re-evaluate the design. Apply and re-run are different actions, and the
+      // run control is never a second Apply.
+      action: OPTIMISER_PRESENTATION_ACTION.RERUN,
+      actionLabel: OPTIMISER_PRESENTATION_ACTION.RERUN,
     });
   }
 
@@ -206,6 +211,8 @@ export function resolveOptimiserPresentationState({
       message: actionable.summary || "An evaluated change is available for this design.",
       explanation: actionable.reason || null,
       showApply: true,
+      action: OPTIMISER_PRESENTATION_ACTION.RERUN,
+      actionLabel: OPTIMISER_PRESENTATION_ACTION.RERUN,
     });
   }
 

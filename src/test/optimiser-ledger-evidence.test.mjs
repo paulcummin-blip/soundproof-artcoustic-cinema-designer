@@ -5,9 +5,12 @@
 //
 // What is verified here:
 //   • a family the run evaluated is never shown as "Not evaluated"
-//   • delay, gain and placement state the run's real outcome
-//   • phase and the subwoofer option are never tested-table rows: a capability
-//     the optimiser does not evaluate is stated once, for Engineer details
+//   • delay, gain and placement state the run's real outcome, in the mandated
+//     vocabulary
+//   • phase states the crossover-region capability limit in its own row, and the
+//     subwoofer option is stated once, for Engineer details
+//   • a supported lever this saved run kept no evidence of searching reads "Not
+//     yet run" with the re-run action — never "not yet supported"
 //   • polarity distinguishes combined-only evidence from a standalone result
 //   • layout is reported as checked in the placement search
 //   • seating states the last-resort policy that governs it, not "Not evaluated"
@@ -277,19 +280,22 @@ test('a lever that worsens the result is rejected, in whole numbers', () => {
   assert.ok(!BANNED_COPY.test(`${row.status} ${row.outcome}`), 'no banned copy');
 });
 
-test('phase is never a tested-table row, and the run evidence still says why', () => {
+test('phase states the crossover-region limit in its own row', () => {
   const planView = terminalPlanView();
-  // Not a row: the designer must never read phase as something ADI tested.
-  assert.equal(rowFor(summaryFor(planView), 'Phase'), null,
-    'phase is not in the default tested table');
+  // Phase IS a row — third, where the lever sits — stating the capability the
+  // model does not have, with the reason. It is never shown as tested.
+  const row = rowFor(summaryFor(planView), 'Phase');
+  assert.ok(row, 'phase is a stated row of the default tested table');
+  assert.equal(row.status, ADI_ROW_STATUS.NOT_YET_SUPPORTED);
+  assert.equal(row.outcome, ADI_ROW_OUTCOME.PHASE_NOT_MODELLED);
+  assert.match(row.outcome, /crossover-region model not available/i);
   assert.equal(rowFor(summaryFor(planView), 'Sub option'), null,
     'the subwoofer option is not in the default tested table');
 
-  // The evidence is still recorded, so Engineer details can state the truth.
+  // The run evidence still records the family, so Engineer details can state it.
   const phase = (planView.run?.families || []).find((entry) => entry.family === 'phase');
   assert.ok(phase, 'the run evidence records the phase family');
   assert.equal(phase.tested, false, 'phase is not recorded as tested');
-  assert.match(phase.reason, /does not model crossover-region phase between the main speakers and subwoofers/);
 });
 
 test('polarity states where its value came from', () => {
@@ -310,22 +316,24 @@ test('layout is reported as checked inside the placement search', () => {
 
 test('seating states the policy that governs it', () => {
   const seating = rowFor(summaryFor(terminalPlanView()), 'Seating');
-  assert.equal(seating.status, ADI_ROW_STATUS.NOT_YET_SUPPORTED_IN_RUN);
+  assert.equal(seating.status, ADI_ROW_STATUS.LAST_RESORT);
   assert.equal(seating.outcome, ADI_ROW_OUTCOME.SEATING_LAST_RESORT);
 });
 
 test('no tested-table row claims a capability the optimiser does not have', () => {
   const summary = summaryFor(terminalPlanView());
-  assert.ok(
-    !summary.rows.some((row) => /not yet supported|not currently/i
-      .test(`${row.status} ${row.outcome || ''}`)),
-    'no row states an unsupported capability in the designer view',
-  );
-  // The capabilities are stated, once, for the collapsed Engineer details.
-  assert.deepEqual(summary.futureCapability.map((note) => note.key), ['phase', 'subwoofer_option']);
+  const unsupported = summary.rows.filter((row) => /not yet supported/i
+    .test(`${row.status} ${row.outcome || ''}`));
+  // Only the crossover region states a capability the model lacks, and only in
+  // its own row — no lever the optimiser searches may read that way.
+  assert.deepEqual(unsupported.map((row) => row.key), ['phase']);
+  // No supported lever is described as "not yet supported in this run".
+  summary.rows.forEach((row) => {
+    assert.ok(!/not yet supported in this run/i.test(`${row.status} ${row.outcome || ''}`));
+  });
+  // The one capability that is not a table lever is stated for Engineer details.
+  assert.deepEqual(summary.futureCapability.map((note) => note.key), ['subwoofer_option']);
   assert.match(summary.futureCapability[0].statement,
-    /not currently evaluated\. This requires modelling main speaker and subwoofer summation through the crossover region\./);
-  assert.match(summary.futureCapability[1].statement,
     /not currently part of this optimisation run\./);
 });
 

@@ -2,10 +2,10 @@
 // ---------------------------------------------------------------------------
 // The running-state contract of the Bass Optimisation card.
 //
-// Product rule: while a run is in progress every family shown is Waiting,
-// Testing or Tested — never "Not tested", and never the previous run's rows.
-// A capability the optimiser does not evaluate is not a row at all: it is stated
-// once as a future capability, in the collapsed Engineer details.
+// Product rule: while a run is in progress every lever in the fixed order is
+// Waiting, Testing or Tested — never "Not tested", and never the previous run's
+// rows. A lever the model does not evaluate (phase / crossover region) states
+// exactly that, with the reason, in its own row.
 // ---------------------------------------------------------------------------
 
 import { describe, it, expect } from "vitest";
@@ -25,15 +25,16 @@ import {
 } from "@/components/room/bass/optimiserPlan/optimiserLiveFamilies.js";
 import { OPTIMISER_LEVER_SEQUENCE } from "@/components/room/bass/optimiserPlan/optimiserLeverOrder.js";
 
-// The tested table while a run is in progress: the families ADI evaluates, in
-// the fixed least-intrusive order, then the absorption advice row.
+// The tested table while a run is in progress: every lever in the fixed
+// least-intrusive order, then the absorption advice row.
 const REQUIRED_ORDER = [
-  "Delay", "Gain", "Polarity", "Placement",
+  "Delay", "Gain", "Phase", "Polarity", "Placement",
   "Layout", "Seating", "Low-frequency absorption",
 ];
 
-// Never a tested-table row: the optimiser does not evaluate these.
-const NEVER_A_ROW = ["Phase", "Sub option", "Subwoofer option"];
+// The subwoofer model / quantity decision is never a table row: it is stated in
+// the collapsed Engineer details.
+const NEVER_A_ROW = ["Sub option", "Subwoofer option"];
 
 const labels = (rows) => rows.map((row) => row.label);
 const statusOf = (rows, label) => rows.find((row) => row.label === label)?.status;
@@ -47,7 +48,7 @@ describe("running state — the live tested rows", () => {
 
   it("exports the same keys, in order", () => {
     expect(ADI_LIVE_ROW_KEYS).toEqual([
-      "delay", "gain", "polarity", "placement",
+      "delay", "gain", "phase", "polarity", "placement",
       "layout", "seating", "absorption",
     ]);
   });
@@ -58,24 +59,24 @@ describe("running state — the live tested rows", () => {
       for (const label of NEVER_A_ROW) {
         expect(labels(rows)).not.toContain(label);
       }
-      expect(rows.map((row) => row.key)).not.toContain("phase");
       expect(rows.map((row) => row.key)).not.toContain("subwoofer_option");
-      // Nothing in the tested table claims an unsupported capability.
-      for (const row of rows) {
-        expect(`${row.status} ${row.outcome || ""}`).not.toMatch(/not yet supported|not currently/i);
-      }
+      // Phase is stated as not evaluated, with the reason — and it is the ONLY
+      // row that may say so while a run is in progress.
+      const unsupported = rows.filter(
+        (row) => /not yet supported/i.test(`${row.status} ${row.outcome || ""}`),
+      );
+      expect(unsupported.map((row) => row.key)).toEqual(["phase"]);
+      expect(unsupported[0].outcome).toMatch(/crossover-region model not available/i);
     }
   });
 
-  it("keeps the future capabilities stated, for Engineer details", () => {
+  it("keeps the outstanding capability stated, for Engineer details", () => {
     const notes = buildFutureCapabilityNotes();
-    expect(notes.map((note) => note.key)).toEqual(["phase", "subwoofer_option"]);
+    // Phase is a stated row of its own, so it is never repeated here.
+    expect(notes.map((note) => note.key)).toEqual(["subwoofer_option"]);
     expect(notes[0].statement)
-      .toBe(OPTIMISER_FUTURE_CAPABILITY.phase.statement);
-    expect(notes[1].statement)
       .toBe(OPTIMISER_FUTURE_CAPABILITY.subwoofer_option.statement);
-    expect(notes[0].statement).toMatch(/not currently evaluated/);
-    expect(notes[1].statement).toMatch(/not currently part of this optimisation run/);
+    expect(notes[0].statement).toMatch(/not currently part of this optimisation run/);
   });
 
   it("shows waiting before any search has been reached", () => {
@@ -139,11 +140,14 @@ describe("running state — the live tested rows", () => {
     expect(statusOf(rows, "Seating")).toBe(ADI_LIVE_STATUS.TESTING);
   });
 
-  it("keeps phase third in the order, for the day the crossover region is modelled", () => {
-    // The order still reserves position 3 for phase, so the capability joins the
-    // tested table in the right place when it goes live — it is simply not
-    // claimed while the model cannot evaluate it.
+  it("states phase third, where the lever sits in the order", () => {
+    // Phase is a row of its own, in position 3, stating what the model does and
+    // does not evaluate.
     expect(OPTIMISER_LEVER_SEQUENCE.indexOf("phase")).toBe(2);
+    const rows = buildLiveFamilyRows({ status: "running", phase: "reviewing" });
+    expect(labels(rows).indexOf("Phase")).toBe(2);
+    expect(statusOf(rows, "Phase")).toBe(ADI_LIVE_STATUS.NOT_YET_SUPPORTED);
+    expect(outcomeOf(rows, "Phase")).toMatch(/crossover-region model not available/i);
   });
 
   it("never shows a vague state or an Apply action while running", () => {
@@ -151,8 +155,16 @@ describe("running state — the live tested rows", () => {
       status: "running", phase: "calibrating", phaseLabel: "Testing grouped phase settings",
     });
     for (const row of rows) {
-      expect(row.status).not.toMatch(/Not tested|Not evaluated|Not available/);
+      expect(row.status).not.toMatch(/Not tested|Not available/);
       expect(row.action).toBeNull();
+      // Every row is either working or stated as not evaluated — never a lever
+      // the engine does not have.
+      expect([
+        ADI_LIVE_STATUS.WAITING,
+        ADI_LIVE_STATUS.TESTING,
+        ADI_LIVE_STATUS.TESTED,
+        ADI_LIVE_STATUS.NOT_YET_SUPPORTED,
+      ]).toContain(row.status);
     }
   });
 
@@ -223,15 +235,18 @@ describe("post-run vocabulary has no vague states", () => {
       ADI_ROW_STATUS.RECOMMENDED,
       ADI_ROW_STATUS.TRADE_OFF,
       ADI_ROW_STATUS.REJECTED,
+      ADI_ROW_STATUS.COMBINED_ONLY,
+      ADI_ROW_STATUS.LAST_RESORT,
       ADI_ROW_STATUS.NOT_YET_SUPPORTED,
-      ADI_ROW_STATUS.NOT_YET_SUPPORTED_IN_RUN,
+      ADI_ROW_STATUS.NOT_RUN,
     ];
     expect(allowed).toEqual([
-      "Tested", "Recommended", "Trade-off", "Rejected",
-      "Not yet supported", "Not yet supported in this run",
+      "Tested", "Recommended", "Trade-off", "Rejected", "Combined only",
+      "Last resort", "Not yet supported", "Not yet run",
     ]);
     expect(Object.values(ADI_ROW_STATUS)).not.toContain("Not tested");
-    expect(Object.values(ADI_ROW_STATUS)).not.toContain("Not evaluated");
     expect(Object.values(ADI_ROW_STATUS)).not.toContain("Not available");
+    // The banned wording: a supported lever is never described this way.
+    expect(Object.values(ADI_ROW_STATUS)).not.toContain("Not yet supported in this run");
   });
 });

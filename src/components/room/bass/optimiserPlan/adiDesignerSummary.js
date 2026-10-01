@@ -68,13 +68,13 @@ const LABEL_OVERRIDE = Object.freeze({
 });
 
 /**
- * The levers ADI reports on, always in the fixed least-intrusive order, and only
- * the ones it genuinely evaluates in the current run: delay, gain, polarity,
- * placement, layout, seating. Low-frequency absorption advice is appended as the
- * final step afterwards.
+ * The levers ADI reports on, always in the fixed least-intrusive order: delay,
+ * gain, phase, polarity, placement, layout, seating. Low-frequency absorption
+ * advice is appended as the final step afterwards.
  *
- * A capability that is not live yet is never a row here: it is stated once, as a
- * future capability, in the collapsed Engineer details.
+ * Every lever is a row. One the model does not evaluate (phase / crossover
+ * region) states that as "Not yet supported" with the reason; the subwoofer
+ * model / quantity decision is stated in Engineer details instead.
  */
 const leverOrder = () => (
   Array.isArray(OPTIMISER_FAMILY_SEQUENCE) && OPTIMISER_FAMILY_SEQUENCE.length
@@ -185,12 +185,13 @@ function seatingRecommendationDetail({ row, baseline = null, currentP20 = null }
 }
 
 /**
- * The "What ADI tested" rows, in the fixed order, restricted to the families ADI
- * evaluates. Every live lever is always present: an unevaluated one states why
- * in one phrase. A capability the model does not have is never a row here.
+ * The "What ADI tested" rows, in the fixed order. Every lever is always present:
+ * an evaluated lever states its own outcome, and one the model cannot evaluate
+ * states that with its reason. Nothing reads as an evaluated lever unless the
+ * run's own evidence says it was evaluated.
  *
  * While a run is in progress the rows come from the engine's own live progress
- * (`liveRows`): every family is Waiting, Testing, Tested, or clearly marked as a
+ * (`liveRows`): every lever is Waiting, Testing, Tested, or clearly marked as a
  * capability the model does not have. Nothing is read from the previous run's
  * evidence during a run, so the card can never look idle while ADI is working.
  */
@@ -271,18 +272,20 @@ export function buildTestedOptionRows(
         };
       }
       // A different subwoofer model or quantity is a design decision, not a
-      // search — it is never silently omitted.
+      // search — it is never silently omitted, and it never claims the lever was
+      // tested.
       if (/sub/i.test(key)) {
         return {
           key,
           label,
-          status: ADI_ROW_STATUS.NOT_YET_SUPPORTED_IN_RUN,
+          status: ADI_ROW_STATUS.NOT_YET_SUPPORTED,
           outcome: ADI_ROW_OUTCOME.COMPARE_SEPARATELY,
           action: null,
         };
       }
-      // An alternative layout is searched inside the placement pool. When the
-      // placement search ran, it found no better layout.
+      // An alternative layout is checked through the placement search. When that
+      // search ran, layout reports its outcome; when it did not, layout says so
+      // without ever claiming the capability is missing.
       if (/layout/i.test(key)) {
         const placement = findLeverRow(planView, "placement");
         const placementTested = placement?.evaluated === true
@@ -290,19 +293,18 @@ export function buildTestedOptionRows(
         return {
           key,
           label,
-          status: ADI_ROW_STATUS.NOT_YET_SUPPORTED_IN_RUN,
+          status: placementTested ? ADI_ROW_STATUS.TESTED : ADI_ROW_STATUS.NOT_RUN,
           outcome: placementTested ? ADI_ROW_OUTCOME.NO_BETTER_LAYOUT : ADI_ROW_OUTCOME.NOT_SEARCHED_IN_RUN,
           action: null,
         };
       }
-      // The last family in the order is the last resort: it is searched only
-      // once the practical options are exhausted, so an untouched seating
-      // search is a policy state rather than a gap.
+      // Seating is the last resort: it is searched only once the practical
+      // options are exhausted, so an untouched seating search is a policy state.
       if (isLast) {
         return {
           key,
           label,
-          status: ADI_ROW_STATUS.NOT_YET_SUPPORTED_IN_RUN,
+          status: ADI_ROW_STATUS.LAST_RESORT,
           outcome: ADI_ROW_OUTCOME.SEATING_LAST_RESORT,
           action: null,
         };
@@ -313,7 +315,7 @@ export function buildTestedOptionRows(
       return {
         key,
         label,
-        status: ADI_ROW_STATUS.NOT_YET_SUPPORTED_IN_RUN,
+        status: ADI_ROW_STATUS.NOT_RUN,
         outcome: reason && !/baseline/i.test(reason) ? reason : ADI_ROW_OUTCOME.NOT_SEARCHED_IN_RUN,
         action: null,
       };
@@ -609,8 +611,10 @@ export function buildAdiDesignerSummary({
         ? `${ADI_STALE_COPY.PREVIOUS_LABEL} P20: ${baselineDeviation}`
         : null,
     absorption,
-    // Capabilities the optimiser does not evaluate yet, stated once for the
-    // collapsed Engineer details. Never a tested-table row.
+    // Capabilities the optimiser does not evaluate, stated once for the
+    // collapsed Engineer details. The levers themselves — including phase, whose
+    // crossover-region limitation is stated in its own row — are never repeated
+    // here.
     futureCapability: buildFutureCapabilityNotes(),
     attemptsWithoutGain,
     recommendation: recommendedLever

@@ -323,6 +323,10 @@ export function resolveAdiOptimiserJourney({
       message: withLead(ADI_OPTIMISER_COPY.PLAN_AVAILABLE),
       explanation: null,
       showPlan: true,
+      // A completed run keeps its ONE run control. The designer can always
+      // evaluate the design again — the button is never hidden after a result,
+      // and it is never duplicated.
+      action: ADI_OPTIMISER_ACTION.RERUN,
     });
   }
 

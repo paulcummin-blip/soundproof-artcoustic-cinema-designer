@@ -9,7 +9,13 @@
 //
 // Vocabulary (fixed):
 //   Waiting · Testing · Tested · Recommended · Trade-off · Rejected ·
-//   No useful improvement · Not yet supported
+//   No useful improvement · Combined only · Last resort · Not yet supported
+//
+// A lever the optimiser searches is NEVER described as unsupported. When a saved
+// run kept no evidence that it searched one, the row states that as a run-scope
+// fact ("Not evaluated" plus the one action that produces the evidence). "Not
+// yet supported" is reserved for a capability the model genuinely lacks, and it
+// always carries the reason.
 //
 // The evidence is the per-family ledger the completed run already wrote
 // (run.families — see optimiserRunFamilies.js). This module reads it, applies
@@ -53,10 +59,18 @@ export const ADI_ROW_STATUS = Object.freeze({
   RECOMMENDED: "Recommended",
   TRADE_OFF: "Trade-off",
   REJECTED: "Rejected",
-  /** The engine genuinely cannot evaluate this family. */
+  /** The engine genuinely cannot evaluate this family; its own reason is stated. */
   NOT_YET_SUPPORTED: "Not yet supported",
-  /** Supported, but not evaluated by THIS run — said plainly, never as "Not tested". */
-  NOT_YET_SUPPORTED_IN_RUN: "Not yet supported in this run",
+  /**
+   * Supported, but this saved run kept no evidence that it searched it — stated
+   * as a run-scope fact with the one action that produces the evidence. This is
+   * never a capability claim: the lever is one the optimiser does search.
+   */
+  NOT_RUN: "Not yet run",
+  /** Evaluated inside the combined candidate only — no standalone result exists. */
+  COMBINED_ONLY: "Combined only",
+  /** Seating's policy state: searched only once the practical options are exhausted. */
+  LAST_RESORT: "Last resort",
   APPLIED: "Applied",
 });
 
@@ -73,7 +87,10 @@ export const ADI_ROW_OUTCOME = Object.freeze({
    */
   NO_USEFUL_BELOW_THRESHOLD:
     "No useful improvement — improvement below the 1 dB action threshold",
-  NO_SAFE_STANDALONE: "No safe standalone result",
+  NO_SAFE_STANDALONE: "No safe standalone improvement",
+  /** The fixed "Combined only" outcome: evaluated, but never on its own. */
+  COMBINED_ONLY:
+    "Evaluated inside the combined candidate — no standalone polarity change to apply",
   /** The fixed "Rejected" outcome. The wording comes from the verdict authority. */
   WORSENS: "Rejected — worsens seat-to-seat consistency",
   /** The fixed "Trade-off" outcome. Never carries an Apply action. */
@@ -102,15 +119,14 @@ export const ADI_ROW_OUTCOME = Object.freeze({
   THEORETICAL_PLACEMENT: "Theoretical option — not offered as default placement.",
   NO_BETTER_LAYOUT: "No better layout found",
   /** Stated for the crossover region — a capability the model does not have. */
-  PHASE_NOT_MODELLED:
-    "Crossover-region phase between the main speakers and subwoofers is not currently modelled",
+  PHASE_NOT_MODELLED: "Crossover-region model not available",
   /** Stated for the subwoofer model / quantity family. */
   COMPARE_SEPARATELY: "Compare subwoofer models separately",
-  /** Stated for a family the run did not search. */
-  NOT_SEARCHED_IN_RUN: "This search did not run in this evaluation",
+  /** Stated for a supported lever this saved run kept no evidence of searching. */
+  NOT_SEARCHED_IN_RUN: "Re-run the Bass Optimiser to evaluate this lever",
   /** Stated for seating the run did not need to search. */
   SEATING_LAST_RESORT:
-    "Seating changes are a last resort, tried only when the practical options cannot resolve the issue",
+    "Tried only when the practical options cannot resolve the issue",
   /** Stated for a polarity / phase evaluation with no standalone result. */
   NO_STANDALONE_SEARCH: "No standalone search — evaluated inside the combined candidate",
   EVALUATION_FAILED: "The evaluation did not complete",
@@ -175,10 +191,10 @@ function wasTested(entry) {
     || entry?.status === OPTIMISER_FAMILY_STATUS.INCOMPLETE;
 }
 
-/** Supported, but this run did not search it. */
-function notSearchedInRun(outcome = null) {
+/** Supported, but this saved run kept no evidence that it searched it. */
+function notRun(outcome = null) {
   return {
-    status: ADI_ROW_STATUS.NOT_YET_SUPPORTED_IN_RUN,
+    status: ADI_ROW_STATUS.NOT_RUN,
     outcome: outcome || ADI_ROW_OUTCOME.NOT_SEARCHED_IN_RUN,
   };
 }
@@ -291,30 +307,34 @@ function rowFor(key, entry, families, baseline) {
       };
     }
     const evaluated = tested || Number(entry?.candidatesEvaluated) > 0;
-    // Polarity is a LIVE lever: the engine tests it inside the grouped
-    // phase/polarity search and the combined candidate. It is therefore never
-    // stated as a capability the optimiser lacks — only as an evaluation with no
-    // standalone result of its own.
+    // Polarity is a supported lever: the engine tests it inside the grouped
+    // phase/polarity search and the combined candidate, so it never reads as a
+    // capability the optimiser lacks. When the run retained a combined attempt,
+    // the row says exactly that — the fixed "Combined only" state.
+    if (entry?.bestAttempt) {
+      return { status: ADI_ROW_STATUS.COMBINED_ONLY, outcome: ADI_ROW_OUTCOME.COMBINED_ONLY };
+    }
     return evaluated
       ? { status: ADI_ROW_STATUS.TESTED, outcome: ADI_ROW_OUTCOME.NO_SAFE_STANDALONE }
       : { status: ADI_ROW_STATUS.TESTED, outcome: ADI_ROW_OUTCOME.NO_STANDALONE_SEARCH };
   }
 
-  // ── Subwoofer option ── never a searched lever: a design decision.
+  // ── Subwoofer option ── never a searched lever: a design decision. Stated as
+  // a capability this optimiser does not cover, with the reason.
   if (key === "subwoofer_option") {
     return {
-      status: ADI_ROW_STATUS.NOT_YET_SUPPORTED_IN_RUN,
+      status: ADI_ROW_STATUS.NOT_YET_SUPPORTED,
       outcome: ADI_ROW_OUTCOME.COMPARE_SEPARATELY,
     };
   }
 
   // ── Layout ── searched inside the placement pool, so it reports what that
-  // search found. When the placement search itself never ran, that is said.
+  // search found. When the placement search itself never ran, that is stated.
   if (key === "layout") {
     if (wasTested(placementEntry(families))) {
       return { status: ADI_ROW_STATUS.TESTED, outcome: ADI_ROW_OUTCOME.NO_BETTER_LAYOUT };
     }
-    return notSearchedInRun(familyReason(entry));
+    return notRun(familyReason(entry));
   }
 
   // ── Gain ── a relative level trim between subwoofer groups. Wherever the
@@ -329,12 +349,12 @@ function rowFor(key, entry, families, baseline) {
         outcome: familyReason(entry) || ADI_ROW_OUTCOME.GAIN_NOT_ADJUSTABLE,
       };
     }
-    // Gain IS a live lever wherever the groups can be trimmed: a saved run that
-    // kept no gain attempt is a statement about THAT RUN, never about the
-    // optimiser's capability.
+    // Gain IS a supported lever wherever the groups can be trimmed: a saved run
+    // that kept no gain attempt is a statement about THAT RUN, and is worded as
+    // one — never as a capability the optimiser lacks.
     if (entry?.gainAdjustable === true) {
       return {
-        status: ADI_ROW_STATUS.NOT_YET_SUPPORTED_IN_RUN,
+        status: ADI_ROW_STATUS.NOT_RUN,
         outcome: ADI_ROW_OUTCOME.GAIN_NOT_EVALUATED,
         actionText: ADI_ROW_ACTION.RERUN_ADI,
       };
@@ -343,7 +363,7 @@ function rowFor(key, entry, families, baseline) {
     // reason when it kept one, otherwise the one action that answers it.
     const kept = familyReason(entry);
     return {
-      status: ADI_ROW_STATUS.NOT_YET_SUPPORTED_IN_RUN,
+      status: ADI_ROW_STATUS.NOT_RUN,
       outcome: kept || ADI_ROW_OUTCOME.GAIN_NOT_EVALUATED,
       actionText: kept ? null : ADI_ROW_ACTION.RERUN_ADI,
     };
@@ -352,7 +372,7 @@ function rowFor(key, entry, families, baseline) {
   // ── Seating ── the last resort, tried only once the practical options are
   // exhausted, so an untouched seating search is a policy state, not a gap.
   if (key === "seating" && !tested) {
-    return notSearchedInRun(ADI_ROW_OUTCOME.SEATING_LAST_RESORT);
+    return { status: ADI_ROW_STATUS.LAST_RESORT, outcome: ADI_ROW_OUTCOME.SEATING_LAST_RESORT };
   }
 
   if (status === OPTIMISER_FAMILY_STATUS.FAILED || status === OPTIMISER_FAMILY_STATUS.INCOMPLETE) {
@@ -362,7 +382,7 @@ function rowFor(key, entry, families, baseline) {
     };
   }
 
-  if (!tested) return notSearchedInRun(familyReason(entry));
+  if (!tested) return notRun(familyReason(entry));
 
   return testedOutcome(entry, baseline);
 }

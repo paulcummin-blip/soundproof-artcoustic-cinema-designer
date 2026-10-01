@@ -152,6 +152,20 @@ function confirmedCount(stage) {
   return num(counts.confirmed);
 }
 
+/**
+ * Did this stage's search actually run? Read from the engine's own record of it:
+ * any recorded operation counter, a retained attempt, a winning candidate or a
+ * recorded best score. Never inferred from another family's outcome, and never
+ * from a value the run did not produce.
+ */
+function stageRan(stage) {
+  if (!stage) return false;
+  if (stage.attempted === true) return true;
+  if (stage.winningCandidate || stage.bestAttempt || stage.bestScoreAfter) return true;
+  const counts = stage.candidatesEvaluated || {};
+  return Object.values(counts).some((value) => num(value) > 0);
+}
+
 /** Build one family record. */
 function family({
   key, status, candidatesEvaluated = null, bestAttempt = null, reason = null, accepted = false, current = null,
@@ -206,11 +220,13 @@ function leverFamily({
   const stage = stageByName(diagnostics, stageName);
   const issue = issueFor(selection, issueStages);
   const confirmed = confirmedCount(stage);
-  // A family is "evaluated" when it confirmed a candidate, produced a winner, or
-  // — for gain — when its own sweep ran on a design whose groups are adjustable.
-  // A swept family is never reported as one the engine did not search.
-  const attempted = (confirmed != null ? confirmed > 0 : !!stage?.winningCandidate)
-    || (searched && stage?.gainAdjustable === true);
+  // A family is "evaluated" when the stage it belongs to actually RAN: the
+  // engine records that search through its operation counters, a retained
+  // attempt, a winning candidate or a recorded best score. A search that ran and
+  // confirmed no candidate is a TESTED lever with no useful improvement — it is
+  // never reported as a lever the engine does not have. A swept gain group
+  // counts for the same reason: the sweep ran on a design that can be trimmed.
+  const attempted = stageRan(stage) || (searched && stage?.gainAdjustable === true);
   const best = bestFromStage(stage);
   // Whether this design's groups can be trimmed at all, carried onto the record
   // so the card states the real reason instead of a generic one.
