@@ -68,7 +68,10 @@ import {
 import { runEngineeringDecisionModel } from "@/components/adi";
 import { buildAdiBassEvidence } from "@/components/adi/adiBassEvidenceBuilder";
 import { buildOptimiserPlan } from "@/components/room/bass/optimiserPlan/buildOptimiserPlan.js";
-import { buildOptimiserRunEvidence } from "@/components/room/bass/optimiserPlan/buildOptimiserRunEvidence.js";
+import {
+  buildActionableOptimiserRunSummary,
+  buildOptimiserRunEvidence,
+} from "@/components/room/bass/optimiserPlan/buildOptimiserRunEvidence.js";
 import {
   getOptimiserPlanAuthority,
   setOptimiserPlanAuthority,
@@ -416,8 +419,17 @@ export default function OptimiseAndCalculate({
           instances: subInstancesRef.current || [],
           leverDecisions: getOptimiserPlanAuthority(projectId, versionId)?.leverDecisions || {},
         });
-        if (optimiserPlan) {
-          setOptimiserPlanAuthority(projectId, versionId, optimiserPlan);
+        const persistedPlan = optimiserPlan
+          ? {
+            ...optimiserPlan,
+            run: buildActionableOptimiserRunSummary({
+              selection: result.selection,
+              diagnostics: result.optimisationDiagnostics || null,
+            }),
+          }
+          : null;
+        if (persistedPlan) {
+          setOptimiserPlanAuthority(projectId, versionId, persistedPlan);
         } else {
           // A run that produced no actionable plan keeps its terminal evidence:
           // the same slot holds what the run evaluated, so the card states the
@@ -441,7 +453,7 @@ export default function OptimiseAndCalculate({
 
         const recommendationForPublication = {
           ...result.recommendation,
-          optimiserPlan: optimiserPlan || undefined,
+          optimiserPlan: persistedPlan || undefined,
           publishedAdiDecision: decision?.recommendation ? {
             outcome: decision.outcome,
             intent: decision.intent,
