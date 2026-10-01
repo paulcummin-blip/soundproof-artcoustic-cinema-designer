@@ -27,6 +27,7 @@ import {
   resolveReportActionRows,
 } from '@/components/proposal/sourceAuthority/proposalReportActions';
 import { PROPOSAL_REPORT_GATE_READY_COPY } from '@/components/proposal/sourceAuthority/proposalReportReadinessGate';
+import { withProposalContext } from '@/components/report/proposalReportContext';
 import { REPORT_FONT_HEADING, REPORT_FONT_BODY } from '@/components/report/typography/reportTypography';
 
 const STATE_COLOUR = {
@@ -68,7 +69,7 @@ function ReportAction({ row, onRequest }) {
 
   return (
     <a
-      href={row.actionUrl}
+      href={withProposalContext(row.actionUrl)}
       onClick={() => onRequest(row.key)}
       className={`inline-block mt-2.5 px-4 py-2 text-[11px] uppercase tracking-[0.14em] transition-colors ${
         quiet

@@ -22,6 +22,7 @@ import {
   PROPOSAL_REPORT_GATE_READY_COPY,
 } from '@/components/proposal/sourceAuthority/proposalReportReadinessGate';
 import { PROPOSAL_REPORT_UI_STATE } from '@/components/proposal/sourceAuthority/proposalReportActions';
+import { withProposalContext } from '@/components/report/proposalReportContext';
 
 const STATE_COLOUR = {
   [PROPOSAL_REPORT_UI_STATE.CURRENT]: '#213428',
@@ -59,7 +60,7 @@ function ReportAction({ row }) {
 
   return (
     <a
-      href={row.actionUrl}
+      href={withProposalContext(row.actionUrl)}
       className={`inline-block mt-2.5 px-4 py-2 text-[11px] uppercase tracking-[0.14em] transition-colors ${
         quiet
           ? 'border border-[#DCDBD6] text-[#3E4349] hover:border-[#213428] hover:text-[#213428]'

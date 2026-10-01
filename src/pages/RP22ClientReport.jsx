@@ -52,6 +52,8 @@ import { LOGO_URL } from "@/components/report/ReportCover";
 import { Button } from "@/components/ui/button";
 import { ArrowLeft, FileText, Download } from "lucide-react";
 import ReportStatePanel from "@/components/report/ReportStatePanel";
+import BackToProposalLink from "@/components/report/BackToProposalLink";
+import { readProposalContext, withProposalContext } from "@/components/report/proposalReportContext";
 import { deriveReportReadiness, REPORT_STATE } from "@/components/report/reportReadinessAuthority";
 import { useAppState } from "@/components/AppStateProvider";
 import { resolveSeatPriority } from "@/components/utils/seatPriorityAuthority";
@@ -845,9 +847,16 @@ export default function RP22ClientReport() {
     navigate(`/RoomDesigner?projectId=${projectId}`);
   };
 
+  // The Visual and Technical Reports are one pairing: moving between them must
+  // not drop the proposal context, or the way back would disappear mid-report.
+  const currentProposalContext = () => readProposalContext(searchParams);
+
   const handleTechnicalReport = () => {
     if (!projectId) return;
-    navigate(`/DesignReview?projectId=${projectId}`);
+    navigate(withProposalContext(
+      `/DesignReview?projectId=${projectId}`,
+      currentProposalContext()
+    ));
   };
 
   const handleOpenBassSimulation = () => {
@@ -897,6 +906,8 @@ export default function RP22ClientReport() {
           )}
         </div>
         <div style={{ display: "flex", gap: 12 }}>
+          {/* Proposal context only — absent when the report was opened from the project flow */}
+          <BackToProposalLink className="client-report-screen-only" />
           <Button
             type="button"
             onClick={handleBackToProject}

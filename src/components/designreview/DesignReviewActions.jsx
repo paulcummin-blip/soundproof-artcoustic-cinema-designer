@@ -17,6 +17,8 @@ import { useNavigate } from "react-router-dom";
 import { useAppState } from "@/components/AppStateProvider";
 import { ArrowLeft, Eye, FileText, Download } from "lucide-react";
 import { generateSVG, generateDXF, downloadTextFile } from "@/components/utils/cadExport";
+import BackToProposalLink from "@/components/report/BackToProposalLink";
+import { readProposalContext, withProposalContext } from "@/components/report/proposalReportContext";
 
 const FONT = "'Futura PT Light', 'Century Gothic', sans-serif";
 
@@ -45,15 +47,27 @@ export default function DesignReviewActions({ projectId }) {
     navigate(`/RoomDesigner?projectId=${projectId}`);
   };
 
+  // The Design Review is the technical report surface reached from the Visual
+  // Report, so the proposal context is carried on through it rather than dropped.
+  const currentProposalContext = () => readProposalContext(
+    typeof window !== "undefined" ? window.location.search : ""
+  );
+
   const handleVisualReport = () => {
     if (!projectId) return;
-    navigate(`/RP22ClientReport?projectId=${projectId}`);
+    navigate(withProposalContext(
+      `/RP22ClientReport?projectId=${projectId}`,
+      currentProposalContext()
+    ));
   };
 
   const handleTechnicalPdf = () => {
     if (!projectId) return;
     // RP22Report owns the full print/capture pipeline — autoPrint triggers it
-    navigate(`/RP22Report?projectId=${projectId}&autoPrint=1`);
+    navigate(withProposalContext(
+      `/RP22Report?projectId=${projectId}&autoPrint=1`,
+      currentProposalContext()
+    ));
   };
 
   // Gather CAD overlay data from live appState
@@ -91,6 +105,8 @@ export default function DesignReviewActions({ projectId }) {
 
   return (
     <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+      {/* Proposal context only — absent when the review was opened from the project flow */}
+      <BackToProposalLink />
       <button
         onClick={handleBackToProject}
         disabled={!projectId}

@@ -245,7 +245,9 @@ test('the readiness block states both reports, the message and the actions', () 
   expect(GATE_UI).toMatch(/gate\.message/);
   expect(GATE_UI).toMatch(/gate\.detail/);
   expect(GATE_UI).toMatch(/row\.actionLabel/);
-  expect(GATE_UI).toMatch(/href=\{row\.actionUrl\}/);
+  // The action opens the report from the proposal workflow, so the link carries
+  // the proposal context that gives the report its way back.
+  expect(GATE_UI).toMatch(/href=\{withProposalContext\(row\.actionUrl\)\}/);
   expect(GATE_UI).toMatch(/role="alert"/);
 });
 

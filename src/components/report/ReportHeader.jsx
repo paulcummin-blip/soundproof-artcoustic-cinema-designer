@@ -6,6 +6,8 @@ import { ArrowLeft, FileText, Download, Eye } from 'lucide-react';
 import { generateSVG, generateDXF, downloadTextFile } from '../utils/cadExport';
 import { isCadExportReady } from './cadExportReadiness';
 import ReportCover from './ReportCover';
+import BackToProposalLink from './BackToProposalLink';
+import { readProposalContext, withProposalContext } from './proposalReportContext';
 
 export default function ReportHeader({
     app,
@@ -72,9 +74,18 @@ export default function ReportHeader({
         navigate(`/RoomDesigner?projectId=${activeProjectId}`);
     };
 
+    // The Visual and Technical Reports are one pairing: moving between them must
+    // not drop the proposal context, or the way back would disappear mid-report.
+    const currentProposalContext = () => readProposalContext(
+        typeof window !== 'undefined' ? window.location.search : ''
+    );
+
     const handleClientReport = () => {
         if (!activeProjectId) return;
-        navigate(`/RP22ClientReport?projectId=${activeProjectId}`);
+        navigate(withProposalContext(
+            `/RP22ClientReport?projectId=${activeProjectId}`,
+            currentProposalContext()
+        ));
     };
 
     const handleExportPDF = () => {
@@ -160,6 +171,8 @@ export default function ReportHeader({
         <ReportCover variant="screen" />
         <div className="flex items-start justify-end gap-4 mb-6">
             <div className="flex gap-3 items-center">
+                {/* Proposal context only — absent when the report was opened from the project flow */}
+                <BackToProposalLink />
                 <Button
                     type="button"
                     onClick={handleBackToProject}
