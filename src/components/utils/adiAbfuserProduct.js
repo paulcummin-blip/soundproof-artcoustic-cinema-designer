@@ -21,6 +21,10 @@ export const ABFUSER_PRODUCT = Object.freeze({
   category: "Acoustic Treatment",
   widthMm: 700,
   heightMm: 1100,
+  // Panel thickness, from the manufacturer's technical drawing (front view
+  // 700 × 1100 mm, left view 18 mm). Plan drawings use the real footprint:
+  // 700 mm along the wall × 18 mm off the wall. Never stretched to fill a zone.
+  depthMm: 18,
   // 0.70 m × 1.10 m
   areaM2: 0.77,
   // Octave-band absorption coefficient (manufacturer data)
