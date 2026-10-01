@@ -6,9 +6,14 @@
  * One client-facing section that presents what Artcoustic Design Intelligence
  * contributes to this design:
  *   - the project-specific strengths the design genuinely achieves
- *   - the main limiting factor and why it exists
- *   - the practical next action, the expected improvement, the remaining
- *     limitation and which further changes are lower value
+ *   - the primary limitation, the current result and the design interpretation
+ *   - the next step: use Bass Optimiser in the design workflow
+ *
+ * The Visual Report is a presentation of the selected design, so the block is
+ * deliberately short and carries no engineering recommendation. Detailed ADI
+ * guidance (best first change, expected improvement, lower-value changes)
+ * belongs to Bass Optimiser, Engineer details and the Technical Report, which
+ * all continue to render the full guidance block.
  *
  * Naming rule: "Artcoustic Design Intelligence" on first reference, "ADI"
  * afterwards. All engineering content is read from the published authority —
@@ -16,7 +21,7 @@
  */
 
 import React from "react";
-import AdiDesignGuidanceBlock from "@/components/adi/designGuidance/AdiDesignGuidanceBlock";
+import ClientAdiVisualSummary from "./ClientAdiVisualSummary";
 import { selectClientAdiStrengths } from "./selectClientAdiStrengths";
 import { getSeatGradeColors, isAssessedLevel } from "./visualReportSeatStyle";
 
@@ -40,6 +45,8 @@ export default function ClientAdiDesignSummary({
   seats,
   geometry,
   system,
+  projectId,
+  versionId,
   print,
   printPart,
 }) {
@@ -155,13 +162,15 @@ export default function ClientAdiDesignSummary({
             color: COLORS.label,
             marginBottom: 8,
           }}>
-            Examples, powered by Artcoustic Design Intelligence
+            Design intelligence summary
           </div>
-          <AdiDesignGuidanceBlock
+          <ClientAdiVisualSummary
             engineeringSummary={engineeringSummary}
             seats={seats}
             geometry={geometry}
             system={system}
+            projectId={projectId}
+            versionId={versionId}
           />
         </div>
       )}

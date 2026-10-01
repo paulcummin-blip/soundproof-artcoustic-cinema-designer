@@ -323,6 +323,8 @@ export default function RP22ClientReport() {
           seats={seatingPositions}
           geometry={reportGeometry}
           system={reportSystem}
+          projectId={projectId}
+          versionId={authority.versionId || null}
         />
       ),
       printData: { type: "adi-design-summary" },
