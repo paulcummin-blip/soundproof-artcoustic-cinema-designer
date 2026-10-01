@@ -177,6 +177,8 @@ export default function InlineRichTextEditor({ html, onSave, onDirty, onUnloadSa
           fontSize: '15px',
           lineHeight: 1.7,
           color: '#1B1A1A',
+          // A quiet outline marks manual edit mode. Inset, so nothing reflows.
+          ...(editable ? { boxShadow: 'inset 0 0 0 1px #DCDBD6', borderRadius: 6 } : {}),
         }}
       />
 

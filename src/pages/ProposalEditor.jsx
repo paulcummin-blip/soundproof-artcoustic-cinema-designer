@@ -9,6 +9,11 @@ import SectionToolbar from '@/components/proposal/SectionToolbar';
 import DealerNotesPanel from '@/components/proposal/DealerNotesPanel';
 import ProposalSectionNav from '@/components/proposal/ProposalSectionNav';
 import { isArchived, getRestoreStatus } from '@/components/proposal/proposalLifecycle';
+import {
+  MANUAL_EDIT_LABEL,
+  isManuallyEdited,
+  requiresRegenerationConfirm,
+} from '@/components/proposal/proposalManualEdit';
 import { resolveDealerBrandPresentation } from '@/components/account/defaultDealerBranding';
 import { resolveDealerIdentityName } from '@/components/account/dealerIdentityDisplay';
 import ProposalWorkspaceToolbar from '@/components/proposal/ProposalWorkspaceToolbar';
@@ -44,6 +49,8 @@ export default function ProposalEditor() {
   const [showClientBrief, setShowClientBrief] = useState(false);
   const [savingBrief, setSavingBrief] = useState(false);
   const [restoring, setRestoring] = useState(false);
+  const [editingSectionId, setEditingSectionId] = useState(null);
+  const [savingEdit, setSavingEdit] = useState(false);
   const [projectContext, setProjectContext] = useState({
     projectName: null,
     dealerName: null,
@@ -145,8 +152,20 @@ export default function ProposalEditor() {
   const unloadSavesRef = useRef({});
   const saveRequestIdRef = useRef(0);
   const savedIndicatorTimersRef = useRef({});
+  // Manual edit keeps its own draft and baseline per section: the draft is what
+  // Save commits, the baseline is what Cancel puts back.
+  const editDraftsRef = useRef({});
+  const editBaselinesRef = useRef({});
   const archivedRef = useRef(false);
   archivedRef.current = isArchived(proposal?.status);
+
+  // Manual edit applies to one section at a time. Selecting another section
+  // leaves edit mode and drops the draft, so Cancel semantics stay honest.
+  useEffect(() => {
+    setEditingSectionId(null);
+    editDraftsRef.current = {};
+    editBaselinesRef.current = {};
+  }, [activeSectionKey]);
 
   const handleDirty = useCallback((sectionId, html, editedAt) => {
     if (archivedRef.current) return;
@@ -367,11 +386,74 @@ export default function ProposalEditor() {
   // ── Section handlers ──
   const activeSection = sections.find((s) => s.section_key === activeSectionKey);
 
+  const handleSetLock = async (section, locked) => {
+    if (!section || archived) return;
+    const updated = { ...section, locked };
+    setSections((prev) => prev.map((s) => (s.id === section.id ? updated : s)));
+    await base44.entities.ProposalSection.update(section.id, { locked });
+  };
+
   const handleToggleLock = async () => {
     if (!activeSection || archived) return;
-    const updated = { ...activeSection, locked: !activeSection.locked };
-    setSections((prev) => prev.map((s) => (s.id === activeSection.id ? updated : s)));
-    await base44.entities.ProposalSection.update(activeSection.id, { locked: updated.locked });
+    await handleSetLock(activeSection, !activeSection.locked);
+  };
+
+  // ── Manual edit — one section, wording only, no AI ──
+  const handleStartEdit = async (section) => {
+    if (!section || archived) return;
+    if (section.locked) {
+      // Never silently unlock: the designer confirms first.
+      const confirmed = window.confirm(
+        'This section is locked. Unlock it to edit the wording by hand?'
+      );
+      if (!confirmed) return;
+      await handleSetLock(section, false);
+    }
+    editBaselinesRef.current[section.id] = section.body || '';
+    editDraftsRef.current[section.id] = null;
+    setShowNotes(false);
+    setEditingSectionId(section.id);
+  };
+
+  const handleEditDirty = useCallback((sectionId, html) => {
+    editDraftsRef.current[sectionId] = html;
+  }, []);
+
+  const handleSaveEdit = async (section) => {
+    if (!section || archived) return;
+    const html = editDraftsRef.current[section.id];
+    if (typeof html !== 'string' || html === section.body) {
+      // Nothing changed: leave edit mode without writing.
+      handleCancelEdit(section);
+      return;
+    }
+    setSavingEdit(true);
+    const editedAt = new Date().toISOString();
+    const outcome = await commitDraft(section.id, html, editedAt, false);
+    setSavingEdit(false);
+    if (!outcome?.ok) return;
+    setSections((prev) =>
+      prev.map((s) =>
+        s.id === section.id ? { ...s, body: html, last_user_edited_at: editedAt } : s
+      )
+    );
+    editDraftsRef.current[section.id] = null;
+    delete editBaselinesRef.current[section.id];
+    setEditingSectionId(null);
+  };
+
+  const handleCancelEdit = (section) => {
+    if (!section) return;
+    const baseline = editBaselinesRef.current[section.id];
+    editDraftsRef.current[section.id] = null;
+    delete editBaselinesRef.current[section.id];
+    setEditingSectionId(null);
+    if (typeof baseline === 'string') {
+      // Restore exactly the text that was there when editing began.
+      setSections((prev) =>
+        prev.map((s) => (s.id === section.id ? { ...s, body: baseline } : s))
+      );
+    }
   };
 
   const handleToggleVisibility = async (sectionId) => {
@@ -444,12 +526,15 @@ export default function ProposalEditor() {
   // ── Regeneration — uses Current Report + Client Brief + Dealer Notes + Authoritative data ──
   const handleRegenerate = async (action) => {
     if (!activeSection || !proposal || archived) return;
-    if (activeSection.locked) {
-      const confirmed = window.confirm(
-        'This section is locked. Regeneration will replace your manual edits. Continue?'
-      );
-      if (!confirmed) return;
+    if (requiresRegenerationConfirm(activeSection)) {
+      const message = activeSection.locked
+        ? 'This section is locked. Regeneration will replace your manual edits. Continue?'
+        : 'This section has a manual edit. Regeneration will replace it. Continue?';
+      if (!window.confirm(message)) return;
     }
+    // Regeneration replaces the stored copy, so manual edit mode ends first.
+    setEditingSectionId(null);
+    editDraftsRef.current = {};
     setRegenerating(activeSection.id);
     try {
       const response = await base44.functions.invoke('regenerateProposalSection', {
@@ -590,7 +675,12 @@ export default function ProposalEditor() {
               </button>
             </div>
           )}
-          {hasUnsavedChanges && !archived && (
+          {editingSectionId && !archived ? (
+            <div className="mb-4 text-xs text-[#213428] flex items-center gap-1.5">
+              <span className="w-1.5 h-1.5 rounded-full bg-[#213428]" />
+              Manual edit in progress — Save commits this section, Cancel restores the previous text.
+            </div>
+          ) : hasUnsavedChanges && !archived && (
             <div className="mb-4 text-xs text-amber-700 flex items-center gap-1.5">
               <span className="w-1.5 h-1.5 rounded-full bg-amber-500" />
               Unsaved changes — {dirtySections.size} {dirtySections.size === 1 ? 'section' : 'sections'} pending. Do not close this tab until saved.
@@ -600,6 +690,7 @@ export default function ProposalEditor() {
             const def = getSectionDef(section.section_type);
             if (!def) return null;
             const isActive = section.section_key === activeSectionKey;
+            const editingThisSection = editingSectionId === section.id;
 
             return (
               <div
@@ -608,12 +699,23 @@ export default function ProposalEditor() {
                 onClick={() => setActiveSectionKey(section.section_key)}
               >
                 {def.type !== 'cover' && (
-                  <h2
-                    className="text-2xl font-bold text-[#1B1A1A] mb-4"
-                    style={{ fontFamily: 'Didact Gothic, sans-serif' }}
-                  >
-                    {section.title}
-                  </h2>
+                  <div className="flex items-center gap-2 mb-4">
+                    <h2
+                      className="text-2xl font-bold text-[#1B1A1A]"
+                      style={{ fontFamily: 'Didact Gothic, sans-serif' }}
+                    >
+                      {section.title}
+                    </h2>
+                    {isManuallyEdited(section) && (
+                      <span
+                        className="px-2 py-0.5 text-[10px] uppercase tracking-[0.12em] text-[#625143] bg-white border border-[#DCDBD6] rounded"
+                        style={{ fontFamily: 'Didact Gothic, sans-serif' }}
+                        title="The text of this section was edited by hand"
+                      >
+                        {MANUAL_EDIT_LABEL}
+                      </span>
+                    )}
+                  </div>
                 )}
 
                 {isActive && def.canEditBody && !archived && (
@@ -624,6 +726,12 @@ export default function ProposalEditor() {
                       onToggleLock={handleToggleLock}
                       onToggleNotes={() => setShowNotes(!showNotes)}
                       isRegenerating={regenerating === section.id}
+                      isEditing={editingThisSection}
+                      isManuallyEdited={isManuallyEdited(section)}
+                      isSavingEdit={savingEdit}
+                      onStartEdit={() => handleStartEdit(section)}
+                      onSaveEdit={() => handleSaveEdit(section)}
+                      onCancelEdit={() => handleCancelEdit(section)}
                     />
                   </div>
                 )}
@@ -641,10 +749,16 @@ export default function ProposalEditor() {
                 {def.canEditBody ? (
                   <InlineRichTextEditor
                     html={section.body}
-                    onSave={(html, editedAt) => handleBodySave(section.id, html, editedAt)}
-                    onDirty={(html, editedAt) => handleDirty(section.id, html, editedAt)}
-                    onUnloadSave={(html, editedAt) => handleUnloadSave(section.id, html, editedAt)}
-                    editable={isActive && !archived}
+                    // In manual edit mode nothing auto-saves: Save commits and
+                    // Cancel discards. Outside it, the normal autosave applies.
+                    onSave={editingThisSection ? undefined : (html, editedAt) => handleBodySave(section.id, html, editedAt)}
+                    onDirty={
+                      editingThisSection
+                        ? (html) => handleEditDirty(section.id, html)
+                        : (html, editedAt) => handleDirty(section.id, html, editedAt)
+                    }
+                    onUnloadSave={editingThisSection ? undefined : (html, editedAt) => handleUnloadSave(section.id, html, editedAt)}
+                    editable={isActive && editingThisSection && !archived}
                     saveStatus={saveStatuses[section.id] || SAVE_STATUS.IDLE}
                   />
                 ) : (
