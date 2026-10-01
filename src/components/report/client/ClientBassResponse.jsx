@@ -22,20 +22,22 @@ import { resolveRspLabelPlacement } from "./ClientSpeakerBalance";
 import { resolveP20SeatDisplay } from "@/components/room/bass/p20DisplayAuthority";
 import { getSeatGradeColors, PRIORITY_LEGEND, isAssessedLevel } from "./visualReportSeatStyle";
 import SeatMarker from "./SeatMarker";
+import RspReferenceMarker from "./RspReferenceMarker";
 import {
   computeHaloRadiusPx,
   PRIMARY_STROKE_WIDTH,
   buildRingSegmentPath,
 } from "./seatMarkerGeometry";
 import { resolveCoordinate } from "./selectClientSpeakerBalance";
+// Seat priority is the designer's classification of a seat. It is NOT the
+// internal RSP / MLP flag, which marks the single reference seat — priority
+// and the reference position are independent facts about the design.
+import { resolveSeatPriority, PRIMARY } from "@/components/utils/seatPriorityAuthority";
 
 import {
   REPORT_FONT_HEADING as HEADING_FONT,
   REPORT_FONT_BODY as BODY_FONT,
 } from '@/components/report/typography/reportTypography';
-
-const RSP_RING_R = 8;
-const RSP_DOT_R = 3;
 
 // ── Level helpers ──
 
@@ -81,12 +83,18 @@ function buildBassSeats(seatingPositions, p19PerSeat, p20PerSeat) {
       const y = resolveCoordinate(s.y, s.position?.y);
       const p19Result = p19Map.get(s.id);
       const p20Result = p20Map.get(s.id);
+      // Priority group. The published seat row is the authority when present;
+      // otherwise the seat's own stamped priority resolves it (legacy projects
+      // default to Primary). The seat's internal isPrimary flag is the RSP/MLP
+      // marker and must never be read as the priority classification.
+      const priority = p20Result?.priority ?? p19Result?.priority ?? resolveSeatPriority(s);
       return {
         id: s.id,
         label: s.label || `Seat ${i + 1}`,
         x,
         y,
-        isPrimary: !!s.isPrimary,
+        priority,
+        isPrimary: priority === PRIMARY,
         p19Level: p19Result ? levelToLabel(p19Result.level) : null,
         p20Level: p20Result ? levelToLabel(p20Result.level) : null,
         p19VariationDb: p19Result?.variationDbRaw != null && Number.isFinite(Number(p19Result.variationDbRaw))
@@ -423,8 +431,7 @@ export default function ClientBassResponse({
             const placement = resolveRspLabelPlacement(rspPx, seatCircles, [], screenRect, { w: SVG_W, h: SVG_H }, { markerRadius: haloRadius + PRIMARY_STROKE_WIDTH });
             return (
               <g>
-                <circle cx={rspPx.px} cy={rspPx.py} r={RSP_RING_R} fill="none" stroke="#213428" strokeWidth={2.5} />
-                <circle cx={rspPx.px} cy={rspPx.py} r={RSP_DOT_R} fill="#213428" />
+                <RspReferenceMarker cx={rspPx.px} cy={rspPx.py} />
                 <text
                   x={placement.x}
                   y={placement.y}
@@ -478,6 +485,16 @@ export default function ClientBassResponse({
                   </span>
                 </div>
               ))}
+              {/* The reference position is a reference POINT, not a seat — its
+                  own glyph, so it is never read as a Primary seat. */}
+              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                <svg width={20} height={20} viewBox="0 0 20 20">
+                  <RspReferenceMarker cx={10} cy={10} ringR={7} dotR={2.5} tickR={9} strokeWidth={2} />
+                </svg>
+                <span style={{ fontSize: 12, color: "#3E4349", letterSpacing: "0.02em" }}>
+                  Reference position (RSP)
+                </span>
+              </div>
             </div>
             {/* Divider */}
             <div style={{ height: 1, background: "#DCDBD6", width: "100%" }} />
@@ -558,6 +575,16 @@ export default function ClientBassResponse({
                             letterSpacing: "0.02em",
                           }}>
                             Seat {seat.seatNumber}
+                            <div style={{
+                              fontSize: 9,
+                              fontWeight: seat.isPrimary ? 700 : 400,
+                              color: seat.isPrimary ? "#213428" : "#625143",
+                              letterSpacing: "0.06em",
+                              textTransform: "uppercase",
+                              marginTop: 2,
+                            }}>
+                              {seat.isPrimary ? "Primary" : "Secondary"}
+                            </div>
                           </th>
                         ))}
                       </tr>
