@@ -27,6 +27,7 @@ import { LEVER_APPLY_LABEL, LEVER_UNDO_LABEL } from "./optimiserPlanLeverApply.j
 import { deltaText, deviationText, levelText } from "./optimiserWholeNumberDb.js";
 import {
   PLACEMENT_APPLIED_MESSAGE,
+  PLACEMENT_BASELINE_MISMATCH,
   PLACEMENT_DEFINITION,
   PLACEMENT_PANEL_TITLE,
   PLACEMENT_PREVIEW_UNAVAILABLE,
@@ -77,7 +78,21 @@ function placementEvidenceFromRun(planView) {
  * The expected result, from the persisted before/after values only. Every row is
  * whole-number; a value the evaluation did not measure is stated as such.
  */
-function expectedRows({ baseline = null, effect = null, evidence = null } = {}) {
+function expectedRows({ baseline = null, effect = null, evidence = null, currentP20 = null } = {}) {
+  // The evaluation's own baseline is not the P20 the design measures now: its
+  // before/after are stated as that run's evidence, beside the current design's
+  // own published result. Nothing here is presented as a current comparison.
+  if (currentP20?.runBaselineDiffers) {
+    const rows = [];
+    const before = deviationText(baseline?.p20VariationDb);
+    const current = currentP20.deviationText;
+    const after = deviationText(effect?.p20VariationDb);
+    if (before) rows.push({ label: "Previous run", value: before });
+    if (current) rows.push({ label: "Current design", value: current });
+    if (after) rows.push({ label: "Candidate from that run", value: after });
+    return rows;
+  }
+
   // No retained change: the run's own measured delta is all there is. It is
   // stated as a measured improvement — never as an absolute after value.
   if (!effect && evidence) {
@@ -175,6 +190,7 @@ export function resolvePlacementRecommendation({
   presentation = null,
   appliedLever = null,
   appliedDirection = null,
+  currentP20 = null,
 } = {}) {
   const lever = findPlacementLever(planView);
   const baseline = planView?.baseline || null;
@@ -256,6 +272,25 @@ export function resolvePlacementRecommendation({
       // Undo stays available while the design still holds the recommended
       // positions, and only then.
       canUndo: !undone && lever.canUndo === true,
+      canRerun: true,
+    };
+  }
+
+  // ── The evaluation's own baseline is not the current result ──
+  // The candidate's before/after belong to the state that run measured from. The
+  // panel states both values, labelled, withholds Apply and names the one action
+  // that makes the comparison current again.
+  if (currentP20?.runBaselineDiffers) {
+    return {
+      ...base,
+      kind: PLACEMENT_KIND.PREVIOUS,
+      status: "Tested",
+      summary: previousSummary({ p20DeltaDb: lever.effect?.p20DeltaDb, p19DeltaDb: lever.effect?.p19DeltaDb }),
+      expected: expectedRows({ baseline, effect: lever.effect, currentP20 }),
+      move,
+      notice: PLACEMENT_BASELINE_MISMATCH,
+      canApply: false,
+      canUndo: false,
       canRerun: true,
     };
   }

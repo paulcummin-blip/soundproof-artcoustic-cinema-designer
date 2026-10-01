@@ -31,6 +31,8 @@ import {
   p14DbText,
   p18HzText,
 } from "./optimiserWholeNumberDb.js";
+import { readAuthoritativeP20Headline } from "./optimiserPlanMetrics.js";
+import { resolveOptimiserCurrentP20 } from "./optimiserCurrentP20.js";
 
 // Lever set-points (delay ms, gain dB). P19/P20/P14/P18 values never go through
 // here — they are printed by the whole-number policy helpers below.
@@ -118,7 +120,7 @@ function changeText(change) {
   return null;
 }
 
-function EffectBlock({ lever, baseline = null }) {
+function EffectBlock({ lever, baseline = null, currentP20 = null }) {
   const effect = lever.effect;
   if (!effect) {
     return <div className="text-[11px] text-[#8B7F76] italic">{lever.effectLabel}</div>;
@@ -128,8 +130,15 @@ function EffectBlock({ lever, baseline = null }) {
   // with the persisted baseline; never add the delta to the after value again.
   const p20Before = deviationText(baseline?.p20VariationDb);
   const p20After = deviationText(effect.p20VariationDb);
+  // When the evaluation's own baseline is not what the design measures now, the
+  // comparison is labelled as that run's baseline beside the current result.
+  const baselineMismatch = currentP20?.runBaselineDiffers === true;
   if (p20After) {
-    rows.push(p20Before && p20After !== p20Before ? `P20: ${p20Before} → ${p20After}` : `P20: ${p20After}`);
+    rows.push(p20Before && p20After !== p20Before
+      ? `P20: ${p20Before} → ${p20After}${baselineMismatch
+        ? ` (that run's baseline · current design ${currentP20.deviationText})`
+        : ""}`
+      : `P20: ${p20After}`);
   }
   const p19Before = deviationText(baseline?.p19VariationDb);
   const p19After = deviationText(effect.p19VariationDb);
@@ -193,6 +202,14 @@ export default function OptimisationPlanStatus({
 }) {
   const view = useOptimiserPlanView({
     projectId, versionId, completedBassAuthority, currentDesignFingerprint, instances, seatingPositions,
+  });
+
+  // ONE current-P20 authority, the same one the card and the tooltip read. When
+  // the run's own baseline differs from it, every absolute before/after value
+  // below is labelled as that run's evidence rather than the current design's.
+  const currentP20 = resolveOptimiserCurrentP20({
+    authorityP20: readAuthoritativeP20Headline(completedBassAuthority),
+    planView: { baseline: view.baseline },
   });
 
   // No evaluated evidence for this version (prose only): state the fact, offer
@@ -264,7 +281,9 @@ export default function OptimisationPlanStatus({
 
       {view.baseline && (
         <details className="mt-2 rounded-md border border-[#E7E5E0] bg-[#FAFAF9] p-2">
-          <summary className="cursor-pointer text-[10px] font-semibold tracking-wide text-[#3E4349]">Current design details</summary>
+          <summary className="cursor-pointer text-[10px] font-semibold tracking-wide text-[#3E4349]">
+            {currentP20.runBaselineDiffers ? "Design when evaluated" : "Current design details"}
+          </summary>
           <ResultRows result={view.baseline} />
         </details>
       )}
@@ -328,7 +347,7 @@ export default function OptimisationPlanStatus({
             )}
 
             <div className="mt-1.5">
-              <EffectBlock lever={lever} baseline={view.baseline} />
+              <EffectBlock lever={lever} baseline={view.baseline} currentP20={currentP20} />
             </div>
 
             {lever.tradeOff?.reason && (

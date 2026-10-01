@@ -300,6 +300,11 @@ export default function AdiOptimisationJourney({
               ? ` · ${summary.seatingRecommendation.p20LevelBefore || "—"} → ${summary.seatingRecommendation.p20LevelAfter || "—"}`
               : ""}
           </div>
+          {summary.seatingRecommendation.baselineNote && (
+            <div className="text-[11px] text-[#8A5A2B] leading-relaxed">
+              {summary.seatingRecommendation.baselineNote}
+            </div>
+          )}
           {summary.seatingRecommendation.reason && (
             <div className="text-[11px] text-[#625143] leading-relaxed">
               Reason: {summary.seatingRecommendation.reason}

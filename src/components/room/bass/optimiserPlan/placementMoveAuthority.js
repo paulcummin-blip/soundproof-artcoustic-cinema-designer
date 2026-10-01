@@ -50,6 +50,14 @@ export const PLACEMENT_PREVIOUS_FOUND =
 export const PLACEMENT_PREVIOUS_FOUND_STALE =
   "Previous result found a possible improvement. Re-run ADI on the current design before applying any change. The design has changed since that evaluation.";
 
+/**
+ * The copy when the evaluation's own baseline is not the P20 the design measures
+ * now. The design has not changed — the comparison was simply made against a
+ * different current result, so it is stated as that run's evidence.
+ */
+export const PLACEMENT_BASELINE_MISMATCH =
+  "This evaluation compared its candidate with the result it measured when it ran, which is not the result the design measures now. Re-run ADI on the current design before applying any change.";
+
 /** A subwoofer may not leave the wall it is mounted on by more than this. */
 const WALL_TOLERANCE_M = 0.15;
 

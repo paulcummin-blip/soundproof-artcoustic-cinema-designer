@@ -41,6 +41,7 @@ import { resolvePlacementRecommendation } from "./placementRecommendationAuthori
 import { LEVER_APPLY_LABEL, LEVER_UNDO_LABEL } from "./optimiserPlanLeverApply.js";
 import { buildLiveFamilyRows } from "./optimiserLiveProgress.js";
 import { OPTIMISER_PRESENTATION_STATE } from "./resolveOptimiserPresentationState.js";
+import { resolveOptimiserCurrentP20 } from "./optimiserCurrentP20.js";
 
 export const ADI_TESTED_TITLE = "What ADI tested";
 export const ADI_ENGINEER_DETAILS_TITLE = "Engineer details";
@@ -145,15 +146,21 @@ function resolveRecommendedLever(planView) {
  * value is read from the lever's persisted effect and the plan's baseline —
  * nothing here is recalculated. Null for every other recommendation.
  */
-function seatingRecommendationDetail({ row, baseline = null } = {}) {
+function seatingRecommendationDetail({ row, baseline = null, currentP20 = null } = {}) {
   if (!row?.seating?.movementLabel) return null;
   const effect = row.effect || null;
   return {
     movementLabel: row.seating.movementLabel,
     wholeBlockMoved: row.seating.wholeBlockMoved === true,
     reason: shortPhrase(row.reason, 160),
-    p20Before: deviationText(baseline?.p20VariationDb),
+    // The before value is the CURRENT design's own result. When the evaluation
+    // ran against a different current state, no current before/after pair is
+    // stated: the run's own figures are explained in baselineNote instead.
+    p20Before: currentP20?.runBaselineDiffers ? null : deviationText(baseline?.p20VariationDb),
     p20After: deviationText(effect?.p20VariationDb),
+    baselineNote: currentP20?.runBaselineDiffers
+      ? `Measured in that evaluation, which compared against a different current result (P20 ${currentP20.runBaselineDeviation}). Current design: P20 ${currentP20.deviationText}.`
+      : null,
     p20LevelBefore: levelText(effect?.p20LevelBefore ?? baseline?.p20Level),
     p20LevelAfter: levelText(effect?.p20LevelAfter),
     p19Delta: deltaText(effect?.p19DeltaDb),
@@ -393,9 +400,17 @@ export function buildTestedOptionRows(
  * recommended with evaluated changes; and, when P20 is the limiting metric, the
  * improvement is at least 1 dB.
  */
-export function resolveApplyPermission({ planView, presentation, recommendedLever }) {
+export function resolveApplyPermission({ planView, presentation, recommendedLever, currentP20 = null }) {
   if (!recommendedLever) {
     return { allowed: false, reason: "No single evaluated change is available to apply." };
+  }
+  // The candidate was measured from a different current state than the design
+  // measures now — that improvement is evidence, never an offer to apply.
+  if (currentP20?.runBaselineDiffers) {
+    return {
+      allowed: false,
+      reason: "This evaluation compared its candidate with a different current result — re-run ADI before applying any change.",
+    };
   }
   if (presentation?.showApply !== true) {
     return { allowed: false, reason: "There is nothing safe to apply in the current optimisation state." };
@@ -494,8 +509,22 @@ export function buildAdiDesignerSummary({
     ? resultSentence(designOptions, { seatCount, activeSubwooferCount: estimate.sourceCount })
     : null;
 
+  // ONE current-P20 authority for the whole card: the published current result
+  // first — the same value the tooltip, seat pill, graph marker and result strip
+  // show — with the run's baseline only as a fallback when no published value
+  // exists. When the run's own baseline differs, every absolute before/after
+  // value on the card is that run's evidence and is labelled as such.
+  const currentP20 = resolveOptimiserCurrentP20({
+    authorityP20: {
+      variationDb: currentP20Deviation,
+      level: currentP20Level,
+      worstFrequencyHz: limitingFrequencyHz,
+    },
+    planView,
+  });
+
   const recommendedLever = resolveRecommendedLever(planView);
-  const apply = resolveApplyPermission({ planView, presentation, recommendedLever });
+  const apply = resolveApplyPermission({ planView, presentation, recommendedLever, currentP20 });
   const undo = resolveUndoPermission({ planView, appliedLever });
   const liveRows = running ? buildLiveFamilyRows(liveProgress) : null;
   const leverRows = buildTestedOptionRows(planView, { recommendedLever, appliedLever, liveRows, roomDims });
@@ -568,7 +597,7 @@ export function buildAdiDesignerSummary({
     // The seating recommendation's own evaluated detail: movement, before/after,
     // trade-offs and destination validity. Null for every other recommendation.
     seatingRecommendation: recommendedRow?.seating
-      ? seatingRecommendationDetail({ row: recommendedRow, baseline: planView?.baseline || null })
+      ? seatingRecommendationDetail({ row: recommendedRow, baseline: planView?.baseline || null, currentP20 })
       : null,
     rows,
     // The placement recommendation, resolved once: the physical move in
@@ -580,6 +609,7 @@ export function buildAdiDesignerSummary({
       presentation,
       appliedLever,
       appliedDirection,
+      currentP20,
     }),
     actions: {
       canApply: apply.allowed,
