@@ -53,6 +53,43 @@ export const ESTIMATE_UNAVAILABLE_REASON =
   "The search space depends on the subwoofer quantity, which this design has not fixed in a form "
   + "the optimiser can search.";
 
+// ── The acoustic work behind those design options ───────────────────────────
+// The visible claim is stated as ACOUSTIC CALCULATIONS so the design option
+// count is never read as a calculation count. The estimate multiplies the real
+// design scale (seats, active subwoofer sources) by the engine passes each
+// option needs, then rounds UP to the next stated tier.
+//
+// Frequency is deliberately NOT a separate multiplier: each pass already
+// evaluates the whole assessment band, so counting frequency points again would
+// count the same work twice.
+
+/** Engine passes each option needs per seat and per active source. */
+export const ACOUSTIC_CALCULATION_PASSES = 7;
+
+/** What those passes are, stated wherever the estimate is explained. */
+export const ACOUSTIC_PASS_BASIS =
+  "raw response · EQ prediction · post-EQ response · P19 assessment · P20 assessment · "
+  + "headroom validation · candidate scoring";
+
+/** The tiers the visible acoustic calculation claim is stated in. */
+export const ACOUSTIC_ROUNDING_THRESHOLDS = Object.freeze([
+  250000, 500000, 750000, 1000000, 2000000,
+]);
+
+/** The three dimensions every acoustic calculation spans. */
+export const ACOUSTIC_SCOPE_CLAUSE = "across seats, frequencies and subwoofer settings";
+
+const ACOUSTIC_TIER_TEXT = ACOUSTIC_ROUNDING_THRESHOLDS
+  .map((tier) => tier.toLocaleString("en-GB"))
+  .join(" · ");
+
+/** The counting basis. Technical detail — it belongs in the disclosure only. */
+export const ACOUSTIC_BASIS_NOTE =
+  `Acoustic calculations = design options × seats × active subwoofer sources × ${ACOUSTIC_CALCULATION_PASSES} `
+  + `engine passes (${ACOUSTIC_PASS_BASIS}). Each pass evaluates the whole assessment frequency band, so `
+  + "frequency points are covered by the passes rather than counted again. "
+  + `The figure shown is rounded up to the next tier: ${ACOUSTIC_TIER_TEXT}.`;
+
 const FAMILY_LABEL = Object.freeze({
   delay: "Delay",
   gain: "Gain",
@@ -154,16 +191,82 @@ export function formatCalculationCount(value) {
   return numeric == null ? null : Math.round(numeric).toLocaleString("en-GB");
 }
 
+/** A positive whole count, defaulting to one when the design does not state it. */
+function positiveCount(value) {
+  const numeric = num(value);
+  return numeric != null && numeric > 0 ? Math.round(numeric) : 1;
+}
+
+/** Rounds a raw acoustic calculation count UP to the next stated tier. */
+export function roundUpAcousticCalculationCount(raw) {
+  const value = num(raw);
+  if (value == null || value <= 0) return null;
+  return ACOUSTIC_ROUNDING_THRESHOLDS.find((tier) => value <= tier)
+    || ACOUSTIC_ROUNDING_THRESHOLDS[ACOUSTIC_ROUNDING_THRESHOLDS.length - 1];
+}
+
 /**
- * The sentence the pre-run card shows. Never claims more than the estimate
- * supports: below one hundred calculations it is stated as a detailed set.
+ * The acoustic work behind the design options:
+ * design options × seats × active subwoofer sources × engine passes, rounded up
+ * to the next stated tier.
+ *
+ * @returns {{available: boolean, raw: number|null, claim: number|null}}
  */
-export function estimateSentence(estimate) {
+export function estimateAcousticCalculations({
+  designOptions = null,
+  seatCount = null,
+  activeSubwooferCount = null,
+} = {}) {
+  const options = num(designOptions);
+  if (options == null || options <= 0) return { available: false, raw: null, claim: null };
+
+  const raw = Math.round(
+    options
+    * positiveCount(seatCount)
+    * positiveCount(activeSubwooferCount)
+    * ACOUSTIC_CALCULATION_PASSES,
+  );
+  return { available: true, raw, claim: roundUpAcousticCalculationCount(raw) };
+}
+
+/** "involving over 250,000 acoustic calculations across seats, frequencies …" */
+function acousticClaimClause({ designOptions, seatCount, activeSubwooferCount }) {
+  const acoustic = estimateAcousticCalculations({ designOptions, seatCount, activeSubwooferCount });
+  return `involving over ${formatCalculationCount(acoustic.claim)} acoustic calculations ${ACOUSTIC_SCOPE_CLAUSE}`;
+}
+
+/**
+ * The sentence the pre-run card shows. The design option count is stated as
+ * DESIGN OPTIONS and the work underneath it as ACOUSTIC CALCULATIONS — the
+ * option count is never itself called a calculation count.
+ */
+export function estimateSentence(estimate, { seatCount = null } = {}) {
   if (!estimate?.available || !(estimate.total > 0)) {
     return "ADI will run a detailed optimisation sequence to improve bass consistency across the seats.";
   }
   if (estimate.total < 100) {
-    return "ADI will run a detailed set of design calculations to improve bass consistency across the seats.";
+    return "ADI will run a detailed set of design options to improve bass consistency across the seats.";
   }
-  return `ADI will run approximately ${formatCalculationCount(estimate.total)} design calculations to improve bass consistency across the seats.`;
+
+  const clause = acousticClaimClause({
+    designOptions: estimate.total,
+    seatCount,
+    activeSubwooferCount: estimate.sourceCount,
+  });
+  return `ADI will test approximately ${formatCalculationCount(estimate.total)} design options, ${clause}.`;
+}
+
+/**
+ * The sentence a completed run shows, from the design options it confirmed.
+ * Returns null when the run confirmed no count worth stating.
+ */
+export function resultSentence(designOptions, {
+  seatCount = null,
+  activeSubwooferCount = null,
+} = {}) {
+  const options = num(designOptions);
+  if (options == null || options <= 0) return null;
+
+  const clause = acousticClaimClause({ designOptions: options, seatCount, activeSubwooferCount });
+  return `ADI tested ${formatCalculationCount(options)} design options, ${clause}.`;
 }

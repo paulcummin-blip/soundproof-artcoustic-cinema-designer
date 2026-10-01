@@ -14,6 +14,8 @@
 import React from "react";
 import { ChevronRight } from "lucide-react";
 import {
+  ACOUSTIC_BASIS_NOTE,
+  estimateAcousticCalculations,
   estimateOptimiserCalculations,
   formatCalculationCount,
 } from "./optimiserCalculationEstimate.js";

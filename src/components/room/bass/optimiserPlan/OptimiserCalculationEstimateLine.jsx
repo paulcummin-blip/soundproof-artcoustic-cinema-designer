@@ -2,7 +2,7 @@
 // ---------------------------------------------------------------------------
 // The default pre-run message: the selling point, in two short lines.
 //
-//   1. how many design calculations ADI will run for this design
+//   1. how many design options ADI will test, and the acoustic work behind them
 //   2. what it checks before it suggests moving anything
 //
 // The per-family counts, the honesty notes and the lever order are technical
@@ -14,9 +14,9 @@ import React from "react";
 import { estimateOptimiserCalculations, estimateSentence } from "./optimiserCalculationEstimate.js";
 import { ADI_OPTIMISER_COPY } from "./resolveAdiOptimiserJourney.js";
 
-export default function OptimiserCalculationEstimateLine({ instances = [], className = "" }) {
+export default function OptimiserCalculationEstimateLine({ instances = [], seatCount = null, className = "" }) {
   const estimate = estimateOptimiserCalculations({ instances });
-  const sentence = estimateSentence(estimate);
+  const sentence = estimateSentence(estimate, { seatCount });
 
   return (
     <div className={className} data-adi-calculation-estimate={estimate.available ? "estimated" : "unavailable"}>

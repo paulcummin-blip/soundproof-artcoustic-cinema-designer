@@ -107,6 +107,8 @@ export const ADI_OPTIMISER_COPY = Object.freeze({
   DISCLOSURE_TITLE: "What ADI will test",
   /** Label above the per-family estimate inside the disclosure. */
   DISCLOSURE_ESTIMATE_LABEL: "Estimated calculations:",
+  /** Label above the acoustic calculation basis inside the disclosure. */
+  DISCLOSURE_ACOUSTIC_LABEL: "Acoustic calculation basis:",
   /** What ADI compares every option against, stated inside the disclosure. */
   DISCLOSURE_COMPARISON:
     "ADI compares each option against the current design, looking for P20 improvement while protecting "
