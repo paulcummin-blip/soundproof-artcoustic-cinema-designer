@@ -359,8 +359,15 @@ describe('TEST 3B: baseline failure and unavailable metrics', () => {
 });
 
 describe('TEST 4: current evaluated lever', () => {
-  it('resolves to Optimisation plan available with a usable Apply action', () => {
-    const planView = planViewFor(planWithEvaluatedDelay());
+  it('resolves to Optimisation plan available with a usable Apply action and completed-run evidence', () => {
+    const plan = planWithEvaluatedDelay();
+    plan.run = {
+      canonicalJobsRun: 22,
+      candidatesEvaluated: 17,
+      current: { p20VariationDb: 12.24 },
+      bestAttempted: { p20VariationDb: 9.8 },
+    };
+    const planView = planViewFor(plan);
     const state = resolveOptimiserPresentationState({ planView, actionable: { available: false } });
 
     expect(planView.status).toBe(OPTIMISER_PLAN_STATUS.CURRENT);
@@ -369,6 +376,8 @@ describe('TEST 4: current evaluated lever', () => {
     expect(state.statusLabel).toBe('Optimisation plan available');
     expect(state.showApply).toBe(true);
     expect(state.showPlan).toBe(true);
+    expect(state.evidence).toBe(planView.run);
+    expect(state.evidence.canonicalJobsRun).toBe(22);
 
     const lever = planView.levers[0];
     expect(lever.key).toBe(OPTIMISER_LEVER.DELAY);
