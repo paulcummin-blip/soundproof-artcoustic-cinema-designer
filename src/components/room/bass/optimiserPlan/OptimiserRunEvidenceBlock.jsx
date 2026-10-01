@@ -162,6 +162,24 @@ export default function OptimiserRunEvidenceBlock({ evidence = null, className =
   const delta = deltaText(best?.p20DeltaDb);
   const calculationCount = evidence.canonicalJobsRun ?? evidence.candidatesEvaluated ?? null;
 
+  // A winning plan already renders its evaluated lever, reason and predicted
+  // effect below. Keep its run evidence compact and never reuse the no-winner
+  // wording for a confirmed recommendation.
+  if (evidence.actionablePlanProduced === true) {
+    return (
+      <div className={`rounded-md border border-[#E7E5E0] bg-[#FAFAF9] px-2.5 py-2 ${className}`}>
+        <div className="text-[11px] text-[#3E4349] leading-relaxed">
+          {calculationCount != null
+            ? `ADI tested ${calculationCount} design calculations before confirming this recommendation.`
+            : "ADI completed the optimisation search before confirming this recommendation."}
+        </div>
+        <div className="mt-0.5 text-[10px] text-[#8B7F76]">
+          No change has been applied.
+        </div>
+      </div>
+    );
+  }
+
   const headlineRows = [];
   if (evidence.canonicalJobsRun != null) headlineRows.push(["Optimiser jobs run", `${evidence.canonicalJobsRun}`]);
   if (evidence.candidatesEvaluated != null) headlineRows.push(["Candidates confirmed", `${evidence.candidatesEvaluated}`]);
