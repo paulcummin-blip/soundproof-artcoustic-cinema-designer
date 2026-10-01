@@ -188,7 +188,7 @@ test('ideal median markers are drawn on the same wall', () => {
 test('actual vs ideal is clear, with a short local deviation label', () => {
   // Visually distinct: the ideal is an outlined, dashed diamond; the actual is solid.
   assert.ok(
-    DRAWING_BODY.includes('fill="#FFFFFF" stroke="#8A7B6A" stroke-width="2" stroke-dasharray="3 2"'),
+    DRAWING_BODY.includes('fill="#FFFFFF" stroke="#8A7B6A" stroke-width="2"'),
     'the ideal marker is outlined, never filled',
   );
   assert.equal(countOf(DRAWING_BODY, '>Ideal<'), 2, 'each ideal marker carries the short label');
@@ -200,7 +200,7 @@ test('actual vs ideal is clear, with a short local deviation label', () => {
   assert.equal(countOf(DRAWING_BODY, '>6.1° deviation<'), 1, 'the published deviation is labelled once');
   assert.ok(!/Level [1-4]/.test(DRAWING_BODY), 'the drawing states no level');
   // Legend explains the two markers, and nothing that is not drawn.
-  for (const legend of ['Front wides (actual)', 'Ideal front wide position', 'Screen speakers', 'Side surrounds']) {
+  for (const legend of ['Front wides actual', 'Front wide ideal', 'Screen speakers', 'Side surrounds']) {
     assert.ok(SCREEN_TEXT.includes(legend), `the legend shows ${legend}`);
   }
   assert.ok(!SCREEN_TEXT.includes('Median reference'), 'no legend entry for an undrawn construction');

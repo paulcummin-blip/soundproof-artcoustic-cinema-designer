@@ -176,8 +176,8 @@ export default function RP22ClientReport() {
   // ── P7 Front Wides — passive read from the canonical summary ──
   const p7FrontWides = useMemo(() => {
     if (hydrating || !engineeringSummary || !Array.isArray(placedSpeakers) || !rsp) return null;
-    return selectClientP7FrontWides(engineeringSummary, placedSpeakers, rsp, analysisResult);
-  }, [hydrating, engineeringSummary, placedSpeakers, rsp, analysisResult]);
+    return selectClientP7FrontWides(engineeringSummary, placedSpeakers, rsp, analysisResult, roomDims);
+  }, [hydrating, engineeringSummary, placedSpeakers, rsp, analysisResult, roomDims]);
 
   // ── Recommended seating position — passive P1 authority read ──
   const recommendedSeatingPosition = useMemo(() => {

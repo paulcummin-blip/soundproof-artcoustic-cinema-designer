@@ -229,12 +229,12 @@ export default function ClientP7FrontWides({
   const legendItems = [
     {
       id: "wides",
-      label: "Front wides (actual)",
+      label: "Front wides actual",
       sample: <circle cx={10} cy={10} r={5} fill={LW_RW_COLOR} />,
     },
     ...(showIdealMedian ? [{
       id: "ideal",
-      label: "Ideal front wide position",
+      label: "Front wide ideal",
       sample: (
         <rect
           x={5.5}
@@ -244,7 +244,6 @@ export default function ClientP7FrontWides({
           fill="#FFFFFF"
           stroke={MEDIAN_COLOR}
           strokeWidth={2}
-          strokeDasharray="3 2"
           transform="rotate(45 10 10)"
         />
       ),
@@ -468,8 +467,7 @@ export default function ClientP7FrontWides({
                 fill="#FFFFFF"
                 stroke={MEDIAN_COLOR}
                 strokeWidth={2}
-                strokeDasharray="3 2"
-                transform={`rotate(45 ${side.idealPx.px} ${side.idealPx.py})`}
+                      transform={`rotate(45 ${side.idealPx.px} ${side.idealPx.py})`}
               />
               <text
                 x={side.idealLabelPx.x}

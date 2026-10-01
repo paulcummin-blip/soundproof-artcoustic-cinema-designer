@@ -191,6 +191,15 @@ test('TEST 4 — the published deviation and level are preserved verbatim', () =
 });
 
 test('TEST 5 — the report draws the Room Designer geometry from one implementation', () => {
+  const reportSource = fs.readFileSync(path.resolve('src/pages/RP22ClientReport.jsx'), 'utf8');
+  assert.ok(
+    reportSource.includes('selectClientP7FrontWides(engineeringSummary, placedSpeakers, rsp, analysisResult, roomDims)'),
+    'the report page supplies room dimensions, otherwise both ideal markers disappear',
+  );
+  assert.ok(
+    reportSource.includes('[hydrating, engineeringSummary, placedSpeakers, rsp, analysisResult, roomDims]'),
+    'the report refreshes the ideal geometry when room dimensions change',
+  );
   const rvHookSource = fs.readFileSync(RV_HOOK_PATH, 'utf8');
   const shimSource = fs.readFileSync(RV_SHIM_PATH, 'utf8');
   assert.ok(rvHookSource.includes('computeFrontWideZonesStrict'), 'the Room Designer draws the authority');
@@ -239,7 +248,7 @@ test('TEST 6 — an old or incomplete snapshot stays safe', () => {
     'the published result still stands',
   );
   assert.ok(
-    !textOf(partialMarkup).includes('Ideal front wide position'),
+    !textOf(partialMarkup).includes('Front wide ideal'),
     'the legend does not explain an undrawn marker',
   );
 
