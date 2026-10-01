@@ -1,5 +1,5 @@
 import React from 'react';
-import { REPORT_FONT_HEADING } from '@/components/report/typography/reportTypography';
+import { proposalRoleStyle } from '@/components/proposal/typography/proposalTypography';
 
 /**
  * KeyPerformanceHighlightsTable
@@ -58,8 +58,8 @@ export default function KeyPerformanceHighlightsTable({ rows, className = '' }) 
             {COLUMNS.map((column) => (
               <th
                 key={column.key}
-                className="px-3 py-2 text-left text-xs font-semibold text-[#213428] bg-[#F5F4F0] border-b border-[#DCDBD6]"
-                style={{ fontFamily: REPORT_FONT_HEADING }}
+                className="px-3 py-2 text-left text-[#213428] bg-[#F5F4F0] border-b border-[#DCDBD6]"
+                style={proposalRoleStyle('label')}
               >
                 {column.label}
               </th>
@@ -69,14 +69,14 @@ export default function KeyPerformanceHighlightsTable({ rows, className = '' }) 
         <tbody>
           {list.map((row, index) => (
             <tr key={row.key || index}>
-              <td className={`${CELL} text-sm text-[#1B1A1A]`}>{row.area}</td>
-              <td className={`${CELL} text-sm text-[#3E4349]`}>{row.result}</td>
-              <td className={`${CELL} text-sm text-[#625143]`}>{row.what_you_hear}</td>
+              <td className={`${CELL} text-[#1B1A1A]`} style={proposalRoleStyle('body')}>{row.area}</td>
+              <td className={`${CELL} text-[#3E4349]`} style={proposalRoleStyle('body')}>{row.result}</td>
+              <td className={`${CELL} text-[#625143]`} style={proposalRoleStyle('body')}>{row.what_you_hear}</td>
             </tr>
           ))}
         </tbody>
       </table>
-      <p className="mt-2 text-[11px] text-[#8A8477]">
+      <p className="mt-2 text-[#8A8477]" style={proposalRoleStyle('caption')}>
         Every value calculated by Sound Proof. RP22 levels and measured results are shown as assessed.
       </p>
     </div>

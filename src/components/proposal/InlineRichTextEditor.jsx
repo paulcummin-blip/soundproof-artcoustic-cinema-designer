@@ -1,5 +1,6 @@
 import React, { useState, useRef, useCallback } from 'react';
 import { Loader2 } from 'lucide-react';
+import { proposalRoleStyle } from '@/components/proposal/typography/proposalTypography';
 
 /**
  * Inline rich text editor for proposal sections.
@@ -170,12 +171,12 @@ export default function InlineRichTextEditor({ html, onSave, onDirty, onUnloadSa
         onMouseUp={handleSelection}
         onKeyUp={handleSelection}
         onBlur={() => setTimeout(() => setShowToolbar(false), 200)}
-        className="proposal-editor-content outline-none prose prose-sm max-w-none focus:outline-none"
+        className="proposal-editor-content proposal-body outline-none prose prose-sm max-w-none focus:outline-none"
         style={{
           minHeight: '60px',
-          fontFamily: 'Georgia, serif',
-          fontSize: '15px',
-          lineHeight: 1.7,
+          // Proposal body type — Didact Gothic, Century Gothic fallback.
+          // Never a serif: the document must not fall back to a mismatched face.
+          ...proposalRoleStyle('body'),
           color: '#1B1A1A',
           // A quiet outline marks manual edit mode. Inset, so nothing reflows.
           ...(editable ? { boxShadow: 'inset 0 0 0 1px #DCDBD6', borderRadius: 6 } : {}),

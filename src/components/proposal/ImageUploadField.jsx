@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { base44 } from '@/api/base44Client';
 import { Label } from '@/components/ui/label';
+import { proposalRoleStyle } from '@/components/proposal/typography/proposalTypography';
 import { Input } from '@/components/ui/input';
 import { Upload, X, Loader2 } from 'lucide-react';
 
@@ -95,6 +96,8 @@ export default function ImageUploadField({
               onBlur={() => onCaptionChange(localCaption)}
               placeholder="Caption..."
               className="bg-white border-[#DCDBD6] text-[#1B1A1A]"
+              // Project Images captions are proposal copy — body face.
+              style={proposalRoleStyle('caption')}
             />
           )}
         </div>

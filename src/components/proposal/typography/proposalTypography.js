@@ -1,0 +1,187 @@
+/**
+ * proposalTypography.js
+ * ---------------------
+ * THE typography authority for every proposal / client proposal surface:
+ *
+ *   - the Proposal Editor preview (cover, section headings, body copy)
+ *   - the generated section bodies (System Design Summary, Spatial Resolution,
+ *     Dynamic Range, Timbre Matching, Key Performance Highlights, Overall Design)
+ *   - Project Images captions
+ *   - the exported / printed proposal document
+ *
+ * Short rule:
+ *   Headers  = Futura PT Light
+ *   Body     = Didact Gothic
+ *   Fallback = Century Gothic
+ *
+ * The families, trackings, leadings and the A4 ratios live in the shared
+ * reportTypography authority and are re-used here — never re-declared. Only the
+ * screen-adapted sizes are added, because a browser preview is not a piece of
+ * paper: the profile's ratios (60 / 40 / 24 / 14) are kept exactly, the absolute
+ * values are expressed so they can breathe responsively.
+ *
+ * Nothing here touches proposal content, calculations, values or layout logic.
+ * It only decides how type is set.
+ *
+ * Pure module: no React, no side effects, no runtime APIs.
+ */
+
+import {
+  REPORT_FONT_HEADING,
+  REPORT_FONT_BODY,
+  REPORT_TRACKING_HEADING,
+  REPORT_TRACKING_BODY,
+  REPORT_LEADING_HEADING,
+  REPORT_LEADING_BODY,
+  REPORT_PROFILES,
+} from '@/components/report/typography/reportTypography';
+
+/* ── Fonts, tracking, leading — re-used from the shared authority ──────── */
+
+export const PROPOSAL_FONT_HEADING = REPORT_FONT_HEADING;
+export const PROPOSAL_FONT_BODY = REPORT_FONT_BODY;
+export const PROPOSAL_TRACKING_HEADING = REPORT_TRACKING_HEADING;
+export const PROPOSAL_TRACKING_BODY = REPORT_TRACKING_BODY;
+export const PROPOSAL_LEADING_HEADING = REPORT_LEADING_HEADING;
+export const PROPOSAL_LEADING_BODY = REPORT_LEADING_BODY;
+
+/** The one-line brand rule, for documentation and tests. */
+export const PROPOSAL_TYPE_RULE =
+  'Headers = Futura PT Light. Body = Didact Gothic. Fallback = Century Gothic.';
+
+/* ── Screen sizes (Proposal Editor preview) ────────────────────────────────
+   Maxima follow the profile's presentation ratios exactly:
+   title 60 : header 40 : subheader 24 : body 14.
+   The lower bound of each clamp keeps the same hierarchy on a small screen,
+   so the header/body relationship never changes. */
+export const PROPOSAL_SCREEN_SIZES = {
+  title: 'clamp(30px, 3.6vw, 60px)',
+  header: 'clamp(22px, 2.4vw, 40px)',
+  subheader: 'clamp(17px, 1.45vw, 24px)',
+  body: '14px',
+  // Supporting roles, derived from the body scale — not new steps in the
+  // hierarchy. A table label is set small so it never competes with content.
+  label: '12px',
+  caption: '13px',
+};
+
+/** Roles that are set in the header face. */
+export const PROPOSAL_HEADING_ROLES = ['title', 'header', 'subheader', 'label'];
+
+/** The A4 roles, read from the shared profile (title 60 / header 22 / subheader 14 / body 9). */
+export const PROPOSAL_A4_SIZES = REPORT_PROFILES.a4;
+
+/* ── Inline role styles ──────────────────────────────────────────────────
+   For components that must set type through the style attribute (cover
+   identity, table cells, the editable document body). */
+
+/**
+ * @param {'title'|'header'|'subheader'|'label'|'body'|'caption'} role
+ * @returns {Object} React style object
+ */
+export function proposalRoleStyle(role = 'body') {
+  if (PROPOSAL_HEADING_ROLES.includes(role)) {
+    return {
+      fontFamily: PROPOSAL_FONT_HEADING,
+      fontSize: PROPOSAL_SCREEN_SIZES[role],
+      fontWeight: 300,
+      letterSpacing: PROPOSAL_TRACKING_HEADING,
+      lineHeight: PROPOSAL_LEADING_HEADING,
+      textTransform: 'uppercase',
+    };
+  }
+  return {
+    fontFamily: PROPOSAL_FONT_BODY,
+    fontSize: role === 'caption' ? PROPOSAL_SCREEN_SIZES.caption : PROPOSAL_SCREEN_SIZES.body,
+    fontWeight: 400,
+    letterSpacing: PROPOSAL_TRACKING_BODY,
+    lineHeight: PROPOSAL_LEADING_BODY,
+    textTransform: 'none',
+  };
+}
+
+/* ── Preview stylesheet ──────────────────────────────────────────────────
+   Role rules for the on-screen proposal document. Section bodies arrive from
+   the generator as HTML (h2 / h3 / p / li), so the document roles are applied
+   by element inside the preview scope, never per component. */
+
+const headingDecls = (size) => `
+  font-family: ${PROPOSAL_FONT_HEADING};
+  font-weight: 300;
+  letter-spacing: ${PROPOSAL_TRACKING_HEADING};
+  line-height: ${PROPOSAL_LEADING_HEADING};
+  text-transform: uppercase;
+  font-size: ${size};`;
+
+const bodyDecls = (size) => `
+  font-family: ${PROPOSAL_FONT_BODY};
+  font-weight: 400;
+  letter-spacing: ${PROPOSAL_TRACKING_BODY};
+  line-height: ${PROPOSAL_LEADING_BODY};
+  text-transform: none;
+  font-size: ${size};`;
+
+/**
+ * @param {Object} [options]
+ * @param {string} [options.scope] Root selector of the proposal document
+ * @returns {string} CSS text
+ */
+export function buildProposalPreviewCss({ scope = '.proposal-preview' } = {}) {
+  const s = scope;
+  const sizes = PROPOSAL_SCREEN_SIZES;
+
+  return `
+/* ── Proposal typography — generated by proposalTypography.js ──
+   ${PROPOSAL_TYPE_RULE} */
+${s} {
+  font-family: ${PROPOSAL_FONT_BODY};
+}
+
+/* Cover — the proposal title takes the header face at title scale */
+${s} .proposal-cover-name {${headingDecls(sizes.title)}
+  overflow-wrap: anywhere;
+}
+${s} .proposal-cover-label {${headingDecls(sizes.label)}
+}
+${s} .proposal-cover-partner {${headingDecls(sizes.label)}
+}
+${s} .proposal-cover-meta {${bodyDecls(sizes.caption)}
+}
+
+/* Document headings — section titles and subheadings */
+${s} .proposal-section-title,
+${s} h1,
+${s} .proposal-header {${headingDecls(sizes.header)}
+}
+${s} h2 {${headingDecls(sizes.subheader)}
+}
+${s} h3,
+${s} h4,
+${s} .proposal-label {${headingDecls(sizes.label)}
+}
+
+/* Body copy — paragraphs, lists, table body, captions, notes */
+${s} p,
+${s} li,
+${s} td,
+${s} .proposal-body {${bodyDecls(sizes.body)}
+}
+${s} .proposal-caption,
+${s} figcaption,
+${s} .proposal-note {${bodyDecls(sizes.caption)}
+}
+
+/* Key Performance Highlights */
+${s} .kph-table th {${headingDecls(sizes.label)}
+}
+${s} .kph-table td {${bodyDecls(sizes.body)}
+}
+
+/* Emphasis stays in the body face — italic only where the text needs it */
+${s} em,
+${s} i {
+  font-family: ${PROPOSAL_FONT_BODY};
+  font-style: italic;
+}
+`.trim();
+}

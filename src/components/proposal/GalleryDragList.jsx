@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd';
 import { Input } from '@/components/ui/input';
+import { proposalRoleStyle } from '@/components/proposal/typography/proposalTypography';
 import {
   Select,
   SelectContent,
@@ -106,6 +107,8 @@ export default function GalleryDragList({
                         onBlur={() => onCaptionChange(item.id, localCaptions[item.id] || '')}
                         placeholder="Caption (e.g. Rear seating area showing cinema bar)..."
                         className="flex-1 bg-white border-[#DCDBD6] text-[#1B1A1A]"
+                        // Project Images captions are proposal copy — body face.
+                        style={proposalRoleStyle('caption')}
                       />
                       <button
                         type="button"

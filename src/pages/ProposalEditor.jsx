@@ -14,6 +14,8 @@ import {
   isManuallyEdited,
   requiresRegenerationConfirm,
 } from '@/components/proposal/proposalManualEdit';
+import ProposalTypographyStyles from '@/components/proposal/typography/ProposalTypographyStyles';
+import { proposalRoleStyle } from '@/components/proposal/typography/proposalTypography';
 import { resolveDealerBrandPresentation } from '@/components/account/defaultDealerBranding';
 import { resolveDealerIdentityName } from '@/components/account/dealerIdentityDisplay';
 import ProposalWorkspaceToolbar from '@/components/proposal/ProposalWorkspaceToolbar';
@@ -654,7 +656,11 @@ export default function ProposalEditor() {
 
       {/* ── Centre: The document ── */}
       <div className="flex-1 overflow-y-auto">
-        <div className="max-w-3xl mx-auto px-12 py-16">
+        {/* Proposal typography scope — cover, section headings and body copy
+            follow the Artcoustic rule: Futura PT Light headings, Didact Gothic
+            body, Century Gothic fallback. */}
+        <ProposalTypographyStyles />
+        <div className="proposal-preview max-w-3xl mx-auto px-12 py-16">
           {archived && (
             <div className="mb-8 rounded-lg border border-[#A79E8C] bg-[#F5F4F0] px-6 py-4 flex items-center justify-between">
               <div>
@@ -701,8 +707,8 @@ export default function ProposalEditor() {
                 {def.type !== 'cover' && (
                   <div className="flex items-center gap-2 mb-4">
                     <h2
-                      className="text-2xl font-bold text-[#1B1A1A]"
-                      style={{ fontFamily: 'Didact Gothic, sans-serif' }}
+                      className="proposal-section-title text-[#1B1A1A]"
+                      style={proposalRoleStyle('header')}
                     >
                       {section.title}
                     </h2>

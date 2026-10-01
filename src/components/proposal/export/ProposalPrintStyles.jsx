@@ -44,8 +44,9 @@ export default function ProposalPrintStyles() {
         body.proposal-export-mode .proposal-print-portal * {
           -webkit-print-color-adjust: exact !important;
           print-color-adjust: exact !important;
-          font-family: "Didact Gothic", "Century Gothic", sans-serif !important;
         }
+        /* No blanket font-family here: a wildcard family would flatten the
+           heading roles. Families are set per role below and on the cover. */
 
         /* ── Cover — one full page of imagery, bled to the paper edge ── */
         body.proposal-export-mode .proposal-print-cover {
@@ -193,6 +194,44 @@ ${buildReportTypographyCss({ scope: '.proposal-print-portal', profile: 'a4', pre
           font-size: var(--report-body-size);
           letter-spacing: var(--report-body-tracking);
           line-height: var(--report-body-leading);
+        }
+
+        body.proposal-export-mode .proposal-print-portal .kph-table th {
+          font-family: var(--report-font-heading) !important;
+          font-size: var(--report-subheader-size);
+          font-weight: 300;
+          letter-spacing: var(--report-heading-tracking);
+          line-height: var(--report-heading-leading);
+          text-transform: uppercase;
+        }
+
+        /* ── Cover — the proposal title in the header face at title scale ── */
+        body.proposal-export-mode .proposal-print-cover .proposal-cover-name {
+          font-family: var(--report-font-heading) !important;
+          font-size: var(--report-title-size) !important;
+          font-weight: 300 !important;
+          letter-spacing: var(--report-heading-tracking) !important;
+          line-height: var(--report-heading-leading) !important;
+          text-transform: uppercase;
+          overflow-wrap: anywhere;
+        }
+
+        body.proposal-export-mode .proposal-print-cover .proposal-cover-label,
+        body.proposal-export-mode .proposal-print-cover .proposal-cover-partner {
+          font-family: var(--report-font-heading) !important;
+          font-size: var(--report-subheader-size) !important;
+          font-weight: 300 !important;
+          letter-spacing: var(--report-heading-tracking) !important;
+          line-height: var(--report-heading-leading) !important;
+          text-transform: uppercase;
+        }
+
+        body.proposal-export-mode .proposal-print-cover .proposal-cover-meta {
+          font-family: var(--report-font-body) !important;
+          font-size: var(--report-body-size) !important;
+          letter-spacing: var(--report-body-tracking) !important;
+          line-height: var(--report-body-leading) !important;
+          text-transform: none;
         }
       }
 

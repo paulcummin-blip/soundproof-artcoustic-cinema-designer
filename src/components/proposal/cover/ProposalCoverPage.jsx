@@ -32,6 +32,12 @@ import { useBrandImage } from '@/components/account/useBrandImage';
 import { APPROVED_DEALER_BRANDING } from '@/components/account/defaultDealerBranding';
 import BrandLockup from '@/components/ui/BrandLockup';
 import { REPORT_FONT_BODY as FONT } from '@/components/report/typography/reportTypography';
+import {
+  PROPOSAL_FONT_HEADING,
+  PROPOSAL_FONT_BODY,
+  PROPOSAL_TRACKING_HEADING,
+  PROPOSAL_LEADING_HEADING,
+} from '@/components/proposal/typography/proposalTypography';
 
 const WHITE = '#FFFFFF';
 
@@ -50,12 +56,21 @@ function formatCoverDate(value) {
 }
 
 /** Small letterspaced label above an identity value. */
-function IdentityValue({ label, value, valueSize = 26, valueSpacing = '0.02em' }) {
+function IdentityValue({
+  label,
+  value,
+  valueSize = 26,
+  valueSpacing = '0.02em',
+  valueClass,
+  heading = false,
+}) {
   if (!value) return null;
   return (
     <div>
       <div
+        className="proposal-cover-label"
         style={{
+          fontFamily: PROPOSAL_FONT_HEADING,
           fontSize: 9,
           fontWeight: 600,
           letterSpacing: '0.26em',
@@ -66,11 +81,24 @@ function IdentityValue({ label, value, valueSize = 26, valueSpacing = '0.02em' }
         {label}
       </div>
       <div
+        className={valueClass}
         style={{
-          fontSize: valueSize,
-          fontWeight: 300,
-          letterSpacing: valueSpacing,
-          lineHeight: 1.2,
+          fontFamily: PROPOSAL_FONT_HEADING,
+          // The project name is the cover title and takes the proposal title
+          // role. A reference code is metadata and keeps its own small size.
+          ...(heading
+            ? {
+                fontWeight: 300,
+                letterSpacing: PROPOSAL_TRACKING_HEADING,
+                lineHeight: PROPOSAL_LEADING_HEADING,
+                textTransform: 'uppercase',
+              }
+            : {
+                fontSize: valueSize,
+                fontWeight: 300,
+                letterSpacing: valueSpacing,
+                lineHeight: PROPOSAL_LEADING_HEADING,
+              }),
           color: WHITE,
           marginTop: 8,
         }}
@@ -151,7 +179,9 @@ export default function ProposalCoverPage({
         >
           {dealerName && (
             <div
+              className="proposal-cover-partner"
               style={{
+                fontFamily: PROPOSAL_FONT_HEADING,
                 fontSize: 15,
                 fontWeight: 400,
                 letterSpacing: '0.08em',
@@ -167,8 +197,8 @@ export default function ProposalCoverPage({
             <IdentityValue
               label="Project"
               value={projectName}
-              valueSize={21}
-              valueSpacing="0.02em"
+              heading
+              valueClass="proposal-cover-name"
             />
           </div>
 
@@ -194,7 +224,9 @@ export default function ProposalCoverPage({
           }}
         >
           <span
+            className="proposal-cover-meta"
             style={{
+              fontFamily: PROPOSAL_FONT_BODY,
               fontSize: 12,
               letterSpacing: '0.08em',
               color: WHITE,
@@ -206,9 +238,10 @@ export default function ProposalCoverPage({
           <div style={{ textAlign: 'right', minWidth: 0 }}>
             <div
               style={{
+                fontFamily: PROPOSAL_FONT_HEADING,
                 fontSize: 11,
-                fontWeight: 600,
-                letterSpacing: '0.08em',
+                fontWeight: 300,
+                letterSpacing: PROPOSAL_TRACKING_HEADING,
                 textTransform: 'uppercase',
                 color: WHITE,
                 lineHeight: 1.3,
@@ -218,8 +251,9 @@ export default function ProposalCoverPage({
             </div>
             <div
               style={{
+                fontFamily: PROPOSAL_FONT_HEADING,
                 fontSize: 9,
-                fontWeight: 500,
+                fontWeight: 300,
                 letterSpacing: '0.04em',
                 textTransform: 'uppercase',
                 color: WHITE,
