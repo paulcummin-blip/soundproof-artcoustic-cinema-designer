@@ -18,6 +18,8 @@ import {
   parameterResultHeading,
   parameterResultDescription,
 } from "./parameterResultCopy";
+import { toPlanTheta } from "./p7IdealAngles";
+import P7PlacementGuidance from "./P7PlacementGuidance";
 
 import {
   REPORT_FONT_HEADING as HEADING_FONT,
@@ -27,6 +29,7 @@ import {
 const FL_FR_COLOR = "#3E4349";
 const LW_RW_COLOR = "#213428";
 const MEDIAN_COLOR = "#8A7B6A";
+const SURROUND_COLOR = "#625143";
 const RSP_RING_COLOR = "#213428";
 
 function levelToLabel(level) {
@@ -53,7 +56,19 @@ export default function ClientP7FrontWides({
 }) {
   if (!p7Data) return null;
 
-  const { level, maxDeviation, lwPos, rwPos, flPos, frPos, medianPoint, rsp } = p7Data;
+  const {
+    level,
+    maxDeviation,
+    lwPos,
+    rwPos,
+    flPos,
+    frPos,
+    medianPoint,
+    rsp,
+    ideal,
+    slPos,
+    srPos,
+  } = p7Data;
 
   const levelLabel = levelToLabel(level);
   const color = levelColor(level);
@@ -100,6 +115,71 @@ export default function ClientP7FrontWides({
   const frPx = frPos ? toPx(frPos.x, frPos.y) : null;
   const medianPx = medianPoint ? toPx(medianPoint.x, medianPoint.y) : null;
 
+  // ── Ideal median position vs the actual front wide position ────────────────
+  // The published P7 result carries, per side, the ideal (median) angle, the
+  // actual angle and the deviation between them. The plan draws the ideal median
+  // ray and the deviation arc, so the reader can see both where each front wide
+  // sits and where it ideally wants to be. Drawing only — nothing is recomputed.
+  const polarToSvg = (cx, cy, radiusM, thetaDeg) => {
+    const rad = (thetaDeg - 90) * (Math.PI / 180);
+    return {
+      x: cx + radiusM * Math.cos(rad) * SCALE,
+      y: cy + radiusM * Math.sin(rad) * SCALE,
+    };
+  };
+
+  const publishedDeviations = [ideal?.LW?.deviation, ideal?.RW?.deviation]
+    .map((value) => Number(value))
+    .filter((value) => Number.isFinite(value));
+  const worstDeviation = publishedDeviations.length ? Math.max(...publishedDeviations) : null;
+
+  const placementSides = [
+    { key: "LW", pos: lwPos, ideal: ideal?.LW },
+    { key: "RW", pos: rwPos, ideal: ideal?.RW },
+  ]
+    .filter((side) => side.ideal && side.pos && rspPx && rsp)
+    .map((side) => {
+      const idealTheta = toPlanTheta(side.ideal.targetAngle);
+      const actualTheta = toPlanTheta(side.ideal.actualAngle);
+      if (idealTheta == null || actualTheta == null) return null;
+      const radiusM = Math.hypot(side.pos.x - rsp.x, side.pos.y - rsp.y) || 1;
+      const idealPt = polarToSvg(rspPx.px, rspPx.py, radiusM, idealTheta);
+      const labelPt = polarToSvg(rspPx.px, rspPx.py, radiusM + 0.4, idealTheta);
+      const arcRadiusM = radiusM * 1.16;
+      const arcStart = polarToSvg(rspPx.px, rspPx.py, arcRadiusM, actualTheta);
+      const arcEnd = polarToSvg(rspPx.px, rspPx.py, arcRadiusM, idealTheta);
+      const sweep = ((idealTheta - actualTheta) % 360 + 360) % 360;
+      const arcLabelPt = polarToSvg(
+        rspPx.px,
+        rspPx.py,
+        arcRadiusM + 0.3,
+        (actualTheta + sweep / 2) % 360,
+      );
+      const deviation = Number(side.ideal.deviation);
+      return {
+        key: side.key,
+        idealPt,
+        labelPt,
+        arcLabelPt,
+        arcPath: `M ${arcStart.x} ${arcStart.y} A ${arcRadiusM * SCALE} ${arcRadiusM * SCALE} 0 ${sweep > 180 ? 1 : 0} 1 ${arcEnd.x} ${arcEnd.y}`,
+        deviationLabel: Number.isFinite(deviation) ? `${deviation.toFixed(1)}°` : null,
+        isWorst: Number.isFinite(deviation)
+          && Number.isFinite(worstDeviation)
+          && Math.abs(deviation - worstDeviation) < 0.001,
+      };
+    })
+    .filter(Boolean);
+
+  const showIdealMedian = placementSides.length > 0;
+
+  // The adjacent side surrounds give the median angle its far end.
+  const surroundPx = [
+    { pos: slPos, label: "SL" },
+    { pos: srPos, label: "SR" },
+  ]
+    .filter((entry) => entry.pos)
+    .map((entry) => ({ ...toPx(entry.pos.x, entry.pos.y), label: entry.label }));
+
   const showDrawing = !print || printPart !== "support";
   const showSupport = !print || printPart !== "drawing";
 
@@ -121,6 +201,38 @@ export default function ClientP7FrontWides({
     : printPart === "support"
     ? { width: "100%", display: "flex", flexDirection: "column", alignItems: "center", gap: 8, padding: "0 16px", fontFamily: BODY_FONT }
     : { display: "flex", flexDirection: "column", alignItems: "center", gap: 12, padding: "8px 16px", width: "100%", height: "100%", fontFamily: BODY_FONT };
+
+  // Legend reads the same three facts as the drawing: the ideal median
+  // direction, where the front wides actually sit, and the deviation between
+  // them. The fallback keeps the original three entries when no ideal angle was
+  // published.
+  const legendItems = [
+    {
+      id: "median",
+      label: showIdealMedian ? "Ideal median position" : "Median reference",
+      sample: <line x1={10} y1={10} x2={16} y2={4} stroke={MEDIAN_COLOR} strokeWidth={2} strokeDasharray="3 2" />,
+    },
+    {
+      id: "wides",
+      label: "Front wides (actual)",
+      sample: <circle cx={10} cy={10} r={5} fill={LW_RW_COLOR} />,
+    },
+    ...(showIdealMedian ? [{
+      id: "deviation",
+      label: "Deviation from median",
+      sample: <path d="M 4 14 A 10 10 0 0 1 16 14" fill="none" stroke={MEDIAN_COLOR} strokeWidth={2} />,
+    }] : []),
+    {
+      id: "screen",
+      label: "Screen speakers",
+      sample: <circle cx={10} cy={10} r={5} fill={FL_FR_COLOR} />,
+    },
+    ...(surroundPx.length ? [{
+      id: "surrounds",
+      label: "Side surrounds",
+      sample: <circle cx={10} cy={10} r={5} fill={SURROUND_COLOR} />,
+    }] : []),
+  ];
 
   return (
     <div style={containerStyle}>
@@ -201,19 +313,60 @@ export default function ClientP7FrontWides({
             SCREEN
           </text>
 
-          {/* Median reference line from RSP through median point */}
-          {rspPx && medianPx && (
-            <line
-              x1={rspPx.px}
-              y1={rspPx.py}
-              x2={medianPx.px}
-              y2={medianPx.py}
-              stroke={MEDIAN_COLOR}
-              strokeWidth={2}
-              strokeDasharray="6 4"
-              strokeLinecap="round"
-            />
-          )}
+          {/* Median reference — the ideal median direction per side, drawn from
+              the published angles. Falls back to the midpoint of the current
+              front wide positions when the published angles are unavailable. */}
+          {showIdealMedian
+            ? placementSides.map((side) => (
+                <line
+                  key={`ideal-ray-${side.key}`}
+                  x1={rspPx.px}
+                  y1={rspPx.py}
+                  x2={side.idealPt.x}
+                  y2={side.idealPt.y}
+                  stroke={MEDIAN_COLOR}
+                  strokeWidth={2}
+                  strokeDasharray="6 4"
+                  strokeLinecap="round"
+                />
+              ))
+            : rspPx && medianPx && (
+                <line
+                  x1={rspPx.px}
+                  y1={rspPx.py}
+                  x2={medianPx.px}
+                  y2={medianPx.py}
+                  stroke={MEDIAN_COLOR}
+                  strokeWidth={2}
+                  strokeDasharray="6 4"
+                  strokeLinecap="round"
+                />
+              )}
+
+          {/* Adjacent side surrounds — the far end of the median angle */}
+          {surroundPx.map((surround) => (
+            <g key={`surround-${surround.label}`}>
+              <circle
+                cx={surround.px}
+                cy={surround.py}
+                r={5}
+                fill={SURROUND_COLOR}
+                stroke="#F8F8F7"
+                strokeWidth={1.5}
+              />
+              <text
+                x={surround.px}
+                y={surround.py - 12}
+                fill={SURROUND_COLOR}
+                fontSize={10}
+                textAnchor="middle"
+                fontFamily={BODY_FONT}
+                fontWeight={600}
+              >
+                {surround.label}
+              </text>
+            </g>
+          ))}
 
           {/* FL / FR speakers */}
           {flPx && (
@@ -273,8 +426,62 @@ export default function ClientP7FrontWides({
             </text>
           </g>
 
-          {/* Median marker (small diamond at median point) */}
-          {medianPx && (
+          {/* Deviation from the median — the angular span between the actual
+              position and the ideal median position. The side that sets the
+              result carries the level colour. */}
+          {placementSides.map((side) => (
+            <g key={`deviation-${side.key}`}>
+              <path
+                d={side.arcPath}
+                fill="none"
+                stroke={side.isWorst ? color : MEDIAN_COLOR}
+                strokeWidth={side.isWorst ? 2.5 : 1.5}
+                strokeOpacity={side.isWorst ? 0.95 : 0.6}
+              />
+              {side.deviationLabel && (
+                <text
+                  x={side.arcLabelPt.x}
+                  y={side.arcLabelPt.y}
+                  fill={side.isWorst ? color : MEDIAN_COLOR}
+                  fontSize={11}
+                  fontWeight={side.isWorst ? 600 : 400}
+                  textAnchor="middle"
+                  fontFamily={BODY_FONT}
+                >
+                  {side.deviationLabel}
+                </text>
+              )}
+            </g>
+          ))}
+
+          {/* Ideal median position markers — where each front wide aims to be */}
+          {placementSides.map((side) => (
+            <g key={`ideal-marker-${side.key}`}>
+              <rect
+                x={side.idealPt.x - 4}
+                y={side.idealPt.y - 4}
+                width={8}
+                height={8}
+                fill={MEDIAN_COLOR}
+                transform={`rotate(45 ${side.idealPt.x} ${side.idealPt.y})`}
+              />
+              <text
+                x={side.labelPt.x}
+                y={side.labelPt.y}
+                fill={MEDIAN_COLOR}
+                fontSize={9}
+                textAnchor="middle"
+                fontFamily={BODY_FONT}
+                letterSpacing="0.06em"
+              >
+                IDEAL
+              </text>
+            </g>
+          ))}
+
+          {/* Median marker (small diamond at median point) — only when the
+              published ideal angles are unavailable */}
+          {!showIdealMedian && medianPx && (
             <g>
               <rect
                 x={medianPx.px - 4}
@@ -333,24 +540,12 @@ export default function ClientP7FrontWides({
             maxWidth: print ? "100%" : 600,
             fontFamily: BODY_FONT,
           }}>
-            <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-              <svg width={18} height={18} viewBox="0 0 20 20">
-                <line x1={10} y1={10} x2={16} y2={4} stroke={MEDIAN_COLOR} strokeWidth={2} strokeDasharray="3 2" />
-              </svg>
-              <span style={{ fontSize: 11, color: "#3E4349" }}>Median reference</span>
-            </div>
-            <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-              <svg width={18} height={18} viewBox="0 0 20 20">
-                <circle cx={10} cy={10} r={5} fill={LW_RW_COLOR} />
-              </svg>
-              <span style={{ fontSize: 11, color: "#3E4349" }}>Front wides</span>
-            </div>
-            <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-              <svg width={18} height={18} viewBox="0 0 20 20">
-                <circle cx={10} cy={10} r={5} fill={FL_FR_COLOR} />
-              </svg>
-              <span style={{ fontSize: 11, color: "#3E4349" }}>Screen speakers</span>
-            </div>
+            {legendItems.map((item) => (
+              <div key={item.id} style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                <svg width={18} height={18} viewBox="0 0 20 20">{item.sample}</svg>
+                <span style={{ fontSize: 11, color: "#3E4349" }}>{item.label}</span>
+              </div>
+            ))}
           </div>
 
           {/* ── P7 result card — pill, level heading, official RP22 description ── */}
@@ -399,29 +594,13 @@ export default function ClientP7FrontWides({
             </div>
           )}
 
-          {/* ── Summary callout (screen only) ── */}
-          {!print && (
-            <div style={{
-              display: "flex",
-              alignItems: "center",
-              gap: 16,
-              padding: "16px 20px",
-              background: "#F1F0EE",
-              borderRadius: 12,
-              border: "1px solid #DCDBD6",
-              width: "100%",
-              fontFamily: BODY_FONT,
-            }}>
-              <div style={{ flex: 1 }}>
-                <div style={{ fontSize: 16, fontWeight: 600, color: "#213428", marginBottom: 4, fontFamily: HEADING_FONT }}>
-                  Front Wide Placement
-                </div>
-                <div style={{ fontSize: 13, color: "#3E4349", lineHeight: 1.5 }}>
-                  The front wide speakers are positioned relative to the median angle between the screen and surround channels.
-                </div>
-              </div>
-            </div>
-          )}
+          {/* ── Placement guidance — where the wides sit, where they want to be ── */}
+          <P7PlacementGuidance
+            level={level}
+            maxDeviation={maxDeviation}
+            ideal={ideal}
+            print={print}
+          />
         </>
       )}
     </div>

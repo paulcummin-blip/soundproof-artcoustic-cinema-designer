@@ -13,6 +13,25 @@ function getSpeakerPos(speaker) {
   return Number.isFinite(x) && Number.isFinite(y) ? { x, y } : null;
 }
 
+/**
+ * The published ideal-median authority for one front wide. The engine publishes,
+ * per side, the ideal (median) angle, the actual angle and the deviation between
+ * them — read verbatim, never re-derived. The angles stay in the engine's own
+ * azimuth frame; the report converts them for drawing and copy.
+ */
+function readIdealSide(side) {
+  if (!side) return null;
+  const targetAngle = Number(side.targetAngle);
+  const actualAngle = Number(side.actualAngle);
+  if (!Number.isFinite(targetAngle) || !Number.isFinite(actualAngle)) return null;
+  const deviation = Number(side.deviation);
+  return {
+    targetAngle,
+    actualAngle,
+    deviation: Number.isFinite(deviation) ? deviation : null,
+  };
+}
+
 export function selectClientP7FrontWides(engineeringSummary, placedSpeakers, rsp) {
   if (!engineeringSummary || !Array.isArray(placedSpeakers)) return null;
 
@@ -30,10 +49,18 @@ export function selectClientP7FrontWides(engineeringSummary, placedSpeakers, rsp
     level: p7Param.level || null,
     maxDeviation: Number.isFinite(Number(p7Param.value)) ? Number(p7Param.value) : null,
     perSide: p7Param.perSide || null,
+    // Ideal median position per side — where each front wide aims to be, and how
+    // far the current position deviates from it.
+    ideal: {
+      LW: readIdealSide(p7Param.perSide?.LW),
+      RW: readIdealSide(p7Param.perSide?.RW),
+    },
     lwPos,
     rwPos,
     flPos: getSpeakerPos(find("FL")),
     frPos: getSpeakerPos(find("FR")),
+    slPos: getSpeakerPos(find("SL")),
+    srPos: getSpeakerPos(find("SR")),
     medianPoint: {
       x: (lwPos.x + rwPos.x) / 2,
       y: (lwPos.y + rwPos.y) / 2,
