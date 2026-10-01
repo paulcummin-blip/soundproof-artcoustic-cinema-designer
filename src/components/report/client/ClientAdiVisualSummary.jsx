@@ -3,20 +3,27 @@
  * ----------------------
  * The Visual Report's ADI Design Summary block.
  *
- * Four short statements — the primary limitation, the current result, the
- * design interpretation and the next step — plus one optimiser status line
- * when an evaluated optimiser result exists. It is deliberately short and
- * deliberately free of engineering recommendations: the Visual Report
- * presents the selected design, and every design action lives in the design
- * workflow (Bass Optimiser) and the Technical Report.
+ * The Visual Report presents a COMPLETED design, so this block is strength-led:
+ * the ADI review line, one short paragraph of the design's genuine engineering
+ * strengths, one Bass Optimiser review line when a result exists, and the
+ * pointer to the Technical Report for engineering detail.
  *
- * Presentation only. Every value comes from buildAdiVisualReportSummary(),
- * which reads the canonical ADI guidance; nothing is recalculated here.
+ * It never reopens the design process: no limiting factor, no parameter level,
+ * no worst-affected seat, no "next step" and no instruction to optimise.
+ * Poorer results belong to the Technical Report, the RP22 parameter table and
+ * the Bass Optimiser panel.
+ *
+ * Presentation only. Every sentence comes from buildAdiVisualReportSummary(),
+ * which reads the published strengths and the persisted optimiser record.
+ * Nothing is recalculated here.
  */
 
 import React, { useMemo } from "react";
-import { buildAdiDesignGuidance } from "@/components/adi/designGuidance/adiDesignGuidanceEngine";
-import { buildAdiVisualReportSummary } from "@/components/adi/designGuidance/adiVisualReportCopy";
+import { selectClientAdiStrengths } from "./selectClientAdiStrengths";
+import {
+  buildAdiVisualReportSummary,
+  ADI_VISUAL_PARAGRAPH_LIMIT,
+} from "@/components/adi/designGuidance/adiVisualReportCopy";
 import { useOptimiserPlanAuthority } from "@/components/room/bass/optimiserPlan/optimiserPlanStore";
 import {
   REPORT_FONT_HEADING as FONT_HEADING,
@@ -33,13 +40,8 @@ const COLORS = {
   label: "#9B8E82",
 };
 
-const ROWS = [
-  ["primaryLimitation", "Primary limitation"],
-  ["currentResult", "Current result"],
-  ["worstAffected", "Worst affected"],
-  ["interpretation", "Design interpretation"],
-  ["nextStep", "Next step"],
-];
+/** Strongest-first pool the paragraph draws its sentences from. */
+const STRENGTH_POOL_LIMIT = 6;
 
 function AdiMark() {
   return (
@@ -67,9 +69,6 @@ function AdiMark() {
 
 export default function ClientAdiVisualSummary({
   engineeringSummary,
-  seats,
-  geometry,
-  system,
   projectId = null,
   versionId = null,
   compact = false,
@@ -77,9 +76,13 @@ export default function ClientAdiVisualSummary({
   const optimiserRecord = useOptimiserPlanAuthority(projectId, versionId);
 
   const summary = useMemo(() => {
-    const guidance = buildAdiDesignGuidance(engineeringSummary, { seats, geometry, system });
-    return buildAdiVisualReportSummary({ guidance, optimiserRecord });
-  }, [engineeringSummary, seats, geometry, system, optimiserRecord]);
+    const strengths = selectClientAdiStrengths(engineeringSummary, { limit: STRENGTH_POOL_LIMIT });
+    return buildAdiVisualReportSummary({
+      strengths,
+      optimiserRecord,
+      paragraphLimit: ADI_VISUAL_PARAGRAPH_LIMIT,
+    });
+  }, [engineeringSummary, optimiserRecord]);
 
   if (!summary) return null;
 
@@ -134,39 +137,30 @@ export default function ClientAdiVisualSummary({
           borderTop: `1px solid ${COLORS.divider}`,
           display: "flex",
           flexDirection: "column",
-          gap: 10,
+          gap: 8,
         }}
       >
-        {ROWS.map(([field, label]) => {
-          const value = summary[field];
-          if (!value) return null;
-          return (
-            <div key={field}>
-              <div
-                style={{
-                  fontSize: 9,
-                  fontWeight: 700,
-                  letterSpacing: "0.1em",
-                  textTransform: "uppercase",
-                  color: COLORS.label,
-                  marginBottom: 3,
-                }}
-              >
-                {label}
-              </div>
-              <div
-                style={{
-                  fontSize: compact ? 11.5 : 12.5,
-                  lineHeight: 1.55,
-                  color: field === "primaryLimitation" ? COLORS.primary : COLORS.body,
-                  fontWeight: field === "primaryLimitation" ? 600 : 400,
-                }}
-              >
-                {value}
-              </div>
-            </div>
-          );
-        })}
+        <p
+          style={{
+            margin: 0,
+            fontSize: compact ? 11.5 : 12.5,
+            lineHeight: 1.6,
+            color: COLORS.primary,
+            fontWeight: 600,
+          }}
+        >
+          {summary.intro}
+        </p>
+        <p
+          style={{
+            margin: 0,
+            fontSize: compact ? 11.5 : 12.5,
+            lineHeight: 1.6,
+            color: COLORS.body,
+          }}
+        >
+          {summary.body.join(" ")}
+        </p>
       </div>
 
       {summary.optimiserStatus && (
@@ -181,6 +175,19 @@ export default function ClientAdiVisualSummary({
           }}
         >
           {summary.optimiserStatus}
+        </div>
+      )}
+
+      {summary.closing && (
+        <div
+          style={{
+            marginTop: 10,
+            fontSize: 10.5,
+            lineHeight: 1.55,
+            color: COLORS.label,
+          }}
+        >
+          {summary.closing}
         </div>
       )}
     </section>

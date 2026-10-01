@@ -4,16 +4,16 @@
  * Visual Report PAGE — ADI Design Summary.
  *
  * One client-facing section that presents what Artcoustic Design Intelligence
- * contributes to this design:
+ * contributes to this COMPLETED design:
  *   - the project-specific strengths the design genuinely achieves
- *   - the primary limitation, the current result and the design interpretation
- *   - the next step: use Bass Optimiser in the design workflow
+ *   - the ADI review of the completed design, in the design's strongest terms
  *
- * The Visual Report is a presentation of the selected design, so the block is
- * deliberately short and carries no engineering recommendation. Detailed ADI
- * guidance (best first change, expected improvement, lower-value changes)
- * belongs to Bass Optimiser, Engineer details and the Technical Report, which
- * all continue to render the full guidance block.
+ * The Visual Report presents a finished design, so the section is strength-led:
+ * it never leads with a limiting factor, a parameter level, a worst-affected
+ * seat or a "next step", and it never tells the reader to go and optimise.
+ * Poorer results and the engineering detail stay in the Technical Report, the
+ * RP22 parameter table, the Bass Optimiser panel and Engineer details — all of
+ * which keep the full ADI guidance block unchanged.
  *
  * Naming rule: "Artcoustic Design Intelligence" on first reference, "ADI"
  * afterwards. All engineering content is read from the published authority —
@@ -151,7 +151,7 @@ export default function ClientAdiDesignSummary({
         </div>
       )}
 
-      {/* ── Guidance — the ADI limiting factor and practical next actions ── */}
+      {/* ── ADI review — the completed design's strengths, never its limits ── */}
       {showGuidance && (
         <div style={{ width: "100%" }}>
           <div style={{
@@ -162,13 +162,10 @@ export default function ClientAdiDesignSummary({
             color: COLORS.label,
             marginBottom: 8,
           }}>
-            Design intelligence summary
+            Design strengths and interpretation
           </div>
           <ClientAdiVisualSummary
             engineeringSummary={engineeringSummary}
-            seats={seats}
-            geometry={geometry}
-            system={system}
             projectId={projectId}
             versionId={versionId}
           />

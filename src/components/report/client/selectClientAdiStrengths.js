@@ -14,7 +14,7 @@
 import { getOfficialRp22Title } from "@/components/utils/rp22OfficialTitles";
 
 const ROOM_SCOPE_KEYS = [12, 13, 14, 18];
-const SEAT_SCOPE_KEYS = ["p1", "p4", "p5", "p6", "p9", "p10", "p16", "p17"];
+const SEAT_SCOPE_KEYS = ["p1", "p4", "p5", "p6", "p9", "p10", "p16", "p17", "p19", "p20"];
 
 const LEVEL_RANK = { L4: 4, L3: 3, L2: 2, L1: 1, FAIL: 0 };
 

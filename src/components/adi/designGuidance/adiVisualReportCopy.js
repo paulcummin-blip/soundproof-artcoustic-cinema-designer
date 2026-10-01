@@ -3,113 +3,131 @@
 // ARTCOUSTIC DESIGN INTELLIGENCE (ADI)
 // The Visual Report's ADI Design Summary — copy builder.
 //
-// The Visual Report PRESENTS the selected design. It is not a design-debug
-// document, so it states four things and nothing else:
+// PRODUCT RULE
+//   Visual Report   → presents the COMPLETED design (this module)
+//   Bass Optimiser  → improves the design
+//   Technical Report→ explains the engineering and the limitations
 //
-//   Primary limitation   — what ADI identified (the canonical headline)
-//   Current result       — the measured parameter and its level
-//   Worst affected       — the canonical fact line, verbatim
-//   Design interpretation— why the result is what it is
-//   Next step            — use Bass Optimiser in the design workflow
+// The Visual Report is produced after the design is finalised, so this module
+// never reopens the design process: it states the strongest engineering
+// qualities the published results genuinely support, and nothing else.
 //
-// plus, only where an optimiser record exists, one status line.
+//   Intro    — ADI has reviewed the completed design
+//   Body     — one sentence per genuinely strong parameter (L3 or better),
+//              strongest first, or a neutral assessed-design line if none
+//   Optimiser— one line, and only when a Bass Optimiser result exists
+//   Closing  — the design is presented as assessed; engineering detail is in
+//              the Technical Report
 //
 // WHAT THIS MODULE DELIBERATELY DOES NOT DO
-// It never prints the engineering guidance: no "best first change", no
-// "expected improvement", no re-placement or seating-move instruction, no
-// projected P20 level. Those belong to the design workflow (Bass Optimiser,
-// Engineer details) and to the Technical Report. Nothing here is offered as a
-// design action unless the optimiser has already evaluated and applied it.
+// It never prints a limiting factor, a parameter level, a worst-affected seat,
+// a "next step", any repositioning guidance, a projected level, or any advice
+// implying the design is unfinished. Those belong to the Technical Report, the
+// RP22 parameter table, the Bass Optimiser panel and Engineer details.
 //
-// This module produces TEXT ONLY. Every number and level it prints is copied
-// from the canonical guidance it is given — it calculates nothing.
+// This module produces TEXT ONLY. It calculates nothing: each sentence is
+// selected by an already-published strength, and no value is ever invented.
 //
 // PURE: no React, no side effects, no stores.
 // ---------------------------------------------------------------------------
 
-import { ADI_FACTOR_KIND } from "./adiLimitingFactorRules";
 import {
   OPTIMISER_LEVER_STATE,
   OPTIMISER_RECORD_KIND,
   OPTIMISER_TERMINAL_OUTCOME,
 } from "@/components/room/bass/optimiserPlan/optimiserPlanConstants";
 
-/** The one action the Visual Report ever names. */
-export const ADI_VISUAL_NEXT_STEP =
-  'Use Bass Optimiser in the design workflow to test practical improvement options before finalising the proposal.';
+/** The ADI review line that opens the Visual Report summary. */
+export const ADI_VISUAL_INTRO =
+  'ADI has reviewed the completed cinema design and identified the strongest engineering qualities of the system.';
 
-/** Stated when an optimiser result has been applied to this design. */
-export const ADI_VISUAL_OPTIMISER_APPLIED =
-  'Bass Optimiser has been applied to this design.';
-
-/** Stated when the optimiser confirmed an option that has not been applied. */
-export const ADI_VISUAL_OPTIMISER_AVAILABLE =
-  'Bass Optimiser has evaluated this design and confirmed an option worth applying. The recommendation and its engineering detail are in the Bass Optimiser panel.';
-
-/** Stated when the optimiser found nothing worth applying. */
-export const ADI_VISUAL_OPTIMISER_NO_IMPROVEMENT =
-  'Bass Optimiser did not confirm a practical change worth applying. Low-frequency treatment or seating/subwoofer layout changes may be considered during detailed design.';
+/** Stated in place of strengths when no parameter reaches the strength band. */
+export const ADI_VISUAL_NO_STRENGTHS_FALLBACK =
+  'The completed design has been assessed in full, and its RP22 performance results are reported on the following pages.';
 
 /**
- * Why the result is what it is, per limiting factor. Written as an
- * interpretation of the design, never as an instruction to change it.
+ * The one optimiser line the Visual Report ever prints. A run means the
+ * subwoofer layout was reviewed as part of the design process — never that
+ * something is still waiting to be applied.
  */
-const INTERPRETATION = Object.freeze({
-  [ADI_FACTOR_KIND.BASS_CONSISTENCY]:
-    'The current design delivers strong bass output and reference-seat performance, but the response varies across the seating area below the transition frequency. This is a room-and-seat interaction, not a loudspeaker output limit.',
-  [ADI_FACTOR_KIND.BASS_RESPONSE]:
-    'The reference-seat response is set by how the room behaves below the transition frequency at that position, rather than by the loudspeaker. It is a room and system interaction.',
-  [ADI_FACTOR_KIND.CAPABILITY]:
-    'The achievable output is set by the speaker and amplifier combination at the listening distance, so this is a system capability limit rather than a room interaction.',
-  [ADI_FACTOR_KIND.ROW_COLLAPSE]:
-    'The listening area is deeper than the layout serves evenly, so each row sees a slightly different result. This is a seating and geometry interaction.',
-  [ADI_FACTOR_KIND.INCOMPLETE]:
-    'ADI holds its conclusion until the outstanding results publish, so the design is not judged on provisional numbers.',
-  [ADI_FACTOR_KIND.BALANCED]:
-    'No single result is holding the design back; the remaining differences between parameters are refinements rather than constraints.',
+export const ADI_VISUAL_OPTIMISER_REVIEWED =
+  'Bass Optimiser has reviewed the subwoofer layout as part of the design process.';
+
+/** Closes the block and points to the engineering detail. */
+export const ADI_VISUAL_CLOSING =
+  'This report presents the selected design as assessed. Detailed engineering evidence remains available in the Technical Report.';
+
+/**
+ * One sentence per RP22 parameter, written only for parameters the published
+ * results show as genuinely strong (L3 or better). Each sentence is a positive
+ * statement of what the design achieves — never a comparative or a promise.
+ */
+export const ADI_VISUAL_STRENGTH_SENTENCES = Object.freeze({
+  1: 'The listening positions are set well clear of the room boundaries, supporting precise and stable spatial resolution.',
+  4: 'The screen wall speakers are closely matched in level, supporting clear dialogue and stable imaging behind the screen.',
+  5: 'The surround speakers are spaced to support smooth, convincing movement around the seating area.',
+  6: 'The surround speakers are closely matched in level, supporting consistent effects all around the room.',
+  7: 'The wide speakers are accurately placed, widening and stabilising the front soundstage.',
+  9: 'The height speakers are spaced to support smooth, convincing movement above the seating area.',
+  10: 'The overhead speakers are closely matched in level, supporting consistent effects above the listener.',
+  12: 'The screen channels deliver strong dynamic capability at the reference listening position.',
+  13: 'The surround and overhead channels deliver strong dynamic capability at the reference listening position.',
+  14: 'The system delivers strong low-frequency output capability at the reference listening position.',
+  16: 'Sound stays consistent from seat to seat across the screen channels.',
+  17: 'Sound stays consistent from seat to seat across the surround and height channels.',
+  18: 'The system delivers deep in-room low-frequency extension.',
+  19: 'The bass response at the reference seat is smooth and well controlled.',
+  20: 'Low-frequency performance stays consistent across the seating area.',
 });
 
-const DEFAULT_INTERPRETATION =
-  'This result is set by the interaction between the room, the seating and the system rather than by any one component.';
+/** The default number of strength sentences the paragraph carries. */
+export const ADI_VISUAL_PARAGRAPH_LIMIT = 3;
 
-const text = (value) => (typeof value === "string" && value.trim() ? value.trim() : null);
-
-/** "P20 L1 — worst-seat deviation ±1.2 dB…" → the fact after the prefix. */
-function factAfterPrefix(line, prefix) {
-  const value = text(line);
-  if (!value) return null;
-  if (!prefix) return value;
-  const stripped = value.startsWith(prefix) ? value.slice(prefix.length) : value;
-  return stripped.replace(/^\s*[—-]\s*/, "").trim() || null;
-}
-
-/** The canonical parameter + level, e.g. "P20: L1". */
-function currentResultLine(guidance) {
-  const number = guidance?.parameterNumber;
-  const level = guidance?.level;
-  if (number == null && !level) return "Not calculated yet";
-  if (number == null) return `${level}`;
-  return `P${number}: ${level || "not calculated"}`;
+/**
+ * One sentence per genuinely strong parameter, strongest first.
+ *
+ * @param {Array<{number: number}>} strengths — selected strengths, already
+ *   gated on the published results by selectClientAdiStrengths
+ * @param {number} [limit]
+ * @returns {string[]}
+ */
+export function buildStrengthSentences(strengths, limit = ADI_VISUAL_PARAGRAPH_LIMIT) {
+  if (!Array.isArray(strengths)) return [];
+  return strengths
+    .map((strength) => ADI_VISUAL_STRENGTH_SENTENCES[Number(strength?.number)] || null)
+    .filter(Boolean)
+    .slice(0, Math.max(1, limit));
 }
 
 /**
- * The optimiser status line, or null when no evaluated result exists.
- * Reads the persisted record's own vocabulary — it never infers a result.
+ * The optimiser line, or null when there is nothing to state.
+ *
+ * A completed review is stated as a review and nothing more — whether an option
+ * was applied, confirmed or found unnecessary. A run that failed, never
+ * completed, or never happened makes no claim at all: the Visual Report never
+ * tells the reader to go and optimise the design.
  */
 export function resolveOptimiserStatusLine(record) {
   if (!record || typeof record !== "object") return null;
 
-  if (record.terminalOutcome === OPTIMISER_TERMINAL_OUTCOME.NO_USEFUL_IMPROVEMENT) {
-    return ADI_VISUAL_OPTIMISER_NO_IMPROVEMENT;
+  if (
+    record.terminalOutcome === OPTIMISER_TERMINAL_OUTCOME.FAILED
+    || record.terminalOutcome === OPTIMISER_TERMINAL_OUTCOME.EVALUATION_INCOMPLETE
+  ) {
+    return null;
   }
 
   const appliedStates = Object.values(record.applied || {});
   if (appliedStates.includes(OPTIMISER_LEVER_STATE.APPLIED)) {
-    return ADI_VISUAL_OPTIMISER_APPLIED;
+    return ADI_VISUAL_OPTIMISER_REVIEWED;
   }
 
   if (record.recordKind === OPTIMISER_RECORD_KIND.PLAN) {
-    return ADI_VISUAL_OPTIMISER_AVAILABLE;
+    return ADI_VISUAL_OPTIMISER_REVIEWED;
+  }
+
+  if (record.terminalOutcome === OPTIMISER_TERMINAL_OUTCOME.NO_USEFUL_IMPROVEMENT) {
+    return ADI_VISUAL_OPTIMISER_REVIEWED;
   }
 
   return null;
@@ -119,28 +137,26 @@ export function resolveOptimiserStatusLine(record) {
  * Build the Visual Report ADI Design Summary.
  *
  * @param {Object} params
- * @param {Object|null} params.guidance        — buildAdiDesignGuidance output
+ * @param {Array}  [params.strengths]        — selected strengths (see above)
  * @param {Object|null} [params.optimiserRecord] — persisted optimiser record
- * @returns {Object|null} summary, or null when there is no guidance
+ * @param {number} [params.paragraphLimit]
+ * @returns {Object|null} summary, or null when no strengths were supplied
  */
-export function buildAdiVisualReportSummary({ guidance, optimiserRecord = null } = {}) {
-  if (!guidance?.available) return null;
+export function buildAdiVisualReportSummary({
+  strengths = [],
+  optimiserRecord = null,
+  paragraphLimit = ADI_VISUAL_PARAGRAPH_LIMIT,
+} = {}) {
+  if (!Array.isArray(strengths)) return null;
 
-  const limitation = text(guidance.headline) || text(guidance.area);
-  if (!limitation) return null;
-
-  const prefix = guidance.parameterNumber != null
-    ? `P${guidance.parameterNumber}${guidance.level ? ` ${guidance.level}` : ""}`
-    : null;
+  const sentences = buildStrengthSentences(strengths, paragraphLimit);
 
   return {
     heading: "ADI Design Summary",
-    primaryLimitation: limitation,
-    currentResult: currentResultLine(guidance),
-    worstAffected: factAfterPrefix(guidance.evidenceLines?.[0], prefix),
-    interpretation: INTERPRETATION[guidance.kind] || DEFAULT_INTERPRETATION,
-    nextStep: ADI_VISUAL_NEXT_STEP,
+    intro: ADI_VISUAL_INTRO,
+    body: sentences.length > 0 ? sentences : [ADI_VISUAL_NO_STRENGTHS_FALLBACK],
     optimiserStatus: resolveOptimiserStatusLine(optimiserRecord),
+    closing: ADI_VISUAL_CLOSING,
   };
 }
 

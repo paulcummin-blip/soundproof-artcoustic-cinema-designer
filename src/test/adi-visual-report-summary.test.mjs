@@ -1,28 +1,34 @@
 // adi-visual-report-summary.test.mjs
 // ----------------------------------
-// The Visual Report's ADI Design Summary presents the selected design:
+// The Visual Report presents a COMPLETED design. Its ADI Design Summary is
+// therefore strength-led:
 //
-//   Primary limitation · Current result · Worst affected ·
-//   Design interpretation · Next step
+//   Intro (ADI has reviewed the completed design) · strength sentences ·
+//   one Bass Optimiser review line when a result exists · closing pointer to
+//   the Technical Report.
 //
-// plus one optimiser status line when an evaluated optimiser result exists.
+// Short rule: the Visual Report sells the completed design, the Technical
+// Report explains the engineering, Bass Optimiser improves the design.
 //
-// It must NOT read like a design failure note. These tests pin the product
-// rules: no un-applied design advice, no speculative P20 claim, no re-designed
-// system, the honest RP22 result preserved, and Bass Optimiser named as the
-// only action path.
+// These tests pin the product rules: no limiting factor, no parameter code or
+// level, no worst-affected seat, no "next step", no un-applied design advice,
+// no speculative improvement claim — and the engineering guidance block still
+// in place everywhere it belongs.
 
 import { test, expect } from 'vitest';
 import fs from 'node:fs';
 import {
-  ADI_VISUAL_NEXT_STEP,
-  ADI_VISUAL_OPTIMISER_APPLIED,
-  ADI_VISUAL_OPTIMISER_AVAILABLE,
-  ADI_VISUAL_OPTIMISER_NO_IMPROVEMENT,
+  ADI_VISUAL_INTRO,
+  ADI_VISUAL_CLOSING,
+  ADI_VISUAL_NO_STRENGTHS_FALLBACK,
+  ADI_VISUAL_OPTIMISER_REVIEWED,
+  ADI_VISUAL_STRENGTH_SENTENCES,
+  ADI_VISUAL_PARAGRAPH_LIMIT,
+  buildStrengthSentences,
   buildAdiVisualReportSummary,
   resolveOptimiserStatusLine,
 } from '../components/adi/designGuidance/adiVisualReportCopy.js';
-import { ADI_FACTOR_KIND } from '../components/adi/designGuidance/adiLimitingFactorRules.js';
+import { selectClientAdiStrengths } from '../components/report/client/selectClientAdiStrengths.js';
 import {
   OPTIMISER_LEVER_STATE,
   OPTIMISER_RECORD_KIND,
@@ -38,181 +44,178 @@ const REPORT_PAGE = read('src/pages/RP22ClientReport.jsx');
 const LONG_BLOCK = read('src/components/adi/designGuidance/AdiDesignGuidanceBlock.jsx');
 const TECHNICAL = read('src/components/report/technical/TechnicalAdiAssessment.jsx');
 
-/** The canonical guidance output shape, as the engine produces it. */
-const guidance = (overrides = {}) => ({
-  available: true,
-  kind: ADI_FACTOR_KIND.BASS_CONSISTENCY,
-  parameterKey: 'p20',
-  parameterNumber: 20,
-  area: 'P20 Bass consistency',
-  level: 'L1',
-  severity: 'MEDIUM',
-  headline: 'Seat-to-seat bass consistency',
-  evidenceLines: [
-    'P20 L1 — worst-seat deviation ±1.2 dB across 8 seats',
-    'Next lowest result: P19 Bass response (L2)',
-  ],
-  rankedResults: [],
-  incomplete: false,
-  missingParameters: [],
-  // The full engineering guidance the Visual Report must NOT print.
-  whatIsWrong: 'Seat-to-seat bass consistency is the limiting factor of this design.',
-  whyItIsHappening: 'A single subwoofer can only be correctly aligned to one listening position.',
-  changeFirst: 'Move the seating first — pull row 2 forward, then re-place the subwoofers.',
-  expectedImprovement: 'Expect the worst-seat deviation to fall into the L2 window, moving P20 toward L2 or better.',
-  remainingLimitation: 'Any seat within about 0.6 m of a boundary keeps some error.',
-  lowerValueChanges: 'Changing the loudspeakers or re-aiming the bed channels does not address P20.',
-  ...overrides,
+/** The published engineering summary shape the strengths selector reads. */
+const engineeringSummary = ({ room = {}, seat = {} } = {}) => ({
+  roomResultsByParameter: Object.fromEntries(
+    Object.entries(room).map(([number, level]) => [Number(number), { level }]),
+  ),
+  project: {
+    reportCounts: {
+      seatResultsByParameter: Object.fromEntries(
+        Object.entries(seat).map(([key, level]) => [key, [{ level }]]),
+      ),
+    },
+  },
 });
 
-const summaryText = (summary) => Object.values(summary).filter((v) => typeof v === 'string').join(' \n ');
+const summaryText = (summary) =>
+  Object.values(summary).flat().filter((value) => typeof value === 'string').join(' \n ');
 
-/* ── Shape and length ─────────────────────────────────────────────────── */
+const strengthsFor = (fixture) =>
+  selectClientAdiStrengths(engineeringSummary(fixture), { limit: 6 });
 
-test('the Visual Report summary is four statements and a next step', () => {
-  const summary = buildAdiVisualReportSummary({ guidance: guidance() });
+/* ── Shape ────────────────────────────────────────────────────────────── */
+
+test('the Visual Report summary is an ADI review of the completed design', () => {
+  const summary = buildAdiVisualReportSummary({ strengths: strengthsFor({ room: { 14: 'L4' } }) });
 
   expect(summary.heading).toBe('ADI Design Summary');
   expect(Object.keys(summary)).toEqual([
     'heading',
-    'primaryLimitation',
-    'currentResult',
-    'worstAffected',
-    'interpretation',
-    'nextStep',
+    'intro',
+    'body',
     'optimiserStatus',
+    'closing',
   ]);
+  expect(summary.intro).toBe(ADI_VISUAL_INTRO);
+  expect(summary.intro).toMatch(/has reviewed the completed cinema design/);
+  expect(summary.intro).toMatch(/strongest engineering qualities/);
+  expect(summary.closing).toBe(ADI_VISUAL_CLOSING);
+  expect(summary.closing).toMatch(/present[^.]*as assessed/i);
+  expect(summary.closing).toMatch(/Technical Report/);
   expect(summary.optimiserStatus).toBeNull();
-  // Shorter than the engineering guidance it replaces, not a re-flow of it.
+  // Short: a summary of the design, not a re-flow of the engineering guidance.
   expect(summaryText(summary).length).toBeLessThan(700);
 });
 
-test('the honest limitation and the measured result are preserved', () => {
-  const summary = buildAdiVisualReportSummary({ guidance: guidance() });
+test('no limitations report shape survives on the Visual Report', () => {
+  const summary = buildAdiVisualReportSummary({ strengths: strengthsFor({ room: { 14: 'L4' } }) });
 
-  expect(summary.primaryLimitation).toBe('Seat-to-seat bass consistency');
-  expect(summary.currentResult).toBe('P20: L1');
-  expect(summary.worstAffected).toBe('worst-seat deviation ±1.2 dB across 8 seats');
+  expect(summary.primaryLimitation).toBeUndefined();
+  expect(summary.currentResult).toBeUndefined();
+  expect(summary.worstAffected).toBeUndefined();
+  expect(summary.interpretation).toBeUndefined();
+  expect(summary.nextStep).toBeUndefined();
 });
 
-test('an ungraded parameter states that rather than inventing a level', () => {
-  const summary = buildAdiVisualReportSummary({
-    guidance: guidance({ level: null, evidenceLines: [] }),
-  });
-  expect(summary.currentResult).toBe('P20: not calculated');
-  expect(summary.worstAffected).toBeNull();
-});
+/* ── Strength-led vocabulary ───────────────────────────────────────────── */
 
-test('no guidance means no block', () => {
-  expect(buildAdiVisualReportSummary({ guidance: null })).toBeNull();
-  expect(buildAdiVisualReportSummary({ guidance: { available: false } })).toBeNull();
-});
-
-/* ── Product rules: no advice, no speculation ─────────────────────────── */
-
-test('the engineering guidance is never printed', () => {
-  const summary = buildAdiVisualReportSummary({ guidance: guidance() });
-  const text = summaryText(summary);
-
-  expect(text).not.toContain(guidance().changeFirst);
-  expect(text).not.toContain(guidance().expectedImprovement);
-  expect(text).not.toContain(guidance().whyItIsHappening);
-  expect(text).not.toContain(guidance().lowerValueChanges);
-  expect(text).not.toContain(guidance().remainingLimitation);
-  expect(text).not.toContain(guidance().whatIsWrong);
-});
-
-test('no un-applied design change is presented as an action', () => {
-  const text = summaryText(buildAdiVisualReportSummary({ guidance: guidance() }));
+test('the summary never leads with a limitation, a level or a next step', () => {
+  const text = summaryText(buildAdiVisualReportSummary({
+    strengths: strengthsFor({
+      room: { 14: 'L4', 18: 'L3' },
+      seat: { p4: 'L3', p20: 'L1', p19: 'L2' },
+    }),
+  }));
 
   [
-    /re-place/i,
-    /re-place the existing subwoofer/i,
-    /move the seating/i,
-    /pull .*row/i,
-    /add a second subwoofer/i,
-    /opposing (wall )?mid-points/i,
-    /side-wall midpoint/i,
-    /add the missing speaker/i,
-    /change the seating distance/i,
-    /step up the range/i,
-  ].forEach((pattern) => expect(text).not.toMatch(pattern));
+    'Primary limitation',
+    'Primary limitation:',
+    'Worst affected',
+    'Next step',
+    'Use Bass Optimiser',
+    'in the design workflow',
+    'before finalising',
+    'before finalizing',
+    'could be improved',
+    'limitation',
+  ].forEach((phrase) => expect(text).not.toContain(phrase));
+
+  // No parameter code, no performance level, no worst-case language.
+  expect(text).not.toMatch(/\bP\d{1,2}\b/);
+  expect(text).not.toMatch(/\bL[1-4]\b/);
+  expect(text).not.toMatch(/worst/i);
+  expect(text).not.toMatch(/fail/i);
 });
 
-test('no speculative improvement claim, and no projected level', () => {
-  const text = summaryText(buildAdiVisualReportSummary({ guidance: guidance() }));
-
-  expect(text).not.toMatch(/expect/i);
-  expect(text).not.toMatch(/\bL2\b/);
-  expect(text).not.toMatch(/toward L\d/);
-  expect(text).not.toMatch(/will reach/i);
-  expect(text).not.toMatch(/should recover/i);
-  expect(text).not.toMatch(/performance levels lost/i);
-});
-
-test('the module can only name Bass Optimiser as the action path', () => {
-  const text = summaryText(buildAdiVisualReportSummary({ guidance: guidance() }));
-  expect(text).toContain('Bass Optimiser');
-  expect(COPY).not.toMatch(/GUIDANCE_LABELS|changeFirst|expectedImprovement|lowerValueChanges/);
-  expect(COPY).toMatch(/export const ADI_VISUAL_NEXT_STEP/);
-});
-
-test('the interpretation names the cause without instructing a change', () => {
-  const consistency = buildAdiVisualReportSummary({ guidance: guidance() });
-  expect(consistency.interpretation).toMatch(/room-and-seat interaction/);
-  expect(consistency.nextStep).toBe(ADI_VISUAL_NEXT_STEP);
-
-  const collapse = buildAdiVisualReportSummary({
-    guidance: guidance({ kind: ADI_FACTOR_KIND.ROW_COLLAPSE, parameterNumber: 5, key: 'p5' }),
+test('only genuinely strong parameters are described', () => {
+  // P20 L1 (the reported weak result) and P19 L2 are NOT strengths.
+  const strengths = strengthsFor({
+    room: { 14: 'L4', 12: 'L3' },
+    seat: { p4: 'L3', p20: 'L1', p19: 'L2' },
   });
-  expect(collapse.interpretation).toMatch(/seating and geometry interaction/);
+  const summary = buildAdiVisualReportSummary({ strengths });
+  const text = summaryText(summary);
 
-  const balanced = buildAdiVisualReportSummary({ guidance: guidance({ kind: ADI_FACTOR_KIND.BALANCED }) });
-  expect(balanced.interpretation).toMatch(/No single result is holding the design back/);
+  expect(text).toContain('strong low-frequency output capability');
+  expect(text).toContain('screen wall speakers are closely matched');
 
-  const incomplete = buildAdiVisualReportSummary({ guidance: guidance({ kind: ADI_FACTOR_KIND.INCOMPLETE }) });
-  expect(incomplete.interpretation).toMatch(/holds its conclusion/);
+  // Nothing about the weaker results — not even in softened language.
+  expect(text).not.toContain(ADI_VISUAL_STRENGTH_SENTENCES[20]);
+  expect(text).not.toContain(ADI_VISUAL_STRENGTH_SENTENCES[19]);
+  expect(text).not.toMatch(/consistency/i);
+  expect(text).not.toMatch(/varies|variance|deviation/i);
 });
 
-/* ── Optimiser status ─────────────────────────────────────────────────── */
+test('the strongest qualities lead, and the paragraph stays short', () => {
+  const strengths = [
+    { number: 14 },
+    { number: 4 },
+    { number: 18 },
+    { number: 6 },
+  ];
+  const summary = buildAdiVisualReportSummary({ strengths });
+
+  expect(summary.body).toHaveLength(ADI_VISUAL_PARAGRAPH_LIMIT);
+  expect(summary.body[0]).toBe(ADI_VISUAL_STRENGTH_SENTENCES[14]);
+  expect(summary.body[1]).toBe(ADI_VISUAL_STRENGTH_SENTENCES[4]);
+  expect(buildStrengthSentences(strengths, 1)).toEqual([ADI_VISUAL_STRENGTH_SENTENCES[14]]);
+  expect(buildStrengthSentences(null)).toEqual([]);
+});
+
+test('a design with no strength-band result still reads as assessed, not as failing', () => {
+  const strengths = strengthsFor({ seat: { p20: 'L1', p19: 'L1', p6: 'L1' } });
+  expect(strengths).toEqual([]);
+
+  const summary = buildAdiVisualReportSummary({ strengths });
+  expect(summary.body).toEqual([ADI_VISUAL_NO_STRENGTHS_FALLBACK]);
+
+  const text = summaryText(summary);
+  expect(text).not.toMatch(/limitation|weaker|weak|fail|improv|optimis/i);
+  expect(text).toMatch(/assessed in full/);
+  expect(text).toMatch(/reported on the following pages/);
+});
+
+test('no strengths supplied at all means no block', () => {
+  // A caller with no strengths to offer gets no block at all.
+  expect(buildAdiVisualReportSummary({ strengths: null })).toBeNull();
+  // No strengths selected is a real answer: the design is assessed, just not
+  // graded strong on any published parameter.
+  expect(buildAdiVisualReportSummary({}).body).toEqual([ADI_VISUAL_NO_STRENGTHS_FALLBACK]);
+  expect(buildAdiVisualReportSummary({ strengths: [] }).body).toEqual([ADI_VISUAL_NO_STRENGTHS_FALLBACK]);
+});
+
+/* ── Bass Optimiser line ──────────────────────────────────────────────── */
 
 test('no optimiser record means no optimiser claim', () => {
   expect(resolveOptimiserStatusLine(null)).toBeNull();
   expect(resolveOptimiserStatusLine({})).toBeNull();
-  expect(
-    buildAdiVisualReportSummary({ guidance: guidance(), optimiserRecord: null }).optimiserStatus,
-  ).toBeNull();
+  expect(buildAdiVisualReportSummary({ strengths: [] }).optimiserStatus).toBeNull();
 });
 
-test('an applied optimiser result is stated as applied', () => {
-  const record = {
+test('a completed optimiser review is stated as a review, never as pending work', () => {
+  const applied = {
     recordKind: OPTIMISER_RECORD_KIND.PLAN,
     applied: { placement: OPTIMISER_LEVER_STATE.APPLIED },
   };
-  expect(resolveOptimiserStatusLine(record)).toBe(ADI_VISUAL_OPTIMISER_APPLIED);
-  expect(ADI_VISUAL_OPTIMISER_APPLIED).toMatch(/applied to this design/);
-});
-
-test('a confirmed but unapplied recommendation is offered, never asserted', () => {
-  const record = {
+  const plan = {
     recordKind: OPTIMISER_RECORD_KIND.PLAN,
     applied: { placement: OPTIMISER_LEVER_STATE.NOT_APPLIED },
   };
-  expect(resolveOptimiserStatusLine(record)).toBe(ADI_VISUAL_OPTIMISER_AVAILABLE);
-  expect(ADI_VISUAL_OPTIMISER_AVAILABLE).toMatch(/Bass Optimiser panel/);
-});
-
-test('a run that found nothing worth applying says exactly that', () => {
-  const record = {
+  const nothingToApply = {
     recordKind: OPTIMISER_RECORD_KIND.RUN_EVIDENCE,
     terminalOutcome: OPTIMISER_TERMINAL_OUTCOME.NO_USEFUL_IMPROVEMENT,
   };
-  expect(resolveOptimiserStatusLine(record)).toBe(ADI_VISUAL_OPTIMISER_NO_IMPROVEMENT);
-  expect(ADI_VISUAL_OPTIMISER_NO_IMPROVEMENT)
-    .toBe('Bass Optimiser did not confirm a practical change worth applying. Low-frequency treatment or seating/subwoofer layout changes may be considered during detailed design.');
+
+  expect(resolveOptimiserStatusLine(applied)).toBe(ADI_VISUAL_OPTIMISER_REVIEWED);
+  expect(resolveOptimiserStatusLine(plan)).toBe(ADI_VISUAL_OPTIMISER_REVIEWED);
+  expect(resolveOptimiserStatusLine(nothingToApply)).toBe(ADI_VISUAL_OPTIMISER_REVIEWED);
+  expect(ADI_VISUAL_OPTIMISER_REVIEWED)
+    .toBe('Bass Optimiser has reviewed the subwoofer layout as part of the design process.');
+  expect(ADI_VISUAL_OPTIMISER_REVIEWED).not.toMatch(/worth applying|panel|may be considered/i);
 });
 
-test('a failed or incomplete run makes no claim about the design', () => {
+test('a failed or incomplete run tells the client nothing', () => {
   expect(resolveOptimiserStatusLine({
     recordKind: OPTIMISER_RECORD_KIND.RUN_EVIDENCE,
     terminalOutcome: OPTIMISER_TERMINAL_OUTCOME.FAILED,
@@ -223,33 +226,46 @@ test('a failed or incomplete run makes no claim about the design', () => {
   })).toBeNull();
 });
 
+/* ── The copy module carries no design action ─────────────────────────── */
+
+test('the module can no longer name a next step or offer design advice', () => {
+  expect(COPY).toMatch(/ADI_VISUAL_OPTIMISER_REVIEWED/);
+  expect(COPY).not.toMatch(/ADI_VISUAL_NEXT_STEP/);
+  expect(COPY).not.toMatch(/before finalising/);
+  expect(COPY).not.toMatch(/worth applying/);
+  expect(COPY).not.toMatch(/may be considered/);
+  expect(COPY).not.toMatch(/GUIDANCE_LABELS|changeFirst|expectedImprovement|lowerValueChanges|remainingLimitation/);
+  expect(COPY).not.toMatch(/re-place|move the seating/i);
+  expect(COPY).not.toMatch(/buildAdiDesignGuidance/);
+});
+
 /* ── Wiring: only the Visual Report changed ───────────────────────────── */
 
-test('the Visual Report renders the short summary instead of the guidance block', () => {
+test('the Visual Report renders the strength-led summary, not the guidance block', () => {
   expect(VISUAL_PAGE).toMatch(/import ClientAdiVisualSummary from "\.\/ClientAdiVisualSummary"/);
   expect(VISUAL_PAGE).toMatch(/<ClientAdiVisualSummary/);
   expect(VISUAL_PAGE).not.toMatch(/AdiDesignGuidanceBlock/);
-  expect(VISUAL_PAGE).not.toMatch(/Examples, powered by/);
+  expect(VISUAL_PAGE).toMatch(/Where this design is strong/);
 });
 
-test('the summary block is presentation only and reads the optimiser record', () => {
+test('the summary block is presentation only: published strengths, no guidance maths', () => {
   expect(SUMMARY_BLOCK).toMatch(/buildAdiVisualReportSummary/);
+  expect(SUMMARY_BLOCK).toMatch(/selectClientAdiStrengths/);
   expect(SUMMARY_BLOCK).toMatch(/useOptimiserPlanAuthority\(projectId, versionId\)/);
-  // No guidance field is printed by the block itself.
+  expect(SUMMARY_BLOCK).not.toMatch(/buildAdiDesignGuidance/);
+  expect(SUMMARY_BLOCK).not.toMatch(/Primary limitation|Worst affected|Next step|primaryLimitation/);
   expect(SUMMARY_BLOCK).not.toMatch(/changeFirst|expectedImprovement|lowerValueChanges/);
-  expect(SUMMARY_BLOCK).toMatch(/Primary limitation/);
-  expect(SUMMARY_BLOCK).toMatch(/Current result/);
-  expect(SUMMARY_BLOCK).toMatch(/Design interpretation/);
-  expect(SUMMARY_BLOCK).toMatch(/Next step/);
 });
 
-test('the report page hands the block the version it belongs to', () => {
+test('the report page still hands the block the version it belongs to', () => {
   expect(REPORT_PAGE).toMatch(/projectId=\{projectId\}/);
   expect(REPORT_PAGE).toMatch(/versionId=\{authority\.versionId \|\| null\}/);
+  expect(REPORT_PAGE).toMatch(/engineeringSummary=\{engineeringSummary\}/);
 });
 
 test('the Technical Report and design workflow keep the full guidance block', () => {
   expect(TECHNICAL).toMatch(/AdiDesignGuidanceBlock/);
   expect(LONG_BLOCK).toMatch(/Best first change/);
   expect(LONG_BLOCK).toMatch(/Expected improvement/);
+  expect(LONG_BLOCK).toMatch(/What remains limited/);
 });
