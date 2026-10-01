@@ -11,6 +11,7 @@ import GenerateStep from '@/components/proposal/wizard/GenerateStep';
 import { useVersionedEngineeringSnapshot } from '@/components/proposal/engineeringAuthority/useVersionedEngineeringSnapshot';
 import ProposalSourcePanel from '@/components/proposal/sourceAuthority/ProposalSourcePanel';
 import { useProposalSourceStatus } from '@/components/proposal/sourceAuthority/useProposalSourceStatus';
+import { resolveReportGate } from '@/components/proposal/sourceAuthority/proposalReportReadinessGate';
 
 const STEPS = [
   { key: 'project', label: 'Project' },
@@ -72,6 +73,12 @@ export default function CreateProposalWizard({ onCreated, onCancel }) {
     loading: snapshotLoading,
   });
   const sourceReady = sourceStatus?.ready === true;
+
+  // ── Step 3 readiness gate ──
+  // The Versions step does not advance until the selected version has both a
+  // current Visual Report and a current Technical Report. Without them the
+  // proposal would be written from stale project data.
+  const reportGate = resolveReportGate({ status: sourceStatus, loading: sourceLoading });
 
   const handleSelectProject = useCallback((projectId) => {
     setSelectedProjectId(projectId);
@@ -156,7 +163,7 @@ export default function CreateProposalWizard({ onCreated, onCancel }) {
   const canProceed = [
     !!selectedProjectId, // step 0
     !!proposalType, // step 1
-    versionsValid, // step 2
+    versionsValid && reportGate.ready, // step 2 — both reports must be current
     true, // step 3 — client brief is optional
   ];
 
@@ -194,6 +201,7 @@ export default function CreateProposalWizard({ onCreated, onCancel }) {
           proposalType={proposalType}
           selectedVersionIds={selectedVersionIds}
           onSelect={handleSelectVersions}
+          reportGate={reportGate}
         />
       )}
 
