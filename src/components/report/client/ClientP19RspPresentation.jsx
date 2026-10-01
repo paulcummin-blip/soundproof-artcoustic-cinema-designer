@@ -18,6 +18,13 @@ import { formatP19P20DeviationText } from "@/components/utils/rp22/resolveRp22De
 import { resolveRspLabelPlacement } from "./ClientSpeakerBalance";
 import { resolveCoordinate } from "./selectClientSpeakerBalance";
 import { getSeatGradeColors, PRIORITY_LEGEND } from "./visualReportSeatStyle";
+import { PositionMarker } from "./SeatMarker";
+import RspReferenceMarker, { RSP_TICK_R } from "./RspReferenceMarker";
+import { computeHaloRadiusPx, PRIMARY_STROKE_WIDTH } from "./seatMarkerGeometry";
+// Seat PRIORITY is the designer's Primary/Secondary classification. It is NOT
+// the internal RSP / MLP flag, which marks the single reference seat: the plan
+// below must never present the reference seat as the only primary seat.
+import { resolveSeatPriority, PRIMARY } from "@/components/utils/seatPriorityAuthority";
 
 import {
   REPORT_FONT_HEADING as FONT_HEADING,
@@ -33,9 +40,6 @@ const COLORS = {
   muted: "#8A7B6A",
   seat: "#625143",
 };
-
-const RSP_RING_R = 8;
-const RSP_DOT_R = 3;
 
 const SCOPE_STATEMENT =
   "P19 is assessed at the Reference Seating Position only. Seat-to-seat bass consistency is assessed separately under P20.";
@@ -112,14 +116,22 @@ export default function ClientP19RspPresentation({
   const roomTopLeft = toPx(0, 0);
   const roomBottomRight = toPx(W, L);
 
+  // Every seat carries its own priority group, so all primary seats are drawn
+  // as primary — never just the one seat that happens to hold the RSP flag.
   const seatPoints = (Array.isArray(seatingPositions) ? seatingPositions : [])
     .map((seat, index) => {
       const x = resolveCoordinate(seat?.x, seat?.position?.x);
       const y = resolveCoordinate(seat?.y, seat?.position?.y);
       if (x === null || y === null) return null;
-      return { id: seat?.id || `seat-${index}`, isPrimary: !!seat?.isPrimary, ...toPx(x, y) };
+      return {
+        id: seat?.id || `seat-${index}`,
+        isPrimary: resolveSeatPriority(seat) === PRIMARY,
+        ...toPx(x, y),
+      };
     })
     .filter(Boolean);
+
+  const haloRadius = computeHaloRadiusPx(seatPoints.map((seat) => ({ px: seat.px, py: seat.py })));
 
   const rspX = Number(rsp?.x);
   const rspY = Number(rsp?.y);
@@ -242,22 +254,26 @@ export default function ClientP19RspPresentation({
             />
           ))}
 
-          {/* Seats — position only. P19 has no per-seat result, so no grade is
-              shown on any seat here; seat-to-seat results live on the P20 page. */}
+          {/* Seats — position and priority. P19 has no per-seat result, so no
+              grade is shown on any seat here; seat-to-seat results live on the
+              P20 page. Every primary seat carries the bold keyline, so the
+              reference marker can never be read as the only primary seat. */}
           {seatPoints.map((seat) => (
-            <circle
+            <PositionMarker
               key={seat.id}
               cx={seat.px}
               cy={seat.py}
-              r={4}
-              fill={COLORS.seat}
-              stroke="#F8F8F7"
-              strokeWidth={1}
+              haloRadius={haloRadius}
+              isPrimary={seat.isPrimary}
             />
           ))}
 
           {rspPx && (() => {
-            const seatCircles = seatPoints.map((seat) => ({ cx: seat.px, cy: seat.py, r: 7 }));
+            const seatCircles = seatPoints.map((seat) => ({
+              cx: seat.px,
+              cy: seat.py,
+              r: haloRadius + PRIMARY_STROKE_WIDTH,
+            }));
             const screenCx = (screenLeftPx.px + screenRightPx.px) / 2;
             const screenRect = {
               x1: Math.min(screenLeftPx.px, screenCx - 25),
@@ -271,12 +287,11 @@ export default function ClientP19RspPresentation({
               [],
               screenRect,
               { w: SVG_W, h: SVG_H },
-              { markerRadius: RSP_RING_R },
+              { markerRadius: RSP_TICK_R },
             );
             return (
               <g>
-                <circle cx={rspPx.px} cy={rspPx.py} r={RSP_RING_R} fill="none" stroke={COLORS.primary} strokeWidth={2.5} />
-                <circle cx={rspPx.px} cy={rspPx.py} r={RSP_DOT_R} fill={COLORS.primary} />
+                <RspReferenceMarker cx={rspPx.px} cy={rspPx.py} />
                 <text
                   x={placement.x}
                   y={placement.y}
@@ -397,7 +412,7 @@ export default function ClientP19RspPresentation({
             {SCOPE_STATEMENT}
           </p>
 
-          {/* ── Priority key (primary / secondary seats) ── */}
+          {/* ── Priority + reference key ── */}
           <div style={{ display: "flex", flexWrap: "wrap", justifyContent: "center", gap: 16 }}>
             {PRIORITY_LEGEND.map((entry) => (
               <div key={entry.key} style={{ display: "flex", alignItems: "center", gap: 6 }}>
@@ -409,6 +424,16 @@ export default function ClientP19RspPresentation({
                 </span>
               </div>
             ))}
+            {/* The reference position is a reference POINT, not a seat — its own
+                glyph, so it is never read as a Primary seat. */}
+            <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+              <svg width={18} height={18} viewBox="0 0 20 20">
+                <RspReferenceMarker cx={10} cy={10} ringR={6} dotR={2} tickR={8.5} strokeWidth={1.8} />
+              </svg>
+              <span style={{ fontSize: 11, color: COLORS.body, letterSpacing: "0.02em", fontFamily: FONT_BODY }}>
+                Reference position (RSP)
+              </span>
+            </div>
           </div>
         </>
       )}

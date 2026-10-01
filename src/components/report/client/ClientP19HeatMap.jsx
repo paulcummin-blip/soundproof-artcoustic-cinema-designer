@@ -13,6 +13,9 @@ import React from "react";
 import { RP22_GRADE_TOKENS } from "@/components/utils/rp22Colors";
 import SeatMarker from "./SeatMarker";
 import { computeHaloRadiusPx, BASS_TWO_SEGMENT_LAYOUT, PRIMARY_STROKE_WIDTH } from "./seatMarkerGeometry";
+// Seat PRIORITY is the designer's classification, never the internal RSP / MLP
+// flag carried by a single seat.
+import { resolveSeatPriority, PRIMARY } from "@/components/utils/seatPriorityAuthority";
 import { resolveCoordinate } from "./selectClientSpeakerBalance";
 import { resolveRspLabelPlacement } from "./ClientSpeakerBalance";
 import { Loader2 } from "lucide-react";
@@ -78,7 +81,7 @@ function buildBassSeats(seatingPositions, p19PerSeat) {
         id: s.id,
         label: s.label || `Seat ${i + 1}`,
         x, y,
-        isPrimary: !!s.isPrimary,
+        isPrimary: resolveSeatPriority(s) === PRIMARY,
         p19Level: p19Result ? levelToLabel(p19Result.level) : null,
       };
     });
