@@ -271,14 +271,16 @@ export function buildCorrectionTrace({
       const before = correctionBeforeSmoothingDb;
       const after = correctionAfterSmoothingDb;
 
-      if (requestsBoost) {
-        // The predictor's nominal boost is min(error, +6 dB, available headroom),
-        // then clipped by the source-domain allowance.
-        const headroomCap = availableBoostHeadroomDb === null
-          ? Infinity
-          : availableBoostHeadroomDb;
-        const nominalBoost = Math.min(requestedCorrectionDb, MAX_BOOST_DB, headroomCap);
+      // The predictor's nominal boost is min(error, +6 dB, available headroom),
+      // then clipped by the source-domain allowance. Declared in this scope
+      // because the global-alignment decision below needs the same permission
+      // ceiling (null when no boost was requested).
+      const headroomCap = availableBoostHeadroomDb === null ? Infinity : availableBoostHeadroomDb;
+      const nominalBoost = requestsBoost
+        ? Math.min(requestedCorrectionDb, MAX_BOOST_DB, headroomCap)
+        : null;
 
+      if (requestsBoost) {
         if (Number.isFinite(before)) {
           boostLimitActive = requestedCorrectionDb > MAX_BOOST_DB + MATERIALITY_DB
             && before >= MAX_BOOST_DB - MATERIALITY_DB;
@@ -337,6 +339,7 @@ export function buildCorrectionTrace({
       correctionAfterSmoothingDb: Number.isFinite(correctionAfterSmoothingDb)
         ? round2(correctionAfterSmoothingDb) : null,
       globalAlignmentTrimDb: trim === null ? null : round2(trim),
+      appliedCorrectionDb: hasRaw ? round2(finalPostEqDb - rawRspDb) : null,
       finalPostEqDb: round2(finalPostEqDb),
       finalResidualDb,
       maxOutputDb: Number.isFinite(maxOutputDb) ? round2(maxOutputDb) : null,
@@ -355,16 +358,11 @@ export function buildCorrectionTrace({
     };
   };
 
-  // ── Strided pass ──
-  const stride = Math.max(1, Math.ceil(grid.length / MAX_RECORDS));
-  const byFrequency = new Map();
-  for (let index = 0; index < grid.length; index += stride) {
-    const record = buildRecord(grid[index]);
-    if (record) byFrequency.set(record.frequency, record);
-  }
-
-  // ── Required retention — stride must never drop these ──
-  const retained = [
+  // ── Required retention targets, resolved onto the real engine grid ──
+  // Resolved BEFORE the stride so retention reserves capacity: the retained
+  // rows are never displaced by the downsampled set, and the trace still obeys
+  // the record bound.
+  const retainedTargets = [
     ...REQUIRED_INSPECTION_FREQUENCIES_HZ.map((frequency) => ({
       requested: frequency,
       reason: RETENTION_REASONS.REQUIRED,
@@ -375,11 +373,26 @@ export function buildCorrectionTrace({
       requested: Number.isFinite(transitionEdgeHz) ? transitionEdgeHz : assessmentEndHz,
       reason: RETENTION_REASONS.TRANSITION_EDGE,
     },
-  ];
-  for (const { requested, reason } of retained) {
-    const gridFrequency = nearestGridFrequency(grid, Number(requested));
-    if (gridFrequency === null) continue;
-    const record = buildRecord(gridFrequency, Number(requested), reason);
+  ].map(({ requested, reason }) => ({
+    requested: Number(requested),
+    reason,
+    gridFrequency: nearestGridFrequency(grid, Number(requested)),
+  })).filter((entry) => entry.gridFrequency !== null);
+
+  const retainedFrequencyCount = new Set(retainedTargets.map((entry) => entry.gridFrequency)).size;
+  const capacity = Math.max(1, MAX_RECORDS - retainedFrequencyCount);
+
+  // ── Strided pass ──
+  const stride = Math.max(1, Math.ceil(grid.length / capacity));
+  const byFrequency = new Map();
+  for (let index = 0; index < grid.length && byFrequency.size < capacity; index += stride) {
+    const record = buildRecord(grid[index]);
+    if (record) byFrequency.set(record.frequency, record);
+  }
+
+  // ── Required retention — the stride is never allowed to drop these ──
+  for (const { requested, reason, gridFrequency } of retainedTargets) {
+    const record = buildRecord(gridFrequency, requested, reason);
     if (record) byFrequency.set(record.frequency, record);
   }
 
