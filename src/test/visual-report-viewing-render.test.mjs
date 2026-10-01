@@ -80,8 +80,12 @@ test('seat pills are laid out row by row, in seating-plan order', () => {
   assert.ok(front !== -1 && rear !== -1, 'both physical rows are labelled');
   assert.ok(front < rear, 'front row is shown first');
 
+  // Bound the pills to the result region — the level key below the projector
+  // card also prints L1–L4 swatch labels and is not part of the seat rows.
+  const resultEnd = text.indexOf(interpretation);
+  assert.ok(resultEnd > rear, 'the interpretation follows the seat rows');
   const frontBlock = text.slice(front, rear);
-  const rearBlock = text.slice(rear);
+  const rearBlock = text.slice(rear, resultEnd);
   assert.equal((frontBlock.match(/\bL4\b/g) || []).length, 4, 'four front-row Level 4 pills');
   assert.equal((rearBlock.match(/\bL3\b/g) || []).length, 5, 'five rear-row Level 3 pills');
 });

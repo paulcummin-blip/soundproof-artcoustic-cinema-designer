@@ -20,6 +20,10 @@ import {
   REPORT_FONT_HEADING as HEADING_FONT,
   REPORT_FONT_BODY as BODY_FONT,
 } from '@/components/report/typography/reportTypography';
+import {
+  parameterResultHeading,
+  parameterResultDescription,
+} from './parameterResultCopy';
 
 // Speaker role colours (brand-aligned, same as P12/P13 plan)
 const ROLE_COLORS = {
@@ -74,6 +78,12 @@ export default function ClientP2SystemArchitecture({
 
   const levelLabel = levelToLabel(level);
   const color = levelColor(level);
+
+  // Result-card copy: the level spoken as a word, and the official RP22
+  // parameter description. The page header already identifies the parameter and
+  // the pill already shows the level, so neither is repeated in the title text.
+  const resultHeading = parameterResultHeading(level);
+  const resultDescription = parameterResultDescription(2);
 
   // Room geometry
   const W = Number(roomDims?.widthM) || 4.5;
@@ -172,7 +182,7 @@ export default function ClientP2SystemArchitecture({
             textAlign: "center",
             fontFamily: BODY_FONT,
           }}>
-            RP22 Parameter 2 — Number of Discrete Speaker Channels
+            RP22 Parameter 2
           </p>
         </div>
       )}
@@ -424,8 +434,8 @@ export default function ClientP2SystemArchitecture({
             </div>
           </div>
 
-          {/* ── P2 level badge ── */}
-          {levelLabel && (
+          {/* ── P2 result card — pill, level heading, official RP22 description ── */}
+          {levelLabel && resultHeading && (
             <div style={{
               display: "flex",
               alignItems: "center",
@@ -456,7 +466,10 @@ export default function ClientP2SystemArchitecture({
               </div>
               <div style={{ flex: 1 }}>
                 <div style={{ fontSize: 16, fontWeight: 600, color: "#213428", fontFamily: HEADING_FONT }}>
-                  P2 — {levelLabel}
+                  {resultHeading}
+                </div>
+                <div style={{ fontSize: 13, color: "#3E4349", marginTop: 2, lineHeight: 1.45 }}>
+                  {resultDescription}
                 </div>
                 <div style={{ fontSize: 13, color: "#3E4349", marginTop: 2 }}>
                   {configuration ? `${configuration} configuration` : "Discrete speaker configuration"}
@@ -465,25 +478,8 @@ export default function ClientP2SystemArchitecture({
             </div>
           )}
 
-          {/* ── Already L4 ── */}
-          {level === "L4" && (
-            <div style={{
-              width: "100%",
-              maxWidth: print ? "100%" : 600,
-              padding: "16px 20px",
-              background: "#F5F4F1",
-              borderRadius: 12,
-              border: "1px solid #D9D5CE",
-              fontFamily: BODY_FONT,
-            }}>
-              <div style={{ fontSize: 14, color: "#213428", lineHeight: 1.5 }}>
-                The system meets the highest Parameter 2 level.
-              </div>
-            </div>
-          )}
-
           {/* ── Factual upgrade path (objective: channel-count → next RP22 threshold) ── */}
-          {level !== "L4" && upgradePath && (
+          {levelLabel !== "L4" && upgradePath && (
             <div style={{
               width: "100%",
               maxWidth: print ? "100%" : 600,
@@ -501,32 +497,6 @@ export default function ClientP2SystemArchitecture({
             </div>
           )}
 
-          {/* ── Summary callout (screen only) ── */}
-          {!print && (
-            <div style={{
-              display: "flex",
-              alignItems: "center",
-              gap: 16,
-              padding: "16px 20px",
-              background: "#F1F0EE",
-              borderRadius: 12,
-              border: "1px solid #DCDBD6",
-              width: "100%",
-              fontFamily: BODY_FONT,
-            }}>
-              <div style={{ flex: 1 }}>
-                <div style={{ fontSize: 16, fontWeight: 600, color: "#213428", marginBottom: 4, fontFamily: HEADING_FONT }}>
-                  System Architecture
-                </div>
-                <div style={{ fontSize: 13, color: "#3E4349", lineHeight: 1.5 }}>
-                  {levelLabel
-                    ? `The current layout achieves ${levelLabel} for RP22 Parameter 2 with ${discreteCount ?? 0} discrete speaker channels.`
-                    : "Discrete speaker channel configuration."
-                  }
-                </div>
-              </div>
-            </div>
-          )}
         </>
       )}
     </div>

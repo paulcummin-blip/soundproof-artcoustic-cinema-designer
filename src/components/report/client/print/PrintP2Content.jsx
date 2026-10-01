@@ -29,7 +29,7 @@ export default function PrintP2Content({
     <>
       <div className="client-report-print-heading">
         <h1 className="client-report-print-heading__title">Spatial Resolution</h1>
-        <p className="client-report-print-heading__subtitle">RP22 Parameter 2 — Number of Discrete Speaker Channels</p>
+        <p className="client-report-print-heading__subtitle">RP22 Parameter 2</p>
       </div>
       <div className="client-report-print-drawing">
         <ClientP2SystemArchitecture
