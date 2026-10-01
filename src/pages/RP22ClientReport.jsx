@@ -102,27 +102,10 @@ export default function RP22ClientReport() {
   // The report's canonical readiness state is derived below, once the
   // published bass authority has resolved. One state governs the whole report.
 
-  // ── Design Summary (static intro + canonical design assumptions) ──
+  // ── Design Summary (static intro) ──
+  // Design assumptions (P15/P21) are deliberately absent from the Visual Report:
+  // they are engineering caveats and remain in the Technical Report.
   const highlights = useMemo(() => selectClientDesignHighlights(), []);
-  const designAssumptions = useMemo(() => {
-    const roomResults = engineeringSummary?.roomResultsByParameter || {};
-    const p15 = roomResults?.[15] || {};
-    const p21 = roomResults?.[21] || {};
-    return {
-      p15: {
-        label: "Background Noise Floor",
-        status: p15.status === "measured" ? "Measured" : "Assumed",
-        level: p15.level || "L2",
-        detail: p15.status === "measured" ? (p15.formatted || "Measured result") : "Design target: NCB 22",
-      },
-      p21: {
-        label: "Early Reflections",
-        status: p21.status === "measured" ? "Measured" : "Assumed",
-        level: p21.level || "L2",
-        detail: p21.status === "measured" ? (p21.formatted || "Measured result") : "Early reflections have not been measured.",
-      },
-    };
-  }, [engineeringSummary]);
 
   // PASSIVE CONSUMER: the Visual Report reads the exact coverage result
   // published by the Room Designer's canonical engineering summary.
@@ -300,7 +283,6 @@ export default function RP22ClientReport() {
           <ClientDesignHighlights
             highlights={highlights}
             coverageSentence={coverageSentence}
-            assumptions={designAssumptions}
             recommendationFooter={<ClientRecommendationFooter recommendations={publishedRecommendations} />}
           />
         ),
@@ -309,7 +291,6 @@ export default function RP22ClientReport() {
           highlights,
           recommendations: publishedRecommendations,
           coverageSentence,
-          assumptions: designAssumptions,
         },
       });
     }
@@ -757,7 +738,7 @@ export default function RP22ClientReport() {
       ...bassPages,
       ...closingPages,
     ];
-  }, [p5Snapshot, p9Snapshot, p9Overhead, bestListeningArea, timbreConsistency, frontSoundstage, nonScreenSoundstage, highlights, designAssumptions, screenSeating, hasSeatingPosition, recommendedSeatingPosition, bassPerformance, roomDims, rsp, rspSourceLabel, screenFrontPlaneM, screenWidthM, screen, placedSpeakers, appState?.acousticTreatmentEnabled, appState?.selectedAbfuserQty, publishedRecommendations, coverageSentence, reportGeometry, reportSystem, projectId]);
+  }, [p5Snapshot, p9Snapshot, p9Overhead, bestListeningArea, timbreConsistency, frontSoundstage, nonScreenSoundstage, highlights, screenSeating, hasSeatingPosition, recommendedSeatingPosition, bassPerformance, roomDims, rsp, rspSourceLabel, screenFrontPlaneM, screenWidthM, screen, placedSpeakers, appState?.acousticTreatmentEnabled, appState?.selectedAbfuserQty, publishedRecommendations, coverageSentence, reportGeometry, reportSystem, projectId]);
 
   // Each category heading is printed once. The first page of a category keeps
   // its heading; continuation pages never repeat the major category heading.
