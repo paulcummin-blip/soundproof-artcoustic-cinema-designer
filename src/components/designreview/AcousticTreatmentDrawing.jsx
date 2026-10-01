@@ -11,6 +11,7 @@
 
 import React, { useMemo } from "react";
 import { selectClientAcousticTreatment } from "@/components/report/client/selectClientAcousticTreatment";
+import AbfuserPlanDrawing from "@/components/report/AbfuserPlanDrawing";
 
 const COLORS = {
   bg: "transparent",
@@ -20,19 +21,9 @@ const COLORS = {
   secondary: "#625143",
   border: "#E6E4DD",
   muted: "#77736B",
-  zoneFill: "rgba(33, 52, 40, 0.12)",
-  zoneStroke: "#213428",
-  roomStroke: "#B0AEA8",
-  roomFill: "#F4F3F0",
-  screenFill: "#2C2C2C",
-  seatFill: "#213428",
-  speakerFill: "#625143",
 };
 
 const FONT_BODY = "'Didact Gothic', 'Century Gothic', sans-serif";
-
-const PADDING = 40;
-const LABEL_TOP = 20;
 
 export default function AcousticTreatmentDrawing({
   roomDims,
@@ -55,14 +46,8 @@ export default function AcousticTreatmentDrawing({
   const widthM = Number(roomDims?.widthM) || 4.5;
   const lengthM = Number(roomDims?.lengthM) || 6.0;
 
-  // SVG layout
-  const SVG_W = 640;
-  const drawW = SVG_W - PADDING * 2;
-  const drawH = Math.round(drawW * (lengthM / widthM));
-  const SVG_H = drawH + PADDING * 2 + LABEL_TOP;
-
-  const rx = (m) => PADDING + (m / widthM) * drawW;
-  const ry = (m) => PADDING + LABEL_TOP + (m / lengthM) * drawH;
+  // Plan geometry is drawn by the single Abfuser plan authority, on the same
+  // room scale the Visual Report uses. This page adds no geometry of its own.
 
   // The page follows the Acoustic Treatment toggle, not the included quantity:
   // the ADI recommendation is guidance and is shown even when nothing has been
@@ -96,74 +81,14 @@ export default function AcousticTreatmentDrawing({
         borderRadius: 8,
         overflow: "hidden",
       }}>
-        <svg width="100%" viewBox={`0 0 ${SVG_W} ${SVG_H}`} style={{ display: "block" }}>
-          {/* Room background */}
-          <rect
-            x={rx(0)} y={ry(0)}
-            width={drawW} height={drawH}
-            fill={COLORS.roomFill}
-            stroke={COLORS.roomStroke}
-            strokeWidth={1.5}
-          />
-
-          {/* Screen (front wall) */}
-          <rect
-            x={rx(0)} y={ry(0)}
-            width={drawW} height={4}
-            fill={COLORS.screenFill}
-          />
-
-          {/* Treatment zones */}
-          {zones.map((zone) => (
-            <rect
-              key={zone.id}
-              x={rx(zone.x)}
-              y={ry(zone.y)}
-              width={Math.max(2, (zone.width / widthM) * drawW)}
-              height={Math.max(2, (zone.height / lengthM) * drawH)}
-              fill={COLORS.zoneFill}
-              stroke={COLORS.zoneStroke}
-              strokeWidth={1}
-              strokeDasharray="3 2"
-            />
-          ))}
-
-          {/* Recommended Abfuser markers */}
-          {markers.map((marker) => (
-            <rect
-              key={marker.key}
-              x={rx(marker.x)}
-              y={ry(marker.y)}
-              width={Math.max(2, (marker.width / widthM) * drawW)}
-              height={Math.max(2, (marker.height / lengthM) * drawH)}
-              fill={marker.advisory ? COLORS.secondary : COLORS.primary}
-              opacity={marker.advisory ? 0.7 : 1}
-            />
-          ))}
-
-          {/* Seating positions */}
-          {seatingPositions.filter(s => s && Number.isFinite(s.x) && Number.isFinite(s.y)).map((seat, i) => (
-            <circle
-              key={seat.id || i}
-              cx={rx(Number(seat.x))}
-              cy={ry(Number(seat.y))}
-              r={3}
-              fill={COLORS.seatFill}
-            />
-          ))}
-
-          {/* Speakers (non-overhead only) */}
-          {placedSpeakers.filter(s => s && Number.isFinite(s.x) && Number.isFinite(s.y) && !String(s.role || "").startsWith("T")).map((spk, i) => (
-            <rect
-              key={spk.id || i}
-              x={rx(Number(spk.x)) - 2}
-              y={ry(Number(spk.y)) - 2}
-              width={4}
-              height={4}
-              fill={COLORS.speakerFill}
-            />
-          ))}
-        </svg>
+        <AbfuserPlanDrawing
+          variant="technical"
+          roomPlan={{ widthM, lengthM }}
+          zones={zones}
+          panels={markers}
+          seatingPositions={seatingPositions}
+          placedSpeakers={placedSpeakers}
+        />
       </div>
 
       {/* Quantity summary */}

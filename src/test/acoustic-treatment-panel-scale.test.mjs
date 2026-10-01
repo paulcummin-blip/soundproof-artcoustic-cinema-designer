@@ -14,6 +14,7 @@
 //   TEST 8  Missing product size is stated, never guessed
 //   TEST 9  No recommendation maths, pricing or quantity-authority change
 //   TEST 10 No layout overflow, and the page renders once
+//   TEST 11 Both reports render ONE plan authority, with identical panel marks
 // ---------------------------------------------------------------------------
 import { test } from 'vitest';
 import assert from 'node:assert/strict';
@@ -24,15 +25,23 @@ import { renderToStaticMarkup } from 'react-dom/server';
 
 import ClientAcousticTreatment from '../components/report/client/ClientAcousticTreatment.jsx';
 import AbfuserTreatmentPlan from '../components/report/client/AbfuserTreatmentPlan.jsx';
+import AcousticTreatmentDrawing from '../components/designreview/AcousticTreatmentDrawing.jsx';
 import { selectClientAcousticTreatment } from '../components/report/client/selectClientAcousticTreatment.js';
 import { ABFUSER_PRODUCT } from '../components/utils/adiAbfuserProduct.js';
 import { ZONE_DEPTH_M } from '../components/utils/abfuserTreatmentZones.js';
 
 const PAGE_PATH = path.resolve('src/components/report/client/ClientAcousticTreatment.jsx');
-const PLAN_PATH = path.resolve('src/components/report/client/AbfuserTreatmentPlan.jsx');
+// The drawing itself lives in ONE authority, shared by both reports. The
+// assertions below follow the drawing, so any drift between the Visual and
+// Technical Report plans fails here.
+const PLAN_PATH = path.resolve('src/components/report/AbfuserPlanDrawing.jsx');
+const PLAN_PRESENTER_PATH = path.resolve('src/components/report/client/AbfuserTreatmentPlan.jsx');
+const TECHNICAL_PATH = path.resolve('src/components/designreview/AcousticTreatmentDrawing.jsx');
 const SELECTOR_PATH = path.resolve('src/components/report/client/selectClientAcousticTreatment.js');
 const pageSource = fs.readFileSync(PAGE_PATH, 'utf8');
 const planSource = fs.readFileSync(PLAN_PATH, 'utf8');
+const planPresenterSource = fs.readFileSync(PLAN_PRESENTER_PATH, 'utf8');
+const technicalSource = fs.readFileSync(TECHNICAL_PATH, 'utf8');
 const selectorSource = fs.readFileSync(SELECTOR_PATH, 'utf8');
 
 // ── The project's real data (Marquee Home) ──────────────────────────────────
@@ -297,4 +306,44 @@ test('no layout overflow, and the page renders once', () => {
   assert.ok(pageSource.includes('<AbfuserTreatmentPlan'), 'the page composes the shared plan component');
   assert.equal(countOf(PAGE, '>ACOUSTIC TREATMENT<'), 1, 'one page heading');
   assert.equal(typeof AbfuserTreatmentPlan, 'function', 'the plan is a reusable component');
+});
+
+test('both reports render ONE plan authority, with identical panel marks', () => {
+  // The Visual Report presenter owns no geometry: it switches the annotation
+  // layer on. The Technical Report drawing owns no geometry either.
+  assert.ok(planPresenterSource.includes('AbfuserPlanDrawing'), 'the Visual Report uses the shared drawing');
+  assert.ok(technicalSource.includes('AbfuserPlanDrawing'), 'the Technical Report uses the shared drawing');
+  assert.ok(planPresenterSource.includes('variant="visual"'), 'the Visual Report keeps its annotation layer');
+  assert.ok(technicalSource.includes('variant="technical"'), 'the Technical Report keeps its plain layer');
+  assert.ok(!planPresenterSource.includes('viewBox'), 'the Visual Report presenter draws no geometry');
+  assert.ok(!technicalSource.includes('viewBox'), 'the Technical Report drawing draws no geometry');
+  assert.ok(!planPresenterSource.includes('toX('), 'no Visual-Report-only coordinate transform remains');
+
+  // Same drawing, same marks: the Technical Report plan is rendered from the
+  // same selector data through the same code, so every panel matches.
+  const technicalMarkup = renderToStaticMarkup(
+    React.createElement(AcousticTreatmentDrawing, {
+      roomDims,
+      seatingPositions,
+      placedSpeakers,
+      acousticTreatmentEnabled: true,
+      selectedAbfuserQty: 6,
+    }),
+  );
+  const TECHNICAL_SVG = planSvg(technicalMarkup);
+  assert.ok(TECHNICAL_SVG.length > 0, 'the Technical Report renders its plan drawing');
+  assert.ok(TECHNICAL_SVG.includes('viewBox="0 0 6.18 8.29"'), 'both plans use the same room scale');
+  for (const mark of [' width="0.018"', ' height="0.018"', ' height="0.7"', ' width="0.7"']) {
+    assert.equal(
+      countOf(TECHNICAL_SVG, mark),
+      countOf(PLAN_SVG, mark),
+      `the same panels are drawn in both reports (${mark.trim()})`,
+    );
+  }
+  assert.equal(countOf(TECHNICAL_SVG, 'fill="rgba(33, 52, 40, 0.06)"'), 3, 'the same three zones are drawn');
+  // Panel count authority is the recommendation in both reports.
+  assert.equal(countOf(TECHNICAL_SVG, 'height="0.7"'), 6, 'six side panels');
+  assert.equal(countOf(TECHNICAL_SVG, 'width="0.7"'), 2, 'two rear panels');
+  // The Technical Report states its own counts; it draws no legend or total.
+  assert.ok(!technicalSource.includes('Total:'), 'the Technical Report plan adds no total of its own');
 });

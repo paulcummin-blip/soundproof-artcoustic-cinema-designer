@@ -114,6 +114,7 @@ export default function ClientAcousticTreatment({
           panels={data.markers}
           panel={data.panel}
           seatingPositions={seatingPositions}
+          placedSpeakers={placedSpeakers}
           rsp={rsp}
           totalPanels={recommendedQty}
         />
