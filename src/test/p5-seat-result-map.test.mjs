@@ -7,7 +7,7 @@
 //   TEST 1  The RSP graphic is preserved and labelled as the design view
 //   TEST 2  Every assessed seat carries a P5 level pill, laid out by row
 //   TEST 3  Each seat keeps its published angle beneath its pill
-//   TEST 4  The limiting seat and limiting angle are shown
+//   TEST 4  The limiting seat / limiting angle block is NOT shown
 //   TEST 5  The page states the project result, not the RSP result
 //   TEST 6  The official RP22 Parameter 5 wording is used
 //   TEST 7  The printed page (PDF) carries the graphic AND the seat map
@@ -122,11 +122,12 @@ const SCREEN_TEXT = textOf(SCREEN);
 const PRINT_TEXT = textOf(PRINT);
 const countOf = (haystack, needle) => haystack.split(needle).length - 1;
 
-// Seat-map region: the assessed block only, so the RSP arc labels can never be
-// mistaken for seat pills or seat angles.
+// Seat-map region: from the map heading up to the final result card, so the RSP
+// arc labels can never be mistaken for seat pills or seat angles.
+const RESULT_CARD_MARKER = 'Level 2';
 const seatMapRegion = (text) => {
   const start = text.indexOf('P5 Seat Results');
-  const end = text.indexOf('Limiting seat');
+  const end = text.indexOf(RESULT_CARD_MARKER, start);
   assert.ok(start !== -1 && end > start, 'the seat result map is present');
   return text.slice(start, end);
 };
@@ -168,12 +169,15 @@ test('each seat keeps its published angle beneath its pill', () => {
   }
 });
 
-test('the limiting seat and limiting angle are shown', () => {
-  assert.ok(SCREEN_TEXT.includes('Limiting seat — Rear row, seat 3 of 6'), 'the limiting seat is named');
-  assert.ok(
-    SCREEN_TEXT.includes('Limiting angle — 60° maximum spacing between adjacent surround speakers.'),
-    'the limiting angle is stated',
-  );
+test('the limiting seat / limiting angle block is removed', () => {
+  // The seat map already shows every seat's result, so the separate block was
+  // clutter: it is gone from the screen page and from the printed page alike.
+  for (const [label, text] of [['screen', SCREEN_TEXT], ['print', PRINT_TEXT]]) {
+    assert.ok(!text.includes('Limiting seat'), `no limiting-seat block on the ${label} page`);
+    assert.ok(!text.includes('Limiting angle'), `no limiting-angle block on the ${label} page`);
+  }
+  assert.ok(SCREEN_TEXT.includes('P5 Seat Results'), 'the seat result map remains');
+  assert.ok(SCREEN_TEXT.includes('Level 2'), 'the final level result card remains');
 });
 
 test('the page states the project result, not the RSP result', () => {
@@ -198,8 +202,7 @@ test('the printed page (PDF) carries the graphic AND the seat map', () => {
   assert.ok(PRINT_TEXT.includes('RSP design view'), 'the design view is labelled in print');
   assert.ok(PRINT_TEXT.includes(DESIGN_VIEW_COPY), 'the copy prints');
   assert.ok(PRINT_TEXT.includes('P5 Seat Results'), 'the seat map prints');
-  assert.ok(PRINT_TEXT.includes('Limiting seat — Rear row, seat 3 of 6'), 'the limiting seat prints');
-  assert.ok(PRINT_TEXT.includes('60°'), 'the limiting angle prints');
+  assert.ok(PRINT_TEXT.includes('60°'), 'the seat angles print beneath their pills');
   assert.ok(PRINT_TEXT.includes('Level 2'), 'the project result prints');
   assert.ok(PRINT_TEXT.includes('Assessed across the seating positions'), 'the scope line prints');
   // The PDF path forwards the seat results into the print page.
@@ -235,9 +238,11 @@ test('no P5 calculation: published values pass through unchanged', () => {
 test('no layout overflow: rows wrap and the pill styling is canonical', () => {
   // Each row of pills wraps rather than overflowing the page width. Inline
   // styles are read from the markup, since the text view strips them.
-  const mapMarkup = SCREEN.slice(SCREEN.indexOf('P5 Seat Results'), SCREEN.indexOf('Limiting seat'));
+  // The seat map block sits between the graphic and the result card: it spans
+  // the page column and its pill rows wrap rather than overflowing.
+  const mapMarkup = SCREEN.slice(SCREEN.indexOf('</svg>'), SCREEN.indexOf(RESULT_CARD_MARKER));
   assert.ok(mapMarkup.includes('flex-wrap:wrap'), 'seat pills wrap within their row');
-  assert.ok(mapMarkup.includes('max-width:600px'), 'the result block stays inside the page column');
+  assert.ok(mapMarkup.includes('width:100%'), 'the seat map stays inside the page column');
   // Pills keep the one canonical grading treatment — L3 slate, L2 stone.
   assert.ok(SCREEN.includes(RP22_GRADE_TOKENS.L3.bg), 'L3 pills use the canonical fill');
   assert.ok(SCREEN.includes(RP22_GRADE_TOKENS.L3.border), 'L3 pills use the canonical border');

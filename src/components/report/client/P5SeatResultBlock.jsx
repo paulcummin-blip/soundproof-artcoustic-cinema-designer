@@ -6,9 +6,9 @@
  *
  * P5 is assessed at every seating position, so the block lays the published
  * per-seat results out in the SAME physical arrangement as the seating plan
- * (one line per row, one pill per seat) and names the limiting seat and its
- * angle. The drawing above it remains the design view from the reference
- * seating position; this block is the assessed result.
+ * (one line per row, one pill per seat, each seat's published angle beneath it).
+ * The drawing above it remains the design view from the reference seating
+ * position; this block is the assessed result.
  *
  * Presentation only: every level, angle and count comes from the published
  * engineering authority via selectClientP5SeatResults. Nothing here grades,
@@ -22,25 +22,8 @@
 import React from "react";
 import ClientSeatResultRows from "./ClientSeatResultRows";
 
-const COLORS = {
-  limiting: "#213428",
-  limitingLabel: "#625143",
-};
-
 export default function P5SeatResultBlock({ seatResults, print }) {
   if (!seatResults?.hasAnyValidResult) return null;
-
-  const limiting = seatResults.limitingSeat;
-
-  // "Front row, seat 3 of 4" — the seat's place in its own physical row.
-  const limitingSeatLabel = limiting
-    ? [
-        limiting.rowLabel,
-        limiting.positionInRow && limiting.rowSize
-          ? `seat ${limiting.positionInRow} of ${limiting.rowSize}`
-          : null,
-      ].filter(Boolean).join(", ")
-    : null;
 
   return (
     <div
@@ -60,30 +43,6 @@ export default function P5SeatResultBlock({ seatResults, print }) {
         valueKey="formatted"
         print={print}
       />
-
-      {limiting && (
-        <div
-          style={{
-            width: "100%",
-            maxWidth: print ? "100%" : 600,
-            padding: print ? "10px 14px" : "14px 18px",
-            background: "#F1F0EE",
-            borderRadius: 12,
-            border: "1px solid #DCDBD6",
-            display: "flex",
-            flexDirection: "column",
-            gap: print ? 4 : 6,
-          }}
-        >
-          <div style={{ fontSize: print ? 12 : 14, color: COLORS.limiting, fontWeight: 600 }}>
-            Limiting seat — {limitingSeatLabel}
-          </div>
-          <div style={{ fontSize: print ? 11 : 13, color: COLORS.limitingLabel, lineHeight: 1.5 }}>
-            Limiting angle — {limiting.formatted} maximum spacing between adjacent surround
-            speakers.
-          </div>
-        </div>
-      )}
     </div>
   );
 }
