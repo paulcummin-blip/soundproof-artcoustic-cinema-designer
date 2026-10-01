@@ -7,7 +7,7 @@
 //   • the expected result in whole dB — P20, P19, output/headroom, extension
 //   • Apply placement, or Undo placement once it has been applied
 //   • the one action that applies when the result belongs to an earlier design
-//     state (Re-run Optimisation Plan) — never an Apply that cannot work
+//     state (Bass Optimiser) — never an Apply that cannot work
 //
 // Presentation only: every value arrives from placementRecommendationAuthority.
 // No coordinates, no decimals, no calculation.
@@ -16,6 +16,7 @@
 import React from "react";
 import { ArrowRight, Check, Loader2, MapPin, RotateCcw, Undo2 } from "lucide-react";
 import { PLACEMENT_KIND } from "./placementRecommendationAuthority.js";
+import { ADI_BASS_OPTIMISER_LABEL } from "./resolveAdiOptimiserJourney.js";
 import { PLACEMENT_PREVIEW_UNAVAILABLE } from "./placementMoveAuthority.js";
 
 const PRIMARY = "inline-flex items-center gap-1.5 rounded-md bg-[#213428] px-4 py-2 text-[12px] font-semibold text-white transition-colors hover:bg-[#3E4349] disabled:opacity-60";
@@ -129,7 +130,7 @@ export default function PlacementRecommendationPanel({
           {showRerun && (
             <button type="button" className={SECONDARY} onClick={onRerun} disabled={busy}>
               <RotateCcw className="h-3.5 w-3.5" />
-              {placement.rerunLabel || "Re-run Optimisation Plan"}
+              {placement.rerunLabel || ADI_BASS_OPTIMISER_LABEL}
               <ArrowRight className="h-3.5 w-3.5" />
             </button>
           )}

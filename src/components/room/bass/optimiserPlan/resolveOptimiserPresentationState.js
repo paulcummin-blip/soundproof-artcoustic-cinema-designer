@@ -17,6 +17,7 @@
 // ---------------------------------------------------------------------------
 
 import { OPTIMISER_PLAN_STATUS } from "./optimiserPlanConstants.js";
+import { ADI_BASS_OPTIMISER_LABEL } from "./resolveAdiOptimiserJourney.js";
 
 /** The complete set of optimiser presentation states. */
 export const OPTIMISER_PRESENTATION_STATE = Object.freeze({
@@ -42,11 +43,13 @@ export const OPTIMISER_PRESENTATION_LABEL = Object.freeze({
 
 /** Action offered by each state. */
 export const OPTIMISER_PRESENTATION_ACTION = Object.freeze({
-  // ONE re-run wording everywhere, including the never-run state: there is only
-  // ever a single re-run control, and never a "Re-run to apply".
-  RUN: "Re-run Optimisation Plan",
-  RERUN: "Re-run Optimisation Plan",
-  COMPLETE: "Complete Optimisation Plan",
+  // The same action states the same wording in every state — before a run, after
+  // a stale result, after a failed run and after an incomplete evaluation. The
+  // state itself is carried by the status pill, the spinner and the copy, so
+  // there is only ever one run control and never a "Re-run to apply".
+  RUN: ADI_BASS_OPTIMISER_LABEL,
+  RERUN: ADI_BASS_OPTIMISER_LABEL,
+  COMPLETE: ADI_BASS_OPTIMISER_LABEL,
 });
 
 export const OPTIMISER_PRESENTATION_COPY = Object.freeze({

@@ -10,9 +10,9 @@
 // Four states, resolved from the SAVED Optimisation Plan (the plan status
 // authority) and whether the optimiser can be run against the current design:
 //
-//   1. no saved plan            → Optimisation required      · Re-run Optimisation Plan
-//   2. saved plan is stale      → Re-evaluation required     · Re-run Optimisation Plan
-//   3. lever-level data missing → Evaluation incomplete      · Complete / Re-run Optimisation Plan
+//   1. no saved plan            → Optimisation required      · Bass Optimiser
+//   2. saved plan is stale      → Re-evaluation required     · Bass Optimiser
+//   3. lever-level data missing → Evaluation incomplete      · Bass Optimiser
 //   4. saved plan is current    → Optimisation plan available · (read-only plan)
 //
 // There is NO fifth "nothing to do" state: a card may never end at
@@ -55,13 +55,25 @@ export const ADI_OPTIMISER_ACTION = Object.freeze({
   CALCULATE: "calculate",
 });
 
+/**
+ * The ONE feature name for the optimiser action, wherever it appears — the
+ * primary button before a run, during a run, after a stale result, after a
+ * failed run and after an incomplete evaluation.
+ *
+ * The state is carried by the status pill, the spinner and the surrounding
+ * copy, never by the button's wording: the same action always reads the same.
+ * The panel title stays "Bass Optimisation — Powered by ADI".
+ */
+export const ADI_BASS_OPTIMISER_LABEL = "Bass Optimiser";
+
 export const ADI_OPTIMISER_ACTION_LABEL = Object.freeze({
-  // ONE re-run wording, everywhere: before a first run, after a stale result,
-  // after a failed run, and after an incomplete evaluation. There is never a
-  // second re-run button and never a "Re-run to apply".
-  [ADI_OPTIMISER_ACTION.RUN]: "Re-run Optimisation Plan",
-  [ADI_OPTIMISER_ACTION.RERUN]: "Re-run Optimisation Plan",
-  [ADI_OPTIMISER_ACTION.COMPLETE]: "Complete Optimisation Plan",
+  // ONE wording, everywhere: this is the same action in every state, so the
+  // button says the same thing in every state. There is never a second re-run
+  // button and never a "Re-run to apply". CALCULATE is a different action —
+  // the bass calculation itself — so it keeps its own wording.
+  [ADI_OPTIMISER_ACTION.RUN]: ADI_BASS_OPTIMISER_LABEL,
+  [ADI_OPTIMISER_ACTION.RERUN]: ADI_BASS_OPTIMISER_LABEL,
+  [ADI_OPTIMISER_ACTION.COMPLETE]: ADI_BASS_OPTIMISER_LABEL,
   [ADI_OPTIMISER_ACTION.CALCULATE]: BASELINE_PARITY_COPY.CTA,
 });
 

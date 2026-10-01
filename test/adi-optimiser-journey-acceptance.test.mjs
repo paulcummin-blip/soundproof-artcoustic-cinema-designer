@@ -76,7 +76,7 @@ describe("ADI optimiser journey — states", () => {
     const journey = resolve(planViewAbsent);
     expect(journey.state).toBe(ADI_OPTIMISER_JOURNEY_STATE.OPTIMISATION_REQUIRED);
     expect(journey.action).toBe(ADI_OPTIMISER_ACTION.RUN);
-    expect(journey.actionLabel).toBe("Re-run Optimisation Plan");
+    expect(journey.actionLabel).toBe("Bass Optimiser");
     expect(journey.message).toContain(LIMITING);
     // The pre-run card is deliberately short and sales-friendly: the calculation
     // count and the electronic-first summary carry it, and every technical

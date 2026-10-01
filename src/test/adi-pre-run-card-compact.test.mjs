@@ -146,10 +146,12 @@ describe('BUTTON PROMINENT', () => {
     expect(card).toMatch(/bg-\[#213428\]/);
   });
 
-  it('labels the one re-run control Re-run Optimisation Plan', () => {
-    expect(ADI_OPTIMISER_ACTION_LABEL[ADI_OPTIMISER_ACTION.RUN]).toBe('Re-run Optimisation Plan');
-    expect(ADI_OPTIMISER_ACTION_LABEL[ADI_OPTIMISER_ACTION.RERUN]).toBe('Re-run Optimisation Plan');
-    expect(noPlan().actionLabel).toBe('Re-run Optimisation Plan');
+  it('labels the one run control Bass Optimiser in every state', () => {
+    // ONE feature name, identical in every state that offers the action.
+    expect(ADI_OPTIMISER_ACTION_LABEL[ADI_OPTIMISER_ACTION.RUN]).toBe('Bass Optimiser');
+    expect(ADI_OPTIMISER_ACTION_LABEL[ADI_OPTIMISER_ACTION.RERUN]).toBe('Bass Optimiser');
+    expect(ADI_OPTIMISER_ACTION_LABEL[ADI_OPTIMISER_ACTION.COMPLETE]).toBe('Bass Optimiser');
+    expect(noPlan().actionLabel).toBe('Bass Optimiser');
   });
 });
 

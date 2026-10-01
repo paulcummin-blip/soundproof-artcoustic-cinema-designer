@@ -6,7 +6,7 @@
 //
 //   • the limiting factor and what is incomplete
 //   • why it matters
-//   • the next action (Run / Re-run / Complete Optimisation Plan)
+//   • the next action (the Bass Optimiser, worded identically in every state)
 //   • what that next step will evaluate and compare
 //   • the reason, when the optimiser cannot run yet
 //
@@ -23,6 +23,7 @@ import { Activity, AlertTriangle, ArrowRight, CheckCircle2, Loader2, Sparkles } 
 import { useOptimiserPlanView } from "./useOptimiserPlanView.js";
 import { useImproveBassV2State } from "../improveBassV2/improveBassV2Store.js";
 import {
+  ADI_BASS_OPTIMISER_LABEL,
   ADI_OPTIMISER_ACTION,
   ADI_OPTIMISER_JOURNEY_STATE,
   resolveAdiOptimiserJourney,
@@ -244,14 +245,22 @@ export default function AdiOptimisationJourney({
       style={{ borderColor: theme.border, background: theme.background }}
       data-adi-optimiser-journey={journeyStateKey}
     >
-      {/* Header — status */}
-      <div className="flex flex-wrap items-center gap-2">
-        <Icon className="h-4 w-4 shrink-0" style={{ color: theme.iconColor }} />
-        <span className="min-w-0 text-[13px] font-semibold text-[#1B1A1A]">
-          Bass Optimisation — Powered by ADI
-        </span>
+      {/* Header — the title carries the weight of a major ADI feature and the
+          pill states the state. The row wraps instead of overflowing. */}
+      <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2">
+        <div className="flex min-w-0 items-center gap-2.5">
+          <span
+            className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md"
+            style={{ background: theme.pill.background }}
+          >
+            <Icon className="h-4 w-4 text-white" />
+          </span>
+          <span className="min-w-0 text-[18px] font-bold leading-tight tracking-[-0.01em] text-[#1B1A1A]">
+            Bass Optimisation — Powered by ADI
+          </span>
+        </div>
         <span
-          className="ml-auto inline-flex shrink-0 items-center gap-1 whitespace-nowrap rounded-full px-2 py-0.5 text-[9px] font-semibold uppercase"
+          className="inline-flex shrink-0 items-center gap-1 whitespace-nowrap rounded-full px-2.5 py-1 text-[10px] font-semibold uppercase"
           style={theme.pill}
         >
           {journey.statusLabel}
@@ -360,27 +369,34 @@ export default function AdiOptimisationJourney({
           gone, and its evidence sits in Engineer details. */}
       <AdiTestedOptionsTable summary={summary} />
 
-      {/* How many design options ADI will test, and the acoustic work behind them. */}
+      {/* The pre-run summary. The calculation count is stated ONCE, near the top
+          of the card, so this line never repeats it. */}
       {showEstimate && (
         <OptimiserCalculationEstimateLine
           instances={instances}
           seatCount={seatCount}
+          showSentence={!summary.testedSentence}
           className="rounded-md border border-[#E7E5E0] bg-white px-3 py-2"
         />
       )}
 
-      {/* Primary action */}
+      {/* Primary action. Running: the same button, disabled, with the spinner
+          stating the state. The wording never changes — only the pill and the
+          spinner change. */}
       {isRunning && (
-        <div className="inline-flex items-center gap-2 rounded-md bg-[#213428] px-4 py-2 text-[12px] font-semibold text-white opacity-70">
+        <div
+          className="inline-flex items-center gap-2 rounded-md bg-[#213428] px-5 py-2.5 text-[13px] font-semibold text-white opacity-70"
+          data-adi-optimiser-button="running"
+          aria-busy="true"
+        >
           <Loader2 className="h-3.5 w-3.5 animate-spin" />
-          Running Optimisation Plan…
+          {ADI_BASS_OPTIMISER_LABEL}
         </div>
       )}
 
-      {/* The card's ONE re-run control — "Re-run Optimisation Plan" in every
-          state that offers it. It stands down while the placement panel is
-          already stating that same single action, so two re-run buttons can
-          never appear together. */}
+      {/* The card's ONE primary control — "Bass Optimiser" in every state that
+          offers it. It stands down while the placement panel is already stating
+          that same single action, so two run buttons can never appear. */}
       {showAction && !panelShowsRerun && (
         <button
           type="button"
@@ -389,6 +405,7 @@ export default function AdiOptimisationJourney({
             : onRunOptimisationPlan}
           data-adi-rerun-plan={journey.action === ADI_OPTIMISER_ACTION.CALCULATE ? undefined : "true"}
           data-adi-calculate-bass={journey.action === ADI_OPTIMISER_ACTION.CALCULATE ? "true" : undefined}
+          data-adi-optimiser-button="idle"
           className="inline-flex items-center gap-1.5 rounded-md bg-[#213428] px-5 py-2.5 text-[13px] font-semibold text-white transition-colors hover:bg-[#3E4349]"
         >
           <Sparkles className="h-3.5 w-3.5" />

@@ -1,6 +1,6 @@
 // useRunOptimisationPlan.js
 // ---------------------------------------------------------------------------
-// Run / Re-run Optimisation Plan — EVIDENCE ONLY.
+// The Bass Optimiser run — EVIDENCE ONLY.
 //
 // The ADI journey card needs one action: evaluate the available improvement
 // options for the CURRENT design and save the result, without changing the

@@ -22,6 +22,7 @@ import {
   OPTIMISER_LEVER_STATE,
   OPTIMISER_PLAN_STATUS,
 } from "./optimiserPlanConstants.js";
+import { ADI_BASS_OPTIMISER_LABEL } from "./resolveAdiOptimiserJourney.js";
 import { resolveLeverVerdict } from "./optimiserLeverVerdict.js";
 import { LEVER_APPLY_LABEL, LEVER_UNDO_LABEL } from "./optimiserPlanLeverApply.js";
 import { deltaText, deviationText, levelText } from "./optimiserWholeNumberDb.js";
@@ -203,7 +204,7 @@ export function resolvePlacementRecommendation({
     definition: PLACEMENT_DEFINITION,
     applyLabel: LEVER_APPLY_LABEL[OPTIMISER_LEVER.PLACEMENT],
     undoLabel: LEVER_UNDO_LABEL[OPTIMISER_LEVER.PLACEMENT],
-    rerunLabel: "Re-run Optimisation Plan",
+    rerunLabel: ADI_BASS_OPTIMISER_LABEL,
     theoretical: false,
     theoreticalNote: null,
     notice: null,

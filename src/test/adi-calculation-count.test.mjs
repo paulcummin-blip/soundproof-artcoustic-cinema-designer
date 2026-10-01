@@ -68,6 +68,9 @@ describe('PRE-RUN ESTIMATED COUNT SHOWN', () => {
     const card = read('components/room/bass/optimiserPlan/AdiOptimisationJourney.jsx');
     expect(card).toMatch(/OptimiserCalculationEstimateLine/);
     expect(card).toMatch(/const showEstimate = isPreRun && !runEvidence;/);
+    // The count is stated ONCE, near the top of the card: the line above the
+    // button never repeats it.
+    expect(card).toMatch(/showSentence=\{!summary\.testedSentence\}/);
   });
 
   it('falls back to the sequence sentence when the count cannot be derived', () => {
@@ -219,8 +222,8 @@ describe('PLACEMENT FIFTH', () => {
 });
 
 describe('COPY AND BUTTON', () => {
-  it('uses the pre-run copy and the one Re-run Optimisation Plan control', () => {
-    expect(ADI_OPTIMISER_ACTION_LABEL[ADI_OPTIMISER_ACTION.RUN]).toBe('Re-run Optimisation Plan');
+  it('uses the pre-run copy and the one Bass Optimiser control', () => {
+    expect(ADI_OPTIMISER_ACTION_LABEL[ADI_OPTIMISER_ACTION.RUN]).toBe('Bass Optimiser');
     expect(ADI_OPTIMISER_COPY.RUN_EXPLANATION).toMatch(/checks electronic adjustments first/);
     expect(ADI_OPTIMISER_COPY.RUN_EXPLANATION).toMatch(/subwoofer placement, alternative layouts, different subwoofer capability, and seating changes/);
     expect(ADI_OPTIMISER_COPY.SYSTEMATIC_NOTE).toMatch(/P20 seat-to-seat consistency/);

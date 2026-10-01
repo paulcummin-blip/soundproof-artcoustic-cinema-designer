@@ -37,7 +37,7 @@ export const ADI_ROW_ACTION = Object.freeze({
    * Never "Re-run to apply": the designer is asked to re-evaluate the design,
    * not told that a found improvement is simply unavailable.
    */
-  RERUN_ADI: "Re-run Optimisation Plan",
+  RERUN_ADI: "Bass Optimiser",
 });
 
 /**
@@ -91,7 +91,7 @@ export const ADI_ROW_OUTCOME = Object.freeze({
    * in this run".
    */
   GAIN_NOT_EVALUATED:
-    "Gain groups are adjustable on this design, but this saved run did not evaluate them. Re-run Optimisation Plan to test gain.",
+    "Gain groups are adjustable on this design, but this saved run did not evaluate them. Run the Bass Optimiser to test gain.",
   /** Only where the engine genuinely cannot adjust gain (one source, symmetric pair). */
   GAIN_NOT_ADJUSTABLE: "Gain cannot be adjusted for this layout.",
   /** Stated for a movement outside the practical, wall-based placement envelope. */

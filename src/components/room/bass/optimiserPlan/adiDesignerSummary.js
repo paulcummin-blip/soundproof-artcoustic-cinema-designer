@@ -40,6 +40,7 @@ import { PLACEMENT_THEORETICAL_NOTE, describePlacementMove } from "./placementMo
 import { resolvePlacementRecommendation } from "./placementRecommendationAuthority.js";
 import { LEVER_APPLY_LABEL, LEVER_UNDO_LABEL } from "./optimiserPlanLeverApply.js";
 import { buildLiveFamilyRows } from "./optimiserLiveProgress.js";
+import { ADI_BASS_OPTIMISER_LABEL } from "./resolveAdiOptimiserJourney.js";
 import { OPTIMISER_PRESENTATION_STATE } from "./resolveOptimiserPresentationState.js";
 import { resolveOptimiserCurrentP20 } from "./optimiserCurrentP20.js";
 import { parityBlocksApply } from "./optimiserBaselineAuthority.js";
@@ -637,8 +638,8 @@ export function buildAdiDesignerSummary({
       // No on-plan preview of a proposed change exists yet — the card never
       // implies that one does.
       canPreview: false,
-      // ONE re-run wording for every state that offers it.
-      rerunLabel: "Re-run Optimisation Plan",
+      // ONE wording for every state that offers it.
+      rerunLabel: ADI_BASS_OPTIMISER_LABEL,
     },
   };
 }

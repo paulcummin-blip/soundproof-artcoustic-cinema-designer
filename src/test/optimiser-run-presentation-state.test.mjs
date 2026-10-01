@@ -154,7 +154,7 @@ describe('TEST 1: generic advice with no saved plan', () => {
     expect(state.statusLabel).toBe('Optimisation required');
     expect(state.showApply).toBe(false);
     expect(state.statusLabel).not.toBe('Recommendation available');
-    expect(state.actionLabel).toBe('Re-run Optimisation Plan');
+    expect(state.actionLabel).toBe('Bass Optimiser');
   });
 
   it('never renders the ADI recommendation pill outside the available state', () => {
@@ -245,7 +245,7 @@ describe('TEST 3: incomplete or unsaved run', () => {
     expect(unsaved.state).toBe(OPTIMISER_PRESENTATION_STATE.EVALUATION_INCOMPLETE);
     expect(unsaved.statusLabel).toBe('Evaluation incomplete');
     expect(unsaved.message).toMatch(/could not be saved/);
-    expect(unsaved.actionLabel).toBe('Re-run Optimisation Plan');
+    expect(unsaved.actionLabel).toBe('Bass Optimiser');
     expect(unsaved.showApply).toBe(false);
 
     const unreadable = resolveOptimiserPresentationState({
@@ -466,7 +466,7 @@ describe('TEST 6: stale plan', () => {
     expect(state.state).toBe(OPTIMISER_PRESENTATION_STATE.STALE);
     expect(state.statusLabel).toBe('Re-evaluation required');
     expect(state.showApply).toBe(false);
-    expect(state.actionLabel).toBe('Re-run Optimisation Plan');
+    expect(state.actionLabel).toBe('Bass Optimiser');
   });
 
   it('reads the plan without ever writing the design', () => {
