@@ -328,12 +328,13 @@ function rowFor(key, entry, families, baseline) {
         actionText: ADI_ROW_ACTION.RERUN_ADI,
       };
     }
-    // No grouping evidence was kept with this saved run: the layout may well be
-    // adjustable, so the row states the one action that answers it.
+    // No grouping evidence was kept with this saved run: state the run's own
+    // reason when it kept one, otherwise the one action that answers it.
+    const kept = familyReason(entry);
     return {
       status: ADI_ROW_STATUS.NOT_YET_SUPPORTED,
-      outcome: ADI_ROW_OUTCOME.GAIN_NOT_EVALUATED,
-      actionText: ADI_ROW_ACTION.RERUN_ADI,
+      outcome: kept || ADI_ROW_OUTCOME.GAIN_NOT_EVALUATED,
+      actionText: kept ? null : ADI_ROW_ACTION.RERUN_ADI,
     };
   }
 

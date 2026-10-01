@@ -10,7 +10,7 @@
 // Four states, resolved from the SAVED Optimisation Plan (the plan status
 // authority) and whether the optimiser can be run against the current design:
 //
-//   1. no saved plan            → Optimisation required      · Run Optimisation Plan
+//   1. no saved plan            → Optimisation required      · Re-run Optimisation Plan
 //   2. saved plan is stale      → Re-evaluation required     · Re-run Optimisation Plan
 //   3. lever-level data missing → Evaluation incomplete      · Complete / Re-run Optimisation Plan
 //   4. saved plan is current    → Optimisation plan available · (read-only plan)
