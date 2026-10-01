@@ -11,7 +11,6 @@ import { useActiveProjectId } from '@/components/state/project-session';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { BarChart4 } from 'lucide-react';
 import { rp22Parameters } from '../components/data/rp22Parameters';
-import RP22GradingPill from '../components/ui/RP22GradingPill';
 import { getSpeakerModelMeta } from '../components/models/speakers/registry';
 import { computeScreenMetrics } from '../components/utils/screenMetrics';
 import { resolveEffectiveViewableDimsM } from '../components/models/screen/resolveEffectiveScreen';
@@ -48,6 +47,7 @@ import { getP21PresetResult, levelP21_earlyReflections } from '@/components/util
 import TechnicalProjectOverview from '@/components/report/technical/TechnicalProjectOverview';
 import TechnicalPerformanceSummary from '@/components/report/technical/TechnicalPerformanceSummary';
 import TechnicalAsdrScorecard from '@/components/report/technical/TechnicalAsdrScorecard';
+import TechnicalRp23Rows from '@/components/report/technical/TechnicalRp23Rows';
 import ScopedAsdrSummary from '@/components/report/technical/ScopedAsdrSummary';
 import TechnicalReportRecommendations from '@/components/report/technical/TechnicalReportRecommendations';
 import TechnicalAdiAssessment from '@/components/report/technical/TechnicalAdiAssessment';
@@ -1149,64 +1149,13 @@ function RP22ReportInner() {
                             <CardTitle className="text-[#1B1A1A] font-header">RP22 Parameters</CardTitle>
                         </CardHeader>
                         <CardContent className="space-y-6">
-                            {/* RP23 row */}
-                            {(() => {
-                                const rp23Rows = rowCentralSeats
-                                    .map(seat => {
-                                        const rowNum = seat.rowNumber || 1;
-                                        const snap = reportSeatHudById?.[seat.id];
-                                        return { rowNum, rp23: snap?.rp23 || null };
-                                    })
-                                    .filter(r => r.rp23);
-                                if (rp23Rows.length === 0) return null;
-                                return (
-                                    <Card className="bg-[#FFFFFF] border-[#DCDBD6]">
-                                        <CardHeader className="pb-2">
-                                            <CardTitle className="text-[#1B1A1A] font-header">RP23 — Horizontal Viewing Angle</CardTitle>
-                                            <p className="text-xs text-[#625143] mt-1">Representative seat per row · target range 50°–65° (L4)</p>
-                                        </CardHeader>
-                                        <CardContent>
-                                            <div className="space-y-2">
-                                                {rp23Rows.map(({ rowNum, rp23 }) => (
-                                                    <div key={rowNum} className="flex items-center justify-between py-1.5 border-b border-[#F0EFEA] last:border-0">
-                                                        <span className="text-sm text-[#3E4349] font-medium">Row {rowNum}</span>
-                                                        <div className="flex items-center gap-3">
-                                                            <span className="text-sm font-bold text-[#1B1A1A]">{rp23.formatted || '—'}</span>
-                                                            <RP22GradingPill level={rp23.level || '—'} />
-                                                        </div>
-                                                    </div>
-                                                ))}
-                                            </div>
-                                            <div style={{ marginTop: 16, paddingTop: 12, borderTop: '1px solid #E8E6E1' }}>
-                                                <div style={{
-                                                    display: 'grid',
-                                                    gridTemplateColumns: 'repeat(4, 1fr)',
-                                                    textAlign: 'center',
-                                                    fontSize: 12,
-                                                    color: '#6F6B64'
-                                                }}>
-                                                    <div>
-                                                        <div style={{ fontWeight: 600 }}>L4</div>
-                                                        <div>50°–65°</div>
-                                                    </div>
-                                                    <div>
-                                                        <div style={{ fontWeight: 600 }}>L3</div>
-                                                        <div>45°–70°</div>
-                                                    </div>
-                                                    <div>
-                                                        <div style={{ fontWeight: 600 }}>L2</div>
-                                                        <div>40°–80°</div>
-                                                    </div>
-                                                    <div>
-                                                        <div style={{ fontWeight: 600 }}>L1</div>
-                                                        <div>33°–90°</div>
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        </CardContent>
-                                    </Card>
-                                );
-                            })()}
+                            {/* RP23 row — one result per seating row, read from the shared
+                                published viewing authority (the same one the Visual Report
+                                Viewing Experience page and the seat pop-up read). */}
+                            <TechnicalRp23Rows
+                                representativeSeats={rowCentralSeats}
+                                engineeringSummary={engineeringSummary}
+                            />
 
                             <RP22ReportParameterGrid {...parameterGridProps} />
                         </CardContent>
