@@ -12,8 +12,17 @@
 //   - cabinet model dimensions from the speaker registry (never hardcoded)
 //
 // Deduplication: identical physical states are filtered out.
+//
+// PRACTICALITY: every candidate is tagged practical / theoretical. Only
+// practical candidates may enter the DEFAULT search — a movement is practical
+// only while every subwoofer stays on the practical wall it started on, so
+// depth moves, side/interior moves and wall crossings are theoretical.
 
 import { subHalfExtents, deriveSubWallOrientation } from "../../rv/utils/subWallOrientation.js";
+import {
+  classifyMovementPracticality,
+  PLACEMENT_PRACTICALITY,
+} from "../best-layout/practicalPlacementAuthority.js";
 
 const GRID_M = 0.1; // 100 mm
 const SYM_MAX_M = 0.3; // ±300 mm for symmetric
@@ -37,7 +46,7 @@ function isPhysicallyValid(x, y, roomDims, subWidthM, subDepthM) {
   return true;
 }
 
-function validateCandidateSet(positions, roomDims, subWidthM, subDepthM) {
+export function validateCandidateSet(positions, roomDims, subWidthM, subDepthM) {
   for (const pos of positions) {
     if (!isPhysicallyValid(pos.x, pos.y, roomDims, subWidthM, subDepthM)) return false;
   }
@@ -52,6 +61,52 @@ function validateCandidateSet(positions, roomDims, subWidthM, subDepthM) {
 
 function dedupKey(positions) {
   return positions.map((p) => `${p.x.toFixed(3)},${p.y.toFixed(3)}`).join("|");
+}
+
+/**
+ * The current positions of a layout, indexed by original position, so a
+ * generated set can be classified against the wall each subwoofer started on.
+ */
+function layoutPositions(layout) {
+  const positions = [];
+  const put = (entry) => {
+    if (!entry || entry.originalIndex == null) return;
+    positions[entry.originalIndex] = { x: entry.x, y: entry.y };
+  };
+  put(layout?.frontLeft);
+  put(layout?.frontRight);
+  put(layout?.rearLeft);
+  put(layout?.rearRight);
+  put(layout?.left);
+  put(layout?.right);
+  put(layout?.single);
+  return positions;
+}
+
+/** Practicality tag carried on every candidate. */
+function practicalityOf(currentPositions, coordinates, roomDims) {
+  const verdict = classifyMovementPracticality({ currentPositions, coordinates, roomDims });
+  return {
+    practical: verdict.practical,
+    practicality: verdict.practical
+      ? PLACEMENT_PRACTICALITY.PRACTICAL
+      : PLACEMENT_PRACTICALITY.THEORETICAL,
+    impracticalReason: verdict.reason,
+  };
+}
+
+/**
+ * Split generated candidates into the DEFAULT practical search set and the
+ * theoretical set that is retained for Engineer Details only.
+ */
+export function splitPracticalCandidates(candidates) {
+  const practical = [];
+  const theoretical = [];
+  for (const candidate of Array.isArray(candidates) ? candidates : []) {
+    if (candidate?.practical === false) theoretical.push(candidate);
+    else practical.push(candidate);
+  }
+  return { practical, theoretical };
 }
 
 // ── Layout identification ────────────────────────────────────────────────
@@ -122,6 +177,7 @@ function generateSymmetricQuad(layout, roomDims, subWidthM, subDepthM) {
   const seen = new Set();
   const W = Number(roomDims.widthM);
   const { frontLeft, frontRight, rearLeft, rearRight } = layout;
+  const basePositions = layoutPositions(layout);
 
   function tryAdd(label, positions, movement) {
     // Reconstruct full position array in original order
@@ -135,7 +191,10 @@ function generateSymmetricQuad(layout, roomDims, subWidthM, subDepthM) {
     const key = dedupKey(full);
     if (seen.has(key)) return;
     seen.add(key);
-    candidates.push({ id: `sym-${label}`, label, coordinates: full, movement, phase: "symmetric" });
+    candidates.push({
+      id: `sym-${label}`, label, coordinates: full, movement, phase: "symmetric",
+      ...practicalityOf(basePositions, full, roomDims),
+    });
   }
 
   const frontPair = [frontLeft, frontRight];
@@ -193,13 +252,17 @@ function generateSymmetricPair(layout, roomDims, subWidthM, subDepthM) {
   const seen = new Set();
   const W = Number(roomDims.widthM);
   const { left, right } = layout;
+  const basePositions = layoutPositions(layout);
 
   function tryAdd(label, positions, movement) {
     if (!validateCandidateSet(positions, roomDims, subWidthM, subDepthM)) return;
     const key = dedupKey(positions);
     if (seen.has(key)) return;
     seen.add(key);
-    candidates.push({ id: `sym-${label}`, label, coordinates: positions, movement, phase: "symmetric" });
+    candidates.push({
+      id: `sym-${label}`, label, coordinates: positions, movement, phase: "symmetric",
+      ...practicalityOf(basePositions, positions, roomDims),
+    });
   }
 
   for (const deltaMm of [100, 200, 300]) {
@@ -224,6 +287,7 @@ function generateAsymmetricPairQuad(layout, roomDims, subWidthM, subDepthM) {
   const seen = new Set();
   const W = Number(roomDims.widthM);
   const { frontLeft, frontRight, rearLeft, rearRight } = layout;
+  const basePositions = layoutPositions(layout);
 
   function tryAdd(label, positions, movement) {
     const full = new Array(4);
@@ -235,7 +299,10 @@ function generateAsymmetricPairQuad(layout, roomDims, subWidthM, subDepthM) {
     const key = dedupKey(full);
     if (seen.has(key)) return;
     seen.add(key);
-    candidates.push({ id: `asym-${label}`, label, coordinates: full, movement, phase: "asymmetric-pair" });
+    candidates.push({
+      id: `asym-${label}`, label, coordinates: full, movement, phase: "asymmetric-pair",
+      ...practicalityOf(basePositions, full, roomDims),
+    });
   }
 
   for (const deltaMm of [100, 200]) {
@@ -300,6 +367,7 @@ function generateIndividualCandidates(currentPositions, roomDims, subWidthM, sub
             coordinates: positions,
             movement: `Sub ${subIdx + 1} ${dirLabel} ${deltaMm} mm`,
             phase: "individual",
+            ...practicalityOf(currentPositions, positions, roomDims),
           });
         }
       }

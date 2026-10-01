@@ -12,8 +12,16 @@
 //
 // Each phase promotes only 2-3 candidates into the expensive V2 pipeline.
 // Funnel instrumentation tracks: generated → screened → promoted → confirmed.
+//
+// PRACTICAL PLACEMENT CONSTRAINT: every phase screens PRACTICAL candidates only
+// (subwoofers horizontal along their own wall). Candidates that would place a
+// subwoofer off its wall — depth moves, side or mid-room positions, wall
+// crossings — are never searched by default; they are returned as labelled
+// theoretical options for Engineer Details.
 
-import { generateSymmetricCandidates, generateAsymmetricPairCandidates, generateIndividualCandidatesForPhase } from "./positionCandidateGenerator.js";
+import { generateSymmetricCandidates, generateAsymmetricPairCandidates, generateIndividualCandidatesForPhase, splitPracticalCandidates } from "./positionCandidateGenerator.js";
+import { generatePracticalWallLadderCandidates } from "./practicalWallSearch.js";
+import { describeTheoreticalCandidate } from "../best-layout/practicalPlacementAuthority.js";
 import { screenPositionCandidates, promoteScreenedCandidates } from "./positionScreeningEngine.js";
 import { isMaterialImprovement } from "./materialityGate.js";
 import { isSamePlacement } from "./improveBassV2Engine.js";
@@ -27,30 +35,41 @@ const MAX_PROMOTED_PER_PHASE = 3;
  * Run one position search phase: generate → screen → promote.
  * Returns only the 2-3 promoted candidates plus funnel metrics.
  */
-export function runPositionScreenPhase(phase, currentPositions, roomDims, cabinetDims, seatingPositions, rspPosition, subwooferBottomHeightM) {
+export function runPositionScreenPhase(phase, currentPositions, roomDims, cabinetDims, seatingPositions, rspPosition, subwooferBottomHeightM, groups = []) {
   const screeningPhysics = { qStrategy: "ab_corrected" };
   const t0 = typeof performance !== "undefined" ? performance.now() : Date.now();
 
   let candidates = [];
   if (phase === "symmetric") {
-    candidates = generateSymmetricCandidates(currentPositions, roomDims, cabinetDims);
+    // Local refinement around the current positions PLUS the practical wall
+    // ladder (horizontal positions along each subwoofer's own wall, centre →
+    // quarter → third → near-corner).
+    candidates = [
+      ...generateSymmetricCandidates(currentPositions, roomDims, cabinetDims),
+      ...generatePracticalWallLadderCandidates({ currentPositions, roomDims, cabinetDims, groups }),
+    ];
   } else if (phase === "asymmetric-pair") {
     candidates = generateAsymmetricPairCandidates(currentPositions, roomDims, cabinetDims);
   } else if (phase === "individual") {
     candidates = generateIndividualCandidatesForPhase(currentPositions, roomDims, cabinetDims);
   }
 
-  const generated = candidates.length;
+  // Only practical candidates enter the default search. Theoretical candidates
+  // are retained as labelled options — they are never searched or recommendable.
+  const { practical, theoretical } = splitPracticalCandidates(candidates);
+  const theoreticalExcluded = theoretical.map((candidate) => describeTheoreticalCandidate(candidate));
+  const generated = practical.length;
   if (generated === 0) {
     return {
       promoted: [],
-      funnel: { generated: 0, screened: 0, promotedToV2: 0 },
+      funnel: { generated: 0, screened: 0, promotedToV2: 0, theoreticalExcluded: theoreticalExcluded.length },
       timingMs: (typeof performance !== "undefined" ? performance.now() : Date.now()) - t0,
+      theoreticalExcluded,
     };
   }
 
   const screened = screenPositionCandidates(
-    candidates, roomDims, seatingPositions, rspPosition,
+    practical, roomDims, seatingPositions, rspPosition,
     subwooferBottomHeightM, cabinetDims.heightM, screeningPhysics,
   );
 
@@ -98,10 +117,12 @@ export function runPositionScreenPhase(phase, currentPositions, roomDims, cabine
     promoted,
     funnel: {
       generated,
-      screened: generated, // all generated are screened
+      screened: generated, // every practical candidate is screened
       promotedToV2: promoted.length,
+      theoreticalExcluded: theoreticalExcluded.length,
     },
     timingMs: (typeof performance !== "undefined" ? performance.now() : Date.now()) - t0,
+    theoreticalExcluded,
   };
 }
 
@@ -148,7 +169,7 @@ export function checkPhaseMateriality(confirmedResults, existingAuthority) {
 /**
  * Build the detailed per-phase exhaustion state for the selection.
  */
-export function buildPositionOptimisationState(phasesRun, funnel, existingAuthority, finalWinner) {
+export function buildPositionOptimisationState(phasesRun, funnel, existingAuthority, finalWinner, theoreticalExcluded = []) {
   const state = {
     attempted: phasesRun.length > 0,
     symmetric: {
@@ -179,6 +200,12 @@ export function buildPositionOptimisationState(phasesRun, funnel, existingAuthor
     subOptimisationExhausted: false,
     bestPracticalSubResult: finalWinner || null,
   };
+
+  // Candidates that were generated but deliberately NOT searched because they
+  // are not practical placements. Recorded, labelled, for Engineer Details —
+  // they were never recommendable. Capped so the record stays readable.
+  state.excludedTheoretical = (Array.isArray(theoreticalExcluded) ? theoreticalExcluded : []).slice(0, 40);
+  state.theoreticalExcludedCount = state.excludedTheoretical.length;
 
   // Materiality: only if the final winner is a position candidate and is material
   if (finalWinner && existingAuthority) {
