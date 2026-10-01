@@ -565,6 +565,11 @@ function buildCanonicalCandidate({
     const correctionCurve = realisticResult.correctionCurve;
     const globalTrimDb = realisticResult.globalTrimDb;
     const operatingPreEqCurve = realisticResult.operatingPreEqCurve;
+    // The REAL pre-smoothing correction envelope. Carried (never rebuilt) so the
+    // published correction trace can prove whether smoothing limited a
+    // frequency, and so the smoothing counterfactual has the actual envelope.
+    const rawCorrectionCurve = Array.isArray(realisticResult.rawCorrectionCurve)
+      ? realisticResult.rawCorrectionCurve : [];
     const achievedPre = operatingPreEqCurve.map((point) => ({ ...point }));
 
     // Build the product operating envelope from THIS candidate's correction
@@ -733,7 +738,7 @@ function buildCanonicalCandidate({
     const physicalEqAuthorityPassed = physicalAuthorityViolations.length === 0;
 
     return {
-      globalTrimDb, correctionCurve, operatingPreEqCurve,
+      globalTrimDb, correctionCurve, operatingPreEqCurve, rawCorrectionCurve,
       achievedPreEqCurve: achievedPre, unconstrainedPostEqCurve: unconstrainedPost,
       finalPostEqCurve: finalPost, perSeatPostEqCurves: candidatePerSeatCurves,
       productOperatingEnvelope: envelope,
@@ -771,6 +776,7 @@ function buildCanonicalCandidate({
 
   // ── Select final response ──
   let realisticCorrectionCurve = pass1Evaluation.correctionCurve;
+  let realisticRawCorrectionCurve = pass1Evaluation.rawCorrectionCurve || [];
   let realisticGlobalTrimDb = pass1Evaluation.globalTrimDb;
   let realisticOperatingPreEqCurve = pass1Evaluation.operatingPreEqCurve;
   let achievedPreEqCurve = pass1Evaluation.achievedPreEqCurve;
@@ -820,6 +826,7 @@ function buildCanonicalCandidate({
     if (refinementResult.refinementImproved && refinementResult.refinedEvaluation) {
       const refined = refinementResult.refinedEvaluation;
       realisticCorrectionCurve = refined.correctionCurve;
+      realisticRawCorrectionCurve = refined.rawCorrectionCurve || [];
       realisticGlobalTrimDb = refined.globalTrimDb;
       realisticOperatingPreEqCurve = refined.operatingPreEqCurve;
       achievedPreEqCurve = refined.achievedPreEqCurve;
@@ -926,6 +933,8 @@ function buildCanonicalCandidate({
     rspBeforePeqAtOperatingLevel: achievedPreEqCurve,
     realisticGlobalTrimDb: Number.isFinite(realisticGlobalTrimDb) ? realisticGlobalTrimDb : 0,
     operatingPreEqCurve: (realisticOperatingPreEqCurve || []).map((point) => ({ ...point })),
+    // Pre-smoothing correction envelope, carried verbatim from the predictor.
+    rawCorrectionCurve: (realisticRawCorrectionCurve || []).map((point) => ({ ...point })),
     operatingLevelOffsetDb: Number.isFinite(operatingLevelOffsetDb) ? operatingLevelOffsetDb : 0,
     requestedOperatingLevelOffsetDb: Number.isFinite(requestedOperatingLevelOffsetDb) ? requestedOperatingLevelOffsetDb : 0,
     baseRequestedSystemOutputDb: Number.isFinite(baseRequestedSystemOutputDb) ? baseRequestedSystemOutputDb : null,

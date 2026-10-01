@@ -68,6 +68,10 @@ export function buildFinishedGraphOptimisationResult(compactContract) {
     selectedCandidateId: candidateId,
     postEqRspCurve,
     correctionCurve,
+    // Pre-smoothing envelope restored from the persisted payload so the cached
+    // tooltip explains the same mechanism as the live calculation. Empty when
+    // the persisted contract predates it.
+    rawCorrectionCurve: Array.isArray(gp.rawCorrectionCurve) ? gp.rawCorrectionCurve.map((p) => ({ ...p })) : [],
     correctionCurveSignature: buildCorrectionCurveSignature({ correctionCurve }),
     canonicalPostEqRsp: postEqRspCurve,
     referenceEq,

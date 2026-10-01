@@ -1,5 +1,5 @@
 import { buildCurveSignature, buildFilterBankSignature, buildCorrectionCurveSignature } from "@/components/room/bass/bassResultAuthority";
-import { buildCorrectionTrace } from "@/components/room/bass/correctionTraceAuthority";
+import { assembleCorrectionTrace } from "@/components/room/bass/correctionTraceAssembly";
 
 const cloneCurve = (curve) => (Array.isArray(curve) ? curve.map((point) => ({ ...point })) : []);
 
@@ -163,8 +163,21 @@ export function applyAuthorityToCanonicalResult(canonicalResult, authorityBearin
         responseData: cloneCurve(seat.responseData),
       }))
     : canonicalResult.canonicalPostEqSeatResponses;
+  // The persisted correction trace plus the counterfactual examination of the
+  // worst low-frequency residual. Built ONCE on the final post-alignment
+  // response: a read-only derivation of curves already computed. It changes no
+  // acoustic maths, EQ, smoothing, limits, grading or target.
+  const traceAssembly = assembleCorrectionTrace({
+    canonicalResult,
+    candidate,
+    alignedRsp,
+  });
+
   return {
     ...canonicalResult,
+    // The real pre-smoothing correction envelope, carried for the trace and for
+    // the persisted payload. Never rebuilt downstream.
+    rawCorrectionCurve: traceAssembly.rawCorrectionCurve,
     achievedP14Db: candidate.achievedP14Db ?? null,
     achievedP14Level: candidate.achievedP14Level ?? null,
     achievedP18FrequencyHz: candidate.achievedP18FrequencyHz ?? null,
@@ -225,22 +238,7 @@ export function applyAuthorityToCanonicalResult(canonicalResult, authorityBearin
     assessmentEndHz: Number.isFinite(candidate.assessmentEndHz)
       ? Number(candidate.assessmentEndHz)
       : (canonicalResult.assessmentEndHz ?? null),
-    // Persisted correction trace, built ONCE on the final post-alignment
-    // response. Read-only derivation of curves already computed — it changes no
-    // acoustic maths, EQ, smoothing, limits, grading or target.
-    correctionTrace: buildCorrectionTrace({
-      postEqRspCurve: alignedRsp,
-      rawRspCurve: canonicalResult.rspBeforePeqAtOperatingLevel?.length
-        ? canonicalResult.rspBeforePeqAtOperatingLevel
-        : canonicalResult.physicalRawResponseCurve,
-      targetCurve: canonicalResult.canonicalTargetCurve,
-      correctionCurve: canonicalResult.correctionCurve,
-      capabilityLimitedRegions: candidate.capabilityLimitedRegions
-        || canonicalResult.capabilityLimitedRegions,
-      protectedNullRegions: candidate.protectedNullRegions || canonicalResult.protectedNullRegions,
-      initialOperatingAdjustmentDb: canonicalResult.operatingLevelOffsetDb,
-      finalGlobalAlignmentTrimDb: candidate.globalLevelAlignment?.recommendedTrimDb,
-    }),
+    correctionTrace: traceAssembly.correctionTrace,
   };
 }
 

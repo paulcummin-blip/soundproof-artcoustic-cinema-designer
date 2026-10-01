@@ -353,6 +353,10 @@ function buildGraphPayload(contract) {
     // final post-EQ response. Persist it verbatim so cold hydration can satisfy
     // the same finalOptimisedBassAuthorityMatches gate as a live calculation.
     correctionCurve: cloneCurve(finalResponse.correctionCurve),
+    // The REAL pre-smoothing correction envelope, persisted so a cached reopen
+    // can still prove (per frequency) whether smoothing limited the correction.
+    // Absent for results persisted before it was carried through.
+    rawCorrectionCurve: cloneCurve(finalResponse.rawCorrectionCurve),
     referenceEq: cloneCurve(finalResponse.referenceEq),
     productionHouseCurveTarget: cloneCurve(finalResponse.canonicalTargetCurve),
     maximumSplCurveAfterEq: cloneCurve(finalResponse.maximumSplCurveAfterEq),
