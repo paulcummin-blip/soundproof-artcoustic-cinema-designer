@@ -3,7 +3,14 @@
  *
  * Reads exact per-seat P1 rows from the published engineering summary and joins
  * them to geometry. Wall-distance zones remain presentation-only.
+ *
+ * Each seat carries both the RAW published level (levelLabel — the pill's
+ * colour authority) and the report's own wording for it (pillText), so a
+ * failure reads "Below L1" in the pill exactly as the boundary-zone legend
+ * names it, without a second name for the same state.
  */
+import { groupSeatsIntoRows } from "./seatRowGrouping";
+
 const LEVEL_LABELS = {
   L4: "L4",
   L3: "L3",
@@ -40,12 +47,18 @@ export function selectClientRecommendedSeatingPosition({ engineeringSummary, sea
         formatted: result.valueFormatted || (distanceM == null ? null : `${distanceM.toFixed(2)}m`),
         level: LEVEL_LABELS[levelRaw] || null,
         levelRaw,
+        levelLabel: levelRaw,
+        pillText: LEVEL_LABELS[levelRaw] || null,
         rank: LEVEL_RANK[levelRaw] ?? -1,
       };
     })
     .filter(Boolean);
 
-  return { seats, rsp, hasAny: seats.length > 0 };
+  // The seat arrangement the client sees in the seating plan, so the result is
+  // read in the same physical shape — never a linear Seat 1 … Seat N list.
+  const rows = groupSeatsIntoRows(seats);
+
+  return { seats, rows, rsp, hasAny: seats.length > 0 };
 }
 
 export default selectClientRecommendedSeatingPosition;

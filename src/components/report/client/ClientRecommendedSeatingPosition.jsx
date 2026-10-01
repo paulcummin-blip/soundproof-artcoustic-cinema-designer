@@ -8,7 +8,9 @@
  *     (Below L1 / L1 / L2 / L3 / L4 — progressively calmer toward the centre)
  *   - all real seats plotted at their room coordinates
  *   - strongest seats (highest canonical P1 level) visually emphasised
- *   - compact result matrix, horizontal legend, and client explanation
+ *   - the assessed seat result laid out in the SAME physical arrangement as the
+ *     seating plan: one pill per assessed seat, its published wall distance
+ *     beneath it, then the boundary-zone legend as a footnote
  *
  * Seat P1 distance/level come ONLY from the canonical authority:
  *   analysisResult.perSeatRp22[seatId].rp22[1]
@@ -20,9 +22,10 @@
 import React, { useMemo } from "react";
 import { LEVEL_FILLS, LEVEL_LABEL_COLORS, zoneLabelPosition } from "./levelFills";
 import SeatMarker from "./SeatMarker";
-import { getSeatGradeColors } from "./visualReportSeatStyle";
 import { computeHaloRadiusPx, PRIMARY_STROKE_WIDTH } from "./seatMarkerGeometry";
 import { resolveRspLabelPlacement } from "./ClientSpeakerBalance";
+import { groupSeatsIntoRows } from "./seatRowGrouping";
+import P1SeatResultBlock from "./P1SeatResultBlock";
 
 // ── Wall-distance zones (metres inward from each room wall) ──
 // Thresholds match the canonical P1 grading authority.
@@ -78,12 +81,22 @@ export default function ClientRecommendedSeatingPosition({
             distanceM: s.distanceM,
             formatted: s.formatted,
             level: s.level,
+            // Pill colour authority is the RAW published level; the pill's TEXT
+            // uses the report's own wording (a failure reads "Below L1"). Both
+            // come from the selector — nothing is named here.
+            levelLabel: s.levelLabel,
+            pillText: s.pillText,
             isPrimary: s.isPrimary === true,
           };
         })
         .filter(Boolean),
     [seats]
   );
+
+  // P1 is assessed at every seating position, so the result is laid out in the
+  // same physical row/seat arrangement as the plan above — never a linear
+  // Seat 1 … Seat N list. Grouping only: no re-grading, no re-measuring.
+  const seatRows = useMemo(() => groupSeatsIntoRows(plotSeats), [plotSeats]);
 
   // RSP marker (preserved)
   const rspX = Number(rsp?.x);
@@ -326,7 +339,13 @@ export default function ClientRecommendedSeatingPosition({
       )}
 
       {showSupport && (<>
-      {/* ── Compact horizontal legend ── */}
+      {/* ── P1 seat result map — the assessed result, laid out in the same
+             row/seat arrangement as the seating plan above. This is the page's
+             statement; the legend below is only a footnote for the zones. ── */}
+      <P1SeatResultBlock rows={seatRows} print={print} />
+
+      {/* ── Compact horizontal legend — a footnote beneath the result, for
+             reading the boundary zones in the drawing above ── */}
       <div style={{
         display: "flex",
         flexWrap: "wrap",
@@ -352,88 +371,6 @@ export default function ClientRecommendedSeatingPosition({
         ))}
       </div>
 
-      {/* ── Compact result matrix ── */}
-      <div style={{
-        display: "flex",
-        justifyContent: "center",
-        width: "100%",
-        fontFamily: "Didact Gothic, Century Gothic, sans-serif",
-      }}>
-        <table style={{
-          borderCollapse: "collapse",
-          fontSize: print ? 10 : 12,
-          color: "#3E4349",
-        }}>
-          <thead>
-            <tr>
-              <th style={{ padding: "4px 10px", textAlign: "left", fontWeight: 600, color: "#625143", borderBottom: "1px solid #DCDBD6" }} />
-              {plotSeats.map((seat, i) => (
-                <th
-                  key={seat.id}
-                  style={{
-                    padding: "4px 12px",
-                    textAlign: "center",
-                    fontWeight: seat.isPrimary ? 700 : 500,
-                    color: seat.isPrimary ? "#213428" : "#625143",
-                    borderBottom: "1px solid #DCDBD6",
-                  }}
-                >
-                  Seat {i + 1}
-                </th>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-            <tr>
-              <td style={{ padding: "4px 10px", textAlign: "left", fontWeight: 600, color: "#625143" }}>P1 Distance</td>
-              {plotSeats.map((seat) => {
-                const grade = getSeatGradeColors(seat.level);
-                return (
-                  <td
-                    key={seat.id}
-                    style={{
-                      padding: "4px 12px",
-                      textAlign: "center",
-                      fontWeight: seat.isPrimary ? 700 : 500,
-                      color: grade.text,
-                    }}
-                  >
-                    {seat.level ? (
-                      <span style={{ display: "inline-flex", alignItems: "center", gap: 5 }}>
-                        <span style={{
-                          display: "inline-block",
-                          width: 8,
-                          height: 8,
-                          borderRadius: "50%",
-                          background: grade.fill,
-                          border: `1px solid ${grade.border}`,
-                        }} />
-                        {seat.level}
-                      </span>
-                    ) : "—"}
-                  </td>
-                );
-              })}
-            </tr>
-            <tr>
-              <td style={{ padding: "2px 10px 4px" }} />
-              {plotSeats.map((seat) => (
-                <td
-                  key={seat.id}
-                  style={{
-                    padding: "2px 12px 4px",
-                    textAlign: "center",
-                    fontSize: print ? 8.5 : 10,
-                    color: "#625143",
-                  }}
-                >
-                  {seat.formatted ?? "—"}
-                </td>
-              ))}
-            </tr>
-          </tbody>
-        </table>
-      </div>
       </>)}
 
     </div>

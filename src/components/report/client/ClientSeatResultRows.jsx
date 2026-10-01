@@ -15,10 +15,14 @@
  * from already-published seat results.
  *
  * Props:
- *   rows     — [{ rowIndex, label, seats: [{ id, levelLabel, formatted, isPrimary }] }]
- *   heading  — optional block heading (e.g. "RP23 Viewing Result")
- *   valueKey — seat field shown beneath each pill (default "formatted")
- *   print    — print (PDF) context; screen sizes are slightly reduced
+ *   rows        — [{ rowIndex, label, seats: [{ id, levelLabel, formatted, isPrimary }] }]
+ *   heading     — optional block heading (e.g. "RP23 Viewing Result")
+ *   valueKey    — seat field shown beneath each pill (default "formatted")
+ *   pillTextKey — optional seat field whose text labels the pill. Pill COLOURS
+ *                 still come from levelLabel, so a report that names a level in
+ *                 its own words (P1's "Below L1") keeps the canonical grading
+ *                 treatment while speaking the report's language.
+ *   print       — print (PDF) context; screen sizes are slightly reduced
  */
 
 import React from "react";
@@ -34,6 +38,7 @@ export default function ClientSeatResultRows({
   rows,
   heading,
   valueKey = "formatted",
+  pillTextKey,
   print,
 }) {
   const filled = (Array.isArray(rows) ? rows : []).filter((row) => row?.seats?.length);
@@ -114,7 +119,9 @@ export default function ClientSeatResultRows({
                     minWidth: print ? 46 : 52,
                     fontWeight: seat.isPrimary ? 700 : 600,
                   }}
-                />
+                >
+                  {pillTextKey ? seat[pillTextKey] || undefined : undefined}
+                </RP22GradingPill>
                 <span
                   style={{
                     fontSize: print ? 9.5 : 11,
