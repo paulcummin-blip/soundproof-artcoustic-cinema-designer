@@ -96,6 +96,38 @@ function resolveEvaluatedCount(diagnostics, rows) {
   return { count: 0, basis: null };
 }
 
+/**
+ * Build the compact run summary saved alongside an actionable plan.
+ *
+ * This uses only counters the completed optimiser already produced. It does not
+ * score, select or alter a candidate. The full no-winner evidence record below
+ * remains separate because its rejection wording is not truthful for a winner.
+ */
+export function buildActionableOptimiserRunSummary({
+  selection = null,
+  diagnostics = null,
+} = {}) {
+  if (!selection?.winner) return null;
+  const rows = Array.isArray(selection.confirmedResults) ? selection.confirmedResults : [];
+  const evaluated = resolveEvaluatedCount(diagnostics, rows);
+  return {
+    completedAt: new Date().toISOString(),
+    outcome: "actionable_plan_produced",
+    canonicalJobsRun: num(selection.canonicalJobsRun
+      ?? diagnostics?.canonicalJobsRun
+      ?? diagnostics?.runtimeMetrics?.canonicalJobsRun),
+    candidatesEvaluated: evaluated.count,
+    candidatesEvaluatedBasis: evaluated.basis,
+    resultsRetained: rows.length,
+    winnerCandidateId: selection.winner.candidateId || null,
+    actionablePlanProduced: true,
+    rejectionReasons: [],
+    // Running the plan evaluates evidence only. Applying a lever is a separate,
+    // explicit designer action.
+    designUnchanged: true,
+  };
+}
+
 function candidateRows(diagnostics) {
   return Array.isArray(diagnostics?.topCandidatesForWinningStage)
     ? diagnostics.topCandidatesForWinningStage
