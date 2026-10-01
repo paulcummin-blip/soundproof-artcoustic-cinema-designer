@@ -13,6 +13,7 @@
 //   TEST 7  The printed page (PDF) carries the graphic AND the seat map
 //   TEST 8  No P5 calculation: published values pass through unchanged
 //   TEST 9  No layout overflow: rows wrap, the result stays inside its card
+//   TEST 10 No overall result card: the seat map carries the result
 // ---------------------------------------------------------------------------
 import { test } from 'vitest';
 import assert from 'node:assert/strict';
@@ -122,12 +123,12 @@ const SCREEN_TEXT = textOf(SCREEN);
 const PRINT_TEXT = textOf(PRINT);
 const countOf = (haystack, needle) => haystack.split(needle).length - 1;
 
-// Seat-map region: from the map heading up to the final result card, so the RSP
-// arc labels can never be mistaken for seat pills or seat angles.
-const RESULT_CARD_MARKER = 'Level 2';
+// Seat-map region: from the map heading up to the one-line result beneath it, so
+// the RSP arc labels can never be mistaken for seat pills or seat angles.
+const RESULT_LINE_MARKER = 'Lowest assessed seat result';
 const seatMapRegion = (text) => {
   const start = text.indexOf('P5 Seat Results');
-  const end = text.indexOf(RESULT_CARD_MARKER, start);
+  const end = text.indexOf(RESULT_LINE_MARKER, start);
   assert.ok(start !== -1 && end > start, 'the seat result map is present');
   return text.slice(start, end);
 };
@@ -177,15 +178,15 @@ test('the limiting seat / limiting angle block is removed', () => {
     assert.ok(!text.includes('Limiting angle'), `no limiting-angle block on the ${label} page`);
   }
   assert.ok(SCREEN_TEXT.includes('P5 Seat Results'), 'the seat result map remains');
-  assert.ok(SCREEN_TEXT.includes('Level 2'), 'the final level result card remains');
+  assert.ok(!SCREEN_TEXT.includes('Assessed across the seating positions'), 'the overall result card is gone');
 });
 
 test('the page states the project result, not the RSP result', () => {
-  // The card reads the published project floor (L2), not the RSP design-view
-  // level (L4) — so the page can never imply P5 is RSP-only.
-  assert.ok(SCREEN_TEXT.includes('Level 2'), 'the card states the project level');
+  // The one line beneath the seat map reads the published project floor (L2), not
+  // the RSP design-view level (L4) — so the page can never imply P5 is RSP-only.
+  assert.ok(SCREEN_TEXT.includes('Lowest assessed seat result: Level 2.'), 'the project result is stated once');
   assert.ok(!SCREEN_TEXT.includes('Level 4'), 'the RSP design-view level is not presented as the result');
-  assert.ok(SCREEN_TEXT.includes('Assessed across the seating positions'), 'the assessment scope is stated');
+  assert.equal(countOf(SCREEN_TEXT, RP22_P5_DESCRIPTION), 1, 'the RP22 wording appears once, in the subtitle');
   assert.equal(seatResults.level, 'L2', 'the project level comes from the published authority');
 });
 
@@ -203,8 +204,8 @@ test('the printed page (PDF) carries the graphic AND the seat map', () => {
   assert.ok(PRINT_TEXT.includes(DESIGN_VIEW_COPY), 'the copy prints');
   assert.ok(PRINT_TEXT.includes('P5 Seat Results'), 'the seat map prints');
   assert.ok(PRINT_TEXT.includes('60°'), 'the seat angles print beneath their pills');
-  assert.ok(PRINT_TEXT.includes('Level 2'), 'the project result prints');
-  assert.ok(PRINT_TEXT.includes('Assessed across the seating positions'), 'the scope line prints');
+  assert.ok(PRINT_TEXT.includes('Lowest assessed seat result: Level 2.'), 'the same one-line result prints');
+  assert.equal(countOf(PRINT_TEXT, RP22_P5_DESCRIPTION), 1, 'no duplicated RP22 card text in print');
   // The PDF path forwards the seat results into the print page.
   const printPage = fs.readFileSync('src/components/report/client/ClientReportPage.jsx', 'utf8');
   assert.ok(printPage.includes('seatResults={printData.seatResults}'), 'print receives the seat results');
@@ -240,7 +241,7 @@ test('no layout overflow: rows wrap and the pill styling is canonical', () => {
   // styles are read from the markup, since the text view strips them.
   // The seat map block sits between the graphic and the result card: it spans
   // the page column and its pill rows wrap rather than overflowing.
-  const mapMarkup = SCREEN.slice(SCREEN.indexOf('</svg>'), SCREEN.indexOf(RESULT_CARD_MARKER));
+  const mapMarkup = SCREEN.slice(SCREEN.indexOf('</svg>'), SCREEN.indexOf(RESULT_LINE_MARKER));
   assert.ok(mapMarkup.includes('flex-wrap:wrap'), 'seat pills wrap within their row');
   assert.ok(mapMarkup.includes('width:100%'), 'the seat map stays inside the page column');
   // Pills keep the one canonical grading treatment — L3 slate, L2 stone.
@@ -248,4 +249,19 @@ test('no layout overflow: rows wrap and the pill styling is canonical', () => {
   assert.ok(SCREEN.includes(RP22_GRADE_TOKENS.L3.border), 'L3 pills use the canonical border');
   assert.ok(SCREEN.includes(RP22_GRADE_TOKENS.L2.bg), 'L2 pills use the canonical fill');
   assert.ok(SCREEN.includes(RP22_GRADE_TOKENS.L2.border), 'L2 pills use the canonical border');
+});
+
+test('no overall result card: the seat map carries the result', () => {
+  // The duplicated card is gone from the screen page and the printed page alike:
+  // no card surface, no badge, no repeated RP22 parameter text beneath the map.
+  for (const [label, markup] of [['screen', SCREEN], ['print', PRINT]]) {
+    assert.ok(!markup.includes('client-report-print-result'), `no result card on the ${label} page`);
+    assert.ok(!markup.includes('#F1F0EE'), `no card surface on the ${label} page`);
+    assert.ok(!markup.includes('Assessed across the seating positions'), `no scope line on the ${label} page`);
+  }
+  // One line, and only one, states the project result — and never the drawing's own
+  // design-view level, which is what produced the old L4 / L1 contradiction.
+  assert.equal(countOf(SCREEN_TEXT, 'Lowest assessed seat result'), 1, 'exactly one summary line on screen');
+  assert.equal(countOf(PRINT_TEXT, 'Lowest assessed seat result'), 1, 'exactly one summary line in print');
+  assert.ok(!SCREEN_TEXT.includes('Level 4'), 'the design-view level is never stated as the result');
 });

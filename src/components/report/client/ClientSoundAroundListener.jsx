@@ -22,18 +22,11 @@ import { parameterResultHeading, parameterResultDescription } from "./parameterR
 import P5SeatResultBlock from "./P5SeatResultBlock";
 
 // ── Result copy ────────────────────────────────────────────────────────────
-// One shared authority: the level spoken as a word ("Level 3") and the official
-// RP22 Parameter 5 description. Wording is never invented in this component.
-function getStatusInfo(level) {
-  const { token } = resolveGradeToken(level);
-  return {
-    label: parameterResultHeading(level, { failLabel: "Does not achieve Level 1" }),
-    explanation: parameterResultDescription(5),
-    color: token.border,
-    tokenBg: token.bg,
-    tokenText: token.text,
-    tokenSolid: token.solid,
-  };
+// One shared authority for the level spoken as a word ("Level 3"). A seat-based
+// parameter keeps NO overall result card: the seat map below the drawing IS the
+// result, so the page states only the one line that names the seat setting it.
+function getAssessedResultLabel(level) {
+  return parameterResultHeading(level, { failLabel: "Does not achieve Level 1" });
 }
 
 // ── Role label colours ─────────────────────────────────────────────────────
@@ -94,7 +87,7 @@ export default function ClientSoundAroundListener({ p5Snapshot, seatResults, roo
   // The assessed result is the published project level ACROSS THE SEATING
   // POSITIONS. The drawing keeps its own RSP design-view level for its arcs.
   const assessedLevel = seatResults?.level || level;
-  const statusInfo = getStatusInfo(assessedLevel);
+  const assessedResultLabel = getAssessedResultLabel(assessedLevel);
 
   // Screen geometry (simplified — just the front wall region)
   const screenViewWm = useMemo(() => {
@@ -485,58 +478,20 @@ export default function ClientSoundAroundListener({ p5Snapshot, seatResults, roo
       {/* ── Assessed seat results — P5 is assessed at every seating position ── */}
       <P5SeatResultBlock seatResults={seatResults} />
 
-      {/* ── Result summary ── */}
-      <div style={{
-        display: "flex",
-        alignItems: "center",
-        gap: 16,
-        padding: "16px 20px",
-        background: "#F1F0EE",
-        borderRadius: 12,
-        border: `1px solid ${statusInfo.color}40`,
-      }}>
+      {/* ── One short line, and nothing else: the seat map above is the result.
+             A seat-based parameter never gets a second overall card beneath it. ── */}
+      {assessedResultLabel && (
         <div style={{
-          width: 48,
-          height: 48,
-          borderRadius: 8,
-          background: statusInfo.tokenBg,
-          border: `2px solid ${statusInfo.color}`,
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          fontSize: 18,
-          fontWeight: 700,
-          color: statusInfo.tokenText,
-          fontFamily: "Futura PT Light, Century Gothic, sans-serif",
-          flexShrink: 0,
+          marginTop: 18,
+          fontSize: 13,
+          color: "#625143",
+          letterSpacing: "0.02em",
+          textAlign: "center",
+          fontFamily: "Didact Gothic, Century Gothic, sans-serif",
         }}>
-          {level}
+          {`Lowest assessed seat result: ${assessedResultLabel}.`}
         </div>
-        <div style={{ flex: 1 }}>
-          <div style={{
-            fontSize: 16,
-            fontWeight: 600,
-            color: "#213428",
-            marginBottom: 4,
-          }}>
-            {statusInfo.label}
-          </div>
-          <div style={{
-            fontSize: 13,
-            color: "#3E4349",
-            lineHeight: 1.5,
-          }}>
-            {statusInfo.explanation}
-          </div>
-          <div style={{
-            fontSize: 12,
-            color: "#625143",
-            marginTop: 6,
-          }}>
-            Assessed across the seating positions
-          </div>
-        </div>
-      </div>
+      )}
 
     </div>
   );

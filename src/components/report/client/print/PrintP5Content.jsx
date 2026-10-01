@@ -20,16 +20,8 @@ import { parameterResultHeading, parameterResultDescription } from "../parameter
 import P5SeatResultBlock from "../P5SeatResultBlock";
 
 // ── Result copy (one shared authority with the screen page) ────────────────
-function getStatusInfo(level) {
-  const { token } = resolveGradeToken(level);
-  return {
-    label: parameterResultHeading(level, { failLabel: "Does not achieve Level 1" }),
-    explanation: parameterResultDescription(5),
-    color: token.border,
-    tokenBg: token.bg,
-    tokenText: token.text,
-    tokenSolid: token.solid,
-  };
+function getAssessedResultLabel(level) {
+  return parameterResultHeading(level, { failLabel: "Does not achieve Level 1" });
 }
 
 const ROLE_COLORS = {
@@ -84,7 +76,7 @@ export default function PrintP5Content({ p5Snapshot, seatResults, roomDims, scre
   // The assessed result is the published project level ACROSS THE SEATING
   // POSITIONS; the drawing keeps its own RSP design-view level for its arcs.
   const assessedLevel = seatResults?.level || level;
-  const statusInfo = getStatusInfo(assessedLevel);
+  const assessedResultLabel = getAssessedResultLabel(assessedLevel);
 
   const screenViewWm = useMemo(() => {
     const inches = Number(screen?.visibleWidthInches) || 0;
@@ -296,23 +288,21 @@ export default function PrintP5Content({ p5Snapshot, seatResults, roomDims, scre
         <P5SeatResultBlock seatResults={seatResults} print />
       </div>
 
-      {/* ── Result summary ── */}
-      <div className="client-report-print-result" style={{ borderColor: `${statusInfo.color}40` }}>
-        <div className="client-report-print-result__badge" style={{
-          borderColor: statusInfo.color,
-          background: statusInfo.tokenBg,
-          color: statusInfo.tokenText,
+      {/* ── One short line, and nothing else: the seat map above is the result.
+             The printed page never carries a second overall card beneath it. ── */}
+      {assessedResultLabel && (
+        <div style={{
+          flexShrink: 0,
+          marginTop: "3mm",
+          fontSize: "8.5pt",
+          color: "#625143",
+          letterSpacing: "0.02em",
+          textAlign: "center",
+          width: "100%",
         }}>
-          {assessedLevel}
+          {`Lowest assessed seat result: ${assessedResultLabel}.`}
         </div>
-        <div className="client-report-print-result__content">
-          <div className="client-report-print-result__label">{statusInfo.label}</div>
-          <div className="client-report-print-result__explanation">{statusInfo.explanation}</div>
-          <div className="client-report-print-result__supporting">
-            Assessed across the seating positions
-          </div>
-        </div>
-      </div>
+      )}
     </>
   );
 }
