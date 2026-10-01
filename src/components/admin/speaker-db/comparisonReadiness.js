@@ -130,7 +130,10 @@ export function comparisonReadiness({ product, specification }) {
     specification: spec,
     manufacturerName: product?.manufacturer_name || "",
   });
-  const normalized = normalizeCompetitor(mapped);
+  // The same ADI sensitivity-basis treatment the RP22 candidate list applies, so
+  // this list can never report a different class from the grade a dealer sees.
+  const { row: comparisonRow, assumed: sensitivityBasisAssumed } = applySensitivityBasisAssumption(mapped);
+  const normalized = normalizeCompetitor(comparisonRow);
   const level = READINESS_LEVELS[normalized.data_confidence] || READINESS_LEVELS.INSUFFICIENT;
 
   return {
@@ -144,6 +147,7 @@ export function comparisonReadiness({ product, specification }) {
     missingUsefulLabels: missingUseful.map((f) => f.label),
     presentCount: presentKeys.length,
     totalCount: COMPARISON_FIELDS.length,
+    sensitivityBasisAssumed,
     powerAuthority: normalized.power_authority,
     powerAuthorityW: normalized.power_authority_w,
     capabilityBasis: normalized.capability_basis,

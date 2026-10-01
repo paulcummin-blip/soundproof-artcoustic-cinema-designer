@@ -24,7 +24,8 @@
 
 import { base44 } from "@/api/base44Client";
 import { buildComparisonRow } from "@/components/admin/speaker-db/model-first/rp22ComparisonPublish.js";
-import { normalizeCompetitor, parseSensitivityBasis } from "@/components/utils/spl/competitorNormalization";
+import { normalizeCompetitor } from "@/components/utils/spl/competitorNormalization";
+import { ASSUMED_SENSITIVITY_BASIS, applySensitivityBasisAssumption } from "@/components/utils/spl/sensitivityBasisAssumption";
 import { competitorIdentityKey } from "@/components/utils/spl/manufacturerIdentity";
 import { RP22_EQ_HEADROOM_LABEL } from "@/components/utils/spl/rp22HeadroomPolicy";
 import {
@@ -83,23 +84,15 @@ export const COMPARISON_PARITY_STATEMENT =
 
 // Controlled assumptions — each one is stated wherever the comparison is shown.
 const ASSUMED_SPACE = "Measurement space not stated — half-space normalisation applied";
-const ASSUMED_SENSITIVITY_BASIS = "Sensitivity basis not stated — treated as 2.83 V / 1 m";
 
 const STATUS_RANK = { Published: 0, Approved: 1, "Awaiting Review": 2, Draft: 3, Superseded: 4, Archived: 5, Manual: 6 };
 const CONFIDENCE_RANK = { A: 0, B: 1, C: 2, D: 3 };
 
 const hasValue = (value) => value !== null && value !== undefined && String(value).trim() !== "";
 
-// ADI estimate rule: when no sensitivity basis is declared but a sensitivity and
-// an impedance are published, treat the figure as 2.83 V / 1 m and say so. The
-// value itself is never invented, and a missing impedance is not assumed.
-function applySensitivityBasisAssumption(row) {
-  const hasSensitivity = hasValue(row.sensitivity_value_db);
-  const basisDeclared = parseSensitivityBasis(row.sensitivity_reference) !== null;
-  const impedanceKnown = hasValue(row.sensitivity_impedance_used_ohm) || hasValue(row.rated_impedance_ohm);
-  if (!hasSensitivity || basisDeclared || !impedanceKnown) return { row, assumed: false };
-  return { row: { ...row, sensitivity_reference: "2.83V/1m" }, assumed: true };
-}
+// The ADI sensitivity-basis treatment lives in
+// utils/spl/sensitivityBasisAssumption.js so the Speaker Database readiness list
+// applies exactly the same rule.
 
 /**
  * Classify one comparison row (the mapped shape the RP22 engine consumes).
