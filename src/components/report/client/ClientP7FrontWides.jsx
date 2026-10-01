@@ -65,6 +65,8 @@ export default function ClientP7FrontWides({
     frPos,
     rsp,
     ideal,
+    idealPoints,
+    geometryOrigin,
     slPos,
     srPos,
   } = p7Data;
@@ -114,12 +116,14 @@ export default function ClientP7FrontWides({
   const frPx = frPos ? toPx(frPos.x, frPos.y) : null;
 
   // ── Ideal median position vs the actual front wide position ────────────────
-  // The published P7 result carries, per side, the ideal (median) angle, the
-  // actual angle and the deviation between them. The report marks the ideal
-  // median direction ON THE SAME WALL the front wide is mounted on, so the reader
-  // sees both positions on the wall and the distance between them — nothing is
-  // projected outside the room and no construction geometry is drawn. Drawing
-  // only: no angle is measured and nothing is recomputed.
+  // Both positions come from the app, not from the report. The engine publishes,
+  // with the P7 result, the ideal median POSITION of each front wide — the median
+  // between that screen speaker and its adjacent side surround, which is the same
+  // authority the Room Designer draws and the same geometry the result was graded
+  // against. The report marks those two points with the plan's one room-to-drawing
+  // transform, exactly as it marks every speaker, and joins them with a short line
+  // along the wall. Drawing only: no angle is measured, nothing is projected
+  // outside the room and no construction geometry is drawn.
 
   // Which wall the front wide is mounted on — the nearest room boundary.
   const wallOfPoint = (x, y) => [
@@ -131,7 +135,13 @@ export default function ClientP7FrontWides({
 
   // Where the ideal median direction meets that wall. Kept inside the room, so
   // no marker can ever be drawn outside the plan.
-  const projectToWall = (pos, thetaDeg) => {
+  const projectToWall = (pos, thetaDeg, originOverride = null) => {
+    // The ray is cast from the origin the engine measured the angle from — the
+    // published one when it exists, so angle and origin always belong together.
+    const rayOrigin = Number.isFinite(originOverride?.x) && Number.isFinite(originOverride?.y)
+      ? originOverride
+      : rsp;
+    if (!rayOrigin) return null;
     const rad = (thetaDeg - 90) * (Math.PI / 180);
     const dx = Math.cos(rad);
     const dy = Math.sin(rad);
@@ -140,16 +150,16 @@ export default function ClientP7FrontWides({
     let y = pos.y;
     if (wall.axis === "x") {
       if (Math.abs(dx) < 1e-6) return null;
-      const t = (wall.value - rsp.x) / dx;
+      const t = (wall.value - rayOrigin.x) / dx;
       if (!(t > 0)) return null;
       x = wall.value;
-      y = rsp.y + t * dy;
+      y = rayOrigin.y + t * dy;
     } else {
       if (Math.abs(dy) < 1e-6) return null;
-      const t = (wall.value - rsp.y) / dy;
+      const t = (wall.value - rayOrigin.y) / dy;
       if (!(t > 0)) return null;
       y = wall.value;
-      x = rsp.x + t * dx;
+      x = rayOrigin.x + t * dx;
     }
     const margin = 0.08;
     return {
@@ -170,9 +180,23 @@ export default function ClientP7FrontWides({
   ]
     .filter((side) => side.ideal && side.pos && rsp)
     .map((side) => {
-      const idealTheta = toPlanTheta(side.ideal.targetAngle);
-      if (idealTheta == null) return null;
-      const idealM = projectToWall(side.pos, idealTheta);
+      // The ideal median position as the app published it. When the engine
+      // published the graded geometry, that point IS the authority — the position
+      // the Room Designer draws and the geometry the result was measured against —
+      // so it is marked directly. Snapshots that carry only angles fall back to
+      // the projection, cast from the engine's own origin.
+      const publishedIdeal = idealPoints?.[side.key];
+      const idealM = publishedIdeal
+        ? {
+            x: publishedIdeal.x,
+            y: publishedIdeal.y,
+            wall: wallOfPoint(publishedIdeal.x, publishedIdeal.y),
+          }
+        : (() => {
+            const idealTheta = toPlanTheta(side.ideal.targetAngle);
+            if (idealTheta == null) return null;
+            return projectToWall(side.pos, idealTheta, geometryOrigin);
+          })();
       if (!idealM) return null;
       const actualPx = toPx(side.pos.x, side.pos.y);
       const idealPx = toPx(idealM.x, idealM.y);

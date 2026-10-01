@@ -1891,7 +1891,23 @@ export const useRP22AnalysisEngine = ({ placedSpeakers, seatingPositions, dimens
     return {
       gradedParameters,
       __p18Debug: __p18DebugData,
-      p7Details: (evaluateFrontWideDeviation(safeSpeakers, safeSeats, mlpBasis) || {}).perSide,
+      // The P7 geometry travels WITH the result. The Visual Report draws these
+      // exact ideal median positions — the same points the Room Designer draws and
+      // the same geometry this result was graded against — instead of casting a
+      // ray of its own. p7Details is the SAME evaluation's per-side angles, so the
+      // published detail and the published grade can never come from two
+      // different calculations.
+      p7Details: (p7Result || {}).perSide,
+      p7Geometry: p7Result ? {
+        origin: p7Result.p7MlpUsed || null,
+        source: p7Result.p7IdealSource || null,
+        LW: (p7Result.p7IdealLW && p7Result.p7ActualLW)
+          ? { ideal: p7Result.p7IdealLW, actual: p7Result.p7ActualLW }
+          : null,
+        RW: (p7Result.p7IdealRW && p7Result.p7ActualRW)
+          ? { ideal: p7Result.p7IdealRW, actual: p7Result.p7ActualRW }
+          : null,
+      } : null,
       param5,
       surroundGaps,
       seatMetrics,

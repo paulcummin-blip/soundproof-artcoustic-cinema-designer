@@ -1,8 +1,9 @@
 /**
  * Passive P7 Visual Report selector.
  *
- * P7 engineering values come only from the published summary. Speaker
- * positions are descriptive drawing geometry.
+ * P7 engineering values come only from the published summary, and the ideal
+ * median POSITION comes only from the geometry the engine published alongside
+ * that result. Speaker positions are descriptive drawing geometry.
  */
 import { getCanonicalRole } from "@/components/utils/surroundRoleMap";
 
@@ -10,6 +11,14 @@ function getSpeakerPos(speaker) {
   if (!speaker) return null;
   const x = Number(speaker.position?.x ?? speaker.pos?.x ?? speaker.x);
   const y = Number(speaker.position?.y ?? speaker.pos?.y ?? speaker.y);
+  return Number.isFinite(x) && Number.isFinite(y) ? { x, y } : null;
+}
+
+/** A published room-coordinate point, or absent — never a guess. */
+function readPoint(point) {
+  if (!point) return null;
+  const x = Number(point.x);
+  const y = Number(point.y);
   return Number.isFinite(x) && Number.isFinite(y) ? { x, y } : null;
 }
 
@@ -74,8 +83,24 @@ export function selectClientP7FrontWides(engineeringSummary, placedSpeakers, rsp
     LW: readMedianDetail(analysisResult?.p7Details?.LW),
     RW: readMedianDetail(analysisResult?.p7Details?.RW),
   };
+  // The ideal median POSITION, exactly as the engine published it with the
+  // result. The engine computes it from the authority the Room Designer draws
+  // (the median between each screen speaker and its adjacent side surround) and
+  // grades this very result against it, so the report marks these points instead
+  // of projecting its own. Snapshots written before the geometry was published
+  // still carry angles only: those fall back to the angle projection, cast from
+  // the same origin the engine measured from.
+  const geometry = analysisResult?.p7Geometry || null;
+  const idealPoints = {
+    LW: readPoint(geometry?.LW?.ideal),
+    RW: readPoint(geometry?.RW?.ideal),
+  };
+  const hasIdealPoints = Boolean(idealPoints.LW || idealPoints.RW);
+
   const ideal = hasPublishedPerSide ? publishedPerSide : medianDetail;
-  const idealSource = hasPublishedPerSide
+  const idealSource = hasIdealPoints
+    ? "p7_geometry"
+    : hasPublishedPerSide
     ? "p7_result"
     : medianDetail.LW || medianDetail.RW
     ? "engine_median"
@@ -89,6 +114,8 @@ export function selectClientP7FrontWides(engineeringSummary, placedSpeakers, rsp
     perSide: p7Param.perSide || null,
     ideal,
     idealSource,
+    idealPoints,
+    geometryOrigin: readPoint(geometry?.origin),
     lwPos,
     rwPos,
     flPos: getSpeakerPos(find("FL")),
