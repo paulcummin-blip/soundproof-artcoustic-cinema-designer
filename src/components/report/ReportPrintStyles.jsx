@@ -6,9 +6,11 @@ export default function ReportPrintStyles() {
         <style>{`
             @media print {
                 /* Global typography: the shared report system sets the body
-                   face. Headings are set by the canonical block at the end of
-                   this stylesheet. */
-                * {
+                   face for every element that does not declare its own family.
+                   An element carrying an explicit font-family (the Futura PT
+                   Light headings, the Didact Gothic body copy) keeps it, so a
+                   heading is never flattened to the body face. */
+                *:not([style*="font-family"]) {
                     font-family: ${REPORT_FONT_BODY} !important;
                 }
                 
@@ -174,6 +176,15 @@ export default function ReportPrintStyles() {
                 .print-only .rounded-xl * {
                     overflow: visible !important;
                     max-height: none !important;
+                }
+
+                /* App-shell brand front matter — the dealer hero banner image
+                   and the Artcoustic brand bar belong to the app chrome, never
+                   to the Technical Report document. The report begins with its
+                   own cover page, so no leading brand page is emitted. */
+                [data-dealer-hero="true"],
+                [data-brand-bar="true"] {
+                    display: none !important;
                 }
 
                 .screen-only,

@@ -17,6 +17,7 @@ const ARTCOUSTIC_AUTHORITY_LOGO =
 export default function BrandBar() {
   return (
     <div
+      data-brand-bar="true"
       className="w-full flex-shrink-0"
       style={{
         background: "#FFFFFF",
