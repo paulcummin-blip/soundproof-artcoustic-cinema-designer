@@ -66,7 +66,9 @@ export default function ProposalEditor() {
       proposalRecord.project_id
         ? base44.entities.ProposalAsset.filter({
             project_id: proposalRecord.project_id,
-            asset_type: 'cover_image',
+            // The cover is found by its gallery slot as well as by the legacy
+            // type, so a cover image uploaded under either model is used.
+            $or: [{ slot: 'cover' }, { asset_type: 'cover_image' }],
           })
         : Promise.resolve([]),
       proposalRecord.account_id

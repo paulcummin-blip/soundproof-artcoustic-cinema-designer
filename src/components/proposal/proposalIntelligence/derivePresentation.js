@@ -12,6 +12,7 @@
  */
 
 import { withDecisionConfidence } from './confidence';
+import { ASSET_SLOT, IMAGE_SLOT_KEYS, resolveAssetSlot, slotAssetType } from '../assetSlotAuthority';
 
 const IMAGE_SECTIONS = [
   { section: 'cover', editorial_intent: 'Establish the room as a destination — the first impression of the space.' },
@@ -40,39 +41,30 @@ export function deriveImageStory({ engineeringAuthority, engineeringFloor }) {
     }));
   }
 
-  // Map available assets to sections by type
-  const assetsByType = {};
+  // Which gallery slots the project actually has. The image's place in the
+  // gallery decides availability: the proposal no longer needs to know whether
+  // an image is a front view, a plan or a construction shot.
+  const slots = new Set();
   if (Array.isArray(images.assets)) {
     for (const asset of images.assets) {
-      const type = asset.asset_type || asset.type || 'gallery';
-      if (!assetsByType[type]) assetsByType[type] = [];
-      assetsByType[type].push(asset);
+      const slot = asset.slot || resolveAssetSlot(asset);
+      if (slot) slots.add(slot);
     }
   }
 
   return IMAGE_SECTIONS.map((s) => {
-    const mappedType = mapSectionToAssetType(s.section);
-    const available = !!(assetsByType[mappedType] && assetsByType[mappedType].length > 0);
+    const slot = s.section === 'cover'
+      ? (slots.has(ASSET_SLOT.COVER) ? ASSET_SLOT.COVER : null)
+      : (IMAGE_SLOT_KEYS.find((key) => slots.has(key)) || null);
     return {
       section: s.section,
       editorial_intent: s.editorial_intent,
-      available,
-      asset_type: available ? mappedType : null,
+      available: Boolean(slot),
+      asset_type: slot ? slotAssetType(slot) : null,
+      slot,
       ...withDecisionConfidence(engineeringFloor),
     };
   });
-}
-
-function mapSectionToAssetType(section) {
-  const map = {
-    cover: 'cover_image',
-    executive_summary: 'front_view',
-    system_overview: 'gallery',
-    room_images: 'plan',
-    performance: 'technical_drawings',
-    construction: 'construction',
-  };
-  return map[section] || 'gallery';
 }
 
 const AUDIENCE_PROFILES = {

@@ -1,7 +1,7 @@
 {
   "name": "ProposalAsset",
   "type": "object",
-  "description": "A visual asset (image) attached to a project for use in proposals. Supports cover images, front/rear views, plan views, elevation views, construction drawings, client logos, reference photography, technical drawings, documents, and gallery images. Each asset has a caption and drag-orderable position (used for gallery images). Linked to the project so assets exist independently of any generated Proposal record. Gallery images additionally store category and proposal_importance metadata to help the future Proposal Engine select the most appropriate images for each section.",
+  "description": "A visual asset (image) attached to a project for use in reports and proposals. The project gallery is deliberately simple: one Cover Image plus Image 1 to Image 10, each with an optional caption. The slot field is the label authority. Legacy assets uploaded under the previous labelled model (front view, rear view, plan, elevation, construction, client logo, reference photography, technical drawings, documents, gallery) keep their asset_type and are placed into slots by the gallery mapping \u2014 they are never moved or deleted.",
   "properties": {
     "project_id": {
       "type": "string",
@@ -10,6 +10,24 @@
     "account_id": {
       "type": "string",
       "description": "Denormalized account_id for RLS."
+    },
+    "slot": {
+      "type": "string",
+      "enum": [
+        "cover",
+        "image_1",
+        "image_2",
+        "image_3",
+        "image_4",
+        "image_5",
+        "image_6",
+        "image_7",
+        "image_8",
+        "image_9",
+        "image_10"
+      ],
+      "nullable": true,
+      "description": "The image's place in the simple project gallery: 'cover' for the cover image, 'image_1' to 'image_10' for the ten project images. This is the label authority for the Project Images page, reports and proposals \u2014 an image never has to be declared as a front view, plan or construction shot. Null on images uploaded before the gallery was simplified: those are placed by their legacy asset_type through the gallery mapping, and the slot is stamped the next time the image is edited. Setting a slot never moves or deletes an image."
     },
     "asset_type": {
       "type": "string",
@@ -26,7 +44,7 @@
         "documents",
         "gallery"
       ],
-      "description": "Type of visual asset. Single-asset types (cover_image, front_view, rear_view, plan, elevation, construction, client_logo, reference_photography, technical_drawings, documents) have one image per project. Gallery allows multiple images with drag ordering, category, and proposal importance metadata."
+      "description": "Legacy asset type, retained so images uploaded under the previous labelled model are never lost or reinterpreted. New uploads record 'cover_image' for the cover slot and 'gallery' for every image slot. The gallery mapping places legacy values into slots: cover_image \u2192 cover, front_view \u2192 image_1, rear_view \u2192 image_2, plan \u2192 image_3, elevation \u2192 image_4, construction \u2192 image_5, client_logo \u2192 image_6, reference_photography \u2192 image_7, technical_drawings \u2192 image_8, documents \u2192 image_9; gallery images fill the next free image slot in order."
     },
     "file_url": {
       "type": "string",
@@ -34,13 +52,13 @@
     },
     "caption": {
       "type": "string",
-      "description": "Caption displayed with the asset in the proposal. For gallery images, this free-text caption will be supplied to GPT during proposal generation.",
+      "description": "Optional caption displayed with the image in the proposal. The caption is where an image explains what it is \u2014 the gallery itself stays generic. For gallery images this free-text caption is supplied to GPT during proposal generation.",
       "default": ""
     },
     "order_index": {
       "type": "number",
       "default": 0,
-      "description": "Display order. Used for gallery images as drag-and-drop sort order; the Proposal Engine uses this as an additional priority when importance is equal. Single-asset types use 0."
+      "description": "Fallback ordering for legacy images. The gallery slot number is the primary order; this is used only to place images that have no slot yet."
     },
     "category": {
       "type": "string",
@@ -60,7 +78,7 @@
         "Other"
       ],
       "default": "Other",
-      "description": "Gallery image category. Helps the future Proposal Engine decide which images are most appropriate for each proposal section. Primarily for gallery images; single-asset types default to their type."
+      "description": "Optional category retained from the older gallery model. Not required by the simple gallery: it stays on existing records and defaults to 'Other' on new uploads."
     },
     "proposal_importance": {
       "type": "string",
@@ -71,7 +89,7 @@
         "Do Not Use"
       ],
       "default": "Preferred",
-      "description": "Proposal priority for this image. The future Proposal Engine will always prioritise images in this order: Essential > Preferred > Optional. Images marked 'Do Not Use' must never be inserted automatically into proposals."
+      "description": "Proposal priority retained from the older gallery model. The Proposal Engine prioritises Essential > Preferred > Optional, and never inserts an image marked 'Do Not Use' automatically. New uploads default to 'Preferred'."
     },
     "usage": {
       "type": "string",
@@ -87,7 +105,6 @@
   "required": [
     "project_id",
     "account_id",
-    "asset_type",
     "file_url"
   ],
   "rls": {

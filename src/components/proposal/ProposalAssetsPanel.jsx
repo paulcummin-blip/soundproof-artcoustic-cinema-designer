@@ -1,26 +1,21 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { base44 } from '@/api/base44Client';
-import { Loader2, Upload, ImageOff } from 'lucide-react';
+import { Loader2, ImageOff } from 'lucide-react';
 import ImageUploadField from '@/components/proposal/ImageUploadField';
-import GalleryDragList from '@/components/proposal/GalleryDragList';
-
-const SINGLE_ASSET_TYPES = [
-  { value: 'cover_image', label: 'Cover Image' },
-  { value: 'front_view', label: 'Front View' },
-  { value: 'rear_view', label: 'Rear View' },
-  { value: 'plan', label: 'Plan' },
-  { value: 'elevation', label: 'Elevation' },
-  { value: 'construction', label: 'Construction' },
-  { value: 'client_logo', label: 'Client Logo (Optional)' },
-  { value: 'reference_photography', label: 'Reference Photography' },
-  { value: 'technical_drawings', label: 'Technical Drawings' },
-  { value: 'documents', label: 'Documents' },
-];
+import {
+  ASSET_SLOT_OPTIONS,
+  resolveSlotAssignments,
+  slotAssetType,
+  slotNumber,
+} from '@/components/proposal/assetSlotAuthority';
 
 /**
- * Proposal Assets panel — per-project visual assets for proposals.
- * Supports single-image asset types (hero render, front/rear views, etc.)
- * and a drag-orderable gallery.
+ * Project gallery panel — one Cover Image plus Image 1 to Image 10.
+ *
+ * Captions explain what each image is, so no image has to be declared as a front
+ * view, a plan or a construction shot. Images uploaded under the older labelled
+ * model appear in the slot their type maps to (see assetSlotAuthority) and are
+ * stamped with that slot the next time they are edited.
  *
  * Props:
  * - projectId: string (null if no active project)
@@ -30,8 +25,6 @@ export default function ProposalAssetsPanel({ projectId, accountId }) {
   const [assets, setAssets] = useState([]);
   const [projectName, setProjectName] = useState(null);
   const [loading, setLoading] = useState(false);
-  const [galleryUploading, setGalleryUploading] = useState(false);
-  const galleryInputRef = React.useRef(null);
 
   const load = useCallback(async () => {
     if (!projectId) return;
@@ -44,7 +37,7 @@ export default function ProposalAssetsPanel({ projectId, accountId }) {
       setAssets(assetResults || []);
       setProjectName(projectResults?.[0]?.name || 'Untitled Project');
     } catch (err) {
-      console.error('Failed to load proposal assets:', err);
+      console.error('Failed to load project images:', err);
     } finally {
       setLoading(false);
     }
@@ -54,134 +47,60 @@ export default function ProposalAssetsPanel({ projectId, accountId }) {
     load();
   }, [load]);
 
-  const getSingle = (type) => assets.find((a) => a.asset_type === type) || null;
-  const getGallery = () =>
-    assets
-      .filter((a) => a.asset_type === 'gallery')
-      .sort((a, b) => (a.order_index || 0) - (b.order_index || 0));
+  const { bySlot, surplus } = useMemo(() => resolveSlotAssignments(assets), [assets]);
+  const assetForSlot = (slot) => bySlot[slot] || null;
 
-  // ── Single asset handlers ──
-  const handleSingleUpload = async (type, url) => {
-    const existing = getSingle(type);
+  const handleUpload = async (slot, url) => {
+    const existing = assetForSlot(slot);
     try {
       if (existing) {
-        await base44.entities.ProposalAsset.update(existing.id, { file_url: url });
+        // Replacing an image keeps the record, its caption and its identity.
+        await base44.entities.ProposalAsset.update(existing.id, {
+          file_url: url,
+          slot,
+          asset_type: slotAssetType(slot),
+        });
       } else {
         await base44.entities.ProposalAsset.create({
           project_id: projectId,
           account_id: accountId,
-          asset_type: type,
+          slot,
+          asset_type: slotAssetType(slot),
           file_url: url,
           caption: '',
-          order_index: 0,
+          order_index: slotNumber(slot) ?? 0,
+          category: 'Other',
+          proposal_importance: 'Preferred',
         });
       }
       await load();
     } catch (err) {
-      console.error('Failed to save asset:', err);
-      alert('Failed to save asset. Please try again.');
+      console.error('Failed to save image:', err);
+      alert('Failed to save image. Please try again.');
     }
   };
 
-  const handleSingleRemove = async (type) => {
-    const existing = getSingle(type);
+  const handleRemove = async (slot) => {
+    const existing = assetForSlot(slot);
     if (!existing) return;
     try {
       await base44.entities.ProposalAsset.delete(existing.id);
       await load();
     } catch (err) {
-      console.error('Failed to remove asset:', err);
+      console.error('Failed to remove image:', err);
     }
   };
 
-  const handleSingleCaption = async (type, caption) => {
-    const existing = getSingle(type);
+  const handleCaption = async (slot, caption) => {
+    const existing = assetForSlot(slot);
     if (!existing) return;
     try {
-      await base44.entities.ProposalAsset.update(existing.id, { caption });
-      await load();
+      // Stamping the slot here is what moves a legacy image onto the simple
+      // gallery model — the file, the caption and the record all stay.
+      await base44.entities.ProposalAsset.update(existing.id, { caption, slot });
+      setAssets((prev) => prev.map((a) => (a.id === existing.id ? { ...a, caption, slot } : a)));
     } catch (err) {
       console.error('Failed to update caption:', err);
-    }
-  };
-
-  // ── Gallery handlers ──
-  const handleGalleryUpload = async (file) => {
-    if (!file) return;
-    setGalleryUploading(true);
-    try {
-      const { file_url } = await base44.integrations.Core.UploadFile({ file });
-      const gallery = getGallery();
-      const nextIndex = gallery.length > 0 ? Math.max(...gallery.map((g) => g.order_index || 0)) + 1 : 0;
-      await base44.entities.ProposalAsset.create({
-        project_id: projectId,
-        account_id: accountId,
-        asset_type: 'gallery',
-        file_url,
-        caption: '',
-        order_index: nextIndex,
-        category: 'Other',
-        proposal_importance: 'Preferred',
-      });
-      await load();
-    } catch (err) {
-      console.error('Gallery upload failed:', err);
-      alert('Upload failed. Please try again.');
-    } finally {
-      setGalleryUploading(false);
-      if (galleryInputRef.current) galleryInputRef.current.value = '';
-    }
-  };
-
-  const handleGalleryReorder = async (reorderedItems) => {
-    // Optimistic update
-    setAssets((prev) => {
-      const nonGallery = prev.filter((a) => a.asset_type !== 'gallery');
-      return [...nonGallery, ...reorderedItems.map((item, i) => ({ ...item, order_index: i }))];
-    });
-    try {
-      await base44.entities.ProposalAsset.bulkUpdate(
-        reorderedItems.map((item, i) => ({ id: item.id, order_index: i }))
-      );
-    } catch (err) {
-      console.error('Failed to reorder gallery:', err);
-      await load();
-    }
-  };
-
-  const handleGalleryCaption = async (id, caption) => {
-    try {
-      await base44.entities.ProposalAsset.update(id, { caption });
-      setAssets((prev) => prev.map((a) => (a.id === id ? { ...a, caption } : a)));
-    } catch (err) {
-      console.error('Failed to update caption:', err);
-    }
-  };
-
-  const handleGalleryCategory = async (id, category) => {
-    try {
-      await base44.entities.ProposalAsset.update(id, { category });
-      setAssets((prev) => prev.map((a) => (a.id === id ? { ...a, category } : a)));
-    } catch (err) {
-      console.error('Failed to update category:', err);
-    }
-  };
-
-  const handleGalleryImportance = async (id, proposal_importance) => {
-    try {
-      await base44.entities.ProposalAsset.update(id, { proposal_importance });
-      setAssets((prev) => prev.map((a) => (a.id === id ? { ...a, proposal_importance } : a)));
-    } catch (err) {
-      console.error('Failed to update importance:', err);
-    }
-  };
-
-  const handleGalleryDelete = async (id) => {
-    try {
-      await base44.entities.ProposalAsset.delete(id);
-      await load();
-    } catch (err) {
-      console.error('Failed to delete gallery image:', err);
     }
   };
 
@@ -204,8 +123,6 @@ export default function ProposalAssetsPanel({ projectId, accountId }) {
     );
   }
 
-  const galleryItems = getGallery();
-
   return (
     <div className="space-y-6">
       <div className="bg-white border border-[#DCDBD6] rounded-lg p-4">
@@ -215,66 +132,30 @@ export default function ProposalAssetsPanel({ projectId, accountId }) {
         </div>
       </div>
 
-      {/* Single-asset grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {SINGLE_ASSET_TYPES.map((type) => {
-          const existing = getSingle(type.value);
+        {ASSET_SLOT_OPTIONS.map(({ slot, label }) => {
+          const existing = assetForSlot(slot);
           return (
-            <div key={type.value} className="bg-white border border-[#DCDBD6] rounded-lg p-4">
+            <div key={slot} className="bg-white border border-[#DCDBD6] rounded-lg p-4">
               <ImageUploadField
-                label={type.label}
+                label={label}
                 value={existing?.file_url || null}
-                onUpload={(url) => handleSingleUpload(type.value, url)}
-                onRemove={() => handleSingleRemove(type.value)}
+                onUpload={(url) => handleUpload(slot, url)}
+                onRemove={() => handleRemove(slot)}
                 caption={existing?.caption || ''}
-                onCaptionChange={(cap) => handleSingleCaption(type.value, cap)}
+                onCaptionChange={(cap) => handleCaption(slot, cap)}
               />
             </div>
           );
         })}
       </div>
 
-      {/* Gallery section */}
-      <div className="bg-white border border-[#DCDBD6] rounded-lg p-4">
-        <div className="flex items-center justify-between mb-1">
-          <div>
-            <h3 className="text-base font-semibold text-[#213428]" style={{ fontFamily: 'Didact Gothic, sans-serif' }}>
-              Project Gallery
-            </h3>
-            <p className="text-xs text-[#625143] mt-0.5">
-              Additional project images with category and importance metadata for the Proposal Engine.
-            </p>
-          </div>
-          <button
-            type="button"
-            onClick={() => !galleryUploading && galleryInputRef.current?.click()}
-            disabled={galleryUploading}
-            className="flex items-center gap-2 px-3 py-1.5 text-sm rounded-md border border-[#DCDBD6] text-[#3E4349] hover:bg-[#F5F4F0] transition-colors disabled:opacity-50 flex-shrink-0"
-          >
-            {galleryUploading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Upload className="w-4 h-4" />}
-            Add Image
-          </button>
-          <input
-            ref={galleryInputRef}
-            type="file"
-            accept="image/*"
-            className="hidden"
-            onChange={(e) => e.target.files[0] && handleGalleryUpload(e.target.files[0])}
-          />
-        </div>
-        {galleryItems.length === 0 ? (
-          <p className="text-sm text-[#625143] text-center py-6">No gallery images yet. Click "Add Image" to upload.</p>
-        ) : (
-          <GalleryDragList
-            items={galleryItems}
-            onReorder={handleGalleryReorder}
-            onCaptionChange={handleGalleryCaption}
-            onCategoryChange={handleGalleryCategory}
-            onImportanceChange={handleGalleryImportance}
-            onDelete={handleGalleryDelete}
-          />
-        )}
-      </div>
+      {surplus.length > 0 && (
+        <p className="text-xs text-[#625143]">
+          {surplus.length} further stored {surplus.length === 1 ? 'image is' : 'images are'} not shown in
+          these ten slots. They are kept safe and are not deleted — remove an image above to free a slot.
+        </p>
+      )}
     </div>
   );
 }

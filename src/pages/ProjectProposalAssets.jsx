@@ -24,7 +24,7 @@ export default function ProjectProposalAssets() {
             Project Images
           </h1>
           <p className="text-sm text-[#625143] mt-1">
-            Upload fixed project images and manage the Project Gallery — the Proposal Engine will use these automatically.
+            Upload a cover image and up to 10 project images for reports and proposals.
           </p>
         </div>
         <ProposalAssetsPanel projectId={activeProjectId} accountId={accountId} />
