@@ -231,6 +231,10 @@ export async function runOptimisation(opts) {
 
     if (result.status === "cancelled") {
       setCancelled(projectId, versionId);
+    } else if (result.status === "blocked") {
+      // No completed production baseline for the live design: the run stopped
+      // before any evaluation. Terminal, with the reason stated.
+      setError(projectId, versionId, result.error);
     } else if (result.status === "stale") {
       setStale(projectId, versionId, result.message);
     } else if (result.status === "error") {

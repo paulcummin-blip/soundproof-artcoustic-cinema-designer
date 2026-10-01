@@ -30,6 +30,35 @@ import { resolveLeverState } from "./optimiserPlanMatching.js";
 import { resolveLeverApplyMap } from "./optimiserPlanLeverApply.js";
 import { leverLabel, leverTitle } from "./optimiserLeverOrder.js";
 import { resolveLeverVerdict } from "./optimiserLeverVerdict.js";
+import {
+  BASELINE_PARITY_COPY,
+  BASELINE_PARITY_STATUS,
+  parityBlocksApply,
+} from "./optimiserBaselineAuthority.js";
+
+/**
+ * The saved baseline-parity record. A result saved BEFORE parity was recorded
+ * has no usable parity: it is reported as UNKNOWN and nothing may be applied
+ * from it until it has been re-run from the completed production authority.
+ */
+function savedBaselineParity(plan) {
+  const saved = plan?.baselineParity || plan?.identity?.baselineParity || null;
+  if (saved && saved.status) return saved;
+  return {
+    status: BASELINE_PARITY_STATUS.UNKNOWN,
+    reasons: [],
+    trace: null,
+    requiresBassCalculation: true,
+    statusLabel: BASELINE_PARITY_COPY.UNKNOWN_STATUS,
+    message: null,
+  };
+}
+
+/** Why a lever's Apply is withheld when parity does not hold. */
+function parityBlockedReason(parity) {
+  return parity?.message
+    || "This optimiser result was saved before baseline parity was recorded. Re-run the optimiser from the completed bass calculation before applying any change.";
+}
 
 /**
  * @param {object} params
@@ -47,6 +76,7 @@ export function resolveOptimiserPlanStatus({
   if (!plan) {
     return {
       status: OPTIMISER_PLAN_STATUS.ABSENT,
+      baselineParity: null,
       evidenceMessage: NO_EVALUATED_OPTIMISER_CHANGES,
       recordKind: null,
       terminalOutcome: null,
@@ -138,6 +168,7 @@ export function resolveOptimiserPlanStatus({
       evidenceMessage: null,
       recordKind: plan.recordKind || null,
       terminalOutcome,
+      baselineParity: savedBaselineParity(plan),
       run: plan.run || null,
       planVersion: savedVersion,
       projectId: plan.projectId || null,
@@ -237,6 +268,19 @@ export function resolveOptimiserPlanStatus({
   const appliedCount = levers.filter((lever) => lever.state === OPTIMISER_LEVER_STATE.APPLIED).length;
   const disabledCount = levers.filter((lever) => lever.state === OPTIMISER_LEVER_STATE.DISABLED).length;
 
+  // ── Parity gate ────────────────────────────────────────────────────────
+  // The optimiser baseline must BE the published bass result. When parity was
+  // never established — missing, mismatched, or not recorded — no lever from
+  // this result is applyable: the designer re-runs from the completed bass
+  // calculation instead. This is the single gate every Apply surface reads.
+  const baselineParity = savedBaselineParity(plan);
+  if (parityBlocksApply(baselineParity)) {
+    for (const lever of levers) {
+      lever.canApply = false;
+      lever.applyBlockedReason = parityBlockedReason(baselineParity);
+    }
+  }
+
   return {
     status,
     evidenceMessage: null,
@@ -250,6 +294,7 @@ export function resolveOptimiserPlanStatus({
     staleReason,
     levers,
     individualEffectsEvaluated: plan.individualEffectsEvaluated === true,
+    baselineParity,
     baseline: plan.baseline || null,
     combined: plan.combined
       ? {

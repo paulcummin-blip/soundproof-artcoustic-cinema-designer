@@ -112,6 +112,7 @@ export default function AdiOptimisationJourney({
   runStatus = "idle",
   runError = null,
   onRunOptimisationPlan = null,
+  onCalculateBassPerformance = null,
   onApplyLever = null,
   onUndoLever = null,
   leverApplyBusy = null,
@@ -140,7 +141,16 @@ export default function AdiOptimisationJourney({
   // explanation, the evidence, the Apply visibility and the action. When it is
   // supplied, this card states exactly what it resolved, so the status and the
   // body can never disagree. Without it, the journey copy is used unchanged.
-  const journey = presentation
+  // Baseline parity governs the card. When the optimiser has no matching
+  // published baseline — missing, mismatched, or never recorded — the card
+  // states that status and its single calculation action, overriding the
+  // presentation state so the status, the copy, the evidence and the action can
+  // never disagree. (Literal status values: the same frozen strings the parity
+  // authority publishes.)
+  const parityStatus = planView?.baselineParity?.status || null;
+  const parityBlocked = parityStatus === "MISSING" || parityStatus === "MISMATCH" || parityStatus === "UNKNOWN";
+
+  const journey = presentation && !parityBlocked
     ? {
       ...resolved,
       state: PRESENTATION_THEME_KEY[presentation.state] || resolved.state,
@@ -155,7 +165,9 @@ export default function AdiOptimisationJourney({
     }
     : resolved;
 
-  const theme = STATE_THEME[journey.state] || STATE_THEME[resolved.state];
+  const theme = STATE_THEME[journey.state]
+    || STATE_THEME[resolved.state]
+    || STATE_THEME[ADI_OPTIMISER_JOURNEY_STATE.OPTIMISATION_REQUIRED];
   const Icon = theme.icon;
   const runEvidence = presentation?.evidence || null;
   const journeyStateKey = presentation?.state || resolved.state;
@@ -390,8 +402,11 @@ export default function AdiOptimisationJourney({
       {showAction && !panelShowsRerun && (
         <button
           type="button"
-          onClick={onRunOptimisationPlan}
-          data-adi-rerun-plan="true"
+          onClick={journey.action === ADI_OPTIMISER_ACTION.CALCULATE
+            ? onCalculateBassPerformance
+            : onRunOptimisationPlan}
+          data-adi-rerun-plan={journey.action === ADI_OPTIMISER_ACTION.CALCULATE ? undefined : "true"}
+          data-adi-calculate-bass={journey.action === ADI_OPTIMISER_ACTION.CALCULATE ? "true" : undefined}
           className="inline-flex items-center gap-1.5 rounded-md bg-[#213428] px-5 py-2.5 text-[13px] font-semibold text-white transition-colors hover:bg-[#3E4349]"
         >
           <Sparkles className="h-3.5 w-3.5" />

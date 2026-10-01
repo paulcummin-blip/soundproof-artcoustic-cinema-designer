@@ -25,6 +25,10 @@
 // ---------------------------------------------------------------------------
 
 import { OPTIMISER_PLAN_STATUS } from "./optimiserPlanConstants.js";
+import {
+  BASELINE_PARITY_COPY,
+  BASELINE_PARITY_STATUS,
+} from "./optimiserBaselineAuthority.js";
 
 /** The four journey states. */
 export const ADI_OPTIMISER_JOURNEY_STATE = Object.freeze({
@@ -34,6 +38,10 @@ export const ADI_OPTIMISER_JOURNEY_STATE = Object.freeze({
   PLAN_AVAILABLE: "plan_available",
   /** Evaluation finished, evidence is complete, no candidate was worth applying. */
   NO_USEFUL_IMPROVEMENT: "no_useful_improvement",
+  /** No completed production authority exists for the live design. */
+  BASELINE_REQUIRED: "baseline_required",
+  /** The optimiser baseline does not match the published bass result. */
+  BASELINE_MISMATCH: "baseline_mismatch",
   /** The run itself failed. A technical failure, never a design statement. */
   FAILED: "failed",
 });
@@ -43,6 +51,8 @@ export const ADI_OPTIMISER_ACTION = Object.freeze({
   RUN: "run",
   RERUN: "rerun",
   COMPLETE: "complete",
+  /** The current bass calculation must be produced before ADI can run. */
+  CALCULATE: "calculate",
 });
 
 export const ADI_OPTIMISER_ACTION_LABEL = Object.freeze({
@@ -52,6 +62,7 @@ export const ADI_OPTIMISER_ACTION_LABEL = Object.freeze({
   [ADI_OPTIMISER_ACTION.RUN]: "Re-run Optimisation Plan",
   [ADI_OPTIMISER_ACTION.RERUN]: "Re-run Optimisation Plan",
   [ADI_OPTIMISER_ACTION.COMPLETE]: "Complete Optimisation Plan",
+  [ADI_OPTIMISER_ACTION.CALCULATE]: BASELINE_PARITY_COPY.CTA,
 });
 
 export const ADI_OPTIMISER_STATUS_LABEL = Object.freeze({
@@ -60,6 +71,8 @@ export const ADI_OPTIMISER_STATUS_LABEL = Object.freeze({
   [ADI_OPTIMISER_JOURNEY_STATE.EVALUATION_INCOMPLETE]: "Evaluation incomplete",
   [ADI_OPTIMISER_JOURNEY_STATE.PLAN_AVAILABLE]: "Optimisation plan available",
   [ADI_OPTIMISER_JOURNEY_STATE.NO_USEFUL_IMPROVEMENT]: "No useful improvement found",
+  [ADI_OPTIMISER_JOURNEY_STATE.BASELINE_REQUIRED]: BASELINE_PARITY_COPY.MISSING_STATUS,
+  [ADI_OPTIMISER_JOURNEY_STATE.BASELINE_MISMATCH]: BASELINE_PARITY_COPY.MISMATCH_STATUS,
   [ADI_OPTIMISER_JOURNEY_STATE.FAILED]: "Optimisation failed",
 });
 
@@ -242,7 +255,7 @@ export function resolveAdiOptimiserJourney({
   const canRun = !blockReason;
   const withLead = (text) => `${lead}${text}`.trim();
 
-  const build = (state, { message, explanation, notes = [], action = null, showPlan = false }) => ({
+  const build = (state, { message, explanation, notes = [], action = null, showPlan = false, canRunOverride = null }) => ({
     state,
     statusLabel: ADI_OPTIMISER_STATUS_LABEL[state],
     message,
@@ -251,10 +264,45 @@ export function resolveAdiOptimiserJourney({
     action,
     actionLabel: action ? ADI_OPTIMISER_ACTION_LABEL[action] : null,
     showPlan,
-    canRun,
+    canRun: canRunOverride == null ? canRun : canRunOverride,
     blockReason,
     limitingFactorSentence,
   });
+
+  // ── 0. The baseline must BE the published bass result ──
+  // The optimiser compares every option against the published current result.
+  // Without a completed authority — or with one that does not match the live
+  // design — optimisation does not run: the card states the status, the reason
+  // and the ONE action that fixes it. No baseline, no comparison, no Apply.
+  const parity = planView?.baselineParity || null;
+  if (parity?.status === BASELINE_PARITY_STATUS.MISSING
+    || parity?.status === BASELINE_PARITY_STATUS.MISMATCH) {
+    const missing = parity.status === BASELINE_PARITY_STATUS.MISSING;
+    return build(
+      missing ? ADI_OPTIMISER_JOURNEY_STATE.BASELINE_REQUIRED : ADI_OPTIMISER_JOURNEY_STATE.BASELINE_MISMATCH,
+      {
+        message: missing ? BASELINE_PARITY_COPY.MISSING_MESSAGE : BASELINE_PARITY_COPY.MISMATCH_MESSAGE,
+        explanation: "The optimiser compares every option against the published bass result, so it needs that result before it can evaluate this design.",
+        notes: [],
+        action: ADI_OPTIMISER_ACTION.CALCULATE,
+        showPlan: false,
+        // The required action is the calculation itself — it is never hidden by
+        // another run block.
+        canRunOverride: true,
+      },
+    );
+  }
+
+  // A result saved before parity was recorded cannot be applied from: it has to
+  // be re-run from the completed production authority first.
+  if (parity?.status === BASELINE_PARITY_STATUS.UNKNOWN) {
+    return build(ADI_OPTIMISER_JOURNEY_STATE.REEVALUATION_REQUIRED, {
+      message: BASELINE_PARITY_COPY.UNKNOWN_MESSAGE,
+      explanation: null,
+      notes: [],
+      action: ADI_OPTIMISER_ACTION.RERUN,
+    });
+  }
 
   // ── 4. A current plan with complete lever-level evidence ──
   if (status === OPTIMISER_PLAN_STATUS.CURRENT && isLeverLevelComplete(planView)) {

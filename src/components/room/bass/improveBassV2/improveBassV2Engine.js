@@ -48,6 +48,13 @@ import { createSeatingProfiler } from "./seatingStageProfiler.js";
 import { selectSeatingShortlist, selectSeatingWinner, SEATING_SHORTLIST_SIZE } from "./seatingShortlistPolicy.js";
 
 import { attachCurrentCanonicalValidation } from "./currentAuthorityValidation.js";
+import {
+  BASELINE_PARITY_COPY,
+  BASELINE_PARITY_STATUS,
+  buildPersistedBaselineParity,
+  buildPublishedBaseline,
+  resolveBaselineParity,
+} from "../optimiserPlan/optimiserBaselineAuthority.js";
 import { buildOptimisationDiagnosticsReport, logOptimisationDiagnosticsReport } from "./optimisationDiagnosticsReport.js";
 import { runCombinedOptimisation, identifyBestPositionCandidate } from "./combinedOptimisationSearch.js";
 import { setCombinedResult } from "./improveBassV2Store.js";
@@ -655,6 +662,36 @@ export async function runImproveBassV2(projectId, versionId, params, callbacks) 
     // the persisted authority belongs to the live design. V2 must NOT
     // reconstruct a partial calibration fingerprint — it consumes the
     // production-resolved condition directly.
+    // ── The ONE canonical current bass authority ─────────────────────────
+    // The optimiser's baseline IS the published result: the same design
+    // fingerprint, target identity, seat set and assessment band, with its own
+    // P19/P20/P14/P18 values. A missing or mismatched authority STOPS the run —
+    // the optimiser never presents a re-derived Current as the designer-facing
+    // baseline. The parity outcome is recorded either way, so a future mismatch
+    // is diagnosable from saved evidence.
+    const liveSeatIds = (seatingPositions || []).map((seat) => seat?.id).filter(Boolean);
+    const baselineTargetIdentity = { p14TargetBasis, p14TargetLevel, p14TargetDb, p18TargetBasis };
+    let baselineParity = resolveBaselineParity({
+      currentAuthority, liveCacheKey,
+      targetIdentity: baselineTargetIdentity,
+      seatIds: liveSeatIds,
+    });
+    let baselineBlocked = false;
+    if (baselineParity.status === BASELINE_PARITY_STATUS.MISSING
+      || baselineParity.status === BASELINE_PARITY_STATUS.MISMATCH) {
+      return {
+        status: "blocked",
+        code: baselineParity.status === BASELINE_PARITY_STATUS.MISSING
+          ? "CURRENT_AUTHORITY_MISSING"
+          : "CURRENT_AUTHORITY_MISMATCH",
+        error: baselineParity.status === BASELINE_PARITY_STATUS.MISSING
+          ? BASELINE_PARITY_COPY.MISSING_MESSAGE
+          : BASELINE_PARITY_COPY.MISMATCH_MESSAGE,
+        baselineParity: buildPersistedBaselineParity(baselineParity),
+        snapshot,
+      };
+    }
+
     const authorityNonStale = isCurrentAuthorityNonStale(currentAuthority, liveCacheKey);
     let existingAuthority = authorityNonStale
       ? attachCurrentCanonicalValidation(extractAuthorityForComparison(currentAuthority), {
@@ -668,6 +705,15 @@ export async function runImproveBassV2(projectId, versionId, params, callbacks) 
       existingAuthority.inputIdentity=startFingerprint;
       const check=validateConfirmedCandidate(existingAuthority,validationContext);
       existingAuthority=check.valid?check.result:null;
+    }
+    if (!existingAuthority) {
+      // The canonical receipt could not be re-attached — a cold load does not
+      // persist every signature. The PUBLISHED values themselves are the
+      // baseline: read straight from the completed contract, never recomputed.
+      existingAuthority = buildPublishedBaseline({
+        currentAuthority, sources: currentSources, sourceIds: snapshot.instanceIds,
+        startFingerprint,
+      });
     }
     metrics.recordCurrentReuse(!!existingAuthority);
     metrics.recordPlacementFingerprint(placementFingerprint);
@@ -1132,7 +1178,23 @@ export async function runImproveBassV2(projectId, versionId, params, callbacks) 
           if (currentConfirmation) {
             const current=bindConfirmation(currentConfirmation,installedTuning,currentFinalist,"current");
             const check=validateConfirmedCandidate(current,validationContext);
-            if(check.valid){existingAuthority=check.result;confirmedResults.push(existingAuthority);}
+            if(check.valid){
+              // A re-derived Current may only become the baseline when it IS the
+              // published result, within parity tolerance. Anything else stops
+              // the run: the designer is never shown a different current result.
+              const reconstructionParity = resolveBaselineParity({
+                currentAuthority, liveCacheKey,
+                targetIdentity: baselineTargetIdentity,
+                seatIds: liveSeatIds,
+                reconstruction: check.result,
+              });
+              baselineParity = { ...reconstructionParity, reconstruction: true };
+              if (reconstructionParity.status === BASELINE_PARITY_STATUS.MATCH) {
+                existingAuthority=check.result;confirmedResults.push(existingAuthority);
+              } else {
+                baselineBlocked = true;
+              }
+            }
             else evaluationIssues.push({stage:"current",issues:check.issues});
           }
         }
@@ -1140,6 +1202,18 @@ export async function runImproveBassV2(projectId, versionId, params, callbacks) 
         if (isFatalLifecycleError(err)) throw err;
       }
       await yieldToUI();
+    }
+
+    // ── The re-derived Current did not match the published result ─────────
+    // Stop: no baseline, no candidate comparison, no plan, nothing to apply.
+    if (baselineBlocked) {
+      return {
+        status: "blocked",
+        code: "CURRENT_AUTHORITY_MISMATCH",
+        error: BASELINE_PARITY_COPY.MISMATCH_MESSAGE,
+        baselineParity: buildPersistedBaselineParity(baselineParity),
+        snapshot,
+      };
     }
 
     if(existingAuthority){
@@ -1676,6 +1750,7 @@ export async function runImproveBassV2(projectId, versionId, params, callbacks) 
         },
         snapshot,
         confirmedResults,
+        baselineParity: buildPersistedBaselineParity(baselineParity),
       };
       return runResult;
     }
@@ -1696,7 +1771,16 @@ export async function runImproveBassV2(projectId, versionId, params, callbacks) 
       position: positionRawTransfer,
     };
 
-    runResult = { status: "complete", selection, snapshot, confirmedResults };
+    runResult = {
+      status: "complete",
+      selection,
+      snapshot,
+      confirmedResults,
+      // The parity record travels WITH the result: the plan stores it so a
+      // future mismatch is diagnosable and so Apply can be refused when parity
+      // was never established.
+      baselineParity: buildPersistedBaselineParity(baselineParity),
+    };
     return runResult;
   } catch (error) {
     // AbortError = user cancellation → canonical cancelled.

@@ -192,8 +192,13 @@ export function buildOptimiserRunEvidence({
   failureReason = null,
   terminalOutcome = null,
   notes = [],
+  baselineParity = null,
 } = {}) {
-  if (!selection && !diagnostics) return null;
+  // The baseline-parity record travels with the evidence: a run that stopped for
+  // want of a matching published authority still saves WHY, so the block is
+  // diagnosable and nothing can be applied from it.
+  const parityRecord = baselineParity || identity?.baselineParity || null;
+  if (!selection && !diagnostics && !parityRecord) return null;
 
   const savedAt = new Date().toISOString();
   const currentSummary = summariseResult(selection?.currentResult || null);
@@ -304,6 +309,7 @@ export function buildOptimiserRunEvidence({
     engineVersion: identity.engineVersion || null,
     // --- terminal outcome ---
     terminalOutcome: outcome,
+    baselineParity: parityRecord,
     run: {
       completedAt: savedAt,
       outcome,

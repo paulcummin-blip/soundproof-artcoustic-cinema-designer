@@ -514,6 +514,9 @@ export function buildOptimiserPlan({
       targetKey: identity.target?.targetKey || null,
     },
     engineVersion: identity.engineVersion || winner?.algorithmVersion || null,
+    // The published-authority parity record this plan was evaluated under. A
+    // plan whose parity was never established may not be applied from.
+    baselineParity: identity.baselineParity || null,
     candidateId: winner?.candidateId || positionResult?.candidateId || null,
     candidateKind: winner?.candidateKind
       || ((winner?.isPositionCandidate || (!winner && positionResult)) ? "position" : null),

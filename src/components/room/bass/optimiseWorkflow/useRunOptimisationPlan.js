@@ -29,6 +29,7 @@ import { runOptimisation } from "./optimiseWorkflowOrchestrator";
 import { publishRecommendation } from "@/components/recommendationEngine";
 import { buildOptimiserPlan } from "@/components/room/bass/optimiserPlan/buildOptimiserPlan.js";
 import { buildOptimiserResultForSave } from "@/components/room/bass/optimiserPlan/optimiserPlanSave.js";
+import { buildOptimiserRunEvidence } from "@/components/room/bass/optimiserPlan/buildOptimiserRunEvidence.js";
 import {
   getOptimiserPlanAuthority,
   setOptimiserPlanAuthority,
@@ -101,6 +102,31 @@ export default function useRunOptimisationPlan({
         setError(result.error || "The optimiser could not complete. Re-run the Optimisation Plan.");
         return;
       }
+      if (result.status === "blocked") {
+        // The optimiser baseline must BE the published bass result. With no
+        // matching completed authority the run stopped before evaluating
+        // anything: the block reason and its parity trace are saved as terminal
+        // evidence (so the card states it after reopen) and NOTHING is saved as
+        // an actionable plan — there is no baseline, no comparison and no Apply.
+        const blockedShared = sharedRef.current;
+        const blockedEvidence = buildOptimiserRunEvidence({
+          identity: {
+            projectId,
+            versionId,
+            designFingerprint: blockedShared?.cacheKey || null,
+            resultFingerprint: blockedShared?.completedBassAuthority?.contract?.job?.resultFingerprint
+              || blockedShared?.currentFingerprint || null,
+            cacheKey: blockedShared?.cacheKey || null,
+            baseDesignFingerprint: blockedShared?.baseDesignFingerprint || null,
+            baselineParity: result.baselineParity || null,
+          },
+          baselineParity: result.baselineParity || null,
+        });
+        if (blockedEvidence) setOptimiserPlanAuthority(projectId, versionId, blockedEvidence);
+        setStatus("failed");
+        setError(result.error || "Bass calculation required before optimisation.");
+        return;
+      }
 
       const currentShared = sharedRef.current;
       const fingerprint = currentShared?.completedBassAuthority?.contract?.job?.resultFingerprint
@@ -110,6 +136,8 @@ export default function useRunOptimisationPlan({
       const planIdentity = {
         projectId,
         versionId,
+        // The published-authority parity this evaluation was made under.
+        baselineParity: result.baselineParity || null,
         designFingerprint: currentShared?.cacheKey || null,
         resultFingerprint: fingerprint,
         cacheKey: currentShared?.cacheKey || null,

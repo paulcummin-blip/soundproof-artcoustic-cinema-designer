@@ -42,6 +42,7 @@ import { LEVER_APPLY_LABEL, LEVER_UNDO_LABEL } from "./optimiserPlanLeverApply.j
 import { buildLiveFamilyRows } from "./optimiserLiveProgress.js";
 import { OPTIMISER_PRESENTATION_STATE } from "./resolveOptimiserPresentationState.js";
 import { resolveOptimiserCurrentP20 } from "./optimiserCurrentP20.js";
+import { parityBlocksApply } from "./optimiserBaselineAuthority.js";
 
 export const ADI_TESTED_TITLE = "What ADI tested";
 export const ADI_ENGINEER_DETAILS_TITLE = "Engineer details";
@@ -400,9 +401,18 @@ export function buildTestedOptionRows(
  * recommended with evaluated changes; and, when P20 is the limiting metric, the
  * improvement is at least 1 dB.
  */
-export function resolveApplyPermission({ planView, presentation, recommendedLever, currentP20 = null }) {
+export function resolveApplyPermission({ planView, presentation, recommendedLever, currentP20 = null, parityBlocked = false }) {
   if (!recommendedLever) {
     return { allowed: false, reason: "No single evaluated change is available to apply." };
+  }
+  // Parity first: the baseline must be the published bass result. Nothing from a
+  // result whose parity was never established can be applied.
+  if (parityBlocked === true) {
+    return {
+      allowed: false,
+      reason: planView?.baselineParity?.message
+        || "This optimiser baseline does not match the published bass result. Recalculate bass performance, then re-run the Optimisation Plan.",
+    };
   }
   // The candidate was measured from a different current state than the design
   // measures now — that improvement is evidence, never an offer to apply.
@@ -523,8 +533,12 @@ export function buildAdiDesignerSummary({
     planView,
   });
 
+  // The saved parity record: no lever from a result whose baseline parity was
+  // never established against the published result may be applied.
+  const parityBlocked = parityBlocksApply(planView?.baselineParity);
+
   const recommendedLever = resolveRecommendedLever(planView);
-  const apply = resolveApplyPermission({ planView, presentation, recommendedLever, currentP20 });
+  const apply = resolveApplyPermission({ planView, presentation, recommendedLever, currentP20, parityBlocked });
   const undo = resolveUndoPermission({ planView, appliedLever });
   const liveRows = running ? buildLiveFamilyRows(liveProgress) : null;
   const leverRows = buildTestedOptionRows(planView, { recommendedLever, appliedLever, liveRows, roomDims });
@@ -610,6 +624,7 @@ export function buildAdiDesignerSummary({
       appliedLever,
       appliedDirection,
       currentP20,
+      parityBlocked,
     }),
     actions: {
       canApply: apply.allowed,

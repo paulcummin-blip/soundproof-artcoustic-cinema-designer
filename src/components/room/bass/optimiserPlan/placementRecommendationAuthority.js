@@ -191,6 +191,7 @@ export function resolvePlacementRecommendation({
   appliedLever = null,
   appliedDirection = null,
   currentP20 = null,
+  parityBlocked = false,
 } = {}) {
   const lever = findPlacementLever(planView);
   const baseline = planView?.baseline || null;
@@ -315,7 +316,9 @@ export function resolvePlacementRecommendation({
   // does not allow to be applied (a trade-off, a rejection, no useful
   // improvement) is never presented here: the lever row states it instead.
   if (verdict.applyAllowed !== true) return null;
-  const canApply = lever.canApply === true;
+  // Parity first: an evaluation whose baseline was never established against the
+  // published result is evidence, never an offer.
+  const canApply = parityBlocked !== true && lever.canApply === true;
 
   return {
     ...base,

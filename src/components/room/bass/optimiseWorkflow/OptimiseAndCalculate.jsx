@@ -330,6 +330,14 @@ export default function OptimiseAndCalculate({
         setWorkflowError(projectId, versionId, result.error || "Optimisation failed.");
         return;
       }
+      if (result.status === "blocked") {
+        // The optimiser baseline must be the published bass result. With no
+        // matching completed authority the run stopped before evaluating
+        // anything: state the reason and stop — nothing is auto-applied and no
+        // plan is saved, so nothing can be applied from it.
+        setWorkflowError(projectId, versionId, result.error);
+        return;
+      }
 
       // ── ADI: Consume the optimiser's authoritative result ──────────
       // ADI is a pure reasoning module. It receives the optimiser's
@@ -402,6 +410,9 @@ export default function OptimiseAndCalculate({
             // compares against on reopen) plus this run's own result fingerprint.
             designFingerprint: currentShared?.cacheKey || null,
             resultFingerprint: fingerprint,
+            // The parity record this evaluation was made under: the baseline must
+            // be the published bass result, and the record proves it.
+            baselineParity: result.baselineParity || null,
             cacheKey: currentShared?.cacheKey || null,
             // Only recorded when the authority actually carries one — never invented.
             baseDesignFingerprint: currentShared?.baseDesignFingerprint || null,
@@ -430,6 +441,7 @@ export default function OptimiseAndCalculate({
             versionId,
             designFingerprint: currentShared?.cacheKey || null,
             resultFingerprint: fingerprint,
+            baselineParity: result.baselineParity || null,
             cacheKey: currentShared?.cacheKey || null,
             baseDesignFingerprint: currentShared?.baseDesignFingerprint || null,
             engineVersion: result.selection?.winner?.algorithmVersion || null,
@@ -897,6 +909,9 @@ export default function OptimiseAndCalculate({
             optimisationRunStatus={planRunStatus}
             optimisationRunError={planRunError}
             onRunOptimisationPlan={runOptimisationPlan}
+            onCalculateBassPerformance={() => {
+              if (typeof sharedRef.current?.onCalculate === "function") sharedRef.current.onCalculate();
+            }}
           />
         </div>
       )}

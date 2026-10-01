@@ -130,6 +130,7 @@ export default function AdiRecommendation({
   optimisationRunStatus,
   optimisationRunError,
   onRunOptimisationPlan,
+  onCalculateBassPerformance,
 }) {
   const [applying, setApplying] = useState(false);
 
@@ -520,6 +521,7 @@ export default function AdiRecommendation({
         runStatus={optimisationRunStatus || "idle"}
         runError={optimisationRunError || null}
         onRunOptimisationPlan={onRunOptimisationPlan}
+        onCalculateBassPerformance={onCalculateBassPerformance || null}
         onApplyLever={handleApplyLever}
         onUndoLever={handleUndoLever}
         leverApplyBusy={leverApplyBusy}
@@ -641,6 +643,7 @@ export default function AdiRecommendation({
         runStatus={optimisationRunStatus || "idle"}
         runError={optimisationRunError || null}
         onRunOptimisationPlan={onRunOptimisationPlan}
+        onCalculateBassPerformance={onCalculateBassPerformance || null}
         onApplyLever={handleApplyLever}
         onUndoLever={handleUndoLever}
         leverApplyBusy={leverApplyBusy}
