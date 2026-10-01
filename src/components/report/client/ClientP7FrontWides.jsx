@@ -14,6 +14,10 @@
 import React from "react";
 import { resolveGradeToken } from "@/components/utils/rp22Colors";
 import { resolveRspLabelPlacement } from "./ClientSpeakerBalance";
+import {
+  parameterResultHeading,
+  parameterResultDescription,
+} from "./parameterResultCopy";
 
 import {
   REPORT_FONT_HEADING as HEADING_FONT,
@@ -53,6 +57,12 @@ export default function ClientP7FrontWides({
 
   const levelLabel = levelToLabel(level);
   const color = levelColor(level);
+
+  // Result-card copy comes from the shared Visual Report authority: the pill
+  // carries the level, so the card speaks it as a word and never repeats the
+  // parameter number the page has already identified.
+  const resultHeading = parameterResultHeading(level);
+  const resultDescription = parameterResultDescription(7);
 
   // Room geometry
   const W = Number(roomDims?.widthM) || 4.5;
@@ -343,8 +353,8 @@ export default function ClientP7FrontWides({
             </div>
           </div>
 
-          {/* ── P7 level badge ── */}
-          {levelLabel && (
+          {/* ── P7 result card — pill, level heading, official RP22 description ── */}
+          {levelLabel && resultHeading && (
             <div style={{
               display: "flex",
               alignItems: "center",
@@ -375,7 +385,10 @@ export default function ClientP7FrontWides({
               </div>
               <div style={{ flex: 1 }}>
                 <div style={{ fontSize: 16, fontWeight: 600, color: "#213428", fontFamily: HEADING_FONT }}>
-                  P7 — {levelLabel}
+                  {resultHeading}
+                </div>
+                <div style={{ fontSize: 13, color: "#3E4349", marginTop: 2, lineHeight: 1.45 }}>
+                  {resultDescription}
                 </div>
                 {maxDeviation != null && (
                   <div style={{ fontSize: 12, color: "#625143", marginTop: 2 }}>
