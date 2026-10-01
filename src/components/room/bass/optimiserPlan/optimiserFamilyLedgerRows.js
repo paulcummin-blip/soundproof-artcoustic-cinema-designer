@@ -25,6 +25,15 @@ import {
   OPTIMISER_RUN_FAMILY,
 } from "./optimiserRunFamilies.js";
 import { OPTIMISER_LEVER_VERDICT, resolveLeverVerdict } from "./optimiserLeverVerdict.js";
+import { deltaText } from "./optimiserWholeNumberDb.js";
+
+/**
+ * The action column's own words. A change that cannot be applied says what to do
+ * about it here rather than leaving the designer with "—" and no explanation.
+ */
+export const ADI_ROW_ACTION = Object.freeze({
+  RERUN_TO_APPLY: "Re-run to apply",
+});
 
 /**
  * The designer-facing status words. Only these are ever shown, and each says
@@ -48,10 +57,25 @@ export const ADI_ROW_STATUS = Object.freeze({
  */
 export const ADI_ROW_OUTCOME = Object.freeze({
   NO_USEFUL: "No useful improvement",
+  /**
+   * Evaluated, and the best attempt's measured effect stayed inside the 1 dB
+   * action threshold. This is the fixed "Tested — no useful improvement"
+   * outcome: the reason is stated plainly, never as a vague "not offered".
+   */
+  NO_USEFUL_BELOW_THRESHOLD:
+    "No useful improvement — improvement below the 1 dB action threshold",
   NO_SAFE_STANDALONE: "No safe standalone result",
-  WORSENS: "Worsens the result",
-  TRADE_OFF: "Improves one measure, worsens another",
-  IMPROVES_NOT_OFFERED: "Improvement found — not offered for application",
+  /** The fixed "Rejected" outcome. The wording comes from the verdict authority. */
+  WORSENS: "Rejected — worsens seat-to-seat consistency",
+  /** The fixed "Trade-off" outcome. Never carries an Apply action. */
+  TRADE_OFF: "Trade-off — improves one measure and worsens another. No automatic apply",
+  /**
+   * A real, measured improvement that this run cannot offer, because the change
+   * that produced it was not kept with the run. Replaces the old
+   * "Improvement found — not offered for application": the improvement is stated
+   * WITH the reason and the row's action states the next step.
+   */
+  NOT_RETAINED: "Improvement measured, but no applicable change was kept by this run",
   NO_BETTER_LAYOUT: "No better layout found",
   /** Stated for the crossover region — a capability the model does not have. */
   PHASE_NOT_MODELLED:
@@ -97,9 +121,17 @@ function shortPhrase(text, maxLength = 72) {
 }
 
 /** The run's own recorded reason, when it is about this family. */
+/**
+ * Wording the card must never carry. A run-internal sentence containing one of
+ * these is not a lever's reason: the fixed outcome words replace it.
+ */
+const FORBIDDEN_REASON =
+  /not offered|improvement found|retained no attempt|no attempt value|not available|not evaluated|not tested/i;
+
 function familyReason(entry) {
   const reason = shortPhrase(entry?.reason);
-  return reason && !isBaselineStatement(reason) ? reason : null;
+  if (!reason || isBaselineStatement(reason) || FORBIDDEN_REASON.test(reason)) return null;
+  return reason;
 }
 
 /** One family record from the run's own ledger. */
@@ -132,10 +164,29 @@ function notSearchedInRun(outcome = null) {
  * designer vocabulary. Read from the same verdict authority the Engineer
  * details block uses, so the summary row and the detail can never disagree.
  */
+/** The magnitude of a P19/P20 change in whole dB. Null when it is under 1 dB. */
+function changeMagnitudeDb(delta) {
+  const number = Number(delta);
+  if (!Number.isFinite(number)) return null;
+  const text = deltaText(Math.abs(number));
+  return !text || text === "no meaningful change" ? null : text;
+}
+
+/** "improves P20 by 4 dB" — the measured effect, in whole numbers only. */
+function measuredImprovementText(attempt) {
+  const parts = [];
+  const p20 = changeMagnitudeDb(attempt?.p20DeltaDb);
+  const p19 = changeMagnitudeDb(attempt?.p19DeltaDb);
+  if (p20) parts.push(`P20 by ${p20}`);
+  if (p19) parts.push(`P19 by ${p19}`);
+  if (!parts.length) return null;
+  return `improves ${parts.join(" and ")}`;
+}
+
 function testedOutcome(entry, baseline) {
   const attempt = entry?.bestAttempt || null;
-  // A tested family always retains a result summary. When the run kept no
-  // attempt value, the honest summary is that nothing useful came of it.
+  // A tested family whose run kept no comparison value measured nothing against
+  // the baseline, so the honest summary is that no useful improvement came of it.
   if (!attempt) {
     return { status: ADI_ROW_STATUS.TESTED, outcome: ADI_ROW_OUTCOME.NO_USEFUL };
   }
@@ -151,18 +202,31 @@ function testedOutcome(entry, baseline) {
   });
 
   if (verdict.verdict === OPTIMISER_LEVER_VERDICT.REJECTED) {
-    return { status: ADI_ROW_STATUS.REJECTED, outcome: ADI_ROW_OUTCOME.WORSENS };
+    // The verdict authority words the rejection, in whole numbers.
+    return { status: ADI_ROW_STATUS.REJECTED, outcome: verdict.summary };
   }
   if (verdict.verdict === OPTIMISER_LEVER_VERDICT.TRADE_OFF) {
-    return { status: ADI_ROW_STATUS.TRADE_OFF, outcome: ADI_ROW_OUTCOME.TRADE_OFF };
+    return { status: ADI_ROW_STATUS.TRADE_OFF, outcome: verdict.summary };
   }
   if (verdict.verdict === OPTIMISER_LEVER_VERDICT.RECOMMENDED) {
-    return { status: ADI_ROW_STATUS.TESTED, outcome: ADI_ROW_OUTCOME.IMPROVES_NOT_OFFERED };
+    // A genuine improvement. It is offered as a recommendation by the row that
+    // carries the change; here the run kept the measured effect only, so the
+    // improvement is stated WITH the reason it cannot be applied.
+    const measured = measuredImprovementText(attempt);
+    return {
+      status: ADI_ROW_STATUS.TESTED,
+      outcome: measured
+        ? `This run measured an improvement — it ${measured}, but no applicable change was kept`
+        : ADI_ROW_OUTCOME.NOT_RETAINED,
+      actionText: ADI_ROW_ACTION.RERUN_TO_APPLY,
+    };
   }
   if (verdict.verdict === OPTIMISER_LEVER_VERDICT.NOT_APPLICABLE) {
     return { status: ADI_ROW_STATUS.TESTED, outcome: familyReason(entry) || ADI_ROW_OUTCOME.NO_USEFUL };
   }
-  return { status: ADI_ROW_STATUS.TESTED, outcome: ADI_ROW_OUTCOME.NO_USEFUL };
+  // Evaluated, and the best attempt stayed inside the 1 dB action threshold:
+  // this is the fixed "Tested — no useful improvement" outcome, with its reason.
+  return { status: ADI_ROW_STATUS.TESTED, outcome: ADI_ROW_OUTCOME.NO_USEFUL_BELOW_THRESHOLD };
 }
 
 /**
