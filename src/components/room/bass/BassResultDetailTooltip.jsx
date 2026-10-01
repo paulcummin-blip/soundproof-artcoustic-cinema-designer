@@ -138,7 +138,11 @@ function buildSeatLines(paramKey, seatData, shared) {
   if (numericLevel === null) return null;
 
   const lines = [];
-  lines.push(["Seat", formatSeatLabel(seatData.seatId)]);
+  // P19 is RSP-only: no per-seat P19 result exists, so the measured position is
+  // stated as the RSP rather than a seat.
+  lines.push(paramKey === "p19"
+    ? ["Measured position", "RSP (Reference Seat Position)"]
+    : ["Seat", formatSeatLabel(seatData.seatId)]);
   // P20 reads its value from the canonical display authority, so the pill, the
   // marker and this tooltip always state the same floored figure. The exact
   // value is shown too, but explicitly labelled exact.
@@ -154,6 +158,11 @@ function buildSeatLines(paramKey, seatData, shared) {
     // Whole-number story only. The exact decimal deviation and any rounding
     // explanation stay out of the user-facing tooltip.
     lines.push(["Metric", "Seat-to-seat response relative to RSP, 1/3-octave smoothed, below transition"]);
+    lines.push(["EQ", "One RSP-derived EQ, applied to every seat"]);
+  }
+
+  if (paramKey === "p19") {
+    lines.push(["Metric", "Corrected RSP response against the house target, 1/3-octave smoothed, below transition"]);
   }
 
   const limitingText = p20Display?.displayFrequencyText
@@ -176,10 +185,21 @@ function buildSeatLines(paramKey, seatData, shared) {
   return lines;
 }
 
-function buildSeatHeadlineLines() {
+// P19 and P20 headline pills. P19 is an RSP result and is never scoped to a
+// seat. P20 is the all-seat consistency result: one RSP-derived EQ is applied to
+// every seat, and each seat's corrected response is compared with the post-EQ RSP.
+function buildHeadlineLines(paramKey) {
+  if (paramKey === "p19") {
+    return [
+      ["Scope", "RSP (Reference Seat Position)"],
+      ["Measures", "The corrected RSP response against the house target below transition"],
+      ["Smoothing", "1/3-octave (official result)"],
+    ];
+  }
   return [
-    ["Scope", "Seat-scoped parameter"],
-    ["Description", "Individual seat results are shown in the per-seat grid below."],
+    ["Scope", "All seats — project worst"],
+    ["Measures", "Each seat after the same RSP-derived EQ, compared with the post-EQ RSP"],
+    ["Smoothing", "1/3-octave (official result)"],
   ];
 }
 
@@ -212,7 +232,7 @@ export default function BassResultDetailTooltip({ parameterKey, seatData, childr
   } else if ((parameterKey === "p19" || parameterKey === "p20") && seatData) {
     lines = buildSeatLines(parameterKey, seatData, shared);
   } else if (parameterKey === "p19" || parameterKey === "p20") {
-    lines = buildSeatHeadlineLines();
+    lines = buildHeadlineLines(parameterKey);
   }
 
   const hasDetail = lines && lines.length > 0;

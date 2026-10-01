@@ -149,9 +149,10 @@ export default function ClientP19HeatMap({
       y: Number(s.position.y) || 0,
     }));
 
-  // Presentation summary from the canonical publication only.
+  // Presentation summary from the canonical publication only. P19 is measured at
+  // the RSP — it is never a per-seat result, so the fallback says so.
   const summary = bassPerformance?.p19?.project?.coverageSummary
-    || "Published per-seat P19 response quality across the listening area.";
+    || "P19 is measured at the RSP: the corrected RSP response against the house target below transition.";
 
   const showDrawing = !print || printPart !== "support";
   const showSupport = !print || printPart !== "drawing";

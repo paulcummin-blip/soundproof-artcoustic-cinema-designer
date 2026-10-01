@@ -32,6 +32,7 @@ import { formatSeatPillLabel } from "@/components/utils/seatLabel";
 import BassCurveVisibilityControls, { DEFAULT_BASS_CURVE_VISIBILITY } from "@/components/room/bass/BassCurveVisibilityControls";
 import BassSmoothingControl from "@/components/room/bass/BassSmoothingControl";
 import { buildRp22GraphMarkers } from "@/components/room/bass/rp22GraphMarkers";
+import { formatP20MarkerLabel } from "@/components/room/bass/p20DisplayAuthority";
 import Rp22GraphMarkerKey from "@/components/room/bass/Rp22GraphMarkerKey";
 import ExpertCurveView from "@/components/room/bass/ExpertCurveView";
 import CopyLiveBassValidationButton from "@/components/room/bass/CopyLiveBassValidationButton";
@@ -581,13 +582,17 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, h
     if (metric === "p19" && Number.isFinite(rp22GraphMarkers.p19WorstFrequencyHz)) {
       return {
         frequencyHz: rp22GraphMarkers.p19WorstFrequencyHz,
-        label: `P19 worst · ${rp22GraphMarkers.p19WorstFrequencyHz.toFixed(0)} Hz`,
+        // P19 is RSP-only — its limiting frequency, not a seat's.
+        label: `P19 limiting · ${rp22GraphMarkers.p19WorstFrequencyHz.toFixed(0)} Hz (RSP)`,
       };
     }
     if (metric === "p20" && Number.isFinite(rp22GraphMarkers.p20WorstFrequencyHz)) {
       return {
         frequencyHz: rp22GraphMarkers.p20WorstFrequencyHz,
-        label: `P20 worst · ${rp22GraphMarkers.p20WorstFrequencyHz.toFixed(0)} Hz`,
+        // The official project-worst P20 point, from the same authority the
+        // marker and the pill read.
+        label: formatP20MarkerLabel(rp22GraphMarkers.p20WorstDisplay, { prefix: "P20 official worst" })
+          || `P20 official worst · ${rp22GraphMarkers.p20WorstFrequencyHz.toFixed(0)} Hz`,
       };
     }
     if (metric === "p18" && Number.isFinite(rp22GraphMarkers.p18FrequencyHz)) {

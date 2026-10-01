@@ -24,7 +24,7 @@ let state = {
   // Set directly when the graph itself initiates the highlight.
   highlightFrequencyHz: null,
 
-  // Human-readable label for the highlight (e.g. "P19 worst · 47 Hz").
+  // Human-readable label for the highlight (e.g. "P19 limiting · 77 Hz (RSP)").
   highlightLabel: null,
 
   // Which seat is currently focused (drives graph seat selection).

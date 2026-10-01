@@ -9,68 +9,59 @@ const finite = (value) => value !== null && value !== "" && Number.isFinite(Numb
  * @param {object} finalBassResponse - finalOptimisedBassResponse (live or restored)
  * @param {string|null} selectedSeatId - the currently selected seat ID ("rsp" or a real seat)
  *
+ * One RSP-derived EQ is applied to every seat. There is no per-seat EQ.
+ *
  * P19 marker:
- *   - RSP selected → RSP P19 worst frequency (the authoritative assessment position)
- *   - Individual seat selected → that seat's canonical P19 worst frequency
+ *   - always the authoritative RSP limiting frequency (post-EQ RSP vs house
+ *     target). P19 is RSP-only, so the marker never moves with the selected seat.
  *
  * P20 marker:
- *   - RSP selected → overall worst seat P20 (established RSP presentation)
- *   - Individual seat selected → that seat's P20 worst frequency
+ *   - always the overall project-worst seat (post-EQ seat vs post-EQ RSP). A
+ *     selected seat's own point is returned separately as secondary detail and
+ *     never replaces the official result.
  */
 export function buildRp22GraphMarkers(finalBassResponse, selectedSeatId = null) {
   const seatVariation = finalBassResponse?.finalSeatVariationData || {};
-  const p19PerSeat = Array.isArray(seatVariation?.p19?.perSeatResults)
-    ? seatVariation.p19.perSeatResults
-    : [];
   const p20Results = Array.isArray(seatVariation?.p20?.perSeatResults)
     ? seatVariation.p20.perSeatResults
     : [];
 
-  // ── P19 worst frequency: selected seat or RSP ──
-  let p19WorstFrequencyHz = null;
-  if (selectedSeatId && selectedSeatId !== "rsp") {
-    const seatP19 = p19PerSeat.find((seat) => String(seat?.seatId) === String(selectedSeatId));
-    p19WorstFrequencyHz = seatP19 && finite(seatP19.worstFrequencyHz)
-      ? Number(seatP19.worstFrequencyHz)
-      : null;
-  } else {
-    p19WorstFrequencyHz = finite(seatVariation?.p19?.worstFrequencyHz)
-      ? Number(seatVariation.p19.worstFrequencyHz)
-      : null;
-  }
+  // ── P19 limiting frequency: the authoritative RSP result, always ──
+  // P19 is RSP-only: the corrected RSP response measured against the house target
+  // below transition. There is no per-seat P19, so this is never resolved from the
+  // selected seat — doing so made the marker vanish the moment a seat was clicked,
+  // and would have claimed a per-seat result that does not exist.
+  const p19WorstFrequencyHz = finite(seatVariation?.p19?.worstFrequencyHz)
+    ? Number(seatVariation.p19.worstFrequencyHz)
+    : null;
 
-  // ── P20 worst frequency: selected seat or overall worst (RSP) ──
-  let p20WorstFrequencyHz = null;
-  let p20WorstSeatId = null;
-  let p20WorstSeat = null;
-  if (selectedSeatId && selectedSeatId !== "rsp") {
-    const seatP20 = p20Results.find((seat) => String(seat?.seatId) === String(selectedSeatId));
-    if (seatP20 && finite(seatP20.worstFrequencyHz)) {
-      p20WorstFrequencyHz = Number(seatP20.worstFrequencyHz);
-      p20WorstSeatId = seatP20.seatId;
-      p20WorstSeat = seatP20;
-    }
-  } else {
-    // RSP: established presentation — overall worst seat P20 marker.
-    const worstSeatId = seatVariation?.p20?.worstSeatId ?? null;
-    const worstP20 = p20Results.find((seat) => String(seat?.seatId) === String(worstSeatId))
-      || p20Results.reduce((worst, seat) => {
-        if (!finite(seat?.variationDbRaw)) return worst;
-        if (!worst || Number(seat.variationDbRaw) > Number(worst.variationDbRaw)) return seat;
-        return worst;
-      }, null);
-    p20WorstFrequencyHz = finite(worstP20?.worstFrequencyHz)
-      ? Number(worstP20.worstFrequencyHz)
-      : null;
-    p20WorstSeatId = worstP20?.seatId ?? worstSeatId;
-    p20WorstSeat = worstP20 ?? null;
-  }
-  // Canonical display for the marked seat. The marker, the pill and the tooltip
-  // all state this same floored value — the marker never formats its own.
-  const p20Display = resolveP20SeatDisplay(p20WorstSeat, {
-    selectedSeatId,
-    isAllSeatWorst: !(selectedSeatId && selectedSeatId !== "rsp"),
-  });
+  // ── P20: the official project-worst point, always ──
+  // The published P20 result is the worst seat in the project, under one
+  // RSP-derived EQ applied to every seat. Selecting a seat adds that seat's own
+  // point as secondary detail — it never replaces the official result.
+  const officialWorstSeatId = seatVariation?.p20?.worstSeatId ?? null;
+  const worstP20 = p20Results.find((seat) => String(seat?.seatId) === String(officialWorstSeatId))
+    || p20Results.reduce((worst, seat) => {
+      if (!finite(seat?.variationDbRaw)) return worst;
+      if (!worst || Number(seat.variationDbRaw) > Number(worst.variationDbRaw)) return seat;
+      return worst;
+    }, null);
+  const p20WorstFrequencyHz = finite(worstP20?.worstFrequencyHz)
+    ? Number(worstP20.worstFrequencyHz)
+    : null;
+  const p20WorstSeatId = worstP20?.seatId ?? officialWorstSeatId;
+  // Canonical display for the official result. The marker, the pill and the
+  // tooltip all state this same floored value — the marker never formats its own.
+  const p20Display = resolveP20SeatDisplay(worstP20, { isAllSeatWorst: true });
+
+  // Secondary detail: the selected seat's own point, presented beside the official
+  // result and never in place of it.
+  const selectedSeatP20 = selectedSeatId && selectedSeatId !== "rsp"
+    ? p20Results.find((seat) => String(seat?.seatId) === String(selectedSeatId)) || null
+    : null;
+  const p20SelectedDisplay = selectedSeatP20
+    ? resolveP20SeatDisplay(selectedSeatP20, { selectedSeatId })
+    : null;
 
   // P18 bounded flag: when the response is still above the -3 dB cutoff at the
   // product validity floor, the published point is the lowest valid frequency,
@@ -102,10 +93,15 @@ export function buildRp22GraphMarkers(finalBassResponse, selectedSeatId = null) 
     p19WorstFrequencyHz,
     p20WorstFrequencyHz,
     p20WorstSeatId,
-    // The canonical display object for the marked seat (exact value, floored
-    // display value, grade, limiting frequency, scope). Every P20 surface reads
-    // it, so the marker can never disagree with the pill or the tooltip.
+    // The canonical display object for the official worst seat (exact value,
+    // floored display value, grade, limiting frequency, scope). Every P20 surface
+    // reads it, so the marker can never disagree with the pill or the tooltip.
     p20WorstDisplay: p20Display,
+    // Secondary detail only: the selected seat's own P20 point, shown beside the
+    // official project-worst result — never in place of it.
+    p20SelectedSeatId: p20SelectedDisplay?.seatId ?? null,
+    p20SelectedSeatFrequencyHz: p20SelectedDisplay?.limitingFrequencyHz ?? null,
+    p20SelectedSeatDisplay: p20SelectedDisplay,
   };
 }
 

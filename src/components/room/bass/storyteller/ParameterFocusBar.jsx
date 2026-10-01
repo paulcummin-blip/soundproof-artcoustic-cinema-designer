@@ -14,8 +14,8 @@ import { useGraphInteraction, setGraphInteraction } from "@/components/room/bass
 const METRICS = [
   { key: "p14", label: "P14", title: "Bass SPL Capability" },
   { key: "p18", label: "P18", title: "Low-Frequency Extension" },
-  { key: "p19", label: "P19", title: "Response Fit vs Reference EQ" },
-  { key: "p20", label: "P20", title: "Seat-to-Seat Consistency" },
+  { key: "p19", label: "P19", title: "P19 — The Result · RSP after EQ vs house target" },
+  { key: "p20", label: "P20", title: "P20 — The Consistency · every seat under the same RSP-derived EQ" },
 ];
 
 export default function ParameterFocusBar({ disabled = false }) {

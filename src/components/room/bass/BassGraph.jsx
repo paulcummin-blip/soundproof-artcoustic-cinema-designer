@@ -56,6 +56,7 @@ export default function BassGraph({
     p19WorstFrequencyHz: null,
     p20WorstFrequencyHz: null,
     p20WorstSeatId: null,
+    p20SelectedSeatFrequencyHz: null,
   },
   highlightFrequencyHz = null,
   highlightLabel = null,
@@ -375,6 +376,18 @@ export default function BassGraph({
                         stroke="#7C3AED"
                         strokeWidth={1.25}
                         strokeDasharray="3 4"
+                      />
+                    )}
+                    {/* Secondary detail: the selected seat's own P20 point, drawn
+                        beside the official project-worst result — never in place
+                        of it. */}
+                    {Number.isFinite(rp22Markers?.p20SelectedSeatFrequencyHz)
+                      && rp22Markers.p20SelectedSeatFrequencyHz !== rp22Markers?.p20WorstFrequencyHz && (
+                      <ReferenceLine
+                        x={rp22Markers.p20SelectedSeatFrequencyHz}
+                        stroke="#B45309"
+                        strokeWidth={1}
+                        strokeDasharray="2 4"
                       />
                     )}
 

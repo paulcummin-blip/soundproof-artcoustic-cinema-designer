@@ -26,7 +26,8 @@ export default function Rp22GraphMarkerKey({ markers }) {
   const hasBand = finite(markers?.p19StartHz) && finite(markers?.p19EndHz);
   const hasP19Worst = finite(markers?.p19WorstFrequencyHz);
   const hasP20Worst = finite(markers?.p20WorstFrequencyHz);
-  if (!hasP18 && !hasBand && !hasP19Worst && !hasP20Worst) return null;
+  const hasP20Selected = finite(markers?.p20SelectedSeatFrequencyHz);
+  if (!hasP18 && !hasBand && !hasP19Worst && !hasP20Worst && !hasP20Selected) return null;
 
   return (
     <div
@@ -70,13 +71,19 @@ export default function Rp22GraphMarkerKey({ markers }) {
       )}
       {hasP19Worst && (
         <MarkerItem color="#B45309" dash="3 4">
-          P19 worst point · {Number(markers.p19WorstFrequencyHz).toFixed(0)} Hz
+          P19 limiting frequency · {Number(markers.p19WorstFrequencyHz).toFixed(0)} Hz (RSP)
         </MarkerItem>
       )}
       {hasP20Worst && (
         <MarkerItem color="#7C3AED" dash="3 4">
-          {formatP20MarkerLabel(markers?.p20WorstDisplay, { prefix: markers?.p20WorstDisplay?.scope === "selected-seat" ? "P20 point (selected seat)" : "P20 worst point" })
-            || `P20 worst point${markers.p20WorstSeatId ? ` · ${markers.p20WorstSeatId}` : ""} · ${Number(markers.p20WorstFrequencyHz).toFixed(0)} Hz`}
+          {formatP20MarkerLabel(markers?.p20WorstDisplay, { prefix: "P20 official worst" })
+            || `P20 official worst${markers.p20WorstSeatId ? ` · ${markers.p20WorstSeatId}` : ""} · ${Number(markers.p20WorstFrequencyHz).toFixed(0)} Hz`}
+        </MarkerItem>
+      )}
+      {hasP20Selected && (
+        <MarkerItem color="#B45309" dash="2 4">
+          {formatP20MarkerLabel(markers?.p20SelectedSeatDisplay, { prefix: "P20 selected seat (detail)" })
+            || `P20 selected seat (detail) · ${Number(markers.p20SelectedSeatFrequencyHz).toFixed(0)} Hz`}
         </MarkerItem>
       )}
     </div>

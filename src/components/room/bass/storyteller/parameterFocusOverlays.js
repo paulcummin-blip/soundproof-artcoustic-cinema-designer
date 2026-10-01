@@ -219,90 +219,61 @@ function buildP18Focus({ rp22GraphMarkers, finalBassResponse, smoothingMode }) {
   };
 }
 
-// ── P19: selected seat vs RSP Reference EQ, deviation, limiting frequency ──
-// P19 measures the maximum deviation between a seat's calibrated response and
-// the RSP Reference EQ (the post-EQ RSP curve). The graph must display the
-// same engineering quantity: the Selected Seat curve vs the RSP Reference EQ,
-// with the deviation between them and the limiting frequency highlighted.
-// The House Target is deliberately NOT shown — P19 does not measure against
-// the house curve, it measures against the Reference EQ.
-function buildP19Focus({ rp22GraphMarkers, finalBassResponse, selectedSeatId, smoothingMode, seatingPositions }) {
+// ── P19: the corrected RSP vs the house target ──
+// P19 is RSP-only. The published result is the corrected RSP response measured
+// against the house target below transition, 1/3-octave smoothed. There is one
+// RSP-derived EQ, applied to every seat — there is no per-seat EQ and no
+// per-seat P19. The graph therefore always shows the RSP after EQ curve against
+// the house target, and the marker always sits on the authoritative RSP limiting
+// frequency, whichever seat happens to be selected.
+function buildP19Focus({ rp22GraphMarkers, finalBassResponse, smoothingMode }) {
   const startHz = finite(rp22GraphMarkers?.p19StartHz) ? Number(rp22GraphMarkers.p19StartHz) : null;
   const endHz = finite(rp22GraphMarkers?.p19EndHz) ? Number(rp22GraphMarkers.p19EndHz) : null;
-  const worstFreq = finite(rp22GraphMarkers?.p19WorstFrequencyHz) ? Number(rp22GraphMarkers.p19WorstFrequencyHz) : null;
+  const limitingHz = finite(rp22GraphMarkers?.p19WorstFrequencyHz) ? Number(rp22GraphMarkers.p19WorstFrequencyHz) : null;
 
-  const p19Data = finalBassResponse?.finalSeatVariationData?.p19;
-  const perSeat = Array.isArray(p19Data?.perSeatResults) ? p19Data.perSeatResults : [];
-
-  // Auto-select the worst P19 seat when no specific seat is selected. This is
-  // the critical P19 validation: clicking P19 must immediately show the seat
-  // that caused the published grade. The designer sees the deviation between
-  // the worst seat and the Reference EQ without manually selecting a seat.
-  let seatId = selectedSeatId && selectedSeatId !== "rsp" ? selectedSeatId : null;
-  if (!seatId && perSeat.length > 0) {
-    let worst = null;
-    for (const seat of perSeat) {
-      if (!finite(seat?.variationDbRaw)) continue;
-      if (!worst || Number(seat.variationDbRaw) > Number(worst.variationDbRaw)) worst = seat;
-    }
-    if (worst) seatId = worst.seatId;
-  }
-
-  const seatResult = seatId ? perSeat.find((s) => String(s?.seatId) === String(seatId)) : null;
-  const variation = finite(seatResult?.variationDbRaw) ? Number(seatResult.variationDbRaw) : (finite(p19Data?.variationDb) ? Number(p19Data.variationDb) : null);
-  const level = seatResult?.level || p19Data?.level || null;
-
-  // Reference EQ = the calibrated RSP post-EQ curve. This is the curve P19
-  // actually compares against — NOT the house-curve target.
-  const referenceEqCurve = finalBassResponse?.postEqRspCurve || finalBassResponse?.canonicalPostEqRsp || [];
+  // The two curves P19 is measured between: the corrected RSP response and the
+  // house target. The house target is part of the P19 story and is never hidden.
+  const rspAfterEq = finalBassResponse?.postEqRspCurve || finalBassResponse?.canonicalPostEqRsp || [];
+  const houseTarget = finalBassResponse?.canonicalTargetCurve || finalBassResponse?.canonicalHouseCurveShape || finalBassResponse?.productionHouseCurveTarget || [];
   const additionalSeries = [];
 
-  // Selected Seat curve — the other half of the deviation P19 measures.
-  // When a real seat is selected, show its post-EQ curve so the designer can
-  // see the deviation from the Reference EQ directly. When RSP is selected,
-  // the seat curve IS the Reference EQ, so only one curve is shown.
-  if (seatId) {
-    const postEqPerSeat = finalBassResponse?.postEqPerSeatCurves || finalBassResponse?.canonicalPostEqSeatResponses || [];
-    const seatCurve = postEqPerSeat.find((s) => String(s?.seatId) === String(seatId));
-    if (seatCurve?.responseData && Array.isArray(seatCurve.responseData) && seatCurve.responseData.length > 0) {
-      additionalSeries.push({
-        id: "focus-selected-seat",
-        kind: "focus-selected-seat",
-        label: `Seat ${formatSeatPillLabel(seatId)}`,
-        tooltipLabel: `Selected seat ${formatSeatPillLabel(seatId)} — the calibrated response P19 compares to the Reference EQ`,
-        color: "#B45309",
-        strokeWidth: 2.5,
-        data: applyBassSmoothing(seatCurve.responseData, smoothingMode || "third"),
-      });
-    }
-  }
-
-  if (Array.isArray(referenceEqCurve) && referenceEqCurve.length > 0) {
+  if (Array.isArray(rspAfterEq) && rspAfterEq.length > 0) {
     additionalSeries.push({
-      id: "focus-reference-eq",
-      kind: "reference-eq",
-      label: "RSP (Reference EQ)",
-      tooltipLabel: "Reference EQ — the calibrated RSP response (aligned post-EQ RSP)",
+      id: "focus-rsp-after-eq",
+      kind: "focus-rsp-after-eq",
+      label: "RSP after EQ",
+      tooltipLabel: "RSP after EQ — the corrected RSP response P19 measures against the house target",
       color: "#2563EB",
       strokeWidth: 2.5,
+      data: applyBassSmoothing(rspAfterEq, smoothingMode || "third"),
+    });
+  }
+  if (Array.isArray(houseTarget) && houseTarget.length > 0) {
+    additionalSeries.push({
+      id: "focus-house-target",
+      kind: "focus-house-target",
+      label: "House Target",
+      tooltipLabel: "House Target — the target curve the corrected RSP response is measured against",
+      color: "#213428",
+      strokeWidth: 2,
       strokeDasharray: "8 4",
-      data: applyBassSmoothing(referenceEqCurve, smoothingMode || "third"),
+      data: applyBassSmoothing(houseTarget, smoothingMode || "third"),
     });
   }
 
+  // The published P19 result. Never a per-seat value — the RSP is the measured
+  // position for P19.
+  const p19Data = finalBassResponse?.finalSeatVariationData?.p19;
+  const variation = finite(p19Data?.variationDb) ? Number(p19Data.variationDb) : null;
+  const level = p19Data?.level || null;
+
   const lines = [];
-  if (seatId) {
-    lines.push(`Selected Seat: ${formatSeatPillLabel(seatId)} (amber solid)`);
-    lines.push(`Reference EQ: the calibrated RSP response (blue dashed)`);
-  } else {
-    lines.push("Seat: RSP (Reference Seat Position)");
-    lines.push("RSP Reference EQ: the calibrated RSP response (blue dashed)");
-  }
+  lines.push("P19 = max |post-EQ RSP − house target|");
   if (startHz != null && endHz != null) {
-    lines.push(`Assessment band: ${Math.round(startHz)}–${Math.round(endHz)} Hz (1/3-octave smoothed)`);
+    lines.push(`Assessment band: ${Math.round(startHz)}–${Math.round(endHz)} Hz`);
   }
-  if (worstFreq != null) {
-    lines.push(`Limiting frequency: ${Math.round(worstFreq)} Hz — where the deviation is greatest`);
+  if (limitingHz != null) {
+    lines.push(`Limiting frequency: ${Math.round(limitingHz)} Hz — where the deviation is greatest`);
   }
   if (variation != null) {
     // P19 deviation: whole number only in design-facing UI.
@@ -311,7 +282,10 @@ function buildP19Focus({ rp22GraphMarkers, finalBassResponse, selectedSeatId, sm
   if (level) {
     lines.push(`Grade: ${level}`);
   }
-  lines.push("P19 = max |Selected Seat − RSP| across the assessment band");
+  lines.push("RSP after EQ = the corrected RSP response (blue solid)");
+  lines.push("House Target = the target curve (dark dashed)");
+  lines.push("Measured at the RSP only — P19 is not a per-seat result");
+  lines.push("Official result uses 1/3-octave smoothing");
 
   return {
     metric: "p19",
@@ -332,37 +306,43 @@ function buildP19Focus({ rp22GraphMarkers, finalBassResponse, selectedSeatId, sm
         fontWeight: 600,
       },
     }] : [],
-    referenceLines: worstFreq != null ? [{
-      x: worstFreq,
+    // The authoritative RSP limiting frequency. Never resolved from the selected
+    // seat — P19 has no per-seat result to resolve.
+    referenceLines: limitingHz != null ? [{
+      x: limitingHz,
       stroke: "#B45309",
       strokeWidth: 2.5,
       strokeDasharray: "4 3",
-      seatPillLabel: seatId ? formatSeatPillLabel(seatId) : null,
-      limitingFrequencyHz: Math.round(worstFreq),
-      label: `P19 worst · ${Math.round(worstFreq)} Hz`,
+      limitingFrequencyHz: Math.round(limitingHz),
+      label: `P19 limiting · ${Math.round(limitingHz)} Hz (RSP)`,
       labelPosition: "top",
       ifOverflow: "extendDomain",
     }] : [],
     additionalSeries,
-    // Dim the house-curve and raw room response — P19 does not measure against
-    // these, so showing them prominently would tell a different engineering story.
-    dimKinds: ["room-response", "product-maximum", "maximum-spl", "house-curve", "normalized-target"],
+    // Only the raw room response and the product limits are dimmed: P19 does not
+    // measure against those. The house target stays visible — it is the reference
+    // the corrected RSP is compared with.
+    dimKinds: ["room-response", "product-maximum", "maximum-spl"],
     explanation: {
-      title: "P19 — Response Fit vs Reference EQ",
-      subtitle: "Maximum deviation between the selected seat's calibrated response and the RSP Reference EQ",
-      seatPillLabel: seatId ? formatSeatPillLabel(seatId) : null,
-      limitingFrequencyHz: worstFreq != null ? Math.round(worstFreq) : null,
+      title: "P19 — The Result",
+      subtitle: "RSP after EQ vs house target",
+      limitingFrequencyHz: limitingHz != null ? Math.round(limitingHz) : null,
       lines,
     },
   };
 }
 
-// ── P20: best/worst seat overlay, variation frequency ──
+// ── P20: every seat after the same RSP-derived EQ ──
+// P20 measures each seat's corrected response against the post-EQ RSP below
+// transition, 1/3-octave smoothed. One RSP-derived EQ is applied to every seat —
+// there is no per-seat EQ. The official result is the project-worst seat, and it
+// stays on the graph when a seat is selected; the selected seat is added as
+// secondary detail only, never in place of the official result.
 function buildP20Focus({ rp22GraphMarkers, finalBassResponse, smoothingMode }) {
   const p20Data = finalBassResponse?.finalSeatVariationData?.p20;
   const perSeat = Array.isArray(p20Data?.perSeatResults) ? p20Data.perSeatResults : [];
-  const worstFreq = finite(rp22GraphMarkers?.p20WorstFrequencyHz) ? Number(rp22GraphMarkers.p20WorstFrequencyHz) : null;
-  const worstSeatId = rp22GraphMarkers?.p20WorstSeatId || p20Data?.worstSeatId || null;
+  const startHz = finite(rp22GraphMarkers?.p19StartHz) ? Number(rp22GraphMarkers.p19StartHz) : null;
+  const endHz = finite(rp22GraphMarkers?.p19EndHz) ? Number(rp22GraphMarkers.p19EndHz) : null;
 
   // Find best and worst seats by variationDbRaw
   let worstSeat = null;
@@ -375,14 +355,33 @@ function buildP20Focus({ rp22GraphMarkers, finalBassResponse, smoothingMode }) {
 
   // Canonical display objects. The overlay states the same floored value as the
   // pill, the tooltip and the graph marker — it never rounds a P20 deviation
-  // itself, and it never invents a second P20 number.
-  const worstDisplay = resolveP20SeatDisplay(worstSeat, { isAllSeatWorst: true });
+  // itself, and it never invents a second P20 number. The official result is read
+  // from the marker authority so the overlay cannot name a different seat.
+  const worstDisplay = rp22GraphMarkers?.p20WorstDisplay || resolveP20SeatDisplay(worstSeat, { isAllSeatWorst: true });
   const bestDisplay = resolveP20SeatDisplay(bestSeat);
+  // Secondary detail only: the selected seat's own point, also from the marker
+  // authority. It never replaces the official project-worst result.
+  const selectedDisplay = rp22GraphMarkers?.p20SelectedSeatDisplay || null;
 
-  // Add worst and best seat curves as additional series
   const postEqPerSeat = finalBassResponse?.postEqPerSeatCurves || finalBassResponse?.canonicalPostEqSeatResponses || [];
   const seatCurveById = new Map(postEqPerSeat.map((s) => [String(s?.seatId), s]));
+  const rspAfterEq = finalBassResponse?.postEqRspCurve || finalBassResponse?.canonicalPostEqRsp || [];
   const additionalSeries = [];
+
+  // The post-EQ RSP is the reference every seat is compared with, so it belongs
+  // on the graph: P20 is a comparison against it, not against the house target.
+  if (Array.isArray(rspAfterEq) && rspAfterEq.length > 0) {
+    additionalSeries.push({
+      id: "focus-rsp-reference",
+      kind: "focus-rsp-reference",
+      label: "RSP after EQ (reference)",
+      tooltipLabel: "RSP after EQ — the reference every seat is compared with. The same RSP-derived EQ is applied to every seat.",
+      color: "#2563EB",
+      strokeWidth: 2,
+      strokeDasharray: "8 4",
+      data: applyBassSmoothing(rspAfterEq, smoothingMode || "third"),
+    });
+  }
 
   if (worstSeat && seatCurveById.has(String(worstSeat.seatId))) {
     const curve = seatCurveById.get(String(worstSeat.seatId));
@@ -393,6 +392,19 @@ function buildP20Focus({ rp22GraphMarkers, finalBassResponse, smoothingMode }) {
       tooltipLabel: `Worst seat — ${formatSeatPillLabel(worstSeat.seatId)} · ${worstDisplay?.displayVariationText ?? "—"}`,
       color: "#dc2626",
       strokeWidth: 2.5,
+      data: applyBassSmoothing(curve.responseData, smoothingMode || "third"),
+    });
+  }
+  if (selectedDisplay && seatCurveById.has(String(selectedDisplay.seatId))) {
+    const curve = seatCurveById.get(String(selectedDisplay.seatId));
+    additionalSeries.push({
+      id: "focus-selected-seat",
+      kind: "focus-selected-seat",
+      label: `Selected: ${selectedDisplay.seatPillLabel} (${selectedDisplay.displayVariationText})`,
+      tooltipLabel: `Selected seat — ${selectedDisplay.seatPillLabel} · ${selectedDisplay.displayVariationText}. Secondary detail: the official P20 result is the overall worst seat.`,
+      color: "#B45309",
+      strokeWidth: 2,
+      strokeDasharray: "6 4",
       data: applyBassSmoothing(curve.responseData, smoothingMode || "third"),
     });
   }
@@ -411,46 +423,69 @@ function buildP20Focus({ rp22GraphMarkers, finalBassResponse, smoothingMode }) {
 
   const lines = [];
   if (worstDisplay) {
-    lines.push(`Worst seat: ${worstDisplay.seatPillLabel} ${worstDisplay.displayVariationText}`);
+    lines.push(`Overall worst: ${worstDisplay.seatPillLabel} at ${worstDisplay.displayFrequencyText} · ${worstDisplay.displayVariationText}`);
+  }
+  if (selectedDisplay) {
+    lines.push(`Selected seat: ${selectedDisplay.seatPillLabel} at ${selectedDisplay.displayFrequencyText} · ${selectedDisplay.displayVariationText} — secondary detail, the official result is the overall worst seat`);
   }
   if (bestDisplay && bestDisplay.seatId !== worstDisplay?.seatId) {
     lines.push(`Best seat: ${bestDisplay.seatPillLabel} ${bestDisplay.displayVariationText}`);
   }
-  if (worstDisplay?.displayFrequencyText) {
-    lines.push(`Limiting frequency: ${worstDisplay.displayFrequencyText}`);
-  }
   if (worstDisplay?.grade && worstDisplay.grade !== "—") {
     lines.push(`Grade: ${worstDisplay.grade}`);
   }
-  lines.push("Scope: project worst all-seat P20 (not the selected seat)");
-  lines.push("Variation = max |seat − RSP| across the assessment band");
-  lines.push("Not response-vs-target: that relationship is P19, measured against the house target");
-  lines.push("Best and worst seat curves shown directly — the graph displays seat consistency");
+  lines.push("P20 = max |post-EQ seat − post-EQ RSP|");
+  if (startHz != null && endHz != null) {
+    lines.push(`Assessment band: ${Math.round(startHz)}–${Math.round(endHz)} Hz`);
+  }
+  lines.push("Every seat receives the same RSP-derived EQ — there is no per-seat EQ");
+  lines.push("RSP after EQ = the reference every seat is compared with (blue dashed)");
+  lines.push("Official result uses 1/3-octave smoothing");
+
+  const referenceLines = [];
+  if (worstDisplay?.limitingFrequencyHz != null) {
+    referenceLines.push({
+      x: worstDisplay.limitingFrequencyHz,
+      stroke: "#7C3AED",
+      strokeWidth: 2.5,
+      strokeDasharray: "4 3",
+      seatPillLabel: worstDisplay.seatPillLabel,
+      limitingFrequencyHz: worstDisplay.displayFrequencyHz,
+      label: `P20 official worst · ${worstDisplay.seatPillLabel} · ${worstDisplay.displayFrequencyText} · ${worstDisplay.displayVariationText}`,
+      labelPosition: "top",
+      ifOverflow: "extendDomain",
+    });
+  }
+  // The selected seat's own frequency, drawn beside the official result as
+  // secondary detail. It is only ever added, never substituted.
+  if (selectedDisplay?.limitingFrequencyHz != null
+    && selectedDisplay.limitingFrequencyHz !== worstDisplay?.limitingFrequencyHz) {
+    referenceLines.push({
+      x: selectedDisplay.limitingFrequencyHz,
+      stroke: "#B45309",
+      strokeWidth: 1.5,
+      strokeDasharray: "2 4",
+      seatPillLabel: selectedDisplay.seatPillLabel,
+      limitingFrequencyHz: selectedDisplay.displayFrequencyHz,
+      label: `Selected seat · ${selectedDisplay.seatPillLabel} · ${selectedDisplay.displayFrequencyText}`,
+      labelPosition: "insideTopRight",
+      ifOverflow: "extendDomain",
+    });
+  }
 
   return {
     metric: "p20",
     referenceAreas: [],
-    referenceLines: worstFreq != null ? [{
-      x: worstFreq,
-      stroke: "#7C3AED",
-      strokeWidth: 2.5,
-      strokeDasharray: "4 3",
-      seatPillLabel: worstSeat ? formatSeatPillLabel(worstSeat.seatId) : null,
-      limitingFrequencyHz: worstDisplay?.displayFrequencyHz ?? null,
-      label: `P20 worst · ${worstDisplay?.displayFrequencyText ?? ""} · ${worstDisplay?.displayVariationText ?? ""}`.trim(),
-      labelPosition: "top",
-      ifOverflow: "extendDomain",
-    }] : [],
+    referenceLines,
     additionalSeries,
     // Dim the house-curve and raw room response — P20 measures seat-to-seat
-    // consistency, not against the house target. Showing the house curve
-    // prominently would tell a different engineering story.
+    // consistency against the post-EQ RSP, not against the house target.
     dimKinds: ["room-response", "product-maximum", "maximum-spl", "house-curve", "normalized-target"],
     explanation: {
-      title: "P20 — Seat-to-Seat Consistency",
-      subtitle: "Maximum deviation between any seat and the RSP across the assessment band",
-      seatPillLabel: worstSeat ? formatSeatPillLabel(worstSeat.seatId) : null,
-      limitingFrequencyHz: worstFreq != null ? Math.round(worstFreq) : null,
+      title: "P20 — The Consistency",
+      subtitle: "Each seat after the same RSP-derived EQ, compared with the post-EQ RSP",
+      seatPillLabel: worstDisplay?.seatPillLabel || null,
+      limitingFrequencyHz: worstDisplay?.displayFrequencyHz ?? null,
       lines,
     },
   };
@@ -460,23 +495,22 @@ function buildP20Focus({ rp22GraphMarkers, finalBassResponse, smoothingMode }) {
 function buildSeatFocus({ selectedSeatId, rp22GraphMarkers, finalBassResponse, smoothingMode }) {
   if (!selectedSeatId || selectedSeatId === "rsp") return null;
 
-  const p19Data = finalBassResponse?.finalSeatVariationData?.p19;
   const p20Data = finalBassResponse?.finalSeatVariationData?.p20;
-  const p19PerSeat = Array.isArray(p19Data?.perSeatResults) ? p19Data.perSeatResults : [];
   const p20PerSeat = Array.isArray(p20Data?.perSeatResults) ? p20Data.perSeatResults : [];
 
-  const seatP19 = p19PerSeat.find((s) => String(s?.seatId) === String(selectedSeatId));
+  // P19 is RSP-only — there is no per-seat P19 to look up, so none is attempted.
   const seatP20 = p20PerSeat.find((s) => String(s?.seatId) === String(selectedSeatId));
 
-  // Add Reference EQ for comparison
+  // The RSP after EQ is the reference this seat is compared with — the same
+  // RSP-derived EQ is applied to every seat, so it is the shared reference curve.
   const referenceEqCurve = finalBassResponse?.postEqRspCurve || finalBassResponse?.canonicalPostEqRsp || [];
   const additionalSeries = [];
   if (Array.isArray(referenceEqCurve) && referenceEqCurve.length > 0) {
     additionalSeries.push({
       id: "focus-reference-eq",
       kind: "reference-eq",
-      label: "Reference EQ (RSP after EQ)",
-      tooltipLabel: "Reference EQ — the calibrated RSP response",
+      label: "RSP after EQ (reference)",
+      tooltipLabel: "RSP after EQ — the shared reference every seat is compared with (one RSP-derived EQ, applied to every seat)",
       color: "#2563EB",
       strokeWidth: 2,
       strokeDasharray: "8 4",
@@ -484,28 +518,25 @@ function buildSeatFocus({ selectedSeatId, rp22GraphMarkers, finalBassResponse, s
     });
   }
 
+  const seatDisplay = seatP20 ? resolveP20SeatDisplay(seatP20, { selectedSeatId }) : null;
+  const worstDisplay = rp22GraphMarkers?.p20WorstDisplay || null;
+
   const lines = [];
   lines.push(`Seat: ${formatSeatPillLabel(selectedSeatId)}`);
-  // P19 is RSP-only — no per-seat P19 tooltip.
-  if (seatP20) {
-    const seatDisplay = resolveP20SeatDisplay(seatP20, { selectedSeatId });
-    if (seatDisplay) {
-      lines.push(`P20 (seat-to-seat): ${seatDisplay.displayVariationText} at ${seatDisplay.displayFrequencyText} (${seatDisplay.grade})`);
-    }
+  // P19 is RSP-only: this seat is never given a P19 of its own, and no per-seat
+  // P19 lookup is attempted. What this seat carries is its P20 consistency
+  // result, measured under the same RSP-derived EQ every seat receives.
+  if (seatDisplay) {
+    const at = seatDisplay.displayFrequencyText ? ` at ${seatDisplay.displayFrequencyText}` : "";
+    lines.push(`P20 (seat consistency): ${seatDisplay.displayVariationText}${at} (${seatDisplay.grade})`);
   }
-
-  // Determine which parameter limits this seat
-  const p19Var = seatP19 ? Number(seatP19.variationDbRaw) : null;
-  const p20Var = seatP20 ? Number(seatP20.variationDbRaw) : null;
-  if (p19Var != null && p20Var != null) {
-    if (p19Var >= p20Var) {
-      lines.push(`Limiting parameter: P19 (response fit vs Reference EQ)`);
-    } else {
-      lines.push(`Limiting parameter: P20 (seat-to-seat consistency)`);
-    }
+  if (worstDisplay && worstDisplay.seatId !== String(selectedSeatId)) {
+    lines.push(`Project worst: ${worstDisplay.seatPillLabel} ${worstDisplay.displayVariationText} at ${worstDisplay.displayFrequencyText}`);
   }
+  lines.push("Every seat receives the same RSP-derived EQ — there is no per-seat EQ");
+  lines.push("Official result uses 1/3-octave smoothing");
 
-  const worstFreq = seatP19?.worstFrequencyHz || seatP20?.worstFrequencyHz || null;
+  const worstFreq = seatDisplay?.limitingFrequencyHz ?? null;
 
   return {
     metric: null,
