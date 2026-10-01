@@ -1,5 +1,4 @@
 import {
-  BRIDGE_URL_SECRET,
   PILOT_EXTERNAL_SUBJECT,
   PILOT_PARTNER_PROFILE_ID,
   PILOT_SOUND_PROOF_ACCOUNT_ID,
@@ -7,210 +6,23 @@ import {
   PORTAL_TARGET,
 } from './pilotPortalConstants.js';
 import {
+  PORTAL_LAUNCH_DIAGNOSTIC_EVENTS,
   PORTAL_LAUNCH_DIAGNOSTIC_OUTCOMES,
   recordPortalLaunchDiagnostic,
 } from './portalLaunchDiagnostics.js';
 import { claimPilotPortalAdministratorSeat } from './pilotSeatClaimAuthority.js';
+import { hasText, normaliseEmail, uniqueRows } from './portalPrimitives.js';
+import { callBridge, providerAccessToken, providerIdToken } from './portalBridgeTransport.js';
+import { bindingGateFailure as classifyBindingGateFailure } from './portalBindingGate.js';
+import {
+  resolveOrClaimPortalAdministratorMembership as resolveAccountAdministratorMembership,
+} from './portalMembershipClaim.js';
 
-function hasText(value) {
-  return typeof value === 'string' && value.trim().length > 0;
-}
-
-function providerTokenValue(response) {
-  const candidate = (value, depth = 0) => {
-    if (depth > 4) return null;
-    if (typeof value === 'string') {
-      const trimmed = value.trim();
-      try {
-        const parsed = JSON.parse(trimmed);
-        if (parsed !== trimmed) return candidate(parsed, depth + 1);
-      } catch {
-        return trimmed;
-      }
-      return trimmed;
-    }
-    if (value && typeof value === 'object') {
-      return candidate(
-        value.id_token
-        ?? value.idToken
-        ?? value.token
-        ?? value.value
-        ?? value.data?.id_token
-        ?? value.data?.idToken
-        ?? value.data?.token
-        ?? value.data?.value
-        ?? value.data,
-        depth + 1,
-      );
-    }
-    return null;
-  };
-
-  let token = candidate(response);
-  if (typeof token === 'string' && token.startsWith('Bearer ')) {
-    token = token.slice(7);
-  }
-  if (!hasText(token)) throw new Error('PROVIDER_TOKEN_UNAVAILABLE');
-  return token;
-}
-
-export async function providerIdToken(base44, base44UserId) {
-  const response = await base44.asServiceRole.sso.getIdToken(base44UserId);
-  return providerTokenValue(response);
-}
-
-function providerAccessTokenValue(response) {
-  const candidate = response?.access_token
-    ?? response?.accessToken
-    ?? response?.data?.access_token
-    ?? response?.data?.accessToken
-    ?? response?.data
-    ?? response;
-  if (typeof candidate !== 'string' || !candidate.trim()) {
-    throw new Error('PROVIDER_ACCESS_TOKEN_UNAVAILABLE');
-  }
-  const token = candidate.trim();
-  return token.startsWith('Bearer ') ? token.slice(7) : token;
-}
-
-export async function providerAccessToken(base44, base44UserId) {
-  const response = await base44.asServiceRole.sso.getAccessToken(base44UserId);
-  return providerAccessTokenValue(response);
-}
-
-function configuredBridgeUrl(override) {
-  const raw = hasText(override)
-    ? override
-    : globalThis.Deno?.env?.get?.(BRIDGE_URL_SECRET);
-  if (!hasText(raw)) throw new Error('PORTAL_BRIDGE_URL_UNAVAILABLE');
-
-  let endpoint;
-  try {
-    endpoint = new URL(raw.trim());
-  } catch {
-    throw new Error('PORTAL_BRIDGE_URL_INVALID');
-  }
-  if (endpoint.protocol !== 'https:' || endpoint.username || endpoint.password || endpoint.hash) {
-    throw new Error('PORTAL_BRIDGE_URL_INVALID');
-  }
-  return endpoint.toString();
-}
-
-async function callBridge(base44, base44UserId, body, bridgeUrl) {
-  const token = await providerIdToken(base44, base44UserId);
-  const response = await fetch(configuredBridgeUrl(bridgeUrl), {
-    method: 'POST',
-    headers: {
-      'content-type': 'application/json',
-      authorization: `Bearer ${token}`,
-    },
-    body: JSON.stringify(body),
-  });
-  const payload = await response.json().catch(() => null);
-  if (!response.ok || payload?.ok !== true || !payload?.binding) {
-    throw new Error('PORTAL_SESSION_REJECTED');
-  }
-  return payload.binding;
-}
-
-async function uniqueRows(entity, query) {
-  const rows = await entity.filter(query);
-  return Array.isArray(rows) ? rows : [];
-}
-
-function normaliseEmail(value) {
-  return String(value || '').trim().toLowerCase();
-}
-
-function isPortalAdministratorMembership(membership) {
-  return (
-    membership?.is_account_admin === true
-    && membership?.membership_role === 'dealer_admin'
-    && membership?.access_level === 'FULL_ACCESS'
-  );
-}
-
-async function resolveOrClaimPortalAdministratorMembership(
-  service,
-  base44User,
-  accountId,
-) {
-  const accountMemberships = await uniqueRows(
-    service.entities.AccountMembership,
-    { account_id: accountId },
-  );
-
-  const linked = accountMemberships.filter(
-    (membership) => membership?.user_id === base44User.id,
-  );
-  if (linked.length > 1) throw new Error('PORTAL_MEMBERSHIP_AMBIGUOUS');
-  if (linked.length === 1) {
-    const membership = linked[0];
-    if (
-      !['pending', 'active'].includes(membership.status)
-      || !isPortalAdministratorMembership(membership)
-    ) {
-      throw new Error('PORTAL_ACCOUNT_ASSIGNMENT_REQUIRED');
-    }
-    return { membership, claimed: false };
-  }
-
-  const email = normaliseEmail(base44User?.email);
-  if (!hasText(email)) throw new Error('PORTAL_MEMBERSHIP_EMAIL_REQUIRED');
-
-  const membershipsForEmail = await uniqueRows(
-    service.entities.AccountMembership,
-    { email },
-  );
-  if (membershipsForEmail.some(
-    (membership) => membership?.user_id && membership.user_id !== base44User.id,
-  )) {
-    throw new Error('PORTAL_MEMBERSHIP_ALREADY_CLAIMED');
-  }
-  if (membershipsForEmail.some(
-    (membership) => membership?.account_id !== accountId,
-  )) {
-    throw new Error('PORTAL_MEMBERSHIP_ACCOUNT_MISMATCH');
-  }
-
-  const unclaimedAdministrators = accountMemberships.filter(
-    (membership) =>
-      membership?.status === 'pending'
-      && !membership?.user_id
-      && isPortalAdministratorMembership(membership),
-  );
-  if (unclaimedAdministrators.length > 1) {
-    throw new Error('PORTAL_MEMBERSHIP_AMBIGUOUS');
-  }
-
-  const candidates = unclaimedAdministrators.filter(
-    (membership) => normaliseEmail(membership?.email) === email,
-  );
-  if (candidates.length !== 1) {
-    if (unclaimedAdministrators.length === 1) {
-      await recordPortalLaunchDiagnostic(service, {
-        event: 'PORTAL_MEMBERSHIP_EMAIL_MISMATCH',
-        reason: 'PORTAL_MEMBERSHIP_EMAIL_MISMATCH',
-        base44User,
-        accountId,
-        membershipId: unclaimedAdministrators[0]?.id || null,
-        details: {
-          seat_email: normaliseEmail(unclaimedAdministrators[0]?.email) || null,
-          base44_user_email: email,
-          claim_route: 'invited_email_match',
-        },
-      });
-      throw new Error('PORTAL_MEMBERSHIP_EMAIL_MISMATCH');
-    }
-    throw new Error('PORTAL_ACCOUNT_ASSIGNMENT_REQUIRED');
-  }
-
-  const membership = await service.entities.AccountMembership.update(
-    candidates[0].id,
-    { user_id: base44User.id },
-  );
-  return { membership, claimed: true };
-}
+// Provider tokens and the bridge call now live in portalBridgeTransport.js, the
+// binding gate in portalBindingGate.js, and the email-matched seat claim in
+// portalMembershipClaim.js. They are re-exported here so every existing
+// importer keeps one stable entry point and no import path changes.
+export { providerAccessToken, providerIdToken };
 
 export async function resolvePilotPortalMapping(service, accountId) {
   if (accountId !== PILOT_SOUND_PROOF_ACCOUNT_ID) {
@@ -266,49 +78,171 @@ export async function consumePilotPortalLaunch(base44, base44User, launchPass, {
   associateDealerIdentity,
 } = {}) {
   const service = base44.asServiceRole;
-  const binding = await callBridge(base44, base44User.id, {
-    action: 'consume',
-    launch_pass: launchPass,
-    target: PORTAL_TARGET,
-  }, bridgeUrl);
+  const expectedPilot = {
+    expectedSubject: PILOT_EXTERNAL_SUBJECT,
+    expectedProfileId: PILOT_PARTNER_PROFILE_ID,
+  };
+
+  // The launch pass has been consumed by the time this function runs, so the
+  // trail starts here: a launch that never records anything after this point
+  // means it did not reach this app environment at all.
+  await recordPortalLaunchDiagnostic(service, {
+    event: PORTAL_LAUNCH_DIAGNOSTIC_EVENTS.LAUNCH_STARTED,
+    outcome: PORTAL_LAUNCH_DIAGNOSTIC_OUTCOMES.SUCCESS,
+    base44User,
+    launchPass,
+    ...expectedPilot,
+    details: { stage: 'launch_started', binding_present: false },
+  });
+
+  await recordPortalLaunchDiagnostic(service, {
+    event: PORTAL_LAUNCH_DIAGNOSTIC_EVENTS.BRIDGE_CONSUME_ATTEMPTED,
+    outcome: PORTAL_LAUNCH_DIAGNOSTIC_OUTCOMES.SUCCESS,
+    base44User,
+    launchPass,
+    ...expectedPilot,
+    details: { stage: 'bridge_consume' },
+  });
+
+  let binding;
+  try {
+    binding = await callBridge(base44, base44User.id, {
+      action: 'consume',
+      launch_pass: launchPass,
+      target: PORTAL_TARGET,
+    }, bridgeUrl);
+  } catch (bridgeError) {
+    // The binding never arrived, so there is no binding identity to record —
+    // the bridge envelope itself is what this environment rejected.
+    const bridgeReason = String(bridgeError?.message || 'PORTAL_SESSION_REJECTED');
+    await recordPortalLaunchDiagnostic(service, {
+      event: PORTAL_LAUNCH_DIAGNOSTIC_EVENTS.BRIDGE_RESPONSE_INVALID,
+      outcome: PORTAL_LAUNCH_DIAGNOSTIC_OUTCOMES.FAILURE,
+      reason: bridgeReason,
+      base44User,
+      launchPass,
+      ...expectedPilot,
+      failureReason: bridgeReason,
+      details: { stage: 'bridge_consume', binding_present: false },
+    });
+    throw bridgeError;
+  }
+
+  await recordPortalLaunchDiagnostic(service, {
+    event: PORTAL_LAUNCH_DIAGNOSTIC_EVENTS.BRIDGE_CONSUME_RETURNED,
+    outcome: PORTAL_LAUNCH_DIAGNOSTIC_OUTCOMES.SUCCESS,
+    base44User,
+    binding,
+    launchPass,
+    ...expectedPilot,
+    details: {
+      stage: 'bridge_consume',
+      binding_present: true,
+      binding_target: hasText(binding?.target) ? binding.target : null,
+      binding_session_present: hasText(binding?.session_id),
+      binding_account_name_present: hasText(binding?.account_name),
+      binding_expires_at: hasText(binding?.expires_at) ? binding.expires_at : null,
+    },
+  });
 
   // A binding that identifies a different Partner Portal profile is its own
   // durable event, recorded before the launch is rejected.
   if (hasText(binding?.profile_id) && binding.profile_id !== PILOT_PARTNER_PROFILE_ID) {
     await recordPortalLaunchDiagnostic(service, {
-      event: 'PROFILE_MISMATCH',
+      event: PORTAL_LAUNCH_DIAGNOSTIC_EVENTS.PROFILE_MISMATCH,
       reason: 'PORTAL_BINDING_INVALID',
       base44User,
       binding,
+      launchPass,
+      ...expectedPilot,
+      failureReason: 'PROFILE_MISMATCH',
       details: {
         expected_profile_id: PILOT_PARTNER_PROFILE_ID,
         received_profile_id: binding.profile_id,
+        stage: 'binding_gate',
       },
     });
   }
 
-  if (
-    binding?.target !== PORTAL_TARGET
-    || binding?.user_id !== PILOT_EXTERNAL_SUBJECT
-    || !hasText(binding?.session_id)
-    || binding?.profile_id !== PILOT_PARTNER_PROFILE_ID
-    || !hasText(binding?.account_name)
-    || !hasText(binding?.expires_at)
-    || Date.parse(binding.expires_at) <= Date.now()
-  ) {
-    throw new Error('PORTAL_BINDING_INVALID');
+  const bindingFailure = classifyBindingGateFailure(binding);
+  if (bindingFailure) {
+    await recordPortalLaunchDiagnostic(service, {
+      event: bindingFailure.event,
+      outcome: PORTAL_LAUNCH_DIAGNOSTIC_OUTCOMES.FAILURE,
+      reason: bindingFailure.reason,
+      base44User,
+      binding,
+      launchPass,
+      ...expectedPilot,
+      failureReason: bindingFailure.reason,
+      details: { stage: 'binding_gate', ...(bindingFailure.details || {}) },
+    });
+    throw new Error(bindingFailure.reason);
   }
+
+  await recordPortalLaunchDiagnostic(service, {
+    event: PORTAL_LAUNCH_DIAGNOSTIC_EVENTS.PILOT_BINDING_VERIFIED,
+    outcome: PORTAL_LAUNCH_DIAGNOSTIC_OUTCOMES.SUCCESS,
+    base44User,
+    binding,
+    launchPass,
+    ...expectedPilot,
+    details: {
+      stage: 'binding_gate',
+      binding_target: binding.target,
+      binding_expires_at: binding.expires_at,
+    },
+  });
 
   const identityLinks = await uniqueRows(service.entities.ExternalAccountLink, {
     source_system: PORTAL_SOURCE,
     partner_user_id: binding.user_id,
     active: true,
   });
-  if (identityLinks.length !== 1) throw new Error('PORTAL_MAPPING_AMBIGUOUS');
+  if (identityLinks.length !== 1) {
+    const ambiguous = identityLinks.length > 1;
+    const linkReason = ambiguous ? 'PORTAL_MAPPING_AMBIGUOUS' : 'PORTAL_EXTERNAL_LINK_NOT_FOUND';
+    await recordPortalLaunchDiagnostic(service, {
+      event: ambiguous
+        ? PORTAL_LAUNCH_DIAGNOSTIC_EVENTS.EXTERNAL_LINK_AMBIGUOUS
+        : PORTAL_LAUNCH_DIAGNOSTIC_EVENTS.EXTERNAL_LINK_NOT_FOUND,
+      outcome: PORTAL_LAUNCH_DIAGNOSTIC_OUTCOMES.FAILURE,
+      reason: linkReason,
+      base44User,
+      binding,
+      launchPass,
+      ...expectedPilot,
+      externalLinkCount: identityLinks.length,
+      failureReason: linkReason,
+      details: {
+        stage: 'external_link_lookup',
+        external_link_count: identityLinks.length,
+        cause: ambiguous ? 'External dealer link ambiguous' : 'No external dealer link for this subject',
+      },
+    });
+    throw new Error(linkReason);
+  }
   const link = identityLinks[0];
 
   const accounts = await uniqueRows(service.entities.Account, { id: link.account_id });
   if (accounts.length !== 1 || accounts[0]?.status !== 'active') {
+    await recordPortalLaunchDiagnostic(service, {
+      event: 'PORTAL_ACCOUNT_INACTIVE',
+      outcome: PORTAL_LAUNCH_DIAGNOSTIC_OUTCOMES.FAILURE,
+      reason: 'PORTAL_ACCOUNT_INACTIVE',
+      base44User,
+      binding,
+      launchPass,
+      ...expectedPilot,
+      accountId: link.account_id,
+      externalLinkCount: identityLinks.length,
+      failureReason: 'PORTAL_ACCOUNT_INACTIVE',
+      details: {
+        stage: 'account_lookup',
+        account_count: accounts.length,
+        account_status: accounts[0]?.status || null,
+      },
+    });
     throw new Error('PORTAL_ACCOUNT_INACTIVE');
   }
 
@@ -341,6 +275,10 @@ export async function consumePilotPortalLaunch(base44, base44User, launchPass, {
       base44User,
       binding,
       accountId: link.account_id,
+      launchPass,
+      ...expectedPilot,
+      externalLinkCount: identityLinks.length,
+      failureReason: 'DEALER_IDENTITY_MISMATCH',
       details: {
         stored_dealer_account_id: association?.stored_dealer_account_id || null,
         resolved_dealer_account_id: association?.resolved_dealer_account_id || null,
@@ -360,6 +298,10 @@ export async function consumePilotPortalLaunch(base44, base44User, launchPass, {
       base44User,
       binding,
       accountId: link.account_id,
+      launchPass,
+      ...expectedPilot,
+      externalLinkCount: identityLinks.length,
+      failureReason: associationReason,
       details: {
         pilot_account: link.account_id === PILOT_SOUND_PROOF_ACCOUNT_ID,
         access_token_available: associationReason !== 'NO_PORTAL_TOKEN',
@@ -375,19 +317,59 @@ export async function consumePilotPortalLaunch(base44, base44User, launchPass, {
   // from the verified portal binding; every other account keeps the existing
   // email-matched rule unchanged. Ambiguous, foreign or already-claimed seats
   // fail closed in both routes.
+  // The seat state the claim will act on, read before the attempt: a claim
+  // that fails closed can then be read against the seats it failed on.
+  let pendingAdminSeatCount = null;
+  if (pilotLaunchContext) {
+    const seatRows = await uniqueRows(service.entities.AccountMembership, {
+      account_id: link.account_id,
+    });
+    pendingAdminSeatCount = seatRows.filter(
+      (membership) => membership?.status === 'pending' && membership?.is_account_admin === true,
+    ).length;
+  }
+
   let claim;
   try {
+    if (pilotLaunchContext) {
+      await recordPortalLaunchDiagnostic(service, {
+        event: PORTAL_LAUNCH_DIAGNOSTIC_EVENTS.PILOT_CLAIM_ATTEMPTED,
+        outcome: PORTAL_LAUNCH_DIAGNOSTIC_OUTCOMES.SUCCESS,
+        base44User,
+        binding,
+        accountId: link.account_id,
+        launchPass,
+        ...expectedPilot,
+        externalLinkCount: identityLinks.length,
+        pendingAdminSeatCount,
+        details: {
+          stage: 'seat_claim',
+          claim_route: 'verified_binding',
+          email_match_used: false,
+        },
+      });
+    }
     claim = pilotLaunchContext
       ? await claimPilotPortalAdministratorSeat({ service, base44User, binding, link })
-      : await resolveOrClaimPortalAdministratorMembership(service, base44User, link.account_id);
+      : await resolveAccountAdministratorMembership(service, base44User, link.account_id);
   } catch (claimError) {
+    const claimReason = String(claimError?.message || 'MEMBERSHIP_CLAIM_FAILED');
     await recordPortalLaunchDiagnostic(service, {
-      event: 'MEMBERSHIP_CLAIM_FAILED',
-      reason: String(claimError?.message || 'MEMBERSHIP_CLAIM_FAILED'),
+      event: pilotLaunchContext
+        ? PORTAL_LAUNCH_DIAGNOSTIC_EVENTS.PILOT_CLAIM_FAILED
+        : PORTAL_LAUNCH_DIAGNOSTIC_EVENTS.MEMBERSHIP_CLAIM_FAILED,
+      outcome: PORTAL_LAUNCH_DIAGNOSTIC_OUTCOMES.FAILURE,
+      reason: claimReason,
       base44User,
       binding,
       accountId: link.account_id,
+      launchPass,
+      ...expectedPilot,
+      externalLinkCount: identityLinks.length,
+      pendingAdminSeatCount,
+      failureReason: claimReason,
       details: {
+        stage: 'seat_claim',
         claim_route: pilotLaunchContext ? 'verified_binding' : 'invited_email_match',
       },
     });
@@ -396,13 +378,20 @@ export async function consumePilotPortalLaunch(base44, base44User, launchPass, {
 
   if (claim?.claimed) {
     await recordPortalLaunchDiagnostic(service, {
-      event: 'MEMBERSHIP_CLAIMED',
+      event: pilotLaunchContext
+        ? PORTAL_LAUNCH_DIAGNOSTIC_EVENTS.PILOT_CLAIM_SUCCEEDED
+        : PORTAL_LAUNCH_DIAGNOSTIC_EVENTS.MEMBERSHIP_CLAIMED,
       outcome: PORTAL_LAUNCH_DIAGNOSTIC_OUTCOMES.SUCCESS,
       base44User,
       binding,
       accountId: link.account_id,
       membershipId: claim.membership?.id || null,
+      launchPass,
+      ...expectedPilot,
+      externalLinkCount: identityLinks.length,
+      pendingAdminSeatCount,
       details: {
+        stage: 'seat_claim',
         claim_route: pilotLaunchContext ? 'verified_binding' : 'invited_email_match',
         email_match_used: !pilotLaunchContext,
         previous_user_id: claim.previousUserId || null,
@@ -414,7 +403,21 @@ export async function consumePilotPortalLaunch(base44, base44User, launchPass, {
     base44_user_id: base44User.id,
     target: PORTAL_TARGET,
   });
-  if (identities.length > 1) throw new Error('PORTAL_IDENTITY_AMBIGUOUS');
+  if (identities.length > 1) {
+    await recordPortalLaunchDiagnostic(service, {
+      event: 'PORTAL_IDENTITY_AMBIGUOUS',
+      outcome: PORTAL_LAUNCH_DIAGNOSTIC_OUTCOMES.FAILURE,
+      reason: 'PORTAL_IDENTITY_AMBIGUOUS',
+      base44User,
+      binding,
+      accountId: link.account_id,
+      launchPass,
+      ...expectedPilot,
+      failureReason: 'PORTAL_IDENTITY_AMBIGUOUS',
+      details: { stage: 'portal_identity', identity_count: identities.length },
+    });
+    throw new Error('PORTAL_IDENTITY_AMBIGUOUS');
+  }
   const existing = identities[0] || null;
   if (
     existing
@@ -424,6 +427,23 @@ export async function consumePilotPortalLaunch(base44, base44User, launchPass, {
       || existing.partner_profile_id !== binding.profile_id
     )
   ) {
+    await recordPortalLaunchDiagnostic(service, {
+      event: PORTAL_LAUNCH_DIAGNOSTIC_EVENTS.PORTAL_IDENTITY_CONFLICT,
+      outcome: PORTAL_LAUNCH_DIAGNOSTIC_OUTCOMES.FAILURE,
+      reason: 'PORTAL_IDENTITY_CONFLICT',
+      base44User,
+      binding,
+      accountId: link.account_id,
+      launchPass,
+      ...expectedPilot,
+      failureReason: 'PORTAL_IDENTITY_CONFLICT',
+      details: {
+        stage: 'portal_identity',
+        stored_external_subject: existing.external_subject || null,
+        stored_account_id: existing.account_id || null,
+        stored_profile_id: existing.partner_profile_id || null,
+      },
+    });
     throw new Error('PORTAL_IDENTITY_CONFLICT');
   }
 
@@ -439,6 +459,17 @@ export async function consumePilotPortalLaunch(base44, base44User, launchPass, {
     binding_expires_at: binding.expires_at,
     last_verified_at: new Date().toISOString(),
   };
+  await recordPortalLaunchDiagnostic(service, {
+    event: PORTAL_LAUNCH_DIAGNOSTIC_EVENTS.PORTAL_IDENTITY_CREATE_ATTEMPTED,
+    outcome: PORTAL_LAUNCH_DIAGNOSTIC_OUTCOMES.SUCCESS,
+    base44User,
+    binding,
+    accountId: link.account_id,
+    membershipId: claim?.membership?.id || null,
+    launchPass,
+    ...expectedPilot,
+    details: { stage: 'portal_identity', operation: existing ? 'update' : 'create' },
+  });
   const identity = existing
     ? await service.entities.PortalIdentity.update(existing.id, data)
     : await service.entities.PortalIdentity.create(data);
@@ -450,7 +481,10 @@ export async function consumePilotPortalLaunch(base44, base44User, launchPass, {
     binding,
     accountId: identity.account_id,
     membershipId: claim?.membership?.id || null,
+    launchPass,
+    ...expectedPilot,
     details: {
+      stage: 'portal_identity',
       operation: existing ? 'updated' : 'created',
       identity_id: identity.id,
       identity_authority: 'verified_launch_binding',
@@ -465,6 +499,24 @@ export async function consumePilotPortalLaunch(base44, base44User, launchPass, {
       external_account_name: binding.account_name,
     });
   }
+
+  await recordPortalLaunchDiagnostic(service, {
+    event: PORTAL_LAUNCH_DIAGNOSTIC_EVENTS.LAUNCH_COMPLETE,
+    outcome: PORTAL_LAUNCH_DIAGNOSTIC_OUTCOMES.SUCCESS,
+    base44User,
+    binding,
+    accountId: identity.account_id,
+    membershipId: claim?.membership?.id || null,
+    launchPass,
+    ...expectedPilot,
+    externalLinkCount: identityLinks.length,
+    pendingAdminSeatCount,
+    details: {
+      stage: 'launch_complete',
+      claim_route: pilotLaunchContext ? 'verified_binding' : 'invited_email_match',
+      seat_claimed: claim?.claimed === true,
+    },
+  });
 
   return {
     ok: true,

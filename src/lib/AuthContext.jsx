@@ -1,5 +1,6 @@
 import React, { createContext, useState, useContext, useEffect } from 'react';
 import { base44 } from '@/api/base44Client';
+import { portalLaunchRejectionMessage } from '@/components/account/portalLaunchFailureCopy';
 import { appParams } from '@/lib/app-params';
 import { createAxiosClient } from '@base44/sdk/dist/utils/axios-client';
 
@@ -123,7 +124,7 @@ export const AuthProvider = ({ children }) => {
             type: 'access_denied',
             message: reason === 'PORTAL_ACCOUNT_ASSIGNMENT_REQUIRED'
               ? 'The verified iCubed login is ready, but its Sound Proof administrator seat still needs to be assigned.'
-              : 'This Dealer Portal launch could not be verified. Return to the dealer page and try again.',
+              : portalLaunchRejectionMessage(reason),
           });
           setIsLoadingAuth(false);
           return;
