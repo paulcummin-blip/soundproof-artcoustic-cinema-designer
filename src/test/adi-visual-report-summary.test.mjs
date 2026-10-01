@@ -1,29 +1,34 @@
 // adi-visual-report-summary.test.mjs
 // ----------------------------------
-// The Visual Report presents a COMPLETED design. Its ADI Design Summary is
-// therefore strength-led:
+// The Visual Report presents a COMPLETED design and answers one question:
 //
-//   Intro (ADI has reviewed the completed design) · strength sentences ·
+//   "This is a strong design for this room because…"
+//
+//   Lead (the framing line) · body (how the layout suits the room and its
+//   seating, then the design's genuine strengths, then the balance statement) ·
 //   one Bass Optimiser review line when a result exists · closing pointer to
 //   the Technical Report.
 //
-// Short rule: the Visual Report sells the completed design, the Technical
-// Report explains the engineering, Bass Optimiser improves the design.
+// Short rule: the Visual Report says WHY this design works, the Technical
+// Report says HOW the engineering measures, Bass Optimiser says how to improve
+// it.
 //
 // These tests pin the product rules: no limiting factor, no parameter code or
-// level, no worst-affected seat, no "next step", no un-applied design advice,
-// no speculative improvement claim — and the engineering guidance block still
-// in place everywhere it belongs.
+// level, no worst-affected seat, no "next step", no speculative change, no
+// improvement promise — and the engineering guidance block still in place
+// everywhere it belongs.
 
 import { test, expect } from 'vitest';
 import fs from 'node:fs';
 import {
-  ADI_VISUAL_INTRO,
+  ADI_VISUAL_LEAD,
+  ADI_VISUAL_BALANCE,
   ADI_VISUAL_CLOSING,
   ADI_VISUAL_NO_STRENGTHS_FALLBACK,
   ADI_VISUAL_OPTIMISER_REVIEWED,
   ADI_VISUAL_STRENGTH_SENTENCES,
   ADI_VISUAL_PARAGRAPH_LIMIT,
+  buildRoomSentence,
   buildStrengthSentences,
   buildAdiVisualReportSummary,
   resolveOptimiserStatusLine,
@@ -43,6 +48,12 @@ const VISUAL_PAGE = read('src/components/report/client/ClientAdiDesignSummary.js
 const REPORT_PAGE = read('src/pages/RP22ClientReport.jsx');
 const LONG_BLOCK = read('src/components/adi/designGuidance/AdiDesignGuidanceBlock.jsx');
 const TECHNICAL = read('src/components/report/technical/TechnicalAdiAssessment.jsx');
+
+/** The published room context the report page hands the block. */
+const CONTEXT = {
+  roomDims: { widthM: 4.5, lengthM: 6, heightM: 2.4 },
+  seatCount: 8,
+};
 
 /** The published engineering summary shape the strengths selector reads. */
 const engineeringSummary = ({ room = {}, seat = {} } = {}) => ({
@@ -64,32 +75,37 @@ const summaryText = (summary) =>
 const strengthsFor = (fixture) =>
   selectClientAdiStrengths(engineeringSummary(fixture), { limit: 6 });
 
+const build = (fixture, options = {}) =>
+  buildAdiVisualReportSummary({
+    strengths: strengthsFor(fixture),
+    context: CONTEXT,
+    ...options,
+  });
+
 /* ── Shape ────────────────────────────────────────────────────────────── */
 
-test('the Visual Report summary is an ADI review of the completed design', () => {
-  const summary = buildAdiVisualReportSummary({ strengths: strengthsFor({ room: { 14: 'L4' } }) });
+test('the Visual Report summary answers why this is a strong design for this room', () => {
+  const summary = build({ room: { 14: 'L4' } });
 
   expect(summary.heading).toBe('ADI Design Summary');
   expect(Object.keys(summary)).toEqual([
     'heading',
-    'intro',
+    'lead',
     'body',
     'optimiserStatus',
     'closing',
   ]);
-  expect(summary.intro).toBe(ADI_VISUAL_INTRO);
-  expect(summary.intro).toMatch(/has reviewed the completed cinema design/);
-  expect(summary.intro).toMatch(/strongest engineering qualities/);
-  expect(summary.closing).toBe(ADI_VISUAL_CLOSING);
-  expect(summary.closing).toMatch(/present[^.]*as assessed/i);
-  expect(summary.closing).toMatch(/Technical Report/);
+  expect(summary.lead).toBe(ADI_VISUAL_LEAD);
+  expect(summary.lead).toBe('This is a strong design for this room because:');
   expect(summary.optimiserStatus).toBeNull();
-  // Short: a summary of the design, not a re-flow of the engineering guidance.
-  expect(summaryText(summary).length).toBeLessThan(700);
+  expect(summary.closing).toBe(ADI_VISUAL_CLOSING);
+  expect(summary.closing).toMatch(/Technical Report/);
+  // A summary of the design, not a re-flow of the engineering guidance.
+  expect(summaryText(summary).length).toBeLessThan(900);
 });
 
 test('no limitations report shape survives on the Visual Report', () => {
-  const summary = buildAdiVisualReportSummary({ strengths: strengthsFor({ room: { 14: 'L4' } }) });
+  const summary = build({ room: { 14: 'L4' } });
 
   expect(summary.primaryLimitation).toBeUndefined();
   expect(summary.currentResult).toBeUndefined();
@@ -98,43 +114,39 @@ test('no limitations report shape survives on the Visual Report', () => {
   expect(summary.nextStep).toBeUndefined();
 });
 
-/* ── Strength-led vocabulary ───────────────────────────────────────────── */
+/* ── Project-specific framing ─────────────────────────────────────────── */
 
-test('the summary never leads with a limitation, a level or a next step', () => {
-  const text = summaryText(buildAdiVisualReportSummary({
-    strengths: strengthsFor({
-      room: { 14: 'L4', 18: 'L3' },
-      seat: { p4: 'L3', p20: 'L1', p19: 'L2' },
-    }),
-  }));
+test('the layout sentence uses the published room and seating, never invented numbers', () => {
+  expect(buildRoomSentence(CONTEXT))
+    .toContain('4.5 m × 6.0 m × 2.4 m');
+  expect(buildRoomSentence(CONTEXT)).toContain('8 seating positions');
+  expect(buildRoomSentence(CONTEXT)).toMatch(/rather than fighting them/);
 
-  [
-    'Primary limitation',
-    'Primary limitation:',
-    'Worst affected',
-    'Next step',
-    'Use Bass Optimiser',
-    'in the design workflow',
-    'before finalising',
-    'before finalizing',
-    'could be improved',
-    'limitation',
-  ].forEach((phrase) => expect(text).not.toContain(phrase));
+  // Unknown geometry loses the dimension clause rather than guessing.
+  expect(buildRoomSentence({ seatCount: 8 })).not.toMatch(/\dm/);
+  expect(buildRoomSentence({ seatCount: 8 })).toContain('8 seating positions');
+  expect(buildRoomSentence({})).toContain('the space available');
 
-  // No parameter code, no performance level, no worst-case language.
-  expect(text).not.toMatch(/\bP\d{1,2}\b/);
-  expect(text).not.toMatch(/\bL[1-4]\b/);
-  expect(text).not.toMatch(/worst/i);
-  expect(text).not.toMatch(/fail/i);
+  // A single seat reads correctly.
+  expect(buildRoomSentence({ seatCount: 1 })).toContain('1 seating position it has to serve');
+  expect(buildRoomSentence({ seatCount: 1 })).not.toMatch(/positions/);
+});
+
+test('the body opens with the room and closes with the balance statement', () => {
+  const summary = build({ room: { 14: 'L4' } });
+
+  expect(summary.body[0]).toContain('4.5 m × 6.0 m × 2.4 m');
+  expect(summary.body[summary.body.length - 1]).toBe(ADI_VISUAL_BALANCE);
+  expect(ADI_VISUAL_BALANCE).toMatch(/architectural constraints/);
+  expect(ADI_VISUAL_BALANCE).toMatch(/practical to install and credible to calibrate/);
 });
 
 test('only genuinely strong parameters are described', () => {
   // P20 L1 (the reported weak result) and P19 L2 are NOT strengths.
-  const strengths = strengthsFor({
+  const summary = build({
     room: { 14: 'L4', 12: 'L3' },
     seat: { p4: 'L3', p20: 'L1', p19: 'L2' },
   });
-  const summary = buildAdiVisualReportSummary({ strengths });
   const text = summaryText(summary);
 
   expect(text).toContain('strong low-frequency output capability');
@@ -148,17 +160,12 @@ test('only genuinely strong parameters are described', () => {
 });
 
 test('the strongest qualities lead, and the paragraph stays short', () => {
-  const strengths = [
-    { number: 14 },
-    { number: 4 },
-    { number: 18 },
-    { number: 6 },
-  ];
-  const summary = buildAdiVisualReportSummary({ strengths });
+  const strengths = [{ number: 14 }, { number: 4 }, { number: 18 }, { number: 6 }];
+  const summary = buildAdiVisualReportSummary({ strengths, context: CONTEXT });
 
-  expect(summary.body).toHaveLength(ADI_VISUAL_PARAGRAPH_LIMIT);
-  expect(summary.body[0]).toBe(ADI_VISUAL_STRENGTH_SENTENCES[14]);
-  expect(summary.body[1]).toBe(ADI_VISUAL_STRENGTH_SENTENCES[4]);
+  expect(summary.body).toHaveLength(ADI_VISUAL_PARAGRAPH_LIMIT + 2); // room + 3 strengths + balance
+  expect(summary.body[1]).toBe(ADI_VISUAL_STRENGTH_SENTENCES[14]);
+  expect(summary.body[2]).toBe(ADI_VISUAL_STRENGTH_SENTENCES[4]);
   expect(buildStrengthSentences(strengths, 1)).toEqual([ADI_VISUAL_STRENGTH_SENTENCES[14]]);
   expect(buildStrengthSentences(null)).toEqual([]);
 });
@@ -167,22 +174,53 @@ test('a design with no strength-band result still reads as assessed, not as fail
   const strengths = strengthsFor({ seat: { p20: 'L1', p19: 'L1', p6: 'L1' } });
   expect(strengths).toEqual([]);
 
-  const summary = buildAdiVisualReportSummary({ strengths });
-  expect(summary.body).toEqual([ADI_VISUAL_NO_STRENGTHS_FALLBACK]);
+  const summary = buildAdiVisualReportSummary({ strengths, context: CONTEXT });
+  expect(summary.body).toContain(ADI_VISUAL_NO_STRENGTHS_FALLBACK);
 
   const text = summaryText(summary);
-  expect(text).not.toMatch(/limitation|weaker|weak|fail|improv|optimis/i);
+  expect(text).not.toMatch(/limitation|weaker|weak result|fail|improv|optimis/i);
   expect(text).toMatch(/assessed in full/);
   expect(text).toMatch(/reported on the following pages/);
 });
 
 test('no strengths supplied at all means no block', () => {
-  // A caller with no strengths to offer gets no block at all.
   expect(buildAdiVisualReportSummary({ strengths: null })).toBeNull();
-  // No strengths selected is a real answer: the design is assessed, just not
-  // graded strong on any published parameter.
-  expect(buildAdiVisualReportSummary({}).body).toEqual([ADI_VISUAL_NO_STRENGTHS_FALLBACK]);
-  expect(buildAdiVisualReportSummary({ strengths: [] }).body).toEqual([ADI_VISUAL_NO_STRENGTHS_FALLBACK]);
+  expect(buildAdiVisualReportSummary({}).body).toContain(ADI_VISUAL_NO_STRENGTHS_FALLBACK);
+});
+
+/* ── Strength-led vocabulary ───────────────────────────────────────────── */
+
+test('the summary never leads with a limitation, a level or a next step', () => {
+  const text = summaryText(build({
+    room: { 14: 'L4', 18: 'L3' },
+    seat: { p4: 'L3', p20: 'L1', p19: 'L2' },
+  }));
+
+  [
+    'Primary limitation',
+    'Worst affected',
+    'Next step',
+    'Use Bass Optimiser',
+    'in the design workflow',
+    'before finalising',
+    'before finalizing',
+    'could be improved',
+    'This could be improved',
+    'Move the subs',
+    'Move the seats',
+    'Expected to reach',
+    'limitation',
+  ].forEach((phrase) => expect(text).not.toContain(phrase));
+
+  // No parameter code, no performance level, no worst-case or prediction language.
+  expect(text).not.toMatch(/\bP\d{1,2}\b/);
+  expect(text).not.toMatch(/\bL[1-4]\b/);
+  expect(text).not.toMatch(/worst/i);
+  expect(text).not.toMatch(/fail/i);
+  expect(text).not.toMatch(/expect/i);
+
+  // Every strength sentence is itself free of parameter codes and levels.
+  expect(Object.values(ADI_VISUAL_STRENGTH_SENTENCES).join(' ')).not.toMatch(/\bP\d{1,2}\b|\bL[1-4]\b/);
 });
 
 /* ── Bass Optimiser line ──────────────────────────────────────────────── */
@@ -210,8 +248,6 @@ test('a completed optimiser review is stated as a review, never as pending work'
   expect(resolveOptimiserStatusLine(applied)).toBe(ADI_VISUAL_OPTIMISER_REVIEWED);
   expect(resolveOptimiserStatusLine(plan)).toBe(ADI_VISUAL_OPTIMISER_REVIEWED);
   expect(resolveOptimiserStatusLine(nothingToApply)).toBe(ADI_VISUAL_OPTIMISER_REVIEWED);
-  expect(ADI_VISUAL_OPTIMISER_REVIEWED)
-    .toBe('Bass Optimiser has reviewed the subwoofer layout as part of the design process.');
   expect(ADI_VISUAL_OPTIMISER_REVIEWED).not.toMatch(/worth applying|panel|may be considered/i);
 });
 
@@ -229,13 +265,14 @@ test('a failed or incomplete run tells the client nothing', () => {
 /* ── The copy module carries no design action ─────────────────────────── */
 
 test('the module can no longer name a next step or offer design advice', () => {
+  expect(COPY).toMatch(/ADI_VISUAL_LEAD/);
   expect(COPY).toMatch(/ADI_VISUAL_OPTIMISER_REVIEWED/);
   expect(COPY).not.toMatch(/ADI_VISUAL_NEXT_STEP/);
   expect(COPY).not.toMatch(/before finalising/);
   expect(COPY).not.toMatch(/worth applying/);
   expect(COPY).not.toMatch(/may be considered/);
+  expect(COPY).not.toMatch(/Expected to reach|Move the sub|Move the seat/);
   expect(COPY).not.toMatch(/GUIDANCE_LABELS|changeFirst|expectedImprovement|lowerValueChanges|remainingLimitation/);
-  expect(COPY).not.toMatch(/re-place|move the seating/i);
   expect(COPY).not.toMatch(/buildAdiDesignGuidance/);
 });
 
@@ -244,14 +281,19 @@ test('the module can no longer name a next step or offer design advice', () => {
 test('the Visual Report renders the strength-led summary, not the guidance block', () => {
   expect(VISUAL_PAGE).toMatch(/import ClientAdiVisualSummary from "\.\/ClientAdiVisualSummary"/);
   expect(VISUAL_PAGE).toMatch(/<ClientAdiVisualSummary/);
-  expect(VISUAL_PAGE).not.toMatch(/AdiDesignGuidanceBlock/);
+  expect(VISUAL_PAGE).toMatch(/Why this design is strong for this room/);
   expect(VISUAL_PAGE).toMatch(/Where this design is strong/);
+  expect(VISUAL_PAGE).toMatch(/seats=\{seats\}/);
+  expect(VISUAL_PAGE).toMatch(/geometry=\{geometry\}/);
+  expect(VISUAL_PAGE).toMatch(/system=\{system\}/);
+  expect(VISUAL_PAGE).not.toMatch(/AdiDesignGuidanceBlock/);
 });
 
-test('the summary block is presentation only: published strengths, no guidance maths', () => {
+test('the summary block is presentation only: published strengths and room, no guidance maths', () => {
   expect(SUMMARY_BLOCK).toMatch(/buildAdiVisualReportSummary/);
   expect(SUMMARY_BLOCK).toMatch(/selectClientAdiStrengths/);
   expect(SUMMARY_BLOCK).toMatch(/useOptimiserPlanAuthority\(projectId, versionId\)/);
+  expect(SUMMARY_BLOCK).toMatch(/geometry\?\.roomDims/);
   expect(SUMMARY_BLOCK).not.toMatch(/buildAdiDesignGuidance/);
   expect(SUMMARY_BLOCK).not.toMatch(/Primary limitation|Worst affected|Next step|primaryLimitation/);
   expect(SUMMARY_BLOCK).not.toMatch(/changeFirst|expectedImprovement|lowerValueChanges/);

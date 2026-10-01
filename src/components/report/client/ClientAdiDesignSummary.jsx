@@ -6,7 +6,7 @@
  * One client-facing section that presents what Artcoustic Design Intelligence
  * contributes to this COMPLETED design:
  *   - the project-specific strengths the design genuinely achieves
- *   - the ADI review of the completed design, in the design's strongest terms
+ *   - why the selected design works for this room, in the design's own terms
  *
  * The Visual Report presents a finished design, so the section is strength-led:
  * it never leads with a limiting factor, a parameter level, a worst-affected
@@ -162,10 +162,13 @@ export default function ClientAdiDesignSummary({
             color: COLORS.label,
             marginBottom: 8,
           }}>
-            Design strengths and interpretation
+            Why this design is strong for this room
           </div>
           <ClientAdiVisualSummary
             engineeringSummary={engineeringSummary}
+            seats={seats}
+            geometry={geometry}
+            system={system}
             projectId={projectId}
             versionId={versionId}
           />
