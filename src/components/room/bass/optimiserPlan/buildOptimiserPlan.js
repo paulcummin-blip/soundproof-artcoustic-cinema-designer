@@ -471,7 +471,7 @@ export function buildOptimiserPlan({
   }
   if (components.inseparable.length > 1) {
     planNotes.push(
-      `The combined candidate was evaluated as one change (${components.inseparable.join(" + ")}); those parts are not offered as separate changes.`,
+      `The combined candidate was evaluated as one change (${components.inseparable.join(" + ")}); those parts are recorded as one combined change.`,
     );
   }
   if (components.calibrationRetuned && components.tuningUnchanged) {

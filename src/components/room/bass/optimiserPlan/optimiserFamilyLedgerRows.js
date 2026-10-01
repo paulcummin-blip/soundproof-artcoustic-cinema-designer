@@ -71,9 +71,9 @@ export const ADI_ROW_OUTCOME = Object.freeze({
   TRADE_OFF: "Trade-off — improves one measure and worsens another. No automatic apply",
   /**
    * A real, measured improvement that this run cannot offer, because the change
-   * that produced it was not kept with the run. Replaces the old
-   * "Improvement found — not offered for application": the improvement is stated
-   * WITH the reason and the row's action states the next step.
+   * that produced it was not kept with the run. The improvement is stated WITH
+   * the reason it cannot be applied, and the row's action states the next step —
+   * a measured improvement is never withheld without a reason.
    */
   NOT_RETAINED: "Improvement measured, but no applicable change was kept by this run",
   NO_BETTER_LAYOUT: "No better layout found",
@@ -172,15 +172,19 @@ function changeMagnitudeDb(delta) {
   return !text || text === "no meaningful change" ? null : text;
 }
 
-/** "improves P20 by 4 dB" — the measured effect, in whole numbers only. */
-function measuredImprovementText(attempt) {
+/**
+ * The outcome for a real improvement the run kept no change for:
+ * "Measured improvement (P20 better by 3 dB) — no applicable change was kept by
+ * this run". States the improvement, states the reason, states the next step.
+ */
+function notRetainedText(attempt) {
   const parts = [];
   const p20 = changeMagnitudeDb(attempt?.p20DeltaDb);
   const p19 = changeMagnitudeDb(attempt?.p19DeltaDb);
-  if (p20) parts.push(`P20 by ${p20}`);
-  if (p19) parts.push(`P19 by ${p19}`);
-  if (!parts.length) return null;
-  return `improves ${parts.join(" and ")}`;
+  if (p20) parts.push(`P20 better by ${p20}`);
+  if (p19) parts.push(`P19 better by ${p19}`);
+  if (!parts.length) return ADI_ROW_OUTCOME.NOT_RETAINED;
+  return `Measured improvement (${parts.join(", ")}) — no applicable change was kept with this run`;
 }
 
 function testedOutcome(entry, baseline) {
@@ -212,12 +216,9 @@ function testedOutcome(entry, baseline) {
     // A genuine improvement. It is offered as a recommendation by the row that
     // carries the change; here the run kept the measured effect only, so the
     // improvement is stated WITH the reason it cannot be applied.
-    const measured = measuredImprovementText(attempt);
     return {
       status: ADI_ROW_STATUS.TESTED,
-      outcome: measured
-        ? `This run measured an improvement — it ${measured}, but no applicable change was kept`
-        : ADI_ROW_OUTCOME.NOT_RETAINED,
+      outcome: notRetainedText(attempt),
       actionText: ADI_ROW_ACTION.RERUN_TO_APPLY,
     };
   }

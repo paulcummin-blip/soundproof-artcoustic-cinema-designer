@@ -223,7 +223,7 @@ function leverFamily({
       status: OPTIMISER_FAMILY_STATUS.EVALUATED,
       candidatesEvaluated: confirmedCount(stage),
       reason: stageReason(stage) || reasonFallback
-        || "Evaluated, but the run retained no attempt value for this search.",
+        || "Evaluated — no comparison value was kept for this search.",
       current,
     });
   }
@@ -357,7 +357,7 @@ export function buildFamilyLedger({ selection = null, diagnostics = null, curren
     candidatesEvaluated: positionPhases.length ? positionConfirmed : null,
     bestAttempt: positionPhases.length ? positionAttempt : null,
     reason: positionPhases.length
-      ? (positionAttempt ? OPTIMISER_FAMILY_NO_WINNER_REASON : "Evaluated, but the run retained no attempt value for this search.")
+      ? (positionAttempt ? OPTIMISER_FAMILY_NO_WINNER_REASON : "Evaluated — no comparison value was kept for this search.")
       : OPTIMISER_FAMILY_NOT_TESTED_REASON,
     current,
   }));
@@ -403,7 +403,7 @@ export function buildFamilyLedger({ selection = null, diagnostics = null, curren
       ? issueText(seatingIssue)
       : (seatingAttempt ? OPTIMISER_FAMILY_NO_WINNER_REASON
         : (seatingTested
-          ? "Evaluated, but the run retained no attempt value for this search."
+          ? "Evaluated — no comparison value was kept for this search."
           : "Not searched — listener movement is a last resort, tried only once the electronic and placement options are exhausted.")),
     current,
   }));

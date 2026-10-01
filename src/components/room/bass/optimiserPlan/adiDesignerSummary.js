@@ -21,7 +21,12 @@
 
 import { OPTIMISER_EVIDENCE_STATUS_LABEL } from "./optimiserPlanConstants.js";
 import { leverLabel, OPTIMISER_FAMILY_SEQUENCE } from "./optimiserLeverOrder.js";
-import { describeLeverEffect, resolveLimitingMetric } from "./optimiserLeverVerdict.js";
+import {
+  OPTIMISER_LEVER_VERDICT,
+  describeLeverEffect,
+  resolveLeverVerdict,
+  resolveLimitingMetric,
+} from "./optimiserLeverVerdict.js";
 import { deltaText, deviationText, frequencyText, levelText } from "./optimiserWholeNumberDb.js";
 import { leverIsOfferable } from "./optimiserPlanSave.js";
 import { estimateOptimiserCalculations, resultSentence } from "./optimiserCalculationEstimate.js";
@@ -222,6 +227,9 @@ export function buildTestedOptionRows(
         status: familyRow.status,
         outcome: familyRow.outcome,
         action: null,
+        // A row that cannot be applied says what to do about it ("Re-run to
+        // apply") rather than leaving the action column unexplained.
+        actionText: familyRow.actionText || null,
       };
     }
 
@@ -289,17 +297,69 @@ export function buildTestedOptionRows(
       };
     }
 
-    // Evaluated but not the recommendation: state the honest short outcome.
+    // Evaluated but not the change the card applies: the lever's OWN verdict
+    // word, so a rejected or trade-off change is never shown as a plain "Tested"
+    // row with only a number beside it.
+    const leverVerdict = resolveLeverVerdict({
+      effect: row?.effect || null,
+      baseline: planView?.baseline || null,
+      tested: true,
+    });
     const phrase = row?.seating?.movementLabel
       || shortPhrase(describeLeverEffect(row?.effect))
       || shortPhrase(row?.reason)
-      || OPTIMISER_EVIDENCE_STATUS_LABEL?.[row?.evidenceStatus]
       || null;
+
+    if (leverVerdict.verdict === OPTIMISER_LEVER_VERDICT.REJECTED) {
+      return { key, label, status: ADI_ROW_STATUS.REJECTED, outcome: leverVerdict.summary, action: null };
+    }
+    if (leverVerdict.verdict === OPTIMISER_LEVER_VERDICT.TRADE_OFF) {
+      return { key, label, status: ADI_ROW_STATUS.TRADE_OFF, outcome: leverVerdict.summary, action: null };
+    }
+    if (leverVerdict.verdict === OPTIMISER_LEVER_VERDICT.RECOMMENDED) {
+      // A genuine improvement that is not the one change the card applies.
+      if (row?.validation?.destinationsValid === false) {
+        return {
+          key,
+          label,
+          status: ADI_ROW_STATUS.REJECTED,
+          outcome: `Rejected — the destination positions could not be confirmed as safe${
+            row?.validation?.reason ? `: ${shortPhrase(row.validation.reason, 60)}` : ""
+          }`,
+          action: null,
+        };
+      }
+      const offerableCount = (Array.isArray(planView?.levers) ? planView.levers : [])
+        .filter((candidate) => leverIsOfferable(candidate, planView?.baseline || null)).length;
+      return {
+        key,
+        label,
+        status: ADI_ROW_STATUS.RECOMMENDED,
+        outcome: phrase || leverVerdict.summary,
+        action: null,
+        actionText: offerableCount > 1 ? "Apply one at a time" : null,
+      };
+    }
+    if (leverVerdict.verdict === OPTIMISER_LEVER_VERDICT.NOT_APPLICABLE) {
+      return {
+        key,
+        label,
+        status: ADI_ROW_STATUS.TESTED,
+        outcome: shortPhrase(row?.reason) || leverVerdict.summary,
+        action: null,
+      };
+    }
+
+    // Evaluated, inside the action threshold: the fixed "no useful improvement"
+    // outcome states the threshold itself rather than leaving a bare number.
     return {
       key,
       label,
       status: ADI_ROW_STATUS.TESTED,
-      outcome: phrase || ADI_ROW_OUTCOME.NO_USEFUL,
+      outcome: row?.seating?.movementLabel
+        || leverVerdict.summary
+        || phrase
+        || ADI_ROW_OUTCOME.NO_USEFUL,
       action: null,
     };
   });
@@ -314,25 +374,29 @@ export function buildTestedOptionRows(
  * improvement is at least 1 dB.
  */
 export function resolveApplyPermission({ planView, presentation, recommendedLever }) {
-  if (!recommendedLever) return { allowed: false, reason: "no_recommendation" };
-  if (presentation?.showApply !== true) return { allowed: false, reason: "state_not_applicable" };
+  if (!recommendedLever) {
+    return { allowed: false, reason: "No single evaluated change is available to apply." };
+  }
+  if (presentation?.showApply !== true) {
+    return { allowed: false, reason: "There is nothing safe to apply in the current optimisation state." };
+  }
   if (planView?.status !== "current" && planView?.status !== undefined && String(planView?.status) !== "current") {
-    return { allowed: false, reason: "plan_not_current" };
+    return { allowed: false, reason: "This optimisation result belongs to an earlier design state — re-run ADI before applying any change." };
   }
   if (planView?.individualEffectsEvaluated !== true) {
-    return { allowed: false, reason: "individual_effects_not_evaluated" };
+    return { allowed: false, reason: "No lever was evaluated on its own, so no change can be applied independently." };
   }
 
   const row = findLeverRow(planView, recommendedLever);
   if (!row || row.evaluated !== true || !Array.isArray(row.changes) || row.changes.length === 0) {
-    return { allowed: false, reason: "changes_not_evaluated" };
+    return { allowed: false, reason: "The change behind this result was not kept, so it cannot be applied." };
   }
 
   const limiting = String(resolveLimitingMetric(planView?.baseline) || "");
   if (limiting.includes("20")) {
     const improvement = Number(row?.effect?.p20DeltaDb ?? NaN);
     if (Number.isFinite(improvement) && Math.abs(improvement) < 1) {
-      return { allowed: false, reason: "below_materiality" };
+      return { allowed: false, reason: "The improvement is below the 1 dB action threshold, so no change is applied." };
     }
   }
 

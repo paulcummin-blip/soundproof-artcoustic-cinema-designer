@@ -3,14 +3,21 @@
 // What a lever's own evaluated effect actually means, stated plainly.
 //
 // Product rule: a lever that makes the limiting result worse is NEVER presented
-// as an applyable recommendation. Only these outcomes exist:
+// as an applyable recommendation. Every lever row uses exactly one of these six
+// outcomes:
 //
-//   Recommended     — improves the limiting result and damages nothing required
-//   Trade-off       — improves the limiting result but worsens a named metric
-//   Rejected        — makes the limiting result (or seat-to-seat consistency) worse
-//   No improvement  — evaluated, nothing worth applying
-//   Not tested      — never evaluated, reason stated
-//   Not applicable  — no individually evaluated effect exists to apply
+//   Recommended                     improves the limiting result, damages nothing,
+//                                   and is independently applyable
+//   Trade-off                       improves P20 but worsens another meaningful
+//                                   metric — never applied automatically
+//   Tested — no useful improvement  the improvement is below the 1 dB action
+//                                   threshold
+//   Rejected — worsens the result   it worsens P20 or the stated limiting issue
+//   Not yet supported               the optimiser cannot currently evaluate it
+//   Compare separately              subwoofer model / quantity, out of this run
+//
+// The card never says "not offered", "not available", "not tested",
+// "not evaluated" or "retained no attempt value".
 //
 // READ-ONLY: it reads the effect the optimiser already measured. It evaluates
 // nothing, scores nothing, recalculates nothing, and changes no bass maths.
@@ -78,6 +85,9 @@ const improving = (delta) => delta != null && delta <= -MATERIAL_DB;
 /** Human name of a metric, for trade-off copy. */
 const metricName = (key) => (key === "p19" ? "P19 consistency" : "P20 consistency");
 
+/** The short metric name: P20 or P19. */
+const metricShortName = (key) => (key === "p19" ? "P19" : "P20");
+
 /**
  * The verdict for one lever, from its OWN evaluated effect.
  *
@@ -121,7 +131,7 @@ export function resolveLeverVerdict({
       ...base,
       verdict: OPTIMISER_LEVER_VERDICT.NOT_APPLICABLE,
       label: OPTIMISER_LEVER_VERDICT_LABEL[OPTIMISER_LEVER_VERDICT.NOT_APPLICABLE],
-      summary: "No individually evaluated result exists for this lever, so it is not offered for separate application.",
+      summary: "No individually evaluated result exists for this lever — its value comes from the combined candidate.",
     };
   }
 
@@ -155,7 +165,7 @@ export function resolveLeverVerdict({
       ...base,
       verdict: OPTIMISER_LEVER_VERDICT.TRADE_OFF,
       label: OPTIMISER_LEVER_VERDICT_LABEL[OPTIMISER_LEVER_VERDICT.TRADE_OFF],
-      summary: `Trade-off — improves ${limiting.label} but worsens ${damaged} by ${deltaText(Math.abs(damagedDelta))}.`,
+      summary: `Trade-off — improves ${metricShortName(limiting.key)} but worsens ${damaged} by ${deltaText(Math.abs(damagedDelta))}. No automatic apply.`,
       applyAllowed: true,
     };
   }
@@ -174,7 +184,7 @@ export function resolveLeverVerdict({
     ...base,
     verdict: OPTIMISER_LEVER_VERDICT.NO_IMPROVEMENT,
     label: OPTIMISER_LEVER_VERDICT_LABEL[OPTIMISER_LEVER_VERDICT.NO_IMPROVEMENT],
-    summary: "Tested — the best attempt produced no useful improvement, so nothing is offered for application.",
+    summary: "Tested — no useful improvement: the best attempt stayed inside the 1 dB action threshold, so no change is recommended.",
   };
 }
 

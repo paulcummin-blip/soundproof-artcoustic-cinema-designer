@@ -36,10 +36,19 @@ import {
 } from '../components/room/bass/optimiserPlan/adiDesignerSummary.js';
 import { OPTIMISER_PLAN_VERSION } from '../components/room/bass/optimiserPlan/optimiserPlanConstants.js';
 import {
+  ADI_ROW_ACTION,
   ADI_ROW_OUTCOME,
   ADI_ROW_STATUS,
   buildFamilyLedgerRows,
 } from '../components/room/bass/optimiserPlan/optimiserFamilyLedgerRows.js';
+
+/**
+ * Copy the Bass Optimisation card must never carry: a measured improvement is
+ * never withheld without a reason, and a search that ran is never described as
+ * one that did not.
+ */
+const BANNED_COPY =
+  /not offered|improvement found|retained no attempt|no attempt value|not available|not evaluated|not tested/i;
 import {
   MIN_VALID_FREQUENCY_HZ,
   frequencyText,
@@ -169,16 +178,24 @@ test('the saved run evidence carries a per-family ledger', () => {
 test('no row states "Not tested", "Not evaluated" or "Not available"', () => {
   const summary = summaryFor(terminalPlanView());
   assert.equal(summary.rows.length, 9, 'eight families plus absorption');
-  const forbidden = /not tested|not evaluated|not available/i;
   assert.ok(
-    !summary.rows.some((row) => forbidden.test(`${row.status} ${row.outcome || ''}`)),
-    'no row carries forbidden copy after a run',
+    !summary.rows.some((row) => BANNED_COPY.test(`${row.status} ${row.outcome || ''}`)),
+    'no row carries banned copy after a run',
   );
   assert.deepEqual(
-    Object.values(ADI_ROW_STATUS).filter((status) => forbidden.test(status)),
+    Object.values(ADI_ROW_STATUS).filter((status) => BANNED_COPY.test(status)),
     [],
-    'the ledger vocabulary itself contains none of the forbidden phrases',
+    'the ledger vocabulary itself contains none of the banned phrases',
   );
+});
+
+test('no lever outcome or action word carries banned copy', () => {
+  const copy = [
+    ...Object.values(ADI_ROW_STATUS),
+    ...Object.values(ADI_ROW_OUTCOME),
+    ...Object.values(ADI_ROW_ACTION),
+  ];
+  assert.deepEqual(copy.filter((text) => BANNED_COPY.test(text)), []);
 });
 
 test('delay, gain and placement state the run’s real outcome', () => {
@@ -186,11 +203,72 @@ test('delay, gain and placement state the run’s real outcome', () => {
   ['Delay', 'Gain', 'Placement'].forEach((label) => {
     const row = rowFor(summary, label);
     assert.equal(row.status, ADI_ROW_STATUS.TESTED, `${label} was tested`);
-    assert.equal(row.outcome, ADI_ROW_OUTCOME.NO_USEFUL, `${label} states no useful improvement`);
+    assert.match(row.outcome, /no useful improvement/i, `${label} states no useful improvement`);
   });
   // The evidence behind those rows is the families the run confirmed.
   const tested = (summary.rows || []).filter((row) => row.status === ADI_ROW_STATUS.TESTED).map((row) => row.label);
   assert.deepEqual(tested, ['Delay', 'Gain', 'Placement']);
+});
+
+// ── The four outcomes a placement row may state ──────────────────────────────
+
+/** One placement family row, from evidence shaped like a saved run's. */
+const placementRow = (bestAttempt) => buildFamilyLedgerRows({
+  families: [{
+    family: 'placement',
+    status: 'rejected',
+    tested: true,
+    candidatesEvaluated: 4,
+    bestAttempt,
+    reason: 'Evaluated, but no candidate from this family was confirmed as a winner.',
+  }],
+  baseline: null,
+})?.placement || null;
+
+test('a measured improvement that could not be kept states it, with the next step', () => {
+  // The saved Marquee Home placement attempt, exactly: P20 −3.91 dB, P19 −0.62 dB.
+  const row = placementRow({
+    candidateId: 'practical-wall-front-single-33%',
+    p20VariationDb: 14.521646809802334,
+    p20Level: 1,
+    p19VariationDb: 0.38570478768849625,
+    p19Level: 4,
+    p14Db: 125.11946050257433,
+    p20DeltaDb: -3.91,
+    p19DeltaDb: -0.62,
+    p14DeltaDb: null,
+  });
+  assert.equal(row.status, ADI_ROW_STATUS.TESTED);
+  assert.match(row.outcome, /Measured improvement/i, 'the improvement is stated');
+  assert.match(row.outcome, /P20 better by 3 dB/, 'in whole numbers, never overstated');
+  assert.match(row.outcome, /no applicable change was kept/i, 'with the reason it cannot be applied');
+  assert.equal(row.actionText, ADI_ROW_ACTION.RERUN_TO_APPLY, 'and the next step');
+  assert.ok(!BANNED_COPY.test(`${row.status} ${row.outcome} ${row.actionText}`), 'no banned copy');
+});
+
+test('an improvement below the action threshold says so instead of a bare number', () => {
+  const row = placementRow({ p20DeltaDb: -0.4, p19DeltaDb: 0.2, p20VariationDb: 13 });
+  assert.equal(row.status, ADI_ROW_STATUS.TESTED);
+  assert.equal(row.outcome, ADI_ROW_OUTCOME.NO_USEFUL_BELOW_THRESHOLD);
+  assert.match(row.outcome, /no useful improvement/i);
+  assert.match(row.outcome, /below the 1 dB action threshold/i);
+});
+
+test('a trade-off is labelled a trade-off and is never applied automatically', () => {
+  const row = placementRow({ p20DeltaDb: -4, p19DeltaDb: 2, p20VariationDb: 12 });
+  assert.equal(row.status, ADI_ROW_STATUS.TRADE_OFF);
+  assert.match(row.outcome, /improves P20 but worsens P19 consistency by 2 dB/i);
+  assert.match(row.outcome, /no automatic apply/i);
+  assert.equal(row.action ?? null, null, 'a trade-off never carries an Apply action');
+  assert.ok(!BANNED_COPY.test(`${row.status} ${row.outcome}`), 'no banned copy');
+});
+
+test('a lever that worsens the result is rejected, in whole numbers', () => {
+  const row = placementRow({ p20DeltaDb: 2.4, p19DeltaDb: -1, p20VariationDb: 12 });
+  assert.equal(row.status, ADI_ROW_STATUS.REJECTED);
+  assert.match(row.outcome, /rejected/i);
+  assert.match(row.outcome, /worsens seat-to-seat consistency by 2 dB/i);
+  assert.ok(!BANNED_COPY.test(`${row.status} ${row.outcome}`), 'no banned copy');
 });
 
 test('phase states that the crossover region is not modelled', () => {
@@ -261,7 +339,9 @@ test('a plan’s own lever evidence wins over the family ledger', () => {
     ],
   };
   const delay = rowFor({ rows: buildTestedOptionRows(withLever) }, 'Delay');
-  assert.equal(delay.status, ADI_ROW_STATUS.TESTED);
+  // The lever's own verdict is stated: −3 dB on P20 with nothing damaged is a
+  // recommendation, not an anonymous "Tested" row.
+  assert.equal(delay.status, ADI_ROW_STATUS.RECOMMENDED);
   assert.match(String(delay.outcome), /12/, 'the lever’s own evaluated value is stated');
   assert.notEqual(delay.outcome, ADI_ROW_OUTCOME.NO_USEFUL);
 });

@@ -35,9 +35,13 @@ import {
 export const WINNING_CHANGE_NOT_RETAINED_REASON =
   "The winning candidate's change was not retained with this run, so it cannot be shown or applied. Re-run the Optimisation Plan.";
 
-/** No evaluated change cleared the materiality gate. */
+/** Evaluated changes existed, but none cleared the materiality gate. */
 export const NO_MATERIAL_CHANGE_REASON =
-  "Every evaluated change was below the 1 dB materiality threshold, so nothing is offered for application.";
+  "Every evaluated change stayed below the 1 dB action threshold, so there is nothing to apply.";
+
+/** No independently evaluated change was kept with the run at all. */
+export const NO_RETAINED_CHANGE_REASON =
+  "The run kept no independently evaluated change, so there is nothing to apply.";
 
 /** The evaluated seating movement cannot be applied safely. */
 export const SEATING_NOT_SAFE_REASON_PREFIX =
@@ -139,10 +143,16 @@ export function resolvePlanActionability({ plan = null, selection = null } = {})
     };
   }
 
+  // State which of the two honest reasons applies: evaluated changes that all
+  // fell below the gate, or no independently evaluated change kept at all.
+  const keptEvaluatedChange = Object.values(levers)
+    .some((lever) => lever?.evaluated === true
+      && Array.isArray(lever?.changes) && lever.changes.length > 0);
+
   return {
     actionable: false,
     terminalOutcome: OPTIMISER_TERMINAL_OUTCOME.NO_USEFUL_IMPROVEMENT,
-    reason: NO_MATERIAL_CHANGE_REASON,
+    reason: keptEvaluatedChange ? NO_MATERIAL_CHANGE_REASON : NO_RETAINED_CHANGE_REASON,
     offerableLevers: [],
   };
 }
