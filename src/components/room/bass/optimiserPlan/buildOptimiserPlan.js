@@ -23,6 +23,11 @@ import {
 } from "./optimiserPlanConstants.js";
 import { existingTradeOff, leverEffectFrom, summariseResult, summariseSeats } from "./optimiserPlanMetrics.js";
 import { activeInstances, instanceById, polarityLabel, resolveAppliedMap } from "./optimiserPlanMatching.js";
+import {
+  buildSeatingComponent,
+  buildSeatingMovement,
+  seatingDestinationsValid,
+} from "./optimiserSeatingEvidence.js";
 
 const num = (value) => (Number.isFinite(Number(value)) ? Number(value) : null);
 const round = (value, digits = 2) => (value == null ? null : Number(Number(value).toFixed(digits)));
@@ -212,6 +217,107 @@ function selectPositionResult(selection) {
   return candidates[0] || null;
 }
 
+/**
+ * The SEATING lever: the listener movement the optimiser evaluated and confirmed
+ * on its own. Built only from that confirmed result — an offset the run did not
+ * evaluate is never presented as a change, and every seat row carries the exact
+ * previous and evaluated position so the movement can be applied and undone.
+ */
+function seatingLever({ selection, baselineResult, seatingPositions, roomDims }) {
+  const result = selection?.seatingResult || null;
+  if (!result) return null;
+  const movement = buildSeatingMovement({ seatingResult: result, seatingPositions });
+  if (!movement || movement.changes.length === 0) return null;
+
+  const destinations = seatingDestinationsValid({ changes: movement.changes, roomDims });
+  const base = leverEffectFrom(result, baselineResult);
+  if (!base) return null;
+  const before = summariseResult(baselineResult);
+  const after = summariseResult(result);
+
+  return {
+    lever: OPTIMISER_LEVER.SEATING,
+    evidenceStatus: OPTIMISER_LEVER_EVIDENCE.EVALUATED,
+    evaluated: true,
+    notEvaluated: false,
+    notEvaluatedReason: null,
+    sourceCandidateId: result.candidateId || null,
+    changes: movement.changes,
+    effect: {
+      ...base,
+      p19LevelBefore: before?.p19Level ?? null,
+      p19LevelAfter: after?.p19Level ?? null,
+      p20LevelBefore: before?.p20Level ?? null,
+      p20LevelAfter: after?.p20Level ?? null,
+      p18DeltaHz: before?.achievedP18Hz != null && after?.achievedP18Hz != null
+        ? Math.round((after.achievedP18Hz - before.achievedP18Hz) * 10) / 10
+        : null,
+    },
+    reason: selection?.seatingMaterial?.reason || null,
+    tradeOff: existingTradeOff(result),
+    // The movement itself, stated once: how far, in which direction, whether the
+    // whole block moved, and which seats it affected.
+    seating: {
+      seatingOffsetMm: movement.seatingOffsetMm,
+      wholeBlockMoved: movement.wholeBlockMoved,
+      seatsKnown: movement.seatsKnown,
+      seatIds: movement.seatIds,
+      movementLabel: movement.movementLabel,
+    },
+    // Destination validity is persisted, never re-decided on read.
+    validation: {
+      destinationsValid: destinations.valid,
+      basis: destinations.basis,
+      reason: destinations.reason,
+    },
+  };
+}
+
+/**
+ * The combined candidate's ACTUAL components, stated so the winning change is
+ * never inferred from a single lever. Every value comes from the candidate the
+ * run confirmed; a component that did not change is recorded as unchanged rather
+ * than substituted with a convenient one.
+ */
+function combinedComponents({ winner, instances, seatingPositions, coordinates }) {
+  const tuning = combinedTuning(winner, instances);
+  const seating = buildSeatingComponent({ winner, seatingPositions });
+  const coordinatesKnown = Array.isArray(coordinates) && coordinates.length > 0;
+  const from = winner?.combinedFrom || {};
+  const calibrationRetuned = from.calibrationRetuned === true
+    || from.phaseRetuned === true
+    || from.delayRetuned === true
+    || from.gainRetuned === true;
+  const inseparable = [
+    ...(calibrationRetuned ? ["calibration"] : []),
+    ...(seating ? ["seating"] : []),
+    ...(coordinatesKnown ? ["placement"] : []),
+  ];
+  return {
+    calibrationRetuned,
+    phaseRetuned: from.phaseRetuned === true,
+    delayRetuned: from.delayRetuned === true,
+    gainRetuned: from.gainRetuned === true,
+    seating,
+    placement: coordinatesKnown
+      ? {
+        sourceCandidateId: from.positionCandidateId || null,
+        subCount: coordinates.length,
+        coordinates: coordinates.map((coordinate) => ({
+          x: round(coordinate?.x),
+          y: round(coordinate?.y),
+        })),
+      }
+      : null,
+    // Only the tuning values that actually changed are listed as changes. An
+    // unchanged delay, gain or polarity is never presented as a recommendation.
+    changedTuning: tuning.filter((row) => row.changed),
+    tuningUnchanged: tuning.length > 0 && tuning.every((row) => !row.changed),
+    inseparable,
+    applyPath: seating ? OPTIMISER_LEVER.SEATING : null,
+  };
+}
+
 function normaliseDecisions(decisions) {
   const normalised = {};
   for (const leverKey of OPTIMISER_LEVER_ORDER) {
@@ -240,6 +346,8 @@ export function buildOptimiserPlan({
   baseline = null,
   identity = {},
   instances = [],
+  seatingPositions = [],
+  roomDims = null,
   leverDecisions = {},
   notes = [],
 } = {}) {
@@ -327,6 +435,12 @@ export function buildOptimiserPlan({
     }
   }
 
+  // ── Seating ── a real lever with its own confirmed evaluation, its own
+  // persisted movement, and its own Apply/Undo path. Omitted entirely when the
+  // seating search retained no evaluated movement.
+  const seating = seatingLever({ selection, baselineResult, seatingPositions, roomDims });
+  if (seating) levers[OPTIMISER_LEVER.SEATING] = seating;
+
   if (Object.keys(levers).length === 0) return null;
 
   const individualEffectsEvaluated = OPTIMISER_LEVER_ORDER
@@ -345,6 +459,26 @@ export function buildOptimiserPlan({
   }
 
   const combinedCoordinates = winner.positionCoordinates || winner.coordinates || null;
+  const components = combinedComponents({ winner, instances, seatingPositions, coordinates: combinedCoordinates });
+
+  // The winning change is stated with its components. When the combined
+  // candidate moved the seating but the seating search retained no separate
+  // result, that is said plainly rather than left implicit.
+  if (components.seating && !levers[OPTIMISER_LEVER.SEATING]) {
+    planNotes.push(
+      "The combined candidate moved the seating, but the seating search retained no separate result — its movement is recorded as combined evidence only.",
+    );
+  }
+  if (components.inseparable.length > 1) {
+    planNotes.push(
+      `The combined candidate was evaluated as one change (${components.inseparable.join(" + ")}); those parts are not offered as separate changes.`,
+    );
+  }
+  if (components.calibrationRetuned && components.tuningUnchanged) {
+    planNotes.push(
+      "The combined candidate retuned the calibration, but its delay, gain and polarity values are unchanged from the current tuning — no tuning change is offered.",
+    );
+  }
 
   return {
     planVersion: OPTIMISER_PLAN_VERSION,
@@ -379,11 +513,13 @@ export function buildOptimiserPlan({
       effect: leverEffectFrom(winner, baselineResult),
       seats: summariseSeats(winner),
       tradeOff: existingTradeOff(winner),
+      // What the winning candidate actually changed, component by component.
+      components,
     },
     levers,
     individualEffectsEvaluated,
     leverDecisions: normaliseDecisions(leverDecisions),
-    applied: resolveAppliedMap(levers, instances),
+    applied: resolveAppliedMap(levers, instances, seatingPositions),
     notes: planNotes,
   };
 }

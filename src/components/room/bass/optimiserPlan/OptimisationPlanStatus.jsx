@@ -91,6 +91,15 @@ function ResultRows({ result }) {
 }
 
 function changeText(change) {
+  if (change.lever === OPTIMISER_LEVER.SEATING) {
+    const mm = Number.isFinite(Number(change.deltaMm)) ? Math.abs(Math.round(Number(change.deltaMm))) : null;
+    const from = Number.isFinite(Number(change.fromY)) ? Number(change.fromY).toFixed(2) : null;
+    const to = Number.isFinite(Number(change.toY)) ? Number(change.toY).toFixed(2) : null;
+    const movement = mm != null && mm >= 5
+      ? `${mm} mm ${change.direction || ""}`.trim()
+      : "no movement recorded";
+    return from && to ? `${from} m → ${to} m (${movement})` : movement;
+  }
   if (change.lever === OPTIMISER_LEVER.PLACEMENT) {
     return `${change.fromX?.toFixed(2)}, ${change.fromY?.toFixed(2)} m → ${change.toX?.toFixed(2)}, ${change.toY?.toFixed(2)} m`;
   }
@@ -172,6 +181,7 @@ export default function OptimisationPlanStatus({
   completedBassAuthority = null,
   currentDesignFingerprint = null,
   instances = [],
+  seatingPositions = [],
   onApplyLever = null,
   onUndoLever = null,
   leverApplyBusy = null,
@@ -179,7 +189,7 @@ export default function OptimisationPlanStatus({
   className = "",
 }) {
   const view = useOptimiserPlanView({
-    projectId, versionId, completedBassAuthority, currentDesignFingerprint, instances,
+    projectId, versionId, completedBassAuthority, currentDesignFingerprint, instances, seatingPositions,
   });
 
   // No evaluated evidence for this version (prose only): state the fact, offer
@@ -312,6 +322,25 @@ export default function OptimisationPlanStatus({
               <div className="mt-1 text-[11px] text-[#8A5A2B]">Trade-off: {lever.tradeOff.reason}</div>
             )}
 
+            {/* Seating: the movement itself, and whether every destination
+                position is legal. A movement whose destinations could not be
+                confirmed is shown with the reason and offers no Apply. */}
+            {lever.seating?.movementLabel && (
+              <div className="mt-1 text-[11px] font-semibold text-[#1B1A1A]">
+                {lever.seating.movementLabel}
+                {lever.seating.wholeBlockMoved === true ? " (whole seating block)" : ""}
+              </div>
+            )}
+            {lever.validation && (
+              <div className="mt-0.5 text-[10px] text-[#8B7F76]">
+                {lever.validation.destinationsValid === true
+                  ? `Destination positions checked: valid (${lever.validation.basis}).`
+                  : lever.validation.destinationsValid === false
+                    ? `Destination positions not valid: ${lever.validation.reason || "a seat position is outside this room."}`
+                    : `Destination positions: ${lever.validation.basis || "not re-checked here"}.`}
+              </div>
+            )}
+
             {/* Individual Apply / Undo — this lever only. Blocked states state why. */}
             <div className="mt-2 flex flex-wrap items-center gap-2">
               {lever.canApply && onApplyLever && (
@@ -355,8 +384,25 @@ export default function OptimisationPlanStatus({
             </div>
           )}
           <ResultRows result={view.combined.effect} />
+          {view.combined.components?.seating?.changes?.length > 0 && (
+            <div className="mt-1.5 space-y-0.5">
+              <div className="text-[10px] font-semibold tracking-wide text-[#3E4349]">
+                This candidate moved the seating
+              </div>
+              {view.combined.components.seating.changes.map((change) => (
+                <div key={change.seatId} className="text-[11px] text-[#1B1A1A]">
+                  <span className="text-[#625143]">{change.label || change.seatId}</span>
+                  {" — "}
+                  <span>{changeText(change)}</span>
+                </div>
+              ))}
+            </div>
+          )}
           {view.combined.tuning.filter((row) => row.changed).length > 0 && (
             <div className="mt-1.5 space-y-0.5">
+              <div className="text-[10px] font-semibold tracking-wide text-[#3E4349]">
+                This candidate retuned the tuning
+              </div>
               {view.combined.tuning.filter((row) => row.changed).map((row) => (
                 <div key={row.subId} className="text-[11px] text-[#1B1A1A]">
                   <span className="text-[#625143]">{row.label || row.subId}</span>

@@ -25,7 +25,8 @@ import {
 } from "./optimiserPlanConstants.js";
 import { leverLabel, OPTIMISER_FAMILY_SEQUENCE } from "./optimiserLeverOrder.js";
 import { describeLeverEffect, resolveLimitingMetric } from "./optimiserLeverVerdict.js";
-import { deviationText, levelText } from "./optimiserWholeNumberDb.js";
+import { deltaText, deviationText, frequencyText, levelText } from "./optimiserWholeNumberDb.js";
+import { leverIsOfferable } from "./optimiserPlanSave.js";
 import { estimateOptimiserCalculations, resultSentence } from "./optimiserCalculationEstimate.js";
 import { resolveAbsorptionAdvice } from "./absorptionAdviceAuthority.js";
 import { OPTIMISER_PRESENTATION_STATE } from "./resolveOptimiserPresentationState.js";
@@ -131,14 +132,48 @@ function p20Line(level, deviation) {
   return null;
 }
 
-/** The recommended lever: evaluated, with an evaluated effect, and applicable. */
+/**
+ * The recommended lever: the ONE lever that carries an independently evaluated
+ * change which clears the materiality gate and whose destination geometry is
+ * legal. A lever that was evaluated but is below the gate is never presented as
+ * a recommendation — it is reported as tested with no useful improvement.
+ */
 function resolveRecommendedLever(planView) {
   const rows = Array.isArray(planView?.levers) ? planView.levers : [];
-  const actionable = rows.filter(
-    (row) => row?.evaluated === true && Array.isArray(row?.changes) && row.changes.length > 0,
-  );
-  if (actionable.length !== 1) return null;
-  return leverKeyOf(actionable[0]);
+  const baseline = planView?.baseline || null;
+  const offerable = rows.filter((row) => leverIsOfferable(row, baseline));
+  if (offerable.length !== 1) return null;
+  return leverKeyOf(offerable[0]);
+}
+
+/**
+ * The seating recommendation's own evaluated detail, in whole numbers. Every
+ * value is read from the lever's persisted effect and the plan's baseline —
+ * nothing here is recalculated. Null for every other recommendation.
+ */
+function seatingRecommendationDetail({ row, baseline = null } = {}) {
+  if (!row?.seating?.movementLabel) return null;
+  const effect = row.effect || null;
+  return {
+    movementLabel: row.seating.movementLabel,
+    wholeBlockMoved: row.seating.wholeBlockMoved === true,
+    reason: shortPhrase(row.reason, 160),
+    p20Before: deviationText(baseline?.p20VariationDb),
+    p20After: deviationText(effect?.p20VariationDb),
+    p20LevelBefore: levelText(effect?.p20LevelBefore ?? baseline?.p20Level),
+    p20LevelAfter: levelText(effect?.p20LevelAfter),
+    p19Delta: deltaText(effect?.p19DeltaDb),
+    p14Delta: deltaText(effect?.p14DeltaDb),
+    p18DeltaHz: Number.isFinite(Number(effect?.p18DeltaHz)) ? Number(effect.p18DeltaHz) : null,
+    outputDelta: deltaText(effect?.outputDeltaDb),
+    worstSeat: effect?.worstSeatId
+      ? `${effect.worstSeatId}${frequencyText(effect.worstFrequencyHz) ? ` · ${frequencyText(effect.worstFrequencyHz)}` : ""}`
+      : null,
+    tradeOff: row.tradeOff?.reason || null,
+    destinationsValid: row.validation?.destinationsValid ?? null,
+    validationBasis: row.validation?.basis || null,
+    validationReason: row.validation?.reason || null,
+  };
 }
 
 /**
@@ -169,11 +204,15 @@ export function buildTestedOptionRows(planView, { recommendedLever = null, appli
     }
 
     if (key === recommendedLever && evaluated && hasChanges) {
+      // A seating recommendation states the movement itself — "move the seating
+      // 100 mm toward the screen" — beside its evaluated effect.
+      const movement = row?.seating?.movementLabel || null;
+      const effect = shortPhrase(describeLeverEffect(row?.effect));
       return {
         key,
         label,
         status: ADI_ROW_STATUS.RECOMMENDED,
-        outcome: shortPhrase(describeLeverEffect(row?.effect)) || null,
+        outcome: movement ? (effect ? `${movement} · ${effect}` : movement) : (effect || null),
         action: "apply",
       };
     }
@@ -200,7 +239,8 @@ export function buildTestedOptionRows(planView, { recommendedLever = null, appli
     }
 
     // Evaluated but not the recommendation: state the honest short outcome.
-    const phrase = shortPhrase(describeLeverEffect(row?.effect))
+    const phrase = row?.seating?.movementLabel
+      || shortPhrase(describeLeverEffect(row?.effect))
       || shortPhrase(row?.reason)
       || OPTIMISER_EVIDENCE_STATUS_LABEL?.[row?.evidenceStatus]
       || null;
@@ -352,6 +392,11 @@ export function buildAdiDesignerSummary({
       : null,
     recommendedLever,
     recommendedLeverLabel: recommendedLever ? displayLabel(recommendedLever) : null,
+    // The seating recommendation's own evaluated detail: movement, before/after,
+    // trade-offs and destination validity. Null for every other recommendation.
+    seatingRecommendation: recommendedRow?.seating
+      ? seatingRecommendationDetail({ row: recommendedRow, baseline: planView?.baseline || null })
+      : null,
     rows,
     actions: {
       canApply: apply.allowed,

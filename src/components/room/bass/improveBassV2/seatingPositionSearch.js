@@ -100,6 +100,15 @@ function validateSeatingConstraints(movedSeats, roomDims, screenWall, offsetM) {
 }
 
 /**
+ * Validate an already-evaluated set of seat positions against the room's own
+ * bounds and screen clearance. Returns the rejection reason, or null when every
+ * position is legal. Pure geometry: no acoustic calculation of any kind.
+ */
+export function validateSeatingPositions(movedSeats, roomDims, screenWall = "front") {
+  return validateSeatingConstraints(movedSeats, roomDims, screenWall, 0);
+}
+
+/**
  * Get the offset candidates (for display/diagnostics).
  */
 export function getSearchOffsets() {

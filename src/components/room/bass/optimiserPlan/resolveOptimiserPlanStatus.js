@@ -42,6 +42,7 @@ export function resolveOptimiserPlanStatus({
   plan = null,
   currentDesignFingerprint = null,
   instances = [],
+  seatingPositions = [],
 } = {}) {
   if (!plan) {
     return {
@@ -167,7 +168,7 @@ export function resolveOptimiserPlanStatus({
     .map((leverKey) => {
       const lever = plan.levers[leverKey];
       const disabled = decisions[leverKey]?.disabled === true;
-      const state = resolveLeverState({ lever, leverKey, instances, disabled, planStale });
+      const state = resolveLeverState({ lever, leverKey, instances, seatingPositions, disabled, planStale });
       return {
         key: leverKey,
         label: leverLabel(leverKey) || OPTIMISER_LEVER_LABEL[leverKey],
@@ -185,6 +186,10 @@ export function resolveOptimiserPlanStatus({
         changes: Array.isArray(lever.changes) ? lever.changes : [],
         reason: lever.reason || null,
         tradeOff: lever.tradeOff || null,
+        // Seating-specific evidence: the evaluated movement and whether its
+        // destination positions are legal. Null for every other lever.
+        seating: lever.seating || null,
+        validation: lever.validation || null,
         disabled,
         state,
         stateLabel: OPTIMISER_LEVER_STATE_LABEL[state] || state,
@@ -198,7 +203,7 @@ export function resolveOptimiserPlanStatus({
   for (const [leverKey, lever] of Object.entries(plan.levers || {})) {
     applyLevers[leverKey] = { ...lever, disabled: decisions[leverKey]?.disabled === true };
   }
-  const leverApplyMap = resolveLeverApplyMap({ levers: applyLevers, planStatus: status, instances });
+  const leverApplyMap = resolveLeverApplyMap({ levers: applyLevers, planStatus: status, instances, seatingPositions });
   for (const lever of levers) {
     const applyState = leverApplyMap[lever.key] || null;
     // A lever that makes the limiting result worse is never applyable, whatever
@@ -248,6 +253,8 @@ export function resolveOptimiserPlanStatus({
         effect: plan.combined.effect || null,
         seats: Array.isArray(plan.combined.seats) ? plan.combined.seats : [],
         tradeOff: plan.combined.tradeOff || null,
+        // What the winning candidate actually changed, component by component.
+        components: plan.combined.components || null,
       }
       : null,
     combinedEffect: plan.combined?.effect || null,

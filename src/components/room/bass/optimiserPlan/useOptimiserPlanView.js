@@ -23,6 +23,7 @@ export function useOptimiserPlanView({
   completedBassAuthority = null,
   currentDesignFingerprint = null,
   instances = [],
+  seatingPositions = [],
 } = {}) {
   const storedPlan = useOptimiserPlanAuthority(projectId, versionId);
 
@@ -38,7 +39,8 @@ export function useOptimiserPlanView({
       plan: storedPlan,
       currentDesignFingerprint,
       instances,
+      seatingPositions,
     }),
-    [storedPlan, currentDesignFingerprint, instances],
+    [storedPlan, currentDesignFingerprint, instances, seatingPositions],
   );
 }

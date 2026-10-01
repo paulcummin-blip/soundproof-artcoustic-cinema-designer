@@ -101,6 +101,7 @@ export default function AdiOptimisationJourney({
   completedBassAuthority = null,
   currentDesignFingerprint = null,
   instances = [],
+  seatingPositions = [],
   seatCount = null,
   limitingFactorSentence = null,
   runBlockReason = null,
@@ -122,6 +123,7 @@ export default function AdiOptimisationJourney({
     completedBassAuthority,
     currentDesignFingerprint,
     instances,
+    seatingPositions,
   });
 
   const resolved = resolveAdiOptimiserJourney({
@@ -249,6 +251,53 @@ export default function AdiOptimisationJourney({
         </div>
       )}
 
+      {/* The seating recommendation's own evaluated detail — the movement, the
+          before/after, the trade-offs and whether every destination seat position
+          is legal. Read from the saved plan; nothing is recalculated. */}
+      {summary.seatingRecommendation && (
+        <div className="rounded-md border border-[#E7E5E0] bg-white px-3 py-2 space-y-1">
+          <div className="text-[12px] font-semibold text-[#1B1A1A]">
+            {summary.seatingRecommendation.movementLabel}
+            {summary.seatingRecommendation.wholeBlockMoved ? " (whole seating block)" : ""}
+          </div>
+          <div className="text-[11px] text-[#3E4349] leading-relaxed">
+            {summary.seatingRecommendation.p20Before && summary.seatingRecommendation.p20After
+              ? `P20 ${summary.seatingRecommendation.p20Before} → ${summary.seatingRecommendation.p20After}`
+              : summary.seatingRecommendation.p20After
+                ? `P20 ${summary.seatingRecommendation.p20After}`
+                : null}
+            {summary.seatingRecommendation.p20LevelBefore || summary.seatingRecommendation.p20LevelAfter
+              ? ` · ${summary.seatingRecommendation.p20LevelBefore || "—"} → ${summary.seatingRecommendation.p20LevelAfter || "—"}`
+              : ""}
+          </div>
+          {summary.seatingRecommendation.reason && (
+            <div className="text-[11px] text-[#625143] leading-relaxed">
+              Reason: {summary.seatingRecommendation.reason}
+            </div>
+          )}
+          <div className="text-[10px] text-[#8B7F76] leading-relaxed">
+            {summary.seatingRecommendation.worstSeat
+              ? `Worst seat after the move: ${summary.seatingRecommendation.worstSeat}. `
+              : ""}
+            {summary.seatingRecommendation.p19Delta ? `P19 ${summary.seatingRecommendation.p19Delta}. ` : ""}
+            {summary.seatingRecommendation.p14Delta ? `P14 ${summary.seatingRecommendation.p14Delta}. ` : ""}
+            {summary.seatingRecommendation.p18DeltaHz != null
+              ? `P18 extension ${summary.seatingRecommendation.p18DeltaHz >= 0 ? "+" : "−"}${Math.abs(Math.round(summary.seatingRecommendation.p18DeltaHz))} Hz. `
+              : ""}
+            {summary.seatingRecommendation.destinationsValid === true
+              ? `Every destination seat position checked: valid (${summary.seatingRecommendation.validationBasis}).`
+              : summary.seatingRecommendation.destinationsValid === false
+                ? `Not applied: ${summary.seatingRecommendation.validationReason || "a destination seat position is not legal in this room."}`
+                : "Destination seat positions were validated by the optimiser before evaluation."}
+          </div>
+          {summary.seatingRecommendation.tradeOff && (
+            <div className="text-[11px] text-[#8A5A2B]">
+              Trade-off: {summary.seatingRecommendation.tradeOff}
+            </div>
+          )}
+        </div>
+      )}
+
       <AdiTestedOptionsTable summary={summary} />
 
       {/* Low-frequency absorption — ninth in the fixed order, after every
@@ -340,6 +389,7 @@ export default function AdiOptimisationJourney({
               completedBassAuthority={completedBassAuthority}
               currentDesignFingerprint={currentDesignFingerprint}
               instances={instances}
+              seatingPositions={seatingPositions}
               onApplyLever={onApplyLever}
               onUndoLever={onUndoLever}
               leverApplyBusy={leverApplyBusy}

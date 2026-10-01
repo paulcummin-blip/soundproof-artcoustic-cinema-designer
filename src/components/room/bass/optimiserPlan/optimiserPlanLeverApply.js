@@ -21,7 +21,7 @@ import {
   OPTIMISER_LEVER_EVIDENCE,
   OPTIMISER_PLAN_STATUS,
 } from "./optimiserPlanConstants.js";
-import { normaliseCanonicalPolarity, resolveLeverMatch } from "./optimiserPlanMatching.js";
+import { normaliseCanonicalPolarity, resolveLeverMatch, resolveSeatingMatch } from "./optimiserPlanMatching.js";
 
 /** Why a lever cannot be applied on its own. */
 export const LEVER_APPLY_BLOCK = Object.freeze({
@@ -34,6 +34,10 @@ export const LEVER_APPLY_BLOCK = Object.freeze({
   NO_CHANGES: "no_changes",
   MISSING_SUB: "missing_sub",
   ALREADY_APPLIED: "already_applied",
+  /** The design's seat positions are not available to write to. */
+  SEATING_POSITIONS_UNAVAILABLE: "seating_positions_unavailable",
+  /** An evaluated destination seat position is not a legal position. */
+  SEATING_DESTINATION_INVALID: "seating_destination_invalid",
 });
 
 export const LEVER_APPLY_BLOCK_MESSAGE = Object.freeze({
@@ -53,6 +57,10 @@ export const LEVER_APPLY_BLOCK_MESSAGE = Object.freeze({
   [LEVER_APPLY_BLOCK.MISSING_SUB]:
     "An affected subwoofer no longer exists in this design.",
   [LEVER_APPLY_BLOCK.ALREADY_APPLIED]: "Already applied to this design.",
+  [LEVER_APPLY_BLOCK.SEATING_POSITIONS_UNAVAILABLE]:
+    "The seating positions for this design are not available, so the evaluated movement cannot be applied here.",
+  [LEVER_APPLY_BLOCK.SEATING_DESTINATION_INVALID]:
+    "The evaluated seating movement was not applied: a destination seat position is not a legal position in this room.",
 });
 
 export const LEVER_APPLY_LABEL = Object.freeze({
@@ -60,6 +68,7 @@ export const LEVER_APPLY_LABEL = Object.freeze({
   [OPTIMISER_LEVER.DELAY]: "Apply delay",
   [OPTIMISER_LEVER.GAIN]: "Apply gain",
   [OPTIMISER_LEVER.POLARITY]: "Apply polarity",
+  [OPTIMISER_LEVER.SEATING]: "Apply seating",
 });
 
 export const LEVER_UNDO_LABEL = Object.freeze({
@@ -67,6 +76,7 @@ export const LEVER_UNDO_LABEL = Object.freeze({
   [OPTIMISER_LEVER.DELAY]: "Undo delay",
   [OPTIMISER_LEVER.GAIN]: "Undo gain",
   [OPTIMISER_LEVER.POLARITY]: "Undo polarity",
+  [OPTIMISER_LEVER.SEATING]: "Undo seating",
 });
 
 const LEVER_KEYS = new Set(Object.values(OPTIMISER_LEVER));
@@ -109,6 +119,18 @@ export function resolveLeverApplyState({
   }
   const changes = Array.isArray(lever.changes) ? lever.changes : [];
   if (!changes.length) return blocked(LEVER_APPLY_BLOCK.NO_CHANGES);
+  if (leverKey === OPTIMISER_LEVER.SEATING) {
+    // A seating movement is offered only when it was canonically evaluated, every
+    // destination position is legal, and the exact movement is persisted.
+    if (lever.validation?.destinationsValid === false) {
+      return blocked(LEVER_APPLY_BLOCK.SEATING_DESTINATION_INVALID);
+    }
+    const movementKnown = changes.every((change) => change?.seatId != null
+      && Number.isFinite(Number(change?.toY)));
+    if (!movementKnown) return blocked(LEVER_APPLY_BLOCK.NO_CHANGES);
+    if (applied) return blocked(LEVER_APPLY_BLOCK.ALREADY_APPLIED);
+    return { canApply: true, code: null, reason: null };
+  }
   if (missingSubIds.length) return blocked(LEVER_APPLY_BLOCK.MISSING_SUB);
   if (applied) return blocked(LEVER_APPLY_BLOCK.ALREADY_APPLIED);
   return { canApply: true, code: null, reason: null };
@@ -209,6 +231,70 @@ function buildInstances({ leverKey, lever, instances, direction }) {
   };
 }
 
+/**
+ * Write ONE seating movement onto the seat positions.
+ *
+ * Only the seat's length coordinate is written, and only for the seats the run
+ * evaluated. Every other field — seat id, lateral position, row, priority, ear
+ * and platform heights — is carried through untouched. Undo writes back the
+ * lever's own persisted previous coordinate, so it restores the exact positions.
+ */
+function buildSeatingPositions({ lever, seatingPositions, direction }) {
+  const list = Array.isArray(seatingPositions) ? seatingPositions : [];
+  const changes = Array.isArray(lever?.changes) ? lever.changes : [];
+  if (!changes.length) {
+    return {
+      ok: false,
+      code: LEVER_APPLY_BLOCK.NO_CHANGES,
+      reason: LEVER_APPLY_BLOCK_MESSAGE[LEVER_APPLY_BLOCK.NO_CHANGES],
+      seatingPositions: list,
+      affectedSeatIds: [],
+    };
+  }
+  if (!list.length) {
+    return {
+      ok: false,
+      code: LEVER_APPLY_BLOCK.SEATING_POSITIONS_UNAVAILABLE,
+      reason: LEVER_APPLY_BLOCK_MESSAGE[LEVER_APPLY_BLOCK.SEATING_POSITIONS_UNAVAILABLE],
+      seatingPositions: list,
+      affectedSeatIds: [],
+    };
+  }
+
+  const bySeatId = new Map(changes.map((change) => [String(change.seatId), change]));
+  const touched = [];
+  const next = list.map((seat) => {
+    const change = seat?.id == null ? null : bySeatId.get(String(seat.id));
+    if (!change) return seat;
+    const value = Number(direction === "from" ? change.fromY : change.toY);
+    if (!Number.isFinite(value)) return seat;
+    touched.push(String(seat.id));
+    return { ...seat, y: value };
+  });
+
+  if (touched.length === 0) {
+    return {
+      ok: false,
+      code: LEVER_APPLY_BLOCK.SEATING_POSITIONS_UNAVAILABLE,
+      reason: LEVER_APPLY_BLOCK_MESSAGE[LEVER_APPLY_BLOCK.SEATING_POSITIONS_UNAVAILABLE],
+      seatingPositions: list,
+      affectedSeatIds: [],
+    };
+  }
+
+  return { ok: true, code: null, reason: null, seatingPositions: next, affectedSeatIds: touched };
+}
+
+/** Apply the evaluated seating movement. */
+export function buildSeatingApplyPositions({ lever, seatingPositions }) {
+  return buildSeatingPositions({ lever, seatingPositions, direction: "to" });
+}
+
+/** Restore the exact seat positions the movement started from. */
+export function buildSeatingUndoPositions({ lever, seatingPositions }) {
+  return buildSeatingPositions({ lever, seatingPositions, direction: "from" });
+}
+
 /** Apply ONE lever's proposed values. */
 export function buildLeverApplyInstances({ leverKey, lever, instances }) {
   return buildInstances({ leverKey, lever, instances, direction: "to" });
@@ -223,12 +309,14 @@ export function buildLeverUndoInstances({ leverKey, lever, instances }) {
  * Per-lever apply/undo availability for the plan status view. Applied state is
  * re-derived from the design itself, never trusted from stored flags.
  */
-export function resolveLeverApplyMap({ levers = {}, planStatus, instances = [] } = {}) {
+export function resolveLeverApplyMap({ levers = {}, planStatus, instances = [], seatingPositions = [] } = {}) {
   const map = {};
   const readable = planStatus === OPTIMISER_PLAN_STATUS.CURRENT
     || planStatus === OPTIMISER_PLAN_STATUS.STALE;
   for (const [leverKey, lever] of Object.entries(levers || {})) {
-    const match = resolveLeverMatch(lever, instances);
+    const match = leverKey === OPTIMISER_LEVER.SEATING
+      ? resolveSeatingMatch(lever, seatingPositions)
+      : resolveLeverMatch(lever, instances);
     const apply = resolveLeverApplyState({
       leverKey,
       lever,

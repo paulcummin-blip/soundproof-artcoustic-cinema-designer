@@ -28,6 +28,8 @@ import { buildOptimisedInstances } from "../improveBassV2/improveBassV2Apply";
 import {
   buildLeverApplyInstances,
   buildLeverUndoInstances,
+  buildSeatingApplyPositions,
+  buildSeatingUndoPositions,
 } from "../optimiserPlan/optimiserPlanLeverApply.js";
 import { readAuthoritativeP20Headline } from "../optimiserPlan/optimiserPlanMetrics.js";
 import { OPTIMISER_LEVER } from "../optimiserPlan/optimiserPlanConstants.js";
@@ -259,6 +261,7 @@ export default function AdiRecommendation({
     completedBassAuthority,
     currentDesignFingerprint: shared?.cacheKey || null,
     instances: currentInstances,
+    seatingPositions,
   });
 
   // ── Apply handlers (preserved from FurtherImprovements) ──
@@ -296,27 +299,52 @@ export default function AdiRecommendation({
   const [leverApplyBusy, setLeverApplyBusy] = useState(null);
   const [leverOutcome, setLeverOutcome] = useState(null);
 
-  const commitLeverChange = useCallback((lever, build) => {
-    if (!commitInstances || !lever?.key) return;
-    const result = build({ leverKey: lever.key, lever, instances: currentInstances });
-    if (!result.ok) return;
+  const commitLeverChange = useCallback((lever, direction = "to") => {
+    if (!lever?.key) return;
     const before = readAuthoritativeP20Headline(completedBassAuthority);
+
+    // A seating lever writes the evaluated seat positions — the subwoofer
+    // instances are never touched by it, and vice versa. Undo writes back the
+    // lever's own persisted previous positions.
+    if (lever.key === OPTIMISER_LEVER.SEATING) {
+      if (!commitSeating) return;
+      const result = direction === "from"
+        ? buildSeatingUndoPositions({ lever, seatingPositions })
+        : buildSeatingApplyPositions({ lever, seatingPositions });
+      if (!result.ok) return;
+      commitSeating(result.seatingPositions);
+      setLeverOutcome({
+        leverKey: lever.key, label: lever.label || lever.key, before, after: null, appliedLever: lever.key,
+      });
+      if (typeof onRecalculate === "function") {
+        onRecalculate({ previousCacheKey: shared?.cacheKey || null });
+      }
+      return;
+    }
+
+    if (!commitInstances) return;
+    const result = direction === "from"
+      ? buildLeverUndoInstances({ leverKey: lever.key, lever, instances: currentInstances })
+      : buildLeverApplyInstances({ leverKey: lever.key, lever, instances: currentInstances });
+    if (!result.ok) return;
     commitInstances(
       result.instances,
       lever.key === OPTIMISER_LEVER.PLACEMENT
         ? { front: { placementMode: "manual", isManual: true }, rear: { placementMode: "manual", isManual: true } }
         : undefined,
     );
-    setLeverOutcome({ leverKey: lever.key, label: lever.label || lever.key, before, after: null });
+    setLeverOutcome({
+      leverKey: lever.key, label: lever.label || lever.key, before, after: null, appliedLever: lever.key,
+    });
     if (typeof onRecalculate === "function") {
       onRecalculate({ previousCacheKey: shared?.cacheKey || null });
     }
-  }, [commitInstances, currentInstances, completedBassAuthority, onRecalculate, shared]);
+  }, [commitInstances, commitSeating, currentInstances, seatingPositions, completedBassAuthority, onRecalculate, shared]);
 
   const handleApplyLever = useCallback((lever) => {
     setLeverApplyBusy(lever?.key || null);
     try {
-      commitLeverChange(lever, buildLeverApplyInstances);
+      commitLeverChange(lever, "to");
     } finally {
       setLeverApplyBusy(null);
     }
@@ -325,7 +353,7 @@ export default function AdiRecommendation({
   const handleUndoLever = useCallback((lever) => {
     setLeverApplyBusy(lever?.key || null);
     try {
-      commitLeverChange(lever, buildLeverUndoInstances);
+      commitLeverChange(lever, "from");
     } finally {
       setLeverApplyBusy(null);
     }
@@ -463,6 +491,7 @@ export default function AdiRecommendation({
         completedBassAuthority={completedBassAuthority}
         currentDesignFingerprint={shared?.cacheKey || null}
         instances={currentInstances}
+        seatingPositions={seatingPositions}
         seatCount={seatCount}
         limitingFactorSentence={limitingFactorSentence}
         runBlockReason={optimisationRunBlockReason || null}
@@ -582,6 +611,7 @@ export default function AdiRecommendation({
         completedBassAuthority={completedBassAuthority}
         currentDesignFingerprint={shared?.cacheKey || null}
         instances={currentInstances}
+        seatingPositions={seatingPositions}
         seatCount={seatCount}
         limitingFactorSentence={limitingFactorSentence}
         runBlockReason={optimisationRunBlockReason || null}
@@ -721,6 +751,7 @@ export default function AdiRecommendation({
         completedBassAuthority={completedBassAuthority}
         currentDesignFingerprint={shared?.cacheKey || null}
         instances={currentInstances}
+        seatingPositions={seatingPositions}
         onApplyLever={handleApplyLever}
         onUndoLever={handleUndoLever}
         leverApplyBusy={leverApplyBusy}

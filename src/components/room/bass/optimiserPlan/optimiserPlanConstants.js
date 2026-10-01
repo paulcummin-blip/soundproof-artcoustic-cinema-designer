@@ -15,7 +15,7 @@
  * unavailable and asks for a re-run. It never crashes and never fabricates a
  * lever from evidence it cannot read.
  */
-export const OPTIMISER_PLAN_VERSION = 2;
+export const OPTIMISER_PLAN_VERSION = 3;
 
 /**
  * Evidence status of a single lever. This is the honest classification of what
@@ -57,6 +57,13 @@ export const OPTIMISER_LEVER = Object.freeze({
   DELAY: "delay",
   POLARITY: "polarity",
   GAIN: "gain",
+  /**
+   * Listener movement. A real lever with its own evaluated result, its own
+   * Apply/Undo path (it writes the seat positions, not the subwoofers) and the
+   * strictest gate of all: nothing is offered unless the movement itself was
+   * canonically evaluated and every destination seat position is valid.
+   */
+  SEATING: "seating",
 });
 
 /**
@@ -74,6 +81,7 @@ export const OPTIMISER_LEVER_ORDER = Object.freeze([
   OPTIMISER_LEVER.GAIN,
   OPTIMISER_LEVER.POLARITY,
   OPTIMISER_LEVER.PLACEMENT,
+  OPTIMISER_LEVER.SEATING,
 ]);
 
 export const OPTIMISER_LEVER_LABEL = Object.freeze({
@@ -81,6 +89,7 @@ export const OPTIMISER_LEVER_LABEL = Object.freeze({
   [OPTIMISER_LEVER.DELAY]: "DELAY",
   [OPTIMISER_LEVER.POLARITY]: "POLARITY",
   [OPTIMISER_LEVER.GAIN]: "GAIN",
+  [OPTIMISER_LEVER.SEATING]: "SEATING",
 });
 
 /** Plan-level status. STALE = the saved plan no longer belongs to this design. */
