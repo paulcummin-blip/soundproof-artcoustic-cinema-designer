@@ -18,6 +18,7 @@ import { isValidLimitedP14Contract } from "./p14LimitedTargetAuthority";
 import { bassCacheKey, bassDbFilter, parseBassCacheKey } from "./bassCacheKey";
 import { assertNotAuthoritativeReadOnly } from "@/components/state/authoritativeReadOnlyMode";
 import { hydrateRecommendation } from "@/components/recommendationEngine/recommendationPersistence";
+import { queueBassAuthorityWrite, resetBassAuthorityWriteQueue } from "./bassAuthorityWriteQueue";
 
 export {
   BASS_AUTHORITY_STATUS,
@@ -35,6 +36,8 @@ const memoryByProject = new Map();
 const listeners = new Set();
 const writeQueues = new Map();
 const syncSignatures = new Map();
+
+// DB write coalescing for the authority row lives in bassAuthorityWriteQueue.js.
 
 // ── Project-keyed refcounted authority manager ──────────────────────────
 // Ensures ONE initial hydration per project regardless of how many React
@@ -440,8 +443,9 @@ export function syncCachedCompactBassAuthority(projectId, versionId, compactCont
         status: persisted.status,
         completed_by_fingerprint: persisted.completedByFingerprint,
       };
-      if (record?.id) await base44.entities.ProjectAnalysisCache.update(record.id, payload);
-      else await base44.entities.ProjectAnalysisCache.create(payload);
+      // Coalesced: the row is written once the burst of publishes settles, and
+      // never when the row already holds this authority.
+      queueBassAuthorityWrite(key, signature, record, payload);
       const resolved = resolvePersistedBassAuthority(key, persisted);
       if (resolved?.authoritative) {
         return setMemory(projectId, versionId, resolved);
@@ -510,8 +514,10 @@ export function syncStaleBassAuthority(projectId, versionId, currentFingerprint)
         return liveAfterRead || null;
       }
 
-      if (record?.id) await base44.entities.ProjectAnalysisCache.update(record.id, payload);
-      else await base44.entities.ProjectAnalysisCache.create(payload);
+      // Coalesced write (see queueBassAuthorityWrite): a stale mark is often
+      // re-synced while the design is still settling, and every one of those
+      // used to be an entity write.
+      queueBassAuthorityWrite(key, signature, record, payload);
 
       const live = memoryByProject.get(key);
       if (
@@ -560,8 +566,10 @@ export function syncPersistentBassAuthority(projectId, versionId, currentFingerp
       status: persisted.status,
       completed_by_fingerprint: persisted.completedByFingerprint,
     };
-    if (record?.id) await base44.entities.ProjectAnalysisCache.update(record.id, payload);
-    else await base44.entities.ProjectAnalysisCache.create(payload);
+    // Coalesced: the current authority is re-published as each background target
+    // settles, so the row is written at the end of that burst — and only when it
+    // does not already hold this authority.
+    queueBassAuthorityWrite(key, signature, record, payload);
     const resolved = resolvePersistedBassAuthority(key, persisted);
     if (!completed && resolved && !resolved.authoritative) {
       return memoryByProject.get(key) || resolved;
@@ -650,6 +658,7 @@ export function _resetCompletedBassStoreForTest() {
   memoryByProject.clear();
   writeQueues.clear();
   syncSignatures.clear();
+  resetBassAuthorityWriteQueue();
   projectAuthorityState.clear();
   notify();
 }
