@@ -4,29 +4,32 @@
 // The Visual Report's ADI Design Summary — copy builder.
 //
 // PRODUCT RULE
-//   Visual Report   → presents the COMPLETED design (this module)
-//   Bass Optimiser  → improves the design
-//   Technical Report→ explains the engineering and the limitations
+//   Visual Report    → WHY this design works for this room (this module)
+//   Technical Report → HOW the engineering measures
+//   Bass Optimiser   → how to improve the design
 //
-// The Visual Report is produced after the design is finalised, so this module
-// never reopens the design process: it states the strongest engineering
-// qualities the published results genuinely support, and nothing else.
+// The Visual Report is produced after the design is complete, so the ADI
+// summary answers one question, in the design's own terms:
 //
-//   Intro    — ADI has reviewed the completed design
-//   Body     — one sentence per genuinely strong parameter (L3 or better),
-//              strongest first, or a neutral assessed-design line if none
+//   "This is a strong design for this room because…"
+//
+//   Lead     — the framing line
+//   Body     — how the layout suits this room and its seating, one sentence per
+//              genuinely strong parameter (L3 or better), strongest first, then
+//              the balance-with-constraints statement
 //   Optimiser— one line, and only when a Bass Optimiser result exists
-//   Closing  — the design is presented as assessed; engineering detail is in
-//              the Technical Report
+//   Closing  — the engineering detail lives in the Technical Report
 //
 // WHAT THIS MODULE DELIBERATELY DOES NOT DO
 // It never prints a limiting factor, a parameter level, a worst-affected seat,
-// a "next step", any repositioning guidance, a projected level, or any advice
-// implying the design is unfinished. Those belong to the Technical Report, the
-// RP22 parameter table, the Bass Optimiser panel and Engineer details.
+// a "next step", any repositioning guidance, a projected level, or a
+// speculative change that has not been applied. Those belong to the Technical
+// Report, the RP22 parameter table, the Bass Optimiser panel and Engineer
+// details.
 //
-// This module produces TEXT ONLY. It calculates nothing: each sentence is
-// selected by an already-published strength, and no value is ever invented.
+// This module produces TEXT ONLY. It calculates nothing: the room facts come
+// from the geometry and seating already published for this version, and every
+// strength sentence is selected by an already-published parameter result.
 //
 // PURE: no React, no side effects, no stores.
 // ---------------------------------------------------------------------------
@@ -37,13 +40,16 @@ import {
   OPTIMISER_TERMINAL_OUTCOME,
 } from "@/components/room/bass/optimiserPlan/optimiserPlanConstants";
 
-/** The ADI review line that opens the Visual Report summary. */
-export const ADI_VISUAL_INTRO =
-  'ADI has reviewed the completed cinema design and identified the strongest engineering qualities of the system.';
+/** The framing line the Visual Report ADI page answers. */
+export const ADI_VISUAL_LEAD = 'This is a strong design for this room because:';
 
 /** Stated in place of strengths when no parameter reaches the strength band. */
 export const ADI_VISUAL_NO_STRENGTHS_FALLBACK =
   'The completed design has been assessed in full, and its RP22 performance results are reported on the following pages.';
+
+/** The balance statement that closes the strength paragraph. */
+export const ADI_VISUAL_BALANCE =
+  'Within the room’s architectural constraints, the design gives a high-performance result that is practical to install and credible to calibrate.';
 
 /**
  * The one optimiser line the Visual Report ever prints. A run means the
@@ -55,7 +61,7 @@ export const ADI_VISUAL_OPTIMISER_REVIEWED =
 
 /** Closes the block and points to the engineering detail. */
 export const ADI_VISUAL_CLOSING =
-  'This report presents the selected design as assessed. Detailed engineering evidence remains available in the Technical Report.';
+  'Detailed engineering results remain available in the Technical Report.';
 
 /**
  * One sentence per RP22 parameter, written only for parameters the published
@@ -82,6 +88,33 @@ export const ADI_VISUAL_STRENGTH_SENTENCES = Object.freeze({
 
 /** The default number of strength sentences the paragraph carries. */
 export const ADI_VISUAL_PARAGRAPH_LIMIT = 3;
+
+const hasLength = (value) => Number.isFinite(Number(value)) && Number(value) > 0;
+const metres = (value) => Number(value).toFixed(1);
+
+/**
+ * How the layout suits this room — built only from the room geometry and
+ * seating already published for this version. No dimension is invented: an
+ * unknown room simply loses the dimension clause.
+ *
+ * @param {Object} [context]
+ * @param {Object} [context.roomDims] — { widthM, lengthM, heightM }
+ * @param {number} [context.seatCount]
+ * @returns {string}
+ */
+export function buildRoomSentence({ roomDims, seatCount } = {}) {
+  const dims = roomDims || {};
+  const hasDims = hasLength(dims.widthM) && hasLength(dims.lengthM) && hasLength(dims.heightM);
+  const seats = Number(seatCount) > 0 ? Number(seatCount) : 0;
+  const seatClause = seats > 0
+    ? ` and the ${seats} seating position${seats === 1 ? '' : 's'} it has to serve`
+    : '';
+
+  if (hasDims) {
+    return `The speaker layout works with this room’s ${metres(dims.widthM)} m × ${metres(dims.lengthM)} m × ${metres(dims.heightM)} m proportions${seatClause}, rather than fighting them.`;
+  }
+  return `The speaker layout works with the space available${seatClause}, rather than fighting it.`;
+}
 
 /**
  * One sentence per genuinely strong parameter, strongest first.
@@ -138,12 +171,14 @@ export function resolveOptimiserStatusLine(record) {
  *
  * @param {Object} params
  * @param {Array}  [params.strengths]        — selected strengths (see above)
+ * @param {Object} [params.context]          — { roomDims, seatCount }
  * @param {Object|null} [params.optimiserRecord] — persisted optimiser record
  * @param {number} [params.paragraphLimit]
  * @returns {Object|null} summary, or null when no strengths were supplied
  */
 export function buildAdiVisualReportSummary({
   strengths = [],
+  context = {},
   optimiserRecord = null,
   paragraphLimit = ADI_VISUAL_PARAGRAPH_LIMIT,
 } = {}) {
@@ -153,8 +188,12 @@ export function buildAdiVisualReportSummary({
 
   return {
     heading: "ADI Design Summary",
-    intro: ADI_VISUAL_INTRO,
-    body: sentences.length > 0 ? sentences : [ADI_VISUAL_NO_STRENGTHS_FALLBACK],
+    lead: ADI_VISUAL_LEAD,
+    body: [
+      buildRoomSentence(context),
+      ...(sentences.length > 0 ? sentences : [ADI_VISUAL_NO_STRENGTHS_FALLBACK]),
+      ADI_VISUAL_BALANCE,
+    ],
     optimiserStatus: resolveOptimiserStatusLine(optimiserRecord),
     closing: ADI_VISUAL_CLOSING,
   };

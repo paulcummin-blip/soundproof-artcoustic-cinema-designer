@@ -3,19 +3,20 @@
  * ----------------------
  * The Visual Report's ADI Design Summary block.
  *
- * The Visual Report presents a COMPLETED design, so this block is strength-led:
- * the ADI review line, one short paragraph of the design's genuine engineering
- * strengths, one Bass Optimiser review line when a result exists, and the
- * pointer to the Technical Report for engineering detail.
+ * The Visual Report presents a COMPLETED design and explains why it works for
+ * this room, so this block is strength-led: the framing line, how the layout
+ * suits the room and its seating, the design's genuine engineering strengths,
+ * the balance-with-constraints statement, one Bass Optimiser review line when a
+ * result exists, and the pointer to the Technical Report.
  *
  * It never reopens the design process: no limiting factor, no parameter level,
- * no worst-affected seat, no "next step" and no instruction to optimise.
- * Poorer results belong to the Technical Report, the RP22 parameter table and
- * the Bass Optimiser panel.
+ * no worst-affected seat, no "next step", no speculative change and no
+ * instruction to optimise. Poorer results belong to the Technical Report, the
+ * RP22 parameter table and the Bass Optimiser panel.
  *
  * Presentation only. Every sentence comes from buildAdiVisualReportSummary(),
- * which reads the published strengths and the persisted optimiser record.
- * Nothing is recalculated here.
+ * which reads the published strengths, the published room geometry and seating,
+ * and the persisted optimiser record. Nothing is recalculated here.
  */
 
 import React, { useMemo } from "react";
@@ -69,6 +70,9 @@ function AdiMark() {
 
 export default function ClientAdiVisualSummary({
   engineeringSummary,
+  seats,
+  geometry,
+  system,
   projectId = null,
   versionId = null,
   compact = false,
@@ -79,10 +83,15 @@ export default function ClientAdiVisualSummary({
     const strengths = selectClientAdiStrengths(engineeringSummary, { limit: STRENGTH_POOL_LIMIT });
     return buildAdiVisualReportSummary({
       strengths,
+      context: {
+        roomDims: geometry?.roomDims || null,
+        seatCount: Array.isArray(seats) ? seats.length : 0,
+        subwooferCount: Number(system?.subwooferCount) || 0,
+      },
       optimiserRecord,
       paragraphLimit: ADI_VISUAL_PARAGRAPH_LIMIT,
     });
-  }, [engineeringSummary, optimiserRecord]);
+  }, [engineeringSummary, seats, geometry, system, optimiserRecord]);
 
   if (!summary) return null;
 
@@ -143,13 +152,13 @@ export default function ClientAdiVisualSummary({
         <p
           style={{
             margin: 0,
-            fontSize: compact ? 11.5 : 12.5,
-            lineHeight: 1.6,
+            fontFamily: FONT_HEADING,
+            fontSize: compact ? 13 : 14.5,
+            lineHeight: 1.5,
             color: COLORS.primary,
-            fontWeight: 600,
           }}
         >
-          {summary.intro}
+          {summary.lead}
         </p>
         <p
           style={{
