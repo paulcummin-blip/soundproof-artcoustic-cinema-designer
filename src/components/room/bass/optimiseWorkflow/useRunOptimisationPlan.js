@@ -28,7 +28,10 @@ import { useCallback, useRef, useState } from "react";
 import { runOptimisation } from "./optimiseWorkflowOrchestrator";
 import { publishRecommendation } from "@/components/recommendationEngine";
 import { buildOptimiserPlan } from "@/components/room/bass/optimiserPlan/buildOptimiserPlan.js";
-import { buildOptimiserRunEvidence } from "@/components/room/bass/optimiserPlan/buildOptimiserRunEvidence.js";
+import {
+  buildActionableOptimiserRunSummary,
+  buildOptimiserRunEvidence,
+} from "@/components/room/bass/optimiserPlan/buildOptimiserRunEvidence.js";
 import {
   getOptimiserPlanAuthority,
   setOptimiserPlanAuthority,
@@ -131,11 +134,18 @@ export default function useRunOptimisationPlan({
         leverDecisions: getOptimiserPlanAuthority(projectId, versionId)?.leverDecisions || {},
       });
 
-      // A completed run that produced NO actionable plan keeps its evidence: what
-      // was evaluated, which controls were tested, the best attempted result and
-      // why no candidate was accepted. It is saved in the same slot, so the card
-      // can state the outcome after a refresh or a reopen instead of reporting
-      // "no plan". The design is not touched by any of this.
+      // A winning plan carries the completed run's honest calculation count.
+      // A no-winner run keeps the fuller rejection evidence instead. Both are
+      // saved in the same version slot and survive refresh/reopen.
+      const actionableRun = optimiserPlan
+        ? buildActionableOptimiserRunSummary({
+          selection: result.selection,
+          diagnostics: result.optimisationDiagnostics || null,
+        })
+        : null;
+      const persistedPlan = optimiserPlan
+        ? { ...optimiserPlan, run: actionableRun }
+        : null;
       const runEvidence = optimiserPlan ? null : buildOptimiserRunEvidence({
         selection: result.selection,
         diagnostics: result.optimisationDiagnostics || null,
@@ -143,21 +153,21 @@ export default function useRunOptimisationPlan({
         currentPolarity: (subInstancesRef.current || []).map((instance) => instance?.polarity ?? 1),
       });
 
-      if (!optimiserPlan && !runEvidence) {
+      if (!persistedPlan && !runEvidence) {
         setStatus("failed");
         setError("The optimiser returned no usable result for this design. Re-run the Optimisation Plan.");
         return;
       }
 
-      setOptimiserPlanAuthority(projectId, versionId, optimiserPlan || runEvidence);
+      setOptimiserPlanAuthority(projectId, versionId, persistedPlan || runEvidence);
 
       // Only an actionable plan is published with the recommendation. A rejected
       // candidate is never published as an available recommendation.
-      if (optimiserPlan && fingerprint && result.recommendation) {
+      if (persistedPlan && fingerprint && result.recommendation) {
         await publishRecommendation(
           projectId,
           versionId,
-          { ...result.recommendation, optimiserPlan },
+          { ...result.recommendation, optimiserPlan: persistedPlan },
           fingerprint,
         );
       }
