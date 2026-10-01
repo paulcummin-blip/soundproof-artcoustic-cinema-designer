@@ -20,7 +20,7 @@
 //   • levers that improved one seat while worsening another (trade-offs)
 // ---------------------------------------------------------------------------
 
-import { frequencyText } from "./optimiserWholeNumberDb.js";
+import { frequencyText, validFrequencyHz } from "./optimiserWholeNumberDb.js";
 
 export const ABSORPTION_ROW_KEY = "low_frequency_absorption";
 export const ABSORPTION_LABEL = "Low-frequency absorption";
@@ -46,6 +46,13 @@ export const ABSORPTION_POOR_DEVIATION_DB = 10;
 /** Seats whose worst P20 frequency falls within this band share a frequency. */
 export const ABSORPTION_FREQUENCY_TOLERANCE_HZ = 3;
 
+/**
+ * Stated when the remaining variation is real but no valid limiting frequency
+ * exists. The copy never invents a frequency, and "0 Hz" is never shown.
+ */
+export const ABSORPTION_NO_FREQUENCY_REASON =
+  "Persistent low-frequency variation across seats";
+
 function numeric(value) {
   const number = Number(value);
   return Number.isFinite(number) ? number : null;
@@ -57,8 +64,10 @@ function numeric(value) {
  */
 export function persistentFrequency(seats = []) {
   const values = (Array.isArray(seats) ? seats : [])
-    .map((seat) => numeric(seat?.p20WorstFrequencyHz ?? seat?.worstFrequencyHz))
-    .filter((value) => value != null && value > 0)
+    // A missing, zero or invalid frequency is not evidence of a shared
+    // frequency, so it is dropped rather than rounded into one.
+    .map((seat) => validFrequencyHz(seat?.p20WorstFrequencyHz ?? seat?.worstFrequencyHz))
+    .filter((value) => value != null)
     .sort((a, b) => a - b);
   if (values.length < 2) return null;
 
@@ -66,7 +75,7 @@ export function persistentFrequency(seats = []) {
   values.forEach((value) => {
     const clustered = values.filter((other) => Math.abs(other - value) <= ABSORPTION_FREQUENCY_TOLERANCE_HZ);
     if (!best || clustered.length > best.seatCount) {
-      best = { seatCount: clustered.length, hz: Math.round(value) };
+      best = { seatCount: clustered.length, hz: value };
     }
   });
   return best && best.seatCount >= 2 ? best : null;
@@ -102,8 +111,11 @@ export function resolveAbsorptionAdvice({
   const tradedOff = rows.some((row) => row?.tradeOff && row.tradeOff.isTradeOff !== false);
   const placementEvaluated = rows.some((row) => /placement/i.test(leverKeyOf(row)) && row?.evaluated === true);
 
-  const fallback = numeric(limitingFrequencyHz);
-  const frequencyHz = persistent?.hz ?? (fallback != null ? Math.round(fallback) : null);
+  // A frequency is only stated when it is a real frequency. A missing, null,
+  // zero or invalid limiting frequency is never rounded into "0 Hz" — the
+  // advice then states the persistent variation without naming a frequency.
+  const fallback = validFrequencyHz(limitingFrequencyHz);
+  const frequencyHz = persistent?.hz ?? fallback;
 
   const status = persistent || tradedOff
     ? ABSORPTION_STATUS.RECOMMENDED
@@ -111,7 +123,7 @@ export function resolveAbsorptionAdvice({
 
   const reason = frequencyHz != null
     ? `Persistent modal issue around ${frequencyText(frequencyHz)}`
-    : "Seat-to-seat variation remains after electronic and placement options";
+    : ABSORPTION_NO_FREQUENCY_REASON;
 
   const headline = frequencyHz != null
     ? `ADI found a persistent seat-to-seat variation around ${frequencyText(frequencyHz)}. Electronic tuning and practical placement did not fully solve it. Consider low-frequency absorption at the front wall / front corners to reduce modal energy.`
@@ -127,7 +139,7 @@ export function resolveAbsorptionAdvice({
     label: ABSORPTION_LABEL,
     status,
     frequencyHz,
-    frequencyText: frequencyHz == null ? null : frequencyText(frequencyHz),
+    frequencyText: frequencyText(frequencyHz),
     affectedSeatCount: persistent?.seatCount ?? 0,
     reason,
     headline,

@@ -156,7 +156,7 @@ function LeverOutcome({ outcome }) {
   const p20Text = (headline) => deviationText(headline?.variationDb);
   const seatText = (headline) => {
     const seat = headline?.worstSeatId ? ` · ${headline.worstSeatId}` : "";
-    const hz = headline?.worstFrequencyHz != null ? ` at ${Math.round(Number(headline.worstFrequencyHz))} Hz` : "";
+    const hz = frequencyText(headline?.worstFrequencyHz) ? ` at ${frequencyText(headline.worstFrequencyHz)}` : "";
     return `${seat}${hz}`;
   };
   const before = p20Text(outcome.before);

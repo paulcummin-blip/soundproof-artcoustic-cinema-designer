@@ -282,6 +282,7 @@ export default function AdiOptimisationJourney({
             {summary.seatingRecommendation.p19Delta ? `P19 ${summary.seatingRecommendation.p19Delta}. ` : ""}
             {summary.seatingRecommendation.p14Delta ? `P14 ${summary.seatingRecommendation.p14Delta}. ` : ""}
             {summary.seatingRecommendation.p18DeltaHz != null
+              && Math.abs(Math.round(summary.seatingRecommendation.p18DeltaHz)) > 0
               ? `P18 extension ${summary.seatingRecommendation.p18DeltaHz >= 0 ? "+" : "−"}${Math.abs(Math.round(summary.seatingRecommendation.p18DeltaHz))} Hz. `
               : ""}
             {summary.seatingRecommendation.destinationsValid === true

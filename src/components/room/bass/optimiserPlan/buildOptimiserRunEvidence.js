@@ -110,9 +110,26 @@ export function buildActionableOptimiserRunSummary({
   if (!selection?.winner) return null;
   const rows = Array.isArray(selection.confirmedResults) ? selection.confirmedResults : [];
   const evaluated = resolveEvaluatedCount(diagnostics, rows);
+  // A winning run states the same per-family evidence a terminal run does: what
+  // each family was tested for and what happened. Without it the ledger below the
+  // card would show an evaluated family as "Not evaluated".
+  const currentSummary = summariseResult(selection?.currentResult || null);
+  const families = buildFamilyLedger({
+    selection,
+    diagnostics,
+    current: {
+      p20VariationDb: num(diagnostics?.currentResult?.score?.p20VariationDb)
+        ?? currentSummary?.p20VariationDb
+        ?? null,
+      p19VariationDb: num(diagnostics?.currentResult?.score?.p19VariationDb)
+        ?? currentSummary?.p19VariationDb
+        ?? null,
+    },
+  });
   return {
     completedAt: new Date().toISOString(),
     outcome: "actionable_plan_produced",
+    families,
     canonicalJobsRun: num(selection.canonicalJobsRun
       ?? diagnostics?.canonicalJobsRun
       ?? diagnostics?.runtimeMetrics?.canonicalJobsRun),

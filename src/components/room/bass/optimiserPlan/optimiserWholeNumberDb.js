@@ -53,8 +53,22 @@ export function levelText(level) {
   return match ? `L${match[1]}` : null;
 }
 
-/** "at 73 Hz" — a limiting frequency, whole Hz. */
-export function frequencyText(value) {
+/**
+ * The lowest value that can be a frequency. A missing, zero or negative value
+ * is not a frequency, and is never printed as "0 Hz".
+ */
+export const MIN_VALID_FREQUENCY_HZ = 1;
+
+/** A limiting frequency in whole Hz, or null when the value is not one. */
+export function validFrequencyHz(value) {
   const number = Number(value);
-  return Number.isFinite(number) ? `${Math.round(number)} Hz` : null;
+  return Number.isFinite(number) && number >= MIN_VALID_FREQUENCY_HZ
+    ? Math.round(number)
+    : null;
+}
+
+/** "73 Hz" — a limiting frequency, whole Hz. Null when the value is not one. */
+export function frequencyText(value) {
+  const whole = validFrequencyHz(value);
+  return whole == null ? null : `${whole} Hz`;
 }

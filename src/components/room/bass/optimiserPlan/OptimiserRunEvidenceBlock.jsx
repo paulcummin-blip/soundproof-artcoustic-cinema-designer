@@ -261,7 +261,7 @@ export default function OptimiserRunEvidenceBlock({
           <span className="text-[#8B7F76]">Current P20 (canonical): </span>
           {currentP20 || UNAVAILABLE}
           {current?.worstSeatId ? ` · worst seat ${current.worstSeatId}` : ""}
-          {current?.worstFrequencyHz != null ? ` at ${Math.round(Number(current.worstFrequencyHz))} Hz` : ""}
+          {frequencyText(current?.worstFrequencyHz) ? ` at ${frequencyText(current.worstFrequencyHz)}` : ""}
         </div>
         {best && (
           <div className="text-[#1B1A1A]">

@@ -29,6 +29,11 @@ import { deltaText, deviationText, frequencyText, levelText } from "./optimiserW
 import { leverIsOfferable } from "./optimiserPlanSave.js";
 import { estimateOptimiserCalculations, resultSentence } from "./optimiserCalculationEstimate.js";
 import { resolveAbsorptionAdvice } from "./absorptionAdviceAuthority.js";
+import {
+  ADI_ROW_OUTCOME,
+  ADI_ROW_STATUS,
+  buildFamilyLedgerRows,
+} from "./optimiserFamilyLedgerRows.js";
 import { OPTIMISER_PRESENTATION_STATE } from "./resolveOptimiserPresentationState.js";
 
 export const ADI_TESTED_TITLE = "What ADI tested";
@@ -41,27 +46,10 @@ export const ADI_STALE_COPY = Object.freeze({
   PREVIOUS_LABEL: "Previous best result:",
 });
 
-/** Designer-facing status words — short, never internal terminology. */
-export const ADI_ROW_STATUS = Object.freeze({
-  TESTED: "Tested",
-  RECOMMENDED: "Recommended",
-  NOT_EVALUATED: "Not evaluated",
-  NOT_TESTED: "Not tested",
-  NOT_RETAINED: "Not retained",
-  LAST_RESORT: "Last resort",
-  APPLIED: "Applied",
-});
-
-export const ADI_ROW_OUTCOME = Object.freeze({
-  NO_USEFUL: "No useful improvement",
-  NO_SAFE: "No safe improvement",
-  NO_SAFE_STANDALONE: "No safe standalone improvement",
-  NO_BETTER_LAYOUT: "No better layout found",
-  COMPARE_SEPARATELY: "Compare separately",
-  NOT_REQUIRED_YET: "Not required yet",
-  UNAVAILABLE: "Not available",
-  PHASE_UNAVAILABLE: "Crossover-region model not available",
-});
+// The designer-facing ledger vocabulary — status words and outcome phrases —
+// lives with the evidence it describes (optimiserFamilyLedgerRows.js) and is
+// re-exported here for the card.
+export { ADI_ROW_OUTCOME, ADI_ROW_STATUS };
 
 const LABEL_OVERRIDE = Object.freeze({
   "Subwoofer option": "Sub option",
@@ -182,6 +170,13 @@ function seatingRecommendationDetail({ row, baseline = null } = {}) {
  */
 export function buildTestedOptionRows(planView, { recommendedLever = null, appliedLever = null } = {}) {
   const lastKey = leverOrder()[leverOrder().length - 1] || null;
+  // The run's own per-family evidence: what each family actually did. Null for a
+  // saved record that carries no family ledger (an older plan), in which case
+  // the plan's own lever rows are the only evidence there is.
+  const familyRows = buildFamilyLedgerRows({
+    families: planView?.run?.families,
+    baseline: planView?.baseline || null,
+  });
   return leverOrder().map((key) => {
     const row = findLeverRow(planView, key);
     const label = displayLabel(key);
@@ -191,16 +186,6 @@ export function buildTestedOptionRows(planView, { recommendedLever = null, appli
 
     if (key === appliedLever) {
       return { key, label, status: ADI_ROW_STATUS.APPLIED, outcome: "Undo to review the previous design", action: null };
-    }
-
-    if (isLast && !evaluated) {
-      return {
-        key,
-        label,
-        status: ADI_ROW_STATUS.LAST_RESORT,
-        outcome: ADI_ROW_OUTCOME.NOT_REQUIRED_YET,
-        action: null,
-      };
     }
 
     if (key === recommendedLever && evaluated && hasChanges) {
@@ -214,6 +199,34 @@ export function buildTestedOptionRows(planView, { recommendedLever = null, appli
         status: ADI_ROW_STATUS.RECOMMENDED,
         outcome: movement ? (effect ? `${movement} · ${effect}` : movement) : (effect || null),
         action: "apply",
+      };
+    }
+
+    // ── The saved run evidence ──
+    // A family the run evaluated is never shown as "Not evaluated": its status
+    // and outcome are read from the per-family ledger the run saved. Used only
+    // where the plan carries no lever evaluation of its own, so plan evidence
+    // always wins.
+    const familyRow = familyRows ? familyRows[key] : null;
+    if (!evaluated && familyRow) {
+      return {
+        key,
+        label,
+        status: familyRow.status,
+        outcome: familyRow.outcome,
+        action: null,
+      };
+    }
+
+    // The last lever in the order is the last resort: not required is a real
+    // state, and it is only stated when the run did not evaluate it.
+    if (isLast && !evaluated) {
+      return {
+        key,
+        label,
+        status: ADI_ROW_STATUS.LAST_RESORT,
+        outcome: ADI_ROW_OUTCOME.NOT_REQUIRED_YET,
+        action: null,
       };
     }
 
@@ -296,6 +309,19 @@ export function resolveUndoPermission({ planView, appliedLever = null }) {
 }
 
 /**
+ * Which families were evaluated, for the absorption advice's own checks. The
+ * plan's lever rows are preferred; a run that saved terminal evidence has none,
+ * so its family ledger is used instead. It states what the run did — nothing is
+ * inferred from a family the run never searched.
+ */
+function absorptionLeverRows(planView) {
+  const levers = Array.isArray(planView?.levers) ? planView.levers : [];
+  if (levers.length > 0) return levers;
+  const families = Array.isArray(planView?.run?.families) ? planView.run.families : [];
+  return families.map((entry) => ({ lever: entry?.family || null, evaluated: entry?.tested === true }));
+}
+
+/**
  * The complete designer view model for the card.
  * `currentP20Deviation` comes from the published authority; everything else is
  * read from the saved plan. Missing authorities produce null — never a guess.
@@ -347,7 +373,7 @@ export function buildAdiDesignerSummary({
       ?? planView?.baseline?.p20VariationDb
       ?? null,
     seats: planView?.baseline?.seats,
-    leverRows: planView?.levers,
+    leverRows: absorptionLeverRows(planView),
     limitingFrequencyHz,
   });
   const rows = absorption
