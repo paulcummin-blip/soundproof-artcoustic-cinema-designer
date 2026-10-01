@@ -23,6 +23,7 @@ import {
 } from "@/components/report/technical/designRatingPresentation";
 import { getLowestPerformanceResults } from "@/components/designreview/needsAttentionAuthority";
 import { getCategoryForParam } from "@/components/report/technical/technicalParameterMeta";
+import { isSeatScopedParameterKey } from "@/components/utils/rp22ParameterPresentation";
 import { buildRp22SeatCoverageResult } from "@/components/utils/rp22SeatCoverageSentence";
 import { getScopedSeatIds, buildSeatPriorityFingerprint } from "@/components/utils/seatScopeAuthority";
 import { P8_NUMBER, buildP8RoomResult } from "@/components/utils/rp22/p8Authority";
@@ -132,7 +133,10 @@ function buildComplianceSummary(parameters) {
   for (const [key, parameter] of Object.entries(parameters || {})) {
     if (key === "screen") continue;
     const level = parameterAggregateLevel(parameter);
-    const isSeatScope = parameter?.scope === "seat";
+    // Seat counting follows the canonical RP22 catalogue scope, not the scoring
+    // structure. P19 is RSP-scoped (RSP after EQ vs house target) and is never
+    // counted as a seat parameter. Its maths and scoring are untouched.
+    const isSeatScope = parameter?.scope === "seat" && isSeatScopedParameterKey(key);
     if (isSeatScope) {
       seatParamCount += 1;
       if (level) calculatedSeatParams += 1;
@@ -180,8 +184,12 @@ function buildComplianceSummary(parameters) {
 
 function buildReportCounts(parameters, seats, seatHudById) {
   const roomLevelCounts = { L4: 0, L3: 0, L2: 0, L1: 0, fail: 0, unassessed: 0 };
+  // Seat counting follows the canonical RP22 catalogue scope. P19 is RSP-scoped
+  // there, so it enters neither group: it is not a seat parameter, and its one
+  // RSP result is presented on its own authority rather than as an aggregate of
+  // seats. No other parameter changes group.
   const seatParameterEntries = Object.entries(parameters || {})
-    .filter(([key, parameter]) => key !== "screen" && parameter?.scope === "seat");
+    .filter(([key, parameter]) => key !== "screen" && parameter?.scope === "seat" && isSeatScopedParameterKey(key));
   const roomParameterEntries = Object.entries(parameters || {})
     .filter(([key, parameter]) => key !== "screen" && parameter?.scope !== "seat");
 

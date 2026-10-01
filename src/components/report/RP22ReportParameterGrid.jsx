@@ -58,11 +58,11 @@ export default function RP22ReportParameterGrid({
    * Seat results for a parameter, arranged as a seat-layout map.
    *
    * Seat-scoped parameters show their results in the shape of the seating plan.
-   * P19 is seat-scoped in the catalog but is a room-level bass result: it is
-   * never presented as a per-seat map.
+   * P19 is RSP-scoped in the canonical catalogue, so no per-seat map is ever
+   * built for it — the scope authority decides, not this grid.
    */
   const seatMapFor = (param) => (
-    String(param?.scope || "").toLowerCase() === "seat" && Number(param?.id) !== 19
+    String(param?.scope || "").toLowerCase() === "seat"
       ? buildSeatGridData(param.id)
       : null
   );
