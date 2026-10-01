@@ -615,8 +615,10 @@ describe('TEST 9: the card receives the run evidence', () => {
     expect(journey).toMatch(/<OptimiserRunEvidenceBlock evidence=\{runEvidence\} seatCount=\{seatCount\} instances=\{instances\} \/>/);
 
     const card = read('components/room/bass/optimiseWorkflow/AdiRecommendation.jsx');
-    // The resolved presentation is handed to the journey card...
-    expect((card.match(/presentation=\{optimiserPresentation\}/g) || []).length).toBe(2);
+    // The resolved presentation is handed to the journey card in both of its
+    // branches, and to the placement recommendation section, so every optimiser
+    // surface states the same resolved state.
+    expect((card.match(/presentation=\{optimiserPresentation\}/g) || []).length).toBe(3);
     // ...and the two terminal cards that resolve their own copy still show what
     // the run evaluated, so no no-winner outcome hides the evidence.
     const evidenceBlock = /<OptimiserRunEvidenceBlock\s+evidence=\{optimiserPresentation\.evidence\}\s+seatCount=\{seatCount\}\s+instances=\{currentInstances\}\s+\/>/g;

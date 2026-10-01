@@ -28,6 +28,7 @@ import {
   buildSeatingMovement,
   seatingDestinationsValid,
 } from "./optimiserSeatingEvidence.js";
+import { describePlacementMove } from "./placementMoveAuthority.js";
 
 const num = (value) => (Number.isFinite(Number(value)) ? Number(value) : null);
 const round = (value, digits = 2) => (value == null ? null : Number(Number(value).toFixed(digits)));
@@ -353,17 +354,22 @@ export function buildOptimiserPlan({
 } = {}) {
   if (!selection || typeof selection !== "object") return null;
   const winner = selection.winner || null;
-  if (!winner) return null;
+  // A run that confirmed no single winner can still have evaluated ONE lever on
+  // its own — most often placement. That result is retained exactly as the run
+  // produced it (never invented), so it can be offered, applied and undone like
+  // any other lever. Every winner-specific block below stays empty in that case.
+  const positionResult = selectPositionResult(selection);
+  if (!winner && !positionResult) return null;
 
   const baselineResult = baseline || selection.currentResult || null;
   const baselineSummary = summariseResult(baselineResult);
 
   const levers = {};
 
-  const positionResult = selectPositionResult(selection);
   if (positionResult) {
     const changes = placementChanges({ positionResult, instances });
     if (changes.length > 0) {
+      const move = describePlacementMove({ changes, roomDims });
       levers[OPTIMISER_LEVER.PLACEMENT] = {
         lever: OPTIMISER_LEVER.PLACEMENT,
         evidenceStatus: OPTIMISER_LEVER_EVIDENCE.EVALUATED,
@@ -376,6 +382,14 @@ export function buildOptimiserPlan({
         reason: selection?.positionOptimisation?.materialityReason
           || positionResult?.materialityReason || null,
         tradeOff: existingTradeOff(positionResult),
+        // Practical, wall-based placement only. A movement off the mounting wall
+        // is retained as evidence and marked theoretical: it is never offered as
+        // default placement, and the reason is stated with the lever.
+        practical: move?.practical !== false,
+        theoreticalReason: move?.practical === false ? move.theoreticalReason : null,
+        // The physical move in installer words — the designer never leads with
+        // coordinates.
+        movementLabel: move?.movementLabel || null,
       };
     }
   }
@@ -447,6 +461,11 @@ export function buildOptimiserPlan({
     .some((leverKey) => levers[leverKey]?.effect != null);
 
   const planNotes = [...notes];
+  if (!winner) {
+    planNotes.push(
+      "This run confirmed no single winning candidate. The one change it evaluated on its own is offered separately, with its own Apply and Undo.",
+    );
+  }
   if (!individualEffectsEvaluated) {
     planNotes.push(
       "Only the combined candidate was evaluated — no individual lever effects were recorded.",
@@ -458,7 +477,7 @@ export function buildOptimiserPlan({
     );
   }
 
-  const combinedCoordinates = winner.positionCoordinates || winner.coordinates || null;
+  const combinedCoordinates = winner?.positionCoordinates || winner?.coordinates || null;
   const components = combinedComponents({ winner, instances, seatingPositions, coordinates: combinedCoordinates });
 
   // The winning change is stated with its components. When the combined
@@ -494,13 +513,16 @@ export function buildOptimiserPlan({
       p14TargetDb: num(identity.target?.p14TargetDb),
       targetKey: identity.target?.targetKey || null,
     },
-    engineVersion: identity.engineVersion || winner.algorithmVersion || null,
-    candidateId: winner.candidateId || null,
-    candidateKind: winner.candidateKind || (winner.isPositionCandidate ? "position" : null),
+    engineVersion: identity.engineVersion || winner?.algorithmVersion || null,
+    candidateId: winner?.candidateId || positionResult?.candidateId || null,
+    candidateKind: winner?.candidateKind
+      || ((winner?.isPositionCandidate || (!winner && positionResult)) ? "position" : null),
     // --- 2. baseline result ---
     baseline: baselineSummary,
     // --- 3. combined winning candidate ---
-    combined: {
+    // Null when the run confirmed no single winner: the retained lever above is
+    // then the whole offer, and no combined candidate is claimed.
+    combined: winner ? {
       evaluated: true,
       candidateId: winner.candidateId || null,
       coordinates: Array.isArray(combinedCoordinates)
@@ -515,7 +537,7 @@ export function buildOptimiserPlan({
       tradeOff: existingTradeOff(winner),
       // What the winning candidate actually changed, component by component.
       components,
-    },
+    } : null,
     levers,
     individualEffectsEvaluated,
     leverDecisions: normaliseDecisions(leverDecisions),

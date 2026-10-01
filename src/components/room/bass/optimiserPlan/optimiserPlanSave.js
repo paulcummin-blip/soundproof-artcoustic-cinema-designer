@@ -23,9 +23,10 @@
 // recalculates nothing, and changes no bass maths, scoring or RP22 grading.
 // ---------------------------------------------------------------------------
 
-import { OPTIMISER_TERMINAL_OUTCOME } from "./optimiserPlanConstants.js";
+import { OPTIMISER_LEVER, OPTIMISER_TERMINAL_OUTCOME } from "./optimiserPlanConstants.js";
 import { OPTIMISER_LEVER_VERDICT, resolveLeverVerdict } from "./optimiserLeverVerdict.js";
 import { leverLabel } from "./optimiserLeverOrder.js";
+import { PLACEMENT_THEORETICAL_NOTE } from "./placementMoveAuthority.js";
 import {
   buildActionableOptimiserRunSummary,
   buildOptimiserRunEvidence,
@@ -74,6 +75,9 @@ export function leverIsOfferable(lever, baseline) {
     notTestedReason: lever.notEvaluatedReason || null,
   });
   if (verdict.verdict === OPTIMISER_LEVER_VERDICT.NOT_APPLICABLE) return false;
+  // A movement outside the practical, wall-based placement envelope is retained
+  // as evidence, but it is never offered as default placement.
+  if (lever.practical === false) return false;
   const geometry = lever.validation?.destinationsValid;
   return verdict.applyAllowed === true && geometry !== false;
 }
@@ -139,6 +143,21 @@ export function resolvePlanActionability({ plan = null, selection = null } = {})
       terminalOutcome: OPTIMISER_TERMINAL_OUTCOME.NO_USEFUL_IMPROVEMENT,
       reason: `${SEATING_NOT_SAFE_REASON_PREFIX} ${blockedByGeometry.validation?.reason
         || "the destination seat positions could not be confirmed."} (${label})`,
+      offerableLevers: [],
+    };
+  }
+
+  // A retained placement result outside the practical envelope is stated as
+  // exactly that: the improvement is real, the movement is not offered as
+  // default placement, and nothing is silently dropped.
+  const theoreticalPlacement = Object.values(levers)
+    .find((lever) => lever.lever === OPTIMISER_LEVER.PLACEMENT && lever.practical === false);
+  if (theoreticalPlacement) {
+    const detail = theoreticalPlacement.theoreticalReason ? ` ${theoreticalPlacement.theoreticalReason}` : "";
+    return {
+      actionable: false,
+      terminalOutcome: OPTIMISER_TERMINAL_OUTCOME.NO_USEFUL_IMPROVEMENT,
+      reason: `${PLACEMENT_THEORETICAL_NOTE}${detail}`,
       offerableLevers: [],
     };
   }

@@ -22,6 +22,7 @@ import {
   OPTIMISER_PLAN_STATUS,
 } from "./optimiserPlanConstants.js";
 import { normaliseCanonicalPolarity, resolveLeverMatch, resolveSeatingMatch } from "./optimiserPlanMatching.js";
+import { PLACEMENT_THEORETICAL_NOTE } from "./placementMoveAuthority.js";
 
 /** Why a lever cannot be applied on its own. */
 export const LEVER_APPLY_BLOCK = Object.freeze({
@@ -38,6 +39,8 @@ export const LEVER_APPLY_BLOCK = Object.freeze({
   SEATING_POSITIONS_UNAVAILABLE: "seating_positions_unavailable",
   /** An evaluated destination seat position is not a legal position. */
   SEATING_DESTINATION_INVALID: "seating_destination_invalid",
+  /** The evaluated movement leaves the practical, wall-based placement envelope. */
+  IMPRACTICAL: "impractical",
 });
 
 export const LEVER_APPLY_BLOCK_MESSAGE = Object.freeze({
@@ -61,6 +64,7 @@ export const LEVER_APPLY_BLOCK_MESSAGE = Object.freeze({
     "The seating positions for this design cannot be read, so the evaluated movement cannot be applied here.",
   [LEVER_APPLY_BLOCK.SEATING_DESTINATION_INVALID]:
     "The evaluated seating movement was not applied: a destination seat position is not a legal position in this room.",
+  [LEVER_APPLY_BLOCK.IMPRACTICAL]: PLACEMENT_THEORETICAL_NOTE,
 });
 
 export const LEVER_APPLY_LABEL = Object.freeze({
@@ -109,6 +113,11 @@ export function resolveLeverApplyState({
     return blocked(LEVER_APPLY_BLOCK.UNKNOWN_LEVER);
   }
   if (lever.disabled === true) return blocked(LEVER_APPLY_BLOCK.DISABLED);
+  // A theoretical placement is never applied from the card. The lever keeps its
+  // evidence and its reason; only the offer is withheld.
+  if (leverKey === OPTIMISER_LEVER.PLACEMENT && lever.practical === false) {
+    return blocked(LEVER_APPLY_BLOCK.IMPRACTICAL);
+  }
   if (lever.evaluated !== true || lever.notEvaluated === true || !lever.effect) {
     return blocked(LEVER_APPLY_BLOCK.NOT_EVALUATED);
   }

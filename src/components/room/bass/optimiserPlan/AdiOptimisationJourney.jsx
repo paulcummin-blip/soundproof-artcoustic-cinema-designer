@@ -34,6 +34,8 @@ import OptimiserCalculationEstimateLine from "./OptimiserCalculationEstimateLine
 import OptimiserCalculationDetail from "./OptimiserCalculationDetail.jsx";
 import AdiTestedOptionsTable from "./AdiTestedOptionsTable.jsx";
 import AdiDesignerActionBar from "./AdiDesignerActionBar.jsx";
+import PlacementRecommendationPanel from "./PlacementRecommendationPanel.jsx";
+import { OPTIMISER_LEVER } from "./optimiserPlanConstants.js";
 import { ADI_ENGINEER_DETAILS_TITLE, buildAdiDesignerSummary } from "./adiDesignerSummary.js";
 import { readAuthoritativeP20Headline } from "./optimiserPlanMetrics.js";
 
@@ -104,6 +106,7 @@ export default function AdiOptimisationJourney({
   instances = [],
   seatingPositions = [],
   seatCount = null,
+  roomDims = null,
   limitingFactorSentence = null,
   runBlockReason = null,
   runStatus = "idle",
@@ -176,16 +179,35 @@ export default function AdiOptimisationJourney({
     liveProgress: isRunning ? { ...liveState, running: true } : null,
     instances,
     seatCount,
+    roomDims,
     currentP20Deviation: p20Headline?.variationDb ?? null,
     currentP20Level: p20Headline?.level ?? null,
     limitingFrequencyHz: p20Headline?.worstFrequencyHz ?? null,
     appliedLever: leverOutcome?.appliedLever ?? null,
+    appliedDirection: leverOutcome?.direction ?? null,
   });
   const handleApplyRecommended = summary.actions.canApply && typeof onApplyLever === "function"
     ? () => onApplyLever(summary.recommendedLever)
     : null;
   const handleUndoRecommended = summary.actions.canUndo && typeof onUndoLever === "function"
     ? () => onUndoLever(summary.actions.undoLever || summary.recommendedLever)
+    : null;
+
+  // ── The placement recommendation owns its own actions ──
+  // Placement is the one lever with a physical, wall-based move to describe, so
+  // its panel carries Apply placement / Undo placement / Re-run. The generic
+  // action bar never duplicates what the panel already offers.
+  const placement = summary.placementRecommendation || null;
+  const placementLever = (planView?.levers || [])
+    .find((lever) => (lever?.key ?? lever?.lever) === OPTIMISER_LEVER.PLACEMENT) || null;
+  const panelShowsApply = placement?.kind === "recommended" && placement.canApply === true;
+  const panelShowsUndo = placement?.kind === "applied" && placement.canUndo === true;
+  const panelShowsRerun = placement?.kind === "previous";
+  const handleApplyPlacement = panelShowsApply && placementLever && typeof onApplyLever === "function"
+    ? () => onApplyLever(placementLever)
+    : null;
+  const handleUndoPlacement = panelShowsUndo && placementLever && typeof onUndoLever === "function"
+    ? () => onUndoLever(placementLever)
     : null;
 
   const showAction = !!journey.action && journey.canRun && !isRunning;
@@ -305,6 +327,16 @@ export default function AdiOptimisationJourney({
         </div>
       )}
 
+      {/* Placement — the physical move, its expected result in whole dB, and its
+          own Apply/Undo actions. Nothing else on this card moves a subwoofer. */}
+      <PlacementRecommendationPanel
+        placement={placement}
+        busy={isRunning}
+        onApply={handleApplyPlacement}
+        onUndo={handleUndoPlacement}
+        onRerun={onRunOptimisationPlan}
+      />
+
       <AdiTestedOptionsTable summary={summary} />
 
       {/* Low-frequency absorption — ninth in the fixed order, after every
@@ -323,9 +355,9 @@ export default function AdiOptimisationJourney({
       <AdiDesignerActionBar
         summary={summary}
         busy={isRunning}
-        onApply={handleApplyRecommended}
-        onUndo={handleUndoRecommended}
-        onRerun={onRunOptimisationPlan}
+        onApply={panelShowsApply ? null : handleApplyRecommended}
+        onUndo={panelShowsUndo ? null : handleUndoRecommended}
+        onRerun={panelShowsRerun ? null : onRunOptimisationPlan}
       />
 
       {/* How many design options ADI will test, and the acoustic work behind them. */}

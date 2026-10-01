@@ -32,7 +32,12 @@ import { deltaText } from "./optimiserWholeNumberDb.js";
  * about it here rather than leaving the designer with "—" and no explanation.
  */
 export const ADI_ROW_ACTION = Object.freeze({
-  RERUN_TO_APPLY: "Re-run to apply",
+  /**
+   * The ONE action that makes a previously measured improvement available again.
+   * Never "Re-run to apply": the designer is asked to re-evaluate the design,
+   * not told that a found improvement is simply unavailable.
+   */
+  RERUN_ADI: "Re-run Optimisation Plan",
 });
 
 /**
@@ -70,12 +75,17 @@ export const ADI_ROW_OUTCOME = Object.freeze({
   /** The fixed "Trade-off" outcome. Never carries an Apply action. */
   TRADE_OFF: "Trade-off — improves one measure and worsens another. No automatic apply",
   /**
-   * A real, measured improvement that this run cannot offer, because the change
-   * that produced it was not kept with the run. The improvement is stated WITH
-   * the reason it cannot be applied, and the row's action states the next step —
-   * a measured improvement is never withheld without a reason.
+   * A real, measured improvement whose evaluated change was not kept with the
+   * run. The mandated sentence comes FIRST, verbatim, so the designer reads the
+   * one action that makes it available; the measured value follows it. An
+   * improvement is never withheld, never called "not offered", and never left
+   * for the designer to guess at.
    */
-  NOT_RETAINED: "Improvement measured, but no applicable change was kept by this run",
+  PREVIOUS_FOUND: "Previous placement improvement found. Re-run ADI on the current design before applying.",
+  /** The same rule when the design itself has moved on since the evaluation. */
+  PREVIOUS_FOUND_STALE: "Previous placement improvement found, but the design has changed. Re-run ADI before applying.",
+  /** Stated for a movement outside the practical, wall-based placement envelope. */
+  THEORETICAL_PLACEMENT: "Theoretical option — not offered as default placement.",
   NO_BETTER_LAYOUT: "No better layout found",
   /** Stated for the crossover region — a capability the model does not have. */
   PHASE_NOT_MODELLED:
@@ -173,18 +183,22 @@ function changeMagnitudeDb(delta) {
 }
 
 /**
- * The outcome for a real improvement the run kept no change for:
- * "Measured improvement (P20 better by 3 dB) — no applicable change was kept by
- * this run". States the improvement, states the reason, states the next step.
+ * The outcome for a real improvement the run kept no evaluated change for: the
+ * mandated sentence first, then the measured value, in whole dB. The improvement
+ * is stated — it is never withheld.
  */
-function notRetainedText(attempt) {
+function previousImprovementText(entry, attempt) {
   const parts = [];
   const p20 = changeMagnitudeDb(attempt?.p20DeltaDb);
   const p19 = changeMagnitudeDb(attempt?.p19DeltaDb);
   if (p20) parts.push(`P20 better by ${p20}`);
   if (p19) parts.push(`P19 better by ${p19}`);
-  if (!parts.length) return ADI_ROW_OUTCOME.NOT_RETAINED;
-  return `Measured improvement (${parts.join(", ")}) — no applicable change was kept with this run`;
+  const noun = entry?.family === OPTIMISER_RUN_FAMILY.PLACEMENT
+    ? "placement"
+    : String(entry?.label || "optimiser").toLowerCase();
+  const sentence = `Previous ${noun} improvement found. Re-run ADI on the current design before applying.`;
+  if (!parts.length) return sentence;
+  return `${sentence} That evaluation measured ${parts.join(", ")}.`;
 }
 
 function testedOutcome(entry, baseline) {
@@ -214,12 +228,12 @@ function testedOutcome(entry, baseline) {
   }
   if (verdict.verdict === OPTIMISER_LEVER_VERDICT.RECOMMENDED) {
     // A genuine improvement. It is offered as a recommendation by the row that
-    // carries the change; here the run kept the measured effect only, so the
-    // improvement is stated WITH the reason it cannot be applied.
+    // carries the change; here the run kept the measured effect only, so the row
+    // states the improvement and the one action that makes it available.
     return {
       status: ADI_ROW_STATUS.TESTED,
-      outcome: notRetainedText(attempt),
-      actionText: ADI_ROW_ACTION.RERUN_TO_APPLY,
+      outcome: previousImprovementText(entry, attempt),
+      actionText: null,
     };
   }
   if (verdict.verdict === OPTIMISER_LEVER_VERDICT.NOT_APPLICABLE) {

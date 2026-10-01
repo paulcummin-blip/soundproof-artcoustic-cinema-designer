@@ -190,6 +190,12 @@ export function resolveOptimiserPlanStatus({
         // destination positions are legal. Null for every other lever.
         seating: lever.seating || null,
         validation: lever.validation || null,
+        // Placement-specific evidence: whether the evaluated movement is a
+        // practical, wall-based one, the reason when it is not, and the physical
+        // move stated in installer words rather than coordinates.
+        practical: lever.practical ?? null,
+        theoreticalReason: lever.theoreticalReason || null,
+        movementLabel: lever.movementLabel || null,
         disabled,
         state,
         stateLabel: OPTIMISER_LEVER_STATE_LABEL[state] || state,

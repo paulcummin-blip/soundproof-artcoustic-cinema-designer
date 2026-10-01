@@ -45,6 +45,8 @@ import { buildAuthoritativeRspPosition } from "../authoritativeRspPosition";
 import { useActiveProjectId } from "@/components/state/project-session";
 import { useAppliedCalibrationAuthority } from "../appliedCalibrationAuthority/appliedCalibrationAuthorityStore";
 import OptimisationPlanStatus from "@/components/room/bass/optimiserPlan/OptimisationPlanStatus.jsx";
+import PlacementRecommendationSection from "@/components/room/bass/optimiserPlan/PlacementRecommendationSection.jsx";
+import { resolvePlacementRecommendation } from "@/components/room/bass/optimiserPlan/placementRecommendationAuthority.js";
 import AdiOptimisationJourney from "@/components/room/bass/optimiserPlan/AdiOptimisationJourney.jsx";
 import OptimiserRunEvidenceBlock from "@/components/room/bass/optimiserPlan/OptimiserRunEvidenceBlock.jsx";
 import { firstSentence } from "@/components/room/bass/optimiserPlan/resolveAdiOptimiserJourney.js";
@@ -314,7 +316,7 @@ export default function AdiRecommendation({
       if (!result.ok) return;
       commitSeating(result.seatingPositions);
       setLeverOutcome({
-        leverKey: lever.key, label: lever.label || lever.key, before, after: null, appliedLever: lever.key,
+        leverKey: lever.key, label: lever.label || lever.key, before, after: null, appliedLever: lever.key, direction,
       });
       if (typeof onRecalculate === "function") {
         onRecalculate({ previousCacheKey: shared?.cacheKey || null });
@@ -334,7 +336,7 @@ export default function AdiRecommendation({
         : undefined,
     );
     setLeverOutcome({
-      leverKey: lever.key, label: lever.label || lever.key, before, after: null, appliedLever: lever.key,
+      leverKey: lever.key, label: lever.label || lever.key, before, after: null, appliedLever: lever.key, direction,
     });
     if (typeof onRecalculate === "function") {
       onRecalculate({ previousCacheKey: shared?.cacheKey || null });
@@ -483,6 +485,21 @@ export default function AdiRecommendation({
     runBlocked: !!optimisationRunBlockReason,
   });
 
+  // ── The placement recommendation ──
+  // Resolved here only for what this card must know about it: whether the
+  // placement panel is showing its own Apply button, so this card's button never
+  // duplicates it. A plain resolver call, not a hook: it sits after this
+  // component's early returns, and it is a pure read of the saved plan.
+  const placementRecommendation = resolvePlacementRecommendation({
+    planView: optimiserPlanView,
+    roomDims,
+    presentation: optimiserPresentation,
+    appliedLever: leverOutcomeResolved?.appliedLever ?? null,
+    appliedDirection: leverOutcomeResolved?.direction ?? null,
+  });
+  const panelShowsApply = placementRecommendation?.kind === "recommended"
+    && placementRecommendation.canApply === true;
+
   // FIX 4 (revised): an incomplete evaluation is never a dead end. The card
   // states the limiting factor, what is incomplete, the next action and what
   // that action will evaluate — resolved from the saved Optimisation Plan by
@@ -497,6 +514,7 @@ export default function AdiRecommendation({
         instances={currentInstances}
         seatingPositions={seatingPositions}
         seatCount={seatCount}
+        roomDims={roomDims}
         limitingFactorSentence={limitingFactorSentence}
         runBlockReason={optimisationRunBlockReason || null}
         runStatus={optimisationRunStatus || "idle"}
@@ -617,6 +635,7 @@ export default function AdiRecommendation({
         instances={currentInstances}
         seatingPositions={seatingPositions}
         seatCount={seatCount}
+        roomDims={roomDims}
         limitingFactorSentence={limitingFactorSentence}
         runBlockReason={optimisationRunBlockReason || null}
         runStatus={optimisationRunStatus || "idle"}
@@ -653,7 +672,11 @@ export default function AdiRecommendation({
   const canApplySeating = actionableSeating;
   // The Apply action exists only where the canonical presentation state says an
   // evaluated change is available and applicable.
-  const showApplyButton = optimiserPresentation.showApply && (canApplySubPositions || canApplySeating);
+  // The placement panel carries its own Apply; this button stays for the
+  // sub-position and seating path, so the two can never duplicate an action.
+  const showApplyButton = optimiserPresentation.showApply
+    && (canApplySubPositions || canApplySeating)
+    && !panelShowsApply;
   const applyHandler = canApplySubPositions ? handleApplySubPositions : canApplySeating ? handleApplySeating : null;
 
   // ── Applied state — ONE authority ──
@@ -746,6 +769,19 @@ export default function AdiRecommendation({
           </div>
         </div>
       )}
+
+      {/* Placement — what physically moves, what it is expected to do in whole
+          dB, and its own Apply placement / Undo placement actions. */}
+      <PlacementRecommendationSection
+        planView={optimiserPlanView}
+        roomDims={roomDims}
+        presentation={optimiserPresentation}
+        leverOutcome={leverOutcomeResolved}
+        busy={applying}
+        onApplyLever={handleApplyLever}
+        onUndoLever={handleUndoLever}
+        onRerun={onRunOptimisationPlan}
+      />
 
       {/* Optimisation Plan — the SAVED evaluated optimiser result, restored from
           the design version (or the published result) and never recomputed */}

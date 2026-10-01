@@ -36,6 +36,9 @@ import {
   ADI_ROW_STATUS,
   buildFamilyLedgerRows,
 } from "./optimiserFamilyLedgerRows.js";
+import { PLACEMENT_THEORETICAL_NOTE, describePlacementMove } from "./placementMoveAuthority.js";
+import { resolvePlacementRecommendation } from "./placementRecommendationAuthority.js";
+import { LEVER_APPLY_LABEL, LEVER_UNDO_LABEL } from "./optimiserPlanLeverApply.js";
 import { buildLiveFamilyRows } from "./optimiserLiveProgress.js";
 import { OPTIMISER_PRESENTATION_STATE } from "./resolveOptimiserPresentationState.js";
 
@@ -178,7 +181,7 @@ function seatingRecommendationDetail({ row, baseline = null } = {}) {
  */
 export function buildTestedOptionRows(
   planView,
-  { recommendedLever = null, appliedLever = null, liveRows = null } = {},
+  { recommendedLever = null, appliedLever = null, liveRows = null, roomDims = null } = {},
 ) {
   if (Array.isArray(liveRows) && liveRows.length) return liveRows;
   const lastKey = leverOrder()[leverOrder().length - 1] || null;
@@ -201,15 +204,19 @@ export function buildTestedOptionRows(
     }
 
     if (key === recommendedLever && evaluated && hasChanges) {
-      // A seating recommendation states the movement itself — "move the seating
-      // 100 mm toward the screen" — beside its evaluated effect.
-      const movement = row?.seating?.movementLabel || null;
+      // A physical recommendation states the movement itself — "move the front
+      // subs wider along the front wall", "move the seating 100 mm toward the
+      // screen" — beside its evaluated effect, in whole dB.
+      const movement = row?.seating?.movementLabel
+        || row?.movementLabel
+        || describePlacementMove({ changes: row?.changes, roomDims })?.movementLabel
+        || null;
       const effect = shortPhrase(describeLeverEffect(row?.effect));
       return {
         key,
         label,
         status: ADI_ROW_STATUS.RECOMMENDED,
-        outcome: movement ? (effect ? `${movement} · ${effect}` : movement) : (effect || null),
+        outcome: movement ? (effect ? `${movement} ${effect}` : movement) : (effect || null),
         action: "apply",
       };
     }
@@ -318,6 +325,19 @@ export function buildTestedOptionRows(
     }
     if (leverVerdict.verdict === OPTIMISER_LEVER_VERDICT.RECOMMENDED) {
       // A genuine improvement that is not the one change the card applies.
+      // A movement outside the practical placement envelope is stated as
+      // theoretical: the improvement is real, the move is not offered by default.
+      if (row?.practical === false) {
+        return {
+          key,
+          label,
+          status: ADI_ROW_STATUS.TESTED,
+          outcome: row?.theoreticalReason
+            ? `${PLACEMENT_THEORETICAL_NOTE} ${row.theoreticalReason}`
+            : PLACEMENT_THEORETICAL_NOTE,
+          action: null,
+        };
+      }
       if (row?.validation?.destinationsValid === false) {
         return {
           key,
@@ -391,6 +411,13 @@ export function resolveApplyPermission({ planView, presentation, recommendedLeve
   if (!row || row.evaluated !== true || !Array.isArray(row.changes) || row.changes.length === 0) {
     return { allowed: false, reason: "The change behind this result was not kept, so it cannot be applied." };
   }
+  // A theoretical placement is evidence, never an offer.
+  if (row.practical === false) {
+    return {
+      allowed: false,
+      reason: `${PLACEMENT_THEORETICAL_NOTE}${row.theoreticalReason ? ` ${row.theoreticalReason}` : ""}`,
+    };
+  }
 
   const limiting = String(resolveLimitingMetric(planView?.baseline) || "");
   if (limiting.includes("20")) {
@@ -400,12 +427,22 @@ export function resolveApplyPermission({ planView, presentation, recommendedLeve
     }
   }
 
-  return { allowed: true, lever: recommendedLever, label: `Apply ${displayLabel(recommendedLever).toLowerCase()}` };
+  return {
+    allowed: true,
+    lever: recommendedLever,
+    label: LEVER_APPLY_LABEL[recommendedLever] || `Apply ${displayLabel(recommendedLever).toLowerCase()}`,
+  };
 }
 
 /** Can this result be undone? Only a result that was applied to the design. */
 export function resolveUndoPermission({ planView, appliedLever = null }) {
-  if (appliedLever) return { allowed: true, lever: appliedLever, label: "Undo change" };
+  if (appliedLever) {
+    return {
+      allowed: true,
+      lever: appliedLever,
+      label: LEVER_UNDO_LABEL[appliedLever] || "Undo change",
+    };
+  }
   if (Number(planView?.appliedCount) > 0) return { allowed: true, lever: null, label: "Undo change" };
   return { allowed: false, lever: null, label: null };
 }
@@ -438,6 +475,8 @@ export function buildAdiDesignerSummary({
   currentP20Level = null,
   limitingFrequencyHz = null,
   appliedLever = null,
+  appliedDirection = null,
+  roomDims = null,
 } = {}) {
   const state = presentation?.state || null;
   const stale = state === OPTIMISER_PRESENTATION_STATE.STALE;
@@ -459,7 +498,7 @@ export function buildAdiDesignerSummary({
   const apply = resolveApplyPermission({ planView, presentation, recommendedLever });
   const undo = resolveUndoPermission({ planView, appliedLever });
   const liveRows = running ? buildLiveFamilyRows(liveProgress) : null;
-  const leverRows = buildTestedOptionRows(planView, { recommendedLever, appliedLever, liveRows });
+  const leverRows = buildTestedOptionRows(planView, { recommendedLever, appliedLever, liveRows, roomDims });
 
   const baselineDeviation = wholeNumberDeviation(planView?.baseline?.p20VariationDb ?? null);
   const baselineLevel = planView?.baseline?.p20Level ?? null;
@@ -532,6 +571,16 @@ export function buildAdiDesignerSummary({
       ? seatingRecommendationDetail({ row: recommendedRow, baseline: planView?.baseline || null })
       : null,
     rows,
+    // The placement recommendation, resolved once: the physical move in
+    // installer words, what it is expected to do, and whether it can be applied
+    // or undone. Null when there is nothing to state about placement.
+    placementRecommendation: resolvePlacementRecommendation({
+      planView,
+      roomDims,
+      presentation,
+      appliedLever,
+      appliedDirection,
+    }),
     actions: {
       canApply: apply.allowed,
       applyLabel: apply.label,
@@ -540,8 +589,10 @@ export function buildAdiDesignerSummary({
       undoLabel: undo.label,
       undoLever: undo.lever,
       canRerun: true,
-      canPreview: apply.allowed,
-      rerunLabel: stale ? "Re-run Optimisation Plan" : noRun ? "Run Optimisation Plan" : "Re-run optimisation",
+      // No on-plan preview of a proposed change exists yet — the card never
+      // implies that one does.
+      canPreview: false,
+      rerunLabel: noRun ? "Run Optimisation Plan" : "Re-run Optimisation Plan",
     },
   };
 }

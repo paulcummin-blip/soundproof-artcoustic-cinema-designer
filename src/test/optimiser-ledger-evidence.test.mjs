@@ -43,12 +43,13 @@ import {
 } from '../components/room/bass/optimiserPlan/optimiserFamilyLedgerRows.js';
 
 /**
- * Copy the Bass Optimisation card must never carry: a measured improvement is
- * never withheld without a reason, and a search that ran is never described as
- * one that did not.
+ * Copy the Bass Optimisation card must never carry: the phrasings that withhold
+ * a found improvement. "Improvement found" on its own is required copy — the
+ * mandated previous-improvement sentence uses it — so only the withholding
+ * phrasings are banned.
  */
 const BANNED_COPY =
-  /not offered|improvement found|retained no attempt|no attempt value|not available|not evaluated|not tested/i;
+  /improvement found but not offered|not offered for application|re-run to apply|no applicable change was kept|placement tested but no value retained|retained no attempt|no attempt value|not available|not evaluated|not tested/i;
 import {
   MIN_VALID_FREQUENCY_HZ,
   frequencyText,
@@ -207,7 +208,7 @@ test('delay, gain and placement state the run’s real outcome', () => {
   });
   // The evidence behind those rows is the families the run confirmed.
   const tested = (summary.rows || []).filter((row) => row.status === ADI_ROW_STATUS.TESTED).map((row) => row.label);
-  assert.deepEqual(tested, ['Delay', 'Gain', 'Placement']);
+  assert.deepEqual(tested, ['Delay', 'Gain', 'Placement', 'Layout']);
 });
 
 // ── The four outcomes a placement row may state ──────────────────────────────
@@ -225,7 +226,7 @@ const placementRow = (bestAttempt) => buildFamilyLedgerRows({
   baseline: null,
 })?.placement || null;
 
-test('a measured improvement that could not be kept states it, with the next step', () => {
+test('a measured improvement states the value and the one action that offers it', () => {
   // The saved Marquee Home placement attempt, exactly: P20 −3.91 dB, P19 −0.62 dB.
   const row = placementRow({
     candidateId: 'practical-wall-front-single-33%',
@@ -239,11 +240,12 @@ test('a measured improvement that could not be kept states it, with the next ste
     p14DeltaDb: null,
   });
   assert.equal(row.status, ADI_ROW_STATUS.TESTED);
-  assert.match(row.outcome, /Measured improvement/i, 'the improvement is stated');
+  // The mandated sentence comes first, verbatim; the measured value follows it.
+  assert.match(row.outcome, /^Previous placement improvement found\. Re-run ADI on the current design before applying\./,
+    'the mandated copy is stated verbatim');
   assert.match(row.outcome, /P20 better by 3 dB/, 'in whole numbers, never overstated');
-  assert.match(row.outcome, /no applicable change was kept/i, 'with the reason it cannot be applied');
-  assert.equal(row.actionText, ADI_ROW_ACTION.RERUN_TO_APPLY, 'and the next step');
-  assert.ok(!BANNED_COPY.test(`${row.status} ${row.outcome} ${row.actionText}`), 'no banned copy');
+  assert.equal(row.actionText, null, 'the placement panel carries the re-run, not the row');
+  assert.ok(!BANNED_COPY.test(`${row.status} ${row.outcome} ${row.actionText || ''}`), 'no banned copy');
 });
 
 test('an improvement below the action threshold says so instead of a bare number', () => {

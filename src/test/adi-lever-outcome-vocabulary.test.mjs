@@ -37,9 +37,15 @@ import {
   resolvePlanActionability,
 } from "../components/room/bass/optimiserPlan/optimiserPlanSave.js";
 
-/** Copy the card must never carry. */
+/**
+ * Copy the card must never carry: the phrasings that withhold a found
+ * improvement. The mandated previous-improvement sentence — "Previous placement
+ * improvement found. Re-run ADI on the current design before applying." — is
+ * required copy, so "improvement found" on its own is not a match, and the
+ * theoretical-option note ("not offered as default placement") is required too.
+ */
 const BANNED_COPY =
-  /not offered|improvement found|retained no attempt|no attempt value|not available|not evaluated|not tested/i;
+  /improvement found but not offered|not offered for application|re-run to apply|no applicable change was kept|placement tested but no value retained|retained no attempt|no attempt value|not available|not evaluated|not tested/i;
 
 const textOf = (row) => `${row.status} ${row.outcome || ""} ${row.actionText || ""}`;
 
@@ -79,13 +85,15 @@ describe("the fixed lever outcome vocabulary", () => {
     expect(copy.filter((text) => BANNED_COPY.test(text))).toEqual([]);
   });
 
-  it("states a measured improvement with the reason it cannot be applied", () => {
+  it("states a measured improvement and the one action that makes it available", () => {
     const row = placementRow(MARQUEE_PLACEMENT_ATTEMPT);
     expect(row.status).toBe(ADI_ROW_STATUS.TESTED);
-    expect(row.outcome).toMatch(/Measured improvement/i);
+    // The mandated sentence comes first, verbatim, then the measured value.
+    expect(row.outcome).toContain("Previous placement improvement found. Re-run ADI on the current design before applying.");
     expect(row.outcome).toMatch(/P20 better by 3 dB/);
-    expect(row.outcome).toMatch(/no applicable change was kept/i);
-    expect(row.actionText).toBe(ADI_ROW_ACTION.RERUN_TO_APPLY);
+    // The action column carries no "Re-run to apply": the placement panel states
+    // the re-run, so the row does not.
+    expect(row.actionText).toBe(null);
     expect(BANNED_COPY.test(textOf(row))).toBe(false);
     // No decimal dB anywhere in the designer copy.
     expect(textOf(row)).not.toMatch(/\d\.\d/);
@@ -138,10 +146,9 @@ describe("the saved Marquee Home run, through the card's own row builder", () =>
   it("states the placement outcome without withholding it", () => {
     const row = rowFor("placement");
     expect(row.status).toBe(ADI_ROW_STATUS.TESTED);
-    expect(row.outcome).toMatch(/Measured improvement/i);
+    expect(row.outcome).toContain("Previous placement improvement found. Re-run ADI on the current design before applying.");
     expect(row.outcome).toMatch(/P20 better by 3 dB/);
-    expect(row.outcome).toMatch(/no applicable change was kept/i);
-    expect(row.actionText).toBe(ADI_ROW_ACTION.RERUN_TO_APPLY);
+    expect(row.actionText).toBe(null);
   });
 
   it("carries no banned copy on any row of the saved run", () => {

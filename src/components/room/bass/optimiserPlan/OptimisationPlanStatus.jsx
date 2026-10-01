@@ -22,6 +22,7 @@ import {
   leverLabel,
 } from "./optimiserLeverOrder.js";
 import { OPTIMISER_LEVER_VERDICT } from "./optimiserLeverVerdict.js";
+import { PLACEMENT_THEORETICAL_NOTE, describePlacementChange } from "./placementMoveAuthority.js";
 import {
   deltaText,
   deviationText,
@@ -101,7 +102,9 @@ function changeText(change) {
     return from && to ? `${from} m → ${to} m (${movement})` : movement;
   }
   if (change.lever === OPTIMISER_LEVER.PLACEMENT) {
-    return `${change.fromX?.toFixed(2)}, ${change.fromY?.toFixed(2)} m → ${change.toX?.toFixed(2)}, ${change.toY?.toFixed(2)} m`;
+    // Installer language, never coordinates: the designer reads what physically
+    // moves. The exact positions stay in the persisted plan for Apply and Undo.
+    return describePlacementChange(change);
   }
   if (change.lever === OPTIMISER_LEVER.DELAY) {
     return `${fmt(change.fromMs)} ms → ${signedMs(change.toMs - change.fromMs)} (total ${fmt(change.toMs)} ms)`;
@@ -301,6 +304,16 @@ export default function OptimisationPlanStatus({
                 </div>
               ))}
             </div>
+
+            {lever.movementLabel && (
+              <div className="mt-1 text-[11px] font-semibold text-[#1B1A1A]">{lever.movementLabel}</div>
+            )}
+            {lever.practical === false && (
+              <div className="mt-1 text-[10px] text-[#8A5A2B]">
+                {PLACEMENT_THEORETICAL_NOTE}
+                {lever.theoreticalReason ? ` ${lever.theoreticalReason}` : ""}
+              </div>
+            )}
 
             {lever.evidenceLabel && (
               <div className="mt-1 text-[10px] text-[#8B7F76]">{lever.evidenceLabel}</div>
