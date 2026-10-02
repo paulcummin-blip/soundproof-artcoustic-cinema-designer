@@ -8,6 +8,7 @@
 
 import { useMemo } from 'react';
 import { buildEngineeringSnapshot } from './buildEngineeringSnapshot';
+import { assessEngineeringReportCompleteness } from '@/components/engineering/engineeringReportCompleteness';
 
 export function useEngineeringSnapshot({
   projectId,
@@ -54,6 +55,15 @@ export function useEngineeringSnapshot({
         // Both authorities were checked: the durable DB publication and this
         // browser's handoff. Neither holds a settled result for this version.
         error: 'No published engineering result was found for the selected version — checked the saved engineering publication and this browser. Open that version in Room Designer and calculate it first.',
+      };
+    }
+
+    const reportCompleteness = assessEngineeringReportCompleteness(engineeringSummary);
+    if (!reportCompleteness.complete) {
+      return {
+        snapshot: null,
+        loading: false,
+        error: reportCompleteness.reason || 'Complete every project assessment before generating reports or proposals.',
       };
     }
 
