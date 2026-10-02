@@ -26,6 +26,7 @@ import TechnicalLevelBadge from "./TechnicalLevelBadge";
 import TechnicalSeatGrid from "./TechnicalSeatGrid";
 import SeatScopeBadge from "../SeatScopeBadge";
 import { isP8Number, P8_NOTE } from "@/components/utils/rp22/p8Authority";
+import { firstStatedPrimitive } from "@/components/utils/renderSafe";
 
 import {
   REPORT_FONT_HEADING as HEADING_FONT,
@@ -223,7 +224,7 @@ export default function TechnicalParameterCard({
             <div style={{ fontSize: u.fsValue, fontWeight: 700, color: "#213428" }}>
               {assumed && Number(param?.id) === 21
                 ? "Level 2 design assumption"
-                : (achievedValue || (assumed ? "L2 design assumption" : "—"))}
+                : firstStatedPrimitive([achievedValue], assumed ? "L2 design assumption" : "—")}
             </div>
           </div>
         )}
