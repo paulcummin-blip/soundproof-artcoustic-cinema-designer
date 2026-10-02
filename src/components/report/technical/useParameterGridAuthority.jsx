@@ -150,9 +150,14 @@ export function useParameterGridAuthority({
 
   const makeBassParam = (id) => {
     const result = roomResultFor(engineeringSummary, id);
+    // P19 and P20 carry no room-level result of their own — P19 is RSP-scoped and
+    // P20 is assessed seat by seat — so they state the same published value the
+    // parameter grid states, rather than an empty box, wherever they were
+    // calculated. P14 and P18 are room results and are unchanged.
+    const scopedFallback = (id === 19 || id === 20) ? getHudValueForParam({ id }) : null;
     return {
       level: parameterSummaries[`p${id}`]?.level || result?.level || "—",
-      valueText: result?.formatted || "—",
+      valueText: result?.formatted || scopedFallback || "—",
       detail: result?.detail || null,
       targetBasis: result?.targetBasis || null,
     };
