@@ -16,7 +16,10 @@
  */
 
 import { useEffect, useMemo, useState } from 'react';
-import { base44 } from '@/api/base44Client';
+import {
+  readProjectRecord,
+  readProjectVersionRecord,
+} from '@/components/state/projectReadCache';
 import { mergeProjectAndVersion } from '@/lib/versionAuthority';
 import { useEngineeringSnapshot } from './useEngineeringSnapshot';
 import { useVersionedEngineeringAuthority } from '@/components/engineering/useVersionedEngineeringAuthority';
@@ -45,17 +48,15 @@ export function useVersionedEngineeringSnapshot(projectId, versionId, options = 
     setError(null);
     (async () => {
       try {
-        const projects = await base44.entities.Project.filter({ id: projectId });
+        const nextProject = await readProjectRecord(projectId);
         if (cancelled) return;
-        const nextProject = Array.isArray(projects) && projects.length ? projects[0] : null;
         if (!nextProject) throw new Error('Project not found.');
 
         const targetVersionId = versionId || nextProject.active_version_id || null;
         let nextVersion = null;
         if (targetVersionId) {
-          const versions = await base44.entities.ProjectVersion.filter({ id: targetVersionId });
+          nextVersion = await readProjectVersionRecord(targetVersionId);
           if (cancelled) return;
-          nextVersion = Array.isArray(versions) && versions.length ? versions[0] : null;
         }
 
         setProject(nextProject);
@@ -96,7 +97,9 @@ export function useVersionedEngineeringSnapshot(projectId, versionId, options = 
     assessmentModes: options.assessmentModes,
   });
 
-  const finalError = error || snapshotResult.error;
+  const finalError = authority.readFailed
+    ? (authority.readError || 'Saved engineering authority could not be read.')
+    : error || snapshotResult.error;
   return {
     snapshot: snapshotResult.snapshot,
     loading: loading || authority.loading || snapshotResult.loading,
@@ -105,6 +108,8 @@ export function useVersionedEngineeringSnapshot(projectId, versionId, options = 
     version,
     authorityState: authority.state,
     authoritySource: authority.source,
-    isReady: !loading && !!snapshotResult.snapshot && !finalError,
+    readFailed: authority.readFailed,
+    retry: authority.retry,
+    isReady: !loading && !authority.loading && !!snapshotResult.snapshot && !finalError,
   };
 }
