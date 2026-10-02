@@ -28,8 +28,7 @@ import ProjectSelectionSummary from '@/components/admin/intelligence/ProjectSele
 import ProjectSelectionTable from '@/components/admin/intelligence/ProjectSelectionTable';
 import StatusInclusionPanel from '@/components/admin/intelligence/StatusInclusionPanel';
 import CategoryInclusionPanel from '@/components/admin/intelligence/CategoryInclusionPanel';
-import PipelineAgeOverview from '@/components/admin/intelligence/PipelineAgeOverview';
-import TrendsPanel from '@/components/admin/intelligence/TrendsPanel';
+import ForecastDashboard from '@/components/admin/intelligence/ForecastDashboard';
 import ProductDemandTable from '@/components/admin/intelligence/ProductDemandTable';
 import ExcludedCatalogueLines from '@/components/admin/intelligence/ExcludedCatalogueLines';
 import ExcludedHistoricAbfusers from '@/components/admin/intelligence/ExcludedHistoricAbfusers';
@@ -54,7 +53,6 @@ const TABS = [
   { key: 'demand', label: 'Product Demand' },
   { key: 'projects', label: 'Projects' },
   { key: 'variations', label: 'Variations' },
-  { key: 'trends', label: 'Trends' },
   { key: 'advanced', label: 'Advanced diagnostics' },
 ];
 
@@ -108,11 +106,10 @@ export default function AdminProjectIntelligence() {
   // same order: it opens on Product Demand catalogue value, highest first.
   const [demandSort, setDemandSort] = useState(DEFAULT_PRODUCT_DEMAND_SORT);
 
-  // Projects table sort order, the age bucket the overview is filtering to, and
-  // the dealer/account the trends are measured for. All view state only.
+  // Projects table sort order and the age bucket the dashboard is filtering to.
+  // View state only.
   const [projectSort, setProjectSort] = useState(DEFAULT_PROJECT_SORT);
   const [ageFilter, setAgeFilter] = useState(null);
-  const [trendAccountId, setTrendAccountId] = useState('');
 
   // Clicking an age bucket narrows the Projects table to that bucket; clicking
   // the active bucket again clears it. No record and no selection is changed.
@@ -131,9 +128,9 @@ export default function AdminProjectIntelligence() {
   const ageFilterLabel = ageBucketByKey(ageFilter)?.label || null;
   const projectSortLabel = PROJECT_SORT_COLUMNS.find((column) => column.key === projectSort.key)?.label || null;
 
-  // Dealer/account options come from the included selection, so the trend filter
-  // always has data behind it.
-  const trendAccountOptions = useMemo(() => {
+  // Dealer/account options come from the selection, so the dashboard's account
+  // scope always has data behind it.
+  const dealerAccountOptions = useMemo(() => {
     const byId = new Map();
     for (const family of selection.selectedFamilies) {
       if (!family.accountId || byId.has(family.accountId)) continue;
@@ -144,14 +141,15 @@ export default function AdminProjectIntelligence() {
       .sort((a, b) => a.name.localeCompare(b.name));
   }, [selection.selectedFamilies]);
 
-  // Rolling 90-day trends, recalculated for the selected dealer/account. The
-  // reference instant is the reporting run, so the windows match the data loaded.
+  // The workbook's Trend Summary tab is built from the rolling 90-day window
+  // authority, measured across every account. The dashboard draws its own time
+  // series from forecastTimelines. The reference instant is the reporting run,
+  // so the windows match the data that was loaded.
   const trends = useMemo(() => buildTrendSummary(selection.selectedFamilies, {
     unitsByProjectId: selection.unitsByProjectId,
     retailByProjectId: selection.retailByProjectId,
     now: report?.generatedAt,
-    accountId: trendAccountId || null,
-  }), [selection.selectedFamilies, selection.unitsByProjectId, selection.retailByProjectId, report, trendAccountId]);
+  }), [selection.selectedFamilies, selection.unitsByProjectId, selection.retailByProjectId, report]);
 
   const familiesById = useMemo(() => (
     new Map((report?.families || []).map((family) => [family.id, family]))
@@ -335,9 +333,14 @@ export default function AdminProjectIntelligence() {
             />
           </div>
 
-          <PipelineAgeOverview
+          <ForecastDashboard
+            forecastProjects={selection.forecastProjects}
             pipelineAge={selection.pipelineAge}
+            unitsByProjectId={selection.unitsByProjectId}
+            retailByProjectId={selection.retailByProjectId}
             currency={report.summary.liveCurrency}
+            accountOptions={dealerAccountOptions}
+            now={report?.generatedAt}
             activeBucket={ageFilter}
             onBucketClick={handleBucketClick}
           />
@@ -439,16 +442,6 @@ export default function AdminProjectIntelligence() {
                 currency={report.summary.liveCurrency}
               />
             </Card>
-          )}
-
-          {tab === 'trends' && (
-            <TrendsPanel
-              trends={trends}
-              currency={report.summary.liveCurrency}
-              accountId={trendAccountId}
-              accountOptions={trendAccountOptions}
-              onAccountChange={setTrendAccountId}
-            />
           )}
 
           {tab === 'advanced' && (

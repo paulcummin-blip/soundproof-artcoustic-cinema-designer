@@ -208,6 +208,9 @@ function buildFamily({ project, versions, proposals, statusLookup, accountsById,
     accountId: project?.account_id || null,
     accountName: account?.name || null,
     accountType: account?.account_type || null,
+    // The account's own commercial group, used by the forecast composition
+    // chart. Never inferred from the account name.
+    accountGroup: account?.dealer_group || null,
     territory: account?.territory || null,
     dealerName: text(project?.dealer_name) || account?.name || null,
     ...status,
