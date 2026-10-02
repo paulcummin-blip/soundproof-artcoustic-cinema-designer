@@ -1,6 +1,6 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.49';
 import { buildWritingStyleContract } from '../../shared/reportWritingStyleContract.js';
-import { SYSTEM_SUMMARY_SECTIONS, HIGHLIGHTS_SECTION_TYPE, getSystemSummarySectionPrompt } from '../../shared/systemDesignSummarySections.js';
+import { SYSTEM_SUMMARY_SECTIONS, HIGHLIGHTS_SECTION_TYPE, getSystemSummarySectionPrompt, COMPARISON_REPORT_INSTRUCTIONS } from '../../shared/systemDesignSummarySections.js';
 import { buildEngineeringEvidence, selectHighlightRows, mergeHighlightRows, buildHighlightsPrompt, HIGHLIGHTS_JSON_SCHEMA } from '../../shared/engineeringSnapshotEvidence.js';
 import { buildProjectInterpretation, formatInterpretationForPrompt, formatInterpretationForLog } from '../../shared/adiProjectInterpretation.js';
 import { compareInterpretations, formatComparisonInterpretationForPrompt } from '../../shared/adiReportComparison.js';
@@ -12,12 +12,6 @@ import { loadCacheRecord, findPublication } from '../../shared/publishedEngineer
 // both places and a test asserts they match.
 const PROPOSAL_SOURCE_REQUIRED_MESSAGE =
   'Generate the Visual and Technical Reports before creating a proposal. This ensures the proposal uses the current project data and RP22 results.';
-
-const COMPARISON_STRUCTURE_INSTRUCTION = [
-  'This is a comparison report. Use the same voice as a single system report.',
-  'First explain what stays the same between the versions, then what changes, then what the client gains from the change.',
-  'Do not turn the comparison into an equipment table. Where one version is clearly stronger, explain why, without attacking the alternative.',
-].join('\n');
 
 const SECTIONS = [
   { type: 'cover', key: 'cover', title: 'Cover', canEditBody: false },
@@ -282,7 +276,7 @@ export default async function(req) {
     // Report identity: the versions this report covers, in selection order.
     const reportVersions = resolvedVersionIds.map((id, index) => {
       const record = (projectVersions || []).find((version) => version.id === id);
-      return `Version ${record?.version_number ?? index + 1} — ${record?.version_name || 'Untitled'}`;
+      return `Version ${record?.version_number ?? index + 1} - ${record?.version_name || 'Untitled'}`;
     });
     const projectContext = buildProjectContext(
       project,
@@ -507,7 +501,7 @@ function buildSectionPrompt(sectionDef, projectContext, proposalType, interpreta
     `You are writing the "${sectionDef.title}" section of a professional home cinema design proposal.`,
     '',
     sectionInstruction,
-    proposalType === 'comparison' ? COMPARISON_STRUCTURE_INSTRUCTION : '',
+    proposalType === 'comparison' ? COMPARISON_REPORT_INSTRUCTIONS : '',
     '',
     'Format the response as HTML. Use <h2>, <h3>, <p>, <ul>, <li>, <strong>, <em> tags.',
     'Do NOT include the section title — only the body content.',

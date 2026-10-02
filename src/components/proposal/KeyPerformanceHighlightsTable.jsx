@@ -4,8 +4,8 @@ import { proposalRoleStyle } from '@/components/proposal/typography/proposalTypo
 /**
  * KeyPerformanceHighlightsTable
  * -----------------------------
- * The measured summary table of a System Design Summary:
- * Performance area | Result | What listeners hear.
+ * The measured summary table of a System Design report:
+ * Performance area | Result | What you experience.
  *
  * The Result column is read verbatim from the calculated Sound Proof rows
  * stored on the section. This component never derives, rounds, regrades or
@@ -16,14 +16,14 @@ import { proposalRoleStyle } from '@/components/proposal/typography/proposalTypo
  *
  * Props:
  * - rows: Array<{ key, area, result, what_you_hear }> (what_you_hear is the
- *   stored key for the "What listeners hear" column)
+ *   stored key for the "What you experience" column)
  * - className: optional wrapper class
  */
 
 const COLUMNS = [
   { key: 'area', label: 'Performance area' },
   { key: 'result', label: 'Result' },
-  { key: 'what_you_hear', label: 'What listeners hear' },
+  { key: 'what_you_hear', label: 'What you experience' },
 ];
 
 const CELL = 'px-3 py-2 align-top border-b border-[#EAE8E3]';

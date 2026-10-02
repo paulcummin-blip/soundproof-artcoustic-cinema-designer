@@ -1,5 +1,6 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.44';
 import { buildWritingStyleContract } from '../../shared/reportWritingStyleContract.js';
+import { COMPARISON_REPORT_INSTRUCTIONS } from '../../shared/systemDesignSummarySections.js';
 import { buildEngineeringEvidence } from '../../shared/engineeringSnapshotEvidence.js';
 import { buildProjectInterpretation, formatInterpretationForPrompt, formatInterpretationForLog } from '../../shared/adiProjectInterpretation.js';
 
@@ -149,6 +150,7 @@ export default async function(req) {
       '=== INSTRUCTION ===',
       actionInstruction,
       sectionNote,
+      proposal.proposal_type === 'comparison' ? COMPARISON_REPORT_INSTRUCTIONS : '',
       '',
       '=== CONSTRAINT ===',
       'The Client Brief influences narrative emphasis, wording, and structure ONLY.',

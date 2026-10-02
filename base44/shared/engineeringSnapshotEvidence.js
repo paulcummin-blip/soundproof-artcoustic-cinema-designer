@@ -15,7 +15,7 @@
  *      app, so the AI can never invent, regrade or alter a table value.
  *
  * The AI supplies only prose: the section narrative in body copy, and the
- * "What listeners hear" cell for the rows selected here (stored under the
+ * "What you experience" cell for the rows selected here (stored under the
  * existing what_you_hear key). mergeHighlightRows() joins the two, keeping the
  * calculated Result values untouched.
  *
@@ -42,7 +42,7 @@ import {
   resolveBassEvidence,
   splitParameterEvidence,
 } from './adiReportEvidenceRules.js';
-import { NEUTRAL_VOICE_RULES } from './reportWritingStyleContract.js';
+import { CLIENT_ADDRESS_VOICE_RULES } from './reportWritingStyleContract.js';
 
 function compose(...parts) {
   const clean = parts
@@ -300,7 +300,7 @@ export const HIGHLIGHTS_JSON_SCHEMA = {
 
 /**
  * The prompt that asks the model for the highlights prose: a short section
- * introduction plus the "What listeners hear" cell for each calculated row.
+ * introduction plus the "What you experience" cell for each calculated row.
  *
  * @param {string} evidence — buildEngineeringEvidence() output
  * @param {Array<{ key, area, result }>} rows
@@ -315,21 +315,22 @@ export function buildHighlightsPrompt(evidence, rows) {
     '=== TABLE ROWS (fixed, calculated by Sound Proof) ===',
     ...list,
     '',
-    'You are writing the Key Performance Highlights section of a client-facing system design summary.',
+    'You are writing the Key Performance Highlights section of a client-facing system design report, in the designer-to-client voice defined in the style contract below.',
     '',
     'Return two things:',
-    'a) intro_html: one or two sentences introducing the section as the measured summary of this design, as simple HTML with a <p> tag.',
-    'b) rows: one entry per row above, using its key exactly, giving the "What listeners hear" cell.',
+    'a) intro_html: one or two sentences introducing the section as the measured summary of this design, as simple HTML with a <p> tag. Tell the client that each row states what the result means in the room. Do not list the rows.',
+    'b) rows: one entry per row above, using its key exactly, giving the "What you experience" cell.',
     '',
-    'Each "What listeners hear" cell must be one short, specific sentence (about 15 words) describing what that result means for the listeners, in plain language.',
-    NEUTRAL_VOICE_RULES,
+    'Each "What you experience" cell is one short, specific sentence (about 15 words) telling the client what that result means in their room, in plain language. The numbers support the sentence. They are not the sentence.',
+    CLIENT_ADDRESS_VOICE_RULES,
     '',
     'RULES:',
     '- Never change, reorder, add or remove a row. The Result values are calculated by Sound Proof and are already final.',
-    '- Never invent a value. If a row needs numbers, use only the numbers shown in that row.',
+    '- Never invent a value, a product or a result. If a cell needs a number, use only the numbers shown in that row.',
     '- Reference only the results shown in the table above. Do not mention a parameter, a level or a measurement that is not in it.',
-    '- Say what the result means for the listeners, not what the parameter is called. The Result column already states the number.',
-    '- Keep the neutral voice above: third person, and no "you" or "your" anywhere in the cell.',
+    '- Say what the result means for the client, not what the parameter is called, and do not explain an obvious result.',
+    '- Never write a cell for an assumed parameter, and never reference P8, P15 or P20.',
+    '- Use the voice above: speak to the client as "you". No marketing language, no em dashes.',
   ].join('\n');
 }
 
