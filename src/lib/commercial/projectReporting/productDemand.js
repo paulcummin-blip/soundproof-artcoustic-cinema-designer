@@ -21,6 +21,7 @@ import { STATUS_BUCKETS } from './statusBuckets';
 import { safeArray, text } from './reportingUtils';
 import { classifyCatalogueLine, isEngineDerivedLine } from './catalogueLineAuthority';
 import { ABFUSER_REASON, classifyAbfuserCutoff, formatCutoffDate } from './abfuserCutoffAuthority';
+import { categoryKeyOf } from './artcousticForecast';
 
 /**
  * Whether a line is an Artcoustic line the pricing engine generated from the
@@ -71,10 +72,13 @@ function countedVariationOf(family) {
  * @param {Array} input.families — included project families
  * @param {Map} input.priceMap — Product Master index (sku → product)
  * @param {boolean} [input.includeQuoted] — add quoted snapshot demand (default true)
- * @returns {{ rows: Array<Object>, excludedLines: Array<Object>, abfuserExclusions: Array<Object>, abfuserWarnings: Array<string>, unitsByProjectId: Object }}
+ * @returns {{ rows: Array<Object>, excludedLines: Array<Object>, abfuserExclusions: Array<Object>, abfuserWarnings: Array<string>, unitsByProjectId: Object, categoryTotals: Array<Object> }}
  *   unitsByProjectId carries the counted catalogue units per project, from this
  *   same pass, so the age and trend overviews measure units on exactly the
- *   lines Product Demand counts.
+ *   lines Product Demand counts. categoryTotals carries the Artcoustic retail
+ *   and units behind each catalogue category, for the category control.
+ *   Each row also carries qtyByProjectId and valueByProjectId, the per-project
+ *   evidence the Artcoustic forecast view reads.
  */
 export function buildCatalogueDemand({ families = [], priceMap = null, includeQuoted = true } = {}) {
   const rows = new Map();
@@ -90,12 +94,19 @@ export function buildCatalogueDemand({ families = [], priceMap = null, includeQu
     if (!key) return null;
     if (!rows.has(key)) {
       const product = classification?.product || priceMap?.get?.(text(sku)) || null;
+      const category = product?.category || product?.product_type || 'Uncategorised';
       rows.set(key, {
         sku: text(sku) || null,
         product: product?.label || label || text(sku) || 'Unknown product',
-        category: product?.category || product?.product_type || '—',
+        category,
+        categoryKey: categoryKeyOf(category),
         quantity: 0,
         projectIds: new Set(),
+        // Per-project evidence: which project contributed which quantity and which
+        // retail value. This is what lets the Artcoustic forecast narrow a row to
+        // the projects and categories it counts without a second demand pass.
+        qtyByProjectId: {},
+        valueByProjectId: {},
         qtyByBucket: Object.fromEntries(STATUS_BUCKETS.map((bucket) => [bucket.key, 0])),
         liveValue: 0,
         quotedValue: 0,
@@ -167,6 +178,21 @@ export function buildCatalogueDemand({ families = [], priceMap = null, includeQu
     if (verdict?.warning) abfuserWarnings.add(verdict.warning);
   };
 
+  // Catalogue category totals, from the same lines the demand rows are built
+  // from, so the Product categories control and Product Demand cannot disagree.
+  const categoryAccumulator = new Map();
+  const categoryEntryFor = (row) => {
+    const entry = categoryAccumulator.get(row.categoryKey) || {
+      key: row.categoryKey,
+      label: row.category,
+      retail: 0,
+      units: 0,
+      lineCount: 0,
+    };
+    categoryAccumulator.set(row.categoryKey, entry);
+    return entry;
+  };
+
   // Live design demand, from the priced schedule of the counted version only.
   for (const family of families) {
     const counted = countedVariationOf(family);
@@ -209,8 +235,13 @@ export function buildCatalogueDemand({ families = [], priceMap = null, includeQu
       if (!row) continue;
       row.quantity += quantity;
       row.projectIds.add(family.id);
+      row.qtyByProjectId[family.id] = (row.qtyByProjectId[family.id] || 0) + quantity;
       row.qtyByBucket[family.bucket] = (row.qtyByBucket[family.bucket] || 0) + quantity;
       unitsByProject.set(family.id, (unitsByProject.get(family.id) || 0) + quantity);
+
+      const categoryEntry = categoryEntryFor(row);
+      categoryEntry.units += quantity;
+      categoryEntry.lineCount += 1;
 
       if (line.unitPriceExVat === null || line.unitPriceExVat === undefined) {
         // No price is known for this line: the quantity is still reported, the
@@ -219,8 +250,11 @@ export function buildCatalogueDemand({ families = [], priceMap = null, includeQu
         row.priced = false;
         row.inactive = row.inactive || line.inactive === true;
       } else {
+        const lineValue = Number(line.subtotalExVat) || 0;
         row.priceKnown = true;
-        row.liveValue += Number(line.subtotalExVat) || 0;
+        row.liveValue += lineValue;
+        row.valueByProjectId[family.id] = (row.valueByProjectId[family.id] || 0) + lineValue;
+        categoryEntry.retail += lineValue;
       }
     }
   }
@@ -327,6 +361,7 @@ export function buildCatalogueDemand({ families = [], priceMap = null, includeQu
     abfuserExclusions,
     abfuserWarnings: [...abfuserWarnings],
     unitsByProjectId: Object.fromEntries(unitsByProject),
+    categoryTotals: [...categoryAccumulator.values()],
   };
 }
 

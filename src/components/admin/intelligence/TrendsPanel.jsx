@@ -66,19 +66,19 @@ export default function TrendsPanel({
       : (mixed ? 'Mixed currencies' : formatMoney(value, displayCurrency))
   );
 
-  const changeValueHint = [
-    latest?.changeValue === null || latest?.changeValue === undefined
+  const changeHint = [
+    latest?.changeRetail === null || latest?.changeRetail === undefined
       ? null
-      : `Value ${signedMoney(latest.changeValue, displayCurrency)}`,
-    latest?.changeAverageValue === null || latest?.changeAverageValue === undefined
+      : `Retail ${signedMoney(latest.changeRetail, displayCurrency)}`,
+    latest?.changeAverageTrade === null || latest?.changeAverageTrade === undefined
       ? null
-      : `Average ${signedMoney(latest.changeAverageValue, displayCurrency)}`,
+      : `Average trade ${signedMoney(latest.changeAverageTrade, displayCurrency)}`,
   ].filter(Boolean).join(' · ');
 
   return (
     <Card
       title="Trends"
-      subtitle="Rolling 90-day periods, newest first. A project sits in the period it was created in; its value and catalogue units come from its counted version. Periods do not overlap, so each can be compared with the one before it."
+      subtitle="Rolling 90-day periods, newest first. A project sits in the period it was created in; its Artcoustic retail and trade value and its catalogue units come from its counted version. Periods do not overlap, so each can be compared with the one before it."
       actions={(
         <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: BRAND.subtext }}>
           <span style={{ fontWeight: 700, color: BRAND.accent, textTransform: 'uppercase', fontSize: 11, letterSpacing: '0.04em' }}>
@@ -108,33 +108,36 @@ export default function TrendsPanel({
       <div style={{ display: 'grid', gap: 14 }}>
         <div style={{ display: 'grid', gap: 12, gridTemplateColumns: 'repeat(auto-fit, minmax(190px, 1fr))' }}>
           <TrendCard
-            label="Projects this rolling 90 days"
+            label="Forecast projects this rolling 90 days"
             value={formatNumber(latest?.projects ?? 0)}
             hint={latest ? latest.label : null}
           />
           <TrendCard
-            label="Value this rolling 90 days"
-            value={valueText(latest?.totalLiveValue)}
-            hint="Counted versions of these projects"
+            label="Artcoustic retail this rolling 90 days"
+            value={valueText(latest?.retail)}
+            hint="Retail ex VAT, catalogue products only"
           />
           <TrendCard
-            label="Average value this rolling 90 days"
-            value={latest?.averageValue === null || latest?.averageValue === undefined
-              ? 'Not calculable'
-              : (mixed ? 'Mixed currencies' : formatMoney(latest.averageValue, displayCurrency))}
-            hint={`Across ${formatNumber(latest?.valuedProjects ?? 0)} project${(latest?.valuedProjects ?? 0) === 1 ? '' : 's'} with a calculable value`}
+            label="Artcoustic trade this rolling 90 days"
+            value={valueText(latest?.trade)}
+            hint="Retail ex VAT × 0.59"
+          />
+          <TrendCard
+            label="Average Artcoustic trade per project"
+            value={valueText(latest?.averageTrade)}
+            hint={`Across ${formatNumber(latest?.valuedProjects ?? 0)} project${(latest?.valuedProjects ?? 0) === 1 ? '' : 's'} with an Artcoustic value`}
           />
           <TrendCard
             label="Catalogue units this rolling 90 days"
             value={formatNumber(latest?.units ?? 0)}
-            hint="Counted catalogue lines only"
+            hint="Artcoustic catalogue units only"
           />
           <TrendCard
             label="Change versus previous 90 days"
             value={latest?.changeProjects === null || latest?.changeProjects === undefined
               ? '—'
               : `${signedNumber(latest.changeProjects)} project${Math.abs(latest.changeProjects) === 1 ? '' : 's'}`}
-            hint={latest?.previousProjects === null ? 'No previous period' : (changeValueHint || 'No value change to report')}
+            hint={latest?.previousProjects === null ? 'No previous period' : (changeHint || 'No change to report')}
           />
         </div>
 
@@ -152,7 +155,7 @@ export default function TrendsPanel({
         <TrendSummaryTable windows={trends.windows} currency={currency} />
 
         <div style={{ fontSize: 12, color: BRAND.muted }}>
-          {formatNumber(trends.scopedProjectCount)} included project{trends.scopedProjectCount === 1 ? '' : 's'} in
+          {formatNumber(trends.scopedProjectCount)} forecast project{trends.scopedProjectCount === 1 ? '' : 's'} in
           scope, across {formatNumber(trends.activeAccountCount)} dealer / account
           {trends.activeAccountCount === 1 ? '' : 's'}. Statements use the newest two periods only, and a change under
           10% is described as broadly unchanged. Trends become more useful as dealers create projects in their own

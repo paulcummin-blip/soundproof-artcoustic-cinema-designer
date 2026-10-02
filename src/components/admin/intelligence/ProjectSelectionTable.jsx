@@ -5,7 +5,10 @@
 // Inclusion and the counted version are admin choices held as local report
 // selection; nothing here writes to the database.
 //
-// Included, Age, Last updated, Counted version and Live value sort on click.
+// Included, Age, Last updated, Counted version and Artcoustic retail sort on
+// click. The retail column is the Artcoustic catalogue value of the counted
+// version — overall project value is not shown, because this page forecasts
+// Artcoustic product business.
 // Sorting is display order only: it never changes a value or an inclusion choice,
 // and with no heading chosen the reporting order is shown untouched.
 
@@ -41,6 +44,7 @@ const statusTone = (bucket) => {
 function flagsOf(family) {
   const flags = [];
   if (family.selection?.inclusionPill) flags.push(family.selection.inclusionPill);
+  if (family.forecastExclusionPill) flags.push(family.forecastExclusionPill);
   for (const warning of family.warnings || []) flags.push(warning);
   if (family.selection?.countBasisNote) flags.push(family.selection.countBasisNote);
   return flags;
@@ -100,7 +104,7 @@ export default function ProjectSelectionTable({
             <Th align="right">Versions</Th>
             {sortable('countedVersion', 'Counted version')}
             <Th>Count basis</Th>
-            {sortable('liveValue', 'Live value')}
+            {sortable('liveValue', 'Artcoustic retail')}
             <Th align="right">Product lines</Th>
             <Th>Notes / flags</Th>
           </tr>
@@ -154,9 +158,9 @@ export default function ProjectSelectionTable({
                   )}
                 </Td>
                 <Td align="right" mono>
-                  {family.countedLiveValue === null || family.countedLiveValue === undefined
-                    ? <Pill tone="warn">not calculable</Pill>
-                    : formatMoney(family.countedLiveValue, family.countedCurrency || currency || 'GBP')}
+                  {family.artcousticRetail === null || family.artcousticRetail === undefined
+                    ? <Pill tone="warn">no catalogue value</Pill>
+                    : formatMoney(family.artcousticRetail, family.countedCurrency || currency || 'GBP')}
                 </Td>
                 <Td align="right" mono>
                   {formatNumber(family.countedLineCount || 0)}

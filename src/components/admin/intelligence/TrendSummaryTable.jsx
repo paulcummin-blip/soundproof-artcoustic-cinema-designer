@@ -1,7 +1,7 @@
 // TrendSummaryTable.jsx
 // ---------------------
-// The rolling 90-day period table for the Trends view: plain numbers per period,
-// newest first. Presentation only.
+// The rolling 90-day period table for the Trends view: plain Artcoustic retail
+// and trade numbers per period, newest first. Presentation only.
 
 import React from 'react';
 import { BRAND, EmptyState, TABLE, TABLE_WRAP, Td, Th } from './IntelligenceUi';
@@ -18,11 +18,11 @@ export default function TrendSummaryTable({ windows = [], currency }) {
         <thead>
           <tr>
             <Th>Period</Th>
-            <Th align="right">Projects</Th>
-            <Th align="right">Total live value</Th>
-            <Th align="right">Average value</Th>
+            <Th align="right">Forecast projects</Th>
+            <Th align="right">Artcoustic retail</Th>
+            <Th align="right">Artcoustic trade</Th>
+            <Th align="right">Avg trade / project</Th>
             <Th align="right">Catalogue units</Th>
-            <Th align="right">Average units / project</Th>
             <Th align="right">Active dealers / accounts</Th>
           </tr>
         </thead>
@@ -35,15 +35,15 @@ export default function TrendSummaryTable({ windows = [], currency }) {
               </Td>
               <Td align="right" mono>{formatNumber(row.projects)}</Td>
               <Td align="right" mono>
-                {row.totalLiveValue === null ? 'Not calculable' : formatMoney(row.totalLiveValue, row.currency || currency || 'GBP')}
+                {row.retail === null ? 'Not calculable' : formatMoney(row.retail, row.currency || currency || 'GBP')}
               </Td>
               <Td align="right" mono>
-                {row.averageValue === null ? '—' : formatMoney(row.averageValue, row.currency || currency || 'GBP')}
+                {row.trade === null ? '—' : formatMoney(row.trade, row.currency || currency || 'GBP')}
+              </Td>
+              <Td align="right" mono>
+                {row.averageTrade === null ? '—' : formatMoney(row.averageTrade, row.currency || currency || 'GBP')}
               </Td>
               <Td align="right" mono>{formatNumber(row.units)}</Td>
-              <Td align="right" mono>
-                {row.averageUnitsPerProject === null ? '—' : row.averageUnitsPerProject.toFixed(1)}
-              </Td>
               <Td align="right" mono>{formatNumber(row.activeAccounts)}</Td>
             </tr>
           ))}

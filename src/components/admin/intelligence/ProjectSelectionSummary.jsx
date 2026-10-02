@@ -1,13 +1,22 @@
 // ProjectSelectionSummary.jsx
 // ---------------------------
-// The headline numbers for the inclusion and product demand workflow, and
-// nothing else: the totals, then the age and value ageing cards fed by the
-// pipelineAge authority. Counted totals come from the counted version of
-// included projects only.
+// The headline forecast numbers: how many projects are loaded, how many are in
+// the forecast, and what Artcoustic business they represent. Nothing else.
+//
+// Every money figure is Artcoustic catalogue products only, retail ex VAT, and
+// the trade value is derived from that retail — overall project value is not a
+// headline here, because this page forecasts Artcoustic product business.
+//
+// The values come from the same catalogue pass and the same age authority the
+// tables below read, so a card can never disagree with the detail.
 
 import React from 'react';
 import { BRAND, Pill } from './IntelligenceUi';
 import { formatMoney, formatNumber } from '@/lib/commercial/projectReporting/formatMoney';
+import {
+  ARTCOUSTIC_RETAIL_HELPER,
+  ARTCOUSTIC_TRADE_HELPER,
+} from '@/lib/commercial/projectReporting/artcousticForecast';
 
 const CARD = {
   background: BRAND.card,
@@ -39,63 +48,61 @@ function MetricCard({ label, value, hint, tone }) {
 export default function ProjectSelectionSummary({
   summary,
   currency,
-  hiddenCount = 0,
+  forecast = null,
   pipelineAge = null,
-  productDemandValue = null,
-  productDemandUnpricedLines = 0,
+  hiddenCount = 0,
 }) {
   if (!summary) return null;
-  const valueText = summary.countedLiveValue === null
-    ? 'Not calculable'
-    : formatMoney(summary.countedLiveValue, summary.countedCurrency || currency || 'GBP');
 
-  // The Product Demand figure comes from the demand rows themselves, so a card
-  // and the Product Demand table can never disagree.
-  const catalogueValueText = productDemandValue === null || productDemandValue === undefined
-    ? 'Not calculable'
-    : formatMoney(productDemandValue, summary.countedCurrency || currency || 'GBP');
-
-  // Age-bucket values come from the age overview, so a card and the bucket table
-  // below it can never disagree.
+  const displayCurrency = summary.countedCurrency || currency || 'GBP';
   const money = (value) => (
     value === null || value === undefined
-      ? '—'
-      : formatMoney(value, summary.countedCurrency || currency || 'GBP')
+      ? 'Not calculable'
+      : (summary.countedMixedCurrency ? 'Mixed currencies' : formatMoney(value, displayCurrency))
   );
-  const bucketValue = (key) => money(pipelineAge?.totals?.[key]);
+
+  const forecastProjectCount = forecast?.projectCount ?? 0;
+  const listedCount = summary.listedProjectCount || 0;
+  const excludedCount = Math.max(0, listedCount - forecastProjectCount);
 
   return (
     <div style={{ display: 'grid', gap: 12 }}>
       <div style={{ display: 'grid', gap: 12, gridTemplateColumns: 'repeat(auto-fit, minmax(190px, 1fr))' }}>
-        <MetricCard label="Total projects loaded" value={formatNumber(summary.totalLoadedProjects)} />
-        <MetricCard label="Included projects" value={formatNumber(summary.includedCount)} tone={BRAND.good} />
         <MetricCard
-          label="Included Project Live Value"
-          value={valueText}
-          hint={summary.countedMixedCurrency ? 'Mixed currencies — not summed' : 'Full live value of each included project\'s counted version'}
+          label="Total projects loaded"
+          value={formatNumber(summary.totalLoadedProjects)}
         />
         <MetricCard
-          label="Product Demand Catalogue Value"
-          value={catalogueValueText}
-          hint={productDemandUnpricedLines > 0
-            ? `Artcoustic catalogue products only · ${formatNumber(productDemandUnpricedLines)} line${productDemandUnpricedLines === 1 ? '' : 's'} unpriced`
-            : 'Artcoustic catalogue products only'}
+          label="Included forecast projects"
+          value={formatNumber(forecastProjectCount)}
+          tone={BRAND.good}
+          hint="Included in the table and counted by an included status"
         />
         <MetricCard
-          label="0–30 day value"
-          value={bucketValue('valueDays0To30')}
-          hint="Included projects updated or created in the last 30 days"
+          label="Excluded projects"
+          value={formatNumber(excludedCount)}
+          hint="Not included, or counted by a status outside the forecast"
         />
         <MetricCard
-          label="31–90 day value"
-          value={bucketValue('valueDays31To90')}
-          hint="Included projects 31–90 days old"
+          label="Artcoustic retail value"
+          value={money(forecast?.retail)}
+          hint={ARTCOUSTIC_RETAIL_HELPER}
         />
         <MetricCard
-          label="91+ day value"
-          value={bucketValue('valueDays91Plus')}
-          hint="Included projects 91 days and older"
-          tone={BRAND.warn}
+          label="Artcoustic trade value"
+          value={money(forecast?.trade)}
+          hint={ARTCOUSTIC_TRADE_HELPER}
+          tone={BRAND.primary}
+        />
+        <MetricCard
+          label="Counted catalogue units"
+          value={formatNumber(forecast?.units ?? 0)}
+          hint="Artcoustic catalogue units across counted versions"
+        />
+        <MetricCard
+          label="Projects with multiple versions"
+          value={formatNumber(summary.multiVersionCount)}
+          hint="Design options — only the counted version is forecast"
         />
         <MetricCard
           label="Projects over 1 year"
@@ -103,34 +110,32 @@ export default function ProjectSelectionSummary({
           tone={(pipelineAge?.totals?.projectsOverOneYear ?? 0) > 0 ? BRAND.warn : BRAND.text}
           hint="Stale unless confirmed active"
         />
-        <MetricCard
-          label="Counted catalogue units"
-          value={formatNumber(pipelineAge?.totals?.units ?? 0)}
-          hint="Catalogue units across counted versions"
-        />
       </div>
 
       <div style={{ fontSize: 12, color: BRAND.muted, lineHeight: 1.6 }}>
-        Project value can include priced design/proposal lines that are not part of catalogue product demand. Product
-        Demand value includes Artcoustic catalogue products only.
+        This is an Artcoustic product forecast, not project accounting: only Artcoustic catalogue products count, priced at
+        retail ex VAT, and overall project value — manual extras, third-party items, labour and installation — is
+        deliberately excluded from every total here.
       </div>
 
       <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center', fontSize: 12, color: BRAND.muted }}>
         <Pill tone="info">One version per project</Pill>
         <span>
-          A client cannot buy every design option, so product demand counts one selected version per included project.
+          A client cannot buy every design option, so the forecast counts one selected version per forecast project.
           Versions are never summed.
         </span>
-        {summary.unpricedCountedCount > 0 && (
-          <Pill tone="warn" title="These counted versions have no calculable live value">
-            {summary.unpricedCountedCount} counted version{summary.unpricedCountedCount === 1 ? '' : 's'} not calculable
+        {(forecast?.unpricedLineCount ?? 0) > 0 && (
+          <Pill tone="warn" title="These catalogue lines carry a quantity but no price, so they add no value">
+            {formatNumber(forecast.unpricedLineCount)} unpriced catalogue line{forecast.unpricedLineCount === 1 ? '' : 's'}
+          </Pill>
+        )}
+        {(pipelineAge?.totals?.noValueCount ?? 0) > 0 && (
+          <Pill tone="neutral" title="No priced Artcoustic catalogue line in the counted version">
+            {formatNumber(pipelineAge.totals.noValueCount)} with no Artcoustic value
           </Pill>
         )}
         <Pill tone="neutral" title="Excluded projects are left out of every total on this page">
-          {formatNumber(summary.excludedCount)} excluded
-        </Pill>
-        <Pill tone="neutral" title="A project's versions are design options and are never summed">
-          {formatNumber(summary.multiVersionCount)} with multiple versions
+          {formatNumber(excludedCount)} excluded
         </Pill>
         {hiddenCount > 0 && (
           <span>

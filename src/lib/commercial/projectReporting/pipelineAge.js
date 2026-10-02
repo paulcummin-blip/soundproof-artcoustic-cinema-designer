@@ -1,17 +1,19 @@
 /**
  * pipelineAge.js
  * --------------
- * Age buckets and value ageing for the Project Intelligence overview.
+ * Age buckets and Artcoustic value ageing for the Project Intelligence overview.
  *
  * The admin needs to see how current or stale the included projects are, so
  * older open projects can be moved to won, lost or excluded and forecast
  * accuracy improves.
  *
  * Rules this module follows, unchanged from the rest of the reporting layer:
- *   · included projects only
- *   · counted versions only — a project's value and catalogue units come from
- *     its counted version, never from every version summed
+ *   · forecast projects only
+ *   · counted versions only — a project's Artcoustic value and catalogue units
+ *     come from its counted version, never from every version summed
  *   · one project counted once
+ *   · Artcoustic catalogue products only: the value is the retail ex VAT the
+ *     catalogue pass counted, and the trade value is derived from it
  *
  * Age basis: the project's last updated date where available, otherwise its
  * created date. Which basis was used is reported per project so the screen can
@@ -21,6 +23,7 @@
  */
 
 import { referenceTime, safeArray, text, timeOf } from './reportingUtils';
+import { tradeValueOf } from './artcousticForecast';
 
 const DAY_MS = 86400000;
 
@@ -84,9 +87,14 @@ export function ageBucketByKey(key) {
   return AGE_BUCKETS.find((bucket) => bucket.key === key) || null;
 }
 
+/** The bucket label for one project, for the screen and the export. */
+export function ageBucketLabelOf(family, now = Date.now()) {
+  return ageBucketByKey(ageBucketKeyOf(family, now))?.label || 'No date recorded';
+}
+
 /**
- * Counted catalogue units for one project, from the demand pass. A project with
- * no counted catalogue line contributes nothing rather than a made-up figure.
+ * Counted catalogue units for one project, from the catalogue pass. A project
+ * with no counted catalogue line contributes nothing rather than a made-up figure.
  */
 export function catalogueUnitsFor(unitsByProjectId, projectId) {
   if (!unitsByProjectId || !projectId) return 0;
@@ -96,9 +104,18 @@ export function catalogueUnitsFor(unitsByProjectId, projectId) {
   return Number.isFinite(Number(units)) ? Number(units) : 0;
 }
 
-const numericValue = (value) => (
-  value === null || value === undefined || !Number.isFinite(Number(value)) ? null : Number(value)
-);
+/**
+ * Artcoustic retail ex VAT for one project, from the catalogue pass. A project
+ * with no priced catalogue line in the counted categories has no value at all —
+ * never a zero standing in for unknown.
+ */
+export function catalogueRetailFor(retailByProjectId, projectId) {
+  if (!retailByProjectId || !projectId) return null;
+  const value = retailByProjectId instanceof Map
+    ? retailByProjectId.get(projectId)
+    : retailByProjectId[projectId];
+  return value === null || value === undefined || !Number.isFinite(Number(value)) ? null : Number(value);
+}
 
 /** The single currency the given projects are counted in, or null. */
 function currencyOf(families) {
@@ -112,22 +129,27 @@ function currencyOf(families) {
 const share = (part, whole) => (whole > 0 ? part / whole : null);
 
 /**
- * The age and value ageing summary for the included projects.
+ * The age and Artcoustic value ageing summary for the forecast projects.
  *
- * @param {Array} families — included project families (counted selection applied)
+ * @param {Array} families — forecast project families
  * @param {Object} [options]
  * @param {Object} [options.unitsByProjectId] — counted catalogue units per project
+ * @param {Object} [options.retailByProjectId] — Artcoustic retail ex VAT per project
  * @param {number} [options.now] — reference instant, for deterministic reporting
  * @returns {Object} buckets, totals and the helper copy
  */
-export function buildPipelineAgeSummary(families = [], { unitsByProjectId = null, now = null } = {}) {
+export function buildPipelineAgeSummary(families = [], { unitsByProjectId = null, retailByProjectId = null, now = null } = {}) {
   const included = safeArray(families);
   const reference = referenceTime(now);
 
   const rawBuckets = AGE_BUCKETS.map((bucket) => {
     const inBucket = included.filter((family) => ageBucketKeyOf(family, reference) === bucket.key);
-    const values = inBucket.map((family) => numericValue(family?.countedLiveValue)).filter((value) => value !== null);
-    const liveValue = values.length > 0 ? values.reduce((sum, value) => sum + value, 0) : null;
+    const retailValues = inBucket
+      .map((family) => catalogueRetailFor(retailByProjectId, family.id))
+      .filter((value) => value !== null);
+    const retail = retailValues.length > 0
+      ? retailValues.reduce((sum, value) => sum + value, 0)
+      : null;
     const units = inBucket.reduce((sum, family) => sum + catalogueUnitsFor(unitsByProjectId, family.id), 0);
 
     return {
@@ -137,33 +159,27 @@ export function buildPipelineAgeSummary(families = [], { unitsByProjectId = null
       fromDays: bucket.fromDays,
       toDays: bucket.toDays,
       count: inBucket.length,
-      valuedCount: values.length,
-      unpricedCount: inBucket.length - values.length,
-      liveValue,
-      averageValue: values.length > 0 ? liveValue / values.length : null,
+      valuedCount: retailValues.length,
+      noValueCount: inBucket.length - retailValues.length,
+      retail,
+      trade: retail === null ? null : tradeValueOf(retail),
       units,
       projectIds: inBucket.map((family) => family.id),
     };
   });
 
-  const allValues = included
-    .map((family) => numericValue(family?.countedLiveValue))
+  const allRetail = included
+    .map((family) => catalogueRetailFor(retailByProjectId, family.id))
     .filter((value) => value !== null);
-  const totalLiveValue = allValues.length > 0 ? allValues.reduce((sum, value) => sum + value, 0) : null;
+  const totalRetail = allRetail.length > 0 ? allRetail.reduce((sum, value) => sum + value, 0) : null;
   const totalUnits = included.reduce((sum, family) => sum + catalogueUnitsFor(unitsByProjectId, family.id), 0);
   const { currency, mixed } = currencyOf(included);
 
   const buckets = rawBuckets.map((bucket) => ({
     ...bucket,
     shareOfCount: share(bucket.count, included.length),
-    shareOfValue: share(bucket.liveValue ?? 0, totalLiveValue ?? 0),
+    shareOfRetail: share(bucket.retail ?? 0, totalRetail ?? 0),
   }));
-
-  const bucketValue = (key) => buckets.find((bucket) => bucket.key === key)?.liveValue ?? null;
-  const sumValues = (...keys) => {
-    const present = keys.map(bucketValue).filter((value) => value !== null);
-    return present.length > 0 ? present.reduce((sum, value) => sum + value, 0) : null;
-  };
 
   const overOneYear = buckets.find((bucket) => bucket.key === 'over_365_days') || null;
   const missingAgeCount = included.filter((family) => ageBasisOf(family, now).days === null).length;
@@ -172,18 +188,16 @@ export function buildPipelineAgeSummary(families = [], { unitsByProjectId = null
     buckets,
     totals: {
       count: included.length,
-      liveValue: totalLiveValue,
-      averageValue: allValues.length > 0 ? totalLiveValue / allValues.length : null,
-      valuedCount: allValues.length,
-      unpricedCount: included.length - allValues.length,
+      retail: totalRetail,
+      trade: totalRetail === null ? null : tradeValueOf(totalRetail),
+      averageRetail: allRetail.length > 0 ? totalRetail / allRetail.length : null,
+      valuedCount: allRetail.length,
+      noValueCount: included.length - allRetail.length,
       units: totalUnits,
       currency,
       mixedCurrency: mixed,
       projectsOverOneYear: overOneYear?.count || 0,
-      valueOverOneYear: overOneYear?.liveValue ?? null,
-      valueDays0To30: bucketValue('days_0_30'),
-      valueDays31To90: bucketValue('days_31_90'),
-      valueDays91Plus: sumValues('days_91_365', 'over_365_days'),
+      retailOverOneYear: overOneYear?.retail ?? null,
       missingAgeCount,
     },
     helperNote: AGE_HELPER_NOTE,

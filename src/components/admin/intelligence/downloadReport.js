@@ -61,9 +61,9 @@ export function downloadCsvSheets(report) {
 export const WORKBOOK_TABS = ['Project Summary', 'Product Demand', 'Variations Detail', 'Warnings'];
 
 /**
- * The product demand export: six tabs built from the admin's inclusion and
- * counted-version selection, so the workbook carries exactly what the page
- * shows. Filename follows the Product Demand convention.
+ * The Artcoustic forecast export: the workbook tabs built from the admin's
+ * inclusion, status, category and counted-version selection, so the workbook
+ * carries exactly what the page shows. Filename follows the forecast convention.
  */
 export function downloadSelectionWorkbook(selection) {
   const sheets = buildSelectionSheets(selection);
@@ -75,7 +75,7 @@ export function downloadSelectionWorkbook(selection) {
   return sheets.map((sheet) => sheet.name);
 }
 
-/** The CSV-per-tab fallback for the same six tabs. */
+/** The CSV-per-tab fallback for the same tabs. */
 export function downloadSelectionCsv(selection) {
   const sheets = buildSelectionSheets(selection);
   const base = selectionExportFilename();

@@ -1,9 +1,11 @@
 // ProductDemandTable.jsx
 // ----------------------
-// Product demand from the counted version of every included project, and
-// nothing else: no excluded project and no non-counted version contributes.
+// Artcoustic product demand from the counted version of every forecast project,
+// and nothing else: no excluded project, no non-counted version and no
+// non-catalogue line contributes. Quantity is catalogue units, value is retail
+// ex VAT, and the trade value is derived from that retail.
 //
-// Each row can be expanded to show which included projects produced the
+// Each row can be expanded to show which forecast projects produced the
 // quantity.
 //
 // Any heading can be clicked to sort. Sorting is display order only — it never
@@ -14,6 +16,7 @@ import React, { useMemo, useState } from 'react';
 import { BRAND, EmptyState, Pill, TABLE, TABLE_WRAP, Td } from './IntelligenceUi';
 import SortableTh from './SortableTh';
 import { formatMoney, formatNumber } from '@/lib/commercial/projectReporting/formatMoney';
+import { tradeValueOf } from '@/lib/commercial/projectReporting/artcousticForecast';
 import {
   DEFAULT_PRODUCT_DEMAND_SORT,
   PRODUCT_DEMAND_SORT_COLUMNS,
@@ -52,21 +55,27 @@ export default function ProductDemandTable({
   if (productDemand.length === 0) {
     return (
       <EmptyState
-        message="No product demand for the current selection."
-        hint="Include at least one project, then demand is read from the priced Artcoustic catalogue lines of its counted version."
+        message="No Artcoustic product demand for the current forecast."
+        hint="Include at least one project with an included status, then demand is read from the priced Artcoustic catalogue lines of its counted version."
       />
     );
   }
 
   const totalQuantity = productDemand.reduce((sum, row) => sum + (Number(row.quantity) || 0), 0);
-  const totalValue = productDemand.reduce((sum, row) => sum + (Number(row.liveValue) || 0), 0);
+  const valuedRows = productDemand.filter((row) => row.retailValue !== null && row.retailValue !== undefined);
+  const totalRetail = valuedRows.length > 0
+    ? valuedRows.reduce((sum, row) => sum + (Number(row.retailValue) || 0), 0)
+    : null;
+  const totalTrade = totalRetail === null ? null : tradeValueOf(totalRetail);
+  const forecastProjectCount = new Set(productDemand.flatMap((row) => row.projectIds || [])).size;
 
   return (
     <div style={{ display: 'grid', gap: 12 }}>
       <div style={{ fontSize: 12, color: BRAND.muted, lineHeight: 1.6 }}>
-        Only Artcoustic catalogue products are included. Manual extras and third-party items are excluded. Demand is read
-        from the counted version of each included project only, with no quoted snapshot quantity or non-counted version
-        quantity added, and a line with no price is shown as <strong>Unpriced</strong> rather than zero.
+        Only Artcoustic catalogue products are included, priced at retail ex VAT. Manual extras, projectors, third-party
+        and non-Artcoustic amplifiers, labour, cabling, racks and custom lines are excluded. Demand is read from the
+        counted version of each forecast project only, with no quoted snapshot quantity or non-counted version quantity
+        added, and a line with no price is shown as <strong>Unpriced</strong> rather than zero.
       </div>
 
       <div style={{ fontSize: 12, color: BRAND.subtext, lineHeight: 1.6 }}>
@@ -94,7 +103,13 @@ export default function ProductDemandTable({
         <strong style={{ color: BRAND.text }}>
           {formatNumber(totalQuantity)} catalogue units,
         </strong>{' '}
-        {formatMoney(totalValue, currency || 'GBP')} Product Demand catalogue value, counted versions only.
+        {totalRetail === null ? 'no priced catalogue value' : formatMoney(totalRetail, currency || 'GBP')} Artcoustic
+        retail ex VAT,{' '}
+        <strong style={{ color: BRAND.text }}>
+          {totalTrade === null ? 'no trade value' : formatMoney(totalTrade, currency || 'GBP')} Artcoustic trade value
+        </strong>{' '}
+        across {formatNumber(forecastProjectCount)} included forecast project{forecastProjectCount === 1 ? '' : 's'}.
+        Counted versions only.
       </div>
 
       <div style={{ fontSize: 12, color: BRAND.muted }}>
@@ -159,7 +174,10 @@ export default function ProductDemandTable({
                     <Td align="right" mono>{formatNumber(row.quantity)}</Td>
                     <Td align="right" mono>{formatNumber(row.projectFamilies)}</Td>
                     <Td align="right" mono>
-                      {row.liveValue === null ? <Pill tone="warn">unpriced</Pill> : formatMoney(row.liveValue, currency || 'GBP')}
+                      {row.retailValue === null || row.retailValue === undefined ? <Pill tone="warn">unpriced</Pill> : formatMoney(row.retailValue, currency || 'GBP')}
+                    </Td>
+                    <Td align="right" mono>
+                      {row.tradeValue === null || row.tradeValue === undefined ? '—' : formatMoney(row.tradeValue, currency || 'GBP')}
                     </Td>
                     <Td>{row.derived ? <Pill tone="info">Yes</Pill> : 'No'}</Td>
                     <Td>
@@ -170,9 +188,9 @@ export default function ProductDemandTable({
                   </tr>
                   {isOpen && (
                     <tr>
-                      <Td colSpan={8} style={{ background: '#FAFAF8' }}>
+                      <Td colSpan={9} style={{ background: '#FAFAF8' }}>
                         <div style={{ fontSize: 12, color: BRAND.subtext }}>
-                          <strong>Included projects contributing:</strong>{' '}
+                          <strong>Included forecast projects contributing:</strong>{' '}
                           {contributors.length === 0 ? '—' : contributors.join(' · ')}
                         </div>
                       </Td>

@@ -10,6 +10,8 @@
 // Nothing here writes to Project, ProjectVersion or any other entity.
 
 export const SELECTION_STORAGE_KEY = 'sound-proof:project-intelligence:selection:v1';
+export const STATUS_INCLUSION_STORAGE_KEY = 'sound-proof:project-intelligence:status-inclusion:v1';
+export const CATEGORY_INCLUSION_STORAGE_KEY = 'sound-proof:project-intelligence:category-inclusion:v1';
 
 export const SELECTION_STORAGE_LABEL =
   'Local report selection: saved in this browser only. Nothing is written to the project database.';
@@ -62,3 +64,49 @@ export function clearSelection() {
     // Nothing to clear.
   }
 }
+
+/**
+ * The forecast inclusion choices — one boolean per status key, one per category
+ * key. Same rule as the project selection: local report selection only, kept in
+ * this browser, never written to the database.
+ */
+function readBooleanMap(key) {
+  try {
+    const raw = window.localStorage.getItem(key);
+    if (!raw) return {};
+    const parsed = JSON.parse(raw);
+    if (!parsed || typeof parsed !== 'object') return {};
+    const clean = {};
+    for (const [entryKey, value] of Object.entries(parsed)) {
+      if (typeof value === 'boolean') clean[entryKey] = value;
+    }
+    return clean;
+  } catch {
+    // A browser that blocks storage simply starts from the defaults.
+    return {};
+  }
+}
+
+function writeBooleanMap(key, map) {
+  try {
+    window.localStorage.setItem(key, JSON.stringify(map || {}));
+  } catch {
+    // Storage unavailable: the choice still works for this session.
+  }
+}
+
+function clearBooleanMap(key) {
+  try {
+    window.localStorage.removeItem(key);
+  } catch {
+    // Nothing to clear.
+  }
+}
+
+export const readStatusInclusion = () => readBooleanMap(STATUS_INCLUSION_STORAGE_KEY);
+export const writeStatusInclusion = (map) => writeBooleanMap(STATUS_INCLUSION_STORAGE_KEY, map);
+export const clearStatusInclusion = () => clearBooleanMap(STATUS_INCLUSION_STORAGE_KEY);
+
+export const readCategoryInclusion = () => readBooleanMap(CATEGORY_INCLUSION_STORAGE_KEY);
+export const writeCategoryInclusion = (map) => writeBooleanMap(CATEGORY_INCLUSION_STORAGE_KEY, map);
+export const clearCategoryInclusion = () => clearBooleanMap(CATEGORY_INCLUSION_STORAGE_KEY);

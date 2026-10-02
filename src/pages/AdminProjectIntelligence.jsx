@@ -1,19 +1,23 @@
 // AdminProjectIntelligence.jsx
 // ----------------------------
-// Project Intelligence — project inclusion, counted-version selection and
-// product demand export.
+// Project Intelligence — the Artcoustic product forecast and demand export.
+//
+// The question this page answers is "what Artcoustic business is likely coming
+// our way?", so every figure is Artcoustic catalogue products only, priced at
+// retail ex VAT with the trade value derived from it.
 //
 // The default workflow is deliberately simple:
-//   1. Include or exclude each project.
-//   2. Choose which version counts where a project has variations.
-//   3. Export the product demand from the counted versions only.
+//   1. Choose which statuses count and which Artcoustic product categories count.
+//   2. Include or exclude each project.
+//   3. Choose which version counts where a project has variations.
+//   4. Export the forecast.
 //
-// Product demand counts exactly ONE version per included project, because a
-// client cannot buy every design option. The deeper reporting views are
-// unchanged and live in the Advanced diagnostics tab.
+// Product demand counts exactly ONE version per forecast project, because a
+// client cannot buy every design option. Overall project value and quoted
+// snapshot detail live in the Advanced diagnostics tab.
 //
-// Read-only: this page performs no writes of any kind. The admin's inclusion and
-// counted-version choices are local report selection in this browser.
+// Read-only: this page performs no writes of any kind. The admin's inclusion,
+// status and category choices are local report selection in this browser.
 
 import React, { useMemo, useState } from 'react';
 import { useAuth } from '@/lib/AuthContext';
@@ -22,6 +26,8 @@ import useProjectSelection from '@/components/admin/intelligence/useProjectSelec
 import { BRAND, Button, Card, Pill } from '@/components/admin/intelligence/IntelligenceUi';
 import ProjectSelectionSummary from '@/components/admin/intelligence/ProjectSelectionSummary';
 import ProjectSelectionTable from '@/components/admin/intelligence/ProjectSelectionTable';
+import StatusInclusionPanel from '@/components/admin/intelligence/StatusInclusionPanel';
+import CategoryInclusionPanel from '@/components/admin/intelligence/CategoryInclusionPanel';
 import PipelineAgeOverview from '@/components/admin/intelligence/PipelineAgeOverview';
 import TrendsPanel from '@/components/admin/intelligence/TrendsPanel';
 import ProductDemandTable from '@/components/admin/intelligence/ProductDemandTable';
@@ -142,9 +148,10 @@ export default function AdminProjectIntelligence() {
   // reference instant is the reporting run, so the windows match the data loaded.
   const trends = useMemo(() => buildTrendSummary(selection.selectedFamilies, {
     unitsByProjectId: selection.unitsByProjectId,
+    retailByProjectId: selection.retailByProjectId,
     now: report?.generatedAt,
     accountId: trendAccountId || null,
-  }), [selection.selectedFamilies, selection.unitsByProjectId, report, trendAccountId]);
+  }), [selection.selectedFamilies, selection.unitsByProjectId, selection.retailByProjectId, report, trendAccountId]);
 
   const familiesById = useMemo(() => (
     new Map((report?.families || []).map((family) => [family.id, family]))
@@ -186,12 +193,18 @@ export default function AdminProjectIntelligence() {
     // The export carries the demand rows in the order shown on screen. Sorting
     // is ordering only — the rows and their values are untouched.
     productDemand: sortProductDemandRows(selection.productDemand, demandSort),
+    // The status, category and version surfaces are the same rows the page shows,
+    // so the workbook cannot disagree with the screen.
+    statusRows: selection.statusRows,
+    categoryRows: selection.categoryRows,
+    versionRows: selection.versionRows,
     excludedLines: selection.excludedLines,
     abfuserExclusions: selection.abfuserExclusions,
     // The age and trend summaries are the same objects the page displays, so the
     // workbook cannot disagree with the screen.
     pipelineAge: selection.pipelineAge,
     trends,
+    currency: report?.summary?.liveCurrency || 'GBP',
   });
 
   const handleExportWorkbook = () => {
@@ -202,8 +215,8 @@ export default function AdminProjectIntelligence() {
 
   const handleExportCsv = () => {
     if (!report) return;
-    downloadSelectionCsv(exportPayload());
-    setExportNotice('CSV downloaded per tab: Included Projects, Excluded Projects, Product Demand, Version Detail, Excluded Manual Lines, Excluded Historic Abfusers, Pipeline Age Summary, Trend Summary.');
+    const tabs = downloadSelectionCsv(exportPayload());
+    setExportNotice(`CSV downloaded per tab: ${tabs.join(', ')}.`);
   };
 
   const truncation = data?.truncation;
@@ -223,11 +236,12 @@ export default function AdminProjectIntelligence() {
         <div>
           <h1 style={{ margin: 0, fontSize: 26, color: BRAND.text }}>Project Intelligence</h1>
           <div style={{ fontSize: 13, color: BRAND.subtext, marginTop: 4 }}>
-            Project selection and product demand export
+            Artcoustic product forecast and demand export
           </div>
-          <div style={{ marginTop: 10, fontSize: 12, color: BRAND.muted, maxWidth: 620, lineHeight: 1.6 }}>
-            Select the projects to include, choose the counted version where there are variations, then export the
-            product demand.
+          <div style={{ marginTop: 10, fontSize: 12, color: BRAND.muted, maxWidth: 720, lineHeight: 1.6 }}>
+            What Artcoustic business is likely coming our way: include the projects to forecast, choose which statuses
+            and product categories count, pick the counted version where there are variations, then export the Artcoustic
+            forecast.
           </div>
         </div>
 
@@ -235,7 +249,7 @@ export default function AdminProjectIntelligence() {
           <Button
             onClick={handleExportWorkbook}
             disabled={!report || loading}
-            title="Workbook: Included Projects, Excluded Projects, Product Demand, Version Detail, the age and trend summaries"
+            title="Workbook: Included Forecast Projects, Excluded Projects, Product Demand, Status Inclusion, Category Inclusion, Version Detail and the exclusion audits"
           >
             Export product demand (workbook)
           </Button>
@@ -297,11 +311,29 @@ export default function AdminProjectIntelligence() {
           <ProjectSelectionSummary
             summary={summary}
             currency={report.summary.liveCurrency}
-            hiddenCount={hiddenProjectCount}
+            forecast={selection.forecastSummary}
             pipelineAge={selection.pipelineAge}
-            productDemandValue={selection.productDemandSummary?.value ?? null}
-            productDemandUnpricedLines={selection.productDemandSummary?.unpricedLineCount ?? 0}
+            hiddenCount={hiddenProjectCount}
           />
+
+          <div style={{
+            display: 'grid',
+            gap: 16,
+            gridTemplateColumns: 'repeat(auto-fit, minmax(440px, 1fr))',
+          }}>
+            <StatusInclusionPanel
+              rows={selection.statusRows}
+              currency={report.summary.liveCurrency}
+              onToggleStatus={selection.setStatusIncluded}
+              onResetStatuses={selection.resetStatuses}
+            />
+            <CategoryInclusionPanel
+              rows={selection.categoryRows}
+              currency={report.summary.liveCurrency}
+              onToggleCategory={selection.setCategoryIncluded}
+              onResetCategories={selection.resetCategories}
+            />
+          </div>
 
           <PipelineAgeOverview
             pipelineAge={selection.pipelineAge}
@@ -312,8 +344,8 @@ export default function AdminProjectIntelligence() {
 
           {!priceListAvailable && (
             <div style={{ fontSize: 12, color: BRAND.warn }}>
-              No price list is available for this session, so live design value is reported as not calculable rather than
-              as zero.
+              No price list is available for this session, so Artcoustic catalogue value is reported as not calculable
+              rather than as zero.
             </div>
           )}
 
@@ -322,7 +354,7 @@ export default function AdminProjectIntelligence() {
               <TabButton key={entry.key} active={tab === entry.key} onClick={() => setTab(entry.key)}>
                 {entry.label}
                 {entry.key === 'demand' && selection.productDemand.length > 0 ? ` (${selection.productDemand.length})` : ''}
-                {entry.key === 'projects' && summary ? ` (${summary.includedCount}/${summary.listedProjectCount})` : ''}
+                {entry.key === 'projects' && summary ? ` (${selection.forecastSummary.projectCount}/${summary.listedProjectCount})` : ''}
               </TabButton>
             ))}
           </div>
@@ -330,7 +362,7 @@ export default function AdminProjectIntelligence() {
           {tab === 'demand' && (
             <Card
               title="Product demand"
-              subtitle={`${selection.productDemand.length} Artcoustic catalogue line${selection.productDemand.length === 1 ? '' : 's'} across ${summary.includedCount} included project${summary.includedCount === 1 ? '' : 's'}. Counted versions only.`}
+              subtitle={`${selection.productDemand.length} Artcoustic catalogue line${selection.productDemand.length === 1 ? '' : 's'} across ${selection.forecastSummary.projectCount} included forecast project${selection.forecastSummary.projectCount === 1 ? '' : 's'}. Counted versions only.`}
             >
               <div style={{ display: 'grid', gap: 16 }}>
                 <ProductDemandTable
@@ -357,8 +389,8 @@ export default function AdminProjectIntelligence() {
             <Card
               title="Project selection"
               subtitle={ageFilterLabel
-                ? `Showing only the ${ageFilterLabel} projects: ${formatNumber(projectRows.length)} of ${formatNumber(selection.selectedFamilies.length)} included and excluded projects.`
-                : 'One row per project. Test, demo and audit projects are excluded by default and can be included manually.'}
+                ? `Showing only the ${ageFilterLabel} projects: ${formatNumber(projectRows.length)} of ${formatNumber(selection.selectedFamilies.length)} forecast and excluded projects.`
+                : 'One row per project. A project counts towards the Artcoustic forecast when it is included here and its status is included in the forecast above. Test, demo and audit projects are excluded by default and can be included manually.'}
               actions={(
                 <Button
                   variant="secondary"
@@ -372,8 +404,8 @@ export default function AdminProjectIntelligence() {
               <div style={{ display: 'grid', gap: 12 }}>
                 <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', fontSize: 12, color: BRAND.muted }}>
                   <span>
-                    Click Included, Age, Last updated, Counted version or Live value to sort. Default order is the
-                    reporting order, highest live value first.
+                    Click Included, Age, Last updated, Counted version or Artcoustic retail to sort. Default order is the
+                    reporting order, highest project value first.
                   </span>
                   {projectSortLabel && <Pill tone="neutral">Sorted by {projectSortLabel}</Pill>}
                   {ageFilterLabel && (
@@ -400,7 +432,7 @@ export default function AdminProjectIntelligence() {
           {tab === 'variations' && (
             <Card
               title="Version detail"
-              subtitle={`${selection.versionRows.length} design version${selection.versionRows.length === 1 ? '' : 's'} across ${summary.listedProjectCount} projects. Only counted versions feed product demand.`}
+              subtitle={`${selection.versionRows.length} design version${selection.versionRows.length === 1 ? '' : 's'} across ${summary.listedProjectCount} projects. Only a forecast project's counted version feeds Artcoustic product demand.`}
             >
               <VariationCountTable
                 rows={selection.versionRows}
@@ -434,8 +466,9 @@ export default function AdminProjectIntelligence() {
           <div style={{ fontSize: 12, color: BRAND.muted, display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
             <Pill tone="neutral">Read-only</Pill>
             <span>
-              Live design value is calculated with the existing pricing engine against the current Product Master, for
-              the counted version of each included project. Versions of a project are design options and are never summed.
+              Every figure on this page is an Artcoustic catalogue forecast: retail ex VAT for the counted version of each
+              forecast project, with the trade value derived at × 0.59. Overall project value is not used, and a project's
+              versions are design options that are never summed.
             </span>
           </div>
         </div>

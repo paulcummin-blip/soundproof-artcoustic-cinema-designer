@@ -11,8 +11,9 @@ export default function VariationCountTable({ rows = [], currency }) {
   return (
     <div style={{ display: 'grid', gap: 12 }}>
       <div style={{ fontSize: 12, color: BRAND.muted, lineHeight: 1.6 }}>
-        One row per design version. Only the counted version of an included project feeds product demand; every other
-        version is listed as an option and never counted.
+        One row per design version. Only the counted version of a forecast project feeds Artcoustic product demand; every
+        other version is listed as an option and never counted. Artcoustic retail and trade values are that version's own
+        catalogue lines only — manual extras and third-party items are excluded.
       </div>
 
       <div style={TABLE_WRAP}>
@@ -24,7 +25,8 @@ export default function VariationCountTable({ rows = [], currency }) {
               <Th align="right">No.</Th>
               <Th>Active</Th>
               <Th>Counted</Th>
-              <Th align="right">Live value</Th>
+              <Th align="right">Artcoustic retail</Th>
+              <Th align="right">Artcoustic trade</Th>
               <Th align="right">Product lines</Th>
               <Th>Counted status</Th>
             </tr>
@@ -45,9 +47,14 @@ export default function VariationCountTable({ rows = [], currency }) {
                 <Td>{row.isActive ? <Pill tone="info">Active</Pill> : '—'}</Td>
                 <Td>{row.counted ? <Pill tone="good">Yes</Pill> : <Pill tone="neutral">No</Pill>}</Td>
                 <Td align="right" mono>
-                  {row.liveValue === null || row.liveValue === undefined
-                    ? <Pill tone="warn">not calculable</Pill>
-                    : formatMoney(row.liveValue, row.currency || currency || 'GBP')}
+                  {row.artcousticRetail === null || row.artcousticRetail === undefined
+                    ? <Pill tone="warn">no catalogue value</Pill>
+                    : formatMoney(row.artcousticRetail, row.currency || currency || 'GBP')}
+                </Td>
+                <Td align="right" mono>
+                  {row.artcousticTrade === null || row.artcousticTrade === undefined
+                    ? '—'
+                    : formatMoney(row.artcousticTrade, row.currency || currency || 'GBP')}
                 </Td>
                 <Td align="right" mono>{formatNumber(row.productLineCount || 0)}</Td>
                 <Td>

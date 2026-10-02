@@ -16,6 +16,7 @@
  */
 
 import { safeArray, text, timeOf } from './reportingUtils';
+import { artcousticValueOfLines } from './forecastDemand';
 
 /** Names and clients that identify a non-commercial project. */
 export const TEST_PROJECT_PATTERNS = [
@@ -273,16 +274,28 @@ export function summariseSelection(selectedFamilies, options = {}) {
   };
 }
 
-/** Every version of every project, marked counted or not. */
-export function buildVersionDetailRows(selectedFamilies) {
+/**
+ * Every version of every project, marked counted or not, with the Artcoustic
+ * retail and trade value of that version's own catalogue lines. The version
+ * figure is a reference only: product demand and every forecast total are read
+ * from the counted version alone.
+ *
+ * @param {Array} selectedFamilies — selected project families
+ * @param {Object} [options]
+ * @param {Map} [options.priceMap] — Product Master index, for catalogue resolution
+ * @param {Set|Array} [options.excludedCategories] — category keys left out of the forecast
+ */
+export function buildVersionDetailRows(selectedFamilies, { priceMap = null, excludedCategories = [] } = {}) {
   return safeArray(selectedFamilies).flatMap((family) => safeArray(family.variations).map((variation) => {
     const counted = family.included && variation.id === family.countedVariationId;
+    const artcoustic = artcousticValueOfLines(variation.lines || [], { priceMap, excludedCategories });
     return {
       projectId: family.id,
       project: family.name,
       client: family.client,
       account: family.dealerName || family.accountName,
       included: family.included,
+      forecastIncluded: family.forecastIncluded === true,
       versionId: variation.id,
       versionNumber: variation.versionNumber,
       versionName: variation.versionName,
@@ -290,6 +303,9 @@ export function buildVersionDetailRows(selectedFamilies) {
       counted,
       countedNote: counted ? 'Counted in product demand' : 'Not counted in product demand',
       liveValue: variation.liveValue,
+      artcousticRetail: artcoustic.retail,
+      artcousticTrade: artcoustic.trade,
+      artcousticUnits: artcoustic.units,
       currency: variation.currency || null,
       productLineCount: variation.lineCount || 0,
       unpricedLineCount: variation.unpricedLineCount || 0,

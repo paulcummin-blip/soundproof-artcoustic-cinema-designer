@@ -1,10 +1,11 @@
 // PipelineAgeOverview.jsx
-// -----------------------
-// "Pipeline age and value" — the age and value ageing overview for the included
+// ------------------------
+// "Pipeline age and Artcoustic value" — the age ageing overview for the forecast
 // projects, shown above the tabs so it is the first thing an admin reads.
 //
-// Included projects only, counted versions only. Clicking a bucket filters the
-// Projects table to that bucket; clicking it again clears the filter.
+// Forecast projects only, counted versions only, Artcoustic catalogue products
+// only. Clicking a bucket filters the Projects table to that bucket; clicking it
+// again clears the filter.
 //
 // Presentation only: every number comes from the pipelineAge authority.
 
@@ -26,7 +27,7 @@ function BucketButton({ label, active, onClick }) {
     <button
       type="button"
       onClick={onClick}
-      title={`${active ? 'Clear the filter and show every included project' : 'Show only the projects in this age bucket in the Projects table'}`}
+      title={`${active ? 'Clear the filter and show every forecast project' : 'Show only the projects in this age bucket in the Projects table'}`}
       style={{
         font: 'inherit',
         fontWeight: 700,
@@ -52,8 +53,8 @@ export default function PipelineAgeOverview({ pipelineAge, currency, activeBucke
 
   return (
     <Card
-      title="Pipeline age and value"
-      subtitle={`${formatNumber(totals.count || 0)} included projects. ${pipelineAge.basisNote}`}
+      title="Pipeline age and Artcoustic value"
+      subtitle={`${formatNumber(totals.count || 0)} forecast projects. ${pipelineAge.basisNote}`}
       actions={activeBucket ? (
         <button
           type="button"
@@ -79,8 +80,8 @@ export default function PipelineAgeOverview({ pipelineAge, currency, activeBucke
               <tr>
                 <Th>Age bucket</Th>
                 <Th align="right">Projects</Th>
-                <Th align="right">Live design value</Th>
-                <Th align="right">Average project value</Th>
+                <Th align="right">Artcoustic retail</Th>
+                <Th align="right">Artcoustic trade</Th>
                 <Th align="right">Catalogue units</Th>
                 <Th>Notes</Th>
               </tr>
@@ -99,14 +100,14 @@ export default function PipelineAgeOverview({ pipelineAge, currency, activeBucke
                       {active && <div style={{ fontSize: 11, color: BRAND.good, marginTop: 3 }}>Filtering the Projects table</div>}
                     </Td>
                     <Td align="right" mono>{formatNumber(bucket.count)}</Td>
-                    <Td align="right" mono>{money(bucket.liveValue, currency)}</Td>
-                    <Td align="right" mono>{money(bucket.averageValue, currency)}</Td>
+                    <Td align="right" mono>{money(bucket.retail, currency)}</Td>
+                    <Td align="right" mono>{money(bucket.trade, currency)}</Td>
                     <Td align="right" mono>{formatNumber(bucket.units)}</Td>
                     <Td>
                       <div>{bucket.note}</div>
-                      {bucket.unpricedCount > 0 && (
+                      {bucket.noValueCount > 0 && (
                         <div style={{ fontSize: 11, color: BRAND.muted }}>
-                          {formatNumber(bucket.unpricedCount)} not calculable
+                          {formatNumber(bucket.noValueCount)} with no Artcoustic value
                         </div>
                       )}
                     </Td>
@@ -115,11 +116,11 @@ export default function PipelineAgeOverview({ pipelineAge, currency, activeBucke
               })}
               <tr>
                 <Td>
-                  <div style={{ fontWeight: 700, color: BRAND.text }}>All included projects</div>
+                  <div style={{ fontWeight: 700, color: BRAND.text }}>All forecast projects</div>
                 </Td>
                 <Td align="right" mono>{formatNumber(totals.count || 0)}</Td>
-                <Td align="right" mono>{money(totals.liveValue, currency)}</Td>
-                <Td align="right" mono>{money(totals.averageValue, currency)}</Td>
+                <Td align="right" mono>{money(totals.retail, currency)}</Td>
+                <Td align="right" mono>{money(totals.trade, currency)}</Td>
                 <Td align="right" mono>{formatNumber(totals.units || 0)}</Td>
                 <Td>
                   {totals.projectsOverOneYear > 0
@@ -133,10 +134,10 @@ export default function PipelineAgeOverview({ pipelineAge, currency, activeBucke
 
         <div style={{ display: 'grid', gap: 8 }}>
           <div style={{ fontSize: 12, color: BRAND.muted }}>
-            Share of included projects — {buckets.map((bucket) => `${bucket.label}: ${percent(bucket.shareOfCount)}`).join(' · ')}
+            Share of forecast projects — {buckets.map((bucket) => `${bucket.label}: ${percent(bucket.shareOfCount)}`).join(' · ')}
           </div>
           <div style={{ fontSize: 12, color: BRAND.muted }}>
-            Share of included live design value — {buckets.map((bucket) => `${bucket.label}: ${percent(bucket.shareOfValue)}`).join(' · ')}
+            Share of Artcoustic retail value — {buckets.map((bucket) => `${bucket.label}: ${percent(bucket.shareOfRetail)}`).join(' · ')}
           </div>
         </div>
 
@@ -144,16 +145,16 @@ export default function PipelineAgeOverview({ pipelineAge, currency, activeBucke
           <Pill tone="warn">{pipelineAge.helperNote}</Pill>
           {totals.missingAgeCount > 0 && (
             <span style={{ fontSize: 12, color: BRAND.muted }}>
-              {formatNumber(totals.missingAgeCount)} included project{totals.missingAgeCount === 1 ? '' : 's'} carry no
+              {formatNumber(totals.missingAgeCount)} forecast project{totals.missingAgeCount === 1 ? '' : 's'} carry no
               created or updated date, so they are not placed in a bucket.
             </span>
           )}
         </div>
 
         <div style={{ fontSize: 12, color: BRAND.muted }}>
-          Live design value and catalogue units come from each project's counted version. Buckets:{' '}
-          {AGE_BUCKETS.map((bucket) => bucket.label).join(', ')}. Click a bucket to show only those projects in the
-          Projects table.
+          Artcoustic retail ex VAT, trade value and catalogue units come from each project's counted version, catalogue
+          products only. Buckets: {AGE_BUCKETS.map((bucket) => bucket.label).join(', ')}. Click a bucket to show only
+          those projects in the Projects table.
         </div>
       </div>
     </Card>
