@@ -74,6 +74,14 @@ export default function BassBackgroundAnalysisOwner({ children, scopeId = "free"
   const controllerRef = useRef(null);
   const scopeRef = useRef(null);
   const [manualAnalysisRequest, setManualAnalysisRequest] = useState(null);
+  // Opening a project is read-only. The target-family scheduler, room-physics
+  // preparation and cache bridge are armed only by an explicit bass calculation
+  // (or Calculate All Targets request), never by hydration alone.
+  const [targetSweepArmed, setTargetSweepArmed] = useState(false);
+  useEffect(() => {
+    setTargetSweepArmed(false);
+    setBackgroundPrepFingerprint(null);
+  }, [scopeId, versionId]);
   // FIX 2&3: Explicit terminal outcome tracking. When the manual request is
   // cleared, this records WHY — success, error, timeout, cancelled, stale,
   // or rejected — so the UI can show an explicit status instead of silently
@@ -1530,6 +1538,7 @@ export default function BassBackgroundAnalysisOwner({ children, scopeId = "free"
   const onCalculate = useCallback(
     ({ collectDiagnostics = false } = {}) => {
       if (!canCalculate) return { action: "blocked" };
+      setTargetSweepArmed(true);
       clearPublicationTrace();
       setColdReloadRecovered(false);
       const diagnosticToken = collectDiagnostics ? createDiagToken("manual-authoritative") : null;
@@ -1692,7 +1701,7 @@ export default function BassBackgroundAnalysisOwner({ children, scopeId = "free"
   // bridge seed. Same protection policy: a bank owned by the published
   // authority's design is never downgraded. No maths, no fingerprint change.
   useEffect(() => {
-    if (!restoredAuthorityRebuild.eligible) return;
+    if (!targetSweepArmed || !restoredAuthorityRebuild.eligible) return;
     const restoredContract = getCompletedBassContract(scopeId, versionId);
     if (!restoredContract
       || !isAuthoritativeBassContract(restoredContract)
@@ -1709,7 +1718,7 @@ export default function BassBackgroundAnalysisOwner({ children, scopeId = "free"
     });
     if (protectsPublishedAuthority) return;
     setTargetCacheEntry(scopeId, versionId, baseDesignFingerprint, targetKey, restoredContract, { immediate: true });
-  }, [restoredAuthorityRebuild.eligible, scopeId, versionId, cacheKey, targetKey, baseDesignFingerprint, completedBassAuthority]);
+  }, [targetSweepArmed, restoredAuthorityRebuild.eligible, scopeId, versionId, cacheKey, targetKey, baseDesignFingerprint, completedBassAuthority]);
 
   // ── Background room-physics preparation ──────────────────────────────
   // On cold restore, rspRawCurve is empty because the authoritative
@@ -1733,7 +1742,8 @@ export default function BassBackgroundAnalysisOwner({ children, scopeId = "free"
   // the next render (same pattern as placementPreviewFp). The hook compares
   // it to its own fingerprints.geometry and runs the simulation if they match.
   useEffect(() => {
-    const shouldPrep = foregroundReady
+    const shouldPrep = targetSweepArmed
+      && foregroundReady
       && !manualAnalysisRequest
       && !isDragging
       && !placementPreviewActive
@@ -1777,6 +1787,7 @@ export default function BassBackgroundAnalysisOwner({ children, scopeId = "free"
       if (timeoutId != null) window.clearTimeout(timeoutId);
     };
   }, [
+    targetSweepArmed,
     foregroundReady,
     manualAnalysisRequest,
     isDragging,
@@ -1867,6 +1878,7 @@ export default function BassBackgroundAnalysisOwner({ children, scopeId = "free"
 
     // Explicit Retry request — bypass the retryable-partial guard.
     if (calcAllTargetsRequest?.requested && backgroundInputsReady && baseDesignFingerprint && scopeId !== "free") {
+      setTargetSweepArmed(true);
       consumeCalculateAllTargetsRequest();
       scheduler.schedule({
         projectId: scopeId,
@@ -1879,7 +1891,14 @@ export default function BassBackgroundAnalysisOwner({ children, scopeId = "free"
       return;
     }
 
-    // Don't auto-start during hydration or when inputs aren't ready.
+    // Opening/restoring is read-only. Missing targets are prepared only after
+    // an explicit calculation has armed this project/version.
+    if (!targetSweepArmed) {
+      if (scheduler.hasActiveBatchWork()) scheduler.cancel();
+      return;
+    }
+
+    // Don't start during hydration or when inputs aren't ready.
     if (!foregroundReady || !backgroundInputsReady || !baseDesignFingerprint || scopeId === "free") {
       if (!scheduler.hasActiveBatchWork()) scheduler.cancel();
       return;
@@ -1934,7 +1953,7 @@ export default function BassBackgroundAnalysisOwner({ children, scopeId = "free"
       allTargets,
       designContext: designContextRef.current,
     });
-  }, [scopeId, versionId, baseDesignFingerprint, targetKey, foregroundReady, backgroundInputsReady, manualAnalysisRequest, heavyActionRunning, stage2Updating, targetFamilyProgress.resolved, targetFamilyProgress.total, calcAllTargetsRequest, allTargets]);
+  }, [scopeId, versionId, baseDesignFingerprint, targetKey, targetSweepArmed, foregroundReady, backgroundInputsReady, manualAnalysisRequest, heavyActionRunning, stage2Updating, targetFamilyProgress.resolved, targetFamilyProgress.total, calcAllTargetsRequest, allTargets]);
 
   // ── Auto-calculate missing target on P14 switch (foreground priority) ──
   // When the user switches to a missing (uncached) target:
@@ -1952,6 +1971,7 @@ export default function BassBackgroundAnalysisOwner({ children, scopeId = "free"
   // it is available in both the effect body and dependency array below.
   const autoCalculatedKeyRef = useRef(null);
   useEffect(() => {
+    if (!targetSweepArmed) return;
     if (!isProjectHydrationReady || !targetKey || !canCalculate) return;
     if (manualAnalysisRequest || calculationInProgress) return;
     if (cachedContract) return; // Already cached — publish effect handles it
@@ -1992,7 +2012,7 @@ export default function BassBackgroundAnalysisOwner({ children, scopeId = "free"
         autoCalculatedKeyRef.current = autoKey;
       }
     }
-  }, [isProjectHydrationReady, targetKey, canCalculate, manualAnalysisRequest, calculationInProgress, cachedContract, completedContractMatches, hasPublishedContract, publishedBaseDesign, baseDesignFingerprint, targetFamilyProgress.resolved, targetFamilyProgress.total, onCalculate]);
+  }, [targetSweepArmed, isProjectHydrationReady, targetKey, canCalculate, manualAnalysisRequest, calculationInProgress, cachedContract, completedContractMatches, hasPublishedContract, publishedBaseDesign, baseDesignFingerprint, targetFamilyProgress.resolved, targetFamilyProgress.total, onCalculate]);
 
   // #1: While the project record is still hydrating, do not present a
   // transitional completed contract as the effective contract — P14 target
