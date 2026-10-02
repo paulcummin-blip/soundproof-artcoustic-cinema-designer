@@ -18,12 +18,13 @@
 //
 //   1. every row is terminal, and
 //   2. every BLOCKING row is in an allowed terminal state — a blocking row that
-//      FAILED holds the panel until the designer explicitly chooses to continue
-//      with a warning (safeToContinue).
+//      FAILED holds the panel, with no way past it: the project opens when the
+//      restore succeeds, or not at all. There is no accepted-failure path.
 //
 // There is no timeout, no route-ready signal and no shell-mounted signal in this
-// decision. Time can only ever hold the panel LONGER (the minimum visible time);
-// it can never release it.
+// decision. Time can only ever hold the panel LONGER (the minimum visible time),
+// or turn a stalled row into a visible FAILURE (projectOpeningAuthority.js); it
+// can never release the panel.
 //
 // Pure: no React, no state, no side effects, no database access. It reads the
 // opening snapshot and answers.
@@ -33,13 +34,12 @@ import {
   OPENING_CHECKPOINT_STATE,
   SAVED_BASS_CHECKPOINT_KEYS,
   criticalOpeningCheckpointKeys,
-  nonBypassableOpeningCheckpointKeys,
   normaliseId,
   openingCheckpointStage,
 } from "./projectOpeningStages.js";
 
 /** The complete restore-status vocabulary. */
-export const RESTORE_CHECKLIST_VERSION = "terminal-all-rows-v2";
+export const RESTORE_CHECKLIST_VERSION = "terminal-all-rows-v3";
 
 export const RESTORE_STATUS = Object.freeze({
   // ── terminal ────────────────────────────────────────────────────────────
@@ -88,7 +88,8 @@ export const RESTORE_NON_TERMINAL_STATUSES = Object.freeze([
 
 /**
  * Terminal states a BLOCKING row may release on. A blocking row that FAILED is
- * deliberately absent: it needs the designer's explicit, warned decision.
+ * deliberately absent, and nothing can accept one: a required row that could not
+ * be restored holds the project until it is.
  */
 export const RESTORE_ALLOWED_BLOCKING_TERMINAL_STATUSES = Object.freeze(
   RESTORE_TERMINAL_STATUSES.filter((status) => status !== RESTORE_STATUS.FAILED),
@@ -104,7 +105,7 @@ export const RESTORE_STATUS_LABEL = Object.freeze({
   [RESTORE_STATUS.NOT_GENERATED]: "Not generated yet",
   [RESTORE_STATUS.NOT_CALCULATED]: "Not calculated yet",
   [RESTORE_STATUS.NOT_APPLICABLE]: "Not applicable",
-  [RESTORE_STATUS.FAILED]: "Unavailable",
+  [RESTORE_STATUS.FAILED]: "Failed",
   [RESTORE_STATUS.RESTORING]: "Restoring",
   [RESTORE_STATUS.LOADING]: "Loading",
   [RESTORE_STATUS.HYDRATING]: "Hydrating",
@@ -221,7 +222,6 @@ export function buildRestoreChecklist({ snapshot, projectId } = {}) {
       status,
       terminal,
       blocking: isRestoreRowBlocking(definition.key, { entry, entrySurface }),
-      safeToContinue: entry?.safeToContinue === true,
       timedOut: entry?.timedOut === true,
       message: entry?.detail || null,
     };
@@ -241,7 +241,7 @@ export function buildRestoreChecklist({ snapshot, projectId } = {}) {
  *
  * @returns {{release:boolean, nonTerminalRows:Array, blockingRows:Array,
  *   blockingFailures:Array, blockedRows:Array, holdLabels:string[],
- *   blockingLabels:string[], canContinueWithWarning:boolean, reason:string|null}}
+ *   blockingLabels:string[], reason:string|null}}
  */
 export function deriveRestoreRelease(checklistOrRows) {
   const rows = Array.isArray(checklistOrRows)
@@ -251,23 +251,15 @@ export function deriveRestoreRelease(checklistOrRows) {
   const nonTerminalRows = rows.filter((row) => !row.terminal);
   const blockingRows = rows.filter((row) => row.blocking);
   // A blocking row that finished anywhere other than an allowed state — in
-  // practice a failure that has not been explicitly accepted.
+  // practice a failure. Nothing accepts one: it holds until it is restored.
   const blockedRows = blockingRows.filter((row) => (
-    !row.terminal
-      ? false
-      : !RESTORE_ALLOWED_BLOCKING_TERMINAL_STATUSES.includes(row.status)
-        && !(row.status === RESTORE_STATUS.FAILED && row.safeToContinue === true)
+    row.terminal && !RESTORE_ALLOWED_BLOCKING_TERMINAL_STATUSES.includes(row.status)
   ));
-  const blockingFailures = blockingRows.filter((row) => (
-    row.status === RESTORE_STATUS.FAILED && row.safeToContinue !== true
-  ));
+  const blockingFailures = blockingRows.filter((row) => row.status === RESTORE_STATUS.FAILED);
 
   const release = nonTerminalRows.length === 0 && blockedRows.length === 0;
   const holdRows = [...nonTerminalRows, ...blockedRows];
   const holdLabels = [...new Set(holdRows.map((row) => row.label))];
-
-  const canContinueWithWarning = nonTerminalRows.length > 0
-    && !nonTerminalRows.some((row) => nonBypassableOpeningCheckpointKeys().includes(row.key));
 
   return {
     release,
@@ -277,11 +269,10 @@ export function deriveRestoreRelease(checklistOrRows) {
     blockedRows,
     holdLabels,
     blockingLabels: blockingRows.map((row) => row.label),
-    canContinueWithWarning,
     reason: release
       ? null
       : blockedRows.length > 0 && nonTerminalRows.length === 0
-        ? `A required step did not confirm: ${holdLabels.join(", ")}.`
+        ? `A required step could not be restored: ${holdLabels.join(", ")}.`
         : `Still restoring: ${holdLabels.join(", ")}.`,
   };
 }

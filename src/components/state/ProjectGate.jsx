@@ -24,7 +24,6 @@ import ProjectDesignHydrator from "@/components/state/ProjectDesignHydrator";
 import ProjectOpeningResolver from "@/components/state/ProjectOpeningResolver";
 import ProjectOpeningWarnings from "@/components/state/ProjectOpeningWarnings";
 import {
-  continueProjectOpeningWithWarning,
   dismissProjectOpeningWarnings,
   openingEntrySurfaceForPath,
   PROJECT_OPENING_STILL_RESTORING_TITLE,
@@ -75,10 +74,11 @@ export default function ProjectGate({ children, requiresDesign = true }) {
   const projectReference = hydration.identity?.projectReference || null;
   // The opening panel is held by the restore checklist: it stays until EVERY row
   // has reached a terminal state — ready, loaded, complete, current, out of date,
-  // not generated yet, not calculated yet, not applicable, or failed with a
-  // visible warning. "The record has loaded" is not enough, and neither is "the
-  // wait ran long": a row that is still restoring keeps the panel open, which is
-  // what stops a report or a proposal being opened on a half-restored authority.
+  // not generated yet, not calculated yet, not applicable, or failed. "The record
+  // has loaded" is not enough, and neither is "the wait ran long": a row that is
+  // still restoring keeps the panel open, and a REQUIRED row that failed keeps it
+  // open too (with Retry). There is no continue-anyway path, which is what stops a
+  // report or a proposal being opened on a half-restored authority.
   const opening = useProjectOpening(hydration.projectId || null);
 
   // One line per opening decision, so a support conversation can see exactly which
@@ -223,10 +223,8 @@ export default function ProjectGate({ children, requiresDesign = true }) {
         heldByLabels={opening.holdLabels}
         phase={opening.phase}
         stillRestoringTitle={PROJECT_OPENING_STILL_RESTORING_TITLE}
-        stillRestoringLabels={opening.pendingLabels}
-        canContinueWithWarning={opening.canContinueWithWarning}
+        stillRestoringLabels={opening.holdLabels}
         onRetry={() => retryProjectOpening()}
-        onContinueWithWarning={() => continueProjectOpeningWithWarning()}
       />
     </>
   );

@@ -8,7 +8,7 @@
 //   TEST 1   A fresh opening holds while any stage is still restoring
 //   TEST 2   The panel does not close before the minimum visible duration
 //   TEST 3   It closes once every stage is definite and the minimum elapsed
-//   TEST 4   The timeout never opens the project — it says it is still restoring
+//   TEST 4   The timeout never opens the project — a stalled row becomes Failed, with Retry
 //   TEST 5   A bass row still restoring holds the panel; an uncalculated bass does not
 //   TEST 6   Commercial hydration must resolve; a failure is warned, not fatal
 //   TEST 7   Retry re-arms every stage and keeps the panel open
@@ -36,7 +36,6 @@ import {
   RESTORE_STATUS_LABEL,
   _resetProjectOpeningForTest,
   beginProjectOpening,
-  continueProjectOpeningWithWarning,
   criticalOpeningCheckpointKeys,
   deriveOpeningReadiness,
   dismissProjectOpeningWarnings,
@@ -114,7 +113,7 @@ test('TEST 3 — it closes once every stage is definite and the minimum has elap
   assert.ok(PROJECT_OPENING_TIMEOUT_MS > PROJECT_OPENING_MIN_VISIBLE_MS, 'the timeout is the longer bound');
 });
 
-test('TEST 4 — the timeout never opens the project: it reports that it is still restoring', () => {
+test('TEST 4 — the timeout never opens the project: a stalled row becomes Failed, with Retry', () => {
   start();
   resolveProjectOpeningCheckpoints({ metadata: { state: OPENING_CHECKPOINT_STATE.READY } });
   markProjectOpeningTimedOut();
@@ -127,17 +126,29 @@ test('TEST 4 — the timeout never opens the project: it reports that it is stil
   assert.equal(isProjectOpeningSatisfied(PROJECT), false, 'the project is not marked opened');
   assert.equal(readiness.holding, true, 'the project stays behind the panel');
   assert.equal(readiness.phase, OPENING_PHASE.STILL_RESTORING);
-  assert.ok(readiness.pendingLabels.length > 0, 'the panel can name what is still restoring');
+  assert.ok(readiness.holdLabels.length > 0, 'the panel can name what is holding it');
+  assert.equal(readiness.release, false, 'a failed required row does not release the project');
+  assert.ok(!('canContinueWithWarning' in readiness), 'and there is no continue path at all');
 
-  // Nothing was resolved on the project's behalf: a still-restoring stage is
-  // still restoring, not silently "not confirmed but fine".
+  // Nothing was resolved on the project's behalf, and nothing is left waiting
+  // silently: every stalled row is recorded as FAILED — terminal, named,
+  // retryable — while a required row that failed still holds the release.
   PROJECT_OPENING_CHECKPOINT_KEYS
     .filter((key) => key !== 'metadata')
     .forEach((key) => {
-      const stageState = snapshot.checkpoints[key]?.state ?? OPENING_CHECKPOINT_STATE.PENDING;
-      assert.equal(stageState, OPENING_CHECKPOINT_STATE.PENDING, `${key} is still restoring`);
-      assert.equal(snapshot.checkpoints[key]?.outcome ?? null, null, `${key} has no outcome yet`);
+      const stage = snapshot.checkpoints[key];
+      assert.equal(stage?.state, OPENING_CHECKPOINT_STATE.UNAVAILABLE, `${key} is no longer waited on silently`);
+      assert.equal(stage?.outcome, OPENING_CHECKPOINT_OUTCOME.FAILED, `${key} records a failure instead`);
+      assert.equal(stage?.timedOut, true, `${key} is marked as the stalled row`);
+      assert.ok(stage?.detail, `${key} carries the reason the panel shows`);
     });
+
+  // Retry is the way out of a failure: the rows are re-armed and the project still
+  // waits — it is never opened from the failed state.
+  retryProjectOpening();
+  assert.equal(getProjectOpening().timedOut, false, 'Retry clears the failure notice');
+  assert.equal(openState().holding, true, 'and the project still waits for the re-read');
+  assert.equal(openState().phase, OPENING_PHASE.RESTORING, 'the rows are restoring again, not failed');
 });
 
 test('TEST 5 — a bass row still restoring holds the panel; an uncalculated bass does not', () => {
@@ -231,16 +242,22 @@ test('TEST 6 — commercial hydration must reach a terminal state; a failure is 
     'the failure is warned about, never silent',
   );
 
-  // The structural rows are not bypassable: without the saved geometry there is
-  // no project to open, so there is nothing to continue past.
+  // A structural row that never confirms is recorded as FAILED — terminal, named,
+  // retryable — and still holds the project. There is no path that opens without
+  // the saved geometry.
   _resetProjectOpeningForTest();
   beginProjectOpening(PROJECT, { versionId: VERSION, minVisibleMs: 0, timeoutMs: 0 });
   resolveAllExcept('roomSeating', ready);
   markProjectOpeningTimedOut();
 
-  assert.equal(openState().canContinueWithWarning, false, 'there is no escape hatch past the saved geometry');
-  assert.equal(continueProjectOpeningWithWarning(), false, 'the continue is refused');
+  const stalled = openState();
   assert.equal(getProjectOpening().closed, false, 'the project stays closed without its saved geometry');
+  assert.equal(stalled.holding, true, 'the saved geometry holds the project');
+  assert.ok(stalled.holdLabels.includes('Room and seating'), 'the panel names the row it is waiting for');
+  const stalledRow = stalled.checklist.find((row) => row.key === 'roomSeating');
+  assert.equal(stalledRow.status, 'failed', 'the stalled row says Failed');
+  assert.equal(stalledRow.terminal, true, 'so it is never left Restoring forever');
+  assert.equal(stalledRow.blocking, true, 'and a failed required row still holds the release');
 });
 
 test('TEST 7 — Retry re-arms every stage, clears the notice and keeps the panel open', () => {
@@ -388,6 +405,7 @@ test('TEST 13 — the gate, panel, resolver and warnings are wired to this autho
   const saver = read('src/components/hooks/useProjectLoader.jsx');
   const checklist = read('src/components/state/projectRestoreChecklist.js');
   const authority = read('src/components/state/projectOpeningAuthority.js');
+  const stages = read('src/components/state/projectOpeningStages.js');
   const technicalReport = read('src/pages/DesignReviewPage.jsx');
   const layout = read('src/Layout.jsx');
 
@@ -397,7 +415,7 @@ test('TEST 13 — the gate, panel, resolver and warnings are wired to this autho
   assert.ok(gate.includes('entrySurface='), 'the gate tells the opening which route it was entered through');
   assert.ok(gate.includes('ProjectOpeningWarnings'), 'the gate shows the warning the project opened with');
   assert.ok(gate.includes('retryProjectOpening'), 'the panel can re-ask');
-  assert.ok(gate.includes('canContinueWithWarning'), 'the panel only offers the warned continue when the authority allows it');
+  assert.ok(!gate.includes('ContinueWithWarning'), 'the panel offers no continue-anyway path');
   assert.ok(gate.includes('heldByLabels'), 'the panel is told which rows are holding the project');
   assert.ok(gate.includes('opening.holdLabels'), 'and it takes them from the release decision');
 
@@ -411,7 +429,8 @@ test('TEST 13 — the gate, panel, resolver and warnings are wired to this autho
   assert.ok(shell.includes('RESTORE_STATUS_LABEL'), 'the status words come from the restore vocabulary');
   assert.ok(shell.includes('line.terminal') && shell.includes('line.blocking'), 'the panel shows terminality and blocking');
   assert.ok(shell.includes('StillRestoringNotice'), 'the panel has the still-restoring notice');
-  assert.ok(shell.includes('onContinueWithWarning'), 'the notice offers the warned continue');
+  assert.ok(!shell.includes('Continue with warning'), 'and offers no continue-anyway button');
+  assert.ok(shell.includes('Retry runs the restore again'), 'Retry is the only action on a stalled restore');
   assert.ok(warnings.includes('warning.detail'), 'the warning strip names what did not resolve');
 
   // The release rule itself: every row terminal, and allowed for the blocking rows.
@@ -421,8 +440,10 @@ test('TEST 13 — the gate, panel, resolver and warnings are wired to this autho
   assert.ok(!checklist.includes('setTimeout'), 'no timer takes part in the release decision');
   assert.ok(!checklist.includes('minVisibleMs'), 'and neither does the minimum visible time');
   assert.ok(authority.includes('buildRestoreChecklist') && authority.includes('deriveRestoreRelease'), 'the authority closes only on the checklist');
-  assert.ok(authority.includes('nonBypassableOpeningCheckpointKeys'), 'the structural rows cannot be continued past');
-  assert.ok(authority.includes('safeToContinue'), 'an explicit continue marks the rows it releases');
+  assert.ok(stages.includes('nonBypassableOpeningCheckpointKeys'), 'the structural rows are still named non-bypassable');
+  assert.ok(authority.includes('OPENING_CHECKPOINT_OUTCOME.FAILED'), 'a stalled row is recorded as failed, with a reason');
+  assert.ok(!authority.includes('safeToContinue'), 'no row can be marked safe to continue past');
+  assert.ok(!authority.includes('continueProjectOpeningWithWarning'), 'and the continue path is gone entirely');
 
   assert.ok(resolver.includes('fetchDurablePublication'), 'bass/RP22 authority is read from the durable publication');
   assert.ok(resolver.includes('resolveProposalSource'), 'report and proposal source states use the canonical resolver');

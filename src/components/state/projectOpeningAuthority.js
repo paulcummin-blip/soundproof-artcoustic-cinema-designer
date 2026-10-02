@@ -12,14 +12,20 @@
 // calculated yet, not applicable, out of date, or failed with a reason. "Still
 // restoring" (and hydrating/calculating/pending/checking) is NOT a completed
 // stage, so a stage that never confirms keeps the panel open; it is never
-// silently resolved into a finished project. When the wait runs long the panel
-// says so and offers Retry, and it will only continue on an explicit, warned
-// decision — and never past a structural stage.
+// silently resolved into a finished project.
+//
+// There is NO continue-anyway path. A stage that has not confirmed within the
+// opening timeout stops being waited on SILENTLY — it is recorded as FAILED, with
+// the reason the panel shows and a Retry — but a failed REQUIRED stage still keeps
+// the project behind the panel. Opening on a half-restored authority is not
+// something this app offers: the panel can wait, retry, or name what did not
+// restore.
 //
 // THE release rule lives in projectRestoreChecklist.js: the panel closes exactly
 // when every restore row is terminal and every blocking row is in an allowed
-// terminal state. Time is never a release condition — the minimum visible time
-// can only hold the panel longer.
+// terminal state — a blocking row that FAILED holds. Time is never a release
+// condition: the minimum visible time can only hold the panel longer, and the
+// timeout only ever turns a stall into a visible failure.
 //
 // Read-only: nothing here calculates, recalculates, generates a report, starts a
 // worker or writes to the database. It only records what other authorities
@@ -30,7 +36,6 @@ import { useMemo, useSyncExternalStore } from "react";
 import {
   OPENING_CHECKPOINT_OUTCOME,
   OPENING_CHECKPOINT_STATE,
-  nonBypassableOpeningCheckpointKeys,
   normaliseId,
   normaliseOutcome,
 } from "./projectOpeningStages.js";
@@ -86,9 +91,9 @@ export const PROJECT_OPENING_MIN_VISIBLE_MS = 900;
 
 /**
  * A dependency that will not confirm within this window stops being waited on
- * silently: the panel says it is still restoring and offers Retry. It never
- * opens the project by itself — an unresolved stage is not a completed stage.
- * A still-unresolved structural stage cannot be continued past at all.
+ * silently: the stalled rows are recorded as FAILED — terminal, carrying the
+ * reason the panel shows — and the panel offers Retry. It never opens the project:
+ * a failed required row holds the release until the restore genuinely succeeds.
  */
 export const PROJECT_OPENING_TIMEOUT_MS = 8000;
 
@@ -96,7 +101,7 @@ export const PROJECT_OPENING_TIMEOUT_MS = 8000;
 export const PROJECT_OPENING_STILL_RESTORING_TITLE = "Still restoring saved project data";
 
 const TIMEOUT_DETAIL =
-  "Not confirmed in time — this step was still restoring when the project was opened.";
+  "Could not be restored in time. Use Retry to run the restore again — the project opens once this finishes.";
 
 const emptySnapshot = () => ({
   projectId: null,
@@ -262,14 +267,34 @@ export function markOpeningMinVisibleElapsed() {
 /**
  * A stage did not confirm within the opening timeout.
  *
- * This deliberately does NOT resolve anything and does NOT open the project:
- * the still-restoring stage keeps gating, and the panel tells the designer it is
- * still restoring while offering Retry. Opening here is what used to show a
- * project whose bass authority and report sources had not been restored.
+ * The stalled rows are recorded as FAILED: a terminal state carrying the reason
+ * the panel shows, so a row can never sit on "Restoring" forever, and Retry is
+ * the way out. This still does NOT open the project — a blocking row that failed
+ * keeps the release (see projectRestoreChecklist.js). Rows that already finished
+ * are left exactly as they are: only a genuinely stalled stage is escalated.
  */
 export function markProjectOpeningTimedOut() {
-  if (!state.projectId || state.closed || state.timedOut) return;
-  state = { ...state, timedOut: true };
+  if (!state.projectId || state.closed) return;
+
+  const stalled = pendingOpeningCheckpointKeys(state);
+  if (stalled.length === 0) {
+    state = { ...state, timedOut: true };
+    notify();
+    return;
+  }
+
+  const checkpoints = { ...state.checkpoints };
+  stalled.forEach((key) => {
+    checkpoints[key] = {
+      state: OPENING_CHECKPOINT_STATE.UNAVAILABLE,
+      outcome: OPENING_CHECKPOINT_OUTCOME.FAILED,
+      detail: TIMEOUT_DETAIL,
+      timedOut: true,
+    };
+  });
+
+  state = { ...state, checkpoints, timedOut: true };
+  closeIfResolved();
   notify();
 }
 
@@ -300,45 +325,6 @@ export function retryProjectOpening(options = {}) {
   scheduleOpeningTimeout(timeoutMs);
 }
 
-/**
- * Open the project while a stage is still restoring — the explicit, warned
- * path offered on the panel once the wait has run long.
- *
- * Refused while a STRUCTURAL stage is still restoring: without the project
- * record, its active version or its saved geometry there is no project to open,
- * so this offers nothing to continue past. Everything else may be continued past
- * on an explicit decision: each unresolved row is then recorded as FAILED with a
- * visible warning, which is a terminal state — the panel closes because the
- * checklist finished, not because a timer ran out.
- *
- * @returns {boolean} whether the project was opened
- */
-export function continueProjectOpeningWithWarning() {
-  if (!state.projectId || state.closed) return false;
-
-  const pending = pendingOpeningCheckpointKeys(state);
-  if (pending.length === 0) return false;
-  if (pending.some((key) => nonBypassableOpeningCheckpointKeys().includes(key))) {
-    return false;
-  }
-
-  const checkpoints = { ...state.checkpoints };
-  pending.forEach((key) => {
-    checkpoints[key] = {
-      state: OPENING_CHECKPOINT_STATE.UNAVAILABLE,
-      outcome: OPENING_CHECKPOINT_OUTCOME.FAILED,
-      detail: TIMEOUT_DETAIL,
-      timedOut: true,
-      safeToContinue: true,
-    };
-  });
-
-  state = { ...state, checkpoints, timedOut: true };
-  closeIfResolved();
-  notify();
-  return state.closed === true;
-}
-
 export function resolveProjectOpeningCheckpoint(key, resolved) {
   resolveProjectOpeningCheckpoints({ [key]: resolved });
 }
@@ -356,7 +342,7 @@ export function resolveProjectOpeningCheckpoint(key, resolved) {
  * in an unreadable limbo.
  *
  * @param {Record<string, {state: string, outcome?: string, detail?: string|null,
- *   timedOut?: boolean, status?: string, blocking?: boolean, safeToContinue?: boolean}>} entries
+ *   timedOut?: boolean, status?: string, blocking?: boolean}>} entries
  */
 export function resolveProjectOpeningCheckpoints(entries) {
   if (!entries || !state.projectId) return;
@@ -382,9 +368,16 @@ export function resolveProjectOpeningCheckpoints(entries) {
       // genuinely still resolving.
       ...(nextState === OPENING_CHECKPOINT_STATE.PENDING && value.status ? { status: value.status } : {}),
       ...(typeof value.blocking === "boolean" ? { blocking: value.blocking } : {}),
-      ...(value.safeToContinue === true ? { safeToContinue: true } : {}),
     };
     const previous = checkpoints[key];
+    // A row that already failed the wait is never silently returned to
+    // "restoring": the panel keeps saying what could not be restored, with Retry,
+    // rather than flickering between the two. A genuine resolution still lands.
+    if (
+      previous?.timedOut === true
+      && previous.outcome === OPENING_CHECKPOINT_OUTCOME.FAILED
+      && next.state === OPENING_CHECKPOINT_STATE.PENDING
+    ) return;
     if (
       previous
       && previous.state === next.state
@@ -393,7 +386,6 @@ export function resolveProjectOpeningCheckpoints(entries) {
       && previous.status === next.status
       && previous.blocking === next.blocking
       && (previous.timedOut === true) === (next.timedOut === true)
-      && (previous.safeToContinue === true) === (next.safeToContinue === true)
     ) return;
     checkpoints[key] = next;
     changed = true;
@@ -410,10 +402,9 @@ export function resolveProjectOpeningCheckpoints(entries) {
  *
  * The release decision is the checklist's, not a timer's: every row must have
  * reached a terminal state, and every blocking row must be in an allowed terminal
- * state (a blocking failure needs the designer's explicit, warned decision — see
- * continueProjectOpeningWithWarning). A row still restoring therefore keeps the
- * project behind the panel, which is what stops a report or a proposal being
- * opened on a half-restored authority.
+ * state — a blocking FAILURE holds, with no path that continues past it. A row
+ * still restoring therefore keeps the project behind the panel, which is what
+ * stops a report or a proposal being opened on a half-restored authority.
  *
  * "Nothing saved for this stage yet" is terminal: an unfinished project opens so
  * the designer can finish it, and its own surfaces say what is missing.

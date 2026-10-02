@@ -61,7 +61,6 @@ function restoreRowToLine(row) {
     status: row.status,
     terminal: row.terminal,
     blocking: row.blocking,
-    safeToContinue: row.safeToContinue,
     source: row.source,
     outcome: row.terminal ? row.status : null,
     timedOut: row.timedOut === true,
@@ -114,9 +113,10 @@ export function openingCheckpointWarnings(snapshot, projectId) {
  * The one decision the opening panel needs.
  *
  * `phase` is 'restoring' while an opening-critical stage is resolving,
- * 'still-restoring' once that wait has run long, and 'ready' when the editable
- * project may be shown. Output stages may continue hydrating in the background;
- * they are gated by the report/proposal surfaces that consume them.
+ * 'still-restoring' once that wait has run long and a stalled row has been
+ * recorded as failed, and 'ready' when the project may be shown. Live work that is
+ * not a restore row (a bass analysis running for an open project) continues in the
+ * background; it is gated by the report/proposal surfaces that consume it.
  *
  * @param {Object} snapshot the opening snapshot
  * @param {string|null} projectId the project being opened
@@ -147,7 +147,7 @@ export function deriveOpeningReadinessFor(snapshot, projectId, context = {}) {
     return {
       ...base, holding: false, pending: [], pendingCritical: [], pendingSupporting: [],
       pendingLabels: [], closed: true, timedOut: false, minVisibleElapsed: true,
-      phase: OPENING_PHASE.IDLE, canContinueWithWarning: false, checklist: [], release: false,
+      phase: OPENING_PHASE.IDLE, checklist: [], release: false,
     };
   }
 
@@ -156,7 +156,7 @@ export function deriveOpeningReadinessFor(snapshot, projectId, context = {}) {
     return {
       ...base, holding: false, pending: [], pendingCritical: [], pendingSupporting: [],
       pendingLabels: [], closed: true, timedOut: false, minVisibleElapsed: true,
-      phase: OPENING_PHASE.READY, canContinueWithWarning: false,
+      phase: OPENING_PHASE.READY,
     };
   }
 
@@ -182,6 +182,5 @@ export function deriveOpeningReadinessFor(snapshot, projectId, context = {}) {
       : timedOut
         ? OPENING_PHASE.STILL_RESTORING
         : OPENING_PHASE.RESTORING,
-    canContinueWithWarning: holding && release.canContinueWithWarning,
   };
 }

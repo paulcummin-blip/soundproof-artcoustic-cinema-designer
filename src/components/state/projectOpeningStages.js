@@ -73,7 +73,7 @@ export const OPENING_OUTCOME_LABEL = Object.freeze({
   [OPENING_CHECKPOINT_OUTCOME.NOT_CALCULATED]: "Not calculated yet",
   [OPENING_CHECKPOINT_OUTCOME.NOT_APPLICABLE]: "Not applicable",
   [OPENING_CHECKPOINT_OUTCOME.STALE]: "Out of date",
-  [OPENING_CHECKPOINT_OUTCOME.FAILED]: "Unavailable",
+  [OPENING_CHECKPOINT_OUTCOME.FAILED]: "Failed",
 });
 
 /** What the panel is doing right now. */

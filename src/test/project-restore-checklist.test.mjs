@@ -5,7 +5,7 @@
 // the panel may not close.
 //
 //   A   Every non-terminal row holds the panel — for every row, every non-terminal state
-//   A2  A blocking row that failed holds the panel until it is explicitly accepted
+//   A2  A blocking row that failed holds the panel — there is no accepted-failure path
 //   B   A completed project waits for RP22, bass, the target bank and report metadata
 //   C   An unfinished project resolves every row honestly, then opens for continued work
 //   D   Entering the Visual Report waits for the Visual Report source
@@ -112,14 +112,17 @@ test('A — every non-terminal row holds the panel, whichever row it is', () => 
   });
 });
 
-test('A2 — a blocking row that failed holds the panel until it is explicitly accepted', () => {
+test('A2 — a blocking row that failed holds the panel, with no accepted-failure path', () => {
   const held = releaseFor({ rp22: entryFor('failed', { blocking: true }) });
   assert.equal(held.release, false, 'a required row that did not confirm holds the project');
   assert.ok(held.holdLabels.includes('RP22 / RP23 results'));
   assert.equal(held.blockingFailures.length, 1);
 
-  const accepted = releaseFor({ rp22: entryFor('failed', { blocking: true, safeToContinue: true }) });
-  assert.equal(accepted.release, true, 'an explicit, warned decision releases it');
+  // Nothing releases it. A caller that tries to mark the row acceptable is
+  // ignored: a required row that could not be restored waits for the restore.
+  const stillHeld = releaseFor({ rp22: entryFor('failed', { blocking: true, safeToContinue: true }) });
+  assert.equal(stillHeld.release, false, 'a failed required row is never released');
+  assert.equal(stillHeld.canContinueWithWarning, undefined, 'there is no continue path to offer');
 
   // A NON-blocking failure never holds the panel, but it is still terminal.
   const nonBlocking = releaseFor({ pricing: entryFor('failed', { blocking: false }) });

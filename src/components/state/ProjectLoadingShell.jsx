@@ -31,9 +31,9 @@ function Bar({ width = "100%", height = 12 }) {
 // project is marked as required, so the panel always names what it is waiting for.
 //
 // A completed stage says HOW it finished — Ready, Not generated yet, Not
-// calculated yet, Not applicable, Out of date or Unavailable — so "nothing is
-// saved for this yet" can never look like a failure, and a failure can never look
-// like an empty project. The detail sentence is carried as a tooltip.
+// calculated yet, Not applicable, Out of date or Failed — so "nothing is saved
+// for this yet" can never look like a failure, and a failure can never look like
+// an empty project. The detail sentence is carried as a tooltip.
 function OpeningLine({ label, status, terminal, blocking, detail }) {
   const warned = terminal && (status === "stale" || status === "failed");
   const done = terminal && !warned;
@@ -86,12 +86,12 @@ const BUTTON_BASE = {
   fontFamily: FONT_BODY,
 };
 
-// The long-wait notice: the panel says plainly that saved data is still
-// restoring, and offers to re-ask. Continuing anyway is offered only when every
-// stage still restoring is a non-blocking one (the authority decides).
-function StillRestoringNotice({ title, labels, canContinueWithWarning, onRetry, onContinueWithWarning }) {
+// The long-wait notice: the panel says plainly what has not finished restoring,
+// and offers to re-ask. There is no continue-anyway option — a required row that
+// could not be restored keeps the project here until Retry restores it.
+function StillRestoringNotice({ title, labels, onRetry }) {
   const named = labels.length > 0
-    ? `${labels.join(", ")} ${labels.length === 1 ? "has" : "have"} not finished yet.`
+    ? `${labels.join(", ")} ${labels.length === 1 ? "has" : "have"} not finished restoring.`
     : "Some saved data has not finished restoring.";
   return (
     <div
@@ -105,10 +105,8 @@ function StillRestoringNotice({ title, labels, canContinueWithWarning, onRetry, 
     >
       <div style={{ fontSize: 13, fontWeight: 700, color: "#1B1A1A" }}>{title}</div>
       <div style={{ fontSize: 12, color: "#625143", marginTop: 6, lineHeight: 1.5 }}>
-        {named} The project opens once these are restored
-        {canContinueWithWarning
-          ? ", or now, if you choose to continue with a warning."
-          : ". This is a required step, so the project cannot be opened without it."}
+        {named} The project opens once every row above has finished restoring — a step
+        that has not confirmed is marked Failed, and Retry runs the restore again.
       </div>
       <div style={{ display: "flex", gap: 8, marginTop: 12, flexWrap: "wrap" }}>
         {onRetry && (
@@ -118,15 +116,6 @@ function StillRestoringNotice({ title, labels, canContinueWithWarning, onRetry, 
             style={{ ...BUTTON_BASE, border: "1px solid #213428", background: "#213428", color: "#FFFFFF" }}
           >
             Retry
-          </button>
-        )}
-        {canContinueWithWarning && onContinueWithWarning && (
-          <button
-            type="button"
-            onClick={onContinueWithWarning}
-            style={{ ...BUTTON_BASE, border: "1px solid #B4732A", background: "#FFFFFF", color: "#8A4B12" }}
-          >
-            Continue with warning
           </button>
         )}
       </div>
@@ -145,9 +134,7 @@ export default function ProjectLoadingShell({
   phase = "restoring",
   stillRestoringTitle = null,
   stillRestoringLabels = [],
-  canContinueWithWarning = false,
   onRetry = null,
-  onContinueWithWarning = null,
 }) {
   const heading = projectName ? projectName : label;
   const clientLine = projectClientName ? `Client: ${projectClientName}` : null;
@@ -251,9 +238,7 @@ export default function ProjectLoadingShell({
           <StillRestoringNotice
             title={stillRestoringTitle}
             labels={stillRestoringLabels}
-            canContinueWithWarning={canContinueWithWarning}
             onRetry={onRetry}
-            onContinueWithWarning={onContinueWithWarning}
           />
         )}
       </div>
