@@ -257,15 +257,15 @@ export const COMPARISON_HIGHLIGHTS_SCHEMA = {
  */
 export function buildComparisonHighlightsPrompt() {
   return [
-    'You are writing the introduction to the Key Performance Highlights section of a System Design Comparison.',
+    'Write the introduction to the Key Performance Highlights section of a System Design Comparison.',
     '',
     'The comparison table below is already calculated by Sound Proof, one column per selected version. It follows your introduction in the report.',
     '',
-    'Return intro_html only: 1 or 2 short sentences, as simple HTML with a <p> tag, written to the client in the voice defined in the style contract.',
+    'Return intro_html only: 1 or 2 short sentences, as simple HTML with a <p> tag, written in the design-led voice defined in the style contract.',
     '',
     'RULES:',
     '- Do not write a table, a row or a value.',
     '- Do not restate a table value and do not describe a difference the table does not show.',
-    '- Do not say which option is better here: your job is the introduction only, and the section that follows explains the differences in order (what stays the same, what changes, what you gain or give up).',
+    '- Do not say which option is better here: this is the introduction only, and the section that follows explains the differences in order (what stays the same, what changes, what the room gains or gives up).',
   ].join('\n');
 }

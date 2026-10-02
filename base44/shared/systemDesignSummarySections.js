@@ -8,8 +8,9 @@
  * system design to the client, built around the three core RP22 design
  * structures: Spatial Resolution, Dynamic Range and Timbre Matching.
  *
- * Written in the designer-to-client voice (see reportWritingStyleContract.js):
- * the report speaks to the client as "you", and the numbers support the story.
+ * Written in the design-led voice (see reportWritingStyleContract.js): the
+ * report is written by the designer about the room, the design and the listening
+ * result, and the numbers support the story.
  *
  * Shared by the backend report generators (generateProposal and
  * regenerateProposalSection) so both write from the same structure.
@@ -40,7 +41,7 @@ export const SYSTEM_SUMMARY_SECTIONS = [
  */
 export const COMPARISON_REPORT_INSTRUCTIONS = [
   'This is a System Design Comparison. Use the same voice, tone and structure as a single system report.',
-  'First explain what stays the same between the options. Then explain what changes. Then explain the listening consequence: what the client actually gains or gives up.',
+  'First explain what stays the same between the options. Then explain what changes. Then explain the listening consequence: what the room actually gains or gives up.',
   'Work through the difference in this order: Dynamic Range, Spatial Resolution, Timbre Matching, the viewing experience, and bass consistency where the evidence is trusted.',
   'Where one option is clearly stronger, explain why, without attacking the alternative.',
   'Do not automatically recommend the largest system unless the evidence supports it.',
@@ -55,16 +56,16 @@ export const COMPARISON_REPORT_INSTRUCTIONS = [
  * writes about a parameter that was not assessed for this design.
  */
 export const SYSTEM_SUMMARY_SECTION_PROMPTS = {
-  system_design_summary: `Open the report by describing the design to the client.
+  system_design_summary: `Open the report by describing the design.
 
 Open with the room, the screen and the system concept: the screen size and type, the viewing distance, the RP23 viewing result where it is relevant, the system format, and the main loudspeaker families. Say why the room has been designed this way.
 
 Then cover, in this order:
 - what has been designed for this room, and what it is trying to achieve
-- why the design takes this form, including the seating and viewing context, how many seats there are for a reason, and how the client uses the room
+- why the design takes this form, including the seating and viewing context, how many seats there are for a reason, and how the room is used
 - the main loudspeaker and subwoofer package, by family or model, and why each was chosen
 - how those parts work together as one system rather than as separate components
-- what the client will experience as a result
+- what the room delivers as a result, and how that experience should feel
 
 Do not open with an equipment list, and do not describe a product in isolation unless you are explaining why that product was chosen.
 
@@ -75,11 +76,11 @@ Use the supplied Sound Proof calculated data wherever it applies, and never inve
 
 Choose the two or three results that matter most for this room from the Spatial Resolution results present in the supplied Sound Proof calculated data, for example discrete channel count, screen consistency, horizontal spacing, surround level consistency, front wide position, overhead spacing and overhead level consistency. Do not work through them all.
 
-Name each chosen result in plain language with its achieved level and measured value exactly as supplied, using no more than one parameter code in the section, and explain what the client will hear because of it.
+Name each chosen result in plain language with its achieved level and measured value exactly as supplied, using no more than one parameter code in the section, and explain what the room gains because of it.
 
 Evidence to choose from, where it was assessed reliably: discrete channel count (P2) for how many physical positions the sound can come from, screen consistency (P4) for stable dialogue and screen-channel agreement, horizontal spacing (P5) for movement between adjacent speakers, surround level consistency (P6), front wide position (P7) for movement between the screen and the side walls, overhead spacing (P9) for front-to-rear movement overhead, and overhead level consistency (P10). Do not mention P8.
 
-Explain the client experience first, then the result that supports it. For example: the largest gap between adjacent speakers is 50 degrees, reaching RP22 Level 4, so effects have more physical positions to move through and movement around the room feels continuous rather than jumping between speakers.
+Explain the listening result first, then the result that supports it. For example: the largest gap between adjacent speakers is 50 degrees, reaching RP22 Level 4, so effects have more physical positions to move through and movement around the room feels continuous rather than jumping between speakers.
 
 Lead with the strongest area of the design. Mention one clear limitation honestly, in client-friendly language, without undermining the design, and say what causes it. Where the data supports it, note a sensible upgrade path.
 Do not list parameters mechanically and do not include a table.
@@ -89,7 +90,7 @@ Do not list parameters mechanically and do not include a table.
 
 Choose the results that matter most for this room from the Dynamic Range results present in the supplied Sound Proof calculated data, for example screen dynamic range, non-screen dynamic range and the subwoofer system output. Do not work through them all, and use no more than one parameter code in the section.
 
-Use the dBC values and the RP22 levels exactly as supplied, and explain in plain language how that headroom benefits dialogue, music and film effects at the level the client will actually listen at.
+Use the dBC values and the RP22 levels exactly as supplied, and explain in plain language how that headroom benefits dialogue, music and film effects at the listening level the design assumes.
 
 Screen Dynamic Range (P12) and Non-screen Dynamic Range (P13) are the main evidence. Use the LFE and subwoofer result (P14) only where the bass output is reliable and relevant. Never reference P15.
 
@@ -104,7 +105,7 @@ If the system is modest, describe the benefit honestly without overstating it. I
 
 Choose the results that matter most for this room from the Timbre Matching results present in the supplied Sound Proof calculated data, for example screen timbre, surround timbre, and the bass behaviour that shapes tonal balance. Do not work through them all, and use no more than one parameter code in the section.
 
-Explain why matched loudspeaker families and consistent voicing matter to what the client hears, using the supplied speaker family data, and say what the client will hear because of the results you chose.
+Explain why matched loudspeaker families and consistent voicing matter to the listening result, using the supplied speaker family data, and describe what those choices give the room.
 
 Screen timbre (P16) and surround timbre (P17) are the main evidence. Use bass extension (P18) and bass response (P19) only where the bass evidence is reliable and useful. Never reference P20, and never claim perfect bass.
 
@@ -114,7 +115,7 @@ Make it practical, for example: a voice or effect may begin on the screen, move 
 
 Where a reliable bass result exists, add a short bass performance paragraph explaining why the subwoofer positions were chosen. For a four-subwoofer design, explain that the main gain is usually consistency across seats rather than extra volume.
 
-Keep it practical and client-facing. Mention a clear limitation honestly where the data shows one, and note a sensible upgrade path where the data supports it.
+Keep it practical. Mention a clear limitation honestly where the data shows one, and note a sensible upgrade path where the data supports it.
 3 to 4 short paragraphs, no table.`,
 
   // The table itself is built by Sound Proof from calculated data, never by the
@@ -125,7 +126,7 @@ Say that this is the measured summary of the design, and that each row states wh
 
 If no calculated rows are supplied for this design, write 2 to 3 short paragraphs describing the performance this design delivers, using only the results present in the supplied Sound Proof calculated data, and still do not write a table.`,
 
-  overall_design: `Write the Overall Design section: a concise client-facing summary of the whole design, and the strongest paragraph in the report.
+  overall_design: `Write the Overall Design section: a concise summary of the whole design, and the strongest paragraph in the report.
 
 Bring the room back together: the image scale on the screen, how the loudspeakers are laid out around and above the listener, the dynamic headroom available, the tonal consistency across the system, the seats where the design performs best, and one clear upgrade opportunity where one exists.
 
@@ -135,7 +136,7 @@ Where the design is strongest, say so plainly. State any clear limitation honest
 
 For a modest system, explain the benefits clearly, do not claim more than the evidence shows, and point to sensible upgrades. For a high performance system, state the quality clearly and do not undersell it.
 
-Do not repeat the previous sections. Do not end with a generic closing phrase. The final paragraphs should leave the client confident that the design decisions are deliberate.
+Do not repeat the previous sections. Do not end with a generic closing phrase. The final paragraphs should leave the reader confident that the design decisions are deliberate.
 2 to 4 short paragraphs.`,
 
   room_images: `Write a brief introduction for the project images section, in the voice above. The images follow this introduction. 1 paragraph.`,

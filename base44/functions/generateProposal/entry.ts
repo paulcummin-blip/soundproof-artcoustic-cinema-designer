@@ -340,8 +340,8 @@ export default async function(req) {
 
     // ── Key Performance Highlights rows ──
     // Read straight out of the frozen Engineering Snapshot. The AI writes the
-    // "What listeners hear" cells only; it never sets or changes a Result value, and
-    // it never chooses which rows appear.
+    // "What the room gains" cells only; it never sets or changes a Result value,
+    // and it never chooses which rows appear.
     const usesSystemStructure = resolvedType !== 'single';
     const isComparisonReport = resolvedType === 'comparison';
     // A single report carries one calculated row per useful result. A
@@ -424,7 +424,7 @@ export default async function(req) {
           metadata: { highlight_rows: rows },
           failed: result.status === 'rejected'
             || intro.length === 0
-            || rows.every((row) => !row.what_you_hear),
+            || rows.every((row) => !(row.what_the_room_gains || row.what_you_hear)),
         };
       }
 
@@ -538,7 +538,7 @@ function buildProjectContext(project, narrativeGoal, brandAsset, clientBrief, en
   return [
     `Report Type: ${isComparison ? 'System Design Comparison' : 'System Design Summary'}`,
     isComparison && reportVersions.length > 0 ? `Versions compared: ${reportVersions.join(' | ')}` : '',
-    isComparison && reportVersions.length > 0 ? `Calculated evidence supplied for: ${reportVersions[0]}` : '',
+    isComparison && reportVersions.length > 0 ? `Calculated evidence supplied for every version: ${reportVersions.join(' | ')}` : '',
     `Narrative Goal: ${goalLabel}`,
     `Company: ${companyName}`,
     `Project: ${project.name || ''}`,
@@ -567,7 +567,7 @@ function buildProjectContext(project, narrativeGoal, brandAsset, clientBrief, en
     'viewing results, SPL capability, bass results, limitations, or recommendations —',
     'from any other project, version, or earlier design.',
     isComparison
-      ? 'Calculated Sound Proof evidence is supplied for one design version only. Compare the designs using that evidence and the supplied system descriptions. Never state or imply a measured result for a version that is not in that evidence.'
+      ? 'Calculated Sound Proof evidence is supplied for every selected version, and the comparison table is calculated for each of them. Never state or imply a measured result that is not in that evidence, and never state a difference the table does not show.'
       : '',
     'The Client Brief influences narrative emphasis, wording, and structure ONLY.',
     'It must NEVER alter, contradict, or override any engineering result, RP22 value,',
@@ -590,7 +590,7 @@ function buildSectionPrompt(sectionDef, projectContext, proposalType, interpreta
     '',
     '---',
     '',
-    `You are writing the "${sectionDef.title}" section of a professional home cinema design proposal.`,
+    `Write the "${sectionDef.title}" section of a professional home cinema design proposal.`,
     '',
     sectionInstruction,
     proposalType === 'comparison' ? COMPARISON_REPORT_INSTRUCTIONS : '',

@@ -5,10 +5,11 @@
 // There are two voices in the app, and this file guards both:
 //
 //   1. The System Design reports (System Design Summary and System Design
-//      Comparison) are written by the designer speaking directly to the client.
-//      They use "you" and "your", they explain the design rather than describe
-//      parameters, and they are built around Spatial Resolution, Dynamic Range
-//      and Timbre Matching. The contract is
+//      Comparison) are design-led and room-focused: the designer explains the
+//      room, the design and the listening result, and never addresses the client
+//      as "you". They explain the design rather than describe parameters, and
+//      they are built around Spatial Resolution, Dynamic Range and Timbre
+//      Matching. The contract is
 //      base44/shared/reportWritingStyleContract.js (buildWritingStyleContract).
 //
 //   2. The internal AI Client Summary and the Visual Report describe the design
@@ -28,11 +29,14 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import {
   buildWritingStyleContract,
-  CLIENT_ADDRESS_VOICE_RULES,
+  DESIGN_LED_VOICE_RULES,
+  DESIGN_LED_SUBJECTS,
+  DESIGN_LED_BLOCKED_PHRASES,
   NEUTRAL_VOICE_RULES,
   NEUTRAL_VOICE_SUBSTITUTIONS,
   BANNED_WORDS,
 } from '../base44/shared/reportWritingStyleContract.js';
+import { buildComparisonHighlightsPrompt } from '../base44/shared/comparisonTable.js';
 import {
   buildHighlightsPrompt,
   selectHighlightRows,
@@ -72,6 +76,25 @@ function auditProposalCopy(text) {
 
 const readSource = (path) => fs.readFileSync(new URL(`../${path}`, import.meta.url), 'utf8');
 
+/** A whole-word pattern, so "you" never matches inside "your". */
+function blockedPhrasePattern(phrase) {
+  const escaped = phrase.replace(/[.*+?^${}()|[\]\\]/g, '\\$&').replace(/['’]/g, "['’]");
+  return new RegExp(`(^|[^a-z0-9])${escaped}([^a-z0-9]|$)`, 'i');
+}
+
+/** Reports every blocked construction in a block of System Design prose. */
+function auditDesignLedCopy(text) {
+  const source = String(text || '');
+  const violations = DESIGN_LED_BLOCKED_PHRASES
+    .filter((phrase) => blockedPhrasePattern(phrase).test(source))
+    .map((phrase) => ({ phrase }));
+  return {
+    ok: violations.length === 0,
+    violations,
+    words: source.split(/\s+/).filter(Boolean).length,
+  };
+}
+
 const LEGACY_SAMPLE = 'Your cinema centres on a 3.5 m screen, and your screen holds 12 fL of peak '
   + 'luminance. You will hear effects move between adjacent speakers, and where you sit determines how '
   + 'continuous that movement feels. You can improve the rear pair with a small change in position.';
@@ -79,6 +102,18 @@ const LEGACY_SAMPLE = 'Your cinema centres on a 3.5 m screen, and your screen ho
 const NEUTRAL_SAMPLE = 'The cinema centres on a 3.5 m screen, and the screen holds 12 fL of peak '
   + 'luminance. Listeners will hear effects move between adjacent speakers, and the movement stays '
   + 'continuous across the seating area. This can be improved at the rear pair with a small change in position.';
+
+/** The approved System Design voice: design-led, room-focused, no direct address. */
+const DESIGN_LED_SAMPLE = 'The room is designed around a 3.5 m screen, and the screen holds 12 fL of peak '
+  + 'luminance. The system uses matched loudspeakers across the screen wall and the side walls, so movement '
+  + 'between adjacent speakers stays continuous. The seating area benefits from the raised rear row, and the '
+  + 'result is a listening position that holds up across all five seats. The main compromise is the low '
+  + 'ceiling, which limits where the overhead pair can be placed.';
+
+/** Blocked by default in the System Design voice: second person, and "we". */
+const SECOND_PERSON_SAMPLE = 'Your cinema is designed around a 3.5 m screen, and you will hear movement '
+  + 'between adjacent speakers. We designed the seating area so you get a consistent result, and we recommend '
+  + 'the raised rear row.';
 
 /** A minimal calculated snapshot carrying rows that must never reach the table. */
 const SNAPSHOT = {
@@ -131,16 +166,62 @@ test('the neutral surfaces still use the neutral professional voice', () => {
   }
 });
 
-test('the System Design contract speaks directly to the client', () => {
+test('the System Design contract is design-led, room-focused and never speaks to the client', () => {
   const contract = buildWritingStyleContract();
 
-  assert.ok(contract.includes(CLIENT_ADDRESS_VOICE_RULES), 'the contract carries the client-facing voice rules verbatim');
-  assert.match(contract, /VOICE: SPEAK TO THE CLIENT \(mandatory/);
-  assert.match(contract, /"you" and "your" where it feels natural/);
+  assert.ok(contract.includes(DESIGN_LED_VOICE_RULES), 'the contract carries the design-led voice rules verbatim');
+  assert.match(contract, /VOICE: DESIGNER-LED AND ROOM-FOCUSED \(mandatory/);
+
+  // The approved rule, stated word for word.
+  assert.match(contract, /The report should read as a professional design proposal written by an experienced cinema designer/);
+  assert.match(contract, /It should explain the room, the design choices and the expected experience/);
+  assert.match(contract, /It should not speak directly to the client as "you" unless quoting or referencing a clearly client-specific requirement/);
+
   assert.match(contract, /the experienced residential cinema designer/);
   assert.match(contract, /Never write like a marketer, a consultant, an AI or an engineering specification/);
-  assert.doesNotMatch(contract, /Write in the third person/, 'the System Design report is not written in the third person');
-  assert.ok(!contract.includes(NEUTRAL_VOICE_RULES), 'the neutral voice is never imposed on the System Design report');
+  assert.match(contract, /Never write like a detached technical audit/);
+
+  // The approved subject vocabulary carries the sentence.
+  for (const subject of ['the room', 'the design', 'the system', 'the seating area', 'the experience', 'this layout', 'the result']) {
+    assert.ok(DESIGN_LED_SUBJECTS.includes(subject), `"${subject}" must be an approved subject`);
+    assert.ok(contract.includes(subject), `the contract must offer "${subject}" as a subject`);
+  }
+
+  // Direct address and the first-person design voice are blocked by default.
+  for (const phrase of ['you', 'your', "you'll", 'you will', 'we designed', 'we recommend']) {
+    assert.ok(DESIGN_LED_BLOCKED_PHRASES.includes(phrase), `"${phrase}" must be blocked`);
+    assert.ok(contract.includes(`"${phrase}"`), `the contract must state the ban on "${phrase}"`);
+  }
+
+  // The previous direct-to-client rule is gone.
+  assert.doesNotMatch(contract, /"you" and "your" where it feels natural/);
+  assert.doesNotMatch(contract, /SPEAK TO THE CLIENT/);
+  assert.match(contract, /Does it sound like an experienced cinema designer explaining the room and the design\?/);
+  assert.match(contract, /Is there no "you", "your", "we designed" or "we recommend" anywhere in the prose\?/);
+  assert.ok(!contract.includes(NEUTRAL_VOICE_RULES), 'the neutral audit voice is never imposed on the System Design report');
+});
+
+test('design-led copy passes the voice audit and second-person copy is blocked', () => {
+  const approved = auditDesignLedCopy(DESIGN_LED_SAMPLE);
+  assert.equal(approved.ok, true, `approved copy must pass: ${JSON.stringify(approved.violations)}`);
+  assert.ok(approved.words > 40, 'the sample must be a realistic paragraph');
+
+  const blocked = auditDesignLedCopy(SECOND_PERSON_SAMPLE);
+  assert.equal(blocked.ok, false, 'second-person copy must be blocked by default');
+  const flagged = blocked.violations.map((violation) => violation.phrase);
+  for (const phrase of ['you', 'your', 'you will', 'we designed', 'we recommend']) {
+    assert.ok(flagged.includes(phrase), `expected "${phrase}" to be flagged, flagged: ${flagged.join(', ')}`);
+  }
+
+  // The audit never confuses "you" with "your".
+  assert.deepEqual(auditDesignLedCopy('The room is designed around the screen.').violations, []);
+  assert.ok(blockedPhrasePattern('your').test('across your seating area'));
+  assert.ok(!blockedPhrasePattern('you').test('across your seating area'));
+
+  // The rewrite keeps every performance value it carried before.
+  for (const value of ['3.5 m', '12 fL']) {
+    assert.ok(DESIGN_LED_SAMPLE.includes(value) && SECOND_PERSON_SAMPLE.includes(value), `${value} must survive the rewrite`);
+  }
 });
 
 test('the contract carries the report purpose, philosophy and priorities', () => {
@@ -241,6 +322,23 @@ test('every System Design section explains the design rather than the parameters
   // The highlights section writes the introduction only: the table is built by
   // Sound Proof from calculated data.
   assert.match(prompts.key_performance_highlights, /Do not write a table/);
+
+  // The instructions describe the design to a reader: the client's experience is
+  // never the subject of the prose.
+  assert.match(prompts.system_design_summary, /Open the report by describing the design\./);
+  assert.match(prompts.system_design_summary, /what the room delivers as a result/);
+  assert.match(prompts.spatial_resolution, /explain what the room gains because of it/);
+  assert.match(prompts.spatial_resolution, /Explain the listening result first/);
+  assert.match(prompts.dynamic_range, /at the listening level the design assumes/);
+  assert.match(prompts.timbre_matching, /describe what those choices give the room/);
+  assert.match(prompts.overall_design, /leave the reader confident/);
+  for (const [name, instructions] of Object.entries(prompts)) {
+    assert.doesNotMatch(
+      instructions,
+      /what the client will hear|what the client hears|the client will experience|speak to the client as "you"/i,
+      `${name} must not make the client's experience the subject`,
+    );
+  }
 });
 
 test('the comparison follows the same voice, then what changes, then the consequence', () => {
@@ -257,6 +355,17 @@ test('the comparison follows the same voice, then what changes, then the consequ
   assert.match(text, /without attacking the alternative/);
   assert.match(text, /Do not automatically recommend the largest system/);
   assert.match(text, /never rank the options as "best"/);
+  assert.match(text, /what the room actually gains or gives up/);
+});
+
+test('the comparison introduction is design-led and writes no value', () => {
+  const prompt = buildComparisonHighlightsPrompt();
+
+  assert.match(prompt, /Write the introduction to the Key Performance Highlights section of a System Design Comparison\./);
+  assert.match(prompt, /design-led voice defined in the style contract/);
+  assert.match(prompt, /what the room gains or gives up/);
+  assert.match(prompt, /Do not write a table, a row or a value\./);
+  assert.doesNotMatch(prompt, /your job|What you experience/i);
 });
 
 test('the highlights table keeps calculated values final and never lists an excluded row', () => {
@@ -285,8 +394,10 @@ test('the highlights table keeps calculated values final and never lists an excl
   rows.forEach((row) => assert.match(row.result, /\S/, 'every row carries a calculated Result'));
 
   const prompt = buildHighlightsPrompt('=== SOUND PROOF CALCULATED DATA ===', rows.slice(0, 1));
-  assert.ok(prompt.includes(CLIENT_ADDRESS_VOICE_RULES), 'the table writer uses the client-facing voice');
-  assert.match(prompt, /"What you experience" cell/);
+  assert.ok(prompt.includes(DESIGN_LED_VOICE_RULES), 'the table writer uses the design-led voice');
+  assert.match(prompt, /"What the room gains" cell/);
+  assert.match(prompt, /Never address the client as "you"/);
+  assert.doesNotMatch(prompt, /speak to the client as "you"/);
   assert.doesNotMatch(prompt, /What listeners hear/);
   assert.match(prompt, /Never change, reorder, add or remove a row/);
   assert.match(prompt, /The Result values are calculated by Sound Proof and are already final/);
@@ -297,8 +408,15 @@ test('the highlights table keeps calculated values final and never lists an excl
 
 test('the report surfaces carry the new table vocabulary', () => {
   const table = readSource('src/components/proposal/KeyPerformanceHighlightsTable.jsx');
-  assert.match(table, /label: 'What you experience'/);
+  assert.match(table, /label: 'What the room gains'/);
+  assert.match(table, /What changes/, 'the comparison change column is unchanged');
+  assert.match(table, /row.what_the_room_gains \?\? row.what_you_hear/, 'rows written before the rename still render');
   assert.doesNotMatch(table, /What listeners hear/);
+
+  const evidence = readSource('base44/shared/engineeringSnapshotEvidence.js');
+  assert.match(evidence, /"What the room gains" cell/);
+  assert.match(evidence, /what_the_room_gains: byKey/, 'the stored cell is written under the new key');
+  assert.doesNotMatch(evidence, /what_you_hear: byKey/);
 
   const summarySections = readSource('base44/shared/systemDesignSummarySections.js');
   assert.match(summarySections, /COMPARISON_REPORT_INSTRUCTIONS/);

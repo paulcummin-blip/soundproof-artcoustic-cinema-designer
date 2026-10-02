@@ -12,12 +12,15 @@
  * immediately BEFORE the model writes, so it is the last thing the model reads.
  * It also instructs the model to run a final self-check before returning.
  *
- * VOICE: the report is written by the designer who designed the room, speaking
- * directly to the client. It uses "you" and "your". This is deliberately
- * different from the NEUTRAL_VOICE_RULES used by the internal AI Client Summary
- * and the Visual Report, which describe the design in the third person. Those
- * surfaces are unchanged; buildWritingStyleContract() is only used by the
- * System Design reports.
+ * VOICE: designer-led and room-focused. The report reads as a professional
+ * design proposal written by the experienced cinema designer who designed the
+ * room: it explains the room, the design choices and the expected experience,
+ * and the subject of a sentence is the room, the design, the system, the
+ * seating area or the listening result. It is never addressed to the client as
+ * "you". This differs from NEUTRAL_VOICE_RULES (the internal AI Client Summary
+ * and the Visual Report), which is third-person too but records the design
+ * rather than proposing it. Those surfaces are unchanged;
+ * buildWritingStyleContract() is only used by the System Design reports.
  *
  * The contract governs prose only. It never changes engineering values, table
  * values, RP22/RP23 levels, Design Ratings or product names: Sound Proof builds
@@ -101,19 +104,64 @@ export const BANNED_WORDS = [
 ];
 
 /**
- * The designer-to-client voice for the System Design reports. Mandatory.
+ * The subjects a System Design sentence is written about. The client is never
+ * one of them: the report explains the room and the design, it does not talk to
+ * the client.
+ */
+export const DESIGN_LED_SUBJECTS = [
+  'the room',
+  'the design',
+  'the system',
+  'the seating area',
+  'the experience',
+  'this layout',
+  'the result',
+];
+
+/**
+ * Constructions blocked by default in System Design prose: direct address to
+ * the client and the first-person design voice. Used by the copy audit, and
+ * stated in the contract so the model never writes them.
+ */
+export const DESIGN_LED_BLOCKED_PHRASES = [
+  'you',
+  'your',
+  "you'll",
+  'you will',
+  'we designed',
+  'we recommend',
+];
+
+/**
+ * The designer-led, room-focused voice for the System Design reports. Mandatory.
  *
  * The reader may be a homeowner, an architect, an interior designer or a
- * project manager. They are intelligent and they are not engineers.
+ * project manager. They are intelligent and they are not engineers. The report
+ * is a design proposal written by the designer who designed the room, not a
+ * message to the client and not a technical audit.
  */
-export const CLIENT_ADDRESS_VOICE_RULES = [
-  'VOICE: SPEAK TO THE CLIENT (mandatory, applies to every sentence):',
-  '- Write as the experienced residential cinema designer who designed this room, sitting with the client and explaining the system properly.',
-  '- Address the client directly: "you" and "your" where it feels natural. "Your screen", "your room", "you will hear" are all correct here.',
+export const DESIGN_LED_VOICE_RULES = [
+  'VOICE: DESIGNER-LED AND ROOM-FOCUSED (mandatory, applies to every sentence):',
+  'The report should read as a professional design proposal written by an experienced cinema designer. It should explain the room, the design choices and the expected experience. It should not speak directly to the client as "you" unless quoting or referencing a clearly client-specific requirement.',
+  '- Write as the experienced residential cinema designer who designed this room, explaining the room, the design decisions and the listening result.',
+  '- The subject of a sentence is the room, the design, the system, the seating area, the screen wall, the experience, the design intent or the listening result. It is never the client.',
   '- Write in the active voice. Keep sentences short and natural.',
   '- Assume an intelligent reader. Never talk down, never over-explain an obvious result, and never explain what a result is when you can explain what it means.',
   '- Never write like a marketer, a consultant, an AI or an engineering specification.',
+  '- Never write like a detached technical audit either: the report explains the design intent and what it delivers, it does not only record what was measured.',
   '- Calm, confident, measured, practical, grounded. Positive where the design supports it.',
+  '',
+  'PREFERRED CONSTRUCTIONS (write like this):',
+  '- "The room is designed around ...", "The system uses ...", "The seating area benefits from ..."',
+  '- "The design improves ...", "This layout gives the room ...", "The result is ..."',
+  '- "The experience should feel ...", "The main compromise is ...", "The speaker choice supports ..."',
+  '',
+  'SUBJECTS (use these as the subject of a sentence):',
+  DESIGN_LED_SUBJECTS.map((subject) => `- ${subject}`).join('\n'),
+  '',
+  'NEVER USE THESE IN GENERATED PROSE (blocked by default):',
+  DESIGN_LED_BLOCKED_PHRASES.map((phrase) => `- "${phrase}"`).join('\n'),
+  '- Any other direct address to the client, any possessive form of it, and any first-person design voice such as "we".',
 ].join('\n');
 
 /**
@@ -241,7 +289,7 @@ const LANGUAGE = [
   '- Use clear, direct language. Keep sentences short and natural.',
   '- Use the active voice.',
   '- Use practical, specific explanations.',
-  '- Use "you" and "your" where it feels natural.',
+  '- Keep the room, the design, the system, the seating area and the listening result as the subject of the sentence.',
   '- Include numbers where they help: screen size, viewing distance, viewing angle, channel count, dBC capability, RP22 level, seat count.',
   '- Carry at most one or two measured values in a paragraph.',
   '- Vary how sentences open. Never repeat the same opening construction within a section.',
@@ -269,11 +317,12 @@ const LANGUAGE = [
 
 const HIGHLIGHTS_TABLE = [
   '=== KEY PERFORMANCE HIGHLIGHTS TABLE ===',
-  '- Always include the Key Performance Highlights table. Sound Proof builds the rows and the Result values from calculated data. You write only the experience cell of each row.',
-  '- Use 8 to 14 rows where the design supports them. Include only the results that help the client understand this room. An empty or padded row is worse than a shorter table.',
+  '- Always include the Key Performance Highlights table. Sound Proof builds the rows and the Result values from calculated data. You write only the final cell of each row, describing what the room gains from that result.',
+  '- A single report table is: Performance area | Result | What the room gains.',
+  '- Use 8 to 14 rows where the design supports them. Include only the results that help the reader understand this room. An empty or padded row is worse than a shorter table.',
   '- Never add, remove, reorder or change a row, a level or a value.',
   '- Never give a row for an assumed parameter, and never a row for P8, P15 or P20.',
-  '- The experience cell is one short, specific sentence written to the client, in the voice above. It says what that result means in the room, not what the parameter is called.',
+  '- The final cell is one short, specific sentence written in the voice above. It says what that result gives the room, not what the parameter is called.',
   '- For a comparison report the table is calculated per option: Performance area | Option A | Option B | What changes, with one column per selected version. Every value comes from that version\'s frozen engineering evidence, and the change column is derived by Sound Proof.',
   '- In a comparison you write the introduction only. Never restate a table value, never add or reorder a row, and never describe a difference the table does not show. Explain the differences in the prose around the table, in the order below.',
 ].join('\n');
@@ -298,13 +347,14 @@ const FINAL_SELF_CHECK = [
   '7. Does it suggest practical upgrades where they are useful?',
   '8. Does it avoid overclaiming?',
   '9. Does it avoid em dashes? Remove every one.',
-  '10. Does it sound like an experienced cinema designer speaking to a client?',
+  '10. Does it sound like an experienced cinema designer explaining the room and the design?',
   '11. Are all banned words and phrases removed?',
   '12. Is every number supported by the supplied Sound Proof data?',
-  '13. Is every sentence addressed to the client, with no marketing, consultant or AI phrasing left?',
+  '13. Is the room, the design or the system the subject of every sentence, with no direct address to the client and no marketing, consultant or AI phrasing left?',
   '14. Is no internal score, index or percentage stated as a figure anywhere?',
   '15. Does no section end with a generic closing phrase?',
   '16. Is there no markdown, hashtag or asterisk in the response?',
+  '17. Is there no "you", "your", "we designed" or "we recommend" anywhere in the prose?',
 ].join('\n');
 
 /**
@@ -317,7 +367,7 @@ export function buildWritingStyleContract() {
     '',
     WHAT_THE_REPORT_MUST_ANSWER,
     '',
-    CLIENT_ADDRESS_VOICE_RULES,
+    DESIGN_LED_VOICE_RULES,
     '',
     DESIGN_PHILOSOPHY,
     '',

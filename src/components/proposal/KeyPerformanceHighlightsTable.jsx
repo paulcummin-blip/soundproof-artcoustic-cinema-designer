@@ -6,7 +6,7 @@ import { proposalRoleStyle } from '@/components/proposal/typography/proposalTypo
  * -----------------------------
  * The measured summary table of a System Design report.
  *
- * Single Summary:      Performance area | Result | What you experience
+ * Single Summary:      Performance area | Result | What the room gains
  * Comparison:          Performance area | Option A | Option B | What changes
  *                      (one column per selected version)
  *
@@ -20,8 +20,9 @@ import { proposalRoleStyle } from '@/components/proposal/typography/proposalTypo
  * exactly the same table. The `kph-table` class is the print stylesheet hook.
  *
  * Props:
- * - rows: Array<{ key, area, result, what_you_hear }> — summary rows
- *   (what_you_hear is the stored key for the "What you experience" column)
+ * - rows: Array<{ key, area, result, what_the_room_gains }> — summary rows
+ *   (what_the_room_gains is the stored key for the "What the room gains" column;
+ *    rows written before the rename still carry the legacy what_you_hear key)
  * - comparisonRows: Array<{ key, area, values: string[], change: string|null }>
  * - comparisonVersions: Array<{ version_id, label, version_name }> — the option
  *   columns, in report order
@@ -31,7 +32,7 @@ import { proposalRoleStyle } from '@/components/proposal/typography/proposalTypo
 const SUMMARY_COLUMNS = [
   { key: 'area', label: 'Performance area' },
   { key: 'result', label: 'Result' },
-  { key: 'what_you_hear', label: 'What you experience' },
+  { key: 'what_the_room_gains', label: 'What the room gains' },
 ];
 
 const CELL = 'px-3 py-2 align-top border-b border-[#EAE8E3]';
@@ -116,7 +117,7 @@ export default function KeyPerformanceHighlightsTable({
             <tr key={row.key || index}>
               <td className={`${CELL} text-[#1B1A1A]`} style={proposalRoleStyle('body')}>{row.area}</td>
               <td className={`${CELL} text-[#3E4349]`} style={proposalRoleStyle('body')}>{row.result}</td>
-              <td className={`${CELL} text-[#625143]`} style={proposalRoleStyle('body')}>{row.what_you_hear}</td>
+              <td className={`${CELL} text-[#625143]`} style={proposalRoleStyle('body')}>{row.what_the_room_gains ?? row.what_you_hear}</td>
             </tr>
           ))}
         </tbody>

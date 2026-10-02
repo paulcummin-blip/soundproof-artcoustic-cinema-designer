@@ -15,8 +15,9 @@
  *      app, so the AI can never invent, regrade or alter a table value.
  *
  * The AI supplies only prose: the section narrative in body copy, and the
- * "What you experience" cell for the rows selected here (stored under the
- * existing what_you_hear key). mergeHighlightRows() joins the two, keeping the
+ * "What the room gains" cell for the rows selected here (stored under the
+ * what_the_room_gains key; the legacy what_you_hear key is still read).
+ * mergeHighlightRows() joins the two, keeping the
  * calculated Result values untouched.
  *
  * Reads the snapshot passively. Never calculates, grades, regroups or
@@ -42,7 +43,7 @@ import {
   resolveBassEvidence,
   splitParameterEvidence,
 } from './adiReportEvidenceRules.js';
-import { CLIENT_ADDRESS_VOICE_RULES } from './reportWritingStyleContract.js';
+import { DESIGN_LED_VOICE_RULES } from './reportWritingStyleContract.js';
 import { readDesignIndex, describeDesignIndex, designIndexHighlightRows } from './designPerformanceIndex.js';
 
 function compose(...parts) {
@@ -297,9 +298,9 @@ export const HIGHLIGHTS_JSON_SCHEMA = {
         type: 'object',
         properties: {
           key: { type: 'string' },
-          what_you_hear: { type: 'string' },
+          what_the_room_gains: { type: 'string' },
         },
-        required: ['key', 'what_you_hear'],
+        required: ['key', 'what_the_room_gains'],
       },
     },
   },
@@ -308,7 +309,7 @@ export const HIGHLIGHTS_JSON_SCHEMA = {
 
 /**
  * The prompt that asks the model for the highlights prose: a short section
- * introduction plus the "What you experience" cell for each calculated row.
+ * introduction plus the "What the room gains" cell for each calculated row.
  *
  * @param {string} evidence — buildEngineeringEvidence() output
  * @param {Array<{ key, area, result }>} rows
@@ -323,22 +324,22 @@ export function buildHighlightsPrompt(evidence, rows) {
     '=== TABLE ROWS (fixed, calculated by Sound Proof) ===',
     ...list,
     '',
-    'You are writing the Key Performance Highlights section of a client-facing system design report, in the designer-to-client voice defined in the style contract below.',
+    'Write the Key Performance Highlights section of a client-facing system design report, in the design-led voice defined in the style contract below.',
     '',
     'Return two things:',
-    'a) intro_html: one or two sentences introducing the section as the measured summary of this design, as simple HTML with a <p> tag. Tell the client that each row states what the result means in the room. Do not list the rows.',
-    'b) rows: one entry per row above, using its key exactly, giving the "What you experience" cell.',
+    'a) intro_html: one or two sentences introducing the section as the measured summary of this design, as simple HTML with a <p> tag. State that each row carries what the result gives the room. Do not list the rows.',
+    'b) rows: one entry per row above, using its key exactly, giving the "What the room gains" cell.',
     '',
-    'Each "What you experience" cell is one short, specific sentence (about 15 words) telling the client what that result means in their room, in plain language. The numbers support the sentence. They are not the sentence.',
-    CLIENT_ADDRESS_VOICE_RULES,
+    'Each "What the room gains" cell is one short, specific sentence (about 15 words) describing what that result gives the room, in plain language. The numbers support the sentence. They are not the sentence.',
+    DESIGN_LED_VOICE_RULES,
     '',
     'RULES:',
     '- Never change, reorder, add or remove a row. The Result values are calculated by Sound Proof and are already final.',
     '- Never invent a value, a product or a result. If a cell needs a number, use only the numbers shown in that row.',
     '- Reference only the results shown in the table above. Do not mention a parameter, a level or a measurement that is not in it.',
-    '- Say what the result means for the client, not what the parameter is called, and do not explain an obvious result.',
+    '- Say what the result means for the room, not what the parameter is called, and do not explain an obvious result.',
     '- Never write a cell for an assumed parameter, and never reference P8, P15 or P20.',
-    '- Use the voice above: speak to the client as "you". No marketing language, no em dashes.',
+    '- Use the voice above: keep the room, the design, the system and the listening result as the subject. Never address the client as "you", and never write "we designed" or "we recommend".',
   ].join('\n');
 }
 
@@ -347,20 +348,22 @@ export function buildHighlightsPrompt(evidence, rows) {
  * Result values exactly as selected.
  *
  * @param {Array<{ key, area, result }>} rows
- * @param {Array<{ key, what_you_hear }>} aiRows
- * @returns {Array<{ key, area, result, what_you_hear }>}
+ * @param {Array<{ key, what_the_room_gains }>} aiRows
+ * @returns {Array<{ key, area, result, what_the_room_gains }>}
  */
 export function mergeHighlightRows(rows, aiRows) {
   const byKey = new Map(
     (Array.isArray(aiRows) ? aiRows : [])
       .filter((row) => row && row.key)
-      .map((row) => [String(row.key), String(row.what_you_hear || '').trim()]),
+      .map((row) => [String(row.key), String(row.what_the_room_gains ?? row.what_you_hear ?? '').trim()]),
   );
 
   return (rows || []).map((row) => ({
     key: row.key,
     area: row.area,
     result: row.result,
-    what_you_hear: byKey.get(String(row.key)) || '',
+    // What this result gives the room. Any row that already carries the legacy
+    // what_you_hear key is still read, so existing proposals keep rendering.
+    what_the_room_gains: byKey.get(String(row.key)) || '',
   }));
 }
