@@ -584,7 +584,7 @@ export async function hydrateCompletedBassAuthority(projectId, versionId, { forc
   const current = memoryByProject.get(key);
   if (!force && current?.status === "error" && current.errorMessage) return current;
   try {
-    const record = await readProjectAnalysisCacheRecord(projectId, versionId);
+    const record = await readProjectAnalysisCacheRecord(projectId, versionId, { force });
     const persisted = buildHydratedPersistedWrapper(record);
     const next = resolvePersistedBassAuthority(key, persisted);
     if (current?.authoritative && current?.contract && !next?.authoritative) {
