@@ -24,6 +24,7 @@ import ProjectSelectionSummary from '@/components/admin/intelligence/ProjectSele
 import ProjectSelectionTable from '@/components/admin/intelligence/ProjectSelectionTable';
 import ProductDemandTable from '@/components/admin/intelligence/ProductDemandTable';
 import ExcludedCatalogueLines from '@/components/admin/intelligence/ExcludedCatalogueLines';
+import ExcludedHistoricAbfusers from '@/components/admin/intelligence/ExcludedHistoricAbfusers';
 import VariationCountTable from '@/components/admin/intelligence/VariationCountTable';
 import AdvancedDiagnosticsPanel from '@/components/admin/intelligence/AdvancedDiagnosticsPanel';
 import VariationDrawer from '@/components/admin/intelligence/VariationDrawer';
@@ -123,6 +124,7 @@ export default function AdminProjectIntelligence() {
     families: selection.selectedFamilies,
     productDemand: selection.productDemand,
     excludedLines: selection.excludedLines,
+    abfuserExclusions: selection.abfuserExclusions,
   });
 
   const handleExportWorkbook = () => {
@@ -134,7 +136,7 @@ export default function AdminProjectIntelligence() {
   const handleExportCsv = () => {
     if (!report) return;
     downloadSelectionCsv(exportPayload());
-    setExportNotice('CSV downloaded per tab: Included Projects, Excluded Projects, Product Demand, Version Detail, Excluded Manual Lines.');
+    setExportNotice('CSV downloaded per tab: Included Projects, Excluded Projects, Product Demand, Version Detail, Excluded Manual Lines, Excluded Historic Abfusers.');
   };
 
   const truncation = data?.truncation;
@@ -257,6 +259,11 @@ export default function AdminProjectIntelligence() {
                   productDemand={selection.productDemand}
                   currency={report.summary.liveCurrency || report.priceContext.currency}
                   projectNamesById={projectNamesById}
+                  abfuserWarnings={selection.abfuserWarnings}
+                />
+                <ExcludedHistoricAbfusers
+                  abfuserExclusions={selection.abfuserExclusions}
+                  currency={report.summary.liveCurrency || report.priceContext.currency}
                 />
                 <ExcludedCatalogueLines
                   excludedLines={selection.excludedLines}

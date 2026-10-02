@@ -3,14 +3,17 @@
  * -------------------------
  * The product demand export for the Project Intelligence selection workflow.
  *
- * Five workbook tabs, built from the admin's inclusion and counted-version
+ * Six workbook tabs, built from the admin's inclusion and counted-version
  * selection:
- *   1. Included Projects      — one row per included project
- *   2. Excluded Projects      — one row per excluded project, with the reason
- *   3. Product Demand         — Artcoustic catalogue lines, counted versions only
- *   4. Version Detail         — every version, marked counted or not
- *   5. Excluded Manual Lines  — the non-catalogue lines left out of demand, for
- *                               audit only (never part of the demand totals)
+ *   1. Included Projects           — one row per included project
+ *   2. Excluded Projects           — one row per excluded project, with the reason
+ *   3. Product Demand              — Artcoustic catalogue lines, counted versions
+ *                                    only, with historic Abfuser excluded
+ *   4. Version Detail              — every version, marked counted or not
+ *   5. Excluded Manual Lines       — the non-catalogue lines left out of demand,
+ *                                    for audit only
+ *   6. Excluded Historic Abfusers  — Abfuser quantity and value left out because
+ *                                    the counted version predates 1 Oct 2026
  *
  * The workbook and CSV strings are produced by projectReportingExport, so this
  * module returns sheet definitions only.
@@ -26,6 +29,7 @@ export const SELECTION_WORKBOOK_TABS = [
   'Product Demand',
   'Version Detail',
   'Excluded Manual Lines',
+  'Excluded Historic Abfusers',
 ];
 
 /** The export filename, e.g. "Sound Proof Project Intelligence Product Demand - 2026-10-02". */
@@ -43,12 +47,17 @@ const noteText = (family) => [
 ].filter(Boolean).join('; ');
 
 /**
- * Build the four sheets from the resolved selection.
+ * Build the sheets from the resolved selection.
  *
- * @param {Object} selection — { families, productDemand, summary }
+ * @param {Object} selection — { families, productDemand, excludedLines, abfuserExclusions }
  * @returns {Array<{ name: string, columns: Array, rows: Array }>}
  */
-export function buildSelectionSheets({ families = [], productDemand = [], excludedLines = [] } = {}) {
+export function buildSelectionSheets({
+  families = [],
+  productDemand = [],
+  excludedLines = [],
+  abfuserExclusions = [],
+} = {}) {
   const included = families.filter((family) => family.included);
   const excluded = families.filter((family) => !family.included);
   const currency = included.map((family) => family.countedCurrency).find(Boolean) || 'GBP';
@@ -95,6 +104,15 @@ export function buildSelectionSheets({ families = [], productDemand = [], exclud
     { key: 'quantity', label: 'Quantity', type: 'number' },
     { key: 'value', label: `Value (${currency})`, type: 'currency' },
     { key: 'reason', label: 'Reason excluded', type: 'string' },
+  ];
+
+  const abfuserColumns = [
+    { key: 'project', label: 'Project', type: 'string' },
+    { key: 'countedVersion', label: 'Counted version', type: 'string' },
+    { key: 'dateUsed', label: 'Date used', type: 'string' },
+    { key: 'quantity', label: 'Quantity excluded', type: 'number' },
+    { key: 'value', label: `Value excluded (${currency})`, type: 'currency' },
+    { key: 'reason', label: 'Reason', type: 'string' },
   ];
 
   const versionColumns = [
@@ -183,6 +201,20 @@ export function buildSelectionSheets({ families = [], productDemand = [], exclud
         project: row.project,
         countedVersion: row.countedVersion,
         description: row.description,
+        quantity: row.quantity,
+        value: row.value,
+        reason: row.reason,
+      })),
+    },
+    {
+      // The Abfuser cutoff audit: the historic Abfuser quantity and value left
+      // out of Product Demand, and the date the counted version was judged on.
+      name: SELECTION_WORKBOOK_TABS[5],
+      columns: abfuserColumns,
+      rows: abfuserExclusions.map((row) => ({
+        project: row.project,
+        countedVersion: row.countedVersion,
+        dateUsed: row.dateLabel,
         quantity: row.quantity,
         value: row.value,
         reason: row.reason,

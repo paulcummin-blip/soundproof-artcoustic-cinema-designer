@@ -45,16 +45,21 @@ export function useProjectSelection({ families = [], priceMap = null, totalLoade
 
   // Product demand counts the counted version of included projects only. No
   // excluded project and no non-counted version can reach this aggregation, and
-  // only Artcoustic catalogue lines are aggregated. The excluded lines are the
-  // audit trail for what was left out; they never affect the demand totals.
+  // only Artcoustic catalogue lines are aggregated. Abfuser from a counted
+  // version dated before 1 Oct 2026 is left out by the reporting cutoff. The
+  // excluded lines are the audit trail for what was left out; they never affect
+  // the demand totals.
   const catalogueDemand = useMemo(() => {
     const counted = includedFamilies(selectedFamilies);
-    if (counted.length === 0) return { rows: [], excludedLines: [] };
+    if (counted.length === 0) return { rows: [], excludedLines: [], abfuserExclusions: [], abfuserWarnings: [] };
     return buildCatalogueDemand({ families: counted, priceMap });
   }, [selectedFamilies, priceMap]);
 
   const productDemand = catalogueDemand.rows;
   const excludedLines = catalogueDemand.excludedLines;
+  // Abfuser left out by the 1 Oct 2026 reporting cutoff, kept for audit only.
+  const abfuserExclusions = catalogueDemand.abfuserExclusions || [];
+  const abfuserWarnings = catalogueDemand.abfuserWarnings || [];
 
   const versionRows = useMemo(() => buildVersionDetailRows(selectedFamilies), [selectedFamilies]);
 
@@ -81,6 +86,8 @@ export function useProjectSelection({ families = [], priceMap = null, totalLoade
     selectedFamilies,
     productDemand,
     excludedLines,
+    abfuserExclusions,
+    abfuserWarnings,
     versionRows,
     summary,
     preferences,

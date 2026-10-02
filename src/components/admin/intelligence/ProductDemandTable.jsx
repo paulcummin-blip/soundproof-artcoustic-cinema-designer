@@ -10,7 +10,7 @@ import React, { useState } from 'react';
 import { BRAND, EmptyState, Pill, TABLE, TABLE_WRAP, Td, Th } from './IntelligenceUi';
 import { formatMoney, formatNumber } from '@/lib/commercial/projectReporting/formatMoney';
 
-export default function ProductDemandTable({ productDemand = [], currency, projectNamesById }) {
+export default function ProductDemandTable({ productDemand = [], currency, projectNamesById, abfuserWarnings = [] }) {
   const [openKey, setOpenKey] = useState(null);
 
   if (productDemand.length === 0) {
@@ -32,6 +32,27 @@ export default function ProductDemandTable({ productDemand = [], currency, proje
         from the counted version of each included project only, and a line with no price is shown as{' '}
         <strong>Unpriced</strong> rather than zero.
       </div>
+
+      <div style={{ fontSize: 12, color: BRAND.subtext, lineHeight: 1.6 }}>
+        Historic Abfuser quantities before 1 Oct 2026 are excluded from demand totals due to a previous quantity issue.
+        Everything else from those projects still counts, and this affects Product Demand reporting only.
+      </div>
+
+      {abfuserWarnings.map((warning) => (
+        <div
+          key={warning}
+          style={{
+            fontSize: 12,
+            color: BRAND.warn,
+            background: BRAND.warnBg,
+            borderRadius: 8,
+            padding: '8px 10px',
+            lineHeight: 1.6,
+          }}
+        >
+          {warning}
+        </div>
+      ))}
 
       <div style={{ display: 'flex', gap: 10, alignItems: 'baseline', flexWrap: 'wrap', fontSize: 13 }}>
         <span style={{ fontWeight: 700, color: BRAND.text }}>{formatNumber(totalQuantity)} catalogue units</span>

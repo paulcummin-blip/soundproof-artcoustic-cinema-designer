@@ -10,12 +10,17 @@
  *
  * Unpriced and inactive products stay visible and are never treated as zero.
  *
+ * Abfuser quantity and value are left out of demand when the counted version is
+ * dated before 1 Oct 2026 (see abfuserCutoffAuthority). That is a reporting
+ * exclusion only: it changes Product Demand and nothing else.
+ *
  * Pure: no React, no side effects.
  */
 
 import { STATUS_BUCKETS } from './statusBuckets';
 import { text } from './reportingUtils';
 import { classifyCatalogueLine, isEngineDerivedLine } from './catalogueLineAuthority';
+import { ABFUSER_REASON, classifyAbfuserCutoff, formatCutoffDate } from './abfuserCutoffAuthority';
 
 /**
  * Whether a line is an Artcoustic line the pricing engine generated from the
@@ -59,11 +64,13 @@ function countedVariationOf(family) {
  * @param {Object} input
  * @param {Array} input.families — included project families
  * @param {Map} input.priceMap — Product Master index (sku → product)
- * @returns {{ rows: Array<Object>, excludedLines: Array<Object> }}
+ * @returns {{ rows: Array<Object>, excludedLines: Array<Object>, abfuserExclusions: Array<Object>, abfuserWarnings: Array<string> }}
  */
 export function buildCatalogueDemand({ families = [], priceMap = null } = {}) {
   const rows = new Map();
   const excluded = new Map();
+  const abfuserExcluded = new Map();
+  const abfuserWarnings = new Set();
 
   const ensureRow = (sku, label, classification) => {
     const key = text(sku).toLowerCase() || text(label).toLowerCase();
@@ -118,6 +125,35 @@ export function buildCatalogueDemand({ families = [], priceMap = null } = {}) {
     excluded.set(key, entry);
   };
 
+  // One audit row per counted version whose Abfuser was left out by the cutoff,
+  // carrying the date the version was judged on. Like the other audit, the two
+  // bases accumulate onto one row and the live design line is what is shown.
+  const recordAbfuserExclusion = ({ family, counted, sku, quantity, value, verdict, basis }) => {
+    const key = [family?.id, counted?.id].join('|');
+    const entry = abfuserExcluded.get(key) || {
+      projectId: family?.id || null,
+      project: family?.name || null,
+      countedVersion: counted?.versionName || 'Legacy design',
+      sku: sku || null,
+      dateUsed: verdict?.dateUsed || null,
+      dateBasis: verdict?.dateBasis || '',
+      reason: ABFUSER_REASON,
+      liveQuantity: 0,
+      liveValue: 0,
+      quotedQuantity: 0,
+      quotedValue: 0,
+    };
+    if (basis === QUOTED_BASIS) {
+      entry.quotedQuantity += quantity;
+      entry.quotedValue += value;
+    } else {
+      entry.liveQuantity += quantity;
+      entry.liveValue += value;
+    }
+    abfuserExcluded.set(key, entry);
+    if (verdict?.warning) abfuserWarnings.add(verdict.warning);
+  };
+
   // Live design demand, from the priced schedule of the counted version only.
   for (const family of families) {
     const counted = countedVariationOf(family);
@@ -134,6 +170,23 @@ export function buildCatalogueDemand({ families = [], priceMap = null } = {}) {
           quantity,
           value: Number(line.subtotalExVat) || 0,
           reason: classification.reason,
+          basis: LIVE_BASIS,
+        });
+        continue;
+      }
+
+      // The Abfuser cutoff: a counted version dated before 1 Oct 2026 gives no
+      // Abfuser quantity or value to demand, while every other line of that
+      // project still counts normally.
+      const cutoff = classifyAbfuserCutoff(line, { classification, variation: counted, family });
+      if (cutoff.excluded) {
+        recordAbfuserExclusion({
+          family,
+          counted,
+          sku: classification.sku,
+          quantity,
+          value: Number(line.subtotalExVat) || 0,
+          verdict: cutoff,
           basis: LIVE_BASIS,
         });
         continue;
@@ -180,6 +233,20 @@ export function buildCatalogueDemand({ families = [], priceMap = null } = {}) {
         continue;
       }
 
+      const cutoff = classifyAbfuserCutoff(line, { classification, variation: counted, family });
+      if (cutoff.excluded) {
+        recordAbfuserExclusion({
+          family,
+          counted,
+          sku: classification.sku,
+          quantity,
+          value: Number(line.subtotal_ex_vat) || 0,
+          verdict: cutoff,
+          basis: QUOTED_BASIS,
+        });
+        continue;
+      }
+
       const row = ensureRow(classification.sku, line.description, classification);
       if (!row) continue;
       row.quotedQuantity += quantity;
@@ -220,7 +287,24 @@ export function buildCatalogueDemand({ families = [], priceMap = null } = {}) {
     return String(a.description || '').localeCompare(String(b.description || ''));
   });
 
-  return { rows: sorted, excludedLines };
+  const abfuserExclusions = [...abfuserExcluded.values()].map((entry) => ({
+    projectId: entry.projectId,
+    project: entry.project,
+    countedVersion: entry.countedVersion,
+    sku: entry.sku,
+    dateUsed: entry.dateUsed,
+    dateBasis: entry.dateBasis,
+    dateLabel: formatCutoffDate({ dateUsed: entry.dateUsed, dateBasis: entry.dateBasis }),
+    quantity: entry.liveQuantity || entry.quotedQuantity,
+    value: entry.liveQuantity > 0 ? entry.liveValue : entry.quotedValue,
+    reason: entry.reason,
+  })).sort((a, b) => {
+    const byProject = String(a.project || '').localeCompare(String(b.project || ''));
+    if (byProject !== 0) return byProject;
+    return String(a.countedVersion || '').localeCompare(String(b.countedVersion || ''));
+  });
+
+  return { rows: sorted, excludedLines, abfuserExclusions, abfuserWarnings: [...abfuserWarnings] };
 }
 
 /**
