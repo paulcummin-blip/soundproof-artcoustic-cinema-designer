@@ -57,11 +57,19 @@ function BuildCheckpointDiagnostic({ isAdmin }) {
   const location = useLocation();
   const query = typeof window !== "undefined" ? new URLSearchParams(window.location.search) : null;
   const enabled = isAdmin || SHOW_DEBUG_PANEL || import.meta.env.DEV || query?.get("debugBuild") === "1";
+  const assetBuildId = typeof document !== "undefined"
+    ? Array.from(document.scripts)
+      .map((script) => script.src)
+      .filter(Boolean)
+      .map((src) => src.match(/\/assets\/(index-[^/?]+\.js)/)?.[1] || null)
+      .find(Boolean)
+    : null;
   const buildId = query?.get("_b44_commit")
     || import.meta.env.VITE_APP_BUILD_ID
     || import.meta.env.VITE_GIT_SHA
     || import.meta.env.VITE_COMMIT_SHA
     || (typeof window !== "undefined" && (window.__BASE44_BUILD_ID__ || window.__APP_BUILD_ID__))
+    || assetBuildId
     || "not exposed";
   const route = `${location.pathname}${location.search}`;
 
