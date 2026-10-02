@@ -76,10 +76,22 @@ export default function CreateProposalWizard({ onCreated, onCancel }) {
   const sourceReady = sourceStatus?.ready === true;
 
   // ── Step 3 readiness gate ──
-  // The Versions step does not advance until the selected version has both a
-  // current Visual Report and a current Technical Report. Without them the
-  // proposal would be written from stale project data.
-  const reportGate = resolveReportGate({ status: sourceStatus, loading: sourceLoading });
+  // Current report snapshots are necessary but not sufficient: older partial
+  // snapshots may predate the strict completeness rule. The frozen engineering
+  // snapshot must also prove every required parameter is terminal.
+  const baseReportGate = resolveReportGate({ status: sourceStatus, loading: sourceLoading });
+  const proposalDataReady = !snapshotLoading && !!engineeringSnapshot && !snapshotError;
+  const reportGate = {
+    ...baseReportGate,
+    checking: baseReportGate.checking || snapshotLoading,
+    ready: baseReportGate.ready && proposalDataReady,
+    message: baseReportGate.ready && !proposalDataReady
+      ? (snapshotError || 'Complete every project assessment before generating reports or proposals.')
+      : baseReportGate.message,
+    detail: baseReportGate.ready && !proposalDataReady
+      ? 'Open this version in Room Designer, finish the remaining calculations, then regenerate the reports.'
+      : baseReportGate.detail,
+  };
 
   const handleSelectProject = useCallback((projectId) => {
     setSelectedProjectId(projectId);
