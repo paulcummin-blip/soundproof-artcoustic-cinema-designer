@@ -178,7 +178,7 @@ test('the proposal builder reads the source status and blocks generation', () =>
   assert.match(WIZARD, /const sourceReady = sourceStatus\?\.ready === true/);
   assert.match(WIZARD, /if \(!sourceReady\) \{/, 'generate is guarded');
   assert.match(WIZARD, /sourceStatus\?\.message/, 'the blocker message is surfaced');
-  assert.match(WIZARD, /<ProposalSourcePanel status=\{sourceStatus\}/, 'source status is shown');
+  assert.match(WIZARD, /<ProposalSourcePanel[\s\S]*status=\{sourceStatus\}/, 'source status is shown');
   assert.match(WIZARD, /\|\| !sourceReady\}/, 'the Generate button is disabled until the reports are current');
   assert.match(WIZARD, /written from the current Visual and Technical Report data/);
 });
@@ -192,8 +192,9 @@ test('Proposal Centre stays passive until the proposal wizard owns source readin
 
 test('the panel shows both reports, the version and the generation time', () => {
   assert.match(PANEL, /PROPOSAL_SOURCE_TITLE/);
-  assert.match(PANEL, /status\.reports\?\.visual/);
-  assert.match(PANEL, /status\.reports\?\.technical/);
+  assert.match(PANEL, /resolveReportActionRows\(\{/);
+  assert.match(PANEL, /reports: status\.reports \|\| \{\}/);
+  assert.match(PANEL, /rows\.map\(\(row\)/);
   assert.match(PANEL, /Project Version/);
   assert.match(PANEL, /Last generated/);
   assert.match(PANEL, /status\.message/, 'the required action is shown');
