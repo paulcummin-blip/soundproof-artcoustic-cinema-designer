@@ -749,10 +749,10 @@ function RP22ReportInner() {
         autoPrintRequested: !!autoPrintRequested,
         reportReady: !reportHydrating && !!explicitProjectId && reportReadyProjectId === explicitProjectId,
         designReviewHandoffReady: !!designReviewHandoff,
-        analysisResultReady: !!analysisResult && !!analysisResult.gradedParameters,
+        analysisResultReady: !!engineeringSummary && reportAuthority.reportComplete,
         engineeringSummaryReady: !!engineeringSummary,
         recommendationsReady: designRecommendations != null,
-        renderGatePassed: !!analysisResult && !!analysisResult.gradedParameters && !showLoadingReport,
+        renderGatePassed: !!engineeringSummary && reportAuthority.reportComplete && !showLoadingReport,
         planCaptureReady: planImageDataUrl !== null && planDimsImageDataUrl !== null && planSpeakerDimsImageDataUrl !== null,
         autoPrintTriggered: !!autoPrintTriggeredRef.current,
         isPrinting: !!isPrinting,
@@ -1009,34 +1009,6 @@ function RP22ReportInner() {
                     <p>App state is not initialised.</p>
                     <p>Please open the Room Designer first, then return to this report.</p>
                 </div>
-            </div>
-        );
-    }
-
-    // The published analysisResult may still be resolving from the durable
-    // authority — wait rather than claiming no analysis exists.
-    if (!authorityResolving && (!analysisResult || !analysisResult.gradedParameters)) {
-        if (isAutoPrintPreparing) {
-            return (
-                <div className="min-h-screen bg-white flex items-center justify-center">
-                    <div className="flex flex-col items-center gap-6">
-                        <div className="w-10 h-10 border-[3px] border-[#E6E4DD] border-t-[#213428] rounded-full animate-spin" />
-                        <div style={{ fontSize: 18, fontWeight: 400, color: '#213428', fontFamily: "'Futura PT Light', 'Century Gothic', sans-serif", letterSpacing: '0.01em' }}>
-                            Preparing Technical Report…
-                        </div>
-                    </div>
-                </div>
-            );
-        }
-        return (
-            <div className="min-h-screen bg-[#F9F8F6] p-6 flex items-center justify-center">
-                <Card className="max-w-xl mx-auto w-full">
-                    <CardHeader><CardTitle className="text-[#1B1A1A] font-header">RP22 Compliance Report</CardTitle></CardHeader>
-                    <CardContent className="text-center py-10">
-                        <BarChart4 className="w-12 h-12 text-gray-300 mx-auto mb-4" />
-                        <p className="text-[#3E4349]">Run an analysis in the Room Designer to see the report.</p>
-                    </CardContent>
-                </Card>
             </div>
         );
     }
