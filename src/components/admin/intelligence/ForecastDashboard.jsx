@@ -13,8 +13,10 @@
 // and pipelineComposition — and nothing on this canvas interprets them: no
 // commentary, no helper copy and no recommended actions.
 //
-// Every point is one month. A month with no valued project leaves a gap rather
-// than a false zero, so the month in progress never reads as a collapse.
+// Every point is one month, and the series stops at the last completed month.
+// The month in progress is only appended when it is switched on, and then it is
+// marked as partial rather than as history. A month with no valued project
+// leaves a gap rather than a false zero, so no chart ends on an artificial drop.
 //
 // The period control only offers periods the loaded data can fill, and the
 // scope control narrows every chart at once. With no account chosen the age
@@ -23,6 +25,7 @@
 import React, { useMemo, useState } from 'react';
 import { BRAND } from './IntelligenceUi';
 import {
+  DEFAULT_INCLUDE_CURRENT_MONTH,
   DEFAULT_TIMELINE_BASIS,
   DEFAULT_TIMELINE_RANGE,
   TIMELINE_BASES,
@@ -93,6 +96,7 @@ export default function ForecastDashboard({
 }) {
   const [rangeKey, setRangeKey] = useState(DEFAULT_TIMELINE_RANGE);
   const [basis, setBasis] = useState(DEFAULT_TIMELINE_BASIS);
+  const [includeCurrentMonth, setIncludeCurrentMonth] = useState(DEFAULT_INCLUDE_CURRENT_MONTH);
   const [accountId, setAccountId] = useState('');
   const [compositionMetricKey, setCompositionMetricKey] = useState('count');
 
@@ -101,7 +105,8 @@ export default function ForecastDashboard({
   ), [forecastProjects, accountId]);
 
   // Only the periods this scope can fill are offered, and a period that is not
-  // available falls back to the widest one that is.
+  // available falls back to the widest one that is. Periods are measured in
+  // completed months, so the switch never changes which ones are offered.
   const availableRanges = useMemo(
     () => availableTimelineRanges(scopedFamilies, { basis, now }),
     [scopedFamilies, basis, now],
@@ -110,13 +115,25 @@ export default function ForecastDashboard({
     ? rangeKey
     : (availableRanges[availableRanges.length - 1] || DEFAULT_TIMELINE_RANGE);
 
+  // The series stops at the last completed month. Switching the month in progress
+  // on appends it as one extra partial point, so no trend chart ends on a month
+  // that has not finished and no completed month ever moves.
   const timeline = useMemo(() => buildForecastTimeline(scopedFamilies, {
     rangeKey: effectiveRangeKey,
     basis,
+    includeCurrentMonth,
     unitsByProjectId,
     retailByProjectId,
     now,
-  }), [scopedFamilies, effectiveRangeKey, basis, unitsByProjectId, retailByProjectId, now]);
+  }), [
+    scopedFamilies,
+    effectiveRangeKey,
+    basis,
+    includeCurrentMonth,
+    unitsByProjectId,
+    retailByProjectId,
+    now,
+  ]);
 
   // With no account chosen this is the same age authority the KPI cards read.
   const scopedAge = useMemo(() => (
@@ -172,6 +189,16 @@ export default function ForecastDashboard({
               </PillButton>
             ))}
           </div>
+
+          <label style={{ display: 'flex', gap: 7, alignItems: 'center', cursor: 'pointer' }}>
+            <input
+              type="checkbox"
+              checked={includeCurrentMonth}
+              onChange={(event) => setIncludeCurrentMonth(event.target.checked)}
+              style={{ width: 15, height: 15, accentColor: BRAND.primary, cursor: 'pointer' }}
+            />
+            <ControlLabel>Include current month (partial)</ControlLabel>
+          </label>
         </div>
 
         <label style={{ display: 'flex', gap: 6, alignItems: 'center' }}>

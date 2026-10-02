@@ -4,10 +4,16 @@
  * The time series behind the forecast dashboard: how many forecast projects and
  * how much Artcoustic value fall in each month.
  *
- * Periods are always months, so every point on the dashboard is one month of
- * pipeline activity and the last point is the month in progress. Which ranges
- * the loaded data can fill is decided here too, so the screen never offers a
- * period that starts before the pipeline does.
+ * Periods are always months. By default the series stops at the last completed
+ * month, because a month in progress is not a period yet: plotted as history it
+ * would read as a collapse at the end of the chart. The month in progress can be
+ * appended on request, and every point says whether it is partial, so a chart can
+ * mark it as in progress rather than as history. Appending it never changes or
+ * displaces a completed month: the history is stable and the partial month is
+ * extra.
+ *
+ * Which ranges the loaded data can fill is decided here too, so the screen never
+ * offers a period that starts before the pipeline does.
  *
  * A project is placed by the date being measured — created or last updated —
  * because those answer different questions: what was specified, and what was
@@ -46,6 +52,12 @@ export const TIMELINE_BASES = [
 ];
 
 export const DEFAULT_TIMELINE_BASIS = 'created';
+
+/**
+ * Whether the month in progress is appended to the series. Off by default:
+ * history means completed months, and the month in progress is always opt-in.
+ */
+export const DEFAULT_INCLUDE_CURRENT_MONTH = false;
 
 export function timelineRangeByKey(key) {
   return TIMELINE_RANGES.find((range) => range.key === key) || TIMELINE_RANGES[1];
@@ -87,32 +99,65 @@ function monthlyBuckets(fromMonthStart, toMonthStart) {
   return buckets;
 }
 
-/** Every month from the oldest dated project to the current month. */
-function allTimeBuckets(reference, earliestStamp) {
-  const toMonth = monthStart(reference);
-  if (earliestStamp === null) return monthlyBuckets(addMonths(toMonth, -11), toMonth);
+/**
+ * Every month from the oldest dated project to the anchor month — the month in
+ * progress, or the last completed month when the month in progress is excluded.
+ */
+function allTimeBuckets(anchor, earliestStamp) {
+  if (earliestStamp === null) return monthlyBuckets(addMonths(anchor, -11), anchor);
 
   const earliestMonth = monthStart(earliestStamp);
-  const span = monthSpan(earliestMonth, toMonth) + 1;
+  if (earliestMonth > anchor) return monthlyBuckets(anchor, anchor);
 
-  const fromMonth = span > MAX_BUCKETS ? addMonths(toMonth, -(MAX_BUCKETS - 1)) : earliestMonth;
-  return monthlyBuckets(fromMonth, toMonth);
+  const span = monthSpan(earliestMonth, anchor) + 1;
+  const fromMonth = span > MAX_BUCKETS ? addMonths(anchor, -(MAX_BUCKETS - 1)) : earliestMonth;
+  return monthlyBuckets(fromMonth, anchor);
 }
 
-function bucketsFor(range, reference, earliestStamp) {
-  if (range.months) return monthlyBuckets(addMonths(monthStart(reference), -(range.months - 1)), monthStart(reference));
-  return allTimeBuckets(reference, earliestStamp);
+/** The month the completed history ends on: the month before the one in progress. */
+function lastCompletedMonthStart(reference) {
+  return addMonths(monthStart(reference), -1);
+}
+
+/** The single bucket for the month in progress, keyed distinctly from history. */
+function inProgressBucket(reference) {
+  const [bucket] = monthlyBuckets(monthStart(reference), monthStart(reference));
+  return bucket ? { ...bucket, key: 'month_in_progress' } : null;
+}
+
+/**
+ * The buckets to plot. The completed history is the range measured back from the
+ * last completed month; the month in progress is appended only when asked for, so
+ * switching it on adds a point at the end and leaves every completed month exactly
+ * where it was.
+ */
+function bucketsFor(range, reference, earliestStamp, includeCurrentMonth) {
+  const anchor = lastCompletedMonthStart(reference);
+  const completed = range.months
+    ? monthlyBuckets(addMonths(anchor, -(range.months - 1)), anchor)
+    : allTimeBuckets(anchor, earliestStamp);
+
+  if (!includeCurrentMonth) return completed;
+
+  const current = inProgressBucket(reference);
+  return current ? completed.concat([current]) : completed;
 }
 
 /**
  * Which ranges the loaded data can actually fill, so the dashboard never offers
  * a period that starts before the pipeline does: half a year of points needs six
  * months of history, a year of points needs twelve. The full history is always
- * available, because it starts wherever the data starts.
+ * available, because it starts wherever the data starts. History means completed
+ * months, so the month in progress never counts towards a range: switching it on
+ * adds a point rather than a requirement.
  */
-export function availableTimelineRanges(families = [], { basis = DEFAULT_TIMELINE_BASIS, now = null } = {}) {
+export function availableTimelineRanges(families = [], {
+  basis = DEFAULT_TIMELINE_BASIS,
+  now = null,
+} = {}) {
   const basisDef = timelineBasisByKey(basis);
   const reference = referenceTime(now);
+  const anchor = lastCompletedMonthStart(reference);
   const earliest = safeArray(families)
     .filter((family) => family?.forecastIncluded !== false)
     .map((family) => {
@@ -124,7 +169,7 @@ export function availableTimelineRanges(families = [], { basis = DEFAULT_TIMELIN
 
   const monthsCovered = earliest === Infinity
     ? 1
-    : monthSpan(monthStart(earliest), monthStart(reference)) + 1;
+    : Math.max(1, monthSpan(monthStart(earliest), anchor) + 1);
 
   return TIMELINE_RANGES
     .filter((range) => range.months === null || range.months <= monthsCovered)
@@ -138,6 +183,7 @@ export function availableTimelineRanges(families = [], { basis = DEFAULT_TIMELIN
  * @param {Object} [options]
  * @param {string} [options.rangeKey] — one of TIMELINE_RANGES
  * @param {string} [options.basis] — 'created' or 'updated'
+ * @param {boolean} [options.includeCurrentMonth] — plot the month in progress
  * @param {Object} [options.unitsByProjectId] — counted catalogue units per project
  * @param {Object} [options.retailByProjectId] — Artcoustic retail ex VAT per project
  * @param {number} [options.now] — reference instant, for deterministic reporting
@@ -146,6 +192,7 @@ export function availableTimelineRanges(families = [], { basis = DEFAULT_TIMELIN
 export function buildForecastTimeline(families = [], {
   rangeKey = DEFAULT_TIMELINE_RANGE,
   basis = DEFAULT_TIMELINE_BASIS,
+  includeCurrentMonth = DEFAULT_INCLUDE_CURRENT_MONTH,
   unitsByProjectId = null,
   retailByProjectId = null,
   now = null,
@@ -167,7 +214,8 @@ export function buildForecastTimeline(families = [], {
     ? dated.reduce((min, entry) => Math.min(min, entry.stamp), Infinity)
     : null;
 
-  const buckets = bucketsFor(range, reference, earliest);
+  const buckets = bucketsFor(range, reference, earliest, includeCurrentMonth);
+  const inProgressMonth = monthStart(reference);
   const first = buckets[0] || null;
   const last = buckets[buckets.length - 1] || null;
 
@@ -189,6 +237,8 @@ export function buildForecastTimeline(families = [], {
       label: bucket.label,
       startDate: new Date(bucket.start).toISOString(),
       endDate: new Date(bucket.end).toISOString(),
+      // True only for the month in progress, and only when it is plotted.
+      partial: bucket.start === inProgressMonth,
       projects: inBucket.length,
       projectIds: inBucket.map((entry) => entry.family.id),
       valuedProjects: retailValues.length,
@@ -213,6 +263,7 @@ export function buildForecastTimeline(families = [], {
     unitLabel: range.unitLabel,
     basis: basisDef.key,
     basisLabel: basisDef.label,
+    includeCurrentMonth,
     points,
     spanLabel: first && last ? `${first.label} – ${points[points.length - 1].label}` : null,
     totals: {

@@ -1,7 +1,12 @@
 // PipelineTimelineChart.jsx
 // -------------------------
-// One time series on the forecast dashboard: a line over periods, with a metric
+// One time series on the forecast dashboard: a line over months, with a metric
 // toggle where a chart carries more than one measure.
+//
+// Completed months are drawn as history, as a solid line. When the month in
+// progress is included it is not drawn as history: the final segment is dashed,
+// its point is a hollow marker, and the tooltip names it as a month in progress —
+// so a month that has not finished is never read as an end-of-chart collapse.
 //
 // Presentation only. The points come from the forecastTimelines authority and
 // nothing here interprets them.
@@ -82,6 +87,45 @@ export default function PipelineTimelineChart({
   const plotted = points.filter((point) => point[metric.key] !== null && point[metric.key] !== undefined);
   const hasData = plotted.length > 0;
 
+  // The month in progress is never part of the solid history line: it is drawn as
+  // a lighter series whose final segment is dashed, and it keeps its own hollow
+  // marker even when the month before it has no value to connect from. Completed
+  // months are therefore always drawn exactly as they were.
+  const valueAt = (index) => (index >= 0 && index < points.length ? points[index][metric.key] : null);
+  const partialIndex = points.findIndex((point) => point.partial === true);
+  const partialValue = valueAt(partialIndex);
+  const showsPartial = partialIndex > 0 && partialValue !== null && partialValue !== undefined;
+  const previousValue = valueAt(partialIndex - 1);
+  const linksToHistory = showsPartial
+    && previousValue !== null && previousValue !== undefined;
+
+  const chartData = points.map((point, index) => ({
+    ...point,
+    seriesValue: showsPartial && index === partialIndex ? null : point[metric.key],
+    partialValue: !showsPartial
+      ? null
+      : (index === partialIndex
+        ? point[metric.key]
+        : (linksToHistory && index === partialIndex - 1 ? point[metric.key] : null)),
+  }));
+
+  const renderPartialDot = (props) => {
+    if (!props?.payload?.partial || props.cx === undefined || props.cy === undefined) {
+      return <g key={`blank-${props?.index}`} />;
+    }
+    return (
+      <circle
+        key={`partial-${props.index}`}
+        cx={props.cx}
+        cy={props.cy}
+        r={3.5}
+        fill={BRAND.card}
+        stroke={accent}
+        strokeWidth={2}
+      />
+    );
+  };
+
   const renderTooltip = ({ active, payload }) => {
     if (!active || !payload || payload.length === 0) return null;
     const point = payload[0].payload;
@@ -95,7 +139,12 @@ export default function PipelineTimelineChart({
         color: BRAND.text,
         lineHeight: 1.5,
       }}>
-        <div style={{ fontWeight: 700 }}>{point.label}</div>
+        <div style={{ fontWeight: 700 }}>
+          {point.label}
+          {point.partial === true && (
+            <span style={{ marginLeft: 6, fontWeight: 600, color: BRAND.accent }}>Month in progress</span>
+          )}
+        </div>
         <div>{metric.label}: {formatMetricValue(point[metric.key], metric, currency)}</div>
         <div style={{ color: BRAND.muted }}>
           {formatNumber(point.projects)} project{point.projects === 1 ? '' : 's'}
@@ -116,7 +165,7 @@ export default function PipelineTimelineChart({
       {hasData ? (
         <div style={{ width: '100%', height: CHART_HEIGHT }}>
           <ResponsiveContainer width="100%" height="100%">
-            <LineChart data={points} margin={{ top: 8, right: 12, bottom: 0, left: 0 }}>
+            <LineChart data={chartData} margin={{ top: 8, right: 12, bottom: 0, left: 0 }}>
               <CartesianGrid stroke="#EFEEEA" vertical={false} />
               <XAxis
                 dataKey="label"
@@ -139,7 +188,7 @@ export default function PipelineTimelineChart({
               <Tooltip content={renderTooltip} />
               <Line
                 type="monotone"
-                dataKey={metric.key}
+                dataKey="seriesValue"
                 name={metric.label}
                 stroke={accent}
                 strokeWidth={2}
@@ -148,6 +197,22 @@ export default function PipelineTimelineChart({
                 connectNulls={false}
                 isAnimationActive={false}
               />
+              {showsPartial && (
+                <Line
+                  type="monotone"
+                  dataKey="partialValue"
+                  name={`${metric.label} (month in progress)`}
+                  stroke={accent}
+                  strokeWidth={2}
+                  strokeDasharray="4 3"
+                  strokeOpacity={0.7}
+                  dot={renderPartialDot}
+                  activeDot={false}
+                  connectNulls={false}
+                  isAnimationActive={false}
+                  legendType="none"
+                />
+              )}
             </LineChart>
           </ResponsiveContainer>
         </div>
