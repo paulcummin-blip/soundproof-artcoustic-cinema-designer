@@ -30,6 +30,7 @@ const GATE_UI = read('src/components/proposal/wizard/ReportReadinessGate.jsx');
 const GATE_AUTHORITY = read('src/components/proposal/sourceAuthority/proposalReportReadinessGate.js');
 const VERSIONED_ENGINEERING_HOOK = read('src/components/engineering/useVersionedEngineeringAuthority.js');
 const TECHNICAL_REPORT = read('src/pages/RP22Report.jsx');
+const ROOM_DESIGNER = read('src/pages/RoomDesigner.jsx');
 
 const source = (overrides = {}) => resolveProposalSource({
   projectId: 'p1',
@@ -221,6 +222,14 @@ test('durable bass restore overlays the engineering summary and reinserts it int
 test('Technical Report cold restore is gated by the complete engineering summary, not session analysisResult', () => {
   expect(TECHNICAL_REPORT).toMatch(/renderGatePassed: !!engineeringSummary && reportAuthority\.reportComplete/);
   expect(TECHNICAL_REPORT).not.toMatch(/if \(!authorityResolving && \(!analysisResult \|\| !analysisResult\.gradedParameters\)\)/);
+});
+
+test('Compliance cold restore uses complete versioned authority without mounting the Bass UI', () => {
+  expect(ROOM_DESIGNER).toMatch(/useVersionedEngineeringAuthority\(/);
+  expect(ROOM_DESIGNER).toMatch(/restoredEngineeringAuthority\.reportComplete/);
+  expect(ROOM_DESIGNER).toMatch(/engineeringSummary=\{complianceEngineeringSummary\}/);
+  expect(ROOM_DESIGNER).toMatch(/p19SeatAuthority=\{complianceEngineeringSummary\?\.p19SeatAuthority/);
+  expect(ROOM_DESIGNER).toMatch(/: \(appDesignRating\?\.engineeringSummary \?\? null\)/);
 });
 
 test('the Versions step cannot advance without both current reports', () => {
