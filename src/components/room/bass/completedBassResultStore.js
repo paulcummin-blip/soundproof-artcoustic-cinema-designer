@@ -19,6 +19,7 @@ import { bassCacheKey, bassDbFilter, parseBassCacheKey } from "./bassCacheKey";
 import { assertNotAuthoritativeReadOnly } from "@/components/state/authoritativeReadOnlyMode";
 import { hydrateRecommendation } from "@/components/recommendationEngine/recommendationPersistence";
 import { queueBassAuthorityWrite, resetBassAuthorityWriteQueue } from "./bassAuthorityWriteQueue";
+import { readProjectAnalysisCacheRecord } from "@/components/state/projectReadCache";
 
 export {
   BASS_AUTHORITY_STATUS,
@@ -91,12 +92,12 @@ function markHydrationSettled(key) {
   }
 }
 
-function startProjectHydration(key) {
+function startProjectHydration(key, { force = false } = {}) {
   const state = ensureProjectAuthorityState(key);
   if (state.hydrationInFlight) return state.hydrationInFlight;
   state.hydrationSettled = false;
   const { projectId, versionId } = parseBassCacheKey(key);
-  state.hydrationInFlight = hydrateCompletedBassAuthority(projectId, versionId).finally(() => {
+  state.hydrationInFlight = hydrateCompletedBassAuthority(projectId, versionId, { force }).finally(() => {
     state.hydrationInFlight = null;
     markHydrationSettled(key);
   });
@@ -423,8 +424,7 @@ export function syncCachedCompactBassAuthority(projectId, versionId, compactCont
   const dbFilter = bassDbFilter(projectId, versionId);
   const queued = (writeQueues.get(key) || Promise.resolve()).then(async () => {
     try {
-      const records = await base44.entities.ProjectAnalysisCache.filter(dbFilter, '-updated_date', 1);
-      const record = Array.isArray(records) ? records[0] : null;
+      const record = await readProjectAnalysisCacheRecord(projectId, versionId);
       const existing = record ? {
         version: record.completed_cache_version,
         instanceAuthorityVersion: record.instance_authority_version,
@@ -481,8 +481,7 @@ export function syncStaleBassAuthority(projectId, versionId, currentFingerprint)
         return liveBefore || null;
       }
 
-      const records = await base44.entities.ProjectAnalysisCache.filter(dbFilter, '-updated_date', 1);
-      const record = Array.isArray(records) ? records[0] : null;
+      const record = await readProjectAnalysisCacheRecord(projectId, versionId);
       const existing = record ? {
         version: record.completed_cache_version,
         instanceAuthorityVersion: record.instance_authority_version,
@@ -546,8 +545,7 @@ export function syncPersistentBassAuthority(projectId, versionId, currentFingerp
   syncSignatures.set(key, signature);
   const dbFilter = bassDbFilter(projectId, versionId);
   const queued = (writeQueues.get(key) || Promise.resolve()).then(async () => {
-    const records = await base44.entities.ProjectAnalysisCache.filter(dbFilter, '-updated_date', 1);
-    const record = Array.isArray(records) ? records[0] : null;
+    const record = await readProjectAnalysisCacheRecord(projectId, versionId);
     const existing = record ? {
       version: record.completed_cache_version,
       instanceAuthorityVersion: record.instance_authority_version,
@@ -580,14 +578,13 @@ export function syncPersistentBassAuthority(projectId, versionId, currentFingerp
   return queued;
 }
 
-export async function hydrateCompletedBassAuthority(projectId, versionId) {
+export async function hydrateCompletedBassAuthority(projectId, versionId, { force = false } = {}) {
   const key = projectKey(projectId, versionId);
   if (key === "free::free") return setMemory(projectId, versionId, { ...emptyAuthority(projectId, versionId), status: "uncalculated", authorityStatus: BASS_AUTHORITY_STATUS.UNCALCULATED });
   const current = memoryByProject.get(key);
-  if (current?.status === "error" && current.errorMessage) return current;
+  if (!force && current?.status === "error" && current.errorMessage) return current;
   try {
-    const records = await base44.entities.ProjectAnalysisCache.filter(bassDbFilter(projectId, versionId), '-updated_date', 1);
-    const record = Array.isArray(records) ? records[0] : null;
+    const record = await readProjectAnalysisCacheRecord(projectId, versionId);
     const persisted = buildHydratedPersistedWrapper(record);
     const next = resolvePersistedBassAuthority(key, persisted);
     if (current?.authoritative && current?.contract && !next?.authoritative) {
@@ -610,6 +607,13 @@ export async function hydrateCompletedBassAuthority(projectId, versionId) {
       publicationRejectionReason: null,
     });
   }
+}
+
+export function retryCompletedBassAuthority(projectId, versionId) {
+  const key = projectKey(projectId, versionId);
+  const state = ensureProjectAuthorityState(key);
+  state.hydrationStarted = true;
+  return startProjectHydration(key, { force: true });
 }
 
 export function getCompletedBassAuthority(projectId, versionId) {
