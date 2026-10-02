@@ -67,6 +67,9 @@ function publishReadDiagnostics() {
     window.__SP_AUTHORITY_READ_DIAGNOSTICS__ = {
       readPublishedEngineering: durablePublicationReadCount,
     };
+    document.documentElement.dataset.spAuthorityReads = JSON.stringify({
+      readPublishedEngineering: durablePublicationReadCount,
+    });
   }
 }
 
