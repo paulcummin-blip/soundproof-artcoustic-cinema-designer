@@ -1,8 +1,13 @@
 /**
  * forecastTimelines.js
  * --------------------
- * The time series behind the forecast dashboard: how many forecast projects,
- * how much Artcoustic value and how many catalogue units fall in each period.
+ * The time series behind the forecast dashboard: how many forecast projects and
+ * how much Artcoustic value fall in each month.
+ *
+ * Periods are always months, so every point on the dashboard is one month of
+ * pipeline activity and the last point is the month in progress. Which ranges
+ * the loaded data can fill is decided here too, so the screen never offers a
+ * period that starts before the pipeline does.
  *
  * A project is placed by the date being measured — created or last updated —
  * because those answer different questions: what was specified, and what was
@@ -23,21 +28,16 @@ import { referenceTime, safeArray, text, timeOf } from './reportingUtils';
 import { catalogueRetailFor, catalogueUnitsFor } from './pipelineAge';
 import { tradeValueOf } from './artcousticForecast';
 
-const DAY_MS = 86400000;
 const MAX_BUCKETS = 240;
 
-/**
- * The ranges offered on the dashboard. A short range is read day by day, a
- * quarter week by week, a year and longer month by month.
- */
+/** The ranges offered on the dashboard, from half a year to the full history. */
 export const TIMELINE_RANGES = [
-  { key: 'last_30_days', label: 'Last 30 days', days: 30, months: null, unit: 'day', unitLabel: 'day' },
-  { key: 'last_90_days', label: 'Last 90 days', days: 90, months: null, unit: 'week', unitLabel: 'week' },
-  { key: 'last_12_months', label: 'Last 12 months', days: null, months: 12, unit: 'month', unitLabel: 'month' },
-  { key: 'all_time', label: 'All time', days: null, months: null, unit: 'month', unitLabel: 'month' },
+  { key: 'last_6_months', label: 'Last 6 months', months: 6, unit: 'month', unitLabel: 'month' },
+  { key: 'last_12_months', label: 'Last 12 months', months: 12, unit: 'month', unitLabel: 'month' },
+  { key: 'all_time', label: 'All time', months: null, unit: 'month', unitLabel: 'month' },
 ];
 
-export const DEFAULT_TIMELINE_RANGE = 'last_90_days';
+export const DEFAULT_TIMELINE_RANGE = 'last_12_months';
 
 /** The date a project is placed by. */
 export const TIMELINE_BASES = [
@@ -55,12 +55,6 @@ export function timelineBasisByKey(key) {
   return TIMELINE_BASES.find((basis) => basis.key === key) || TIMELINE_BASES[0];
 }
 
-const dayStart = (stamp) => {
-  const date = new Date(stamp);
-  date.setHours(0, 0, 0, 0);
-  return date.getTime();
-};
-
 const monthStart = (stamp) => {
   const date = new Date(stamp);
   date.setDate(1);
@@ -74,27 +68,13 @@ const addMonths = (stamp, count) => {
   return date.getTime();
 };
 
-const shortDate = (stamp) => new Date(stamp).toLocaleDateString('en-GB', { day: '2-digit', month: 'short' });
 const shortMonth = (stamp) => new Date(stamp).toLocaleDateString('en-GB', { month: 'short', year: '2-digit' });
 
-function dailyBuckets(reference, days) {
-  const end = dayStart(reference) + DAY_MS;
-  const start = end - days * DAY_MS;
-  return Array.from({ length: days }, (_, index) => {
-    const from = start + index * DAY_MS;
-    return { key: `day_${index}`, label: shortDate(from), start: from, end: from + DAY_MS };
-  });
-}
-
-function weeklyBuckets(reference, days) {
-  const end = dayStart(reference) + DAY_MS;
-  const count = Math.max(1, Math.ceil(days / 7));
-  const start = end - count * 7 * DAY_MS;
-  return Array.from({ length: count }, (_, index) => {
-    const from = start + index * 7 * DAY_MS;
-    return { key: `week_${index}`, label: shortDate(from), start: from, end: from + 7 * DAY_MS };
-  });
-}
+/** Whole months between two month starts. */
+export const monthSpan = (from, to) => (
+  (new Date(to).getFullYear() - new Date(from).getFullYear()) * 12
+  + (new Date(to).getMonth() - new Date(from).getMonth())
+);
 
 function monthlyBuckets(fromMonthStart, toMonthStart) {
   const buckets = [];
@@ -113,20 +93,42 @@ function allTimeBuckets(reference, earliestStamp) {
   if (earliestStamp === null) return monthlyBuckets(addMonths(toMonth, -11), toMonth);
 
   const earliestMonth = monthStart(earliestStamp);
-  const span = (toMonth - earliestMonth) === 0
-    ? 1
-    : Math.round((new Date(toMonth).getFullYear() - new Date(earliestMonth).getFullYear()) * 12
-      + (new Date(toMonth).getMonth() - new Date(earliestMonth).getMonth())) + 1;
+  const span = monthSpan(earliestMonth, toMonth) + 1;
 
   const fromMonth = span > MAX_BUCKETS ? addMonths(toMonth, -(MAX_BUCKETS - 1)) : earliestMonth;
   return monthlyBuckets(fromMonth, toMonth);
 }
 
 function bucketsFor(range, reference, earliestStamp) {
-  if (range.unit === 'day') return dailyBuckets(reference, range.days);
-  if (range.unit === 'week') return weeklyBuckets(reference, range.days);
   if (range.months) return monthlyBuckets(addMonths(monthStart(reference), -(range.months - 1)), monthStart(reference));
   return allTimeBuckets(reference, earliestStamp);
+}
+
+/**
+ * Which ranges the loaded data can actually fill, so the dashboard never offers
+ * a period that starts before the pipeline does: half a year of points needs six
+ * months of history, a year of points needs twelve. The full history is always
+ * available, because it starts wherever the data starts.
+ */
+export function availableTimelineRanges(families = [], { basis = DEFAULT_TIMELINE_BASIS, now = null } = {}) {
+  const basisDef = timelineBasisByKey(basis);
+  const reference = referenceTime(now);
+  const earliest = safeArray(families)
+    .filter((family) => family?.forecastIncluded !== false)
+    .map((family) => {
+      const raw = text(family?.[basisDef.field]);
+      return raw ? timeOf(raw) : null;
+    })
+    .filter((stamp) => stamp !== null)
+    .reduce((min, stamp) => Math.min(min, stamp), Infinity);
+
+  const monthsCovered = earliest === Infinity
+    ? 1
+    : monthSpan(monthStart(earliest), monthStart(reference)) + 1;
+
+  return TIMELINE_RANGES
+    .filter((range) => range.months === null || range.months <= monthsCovered)
+    .map((range) => range.key);
 }
 
 /**

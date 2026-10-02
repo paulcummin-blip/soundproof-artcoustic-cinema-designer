@@ -1,18 +1,16 @@
 // PipelineAgeBars.jsx
 // -------------------
 // Pipeline ageing as bars rather than a table: one row per age bucket, with how
-// many forecast projects sit in it and the Artcoustic retail behind them.
+// many forecast projects sit in it and the trade value behind them.
 //
 // Project count and value are measured on their own scales, so each has its own
 // bar: a long count bar next to a short value bar means many small projects.
 //
-// Presentation only. Clicking a bucket narrows the Projects table to it.
-//
-// The helper note from the age authority is deliberately not shown: this is a
-// dashboard to read, not a set of instructions.
+// Presentation only. Clicking a bucket narrows the Projects table to it. No
+// total row and no helper copy: the dashboard is read, not explained.
 
 import React from 'react';
-import { BRAND, Card, Pill } from '../IntelligenceUi';
+import { BRAND, Card } from '../IntelligenceUi';
 import { formatMoney, formatNumber } from '@/lib/commercial/projectReporting/formatMoney';
 
 const TRACK = { background: '#F1F0EC', borderRadius: 6, height: 12, overflow: 'hidden' };
@@ -53,14 +51,12 @@ export default function PipelineAgeBars({
   if (!pipelineAge) return null;
 
   const buckets = pipelineAge.buckets || [];
-  const totals = pipelineAge.totals || {};
   const maxCount = buckets.reduce((max, bucket) => Math.max(max, bucket.count || 0), 0);
-  const maxRetail = buckets.reduce((max, bucket) => Math.max(max, bucket.retail || 0), 0);
+  const maxTrade = buckets.reduce((max, bucket) => Math.max(max, bucket.trade || 0), 0);
 
   return (
     <Card
       title="Pipeline age distribution"
-      subtitle={`${formatNumber(totals.count || 0)} forecast projects. ${pipelineAge.basisNote}`}
       actions={activeBucket ? (
         <button
           type="button"
@@ -105,7 +101,7 @@ export default function PipelineAgeBars({
               <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, alignItems: 'baseline' }}>
                 <span style={{ fontSize: 13, fontWeight: 700, color: BRAND.text }}>{bucket.label}</span>
                 <span style={{ fontSize: 11, color: BRAND.muted }}>
-                  {percent(bucket.shareOfCount)} of projects · {percent(bucket.shareOfRetail)} of retail value
+                  {percent(bucket.shareOfCount)} of projects
                 </span>
               </div>
               <Bar
@@ -117,36 +113,16 @@ export default function PipelineAgeBars({
                 format="number"
               />
               <Bar
-                label="Retail"
-                value={bucket.retail}
-                max={maxRetail}
+                label="Trade"
+                value={bucket.trade}
+                max={maxTrade}
                 colour={BRAND.accent}
                 currency={currency}
                 format="money"
               />
-              {active && <Pill tone="good">Filtering the Projects table</Pill>}
             </button>
           );
         })}
-
-        <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'center', fontSize: 12, color: BRAND.muted }}>
-          <span style={{ fontWeight: 700, color: BRAND.text }}>All forecast projects</span>
-          <span>{formatNumber(totals.count || 0)} projects</span>
-          <span>{money(totals.retail, currency)} retail ex VAT</span>
-          <span>{money(totals.trade, currency)} trade</span>
-          <span>{formatNumber(totals.units || 0)} catalogue units</span>
-          {totals.noValueCount > 0 && (
-            <span>{formatNumber(totals.noValueCount)} with no Artcoustic value</span>
-          )}
-          {totals.missingAgeCount > 0 && (
-            <span>{formatNumber(totals.missingAgeCount)} with no created or updated date</span>
-          )}
-        </div>
-
-        <div style={{ fontSize: 12, color: BRAND.muted }}>
-          Artcoustic retail ex VAT, trade value and catalogue units come from each project's counted version,
-          catalogue products only. Click a bucket to show only those projects in the Projects table.
-        </div>
       </div>
     </Card>
   );

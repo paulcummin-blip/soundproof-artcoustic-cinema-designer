@@ -1,8 +1,8 @@
 // PipelineCompositionChart.jsx
 // ----------------------------
 // The forecast split across the dealer groups: columns for the chosen measure,
-// with every group's project count, retail and trade shown underneath so the
-// count and the value can be read together.
+// with every group's project count, trade value and units shown underneath so
+// the count and the value can be read together.
 //
 // Presentation only. The groups come from the pipelineComposition authority.
 
@@ -32,7 +32,6 @@ export const GROUP_COLOURS = {
 
 export const COMPOSITION_METRICS = [
   { key: 'count', label: 'Projects', format: 'number' },
-  { key: 'retail', label: 'Artcoustic retail', format: 'money' },
   { key: 'trade', label: 'Trade value', format: 'money' },
 ];
 
@@ -73,7 +72,6 @@ export default function PipelineCompositionChart({ composition, currency = 'GBP'
   if (!composition || !metric) return null;
 
   const rows = composition.rows || [];
-  const totals = composition.totals || {};
   const hasData = rows.some((row) => row[metric.key] !== null && row[metric.key] !== undefined);
 
   const renderTooltip = ({ active, payload }) => {
@@ -92,7 +90,7 @@ export default function PipelineCompositionChart({ composition, currency = 'GBP'
         <div style={{ fontWeight: 700 }}>{row.label}</div>
         <div>{metric.label}: {formatMetricValue(row[metric.key], metric, currency)}</div>
         <div style={{ color: BRAND.muted }}>
-          {formatNumber(row.count)} project{row.count === 1 ? '' : 's'} · {money(row.retail, currency)} retail
+          {formatNumber(row.count)} project{row.count === 1 ? '' : 's'} · {money(row.trade, currency)} trade
         </div>
       </div>
     );
@@ -101,7 +99,6 @@ export default function PipelineCompositionChart({ composition, currency = 'GBP'
   return (
     <Card
       title="Pipeline composition"
-      subtitle={`Forecast split by the account's own dealer group: ${formatNumber(totals.count || 0)} projects in scope.`}
       actions={<MetricToggle metric={metric} onChange={onMetricChange} />}
     >
       <div style={{ display: 'grid', gap: 14 }}>
@@ -136,10 +133,7 @@ export default function PipelineCompositionChart({ composition, currency = 'GBP'
             </ResponsiveContainer>
           </div>
         ) : (
-          <EmptyState
-            message="No Artcoustic value in this scope."
-            hint="Include more projects or product categories to give the split a value."
-          />
+          <EmptyState message="No forecast projects in this scope." />
         )}
 
         <div style={{ display: 'grid', gap: 8, gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))' }}>
@@ -161,7 +155,6 @@ export default function PipelineCompositionChart({ composition, currency = 'GBP'
                 {formatNumber(row.count)}
                 <span style={{ fontSize: 12, fontWeight: 600, color: BRAND.muted, marginLeft: 6 }}>projects</span>
               </div>
-              <div style={{ fontSize: 12, color: BRAND.subtext }}>{money(row.retail, currency)} retail ex VAT</div>
               <div style={{ fontSize: 12, color: BRAND.subtext }}>{money(row.trade, currency)} trade</div>
               <div style={{ fontSize: 12, color: BRAND.muted }}>
                 {formatNumber(row.units)} catalogue units · {row.shareOfCount === null
@@ -172,10 +165,6 @@ export default function PipelineCompositionChart({ composition, currency = 'GBP'
           ))}
         </div>
 
-        <div style={{ fontSize: 12, color: BRAND.muted }}>
-          A project is counted in the group of the account that owns it, from that account's own dealer group.
-          Accounts with no group are counted as Trade.
-        </div>
       </div>
     </Card>
   );
