@@ -23,6 +23,7 @@ const pairKey = (projectId, versionId) => `${normalise(projectId)}::${normalise(
 function publishCounters() {
   if (typeof window !== "undefined") {
     window.__SP_SHARED_READ_DIAGNOSTICS__ = { ...counters };
+    document.documentElement.dataset.spSharedReads = JSON.stringify(counters);
   }
 }
 
