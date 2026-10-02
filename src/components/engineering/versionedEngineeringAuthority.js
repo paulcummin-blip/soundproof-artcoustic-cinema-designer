@@ -168,7 +168,8 @@ export function classifyAuthorityState({ durable, localSnapshot }) {
  * first, so an empty browser store can never manufacture "not calculated".
  */
 /**
- * Whether a summary states the published bass room results (P14 / P18 / P19).
+ * Whether a summary states the complete published bass authority: room/RSP
+ * results P14/P18/P19 plus at least one genuinely scored P20 seat row.
  *
  * A summary assembled while the completed bass authority was still settling
  * carries the RP22 parameters but no bass. That partial summary must never be
