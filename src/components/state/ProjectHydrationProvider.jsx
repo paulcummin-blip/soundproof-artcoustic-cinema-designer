@@ -12,6 +12,7 @@
 
 import React, { useEffect } from "react";
 import { base44 } from "@/api/base44Client";
+import { readProjectRecord } from "@/components/state/projectReadCache";
 import { useActiveProjectId } from "@/components/state/project-session";
 import {
   beginProjectHydration,
@@ -35,9 +36,8 @@ export default function ProjectHydrationProvider({ children }) {
 
     (async () => {
       try {
-        const results = await base44.entities.Project.filter({ id: activeProjectId });
+        const project = await readProjectRecord(activeProjectId);
         if (cancelled) return;
-        const project = Array.isArray(results) && results.length > 0 ? results[0] : null;
         if (!project) {
           markIdentityMissing(activeProjectId);
           return;
