@@ -1001,7 +1001,7 @@ function RP22ReportInner() {
                         <p className="text-[#3E4349] mb-6">{readFailureMessage}</p>
                         <div className="flex justify-center gap-3">
                             <button type="button" className="px-5 py-2.5 text-sm text-white rounded-md" style={{ backgroundColor: '#213428' }} onClick={reportAuthority.retry}>Retry</button>
-                            <button type="button" className="px-5 py-2.5 text-sm rounded-md border border-[#213428] text-[#213428]" onClick={() => navigate(\`/RoomDesigner?projectId=\${explicitProjectId}\`)}>Back to Room Designer</button>
+                            <button type="button" className="px-5 py-2.5 text-sm rounded-md border border-[#213428] text-[#213428]" onClick={() => navigate('/RoomDesigner?projectId=' + encodeURIComponent(explicitProjectId || ''))}>Back to Room Designer</button>
                         </div>
                     </CardContent>
                 </Card>
