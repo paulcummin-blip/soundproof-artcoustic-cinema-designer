@@ -25,7 +25,6 @@ import ProjectOpeningResolver from "@/components/state/ProjectOpeningResolver";
 import ProjectOpeningWarnings from "@/components/state/ProjectOpeningWarnings";
 import {
   dismissProjectOpeningWarnings,
-  openingEntrySurfaceForPath,
   PROJECT_OPENING_STILL_RESTORING_TITLE,
   retryProjectOpening,
   useProjectOpening,
@@ -107,11 +106,6 @@ export default function ProjectGate({ children, requiresDesign = true }) {
     opening.checklist,
   ]);
 
-  // Opening straight into a report or proposal route makes that surface's source
-  // data a required stage for the open — the designer is arriving to read it.
-  const entrySurface = openingEntrySurfaceForPath(
-    typeof window !== "undefined" ? window.location.pathname : "",
-  );
 
   if (hydration.status === "none") {
     return (
@@ -215,7 +209,7 @@ export default function ProjectGate({ children, requiresDesign = true }) {
   return (
     <>
       <ProjectDesignHydrator projectId={hydration.projectId} />
-      <ProjectOpeningResolver projectId={hydration.projectId} entrySurface={entrySurface} />
+      <ProjectOpeningResolver projectId={hydration.projectId} />
       <ProjectLoadingShell
         projectName={projectName}
         projectClientName={projectClientName}
