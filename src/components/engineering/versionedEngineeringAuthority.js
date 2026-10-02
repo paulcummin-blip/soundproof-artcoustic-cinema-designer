@@ -59,8 +59,8 @@ export function isAuthorityAvailable(state) {
 const durablePublicationReads = new Map();
 let durablePublicationReadCount = 0;
 
-const publicationReadKey = (projectId, versionId) =>
-  `${String(projectId || '')}::${String(versionId || '')}`;
+const publicationReadKey = (projectId, versionId, engineeringFingerprint = null) =>
+  `${String(projectId || '')}::${String(versionId || '')}::${String(engineeringFingerprint || 'current')}`;
 
 function publishReadDiagnostics() {
   if (typeof window !== 'undefined') {
@@ -76,7 +76,11 @@ function publishReadDiagnostics() {
  * explicit read_failed result, so React remounts cannot create a retry storm or
  * mislabel a platform/network failure as "not calculated".
  */
-export function fetchDurablePublication(projectId, versionId, { force = false } = {}) {
+export function fetchDurablePublication(
+  projectId,
+  versionId,
+  { force = false, engineeringFingerprint = null } = {},
+) {
   if (!projectId || !versionId) {
     return Promise.resolve({
       publication: null,
@@ -87,7 +91,7 @@ export function fetchDurablePublication(projectId, versionId, { force = false } 
     });
   }
 
-  const key = publicationReadKey(projectId, versionId);
+  const key = publicationReadKey(projectId, versionId, engineeringFingerprint);
   if (force) durablePublicationReads.delete(key);
   const existing = durablePublicationReads.get(key);
   if (existing) return existing;
@@ -99,6 +103,7 @@ export function fetchDurablePublication(projectId, versionId, { force = false } 
       const response = await base44.functions.invoke('readPublishedEngineering', {
         project_id: projectId,
         version_id: versionId,
+        ...(engineeringFingerprint ? { engineering_fingerprint: engineeringFingerprint } : {}),
       });
       const data = response?.data || response || null;
       if (!data || data.error) {
