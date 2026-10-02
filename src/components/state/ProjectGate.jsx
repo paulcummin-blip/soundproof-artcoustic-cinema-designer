@@ -21,7 +21,15 @@ import {
 import ProjectLoadingShell from "@/components/state/ProjectLoadingShell";
 import ProjectDesignHydrator from "@/components/state/ProjectDesignHydrator";
 import ProjectOpeningResolver from "@/components/state/ProjectOpeningResolver";
-import { useProjectOpening } from "@/components/state/projectOpeningAuthority";
+import ProjectOpeningWarnings from "@/components/state/ProjectOpeningWarnings";
+import {
+  continueProjectOpeningWithWarning,
+  dismissProjectOpeningWarnings,
+  openingEntrySurfaceForPath,
+  PROJECT_OPENING_STILL_RESTORING_TITLE,
+  retryProjectOpening,
+  useProjectOpening,
+} from "@/components/state/projectOpeningAuthority";
 
 const FONT_BODY = "'Didact Gothic', 'Century Gothic', sans-serif";
 
@@ -65,9 +73,17 @@ export default function ProjectGate({ children, requiresDesign = true }) {
   const projectClientName = hydration.identity?.clientName || null;
   const projectReference = hydration.identity?.projectReference || null;
   // The opening panel is held by the project opening authority: it stays until
-  // the saved design is restored AND the main project authorities are ready or
-  // known to be unavailable. "The record has loaded" is not enough.
+  // every restore stage has a definite outcome — ready, not generated yet, not
+  // applicable, out of date, or failed with a warning. "The record has loaded" is
+  // not enough, and neither is "the wait ran long": a stage that is still
+  // restoring keeps the panel open.
   const opening = useProjectOpening(hydration.projectId || null);
+
+  // Opening straight into a report or proposal route makes that surface's source
+  // data a required stage for the open — the designer is arriving to read it.
+  const entrySurface = openingEntrySurfaceForPath(
+    typeof window !== "undefined" ? window.location.pathname : "",
+  );
 
   if (hydration.status === "none") {
     return (
@@ -150,7 +166,18 @@ export default function ProjectGate({ children, requiresDesign = true }) {
   // shell even after the hydrator reported the project loaded, and no design page
   // could ever mount; without the second it opened half-restored.
   if (hydration.status === "loaded" && !opening.holding) {
-    return children;
+    // The project is open. A stage that failed, went out of date, or never
+    // confirmed is reported here rather than swallowed: the project is usable,
+    // and the designer can see exactly which step did not resolve cleanly.
+    return (
+      <>
+        <ProjectOpeningWarnings
+          warnings={opening.warnings}
+          onDismiss={() => dismissProjectOpeningWarnings(hydration.projectId)}
+        />
+        {children}
+      </>
+    );
   }
 
   // Only a project that is still loading (or whose identity is not yet known)
@@ -160,12 +187,18 @@ export default function ProjectGate({ children, requiresDesign = true }) {
   return (
     <>
       <ProjectDesignHydrator projectId={hydration.projectId} />
-      <ProjectOpeningResolver projectId={hydration.projectId} />
+      <ProjectOpeningResolver projectId={hydration.projectId} entrySurface={entrySurface} />
       <ProjectLoadingShell
         projectName={projectName}
         projectClientName={projectClientName}
         projectReference={projectReference}
         lines={opening.lines}
+        phase={opening.phase}
+        stillRestoringTitle={PROJECT_OPENING_STILL_RESTORING_TITLE}
+        stillRestoringLabels={opening.pendingLabels}
+        canContinueWithWarning={opening.canContinueWithWarning}
+        onRetry={() => retryProjectOpening()}
+        onContinueWithWarning={() => continueProjectOpeningWithWarning()}
       />
     </>
   );

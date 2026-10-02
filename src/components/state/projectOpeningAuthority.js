@@ -8,8 +8,12 @@
 // answer, so the panel can neither close early (half-restored state on screen)
 // nor hang (an unknown state shown as if it were the truth).
 //
-// Every checkpoint ends in a definite state: ready, or unavailable with a
-// reason. There is no third outcome and no silent fallthrough.
+// Every stage ends in a definite outcome — ready, not generated yet, not
+// applicable, out of date, or failed with a reason. "Still restoring" is NOT a
+// completed stage, so a stage that never confirms keeps the panel open; it is
+// never silently resolved into a finished project. When the wait runs long the
+// panel says so and offers Retry, and it will only continue on an explicit,
+// warned decision — and never past a critical stage.
 //
 // Read-only: nothing here calculates, recalculates, generates a report, starts a
 // worker or writes to the database. It only records what other authorities
@@ -17,60 +21,57 @@
 
 import { useMemo, useSyncExternalStore } from "react";
 
-export const OPENING_CHECKPOINT_STATE = Object.freeze({
-  /** Still resolving — the panel holds. */
-  PENDING: "pending",
-  /** Resolved and usable. */
-  READY: "ready",
-  /** Resolved as not usable, with a reason (missing, stale, not generated…). */
-  UNAVAILABLE: "unavailable",
-});
+import {
+  OPENING_CHECKPOINT_OUTCOME,
+  OPENING_CHECKPOINT_STATE,
+  criticalOpeningCheckpointKeys,
+  normaliseId,
+  normaliseOutcome,
+} from "./projectOpeningStages.js";
+import {
+  PROJECT_OPENING_CHECKPOINT_KEYS,
+  deriveOpeningReadinessFor,
+  pendingOpeningCheckpointKeys,
+} from "./projectOpeningReadiness.js";
 
-/**
- * The progress lines the opening panel shows, in order. Deliberately short: the
- * panel is reassurance, not a status console.
- */
-export const PROJECT_OPENING_LINES = Object.freeze([
-  { key: "roomSeating", label: "Room and seating" },
-  { key: "speakerLayout", label: "Speaker layout" },
-  { key: "rp22", label: "RP22 / RP23 results" },
-  { key: "bass", label: "Bass performance" },
-  { key: "bassTargetBank", label: "Bass target bank" },
-  { key: "visualReport", label: "Visual Report" },
-  { key: "technicalReport", label: "Technical Report" },
-  { key: "proposalSource", label: "Proposal source data" },
-  { key: "pricing", label: "Pricing" },
-]);
-
-/**
- * Checkpoints that gate closure but are not drawn as progress lines — project
- * metadata, the active version, seat priorities and the autosave baseline are
- * preconditions for a coherent project, not steps the designer needs to watch.
- */
-const INTERNAL_CHECKPOINT_KEYS = Object.freeze([
-  "metadata",
-  "activeVersion",
-  "seatPriorities",
-  "autosaveBaseline",
-]);
-
-export const PROJECT_OPENING_CHECKPOINT_KEYS = Object.freeze([
-  ...INTERNAL_CHECKPOINT_KEYS,
-  ...PROJECT_OPENING_LINES.map((line) => line.key),
-]);
+// Re-exported so the panel, the resolver and the tests keep one import site for
+// the whole opening contract.
+export {
+  OPENING_CHECKPOINT_OUTCOME,
+  OPENING_CHECKPOINT_STATE,
+  OPENING_ENTRY_SURFACE,
+  OPENING_OUTCOME_LABEL,
+  OPENING_PHASE,
+  OUTCOME_VALUES,
+  WARNING_OUTCOMES,
+  criticalOpeningCheckpointKeys,
+  openingCheckpointStage,
+  openingEntrySurfaceForPath,
+} from "./projectOpeningStages.js";
+export {
+  PROJECT_OPENING_CHECKPOINT_KEYS,
+  PROJECT_OPENING_LINES,
+  openingCheckpointWarnings,
+  openingProgressLines,
+  pendingOpeningCheckpointKeys,
+} from "./projectOpeningReadiness.js";
 
 /** The panel never flashes: it stays for at least this long. */
 export const PROJECT_OPENING_MIN_VISIBLE_MS = 900;
 
 /**
- * A dependency that will not confirm within this window is reported as not
- * confirmed and the project opens anyway. An unknown state must never hold the
- * project hostage.
+ * A dependency that will not confirm within this window stops being waited on
+ * silently: the panel says it is still restoring and offers Retry. It never
+ * opens the project by itself — an unresolved stage is not a completed stage.
+ * A still-unresolved critical stage cannot be continued past at all.
  */
 export const PROJECT_OPENING_TIMEOUT_MS = 8000;
 
+/** The panel notice shown while a required stage has not confirmed in time. */
+export const PROJECT_OPENING_STILL_RESTORING_TITLE = "Still restoring saved project data";
+
 const TIMEOUT_DETAIL =
-  "Not confirmed in time — the project opened with this step still resolving.";
+  "Not confirmed in time — this step was still restoring when the project was opened.";
 
 const emptySnapshot = () => ({
   projectId: null,
@@ -81,6 +82,11 @@ const emptySnapshot = () => ({
   minVisibleElapsed: false,
   closed: false,
   timedOut: false,
+  /** Route-specific gating: the surface the designer opened straight into. */
+  entrySurface: null,
+  /** How many times the reads have been re-run (Retry). */
+  attempt: 0,
+  warningsDismissed: false,
   checkpoints: {},
 });
 
@@ -95,15 +101,6 @@ let timeoutTimer = null;
  */
 const satisfiedProjects = new Set();
 
-const normaliseId = (value) => (value == null || value === "" ? null : String(value));
-
-const isPending = (entry) =>
-  (entry?.state ?? OPENING_CHECKPOINT_STATE.PENDING) === OPENING_CHECKPOINT_STATE.PENDING;
-
-function pendingKeys(snapshot) {
-  return PROJECT_OPENING_CHECKPOINT_KEYS.filter((key) => isPending(snapshot.checkpoints?.[key]));
-}
-
 function notify() {
   listeners.forEach((listener) => listener());
 }
@@ -117,6 +114,23 @@ function clearTimers() {
     clearTimeout(timeoutTimer);
     timeoutTimer = null;
   }
+}
+
+/**
+ * Arm the "this is taking a long time" notice. It never resolves a stage and
+ * never closes the panel — it only tells the designer the truth, so a slow
+ * read can no longer look like a finished one.
+ */
+function scheduleOpeningTimeout(timeoutMs) {
+  if (timeoutTimer != null) {
+    clearTimeout(timeoutTimer);
+    timeoutTimer = null;
+  }
+  if (!(timeoutMs > 0)) return;
+  timeoutTimer = setTimeout(() => {
+    timeoutTimer = null;
+    markProjectOpeningTimedOut();
+  }, timeoutMs);
 }
 
 function markSatisfied(projectId) {
@@ -170,6 +184,7 @@ export function beginProjectOpening(projectId, options = {}) {
   if (satisfiedProjects.has(pid)) return;
 
   const versionId = normaliseId(options.versionId);
+  const entrySurface = options.entrySurface || null;
   const minVisibleMs = Number.isFinite(Number(options.minVisibleMs))
     ? Math.max(0, Number(options.minVisibleMs))
     : PROJECT_OPENING_MIN_VISIBLE_MS;
@@ -178,7 +193,12 @@ export function beginProjectOpening(projectId, options = {}) {
     : PROJECT_OPENING_TIMEOUT_MS;
 
   if (state.projectId === pid && !state.closed) {
-    if (versionId !== state.versionId) state = { ...state, versionId };
+    // Late-arriving routing detail (the entry surface) is folded into the
+    // opening already under way — it never restarts one.
+    if (versionId !== state.versionId || (entrySurface && entrySurface !== state.entrySurface)) {
+      state = { ...state, versionId, entrySurface: entrySurface || state.entrySurface };
+      notify();
+    }
     return;
   }
 
@@ -187,6 +207,7 @@ export function beginProjectOpening(projectId, options = {}) {
     ...emptySnapshot(),
     projectId: pid,
     versionId,
+    entrySurface,
     startedAt: Date.now(),
     minVisibleMs,
     timeoutMs,
@@ -202,12 +223,7 @@ export function beginProjectOpening(projectId, options = {}) {
       markOpeningMinVisibleElapsed();
     }, minVisibleMs);
   }
-  if (timeoutMs > 0) {
-    timeoutTimer = setTimeout(() => {
-      timeoutTimer = null;
-      expirePendingOpeningCheckpoints();
-    }, timeoutMs);
-  }
+  scheduleOpeningTimeout(timeoutMs);
 }
 
 /** The panel's minimum visible time has passed. */
@@ -219,29 +235,80 @@ export function markOpeningMinVisibleElapsed() {
 }
 
 /**
- * A dependency did not confirm within the opening timeout. Every still-pending
- * checkpoint becomes a definite "not confirmed" state, so the project always
- * opens with a known state rather than hanging on an unknown one.
+ * A stage did not confirm within the opening timeout.
+ *
+ * This deliberately does NOT resolve anything and does NOT open the project:
+ * the still-restoring stage keeps gating, and the panel tells the designer it is
+ * still restoring while offering Retry. Opening here is what used to show a
+ * project whose bass authority and report sources had not been restored.
  */
-export function expirePendingOpeningCheckpoints() {
-  if (!state.projectId) return;
-  const pending = pendingKeys(state);
+export function markProjectOpeningTimedOut() {
+  if (!state.projectId || state.closed || state.timedOut) return;
+  state = { ...state, timedOut: true };
+  notify();
+}
+
+/**
+ * Re-run the opening reads after a stage failed to confirm. Every stage returns
+ * to "restoring" (a resolved stage is re-read rather than trusted), the timeout
+ * notice is cleared and re-armed, and the panel stays open.
+ */
+export function retryProjectOpening(options = {}) {
+  if (!state.projectId || state.closed) return;
+  const timeoutMs = Number.isFinite(Number(options.timeoutMs))
+    ? Math.max(0, Number(options.timeoutMs))
+    : state.timeoutMs;
+
+  clearTimers();
+  state = {
+    ...state,
+    checkpoints: {},
+    timedOut: false,
+    attempt: (Number(state.attempt) || 0) + 1,
+    startedAt: Date.now(),
+    timeoutMs,
+    // The panel has already been read once, so a retry that resolves quickly may
+    // close immediately rather than waiting out the minimum again.
+    minVisibleElapsed: true,
+  };
+  notify();
+  scheduleOpeningTimeout(timeoutMs);
+}
+
+/**
+ * Open the project while a stage is still restoring — the explicit, warned
+ * path offered on the panel once the wait has run long.
+ *
+ * Refused while any CRITICAL stage is still restoring: a project is never
+ * released without its design, saved calculation authority or bass performance.
+ * It is allowed only when the unresolved stages are supporting ones (report
+ * sources, the target bank, pricing), which then appear as visible warnings.
+ *
+ * @returns {boolean} whether the project was opened
+ */
+export function continueProjectOpeningWithWarning() {
+  if (!state.projectId || state.closed) return false;
+
+  const pending = pendingOpeningCheckpointKeys(state);
+  if (pending.length === 0) return false;
+  if (pending.some((key) => criticalOpeningCheckpointKeys(state.entrySurface).includes(key))) {
+    return false;
+  }
+
   const checkpoints = { ...state.checkpoints };
   pending.forEach((key) => {
     checkpoints[key] = {
       state: OPENING_CHECKPOINT_STATE.UNAVAILABLE,
+      outcome: OPENING_CHECKPOINT_OUTCOME.FAILED,
       detail: TIMEOUT_DETAIL,
       timedOut: true,
     };
   });
-  state = {
-    ...state,
-    checkpoints,
-    timedOut: pending.length > 0 || state.timedOut,
-    closed: true,
-  };
-  markSatisfied(state.projectId);
+
+  state = { ...state, checkpoints, timedOut: true };
+  closeIfResolved();
   notify();
+  return state.closed === true;
 }
 
 export function resolveProjectOpeningCheckpoint(key, resolved) {
@@ -253,7 +320,11 @@ export function resolveProjectOpeningCheckpoint(key, resolved) {
  * ignored, and an unchanged value does not notify (this runs during a project
  * open, so it must stay quiet unless something genuinely moved).
  *
- * @param {Record<string, {state: string, detail?: string|null}>} entries
+ * Each entry may state `outcome` (how a completed stage finished) and
+ * `timedOut`. An entry that states neither is normalised from its state, so a
+ * caller can never leave a stage in an unreadable limbo.
+ *
+ * @param {Record<string, {state: string, outcome?: string, detail?: string|null, timedOut?: boolean}>} entries
  */
 export function resolveProjectOpeningCheckpoints(entries) {
   if (!entries || !state.projectId) return;
@@ -263,17 +334,27 @@ export function resolveProjectOpeningCheckpoints(entries) {
 
   Object.entries(entries).forEach(([key, value]) => {
     if (!value || !PROJECT_OPENING_CHECKPOINT_KEYS.includes(key)) return;
+    const nextState = value.state === OPENING_CHECKPOINT_STATE.READY
+      ? OPENING_CHECKPOINT_STATE.READY
+      : value.state === OPENING_CHECKPOINT_STATE.PENDING
+        ? OPENING_CHECKPOINT_STATE.PENDING
+        : OPENING_CHECKPOINT_STATE.UNAVAILABLE;
     const next = {
-      state: value.state === OPENING_CHECKPOINT_STATE.READY
-        ? OPENING_CHECKPOINT_STATE.READY
-        : value.state === OPENING_CHECKPOINT_STATE.PENDING
-          ? OPENING_CHECKPOINT_STATE.PENDING
-          : OPENING_CHECKPOINT_STATE.UNAVAILABLE,
+      state: nextState,
+      outcome: nextState === OPENING_CHECKPOINT_STATE.PENDING
+        ? null
+        : normaliseOutcome(value.outcome, nextState),
       detail: value.detail || null,
       ...(value.timedOut ? { timedOut: true } : {}),
     };
     const previous = checkpoints[key];
-    if (previous && previous.state === next.state && previous.detail === next.detail) return;
+    if (
+      previous
+      && previous.state === next.state
+      && previous.outcome === next.outcome
+      && previous.detail === next.detail
+      && (previous.timedOut === true) === (next.timedOut === true)
+    ) return;
     checkpoints[key] = next;
     changed = true;
   });
@@ -291,66 +372,38 @@ export function resolveProjectOpeningCheckpoints(entries) {
 function closeIfResolved() {
   if (state.closed || !state.projectId) return;
   if (!state.minVisibleElapsed) return;
-  if (pendingKeys(state).length > 0) return;
+  if (pendingOpeningCheckpointKeys(state).length > 0) return;
   state = { ...state, closed: true };
   markSatisfied(state.projectId);
 }
 
-/** The nine progress lines, with the current state of each. */
-export function openingProgressLines(snapshot, projectId) {
+/**
+ * The designer has seen the warnings this project opened with. The warnings stay
+ * recorded (they are still the truth); only the strip is dismissed.
+ */
+export function dismissProjectOpeningWarnings(projectId) {
   const pid = normaliseId(projectId);
-  const active = normaliseId(snapshot?.projectId) === pid ? (snapshot?.checkpoints || {}) : {};
-  return PROJECT_OPENING_LINES.map((line) => ({
-    key: line.key,
-    label: line.label,
-    state: active[line.key]?.state || OPENING_CHECKPOINT_STATE.PENDING,
-    detail: active[line.key]?.detail || null,
-  }));
+  if (!pid || normaliseId(state.projectId) !== pid || state.warningsDismissed) return;
+  state = { ...state, warningsDismissed: true };
+  notify();
 }
 
 /**
- * The one decision the opening panel needs.
+ * The one decision the opening panel needs — see projectOpeningReadiness.js for
+ * the derivation itself. This wrapper supplies the session-scoped knowledge
+ * (which projects have already opened in this browser) and keeps the signature
+ * every consumer uses.
  *
- * @returns {{holding: boolean, begun: boolean, pending: string[], closed: boolean,
- *            timedOut: boolean, minVisibleElapsed: boolean, lines: Array}}
+ * Phases: 'restoring' while any stage is still resolving, 'still-restoring' once
+ * the wait has run long, 'ready' when the project may be shown. The project
+ * opens only when every stage has a definite outcome — or when the designer
+ * explicitly continues past supporting stages that are still restoring.
  */
 export function deriveOpeningReadiness(snapshot, projectId) {
   const pid = normaliseId(projectId);
-  const lines = openingProgressLines(snapshot, pid);
-
-  if (!pid) {
-    return { holding: false, begun: false, pending: [], closed: true, timedOut: false, minVisibleElapsed: true, lines };
-  }
-
-  // Opened earlier in this session: never show the panel again.
-  if (satisfiedProjects.has(pid)) {
-    return { holding: false, begun: false, pending: [], closed: true, timedOut: false, minVisibleElapsed: true, lines };
-  }
-
-  // A project is selected but its opening has not begun yet. Hold, so not even
-  // one frame of the previous or partially-restored state can appear.
-  if (normaliseId(snapshot?.projectId) !== pid) {
-    return {
-      holding: true,
-      begun: false,
-      pending: [...PROJECT_OPENING_CHECKPOINT_KEYS],
-      closed: false,
-      timedOut: false,
-      minVisibleElapsed: false,
-      lines,
-    };
-  }
-
-  const pending = pendingKeys(snapshot);
-  return {
-    holding: !snapshot.closed && (!snapshot.minVisibleElapsed || pending.length > 0),
-    begun: true,
-    pending,
-    closed: snapshot.closed === true,
-    timedOut: snapshot.timedOut === true,
-    minVisibleElapsed: snapshot.minVisibleElapsed === true,
-    lines,
-  };
+  return deriveOpeningReadinessFor(snapshot, pid, {
+    satisfied: !!pid && satisfiedProjects.has(pid),
+  });
 }
 
 /** Reactive opening readiness for one project. */

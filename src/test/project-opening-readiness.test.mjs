@@ -1,48 +1,73 @@
 // project-opening-readiness.test.mjs
 // ---------------------------------------------------------------------------
-// Opening a saved project must hold the loading panel until the design has been
-// restored AND the main project authorities are ready — or are known to be
-// unavailable, with a reason. The panel must never mean "the project record has
-// loaded", must never flash, and must never hang.
+// Opening a saved project must hold the loading panel until EVERY restore stage
+// has reached a definite outcome. "Still restoring" is not an outcome: the panel
+// may not close on it, and the wait running long may not open the project
+// silently.
 //
-//   TEST 1  A fresh opening holds the panel while any checkpoint is pending
-//   TEST 2  The panel does not close before the minimum visible duration
-//   TEST 3  It closes once every checkpoint is definite and the minimum elapsed
-//   TEST 4  A dependency that never confirms becomes a definite "not confirmed"
-//   TEST 5  A project already opened in this session never shows the panel again
-//   TEST 6  A newly selected project holds before its opening has even begun
-//   TEST 7  The panel publishes the nine requested progress lines, in order
-//   TEST 8  The gate, panel copy and resolver are wired to this one authority
+//   TEST 1   A fresh opening holds while any stage is still restoring
+//   TEST 2   The panel does not close before the minimum visible duration
+//   TEST 3   It closes once every stage is definite and the minimum elapsed
+//   TEST 4   The timeout never opens the project — it says it is still restoring
+//   TEST 5   Bass still restoring keeps the panel open (the reported bug)
+//   TEST 6   Only supporting stages may be continued past, and with a warning
+//   TEST 7   Retry re-arms every stage and keeps the panel open
+//   TEST 8   "Not generated yet" is not a warning; a failure is
+//   TEST 9   Route entry makes that surface's report source a required stage
+//   TEST 10  A project already opened in this session never shows the panel again
+//   TEST 11  A newly selected project holds before its opening has even begun
+//   TEST 12  The panel publishes the nine requested progress lines, in order
+//   TEST 13  The gate, panel, resolver and warnings are wired to this authority
 // ---------------------------------------------------------------------------
-import { test } from 'vitest';
+import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 
 import {
+  OPENING_CHECKPOINT_OUTCOME,
   OPENING_CHECKPOINT_STATE,
+  OPENING_ENTRY_SURFACE,
+  OPENING_PHASE,
   PROJECT_OPENING_CHECKPOINT_KEYS,
   PROJECT_OPENING_LINES,
   PROJECT_OPENING_MIN_VISIBLE_MS,
   PROJECT_OPENING_TIMEOUT_MS,
   _resetProjectOpeningForTest,
   beginProjectOpening,
+  continueProjectOpeningWithWarning,
+  criticalOpeningCheckpointKeys,
   deriveOpeningReadiness,
-  expirePendingOpeningCheckpoints,
+  dismissProjectOpeningWarnings,
   getProjectOpening,
   isProjectOpeningSatisfied,
   markOpeningMinVisibleElapsed,
+  markProjectOpeningTimedOut,
+  openingCheckpointStage,
+  openingCheckpointWarnings,
+  openingEntrySurfaceForPath,
   openingProgressLines,
   resetProjectOpening,
   resolveProjectOpeningCheckpoints,
+  retryProjectOpening,
 } from '../components/state/projectOpeningAuthority.js';
 
 const PROJECT = 'project-1';
 const VERSION = 'version-1';
 
-const resolveAll = (state = OPENING_CHECKPOINT_STATE.READY) => {
+const entry = (state, outcome = null, detail = `${state} stage`) => ({ state, outcome, detail });
+
+const resolveAll = (value = entry(OPENING_CHECKPOINT_STATE.READY, OPENING_CHECKPOINT_OUTCOME.READY)) => {
   resolveProjectOpeningCheckpoints(Object.fromEntries(
-    PROJECT_OPENING_CHECKPOINT_KEYS.map((key) => [key, { state, detail: `${key} resolved` }]),
+    PROJECT_OPENING_CHECKPOINT_KEYS.map((key) => [key, { ...value, detail: `${key} ${value.state}` }]),
+  ));
+};
+
+const resolveAllExcept = (skipKey, value) => {
+  resolveProjectOpeningCheckpoints(Object.fromEntries(
+    PROJECT_OPENING_CHECKPOINT_KEYS
+      .filter((key) => key !== skipKey)
+      .map((key) => [key, { ...value, detail: `${key} ${value.state}` }]),
   ));
 };
 
@@ -51,15 +76,18 @@ const start = (options = {}) => {
   beginProjectOpening(PROJECT, { versionId: VERSION, minVisibleMs: 0, timeoutMs: 0, ...options });
 };
 
-test('TEST 1 — a fresh opening holds while any checkpoint is still pending', () => {
+const openState = () => deriveOpeningReadiness(getProjectOpening(), PROJECT);
+
+test('TEST 1 — a fresh opening holds while any stage is still restoring', () => {
   start();
-  assert.equal(deriveOpeningReadiness(getProjectOpening(), PROJECT).holding, true, 'holds while pending');
+  assert.equal(openState().holding, true, 'holds while restoring');
+  assert.equal(openState().phase, OPENING_PHASE.RESTORING);
 
   resolveProjectOpeningCheckpoints({ metadata: { state: OPENING_CHECKPOINT_STATE.READY } });
-  assert.equal(deriveOpeningReadiness(getProjectOpening(), PROJECT).holding, true, 'one resolved checkpoint is not enough');
+  assert.equal(openState().holding, true, 'one resolved stage is not enough');
 
   resolveAll();
-  assert.equal(deriveOpeningReadiness(getProjectOpening(), PROJECT).holding, false, 'all resolved, no minimum, opens');
+  assert.equal(openState().holding, false, 'all resolved, no minimum, opens');
   assert.equal(getProjectOpening().closed, true);
 });
 
@@ -67,44 +95,164 @@ test('TEST 2 — the panel does not close before the minimum visible duration', 
   start({ minVisibleMs: PROJECT_OPENING_MIN_VISIBLE_MS });
   resolveAll();
 
-  const held = deriveOpeningReadiness(getProjectOpening(), PROJECT);
+  const held = openState();
   assert.equal(held.holding, true, 'min-visible holds the panel even when everything is ready');
   assert.equal(getProjectOpening().closed, false, 'the project is not open yet');
   assert.equal(isProjectOpeningSatisfied(PROJECT), false);
 });
 
-test('TEST 3 — it closes once every checkpoint is definite and the minimum has elapsed', () => {
+test('TEST 3 — it closes once every stage is definite and the minimum has elapsed', () => {
   start({ minVisibleMs: PROJECT_OPENING_MIN_VISIBLE_MS });
-  resolveAll({ state: OPENING_CHECKPOINT_STATE.UNAVAILABLE });
+  resolveAll(entry(OPENING_CHECKPOINT_STATE.UNAVAILABLE, OPENING_CHECKPOINT_OUTCOME.NOT_GENERATED));
   markOpeningMinVisibleElapsed();
 
-  const opened = deriveOpeningReadiness(getProjectOpening(), PROJECT);
-  assert.equal(opened.holding, false, 'unavailable-with-a-reason still opens the project');
+  const opened = openState();
+  assert.equal(opened.holding, false, 'a stage that is not generated yet still opens the project');
   assert.equal(opened.closed, true);
   assert.equal(isProjectOpeningSatisfied(PROJECT), true);
   assert.ok(PROJECT_OPENING_TIMEOUT_MS > PROJECT_OPENING_MIN_VISIBLE_MS, 'the timeout is the longer bound');
 });
 
-test('TEST 4 — a dependency that never confirms becomes a definite "not confirmed"', () => {
+test('TEST 4 — the timeout never opens the project: it reports that it is still restoring', () => {
   start();
   resolveProjectOpeningCheckpoints({ metadata: { state: OPENING_CHECKPOINT_STATE.READY } });
-  expirePendingOpeningCheckpoints();
+  markProjectOpeningTimedOut();
 
   const snapshot = getProjectOpening();
-  assert.equal(snapshot.closed, true, 'the panel cannot hang');
-  assert.equal(snapshot.timedOut, true);
-  assert.equal(deriveOpeningReadiness(snapshot, PROJECT).holding, false);
+  const readiness = openState();
 
+  assert.equal(snapshot.timedOut, true, 'the long wait is recorded');
+  assert.equal(snapshot.closed, false, 'the panel did NOT close on the timeout');
+  assert.equal(isProjectOpeningSatisfied(PROJECT), false, 'the project is not marked opened');
+  assert.equal(readiness.holding, true, 'the project stays behind the panel');
+  assert.equal(readiness.phase, OPENING_PHASE.STILL_RESTORING);
+  assert.ok(readiness.pendingLabels.length > 0, 'the panel can name what is still restoring');
+
+  // Nothing was resolved on the project's behalf: a still-restoring stage is
+  // still restoring, not silently "not confirmed but fine".
   PROJECT_OPENING_CHECKPOINT_KEYS
     .filter((key) => key !== 'metadata')
     .forEach((key) => {
-      assert.equal(snapshot.checkpoints[key].state, OPENING_CHECKPOINT_STATE.UNAVAILABLE, `${key} is definite`);
-      assert.ok(snapshot.checkpoints[key].detail, `${key} carries a reason`);
+      const stageState = snapshot.checkpoints[key]?.state ?? OPENING_CHECKPOINT_STATE.PENDING;
+      assert.equal(stageState, OPENING_CHECKPOINT_STATE.PENDING, `${key} is still restoring`);
+      assert.equal(snapshot.checkpoints[key]?.outcome ?? null, null, `${key} has no outcome yet`);
     });
-  assert.equal(snapshot.checkpoints.metadata.state, OPENING_CHECKPOINT_STATE.READY, 'a resolved checkpoint is not overwritten');
 });
 
-test('TEST 5 — a project already opened in this session never shows the panel again', () => {
+test('TEST 5 — bass still restoring keeps the panel open, and releases it when it settles', () => {
+  start();
+  resolveAllExcept('bass', entry(OPENING_CHECKPOINT_STATE.READY, OPENING_CHECKPOINT_OUTCOME.READY));
+
+  const restoring = openState();
+  assert.equal(restoring.holding, true, 'the panel holds while bass is still restoring');
+  assert.equal(getProjectOpening().closed, false, 'the project must not appear while bass restores');
+  assert.deepEqual(restoring.pendingCritical, ['bass'], 'bass is a critical stage');
+  assert.ok(restoring.pendingLabels.includes('Bass performance'), 'the panel names bass as restoring');
+
+  // Bass settles.
+  resolveProjectOpeningCheckpoints({
+    bass: entry(OPENING_CHECKPOINT_STATE.READY, OPENING_CHECKPOINT_OUTCOME.READY, 'Saved bass restored.'),
+  });
+  assert.equal(openState().holding, false, 'the project opens once bass has settled');
+  assert.equal(getProjectOpening().closed, true);
+});
+
+test('TEST 6 — only supporting stages may be continued past, and with a warning', () => {
+  // A still-restoring CRITICAL stage cannot be continued past, ever.
+  start();
+  resolveAllExcept('bass', entry(OPENING_CHECKPOINT_STATE.READY, OPENING_CHECKPOINT_OUTCOME.READY));
+  markProjectOpeningTimedOut();
+
+  assert.equal(openState().canContinueWithWarning, false, 'no escape hatch past a critical stage');
+  assert.equal(continueProjectOpeningWithWarning(), false, 'the continue is refused');
+  assert.equal(getProjectOpening().closed, false, 'the project stays closed');
+
+  // A still-restoring SUPPORTING stage may be, and it opens with a warning.
+  _resetProjectOpeningForTest();
+  beginProjectOpening(PROJECT, { versionId: VERSION, minVisibleMs: 0, timeoutMs: 0 });
+  resolveAllExcept('pricing', entry(OPENING_CHECKPOINT_STATE.READY, OPENING_CHECKPOINT_OUTCOME.READY));
+  markProjectOpeningTimedOut();
+
+  const offered = openState();
+  assert.equal(offered.canContinueWithWarning, true, 'pricing alone may be continued past');
+  assert.deepEqual(offered.pendingSupporting, ['pricing']);
+  assert.equal(continueProjectOpeningWithWarning(), true, 'the project opens with a warning');
+  assert.equal(isProjectOpeningSatisfied(PROJECT), true);
+
+  const warnings = openingCheckpointWarnings(getProjectOpening(), PROJECT);
+  assert.equal(warnings.length, 1, 'exactly the unresolved stage is warned about');
+  assert.equal(warnings[0].key, 'pricing');
+  assert.equal(warnings[0].timedOut, true);
+  assert.ok(warnings[0].detail, 'the warning carries a reason');
+});
+
+test('TEST 7 — Retry re-arms every stage, clears the notice and keeps the panel open', () => {
+  start();
+  resolveProjectOpeningCheckpoints({ metadata: { state: OPENING_CHECKPOINT_STATE.READY } });
+  markProjectOpeningTimedOut();
+  assert.equal(getProjectOpening().timedOut, true);
+
+  retryProjectOpening();
+
+  const retried = getProjectOpening();
+  assert.equal(retried.timedOut, false, 'the still-restoring notice is cleared');
+  assert.equal(retried.closed, false, 'the panel is still open');
+  assert.equal(retried.attempt, 1, 'the reads are re-run, not re-used');
+  assert.deepEqual(
+    PROJECT_OPENING_CHECKPOINT_KEYS.filter((key) => retried.checkpoints[key]),
+    [],
+    'every stage is re-armed as restoring',
+  );
+  assert.equal(openState().holding, true, 'the project waits for the re-read');
+
+  resolveAll();
+  assert.equal(openState().holding, false, 'a retry that resolves closes the panel promptly');
+});
+
+test('TEST 8 — "not generated yet" is not a warning; a failure is', () => {
+  start();
+  resolveAll(entry(OPENING_CHECKPOINT_STATE.UNAVAILABLE, OPENING_CHECKPOINT_OUTCOME.NOT_GENERATED));
+  assert.deepEqual(openingCheckpointWarnings(getProjectOpening(), PROJECT), [], 'an empty project is not a warning');
+
+  resolveProjectOpeningCheckpoints({
+    technicalReport: entry(OPENING_CHECKPOINT_STATE.UNAVAILABLE, OPENING_CHECKPOINT_OUTCOME.STALE, 'Generated from an earlier design.'),
+    pricing: entry(OPENING_CHECKPOINT_STATE.UNAVAILABLE, OPENING_CHECKPOINT_OUTCOME.FAILED, 'Priced selections were not confirmed.'),
+  });
+
+  const warnings = openingCheckpointWarnings(getProjectOpening(), PROJECT);
+  assert.deepEqual(warnings.map((warning) => warning.key), ['technicalReport', 'pricing'], 'out of date and failed are warned');
+
+  dismissProjectOpeningWarnings(PROJECT);
+  assert.deepEqual(openingCheckpointWarnings(getProjectOpening(), PROJECT), [], 'dismissing hides the strip');
+  assert.equal(getProjectOpening().checkpoints.pricing.outcome, OPENING_CHECKPOINT_OUTCOME.FAILED, 'the fact is not erased');
+});
+
+test('TEST 9 — entering through a report route makes that report source a required stage', () => {
+  assert.equal(openingEntrySurfaceForPath('/RP22Report'), OPENING_ENTRY_SURFACE.TECHNICAL_REPORT);
+  assert.equal(openingEntrySurfaceForPath('/RP22ClientReport'), OPENING_ENTRY_SURFACE.VISUAL_REPORT);
+  assert.equal(openingEntrySurfaceForPath('/ProposalCentre'), OPENING_ENTRY_SURFACE.PROPOSAL);
+  assert.equal(openingEntrySurfaceForPath('/RoomDesigner'), null);
+
+  const technicalKeys = criticalOpeningCheckpointKeys(OPENING_ENTRY_SURFACE.TECHNICAL_REPORT);
+  assert.ok(technicalKeys.includes('technicalReport'), 'the Technical Report source is required on that route');
+  assert.ok(technicalKeys.includes('bass'), 'and so is the saved bass authority');
+  assert.ok(
+    !criticalOpeningCheckpointKeys(null).includes('technicalReport'),
+    'opening through the Room Designer does not make a report source required',
+  );
+  assert.equal(openingCheckpointStage('pricing'), 'supporting');
+  assert.equal(openingCheckpointStage('bass'), 'critical');
+
+  // The route-specific requirement is enforced by the same rule as everywhere
+  // else: the required stage may not be continued past while it is restoring.
+  start({ entrySurface: OPENING_ENTRY_SURFACE.TECHNICAL_REPORT });
+  resolveAllExcept('technicalReport', entry(OPENING_CHECKPOINT_STATE.READY, OPENING_CHECKPOINT_OUTCOME.READY));
+  markProjectOpeningTimedOut();
+  assert.equal(openState().canContinueWithWarning, false, 'a report route waits for its own source');
+  assert.equal(continueProjectOpeningWithWarning(), false);
+});
+
+test('TEST 10 — a project already opened in this session never shows the panel again', () => {
   start();
   resolveAll();
   assert.equal(isProjectOpeningSatisfied(PROJECT), true);
@@ -120,7 +268,7 @@ test('TEST 5 — a project already opened in this session never shows the panel 
   assert.equal(reopened.lines.length, 9, 'the panel can still describe the project');
 });
 
-test('TEST 6 — a newly selected project holds before its opening has even begun', () => {
+test('TEST 11 — a newly selected project holds before its opening has even begun', () => {
   start();
   const switched = deriveOpeningReadiness(getProjectOpening(), 'project-2');
   assert.equal(switched.holding, true, 'no frame of the previous project can appear');
@@ -129,7 +277,7 @@ test('TEST 6 — a newly selected project holds before its opening has even begu
   assert.equal(deriveOpeningReadiness(getProjectOpening(), null).holding, false, 'no project means no panel');
 });
 
-test('TEST 7 — the panel publishes the nine requested progress lines, in order', () => {
+test('TEST 12 — the panel publishes the nine requested progress lines, in order', () => {
   start();
   const labels = PROJECT_OPENING_LINES.map((line) => line.label);
   assert.deepEqual(labels, [
@@ -146,30 +294,44 @@ test('TEST 7 — the panel publishes the nine requested progress lines, in order
 
   const lines = openingProgressLines(getProjectOpening(), PROJECT);
   assert.equal(lines.length, 9);
-  lines.forEach((line) => assert.equal(line.state, OPENING_CHECKPOINT_STATE.PENDING, `${line.key} starts pending`));
+  lines.forEach((line) => assert.equal(line.state, OPENING_CHECKPOINT_STATE.PENDING, `${line.key} starts restoring`));
   assert.ok(PROJECT_OPENING_CHECKPOINT_KEYS.includes('autosaveBaseline'), 'the autosave baseline also gates opening');
 });
 
-test('TEST 8 — the gate, panel copy and resolver are wired to this one authority', () => {
+test('TEST 13 — the gate, panel, resolver and warnings are wired to this authority', () => {
   const read = (p) => fs.readFileSync(path.resolve(p), 'utf8');
   const gate = read('src/components/state/ProjectGate.jsx');
   const shell = read('src/components/state/ProjectLoadingShell.jsx');
   const resolver = read('src/components/state/ProjectOpeningResolver.jsx');
+  const warnings = read('src/components/state/ProjectOpeningWarnings.jsx');
   const hydrator = read('src/components/state/ProjectDesignHydrator.jsx');
   const commercial = read('src/components/state/commercialHydrationAuthority.js');
 
   assert.ok(gate.includes('useProjectOpening') && gate.includes('opening.holding'), 'the gate holds on the opening authority');
   assert.ok(gate.includes('ProjectOpeningResolver'), 'the gate mounts the resolver');
+  assert.ok(gate.includes('entrySurface='), 'the gate tells the opening which route it was entered through');
+  assert.ok(gate.includes('ProjectOpeningWarnings'), 'the gate shows the warning the project opened with');
+  assert.ok(gate.includes('retryProjectOpening'), 'the panel can re-ask');
+  assert.ok(gate.includes('canContinueWithWarning'), 'the panel only offers the warned continue when the authority allows it');
+
   assert.ok(shell.includes('Loading Project'), 'the panel states Loading Project');
   assert.ok(
     shell.includes('Restoring saved design, performance results, reports and pricing.'),
     'the panel carries the requested sentence',
   );
   assert.ok(shell.includes('lines.map'), 'the panel renders the progress lines');
+  assert.ok(shell.includes('Not generated yet') && shell.includes('Out of date'), 'a stage says HOW it finished');
+  assert.ok(shell.includes('StillRestoringNotice'), 'the panel has the still-restoring notice');
+  assert.ok(shell.includes('onContinueWithWarning'), 'the notice offers the warned continue');
+  assert.ok(warnings.includes('warning.detail'), 'the warning strip names what did not resolve');
 
   assert.ok(resolver.includes('fetchDurablePublication'), 'bass/RP22 authority is read from the durable publication');
   assert.ok(resolver.includes('resolveProposalSource'), 'report and proposal source states use the canonical resolver');
   assert.ok(resolver.includes('hydrateTargetCache'), 'the P14 target bank is restored (not recalculated)');
+  assert.ok(resolver.includes('statesBassAuthority'), 'a partial live handoff is never reported as a restored authority');
+  assert.ok(resolver.includes('readBassPendingIndicator'), 'bass that is still calculating holds its stage');
+  assert.ok(resolver.includes('restoring('), 'and holds it as restoring, never as finished');
+  assert.ok(resolver.includes('attempt'), 'the resolver re-reads on Retry');
   assert.ok(!resolver.includes('setTargetCacheEntry'), 'the resolver never writes target results');
   assert.ok(!resolver.includes('publishBassPendingIndicator'), 'the resolver never publishes a pending bass state');
   assert.ok(!resolver.includes('publishDesignReviewHandoff'), 'the resolver never publishes authoritative results');
