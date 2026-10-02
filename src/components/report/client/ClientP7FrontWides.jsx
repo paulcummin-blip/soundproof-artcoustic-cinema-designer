@@ -19,6 +19,7 @@ import {
   parameterResultDescription,
 } from "./parameterResultCopy";
 import P7PlacementGuidance from "./P7PlacementGuidance";
+import { formatP7Degrees } from "@/components/utils/rp22/p7DisplayAuthority";
 
 import {
   REPORT_FONT_HEADING as HEADING_FONT,
@@ -185,10 +186,9 @@ export default function ClientP7FrontWides({
   // figure the result card carries — never a re-measurement of the drawn arc. It
   // is written once, on the arc of the side that sets the result; if the published
   // authority does not say which side that is, the first drawn side carries it.
-  const publishedMaxDeviation = Number(maxDeviation);
-  const deviationLabel = Number.isFinite(publishedMaxDeviation)
-    ? `${publishedMaxDeviation.toFixed(1)}° deviation`
-    : null;
+  // Whole degrees, rounded down — the same stated figure as the result card.
+  const wholeDeviationLabel = formatP7Degrees(maxDeviation);
+  const deviationLabel = wholeDeviationLabel ? `${wholeDeviationLabel} deviation` : null;
   const deviationSide = placementSides.find((side) => side.isWorst) || placementSides[0] || null;
 
   // The adjacent side surrounds give the median angle its far end.
@@ -576,9 +576,9 @@ export default function ClientP7FrontWides({
                 <div style={{ fontSize: 13, color: "#3E4349", marginTop: 2, lineHeight: 1.45 }}>
                   {resultDescription}
                 </div>
-                {maxDeviation != null && (
+                {formatP7Degrees(maxDeviation) && (
                   <div style={{ fontSize: 12, color: "#625143", marginTop: 2 }}>
-                    Maximum deviation from median: {maxDeviation.toFixed(1)}°
+                    Maximum deviation from median: {formatP7Degrees(maxDeviation)}
                   </div>
                 )}
               </div>

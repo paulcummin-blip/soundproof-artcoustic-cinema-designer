@@ -3,6 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import RP22GradingPill from '../ui/RP22GradingPill';
 import { P8_NOTE } from '@/components/utils/rp22/p8Authority';
+import { formatP7Degrees } from '@/components/utils/rp22/p7DisplayAuthority';
 import {
   resolveAssumedP15Level,
   resolveAssumedP21Level,
@@ -306,6 +307,13 @@ export default function ParameterCard({ parameter, roomResult, seatResults = [],
                                     Assumed · {p21Level}
                                 </span>
                                 <RP22GradingPill level={p21Level} />
+                            </div>
+                        ) : parameter.id === 7 ? (
+                            <div className="flex justify-between items-center">
+                                <span className="text-sm font-bold text-[#1B1A1A]">
+                                    {formatP7Degrees(roomResult?.value ?? roomResult?.deviation) || 'Not Calculated'}
+                                </span>
+                                {renderLevelBadge(level)}
                             </div>
                         ) : hasRoomResult && roomResult.status !== 'no_data' ? (
                             <div className="flex justify-between items-center">

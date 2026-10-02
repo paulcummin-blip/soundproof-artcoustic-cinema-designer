@@ -24,6 +24,10 @@
 
 import { base44 } from '@/api/base44Client';
 import { readDesignReviewHandoff } from '@/components/state/designReviewHandoff';
+import {
+  stampFixedParameterAuthority,
+  stampFixedParameterAuthoritySnapshot,
+} from './fixedParameterAuthority';
 
 export const ENGINEERING_AUTHORITY_STATE = Object.freeze({
   /** A durable publication exists for this version. */
@@ -108,7 +112,10 @@ export function buildRatingEnvelope(engineeringSummary) {
  * consumer works unchanged, whether the result came from the DB or the browser.
  */
 export function buildDurableSnapshot({ projectId, versionId, publication, designState }) {
-  const engineeringSummary = publication?.engineering_summary || null;
+  // RP22 P8 is a fixed Sound Proof product rule. Stamping it here means a
+  // publication made before the rule was wired still reports Level 4 / "No",
+  // never a dash. A publication that already carries it is returned untouched.
+  const engineeringSummary = stampFixedParameterAuthority(publication?.engineering_summary || null);
   if (!engineeringSummary) return null;
 
   const ds = asObject(designState) || {};
@@ -162,8 +169,11 @@ export function classifyAuthorityState({ durable, localSnapshot }) {
  */
 export function composeAuthoritySnapshot({ localSnapshot, durableSnapshot }) {
   const localHasSummary = !!extractEngineeringSummary(localSnapshot);
-  if (localHasSummary) return localSnapshot;
-  return durableSnapshot || localSnapshot || null;
+  // Stamped on the way out, so a browser handoff stored before the P8 rule
+  // existed also reports Level 4 / "No" instead of a dash. An already-stamped
+  // summary is returned by identity, so this costs nothing on a fresh result.
+  if (localHasSummary) return stampFixedParameterAuthoritySnapshot(localSnapshot);
+  return stampFixedParameterAuthoritySnapshot(durableSnapshot || localSnapshot || null);
 }
 
 /** Read the local handoff for a version (browser fast path). */
