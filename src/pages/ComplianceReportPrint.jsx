@@ -7,7 +7,7 @@ import { formatSeatLabel } from '@/components/utils/seatLabel';
 import { RP22_PRESENTATION_PARAMETERS, RP22_SEAT_PARAMETERS } from '@/components/utils/rp22ParameterPresentation';
 import { readDesignReviewHandoff, subscribeDesignReviewHandoff } from '@/components/state/designReviewHandoff';
 import { useVersionedEngineeringAuthority } from '@/components/engineering/useVersionedEngineeringAuthority';
-import { base44 } from '@/api/base44Client';
+import { readProjectRecord } from '@/components/state/projectReadCache';
 
 export default function ComplianceReportPrint() {
   const [isReady, setIsReady] = useState(false);
@@ -21,9 +21,8 @@ export default function ComplianceReportPrint() {
     let cancelled = false;
     (async () => {
       try {
-        const results = await base44.entities.Project.filter({ id: reportScopeId });
+        const p = await readProjectRecord(reportScopeId);
         if (cancelled) return;
-        const p = Array.isArray(results) && results.length ? results[0] : null;
         setReportVersionId(p?.active_version_id || null);
       } catch {
         if (!cancelled) setReportVersionId(null);
@@ -83,10 +82,13 @@ export default function ComplianceReportPrint() {
     return () => clearTimeout(timer);
   }, [engineeringSummary, engineeringAuthority.loading, engineeringAuthority.bassRestoreFailed, engineeringAuthority.reportComplete]);
 
-  if (engineeringAuthority.bassRestoreFailed) {
+  if (engineeringAuthority.readFailed || engineeringAuthority.bassRestoreFailed) {
     return (
       <div className="flex items-center justify-center min-h-screen px-6 text-center" style={{ fontFamily: 'Didact Gothic, sans-serif' }}>
-        <p className="text-lg">Saved bass results could not be restored. No partial compliance report was generated.</p>
+        <div>
+          <p className="text-lg">{engineeringAuthority.readError || engineeringAuthority.bassRestoreError || 'Saved engineering authority could not be read. No partial compliance report was generated.'}</p>
+          <button type="button" className="mt-4 px-4 py-2 text-white rounded" style={{ backgroundColor: '#213428' }} onClick={engineeringAuthority.retry}>Retry</button>
+        </div>
       </div>
     );
   }
