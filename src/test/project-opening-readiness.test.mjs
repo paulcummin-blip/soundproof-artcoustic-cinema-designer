@@ -441,9 +441,23 @@ test('TEST 13 — the gate, panel, resolver and warnings are wired to this autho
   assert.ok(technicalReport.includes('Technical Report not ready'), 'an incomplete report route shows an explicit not-ready page');
   assert.ok(technicalReport.includes('Missing results:'), 'the not-ready page names the missing assessment results');
   assert.ok(technicalReport.includes('Back to Room Designer'), 'the not-ready page always offers a route back to design work');
-  assert.ok(layout.includes('data-build-checkpoint-diagnostic'), 'admin/test mode exposes a visible build diagnostic');
-  assert.ok(layout.includes('restoreChecklistRowCount'), 'the diagnostic exposes the visible restore row count');
-  assert.ok(layout.includes('REPORT_GATE_VERSION'), 'the diagnostic exposes the report gate version');
+  // The build diagnostic is an opt-in developer aid. It is off on every normal
+  // load — dealer, client, partner and admin alike — and appears only behind an
+  // explicit flag, with a close control that hides it for the rest of the session.
+  const buildDiagnostic = read('src/components/dev/BuildDiagnosticPanel.jsx');
+  assert.ok(layout.includes('<BuildDiagnosticPanel />'), 'the layout mounts the build diagnostic');
+  assert.ok(!layout.includes('BuildCheckpointDiagnostic'), 'the diagnostic is no longer defined inline in the layout');
+  assert.ok(!/<BuildDiagnosticPanel[^>]*isAdmin/.test(layout), 'and the admin role never switches it on');
+  assert.ok(buildDiagnostic.includes('debugBuild'), 'the URL query flag turns it on');
+  assert.ok(buildDiagnostic.includes('soundproof:debug:buildDiagnostic'), 'the localStorage flag turns it on');
+  assert.ok(buildDiagnostic.includes('import.meta.env.DEV'), 'the local development server turns it on');
+  assert.ok(!buildDiagnostic.includes('isAdmin'), 'the admin role does not');
+  assert.ok(buildDiagnostic.includes('if (!requested || dismissed) return null;'), 'it renders nothing unless asked for');
+  assert.ok(buildDiagnostic.includes('onClick={close}'), 'it carries a visible close control');
+  assert.ok(buildDiagnostic.includes('sessionStorage.setItem(DISMISSED_KEY, "1")'), 'closing it persists for the session');
+  assert.ok(buildDiagnostic.includes('data-build-checkpoint-diagnostic'), 'the panel keeps its diagnostic identity while shown');
+  assert.ok(buildDiagnostic.includes('restoreChecklistRowCount'), 'the diagnostic exposes the visible restore row count');
+  assert.ok(buildDiagnostic.includes('REPORT_GATE_VERSION'), 'the diagnostic exposes the report gate version');
 
   assert.ok(commercial.includes('getActiveCommercialAuthority'), 'pricing readiness reads the commercial authority');
   assert.ok(commercial.includes('guardCommercialSave'), 'and the save path is guarded independently of the panel');
