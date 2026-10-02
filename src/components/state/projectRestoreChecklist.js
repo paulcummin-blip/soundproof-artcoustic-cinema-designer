@@ -39,6 +39,8 @@ import {
 } from "./projectOpeningStages.js";
 
 /** The complete restore-status vocabulary. */
+export const RESTORE_CHECKLIST_VERSION = "terminal-all-rows-v2";
+
 export const RESTORE_STATUS = Object.freeze({
   // ── terminal ────────────────────────────────────────────────────────────
   READY: "ready",
