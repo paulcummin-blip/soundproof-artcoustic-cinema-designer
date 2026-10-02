@@ -19,6 +19,7 @@ import AdminPlaceholderPage from './pages/AdminPlaceholderPage';
 import AdminPublicationContent from './pages/AdminPublicationContent';
 import AdminDatasetManager from './pages/AdminDatasetManager';
 import AdminProjectLicensing from './pages/AdminProjectLicensing';
+import AdminProjectIntelligence from './pages/AdminProjectIntelligence';
 import AdminUserLicensingDetail from './pages/AdminUserLicensingDetail';
 import AdminSpeakerDatabase from './pages/AdminSpeakerDatabase';
 import AdminSpeakerProductDetail from './pages/AdminSpeakerProductDetail';
@@ -142,6 +143,7 @@ const AuthenticatedApp = () => {
         <Route path="/admin/datasets" element={<AccessGate masterAdmin><AdminDatasetManager /></AccessGate>} />
         <Route path="/admin/project-licensing" element={<AccessGate masterAdmin><AdminProjectLicensing /></AccessGate>} />
         <Route path="/admin/project-licensing/:userId" element={<AccessGate masterAdmin><AdminUserLicensingDetail /></AccessGate>} />
+        <Route path="/admin/project-intelligence" element={<AccessGate masterAdmin><AdminProjectIntelligence /></AccessGate>} />
         <Route path="/admin/pricing" element={<AccessGate masterAdmin><AdminPlaceholderPage title="Pricing" description="Price lists, discounts and difficulty multipliers." /></AccessGate>} />
         <Route path="/admin/product-prices" element={<AccessGate masterAdmin><Navigate to="/PriceList" replace /></AccessGate>} />
         <Route path="/admin/rp22-config" element={<AccessGate masterAdmin><AdminPlaceholderPage title="RP22 Configuration" description="Compliance parameters and grading thresholds." /></AccessGate>} />

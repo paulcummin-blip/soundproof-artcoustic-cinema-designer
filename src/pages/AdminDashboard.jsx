@@ -11,7 +11,101 @@ const BRAND = {
   card: "#FFFFFF",
   btn: "#1B1A1A",
   btnText: "#FFFFFF",
+  accent: "#625143",
 };
+
+// Core administration stays prominent. Setup, configuration and legacy tooling
+// live under Advanced / Setup so the dashboard leads with the tools that are
+// used daily.
+const CORE_CARDS = [
+  {
+    title: "Commercial Control Centre",
+    description: "Dealer accounts, Professional Projects, turnover and activity.",
+    status: "Healthy",
+    countKey: "accounts",
+    href: "/admin/accounts",
+  },
+  {
+    title: "Account Access & Credits",
+    description: "Dealer access, logins, Sound Proof credits and account diagnostics in one grouped view.",
+    status: "Ready",
+    count: "Partner / Trade / Richer Sounds",
+    href: "/admin/access",
+  },
+  {
+    title: "Project Intelligence",
+    description: "Commercial project counts, project values, product demand and export. Projects are counted once; design versions are shown as variations.",
+    status: "Ready",
+    count: "Projects counted once",
+    href: "/admin/project-intelligence",
+  },
+  {
+    title: "Product Master",
+    description: "Product names, availability, Sound Proof roles and retail pricing — the pricing authority.",
+    status: "Healthy",
+    count: "—",
+    href: "/PriceList",
+  },
+  {
+    title: "Speaker Database",
+    description: "A structured catalogue of loudspeaker specifications and sources. Manufacturers, products, specifications, data quality, change history and model ingestion.",
+    status: "Ready",
+    count: "Foundation built",
+    href: "/admin/speaker-database",
+  },
+  {
+    title: "Content Management",
+    description: "Publication content — the canonical source for About Sound Proof and future client-facing text used in the app, Visual Report, Technical Report, and proposals.",
+    status: "Ready",
+    count: "1 document",
+    href: "/admin/content",
+  },
+  {
+    title: "System Health",
+    description: "Live status of core systems and infrastructure.",
+    status: "Operational",
+    count: "7 systems monitored",
+    href: "/admin/system-health",
+  },
+];
+
+const ADVANCED_CARDS = [
+  {
+    title: "Measured Datasets",
+    description: "Measured polar dataset platform, ingestion wizards and health checks.",
+    status: "Healthy",
+    count: "—",
+    href: "/admin/datasets",
+  },
+  {
+    title: "RP22 Configuration",
+    description: "Compliance parameters and grading thresholds.",
+    status: "Healthy",
+    count: "—",
+    href: "/admin/rp22-config",
+  },
+  {
+    title: "Audit Log",
+    description: "Track changes made across the platform.",
+    status: "Active",
+    count: "—",
+    href: "/admin/audit-log",
+  },
+  {
+    title: "Billing",
+    description: "Subscription plans and payment configuration.",
+    status: "Setup Required",
+    count: "—",
+    href: "/admin/billing",
+  },
+  {
+    title: "Legacy Licensing",
+    description: "Legacy per-user licensing infrastructure. Superseded by the Commercial Control Centre.",
+    status: "Setup Required",
+    count: "Feature flag OFF",
+    href: "/admin/project-licensing",
+  },
+];
 
 export default function AdminDashboard() {
   const { user, isLoadingAuth } = useAuth();
@@ -55,92 +149,29 @@ export default function AdminDashboard() {
     );
   }
 
-  const cards = [
-    {
-      title: "Commercial Control Centre",
-      description: "Dealer accounts, Professional Projects, turnover and activity.",
-      status: "Healthy",
-      count: accountCount !== null ? `${accountCount} account${accountCount !== 1 ? "s" : ""}` : "—",
-      href: "/admin/accounts",
-    },
-    {
-      title: "Account Access & Credits",
-      description: "Dealer access, logins, Sound Proof credits and account diagnostics in one grouped view.",
-      status: "Ready",
-      count: "Partner / Trade / Richer Sounds",
-      href: "/admin/access",
-    },
-    {
-      title: "Engineering Database",
-      description: "Read-only acoustic specifications and measured product data.",
-      status: "Healthy",
-      count: "—",
-      href: "/SpeakerDatabase",
-    },
-    {
-      title: "Speaker Database",
-      description: "A structured catalogue of loudspeaker specifications and sources. Manufacturers, products, specifications, data quality and change history.",
-      status: "Ready",
-      count: "Foundation built",
-      href: "/admin/speaker-database",
-    },
-    {
-      title: "Measured Datasets",
-      description: "Measured polar dataset platform and health checks.",
-      status: "Healthy",
-      count: "—",
-      href: "/admin/datasets",
-    },
-    {
-      title: "Product Master",
-      description: "Product names, availability, Sound Proof roles and retail pricing.",
-      status: "Healthy",
-      count: "—",
-      href: "/PriceList",
-    },
-    {
-      title: "Content Management",
-      description: "Publication content — the canonical source for About Sound Proof and future client-facing text used in the app, Visual Report, Technical Report, and proposals.",
-      status: "Ready",
-      count: "1 document",
-      href: "/admin/content",
-    },
-    {
-      title: "RP22 Configuration",
-      description: "Compliance parameters and grading thresholds.",
-      status: "Healthy",
-      count: "—",
-      href: "/admin/rp22-config",
-    },
-    {
-      title: "System Health",
-      description: "Live status of core systems and infrastructure.",
-      status: "Operational",
-      count: "7 systems monitored",
-      href: "/admin/system-health",
-    },
-    {
-      title: "Audit Log",
-      description: "Track changes made across the platform.",
-      status: "Active",
-      count: "—",
-      href: "/admin/audit-log",
-    },
-    {
-      title: "Billing",
-      description: "Subscription plans and payment configuration.",
-      status: "Setup Required",
-      count: "—",
-      href: "/admin/billing",
-    },
-    {
-      title: "Legacy Licensing",
-      description: "Legacy per-user licensing infrastructure. Superseded by the Commercial Control Centre.",
-      status: "Setup Required",
-      count: "Feature flag OFF",
-      href: "/admin/project-licensing",
-    },
-  ];
+  const accountCountLabel = accountCount !== null
+    ? `${accountCount} account${accountCount !== 1 ? "s" : ""}`
+    : "—";
+
+  const cards = [...CORE_CARDS, ...ADVANCED_CARDS].map((card) => ({
+    ...card,
+    count: card.countKey === "accounts" ? accountCountLabel : card.count,
+  }));
+
+  const coreCards = cards.slice(0, CORE_CARDS.length);
+  const advancedCards = cards.slice(CORE_CARDS.length);
+
+  const renderGrid = (list) => (
+    <div style={{
+      display: "grid",
+      gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))",
+      gap: 18,
+    }}>
+      {list.map(({ countKey, ...card }) => (
+        <AdminSectionCard key={card.title} {...card} />
+      ))}
+    </div>
+  );
 
   return (
     <div style={{ padding: 24, background: BRAND.bg, minHeight: "100vh", color: BRAND.text }}>
@@ -160,14 +191,32 @@ export default function AdminDashboard() {
         </div>
       </div>
 
-      <div style={{
-        display: "grid",
-        gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))",
-        gap: 18,
-      }}>
-        {cards.map((card) => (
-          <AdminSectionCard key={card.title} {...card} />
-        ))}
+      <div style={{ marginBottom: 30 }}>
+        <h2 style={{
+          margin: "0 0 12px",
+          fontSize: 11,
+          fontWeight: 700,
+          letterSpacing: "0.08em",
+          textTransform: "uppercase",
+          color: BRAND.accent,
+        }}>
+          Core administration
+        </h2>
+        {renderGrid(coreCards)}
+      </div>
+
+      <div>
+        <h2 style={{
+          margin: "0 0 12px",
+          fontSize: 11,
+          fontWeight: 700,
+          letterSpacing: "0.08em",
+          textTransform: "uppercase",
+          color: BRAND.accent,
+        }}>
+          Advanced / Setup
+        </h2>
+        {renderGrid(advancedCards)}
       </div>
     </div>
   );
