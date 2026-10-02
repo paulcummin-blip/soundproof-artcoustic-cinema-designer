@@ -16,14 +16,15 @@ const counters = {
   ProjectVersion: 0,
   ProjectAnalysisCache: 0,
 };
+const readHistory = [];
 
 const normalise = (value) => String(value || "").trim();
 const pairKey = (projectId, versionId) => `${normalise(projectId)}::${normalise(versionId)}`;
 
 function publishCounters() {
   if (typeof window !== "undefined") {
-    window.__SP_SHARED_READ_DIAGNOSTICS__ = { ...counters };
-    document.documentElement.dataset.spSharedReads = JSON.stringify(counters);
+    window.__SP_SHARED_READ_DIAGNOSTICS__ = { ...counters, history: [...readHistory] };
+    document.documentElement.dataset.spSharedReads = JSON.stringify({ ...counters, history: readHistory });
   }
 }
 
@@ -41,6 +42,7 @@ export function readProjectRecord(projectId, options) {
   const id = normalise(projectId);
   return singleFlight(projectReads, id, async () => {
     counters.Project += 1;
+    readHistory.push({ entity: "Project", key: id });
     publishCounters();
     const rows = await base44.entities.Project.filter({ id }, "-updated_date", 1);
     return Array.isArray(rows) && rows.length ? rows[0] : null;
@@ -51,6 +53,7 @@ export function readProjectVersionRecord(versionId, options) {
   const id = normalise(versionId);
   return singleFlight(versionReads, id, async () => {
     counters.ProjectVersion += 1;
+    readHistory.push({ entity: "ProjectVersion", key: id });
     publishCounters();
     const rows = await base44.entities.ProjectVersion.filter({ id });
     return Array.isArray(rows) && rows.length ? rows[0] : null;
@@ -64,6 +67,7 @@ export function readProjectAnalysisCacheRecord(projectId, versionId, options) {
   if (!project || !version) return Promise.resolve(null);
   return singleFlight(analysisReads, key, async () => {
     counters.ProjectAnalysisCache += 1;
+    readHistory.push({ entity: "ProjectAnalysisCache", key });
     publishCounters();
     const rows = await base44.entities.ProjectAnalysisCache.filter(
       { project_id: project, version_id: version },
@@ -87,7 +91,7 @@ export function invalidateProjectAnalysisCacheRead(projectId, versionId) {
 }
 
 export function getSharedProjectReadDiagnostics() {
-  return { ...counters };
+  return { ...counters, history: [...readHistory] };
 }
 
 export function resetSharedProjectReadsForTest() {
@@ -97,5 +101,6 @@ export function resetSharedProjectReadsForTest() {
   counters.Project = 0;
   counters.ProjectVersion = 0;
   counters.ProjectAnalysisCache = 0;
+  readHistory.length = 0;
   publishCounters();
 }
