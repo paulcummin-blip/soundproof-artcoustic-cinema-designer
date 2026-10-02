@@ -22,12 +22,17 @@ if (typeof window !== 'undefined' && !window.__SP_READ_DIAGNOSTICS_INSTALLED__) 
     ProjectAnalysisCache: 0,
     readPublishedEngineering: 0,
   };
+  const publishCounts = () => {
+    document.documentElement.dataset.spReadDiagnostics = JSON.stringify(counts);
+  };
+  publishCounts();
   const instrumentFilter = (entityName) => {
     const entity = base44.entities?.[entityName];
     if (!entity || typeof entity.filter !== 'function') return;
     const original = entity.filter.bind(entity);
     entity.filter = (...args) => {
       counts[entityName] += 1;
+      publishCounts();
       console.info('[restore-read]', entityName, counts[entityName]);
       return original(...args);
     };
@@ -37,6 +42,7 @@ if (typeof window !== 'undefined' && !window.__SP_READ_DIAGNOSTICS_INSTALLED__) 
   base44.functions.invoke = (name, ...args) => {
     if (name === 'readPublishedEngineering') {
       counts.readPublishedEngineering += 1;
+      publishCounts();
       console.info('[restore-read]', name, counts.readPublishedEngineering);
     }
     return originalInvoke(name, ...args);
