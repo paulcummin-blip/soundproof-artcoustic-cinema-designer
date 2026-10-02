@@ -10,6 +10,10 @@ import {
   statesBassAuthority,
   statesBassResultEntry,
 } from "../src/components/engineering/versionedEngineeringAuthority.js";
+import {
+  assessEngineeringReportCompleteness,
+  REQUIRED_RP22_PARAMETER_KEYS,
+} from "../src/components/engineering/engineeringReportCompleteness.js";
 
 test("report value authority preserves numeric and string zero only", () => {
   assert.equal(isStatedPrimitive(0), true);
@@ -62,11 +66,61 @@ test("published summary and report gates restore bass without opening the Bass U
   assert.match(rating, /for \(const parameterNumber of \[14, 18, 19\]\)/);
   assert.match(overlay, /statesBassResultEntry\(existing\)/);
   assert.doesNotMatch(overlay, /if \(statesBassAuthority\(summary\)\) return summary/);
-  assert.match(overlay, /row\?\.status === "scored"/);
+  assert.match(overlay, /previous\.state === "scored"/);
+  assert.match(overlay, /summariseEngineeringResults/);
   assert.match(authorityHook, /completedBassAuthority\?\.hydrationSettled !== true/);
   assert.match(authorityHook, /bassRestoreFailed/);
   assert.match(technicalReport, /const bassReportPending = !projectIdMatch \|\| completedBassAuthority\?\.hydrationSettled !== true/);
   assert.match(technicalReport, /\|\| bassReportPending;/);
   assert.match(compliancePrint, /engineeringAuthority\.loading/);
   assert.match(compliancePrint, /engineeringAuthority\.bassRestoreFailed/);
+  assert.match(compliancePrint, /engineeringAuthority\.reportComplete/);
+  assert.match(technicalReport, /reportDataIncomplete/);
+});
+
+test("reports and proposals require every RP22 parameter and every seat result", () => {
+  const seatIds = ["seat-1", "seat-2"];
+  const parameterAuthority = Object.fromEntries(REQUIRED_RP22_PARAMETER_KEYS.map((key) => [
+    key,
+    { key, scope: "room", state: "scored", level: "L3", rawValue: key === "p11" ? 0 : 1 },
+  ]));
+  parameterAuthority.p1 = {
+    key: "p1",
+    scope: "seat",
+    state: "scored",
+    level: null,
+    seats: Object.fromEntries(seatIds.map((seatId) => [seatId, { state: "scored", level: "L3" }])),
+  };
+  parameterAuthority.p20 = {
+    key: "p20",
+    scope: "seat",
+    state: "scored",
+    level: "L1",
+    seats: Object.fromEntries(seatIds.map((seatId) => [seatId, { state: "scored", level: "L1", rawValue: 0 }])),
+  };
+  const complete = {
+    parameterAuthority,
+    project: { seatIds },
+    seatHudById: { "seat-1": {}, "seat-2": {} },
+  };
+  assert.equal(assessEngineeringReportCompleteness(complete).complete, true);
+
+  const partial = structuredClone(complete);
+  partial.parameterAuthority.p19 = { key: "p19", scope: "room", state: "provisional", level: null };
+  assert.equal(assessEngineeringReportCompleteness(partial).complete, false);
+  assert.deepEqual(assessEngineeringReportCompleteness(partial).missingParameterKeys, ["p19"]);
+
+  const missingSeat = structuredClone(complete);
+  missingSeat.parameterAuthority.p20.seats["seat-2"] = { state: "provisional", level: null };
+  assert.equal(assessEngineeringReportCompleteness(missingSeat).complete, false);
+  assert.deepEqual(assessEngineeringReportCompleteness(missingSeat).incompleteSeatParameterKeys, ["p20"]);
+});
+
+test("visual report and proposal generation consume the same completeness gate", () => {
+  const visual = fs.readFileSync("src/pages/RP22ClientReport.jsx", "utf8");
+  const proposalSnapshot = fs.readFileSync("src/components/proposal/engineeringAuthority/useEngineeringSnapshot.js", "utf8");
+  const proposalWizard = fs.readFileSync("src/components/proposal/CreateProposalWizard.jsx", "utf8");
+  assert.match(visual, /authority\.reportComplete/);
+  assert.match(proposalSnapshot, /assessEngineeringReportCompleteness/);
+  assert.match(proposalWizard, /proposalDataReady/);
 });
