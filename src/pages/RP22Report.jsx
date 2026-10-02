@@ -980,6 +980,28 @@ function RP22ReportInner() {
         );
     }
 
+    if (reportDataIncomplete) {
+        return (
+            <div className="min-h-screen bg-[#F9F8F6] p-6 flex items-center justify-center">
+                <Card className="max-w-xl mx-auto w-full">
+                    <CardHeader><CardTitle className="text-[#1B1A1A] font-header">Technical Report not ready</CardTitle></CardHeader>
+                    <CardContent className="text-center py-10">
+                        <BarChart4 className="w-12 h-12 text-gray-300 mx-auto mb-4" />
+                        <p className="text-[#3E4349] mb-6">{reportDataIncompleteReason}</p>
+                        <button
+                            type="button"
+                            className="px-5 py-2.5 text-sm text-white rounded-md"
+                            style={{ backgroundColor: '#213428' }}
+                            onClick={() => navigate(`/RoomDesigner?projectId=${explicitProjectId}`)}
+                        >
+                            Continue analysis
+                        </button>
+                    </CardContent>
+                </Card>
+            </div>
+        );
+    }
+
     if (!app) {
         return (
             <div className="min-h-screen bg-[#F9F8F6] p-6 flex items-center justify-center">
