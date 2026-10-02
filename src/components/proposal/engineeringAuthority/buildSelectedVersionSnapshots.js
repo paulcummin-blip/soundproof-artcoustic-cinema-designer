@@ -26,6 +26,9 @@ import {
   ENGINEERING_AUTHORITY_STATE,
 } from '@/components/engineering/versionedEngineeringAuthority';
 import { buildEngineeringSnapshot } from './buildEngineeringSnapshot';
+import { hydrateCompletedBassAuthority } from '@/components/room/bass/completedBassResultStore';
+import { applyRestoredBassAuthority } from '@/components/engineering/restoredBassOverlay';
+import { assessEngineeringReportCompleteness } from '@/components/engineering/engineeringReportCompleteness';
 
 const MISSING_MESSAGE = 'No published engineering result was found for this version.';
 
@@ -80,8 +83,17 @@ export async function buildSelectedVersionSnapshots({
         : null;
 
       const authorityState = classifyAuthorityState({ durable, localSnapshot });
-      const authoritySnapshot = composeAuthoritySnapshot({ localSnapshot, durableSnapshot });
-      const engineeringSummary = extractEngineeringSummary(authoritySnapshot);
+      const baseAuthoritySnapshot = composeAuthoritySnapshot({ localSnapshot, durableSnapshot });
+      const completedBassAuthority = await hydrateCompletedBassAuthority(projectId, versionId);
+      const baseSummary = extractEngineeringSummary(baseAuthoritySnapshot);
+      const engineeringSummary = applyRestoredBassAuthority(baseSummary, {
+        projectId,
+        versionId,
+        completedBassAuthority,
+      });
+      const authoritySnapshot = engineeringSummary && baseAuthoritySnapshot
+        ? { ...baseAuthoritySnapshot, engineeringSummary }
+        : baseAuthoritySnapshot;
 
       if (!engineeringSummary) {
         results.push({
@@ -92,6 +104,18 @@ export async function buildSelectedVersionSnapshots({
           error: authorityState === ENGINEERING_AUTHORITY_STATE.PUBLISHED_STALE
             ? 'The published engineering result for this version is stale. Recalculate it in Room Designer.'
             : MISSING_MESSAGE,
+        });
+        continue;
+      }
+
+      const reportCompleteness = assessEngineeringReportCompleteness(engineeringSummary);
+      if (!reportCompleteness.complete) {
+        results.push({
+          version_id: versionId,
+          version_name: versionName,
+          snapshot: null,
+          source: authorityState,
+          error: reportCompleteness.reason || 'Complete every project assessment before generating this proposal.',
         });
         continue;
       }
