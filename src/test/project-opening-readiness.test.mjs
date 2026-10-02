@@ -55,9 +55,9 @@ test("TEST 1 — a fresh core opening holds", () => {
 test("TEST 2 — minimum visibility may hold but can never release unfinished work", () => {
   begin({ minVisibleMs: 999999 });
   resolveProjectOpeningCheckpoints(readyEntries());
-  assert.equal(deriveOpeningReadiness(getProjectOpening(), PROJECT).release, false);
+  assert.equal(deriveOpeningReadiness(getProjectOpening(), PROJECT).holding, true);
   markOpeningMinVisibleElapsed();
-  assert.equal(deriveOpeningReadiness(getProjectOpening(), PROJECT).release, true);
+  assert.equal(deriveOpeningReadiness(getProjectOpening(), PROJECT).holding, false);
 });
 
 test("TEST 3 — every terminal core row releases and marks the project satisfied", () => {
@@ -90,7 +90,10 @@ test("TEST 5 — a stalled required core row becomes an explicit failure and rem
   const readiness = deriveOpeningReadiness(getProjectOpening(), PROJECT);
   assert.equal(readiness.release, false);
   assert.equal(readiness.retryAvailable, true);
-  assert.ok(readiness.blockingFailures.some((row) => row.key === "roomSeating"));
+  assert.equal(
+    readiness.checklist.find((row) => row.key === "roomSeating")?.status,
+    "failed",
+  );
 });
 
 test("TEST 6 — Retry re-arms only the core design checklist", () => {
@@ -99,8 +102,11 @@ test("TEST 6 — Retry re-arms only the core design checklist", () => {
   retryProjectOpening({ minVisibleMs: 0, timeoutMs: 0 });
   const snapshot = getProjectOpening();
   assert.equal(snapshot.attempt, 1);
-  assert.deepEqual(Object.keys(snapshot.checkpoints).sort(), PROJECT_OPENING_CHECKPOINT_KEYS.slice().sort());
-  assert.ok(Object.values(snapshot.checkpoints).every((entry) => entry.state === OPENING_CHECKPOINT_STATE.PENDING));
+  assert.deepEqual(snapshot.checkpoints, {});
+  assert.deepEqual(
+    deriveOpeningReadiness(snapshot, PROJECT).pending.slice().sort(),
+    PROJECT_OPENING_CHECKPOINT_KEYS.slice().sort(),
+  );
 });
 
 test("TEST 7 — route names do not alter opening checkpoints", () => {
