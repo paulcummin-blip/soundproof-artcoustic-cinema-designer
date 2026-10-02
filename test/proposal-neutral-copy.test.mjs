@@ -86,6 +86,12 @@ const SNAPSHOT = {
   room: { screen: { size_inches: 120, aspect_ratio: '16:9' } },
   system: { configuration: { text: '9.4.6 immersive layout' } },
   rp22: {
+    // The Design Performance Index is published as supporting evidence.
+    dpi: {
+      primary: { available: true, index: 64, designation: 'Good', percentage: 64 },
+      secondary: { available: true, index: 64, designation: 'Good', percentage: 64 },
+      all_seat: { available: true, index: 60, designation: 'Good', percentage: 60 },
+    },
     parameter_headlines: [
       { parameter_id: 2, title: 'Discrete channels', achieved_level: 'L4', formatted_value: '13 channels' },
       { parameter_id: 8, title: 'Upfiring speaker allowance', achieved_level: 'L4', formatted_value: 'No' },
@@ -179,10 +185,12 @@ test('the contract builds the report around the three themes with hard exclusion
   assert.match(contract, /Do not mention P21\./);
   assert.match(contract, /never mention an assumed parameter/);
 
-  // The Design Index stays supporting evidence, never an RP22 score.
-  assert.match(contract, /Design Performance Index is supporting evidence only/);
-  assert.match(contract, /Never present it as an RP22 score/);
-  assert.match(contract, /never as the basis of the recommendation/);
+  // The Design Index is carried as its own labelled row and stays supporting
+  // evidence: never an RP22 score, never the basis of a recommendation.
+  assert.match(contract, /Design Performance Index is Sound Proof's own overall measure/);
+  assert.match(contract, /It appears in the tables as its own labelled row/);
+  assert.match(contract, /Never call it an RP22 score/);
+  assert.match(contract, /never the basis of a recommendation on its own/);
 });
 
 test('the contract carries the language rules, banned words and final quality check', () => {
@@ -260,7 +268,20 @@ test('the highlights table keeps calculated values final and never lists an excl
   for (const forbidden of ['p8', 'p15', 'p20']) {
     assert.ok(!keys.includes(forbidden), `${forbidden} must never be a client-facing row`);
   }
-  assert.ok(!keys.some((key) => /^dpi_/i.test(key)), 'the internal Design Index is never a client-facing row');
+  // The Design Performance Index is carried as its own labelled row, calculated
+  // by Sound Proof, as supporting evidence for the overall result.
+  assert.ok(keys.includes('dpi_primary'), `expected a primary Design Performance Index row, got ${keys.join(', ')}`);
+  assert.ok(keys.includes('dpi_all_seat'), 'expected an all-seat Design Performance Index row');
+  const firstIndexRow = keys.findIndex((key) => /^dpi_/i.test(key));
+  assert.ok(firstIndexRow > 0, 'the Design Index rows follow the RP22 results');
+  assert.ok(
+    keys.slice(firstIndexRow).every((key) => /^dpi_/i.test(key)),
+    'the Design Index rows are the last rows in the table',
+  );
+  rows.filter((row) => /^dpi_/i.test(row.key)).forEach((row) => {
+    assert.match(row.area, /^Design Performance Index/);
+    assert.match(row.result, /\S/);
+  });
   rows.forEach((row) => assert.match(row.result, /\S/, 'every row carries a calculated Result'));
 
   const prompt = buildHighlightsPrompt('=== SOUND PROOF CALCULATED DATA ===', rows.slice(0, 1));

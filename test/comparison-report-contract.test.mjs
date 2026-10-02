@@ -339,12 +339,13 @@ test('the change column is derived from the values, not written', () => {
   const table = buildComparisonTable(evidenceFor([OPTION_A, OPTION_B]));
   const byKey = new Map(table.rows.map((row) => [row.key, row]));
 
-  // A level change is stated as a level change.
+  // When both versions state an RP22 level, the level change leads: that is the
+  // client-facing fact, and the measured values are already shown per column.
   assert.equal(byKey.get('p2').change, 'L3 → L4');
+  assert.equal(byKey.get('p14').change, 'L3 → L4');
   assert.equal(byKey.get('rp23_viewing').change, 'L3 → L4');
   // A measured change is stated as a difference in the same unit.
   assert.equal(byKey.get('screen_size').change, '+30"');
-  assert.equal(byKey.get('p14').change, '+8 dBC');
   assert.equal(byKey.get('p18').change, '-8 Hz');
   // A plain number is stated as a difference.
   assert.equal(byKey.get('dpi_primary').change, '+10');
