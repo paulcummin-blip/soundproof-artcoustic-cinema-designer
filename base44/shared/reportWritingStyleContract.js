@@ -228,9 +228,11 @@ const CONSTRAINTS_AND_VALUE = [
   '- Explain what the additional investment buys: more headroom, higher Dynamic Range, more channels, better Spatial Resolution, more overhead positions, front wides, better bass consistency, and better performance across more seats.',
   '- Never describe a higher specification as excessive. It is the logical result of pursuing higher performance.',
   '',
-  '=== DESIGN INDEX ===',
-  '- The Sound Proof Design Performance Index is supporting evidence only. Never present it as an RP22 score, never as a percentage, and never as the basis of the recommendation.',
-  '- Never state a Design Index figure, and never lead a section or a recommendation with it. Use it only to support a story the underlying engineering already shows.',
+  '=== DESIGN PERFORMANCE INDEX ===',
+  '- The Sound Proof Design Performance Index is Sound Proof\'s own overall measure. It appears in the tables as its own labelled row, calculated by Sound Proof.',
+  '- Never call it an RP22 score, never describe it as a percentage, and never place it beside an RP22 level as if it were one.',
+  '- Treat it as supporting evidence: it may support a point the RP22 results already make, but it never replaces an RP22 result and is never the basis of a recommendation on its own.',
+  '- Never lead a section with it, and never let it contradict an RP22 result or a limitation.',
 ].join('\n');
 
 const LANGUAGE = [
@@ -272,7 +274,8 @@ const HIGHLIGHTS_TABLE = [
   '- Never add, remove, reorder or change a row, a level or a value.',
   '- Never give a row for an assumed parameter, and never a row for P8, P15 or P20.',
   '- The experience cell is one short, specific sentence written to the client, in the voice above. It says what that result means in the room, not what the parameter is called.',
-  '- For a comparison report the table separates the options by column. Where the supplied evidence covers one option only, the table reports that option and the differences are explained in the prose.',
+  '- For a comparison report the table is calculated per option: Performance area | Option A | Option B | What changes, with one column per selected version. Every value comes from that version\'s frozen engineering evidence, and the change column is derived by Sound Proof.',
+  '- In a comparison you write the introduction only. Never restate a table value, never add or reorder a row, and never describe a difference the table does not show. Explain the differences in the prose around the table, in the order below.',
 ].join('\n');
 
 const REPORT_BEHAVIOUR = [

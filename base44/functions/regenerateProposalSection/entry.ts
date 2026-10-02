@@ -1,6 +1,8 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.44';
 import { buildWritingStyleContract } from '../../shared/reportWritingStyleContract.js';
 import { COMPARISON_REPORT_INSTRUCTIONS } from '../../shared/systemDesignSummarySections.js';
+import { formatVersionEvidenceForPrompt } from '../../shared/comparisonEvidence.js';
+import { formatComparisonTableForPrompt } from '../../shared/comparisonTable.js';
 import { buildEngineeringEvidence } from '../../shared/engineeringSnapshotEvidence.js';
 import { buildProjectInterpretation, formatInterpretationForPrompt, formatInterpretationForLog } from '../../shared/adiProjectInterpretation.js';
 
@@ -100,6 +102,19 @@ export default async function(req) {
     // regenerated section can never drift away from the calculated results.
     const evidence = buildEngineeringEvidence(proposal.engineering_snapshot);
 
+    // A comparison regenerates from the SAME frozen per-version evidence and
+    // calculated table the report was generated from, so a refined section can
+    // never drift to a single version's results.
+    const storedVersions = Array.isArray(proposal.metadata?.selected_versions)
+      ? proposal.metadata.selected_versions
+      : [];
+    const comparisonBlock = proposal.proposal_type === 'comparison' && storedVersions.length > 0
+      ? [
+        formatVersionEvidenceForPrompt(storedVersions),
+        formatComparisonTableForPrompt(proposal.metadata?.comparison_table || { rows: [], versions: [] }),
+      ].join('\n\n')
+      : '';
+
     // ── Stage 1: the ADI project interpretation ──
     // Reuse the interpretation saved with the report, so a refined section
     // still tells the same design story as the rest of the report. Only when a
@@ -124,7 +139,9 @@ export default async function(req) {
     // The Key Performance Highlights table is built by Sound Proof from
     // calculated data. Only the introduction is written prose.
     const sectionNote = section.section_type === 'key_performance_highlights'
-      ? 'This section introduces a performance table that Sound Proof builds from calculated data. Refine the introduction only. Do not write a table, and do not restate the table values.'
+      ? (proposal.proposal_type === 'comparison'
+        ? 'This section introduces a comparison table that Sound Proof calculates from every selected version. Refine the introduction only. Do not write a table, do not restate a value, and do not describe a difference the table does not show.'
+        : 'This section introduces a performance table that Sound Proof builds from calculated data. Refine the introduction only. Do not write a table, and do not restate the table values.')
       : '';
 
     const prompt = [
@@ -137,6 +154,8 @@ export default async function(req) {
       projectContext,
       '',
       evidence,
+      '',
+      comparisonBlock,
       '',
       '=== EMPHASIS NOTES / CLIENT BRIEF (narrative focus: guides emphasis only, never the facts) ===',
       briefText || 'No specific emphasis notes provided. Use a balanced professional narrative.',

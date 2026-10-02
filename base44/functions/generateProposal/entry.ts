@@ -1,6 +1,8 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.49';
 import { buildWritingStyleContract } from '../../shared/reportWritingStyleContract.js';
 import { SYSTEM_SUMMARY_SECTIONS, HIGHLIGHTS_SECTION_TYPE, getSystemSummarySectionPrompt, COMPARISON_REPORT_INSTRUCTIONS } from '../../shared/systemDesignSummarySections.js';
+import { buildSelectedVersionEvidence, formatVersionEvidenceForPrompt } from '../../shared/comparisonEvidence.js';
+import { buildComparisonTable, formatComparisonTableForPrompt, buildComparisonHighlightsPrompt, COMPARISON_HIGHLIGHTS_SCHEMA } from '../../shared/comparisonTable.js';
 import { buildEngineeringEvidence, selectHighlightRows, mergeHighlightRows, buildHighlightsPrompt, HIGHLIGHTS_JSON_SCHEMA } from '../../shared/engineeringSnapshotEvidence.js';
 import { buildProjectInterpretation, formatInterpretationForPrompt, formatInterpretationForLog } from '../../shared/adiProjectInterpretation.js';
 import { compareInterpretations, formatComparisonInterpretationForPrompt } from '../../shared/adiReportComparison.js';
@@ -166,6 +168,46 @@ export default async function(req) {
       }),
     );
 
+    // ── The per-version frozen evidence contract ──
+    // A comparison report receives the frozen engineering evidence for EVERY
+    // selected version, so neither the calculated comparison table nor the
+    // narrative can ever fall back to a single version's results.
+    const versionEvidence = buildSelectedVersionEvidence(suppliedSnapshots.map((entry) => {
+      const versionId = entry?.version_id || entry?.versionId || null;
+      const record = (projectVersions || []).find((version) => version.id === versionId);
+      return {
+        version_id: versionId,
+        version_name: entry?.version_name || record?.version_name || null,
+        snapshot: entry?.snapshot || null,
+      };
+    }));
+    const comparisonTable = resolvedType === 'comparison'
+      ? buildComparisonTable(versionEvidence)
+      : { rows: [], versions: [] };
+    const comparisonEvidenceText = resolvedType === 'comparison'
+      ? [
+        formatVersionEvidenceForPrompt(versionEvidence),
+        formatComparisonTableForPrompt(comparisonTable),
+      ].join('\n\n')
+      : '';
+
+    // A comparison is only generated from calculated evidence for every
+    // version: a missing version would force an invented comparison value.
+    if (resolvedType === 'comparison') {
+      const missingEvidence = resolvedVersionIds.filter((id) => {
+        const evidence = versionEvidence.find((version) => String(version.version_id) === String(id));
+        return !evidence || evidence.available !== true;
+      });
+      if (missingEvidence.length > 0) {
+        return Response.json({
+          error: 'A System Design Comparison needs the calculated engineering evidence for every selected version. '
+            + `No evidence for: ${missingEvidence.map((id) => versionLabelById.get(id) || id).join(', ')}. `
+            + 'Open each version in Room Designer and calculate it first.',
+          missing_version_ids: missingEvidence,
+        }, { status: 409 });
+      }
+    }
+
     // ── SOURCE AUTHORITY: no current reports, no proposal ──
     // A proposal is downstream of the generated Visual and Technical Reports.
     // Both are rendered from the version's current Published Engineering result,
@@ -252,6 +294,12 @@ export default async function(req) {
       metadata: {
         project_interpretation: primaryInterpretation,
         ...(comparisonReading ? { comparison_reading: comparisonReading } : {}),
+        // The comparison data contract: one frozen evidence entry per selected
+        // version, plus the calculated table the report renders. Section
+        // regeneration reuses this exactly.
+        ...(resolvedType === 'comparison'
+          ? { selected_versions: versionEvidence, comparison_table: comparisonTable }
+          : {}),
       },
     });
 
@@ -287,6 +335,7 @@ export default async function(req) {
       resolvedType,
       reportVersions,
       sourceIdentity,
+      comparisonEvidenceText,
     );
 
     // ── Key Performance Highlights rows ──
@@ -294,10 +343,20 @@ export default async function(req) {
     // "What listeners hear" cells only; it never sets or changes a Result value, and
     // it never chooses which rows appear.
     const usesSystemStructure = resolvedType !== 'single';
-    const highlightRows = usesSystemStructure ? selectHighlightRows(engineering_snapshot) : [];
-    const isHighlightsSection = (section) => usesSystemStructure
+    const isComparisonReport = resolvedType === 'comparison';
+    // A single report carries one calculated row per useful result. A
+    // comparison carries the calculated comparison table instead, so its
+    // highlight rows are never selected from one version.
+    const highlightRows = usesSystemStructure && !isComparisonReport
+      ? selectHighlightRows(engineering_snapshot)
+      : [];
+    const isComparisonHighlights = (section) => isComparisonReport
       && section.section_type === HIGHLIGHTS_SECTION_TYPE
-      && highlightRows.length > 0;
+      && comparisonTable.rows.length > 0;
+    const isHighlightsSection = (section) => isComparisonHighlights(section)
+      || (usesSystemStructure
+        && section.section_type === HIGHLIGHTS_SECTION_TYPE
+        && highlightRows.length > 0);
 
     // ── Generate content for each editable section in parallel ──
     const editableIndices = sectionRecords
@@ -307,6 +366,19 @@ export default async function(req) {
     const generationResults = await Promise.allSettled(
       editableIndices.map(({ section }) => {
         const sectionDef = sectionDefs.find((s) => s.type === section.section_type);
+        if (isComparisonHighlights(section)) {
+          // The comparison table is already calculated: the model writes the
+          // introduction only and never a value.
+          return base44.integrations.Core.InvokeLLM({
+            prompt: [
+              interpretationBlock,
+              projectContext,
+              buildComparisonHighlightsPrompt(),
+              buildWritingStyleContract(),
+            ].filter(Boolean).join('\n\n'),
+            response_json_schema: COMPARISON_HIGHLIGHTS_SCHEMA,
+          });
+        }
         if (isHighlightsSection(section)) {
           return base44.integrations.Core.InvokeLLM({
             prompt: [
@@ -326,6 +398,22 @@ export default async function(req) {
     const generatedContent = editableIndices.map(({ section }, index) => {
       const result = generationResults[index];
 
+      if (isComparisonHighlights(section)) {
+        const payload = result.status === 'fulfilled' ? result.value : null;
+        const intro = String(payload?.intro_html || '').trim();
+        return {
+          section,
+          html: intro,
+          // The calculated table travels with the section: one column per
+          // selected version, every value read from that version's evidence.
+          metadata: {
+            comparison: true,
+            comparison_versions: comparisonTable.versions,
+            comparison_rows: comparisonTable.rows,
+          },
+          failed: result.status === 'rejected' || intro.length === 0,
+        };
+      }
       if (isHighlightsSection(section)) {
         const payload = result.status === 'fulfilled' ? result.value : null;
         const intro = String(payload?.intro_html || '').trim();
@@ -413,9 +501,13 @@ async function rollbackCreatedProposal(base44, proposalId, knownSections = []) {
   }
 }
 
-function buildProjectContext(project, narrativeGoal, brandAsset, clientBrief, engineeringSnapshot, reportType = 'system_summary', reportVersions = [], sourceIdentity = null) {
+function buildProjectContext(project, narrativeGoal, brandAsset, clientBrief, engineeringSnapshot, reportType = 'system_summary', reportVersions = [], sourceIdentity = null, versionEvidenceText = '') {
   const goalLabel = GOAL_LABELS[narrativeGoal] || 'Luxury Cinema';
-  const evidence = buildEngineeringEvidence(engineeringSnapshot);
+  // A comparison carries the frozen evidence for EVERY selected version plus the
+  // calculated comparison table. A single report carries its own evidence.
+  const evidence = reportType === 'comparison' && versionEvidenceText
+    ? versionEvidenceText
+    : buildEngineeringEvidence(engineeringSnapshot);
   // Project facts are read from the REPORT — the frozen snapshot built from the
   // current version — never from the legacy project row, so a proposal can
   // never describe another version's screen, room or layout. The project row is

@@ -43,6 +43,7 @@ import {
   splitParameterEvidence,
 } from './adiReportEvidenceRules.js';
 import { CLIENT_ADDRESS_VOICE_RULES } from './reportWritingStyleContract.js';
+import { readDesignIndex, describeDesignIndex, designIndexHighlightRows } from './designPerformanceIndex.js';
 
 function compose(...parts) {
   const clean = parts
@@ -161,9 +162,14 @@ export function buildEngineeringEvidence(snapshot) {
     );
   }
 
-  // ── Design Index deliberately excluded ──
-  // The Design Index is an internal Sound Proof score. It is not a percentage
-  // and it is never supplied to a client-facing report writer.
+  // ── Design Performance Index (supporting evidence) ──
+  // Sound Proof's own index of the overall result. It is supplied as supporting
+  // evidence, always labelled as the Design Performance Index: never as an RP22
+  // score, never as a percentage, and never as the basis of a recommendation.
+  const designIndexLine = describeDesignIndex(readDesignIndex(snapshot));
+  if (designIndexLine) {
+    lines.push('', `Design Performance Index (Sound Proof index, supporting evidence only, never an RP22 score): ${designIndexLine}`);
+  }
 
   // ── Bass availability ──
   // When nothing reliable exists the writer is told so, rather than being left
@@ -270,11 +276,13 @@ export function selectHighlightRows(snapshot) {
   const EVIDENCE_ORDER = [2, 4, 5, 7, 9, 12, 13, 14, 16, 17, 18, 19, 6, 10];
   for (const parameterId of EVIDENCE_ORDER) pushParameter(parameterId);
 
+  // The Design Performance Index is carried as its own labelled row, as
+  // supporting evidence for the overall result. It is read from calculated data
+  // here and is never written by the model.
+  for (const row of designIndexHighlightRows(snapshot)) candidates.push(row);
+
   // Only the most useful results are carried, and the Result column is read
-  // from calculated data. The Design Index is deliberately not a client-facing
-  // row: reports generated before that decision may still carry rows keyed
-  // dpi_primary, dpi_secondary and dpi_all_seat, which the table filters at
-  // render time.
+  // from calculated data.
   return orderHighlightRows(candidates).slice(0, HIGHLIGHT_ROW_LIMIT);
 }
 

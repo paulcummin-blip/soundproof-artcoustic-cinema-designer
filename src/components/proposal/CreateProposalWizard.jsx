@@ -9,6 +9,7 @@ import VersionSelectStep from '@/components/proposal/wizard/VersionSelectStep';
 import ClientBriefStep from '@/components/proposal/wizard/ClientBriefStep';
 import GenerateStep from '@/components/proposal/wizard/GenerateStep';
 import { useVersionedEngineeringSnapshot } from '@/components/proposal/engineeringAuthority/useVersionedEngineeringSnapshot';
+import { buildSelectedVersionSnapshots } from '@/components/proposal/engineeringAuthority/buildSelectedVersionSnapshots';
 import ProposalSourcePanel from '@/components/proposal/sourceAuthority/ProposalSourcePanel';
 import { useProposalSourceStatus } from '@/components/proposal/sourceAuthority/useProposalSourceStatus';
 import { resolveReportGate } from '@/components/proposal/sourceAuthority/proposalReportReadinessGate';
@@ -119,6 +120,33 @@ export default function CreateProposalWizard({ onCreated, onCancel }) {
     const requestId = creationRequestIdRef.current || createRequestId();
     creationRequestIdRef.current = requestId;
     try {
+      // Every selected version contributes its own frozen engineering evidence.
+      // The primary snapshot is reused exactly as the single-report path uses
+      // it; every other version is read from the same published authority, so a
+      // comparison is never written from one version's results.
+      const versionSnapshots = selectedVersionIds.length > 1
+        ? await buildSelectedVersionSnapshots({
+          projectId: selectedProjectId,
+          versionIds: selectedVersionIds,
+          primaryVersionId: snapshotVersionId,
+          primarySnapshot: engineeringSnapshot,
+        })
+        : [{
+          version_id: snapshotVersionId,
+          version_name: selectedVersion?.version_name || null,
+          snapshot: engineeringSnapshot,
+        }];
+
+      const missingSnapshots = versionSnapshots.filter((entry) => !entry.snapshot);
+      if (missingSnapshots.length > 0) {
+        setError(
+          `No calculated engineering result was found for ${missingSnapshots
+            .map((entry) => entry.version_name || entry.version_id)
+            .join(', ')}. Open each version in Room Designer and calculate it before generating this report.`,
+        );
+        return;
+      }
+
       const response = await base44.functions.invoke('generateProposal', {
         request_id: requestId,
         project_id: selectedProjectId,
@@ -127,9 +155,14 @@ export default function CreateProposalWizard({ onCreated, onCancel }) {
         account_id: accountId,
         narrative_goal: 'luxury_cinema',
         client_brief: clientBrief,
-        // Stage 2A: pass the frozen Engineering Snapshot. The backend stores
-        // it on the Proposal but does NOT use it for AI generation yet.
+        // The frozen Engineering Snapshot for the primary version, plus one
+        // frozen evidence entry per selected version for a comparison.
         engineering_snapshot: engineeringSnapshot || null,
+        engineering_snapshots: versionSnapshots.map((entry) => ({
+          version_id: entry.version_id,
+          version_name: entry.version_name || null,
+          snapshot: entry.snapshot,
+        })),
       });
       const proposalId = response?.data?.proposal_id;
       if (proposalId) {

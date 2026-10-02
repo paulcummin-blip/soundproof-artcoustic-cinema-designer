@@ -4,50 +4,99 @@ import { proposalRoleStyle } from '@/components/proposal/typography/proposalTypo
 /**
  * KeyPerformanceHighlightsTable
  * -----------------------------
- * The measured summary table of a System Design report:
- * Performance area | Result | What you experience.
+ * The measured summary table of a System Design report.
  *
- * The Result column is read verbatim from the calculated Sound Proof rows
- * stored on the section. This component never derives, rounds, regrades or
- * recalculates a value.
+ * Single Summary:      Performance area | Result | What you experience
+ * Comparison:          Performance area | Option A | Option B | What changes
+ *                      (one column per selected version)
+ *
+ * Every cell is read verbatim from calculated Sound Proof data stored on the
+ * section: for a summary the calculated rows, for a comparison the calculated
+ * comparison rows (one value per version, plus the derived change). This
+ * component never derives, rounds, regrades or recalculates a value, and the
+ * Design Performance Index rows are calculated rows like any other.
  *
  * Used by the Proposal Editor and by the print/PDF document, so both show
  * exactly the same table. The `kph-table` class is the print stylesheet hook.
  *
  * Props:
- * - rows: Array<{ key, area, result, what_you_hear }> (what_you_hear is the
- *   stored key for the "What you experience" column)
+ * - rows: Array<{ key, area, result, what_you_hear }> — summary rows
+ *   (what_you_hear is the stored key for the "What you experience" column)
+ * - comparisonRows: Array<{ key, area, values: string[], change: string|null }>
+ * - comparisonVersions: Array<{ version_id, label, version_name }> — the option
+ *   columns, in report order
  * - className: optional wrapper class
  */
 
-const COLUMNS = [
+const SUMMARY_COLUMNS = [
   { key: 'area', label: 'Performance area' },
   { key: 'result', label: 'Result' },
   { key: 'what_you_hear', label: 'What you experience' },
 ];
 
 const CELL = 'px-3 py-2 align-top border-b border-[#EAE8E3]';
+const HEAD = 'px-3 py-2 text-left text-[#213428] bg-[#F5F4F0] border-b border-[#DCDBD6]';
 
-/**
- * Design Index rows are no longer selected for the client-facing table, but a
- * report generated before that change still carries them in stored metadata.
- * They are dropped here at render time, so the editor preview and the exported
- * PDF both hide them without regenerating the report.
- */
-const DESIGN_INDEX_KEY = /^dpi_/i;
-const DESIGN_INDEX_AREA = /design index/i;
-
-export function isClientVisibleHighlightRow(row) {
-  if (!row) return false;
-  if (DESIGN_INDEX_KEY.test(String(row.key || ''))) return false;
-  if (DESIGN_INDEX_AREA.test(String(row.area || ''))) return false;
-  return true;
+function optionHeading(column, index) {
+  const label = column?.label || `Option ${String.fromCharCode(65 + index)}`;
+  return column?.version_name ? `${label} · ${column.version_name}` : label;
 }
 
-export default function KeyPerformanceHighlightsTable({ rows, className = '' }) {
-  const list = (rows || []).filter(
-    (row) => isClientVisibleHighlightRow(row) && (row.area || row.result),
-  );
+export default function KeyPerformanceHighlightsTable({
+  rows,
+  comparisonRows,
+  comparisonVersions,
+  className = '',
+}) {
+  const options = Array.isArray(comparisonVersions) ? comparisonVersions : [];
+  const comparison = options.length >= 2 && Array.isArray(comparisonRows) && comparisonRows.length > 0;
+
+  if (comparison) {
+    const showChange = comparisonRows.some((row) => row.change !== null && row.change !== undefined);
+    return (
+      <div className={className}>
+        <table className="kph-table w-full border-collapse">
+          <thead>
+            <tr>
+              <th className={HEAD} style={proposalRoleStyle('label')}>Performance area</th>
+              {options.map((column, index) => (
+                <th key={column.version_id || index} className={HEAD} style={proposalRoleStyle('label')}>
+                  {optionHeading(column, index)}
+                </th>
+              ))}
+              {showChange && <th className={HEAD} style={proposalRoleStyle('label')}>What changes</th>}
+            </tr>
+          </thead>
+          <tbody>
+            {comparisonRows.map((row, index) => (
+              <tr key={row.key || index}>
+                <td className={`${CELL} text-[#1B1A1A]`} style={proposalRoleStyle('body')}>{row.area}</td>
+                {options.map((column, optionIndex) => (
+                  <td
+                    key={`${row.key || index}:${column.version_id || optionIndex}`}
+                    className={`${CELL} text-[#3E4349]`}
+                    style={proposalRoleStyle('body')}
+                  >
+                    {row.values?.[optionIndex] || '—'}
+                  </td>
+                ))}
+                {showChange && (
+                  <td className={`${CELL} text-[#625143]`} style={proposalRoleStyle('body')}>
+                    {row.change || '—'}
+                  </td>
+                )}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+        <p className="mt-2 text-[#8A8477]" style={proposalRoleStyle('caption')}>
+          Every value calculated by Sound Proof for each version. The change column is derived from those values.
+        </p>
+      </div>
+    );
+  }
+
+  const list = (rows || []).filter((row) => row && (row.area || row.result));
   if (list.length === 0) return null;
 
   return (
@@ -55,12 +104,8 @@ export default function KeyPerformanceHighlightsTable({ rows, className = '' }) 
       <table className="kph-table w-full border-collapse">
         <thead>
           <tr>
-            {COLUMNS.map((column) => (
-              <th
-                key={column.key}
-                className="px-3 py-2 text-left text-[#213428] bg-[#F5F4F0] border-b border-[#DCDBD6]"
-                style={proposalRoleStyle('label')}
-              >
+            {SUMMARY_COLUMNS.map((column) => (
+              <th key={column.key} className={HEAD} style={proposalRoleStyle('label')}>
                 {column.label}
               </th>
             ))}

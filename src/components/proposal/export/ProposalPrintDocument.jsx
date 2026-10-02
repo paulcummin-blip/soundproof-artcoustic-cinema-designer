@@ -55,7 +55,11 @@ export default function ProposalPrintDocument({
             dangerouslySetInnerHTML={{ __html: section.body || '' }}
           />
           {section.section_type === 'key_performance_highlights' && (
-            <KeyPerformanceHighlightsTable rows={section.metadata?.highlight_rows} />
+            <KeyPerformanceHighlightsTable
+              rows={section.metadata?.highlight_rows}
+              comparisonRows={section.metadata?.comparison_rows}
+              comparisonVersions={section.metadata?.comparison_versions}
+            />
           )}
         </section>
       ))}

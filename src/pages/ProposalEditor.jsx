@@ -802,7 +802,12 @@ export default function ProposalEditor() {
                 )}
 
                 {section.section_type === 'key_performance_highlights' && (
-                  <KeyPerformanceHighlightsTable rows={section.metadata?.highlight_rows} className="mt-4" />
+                  <KeyPerformanceHighlightsTable
+                    rows={section.metadata?.highlight_rows}
+                    comparisonRows={section.metadata?.comparison_rows}
+                    comparisonVersions={section.metadata?.comparison_versions}
+                    className="mt-4"
+                  />
                 )}
 
                 {regenerating === section.id && (
