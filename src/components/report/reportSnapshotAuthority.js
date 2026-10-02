@@ -181,11 +181,13 @@ export function buildStaleSentence(changedKeys) {
   if (labels.length === 0) {
     return 'This report was generated before the latest changes to this project.';
   }
+  const lower = (label) => label.charAt(0).toLowerCase() + label.slice(1);
   if (labels.length === 1) {
     return `${labels[0]} changed after this report was generated.`;
   }
-  const head = labels.slice(0, -1).join(', ');
-  return `${head} and ${labels[labels.length - 1]} changed after this report was generated.`;
+  // Only the first named input is capitalised, so the sentence reads as prose.
+  const head = labels.slice(0, -1).map((label, index) => (index === 0 ? label : lower(label))).join(', ');
+  return `${head} and ${lower(labels[labels.length - 1])} changed after this report was generated.`;
 }
 
 /**
