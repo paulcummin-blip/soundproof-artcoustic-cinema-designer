@@ -116,7 +116,7 @@ function ReportRow({ row, onRequest }) {
   );
 }
 
-export default function ProposalSourcePanel({ status, loading = false, className = '' }) {
+export default function ProposalSourcePanel({ status, loading = false, className = '', onRetry = null }) {
   // Bumped when a generation is requested, so the running state renders.
   const [revision, setRevision] = useState(0);
 
@@ -189,6 +189,16 @@ export default function ProposalSourcePanel({ status, loading = false, className
           <p className="text-sm text-[#7A2E10] leading-relaxed" style={{ fontFamily: REPORT_FONT_BODY }}>
             {status.message}
           </p>
+          {onRetry && (
+            <button
+              type="button"
+              onClick={onRetry}
+              className="mt-3 px-4 py-2 text-[11px] uppercase tracking-[0.14em] text-white"
+              style={{ backgroundColor: '#213428', fontFamily: REPORT_FONT_BODY }}
+            >
+              Retry saved engineering read
+            </button>
+          )}
         </div>
       )}
 
