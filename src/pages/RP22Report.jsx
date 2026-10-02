@@ -81,8 +81,9 @@ function RP22ReportInner() {
     // ── Authoritative Read-Only Mode ──────────────────────────────────────
     // While the Technical Report is mounted, authoritative write boundaries
     // emit a console warning if called. The report is a pure consumer of the
-    // published engineering summary: zero publishes, recalculations, or cache
-    // hydration. Cleared on unmount.
+    // published engineering summary: zero publishes or recalculations. It may
+    // hydrate the saved read-only authority needed to prove completeness.
+    // Cleared on unmount.
     useEffect(() => {
         setAuthoritativeReadOnlyMode(true);
         return () => setAuthoritativeReadOnlyMode(false);
@@ -176,6 +177,12 @@ function RP22ReportInner() {
         ?? designReviewHandoff?.rating?.engineeringSummary
         ?? null;
     const authorityReportPending = !engineeringSummary;
+    const reportDataIncomplete = !authorityResolving
+        && !bassReportPending
+        && !bassRestoreFailed
+        && !reportAuthority.reportComplete;
+    const reportDataIncompleteReason = reportAuthority.reportCompleteness?.reason
+        || "Complete every project assessment before generating reports or proposals.";
 
     // ── Saved report snapshot (Technical Report) ────────────────────────────
     // The saved report is recorded against this project version when it is
@@ -207,7 +214,7 @@ function RP22ReportInner() {
         reportType: REPORT_SNAPSHOT_TYPE.TECHNICAL,
         currentFingerprints: snapshotFingerprints,
         payload: snapshotPayload,
-        ready: !!engineeringSummary && !authorityResolving && !reportHydrating && !bassReportPending && !bassRestoreFailed,
+        ready: !!engineeringSummary && !authorityResolving && !reportHydrating && !bassReportPending && !bassRestoreFailed && !reportDataIncomplete,
     });
 
     // Full project hydration for RP22Report — mirrors Room Designer's useProjectLoader path
@@ -432,9 +439,9 @@ function RP22ReportInner() {
             logAutoPrintBlock(reportHydrating ? 'reportHydrating = true' : 'reportReadyProjectId mismatch', 391);
             return;
         }
-        if (authorityReportPending || bassReportPending || bassRestoreFailed) {
+        if (authorityReportPending || bassReportPending || bassRestoreFailed || reportDataIncomplete) {
             logAutoPrintBlock(
-                bassRestoreFailed ? 'saved bass authority restore failed' : (bassReportPending ? 'saved bass authority hydrating' : 'engineeringSummary unavailable'),
+                bassRestoreFailed ? 'saved bass authority restore failed' : (bassReportPending ? 'saved bass authority hydrating' : (reportDataIncomplete ? 'engineering assessment incomplete' : 'engineeringSummary unavailable')),
                 395,
             );
             return;
@@ -450,7 +457,7 @@ function RP22ReportInner() {
         setPlanDimsImageDataUrl(null);
         setPlanSpeakerDimsImageDataUrl(null);
         setIsPrinting(true);
-    }, [autoPrintRequested, reportHydrating, explicitProjectId, reportReadyProjectId, isPrinting, authorityReportPending, bassReportPending, bassRestoreFailed]);
+    }, [autoPrintRequested, reportHydrating, explicitProjectId, reportReadyProjectId, isPrinting, authorityReportPending, bassReportPending, bassRestoreFailed, reportDataIncomplete]);
 
     // Mark printReady when all captures are done
     useEffect(() => {
@@ -489,7 +496,7 @@ function RP22ReportInner() {
                 printLockRef.current = false;
                 return;
             }
-            if (!projectIdMatch || bassScopeId !== explicitProjectId || bassReportPending || bassRestoreFailed) {
+            if (!projectIdMatch || bassScopeId !== explicitProjectId || bassReportPending || bassRestoreFailed || reportDataIncomplete) {
                 logAutoPrintBlock('print trigger: bass authority project mismatch or restore incomplete', 441);
                 setExportStatus("Print cancelled — bass authority project mismatch.");
                 setIsPrinting(false);
@@ -521,7 +528,7 @@ function RP22ReportInner() {
             }, 2000);
         }, 250);
         return () => clearTimeout(t);
-    }, [isPrinting, printReady, hasPrintedOnce, explicitProjectId, reportReadyProjectId, reportHydrating, projectIdMatch, bassScopeId, bassReportPending, bassRestoreFailed]);
+    }, [isPrinting, printReady, hasPrintedOnce, explicitProjectId, reportReadyProjectId, reportHydrating, projectIdMatch, bassScopeId, bassReportPending, bassRestoreFailed, reportDataIncomplete]);
 
     useEffect(() => { setExportDebug(d => ({ ...d, isPrinting, printReady })); }, [isPrinting, printReady]);
 
@@ -1188,8 +1195,8 @@ function RP22ReportInner() {
                         setPlanDimsImageDataUrl={setPlanDimsImageDataUrl}
                         setPlanSpeakerDimsImageDataUrl={setPlanSpeakerDimsImageDataUrl}
                         setIsPrinting={setIsPrinting}
-                        exportDisabled={reportHydrating || (explicitProjectId && reportReadyProjectId !== explicitProjectId) || authorityReportPending || bassReportPending || bassRestoreFailed || recommendationsPending || !designAssessmentComplete}
-                        exportDisabledMessage={!designAssessmentComplete ? "Complete assessment to export PDF" : (authorityReportPending ? "Engineering summary loading" : (recommendationsPending ? "Recommendations evaluating" : "Report loading"))}
+                        exportDisabled={reportHydrating || (explicitProjectId && reportReadyProjectId !== explicitProjectId) || authorityReportPending || bassReportPending || bassRestoreFailed || reportDataIncomplete || recommendationsPending || !designAssessmentComplete}
+                        exportDisabledMessage={reportDataIncomplete ? reportDataIncompleteReason : (!designAssessmentComplete ? "Complete assessment to export PDF" : (authorityReportPending ? "Engineering summary loading" : (recommendationsPending ? "Recommendations evaluating" : "Report loading")))}
                         lcrAngleInfo={(() => {
                             // Compute LCR angles exactly as Plan View does:
                             // lcrAimMode === 'angled' → compute yaw from speaker position to MLP
