@@ -1,9 +1,8 @@
 // ProjectLoadingShell.jsx
 // --------------------------------
-// Project-specific loading shell. Renders a neutral skeleton — never default
-// room dimensions, default speaker layouts, RP22 values, prices or engineering
-// results. When the project is known it names it, so the designer can see which
-// project is being opened.
+// Project-specific loading shell. Renders a neutral skeleton while the saved
+// project identity and core design are restored. Report, bass, proposal and
+// pricing authorities are owned by their routes/actions and are not opened here.
 
 import React from "react";
 import { RESTORE_STATUS_LABEL } from "@/components/state/projectRestoreChecklist";
@@ -86,9 +85,8 @@ const BUTTON_BASE = {
   fontFamily: FONT_BODY,
 };
 
-// The long-wait notice. It appears while the restore is simply taking a while —
-// larger projects, saved bass authority, report authority, proposal source data and
-// pricing can all take longer — and it never implies a failure. Retry appears here
+// The long-wait notice. It appears while the project/core-design restore is
+// simply taking a while, and it never implies a failure. Retry appears here
 // only once the authority says a restore genuinely failed or has stopped responding.
 // There is still no continue-anyway option: a required row that has not restored
 // keeps the project here until it does.
@@ -212,7 +210,7 @@ export default function ProjectLoadingShell({
             color: "#8B7F76",
           }}
         >
-          Restoring saved design, performance results, reports and pricing.
+          Restoring the saved project and core design.
         </div>
 
         {lines.length > 0 && (
