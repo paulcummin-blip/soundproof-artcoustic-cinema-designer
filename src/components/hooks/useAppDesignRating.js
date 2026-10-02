@@ -196,6 +196,14 @@ export function resolveBassReadiness(completedBassAuthority, bassApplicable = fa
     return { ready: true, pending: false, reason: 'blocked', fingerprint: null };
   }
   if (status === BASS_AUTHORITY_STATUS.ERROR) {
+    // An error with a preserved published contract still has the last published
+    // bass values and publishes normally. An error with NO contract has no bass
+    // authority at all — publishing from it would write an engineering summary
+    // with no P14/P18/P19/P20 to the durable publication, which every report
+    // would then read as the saved result. Not publishable.
+    if (!completedBassAuthority?.contract) {
+      return { ready: false, pending: false, reason: 'bass-authority-unavailable', fingerprint: currentFp };
+    }
     return { ready: true, pending: false, reason: 'error', fingerprint: currentFp };
   }
   return { ready: false, pending: true, reason: 'unknown', fingerprint: currentFp };

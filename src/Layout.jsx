@@ -41,6 +41,7 @@ import DesignRatingSummary from "@/components/pricing/DesignRatingSummary";
 import { PartnerPortalIdentityProvider } from "@/components/providers/PartnerPortalIdentityProvider";
 import DealerIdentityDiagnostic from "@/components/dev/DealerIdentityDiagnostic";
 import DealerHero from "@/components/ui/HeroBanner";
+import BassAuthorityRestore from "@/components/state/BassAuthorityRestore";
 import BrandBar from "@/components/ui/BrandBar";
 import { subscribeAsdrVisibility, getAsdrVisibility } from "@/components/state/asdrVisibilityStore";
 import { useAuth } from "@/lib/AuthContext";
@@ -552,6 +553,11 @@ export default function Layout({ children, currentPageName }) {
             </div>
           </main>
         </div>
+        {/* The saved bass authority (completed contract + P14 target bank) is
+            restored as soon as a project is open — on every page, not only where
+            the Room Designer's Bass section is mounted. Reports and the sidebar
+            therefore read a restored authority without opening the Bass panel. */}
+        <BassAuthorityRestore projectId={activeProjectId} versionId={activeVersionId} />
         <DealerIdentityDiagnostic />
         </PartnerPortalIdentityProvider>
         </AppStateProvider>

@@ -73,6 +73,11 @@ import {
   resolveProposalSource,
   verifySourceIdentity,
 } from "@/components/proposal/sourceAuthority/proposalSourceAuthority";
+import {
+  getCompletedBassAuthority,
+  isBassAuthorityHydrationSettled,
+} from "@/components/room/bass/completedBassResultStore";
+import BassAuthorityRestore from "@/components/state/BassAuthorityRestore";
 
 const P14_TARGET_BANK_SIZE = 8;
 
@@ -272,13 +277,29 @@ export default function ProjectOpeningResolver({ projectId, entrySurface = null 
             ? stale(PARTIAL_LIVE_DETAIL)
             : notGenerated("No saved RP22 results for this version — the design opens uncalculated.");
 
-      const bassStage = restored
-        ? ready("Performance is current — the saved result is restored, nothing recalculates.")
-        : durableStale
-          ? stale("Saved bass performance is out of date — recalculation required.")
-          : partialLive
-            ? stale(PARTIAL_LIVE_DETAIL)
-            : notGenerated("No saved bass result — bass performance requires recalculation.");
+      // The saved bass authority must be RESTORED before this stage can be
+      // released — the completed contract and the P14 target bank read back from
+      // the database. Reporting "ready" from the publication alone, while the
+      // authority a report reads was still empty, is what left empty P14/P18/P19
+      // boxes and placeholder P20 rows on a reopened project.
+      const bassAuthority = versionId ? getCompletedBassAuthority(projectId, versionId) : null;
+      const bassAuthorityRestored = !!bassAuthority?.contract
+        && (bassAuthority.authoritative === true || bassAuthority.structurallyComplete === true);
+      const bassHydrationSettled = !versionId || isBassAuthorityHydrationSettled(projectId, versionId);
+
+      const bassStage = !bassHydrationSettled
+        ? restoring("Restoring the saved bass authority for this design version.")
+        : restored
+          ? ready(bassAuthorityRestored
+            ? "Performance is current — the saved bass result is restored, nothing recalculates."
+            : "The published engineering record for this version is restored.")
+          : durableStale
+            ? stale("Saved bass performance is out of date — recalculation required.")
+            : partialLive
+              ? stale(PARTIAL_LIVE_DETAIL)
+              : bassAuthorityRestored
+                ? notGenerated("Bass is calculated for this version but no engineering result is published yet — open the design to publish it.")
+                : notGenerated("No saved bass result — bass performance requires recalculation.");
 
       bassAuthorityRef.current = bassStage;
 
@@ -357,6 +378,15 @@ export default function ProjectOpeningResolver({ projectId, entrySurface = null 
         ));
         return;
       }
+      // The saved bass authority must finish restoring before the stage is
+      // released: a half-restored authority is never reported as ready, and the
+      // project is never handed to a report on one.
+      if (versionId && !isBassAuthorityHydrationSettled(projectId, versionId)) {
+        resolveProjectOpeningCheckpoint("bass", restoring(
+          "Restoring the saved bass authority for this design version.",
+        ));
+        return;
+      }
       if (bassAuthorityRef.current) {
         resolveProjectOpeningCheckpoint("bass", bassAuthorityRef.current);
       }
@@ -366,7 +396,11 @@ export default function ProjectOpeningResolver({ projectId, entrySurface = null 
     tick();
 
     return stop;
-  }, [projectId, attempt]);
+  }, [projectId, versionId, attempt]);
 
-  return null;
+  // The restore itself: this hydrates the completed bass authority (and the
+  // persisted P14 target bank) for this version, so the panel above waits on a
+  // real restore rather than on a session only the Bass section would have
+  // started. Reports then read the restored authority, never a live UI store.
+  return <BassAuthorityRestore projectId={projectId} versionId={versionId} />;
 }

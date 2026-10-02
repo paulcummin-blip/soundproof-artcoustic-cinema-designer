@@ -24,6 +24,8 @@ import {
   readLocalHandoff,
 } from './versionedEngineeringAuthority';
 import { subscribeDesignReviewHandoff } from '@/components/state/designReviewHandoff';
+import { useCompletedBassAuthority } from '@/components/room/bass/completedBassResultStore';
+import { applyRestoredBassAuthority } from './restoredBassOverlay';
 
 export function useVersionedEngineeringAuthority(projectId, versionId) {
   const [localSnapshot, setLocalSnapshot] = useState(
@@ -93,7 +95,17 @@ export function useVersionedEngineeringAuthority(projectId, versionId) {
     return () => { cancelled = true; };
   }, [projectId, versionId]);
 
-  const snapshot = composeAuthoritySnapshot({ localSnapshot, durableSnapshot });
+  // The saved bass authority is restored here — on every page that reads the
+  // engineering authority, not only where the Room Designer (and its Bass
+  // section) is mounted. Acquiring it starts the one durable hydration for this
+  // project version and re-renders when it lands. The overlay then fills in the
+  // bass results of a saved summary that does not state them, from the restored
+  // contract, so a report never has to wait for the Bass section to hydrate.
+  const completedBassAuthority = useCompletedBassAuthority(projectId || 'free', versionId || 'free');
+  const snapshot = applyRestoredBassAuthority(
+    composeAuthoritySnapshot({ localSnapshot, durableSnapshot }),
+    { projectId, versionId, completedBassAuthority },
+  );
   const state = classifyAuthorityState({ durable, localSnapshot });
   const localHasSummary = !!extractEngineeringSummary(localSnapshot);
   // Still resolving when the browser has no summary and the durable read has
