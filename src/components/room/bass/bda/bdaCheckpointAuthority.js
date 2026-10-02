@@ -20,6 +20,8 @@
 
 import { useCallback, useRef } from "react";
 import { base44 } from "@/api/base44Client";
+import { readProjectAnalysisCacheRecord } from "@/components/state/projectReadCache";
+import { fetchDurablePublication } from "@/components/engineering/versionedEngineeringAuthority";
 import {
   captureCheckpoint,
   markCheckpointIncludesSeating,
@@ -289,12 +291,7 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
  */
 async function fetchCachedCompactContract(projectId, versionId, bassFingerprint) {
   try {
-    const records = await base44.entities.ProjectAnalysisCache.filter(
-      { project_id: projectId, version_id: versionId },
-      "-updated_date",
-      1,
-    );
-    const record = Array.isArray(records) ? records[0] : null;
+    const record = await readProjectAnalysisCacheRecord(projectId, versionId);
     if (!record?.completed_by_fingerprint) return null;
     const entry = record.completed_by_fingerprint[bassFingerprint];
     if (!entry) return null;
@@ -319,12 +316,9 @@ async function fetchCachedCompactContract(projectId, versionId, bassFingerprint)
 async function repointEngineeringPublication(projectId, versionId, engineeringFingerprint, bassFingerprint) {
   try {
     // 1. Confirm the existing publication is available.
-    const readRes = await base44.functions.invoke("readPublishedEngineering", {
-      project_id: projectId,
-      version_id: versionId,
-      engineering_fingerprint: engineeringFingerprint,
+    const readData = await fetchDurablePublication(projectId, versionId, {
+      engineeringFingerprint,
     });
-    const readData = readRes?.data || readRes;
     if (readData?.status !== "published" || !readData?.publication) {
       return { ok: false, reason: "publication-not-found" };
     }
