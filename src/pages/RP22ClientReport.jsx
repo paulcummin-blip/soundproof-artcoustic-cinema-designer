@@ -845,15 +845,24 @@ export default function RP22ClientReport() {
   });
 
   // A failed export resolves the report to the canonical Failed state.
-  const readiness = exportError
+  const authorityReadFailed = authority.readFailed || authority.bassRestoreFailed;
+  const readiness = authorityReadFailed
     ? {
         state: REPORT_STATE.FAILED,
         missing: [],
-        nextAction: "Retry the report, or return to the project.",
-        reason: exportError,
+        nextAction: "Retry the saved engineering read, or return to the project.",
+        reason: authority.readError || "Saved engineering authority could not be read. Nothing has been treated as missing or uncalculated.",
         canExport: false,
       }
-    : readinessBase;
+    : exportError
+      ? {
+          state: REPORT_STATE.FAILED,
+          missing: [],
+          nextAction: "Retry the report, or return to the project.",
+          reason: exportError,
+          canExport: false,
+        }
+      : readinessBase;
 
   const reportReady = readiness.state === REPORT_STATE.READY;
 
@@ -1092,7 +1101,7 @@ export default function RP22ClientReport() {
               progressItems={progressItems}
               elapsedSeconds={stateSeconds}
               onReturn={handleBackToProject}
-              onRetry={exportError ? handleExport : undefined}
+              onRetry={authorityReadFailed ? authority.retry : (exportError ? handleExport : undefined)}
               diagnostics={gateDiagnostics}
             />
           </div>
