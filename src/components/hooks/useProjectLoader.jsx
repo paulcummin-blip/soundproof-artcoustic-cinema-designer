@@ -128,6 +128,9 @@ appState, // Pass appState directly for setters
   // treatment, price-display basis — have finished loading, and a populated
   // selection may not collapse to a default without a real designer edit.
   const commercialAuthorityRef = useRef(null);
+  // Opening and hydration are read-only. Autosave is armed only after a user
+  // interaction occurs after the current project has finished loading.
+  const autosaveUserArmedRef = useRef(false);
 
   // Active Project ID — resolved from URL params / props. Declared early so
   // hooks below (e.g. useAppliedCalibrationAuthority) can reference it
@@ -594,6 +597,22 @@ appState, // Pass appState directly for setters
     isHydratingRef.current = isCurrentlyHydrating;
   }, [loadState.phase, activeProjectId]);
 
+  useEffect(() => {
+    autosaveUserArmedRef.current = false;
+    if (loadState.phase !== "loaded" || typeof window === "undefined") return;
+    const armAutosave = () => { autosaveUserArmedRef.current = true; };
+    window.addEventListener("input", armAutosave, true);
+    window.addEventListener("change", armAutosave, true);
+    window.addEventListener("pointerup", armAutosave, true);
+    window.addEventListener("keydown", armAutosave, true);
+    return () => {
+      window.removeEventListener("input", armAutosave, true);
+      window.removeEventListener("change", armAutosave, true);
+      window.removeEventListener("pointerup", armAutosave, true);
+      window.removeEventListener("keydown", armAutosave, true);
+    };
+  }, [loadState.phase, activeProjectId]);
+
 
   // Auto-save ONLY for an existing project.
   // Quiet autosave: mark dirty on changes, then commit at most every 10s (and also on short pauses).
@@ -849,6 +868,17 @@ appState, // Pass appState directly for setters
       currentSig = computeSig(buildProjectData());
     } catch {
       currentSig = String(Date.now()); // treat as changed if build fails
+    }
+
+    if (!autosaveUserArmedRef.current) {
+      // Hydration and downstream normalisation may settle over several renders.
+      // Until the designer interacts, keep re-baselining instead of treating
+      // those restore-only changes as edits or writing them back to the DB.
+      r.lastSavedSig = currentSig;
+      r.lastQueuedSig = currentSig;
+      r.dirty = false;
+      if (!r.inFlight) setAutosaveStatus("saved");
+      return;
     }
 
     if (currentSig === r.lastSavedSig) {
