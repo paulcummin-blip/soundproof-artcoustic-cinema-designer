@@ -9,10 +9,10 @@
 // snapshot and answers.
 //
 // The rule, in full:
-//   · every stage must reach a definite outcome before the panel closes
-//   · 'restoring' is never a definite outcome
+//   · editable design and commercial-save authorities must be restored
+//   · calculated/output stages never prevent an unfinished project opening
+//   · reports and proposals enforce completeness inside their own surfaces
 //   · the session knowledge of an already-opened project is honoured
-//   · only supporting stages may be continued past after a long wait
 
 import {
   OPENING_CHECKPOINT_STATE,
@@ -117,10 +117,10 @@ export function openingCheckpointWarnings(snapshot, projectId) {
 /**
  * The one decision the opening panel needs.
  *
- * `phase` is 'restoring' while any stage is still resolving, 'still-restoring'
- * once the wait has run long, and 'ready' when the project may be shown.
- * `canContinueWithWarning` is true only when the stages still restoring are all
- * supporting ones — the escape hatch is never offered past a critical stage.
+ * `phase` is 'restoring' while an opening-critical stage is resolving,
+ * 'still-restoring' once that wait has run long, and 'ready' when the editable
+ * project may be shown. Output stages may continue hydrating in the background;
+ * they are gated by the report/proposal surfaces that consume them.
  *
  * @param {Object} snapshot the opening snapshot
  * @param {string|null} projectId the project being opened
@@ -181,7 +181,7 @@ export function deriveOpeningReadinessFor(snapshot, projectId, context = {}) {
   const pendingCritical = pending.filter((key) => criticalKeys.includes(key));
   const pendingSupporting = pending.filter((key) => !criticalKeys.includes(key));
   const timedOut = snapshot.timedOut === true;
-  const holding = !snapshot.closed && (!snapshot.minVisibleElapsed || pending.length > 0);
+  const holding = !snapshot.closed && (!snapshot.minVisibleElapsed || pendingCritical.length > 0);
 
   return {
     holding,
@@ -198,7 +198,7 @@ export function deriveOpeningReadinessFor(snapshot, projectId, context = {}) {
       : timedOut
         ? OPENING_PHASE.STILL_RESTORING
         : OPENING_PHASE.RESTORING,
-    canContinueWithWarning: holding && timedOut && pending.length > 0 && pendingCritical.length === 0,
+    canContinueWithWarning: false,
     entrySurface,
     attempt,
     lines,
