@@ -238,7 +238,15 @@ function RP22ReportInner() {
         sourceFingerprint: snapshotFingerprints?.engineeringFingerprint ?? null,
         savedFingerprint: reportSnapshot.saved?.source_fingerprints?.engineeringFingerprint ?? null,
         snapshotStatus: reportSnapshot.status,
-        gateResult: reportDataIncomplete ? 'blocked' : (showLoadingReport ? 'loading' : 'open'),
+        gateResult: reportDataIncomplete
+            ? 'blocked'
+            : ((reportHydrating
+                || (explicitProjectId && reportReadyProjectId !== explicitProjectId)
+                || authorityReportPending
+                || authorityResolving
+                || bassReportPending)
+                ? 'loading'
+                : 'open'),
         blockReason: reportDataIncomplete ? reportDataIncompleteReason : null,
     });
 
