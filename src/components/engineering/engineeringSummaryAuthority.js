@@ -23,6 +23,7 @@ import {
 } from "@/components/report/technical/designRatingPresentation";
 import { getLowestPerformanceResults } from "@/components/designreview/needsAttentionAuthority";
 import { getCategoryForParam } from "@/components/report/technical/technicalParameterMeta";
+import { firstStatedPrimitive } from "@/components/utils/renderSafe";
 import { isSeatScopedParameterKey } from "@/components/utils/rp22ParameterPresentation";
 import { buildRp22SeatCoverageResult } from "@/components/utils/rp22SeatCoverageSentence";
 import { getScopedSeatIds, buildSeatPriorityFingerprint } from "@/components/utils/seatScopeAuthority";
@@ -290,7 +291,7 @@ function buildReportCounts(parameters, seats, seatHudById) {
         isPrimary: seat?.isPrimary === true || String(seat?.priority || "").toLowerCase() !== "secondary",
         valueFormatted: isBassDeviation
           ? `±${Number(rawValue).toFixed(1)} dB`
-          : (metric?.formatted || metric?.hudLabel || "—"),
+          : firstStatedPrimitive([metric?.formatted, metric?.hudLabel, rawValue], "—"),
         level: seatAuthority?.state === "scored" ? (normalizeLevel(seatAuthority.level) || "—") : "—",
         status: seatAuthority?.state || metric?.status || null,
         value: rawValue,
