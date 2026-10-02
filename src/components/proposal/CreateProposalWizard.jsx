@@ -66,7 +66,12 @@ export default function CreateProposalWizard({ onCreated, onCancel }) {
   // ── Proposal Source Data ──
   // The proposal is downstream of the generated Visual and Technical Reports.
   // Generation is blocked until a current report source exists for the version.
-  const { status: sourceStatus, loading: sourceLoading } = useProposalSourceStatus({
+  const {
+    status: sourceStatus,
+    loading: sourceLoading,
+    readFailed: sourceReadFailed,
+    retry: retrySourceRead,
+  } = useProposalSourceStatus({
     projectId: selectedProjectId,
     versionId: snapshotVersionId,
     version: selectedVersion,
@@ -267,7 +272,12 @@ export default function CreateProposalWizard({ onCreated, onCancel }) {
       {step === 4 && (
         <div>
           {/* Source status — the proposal is built from these reports only. */}
-          <ProposalSourcePanel status={sourceStatus} loading={sourceLoading} className="mb-8" />
+          <ProposalSourcePanel
+            status={sourceStatus}
+            loading={sourceLoading}
+            className="mb-8"
+            onRetry={sourceReadFailed ? retrySourceRead : null}
+          />
           <div className="mb-10">
             <ReviewRow label="Project" value={selectedProjectId ? 'Selected' : '—'} />
             <ReviewRow
