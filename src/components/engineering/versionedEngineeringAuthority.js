@@ -176,20 +176,42 @@ export function classifyAuthorityState({ durable, localSnapshot }) {
  * made a reopened report render empty P18/P19 boxes from a saved report that
  * held the values.
  */
+export function statesBassResultEntry(entry) {
+  if (!entry || typeof entry !== 'object') return false;
+  // A blank result carries value: null, and null/blank must never become zero.
+  const raw = entry.value ?? entry.rawValue;
+  if (raw !== null && raw !== undefined && raw !== '') {
+    const numeric = Number(raw);
+    if (Number.isFinite(numeric)) return true;
+  }
+  const formatted = typeof entry.formatted === 'string'
+    ? entry.formatted.trim()
+    : (typeof entry.valueText === 'string' ? entry.valueText.trim() : '');
+  return formatted.length > 0
+    && formatted !== '—'
+    && formatted.toUpperCase() !== 'N/A'
+    && formatted.toUpperCase() !== 'NOT CALCULATED';
+}
+
 export function statesBassAuthority(summary) {
   const results = summary?.roomResultsByParameter;
   if (!results || typeof results !== 'object' || Array.isArray(results)) return false;
-  return [14, 18, 19].some((id) => {
-    const entry = results[id] ?? results[String(id)];
-    if (!entry || typeof entry !== 'object') return false;
-    // A blank result carries value: null, and null is NOT a value of zero.
-    const stated = (entry.value === null || entry.value === undefined || entry.value === '')
-      ? null
-      : Number(entry.value);
-    if (Number.isFinite(stated)) return true;
-    const formatted = typeof entry.formatted === 'string' ? entry.formatted.trim() : '';
-    return formatted.length > 0 && formatted !== '—' && formatted !== 'N/A';
-  });
+
+  // P14, P18 and the RSP-scoped P19 must all be stated. "Some bass exists" is
+  // not enough: that test allowed P14/P18 to conceal a missing P19 forever.
+  const roomResultsComplete = [14, 18, 19].every((id) => (
+    statesBassResultEntry(results[id] ?? results[String(id)])
+  ));
+
+  // P20 is seat-scoped. A real zero is valid only when the row is explicitly
+  // scored; placeholder ±0.0 rows published before bass restore are not.
+  const p20Rows = summary?.project?.reportCounts?.seatResultsByParameter?.p20;
+  const p20Complete = Array.isArray(p20Rows) && p20Rows.some((row) => (
+    row?.status === 'scored'
+    && statesBassResultEntry({ value: row?.value, formatted: row?.valueFormatted })
+  ));
+
+  return roomResultsComplete && p20Complete;
 }
 
 export function composeAuthoritySnapshot({ localSnapshot, durableSnapshot }) {
