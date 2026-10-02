@@ -3,12 +3,14 @@
  * -------------------------
  * The product demand export for the Project Intelligence selection workflow.
  *
- * Four workbook tabs, built from the admin's inclusion and counted-version
+ * Five workbook tabs, built from the admin's inclusion and counted-version
  * selection:
- *   1. Included Projects — one row per included project
- *   2. Excluded Projects — one row per excluded project, with the reason
- *   3. Product Demand    — counted versions only, never every version
- *   4. Version Detail    — every version, marked counted or not
+ *   1. Included Projects      — one row per included project
+ *   2. Excluded Projects      — one row per excluded project, with the reason
+ *   3. Product Demand         — Artcoustic catalogue lines, counted versions only
+ *   4. Version Detail         — every version, marked counted or not
+ *   5. Excluded Manual Lines  — the non-catalogue lines left out of demand, for
+ *                               audit only (never part of the demand totals)
  *
  * The workbook and CSV strings are produced by projectReportingExport, so this
  * module returns sheet definitions only.
@@ -23,6 +25,7 @@ export const SELECTION_WORKBOOK_TABS = [
   'Excluded Projects',
   'Product Demand',
   'Version Detail',
+  'Excluded Manual Lines',
 ];
 
 /** The export filename, e.g. "Sound Proof Project Intelligence Product Demand - 2026-10-02". */
@@ -45,7 +48,7 @@ const noteText = (family) => [
  * @param {Object} selection — { families, productDemand, summary }
  * @returns {Array<{ name: string, columns: Array, rows: Array }>}
  */
-export function buildSelectionSheets({ families = [], productDemand = [] } = {}) {
+export function buildSelectionSheets({ families = [], productDemand = [], excludedLines = [] } = {}) {
   const included = families.filter((family) => family.included);
   const excluded = families.filter((family) => !family.included);
   const currency = included.map((family) => family.countedCurrency).find(Boolean) || 'GBP';
@@ -83,6 +86,15 @@ export function buildSelectionSheets({ families = [], productDemand = [] } = {})
     { key: 'liveValue', label: `Total live value (${currency})`, type: 'currency' },
     { key: 'derived', label: 'Derived line', type: 'string' },
     { key: 'priced', label: 'Priced', type: 'string' },
+  ];
+
+  const excludedLineColumns = [
+    { key: 'project', label: 'Project', type: 'string' },
+    { key: 'countedVersion', label: 'Counted version', type: 'string' },
+    { key: 'description', label: 'Manual line description', type: 'string' },
+    { key: 'quantity', label: 'Quantity', type: 'number' },
+    { key: 'value', label: `Value (${currency})`, type: 'currency' },
+    { key: 'reason', label: 'Reason excluded', type: 'string' },
   ];
 
   const versionColumns = [
@@ -160,6 +172,20 @@ export function buildSelectionSheets({ families = [], productDemand = [] } = {})
           productLines: variation.lineCount,
           updated: variation.updatedDate || variation.createdDate || null,
         };
+      })),
+    },
+    {
+      // The audit tab: lines kept OUT of Product Demand. Quantity and value here
+      // are shown for transparency only and are never part of the demand totals.
+      name: SELECTION_WORKBOOK_TABS[4],
+      columns: excludedLineColumns,
+      rows: excludedLines.map((row) => ({
+        project: row.project,
+        countedVersion: row.countedVersion,
+        description: row.description,
+        quantity: row.quantity,
+        value: row.value,
+        reason: row.reason,
       })),
     },
   ];

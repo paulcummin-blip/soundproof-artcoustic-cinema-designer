@@ -17,7 +17,7 @@ import {
   preferenceFromOption,
   summariseSelection,
 } from '@/lib/commercial/projectReporting/projectSelection';
-import { buildProductDemand } from '@/lib/commercial/projectReporting/productDemand';
+import { buildCatalogueDemand } from '@/lib/commercial/projectReporting/productDemand';
 import { clearSelection, readSelection, writeSelection } from './projectSelectionStore';
 
 /**
@@ -44,12 +44,17 @@ export function useProjectSelection({ families = [], priceMap = null, totalLoade
   );
 
   // Product demand counts the counted version of included projects only. No
-  // excluded project and no non-counted version can reach this aggregation.
-  const productDemand = useMemo(() => {
+  // excluded project and no non-counted version can reach this aggregation, and
+  // only Artcoustic catalogue lines are aggregated. The excluded lines are the
+  // audit trail for what was left out; they never affect the demand totals.
+  const catalogueDemand = useMemo(() => {
     const counted = includedFamilies(selectedFamilies);
-    if (counted.length === 0) return [];
-    return buildProductDemand({ families: counted, priceMap });
+    if (counted.length === 0) return { rows: [], excludedLines: [] };
+    return buildCatalogueDemand({ families: counted, priceMap });
   }, [selectedFamilies, priceMap]);
+
+  const productDemand = catalogueDemand.rows;
+  const excludedLines = catalogueDemand.excludedLines;
 
   const versionRows = useMemo(() => buildVersionDetailRows(selectedFamilies), [selectedFamilies]);
 
@@ -75,6 +80,7 @@ export function useProjectSelection({ families = [], priceMap = null, totalLoade
   return {
     selectedFamilies,
     productDemand,
+    excludedLines,
     versionRows,
     summary,
     preferences,

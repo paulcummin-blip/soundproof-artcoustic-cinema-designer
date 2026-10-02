@@ -15,12 +15,18 @@
 
 import { STATUS_BUCKETS } from './statusBuckets';
 import { text } from './reportingUtils';
+import { classifyCatalogueLine, isEngineDerivedLine } from './catalogueLineAuthority';
 
-const DERIVED_LINE_PATTERNS = ['cph-1000d', '500027', 'manual-extra'];
+/**
+ * Whether a line is an Artcoustic line the pricing engine generated from the
+ * design (the CPH-1000D subwoofer amplifier, the Abfuser acoustic treatment).
+ * Manual extras are not demand lines at all, so they are no longer listed here.
+ */
+export const isDerivedLine = isEngineDerivedLine;
 
-export function isDerivedLine(model) {
-  return DERIVED_LINE_PATTERNS.includes(text(model).toLowerCase());
-}
+/** Where an excluded line was found: the design, or the quoted snapshot. */
+const LIVE_BASIS = 'Live design';
+const QUOTED_BASIS = 'Quoted snapshot';
 
 /**
  * The variation whose priced lines count as demand for this project.
@@ -40,30 +46,41 @@ function countedVariationOf(family) {
 }
 
 /**
+ * The catalogue demand pass.
+ *
+ * ONLY Artcoustic catalogue lines reach the demand rows: a line is aggregated
+ * only when it resolves to a real Product Master record. Manual extras and lines
+ * the Product Master does not know are classified out with a reason and returned
+ * separately, so they are visible for audit but never counted.
+ *
+ * Both outputs come from this ONE pass, so the demand and the excluded-line
+ * audit can never disagree.
+ *
  * @param {Object} input
- * @param {Array} input.families — filtered project families
+ * @param {Array} input.families — included project families
  * @param {Map} input.priceMap — Product Master index (sku → product)
- * @returns {Array<Object>} demand rows
+ * @returns {{ rows: Array<Object>, excludedLines: Array<Object> }}
  */
-export function buildProductDemand({ families = [], priceMap = null } = {}) {
+export function buildCatalogueDemand({ families = [], priceMap = null } = {}) {
   const rows = new Map();
+  const excluded = new Map();
 
-  const ensureRow = (sku, label) => {
+  const ensureRow = (sku, label, classification) => {
     const key = text(sku).toLowerCase() || text(label).toLowerCase();
     if (!key) return null;
     if (!rows.has(key)) {
-      const product = priceMap?.get?.(text(sku)) || null;
+      const product = classification?.product || priceMap?.get?.(text(sku)) || null;
       rows.set(key, {
         sku: text(sku) || null,
         product: product?.label || label || text(sku) || 'Unknown product',
-        category: product?.category || product?.product_type || (isDerivedLine(sku) ? 'Derived line' : '—'),
+        category: product?.category || product?.product_type || '—',
         quantity: 0,
         projectIds: new Set(),
         qtyByBucket: Object.fromEntries(STATUS_BUCKETS.map((bucket) => [bucket.key, 0])),
         liveValue: 0,
         quotedValue: 0,
         quotedQuantity: 0,
-        derived: isDerivedLine(sku),
+        derived: classification?.derived === true,
         priced: true,
         inactive: false,
         unpricedQuantity: 0,
@@ -73,13 +90,57 @@ export function buildProductDemand({ families = [], priceMap = null } = {}) {
     return rows.get(key);
   };
 
+  // One audit row per excluded line, whichever basis it appeared in. The same
+  // line normally appears in both the live design and the frozen quoted snapshot;
+  // showing it twice would read as a duplicate, so the two bases accumulate onto
+  // one row and the live design line is the quantity and value shown.
+  const excludeLine = ({ family, counted, sku, description, quantity, value, reason, basis }) => {
+    const key = [family?.id, counted?.id, sku, description, reason].join('|');
+    const entry = excluded.get(key) || {
+      projectId: family?.id || null,
+      project: family?.name || null,
+      countedVersion: counted?.versionName || 'Legacy design',
+      sku: sku || null,
+      description: description || sku || 'Manual item',
+      reason,
+      liveQuantity: 0,
+      liveValue: 0,
+      quotedQuantity: 0,
+      quotedValue: 0,
+    };
+    if (basis === QUOTED_BASIS) {
+      entry.quotedQuantity += quantity;
+      entry.quotedValue += value;
+    } else {
+      entry.liveQuantity += quantity;
+      entry.liveValue += value;
+    }
+    excluded.set(key, entry);
+  };
+
   // Live design demand, from the priced schedule of the counted version only.
   for (const family of families) {
     const counted = countedVariationOf(family);
     for (const line of counted?.lines || []) {
-      const row = ensureRow(line.model, line.description);
-      if (!row) continue;
+      const classification = classifyCatalogueLine(line, priceMap);
       const quantity = Number(line.count ?? line.qty) || 0;
+
+      if (!classification.eligible) {
+        excludeLine({
+          family,
+          counted,
+          sku: classification.sku,
+          description: line.description,
+          quantity,
+          value: Number(line.subtotalExVat) || 0,
+          reason: classification.reason,
+          basis: LIVE_BASIS,
+        });
+        continue;
+      }
+
+      const row = ensureRow(classification.sku, line.description, classification);
+      if (!row) continue;
       row.quantity += quantity;
       row.projectIds.add(family.id);
       row.qtyByBucket[family.bucket] = (row.qtyByBucket[family.bucket] || 0) + quantity;
@@ -97,13 +158,30 @@ export function buildProductDemand({ families = [], priceMap = null } = {}) {
     }
   }
 
-  // Quoted demand, from the frozen snapshot the quoted value is read from.
+  // Quoted demand, from the frozen snapshot the quoted value is read from, held
+  // to exactly the same catalogue rule.
   for (const family of families) {
-    const snapshotLines = family.quotedSnapshotBreakdown || [];
-    for (const line of snapshotLines) {
-      const row = ensureRow(line.model, line.description);
-      if (!row) continue;
+    const counted = countedVariationOf(family);
+    for (const line of family.quotedSnapshotBreakdown || []) {
+      const classification = classifyCatalogueLine(line, priceMap);
       const quantity = Number(line.quantity) || 0;
+
+      if (!classification.eligible) {
+        excludeLine({
+          family,
+          counted,
+          sku: classification.sku,
+          description: line.description,
+          quantity,
+          value: Number(line.subtotal_ex_vat) || 0,
+          reason: classification.reason,
+          basis: QUOTED_BASIS,
+        });
+        continue;
+      }
+
+      const row = ensureRow(classification.sku, line.description, classification);
+      if (!row) continue;
       row.quotedQuantity += quantity;
       row.projectIds.add(family.id);
       row.quotedValue += Number(line.subtotal_ex_vat) || 0;
@@ -111,7 +189,7 @@ export function buildProductDemand({ families = [], priceMap = null } = {}) {
     }
   }
 
-  return [...rows.values()]
+  const sorted = [...rows.values()]
     .map((row) => ({
       ...row,
       projectFamilies: row.projectIds.size,
@@ -123,4 +201,36 @@ export function buildProductDemand({ families = [], priceMap = null } = {}) {
       status: row.inactive ? 'Inactive' : (row.priced ? 'Priced' : 'Unpriced'),
     }))
     .sort((a, b) => (b.quantity + b.quotedQuantity) - (a.quantity + a.quotedQuantity));
+
+  const excludedLines = [...excluded.values()].map((entry) => ({
+    projectId: entry.projectId,
+    project: entry.project,
+    countedVersion: entry.countedVersion,
+    sku: entry.sku,
+    description: entry.description,
+    reason: entry.reason,
+    quantity: entry.liveQuantity || entry.quotedQuantity,
+    value: entry.liveQuantity > 0 ? entry.liveValue : entry.quotedValue,
+    basis: entry.liveQuantity > 0 && entry.quotedQuantity > 0
+      ? `${LIVE_BASIS} and ${QUOTED_BASIS}`
+      : (entry.quotedQuantity > 0 ? QUOTED_BASIS : LIVE_BASIS),
+  })).sort((a, b) => {
+    const byProject = String(a.project || '').localeCompare(String(b.project || ''));
+    if (byProject !== 0) return byProject;
+    return String(a.description || '').localeCompare(String(b.description || ''));
+  });
+
+  return { rows: sorted, excludedLines };
+}
+
+/**
+ * Product Demand: the Artcoustic catalogue rows only.
+ *
+ * @param {Object} input
+ * @param {Array} input.families — filtered project families
+ * @param {Map} input.priceMap — Product Master index (sku → product)
+ * @returns {Array<Object>} demand rows
+ */
+export function buildProductDemand({ families = [], priceMap = null } = {}) {
+  return buildCatalogueDemand({ families, priceMap }).rows;
 }

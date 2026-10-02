@@ -17,17 +17,27 @@ export default function ProductDemandTable({ productDemand = [], currency, proje
     return (
       <EmptyState
         message="No product demand for the current selection."
-        hint="Include at least one project, then demand is read from the priced lines of its counted version."
+        hint="Include at least one project, then demand is read from the priced Artcoustic catalogue lines of its counted version."
       />
     );
   }
 
+  const totalQuantity = productDemand.reduce((sum, row) => sum + (Number(row.quantity) || 0), 0);
+  const totalValue = productDemand.reduce((sum, row) => sum + (Number(row.liveValue) || 0), 0);
+
   return (
     <div style={{ display: 'grid', gap: 12 }}>
       <div style={{ fontSize: 12, color: BRAND.muted, lineHeight: 1.6 }}>
-        Aggregated from the counted version of each included project only. One project contributes one version, however
-        many design options exist. Derived lines (subwoofer amplifier, Abfuser treatment, manual items) are marked, and a
-        line with no price is shown as <strong>Unpriced</strong> rather than zero.
+        Only Artcoustic catalogue products are included. Manual extras and third-party items are excluded. Demand is read
+        from the counted version of each included project only, and a line with no price is shown as{' '}
+        <strong>Unpriced</strong> rather than zero.
+      </div>
+
+      <div style={{ display: 'flex', gap: 10, alignItems: 'baseline', flexWrap: 'wrap', fontSize: 13 }}>
+        <span style={{ fontWeight: 700, color: BRAND.text }}>{formatNumber(totalQuantity)} catalogue units</span>
+        <span style={{ color: BRAND.muted }}>
+          {formatMoney(totalValue, currency || 'GBP')} total live value, counted versions only
+        </span>
       </div>
 
       <div style={TABLE_WRAP}>

@@ -23,6 +23,7 @@ import { BRAND, Button, Card, Pill } from '@/components/admin/intelligence/Intel
 import ProjectSelectionSummary from '@/components/admin/intelligence/ProjectSelectionSummary';
 import ProjectSelectionTable from '@/components/admin/intelligence/ProjectSelectionTable';
 import ProductDemandTable from '@/components/admin/intelligence/ProductDemandTable';
+import ExcludedCatalogueLines from '@/components/admin/intelligence/ExcludedCatalogueLines';
 import VariationCountTable from '@/components/admin/intelligence/VariationCountTable';
 import AdvancedDiagnosticsPanel from '@/components/admin/intelligence/AdvancedDiagnosticsPanel';
 import VariationDrawer from '@/components/admin/intelligence/VariationDrawer';
@@ -121,6 +122,7 @@ export default function AdminProjectIntelligence() {
   const exportPayload = () => ({
     families: selection.selectedFamilies,
     productDemand: selection.productDemand,
+    excludedLines: selection.excludedLines,
   });
 
   const handleExportWorkbook = () => {
@@ -132,7 +134,7 @@ export default function AdminProjectIntelligence() {
   const handleExportCsv = () => {
     if (!report) return;
     downloadSelectionCsv(exportPayload());
-    setExportNotice('CSV downloaded per tab: Included Projects, Excluded Projects, Product Demand, Version Detail.');
+    setExportNotice('CSV downloaded per tab: Included Projects, Excluded Projects, Product Demand, Version Detail, Excluded Manual Lines.');
   };
 
   const truncation = data?.truncation;
@@ -248,13 +250,19 @@ export default function AdminProjectIntelligence() {
           {tab === 'demand' && (
             <Card
               title="Product demand"
-              subtitle={`${selection.productDemand.length} product line${selection.productDemand.length === 1 ? '' : 's'} across ${summary.includedCount} included project${summary.includedCount === 1 ? '' : 's'}. Counted versions only.`}
+              subtitle={`${selection.productDemand.length} Artcoustic catalogue line${selection.productDemand.length === 1 ? '' : 's'} across ${summary.includedCount} included project${summary.includedCount === 1 ? '' : 's'}. Counted versions only.`}
             >
-              <ProductDemandTable
-                productDemand={selection.productDemand}
-                currency={report.summary.liveCurrency || report.priceContext.currency}
-                projectNamesById={projectNamesById}
-              />
+              <div style={{ display: 'grid', gap: 16 }}>
+                <ProductDemandTable
+                  productDemand={selection.productDemand}
+                  currency={report.summary.liveCurrency || report.priceContext.currency}
+                  projectNamesById={projectNamesById}
+                />
+                <ExcludedCatalogueLines
+                  excludedLines={selection.excludedLines}
+                  currency={report.summary.liveCurrency || report.priceContext.currency}
+                />
+              </div>
             </Card>
           )}
 
