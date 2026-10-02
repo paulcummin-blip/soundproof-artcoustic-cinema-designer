@@ -32,7 +32,6 @@ import BookDemoBanner from "@/components/ui/BookDemoBanner";
 import { useProjectActions, useActiveProjectId, setActiveProjectId } from "@/components/state/project-session";
 import { useCanonicalProject } from "@/components/state/projectHydrationStore";
 import { readBassPendingIndicator, readAsdrUnavailableIndicator, readP14TargetUnselectedIndicator, readSeatPriorityFingerprint, readDesignReviewHandoff, subscribeDesignReviewHandoff } from "@/components/state/designReviewHandoff";
-import { useVersionedEngineeringAuthority } from "@/components/engineering/useVersionedEngineeringAuthority";
 import { SegmentBoundary } from "@/components/dev/SegmentBoundary";
 import PageHeaderActions from "@/components/ui/PageHeaderActions";
 import ProjectIdentityLine from "@/components/projects/ProjectIdentityLine";
@@ -41,7 +40,6 @@ import DesignRatingSummary from "@/components/pricing/DesignRatingSummary";
 import { PartnerPortalIdentityProvider } from "@/components/providers/PartnerPortalIdentityProvider";
 import DealerIdentityDiagnostic from "@/components/dev/DealerIdentityDiagnostic";
 import DealerHero from "@/components/ui/HeroBanner";
-import BassAuthorityRestore from "@/components/state/BassAuthorityRestore";
 import BrandBar from "@/components/ui/BrandBar";
 import { subscribeAsdrVisibility, getAsdrVisibility } from "@/components/state/asdrVisibilityStore";
 import { useAuth } from "@/lib/AuthContext";
@@ -142,13 +140,9 @@ export default function Layout({ children, currentPageName }) {
   // authority as every report. It never rebuilds or polls a separate rating.
   const activeVersionId = activeProjectSummary?.active_version_id || null;
 
-  // Durable-first version-scoped authority: the DB Published Engineering
-  // Authority is the authority for "Performance is current"; the same-window
-  // handoff is overlaid as an optimisation. Without this the sidebar shows
-  // nothing for an already-calculated project on a cold load.
-  const versionAuthority = useVersionedEngineeringAuthority(activeProjectId, activeVersionId);
-  const durableAuthoritySnapshot = versionAuthority.snapshot;
-
+  // The global shell observes only the same-window report handoff. Durable
+  // engineering authority is route-owned and is not restored merely to draw the
+  // sidebar while a project opens.
   React.useEffect(() => {
     if (!activeProjectId || !activeVersionId) {
       setEngineeringSummary(null);
@@ -156,8 +150,7 @@ export default function Layout({ children, currentPageName }) {
     }
     const applyPublication = (snapshot) => {
       const published = snapshot
-        || readDesignReviewHandoff(activeProjectId, activeVersionId)
-        || durableAuthoritySnapshot;
+        || readDesignReviewHandoff(activeProjectId, activeVersionId);
       setEngineeringSummary(
         published?.engineeringSummary
           ?? published?.rating?.engineeringSummary
@@ -170,7 +163,7 @@ export default function Layout({ children, currentPageName }) {
         ? readDesignReviewHandoff(activeProjectId, activeVersionId, { preferStored: true })
         : null));
     });
-  }, [activeProjectId, activeVersionId, durableAuthoritySnapshot]);
+  }, [activeProjectId, activeVersionId]);
 
   // Listen for price and lightweight pending-indicator updates.
   React.useEffect(() => {
@@ -553,11 +546,6 @@ export default function Layout({ children, currentPageName }) {
             </div>
           </main>
         </div>
-        {/* The saved bass authority (completed contract + P14 target bank) is
-            restored as soon as a project is open — on every page, not only where
-            the Room Designer's Bass section is mounted. Reports and the sidebar
-            therefore read a restored authority without opening the Bass panel. */}
-        <BassAuthorityRestore projectId={activeProjectId} versionId={activeVersionId} />
         <BuildDiagnosticPanel />
         <DealerIdentityDiagnostic />
         </PartnerPortalIdentityProvider>
