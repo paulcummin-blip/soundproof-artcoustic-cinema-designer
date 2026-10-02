@@ -20,6 +20,11 @@ import {
   REPORT_FONT_HEADING as FONT_HEADING,
   REPORT_FONT_BODY as FONT_BODY,
 } from '@/components/report/typography/reportTypography';
+import {
+  TECHNICAL_DESIGN_INDEX_LABEL,
+  TECHNICAL_DESIGN_INDEX_NOTE,
+  formatDesignIndex,
+} from '@/components/report/technical/designIndexDisplay';
 
 const COLORS = {
   primary: "#213428",
@@ -28,7 +33,7 @@ const COLORS = {
 };
 
 /**
- * One scoped rating line: label, designation, Design Performance Index.
+ * One scoped rating line: label, designation, Internal Design Index.
  * NOT_CONFIGURED scopes show "Not configured" with no index.
  */
 function ScopeLine({ label, summary, emphasize }) {
@@ -63,7 +68,7 @@ function ScopeLine({ label, summary, emphasize }) {
           letterSpacing: "0.03em",
         }}
       >
-        Design Performance Index
+        {TECHNICAL_DESIGN_INDEX_LABEL}
       </div>
       <div
         style={{
@@ -74,7 +79,7 @@ function ScopeLine({ label, summary, emphasize }) {
           lineHeight: 1.15,
         }}
       >
-        {isConfigured ? (index ?? "—") : "Not configured"}
+        {isConfigured ? (formatDesignIndex(index) ?? "—") : "Not configured"}
       </div>
     </div>
   );
@@ -87,6 +92,17 @@ export default function ScopedAsdrSummary({ engineeringSummary }) {
       <ScopeLine label="Primary Seating" summary={engineeringSummary.primary} emphasize />
       <ScopeLine label="Secondary Seating" summary={engineeringSummary.secondary} />
       <ScopeLine label="All Seating" summary={engineeringSummary.project} />
+      <div
+        style={{
+          fontSize: "7pt",
+          color: COLORS.muted,
+          fontFamily: FONT_BODY,
+          fontStyle: "italic",
+          marginTop: "1mm",
+        }}
+      >
+        {TECHNICAL_DESIGN_INDEX_NOTE}
+      </div>
     </div>
   );
 }

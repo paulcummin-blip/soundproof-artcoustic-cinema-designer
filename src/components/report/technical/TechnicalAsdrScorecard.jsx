@@ -6,7 +6,7 @@
  * Hierarchy reversed: the FOUR DESIGN CATEGORIES lead the card (Spatial
  * Resolution, Dynamic Range, Timbre Matching, Viewing Geometry), each with
  * a headline result and Primary / Secondary subrows. The overall seating
- * summaries (Primary / Secondary / All with Design Performance Index) sit
+ * summaries (Primary / Secondary / All with Internal Design Index) sit
  * beneath as supporting content.
  *
  * Presentation-only: consumes the canonical `roomDesignRating` and

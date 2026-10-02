@@ -18,6 +18,10 @@
 import React from "react";
 import TechnicalLevelBadge from "./TechnicalLevelBadge";
 import ScopedAsdrSummary from "./ScopedAsdrSummary";
+import {
+  TECHNICAL_DESIGN_INDEX_LABEL,
+  formatDesignIndex,
+} from "./designIndexDisplay";
 
 import {
   REPORT_FONT_HEADING as FONT_HEADING,
@@ -155,10 +159,10 @@ function SeatSummaryCard({ seat, isRsp, isCompromised, showDesignRating, designR
               fontFamily: FONT_BODY,
             }}
           >
-            DESIGN RATING{" "}
+            {TECHNICAL_DESIGN_INDEX_LABEL.toUpperCase()}{" "}
             {designRating.status === "NOT_ASSESSED"
               ? "NOT ASSESSED"
-              : `Index ${designRatingIndex ?? "—"}`}
+              : formatDesignIndex(designRatingIndex) ?? "—"}
           </div>
 
         </div>

@@ -36,6 +36,12 @@
  *      index-derived designation and the category ceiling.
  */
 
+import {
+  TECHNICAL_DESIGN_INDEX_LABEL,
+  formatDesignIndex,
+  readDesignIndexForDisplay,
+} from "./designIndexDisplay";
+
 const FAIL_LABEL = "Design Improvement Recommended";
 
 // ── Overall room designation bands (additive Design Performance Index) ─────
@@ -650,17 +656,21 @@ export function getDesignRatingSupportingSentence(roomDesignRating) {
 
 /**
  * Format a recommendation comparison line as
- * "Design Performance Index {from} → {to}".
+ * "Internal Design Index {from} → {to}".
  * Accepts rating objects or legacy numeric values.
+ *
+ * The index is displayed digit-only through the shared display authority: a
+ * value stored as a share (0.82) displays as 82, and no percentage is ever
+ * attached to it.
  * @param {Object|number} fromRating
  * @param {Object|number} toRating
  * @returns {string|null}
  */
 export function formatDesignIndexComparison(fromRating, toRating) {
-  const from = getDesignPerformanceIndex(fromRating);
-  const to = getDesignPerformanceIndex(toRating);
+  const from = formatDesignIndex(readDesignIndexForDisplay(fromRating));
+  const to = formatDesignIndex(readDesignIndexForDisplay(toRating));
   if (from == null || to == null) return null;
-  return `Design Performance Index ${from} → ${to}`;
+  return `${TECHNICAL_DESIGN_INDEX_LABEL} ${from} → ${to}`;
 }
 
 // ── Modal achieved level (unweighted) — presentation-only ───────────────────

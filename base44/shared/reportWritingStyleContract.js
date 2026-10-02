@@ -146,6 +146,14 @@ export const DESIGN_INDEX_HARD_RULES = [
 ].join('\n');
 
 /**
+ * The Design Index scope rule, stated exactly as approved. Carried by the shared
+ * contract so every report surface reads the same rule: the index is not
+ * proposal evidence, and in the Technical Report it is an internal technical
+ * diagnostic that is never expressed as a percentage.
+ */
+export const DESIGN_INDEX_SCOPE_RULE = 'Design Index is not client-facing proposal evidence. It must not appear in proposal summaries or proposal comparisons. It may appear in the Technical Report only as an internal technical diagnostic, and never as a percentage.';
+
+/**
  * The names and shapes that would give the internal Design Index away in
  * client-facing copy. Shared by the evidence builder, the table row builders and
  * the frontend row guard, so the exclusion has one authority.
@@ -316,6 +324,7 @@ const PRODUCT_REFERENCES = [
 const DESIGN_INDEX_RULES = [
   '=== DESIGN INDEX (INTERNAL ONLY) ===',
   ...DESIGN_INDEX_HARD_RULES.split('\n').map((rule) => `- ${rule}`),
+  `- ${DESIGN_INDEX_SCOPE_RULE}`,
   `- Never write any of these in the prose or in a table cell: ${DESIGN_INDEX_BANNED_TERMS.join(', ')}.`,
   '- The index is a designer diagnostic. It is not a client-facing result, it is not an RP22 score, and it is never evidence in a section, a table row or a recommendation.',
   '- Where a paragraph previously rested on the index, make the point from the design evidence instead: spatial resolution, dynamic range, timbre matching, the screen and speaker relationship, seating coverage, product choice and reason, or a clearly supported RP22 result.',

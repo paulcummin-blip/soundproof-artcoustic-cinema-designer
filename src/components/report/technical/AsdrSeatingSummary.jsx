@@ -4,9 +4,9 @@
  * Overall seating-group summaries for the redesigned ASDR scorecard.
  * Sits BELOW the four category sections as supporting content.
  *
- * Primary / Secondary show: designation, Design Performance Index, modal
+ * Primary / Secondary show: designation, Internal Design Index, modal
  * achieved level, and the level distribution.
- * All Seating shows: designation, Design Performance Index, and a concise
+ * All Seating shows: designation, Internal Design Index, and a concise
  * supporting sentence (existing getDesignRatingSupportingSentence).
  *
  * Pure presentation — consumes existing designation / index / supporting
@@ -18,6 +18,10 @@ import {
   REPORT_FONT_HEADING as FONT_HEADING,
   REPORT_FONT_BODY as FONT_BODY,
 } from '@/components/report/typography/reportTypography';
+import {
+  TECHNICAL_DESIGN_INDEX_LABEL,
+  formatDesignIndex,
+} from '@/components/report/technical/designIndexDisplay';
 
 const COLORS = {
   primary: "#213428",
@@ -63,7 +67,7 @@ function SeatingBlock({ label, summary, emphasize, concise }) {
           letterSpacing: "0.03em",
         }}
       >
-        Design Performance Index
+        {TECHNICAL_DESIGN_INDEX_LABEL}
       </div>
       <div
         style={{
@@ -74,7 +78,7 @@ function SeatingBlock({ label, summary, emphasize, concise }) {
           lineHeight: 1.15,
         }}
       >
-        {configured ? (index ?? "—") : "Not configured"}
+        {configured ? (formatDesignIndex(index) ?? "—") : "Not configured"}
       </div>
       {supportLine && (
         <div

@@ -15,7 +15,7 @@
  *
  * Presentation is wider and more detailed than the former sidebar cards:
  * each recommendation shows title, parameter/level changes, capability /
- * headroom notes, Design Performance Index movement, disruption, and
+ * headroom notes, Internal Design Index movement, disruption, and
  * confidence.
  */
 
@@ -37,6 +37,11 @@ import {
   REPORT_FONT_HEADING as FONT_HEADING,
   REPORT_FONT_BODY as FONT_BODY,
 } from '@/components/report/typography/reportTypography';
+import {
+  TECHNICAL_DESIGN_INDEX_LABEL,
+  formatDesignIndex,
+  normaliseDesignIndex,
+} from '@/components/report/technical/designIndexDisplay';
 
 const COLORS = {
   primary: "#213428",
@@ -62,8 +67,10 @@ function formatLevelChanges(levelChanges) {
 }
 
 function RecommendationCard({ item, mode }) {
-  const from = Math.round(Number(item?.currentPercentage) || 0);
-  const to = Math.round(Number(item?.newPercentage) || 0);
+  // Normalised for display: a share (0.82) and an integer (82) both read as 82,
+  // and no percentage is ever attached to the internal Design Index.
+  const from = normaliseDesignIndex(item?.currentPercentage) ?? 0;
+  const to = normaliseDesignIndex(item?.newPercentage) ?? 0;
   const isSaving = mode === "saving";
   const isLcrUpgrade = item?.kind === "lcr" && item?.recommendationDirection === "upgrade";
   const levelChanges = (Array.isArray(item?.parameterLevelChanges) ? item.parameterLevelChanges : [])
@@ -181,7 +188,7 @@ function RecommendationCard({ item, mode }) {
         </div>
       )}
       <div style={{ marginTop: 4, fontSize: 10, lineHeight: 1.4, color: COLORS.muted }}>
-        Design Performance Index {from} → {to} · {formatPoints(item.scoreDelta, true)}
+        {TECHNICAL_DESIGN_INDEX_LABEL} {formatDesignIndex(from)} → {formatDesignIndex(to)} · {formatPoints(item.scoreDelta, true)}
       </div>
       <div style={{ marginTop: 2, fontSize: 10, lineHeight: 1.4, color: COLORS.muted }}>
         {item.disruption} disruption · {item.confidence} confidence
