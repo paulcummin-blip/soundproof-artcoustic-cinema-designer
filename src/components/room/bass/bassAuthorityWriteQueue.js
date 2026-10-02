@@ -1,4 +1,5 @@
 import { base44 } from "@/api/base44Client";
+import { invalidateProjectAnalysisCacheRead } from "@/components/state/projectReadCache";
 
 /**
  * Coalesced ProjectAnalysisCache writes for the completed bass authority.
@@ -77,6 +78,8 @@ async function flushQueuedBassAuthorityWrite(key) {
     try {
       if (record?.id) await base44.entities.ProjectAnalysisCache.update(record.id, payload);
       else await base44.entities.ProjectAnalysisCache.create(payload);
+      const [projectId, versionId] = String(key).split("::");
+      invalidateProjectAnalysisCacheRead(projectId, versionId);
       writtenSignatures.set(key, signature);
       return true;
     } catch (e) {
