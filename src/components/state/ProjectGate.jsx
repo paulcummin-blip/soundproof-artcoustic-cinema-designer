@@ -76,9 +76,10 @@ export default function ProjectGate({ children, requiresDesign = true }) {
   // has reached a terminal state — ready, loaded, complete, current, out of date,
   // not generated yet, not calculated yet, not applicable, or failed. "The record
   // has loaded" is not enough, and neither is "the wait ran long": a row that is
-  // still restoring keeps the panel open, and a REQUIRED row that failed keeps it
-  // open too (with Retry). There is no continue-anyway path, which is what stops a
-  // report or a proposal being opened on a half-restored authority.
+  // still restoring keeps the panel open — for as long as it genuinely takes, with
+  // the wait reported in stages rather than cut short — and a REQUIRED row that
+  // failed keeps it open too (with Retry). There is no continue-anyway path, which
+  // is what stops a report or a proposal being opened on a half-restored authority.
   const opening = useProjectOpening(hydration.projectId || null);
 
   // One line per opening decision, so a support conversation can see exactly which
@@ -224,6 +225,7 @@ export default function ProjectGate({ children, requiresDesign = true }) {
         phase={opening.phase}
         stillRestoringTitle={PROJECT_OPENING_STILL_RESTORING_TITLE}
         stillRestoringLabels={opening.holdLabels}
+        retryAvailable={opening.retryAvailable}
         onRetry={() => retryProjectOpening()}
       />
     </>

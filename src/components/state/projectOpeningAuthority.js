@@ -48,6 +48,14 @@ import {
   buildRestoreChecklist,
   deriveRestoreRelease,
 } from "./projectRestoreChecklist.js";
+import {
+  PROJECT_OPENING_MIN_VISIBLE_MS,
+  PROJECT_OPENING_RETRY_MS,
+  PROJECT_OPENING_SLOW_MS,
+  PROJECT_OPENING_STALL_MS,
+  createWaitMarkers,
+  resolveWaitWindows,
+} from "./projectOpeningWaitPolicy.js";
 
 // Re-exported so the panel, the resolver and the tests keep one import site for
 // the whole opening contract.
@@ -73,6 +81,13 @@ export {
   pendingOpeningCheckpointKeys,
 } from "./projectOpeningReadiness.js";
 export {
+  PROJECT_OPENING_MIN_VISIBLE_MS,
+  PROJECT_OPENING_RETRY_MS,
+  PROJECT_OPENING_SLOW_MS,
+  PROJECT_OPENING_STALL_MS,
+};
+export { PROJECT_OPENING_TIMEOUT_MS } from "./projectOpeningWaitPolicy.js";
+export {
   RESTORE_ALLOWED_BLOCKING_TERMINAL_STATUSES,
   RESTORE_NON_TERMINAL_STATUSES,
   RESTORE_ROWS,
@@ -86,32 +101,37 @@ export {
   isRestoreStatusTerminal,
 } from "./projectRestoreChecklist.js";
 
-/** The panel never flashes: it stays for at least this long. */
-export const PROJECT_OPENING_MIN_VISIBLE_MS = 900;
+// The staged wait policy itself — the three windows and the markers that fire on
+// them — lives in projectOpeningWaitPolicy.js, and is re-exported here so the panel,
+// the resolver and the tests keep one import site for the whole opening contract.
 
-/**
- * A dependency that will not confirm within this window stops being waited on
- * silently: the stalled rows are recorded as FAILED — terminal, carrying the
- * reason the panel shows — and the panel offers Retry. It never opens the project:
- * a failed required row holds the release until the restore genuinely succeeds.
- */
-export const PROJECT_OPENING_TIMEOUT_MS = 8000;
-
-/** The panel notice shown while a required stage has not confirmed in time. */
+/** The panel notice shown while the restore is taking longer than usual. */
 export const PROJECT_OPENING_STILL_RESTORING_TITLE = "Still restoring saved project data";
 
-const TIMEOUT_DETAIL =
-  "Could not be restored in time. Use Retry to run the restore again — the project opens once this finishes.";
+const STALL_DETAIL =
+  "No response from the restore for over two minutes. Use Retry to run the restore "
+  + "again — the project opens once it finishes.";
 
 const emptySnapshot = () => ({
   projectId: null,
   versionId: null,
   startedAt: 0,
   minVisibleMs: PROJECT_OPENING_MIN_VISIBLE_MS,
-  timeoutMs: PROJECT_OPENING_TIMEOUT_MS,
+  /** The staged wait windows: the slow notice, the Retry offer, the stall check. */
+  slowMs: PROJECT_OPENING_SLOW_MS,
+  retryMs: PROJECT_OPENING_RETRY_MS,
+  stallMs: PROJECT_OPENING_STALL_MS,
+  timeoutMs: PROJECT_OPENING_STALL_MS,
   minVisibleElapsed: false,
   closed: false,
+  /** The restore is taking longer than usual (30 s). Nothing has failed. */
+  slow: false,
+  /** A restore genuinely failed, or the wait ran long (90 s): Retry is offered. */
+  retryAvailable: false,
+  /** No progress for the whole stall window (120 s): stalled rows were Failed. */
   timedOut: false,
+  /** When a row last genuinely moved — the stall window is measured from here. */
+  lastProgressAt: 0,
   /** Route-specific gating: the surface the designer opened straight into. */
   entrySurface: null,
   /** How many times the reads have been re-run (Retry). */
@@ -123,7 +143,6 @@ const emptySnapshot = () => ({
 let state = emptySnapshot();
 const listeners = new Set();
 let minVisibleTimer = null;
-let timeoutTimer = null;
 
 /**
  * Projects already fully opened in this browser session. Moving between pages
@@ -140,28 +159,20 @@ function clearTimers() {
     clearTimeout(minVisibleTimer);
     minVisibleTimer = null;
   }
-  if (timeoutTimer != null) {
-    clearTimeout(timeoutTimer);
-    timeoutTimer = null;
-  }
+  waitMarkers.clear();
 }
 
 /**
- * Arm the "this is taking a long time" notice. It never resolves a stage and
- * never closes the panel — it only tells the designer the truth, so a slow
- * read can no longer look like a finished one.
+ * The three wait markers for the opening under way: the 30 s notice, the 90 s Retry
+ * offer and the stall check. They only ever REPORT — none of them resolves a stage,
+ * and the stall check is re-armed by genuine progress (see
+ * resolveProjectOpeningCheckpoints).
  */
-function scheduleOpeningTimeout(timeoutMs) {
-  if (timeoutTimer != null) {
-    clearTimeout(timeoutTimer);
-    timeoutTimer = null;
-  }
-  if (!(timeoutMs > 0)) return;
-  timeoutTimer = setTimeout(() => {
-    timeoutTimer = null;
-    markProjectOpeningTimedOut();
-  }, timeoutMs);
-}
+const waitMarkers = createWaitMarkers({
+  onSlow: markProjectOpeningSlow,
+  onRetry: markProjectOpeningRetryAvailable,
+  onStall: markProjectOpeningStalled,
+});
 
 function markSatisfied(projectId) {
   const pid = normaliseId(projectId);
@@ -202,7 +213,10 @@ export function resetProjectOpening() {
  * version id can never restart the opening or re-flash the panel.
  *
  * @param {string} projectId
- * @param {{versionId?: string|null, minVisibleMs?: number, timeoutMs?: number}} [options]
+ * @param {{versionId?: string|null, entrySurface?: string|null, minVisibleMs?: number,
+ *   slowMs?: number, retryMs?: number, stallMs?: number, timeoutMs?: number}} [options]
+ *   the wait windows default to the staged policy (see projectOpeningWaitPolicy.js);
+ *   a zero stall window disables every wait marker.
  */
 export function beginProjectOpening(projectId, options = {}) {
   const pid = normaliseId(projectId);
@@ -218,9 +232,10 @@ export function beginProjectOpening(projectId, options = {}) {
   const minVisibleMs = Number.isFinite(Number(options.minVisibleMs))
     ? Math.max(0, Number(options.minVisibleMs))
     : PROJECT_OPENING_MIN_VISIBLE_MS;
-  const timeoutMs = Number.isFinite(Number(options.timeoutMs))
-    ? Math.max(0, Number(options.timeoutMs))
-    : PROJECT_OPENING_TIMEOUT_MS;
+  // The staged wait windows. `stallMs` is the preferred spelling and `timeoutMs` the
+  // historical name for the same window; a zero stall window disables every marker,
+  // which is what a caller driving them explicitly asks for.
+  const { slowMs, retryMs, stallMs } = resolveWaitWindows(options);
 
   if (state.projectId === pid && !state.closed) {
     // Late-arriving routing detail (the entry surface) is folded into the
@@ -240,7 +255,11 @@ export function beginProjectOpening(projectId, options = {}) {
     entrySurface,
     startedAt: Date.now(),
     minVisibleMs,
-    timeoutMs,
+    slowMs,
+    retryMs,
+    stallMs,
+    timeoutMs: stallMs,
+    lastProgressAt: Date.now(),
     // A zero minimum means "no minimum was asked for" — never hold on a flag
     // whose timer was deliberately not scheduled.
     minVisibleElapsed: minVisibleMs === 0,
@@ -253,7 +272,7 @@ export function beginProjectOpening(projectId, options = {}) {
       markOpeningMinVisibleElapsed();
     }, minVisibleMs);
   }
-  scheduleOpeningTimeout(timeoutMs);
+  waitMarkers.arm({ slowMs, retryMs, stallMs });
 }
 
 /** The panel's minimum visible time has passed. */
@@ -265,20 +284,46 @@ export function markOpeningMinVisibleElapsed() {
 }
 
 /**
- * A stage did not confirm within the opening timeout.
+ * The 30 s marker: the restore is taking longer than usual.
  *
- * The stalled rows are recorded as FAILED: a terminal state carrying the reason
- * the panel shows, so a row can never sit on "Restoring" forever, and Retry is
- * the way out. This still does NOT open the project — a blocking row that failed
- * keeps the release (see projectRestoreChecklist.js). Rows that already finished
- * are left exactly as they are: only a genuinely stalled stage is escalated.
+ * Nothing has failed and nothing is offered — the panel simply says the truth, so
+ * a long restore is neither hidden nor mistaken for a broken one. Larger projects,
+ * saved bass authority, report authority, proposal source data and pricing are all
+ * expected to need real time.
  */
-export function markProjectOpeningTimedOut() {
+export function markProjectOpeningSlow() {
+  if (!state.projectId || state.closed || state.slow) return;
+  state = { ...state, slow: true };
+  notify();
+}
+
+/**
+ * The 90 s marker: the wait has run long. Retry is now offered so a restore that
+ * has stopped responding can be re-run. The rows keep restoring — a long wait is
+ * still not a failure — and the project still does not open.
+ */
+export function markProjectOpeningRetryAvailable() {
+  if (!state.projectId || state.closed || state.retryAvailable) return;
+  state = { ...state, slow: true, retryAvailable: true };
+  notify();
+}
+
+/**
+ * The stall check: the whole stall window has passed with NO progress at all.
+ *
+ * Only the rows still restoring are recorded as FAILED — a terminal state carrying
+ * the reason the panel shows — and a row that has moved since the window began is
+ * left exactly as it is, because the window is re-armed on every genuine move. This
+ * is the only path that turns a slow restore into a failure, it takes far longer
+ * than a normal restore, and it still does NOT open the project: a blocking row
+ * that failed keeps the release (see projectRestoreChecklist.js).
+ */
+export function markProjectOpeningStalled() {
   if (!state.projectId || state.closed) return;
 
   const stalled = pendingOpeningCheckpointKeys(state);
   if (stalled.length === 0) {
-    state = { ...state, timedOut: true };
+    state = { ...state, timedOut: true, slow: true, retryAvailable: true };
     notify();
     return;
   }
@@ -288,41 +333,47 @@ export function markProjectOpeningTimedOut() {
     checkpoints[key] = {
       state: OPENING_CHECKPOINT_STATE.UNAVAILABLE,
       outcome: OPENING_CHECKPOINT_OUTCOME.FAILED,
-      detail: TIMEOUT_DETAIL,
+      detail: STALL_DETAIL,
       timedOut: true,
     };
   });
 
-  state = { ...state, checkpoints, timedOut: true };
+  state = { ...state, checkpoints, timedOut: true, slow: true, retryAvailable: true };
   closeIfResolved();
   notify();
 }
 
 /**
- * Re-run the opening reads after a stage failed to confirm. Every stage returns
- * to "restoring" (a resolved stage is re-read rather than trusted), the timeout
- * notice is cleared and re-armed, and the panel stays open.
+ * Re-run the opening reads after a stage failed to confirm. Every stage returns to
+ * "restoring" (a resolved stage is re-read rather than trusted), the wait is started
+ * again from scratch — no notice, no offer, no failure — and the panel stays open.
  */
 export function retryProjectOpening(options = {}) {
   if (!state.projectId || state.closed) return;
-  const timeoutMs = Number.isFinite(Number(options.timeoutMs))
-    ? Math.max(0, Number(options.timeoutMs))
-    : state.timeoutMs;
+  // Only the windows named here change; the rest carry on from the opening that is
+  // being re-read.
+  const { slowMs, retryMs, stallMs } = resolveWaitWindows(options, state);
 
   clearTimers();
   state = {
     ...state,
     checkpoints: {},
+    // The wait is re-run from the start: no notice, no Retry offer, no failure —
+    // and the stall window begins again with the re-read.
+    slow: false,
+    retryAvailable: false,
     timedOut: false,
+    stallMs,
+    timeoutMs: stallMs,
+    lastProgressAt: Date.now(),
     attempt: (Number(state.attempt) || 0) + 1,
     startedAt: Date.now(),
-    timeoutMs,
     // The panel has already been read once, so a retry that resolves quickly may
     // close immediately rather than waiting out the minimum again.
     minVisibleElapsed: true,
   };
   notify();
-  scheduleOpeningTimeout(timeoutMs);
+  waitMarkers.arm({ slowMs, retryMs, stallMs });
 }
 
 export function resolveProjectOpeningCheckpoint(key, resolved) {
@@ -392,7 +443,20 @@ export function resolveProjectOpeningCheckpoints(entries) {
   });
 
   if (!changed) return;
-  state = { ...state, checkpoints };
+
+  // Genuine movement is progress. It re-arms the stall window, so a restore working
+  // its way through its stages — however long it takes — is never mistaken for one
+  // that has stopped responding.
+  const retryAvailable = state.retryAvailable
+    || Object.values(checkpoints).some((entry) => (
+      entry?.outcome === OPENING_CHECKPOINT_OUTCOME.FAILED && entry?.timedOut !== true
+    ));
+
+  state = { ...state, checkpoints, retryAvailable, lastProgressAt: Date.now() };
+  // A row that is still restoring keeps the stall check in place, measured from the
+  // movement just recorded — so the window only ever completes on a restore that has
+  // stopped responding entirely.
+  if (state.stallMs > 0) waitMarkers.rearmStall(state.stallMs);
   closeIfResolved();
   notify();
 }
@@ -415,6 +479,9 @@ function closeIfResolved() {
   const checklist = buildRestoreChecklist({ snapshot: state, projectId: state.projectId });
   const { release } = deriveRestoreRelease(checklist.rows);
   if (!release) return;
+  // Nothing is left to report: the wait markers are released with the panel, so a
+  // closed opening can never fire a notice, an offer or a stall check afterwards.
+  clearTimers();
   state = { ...state, closed: true };
   markSatisfied(state.projectId);
 }

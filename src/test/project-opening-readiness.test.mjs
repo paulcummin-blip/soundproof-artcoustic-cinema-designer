@@ -8,7 +8,8 @@
 //   TEST 1   A fresh opening holds while any stage is still restoring
 //   TEST 2   The panel does not close before the minimum visible duration
 //   TEST 3   It closes once every stage is definite and the minimum elapsed
-//   TEST 4   The timeout never opens the project — a stalled row becomes Failed, with Retry
+//   TEST 4   A long restore is reported in stages — 30 s notice, 90 s Retry, and only a
+//            120 s progress-free stall turns a row Failed; the project never opens on it
 //   TEST 5   A bass row still restoring holds the panel; an uncalculated bass does not
 //   TEST 6   Commercial hydration must resolve; a failure is warned, not fatal
 //   TEST 7   Retry re-arms every stage and keeps the panel open
@@ -18,6 +19,7 @@
 //   TEST 11  A newly selected project holds before its opening has even begun
 //   TEST 12  The panel publishes the requested progress lines, in order
 //   TEST 13  The gate, panel, resolver and warnings are wired to this authority
+//   TEST 14  A late resolution still lands after a stall: the project opens when it completes
 // ---------------------------------------------------------------------------
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -32,6 +34,9 @@ import {
   PROJECT_OPENING_CHECKPOINT_KEYS,
   PROJECT_OPENING_LINES,
   PROJECT_OPENING_MIN_VISIBLE_MS,
+  PROJECT_OPENING_RETRY_MS,
+  PROJECT_OPENING_SLOW_MS,
+  PROJECT_OPENING_STALL_MS,
   PROJECT_OPENING_TIMEOUT_MS,
   RESTORE_STATUS_LABEL,
   _resetProjectOpeningForTest,
@@ -42,7 +47,9 @@ import {
   getProjectOpening,
   isProjectOpeningSatisfied,
   markOpeningMinVisibleElapsed,
-  markProjectOpeningTimedOut,
+  markProjectOpeningRetryAvailable,
+  markProjectOpeningSlow,
+  markProjectOpeningStalled,
   openingCheckpointStage,
   openingCheckpointWarnings,
   openingEntrySurfaceForPath,
@@ -110,29 +117,79 @@ test('TEST 3 — it closes once every stage is definite and the minimum has elap
   assert.equal(opened.holding, false, 'a stage that is not generated yet still opens the project');
   assert.equal(opened.closed, true);
   assert.equal(isProjectOpeningSatisfied(PROJECT), true);
-  assert.ok(PROJECT_OPENING_TIMEOUT_MS > PROJECT_OPENING_MIN_VISIBLE_MS, 'the timeout is the longer bound');
+  // The wait is staged, and 8 seconds is not one of its bounds: rows are given real
+  // time before anything is called a failure.
+  assert.ok(PROJECT_OPENING_SLOW_MS > PROJECT_OPENING_MIN_VISIBLE_MS, 'the slow notice comes after the minimum visible time');
+  assert.ok(PROJECT_OPENING_RETRY_MS > PROJECT_OPENING_SLOW_MS, 'Retry is offered later than the notice');
+  assert.ok(PROJECT_OPENING_STALL_MS > PROJECT_OPENING_RETRY_MS, 'only a longer stall may turn a row Failed');
+  assert.ok(PROJECT_OPENING_STALL_MS > 8000, 'the restore is not given an 8-second window');
+  assert.equal(PROJECT_OPENING_TIMEOUT_MS, PROJECT_OPENING_STALL_MS, 'the historical name is the stall window');
 });
 
-test('TEST 4 — the timeout never opens the project: a stalled row becomes Failed, with Retry', () => {
+test('TEST 4 — a long restore is reported in stages; only a progress-free stall is Failed', () => {
   start();
   resolveProjectOpeningCheckpoints({ metadata: { state: OPENING_CHECKPOINT_STATE.READY } });
-  markProjectOpeningTimedOut();
 
+  // Nothing has been waited on for long yet. Every row is still honestly restoring,
+  // the panel is up, and no row has been turned into a failure — and nothing has
+  // been offered, because a restore that is simply still running is not a problem.
+  const early = openState();
+  const earlySnapshot = getProjectOpening();
+  assert.equal(earlySnapshot.closed, false, 'the panel does not close while rows are still restoring');
+  assert.equal(earlySnapshot.timedOut, false, 'nothing is failed anywhere in the normal window');
+  assert.equal(earlySnapshot.slow, false, 'and nothing is said about a slow restore yet');
+  assert.equal(early.retryAvailable, false, 'Retry is not offered for a restore that is still running');
+  assert.equal(early.holding, true, 'the project is not opened');
+  assert.equal(early.phase, OPENING_PHASE.RESTORING);
+  PROJECT_OPENING_CHECKPOINT_KEYS
+    .filter((key) => key !== 'metadata')
+    .forEach((key) => {
+      assert.equal(earlySnapshot.checkpoints[key], undefined, `${key} has no verdict recorded — nothing is failed early`);
+    });
+
+  // 30 s — the restore is taking longer than usual. The panel says so and nothing
+  // else changes: the rows keep restoring, nothing has failed, Retry is not offered.
+  markProjectOpeningSlow();
+  const slow = openState();
+  assert.equal(getProjectOpening().slow, true, 'the slow-restore message is armed');
+  assert.equal(slow.phase, OPENING_PHASE.STILL_RESTORING, 'the panel shows it');
+  assert.equal(slow.retryAvailable, false, 'a slow restore is not an offer to retry');
+  assert.equal(slow.release, false, 'and it does not release the project');
+  assert.ok(slow.holdLabels.length > 0, 'the panel names what it is waiting for');
+  const slowRow = slow.checklist.find((row) => row.key === 'rp22');
+  assert.equal(slowRow.status, 'restoring', 'a required row still says Restoring at this point — never Failed');
+  assert.equal(slowRow.terminal, false, 'it is still genuinely restoring');
+
+  // 90 s — still no movement: Retry becomes available, and the rows STILL restore.
+  markProjectOpeningRetryAvailable();
+  const longWait = openState();
+  assert.equal(longWait.retryAvailable, true, 'Retry is offered on a long wait');
+  assert.equal(longWait.phase, OPENING_PHASE.STILL_RESTORING);
+  assert.equal(getProjectOpening().closed, false, 'the panel stays');
+  assert.equal(
+    longWait.checklist.find((row) => row.key === 'bass').status,
+    'restoring',
+    'a long wait still does not mark a row Failed',
+  );
+
+  // 120 s with no progress AT ALL — only now is a row that has genuinely stopped
+  // responding recorded as Failed. This still never opens the project.
+  markProjectOpeningStalled();
   const snapshot = getProjectOpening();
   const readiness = openState();
 
-  assert.equal(snapshot.timedOut, true, 'the long wait is recorded');
-  assert.equal(snapshot.closed, false, 'the panel did NOT close on the timeout');
+  assert.equal(snapshot.timedOut, true, 'the stall is recorded');
+  assert.equal(snapshot.closed, false, 'the panel did NOT close on the stall');
   assert.equal(isProjectOpeningSatisfied(PROJECT), false, 'the project is not marked opened');
   assert.equal(readiness.holding, true, 'the project stays behind the panel');
   assert.equal(readiness.phase, OPENING_PHASE.STILL_RESTORING);
   assert.ok(readiness.holdLabels.length > 0, 'the panel can name what is holding it');
   assert.equal(readiness.release, false, 'a failed required row does not release the project');
+  assert.equal(readiness.retryAvailable, true, 'Retry is the way out of a stall');
   assert.ok(!('canContinueWithWarning' in readiness), 'and there is no continue path at all');
 
-  // Nothing was resolved on the project's behalf, and nothing is left waiting
-  // silently: every stalled row is recorded as FAILED — terminal, named,
-  // retryable — while a required row that failed still holds the release.
+  // Every row that had not moved is recorded as FAILED — terminal, named,
+  // retryable — while a row that had already finished keeps its own outcome.
   PROJECT_OPENING_CHECKPOINT_KEYS
     .filter((key) => key !== 'metadata')
     .forEach((key) => {
@@ -142,12 +199,20 @@ test('TEST 4 — the timeout never opens the project: a stalled row becomes Fail
       assert.equal(stage?.timedOut, true, `${key} is marked as the stalled row`);
       assert.ok(stage?.detail, `${key} carries the reason the panel shows`);
     });
+  assert.equal(
+    snapshot.checkpoints.metadata.outcome,
+    OPENING_CHECKPOINT_OUTCOME.READY,
+    'a row that had already finished keeps its own outcome',
+  );
 
-  // Retry is the way out of a failure: the rows are re-armed and the project still
-  // waits — it is never opened from the failed state.
+  // Retry is the way out of a failure: the rows are re-armed — with the notices
+  // cleared — and the project still waits; it is never opened from the failed state.
   retryProjectOpening();
-  assert.equal(getProjectOpening().timedOut, false, 'Retry clears the failure notice');
-  assert.equal(openState().holding, true, 'and the project still waits for the re-read');
+  const retried = getProjectOpening();
+  assert.equal(retried.timedOut, false, 'Retry clears the failure notice');
+  assert.equal(retried.slow, false, 'and the slow-restore message');
+  assert.equal(retried.retryAvailable, false, 'and the Retry offer itself');
+  assert.equal(openState().holding, true, 'the project still waits for the re-read');
   assert.equal(openState().phase, OPENING_PHASE.RESTORING, 'the rows are restoring again, not failed');
 });
 
@@ -235,6 +300,11 @@ test('TEST 6 — commercial hydration must reach a terminal state; a failure is 
   const opened = openState();
   assert.equal(opened.holding, false, 'the failed row is terminal, so it no longer holds the project');
   assert.equal(getProjectOpening().closed, true);
+  assert.equal(
+    getProjectOpening().retryAvailable,
+    true,
+    'a restore that genuinely failed earns Retry straight away — no wait required',
+  );
   assert.ok(!opened.blockingKeys.includes('pricing'), 'pricing is not a blocking row');
   assert.deepEqual(
     openingCheckpointWarnings(getProjectOpening(), PROJECT).map((warning) => warning.key),
@@ -248,7 +318,7 @@ test('TEST 6 — commercial hydration must reach a terminal state; a failure is 
   _resetProjectOpeningForTest();
   beginProjectOpening(PROJECT, { versionId: VERSION, minVisibleMs: 0, timeoutMs: 0 });
   resolveAllExcept('roomSeating', ready);
-  markProjectOpeningTimedOut();
+  markProjectOpeningStalled();
 
   const stalled = openState();
   assert.equal(getProjectOpening().closed, false, 'the project stays closed without its saved geometry');
@@ -263,13 +333,17 @@ test('TEST 6 — commercial hydration must reach a terminal state; a failure is 
 test('TEST 7 — Retry re-arms every stage, clears the notice and keeps the panel open', () => {
   start();
   resolveProjectOpeningCheckpoints({ metadata: { state: OPENING_CHECKPOINT_STATE.READY } });
-  markProjectOpeningTimedOut();
+  markProjectOpeningSlow();
+  markProjectOpeningRetryAvailable();
+  markProjectOpeningStalled();
   assert.equal(getProjectOpening().timedOut, true);
 
   retryProjectOpening();
 
   const retried = getProjectOpening();
   assert.equal(retried.timedOut, false, 'the still-restoring notice is cleared');
+  assert.equal(retried.slow, false, 'the slow-restore message is cleared with it');
+  assert.equal(retried.retryAvailable, false, 'and the Retry offer is withdrawn until it is earned again');
   assert.equal(retried.closed, false, 'the panel is still open');
   assert.equal(retried.attempt, 1, 'the reads are re-run, not re-used');
   assert.deepEqual(
@@ -406,6 +480,7 @@ test('TEST 13 — the gate, panel, resolver and warnings are wired to this autho
   const checklist = read('src/components/state/projectRestoreChecklist.js');
   const authority = read('src/components/state/projectOpeningAuthority.js');
   const stages = read('src/components/state/projectOpeningStages.js');
+  const waitPolicy = read('src/components/state/projectOpeningWaitPolicy.js');
   const technicalReport = read('src/pages/DesignReviewPage.jsx');
   const layout = read('src/Layout.jsx');
 
@@ -444,6 +519,25 @@ test('TEST 13 — the gate, panel, resolver and warnings are wired to this autho
   assert.ok(authority.includes('OPENING_CHECKPOINT_OUTCOME.FAILED'), 'a stalled row is recorded as failed, with a reason');
   assert.ok(!authority.includes('safeToContinue'), 'no row can be marked safe to continue past');
   assert.ok(!authority.includes('continueProjectOpeningWithWarning'), 'and the continue path is gone entirely');
+
+  // The wait policy: staged and generous. Rows are NOT failed at 8 seconds — the
+  // panel reports the wait at 30 s, offers Retry at 90 s, and only a 120 s
+  // progress-free stall turns a row Failed, with genuine progress re-arming it.
+  assert.ok(waitPolicy.includes('PROJECT_OPENING_SLOW_MS = 30000'), 'the slow notice is at 30 seconds');
+  assert.ok(waitPolicy.includes('PROJECT_OPENING_RETRY_MS = 90000'), 'Retry is offered at 90 seconds');
+  assert.ok(waitPolicy.includes('PROJECT_OPENING_STALL_MS = 120000'), 'only a 120 second stall may fail a row');
+  assert.ok(!waitPolicy.includes('8000'), 'nothing fails a row after 8 seconds');
+  assert.ok(authority.includes('waitMarkers.rearmStall(state.stallMs)'), 'genuine progress re-arms the stall window');
+  assert.ok(authority.includes('lastProgressAt'), 'progress is measured, so a working restore is never failed');
+  assert.ok(
+    authority.includes('markProjectOpeningSlow') && authority.includes('markProjectOpeningRetryAvailable'),
+    'the 30 s notice and the 90 s Retry offer are their own markers',
+  );
+  assert.ok(shell.includes('Larger projects can take longer'), 'the panel carries the slow-restore message');
+  assert.ok(
+    shell.includes('retryAvailable') && gate.includes('opening.retryAvailable'),
+    'Retry is gated on the authority, so a slow-but-working restore shows the message alone',
+  );
 
   assert.ok(resolver.includes('fetchDurablePublication'), 'bass/RP22 authority is read from the durable publication');
   assert.ok(resolver.includes('resolveProposalSource'), 'report and proposal source states use the canonical resolver');
@@ -488,4 +582,31 @@ test('TEST 13 — the gate, panel, resolver and warnings are wired to this autho
     hydrator.includes('isCommercialHydrationComplete') && hydrator.includes('commercialReady'),
     'the design fast path cannot bypass a missing commercial baseline',
   );
+});
+
+test('TEST 14 — a late resolution still lands after a stall: the project opens when it completes', () => {
+  start();
+  resolveAllExcept('bass', {
+    ...entry(OPENING_CHECKPOINT_STATE.READY, OPENING_CHECKPOINT_OUTCOME.READY),
+    blocking: true,
+  });
+  markProjectOpeningStalled();
+  assert.equal(openState().holding, true, 'the stalled required row holds the project');
+  assert.equal(
+    openState().checklist.find((row) => row.key === 'bass').status,
+    'failed',
+    'the row that never moved is recorded as Failed',
+  );
+
+  // The restore finishes late: the row is genuinely resolved — not "returned to
+  // restoring" — and the project opens on the real result rather than being held
+  // on the record of a stall it has since recovered from.
+  resolveProjectOpeningCheckpoints({
+    bass: { ...entry(OPENING_CHECKPOINT_STATE.READY, OPENING_CHECKPOINT_OUTCOME.READY), blocking: true },
+  });
+
+  const opened = openState();
+  assert.equal(opened.holding, false, 'the completed restore opens the project');
+  assert.equal(opened.closed, true);
+  assert.equal(isProjectOpeningSatisfied(PROJECT), true, 'and only then is the project marked open');
 });

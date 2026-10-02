@@ -23,8 +23,8 @@
 //
 // There is no timeout, no route-ready signal and no shell-mounted signal in this
 // decision. Time can only ever hold the panel LONGER (the minimum visible time),
-// or turn a stalled row into a visible FAILURE (projectOpeningAuthority.js); it
-// can never release the panel.
+// or — after a long, progress-free stall — turn a stalled row into a visible
+// FAILURE (projectOpeningAuthority.js); it can never release the panel.
 //
 // Pure: no React, no state, no side effects, no database access. It reads the
 // opening snapshot and answers.

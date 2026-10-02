@@ -112,11 +112,13 @@ export function openingCheckpointWarnings(snapshot, projectId) {
 /**
  * The one decision the opening panel needs.
  *
- * `phase` is 'restoring' while an opening-critical stage is resolving,
- * 'still-restoring' once that wait has run long and a stalled row has been
- * recorded as failed, and 'ready' when the project may be shown. Live work that is
- * not a restore row (a bass analysis running for an open project) continues in the
- * background; it is gated by the report/proposal surfaces that consume it.
+ * `phase` is 'restoring' while an opening-critical stage is resolving, and
+ * 'still-restoring' once the wait has run long enough to be reported — at 30 s the
+ * panel says the restore is taking longer than usual, at 90 s it offers Retry, and a
+ * row is only recorded as failed after a much longer, progress-free stall (see
+ * projectOpeningWaitPolicy.js). 'ready' means the project may be shown. Live work
+ * that is not a restore row (a bass analysis running for an open project) continues
+ * in the background; it is gated by the report/proposal surfaces that consume it.
  *
  * @param {Object} snapshot the opening snapshot
  * @param {string|null} projectId the project being opened
@@ -146,7 +148,8 @@ export function deriveOpeningReadinessFor(snapshot, projectId, context = {}) {
   if (!pid) {
     return {
       ...base, holding: false, pending: [], pendingCritical: [], pendingSupporting: [],
-      pendingLabels: [], closed: true, timedOut: false, minVisibleElapsed: true,
+      pendingLabels: [], closed: true, timedOut: false, slow: false,
+      retryAvailable: false, minVisibleElapsed: true,
       phase: OPENING_PHASE.IDLE, checklist: [], release: false,
     };
   }
@@ -155,7 +158,8 @@ export function deriveOpeningReadinessFor(snapshot, projectId, context = {}) {
   if (context.satisfied === true) {
     return {
       ...base, holding: false, pending: [], pendingCritical: [], pendingSupporting: [],
-      pendingLabels: [], closed: true, timedOut: false, minVisibleElapsed: true,
+      pendingLabels: [], closed: true, timedOut: false, slow: false,
+      retryAvailable: false, minVisibleElapsed: true,
       phase: OPENING_PHASE.READY,
     };
   }
@@ -166,6 +170,11 @@ export function deriveOpeningReadinessFor(snapshot, projectId, context = {}) {
   const minVisibleElapsed = checklist.begun && snapshot?.minVisibleElapsed === true;
   const holding = !release.release || !minVisibleElapsed;
   const timedOut = checklist.begun && snapshot?.timedOut === true;
+  const slow = checklist.begun && snapshot?.slow === true;
+  // Retry is offered on the authority's own flag: a real failure earns it straight
+  // away, a long wait earns it at 90 s, and a slow-but-working restore never does.
+  const retryAvailable = checklist.begun
+    && (snapshot?.retryAvailable === true || timedOut);
 
   return {
     ...base,
@@ -176,10 +185,14 @@ export function deriveOpeningReadinessFor(snapshot, projectId, context = {}) {
     pendingLabels: nonTerminalRows.map((row) => row.label),
     closed: !holding,
     timedOut,
+    slow,
+    retryAvailable,
     minVisibleElapsed,
+    // The panel reports a long wait — it never treats one as a failure, and it shows
+    // the message without an offer while the rows are still making progress.
     phase: !holding
       ? OPENING_PHASE.READY
-      : timedOut
+      : (slow || timedOut || retryAvailable)
         ? OPENING_PHASE.STILL_RESTORING
         : OPENING_PHASE.RESTORING,
   };

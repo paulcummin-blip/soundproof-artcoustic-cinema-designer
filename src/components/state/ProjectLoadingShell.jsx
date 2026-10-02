@@ -86,9 +86,12 @@ const BUTTON_BASE = {
   fontFamily: FONT_BODY,
 };
 
-// The long-wait notice: the panel says plainly what has not finished restoring,
-// and offers to re-ask. There is no continue-anyway option — a required row that
-// could not be restored keeps the project here until Retry restores it.
+// The long-wait notice. It appears while the restore is simply taking a while —
+// larger projects, saved bass authority, report authority, proposal source data and
+// pricing can all take longer — and it never implies a failure. Retry appears here
+// only once the authority says a restore genuinely failed or has stopped responding.
+// There is still no continue-anyway option: a required row that has not restored
+// keeps the project here until it does.
 function StillRestoringNotice({ title, labels, onRetry }) {
   const named = labels.length > 0
     ? `${labels.join(", ")} ${labels.length === 1 ? "has" : "have"} not finished restoring.`
@@ -105,8 +108,9 @@ function StillRestoringNotice({ title, labels, onRetry }) {
     >
       <div style={{ fontSize: 13, fontWeight: 700, color: "#1B1A1A" }}>{title}</div>
       <div style={{ fontSize: 12, color: "#625143", marginTop: 6, lineHeight: 1.5 }}>
-        {named} The project opens once every row above has finished restoring — a step
-        that has not confirmed is marked Failed, and Retry runs the restore again.
+        Larger projects can take longer. {named} The project opens as soon as every
+        row above has finished restoring.
+        {onRetry ? " If a step has stopped responding, Retry runs the restore again." : ""}
       </div>
       <div style={{ display: "flex", gap: 8, marginTop: 12, flexWrap: "wrap" }}>
         {onRetry && (
@@ -134,6 +138,7 @@ export default function ProjectLoadingShell({
   phase = "restoring",
   stillRestoringTitle = null,
   stillRestoringLabels = [],
+  retryAvailable = false,
   onRetry = null,
 }) {
   const heading = projectName ? projectName : label;
@@ -234,11 +239,13 @@ export default function ProjectLoadingShell({
           </div>
         )}
 
+        {/* Retry is offered only once the authority says a restore failed or has
+            stopped responding — a slow-but-working restore shows the notice alone. */}
         {phase === "still-restoring" && stillRestoringTitle && (
           <StillRestoringNotice
             title={stillRestoringTitle}
             labels={stillRestoringLabels}
-            onRetry={onRetry}
+            onRetry={retryAvailable ? onRetry : null}
           />
         )}
       </div>
