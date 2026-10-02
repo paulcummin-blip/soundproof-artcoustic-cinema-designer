@@ -31,6 +31,10 @@ import VariationDrawer from '@/components/admin/intelligence/VariationDrawer';
 import { SELECTION_STORAGE_LABEL } from '@/components/admin/intelligence/projectSelectionStore';
 import { downloadSelectionCsv, downloadSelectionWorkbook } from '@/components/admin/intelligence/downloadReport';
 import { formatNumber } from '@/lib/commercial/projectReporting/formatMoney';
+import {
+  DEFAULT_PRODUCT_DEMAND_SORT,
+  sortProductDemandRows,
+} from '@/lib/commercial/projectReporting/productDemandSort';
 
 const TABS = [
   { key: 'demand', label: 'Product Demand' },
@@ -85,6 +89,10 @@ export default function AdminProjectIntelligence() {
   const [activeFamily, setActiveFamily] = useState(null);
   const [exportNotice, setExportNotice] = useState(null);
 
+  // Product demand sort order. Held here so the table and the export read the
+  // same order: it opens on total live value, highest first.
+  const [demandSort, setDemandSort] = useState(DEFAULT_PRODUCT_DEMAND_SORT);
+
   const familiesById = useMemo(() => (
     new Map((report?.families || []).map((family) => [family.id, family]))
   ), [report]);
@@ -122,7 +130,9 @@ export default function AdminProjectIntelligence() {
 
   const exportPayload = () => ({
     families: selection.selectedFamilies,
-    productDemand: selection.productDemand,
+    // The export carries the demand rows in the order shown on screen. Sorting
+    // is ordering only — the rows and their values are untouched.
+    productDemand: sortProductDemandRows(selection.productDemand, demandSort),
     excludedLines: selection.excludedLines,
     abfuserExclusions: selection.abfuserExclusions,
   });
@@ -183,7 +193,8 @@ export default function AdminProjectIntelligence() {
 
       {exportNotice && (
         <div style={{ marginBottom: 14, fontSize: 12, color: BRAND.muted }}>
-          {exportNotice} The export respects the current inclusion and counted-version selection.
+          {exportNotice} The export respects the current inclusion, counted-version selection and Product Demand
+          sort order.
         </div>
       )}
 
@@ -260,6 +271,8 @@ export default function AdminProjectIntelligence() {
                   currency={report.summary.liveCurrency || report.priceContext.currency}
                   projectNamesById={projectNamesById}
                   abfuserWarnings={selection.abfuserWarnings}
+                  sort={demandSort}
+                  onSortChange={setDemandSort}
                 />
                 <ExcludedHistoricAbfusers
                   abfuserExclusions={selection.abfuserExclusions}

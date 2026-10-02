@@ -5,13 +5,49 @@
 //
 // Each row can be expanded to show which included projects produced the
 // quantity.
+//
+// Any heading can be clicked to sort. Sorting is display order only — it never
+// changes a quantity, a value or a status — and the caller can pass the same
+// sort state through to the export so the workbook follows the screen.
 
-import React, { useState } from 'react';
-import { BRAND, EmptyState, Pill, TABLE, TABLE_WRAP, Td, Th } from './IntelligenceUi';
+import React, { useMemo, useState } from 'react';
+import { BRAND, EmptyState, Pill, TABLE, TABLE_WRAP, Td } from './IntelligenceUi';
+import SortableTh from './SortableTh';
 import { formatMoney, formatNumber } from '@/lib/commercial/projectReporting/formatMoney';
+import {
+  DEFAULT_PRODUCT_DEMAND_SORT,
+  PRODUCT_DEMAND_SORT_COLUMNS,
+  nextProductDemandSort,
+  productDemandSortIndicator,
+  resolveProductDemandSort,
+  sortProductDemandRows,
+} from '@/lib/commercial/projectReporting/productDemandSort';
 
-export default function ProductDemandTable({ productDemand = [], currency, projectNamesById, abfuserWarnings = [] }) {
+export default function ProductDemandTable({
+  productDemand = [],
+  currency,
+  projectNamesById,
+  abfuserWarnings = [],
+  sort,
+  onSortChange,
+}) {
   const [openKey, setOpenKey] = useState(null);
+  const [localSort, setLocalSort] = useState(DEFAULT_PRODUCT_DEMAND_SORT);
+
+  // Controlled by the page when a sort is supplied (so the export can follow it),
+  // and self-contained otherwise.
+  const activeSort = resolveProductDemandSort(sort || localSort);
+
+  const handleSort = (columnKey) => {
+    const next = nextProductDemandSort(activeSort, columnKey);
+    if (onSortChange) onSortChange(next);
+    else setLocalSort(next);
+  };
+
+  const rows = useMemo(
+    () => sortProductDemandRows(productDemand, activeSort),
+    [productDemand, activeSort.key, activeSort.direction],
+  );
 
   if (productDemand.length === 0) {
     return (
@@ -61,22 +97,33 @@ export default function ProductDemandTable({ productDemand = [], currency, proje
         </span>
       </div>
 
+      <div style={{ fontSize: 12, color: BRAND.muted }}>
+        Sorted by {PRODUCT_DEMAND_SORT_COLUMNS.find((column) => column.key === activeSort.key)?.label}
+        {activeSort.direction === 'asc' ? ' (ascending)' : ' (descending)'}. Click a heading to sort; click it again to
+        reverse. The export follows this order.
+      </div>
+
       <div style={TABLE_WRAP}>
         <table style={TABLE}>
           <thead>
             <tr>
-              <Th>Product / model</Th>
-              <Th>SKU</Th>
-              <Th>Category</Th>
-              <Th align="right">Quantity</Th>
-              <Th align="right">Included projects using it</Th>
-              <Th align="right">Total live value</Th>
-              <Th>Derived line</Th>
-              <Th>Priced</Th>
+              {PRODUCT_DEMAND_SORT_COLUMNS.map((column) => (
+                <SortableTh
+                  key={column.key}
+                  label={column.label}
+                  columnKey={column.key}
+                  align={column.align}
+                  hint={column.hint}
+                  activeKey={activeSort.key}
+                  direction={activeSort.direction}
+                  indicator={productDemandSortIndicator(activeSort, column.key)}
+                  onSort={handleSort}
+                />
+              ))}
             </tr>
           </thead>
           <tbody>
-            {productDemand.map((row) => {
+            {rows.map((row) => {
               const key = row.sku || row.product;
               const isOpen = openKey === key;
               const contributors = (row.projectIds || [])
