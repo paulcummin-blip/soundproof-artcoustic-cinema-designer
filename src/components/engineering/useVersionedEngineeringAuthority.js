@@ -12,8 +12,7 @@
  * Read-only: mounts no engine, recalculates nothing, publishes nothing.
  */
 
-import { useEffect, useState } from 'react';
-import { base44 } from '@/api/base44Client';
+import { useCallback, useEffect, useState } from 'react';
 import {
   classifyAuthorityState,
   composeAuthoritySnapshot,
@@ -21,11 +20,13 @@ import {
   buildRatingEnvelope,
   extractEngineeringSummary,
   fetchDurablePublication,
+  invalidateDurablePublicationRead,
   isAuthorityAvailable,
   readLocalHandoff,
 } from './versionedEngineeringAuthority';
 import { subscribeDesignReviewHandoff } from '@/components/state/designReviewHandoff';
-import { useCompletedBassAuthority } from '@/components/room/bass/completedBassResultStore';
+import { retryCompletedBassAuthority, useCompletedBassAuthority } from '@/components/room/bass/completedBassResultStore';
+import { invalidateProjectAnalysisCacheRead, readProjectVersionRecord } from '@/components/state/projectReadCache';
 import { applyRestoredBassAuthority } from './restoredBassOverlay';
 import { assessEngineeringReportCompleteness } from './engineeringReportCompleteness';
 
@@ -36,6 +37,7 @@ export function useVersionedEngineeringAuthority(projectId, versionId) {
   const [durable, setDurable] = useState(null);
   const [durableSnapshot, setDurableSnapshot] = useState(null);
   const [durableLoading, setDurableLoading] = useState(false);
+  const [readAttempt, setReadAttempt] = useState(0);
 
   // ── Browser handoff (fast path) — unchanged live/session transport ──────
   useEffect(() => {
@@ -79,10 +81,8 @@ export function useVersionedEngineeringAuthority(projectId, versionId) {
       // report_snapshot existed).
       let designState = null;
       try {
-        const versions = await base44.entities.ProjectVersion.filter({ id: versionId });
-        if (Array.isArray(versions) && versions.length) {
-          designState = versions[0]?.design_state || null;
-        }
+        const version = await readProjectVersionRecord(versionId);
+        designState = version?.design_state || null;
       } catch (error) {
         console.warn('[engineeringAuthority] design_state read failed:', error?.message || error);
       }
@@ -95,7 +95,7 @@ export function useVersionedEngineeringAuthority(projectId, versionId) {
     })();
 
     return () => { cancelled = true; };
-  }, [projectId, versionId]);
+  }, [projectId, versionId, readAttempt]);
 
   // The saved bass authority is restored here — on every page that reads the
   // engineering authority, not only where the Room Designer (and its Bass
@@ -130,6 +130,10 @@ export function useVersionedEngineeringAuthority(projectId, versionId) {
       }
     : composedSnapshot;
   const state = classifyAuthorityState({ durable, localSnapshot });
+  const readFailed = durable?.status === 'read_failed';
+  const readError = readFailed
+    ? (durable?.error || 'Saved engineering authority could not be read.')
+    : null;
   const reportCompleteness = assessEngineeringReportCompleteness(
     extractEngineeringSummary(snapshot),
   );
@@ -145,13 +149,28 @@ export function useVersionedEngineeringAuthority(projectId, versionId) {
   // Durable engineering and durable bass are one report-readiness boundary.
   // A report must not render a partial saved summary while the bass contract is
   // still hydrating independently of the Room Designer/Bass UI.
-  const loading = (!localHasSummary && (durableLoading || durable === null))
-    || bassHydrationPending;
+  const loading = !readFailed && (
+    (!localHasSummary && (durableLoading || durable === null))
+    || bassHydrationPending
+  );
+
+  const retry = useCallback(() => {
+    if (!projectId || !versionId) return;
+    invalidateDurablePublicationRead(projectId, versionId);
+    invalidateProjectAnalysisCacheRead(projectId, versionId);
+    retryCompletedBassAuthority(projectId, versionId);
+    setDurable(null);
+    setDurableSnapshot(null);
+    setReadAttempt((value) => value + 1);
+  }, [projectId, versionId]);
 
   return {
     snapshot,
     state,
     loading,
+    readFailed,
+    readError,
+    retry,
     bassHydrationPending,
     bassRestoreFailed,
     bassAuthorityStatus: completedBassAuthority?.authorityStatus || null,
