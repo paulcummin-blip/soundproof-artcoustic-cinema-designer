@@ -31,6 +31,8 @@ import {
 import {
   clearCommercialEdits,
   createCommercialAuthority,
+  getActiveCommercialAuthority,
+  isCommercialHydrationComplete,
   markCommercialHydrated,
   normaliseCommercialSelections,
   setActiveCommercialAuthority,
@@ -43,22 +45,37 @@ export default function ProjectDesignHydrator({ projectId }) {
   useEffect(() => {
     if (!projectId || !app) return undefined;
 
-    // Re-entrancy guard: once the canonical store reports this project's design
-    // as hydrated, never fetch again (the app state object identity changes as
-    // hydration writes land, and this effect must not loop).
+    // Re-entrancy guard: both the design and its commercial baseline must be
+    // present. Preview refreshes/HMR can preserve the app state while resetting
+    // the module-scoped commercial authority; treating that as fully hydrated
+    // leaves the project behind the opening screen forever and, more importantly,
+    // would make the autosave guard unable to prove its baseline.
     const canonical = getProjectHydration();
-    if (canonical.projectId === projectId && canonical.design === "loaded" && !canonical.error) {
+    const canonicalVersionId = canonical?.identity?.activeVersionId || null;
+    const commercialReady = isCommercialHydrationComplete(
+      getActiveCommercialAuthority(),
+      projectId,
+      canonicalVersionId,
+    );
+    if (
+      canonical.projectId === projectId
+      && canonical.design === "loaded"
+      && !canonical.error
+      && commercialReady
+    ) {
       return undefined;
     }
 
-    // Already hydrated in this session for this exact project — nothing to do.
+    // Already hydrated in this session for this exact project — nothing to do
+    // only when the commercial editing baseline survived as well. Otherwise the
+    // authoritative project/version is re-read to rebuild that baseline safely.
     const alreadyHydrated =
       activeProjectId === projectId &&
       app?.isProjectHydrationReady === true &&
       Number.isFinite(Number(app?.roomDims?.widthM)) &&
       Number.isFinite(Number(app?.roomDims?.lengthM));
 
-    if (alreadyHydrated) {
+    if (alreadyHydrated && commercialReady) {
       completeDesignHydration(projectId);
       return undefined;
     }
