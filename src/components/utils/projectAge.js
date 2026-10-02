@@ -8,12 +8,20 @@ const MS_PER_DAY = 1000 * 60 * 60 * 24;
 /**
  * Whole calendar days since the project's created_date.
  * Returns null if createdDate is missing or invalid.
+ *
+ * `now` is an optional reference instant (ms, or anything the Date constructor
+ * accepts) so callers that report deterministically — the Project Intelligence
+ * export and its tests — share this same age authority with the Projects page.
  */
-export function getAgeDays(createdDate) {
+export function getAgeDays(createdDate, now = null) {
   if (!createdDate) return null;
   const created = new Date(createdDate);
   if (!Number.isFinite(created.getTime())) return null;
-  const diffMs = Date.now() - created.getTime();
+  const reference = now == null
+    ? Date.now()
+    : (Number.isFinite(Number(now)) ? Number(now) : new Date(now).getTime());
+  if (!Number.isFinite(reference)) return null;
+  const diffMs = reference - created.getTime();
   return Math.floor(diffMs / MS_PER_DAY);
 }
 

@@ -30,7 +30,13 @@
  */
 
 import { BUCKET_LABEL } from './statusBuckets';
-import { AGE_BUCKETS, ageBucketKeyOf } from './pipelineAge';
+import {
+  AGE_BUCKETS,
+  UNKNOWN_AGE_BUCKET_KEY,
+  UNKNOWN_AGE_BUCKET_LABEL,
+  ageBucketByKey,
+  ageBucketKeyOf,
+} from './pipelineAge';
 import { tradeValueOf } from './artcousticForecast';
 
 export const SELECTION_WORKBOOK_TABS = [
@@ -49,8 +55,11 @@ export const SELECTION_WORKBOOK_TABS = [
 const YES = 'Yes';
 const NO = 'No';
 
+// Same bucket the screen shows: a project with no created date exports as
+// Unknown age, never as 0–30 days.
 const ageBucketLabel = (family) => (
-  AGE_BUCKETS.find((bucket) => bucket.key === ageBucketKeyOf(family))?.label || 'No date recorded'
+  ageBucketByKey(ageBucketKeyOf(family) || UNKNOWN_AGE_BUCKET_KEY)?.label
+  || UNKNOWN_AGE_BUCKET_LABEL
 );
 
 /** The export filename, e.g. "Sound Proof Artcoustic Forecast - 2026-10-02". */

@@ -46,7 +46,7 @@ import {
   PROJECT_SORT_COLUMNS,
 } from '@/lib/commercial/projectReporting/projectSort';
 import { buildTrendSummary } from '@/lib/commercial/projectReporting/pipelineTrends';
-import { ageBucketByKey, ageBucketKeyOf } from '@/lib/commercial/projectReporting/pipelineAge';
+import { ageBucketByKey, ageBucketKeyOf, UNKNOWN_AGE_BUCKET_KEY } from '@/lib/commercial/projectReporting/pipelineAge';
 
 const TABS = [
   { key: 'demand', label: 'Product Demand' },
@@ -120,7 +120,7 @@ export default function AdminProjectIntelligence() {
   // The Projects table shows the bucket the overview is filtering to.
   const projectRows = useMemo(() => (
     ageFilter
-      ? selection.selectedFamilies.filter((family) => ageBucketKeyOf(family) === ageFilter)
+      ? selection.selectedFamilies.filter((family) => (ageBucketKeyOf(family) || UNKNOWN_AGE_BUCKET_KEY) === ageFilter)
       : selection.selectedFamilies
   ), [selection.selectedFamilies, ageFilter]);
 

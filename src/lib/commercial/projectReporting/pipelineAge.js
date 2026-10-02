@@ -23,6 +23,7 @@
  */
 
 import { referenceTime, safeArray, text, timeOf } from './reportingUtils';
+import { getAgeDays } from '@/components/utils/projectAge';
 import { tradeValueOf } from './artcousticForecast';
 
 const DAY_MS = 86400000;
@@ -38,32 +39,36 @@ export const AGE_BUCKETS = [
   { key: 'over_365_days', label: 'Over 1 year', fromDays: 366, toDays: null, note: 'Stale unless confirmed active' },
 ];
 
+/** The bucket for projects with no usable created date. Never defaults to 0–30. */
+export const UNKNOWN_AGE_BUCKET_KEY = 'unknown_age';
+export const UNKNOWN_AGE_BUCKET_LABEL = 'Unknown age';
+
 export const AGE_HELPER_NOTE = 'Older open projects should be reviewed and moved to won, lost or excluded to improve forecast accuracy.';
 
-export const AGE_BASIS_NOTE = "Age uses the project's last updated date where available, otherwise its created date.";
+export const AGE_BASIS_NOTE = "Age uses the project's created date — the same age the Projects page shows. A project with no created date is reported as Unknown age, never as 0–30 days.";
 
 export const AGE_BASIS_LABEL = Object.freeze({
-  updated: 'Last updated',
-  created: 'Created',
+  created: 'Project created',
 });
 
-/** The age basis for one project: which date was used, and how old it is. */
+/**
+ * The age of one project: the ONE age authority, shared with the main Projects
+ * page (getAgeDays → whole days since the project's created date).
+ *
+ * The project's updated date is deliberately NOT used. Editing a project does
+ * not make it younger, and using it put every recently touched project into
+ * 0–30 days. A project with no created date has an unknown age — never zero.
+ */
 export function ageBasisOf(family, now = null) {
   const reference = referenceTime(now);
-  // An absent or empty date is genuinely absent: it is never read as the epoch.
-  const updatedValue = text(family?.updatedDate);
-  const createdValue = text(family?.createdDate);
-  const updated = updatedValue ? timeOf(updatedValue) : null;
-  const created = createdValue ? timeOf(createdValue) : null;
-  const basis = updated !== null ? 'updated' : (created !== null ? 'created' : null);
-  const stamp = basis === 'updated' ? updated : (basis === 'created' ? created : null);
-  const date = basis === 'updated' ? updatedValue : (basis === 'created' ? createdValue : null);
+  const created = text(family?.createdDate);
+  const days = getAgeDays(created, reference);
 
   return {
-    basis,
-    basisLabel: basis ? AGE_BASIS_LABEL[basis] : null,
-    date,
-    days: stamp === null ? null : Math.max(0, Math.floor((reference - stamp) / DAY_MS)),
+    basis: days === null ? null : 'created',
+    basisLabel: days === null ? null : AGE_BASIS_LABEL.created,
+    date: days === null ? null : created,
+    days,
   };
 }
 
@@ -82,14 +87,18 @@ export function ageBucketKeyOf(family, now = Date.now()) {
   return ageBucketKeyForDays(ageBasisOf(family, now).days);
 }
 
-/** The bucket definition for a key, or null. */
+/** The bucket definition for a key, or null. Includes the Unknown age bucket. */
 export function ageBucketByKey(key) {
+  if (key === UNKNOWN_AGE_BUCKET_KEY) {
+    return { key: UNKNOWN_AGE_BUCKET_KEY, label: UNKNOWN_AGE_BUCKET_LABEL, fromDays: null, toDays: null };
+  }
   return AGE_BUCKETS.find((bucket) => bucket.key === key) || null;
 }
 
 /** The bucket label for one project, for the screen and the export. */
 export function ageBucketLabelOf(family, now = Date.now()) {
-  return ageBucketByKey(ageBucketKeyOf(family, now))?.label || 'No date recorded';
+  return ageBucketByKey(ageBucketKeyOf(family, now) || UNKNOWN_AGE_BUCKET_KEY)?.label
+    || UNKNOWN_AGE_BUCKET_LABEL;
 }
 
 /**
@@ -175,11 +184,40 @@ export function buildPipelineAgeSummary(families = [], { unitsByProjectId = null
   const totalUnits = included.reduce((sum, family) => sum + catalogueUnitsFor(unitsByProjectId, family.id), 0);
   const { currency, mixed } = currencyOf(included);
 
-  const buckets = rawBuckets.map((bucket) => ({
-    ...bucket,
-    shareOfCount: share(bucket.count, included.length),
-    shareOfRetail: share(bucket.retail ?? 0, totalRetail ?? 0),
-  }));
+  // A project with no created date is reported as Unknown age — never folded
+  // into 0–30 days — so the distribution still totals the included projects.
+  const unknownAgeFamilies = included.filter((family) => ageBasisOf(family, reference).days === null);
+  const unknownRetailValues = unknownAgeFamilies
+    .map((family) => catalogueRetailFor(retailByProjectId, family.id))
+    .filter((value) => value !== null);
+  const unknownRetail = unknownRetailValues.length > 0
+    ? unknownRetailValues.reduce((sum, value) => sum + value, 0)
+    : null;
+  const unknownAgeBucket = {
+    key: UNKNOWN_AGE_BUCKET_KEY,
+    label: UNKNOWN_AGE_BUCKET_LABEL,
+    note: 'No created date recorded',
+    fromDays: null,
+    toDays: null,
+    count: unknownAgeFamilies.length,
+    valuedCount: unknownRetailValues.length,
+    noValueCount: unknownAgeFamilies.length - unknownRetailValues.length,
+    retail: unknownRetail,
+    trade: unknownRetail === null ? null : tradeValueOf(unknownRetail),
+    units: unknownAgeFamilies.reduce((sum, family) => sum + catalogueUnitsFor(unitsByProjectId, family.id), 0),
+    projectIds: unknownAgeFamilies.map((family) => family.id),
+    shareOfCount: share(unknownAgeFamilies.length, included.length),
+    shareOfRetail: share(unknownRetail ?? 0, totalRetail ?? 0),
+  };
+
+  const buckets = [
+    ...rawBuckets.map((bucket) => ({
+      ...bucket,
+      shareOfCount: share(bucket.count, included.length),
+      shareOfRetail: share(bucket.retail ?? 0, totalRetail ?? 0),
+    })),
+    unknownAgeBucket,
+  ];
 
   const overOneYear = buckets.find((bucket) => bucket.key === 'over_365_days') || null;
   const missingAgeCount = included.filter((family) => ageBasisOf(family, now).days === null).length;
@@ -197,6 +235,10 @@ export function buildPipelineAgeSummary(families = [], { unitsByProjectId = null
       currency,
       mixedCurrency: mixed,
       projectsOverOneYear: overOneYear?.count || 0,
+      unknownAgeCount: unknownAgeBucket.count,
+      unknownAgeRetail: unknownAgeBucket.retail,
+      unknownAgeTrade: unknownAgeBucket.trade,
+      unknownAgeProjectIds: unknownAgeBucket.projectIds,
       retailOverOneYear: overOneYear?.retail ?? null,
       missingAgeCount,
     },
@@ -208,9 +250,7 @@ export function buildPipelineAgeSummary(families = [], { unitsByProjectId = null
 /** A plain-text age basis sentence for one project, e.g. for a table tooltip. */
 export function ageBasisSentence(family, now = Date.now()) {
   const age = ageBasisOf(family, now);
-  if (age.days === null) return 'No created or updated date recorded';
+  if (age.days === null) return 'No created date recorded — age is unknown, and is never counted as 0–30 days';
   const when = text(age.date);
-  return age.basis === 'updated'
-    ? `Last updated ${when}`
-    : `Created ${when} (no update recorded)`;
+  return `Created ${when} — ${age.days} day${age.days === 1 ? '' : 's'} old`;
 }

@@ -83,7 +83,7 @@ export default function ProjectSelectionSummary({
         />
       </div>
 
-      {((forecast?.unpricedLineCount ?? 0) > 0 || (pipelineAge?.totals?.noValueCount ?? 0) > 0) && (
+      {((forecast?.unpricedLineCount ?? 0) > 0 || (pipelineAge?.totals?.noValueCount ?? 0) > 0 || (pipelineAge?.totals?.unknownAgeCount ?? 0) > 0) && (
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
           {(forecast?.unpricedLineCount ?? 0) > 0 && (
             <Pill tone="warn" title="These catalogue lines carry a quantity but no price, so they add no value">
@@ -93,6 +93,11 @@ export default function ProjectSelectionSummary({
           {(pipelineAge?.totals?.noValueCount ?? 0) > 0 && (
             <Pill tone="neutral" title="No priced Artcoustic catalogue line in the counted version">
               {formatNumber(pipelineAge.totals.noValueCount)} with no Artcoustic value
+            </Pill>
+          )}
+          {(pipelineAge?.totals?.unknownAgeCount ?? 0) > 0 && (
+            <Pill tone="warn" title="These projects have no created date, so their age cannot be stated. They are never counted as 0–30 days.">
+              {formatNumber(pipelineAge.totals.unknownAgeCount)} with unknown age
             </Pill>
           )}
         </div>

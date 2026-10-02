@@ -17,7 +17,9 @@ import { BRAND, Pill, TABLE, TABLE_WRAP, Td, Th } from './IntelligenceUi';
 import SortableTh from './SortableTh';
 import { formatDate, formatMoney, formatNumber } from '@/lib/commercial/projectReporting/formatMoney';
 import { BUCKET_LABEL } from '@/lib/commercial/projectReporting/statusBuckets';
-import { formatProjectAge } from '@/lib/commercial/projectReporting/projectSelection';
+// Age comes from the ONE shared age authority (created date), so this table
+// always agrees with the main Projects page.
+import { getAgeDays, formatAge } from '@/components/utils/projectAge';
 import { ageBasisSentence } from '@/lib/commercial/projectReporting/pipelineAge';
 import {
   DEFAULT_PROJECT_SORT,
@@ -136,12 +138,12 @@ export default function ProjectSelectionTable({
                   <Pill tone={statusTone(family.bucket)}>{BUCKET_LABEL[family.bucket] || family.bucket || '—'}</Pill>
                 </Td>
                 <Td title={ageBasisSentence(family)}>
-                  {formatProjectAge(family.updatedDate || family.createdDate)}
+                  {formatAge(getAgeDays(family.createdDate)) || 'Unknown age'}
                 </Td>
                 <Td title={ageBasisSentence(family)}>
-                  <div>{formatDate(family.updatedDate || family.createdDate)}</div>
+                  <div>{family.createdDate ? formatDate(family.createdDate) : 'Unknown age'}</div>
                   <div style={{ fontSize: 11, color: BRAND.muted }}>
-                    {family.updatedDate ? 'Last updated' : (family.createdDate ? 'Created' : 'No date recorded')}
+                    {family.createdDate ? 'Project created' : 'No created date recorded'}
                   </div>
                 </Td>
                 <Td align="right" mono>{formatNumber(family.variationCount || 0)}</Td>
