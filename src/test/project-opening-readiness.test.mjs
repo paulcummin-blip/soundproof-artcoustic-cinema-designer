@@ -147,8 +147,9 @@ test('TEST 5 — unfinished bass never prevents the editable project opening', (
   assert.equal(opened.holding, false, 'the project opens while bass remains unfinished');
   assert.equal(getProjectOpening().closed, true, 'Room Designer is available to finish bass');
   assert.deepEqual(opened.pendingCritical, [], 'bass is not an opening-critical stage');
-  assert.deepEqual(opened.pendingSupporting, ['bass'], 'bass still reports its background state');
-  assert.ok(opened.pendingLabels.includes('Bass performance'), 'the pending output remains visible to consumers');
+  const bassLine = openingProgressLines(getProjectOpening(), PROJECT).find((line) => line.key === 'bass');
+  assert.equal(bassLine.state, OPENING_CHECKPOINT_STATE.PENDING, 'bass remains honestly unfinished');
+  assert.equal(bassLine.label, 'Bass performance', 'the output retains its named background state');
 });
 
 test('TEST 6 — edit-safe commercial hydration still blocks, output hydration does not', () => {
@@ -168,7 +169,10 @@ test('TEST 6 — edit-safe commercial hydration still blocks, output hydration d
 
   const opened = openState();
   assert.equal(opened.holding, false, 'unfinished bass does not block the project');
-  assert.deepEqual(opened.pendingSupporting, ['bass']);
+  assert.equal(
+    openingProgressLines(getProjectOpening(), PROJECT).find((line) => line.key === 'bass').state,
+    OPENING_CHECKPOINT_STATE.PENDING,
+  );
   assert.equal(isProjectOpeningSatisfied(PROJECT), true);
 });
 
