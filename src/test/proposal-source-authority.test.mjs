@@ -183,10 +183,11 @@ test('the proposal builder reads the source status and blocks generation', () =>
   assert.match(WIZARD, /written from the current Visual and Technical Report data/);
 });
 
-test('Proposal Centre shows the source status for the active project', () => {
-  assert.match(CENTRE, /useProposalSourceStatus\(\{/);
-  assert.match(CENTRE, /<ProposalSourcePanel status=\{sourceStatus\}/);
-  assert.match(CENTRE, /useActiveProjectId\(\)/);
+test('Proposal Centre stays passive until the proposal wizard owns source readiness', () => {
+  assert.doesNotMatch(CENTRE, /useProposalSourceStatus/);
+  assert.doesNotMatch(CENTRE, /ProposalSourcePanel/);
+  assert.doesNotMatch(CENTRE, /useActiveProjectId/);
+  assert.match(CENTRE, /CreateProposalWizard/);
 });
 
 test('the panel shows both reports, the version and the generation time', () => {
