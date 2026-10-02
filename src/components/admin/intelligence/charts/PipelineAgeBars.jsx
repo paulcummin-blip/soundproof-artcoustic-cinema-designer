@@ -16,7 +16,7 @@ import { BRAND, Card, Pill } from '../IntelligenceUi';
 import { formatMoney, formatNumber } from '@/lib/commercial/projectReporting/formatMoney';
 
 const TRACK = { background: '#F1F0EC', borderRadius: 6, height: 12, overflow: 'hidden' };
-const VALUE_COLUMN = { minWidth: 104, textAlign: 'right', fontVariantNumeric: 'tabular-nums' };
+const VALUE_COLUMN = { minWidth: 136, textAlign: 'right', fontVariantNumeric: 'tabular-nums' };
 const NAME_COLUMN = { minWidth: 96, fontSize: 12, fontWeight: 700, color: BRAND.subtext };
 
 const money = (value, currency) => (

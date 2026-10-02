@@ -52,7 +52,7 @@ export function buildCompositionSummary(families = [], {
   unitsByProjectId = null,
   retailByProjectId = null,
 } = {}) {
-  const included = safeArray(families);
+  const included = safeArray(families).filter((family) => family?.forecastIncluded !== false);
 
   const rawRows = COMPOSITION_GROUPS.map((group) => {
     const inGroup = included.filter((family) => compositionGroupKeyOf(family) === group.key);

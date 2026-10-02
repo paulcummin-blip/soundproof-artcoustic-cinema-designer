@@ -314,6 +314,18 @@ export default function AdminProjectIntelligence() {
             hiddenCount={hiddenProjectCount}
           />
 
+          <ForecastDashboard
+            forecastProjects={selection.forecastProjects}
+            pipelineAge={selection.pipelineAge}
+            unitsByProjectId={selection.unitsByProjectId}
+            retailByProjectId={selection.retailByProjectId}
+            currency={report.summary.liveCurrency}
+            accountOptions={dealerAccountOptions}
+            now={report?.generatedAt}
+            activeBucket={ageFilter}
+            onBucketClick={handleBucketClick}
+          />
+
           <div style={{
             display: 'grid',
             gap: 16,
@@ -332,18 +344,6 @@ export default function AdminProjectIntelligence() {
               onResetCategories={selection.resetCategories}
             />
           </div>
-
-          <ForecastDashboard
-            forecastProjects={selection.forecastProjects}
-            pipelineAge={selection.pipelineAge}
-            unitsByProjectId={selection.unitsByProjectId}
-            retailByProjectId={selection.retailByProjectId}
-            currency={report.summary.liveCurrency}
-            accountOptions={dealerAccountOptions}
-            now={report?.generatedAt}
-            activeBucket={ageFilter}
-            onBucketClick={handleBucketClick}
-          />
 
           {!priceListAvailable && (
             <div style={{ fontSize: 12, color: BRAND.warn }}>
