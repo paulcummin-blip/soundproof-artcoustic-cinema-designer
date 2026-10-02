@@ -73,6 +73,7 @@ import { useElevationDragHandlers } from "@/components/roomdesigner/hooks/useEle
 import { useSubwooferCompatibilityActions } from "@/components/hooks/useSubwooferCompatibilityActions";
 import { subscribeAsdrVisibility, getAsdrVisibility, setAsdrVisibility } from "@/components/state/asdrVisibilityStore";
 import { useAppDesignRating } from "@/components/hooks/useAppDesignRating";
+import { useVersionedEngineeringAuthority } from "@/components/engineering/useVersionedEngineeringAuthority";
 import { hasMinimumSystemForAsdr } from "@/components/utils/minimumSystemForAsdr";
 import DesignRecommendationEngine from "@/components/recommendations/DesignRecommendationEngine";
 
@@ -1788,6 +1789,21 @@ function RoomDesignerWithState() {
     minimumSystemMet,
   });
 
+  // Compliance is also a consumer of the saved version authority. On a cold
+  // reopen, use the restored complete summary (including durable bass overlay)
+  // without requiring the Bass panel to mount. While a project is unfinished,
+  // keep showing the live working summary so analysis can continue normally.
+  const restoredEngineeringAuthority = useVersionedEngineeringAuthority(
+    resolvedProjectId || projectIdState || null,
+    appState?.activeVersionId || null,
+  );
+  const complianceEngineeringSummary = restoredEngineeringAuthority.reportComplete
+    ? (restoredEngineeringAuthority.snapshot?.engineeringSummary
+      ?? restoredEngineeringAuthority.snapshot?.rating?.engineeringSummary
+      ?? appDesignRating?.engineeringSummary
+      ?? null)
+    : (appDesignRating?.engineeringSummary ?? null);
+
   const [designRecommendations, setDesignRecommendations] = React.useState(null);
 
   // Publish the already-settled Room Designer authority for same-window and
@@ -2426,7 +2442,7 @@ function RoomDesignerWithState() {
             frontSubsForRendering={frontSubsForRendering}
             rearSubsForRendering={rearSubsForRendering}
             analysisResult={analysisResult}
-            engineeringSummary={appDesignRating?.engineeringSummary ?? null}
+            engineeringSummary={complianceEngineeringSummary}
             p19SeatAuthority={appDesignRating?.engineeringSummary?.p19SeatAuthority ?? appDesignRating?.p19SeatAuthority ?? null}
             freeMoveLcr={freeMoveLcr}
             showPrices={showPrices}
