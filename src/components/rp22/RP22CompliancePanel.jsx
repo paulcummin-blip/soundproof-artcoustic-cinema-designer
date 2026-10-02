@@ -1,7 +1,7 @@
 // components/rp22/RP22CompliancePanel.jsx
 import React from "react";
 import { computeScreenMetrics } from "@/components/utils/screenMetrics";
-import { renderPrimitive } from "@/components/utils/renderSafe";
+import { firstStatedPrimitive, renderPrimitive } from "@/components/utils/renderSafe";
 import RP22GradingPill from "@/components/ui/RP22GradingPill";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { RP22_PRESENTATION_PARAMETERS } from "@/components/utils/rp22ParameterPresentation";
@@ -305,7 +305,7 @@ export default function RP22CompliancePanel({
     const key = `p${pid}`;
     const roomResult = engineeringSummary?.roomResultsByParameter?.[pid] || null;
     if (roomResult) {
-      return roomResult.formatted || roomResult.hudLabel || (roomResult.value ?? "—");
+      return firstStatedPrimitive([roomResult.formatted, roomResult.hudLabel, roomResult.value], "—");
     }
     if (pid === 19) {
       return engineeringSummary?.p19SeatAuthority?.project?.coverageSummary
@@ -314,7 +314,7 @@ export default function RP22CompliancePanel({
     }
     const selectedSeat = (reportCounts.seatResultsByParameter?.[key] || [])
       .find((seat) => String(seat.seatId) === String(lockedSeatId));
-    return selectedSeat?.valueFormatted || "Seat results";
+    return firstStatedPrimitive([selectedSeat?.valueFormatted, selectedSeat?.value], "Seat results");
   }, [engineeringSummary, reportCounts, lockedSeatId]);
 
   // Full per-parameter detail card (title, description, achieved, scope, thresholds,
