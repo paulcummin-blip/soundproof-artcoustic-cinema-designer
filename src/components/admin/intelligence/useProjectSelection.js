@@ -18,6 +18,7 @@ import {
   summariseSelection,
 } from '@/lib/commercial/projectReporting/projectSelection';
 import { buildCatalogueDemand } from '@/lib/commercial/projectReporting/productDemand';
+import { buildPipelineAgeSummary } from '@/lib/commercial/projectReporting/pipelineAge';
 import { clearSelection, readSelection, writeSelection } from './projectSelectionStore';
 
 /**
@@ -51,7 +52,9 @@ export function useProjectSelection({ families = [], priceMap = null, totalLoade
   // the demand totals.
   const catalogueDemand = useMemo(() => {
     const counted = includedFamilies(selectedFamilies);
-    if (counted.length === 0) return { rows: [], excludedLines: [], abfuserExclusions: [], abfuserWarnings: [] };
+    if (counted.length === 0) {
+      return { rows: [], excludedLines: [], abfuserExclusions: [], abfuserWarnings: [], unitsByProjectId: {} };
+    }
     return buildCatalogueDemand({ families: counted, priceMap });
   }, [selectedFamilies, priceMap]);
 
@@ -60,6 +63,16 @@ export function useProjectSelection({ families = [], priceMap = null, totalLoade
   // Abfuser left out by the 1 Oct 2026 reporting cutoff, kept for audit only.
   const abfuserExclusions = catalogueDemand.abfuserExclusions || [];
   const abfuserWarnings = catalogueDemand.abfuserWarnings || [];
+  // Counted catalogue units per project, from the same demand pass, so the age
+  // and trend overviews measure exactly the lines Product Demand counts.
+  const unitsByProjectId = catalogueDemand.unitsByProjectId || {};
+
+  // Age and value ageing for the overview: included projects only, counted
+  // versions only, one project counted once.
+  const pipelineAge = useMemo(
+    () => buildPipelineAgeSummary(includedFamilies(selectedFamilies), { unitsByProjectId }),
+    [selectedFamilies, unitsByProjectId],
+  );
 
   const versionRows = useMemo(() => buildVersionDetailRows(selectedFamilies), [selectedFamilies]);
 
@@ -88,6 +101,8 @@ export function useProjectSelection({ families = [], priceMap = null, totalLoade
     excludedLines,
     abfuserExclusions,
     abfuserWarnings,
+    unitsByProjectId,
+    pipelineAge,
     versionRows,
     summary,
     preferences,

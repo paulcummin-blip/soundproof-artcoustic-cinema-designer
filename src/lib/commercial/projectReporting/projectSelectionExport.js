@@ -3,7 +3,7 @@
  * -------------------------
  * The product demand export for the Project Intelligence selection workflow.
  *
- * Six workbook tabs, built from the admin's inclusion and counted-version
+ * Eight workbook tabs, built from the admin's inclusion and counted-version
  * selection:
  *   1. Included Projects           — one row per included project
  *   2. Excluded Projects           — one row per excluded project, with the reason
@@ -14,6 +14,10 @@
  *                                    for audit only
  *   6. Excluded Historic Abfusers  — Abfuser quantity and value left out because
  *                                    the counted version predates 1 Oct 2026
+ *   7. Pipeline Age Summary        — project count, value and catalogue units per
+ *                                    age bucket, from the age overview
+ *   8. Trend Summary               — rolling 90-day periods with the change
+ *                                    against the previous period
  *
  * The workbook and CSV strings are produced by projectReportingExport, so this
  * module returns sheet definitions only.
@@ -30,7 +34,14 @@ export const SELECTION_WORKBOOK_TABS = [
   'Version Detail',
   'Excluded Manual Lines',
   'Excluded Historic Abfusers',
+  'Pipeline Age Summary',
+  'Trend Summary',
 ];
+
+/** A share as display text. Shares are reported, never scored. */
+const percentText = (value) => (
+  value === null || value === undefined ? '' : `${(Number(value) * 100).toFixed(1)}%`
+);
 
 /** The export filename, e.g. "Sound Proof Project Intelligence Product Demand - 2026-10-02". */
 export function selectionExportFilename(date = new Date()) {
@@ -49,7 +60,7 @@ const noteText = (family) => [
 /**
  * Build the sheets from the resolved selection.
  *
- * @param {Object} selection — { families, productDemand, excludedLines, abfuserExclusions }
+ * @param {Object} selection — { families, productDemand, excludedLines, abfuserExclusions, pipelineAge, trends }
  * @returns {Array<{ name: string, columns: Array, rows: Array }>}
  */
 export function buildSelectionSheets({
@@ -57,6 +68,8 @@ export function buildSelectionSheets({
   productDemand = [],
   excludedLines = [],
   abfuserExclusions = [],
+  pipelineAge = null,
+  trends = null,
 } = {}) {
   const included = families.filter((family) => family.included);
   const excluded = families.filter((family) => !family.included);
@@ -113,6 +126,29 @@ export function buildSelectionSheets({
     { key: 'quantity', label: 'Quantity excluded', type: 'number' },
     { key: 'value', label: `Value excluded (${currency})`, type: 'currency' },
     { key: 'reason', label: 'Reason', type: 'string' },
+  ];
+
+  const pipelineAgeColumns = [
+    { key: 'bucket', label: 'Age bucket', type: 'string' },
+    { key: 'count', label: 'Project count', type: 'number' },
+    { key: 'liveValue', label: `Live design value (${currency})`, type: 'currency' },
+    { key: 'averageValue', label: `Average project value (${currency})`, type: 'currency' },
+    { key: 'units', label: 'Catalogue units', type: 'number' },
+    { key: 'shareOfCount', label: 'Share of count', type: 'string' },
+    { key: 'shareOfValue', label: 'Share of value', type: 'string' },
+  ];
+
+  const trendColumns = [
+    { key: 'period', label: 'Rolling 90-day period', type: 'string' },
+    { key: 'projects', label: 'Project count', type: 'number' },
+    { key: 'totalLiveValue', label: `Total live value (${currency})`, type: 'currency' },
+    { key: 'averageValue', label: `Average project value (${currency})`, type: 'currency' },
+    { key: 'units', label: 'Catalogue units', type: 'number' },
+    { key: 'averageUnitsPerProject', label: 'Average units/project', type: 'number' },
+    { key: 'activeAccounts', label: 'Active dealers/accounts', type: 'number' },
+    { key: 'changeProjects', label: 'Change vs previous project count', type: 'number' },
+    { key: 'changeValue', label: `Change vs previous value (${currency})`, type: 'currency' },
+    { key: 'changeAverageValue', label: `Change vs previous average value (${currency})`, type: 'currency' },
   ];
 
   const versionColumns = [
@@ -218,6 +254,42 @@ export function buildSelectionSheets({
         quantity: row.quantity,
         value: row.value,
         reason: row.reason,
+      })),
+    },
+    {
+      // Value ageing: how much of the included pipeline, and how many counted
+      // catalogue units, sit in each age bucket. Included projects only, counted
+      // versions only — the same numbers the overview shows.
+      name: SELECTION_WORKBOOK_TABS[6],
+      columns: pipelineAgeColumns,
+      rows: (pipelineAge?.buckets || []).map((bucket) => ({
+        bucket: bucket.label,
+        count: bucket.count,
+        liveValue: bucket.liveValue,
+        averageValue: bucket.averageValue,
+        units: bucket.units,
+        shareOfCount: percentText(bucket.shareOfCount),
+        shareOfValue: percentText(bucket.shareOfValue),
+      })),
+    },
+    {
+      // Rolling 90-day periods, newest first, each with the change against the
+      // previous period. Every figure is reported, never scored.
+      name: SELECTION_WORKBOOK_TABS[7],
+      columns: trendColumns,
+      rows: (trends?.windows || []).map((row) => ({
+        period: row.label,
+        projects: row.projects,
+        totalLiveValue: row.totalLiveValue,
+        averageValue: row.averageValue,
+        units: row.units,
+        averageUnitsPerProject: row.averageUnitsPerProject === null
+          ? null
+          : Number(row.averageUnitsPerProject.toFixed(1)),
+        activeAccounts: row.activeAccounts,
+        changeProjects: row.changeProjects,
+        changeValue: row.changeValue,
+        changeAverageValue: row.changeAverageValue,
       })),
     },
   ];

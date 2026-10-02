@@ -1,8 +1,9 @@
 // ProjectSelectionSummary.jsx
 // ---------------------------
-// The six headline numbers for the inclusion and product demand workflow, and
-// nothing else. Counted totals come from the counted version of included
-// projects only.
+// The headline numbers for the inclusion and product demand workflow, and
+// nothing else: the totals, then the age and value ageing cards fed by the
+// pipelineAge authority. Counted totals come from the counted version of
+// included projects only.
 
 import React from 'react';
 import { BRAND, Pill } from './IntelligenceUi';
@@ -35,11 +36,20 @@ function MetricCard({ label, value, hint, tone }) {
   );
 }
 
-export default function ProjectSelectionSummary({ summary, currency, hiddenCount = 0 }) {
+export default function ProjectSelectionSummary({ summary, currency, hiddenCount = 0, pipelineAge = null }) {
   if (!summary) return null;
   const valueText = summary.countedLiveValue === null
     ? 'Not calculable'
     : formatMoney(summary.countedLiveValue, summary.countedCurrency || currency || 'GBP');
+
+  // Age-bucket values come from the age overview, so a card and the bucket table
+  // below it can never disagree.
+  const money = (value) => (
+    value === null || value === undefined
+      ? '—'
+      : formatMoney(value, summary.countedCurrency || currency || 'GBP')
+  );
+  const bucketValue = (key) => money(pipelineAge?.totals?.[key]);
 
   return (
     <div style={{ display: 'grid', gap: 12 }}>
@@ -47,20 +57,36 @@ export default function ProjectSelectionSummary({ summary, currency, hiddenCount
         <MetricCard label="Total projects loaded" value={formatNumber(summary.totalLoadedProjects)} />
         <MetricCard label="Included projects" value={formatNumber(summary.includedCount)} tone={BRAND.good} />
         <MetricCard
-          label="Excluded projects"
-          value={formatNumber(summary.excludedCount)}
-          tone={summary.excludedCount > 0 ? BRAND.warn : BRAND.text}
-        />
-        <MetricCard label="Projects with multiple versions" value={formatNumber(summary.multiVersionCount)} />
-        <MetricCard
-          label="Counted product lines"
-          value={formatNumber(summary.countedProductLines)}
-          hint="Product lines across counted versions only"
-        />
-        <MetricCard
-          label="Total live design value (counted versions)"
+          label="Included live value"
           value={valueText}
-          hint={summary.countedMixedCurrency ? 'Mixed currencies — not summed' : 'Included projects, counted version only'}
+          hint={summary.countedMixedCurrency ? 'Mixed currencies — not summed' : 'Counted version of each included project'}
+        />
+        <MetricCard
+          label="0–30 day value"
+          value={bucketValue('valueDays0To30')}
+          hint="Included projects updated or created in the last 30 days"
+        />
+        <MetricCard
+          label="31–90 day value"
+          value={bucketValue('valueDays31To90')}
+          hint="Included projects 31–90 days old"
+        />
+        <MetricCard
+          label="91+ day value"
+          value={bucketValue('valueDays91Plus')}
+          hint="Included projects 91 days and older"
+          tone={BRAND.warn}
+        />
+        <MetricCard
+          label="Projects over 1 year"
+          value={formatNumber(pipelineAge?.totals?.projectsOverOneYear ?? 0)}
+          tone={(pipelineAge?.totals?.projectsOverOneYear ?? 0) > 0 ? BRAND.warn : BRAND.text}
+          hint="Stale unless confirmed active"
+        />
+        <MetricCard
+          label="Counted catalogue units"
+          value={formatNumber(pipelineAge?.totals?.units ?? 0)}
+          hint="Catalogue units across counted versions"
         />
       </div>
 
@@ -75,6 +101,12 @@ export default function ProjectSelectionSummary({ summary, currency, hiddenCount
             {summary.unpricedCountedCount} counted version{summary.unpricedCountedCount === 1 ? '' : 's'} not calculable
           </Pill>
         )}
+        <Pill tone="neutral" title="Excluded projects are left out of every total on this page">
+          {formatNumber(summary.excludedCount)} excluded
+        </Pill>
+        <Pill tone="neutral" title="A project's versions are design options and are never summed">
+          {formatNumber(summary.multiVersionCount)} with multiple versions
+        </Pill>
         {hiddenCount > 0 && (
           <span>
             {formatNumber(hiddenCount)} project{hiddenCount === 1 ? '' : 's'} are hidden from the selection list by the

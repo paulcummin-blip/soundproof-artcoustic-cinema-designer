@@ -43,6 +43,18 @@ export function timeOf(value) {
   return Number.isFinite(time) ? time : null;
 }
 
+/**
+ * A usable reference instant in milliseconds, for age and window maths.
+ *
+ * An absent, empty or unparseable value means "now", and never the epoch — a
+ * missing reference must not silently age every project to 1970.
+ */
+export function referenceTime(value) {
+  if (value === null || value === undefined || value === '') return Date.now();
+  const stamp = timeOf(value);
+  return stamp === null ? Date.now() : stamp;
+}
+
 export function dayDiff(a, b) {
   const ta = timeOf(a);
   const tb = timeOf(b);

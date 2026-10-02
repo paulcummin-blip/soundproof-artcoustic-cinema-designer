@@ -4,15 +4,31 @@
 //
 // Inclusion and the counted version are admin choices held as local report
 // selection; nothing here writes to the database.
+//
+// Included, Age, Last updated, Counted version and Live value sort on click.
+// Sorting is display order only: it never changes a value or an inclusion choice,
+// and with no heading chosen the reporting order is shown untouched.
 
-import React from 'react';
+import React, { useMemo, useState } from 'react';
 import { BRAND, Pill, TABLE, TABLE_WRAP, Td, Th } from './IntelligenceUi';
-import { formatMoney, formatNumber } from '@/lib/commercial/projectReporting/formatMoney';
+import SortableTh from './SortableTh';
+import { formatDate, formatMoney, formatNumber } from '@/lib/commercial/projectReporting/formatMoney';
 import { BUCKET_LABEL } from '@/lib/commercial/projectReporting/statusBuckets';
 import { formatProjectAge } from '@/lib/commercial/projectReporting/projectSelection';
+import { ageBasisSentence } from '@/lib/commercial/projectReporting/pipelineAge';
+import {
+  DEFAULT_PROJECT_SORT,
+  PROJECT_SORT_COLUMNS,
+  nextProjectSort,
+  projectSortIndicator,
+  resolveProjectSort,
+  sortProjectFamilies,
+} from '@/lib/commercial/projectReporting/projectSort';
 import CountedVersionSelect from './CountedVersionSelect';
 
 const CHECKBOX = { width: 16, height: 16, cursor: 'pointer' };
+
+const sortColumn = (key) => PROJECT_SORT_COLUMNS.find((column) => column.key === key);
 
 const statusTone = (bucket) => {
   if (bucket === 'live') return 'good';
@@ -35,28 +51,62 @@ export default function ProjectSelectionTable({
   currency,
   onToggleInclude,
   onCountedChange,
+  sort,
+  onSortChange,
 }) {
+  const [localSort, setLocalSort] = useState(DEFAULT_PROJECT_SORT);
+  // Controlled by the page when a sort is supplied, and self-contained otherwise.
+  const activeSort = resolveProjectSort(sort || localSort);
+
+  const rows = useMemo(
+    () => sortProjectFamilies(families, activeSort),
+    [families, activeSort.key, activeSort.direction],
+  );
+
+  const handleSort = (columnKey) => {
+    const next = nextProjectSort(activeSort, columnKey);
+    if (onSortChange) onSortChange(next);
+    else setLocalSort(next);
+  };
+
+  const sortable = (key, fallbackLabel) => {
+    const column = sortColumn(key);
+    return (
+      <SortableTh
+        label={column?.label || fallbackLabel}
+        columnKey={key}
+        align={column?.align || 'left'}
+        hint={column?.hint}
+        activeKey={activeSort.key}
+        direction={activeSort.direction}
+        indicator={projectSortIndicator(activeSort, key)}
+        onSort={handleSort}
+      />
+    );
+  };
+
   return (
     <div style={TABLE_WRAP}>
       <table style={TABLE}>
         <thead>
           <tr>
-            <Th width={64}>Include</Th>
+            {sortable('included', 'Include')}
             <Th>Project</Th>
             <Th>Client</Th>
             <Th>Dealer / account</Th>
             <Th>Status</Th>
-            <Th>Age</Th>
+            {sortable('age', 'Age')}
+            {sortable('updated', 'Last updated')}
             <Th align="right">Versions</Th>
-            <Th>Counted version</Th>
+            {sortable('countedVersion', 'Counted version')}
             <Th>Count basis</Th>
-            <Th align="right">Live value</Th>
+            {sortable('liveValue', 'Live value')}
             <Th align="right">Product lines</Th>
             <Th>Notes / flags</Th>
           </tr>
         </thead>
         <tbody>
-          {families.map((family) => {
+          {rows.map((family) => {
             const selection = family.selection || {};
             const flags = flagsOf(family);
             return (
@@ -81,8 +131,14 @@ export default function ProjectSelectionTable({
                 <Td>
                   <Pill tone={statusTone(family.bucket)}>{BUCKET_LABEL[family.bucket] || family.bucket || '—'}</Pill>
                 </Td>
-                <Td title={family.updatedDate || family.createdDate || ''}>
+                <Td title={ageBasisSentence(family)}>
                   {formatProjectAge(family.updatedDate || family.createdDate)}
+                </Td>
+                <Td title={ageBasisSentence(family)}>
+                  <div>{formatDate(family.updatedDate || family.createdDate)}</div>
+                  <div style={{ fontSize: 11, color: BRAND.muted }}>
+                    {family.updatedDate ? 'Last updated' : (family.createdDate ? 'Created' : 'No date recorded')}
+                  </div>
                 </Td>
                 <Td align="right" mono>{formatNumber(family.variationCount || 0)}</Td>
                 <Td>

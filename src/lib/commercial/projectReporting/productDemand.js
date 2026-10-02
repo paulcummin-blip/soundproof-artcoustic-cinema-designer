@@ -64,13 +64,19 @@ function countedVariationOf(family) {
  * @param {Object} input
  * @param {Array} input.families — included project families
  * @param {Map} input.priceMap — Product Master index (sku → product)
- * @returns {{ rows: Array<Object>, excludedLines: Array<Object>, abfuserExclusions: Array<Object>, abfuserWarnings: Array<string> }}
+ * @returns {{ rows: Array<Object>, excludedLines: Array<Object>, abfuserExclusions: Array<Object>, abfuserWarnings: Array<string>, unitsByProjectId: Object }}
+ *   unitsByProjectId carries the counted catalogue units per project, from this
+ *   same pass, so the age and trend overviews measure units on exactly the
+ *   lines Product Demand counts.
  */
 export function buildCatalogueDemand({ families = [], priceMap = null } = {}) {
   const rows = new Map();
   const excluded = new Map();
   const abfuserExcluded = new Map();
   const abfuserWarnings = new Set();
+  // Counted catalogue units per project, accumulated in the live design pass
+  // below — the same lines, and the same rules, as the demand rows.
+  const unitsByProject = new Map();
 
   const ensureRow = (sku, label, classification) => {
     const key = text(sku).toLowerCase() || text(label).toLowerCase();
@@ -197,6 +203,7 @@ export function buildCatalogueDemand({ families = [], priceMap = null } = {}) {
       row.quantity += quantity;
       row.projectIds.add(family.id);
       row.qtyByBucket[family.bucket] = (row.qtyByBucket[family.bucket] || 0) + quantity;
+      unitsByProject.set(family.id, (unitsByProject.get(family.id) || 0) + quantity);
 
       if (line.unitPriceExVat === null || line.unitPriceExVat === undefined) {
         // No price is known for this line: the quantity is still reported, the
@@ -304,7 +311,13 @@ export function buildCatalogueDemand({ families = [], priceMap = null } = {}) {
     return String(a.countedVersion || '').localeCompare(String(b.countedVersion || ''));
   });
 
-  return { rows: sorted, excludedLines, abfuserExclusions, abfuserWarnings: [...abfuserWarnings] };
+  return {
+    rows: sorted,
+    excludedLines,
+    abfuserExclusions,
+    abfuserWarnings: [...abfuserWarnings],
+    unitsByProjectId: Object.fromEntries(unitsByProject),
+  };
 }
 
 /**

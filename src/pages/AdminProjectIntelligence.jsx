@@ -22,6 +22,8 @@ import useProjectSelection from '@/components/admin/intelligence/useProjectSelec
 import { BRAND, Button, Card, Pill } from '@/components/admin/intelligence/IntelligenceUi';
 import ProjectSelectionSummary from '@/components/admin/intelligence/ProjectSelectionSummary';
 import ProjectSelectionTable from '@/components/admin/intelligence/ProjectSelectionTable';
+import PipelineAgeOverview from '@/components/admin/intelligence/PipelineAgeOverview';
+import TrendsPanel from '@/components/admin/intelligence/TrendsPanel';
 import ProductDemandTable from '@/components/admin/intelligence/ProductDemandTable';
 import ExcludedCatalogueLines from '@/components/admin/intelligence/ExcludedCatalogueLines';
 import ExcludedHistoricAbfusers from '@/components/admin/intelligence/ExcludedHistoricAbfusers';
@@ -35,11 +37,18 @@ import {
   DEFAULT_PRODUCT_DEMAND_SORT,
   sortProductDemandRows,
 } from '@/lib/commercial/projectReporting/productDemandSort';
+import {
+  DEFAULT_PROJECT_SORT,
+  PROJECT_SORT_COLUMNS,
+} from '@/lib/commercial/projectReporting/projectSort';
+import { buildTrendSummary } from '@/lib/commercial/projectReporting/pipelineTrends';
+import { ageBucketByKey, ageBucketKeyOf } from '@/lib/commercial/projectReporting/pipelineAge';
 
 const TABS = [
   { key: 'demand', label: 'Product Demand' },
   { key: 'projects', label: 'Projects' },
   { key: 'variations', label: 'Variations' },
+  { key: 'trends', label: 'Trends' },
   { key: 'advanced', label: 'Advanced diagnostics' },
 ];
 
@@ -93,6 +102,50 @@ export default function AdminProjectIntelligence() {
   // same order: it opens on total live value, highest first.
   const [demandSort, setDemandSort] = useState(DEFAULT_PRODUCT_DEMAND_SORT);
 
+  // Projects table sort order, the age bucket the overview is filtering to, and
+  // the dealer/account the trends are measured for. All view state only.
+  const [projectSort, setProjectSort] = useState(DEFAULT_PROJECT_SORT);
+  const [ageFilter, setAgeFilter] = useState(null);
+  const [trendAccountId, setTrendAccountId] = useState('');
+
+  // Clicking an age bucket narrows the Projects table to that bucket; clicking
+  // the active bucket again clears it. No record and no selection is changed.
+  const handleBucketClick = (bucketKey) => {
+    setAgeFilter((current) => (current === bucketKey ? null : bucketKey));
+    setTab('projects');
+  };
+
+  // The Projects table shows the bucket the overview is filtering to.
+  const projectRows = useMemo(() => (
+    ageFilter
+      ? selection.selectedFamilies.filter((family) => ageBucketKeyOf(family) === ageFilter)
+      : selection.selectedFamilies
+  ), [selection.selectedFamilies, ageFilter]);
+
+  const ageFilterLabel = ageBucketByKey(ageFilter)?.label || null;
+  const projectSortLabel = PROJECT_SORT_COLUMNS.find((column) => column.key === projectSort.key)?.label || null;
+
+  // Dealer/account options come from the included selection, so the trend filter
+  // always has data behind it.
+  const trendAccountOptions = useMemo(() => {
+    const byId = new Map();
+    for (const family of selection.selectedFamilies) {
+      if (!family.accountId || byId.has(family.accountId)) continue;
+      byId.set(family.accountId, family.dealerName || family.accountName || 'Unnamed account');
+    }
+    return [...byId.entries()]
+      .map(([id, name]) => ({ id, name }))
+      .sort((a, b) => a.name.localeCompare(b.name));
+  }, [selection.selectedFamilies]);
+
+  // Rolling 90-day trends, recalculated for the selected dealer/account. The
+  // reference instant is the reporting run, so the windows match the data loaded.
+  const trends = useMemo(() => buildTrendSummary(selection.selectedFamilies, {
+    unitsByProjectId: selection.unitsByProjectId,
+    now: report?.generatedAt,
+    accountId: trendAccountId || null,
+  }), [selection.selectedFamilies, selection.unitsByProjectId, report, trendAccountId]);
+
   const familiesById = useMemo(() => (
     new Map((report?.families || []).map((family) => [family.id, family]))
   ), [report]);
@@ -135,6 +188,10 @@ export default function AdminProjectIntelligence() {
     productDemand: sortProductDemandRows(selection.productDemand, demandSort),
     excludedLines: selection.excludedLines,
     abfuserExclusions: selection.abfuserExclusions,
+    // The age and trend summaries are the same objects the page displays, so the
+    // workbook cannot disagree with the screen.
+    pipelineAge: selection.pipelineAge,
+    trends,
   });
 
   const handleExportWorkbook = () => {
@@ -146,7 +203,7 @@ export default function AdminProjectIntelligence() {
   const handleExportCsv = () => {
     if (!report) return;
     downloadSelectionCsv(exportPayload());
-    setExportNotice('CSV downloaded per tab: Included Projects, Excluded Projects, Product Demand, Version Detail, Excluded Manual Lines, Excluded Historic Abfusers.');
+    setExportNotice('CSV downloaded per tab: Included Projects, Excluded Projects, Product Demand, Version Detail, Excluded Manual Lines, Excluded Historic Abfusers, Pipeline Age Summary, Trend Summary.');
   };
 
   const truncation = data?.truncation;
@@ -178,7 +235,7 @@ export default function AdminProjectIntelligence() {
           <Button
             onClick={handleExportWorkbook}
             disabled={!report || loading}
-            title="Workbook: Included Projects, Excluded Projects, Product Demand and Version Detail"
+            title="Workbook: Included Projects, Excluded Projects, Product Demand, Version Detail, the age and trend summaries"
           >
             Export product demand (workbook)
           </Button>
@@ -193,8 +250,8 @@ export default function AdminProjectIntelligence() {
 
       {exportNotice && (
         <div style={{ marginBottom: 14, fontSize: 12, color: BRAND.muted }}>
-          {exportNotice} The export respects the current inclusion, counted-version selection and Product Demand
-          sort order.
+          {exportNotice} The export respects the current inclusion, counted-version selection, Product Demand sort order
+          and the age and trend figures shown on screen.
         </div>
       )}
 
@@ -241,6 +298,14 @@ export default function AdminProjectIntelligence() {
             summary={summary}
             currency={report.summary.liveCurrency}
             hiddenCount={hiddenProjectCount}
+            pipelineAge={selection.pipelineAge}
+          />
+
+          <PipelineAgeOverview
+            pipelineAge={selection.pipelineAge}
+            currency={report.summary.liveCurrency}
+            activeBucket={ageFilter}
+            onBucketClick={handleBucketClick}
           />
 
           {!priceListAvailable && (
@@ -289,7 +354,9 @@ export default function AdminProjectIntelligence() {
           {tab === 'projects' && (
             <Card
               title="Project selection"
-              subtitle="One row per project. Test, demo and audit projects are excluded by default and can be included manually."
+              subtitle={ageFilterLabel
+                ? `Showing only the ${ageFilterLabel} projects: ${formatNumber(projectRows.length)} of ${formatNumber(selection.selectedFamilies.length)} included and excluded projects.`
+                : 'One row per project. Test, demo and audit projects are excluded by default and can be included manually.'}
               actions={(
                 <Button
                   variant="secondary"
@@ -301,14 +368,28 @@ export default function AdminProjectIntelligence() {
               )}
             >
               <div style={{ display: 'grid', gap: 12 }}>
+                <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', fontSize: 12, color: BRAND.muted }}>
+                  <span>
+                    Click Included, Age, Last updated, Counted version or Live value to sort. Default order is the
+                    reporting order, highest live value first.
+                  </span>
+                  {projectSortLabel && <Pill tone="neutral">Sorted by {projectSortLabel}</Pill>}
+                  {ageFilterLabel && (
+                    <Button variant="secondary" onClick={() => setAgeFilter(null)}>
+                      Clear age filter
+                    </Button>
+                  )}
+                </div>
                 <div style={{ fontSize: 12, color: BRAND.muted }}>
                   Inclusion is report selection only. Nothing is deleted, archived or changed in the project database.
                 </div>
                 <ProjectSelectionTable
-                  families={selection.selectedFamilies}
+                  families={projectRows}
                   currency={report.summary.liveCurrency}
                   onToggleInclude={selection.setIncluded}
                   onCountedChange={selection.setCountedOption}
+                  sort={projectSort}
+                  onSortChange={setProjectSort}
                 />
               </div>
             </Card>
@@ -324,6 +405,16 @@ export default function AdminProjectIntelligence() {
                 currency={report.summary.liveCurrency}
               />
             </Card>
+          )}
+
+          {tab === 'trends' && (
+            <TrendsPanel
+              trends={trends}
+              currency={report.summary.liveCurrency}
+              accountId={trendAccountId}
+              accountOptions={trendAccountOptions}
+              onAccountChange={setTrendAccountId}
+            />
           )}
 
           {tab === 'advanced' && (
