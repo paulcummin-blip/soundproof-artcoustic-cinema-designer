@@ -388,6 +388,8 @@ test('TEST 13 — the gate, panel, resolver and warnings are wired to this autho
   const saver = read('src/components/hooks/useProjectLoader.jsx');
   const checklist = read('src/components/state/projectRestoreChecklist.js');
   const authority = read('src/components/state/projectOpeningAuthority.js');
+  const technicalReport = read('src/pages/DesignReviewPage.jsx');
+  const layout = read('src/Layout.jsx');
 
   // The gate is the panel's only switch, and it is driven by the checklist.
   assert.ok(gate.includes('useProjectOpening') && gate.includes('opening.holding'), 'the gate holds on the opening authority');
@@ -434,6 +436,14 @@ test('TEST 13 — the gate, panel, resolver and warnings are wired to this autho
   assert.ok(!resolver.includes('setTargetCacheEntry'), 'the resolver never writes target results');
   assert.ok(!resolver.includes('publishBassPendingIndicator'), 'the resolver never publishes a pending bass state');
   assert.ok(!resolver.includes('publishDesignReviewHandoff'), 'the resolver never publishes authoritative results');
+
+  assert.ok(technicalReport.includes('asdrAuthority.reportComplete'), 'Technical Report blocks until the restored authority is complete');
+  assert.ok(technicalReport.includes('Technical Report not ready'), 'an incomplete report route shows an explicit not-ready page');
+  assert.ok(technicalReport.includes('Missing results:'), 'the not-ready page names the missing assessment results');
+  assert.ok(technicalReport.includes('Back to Room Designer'), 'the not-ready page always offers a route back to design work');
+  assert.ok(layout.includes('data-build-checkpoint-diagnostic'), 'admin/test mode exposes a visible build diagnostic');
+  assert.ok(layout.includes('restoreChecklistRowCount'), 'the diagnostic exposes the visible restore row count');
+  assert.ok(layout.includes('REPORT_GATE_VERSION'), 'the diagnostic exposes the report gate version');
 
   assert.ok(commercial.includes('getActiveCommercialAuthority'), 'pricing readiness reads the commercial authority');
   assert.ok(commercial.includes('guardCommercialSave'), 'and the save path is guarded independently of the panel');
