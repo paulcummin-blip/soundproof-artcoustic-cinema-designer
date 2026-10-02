@@ -16,6 +16,7 @@
 
 import { base44 } from '@/api/base44Client';
 import { bassDbFilter, parseBassCacheKey } from '@/components/room/bass/bassCacheKey';
+import { readProjectAnalysisCacheRecord, invalidateProjectAnalysisCacheRead } from '@/components/state/projectReadCache';
 
 // In-memory cache for the current recommendation (per project+version)
 const memoryByProject = new Map();
@@ -57,8 +58,7 @@ export async function publishRecommendation(projectId, versionId, recommendation
     const dbFilter = bassDbFilter(projectId, versionId);
     for (let attempt = 0; attempt < 20; attempt += 1) {
       try {
-        const records = await base44.entities.ProjectAnalysisCache.filter(dbFilter, '-updated_date', 1);
-        const record = Array.isArray(records) ? records[0] : null;
+        const record = await readProjectAnalysisCacheRecord(projectId, versionId);
         const completedByFingerprint = record?.completed_by_fingerprint || {};
         const snapshot = completedByFingerprint[resultFingerprint];
         if (record && snapshot) {
@@ -68,6 +68,7 @@ export async function publishRecommendation(projectId, versionId, recommendation
               [resultFingerprint]: { ...snapshot, recommendation },
             },
           });
+          invalidateProjectAnalysisCacheRead(projectId, versionId);
           return true;
         }
       } catch (e) {
@@ -113,9 +114,7 @@ export async function hydrateRecommendation(projectId, versionId, resultFingerpr
   if (memoryByProject.has(key)) return;
 
   try {
-    const dbFilter = bassDbFilter(projectId, versionId);
-    const records = await base44.entities.ProjectAnalysisCache.filter(dbFilter, '-updated_date', 1);
-    const record = Array.isArray(records) ? records[0] : null;
+    const record = await readProjectAnalysisCacheRecord(projectId, versionId);
 
     if (!record) return;
 
