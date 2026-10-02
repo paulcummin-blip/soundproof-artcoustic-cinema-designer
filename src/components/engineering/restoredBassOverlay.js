@@ -82,6 +82,12 @@ export function applyRestoredBassAuthority(summary, { projectId, versionId, comp
     ? presentation.perSeatP20Results
     : [];
 
+  // Repairing the parameter authority is a result in its own right: a summary
+  // whose bass results were all present can still carry a stale parameter label
+  // (for example a legacy per-seat P19 "provisional"). That repair must be
+  // published, not discarded because no room result needed filling.
+  let authorityRepaired = false;
+
   for (const id of BASS_PARAM_IDS) {
     const key = `p${id}`;
     const parameter = parameters[key];
@@ -96,6 +102,7 @@ export function applyRestoredBassAuthority(summary, { projectId, versionId, comp
       rawValue: parameter.rawValue ?? existing.rawValue ?? null,
       restoredFromSavedBassAuthority: overlaidIds.has(id) || existing.restoredFromSavedBassAuthority === true,
     };
+    if (next.state !== existing.state || next.level !== existing.level) authorityRepaired = true;
 
     // P19 is one RSP result, not a per-seat assessment.
     if (id === 19 && overlaidIds.has(id)) {
@@ -134,7 +141,7 @@ export function applyRestoredBassAuthority(summary, { projectId, versionId, comp
     parameterAuthority[key] = next;
   }
 
-  if (!overlaid) return summary;
+  if (!overlaid && !authorityRepaired) return summary;
 
   // Rebuild only the derived rating/report views from the already-published
   // parameter grades. This is not a bass recalculation: it prevents an old

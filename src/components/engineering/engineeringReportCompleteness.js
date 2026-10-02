@@ -31,6 +31,39 @@ function hasScoredLevel(entry) {
   return level !== null && level !== undefined && String(level).trim() !== "";
 }
 
+/**
+ * Parameters whose terminality is carried by ONE published result instead of by
+ * per-seat rows.
+ *
+ * P19 is RSP-scoped (the P19 RSP scope authority), so publications written
+ * under the older per-seat P19 authority still label it "provisional" per seat
+ * even when the summary they carry states a finished P19 RSP result. That
+ * legacy label must not decide whether a completed project can open its report.
+ */
+const SINGLE_RESULT_PARAMETER_KEYS = new Set(["p19"]);
+
+/** The summary's own published result for a parameter, or null. */
+function publishedResultFor(summary, key) {
+  const results = summary?.roomResultsByParameter || {};
+  return results[key] ?? results[Number(String(key).slice(1))] ?? null;
+}
+
+/**
+ * Does the summary's own published result for this parameter state a finished
+ * assessment? Strict: a terminal state AND (for a scored result) a stated level.
+ * A result that is missing, provisional or levelless is NOT terminal.
+ */
+function publishedResultIsTerminal(summary, key) {
+  const result = publishedResultFor(summary, key);
+  if (!result) return false;
+  const state = normalizedState(result.state ?? result.status);
+  if (state === "na" || state === "not_applicable") return true;
+  if (state !== "scored" && state !== "complete") return false;
+  const level = result.level;
+  if (level === 0 || level === "0") return true;
+  return level !== null && level !== undefined && String(level).trim() !== "";
+}
+
 function projectSeatIds(summary) {
   const ids = summary?.project?.seatIds;
   if (Array.isArray(ids) && ids.length) return ids.map(String);
@@ -58,6 +91,10 @@ export function assessEngineeringReportCompleteness(summary) {
   for (const key of REQUIRED_RP22_PARAMETER_KEYS) {
     const parameter = parameters[key];
     if (!isTerminal(parameter)) {
+      // A single-result parameter (P19) is complete when the summary's own
+      // published result is finished — a legacy per-seat label left behind by an
+      // older publication never blocks a report that carries the finished result.
+      if (SINGLE_RESULT_PARAMETER_KEYS.has(key) && publishedResultIsTerminal(summary, key)) continue;
       missingParameterKeys.push(key);
       continue;
     }

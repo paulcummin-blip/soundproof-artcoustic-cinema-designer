@@ -55,6 +55,7 @@ import { LOGO_URL } from "@/components/report/ReportCover";
 import { Button } from "@/components/ui/button";
 import { ArrowLeft, FileText, Download } from "lucide-react";
 import ReportStatePanel from "@/components/report/ReportStatePanel";
+import { buildReportGateDiagnostics } from "@/components/report/reportGateDiagnostics";
 import BackToProposalLink from "@/components/report/BackToProposalLink";
 import { readProposalContext, withProposalContext } from "@/components/report/proposalReportContext";
 import { deriveReportReadiness, REPORT_STATE } from "@/components/report/reportReadinessAuthority";
@@ -897,6 +898,24 @@ export default function RP22ClientReport() {
     ready: reportReady && orderedPages.length > 0,
   });
 
+  // The gate's own account of this report: which authority exists, whether it is
+  // complete, what is missing, and whether the saved report still matches.
+  const gateDiagnostics = buildReportGateDiagnostics({
+    projectId,
+    versionId: authority.versionId,
+    reportType: REPORT_SNAPSHOT_TYPE.VISUAL,
+    hasSavedEngineeringAuthority: !!engineeringSummary,
+    hasCompleteEngineeringSnapshot: authority.reportComplete === true,
+    hasReportSnapshot: !!reportSnapshot.saved,
+    missingParameters: authority.reportCompleteness?.missingParameterKeys,
+    incompleteSeatParameters: authority.reportCompleteness?.incompleteSeatParameterKeys,
+    sourceFingerprint: snapshotFingerprints?.engineeringFingerprint ?? null,
+    savedFingerprint: reportSnapshot.saved?.source_fingerprints?.engineeringFingerprint ?? null,
+    snapshotStatus: reportSnapshot.status,
+    gateResult: readiness.state,
+    blockReason: readiness.reason || authority.reportCompleteness?.reason || null,
+  });
+
   const progressItems = [
     { key: "project", label: "Project loaded", done: !hydrating && !!projectDetails },
     { key: "room", label: "Room geometry", done: Number(roomDims?.widthM) > 0 && Number(roomDims?.lengthM) > 0 },
@@ -1074,6 +1093,7 @@ export default function RP22ClientReport() {
               elapsedSeconds={stateSeconds}
               onReturn={handleBackToProject}
               onRetry={exportError ? handleExport : undefined}
+              diagnostics={gateDiagnostics}
             />
           </div>
         ) : orderedPages.length === 0 ? (

@@ -18,6 +18,7 @@
 import React from "react";
 import { Button } from "@/components/ui/button";
 import { REPORT_STATE } from "./reportReadinessAuthority";
+import ReportGateDiagnosticsPanel from "./ReportGateDiagnosticsPanel";
 import { ArrowLeft, CheckCircle2, CircleDashed, Loader2, RefreshCw, AlertTriangle, Clock } from "lucide-react";
 import {
   REPORT_FONT_HEADING as FONT_HEADING,
@@ -115,6 +116,7 @@ export default function ReportStatePanel({
   onReturn,
   onRetry,
   retryLabel = "Retry",
+  diagnostics = null,
 }) {
   // ── Preparing ──────────────────────────────────────────────────────────
   if (state === REPORT_STATE.PREPARING) {
@@ -177,6 +179,7 @@ export default function ReportStatePanel({
           PDF export is disabled until the report generates successfully.
         </p>
         <StateActions onRetry={onRetry} onReturn={onReturn} retryLabel={retryLabel} />
+        <ReportGateDiagnosticsPanel diagnostics={diagnostics} />
       </div>
     );
   }
@@ -205,6 +208,7 @@ export default function ReportStatePanel({
           or issued to a client.
         </p>
         <StateActions onRetry={onRetry} onReturn={onReturn} retryLabel="Regenerate" />
+        <ReportGateDiagnosticsPanel diagnostics={diagnostics} />
       </div>
     );
   }
@@ -259,6 +263,7 @@ export default function ReportStatePanel({
       </p>
 
       <StateActions onReturn={onReturn} onRetry={onRetry} retryLabel={retryLabel} />
+      <ReportGateDiagnosticsPanel diagnostics={diagnostics} />
     </div>
   );
 }

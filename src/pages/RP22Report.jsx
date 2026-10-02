@@ -30,6 +30,8 @@ import ReportTypographyStyles from '@/components/report/typography/ReportTypogra
 import { REPORT_FONT_BODY } from '@/components/report/typography/reportTypography';
 import RP22ReportParameterGrid from '../components/report/RP22ReportParameterGrid';
 import TechnicalReportNotice from '../components/report/technical/TechnicalReportNotice';
+import ReportGateDiagnosticsPanel from '@/components/report/ReportGateDiagnosticsPanel';
+import { buildReportGateDiagnostics } from '@/components/report/reportGateDiagnostics';
 import { useReportSnapshot } from '@/components/report/useReportSnapshot';
 import ReportSnapshotBanner from '@/components/report/ReportSnapshotBanner';
 import {
@@ -215,6 +217,24 @@ function RP22ReportInner() {
         currentFingerprints: snapshotFingerprints,
         payload: snapshotPayload,
         ready: !!engineeringSummary && !authorityResolving && !reportHydrating && !bassReportPending && !bassRestoreFailed && !reportDataIncomplete,
+    });
+
+    // The gate's own account of this report: which authority exists, whether it
+    // is complete, what is missing, and whether the saved report still matches.
+    const gateDiagnostics = buildReportGateDiagnostics({
+        projectId: explicitProjectId,
+        versionId: reportVersionId,
+        reportType: REPORT_SNAPSHOT_TYPE.TECHNICAL,
+        hasSavedEngineeringAuthority: !!reportAuthority.publication || !!engineeringSummary,
+        hasCompleteEngineeringSnapshot: reportAuthority.reportComplete === true,
+        hasReportSnapshot: !!reportSnapshot.saved,
+        missingParameters: reportAuthority.reportCompleteness?.missingParameterKeys,
+        incompleteSeatParameters: reportAuthority.reportCompleteness?.incompleteSeatParameterKeys,
+        sourceFingerprint: snapshotFingerprints?.engineeringFingerprint ?? null,
+        savedFingerprint: reportSnapshot.saved?.source_fingerprints?.engineeringFingerprint ?? null,
+        snapshotStatus: reportSnapshot.status,
+        gateResult: reportDataIncomplete ? 'blocked' : (showLoadingReport ? 'loading' : 'open'),
+        blockReason: reportDataIncomplete ? reportDataIncompleteReason : null,
     });
 
     // Full project hydration for RP22Report — mirrors Room Designer's useProjectLoader path
@@ -996,6 +1016,7 @@ function RP22ReportInner() {
                         >
                             Continue analysis
                         </button>
+                        <ReportGateDiagnosticsPanel diagnostics={gateDiagnostics} />
                     </CardContent>
                 </Card>
             </div>
