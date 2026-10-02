@@ -19,7 +19,10 @@ import { safeYawToMLP } from '@/components/room/rv/RenderPrimitives';
 import { deriveSubwoofersFromCfg } from '@/components/utils/deriveSubwoofersFromCfg';
 import { hydrateProjectIntoAppState } from '@/components/utils/hydrateProjectIntoAppState';
 import { mergeProjectAndVersion } from '@/lib/versionAuthority';
-import { base44 } from '@/api/base44Client';
+import {
+    readProjectRecord,
+    readProjectVersionRecord,
+} from '@/components/state/projectReadCache';
 import { useEffectiveRsp } from '@/components/room/rsp/useEffectiveRsp';
 import { resolveDesignatedRspSeat, resolveRowDerivedRspYByMode } from '@/components/room/rsp/rspInputResolver';
 import { resolveRspScreenFrontPlaneM, resolveRspScreenWidthM } from '@/components/room/rsp/screenGeometryResolver';
@@ -170,6 +173,7 @@ function RP22ReportInner() {
         && !completedBassAuthority?.contract;
     const designReviewHandoff = reportAuthority.snapshot;
     const authorityResolving = reportAuthority.loading;
+    const authorityReadFailed = reportAuthority.readFailed === true;
     const designRecommendations = designReviewHandoff?.recommendations ?? null;
 
     // One published engineering summary is the sole report authority.
@@ -180,6 +184,7 @@ function RP22ReportInner() {
         ?? null;
     const authorityReportPending = !engineeringSummary;
     const reportDataIncomplete = !authorityResolving
+        && !authorityReadFailed
         && !bassReportPending
         && !bassRestoreFailed
         && !reportAuthority.reportComplete;
@@ -271,9 +276,8 @@ function RP22ReportInner() {
         if (sharedProviderReady) {
             setReportHydrating(false);
             setReportReadyProjectId(explicitProjectId);
-            base44.entities.Project.filter({ id: explicitProjectId }).then((results) => {
+            readProjectRecord(explicitProjectId).then((p) => {
                 if (cancelled) return;
-                const p = Array.isArray(results) && results.length > 0 ? results[0] : null;
                 if (!p) return;
                 setProjectDetails({
                     id: p.id,
@@ -299,9 +303,8 @@ function RP22ReportInner() {
             setReportReadyProjectId(null);
         }
 
-        base44.entities.Project.filter({ id: explicitProjectId }).then(async (results) => {
+        readProjectRecord(explicitProjectId).then(async (p) => {
             if (cancelled) return;
-            const p = Array.isArray(results) && results.length > 0 ? results[0] : null;
             if (!p) {
                 setProjectDetails(null);
                 setReportHydrating(false);
@@ -325,9 +328,8 @@ function RP22ReportInner() {
             const versionId = p.active_version_id;
             if (versionId) {
                 try {
-                    const versions = await base44.entities.ProjectVersion.filter({ id: versionId });
-                    if (!cancelled && versions && versions.length > 0) {
-                        const v = versions[0];
+                    const v = await readProjectVersionRecord(versionId);
+                    if (!cancelled && v) {
                         merged = mergeProjectAndVersion(p, v);
                         setReportVersionNumber(typeof v.version_number === "number" ? v.version_number : null);
                         setReportVersionName(typeof v.version_name === "string" ? v.version_name : null);
@@ -986,14 +988,21 @@ function RP22ReportInner() {
         );
     }
 
-    if (bassRestoreFailed) {
+    if (authorityReadFailed || bassRestoreFailed) {
+        const readFailureMessage = reportAuthority.readError
+            || reportAuthority.bassRestoreError
+            || "Saved engineering authority could not be read. Nothing has been treated as missing or uncalculated.";
         return (
             <div className="min-h-screen bg-[#F9F8F6] p-6 flex items-center justify-center">
                 <Card className="max-w-xl mx-auto w-full">
-                    <CardHeader><CardTitle className="text-[#1B1A1A] font-header">Technical Report</CardTitle></CardHeader>
+                    <CardHeader><CardTitle className="text-[#1B1A1A] font-header">Saved engineering authority could not be read</CardTitle></CardHeader>
                     <CardContent className="text-center py-10">
                         <BarChart4 className="w-12 h-12 text-gray-300 mx-auto mb-4" />
-                        <p className="text-[#3E4349]">Saved bass results could not be restored. Reopen the project and try again; no partial report has been generated.</p>
+                        <p className="text-[#3E4349] mb-6">{readFailureMessage}</p>
+                        <div className="flex justify-center gap-3">
+                            <button type="button" className="px-5 py-2.5 text-sm text-white rounded-md" style={{ backgroundColor: '#213428' }} onClick={reportAuthority.retry}>Retry</button>
+                            <button type="button" className="px-5 py-2.5 text-sm rounded-md border border-[#213428] text-[#213428]" onClick={() => navigate(\`/RoomDesigner?projectId=\${explicitProjectId}\`)}>Back to Room Designer</button>
+                        </div>
                     </CardContent>
                 </Card>
             </div>
