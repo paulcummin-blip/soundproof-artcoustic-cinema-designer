@@ -29,6 +29,7 @@ const VERSIONS_STEP = read('src/components/proposal/wizard/VersionSelectStep.jsx
 const GATE_UI = read('src/components/proposal/wizard/ReportReadinessGate.jsx');
 const GATE_AUTHORITY = read('src/components/proposal/sourceAuthority/proposalReportReadinessGate.js');
 const VERSIONED_ENGINEERING_HOOK = read('src/components/engineering/useVersionedEngineeringAuthority.js');
+const TECHNICAL_REPORT = read('src/pages/RP22Report.jsx');
 
 const source = (overrides = {}) => resolveProposalSource({
   projectId: 'p1',
@@ -215,6 +216,11 @@ test('durable bass restore overlays the engineering summary and reinserts it int
   expect(VERSIONED_ENGINEERING_HOOK).toMatch(/applyRestoredBassAuthority\(\s*composedSummary,/);
   expect(VERSIONED_ENGINEERING_HOOK).toMatch(/engineeringSummary: restoredSummary/);
   expect(VERSIONED_ENGINEERING_HOOK).not.toMatch(/applyRestoredBassAuthority\(\s*composeAuthoritySnapshot/);
+});
+
+test('Technical Report cold restore is gated by the complete engineering summary, not session analysisResult', () => {
+  expect(TECHNICAL_REPORT).toMatch(/renderGatePassed: !!engineeringSummary && reportAuthority\.reportComplete/);
+  expect(TECHNICAL_REPORT).not.toMatch(/if \(!authorityResolving && \(!analysisResult \|\| !analysisResult\.gradedParameters\)\)/);
 });
 
 test('the Versions step cannot advance without both current reports', () => {
