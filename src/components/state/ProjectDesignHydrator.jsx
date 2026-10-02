@@ -28,6 +28,13 @@ import {
   failDesignHydration,
   getProjectHydration,
 } from "@/components/state/projectHydrationStore";
+import {
+  clearCommercialEdits,
+  createCommercialAuthority,
+  markCommercialHydrated,
+  normaliseCommercialSelections,
+  setActiveCommercialAuthority,
+} from "@/components/state/commercialHydrationAuthority";
 
 export default function ProjectDesignHydrator({ projectId }) {
   const app = useAppState();
@@ -89,6 +96,19 @@ export default function ProjectDesignHydrator({ projectId }) {
           setDolbyPreset: app.setDolbyLayout,
         });
         app?.setProjectHydrationReady?.(true);
+
+        // Commercial hydration: this version's priced selections are loaded, so
+        // the price summary can never appear briefly defaulted and no save may
+        // write an empty commercial value over a populated one. Marked before the
+        // design hydration completes, so the opening gate reads it as loaded.
+        clearCommercialEdits();
+        setActiveCommercialAuthority(markCommercialHydrated(
+          createCommercialAuthority({
+            projectId,
+            versionId: project.active_version_id || null,
+          }),
+          normaliseCommercialSelections(merged),
+        ));
 
         if (!cancelled) {
           completeDesignHydration(projectId, {

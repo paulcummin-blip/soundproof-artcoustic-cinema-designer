@@ -20,6 +20,8 @@ import {
 } from "@/components/state/projectHydrationStore";
 import ProjectLoadingShell from "@/components/state/ProjectLoadingShell";
 import ProjectDesignHydrator from "@/components/state/ProjectDesignHydrator";
+import ProjectOpeningResolver from "@/components/state/ProjectOpeningResolver";
+import { useProjectOpening } from "@/components/state/projectOpeningAuthority";
 
 const FONT_BODY = "'Didact Gothic', 'Century Gothic', sans-serif";
 
@@ -61,6 +63,11 @@ export default function ProjectGate({ children, requiresDesign = true }) {
   const hydration = useCanonicalProject();
   const projectName = hydration.identity?.name || null;
   const projectClientName = hydration.identity?.clientName || null;
+  const projectReference = hydration.identity?.projectReference || null;
+  // The opening panel is held by the project opening authority: it stays until
+  // the saved design is restored AND the main project authorities are ready or
+  // known to be unavailable. "The record has loaded" is not enough.
+  const opening = useProjectOpening(hydration.projectId || null);
 
   if (hydration.status === "none") {
     return (
@@ -137,11 +144,12 @@ export default function ProjectGate({ children, requiresDesign = true }) {
     return children;
   }
 
-  // Design-dependent pages: the saved design state is hydrated, so mount the
-  // real page. Without this branch the gate would fall through to the loading
-  // shell even after the hydrator reported the project loaded, and no design
-  // page could ever mount.
-  if (hydration.status === "loaded") {
+  // Design-dependent pages: the saved design state is hydrated AND the project
+  // opening authorities are ready (or known unavailable), so mount the real
+  // page. Without the first branch the gate would fall through to the loading
+  // shell even after the hydrator reported the project loaded, and no design page
+  // could ever mount; without the second it opened half-restored.
+  if (hydration.status === "loaded" && !opening.holding) {
     return children;
   }
 
@@ -152,9 +160,12 @@ export default function ProjectGate({ children, requiresDesign = true }) {
   return (
     <>
       <ProjectDesignHydrator projectId={hydration.projectId} />
+      <ProjectOpeningResolver projectId={hydration.projectId} />
       <ProjectLoadingShell
         projectName={projectName}
         projectClientName={projectClientName}
+        projectReference={projectReference}
+        lines={opening.lines}
       />
     </>
   );

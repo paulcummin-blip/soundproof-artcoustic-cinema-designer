@@ -24,14 +24,45 @@ function Bar({ width = "100%", height = 12 }) {
   );
 }
 
+// One progress line: what is being restored, and whether it is done. The detail
+// sentence is carried as a tooltip so the panel stays calm.
+function OpeningLine({ label, state, detail }) {
+  const done = state === "ready";
+  const known = state === "unavailable";
+  return (
+    <div
+      title={detail || undefined}
+      style={{ display: "flex", alignItems: "center", gap: 10, fontSize: 12, color: "#3E4349" }}
+    >
+      <span
+        style={{
+          width: 8,
+          height: 8,
+          borderRadius: 4,
+          flexShrink: 0,
+          background: done ? "#213428" : known ? "#8B7F76" : "#B9B2A8",
+          animation: done || known ? "none" : "project-shell-dot 1.2s ease-in-out infinite",
+        }}
+      />
+      <span style={{ flex: 1 }}>{label}</span>
+      <span style={{ fontSize: 11, color: done ? "#213428" : "#8B7F76", fontWeight: done ? 700 : 500 }}>
+        {done ? "Ready" : known ? "Not available" : "Restoring"}
+      </span>
+    </div>
+  );
+}
+
 export default function ProjectLoadingShell({
   projectName = null,
   projectClientName = null,
+  projectReference = null,
+  lines = [],
   label = "Your project",
   compact = false,
 }) {
   const heading = projectName ? projectName : label;
   const clientLine = projectClientName ? `Client: ${projectClientName}` : null;
+  const referenceLine = projectReference ? `Reference: ${projectReference}` : null;
 
   return (
     <div
@@ -52,6 +83,10 @@ export default function ProjectLoadingShell({
           0% { background-position: 200% 0; }
           100% { background-position: -200% 0; }
         }
+        @keyframes project-shell-dot {
+          0%, 100% { opacity: 1; }
+          50% { opacity: 0.35; }
+        }
       `}</style>
       <div
         style={{
@@ -64,7 +99,7 @@ export default function ProjectLoadingShell({
         }}
       >
         <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", color: "#625143" }}>
-          Opening project
+          Loading Project
         </div>
         <div style={{ fontSize: 20, fontWeight: 700, color: "#1B1A1A", marginTop: 6, lineHeight: 1.25 }}>
           {heading}
@@ -72,6 +107,11 @@ export default function ProjectLoadingShell({
         {clientLine && (
           <div style={{ fontSize: 13, color: "#625143", marginTop: 4 }}>
             {clientLine}
+          </div>
+        )}
+        {referenceLine && (
+          <div style={{ fontSize: 13, color: "#625143", marginTop: 2 }}>
+            {referenceLine}
           </div>
         )}
 
@@ -91,9 +131,16 @@ export default function ProjectLoadingShell({
             color: "#8B7F76",
           }}
         >
-          Loading the saved design for this project. The room, speaker layout,
-          performance results and pricing will appear when ready.
+          Restoring saved design, performance results, reports and pricing.
         </div>
+
+        {lines.length > 0 && (
+          <div style={{ marginTop: 14, display: "flex", flexDirection: "column", gap: 8 }}>
+            {lines.map((line) => (
+              <OpeningLine key={line.key} label={line.label} state={line.state} detail={line.detail} />
+            ))}
+          </div>
+        )}
       </div>
     </div>
   );

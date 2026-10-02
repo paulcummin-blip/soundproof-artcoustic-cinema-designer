@@ -117,6 +117,15 @@ export function setActiveCommercialAuthority(authority) {
   activeCommercialAuthority = authority || null;
 }
 
+/**
+ * The commercial authority currently in force (null when none is loaded). Lets a
+ * read-only consumer — the project opening gate — report whether this project's
+ * priced selections are hydrated without becoming a second owner of them.
+ */
+export function getActiveCommercialAuthority() {
+  return activeCommercialAuthority;
+}
+
 export function recordCommercialEdit(collection) {
   if (!collection) return;
   if (!activeCommercialAuthority || activeCommercialAuthority.status !== "loaded") return;
