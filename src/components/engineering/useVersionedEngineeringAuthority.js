@@ -108,14 +108,27 @@ export function useVersionedEngineeringAuthority(projectId, versionId) {
   );
   const state = classifyAuthorityState({ durable, localSnapshot });
   const localHasSummary = !!extractEngineeringSummary(localSnapshot);
-  // Still resolving when the browser has no summary and the durable read has
-  // not settled yet — consumers must wait rather than report "not calculated".
-  const loading = !localHasSummary && (durableLoading || durable === null);
+  const bassHydrationPending = !!projectId
+    && !!versionId
+    && completedBassAuthority?.hydrationSettled !== true;
+  const bassRestoreFailed = !!projectId
+    && !!versionId
+    && completedBassAuthority?.hydrationSettled === true
+    && completedBassAuthority?.authorityStatus === 'ERROR'
+    && !completedBassAuthority?.contract;
+  // Durable engineering and durable bass are one report-readiness boundary.
+  // A report must not render a partial saved summary while the bass contract is
+  // still hydrating independently of the Room Designer/Bass UI.
+  const loading = (!localHasSummary && (durableLoading || durable === null))
+    || bassHydrationPending;
 
   return {
     snapshot,
     state,
     loading,
+    bassHydrationPending,
+    bassRestoreFailed,
+    bassAuthorityStatus: completedBassAuthority?.authorityStatus || null,
     durable,
     publication: durable?.publication || null,
     version: durable?.version || null,
