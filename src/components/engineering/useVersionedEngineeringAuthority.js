@@ -26,6 +26,7 @@ import {
 import { subscribeDesignReviewHandoff } from '@/components/state/designReviewHandoff';
 import { useCompletedBassAuthority } from '@/components/room/bass/completedBassResultStore';
 import { applyRestoredBassAuthority } from './restoredBassOverlay';
+import { assessEngineeringReportCompleteness } from './engineeringReportCompleteness';
 
 export function useVersionedEngineeringAuthority(projectId, versionId) {
   const [localSnapshot, setLocalSnapshot] = useState(
@@ -107,6 +108,9 @@ export function useVersionedEngineeringAuthority(projectId, versionId) {
     { projectId, versionId, completedBassAuthority },
   );
   const state = classifyAuthorityState({ durable, localSnapshot });
+  const reportCompleteness = assessEngineeringReportCompleteness(
+    extractEngineeringSummary(snapshot),
+  );
   const localHasSummary = !!extractEngineeringSummary(localSnapshot);
   const bassHydrationPending = !!projectId
     && !!versionId
@@ -129,6 +133,8 @@ export function useVersionedEngineeringAuthority(projectId, versionId) {
     bassHydrationPending,
     bassRestoreFailed,
     bassAuthorityStatus: completedBassAuthority?.authorityStatus || null,
+    reportCompleteness,
+    reportComplete: reportCompleteness.complete,
     durable,
     publication: durable?.publication || null,
     version: durable?.version || null,
