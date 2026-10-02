@@ -15,7 +15,6 @@
 // ---------------------------------------------------------------------------
 
 import { base44 } from '@/api/base44Client';
-import { bassDbFilter, parseBassCacheKey } from '@/components/room/bass/bassCacheKey';
 import { readProjectAnalysisCacheRecord, invalidateProjectAnalysisCacheRead } from '@/components/state/projectReadCache';
 
 // In-memory cache for the current recommendation (per project+version)
@@ -55,7 +54,6 @@ export async function publishRecommendation(projectId, versionId, recommendation
 
   const previousWrite = persistenceWrites.get(key) || Promise.resolve();
   const write = previousWrite.catch(() => {}).then(async () => {
-    const dbFilter = bassDbFilter(projectId, versionId);
     for (let attempt = 0; attempt < 20; attempt += 1) {
       try {
         const record = await readProjectAnalysisCacheRecord(projectId, versionId);
