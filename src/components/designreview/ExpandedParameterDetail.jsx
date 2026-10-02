@@ -28,6 +28,7 @@ import SeatScopeBadge from "@/components/report/SeatScopeBadge";
 import SeatDetailTable from "@/components/designreview/SeatDetailTable";
 import SeatResultLayout from "@/components/designreview/SeatResultLayout";
 import { formatSeatLabel } from "@/components/utils/seatLabel";
+import { firstStatedPrimitive } from "@/components/utils/renderSafe";
 
 const HEADING_FONT = "'Futura PT Light', 'Century Gothic', sans-serif";
 const BODY_FONT = "'Didact Gothic', 'Century Gothic', sans-serif";
@@ -205,7 +206,7 @@ export default function ExpandedParameterDetail({
             )}
             {isAssumed && Number(param.id) === 21
               ? "Level 2 design assumption"
-              : (achievedValue || (isAssumed ? "L2 design assumption" : "—"))}
+              : firstStatedPrimitive([achievedValue], isAssumed ? "L2 design assumption" : "—")}
           </div>
         )}
       </div>
