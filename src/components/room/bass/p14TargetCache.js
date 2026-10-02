@@ -20,6 +20,7 @@ import { hasReadyCanonicalP19Contract } from "./p19Readiness";
 import { isValidLimitedP14Contract } from "./p14LimitedTargetAuthority";
 import { safeConsole } from "@/components/utils/safeConsole";
 import { bassCacheKey, bassDbFilter } from "./bassCacheKey";
+import { readProjectAnalysisCacheRecord, invalidateProjectAnalysisCacheRead } from "@/components/state/projectReadCache";
 
 const cacheByProject = new Map();
 const listeners = new Set();
@@ -377,8 +378,7 @@ export async function hydrateTargetCache(projectId, versionId) {
   const key = projectKey(projectId, versionId);
   if (key === "free::free") return;
   try {
-    const records = await base44.entities.ProjectAnalysisCache.filter(bassDbFilter(projectId, versionId), '-updated_date', 1);
-    const record = Array.isArray(records) ? records[0] : null;
+    const record = await readProjectAnalysisCacheRecord(projectId, versionId);
     if (!record?.target_cache) return;
     const stored = typeof record.target_cache === 'string' ? JSON.parse(record.target_cache) : record.target_cache;
     if (!stored || stored.metricSchemaVersion !== RP22_BASS_METRIC_SCHEMA_VERSION || !stored.baseDesignFingerprint) {
@@ -463,8 +463,7 @@ export function flushTargetCachePersistence(projectId, versionId) {
   const dbFilter = bassDbFilter(projectId, versionId);
   const queued = (writeQueues.get(key) || Promise.resolve()).then(async () => {
     try {
-      const records = await base44.entities.ProjectAnalysisCache.filter(dbFilter, '-updated_date', 1);
-      const record = Array.isArray(records) ? records[0] : null;
+      const record = await readProjectAnalysisCacheRecord(projectId, versionId);
       const payload = {
         ...dbFilter,
         completed_cache_version: COMPLETED_BASS_CACHE_VERSION,
@@ -478,6 +477,7 @@ export function flushTargetCachePersistence(projectId, versionId) {
         await base44.entities.ProjectAnalysisCache.create(payload);
       }
       persistedSignatures.set(key, signature);
+      invalidateProjectAnalysisCacheRead(projectId, versionId);
       // Write succeeded — clear any previous failure record for this project.
       persistenceFailures.delete(key);
     } catch (e) {
