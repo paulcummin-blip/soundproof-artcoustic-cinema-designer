@@ -32,6 +32,7 @@
 
 import { PROPOSAL_STAGE_BOUNDARY } from './proposalStageBoundary.js';
 import { P20_USE_RULE, P20_OMIT_RULE } from './adiReportEvidenceRules.js';
+import { SOUND_PROOF_WRITING_AUTHORITY, WRITING_AUTHORITY_SELF_CHECK } from './soundProofWritingAuthority.js';
 
 /** Banned words and phrases. Never used in generated prose. */
 export const BANNED_WORDS = [
@@ -81,6 +82,15 @@ export const BANNED_WORDS = [
   'Game-changer',
   'Game changer',
   'Ecosystem',
+  // The author's banned list. If a sentence sounds like marketing, rewrite it.
+  'Paradigm',
+  'Game-changing',
+  'Best-in-class',
+  'Best in class',
+  'Utilise',
+  'Utilize',
+  'Transformational',
+  'Immersive experience',
   'Deep dive',
   'Move the needle',
   'Circle back',
@@ -222,7 +232,9 @@ export const DESIGN_LED_VOICE_RULES = [
   '',
   'NEVER USE THESE IN GENERATED PROSE (blocked by default):',
   DESIGN_LED_BLOCKED_PHRASES.map((phrase) => `- "${phrase}"`).join('\n'),
-  '- Any other direct address to the client, any possessive form of it, and any first-person design voice such as "we".',
+  '- Any other direct address to the client, and any possessive form of it.',
+  '- Never state a design decision or a recommendation in the first person: not "we designed", not "we recommend", not "we selected".',
+  '- Practical observation is the one permitted first person, and it is welcome: "We have found that rooms like this...", "In our experience...". It describes what experience has shown about a room like this one; it never states what the design should be.',
 ].join('\n');
 
 /**
@@ -430,6 +442,7 @@ const FINAL_SELF_CHECK = [
   '21. Is there no post-design clever recommendation anywhere, including a placement change, an added product, a processor change or a calibration change?',
   '22. Is the report still built around Spatial Resolution, Dynamic Range and Timbre Matching?',
   '23. Are the parameters used as evidence rather than as the story?',
+  ...WRITING_AUTHORITY_SELF_CHECK.map((question, index) => `${24 + index}. ${question}`),
 ].join('\n');
 
 /**
@@ -439,6 +452,8 @@ const FINAL_SELF_CHECK = [
 export function buildWritingStyleContract() {
   return [
     '=== WRITING STYLE CONTRACT (applies to every sentence of generated prose) ===',
+    '',
+    SOUND_PROOF_WRITING_AUTHORITY,
     '',
     WHAT_THE_REPORT_MUST_ANSWER,
     '',
