@@ -30,6 +30,14 @@ import ReportTypographyStyles from '@/components/report/typography/ReportTypogra
 import { REPORT_FONT_BODY } from '@/components/report/typography/reportTypography';
 import RP22ReportParameterGrid from '../components/report/RP22ReportParameterGrid';
 import TechnicalReportNotice from '../components/report/technical/TechnicalReportNotice';
+import { useReportSnapshot } from '@/components/report/useReportSnapshot';
+import ReportSnapshotBanner from '@/components/report/ReportSnapshotBanner';
+import {
+    REPORT_SNAPSHOT_TYPE,
+    buildSnapshotPayload,
+    currentSourceFingerprints,
+} from '@/components/report/reportSnapshotAuthority';
+import { readSeatPriorityFingerprint } from '@/components/state/designReviewHandoff';
 import ReportHeader from '../components/report/ReportHeader';
 import ReportCover from '../components/report/ReportCover';
 import ReportCountsDashboard from '../components/report/ReportCountsDashboard';
@@ -155,6 +163,39 @@ function RP22ReportInner() {
         ?? null;
     const authorityReportPending = !engineeringSummary;
 
+    // ── Saved report snapshot (Technical Report) ────────────────────────────
+    // The saved report is recorded against this project version when it is
+    // generated, marked as generated before the latest changes rather than
+    // blanked when the design moves on, and overwritten in place on Regenerate.
+    // The values themselves stay in the published engineering publication that
+    // this record points at — one engineering authority, never a second copy.
+    const snapshotFingerprints = useMemo(
+        () => currentSourceFingerprints({
+            authoritySnapshot: designReviewHandoff,
+            engineeringSummary,
+            liveSeatPriorityFingerprint: readSeatPriorityFingerprint(explicitProjectId),
+        }),
+        [designReviewHandoff, engineeringSummary, explicitProjectId]
+    );
+
+    const snapshotPayload = useMemo(
+        () => buildSnapshotPayload({
+            engineeringFingerprint: designReviewHandoff?.engineeringFingerprint || null,
+            presentation: { showAsdr: designReviewHandoff?.showAsdr !== false },
+        }),
+        [designReviewHandoff]
+    );
+
+    const reportSnapshot = useReportSnapshot({
+        projectId: explicitProjectId,
+        versionId: reportVersionId,
+        accountId: projectDetails?.account_id || null,
+        reportType: REPORT_SNAPSHOT_TYPE.TECHNICAL,
+        currentFingerprints: snapshotFingerprints,
+        payload: snapshotPayload,
+        ready: !!engineeringSummary && !authorityResolving && !reportHydrating,
+    });
+
     // Full project hydration for RP22Report — mirrors Room Designer's useProjectLoader path
     useEffect(() => {
         let cancelled = false;
@@ -201,6 +242,7 @@ function RP22ReportInner() {
                     notes: p.notes,
                     created_date: p.created_date,
                     updated_date: p.updated_date,
+                    account_id: p.account_id || null,
                     active_version_id: p.active_version_id || null,
                 });
             }).catch(() => { /* non-blocking metadata fetch */ });
@@ -1021,6 +1063,20 @@ function RP22ReportInner() {
     ) : (
         <div className="min-h-screen bg-[#F9F8F6] p-6">
             <ReportPrintStyles />
+
+            {/* Saved report: generated before the latest changes. The report
+                stays visible; Regenerate overwrites the saved report in place. */}
+            <div className="screen-only">
+                <ReportSnapshotBanner
+                    status={reportSnapshot.status}
+                    reportType={REPORT_SNAPSHOT_TYPE.TECHNICAL}
+                    changedKeys={reportSnapshot.changedKeys}
+                    generatedAt={reportSnapshot.generatedAt}
+                    generatedBy={reportSnapshot.generatedBy}
+                    regenerating={reportSnapshot.saving}
+                    onRegenerate={reportSnapshot.regenerate}
+                />
+            </div>
 
             {/* Assessment gate — the report says the design is not assessed, so
                 the PDF export is disabled and the reason is stated plainly. */}

@@ -114,6 +114,7 @@ export function useClientReportAuthority(projectId) {
           name: p.name,
           client_name: p.client_name,
           created_date: p.created_date,
+          account_id: p.account_id || null,
         });
         setVersionId(p.active_version_id || null);
       }).catch(() => { /* non-blocking metadata fetch */ });
@@ -648,6 +649,9 @@ export function useClientReportAuthority(projectId) {
     // Canonical published authorities
     engineeringSummary,
     analysisResult,
+    // The full authority snapshot (publication identity + presentation payload).
+    // Read only, so a saved report can record the exact publication it came from.
+    authoritySnapshot: publishedEngineering,
     allSeatSplMetrics,
     authoritativeSeat,
     seatingPositions,

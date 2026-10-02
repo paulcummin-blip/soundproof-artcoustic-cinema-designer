@@ -61,6 +61,14 @@ import { deriveReportReadiness, REPORT_STATE } from "@/components/report/reportR
 import { useAppState } from "@/components/AppStateProvider";
 import { resolveSeatPriority } from "@/components/utils/seatPriorityAuthority";
 import { isAssessedLevel } from "@/components/report/client/visualReportSeatStyle";
+import { useReportSnapshot } from "@/components/report/useReportSnapshot";
+import ReportSnapshotBanner from "@/components/report/ReportSnapshotBanner";
+import {
+  REPORT_SNAPSHOT_TYPE,
+  buildSnapshotPayload,
+  currentSourceFingerprints,
+} from "@/components/report/reportSnapshotAuthority";
+import { readSeatPriorityFingerprint } from "@/components/state/designReviewHandoff";
 
 export default function RP22ClientReport() {
   const navigate = useNavigate();
@@ -848,6 +856,47 @@ export default function RP22ClientReport() {
 
   const reportReady = readiness.state === REPORT_STATE.READY;
 
+  // ── Saved report snapshot (Visual Report) ────────────────────────────────
+  // Once this report is generated it is saved against the project version. A
+  // later design change marks it as generated before the latest changes instead
+  // of blanking it, and Regenerate overwrites that saved report in place.
+  const snapshotFingerprints = useMemo(
+    () =>
+      currentSourceFingerprints({
+        authoritySnapshot: authority.authoritySnapshot,
+        engineeringSummary,
+        liveSeatPriorityFingerprint: readSeatPriorityFingerprint(projectId),
+      }),
+    [authority.authoritySnapshot, engineeringSummary, projectId]
+  );
+
+  const snapshotPayload = useMemo(
+    () =>
+      buildSnapshotPayload({
+        engineeringFingerprint: authority.authoritySnapshot?.engineeringFingerprint || null,
+        presentation: {
+          showAsdr: authority.authoritySnapshot?.showAsdr,
+          priceData: authority.authoritySnapshot?.priceData || null,
+          seatingPositions,
+          placedSpeakers,
+          subwooferInstances,
+          dolbyLayout: authority.authoritySnapshot?.dolbyLayout || null,
+        },
+        pages: orderedPages,
+      }),
+    [authority.authoritySnapshot, seatingPositions, placedSpeakers, subwooferInstances, orderedPages]
+  );
+
+  const reportSnapshot = useReportSnapshot({
+    projectId,
+    versionId: authority.versionId,
+    accountId: projectDetails?.account_id || null,
+    reportType: REPORT_SNAPSHOT_TYPE.VISUAL,
+    currentFingerprints: snapshotFingerprints,
+    payload: snapshotPayload,
+    ready: reportReady && orderedPages.length > 0,
+  });
+
   const progressItems = [
     { key: "project", label: "Project loaded", done: !hydrating && !!projectDetails },
     { key: "room", label: "Room geometry", done: Number(roomDims?.widthM) > 0 && Number(roomDims?.lengthM) > 0 },
@@ -988,6 +1037,18 @@ export default function RP22ClientReport() {
         maxWidth: 900,
         margin: "0 auto",
       }}>
+        {/* Saved report: generated before the latest changes. The report stays
+            fully visible; Regenerate overwrites the saved report in place. */}
+        <ReportSnapshotBanner
+          className="client-report-screen-only"
+          status={reportSnapshot.status}
+          reportType={REPORT_SNAPSHOT_TYPE.VISUAL}
+          changedKeys={reportSnapshot.changedKeys}
+          generatedAt={reportSnapshot.generatedAt}
+          generatedBy={reportSnapshot.generatedBy}
+          regenerating={reportSnapshot.saving}
+          onRegenerate={reportSnapshot.regenerate}
+        />
         {!projectId ? (
           <div className="client-report-screen-only" style={{
             background: "#FFFFFF",

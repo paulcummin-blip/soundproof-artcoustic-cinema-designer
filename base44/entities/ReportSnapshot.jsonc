@@ -1,0 +1,233 @@
+{
+  "name": "ReportSnapshot",
+  "type": "object",
+  "description": "One saved report per project version and report type (Visual Report, Technical Report, System Design Summary). A report is saved against the project version when it is generated, and overwritten in place when it is regenerated. Reopening restores the saved report when the source fingerprints it was generated from still match; when a source input has moved on the saved report stays visible and is marked as generated before the latest changes, with Regenerate offered. The payload records the report's own identity: the engineering publication it was generated from, its frozen presentation inputs and its page inventory. It never copies an engineering value - every number in the saved report is read back from the immutable published engineering publication the payload points at, so the report remains a consumer of the single engineering authority rather than a second copy of it.",
+  "properties": {
+    "project_id": {
+      "type": "string",
+      "description": "ID of the Project this saved report belongs to."
+    },
+    "version_id": {
+      "type": "string",
+      "description": "ID of the ProjectVersion this saved report belongs to. A report is always saved against one exact version."
+    },
+    "account_id": {
+      "type": "string",
+      "description": "Denormalized account_id from the parent Project, used for RLS. Must be set at creation time from the parent Project's account_id."
+    },
+    "report_type": {
+      "type": "string",
+      "enum": [
+        "visual",
+        "technical",
+        "system_design_summary"
+      ],
+      "description": "Which report this snapshot is. One saved report per project version and report type."
+    },
+    "report_schema_version": {
+      "type": "integer",
+      "default": 1,
+      "description": "Layout/schema generation of the saved report payload. A snapshot written under a different generation is not restored, so an older payload can never be rendered as a current report."
+    },
+    "source_fingerprints": {
+      "type": "object",
+      "description": "The source inputs this report was generated from: engineeringFingerprint (the published engineering publication key), calculationFingerprint (the bass assessment) and seatPriorityFingerprint (the seating priorities). Staleness is decided by comparing these against the same inputs read now.",
+      "properties": {}
+    },
+    "generated_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "When this saved report was generated (or last regenerated)."
+    },
+    "generated_by": {
+      "type": "string",
+      "description": "Name or email of the user who generated the saved report.",
+      "nullable": true
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "current",
+        "stale"
+      ],
+      "default": "current",
+      "description": "Whether the saved report still matches the project as it stands. 'stale' means the design changed after this report was generated. A stale report stays visible and is never overwritten automatically - only Regenerate replaces it."
+    },
+    "status_reason": {
+      "type": "string",
+      "description": "Plain-English reason for the current status, e.g. which source inputs changed.",
+      "nullable": true
+    },
+    "status_updated_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "When the status was last written.",
+      "nullable": true
+    },
+    "payload": {
+      "type": "object",
+      "description": "The saved report's own payload: the engineering publication fingerprint it was generated from, the frozen presentation inputs, and the page inventory that was generated. Carries no engineering value and no metric authority.",
+      "properties": {}
+    }
+  },
+  "required": [
+    "project_id",
+    "version_id",
+    "account_id",
+    "report_type"
+  ],
+  "rls": {
+    "read": {
+      "$or": [
+        {
+          "$and": [
+            {
+              "data.account_id": "{{user.data.account_id}}"
+            },
+            {
+              "data.account_id": {
+                "$nin": [
+                  null,
+                  ""
+                ]
+              }
+            },
+            {
+              "$or": [
+                {
+                  "user_condition": {
+                    "data.access_level": "FULL_ACCESS"
+                  }
+                },
+                {
+                  "user_condition": {
+                    "data.access_level": "SOUND_PROOF_ONLY"
+                  }
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        }
+      ]
+    },
+    "create": {
+      "$or": [
+        {
+          "$and": [
+            {
+              "data.account_id": "{{user.data.account_id}}"
+            },
+            {
+              "data.account_id": {
+                "$nin": [
+                  null,
+                  ""
+                ]
+              }
+            },
+            {
+              "$or": [
+                {
+                  "user_condition": {
+                    "data.access_level": "FULL_ACCESS"
+                  }
+                },
+                {
+                  "user_condition": {
+                    "data.access_level": "SOUND_PROOF_ONLY"
+                  }
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        }
+      ]
+    },
+    "update": {
+      "$or": [
+        {
+          "$and": [
+            {
+              "data.account_id": "{{user.data.account_id}}"
+            },
+            {
+              "data.account_id": {
+                "$nin": [
+                  null,
+                  ""
+                ]
+              }
+            },
+            {
+              "$or": [
+                {
+                  "user_condition": {
+                    "data.access_level": "FULL_ACCESS"
+                  }
+                },
+                {
+                  "user_condition": {
+                    "data.access_level": "SOUND_PROOF_ONLY"
+                  }
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        }
+      ]
+    },
+    "delete": {
+      "$or": [
+        {
+          "$and": [
+            {
+              "data.account_id": "{{user.data.account_id}}"
+            },
+            {
+              "data.account_id": {
+                "$nin": [
+                  null,
+                  ""
+                ]
+              }
+            },
+            {
+              "$or": [
+                {
+                  "user_condition": {
+                    "data.access_level": "FULL_ACCESS"
+                  }
+                },
+                {
+                  "user_condition": {
+                    "data.access_level": "SOUND_PROOF_ONLY"
+                  }
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        }
+      ]
+    }
+  }
+}
