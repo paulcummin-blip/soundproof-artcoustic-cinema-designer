@@ -69,6 +69,7 @@ import { buildTechnicalReportTitle } from '@/components/report/reportPdfTitle';
 import AboutSoundProofReportPage from '@/components/report/AboutSoundProofReportPage';
 import { readDesignReviewHandoff, subscribeDesignReviewHandoff } from '@/components/state/designReviewHandoff';
 import { useVersionedEngineeringAuthority } from '@/components/engineering/useVersionedEngineeringAuthority';
+import { useCompletedBassAuthority } from '@/components/room/bass/completedBassResultStore';
 import { setAuthoritativeReadOnlyMode } from '@/components/state/authoritativeReadOnlyMode';
 import { useAutoPrintReadinessInstrumentation, logAutoPrintBlock } from '@/components/report/useAutoPrintReadinessInstrumentation';
 import useReportBlockPagination from '@/components/report/useReportBlockPagination';
@@ -151,6 +152,19 @@ function RP22ReportInner() {
     // therefore still restores the published report instead of reporting that
     // no analysis exists. Still read-only: no engine, no recalculation.
     const reportAuthority = useVersionedEngineeringAuthority(explicitProjectId, reportVersionId);
+    const completedBassAuthority = useCompletedBassAuthority(
+        explicitProjectId || "free",
+        reportVersionId || "free",
+    );
+    const bassScopeId = String(completedBassAuthority?.projectId || "").split("::")[0] || null;
+    const projectIdMatch = !!explicitProjectId
+        && !!reportVersionId
+        && String(completedBassAuthority?.projectId || "") === `${explicitProjectId}::${reportVersionId}`;
+    const bassReportPending = !projectIdMatch || completedBassAuthority?.hydrationSettled !== true;
+    const bassRestoreFailed = projectIdMatch
+        && completedBassAuthority?.hydrationSettled === true
+        && completedBassAuthority?.authorityStatus === "ERROR"
+        && !completedBassAuthority?.contract;
     const designReviewHandoff = reportAuthority.snapshot;
     const authorityResolving = reportAuthority.loading;
     const designRecommendations = designReviewHandoff?.recommendations ?? null;
@@ -193,7 +207,7 @@ function RP22ReportInner() {
         reportType: REPORT_SNAPSHOT_TYPE.TECHNICAL,
         currentFingerprints: snapshotFingerprints,
         payload: snapshotPayload,
-        ready: !!engineeringSummary && !authorityResolving && !reportHydrating,
+        ready: !!engineeringSummary && !authorityResolving && !reportHydrating && !bassReportPending && !bassRestoreFailed,
     });
 
     // Full project hydration for RP22Report — mirrors Room Designer's useProjectLoader path
@@ -418,8 +432,11 @@ function RP22ReportInner() {
             logAutoPrintBlock(reportHydrating ? 'reportHydrating = true' : 'reportReadyProjectId mismatch', 391);
             return;
         }
-        if (authorityReportPending) {
-            logAutoPrintBlock('engineeringSummary unavailable', 395);
+        if (authorityReportPending || bassReportPending || bassRestoreFailed) {
+            logAutoPrintBlock(
+                bassRestoreFailed ? 'saved bass authority restore failed' : (bassReportPending ? 'saved bass authority hydrating' : 'engineeringSummary unavailable'),
+                395,
+            );
             return;
         }
         if (isPrinting) {
@@ -433,7 +450,7 @@ function RP22ReportInner() {
         setPlanDimsImageDataUrl(null);
         setPlanSpeakerDimsImageDataUrl(null);
         setIsPrinting(true);
-    }, [autoPrintRequested, reportHydrating, explicitProjectId, reportReadyProjectId, isPrinting, authorityReportPending]);
+    }, [autoPrintRequested, reportHydrating, explicitProjectId, reportReadyProjectId, isPrinting, authorityReportPending, bassReportPending, bassRestoreFailed]);
 
     // Mark printReady when all captures are done
     useEffect(() => {
@@ -472,6 +489,14 @@ function RP22ReportInner() {
                 printLockRef.current = false;
                 return;
             }
+            if (!projectIdMatch || bassScopeId !== explicitProjectId || bassReportPending || bassRestoreFailed) {
+                logAutoPrintBlock('print trigger: bass authority project mismatch or restore incomplete', 441);
+                setExportStatus("Print cancelled — bass authority project mismatch.");
+                setIsPrinting(false);
+                setPrintReady(false);
+                printLockRef.current = false;
+                return;
+            }
             setExportStatus("Opening PDF preview…");
             setHasPrintedOnce(true);
             // Keep the lightweight preparation view mounted until the browser has
@@ -496,7 +521,7 @@ function RP22ReportInner() {
             }, 2000);
         }, 250);
         return () => clearTimeout(t);
-    }, [isPrinting, printReady, hasPrintedOnce]);
+    }, [isPrinting, printReady, hasPrintedOnce, explicitProjectId, reportReadyProjectId, reportHydrating, projectIdMatch, bassScopeId, bassReportPending, bassRestoreFailed]);
 
     useEffect(() => { setExportDebug(d => ({ ...d, isPrinting, printReady })); }, [isPrinting, printReady]);
 
@@ -665,8 +690,9 @@ function RP22ReportInner() {
         }
     }, [app?.screenFrontPlaneM, app?.screen?.frontPlaneYm, app?.screen?.borderThicknessM, app?.screen]);
 
-    // The report waits only for project hydration and the one published summary.
-    const showLoadingReport = reportHydrating || (explicitProjectId && reportReadyProjectId !== explicitProjectId) || authorityReportPending || authorityResolving;
+    // The report waits for project, engineering publication, and durable bass
+    // hydration. It must never render or print a partial summary first.
+    const showLoadingReport = reportHydrating || (explicitProjectId && reportReadyProjectId !== explicitProjectId) || authorityReportPending || authorityResolving || bassReportPending;
 
     // READ-ONLY: useAnalysisSpeakers, useAllSeatSplMetrics, and
     // useRP22AnalysisEngine are NOT called here. The authoritative RP22
@@ -933,6 +959,20 @@ function RP22ReportInner() {
         );
     }
 
+    if (bassRestoreFailed) {
+        return (
+            <div className="min-h-screen bg-[#F9F8F6] p-6 flex items-center justify-center">
+                <Card className="max-w-xl mx-auto w-full">
+                    <CardHeader><CardTitle className="text-[#1B1A1A] font-header">Technical Report</CardTitle></CardHeader>
+                    <CardContent className="text-center py-10">
+                        <BarChart4 className="w-12 h-12 text-gray-300 mx-auto mb-4" />
+                        <p className="text-[#3E4349]">Saved bass results could not be restored. Reopen the project and try again; no partial report has been generated.</p>
+                    </CardContent>
+                </Card>
+            </div>
+        );
+    }
+
     if (!app) {
         return (
             <div className="min-h-screen bg-[#F9F8F6] p-6 flex items-center justify-center">
@@ -1148,7 +1188,7 @@ function RP22ReportInner() {
                         setPlanDimsImageDataUrl={setPlanDimsImageDataUrl}
                         setPlanSpeakerDimsImageDataUrl={setPlanSpeakerDimsImageDataUrl}
                         setIsPrinting={setIsPrinting}
-                        exportDisabled={reportHydrating || (explicitProjectId && reportReadyProjectId !== explicitProjectId) || authorityReportPending || recommendationsPending || !designAssessmentComplete}
+                        exportDisabled={reportHydrating || (explicitProjectId && reportReadyProjectId !== explicitProjectId) || authorityReportPending || bassReportPending || bassRestoreFailed || recommendationsPending || !designAssessmentComplete}
                         exportDisabledMessage={!designAssessmentComplete ? "Complete assessment to export PDF" : (authorityReportPending ? "Engineering summary loading" : (recommendationsPending ? "Recommendations evaluating" : "Report loading"))}
                         lcrAngleInfo={(() => {
                             // Compute LCR angles exactly as Plan View does:
