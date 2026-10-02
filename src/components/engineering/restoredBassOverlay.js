@@ -76,78 +76,137 @@ export function applyRestoredBassAuthority(summary, { projectId, versionId, comp
     overlaidIds.add(id);
   }
 
-  // ── Parameter authority levels (so the grid shows the restored level) ─────
+  // ── Parameter authority levels (so every report sees a terminal result) ──
   const parameterAuthority = { ...(summary.parameterAuthority || {}) };
+  const perSeat = Array.isArray(presentation?.perSeatP20Results)
+    ? presentation.perSeatP20Results
+    : [];
+
   for (const id of BASS_PARAM_IDS) {
     const key = `p${id}`;
     const parameter = parameters[key];
     const existing = parameterAuthority[key];
-    if (!overlaidIds.has(id) || !parameter || !existing) continue;
+    if (!parameter || !existing) continue;
+
     const scored = hasLevel(parameter.level);
-    parameterAuthority[key] = {
+    const next = {
       ...existing,
       state: scored ? "scored" : existing.state,
       level: scored ? parameter.level : existing.level,
       rawValue: parameter.rawValue ?? existing.rawValue ?? null,
-      restoredFromSavedBassAuthority: true,
+      restoredFromSavedBassAuthority: overlaidIds.has(id) || existing.restoredFromSavedBassAuthority === true,
     };
-  }
 
-  // ── P20 per-seat rows (assessed seat by seat) ────────────────────────────
-  // The saved summary holds placeholder rows when its own bass was not
-  // restored; the per-seat results come from the restored contract through the
-  // same presentation authority the Room Designer reads.
-  let project = summary.project;
-  const reportCounts = summary.project?.reportCounts;
-  const savedRows = reportCounts?.seatResultsByParameter?.p20;
-  const perSeat = presentation?.perSeatP20Results;
-  if (Array.isArray(savedRows) && Array.isArray(perSeat) && perSeat.length) {
-    const bySeatId = new Map();
-    for (const seat of perSeat) {
-      if (seat?.seatId != null) bySeatId.set(String(seat.seatId), seat);
+    // P19 is one RSP result, not a per-seat assessment.
+    if (id === 19 && overlaidIds.has(id)) {
+      next.scope = "room";
+      next.seats = null;
     }
-    if (bySeatId.size) {
-      const restoreRow = (row) => {
-        // Preserve a genuinely scored zero; only replace unscored placeholder
-        // rows such as the old ±0.0 dB report rows.
-        if (row?.status === "scored"
-          && statesBassResultEntry({ value: row?.value, formatted: row?.valueFormatted })) {
-          return row;
-        }
-        const seat = bySeatId.get(String(row?.seatId));
+
+    // P20 is seat-scoped. Restore the canonical seat grades as well as the
+    // display rows so completeness/rating authority cannot remain provisional.
+    if (id === 20 && perSeat.length) {
+      const seats = { ...(existing.seats || {}) };
+      for (const seat of perSeat) {
+        const seatId = seat?.seatId == null ? null : String(seat.seatId);
         const raw = Number(seat?.variationDbRaw);
-        if (!seat || !Number.isFinite(raw)) return row;
-        overlaid = true;
-        return {
-          ...row,
-          valueFormatted: `±${raw.toFixed(1)} dB`,
-          level: Number.isFinite(Number(seat.level)) ? `L${Math.max(1, Number(seat.level))}` : row.level,
-          value: raw,
-          status: "scored",
-          worstFrequencyHz: seat.worstFrequencyHz ?? row.worstFrequencyHz ?? null,
+        if (!seatId || !Number.isFinite(raw)) continue;
+        const previous = seats[seatId] || {};
+        if (previous.state === "scored"
+          && statesBassResultEntry({ value: previous.rawValue, formatted: previous.formatted })) {
+          continue;
+        }
+        seats[seatId] = {
+          ...previous,
+          state: "scored",
+          level: Number.isFinite(Number(seat.level)) ? `L${Math.max(1, Number(seat.level))}` : previous.level,
+          rawValue: raw,
+          reason: null,
           restoredFromSavedBassAuthority: true,
         };
-      };
-      project = {
-        ...summary.project,
-        reportCounts: {
-          ...reportCounts,
-          seatResultsByParameter: {
-            ...reportCounts.seatResultsByParameter,
-            p20: savedRows.map(restoreRow),
-          },
-        },
-      };
+        overlaid = true;
+      }
+      next.scope = "seat";
+      next.state = "scored";
+      next.seats = seats;
     }
+
+    parameterAuthority[key] = next;
   }
 
   if (!overlaid) return summary;
+
+  // Rebuild only the derived rating/report views from the already-published
+  // parameter grades. This is not a bass recalculation: it prevents an old
+  // NOT_ASSESSED aggregate surviving after its saved bass grades are restored.
+  const seatIds = Array.isArray(summary.project?.seatIds)
+    ? summary.project.seatIds
+    : Object.keys(summary.seatHudById || {});
+  const primarySeatIds = new Set((summary.primary?.seatIds || []).map(String));
+  const seats = seatIds.map((seatId) => ({
+    id: seatId,
+    isPrimary: primarySeatIds.has(String(seatId)),
+    priority: primarySeatIds.has(String(seatId)) ? "primary" : "secondary",
+  }));
+  let rebuilt = null;
+  try {
+    rebuilt = summariseEngineeringResults({
+      designRatingAuthority: { parameters: parameterAuthority, seatIds },
+      seats,
+      seatHudById: summary.seatHudById || {},
+      roomResultsByParameter: roomResults,
+      p19SeatAuthority: summary.p19SeatAuthority || null,
+      perSeatRp23: {},
+    });
+  } catch {
+    rebuilt = null;
+  }
+
+  let project = rebuilt?.project
+    ? { ...summary.project, ...rebuilt.project }
+    : summary.project;
+  const reportCounts = project?.reportCounts;
+  const savedRows = reportCounts?.seatResultsByParameter?.p20;
+
+  // Preserve/restore limiting-frequency evidence on the rebuilt P20 rows.
+  if (Array.isArray(savedRows) && perSeat.length) {
+    const bySeatId = new Map(perSeat
+      .filter((seat) => seat?.seatId != null)
+      .map((seat) => [String(seat.seatId), seat]));
+    project = {
+      ...project,
+      reportCounts: {
+        ...reportCounts,
+        seatResultsByParameter: {
+          ...reportCounts.seatResultsByParameter,
+          p20: savedRows.map((row) => {
+            const seat = bySeatId.get(String(row?.seatId));
+            const raw = Number(seat?.variationDbRaw);
+            if (!seat || !Number.isFinite(raw)) return row;
+            return {
+              ...row,
+              valueFormatted: `±${raw.toFixed(1)} dB`,
+              level: Number.isFinite(Number(seat.level)) ? `L${Math.max(1, Number(seat.level))}` : row.level,
+              value: raw,
+              status: "scored",
+              worstFrequencyHz: seat.worstFrequencyHz ?? row.worstFrequencyHz ?? null,
+              restoredFromSavedBassAuthority: true,
+            };
+          }),
+        },
+      },
+    };
+  }
 
   return {
     ...summary,
     roomResultsByParameter: roomResults,
     parameterAuthority,
+    parameterSummaries: rebuilt?.parameterSummaries || summary.parameterSummaries,
+    primary: rebuilt?.primary ? { ...summary.primary, ...rebuilt.primary } : summary.primary,
+    secondary: rebuilt?.secondary ? { ...summary.secondary, ...rebuilt.secondary } : summary.secondary,
     project,
+    designRating: rebuilt?.designRating || summary.designRating,
     // Provenance: consumers and diagnostics can see these bass values came from
     // the restored durable bass authority rather than the saved summary.
     bassAuthoritySource: "restored-durable-bass-authority",
