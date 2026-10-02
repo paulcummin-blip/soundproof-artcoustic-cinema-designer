@@ -99,7 +99,7 @@ export default function AdminProjectIntelligence() {
   const [exportNotice, setExportNotice] = useState(null);
 
   // Product demand sort order. Held here so the table and the export read the
-  // same order: it opens on total live value, highest first.
+  // same order: it opens on Product Demand catalogue value, highest first.
   const [demandSort, setDemandSort] = useState(DEFAULT_PRODUCT_DEMAND_SORT);
 
   // Projects table sort order, the age bucket the overview is filtering to, and
@@ -299,6 +299,8 @@ export default function AdminProjectIntelligence() {
             currency={report.summary.liveCurrency}
             hiddenCount={hiddenProjectCount}
             pipelineAge={selection.pipelineAge}
+            productDemandValue={selection.productDemandSummary?.value ?? null}
+            productDemandUnpricedLines={selection.productDemandSummary?.unpricedLineCount ?? 0}
           />
 
           <PipelineAgeOverview

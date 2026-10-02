@@ -17,7 +17,7 @@ import {
   preferenceFromOption,
   summariseSelection,
 } from '@/lib/commercial/projectReporting/projectSelection';
-import { buildCatalogueDemand } from '@/lib/commercial/projectReporting/productDemand';
+import { buildCatalogueDemand, summariseProductDemand } from '@/lib/commercial/projectReporting/productDemand';
 import { buildPipelineAgeSummary } from '@/lib/commercial/projectReporting/pipelineAge';
 import { clearSelection, readSelection, writeSelection } from './projectSelectionStore';
 
@@ -50,15 +50,23 @@ export function useProjectSelection({ families = [], priceMap = null, totalLoade
   // version dated before 1 Oct 2026 is left out by the reporting cutoff. The
   // excluded lines are the audit trail for what was left out; they never affect
   // the demand totals.
+  //
+  // Quoted snapshot demand is deliberately OFF here: Product Demand is a clean
+  // forecast from counted versions, so no quoted quantity, quoted value or
+  // quoted-only product can reach the table or the export. Quoted detail stays
+  // in Advanced diagnostics.
   const catalogueDemand = useMemo(() => {
     const counted = includedFamilies(selectedFamilies);
     if (counted.length === 0) {
       return { rows: [], excludedLines: [], abfuserExclusions: [], abfuserWarnings: [], unitsByProjectId: {} };
     }
-    return buildCatalogueDemand({ families: counted, priceMap });
+    return buildCatalogueDemand({ families: counted, priceMap, includeQuoted: false });
   }, [selectedFamilies, priceMap]);
 
   const productDemand = catalogueDemand.rows;
+  // The Product Demand headline — counted catalogue units and catalogue value —
+  // read from the same rows the table and the export display.
+  const productDemandSummary = useMemo(() => summariseProductDemand(productDemand), [productDemand]);
   const excludedLines = catalogueDemand.excludedLines;
   // Abfuser left out by the 1 Oct 2026 reporting cutoff, kept for audit only.
   const abfuserExclusions = catalogueDemand.abfuserExclusions || [];
@@ -98,6 +106,7 @@ export function useProjectSelection({ families = [], priceMap = null, totalLoade
   return {
     selectedFamilies,
     productDemand,
+    productDemandSummary,
     excludedLines,
     abfuserExclusions,
     abfuserWarnings,

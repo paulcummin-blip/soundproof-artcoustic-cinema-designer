@@ -8,7 +8,9 @@
  *   1. Included Projects           — one row per included project
  *   2. Excluded Projects           — one row per excluded project, with the reason
  *   3. Product Demand              — Artcoustic catalogue lines, counted versions
- *                                    only, with historic Abfuser excluded
+ *                                    only, with historic Abfuser excluded. The
+ *                                    quantity and value are counted demand only:
+ *                                    no quoted snapshot quantity is carried.
  *   4. Version Detail              — every version, marked counted or not
  *   5. Excluded Manual Lines       — the non-catalogue lines left out of demand,
  *                                    for audit only
@@ -105,7 +107,7 @@ export function buildSelectionSheets({
     { key: 'category', label: 'Category', type: 'string' },
     { key: 'quantity', label: 'Quantity', type: 'number' },
     { key: 'projectFamilies', label: 'Included projects using it', type: 'number' },
-    { key: 'liveValue', label: `Total live value (${currency})`, type: 'currency' },
+    { key: 'liveValue', label: `Product Demand catalogue value (${currency})`, type: 'currency' },
     { key: 'derived', label: 'Derived line', type: 'string' },
     { key: 'priced', label: 'Priced', type: 'string' },
   ];

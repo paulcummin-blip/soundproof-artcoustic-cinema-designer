@@ -65,8 +65,8 @@ export default function ProductDemandTable({
     <div style={{ display: 'grid', gap: 12 }}>
       <div style={{ fontSize: 12, color: BRAND.muted, lineHeight: 1.6 }}>
         Only Artcoustic catalogue products are included. Manual extras and third-party items are excluded. Demand is read
-        from the counted version of each included project only, and a line with no price is shown as{' '}
-        <strong>Unpriced</strong> rather than zero.
+        from the counted version of each included project only, with no quoted snapshot quantity or non-counted version
+        quantity added, and a line with no price is shown as <strong>Unpriced</strong> rather than zero.
       </div>
 
       <div style={{ fontSize: 12, color: BRAND.subtext, lineHeight: 1.6 }}>
@@ -90,11 +90,11 @@ export default function ProductDemandTable({
         </div>
       ))}
 
-      <div style={{ display: 'flex', gap: 10, alignItems: 'baseline', flexWrap: 'wrap', fontSize: 13 }}>
-        <span style={{ fontWeight: 700, color: BRAND.text }}>{formatNumber(totalQuantity)} catalogue units</span>
-        <span style={{ color: BRAND.muted }}>
-          {formatMoney(totalValue, currency || 'GBP')} total live value, counted versions only
-        </span>
+      <div style={{ fontSize: 13, color: BRAND.muted }}>
+        <strong style={{ color: BRAND.text }}>
+          {formatNumber(totalQuantity)} catalogue units,
+        </strong>{' '}
+        {formatMoney(totalValue, currency || 'GBP')} Product Demand catalogue value, counted versions only.
       </div>
 
       <div style={{ fontSize: 12, color: BRAND.muted }}>
@@ -156,10 +156,7 @@ export default function ProductDemandTable({
                     </Td>
                     <Td mono>{row.sku || '—'}</Td>
                     <Td>{row.category || '—'}</Td>
-                    <Td align="right" mono>
-                      {formatNumber(row.quantity)}
-                      {row.quotedQuantity > 0 && <span style={{ color: BRAND.muted }}> (+{formatNumber(row.quotedQuantity)} quoted)</span>}
-                    </Td>
+                    <Td align="right" mono>{formatNumber(row.quantity)}</Td>
                     <Td align="right" mono>{formatNumber(row.projectFamilies)}</Td>
                     <Td align="right" mono>
                       {row.liveValue === null ? <Pill tone="warn">unpriced</Pill> : formatMoney(row.liveValue, currency || 'GBP')}

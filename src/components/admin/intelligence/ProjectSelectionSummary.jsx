@@ -36,11 +36,24 @@ function MetricCard({ label, value, hint, tone }) {
   );
 }
 
-export default function ProjectSelectionSummary({ summary, currency, hiddenCount = 0, pipelineAge = null }) {
+export default function ProjectSelectionSummary({
+  summary,
+  currency,
+  hiddenCount = 0,
+  pipelineAge = null,
+  productDemandValue = null,
+  productDemandUnpricedLines = 0,
+}) {
   if (!summary) return null;
   const valueText = summary.countedLiveValue === null
     ? 'Not calculable'
     : formatMoney(summary.countedLiveValue, summary.countedCurrency || currency || 'GBP');
+
+  // The Product Demand figure comes from the demand rows themselves, so a card
+  // and the Product Demand table can never disagree.
+  const catalogueValueText = productDemandValue === null || productDemandValue === undefined
+    ? 'Not calculable'
+    : formatMoney(productDemandValue, summary.countedCurrency || currency || 'GBP');
 
   // Age-bucket values come from the age overview, so a card and the bucket table
   // below it can never disagree.
@@ -57,9 +70,16 @@ export default function ProjectSelectionSummary({ summary, currency, hiddenCount
         <MetricCard label="Total projects loaded" value={formatNumber(summary.totalLoadedProjects)} />
         <MetricCard label="Included projects" value={formatNumber(summary.includedCount)} tone={BRAND.good} />
         <MetricCard
-          label="Included live value"
+          label="Included Project Live Value"
           value={valueText}
-          hint={summary.countedMixedCurrency ? 'Mixed currencies — not summed' : 'Counted version of each included project'}
+          hint={summary.countedMixedCurrency ? 'Mixed currencies — not summed' : 'Full live value of each included project\'s counted version'}
+        />
+        <MetricCard
+          label="Product Demand Catalogue Value"
+          value={catalogueValueText}
+          hint={productDemandUnpricedLines > 0
+            ? `Artcoustic catalogue products only · ${formatNumber(productDemandUnpricedLines)} line${productDemandUnpricedLines === 1 ? '' : 's'} unpriced`
+            : 'Artcoustic catalogue products only'}
         />
         <MetricCard
           label="0–30 day value"
@@ -88,6 +108,11 @@ export default function ProjectSelectionSummary({ summary, currency, hiddenCount
           value={formatNumber(pipelineAge?.totals?.units ?? 0)}
           hint="Catalogue units across counted versions"
         />
+      </div>
+
+      <div style={{ fontSize: 12, color: BRAND.muted, lineHeight: 1.6 }}>
+        Project value can include priced design/proposal lines that are not part of catalogue product demand. Product
+        Demand value includes Artcoustic catalogue products only.
       </div>
 
       <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center', fontSize: 12, color: BRAND.muted }}>

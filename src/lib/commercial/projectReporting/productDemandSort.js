@@ -9,13 +9,13 @@
  * Sorting rules:
  *  - Text columns (Product / model, SKU, Category) order alphabetically, case
  *    insensitively.
- *  - Quantity orders by the counted catalogue quantity itself, never by the
- *    displayed text (which carries a "+12 quoted" suffix), then by quoted
- *    quantity.
+ *  - Quantity orders by the counted catalogue quantity itself. Product Demand
+ *    carries no quoted snapshot or non-counted version quantity, so nothing else
+ *    can influence the ordering.
  *  - Included projects using it orders by the number of contributing projects.
- *  - Total live value orders numerically. A line with no usable price is not a
- *    value of zero, so unpriced lines stay at the end in both directions rather
- *    than being shown as the cheapest products.
+ *  - Product Demand catalogue value orders numerically. A line with no usable
+ *    price is not a value of zero, so unpriced lines stay at the end in both
+ *    directions rather than being shown as the cheapest products.
  *  - Derived line groups Not derived before Derived.
  *  - Priced groups Priced, then Unpriced, then Inactive.
  *  - Every comparison falls back to Product / model and then SKU, so a given set
@@ -74,7 +74,7 @@ export const PRODUCT_DEMAND_SORT_COLUMNS = [
     key: 'quantity',
     label: 'Quantity',
     align: 'right',
-    hint: 'Sort by counted catalogue quantity, not the displayed text',
+    hint: 'Sort by counted catalogue quantity',
     compare: (a, b, direction) => (
       (number(a.quantity) - number(b.quantity)) * direction
       || (number(a.quotedQuantity) - number(b.quotedQuantity)) * direction
@@ -89,9 +89,9 @@ export const PRODUCT_DEMAND_SORT_COLUMNS = [
   },
   {
     key: 'liveValue',
-    label: 'Total live value',
+    label: 'Product Demand catalogue value',
     align: 'right',
-    hint: 'Sort by total live value, highest first when descending. Unpriced lines are always kept last.',
+    hint: 'Sort by Product Demand catalogue value, highest first when descending. Unpriced lines are always kept last.',
     compare: (a, b, direction) => {
       const left = numberOrNull(a.liveValue);
       const right = numberOrNull(b.liveValue);
@@ -126,7 +126,7 @@ const COLUMNS_BY_KEY = new Map(PRODUCT_DEMAND_SORT_COLUMNS.map((column) => [colu
  */
 export const DEFAULT_PRODUCT_DEMAND_SORT = { key: 'liveValue', direction: 'desc' };
 
-export const PRODUCT_DEMAND_SORT_LABEL = 'Total live value, highest first';
+export const PRODUCT_DEMAND_SORT_LABEL = 'Product Demand catalogue value, highest first';
 
 /** A usable sort state, falling back to the default when nothing valid is given. */
 export function resolveProductDemandSort(sort) {

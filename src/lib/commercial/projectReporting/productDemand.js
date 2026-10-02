@@ -18,7 +18,7 @@
  */
 
 import { STATUS_BUCKETS } from './statusBuckets';
-import { text } from './reportingUtils';
+import { safeArray, text } from './reportingUtils';
 import { classifyCatalogueLine, isEngineDerivedLine } from './catalogueLineAuthority';
 import { ABFUSER_REASON, classifyAbfuserCutoff, formatCutoffDate } from './abfuserCutoffAuthority';
 
@@ -61,15 +61,22 @@ function countedVariationOf(family) {
  * Both outputs come from this ONE pass, so the demand and the excluded-line
  * audit can never disagree.
  *
+ * Quoted snapshot demand is OPTIONAL and off for Product Demand. With
+ * includeQuoted=false the quoted pass is not run at all, so the rows are counted
+ * -version catalogue demand only: no quoted quantity, no quoted value, and no
+ * quoted-only product row. Quoted snapshot detail belongs to the Advanced
+ * diagnostics reporting path, which leaves this default in place.
+ *
  * @param {Object} input
  * @param {Array} input.families — included project families
  * @param {Map} input.priceMap — Product Master index (sku → product)
+ * @param {boolean} [input.includeQuoted] — add quoted snapshot demand (default true)
  * @returns {{ rows: Array<Object>, excludedLines: Array<Object>, abfuserExclusions: Array<Object>, abfuserWarnings: Array<string>, unitsByProjectId: Object }}
  *   unitsByProjectId carries the counted catalogue units per project, from this
  *   same pass, so the age and trend overviews measure units on exactly the
  *   lines Product Demand counts.
  */
-export function buildCatalogueDemand({ families = [], priceMap = null } = {}) {
+export function buildCatalogueDemand({ families = [], priceMap = null, includeQuoted = true } = {}) {
   const rows = new Map();
   const excluded = new Map();
   const abfuserExcluded = new Map();
@@ -219,47 +226,50 @@ export function buildCatalogueDemand({ families = [], priceMap = null } = {}) {
   }
 
   // Quoted demand, from the frozen snapshot the quoted value is read from, held
-  // to exactly the same catalogue rule.
-  for (const family of families) {
-    const counted = countedVariationOf(family);
-    for (const line of family.quotedSnapshotBreakdown || []) {
-      const classification = classifyCatalogueLine(line, priceMap);
-      const quantity = Number(line.quantity) || 0;
+  // to exactly the same catalogue rule. Skipped entirely for Product Demand, so
+  // no quoted quantity, value or quoted-only product can reach a demand row.
+  if (includeQuoted) {
+    for (const family of families) {
+      const counted = countedVariationOf(family);
+      for (const line of family.quotedSnapshotBreakdown || []) {
+        const classification = classifyCatalogueLine(line, priceMap);
+        const quantity = Number(line.quantity) || 0;
 
-      if (!classification.eligible) {
-        excludeLine({
-          family,
-          counted,
-          sku: classification.sku,
-          description: line.description,
-          quantity,
-          value: Number(line.subtotal_ex_vat) || 0,
-          reason: classification.reason,
-          basis: QUOTED_BASIS,
-        });
-        continue;
+        if (!classification.eligible) {
+          excludeLine({
+            family,
+            counted,
+            sku: classification.sku,
+            description: line.description,
+            quantity,
+            value: Number(line.subtotal_ex_vat) || 0,
+            reason: classification.reason,
+            basis: QUOTED_BASIS,
+          });
+          continue;
+        }
+
+        const cutoff = classifyAbfuserCutoff(line, { classification, variation: counted, family });
+        if (cutoff.excluded) {
+          recordAbfuserExclusion({
+            family,
+            counted,
+            sku: classification.sku,
+            quantity,
+            value: Number(line.subtotal_ex_vat) || 0,
+            verdict: cutoff,
+            basis: QUOTED_BASIS,
+          });
+          continue;
+        }
+
+        const row = ensureRow(classification.sku, line.description, classification);
+        if (!row) continue;
+        row.quotedQuantity += quantity;
+        row.projectIds.add(family.id);
+        row.quotedValue += Number(line.subtotal_ex_vat) || 0;
+        if (line.unit_price_ex_vat === null || line.unit_price_ex_vat === undefined) row.priced = false;
       }
-
-      const cutoff = classifyAbfuserCutoff(line, { classification, variation: counted, family });
-      if (cutoff.excluded) {
-        recordAbfuserExclusion({
-          family,
-          counted,
-          sku: classification.sku,
-          quantity,
-          value: Number(line.subtotal_ex_vat) || 0,
-          verdict: cutoff,
-          basis: QUOTED_BASIS,
-        });
-        continue;
-      }
-
-      const row = ensureRow(classification.sku, line.description, classification);
-      if (!row) continue;
-      row.quotedQuantity += quantity;
-      row.projectIds.add(family.id);
-      row.quotedValue += Number(line.subtotal_ex_vat) || 0;
-      if (line.unit_price_ex_vat === null || line.unit_price_ex_vat === undefined) row.priced = false;
     }
   }
 
@@ -330,4 +340,26 @@ export function buildCatalogueDemand({ families = [], priceMap = null } = {}) {
  */
 export function buildProductDemand({ families = [], priceMap = null } = {}) {
   return buildCatalogueDemand({ families, priceMap }).rows;
+}
+
+/**
+ * The Product Demand headline, read from the same rows the table and the export
+ * display: counted catalogue units, and the value of those catalogue lines only.
+ * A line with no known price is reported as unpriced, never as a zero value.
+ *
+ * @param {Array<Object>} rows — demand rows
+ * @returns {{ lineCount: number, units: number, value: number|null, valuedLineCount: number, unpricedLineCount: number, unpricedQuantity: number }}
+ */
+export function summariseProductDemand(rows = []) {
+  const list = safeArray(rows);
+  const priced = list.filter((row) => row?.liveValue !== null && row?.liveValue !== undefined);
+
+  return {
+    lineCount: list.length,
+    units: list.reduce((sum, row) => sum + (Number(row?.quantity) || 0), 0),
+    value: priced.length > 0 ? priced.reduce((sum, row) => sum + (Number(row.liveValue) || 0), 0) : null,
+    valuedLineCount: priced.length,
+    unpricedLineCount: list.length - priced.length,
+    unpricedQuantity: list.reduce((sum, row) => sum + (Number(row?.unpricedQuantity) || 0), 0),
+  };
 }
