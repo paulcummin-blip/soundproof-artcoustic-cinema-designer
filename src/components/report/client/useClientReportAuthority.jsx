@@ -635,8 +635,8 @@ export function useClientReportAuthority(projectId) {
     versionNumber,
     versionName,
     projectDetails,
-    hydrating,
-    hydrated: hydratedProjectId === projectId && !hydrating,
+    hydrating: hydrating || engineeringAuthority.loading,
+    hydrated: hydratedProjectId === projectId && !hydrating && !engineeringAuthority.loading,
     roomDims,
     screen,
     screenFrontPlaneM,
@@ -652,6 +652,9 @@ export function useClientReportAuthority(projectId) {
     // The full authority snapshot (publication identity + presentation payload).
     // Read only, so a saved report can record the exact publication it came from.
     authoritySnapshot: publishedEngineering,
+    reportComplete: engineeringAuthority.reportComplete,
+    reportCompleteness: engineeringAuthority.reportCompleteness,
+    bassRestoreFailed: engineeringAuthority.bassRestoreFailed,
     allSeatSplMetrics,
     authoritativeSeat,
     seatingPositions,
