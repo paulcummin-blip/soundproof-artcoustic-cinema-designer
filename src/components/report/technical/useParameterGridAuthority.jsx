@@ -9,6 +9,7 @@
 import React from "react";
 import { resolveParamThresholds } from "@/components/report/technical/roomParameterLevelAuthority";
 import { formatP7Degrees, isP7Number } from "@/components/utils/rp22/p7DisplayAuthority";
+import { firstStatedPrimitive } from "@/components/utils/renderSafe";
 
 function roomResultFor(engineeringSummary, paramId) {
   return engineeringSummary?.roomResultsByParameter?.[Number(paramId)] || null;
@@ -96,7 +97,7 @@ export function useParameterGridAuthority({
         const wholeDegrees = formatP7Degrees(room.value ?? room.deviation ?? room.formatted);
         if (wholeDegrees != null) return wholeDegrees;
       }
-      return room.formatted || room.hudLabel || (room.value ?? "—");
+      return firstStatedPrimitive([room.formatted, room.hudLabel, room.value], "—");
     }
 
     if (id === 19) {
@@ -107,7 +108,7 @@ export function useParameterGridAuthority({
 
     const primaryResult = (reportCounts.seatResultsByParameter?.[key] || [])
       .find((seat) => String(seat.seatId) === String(primarySeatId));
-    return primaryResult?.valueFormatted || "Seat results";
+    return firstStatedPrimitive([primaryResult?.valueFormatted, primaryResult?.value], "Seat results");
   }, [engineeringSummary, reportCounts, primarySeatId]);
 
   const buildSeatGridData = React.useCallback((paramId) => {
@@ -143,7 +144,7 @@ export function useParameterGridAuthority({
     const primaryResult = (reportCounts.seatResultsByParameter?.p6 || [])
       .find((seat) => String(seat.seatId) === String(primarySeatId));
     return {
-      achievedValue: primaryResult?.valueFormatted || "Seat results",
+      achievedValue: firstStatedPrimitive([primaryResult?.valueFormatted, primaryResult?.value], "Seat results"),
       lvl: level,
     };
   }, [parameterSummaries, reportCounts, primarySeatId]);
@@ -157,7 +158,7 @@ export function useParameterGridAuthority({
     const scopedFallback = (id === 19 || id === 20) ? getHudValueForParam({ id }) : null;
     return {
       level: parameterSummaries[`p${id}`]?.level || result?.level || "—",
-      valueText: result?.formatted || scopedFallback || "—",
+      valueText: firstStatedPrimitive([result?.formatted, result?.value, scopedFallback], "—"),
       detail: result?.detail || null,
       targetBasis: result?.targetBasis || null,
     };
