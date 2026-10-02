@@ -18,13 +18,15 @@
  * recalculates anything: every value comes from the restored contract through
  * the shared bass presentation authority.
  *
- * A summary that already states its bass results is returned untouched, so this
- * can never change a value that was already published.
+ * Every bass field is repaired independently. Already-published values are
+ * preserved, while missing P14/P18/P19 fields and placeholder P20 seat rows are
+ * restored from the durable contract.
  */
 
 import { getCompletedBassAuthority } from "@/components/room/bass/completedBassResultStore";
 import { buildComplianceBassPresentation } from "@/components/room/bass/bassCompliancePresentation";
 import { statesBassResultEntry } from "@/components/engineering/versionedEngineeringAuthority";
+import { summariseEngineeringResults } from "@/components/engineering/engineeringSummaryAuthority";
 
 /** The bass parameters the reports read (P19 is RSP-scoped, P20 is per seat). */
 const BASS_PARAM_IDS = [14, 18, 19, 20];
