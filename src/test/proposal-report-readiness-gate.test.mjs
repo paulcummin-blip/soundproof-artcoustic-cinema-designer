@@ -28,6 +28,7 @@ const WIZARD = read('src/components/proposal/CreateProposalWizard.jsx');
 const VERSIONS_STEP = read('src/components/proposal/wizard/VersionSelectStep.jsx');
 const GATE_UI = read('src/components/proposal/wizard/ReportReadinessGate.jsx');
 const GATE_AUTHORITY = read('src/components/proposal/sourceAuthority/proposalReportReadinessGate.js');
+const VERSIONED_ENGINEERING_HOOK = read('src/components/engineering/useVersionedEngineeringAuthority.js');
 
 const source = (overrides = {}) => resolveProposalSource({
   projectId: 'p1',
@@ -208,6 +209,13 @@ test('no Regenerate or Generate / Regenerate wording reaches the gate surfaces',
 });
 
 /* ── Wiring ───────────────────────────────────────────────────────────── */
+
+test('durable bass restore overlays the engineering summary and reinserts it into the report snapshot', () => {
+  expect(VERSIONED_ENGINEERING_HOOK).toMatch(/const composedSummary = extractEngineeringSummary\(composedSnapshot\)/);
+  expect(VERSIONED_ENGINEERING_HOOK).toMatch(/applyRestoredBassAuthority\(\s*composedSummary,/);
+  expect(VERSIONED_ENGINEERING_HOOK).toMatch(/engineeringSummary: restoredSummary/);
+  expect(VERSIONED_ENGINEERING_HOOK).not.toMatch(/applyRestoredBassAuthority\(\s*composeAuthoritySnapshot/);
+});
 
 test('the Versions step cannot advance without both current reports', () => {
   expect(WIZARD).toMatch(/resolveReportGate\(\{ status: sourceStatus, loading: sourceLoading \}\)/);
