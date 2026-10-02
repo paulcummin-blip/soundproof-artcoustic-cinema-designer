@@ -24,7 +24,7 @@
 
 import { getCompletedBassAuthority } from "@/components/room/bass/completedBassResultStore";
 import { buildComplianceBassPresentation } from "@/components/room/bass/bassCompliancePresentation";
-import { statesBassAuthority } from "@/components/engineering/versionedEngineeringAuthority";
+import { statesBassResultEntry } from "@/components/engineering/versionedEngineeringAuthority";
 
 /** The bass parameters the reports read (P19 is RSP-scoped, P20 is per seat). */
 const BASS_PARAM_IDS = [14, 18, 19, 20];
@@ -33,9 +33,6 @@ const hasLevel = (level) => level != null && level !== "—" && level !== "";
 
 export function applyRestoredBassAuthority(summary, { projectId, versionId, completedBassAuthority = null } = {}) {
   if (!summary || !projectId || !versionId) return summary;
-  // Already states its bass results — never touched.
-  if (statesBassAuthority(summary)) return summary;
-
   const authority = completedBassAuthority || getCompletedBassAuthority(projectId, versionId);
   if (!authority?.contract) return summary;
 
@@ -54,10 +51,14 @@ export function applyRestoredBassAuthority(summary, { projectId, versionId, comp
   // ── P14 / P18 / P19 / P20 room results ────────────────────────────────────
   const roomResults = { ...(summary.roomResultsByParameter || {}) };
   let overlaid = false;
+  const overlaidIds = new Set();
   for (const id of BASS_PARAM_IDS) {
     const parameter = parameters[`p${id}`];
-    if (!parameter || parameter.valueText == null) continue;
     const existing = roomResults[id] || roomResults[String(id)] || {};
+    // Preserve each already-published result independently. A complete P14
+    // must not prevent a missing P19 or placeholder P20 from being restored.
+    if (statesBassResultEntry(existing)) continue;
+    if (!statesBassResultEntry({ value: parameter?.rawValue, formatted: parameter?.valueText })) continue;
     roomResults[id] = {
       ...existing,
       ...parameter,
@@ -70,8 +71,8 @@ export function applyRestoredBassAuthority(summary, { projectId, versionId, comp
       restoredFromSavedBassAuthority: true,
     };
     overlaid = true;
+    overlaidIds.add(id);
   }
-  if (!overlaid) return summary;
 
   // ── Parameter authority levels (so the grid shows the restored level) ─────
   const parameterAuthority = { ...(summary.parameterAuthority || {}) };
@@ -79,7 +80,7 @@ export function applyRestoredBassAuthority(summary, { projectId, versionId, comp
     const key = `p${id}`;
     const parameter = parameters[key];
     const existing = parameterAuthority[key];
-    if (!parameter || !existing) continue;
+    if (!overlaidIds.has(id) || !parameter || !existing) continue;
     const scored = hasLevel(parameter.level);
     parameterAuthority[key] = {
       ...existing,
@@ -105,9 +106,16 @@ export function applyRestoredBassAuthority(summary, { projectId, versionId, comp
     }
     if (bySeatId.size) {
       const restoreRow = (row) => {
+        // Preserve a genuinely scored zero; only replace unscored placeholder
+        // rows such as the old ±0.0 dB report rows.
+        if (row?.status === "scored"
+          && statesBassResultEntry({ value: row?.value, formatted: row?.valueFormatted })) {
+          return row;
+        }
         const seat = bySeatId.get(String(row?.seatId));
         const raw = Number(seat?.variationDbRaw);
         if (!seat || !Number.isFinite(raw)) return row;
+        overlaid = true;
         return {
           ...row,
           valueFormatted: `±${raw.toFixed(1)} dB`,
@@ -130,6 +138,8 @@ export function applyRestoredBassAuthority(summary, { projectId, versionId, comp
       };
     }
   }
+
+  if (!overlaid) return summary;
 
   return {
     ...summary,
