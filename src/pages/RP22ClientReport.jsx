@@ -829,8 +829,8 @@ export default function RP22ClientReport() {
     hydrating,
     roomDims,
     placedSpeakers,
-    engineeringSummary,
-    bassPerformance,
+    engineeringSummary: authority.reportComplete ? engineeringSummary : null,
+    bassPerformance: authority.reportComplete ? bassPerformance : null,
     pricingStatus,
     elapsedSeconds: stateSeconds,
   });
@@ -901,11 +901,11 @@ export default function RP22ClientReport() {
     { key: "project", label: "Project loaded", done: !hydrating && !!projectDetails },
     { key: "room", label: "Room geometry", done: Number(roomDims?.widthM) > 0 && Number(roomDims?.lengthM) > 0 },
     { key: "speakers", label: "Speaker layout", done: Array.isArray(placedSpeakers) && placedSpeakers.length > 0 },
-    { key: "rp22", label: "RP22 assessment", done: !!engineeringSummary },
+    { key: "rp22", label: "RP22 assessment", done: authority.reportComplete === true },
     {
       key: "bass",
       label: "Bass assessment",
-      done: !!bassPerformance,
+      done: authority.reportComplete === true && !!bassPerformance,
       running: hydrating || (!bassPerformance && !!engineeringSummary),
     },
   ];
