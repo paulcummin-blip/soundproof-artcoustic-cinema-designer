@@ -74,19 +74,27 @@ export default function ComplianceReportPrint() {
   // Print only after engineering publication and durable bass restoration have
   // both settled. A partial summary must never reach the print dialog.
   useEffect(() => {
-    if (!engineeringSummary || engineeringAuthority.loading || engineeringAuthority.bassRestoreFailed) {
+    if (!engineeringSummary || engineeringAuthority.loading || engineeringAuthority.bassRestoreFailed || !engineeringAuthority.reportComplete) {
       setIsReady(false);
       return undefined;
     }
     setIsReady(true);
     const timer = setTimeout(() => window.print(), 500);
     return () => clearTimeout(timer);
-  }, [engineeringSummary, engineeringAuthority.loading, engineeringAuthority.bassRestoreFailed]);
+  }, [engineeringSummary, engineeringAuthority.loading, engineeringAuthority.bassRestoreFailed, engineeringAuthority.reportComplete]);
 
   if (engineeringAuthority.bassRestoreFailed) {
     return (
       <div className="flex items-center justify-center min-h-screen px-6 text-center" style={{ fontFamily: 'Didact Gothic, sans-serif' }}>
         <p className="text-lg">Saved bass results could not be restored. No partial compliance report was generated.</p>
+      </div>
+    );
+  }
+
+  if (!engineeringAuthority.loading && engineeringSummary && !engineeringAuthority.reportComplete) {
+    return (
+      <div className="flex items-center justify-center min-h-screen px-6 text-center" style={{ fontFamily: 'Didact Gothic, sans-serif' }}>
+        <p className="text-lg">{engineeringAuthority.reportCompleteness?.reason || 'Complete every project assessment before generating the compliance report.'}</p>
       </div>
     );
   }
