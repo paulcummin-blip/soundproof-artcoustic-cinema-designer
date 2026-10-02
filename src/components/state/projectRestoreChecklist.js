@@ -32,14 +32,13 @@
 import {
   OPENING_CHECKPOINT_OUTCOME,
   OPENING_CHECKPOINT_STATE,
-  SAVED_BASS_CHECKPOINT_KEYS,
   criticalOpeningCheckpointKeys,
   normaliseId,
   openingCheckpointStage,
 } from "./projectOpeningStages.js";
 
 /** The complete restore-status vocabulary. */
-export const RESTORE_CHECKLIST_VERSION = "terminal-all-rows-v3";
+export const RESTORE_CHECKLIST_VERSION = "core-design-v1";
 
 export const RESTORE_STATUS = Object.freeze({
   // ── terminal ────────────────────────────────────────────────────────────
@@ -130,15 +129,6 @@ export const RESTORE_ROWS = Object.freeze([
   { key: "roomSeating", label: "Room and seating", source: "saved design state" },
   { key: "speakerLayout", label: "Speaker layout", source: "saved design state" },
   { key: "seatPriorities", label: "Seat priorities", displayed: false, source: "saved design state" },
-  { key: "rp22", label: "RP22 / RP23 results", source: "Published Engineering Authority" },
-  { key: "bass", label: "Bass performance", source: "completed bass authority" },
-  { key: "bassTargetBank", label: "Bass target bank", source: "persisted P14 target cache" },
-  { key: "reportAuthority", label: "Report authority", source: "published engineering metadata" },
-  { key: "visualReport", label: "Visual Report", source: "proposal source authority" },
-  { key: "technicalReport", label: "Technical Report", source: "proposal source authority" },
-  { key: "proposalSource", label: "Proposal source data", source: "proposal source authority" },
-  { key: "pricing", label: "Pricing", source: "commercial hydration authority" },
-  { key: "autosaveBaseline", label: "Editing baseline", displayed: false, source: "commercial hydration authority" },
 ]);
 
 export const isRestoreStatusTerminal = (status) => RESTORE_TERMINAL_STATUSES.includes(status);
@@ -192,7 +182,6 @@ function restoreStatusFor(entry) {
 export function isRestoreRowBlocking(key, context = {}) {
   const stated = context.entry?.blocking;
   if (typeof stated === "boolean") return stated;
-  if (SAVED_BASS_CHECKPOINT_KEYS.includes(key)) return true;
   return openingCheckpointStage(key, context.entrySurface || null) === "critical";
 }
 
@@ -277,11 +266,7 @@ export function deriveRestoreRelease(checklistOrRows) {
   };
 }
 
-/**
- * The blocking rows a given route makes required — so entering straight into a
- * report or the Proposal Centre waits for that surface's own source data.
- */
-export const blockingRestoreRowKeys = (entrySurface = null) =>
-  criticalOpeningCheckpointKeys(entrySurface);
+/** The project-open gate is route-independent and owns core design only. */
+export const blockingRestoreRowKeys = () => criticalOpeningCheckpointKeys();
 
 export default buildRestoreChecklist;
