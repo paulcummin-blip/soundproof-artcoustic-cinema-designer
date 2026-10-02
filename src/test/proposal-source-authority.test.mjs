@@ -198,7 +198,7 @@ test('the panel shows both reports, the version and the generation time', () => 
   assert.match(PANEL, /Project Version/);
   assert.match(PANEL, /Last generated/);
   assert.match(PANEL, /status\.message/, 'the required action is shown');
-  assert.match(PANEL, /buildReportActionUrl/, 'the action opens the report that must be generated');
+  assert.match(PANEL, /href=\{withProposalContext\(row\.actionUrl\)\}/, 'the resolved action opens the report that must be generated');
 });
 
 test('the source status reads the durable report authority, not a parallel one', () => {
