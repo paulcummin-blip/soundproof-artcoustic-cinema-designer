@@ -52,6 +52,7 @@ import {
   computeEngineeringFingerprint,
 } from '@/components/proposal/engineeringAuthority/engineeringFingerprint';
 import { readDesignReviewHandoff } from '@/components/state/designReviewHandoff';
+import { statesBassAuthority } from '@/components/engineering/versionedEngineeringAuthority';
 
 const PUBLISH_DEBOUNCE_MS = 2000;
 
@@ -125,6 +126,15 @@ export function useEngineeringPublicationEffect({
 
     // Must have an engineering summary and the full engineering fingerprint
     if (!engineeringSummary || !engineeringFingerprint) {
+      return;
+    }
+
+    // Never save a partial summary. A summary assembled before the completed
+    // bass authority settled carries the RP22 parameters but no P14/P18/P19,
+    // and saving it is what left every restored report with empty bass boxes.
+    // A publishable rating always states its bass results (settled bass, or
+    // retained same-fingerprint bass), so this blocks only the partial case.
+    if (!statesBassAuthority(engineeringSummary)) {
       return;
     }
 

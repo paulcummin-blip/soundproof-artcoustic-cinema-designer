@@ -330,7 +330,12 @@ export function useAppDesignRating({
       // every downstream consumer receives the same L2 authority and display.
       roomResultsByParameter[15] = resolveAssumedParameterResult(15, roomResultsByParameter[15]);
       roomResultsByParameter[21] = resolveAssumedParameterResult(21, roomResultsByParameter[21]);
-      for (const parameterNumber of [14, 18]) {
+      // P14 and P18 are published room results. P19 is RSP-scoped, so it is never
+      // part of the per-seat RP22 graded parameters — its published room result
+      // comes from the same completed bass authority. Without P19 here the
+      // published summary left the P19 result box empty in every report, on every
+      // restore, because the saved snapshot itself carried no P19 value.
+      for (const parameterNumber of [14, 18, 19]) {
         const presentation = completedBassPresentation?.parameters?.[`p${parameterNumber}`];
         if (!presentation) continue;
         roomResultsByParameter[parameterNumber] = {

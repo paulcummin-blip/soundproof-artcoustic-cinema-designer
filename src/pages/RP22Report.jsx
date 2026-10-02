@@ -29,6 +29,7 @@ import ReportPrintStyles from '../components/report/ReportPrintStyles';
 import ReportTypographyStyles from '@/components/report/typography/ReportTypographyStyles';
 import { REPORT_FONT_BODY } from '@/components/report/typography/reportTypography';
 import RP22ReportParameterGrid from '../components/report/RP22ReportParameterGrid';
+import TechnicalReportNotice from '../components/report/technical/TechnicalReportNotice';
 import ReportHeader from '../components/report/ReportHeader';
 import ReportCover from '../components/report/ReportCover';
 import ReportCountsDashboard from '../components/report/ReportCountsDashboard';
@@ -1013,7 +1014,7 @@ function RP22ReportInner() {
                 <CardHeader><CardTitle className="text-[#1B1A1A] font-header">RP22 Compliance Report</CardTitle></CardHeader>
                 <CardContent className="text-center py-10">
                     <BarChart4 className="w-12 h-12 text-gray-300 mx-auto mb-4" />
-                    <p className="text-[#3E4349]">Loading report…</p>
+                    <p className="text-[#3E4349]">Loading saved report data…</p>
                 </CardContent>
             </Card>
         </div>
@@ -1024,23 +1025,20 @@ function RP22ReportInner() {
             {/* Assessment gate — the report says the design is not assessed, so
                 the PDF export is disabled and the reason is stated plainly. */}
             {!designAssessmentComplete && (
-                <div
-                    className="max-w-7xl mx-auto mb-4"
-                    style={{
-                        background: "#F7F1E6",
-                        border: "1px solid #E2D7BE",
-                        borderRadius: 8,
-                        padding: "12px 16px",
-                        color: "#7A6640",
-                        fontSize: 13,
-                        lineHeight: 1.55,
-                        fontFamily: "'Didact Gothic', 'Century Gothic', sans-serif",
-                    }}
-                >
-                    <strong style={{ color: "#213428" }}>This design has not been assessed.</strong>{" "}
-                    Complete the RP22 assessment in the Room Designer to enable PDF export.
-                    The report can still be viewed here.
-                </div>
+                <TechnicalReportNotice title="This design has not been assessed.">
+                    Complete the RP22 assessment in the Room Designer to enable PDF export. The report can still be
+                    viewed here.
+                </TechnicalReportNotice>
+            )}
+
+            {/* The version points at a publication that cannot be read. Say so
+                plainly instead of letting current values read as the saved
+                report. The saved report is never silently replaced. */}
+            {reportAuthority?.state === 'PUBLISHED_STALE' && (
+                <TechnicalReportNotice title="The saved report for this version could not be read.">
+                    The values shown come from the current design. Open this project in the Room Designer to save it
+                    again.
+                </TechnicalReportNotice>
             )}
 
             {/* READ-ONLY: DesignRecommendationEngine is NOT mounted here.

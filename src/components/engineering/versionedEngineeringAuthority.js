@@ -167,8 +167,43 @@ export function classifyAuthorityState({ durable, localSnapshot }) {
  * otherwise the durable publication. Existence is decided by the durable read
  * first, so an empty browser store can never manufacture "not calculated".
  */
+/**
+ * Whether a summary states the published bass room results (P14 / P18 / P19).
+ *
+ * A summary assembled while the completed bass authority was still settling
+ * carries the RP22 parameters but no bass. That partial summary must never be
+ * preferred over a saved snapshot that does state them: preferring it is what
+ * made a reopened report render empty P18/P19 boxes from a saved report that
+ * held the values.
+ */
+export function statesBassAuthority(summary) {
+  const results = summary?.roomResultsByParameter;
+  if (!results || typeof results !== 'object' || Array.isArray(results)) return false;
+  return [14, 18, 19].some((id) => {
+    const entry = results[id] ?? results[String(id)];
+    if (!entry || typeof entry !== 'object') return false;
+    // A blank result carries value: null, and null is NOT a value of zero.
+    const stated = (entry.value === null || entry.value === undefined || entry.value === '')
+      ? null
+      : Number(entry.value);
+    if (Number.isFinite(stated)) return true;
+    const formatted = typeof entry.formatted === 'string' ? entry.formatted.trim() : '';
+    return formatted.length > 0 && formatted !== '—' && formatted !== 'N/A';
+  });
+}
+
 export function composeAuthoritySnapshot({ localSnapshot, durableSnapshot }) {
-  const localHasSummary = !!extractEngineeringSummary(localSnapshot);
+  const localSummary = extractEngineeringSummary(localSnapshot);
+  const durableSummary = extractEngineeringSummary(durableSnapshot);
+
+  // The saved snapshot wins over a partial transient one. A handoff published
+  // while bass was still settling has no bass results, while the saved report
+  // does — restoring the saved one is the whole point of the authority.
+  if (durableSummary && statesBassAuthority(durableSummary) && !statesBassAuthority(localSummary)) {
+    return stampFixedParameterAuthoritySnapshot(durableSnapshot);
+  }
+
+  const localHasSummary = !!localSummary;
   // Stamped on the way out, so a browser handoff stored before the P8 rule
   // existed also reports Level 4 / "No" instead of a dash. An already-stamped
   // summary is returned by identity, so this costs nothing on a fresh result.

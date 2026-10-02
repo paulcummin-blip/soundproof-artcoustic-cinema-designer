@@ -9,6 +9,7 @@ import {
   upsertPublication,
   cleanPublicationForResponse,
   cleanCacheRecordForResponse,
+  completeMissingBassResults,
 } from '../../shared/publishedEngineeringAuthority.js';
 
 /**
@@ -121,27 +122,23 @@ export default async function(req) {
 
     // Idempotency check — if the fingerprint already exists, no duplicate.
     const existing = findPublication(cacheRecord, fingerprint);
-    let publication;
-    let created = false;
 
-    if (existing) {
-      publication = existing;
-      created = false;
-    } else {
-      // Build the immutable publication entry
-      publication = {
-        engineering_summary: engineeringSummary,
-        ...(reportSnapshot ? { report_snapshot: reportSnapshot } : {}),
-        engineering_fingerprint: fingerprint,
-        published_at: new Date().toISOString(),
-        engine_version: String(body?.engine_version ?? 'unknown'),
-        rp22_version: String(body?.rp22_version ?? 'unknown'),
-        algorithm_version: String(body?.algorithm_version ?? 'unknown'),
-        publication_reason: String(body?.publication_reason ?? 'auto-settled'),
-        provenance: (body?.provenance && typeof body.provenance === 'object') ? body.provenance : null,
-        schema_version: PUBLICATION_SCHEMA_VERSION,
-      };
-    }
+    // The immutable publication entry for a new fingerprint.
+    const incomingPublication = {
+      engineering_summary: engineeringSummary,
+      ...(reportSnapshot ? { report_snapshot: reportSnapshot } : {}),
+      engineering_fingerprint: fingerprint,
+      published_at: new Date().toISOString(),
+      engine_version: String(body?.engine_version ?? 'unknown'),
+      rp22_version: String(body?.rp22_version ?? 'unknown'),
+      algorithm_version: String(body?.algorithm_version ?? 'unknown'),
+      publication_reason: String(body?.publication_reason ?? 'auto-settled'),
+      provenance: (body?.provenance && typeof body.provenance === 'object') ? body.provenance : null,
+      schema_version: PUBLICATION_SCHEMA_VERSION,
+    };
+
+    let publication = existing || incomingPublication;
+    let created = false;
 
     // ── ATOMICITY: Pointer-first write order ──────────────────────────
     //
@@ -191,6 +188,26 @@ export default async function(req) {
           { engineering_publications: { ...basePublications, [fingerprint]: enriched } },
         );
         publication = enriched;
+      }
+
+      // ── Add-only bass completion ──────────────────────────────────────
+      // A publication written before P19 was a published room result leaves that
+      // result blank, so a restored Technical Report rendered an empty P19 box.
+      // The stored publication may gain that value ONCE: identity, fingerprint,
+      // provenance and every already-stated value are never modified, and a
+      // stated value is never replaced. This is the only amendment a publication
+      // can ever receive.
+      const completedPublication = completeMissingBassResults(publication, engineeringSummary);
+      if (completedPublication) {
+        const latestPublications = (cacheRecord.engineering_publications
+          && typeof cacheRecord.engineering_publications === 'object')
+          ? cacheRecord.engineering_publications
+          : {};
+        cacheRecord = await service.entities.ProjectAnalysisCache.update(
+          cacheRecord.id,
+          { engineering_publications: { ...latestPublications, [fingerprint]: completedPublication } },
+        );
+        publication = completedPublication;
       }
     } else {
       const { publications } = upsertPublication(cacheRecord, fingerprint, publication);

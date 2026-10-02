@@ -191,6 +191,62 @@ export function cleanPublicationForResponse(publication) {
   };
 }
 
+/** The bass room results every report reads: P14 and P18 published, P19 RSP-scoped. */
+const BASS_ROOM_RESULT_PARAMETERS = [14, 18, 19];
+
+/** Whether a room result entry actually states a value rather than a blank. */
+function bassRoomResultStatesAValue(entry) {
+  if (!entry || typeof entry !== 'object') return false;
+  // A blank result carries value: null, and null is NOT a value of zero.
+  const stated = (entry.value === null || entry.value === undefined || entry.value === '')
+    ? null
+    : Number(entry.value);
+  if (Number.isFinite(stated)) return true;
+  const formatted = typeof entry.formatted === 'string' ? entry.formatted.trim() : '';
+  return formatted.length > 0 && formatted !== '—' && formatted !== 'N/A';
+}
+
+/**
+ * ADD-ONLY bass completion for an existing publication.
+ *
+ * A summary published before P19 was a published room result leaves that result
+ * blank, so a restored report rendered an empty P19 box. This returns a copy of
+ * the stored publication with those blanks filled from the incoming summary, or
+ * null when there is nothing to add.
+ *
+ * It can only ever FILL a blank. Identity, fingerprint, timestamps, provenance
+ * and every value the stored publication already states are returned untouched —
+ * a stated value is never replaced with a different one.
+ */
+export function completeMissingBassResults(existingPublication, incomingSummary) {
+  const existingSummary = existingPublication?.engineering_summary;
+  if (!existingSummary || !incomingSummary || typeof incomingSummary !== 'object') return null;
+
+  const incomingResults = incomingSummary.roomResultsByParameter;
+  if (!incomingResults || typeof incomingResults !== 'object') return null;
+
+  const existingResults = existingSummary.roomResultsByParameter;
+  const existingMap = (existingResults && typeof existingResults === 'object') ? existingResults : {};
+  const completed = { ...existingMap };
+  let added = false;
+
+  for (const parameterNumber of BASS_ROOM_RESULT_PARAMETERS) {
+    const incomingEntry = incomingResults[parameterNumber] ?? incomingResults[String(parameterNumber)];
+    if (!bassRoomResultStatesAValue(incomingEntry)) continue;
+    const existingEntry = existingMap[parameterNumber] ?? existingMap[String(parameterNumber)];
+    if (bassRoomResultStatesAValue(existingEntry)) continue;
+    completed[parameterNumber] = incomingEntry;
+    added = true;
+  }
+
+  if (!added) return null;
+
+  return {
+    ...existingPublication,
+    engineering_summary: { ...existingSummary, roomResultsByParameter: completed },
+  };
+}
+
 /**
  * Clean the cache record for API response (includes engineering_publications).
  */
