@@ -322,4 +322,8 @@ test('TEST 13 — the gate, panel, resolver and warnings are wired to this autho
 
   assert.ok(commercial.includes('getActiveCommercialAuthority'), 'pricing readiness reads the commercial authority');
   assert.ok(hydrator.includes('markCommercialHydrated'), 'the hydrator marks the priced selections as loaded');
+  assert.ok(
+    hydrator.includes('isCommercialHydrationComplete') && hydrator.includes('commercialReady'),
+    'the design fast path cannot bypass a missing commercial baseline',
+  );
 });
