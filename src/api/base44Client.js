@@ -14,7 +14,7 @@ export const base44 = createClient({
 
 // Temporary cold-open read inventory. Kept deliberately at the SDK boundary so
 // every caller is counted; removed after the before/after measurement.
-if (typeof window !== 'undefined' && import.meta.env.DEV && !window.__SP_READ_DIAGNOSTICS_INSTALLED__) {
+if (typeof window !== 'undefined' && !window.__SP_READ_DIAGNOSTICS_INSTALLED__) {
   window.__SP_READ_DIAGNOSTICS_INSTALLED__ = true;
   const counts = window.__SP_READ_DIAGNOSTICS__ = {
     Project: 0,
