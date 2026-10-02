@@ -18,6 +18,7 @@ import {
   classifyAuthorityState,
   composeAuthoritySnapshot,
   buildDurableSnapshot,
+  buildRatingEnvelope,
   extractEngineeringSummary,
   fetchDurablePublication,
   isAuthorityAvailable,
@@ -103,10 +104,31 @@ export function useVersionedEngineeringAuthority(projectId, versionId) {
   // bass results of a saved summary that does not state them, from the restored
   // contract, so a report never has to wait for the Bass section to hydrate.
   const completedBassAuthority = useCompletedBassAuthority(projectId || 'free', versionId || 'free');
-  const snapshot = applyRestoredBassAuthority(
-    composeAuthoritySnapshot({ localSnapshot, durableSnapshot }),
+  const composedSnapshot = composeAuthoritySnapshot({ localSnapshot, durableSnapshot });
+  const composedSummary = extractEngineeringSummary(composedSnapshot);
+  const restoredSummary = applyRestoredBassAuthority(
+    composedSummary,
     { projectId, versionId, completedBassAuthority },
   );
+  // The bass overlay operates on the engineering summary, not the outer
+  // handoff-shaped snapshot. Reinsert the restored summary at both compatibility
+  // paths so Technical Report, Compliance, Visual Report and Proposal all read
+  // the same restored authority without mounting the Bass UI.
+  const restoredRating = restoredSummary && restoredSummary !== composedSummary
+    ? buildRatingEnvelope(restoredSummary)
+    : null;
+  const snapshot = composedSnapshot && restoredSummary !== composedSummary
+    ? {
+        ...composedSnapshot,
+        engineeringSummary: restoredSummary,
+        rating: composedSnapshot.rating
+          ? { ...composedSnapshot.rating, ...(restoredRating || {}), engineeringSummary: restoredSummary }
+          : restoredRating,
+        p19SeatAuthority: restoredSummary?.p19SeatAuthority
+          ?? composedSnapshot.p19SeatAuthority
+          ?? null,
+      }
+    : composedSnapshot;
   const state = classifyAuthorityState({ durable, localSnapshot });
   const reportCompleteness = assessEngineeringReportCompleteness(
     extractEngineeringSummary(snapshot),
