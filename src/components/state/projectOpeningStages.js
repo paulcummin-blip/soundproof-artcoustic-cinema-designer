@@ -109,8 +109,6 @@ export const STRUCTURAL_CHECKPOINT_KEYS = Object.freeze([
  */
 export const ALWAYS_BLOCKING_CHECKPOINT_KEYS = Object.freeze([
   ...STRUCTURAL_CHECKPOINT_KEYS,
-  "rp22",
-  "reportAuthority",
 ]);
 
 /**
@@ -118,21 +116,14 @@ export const ALWAYS_BLOCKING_CHECKPOINT_KEYS = Object.freeze([
  * to restore — the resolver states that fact, and until it does they are held as
  * blocking, because waiting to learn is never worse than opening half-restored.
  */
-export const SAVED_BASS_CHECKPOINT_KEYS = Object.freeze([
-  "bass",
-  "bassTargetBank",
-]);
+export const SAVED_BASS_CHECKPOINT_KEYS = Object.freeze([]);
 
 /**
  * Stages a route makes blocking: entering straight into a report or the Proposal
  * Centre means that surface's source data is required for the open, because the
  * designer is arriving to read exactly it.
  */
-export const SURFACE_CHECKPOINT_KEYS = Object.freeze({
-  "visual-report": Object.freeze(["visualReport"]),
-  "technical-report": Object.freeze(["technicalReport"]),
-  proposal: Object.freeze(["proposalSource"]),
-});
+export const SURFACE_CHECKPOINT_KEYS = Object.freeze({});
 
 /**
  * Stages that never block the release — but must still REACH a terminal state,
@@ -144,10 +135,7 @@ export const SURFACE_CHECKPOINT_KEYS = Object.freeze({
  * guardCommercialSave(), which refuses to save against an unproven commercial
  * baseline, so nothing can be overwritten while the warning stands.
  */
-export const NON_BLOCKING_CHECKPOINT_KEYS = Object.freeze([
-  "pricing",
-  "autosaveBaseline",
-]);
+export const NON_BLOCKING_CHECKPOINT_KEYS = Object.freeze([]);
 
 /**
  * Opening straight into a report or proposal route makes that surface's source
@@ -178,9 +166,8 @@ export function openingEntrySurfaceForPath(pathname) {
  * The stages that block the release for a given entry surface, in one list.
  * Passing the surface the designer arrived on adds that surface's source stage.
  */
-export function criticalOpeningCheckpointKeys(entrySurface = null) {
-  const surfaceKeys = SURFACE_CHECKPOINT_KEYS[entrySurface] || [];
-  return [...new Set([...ALWAYS_BLOCKING_CHECKPOINT_KEYS, ...surfaceKeys])];
+export function criticalOpeningCheckpointKeys() {
+  return [...ALWAYS_BLOCKING_CHECKPOINT_KEYS];
 }
 
 /**
