@@ -5,9 +5,9 @@
 // Inclusion and the counted version are admin choices held as local report
 // selection; nothing here writes to the database.
 //
-// Included, Age, Last updated, Counted version and Artcoustic retail sort on
-// click. The retail column is the Artcoustic catalogue value of the counted
-// version — overall project value is not shown, because this page forecasts
+// Included, Age, Last updated, Counted version and Trade value sort on click. The
+// value column is the Artcoustic trade value of the counted version's catalogue
+// lines — overall project value is not shown, because this page forecasts
 // Artcoustic product business.
 // Sorting is display order only: it never changes a value or an inclusion choice,
 // and with no heading chosen the reporting order is shown untouched.
@@ -104,7 +104,7 @@ export default function ProjectSelectionTable({
             <Th align="right">Versions</Th>
             {sortable('countedVersion', 'Counted version')}
             <Th>Count basis</Th>
-            {sortable('liveValue', 'Artcoustic retail')}
+            {sortable('liveValue', 'Trade value')}
             <Th align="right">Product lines</Th>
             <Th>Notes / flags</Th>
           </tr>
@@ -158,9 +158,9 @@ export default function ProjectSelectionTable({
                   )}
                 </Td>
                 <Td align="right" mono>
-                  {family.artcousticRetail === null || family.artcousticRetail === undefined
+                  {family.artcousticTrade === null || family.artcousticTrade === undefined
                     ? <Pill tone="warn">no catalogue value</Pill>
-                    : formatMoney(family.artcousticRetail, family.countedCurrency || currency || 'GBP')}
+                    : formatMoney(family.artcousticTrade, family.countedCurrency || currency || 'GBP')}
                 </Td>
                 <Td align="right" mono>
                   {formatNumber(family.countedLineCount || 0)}

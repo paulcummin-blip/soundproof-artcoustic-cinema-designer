@@ -66,8 +66,7 @@ export default function StatusInclusionPanel({
               <Th>Status</Th>
               <Th>Canonical bucket</Th>
               <Th align="right">Projects</Th>
-              <Th align="right">Artcoustic retail</Th>
-              <Th align="right">Artcoustic trade</Th>
+              <Th align="right">Trade value</Th>
               <Th>Notes</Th>
             </tr>
           </thead>
@@ -88,7 +87,6 @@ export default function StatusInclusionPanel({
                 </Td>
                 <Td>{row.bucketLabel}</Td>
                 <Td align="right" mono>{formatNumber(row.count)}</Td>
-                <Td align="right" mono>{money(row.retail, currency)}</Td>
                 <Td align="right" mono>{money(row.trade, currency)}</Td>
                 <Td>
                   <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>

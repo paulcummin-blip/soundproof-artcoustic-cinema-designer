@@ -148,9 +148,11 @@ export default function PipelineTimelineChart({
         <div>{metric.label}: {formatMetricValue(point[metric.key], metric, currency)}</div>
         <div style={{ color: BRAND.muted }}>
           {formatNumber(point.projects)} project{point.projects === 1 ? '' : 's'}
-          {point.retail === null || point.retail === undefined
-            ? ' · no Artcoustic value'
-            : ` · ${formatMoney(point.retail, currency)} retail`}
+          {metric.key === 'trade'
+            ? ''
+            : (point.trade === null || point.trade === undefined
+              ? ' · no Artcoustic value'
+              : ` · ${formatMoney(point.trade, currency)} trade value`)}
         </div>
       </div>
     );

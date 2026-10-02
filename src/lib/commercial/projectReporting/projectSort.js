@@ -14,9 +14,10 @@
  *    updated date has an unknown age, so it stays at the end either way rather
  *    than being shown as the newest project.
  *  - Last updated orders by the date actually used for the project's age.
- *  - Artcoustic retail orders numerically on the counted version's catalogue
- *    value; a version with no catalogue value is unknown, not zero, so it stays
- *    last.
+ *  - Trade value orders numerically on the counted version's catalogue value; a
+ *    version with no catalogue value is unknown, not zero, so it stays last. The
+ *    comparison is made on the retail figure the trade value is derived from,
+ *    which is the same ordering.
  *  - Counted version orders alphabetically by version name, then by version
  *    number.
  *
@@ -85,9 +86,9 @@ export const PROJECT_SORT_COLUMNS = [
   },
   {
     key: 'liveValue',
-    label: 'Artcoustic retail',
+    label: 'Trade value',
     align: 'right',
-    hint: 'Sort by counted-version Artcoustic retail ex VAT, highest first when descending. A project with no catalogue value stays last.',
+    hint: 'Sort by counted-version Artcoustic trade value, highest first when descending. A project with no catalogue value stays last.',
     compare: (a, b, direction) => byValue(a.artcousticRetail, b.artcousticRetail, direction),
   },
   {

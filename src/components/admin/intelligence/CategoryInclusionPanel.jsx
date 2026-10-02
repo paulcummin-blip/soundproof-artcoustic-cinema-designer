@@ -1,7 +1,7 @@
 // CategoryInclusionPanel.jsx
 // --------------------------
 // "Product categories included" — the Artcoustic catalogue categories present in
-// the counted demand, each with its retail and trade value.
+// the counted demand, each with its trade value.
 //
 // All catalogue categories are included by default, so an admin can untick
 // acoustic treatment, amplifiers or anything else and the forecast follows
@@ -63,7 +63,6 @@ export default function CategoryInclusionPanel({
               <Th>Category</Th>
               <Th align="right">Catalogue lines</Th>
               <Th align="right">Units</Th>
-              <Th align="right">Retail ex VAT</Th>
               <Th align="right">Trade value</Th>
             </tr>
           </thead>
@@ -88,7 +87,6 @@ export default function CategoryInclusionPanel({
                 </Td>
                 <Td align="right" mono>{formatNumber(row.lineCount)}</Td>
                 <Td align="right" mono>{formatNumber(row.units)}</Td>
-                <Td align="right" mono>{money(row.retail, currency)}</Td>
                 <Td align="right" mono>{money(row.trade, currency)}</Td>
               </tr>
             ))}

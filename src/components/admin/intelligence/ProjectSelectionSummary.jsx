@@ -4,9 +4,10 @@
 // is worth in trade value, then how many projects sit behind it. Nothing else —
 // no hints and no explanation of how the figures are built.
 //
-// Trade value is the headline commercial figure. Retail stays in the detailed
-// tables; the values here come from the same catalogue pass and the same age
-// authority those tables read, so a card can never disagree with the detail.
+// Trade value is the headline commercial figure, and the only commercial value
+// shown anywhere on this page: the cards read the same catalogue pass and the
+// same age authority as the detail tables, so a card can never disagree with the
+// detail.
 
 import React from 'react';
 import { BRAND, Pill } from './IntelligenceUi';

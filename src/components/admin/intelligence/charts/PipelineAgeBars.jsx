@@ -113,7 +113,7 @@ export default function PipelineAgeBars({
                 format="number"
               />
               <Bar
-                label="Trade"
+                label="Trade value"
                 value={bucket.trade}
                 max={maxTrade}
                 colour={BRAND.accent}

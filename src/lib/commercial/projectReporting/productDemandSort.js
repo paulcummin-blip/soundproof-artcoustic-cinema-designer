@@ -13,10 +13,9 @@
  *    carries no quoted snapshot or non-counted version quantity, so nothing else
  *    can influence the ordering.
  *  - Included projects using it orders by the number of contributing projects.
- *  - Retail ex VAT and Trade value order numerically on the Artcoustic-only
- *    figures. A line with no usable price is not a value of zero, so unpriced
- *    lines stay at the end in both directions rather than being shown as the
- *    cheapest products.
+ *  - Trade value orders numerically on the Artcoustic-only figure. A line with no
+ *    usable price is not a value of zero, so unpriced lines stay at the end in
+ *    both directions rather than being shown as the cheapest products.
  *  - Derived line groups Not derived before Derived.
  *  - Priced groups Priced, then Unpriced, then Inactive.
  *  - Every comparison falls back to Product / model and then SKU, so a given set
@@ -89,25 +88,10 @@ export const PRODUCT_DEMAND_SORT_COLUMNS = [
     compare: (a, b, direction) => (number(a.projectFamilies) - number(b.projectFamilies)) * direction,
   },
   {
-    key: 'liveValue',
-    label: 'Retail ex VAT',
-    align: 'right',
-    hint: 'Sort by Artcoustic retail ex VAT, highest first when descending. Unpriced lines are always kept last.',
-    compare: (a, b, direction) => {
-      const left = numberOrNull(a.liveValue);
-      const right = numberOrNull(b.liveValue);
-      // Unpriced is unknown, not zero: keep it out of the value ranking.
-      if (left === null && right === null) return 0;
-      if (left === null) return 1;
-      if (right === null) return -1;
-      return (left - right) * direction;
-    },
-  },
-  {
     key: 'tradeValue',
     label: 'Trade value',
     align: 'right',
-    hint: 'Sort by Artcoustic trade value (retail ex VAT × 0.59). Unpriced lines are always kept last.',
+    hint: 'Sort by Artcoustic trade value, highest first when descending. Unpriced lines are always kept last.',
     compare: (a, b, direction) => {
       const left = numberOrNull(a.tradeValue);
       const right = numberOrNull(b.tradeValue);
@@ -139,9 +123,9 @@ const COLUMNS_BY_KEY = new Map(PRODUCT_DEMAND_SORT_COLUMNS.map((column) => [colu
  * The opening view: the Artcoustic products that represent the most commercial
  * value.
  */
-export const DEFAULT_PRODUCT_DEMAND_SORT = { key: 'liveValue', direction: 'desc' };
+export const DEFAULT_PRODUCT_DEMAND_SORT = { key: 'tradeValue', direction: 'desc' };
 
-export const PRODUCT_DEMAND_SORT_LABEL = 'Artcoustic retail value, highest first';
+export const PRODUCT_DEMAND_SORT_LABEL = 'Artcoustic trade value, highest first';
 
 /** A usable sort state, falling back to the default when nothing valid is given. */
 export function resolveProductDemandSort(sort) {

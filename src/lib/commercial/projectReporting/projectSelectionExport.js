@@ -4,21 +4,22 @@
  * The Artcoustic forecast export for the Project Intelligence selection workflow.
  *
  * The workbook answers one question: what Artcoustic business is likely coming
- * our way. Every value is Artcoustic catalogue products only, retail ex VAT, with
- * the trade value derived from it — never overall project value, never manual
- * extras or third-party items.
+ * our way. Every value is Artcoustic catalogue products only, shown as the trade
+ * value derived from the catalogue retail ex VAT — never overall project value,
+ * never manual extras or third-party items. Retail itself is an internal
+ * calculation and is not exported.
  *
  * Tabs, built from the admin's inclusion, status, category and counted-version
  * selection:
  *   1. Included Forecast Projects  — one row per project inside the forecast
  *   2. Excluded Projects           — one row per project left out, with the reason
  *   3. Product Demand              — Artcoustic catalogue lines of counted
- *                                    versions, with retail and trade value
+ *                                    versions, with trade value
  *   4. Status Inclusion            — every resolved status, included or not
  *   5. Category Inclusion          — every catalogue category, included or not
  *   6. Version Detail              — every version, marked counted or not
- *   7. Pipeline Age Summary        — Artcoustic retail and trade per age bucket
- *   8. Trend Summary               — Artcoustic retail and trade per rolling period
+ *   7. Pipeline Age Summary        — Artcoustic trade value per age bucket
+ *   8. Trend Summary               — Artcoustic trade value per rolling period
  *   9. Excluded Manual Lines       — non-catalogue lines left out, for audit only
  *  10. Excluded Historic Abfusers  — Abfuser left out by the reporting cutoff
  *
@@ -30,6 +31,7 @@
 
 import { BUCKET_LABEL } from './statusBuckets';
 import { AGE_BUCKETS, ageBucketKeyOf } from './pipelineAge';
+import { tradeValueOf } from './artcousticForecast';
 
 export const SELECTION_WORKBOOK_TABS = [
   'Included Forecast Projects',
@@ -92,8 +94,7 @@ export function buildSelectionSheets({
     { key: 'dealer', label: 'Dealer / account', type: 'string' },
     { key: 'status', label: 'Status', type: 'string' },
     { key: 'countedVersion', label: 'Counted version', type: 'string' },
-    { key: 'retail', label: `Artcoustic retail value (${currency})`, type: 'currency' },
-    { key: 'trade', label: `Artcoustic trade value (${currency})`, type: 'currency' },
+    { key: 'trade', label: `Trade value (${currency})`, type: 'currency' },
     { key: 'units', label: 'Catalogue units', type: 'number' },
     { key: 'ageBucket', label: 'Age bucket', type: 'string' },
   ];
@@ -109,7 +110,6 @@ export function buildSelectionSheets({
     { key: 'sku', label: 'SKU', type: 'string' },
     { key: 'category', label: 'Category', type: 'string' },
     { key: 'quantity', label: 'Quantity', type: 'number' },
-    { key: 'retail', label: `Retail ex VAT (${currency})`, type: 'currency' },
     { key: 'trade', label: `Trade value (${currency})`, type: 'currency' },
     { key: 'projectFamilies', label: 'Included forecast projects using it', type: 'number' },
   ];
@@ -118,14 +118,12 @@ export function buildSelectionSheets({
     { key: 'label', label: 'Status label', type: 'string' },
     { key: 'included', label: 'Included in forecast', type: 'string' },
     { key: 'count', label: 'Project count', type: 'number' },
-    { key: 'retail', label: `Artcoustic retail value (${currency})`, type: 'currency' },
-    { key: 'trade', label: `Artcoustic trade value (${currency})`, type: 'currency' },
+    { key: 'trade', label: `Trade value (${currency})`, type: 'currency' },
   ];
 
   const categoryColumns = [
     { key: 'label', label: 'Category', type: 'string' },
     { key: 'included', label: 'Included in forecast', type: 'string' },
-    { key: 'retail', label: `Retail ex VAT (${currency})`, type: 'currency' },
     { key: 'trade', label: `Trade value (${currency})`, type: 'currency' },
   ];
 
@@ -133,8 +131,7 @@ export function buildSelectionSheets({
     { key: 'project', label: 'Project', type: 'string' },
     { key: 'version', label: 'Version', type: 'string' },
     { key: 'counted', label: 'Counted', type: 'string' },
-    { key: 'retail', label: `Artcoustic retail value (${currency})`, type: 'currency' },
-    { key: 'trade', label: `Artcoustic trade value (${currency})`, type: 'currency' },
+    { key: 'trade', label: `Trade value (${currency})`, type: 'currency' },
   ];
 
   /** A share as display text. Shares are reported, never scored. */
@@ -145,21 +142,19 @@ export function buildSelectionSheets({
   const ageColumns = [
     { key: 'bucket', label: 'Age bucket', type: 'string' },
     { key: 'count', label: 'Project count', type: 'number' },
-    { key: 'retail', label: `Artcoustic retail value (${currency})`, type: 'currency' },
-    { key: 'trade', label: `Artcoustic trade value (${currency})`, type: 'currency' },
+    { key: 'trade', label: `Trade value (${currency})`, type: 'currency' },
     { key: 'units', label: 'Catalogue units', type: 'number' },
-    { key: 'shareOfRetail', label: 'Share of Artcoustic retail', type: 'string' },
+    { key: 'shareOfTrade', label: 'Share of trade value', type: 'string' },
   ];
 
   const trendColumns = [
     { key: 'period', label: 'Rolling 90-day period', type: 'string' },
     { key: 'projects', label: 'Forecast project count', type: 'number' },
-    { key: 'retail', label: `Artcoustic retail value (${currency})`, type: 'currency' },
-    { key: 'trade', label: `Artcoustic trade value (${currency})`, type: 'currency' },
-    { key: 'averageTrade', label: `Average Artcoustic trade per project (${currency})`, type: 'currency' },
+    { key: 'trade', label: `Trade value (${currency})`, type: 'currency' },
+    { key: 'averageTrade', label: `Average trade value per project (${currency})`, type: 'currency' },
     { key: 'units', label: 'Catalogue units', type: 'number' },
     { key: 'changeProjects', label: 'Change vs previous project count', type: 'number' },
-    { key: 'changeRetail', label: `Change vs previous retail (${currency})`, type: 'currency' },
+    { key: 'changeTrade', label: `Change vs previous trade value (${currency})`, type: 'currency' },
   ];
 
   const excludedLineColumns = [
@@ -190,7 +185,6 @@ export function buildSelectionSheets({
         dealer: family.dealerName || family.accountName,
         status: statusText(family),
         countedVersion: family.countedVersionName,
-        retail: family.artcousticRetail ?? null,
         trade: family.artcousticTrade ?? null,
         units: family.artcousticUnits ?? 0,
         ageBucket: ageBucketLabel(family),
@@ -213,7 +207,6 @@ export function buildSelectionSheets({
         sku: row.sku,
         category: row.category,
         quantity: row.quantity,
-        retail: row.retailValue,
         trade: row.tradeValue,
         projectFamilies: row.projectFamilies,
       })),
@@ -225,7 +218,6 @@ export function buildSelectionSheets({
         label: row.label,
         included: row.included ? YES : NO,
         count: row.count,
-        retail: row.retail,
         trade: row.trade,
       })),
     },
@@ -235,7 +227,6 @@ export function buildSelectionSheets({
       rows: categoryRows.map((row) => ({
         label: row.label,
         included: row.included ? YES : NO,
-        retail: row.retail,
         trade: row.trade,
       })),
     },
@@ -246,39 +237,39 @@ export function buildSelectionSheets({
         project: row.project,
         version: row.versionName || `Version ${row.versionNumber ?? '?'}`,
         counted: row.counted ? YES : NO,
-        retail: row.artcousticRetail,
         trade: row.artcousticTrade,
       })),
     },
     {
-      // Artcoustic value ageing: how much retail and trade value, and how many
-      // catalogue units, sit in each age bucket. Forecast projects only, counted
-      // versions only — the same numbers the overview shows.
+      // Artcoustic value ageing: how much trade value, and how many catalogue
+      // units, sit in each age bucket. Forecast projects only, counted versions
+      // only — the same numbers the overview shows. The share is the bucket's
+      // share of total trade value; it is scale-invariant, so it is the same share
+      // the retail figures would give.
       name: SELECTION_WORKBOOK_TABS[6],
       columns: ageColumns,
       rows: (pipelineAge?.buckets || []).map((bucket) => ({
         bucket: bucket.label,
         count: bucket.count,
-        retail: bucket.retail,
         trade: bucket.trade,
         units: bucket.units,
-        shareOfRetail: percentText(bucket.shareOfRetail),
+        shareOfTrade: percentText(bucket.shareOfRetail),
       })),
     },
     {
       // Rolling 90-day periods, newest first. Every figure is Artcoustic-only and
-      // reported, never scored.
+      // reported, never scored. The change column is the trade value of the same
+      // change the retail figures describe.
       name: SELECTION_WORKBOOK_TABS[7],
       columns: trendColumns,
       rows: (trends?.windows || []).map((row) => ({
         period: row.label,
         projects: row.projects,
-        retail: row.retail,
         trade: row.trade,
         averageTrade: row.averageTrade,
         units: row.units,
         changeProjects: row.changeProjects,
-        changeRetail: row.changeRetail,
+        changeTrade: tradeValueOf(row.changeRetail),
       })),
     },
     {
