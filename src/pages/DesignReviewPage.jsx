@@ -28,7 +28,10 @@ import { hydrateProjectIntoAppState } from "@/components/utils/hydrateProjectInt
 import { mergeProjectAndVersion } from "@/lib/versionAuthority";
 import { readDesignReviewHandoff, subscribeDesignReviewHandoff } from "@/components/state/designReviewHandoff";
 import { useVersionedEngineeringAuthority } from "@/components/engineering/useVersionedEngineeringAuthority";
-import { base44 } from "@/api/base44Client";
+import {
+  readProjectRecord,
+  readProjectVersionRecord,
+} from "@/components/state/projectReadCache";
 import { CollapsiblePanel } from "@/components/ui/CollapsiblePanel";
 import ReportCover from "@/components/report/ReportCover";
 import DesignOverviewBlock from "@/components/designreview/DesignOverviewBlock";
@@ -50,7 +53,7 @@ const COLORS = {
 
 const FONT_BODY = "'Didact Gothic', 'Century Gothic', sans-serif";
 
-function ReportReadinessPanel({ title, message, projectId, missing = [] }) {
+function ReportReadinessPanel({ title, message, projectId, missing = [], onRetry = null }) {
   const backTo = projectId
     ? `/RoomDesigner?projectId=${encodeURIComponent(projectId)}`
     : "/Projects";
@@ -67,12 +70,23 @@ function ReportReadinessPanel({ title, message, projectId, missing = [] }) {
             Missing results: {missing.join(", ")}.
           </div>
         )}
+        <div style={{ display: "flex", gap: 10, alignItems: "center", marginTop: 20 }}>
+        {onRetry && (
+          <button
+            type="button"
+            onClick={onRetry}
+            style={{ padding: "9px 16px", borderRadius: 6, border: 0, background: COLORS.primary, color: "#FFFFFF", fontSize: 13, fontWeight: 700, cursor: "pointer", fontFamily: FONT_BODY }}
+          >
+            Retry
+          </button>
+        )}
         <Link
           to={backTo}
-          style={{ display: "inline-block", marginTop: 20, padding: "9px 16px", borderRadius: 6, background: COLORS.primary, color: "#FFFFFF", textDecoration: "none", fontSize: 13, fontWeight: 700 }}
+          style={{ display: "inline-block", padding: "9px 16px", borderRadius: 6, background: onRetry ? "#FFFFFF" : COLORS.primary, border: onRetry ? `1px solid ${COLORS.primary}` : "none", color: onRetry ? COLORS.primary : "#FFFFFF", textDecoration: "none", fontSize: 13, fontWeight: 700 }}
         >
           Back to Room Designer
         </Link>
+        </div>
       </div>
     </div>
   );
@@ -154,9 +168,8 @@ export default function DesignReviewPage() {
     setProjectDetails(null);
     setGeometryReadyProjectId(null);
     setLoadingProject(true);
-    base44.entities.Project.filter({ id: projectId }).then(async (results) => {
+    readProjectRecord(projectId).then(async (p) => {
       if (cancelled) return;
-      const p = Array.isArray(results) && results.length > 0 ? results[0] : null;
       if (p) {
         // Merge with the active ProjectVersion so per-version design fields
         // come from design_state, not from the legacy Project position.
@@ -164,9 +177,9 @@ export default function DesignReviewPage() {
         const versionId = p.active_version_id;
         if (versionId) {
           try {
-            const versions = await base44.entities.ProjectVersion.filter({ id: versionId });
-            if (!cancelled && versions && versions.length > 0) {
-              merged = mergeProjectAndVersion(p, versions[0]);
+            const version = await readProjectVersionRecord(versionId);
+            if (!cancelled && version) {
+              merged = mergeProjectAndVersion(p, version);
             }
           } catch (verErr) {
             console.warn("[DesignReviewPage] Version fetch failed, using project-only:", verErr);
@@ -238,6 +251,17 @@ export default function DesignReviewPage() {
         title="Still restoring saved report results"
         message="The Technical Report is waiting for the saved engineering and bass authority for this design version. No partial report has been opened or saved."
         projectId={projectId}
+      />
+    );
+  }
+
+  if (!!projectId && (asdrAuthority.readFailed || asdrAuthority.bassRestoreFailed)) {
+    return (
+      <ReportReadinessPanel
+        title="Saved engineering authority could not be read"
+        message={asdrAuthority.readError || asdrAuthority.bassRestoreError || "The saved engineering results could not be read. Nothing has been treated as missing or uncalculated."}
+        projectId={projectId}
+        onRetry={asdrAuthority.retry}
       />
     );
   }
