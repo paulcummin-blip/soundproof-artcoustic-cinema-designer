@@ -10,9 +10,10 @@
  * Row rules:
  *   - only client-facing differences are carried: a row appears only when every
  *     version has a reliable value AND the values are not identical;
- *   - P8, P15, P20, P21, assumed parameters, and unavailable, stale, unreliable
- *     or unassessed results never appear, because the evidence rules never
- *     supply them;
+ *   - P8, P15, P21, assumed parameters, and unavailable, stale, unreliable or
+ *     unassessed results never appear, because the evidence rules never supply
+ *     them. Bass consistency (P20) appears when the P20 rule admits it, which is
+ *     what lets a comparison show one bass layout as more even across seats;
  *   - the internal Design Index is never a row: it is a designer diagnostic, not
  *     a client-facing result, and a table stored before that rule existed has
  *     its Design Index rows dropped before it reaches a writer;
@@ -46,6 +47,7 @@ export const COMPARISON_ROW_ORDER = Object.freeze([
   'p17',
   'p18',
   'p19',
+  'p20',
 ]);
 
 const ROW_LABELS = Object.freeze({
@@ -65,6 +67,7 @@ const ROW_LABELS = Object.freeze({
   p17: 'Surround and overhead timbre (P17)',
   p18: 'Bass extension (P18)',
   p19: 'Bass response (P19)',
+  p20: 'Bass consistency (P20)',
 });
 
 /** The reliable value one version carries for a row, or null. */

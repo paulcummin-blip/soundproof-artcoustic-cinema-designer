@@ -19,6 +19,9 @@ export function buildSnapshotP20(engineeringSummary) {
       grade: seat.level,
       raw_value: seat.value,
       display_value: seat.valueFormatted,
+      // Carried through unchanged so the report evidence rules can tell a
+      // current result from a provisional one. Nothing is computed here.
+      status: seat.status ?? null,
     })),
   };
 }

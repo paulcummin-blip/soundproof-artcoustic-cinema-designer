@@ -33,6 +33,8 @@ import {
   splitParameterEvidence,
   resolveBassEvidence,
   statement,
+  P20_USE_RULE,
+  P20_OMIT_RULE,
 } from './adiReportEvidenceRules.js';
 
 export const INTERPRETATION_STAGE = 'adi_project_interpretation';
@@ -288,7 +290,12 @@ export function buildProjectInterpretation(params = {}) {
     strongestAreas.push({ area: 'Upgrade flexibility', evidence: 'layouts and channels remain open' });
   }
   if (bassEvidence.p14 || bassEvidence.p18 || bassEvidence.p19) {
-    strongestAreas.push({ area: 'Bass consistency', evidence: 'reliable calculated bass result' });
+    strongestAreas.push({ area: 'Bass depth and output', evidence: 'reliable calculated bass result' });
+  }
+  // Bass consistency is only ever claimed from the consistency result itself,
+  // and only when it passed the P20 rule: current, positive and useful.
+  if (bassEvidence.p20) {
+    strongestAreas.push({ area: 'Bass consistency', evidence: `seat-to-seat consistency at ${bassEvidence.p20.level}` });
   }
 
   const assumed = rp22.assumed || {};
@@ -458,7 +465,8 @@ export function formatInterpretationForPrompt(interpretation) {
     `  Spatial Resolution: ${listOrNone((byStructure['Spatial Resolution'] || []).map(evidenceLine))}`,
     `  Dynamic Range: ${listOrNone((byStructure['Dynamic Range'] || []).map(evidenceLine))}`,
     `  Timbre Matching: ${listOrNone((byStructure['Timbre Matching'] || []).map(evidenceLine))}`,
-    `  Bass (use only where reliable): ${listOrNone((evidence.bass || []).map(evidenceLine))}`,
+    `  Bass depth and response (use only where reliable): ${listOrNone((evidence.bass || []).filter((row) => row.parameter_id !== 20).map(evidenceLine))}`,
+    `  Bass consistency across seats (use only where reliable, positive and useful): ${listOrNone((evidence.bass || []).filter((row) => row.parameter_id === 20).map(evidenceLine))}`,
     `  Viewing: ${evidence.viewing?.summary ? `${evidence.viewing.summary} (Primary ${evidence.viewing.primary_floor || 'not assessed'}, Secondary ${evidence.viewing.secondary_floor || 'not assessed'})` : 'Not available'}`,
     '',
     NOT_USED_HEADING + ':',
@@ -474,6 +482,9 @@ export function formatInterpretationForPrompt(interpretation) {
     '- Reference a parameter only where it is the clearest evidence for something the client will hear.',
     '- Do not work through the results one by one, and do not quote a level without explaining what it means.',
     '- Never mention anything listed under "' + NOT_USED_HEADING + '".',
+    `- ${P20_USE_RULE}`,
+    `- ${P20_OMIT_RULE}`,
+    '- This report explains the design that was selected. It never redesigns it: no placement change, no added subwoofer, no processor or calibration advice, and no recommendation that is not already in the project data, another saved version, a compared option or the designer brief.',
     '- Never mention the Design Index, a design score, a design rating or any percentage. It is an internal designer diagnostic and is never part of the report.',
     '=== END ADI PROJECT INTERPRETATION ===',
   ].join('\n');

@@ -26,9 +26,11 @@
  * Evidence rules (see adiReportEvidenceRules.js):
  *   - Results are grouped under the three design structures the report is
  *     written around: Spatial Resolution, Dynamic Range, Timbre Matching.
- *   - Parameters excluded from client-facing reports (P8, P15, P20, P21) are
- *     never offered to the writer, and neither is any result that is not
- *     reliable: unreliable results are listed as not used instead.
+ *   - Parameters excluded from client-facing reports (P8, P15, P21) are never
+ *     offered to the writer, and neither is any result that is not reliable:
+ *     unreliable results are listed as not used instead.
+ *   - Bass consistency (P20) is offered only when the P20 rule admits it:
+ *     current, positive (L3 or L4) and useful across more than one seat.
  *   - The Design Index is internal: it is never supplied as a value, never a
  *     highlight row and never evidence in the prose.
  *
@@ -118,14 +120,16 @@ export function buildEngineeringEvidence(snapshot) {
   const bassEvidence = resolveBassEvidence(snapshot);
   const bassByStructure = {
     'Dynamic Range': [bassEvidence.p14].filter(Boolean),
-    'Timbre Matching': [bassEvidence.p18, bassEvidence.p19].filter(Boolean),
+    'Timbre Matching': [bassEvidence.p18, bassEvidence.p19, bassEvidence.p20].filter(Boolean),
   };
   const structureLines = [];
   for (const structure of REPORT_STRUCTURES) {
+    // A bass result that is also present in the parameter headlines (P20) is
+    // listed once.
     const rows = [
       ...(parameterEvidence.byStructure[structure] || []),
       ...(bassByStructure[structure] || []),
-    ];
+    ].filter((row, index, all) => all.findIndex((other) => other.parameter_id === row.parameter_id) === index);
     if (rows.length === 0) continue;
     structureLines.push(`  ${structure}:`);
     for (const row of rows) {
@@ -269,9 +273,10 @@ export function selectHighlightRows(snapshot) {
   }
 
   // Evidence inside the three structures, in client usefulness order. Excluded
-  // parameters (P8, P15, P20, P21) and unreliable results are absent from byId,
-  // so they can never reach the table.
-  const EVIDENCE_ORDER = [2, 4, 5, 7, 9, 12, 13, 14, 16, 17, 18, 19, 6, 10];
+  // parameters (P8, P15, P21) and unreliable results are absent from byId, so
+  // they can never reach the table. Bass consistency (P20) is present only when
+  // the P20 rule admitted it: current, positive and useful.
+  const EVIDENCE_ORDER = [2, 4, 5, 7, 9, 12, 13, 14, 16, 17, 18, 19, 20, 6, 10];
   for (const parameterId of EVIDENCE_ORDER) pushParameter(parameterId);
 
   // The Design Index is an internal designer diagnostic, so it is never a row
@@ -334,7 +339,8 @@ export function buildHighlightsPrompt(evidence, rows) {
     '- Never invent a value, a product or a result. If a cell needs a number, use only the numbers shown in that row.',
     '- Reference only the results shown in the table above. Do not mention a parameter, a level or a measurement that is not in it.',
     '- Say what the result means for the room, not what the parameter is called, and do not explain an obvious result.',
-    '- Never write a cell for an assumed parameter, and never reference P8, P15 or P20.',
+    '- Never write a cell for an assumed parameter, and never reference P8, P15 or P21.',
+    '- A bass consistency row appears only where it is shown in the table above. Its cell explains more even bass across the seating area. Where there is no such row, write nothing about bass consistency and never suggest moving or adding subwoofers.',
     '- Never mention the Design Index, a design score, a design rating or a percentage: it is an internal designer diagnostic, not a client-facing result.',
     '- Use the voice above: keep the room, the design, the system and the listening result as the subject. Never address the client as "you", and never write "we designed" or "we recommend".',
   ].join('\n');

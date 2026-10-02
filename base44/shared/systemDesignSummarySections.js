@@ -21,6 +21,8 @@
  * Pure: no React, no side effects, no runtime-specific APIs.
  */
 
+import { UPGRADE_PATH_RULE, PROPOSAL_STAGE_RULE } from './proposalStageBoundary.js';
+
 export const HIGHLIGHTS_SECTION_TYPE = 'key_performance_highlights';
 
 /** The editable sections of a System Design report, in report order. */
@@ -44,6 +46,7 @@ export const COMPARISON_REPORT_INSTRUCTIONS = [
   'First explain what stays the same between the options. Then explain what changes. Then explain the listening consequence: what the room actually gains or gives up.',
   'Work through the difference in this order: Dynamic Range, Spatial Resolution, Timbre Matching, the viewing experience, and bass consistency where the evidence is trusted.',
   'Where one option is clearly stronger, explain why, without attacking the alternative.',
+  'Where one option improves bass consistency across the seating area, explain that as more even bass between seats: less difference between the strongest and weakest seat. Never describe the other option as wrong, and never present the comparison as a correction.',
   'Do not automatically recommend the largest system unless the evidence supports it.',
   'Never present the comparison as an equipment table, and never rank the options as "best".',
 ].join('\n');
@@ -107,13 +110,13 @@ Choose the results that matter most for this room from the Timbre Matching resul
 
 Explain why matched loudspeaker families and consistent voicing matter to the listening result, using the supplied speaker family data, and describe what those choices give the room.
 
-Screen timbre (P16) and surround timbre (P17) are the main evidence. Use bass extension (P18) and bass response (P19) only where the bass evidence is reliable and useful. Never reference P20, and never claim perfect bass.
+Screen timbre (P16) and surround timbre (P17) are the main evidence. Use bass extension (P18) and bass response (P19) only where the bass evidence is reliable and useful. Use bass consistency across seats (P20) only where it is supplied as reliable, positive and useful, and never claim perfect bass.
 
 Explain why the room should sound like one system rather than a collection of loudspeakers: common drive-unit families, consistent voicing, controlled dispersion, the sub and satellite approach, similar tonal character as effects move, stable dialogue across seats, and consistency between the screen, surround and overhead layers.
 
 Make it practical, for example: a voice or effect may begin on the screen, move into the surrounds and continue overhead, and when those loudspeakers share the same tonal character the sound stays believable throughout that movement.
 
-Where a reliable bass result exists, add a short bass performance paragraph explaining why the subwoofer positions were chosen. For a four-subwoofer design, explain that the main gain is usually consistency across seats rather than extra volume.
+Where a reliable bass result exists, add a short bass performance paragraph explaining why the subwoofer positions were chosen. For a four-subwoofer design, explain that the main gain is usually consistency across seats rather than extra volume. Where a bass consistency result is supplied, explain it as more even bass across the seating area and less difference between the strongest and weakest seat. Do not raise a bass change of any kind: the layout was chosen deliberately, and a weak or missing consistency result is left out rather than reported.
 
 Keep it practical. Mention a clear limitation honestly where the data shows one, and note a sensible upgrade path where the data supports it.
 3 to 4 short paragraphs, no table.`,
@@ -148,6 +151,9 @@ Do not repeat the previous sections. Do not end with a generic closing phrase. T
  * @returns {string} writing instruction for one System Design report section
  */
 export function getSystemSummarySectionPrompt(sectionType, sectionTitle) {
-  return SYSTEM_SUMMARY_SECTION_PROMPTS[sectionType]
+  const instruction = SYSTEM_SUMMARY_SECTION_PROMPTS[sectionType]
     || `Write the ${sectionTitle} section of a client-facing system design report. 2 to 3 short paragraphs.`;
+  // Every section is part of one client-facing explanation of a completed
+  // design, so the proposal-stage and upgrade-path rules apply to all of them.
+  return [instruction, '', PROPOSAL_STAGE_RULE, '', UPGRADE_PATH_RULE].join('\n');
 }

@@ -12,6 +12,12 @@
  * This module decides which results are allowed to appear, and which
  * structure each one supports.
  *
+ * Bass seat-to-seat consistency (P20) is NOT excluded. It is admitted
+ * conditionally: a current, positive (L3 or L4) consistency result is genuine
+ * client evidence for the chosen bass layout. A weak, provisional or
+ * unhelpful one is omitted rather than reported, because a client-facing
+ * report explains the selected design and never criticises it.
+ *
  * It reads the frozen Engineering Snapshot passively. It never calculates,
  * grades, regroups or invents a result: it only excludes, labels and sorts
  * what the snapshot already states.
@@ -33,7 +39,6 @@ export const REPORT_STRUCTURES = Object.freeze([
 export const EXCLUDED_PARAMETERS = Object.freeze({
   8: 'not used',
   15: 'not used',
-  20: 'not used in this client summary',
   21: 'not used',
 });
 
@@ -63,6 +68,7 @@ export const PARAMETER_STRUCTURE = Object.freeze({
   17: 'Timbre Matching',
   18: 'Timbre Matching',
   19: 'Timbre Matching',
+  20: 'Timbre Matching',
 });
 
 /** Plain-language name for each result, used in prose and in the table. */
@@ -86,7 +92,7 @@ export const PARAMETER_PLAIN_LANGUAGE = Object.freeze({
   17: 'Surround timbre',
   18: 'Bass extension',
   19: 'Bass response',
-  20: 'Bass seat-to-seat consistency',
+  20: 'Bass consistency',
   21: 'Early reflection assumption',
 });
 
@@ -145,6 +151,84 @@ export function readReliableResult(entry) {
   };
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// P20: bass seat-to-seat consistency, admitted conditionally
+// ─────────────────────────────────────────────────────────────────────────────
+
+/** The levels a report may use as positive bass consistency evidence. */
+export const P20_POSITIVE_LEVELS = Object.freeze(['L3', 'L4']);
+
+/** Plain-language rule text, reused by the prompts and the audit log. */
+export const P20_USE_RULE = [
+  'Bass consistency may be used only when it is assessed, current, positive (L3 or L4) and useful across more than one seat.',
+  'Where it is used it explains the chosen bass layout: more even bass across the seating area, and less difference between the strongest and weakest seat.',
+  'It is explanation only. It never becomes a redesign suggestion, a placement change or a new recommendation.',
+].join(' ');
+
+/** Plain-language rule text for the case where P20 cannot be used. */
+export const P20_OMIT_RULE = 'Bass consistency is used only when the result is current, positive and useful. Where it is weak, provisional or missing it is left out of the report rather than reported as a limitation.';
+
+const P20_REASONS = Object.freeze({
+  not_assessed: 'Not assessed for this design.',
+  not_current: 'Not current (provisional, stale or waiting).',
+  not_positive: 'Not used in this report unless the result is strong.',
+  single_seat: 'Not useful for a single-seat room.',
+});
+
+function p20Level(source) {
+  // The frozen snapshot states the consistency floor as project_floor /
+  // primary_floor; the generic achieved_level / level names are also read so the
+  // rule works on a headline row or a raw result entry.
+  const raw = source?.project_floor ?? source?.primary_floor ?? source?.secondary_floor
+    ?? source?.achieved_level ?? source?.level ?? null;
+  if (raw == null) return '';
+  return String(raw).trim().toUpperCase();
+}
+
+function p20SeatRows(snapshot) {
+  const rows = snapshot?.bass?.p20?.per_seat;
+  return Array.isArray(rows) ? rows : [];
+}
+
+/**
+ * Decide whether this design's bass seat-to-seat consistency may be used.
+ *
+ * Usable only when all four hold: the result is assessed, it is current (never
+ * provisional, stale or waiting), it is positive (L3 or L4) and the room has
+ * more than one seat for consistency to mean anything.
+ *
+ * @param {Object} snapshot — frozen Engineering Snapshot
+ * @param {Object} [entry] — an explicit result entry (defaults to snapshot.bass.p20)
+ * @returns {{ usable: boolean, level: string|null, value: string|null, reason: string|null }}
+ */
+export function assessP20(snapshot, entry = null) {
+  const source = entry || snapshot?.bass?.p20 || null;
+  const level = p20Level(source);
+  if (!level || UNUSABLE_LEVELS.has(level)) {
+    return { usable: false, level: null, value: null, reason: P20_REASONS.not_assessed };
+  }
+  if (UNUSABLE_STATUS.test(String(source?.status ?? ''))) {
+    return { usable: false, level: null, value: null, reason: P20_REASONS.not_current };
+  }
+  // Per-seat results carry their own status: when none of them is current the
+  // room-level figure is not current either.
+  const seats = p20SeatRows(snapshot);
+  if (seats.length > 0 && !seats.some((seat) => !UNUSABLE_STATUS.test(String(seat?.status ?? '')))) {
+    return { usable: false, level: null, value: null, reason: P20_REASONS.not_current };
+  }
+  const seatCount = Array.isArray(snapshot?.seats) && snapshot.seats.length > 0
+    ? snapshot.seats.length
+    : seats.length;
+  if (seatCount < 2) {
+    return { usable: false, level: null, value: null, reason: P20_REASONS.single_seat };
+  }
+  if (!P20_POSITIVE_LEVELS.includes(level)) {
+    return { usable: false, level: null, value: null, reason: P20_REASONS.not_positive };
+  }
+  const raw = source.formatted_value ?? source.display_value ?? source.raw_value ?? source.formatted ?? null;
+  return { usable: true, level, value: raw == null ? null : String(raw).trim(), reason: null };
+}
+
 /** The structure a parameter supports, or null when it is excluded. */
 export function structureForParameter(parameterId) {
   const id = Number(parameterId);
@@ -198,6 +282,25 @@ export function splitParameterEvidence(snapshot) {
       omitted.push({ parameter_id: id, label, reason: 'No client-facing structure.' });
       continue;
     }
+    // Bass consistency passes its own conditional rule, never the generic one.
+    if (id === 20) {
+      const assessment = assessP20(snapshot, row);
+      if (!assessment.usable) {
+        omitted.push({ parameter_id: id, label, reason: assessment.reason });
+        continue;
+      }
+      const p20Entry = {
+        parameter_id: id,
+        structure,
+        label,
+        level: assessment.level,
+        value: assessment.value,
+        text: [assessment.level, assessment.value].filter(Boolean).join(' · '),
+      };
+      byStructure[structure].push(p20Entry);
+      used.push(p20Entry);
+      continue;
+    }
     const result = readReliableResult(row);
     if (!result) {
       omitted.push({ parameter_id: id, label, reason: 'Not reliable or not calculated.' });
@@ -221,13 +324,14 @@ export function splitParameterEvidence(snapshot) {
 /**
  * The bass results, with their reliability stated rather than assumed.
  *
- * P20 is never part of a client-facing report, so it is reported here only as
- * an exclusion. P14, P18 and P19 are usable only when the snapshot states a
- * reliable result for them.
+ * P14, P18 and P19 are usable only when the snapshot states a reliable result
+ * for them. P20 is admitted by its own rule (assessP20): a current, positive
+ * consistency result is evidence for the chosen bass layout, and anything
+ * weaker is omitted with the reason recorded.
  *
  * @param {Object} snapshot
  * @returns {{
- *   p14: Object|null, p18: Object|null, p19: Object|null,
+ *   p14: Object|null, p18: Object|null, p19: Object|null, p20: Object|null,
  *   usable: Array<Object>,
  *   omitted: Array<{ parameter_id: number, label: string, reason: string }>,
  * }}
@@ -256,15 +360,28 @@ export function resolveBassEvidence(snapshot) {
     ? { achieved_level: bass.p19.rsp.level, formatted_value: bass.p19.rsp.display_value ?? bass.p19.rsp.raw_value }
     : null);
 
-  if (bass.p20) {
-    omitted.push({ parameter_id: 20, label: plainLanguageName(20), reason: EXCLUDED_PARAMETERS[20] });
+  // Bass seat-to-seat consistency is admitted by its own rule, never by
+  // exclusion and never by the generic reliability test alone.
+  const p20Assessment = assessP20(snapshot);
+  const p20 = p20Assessment.usable
+    ? {
+      parameter_id: 20,
+      label: plainLanguageName(20),
+      level: p20Assessment.level,
+      value: p20Assessment.value,
+      text: [p20Assessment.level, p20Assessment.value].filter(Boolean).join(' · '),
+    }
+    : null;
+  if (!p20) {
+    omitted.push({ parameter_id: 20, label: plainLanguageName(20), reason: p20Assessment.reason });
   }
 
   return {
     p14,
     p18,
     p19,
-    usable: [p14, p18, p19].filter(Boolean),
+    p20,
+    usable: [p14, p18, p19, p20].filter(Boolean),
     omitted,
   };
 }
@@ -274,7 +391,9 @@ export function resolveBassEvidence(snapshot) {
  *
  * Only the most useful client-facing results are carried into the table, and
  * only when the calculated result is reliable. Rows for excluded parameters
- * (P8, P15, P20, P21) and for internal scores never appear here.
+ * (P8, P15, P21) and for internal scores never appear here. A bass consistency
+ * row is carried only when it passed the P20 rule, so the table can never
+ * carry a weak or provisional consistency result.
  *
  * The Result value is copied from the snapshot; it is never derived here.
  */
@@ -292,6 +411,7 @@ export const HIGHLIGHT_PRIORITY = Object.freeze([
   'p14',
   'p18',
   'p19',
+  'p20',
   'p16',
   'p17',
   'p6',

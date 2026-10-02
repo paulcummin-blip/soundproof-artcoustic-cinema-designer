@@ -30,6 +30,9 @@
  * from any backend function.
  */
 
+import { PROPOSAL_STAGE_BOUNDARY } from './proposalStageBoundary.js';
+import { P20_USE_RULE, P20_OMIT_RULE } from './adiReportEvidenceRules.js';
+
 /** Banned words and phrases. Never used in generated prose. */
 export const BANNED_WORDS = [
   'Elevate',
@@ -292,8 +295,9 @@ const PRIORITIES = [
 ].join('\n');
 
 const CHALLENGE_ASSUMPTIONS = [
-  '=== CHALLENGE ASSUMPTIONS ===',
-  '- If the calculated evidence points to a different conclusion from the expected sales story, say so carefully. Do not reinforce the selected design when the evidence shows a clear limitation. Offer a practical alternative and explain the reasoning.',
+  '=== HONEST EXPLANATION, NOT REDESIGN ===',
+  '- Explain the selected design honestly, including a real limitation, without reopening the design. This report is written after the design is complete.',
+  '- Where the calculated evidence shows a limitation, state what causes it and what it means in the room. Never offer an alternative layout, an added product or a different approach as a correction to the design that was selected.',
   '- A 5.1 system can be described as clean, simple and credible for its budget. Never imply it performs like a full immersive system.',
   '- If a room has two seating rows and the front row is clearly stronger, say so.',
   '- If a four-subwoofer design materially improves consistency across seats, explain that the benefit is control and consistency, not simply more bass.',
@@ -307,8 +311,9 @@ const THEMES = [
   'Build every section around Spatial Resolution, Dynamic Range and Timbre Matching. Use RP22 results only as evidence inside those themes.',
   'Spatial Resolution: how the system places sound around and above the listener. Relevant evidence where it helps the client understand the design: discrete channel count (P2), screen consistency (P4), horizontal spacing (P5), surround level consistency (P6), front wide position (P7), overhead spacing (P9) and overhead level consistency (P10).',
   'Dynamic Range: headroom, clarity and scale. Screen Dynamic Range (P12) and Non-screen Dynamic Range (P13) are the main evidence. Use the LFE and subwoofer result (P14) only where bass output is reliable and relevant. Never reference P15.',
-  'Timbre Matching: why the system should sound like one coherent loudspeaker system. Screen timbre (P16) and surround timbre (P17) are the main evidence. Use bass extension (P18) and bass response (P19) only where the bass evidence is reliable and useful. Never reference P20.',
-  'Hard exclusions: never mention an assumed parameter. Never reference P15. Never reference P20. Ignore P8 completely. Do not mention P21.',
+  'Timbre Matching: why the system should sound like one coherent loudspeaker system. Screen timbre (P16) and surround timbre (P17) are the main evidence. Use bass extension (P18), bass response (P19) and bass consistency across seats (P20) only where the evidence is reliable and useful.',
+  `Bass consistency: ${P20_USE_RULE} ${P20_OMIT_RULE}`,
+  'Hard exclusions: never mention an assumed parameter. Never reference P15. Ignore P8 completely. Do not mention P21.',
   'Do not let a parameter code become the point of a sentence. Use plain-language names and at most one parameter code in a section.',
 ].join('\n');
 
@@ -385,7 +390,7 @@ const HIGHLIGHTS_TABLE = [
   '- A single report table is: Performance area | Result | What the room gains.',
   '- Use 8 to 14 rows where the design supports them. Include only the results that help the reader understand this room. An empty or padded row is worse than a shorter table.',
   '- Never add, remove, reorder or change a row, a level or a value.',
-  '- Never give a row for an assumed parameter, and never a row for P8, P15 or P20.',
+  '- Never give a row for an assumed parameter, and never a row for P8, P15 or P21. A bass consistency row appears only when Sound Proof supplied one: it is supplied only when the result is current, positive and useful.',
   '- The final cell is one short, specific sentence written in the voice above. It says what that result gives the room, not what the parameter is called.',
   '- For a comparison report the table is calculated per option: Performance area | Option A | Option B | What changes, with one column per selected version. Every value comes from that version\'s frozen engineering evidence, and the change column is derived by Sound Proof.',
   '- In a comparison you write the introduction only. Never restate a table value, never add or reorder a row, and never describe a difference the table does not show. Explain the differences in the prose around the table, in the order below.',
@@ -419,6 +424,12 @@ const FINAL_SELF_CHECK = [
   '15. Does no section end with a generic closing phrase?',
   '16. Is there no markdown, hashtag or asterisk in the response?',
   '17. Is there no "you", "your", "we designed" or "we recommend" anywhere in the prose?',
+  '18. Is this explaining the chosen design rather than redesigning it?',
+  '19. Is every upgrade suggestion supported by a saved version, the project data, a compared option or the designer brief, and phrased as a future option rather than a correction?',
+  '20. Is bass consistency included only where it is current, positive and useful, and never as criticism of the design?',
+  '21. Is there no post-design clever recommendation anywhere, including a placement change, an added product, a processor change or a calibration change?',
+  '22. Is the report still built around Spatial Resolution, Dynamic Range and Timbre Matching?',
+  '23. Are the parameters used as evidence rather than as the story?',
 ].join('\n');
 
 /**
@@ -438,6 +449,8 @@ export function buildWritingStyleContract() {
     PRIORITIES,
     '',
     CHALLENGE_ASSUMPTIONS,
+    '',
+    PROPOSAL_STAGE_BOUNDARY,
     '',
     THEMES,
     '',

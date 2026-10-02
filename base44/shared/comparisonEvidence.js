@@ -8,8 +8,11 @@
  * (adiReportEvidenceRules). Nothing is calculated, graded, regrouped or
  * invented here: results are copied, labelled and grouped.
  *
- * Excluded parameters (P8, P15, P20, P21) and assumed parameters can never
- * appear: they are filtered by the existing rules and are listed as excluded.
+ * Excluded parameters (P8, P15, P21) and assumed parameters can never appear:
+ * they are filtered by the existing rules and are listed as excluded. Bass
+ * consistency (P20) appears only when the P20 rule admits it, which is what
+ * lets a comparison show one bass layout as more even across seats than
+ * another.
  * The Design Index is also internal: it is never supplied to the writer here,
  * never a comparison row and never expressed as a percentage.
  *
@@ -46,7 +49,12 @@ function evidenceForStructure(parameterEvidence, bassEvidence, structure) {
   if (structure === 'Dynamic Range' && bassEvidence.p14) rows.push(bassEvidence.p14);
   if (structure === 'Timbre Matching' && bassEvidence.p18) rows.push(bassEvidence.p18);
   if (structure === 'Timbre Matching' && bassEvidence.p19) rows.push(bassEvidence.p19);
-  return rows.map(describeEvidenceRow);
+  if (structure === 'Timbre Matching' && bassEvidence.p20) rows.push(bassEvidence.p20);
+  // A bass result that is also present in the parameter headlines (P20) is
+  // listed once.
+  return rows
+    .filter((row, index) => rows.findIndex((other) => other.parameter_id === row.parameter_id) === index)
+    .map(describeEvidenceRow);
 }
 
 /**
@@ -178,6 +186,7 @@ export function buildVersionEvidence({
         p14: bassEvidence.p14 ? describeEvidenceRow(bassEvidence.p14) : null,
         p18: bassEvidence.p18 ? describeEvidenceRow(bassEvidence.p18) : null,
         p19: bassEvidence.p19 ? describeEvidenceRow(bassEvidence.p19) : null,
+        p20: bassEvidence.p20 ? describeEvidenceRow(bassEvidence.p20) : null,
       }
       : null,
     limitations,
