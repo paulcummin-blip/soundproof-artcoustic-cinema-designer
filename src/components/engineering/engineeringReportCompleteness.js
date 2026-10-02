@@ -57,14 +57,16 @@ export function assessEngineeringReportCompleteness(summary) {
 
   for (const key of REQUIRED_RP22_PARAMETER_KEYS) {
     const parameter = parameters[key];
-    if (!isTerminal(parameter) || !hasScoredLevel(parameter)) {
+    if (!isTerminal(parameter)) {
       missingParameterKeys.push(key);
       continue;
     }
 
     // P19 is RSP-scoped. Older publications labelled it seat-scoped, but the
     // restored authority normalises it to room/RSP before this gate runs.
-    if (parameter.scope !== "seat" || key === "p19" || normalizedState(parameter.state) !== "scored") {
+    const isSeatScoped = parameter.scope === "seat" && key !== "p19";
+    if (!isSeatScoped || normalizedState(parameter.state) !== "scored") {
+      if (!hasScoredLevel(parameter)) missingParameterKeys.push(key);
       continue;
     }
 
