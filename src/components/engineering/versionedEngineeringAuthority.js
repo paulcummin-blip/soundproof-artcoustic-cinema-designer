@@ -38,6 +38,8 @@ export const ENGINEERING_AUTHORITY_STATE = Object.freeze({
   LOCAL_ONLY: 'LOCAL_ONLY',
   /** Neither durable publication nor local result. */
   NOT_CALCULATED: 'NOT_CALCULATED',
+  /** The saved authority exists or may exist, but the read itself failed. */
+  READ_FAILED: 'READ_FAILED',
 });
 
 const asObject = (value) =>
@@ -54,29 +56,80 @@ export function isAuthorityAvailable(state) {
     || state === ENGINEERING_AUTHORITY_STATE.LOCAL_ONLY;
 }
 
+const durablePublicationReads = new Map();
+let durablePublicationReadCount = 0;
+
+const publicationReadKey = (projectId, versionId) =>
+  `${String(projectId || '')}::${String(versionId || '')}`;
+
+function publishReadDiagnostics() {
+  if (typeof window !== 'undefined') {
+    window.__SP_AUTHORITY_READ_DIAGNOSTICS__ = {
+      readPublishedEngineering: durablePublicationReadCount,
+    };
+  }
+}
+
 /**
  * Read the durable Published Engineering Authority for a version.
- * Never throws — a failed read returns null and the caller keeps the
- * browser handoff (if any) rather than reporting a false "not calculated".
+ * All consumers share one session-scoped promise. Failures are cached as an
+ * explicit read_failed result, so React remounts cannot create a retry storm or
+ * mislabel a platform/network failure as "not calculated".
  */
-export async function fetchDurablePublication(projectId, versionId) {
-  if (!projectId || !versionId) return null;
-  try {
-    const response = await base44.functions.invoke('readPublishedEngineering', {
-      project_id: projectId,
-      version_id: versionId,
+export function fetchDurablePublication(projectId, versionId, { force = false } = {}) {
+  if (!projectId || !versionId) {
+    return Promise.resolve({
+      publication: null,
+      status: 'not_calculated',
+      version: null,
+      readState: 'success',
+      error: null,
     });
-    const data = response?.data || response || null;
-    if (!data) return null;
-    return {
-      publication: data.publication || null,
-      status: data.status || 'not_calculated',
-      version: data.version || null,
-    };
-  } catch (error) {
-    console.warn('[engineeringAuthority] durable publication read failed:', error?.message || error);
-    return null;
   }
+
+  const key = publicationReadKey(projectId, versionId);
+  if (force) durablePublicationReads.delete(key);
+  const existing = durablePublicationReads.get(key);
+  if (existing) return existing;
+
+  const read = (async () => {
+    try {
+      durablePublicationReadCount += 1;
+      publishReadDiagnostics();
+      const response = await base44.functions.invoke('readPublishedEngineering', {
+        project_id: projectId,
+        version_id: versionId,
+      });
+      const data = response?.data || response || null;
+      if (!data || data.error) {
+        throw new Error(data?.message || data?.error || 'Saved engineering authority could not be read.');
+      }
+      return {
+        publication: data.publication || null,
+        status: data.status || 'not_calculated',
+        version: data.version || null,
+        readState: 'success',
+        error: null,
+      };
+    } catch (error) {
+      const message = error?.message || 'Saved engineering authority could not be read.';
+      console.warn('[engineeringAuthority] durable publication read failed:', message);
+      return {
+        publication: null,
+        status: 'read_failed',
+        version: null,
+        readState: 'failed',
+        error: message,
+      };
+    }
+  })();
+
+  durablePublicationReads.set(key, read);
+  return read;
+}
+
+export function invalidateDurablePublicationRead(projectId, versionId) {
+  durablePublicationReads.delete(publicationReadKey(projectId, versionId));
 }
 
 /**
@@ -153,6 +206,7 @@ export function buildDurableSnapshot({ projectId, versionId, publication, design
  * NOT_CALCULATED when a local result exists.
  */
 export function classifyAuthorityState({ durable, localSnapshot }) {
+  if (durable?.status === 'read_failed') return ENGINEERING_AUTHORITY_STATE.READ_FAILED;
   if (durable?.publication) return ENGINEERING_AUTHORITY_STATE.PUBLISHED_CURRENT;
   if (durable?.status === 'stale') return ENGINEERING_AUTHORITY_STATE.PUBLISHED_STALE;
   if (extractEngineeringSummary(localSnapshot)) return ENGINEERING_AUTHORITY_STATE.LOCAL_ONLY;
