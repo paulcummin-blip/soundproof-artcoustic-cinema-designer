@@ -87,9 +87,9 @@ export function Th({ children, align = 'left', width }) {
   );
 }
 
-export function Td({ children, align = 'left', mono = false, style }) {
+export function Td({ children, align = 'left', mono = false, colSpan, style }) {
   return (
-    <td style={{
+    <td colSpan={colSpan} style={{
       textAlign: align,
       padding: '9px 12px',
       borderBottom: '1px solid #EFEEEA',

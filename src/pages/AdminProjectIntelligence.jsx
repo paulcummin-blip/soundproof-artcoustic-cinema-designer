@@ -1,29 +1,40 @@
 // AdminProjectIntelligence.jsx
 // ----------------------------
-// Project Intelligence — commercial project, value and product reporting.
+// Project Intelligence — project inclusion, counted-version selection and
+// product demand export.
 //
-// Projects are counted once. Design versions are shown as variations.
-// Read-only: this page performs no writes of any kind.
+// The default workflow is deliberately simple:
+//   1. Include or exclude each project.
+//   2. Choose which version counts where a project has variations.
+//   3. Export the product demand from the counted versions only.
+//
+// Product demand counts exactly ONE version per included project, because a
+// client cannot buy every design option. The deeper reporting views are
+// unchanged and live in the Advanced diagnostics tab.
+//
+// Read-only: this page performs no writes of any kind. The admin's inclusion and
+// counted-version choices are local report selection in this browser.
 
 import React, { useMemo, useState } from 'react';
 import { useAuth } from '@/lib/AuthContext';
 import useProjectIntelligence from '@/components/admin/intelligence/useProjectIntelligence';
+import useProjectSelection from '@/components/admin/intelligence/useProjectSelection';
 import { BRAND, Button, Card, Pill } from '@/components/admin/intelligence/IntelligenceUi';
-import ProjectIntelligenceFilters from '@/components/admin/intelligence/ProjectIntelligenceFilters';
-import ProjectIntelligenceSummary from '@/components/admin/intelligence/ProjectIntelligenceSummary';
-import StatusBreakdownTable from '@/components/admin/intelligence/StatusBreakdownTable';
-import HighestValueProjectsTable from '@/components/admin/intelligence/HighestValueProjectsTable';
-import ProjectFamilyTable from '@/components/admin/intelligence/ProjectFamilyTable';
+import ProjectSelectionSummary from '@/components/admin/intelligence/ProjectSelectionSummary';
+import ProjectSelectionTable from '@/components/admin/intelligence/ProjectSelectionTable';
+import ProductDemandTable from '@/components/admin/intelligence/ProductDemandTable';
+import VariationCountTable from '@/components/admin/intelligence/VariationCountTable';
+import AdvancedDiagnosticsPanel from '@/components/admin/intelligence/AdvancedDiagnosticsPanel';
 import VariationDrawer from '@/components/admin/intelligence/VariationDrawer';
-import ProductDemandTab from '@/components/admin/intelligence/ProductDemandTab';
-import DuplicatesPanel from '@/components/admin/intelligence/DuplicatesPanel';
-import WarningsPanel from '@/components/admin/intelligence/WarningsPanel';
-import { downloadCsvSheets, downloadWorkbook, WORKBOOK_TABS } from '@/components/admin/intelligence/downloadReport';
+import { SELECTION_STORAGE_LABEL } from '@/components/admin/intelligence/projectSelectionStore';
+import { downloadSelectionCsv, downloadSelectionWorkbook } from '@/components/admin/intelligence/downloadReport';
+import { formatNumber } from '@/lib/commercial/projectReporting/formatMoney';
 
 const TABS = [
-  { key: 'overview', label: 'Overview' },
   { key: 'demand', label: 'Product Demand' },
-  { key: 'warnings', label: 'Warnings & Duplicates' },
+  { key: 'projects', label: 'Projects' },
+  { key: 'variations', label: 'Variations' },
+  { key: 'advanced', label: 'Advanced diagnostics' },
 ];
 
 function TabButton({ active, children, onClick }) {
@@ -61,7 +72,14 @@ export default function AdminProjectIntelligence() {
     resetFilters,
     reload,
   } = useProjectIntelligence();
-  const [tab, setTab] = useState('overview');
+
+  const selection = useProjectSelection({
+    families: useMemo(() => report?.families || [], [report]),
+    priceMap: data?.priceContext?.priceMap || null,
+    totalLoaded: report?.summary?.totalProjectCount,
+  });
+
+  const [tab, setTab] = useState('demand');
   const [activeFamily, setActiveFamily] = useState(null);
   const [exportNotice, setExportNotice] = useState(null);
 
@@ -69,9 +87,14 @@ export default function AdminProjectIntelligence() {
     new Map((report?.families || []).map((family) => [family.id, family]))
   ), [report]);
 
-  // The drawer reads the family from the report so it always reflects the
-  // current filters, and falls back to the record it was opened with.
+  const projectNamesById = useMemo(() => (
+    new Map((report?.families || []).map((family) => [family.id, family.name]))
+  ), [report]);
+
   const drawerFamily = activeFamily ? (familiesById.get(activeFamily.id) || activeFamily) : null;
+  const hiddenProjectCount = report
+    ? Math.max(0, (report.summary.totalProjectCount || 0) - report.families.length)
+    : 0;
 
   if (isLoadingAuth) {
     return <div style={{ padding: 48, textAlign: 'center', color: BRAND.subtext }}>Checking access…</div>;
@@ -95,19 +118,26 @@ export default function AdminProjectIntelligence() {
     );
   }
 
+  const exportPayload = () => ({
+    families: selection.selectedFamilies,
+    productDemand: selection.productDemand,
+  });
+
   const handleExportWorkbook = () => {
     if (!report) return;
-    const tabs = downloadWorkbook(report);
+    const tabs = downloadSelectionWorkbook(exportPayload());
     setExportNotice(`Workbook downloaded with tabs: ${tabs.join(', ')}.`);
   };
 
   const handleExportCsv = () => {
     if (!report) return;
-    downloadCsvSheets(report);
-    setExportNotice(`CSV downloaded per tab: ${WORKBOOK_TABS.join(', ')}.`);
+    downloadSelectionCsv(exportPayload());
+    setExportNotice('CSV downloaded per tab: Included Projects, Excluded Projects, Product Demand, Version Detail.');
   };
 
   const truncation = data?.truncation;
+  const summary = selection.summary;
+  const priceListAvailable = report?.priceContext?.priceListAvailable !== false;
 
   return (
     <div style={{ padding: 24, background: BRAND.bg, minHeight: '100vh', color: BRAND.text }}>
@@ -122,24 +152,21 @@ export default function AdminProjectIntelligence() {
         <div>
           <h1 style={{ margin: 0, fontSize: 26, color: BRAND.text }}>Project Intelligence</h1>
           <div style={{ fontSize: 13, color: BRAND.subtext, marginTop: 4 }}>
-            Commercial project, value and product reporting
+            Project selection and product demand export
           </div>
-          <div style={{
-            marginTop: 10,
-            padding: '8px 12px',
-            border: `1px solid ${BRAND.border}`,
-            borderRadius: 8,
-            background: BRAND.card,
-            fontSize: 12,
-            color: BRAND.muted,
-          }}>
-            Projects are counted once. Design versions are shown as variations.
+          <div style={{ marginTop: 10, fontSize: 12, color: BRAND.muted, maxWidth: 620, lineHeight: 1.6 }}>
+            Select the projects to include, choose the counted version where there are variations, then export the
+            product demand.
           </div>
         </div>
 
         <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
-          <Button onClick={handleExportWorkbook} disabled={!report || loading} title="Excel workbook with Project Summary, Product Demand, Variations Detail and Warnings">
-            Export workbook
+          <Button
+            onClick={handleExportWorkbook}
+            disabled={!report || loading}
+            title="Workbook: Included Projects, Excluded Projects, Product Demand and Version Detail"
+          >
+            Export product demand (workbook)
           </Button>
           <Button variant="secondary" onClick={handleExportCsv} disabled={!report || loading}>
             Export CSV per tab
@@ -152,15 +179,15 @@ export default function AdminProjectIntelligence() {
 
       {exportNotice && (
         <div style={{ marginBottom: 14, fontSize: 12, color: BRAND.muted }}>
-          {exportNotice} Export respects the active filters.
+          {exportNotice} The export respects the current inclusion and counted-version selection.
         </div>
       )}
 
       {data?.counts && (
         <div style={{ marginBottom: 14, fontSize: 12, color: BRAND.muted }}>
-          Loaded {data.counts.projects.toLocaleString('en-GB')} projects, {data.counts.versions.toLocaleString('en-GB')} design versions,
-          {' '}{data.counts.proposals.toLocaleString('en-GB')} proposals and {data.counts.products.toLocaleString('en-GB')} products.
-          {' '}Read-only: this report never writes to the database.
+          Loaded {formatNumber(data.counts.projects)} projects, {formatNumber(data.counts.versions)} design versions,
+          {' '}{formatNumber(data.counts.proposals)} proposals and {formatNumber(data.counts.products)} products.
+          {' '}{SELECTION_STORAGE_LABEL}
         </div>
       )}
 
@@ -174,145 +201,124 @@ export default function AdminProjectIntelligence() {
           fontSize: 12,
           fontWeight: 600,
         }}>
-          The data set hit the reporting row ceiling and may be incomplete. Narrow the date range to load everything.
+          The data set hit the reporting row ceiling and may be incomplete. Narrow the date range in Advanced
+          diagnostics to load everything.
         </div>
       )}
 
-      <div style={{ display: 'grid', gap: 16 }}>
-        <ProjectIntelligenceFilters
-          filters={filters}
-          onChange={updateFilter}
-          onReset={resetFilters}
-          accounts={accountOptions}
-        />
-
-        {error && (
+      {error && (
+        <div style={{ marginBottom: 14 }}>
           <Card title="Reporting data could not be loaded" subtitle={error}>
             <Button onClick={reload}>Try again</Button>
           </Card>
-        )}
+        </div>
+      )}
 
-        {loading && !report && (
-          <Card>
-            <div style={{ fontSize: 13, color: BRAND.muted }}>Loading projects, design versions and the Product Master…</div>
-          </Card>
-        )}
+      {loading && !report && (
+        <Card>
+          <div style={{ fontSize: 13, color: BRAND.muted }}>Loading projects, design versions and the Product Master…</div>
+        </Card>
+      )}
 
-        {report && (
-          <>
-            <ProjectIntelligenceSummary report={report} />
+      {report && (
+        <div style={{ display: 'grid', gap: 16 }}>
+          <ProjectSelectionSummary
+            summary={summary}
+            currency={report.summary.liveCurrency}
+            hiddenCount={hiddenProjectCount}
+          />
 
-            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-              {TABS.map((entry) => (
-                <TabButton key={entry.key} active={tab === entry.key} onClick={() => setTab(entry.key)}>
-                  {entry.label}
-                  {entry.key === 'warnings' && report.warnings.length > 0 ? ` (${report.warnings.length})` : ''}
-                  {entry.key === 'demand' && report.productDemand.length > 0 ? ` (${report.productDemand.length})` : ''}
-                </TabButton>
-              ))}
+          {!priceListAvailable && (
+            <div style={{ fontSize: 12, color: BRAND.warn }}>
+              No price list is available for this session, so live design value is reported as not calculable rather than
+              as zero.
             </div>
+          )}
 
-            {tab === 'overview' && (
-              <>
-                <Card
-                  title="Status breakdown"
-                  subtitle="Count and value by canonical status bucket. Projects are counted once; the design variation count is shown separately."
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+            {TABS.map((entry) => (
+              <TabButton key={entry.key} active={tab === entry.key} onClick={() => setTab(entry.key)}>
+                {entry.label}
+                {entry.key === 'demand' && selection.productDemand.length > 0 ? ` (${selection.productDemand.length})` : ''}
+                {entry.key === 'projects' && summary ? ` (${summary.includedCount}/${summary.listedProjectCount})` : ''}
+              </TabButton>
+            ))}
+          </div>
+
+          {tab === 'demand' && (
+            <Card
+              title="Product demand"
+              subtitle={`${selection.productDemand.length} product line${selection.productDemand.length === 1 ? '' : 's'} across ${summary.includedCount} included project${summary.includedCount === 1 ? '' : 's'}. Counted versions only.`}
+            >
+              <ProductDemandTable
+                productDemand={selection.productDemand}
+                currency={report.summary.liveCurrency || report.priceContext.currency}
+                projectNamesById={projectNamesById}
+              />
+            </Card>
+          )}
+
+          {tab === 'projects' && (
+            <Card
+              title="Project selection"
+              subtitle="One row per project. Test, demo and audit projects are excluded by default and can be included manually."
+              actions={(
+                <Button
+                  variant="secondary"
+                  onClick={selection.resetSelection}
+                  title="Clear the stored inclusion and counted-version choices and return to the defaults"
                 >
-                  <StatusBreakdownTable
-                    buckets={report.bucketBreakdown}
-                    valueBasis={report.filters.valueBasis}
-                    quoteCurrency={report.priceContext.currency}
-                  />
-                </Card>
-
-                <Card
-                  title="Highest-value projects"
-                  subtitle="Project families ranked by the selected value basis. A project appears once however many design versions it has."
-                >
-                  <HighestValueProjectsTable
-                    families={report.families}
-                    valueBasis={report.filters.valueBasis}
-                    onViewVariations={setActiveFamily}
-                  />
-                </Card>
-
-                <Card
-                  title="Project families"
-                  subtitle="One row per project. Live Design Value and Quoted Snapshot Value are reported side by side and are never added together."
-                >
-                  <ProjectFamilyTable
-                    families={report.families}
-                    valueBasis={report.filters.valueBasis}
-                    onViewVariations={setActiveFamily}
-                  />
-                </Card>
-
-                <Card
-                  title="Possible duplicate projects"
-                  subtitle="Advisory only. Detection is conservative: same account plus at least two matching signals. Nothing is merged or changed."
-                >
-                  <DuplicatesPanel
-                    duplicates={report.duplicates}
-                    onViewVariations={setActiveFamily}
-                    familiesById={familiesById}
-                  />
-                </Card>
-              </>
-            )}
-
-            {tab === 'demand' && (
-              <Card
-                title="Product demand"
-                subtitle={`${report.productDemand.length} product line${report.productDemand.length === 1 ? '' : 's'} across ${report.summary.projectCount} project famil${report.summary.projectCount === 1 ? 'y' : 'ies'}.`}
-              >
-                <ProductDemandTab
-                  productDemand={report.productDemand}
-                  currency={report.summary.liveCurrency || report.priceContext.currency}
-                  quotedCurrency={report.summary.quotedCurrency || report.priceContext.currency}
-                />
-              </Card>
-            )}
-
-            {tab === 'warnings' && (
-              <>
-                <Card
-                  title="Warnings"
-                  subtitle="Unclassified statuses, projects whose value cannot be calculated, unpriced lines, inactive products and possible duplicates. Nothing is mapped or zeroed silently."
-                >
-                  <WarningsPanel warnings={report.warnings} />
-                </Card>
-
-                <Card
-                  title="Possible duplicate projects"
-                  subtitle="Advisory only. No automatic grouping and no writes."
-                >
-                  <DuplicatesPanel
-                    duplicates={report.duplicates}
-                    onViewVariations={setActiveFamily}
-                    familiesById={familiesById}
-                  />
-                </Card>
-              </>
-            )}
-
-            {!report.priceContext.priceListAvailable && (
-              <Card>
-                <div style={{ fontSize: 12, color: BRAND.warn }}>
-                  No price list is available for this session, so Live Design Value is reported as not calculable rather than as zero.
+                  Reset selection to defaults
+                </Button>
+              )}
+            >
+              <div style={{ display: 'grid', gap: 12 }}>
+                <div style={{ fontSize: 12, color: BRAND.muted }}>
+                  Inclusion is report selection only. Nothing is deleted, archived or changed in the project database.
                 </div>
-              </Card>
-            )}
+                <ProjectSelectionTable
+                  families={selection.selectedFamilies}
+                  currency={report.summary.liveCurrency}
+                  onToggleInclude={selection.setIncluded}
+                  onCountedChange={selection.setCountedOption}
+                />
+              </div>
+            </Card>
+          )}
 
-            <div style={{ fontSize: 12, color: BRAND.muted, display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
-              <Pill tone="neutral">Read-only</Pill>
-              <span>
-                Live Design Value is calculated from each project's active design version with the existing pricing engine and the current
-                Product Master. Quoted Snapshot Value is read from the frozen proposal snapshot. They are never summed.
-              </span>
-            </div>
-          </>
-        )}
-      </div>
+          {tab === 'variations' && (
+            <Card
+              title="Version detail"
+              subtitle={`${selection.versionRows.length} design version${selection.versionRows.length === 1 ? '' : 's'} across ${summary.listedProjectCount} projects. Only counted versions feed product demand.`}
+            >
+              <VariationCountTable
+                rows={selection.versionRows}
+                currency={report.summary.liveCurrency}
+              />
+            </Card>
+          )}
+
+          {tab === 'advanced' && (
+            <AdvancedDiagnosticsPanel
+              report={report}
+              familiesById={familiesById}
+              onViewVariations={setActiveFamily}
+              filters={filters}
+              accountOptions={accountOptions}
+              onFilterChange={updateFilter}
+              onResetFilters={resetFilters}
+            />
+          )}
+
+          <div style={{ fontSize: 12, color: BRAND.muted, display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
+            <Pill tone="neutral">Read-only</Pill>
+            <span>
+              Live design value is calculated with the existing pricing engine against the current Product Master, for
+              the counted version of each included project. Versions of a project are design options and are never summed.
+            </span>
+          </div>
+        </div>
+      )}
 
       <VariationDrawer family={drawerFamily} onClose={() => setActiveFamily(null)} />
     </div>

@@ -5,6 +5,7 @@
 // text in front of the browser.
 
 import { buildCsv, buildExcelXmlWorkbook, buildReportSheets } from '@/lib/commercial/projectReporting/projectReportingExport';
+import { buildSelectionSheets, selectionExportFilename } from '@/lib/commercial/projectReporting/projectSelectionExport';
 
 function stamp() {
   const now = new Date();
@@ -58,3 +59,30 @@ export function downloadCsvSheets(report) {
 }
 
 export const WORKBOOK_TABS = ['Project Summary', 'Product Demand', 'Variations Detail', 'Warnings'];
+
+/**
+ * The product demand export: four tabs built from the admin's inclusion and
+ * counted-version selection, so the workbook carries exactly what the page
+ * shows. Filename follows the Product Demand convention.
+ */
+export function downloadSelectionWorkbook(selection) {
+  const sheets = buildSelectionSheets(selection);
+  downloadTextFile(
+    `${selectionExportFilename()}.xls`,
+    buildExcelXmlWorkbook(sheets),
+    'application/vnd.ms-excel',
+  );
+  return sheets.map((sheet) => sheet.name);
+}
+
+/** The CSV-per-tab fallback for the same four tabs. */
+export function downloadSelectionCsv(selection) {
+  const sheets = buildSelectionSheets(selection);
+  const base = selectionExportFilename();
+  sheets.forEach((sheet, index) => {
+    setTimeout(() => {
+      downloadTextFile(`${base} - ${slug(sheet.name)}.csv`, buildCsv(sheet), 'text/csv');
+    }, index * 250);
+  });
+  return sheets.map((sheet) => sheet.name);
+}

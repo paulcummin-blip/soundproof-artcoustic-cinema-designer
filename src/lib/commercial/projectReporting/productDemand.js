@@ -23,6 +23,23 @@ export function isDerivedLine(model) {
 }
 
 /**
+ * The variation whose priced lines count as demand for this project.
+ *
+ * A project's versions are design options and a client cannot buy every option,
+ * so only the ONE counted version contributes. The counted version is chosen in
+ * the selection layer; when a caller has not chosen one, the active version is
+ * used exactly as before.
+ */
+function countedVariationOf(family) {
+  const variations = family?.variations || [];
+  if (family?.countedVariationId) {
+    const chosen = variations.find((variation) => variation.id === family.countedVariationId);
+    if (chosen) return chosen;
+  }
+  return variations.find((variation) => variation.isActive) || variations[0];
+}
+
+/**
  * @param {Object} input
  * @param {Array} input.families — filtered project families
  * @param {Map} input.priceMap — Product Master index (sku → product)
@@ -56,10 +73,10 @@ export function buildProductDemand({ families = [], priceMap = null } = {}) {
     return rows.get(key);
   };
 
-  // Live design demand, from the priced schedule of each active version.
+  // Live design demand, from the priced schedule of the counted version only.
   for (const family of families) {
-    const active = family.variations?.find((variation) => variation.isActive) || family.variations?.[0];
-    for (const line of active?.lines || []) {
+    const counted = countedVariationOf(family);
+    for (const line of counted?.lines || []) {
       const row = ensureRow(line.model, line.description);
       if (!row) continue;
       const quantity = Number(line.count ?? line.qty) || 0;
@@ -98,7 +115,9 @@ export function buildProductDemand({ families = [], priceMap = null } = {}) {
     .map((row) => ({
       ...row,
       projectFamilies: row.projectIds.size,
-      projectIds: undefined,
+      // The contributing project ids are kept so the demand table can show which
+      // included projects produced each quantity.
+      projectIds: [...row.projectIds],
       liveValue: row.priceKnown || row.liveValue > 0 ? row.liveValue : null,
       quotedValue: row.quotedQuantity > 0 ? row.quotedValue : null,
       status: row.inactive ? 'Inactive' : (row.priced ? 'Priced' : 'Unpriced'),
