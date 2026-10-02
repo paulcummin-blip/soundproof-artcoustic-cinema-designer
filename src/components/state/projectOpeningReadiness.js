@@ -18,73 +18,69 @@ import {
   OPENING_CHECKPOINT_STATE,
   OPENING_PHASE,
   WARNING_OUTCOMES,
-  criticalOpeningCheckpointKeys,
   normaliseId,
-  normaliseOutcome,
 } from "./projectOpeningStages.js";
+import {
+  RESTORE_ROWS,
+  RESTORE_STATUS,
+  buildRestoreChecklist,
+  deriveRestoreRelease,
+} from "./projectRestoreChecklist.js";
 
 /**
  * The progress lines the opening panel shows, in order. Deliberately short: the
- * panel is reassurance, not a status console.
+ * panel is reassurance, not a status console. Derived from the restore checklist
+ * so the panel and the release decision can never name different rows.
  */
-export const PROJECT_OPENING_LINES = Object.freeze([
-  { key: "roomSeating", label: "Room and seating" },
-  { key: "speakerLayout", label: "Speaker layout" },
-  { key: "rp22", label: "RP22 / RP23 results" },
-  { key: "bass", label: "Bass performance" },
-  { key: "bassTargetBank", label: "Bass target bank" },
-  { key: "visualReport", label: "Visual Report" },
-  { key: "technicalReport", label: "Technical Report" },
-  { key: "proposalSource", label: "Proposal source data" },
-  { key: "pricing", label: "Pricing" },
-]);
+export const PROJECT_OPENING_LINES = Object.freeze(
+  RESTORE_ROWS
+    .filter((row) => row.displayed !== false)
+    .map((row) => Object.freeze({ key: row.key, label: row.label, source: row.source })),
+);
+
+/** Every checklist row — displayed and internal — in release order. */
+export const PROJECT_OPENING_CHECKPOINT_KEYS = Object.freeze(
+  RESTORE_ROWS.map((row) => row.key),
+);
 
 /**
- * Checkpoints that gate closure but are not drawn as progress lines — project
- * metadata, the active version, seat priorities and the autosave baseline are
- * preconditions for a coherent project, not steps the designer needs to watch.
+ * One checklist row as a panel line. The panel is given the row's terminal flag,
+ * its blocking flag and its exact status, so it can never render "Restoring" for
+ * a row that has finished — or hide a row that is holding the project.
  */
-const INTERNAL_CHECKPOINT_KEYS = Object.freeze([
-  "metadata",
-  "activeVersion",
-  "seatPriorities",
-  "autosaveBaseline",
-]);
-
-export const PROJECT_OPENING_CHECKPOINT_KEYS = Object.freeze([
-  ...INTERNAL_CHECKPOINT_KEYS,
-  ...PROJECT_OPENING_LINES.map((line) => line.key),
-]);
-
-const labelForCheckpoint = (key) =>
-  PROJECT_OPENING_LINES.find((line) => line.key === key)?.label || key;
-
-const isPending = (entry) =>
-  (entry?.state ?? OPENING_CHECKPOINT_STATE.PENDING) === OPENING_CHECKPOINT_STATE.PENDING;
-
-/** Every stage still restoring, in panel order. */
-export function pendingOpeningCheckpointKeys(snapshot) {
-  return PROJECT_OPENING_CHECKPOINT_KEYS.filter((key) => isPending(snapshot?.checkpoints?.[key]));
+function restoreRowToLine(row) {
+  return {
+    key: row.key,
+    label: row.label,
+    // The state vocabulary existing consumers read.
+    state: !row.terminal
+      ? OPENING_CHECKPOINT_STATE.PENDING
+      : row.status === RESTORE_STATUS.FAILED
+        ? OPENING_CHECKPOINT_STATE.UNAVAILABLE
+        : OPENING_CHECKPOINT_STATE.READY,
+    status: row.status,
+    terminal: row.terminal,
+    blocking: row.blocking,
+    safeToContinue: row.safeToContinue,
+    source: row.source,
+    outcome: row.terminal ? row.status : null,
+    timedOut: row.timedOut === true,
+    detail: row.message,
+  };
 }
 
-/** The nine progress lines, with the current state and outcome of each. */
+/** Every stage still restoring, in checklist order. */
+export function pendingOpeningCheckpointKeys(snapshot, projectId = snapshot?.projectId) {
+  return buildRestoreChecklist({ snapshot, projectId })
+    .rows.filter((row) => !row.terminal)
+    .map((row) => row.key);
+}
+
+/** The progress lines, with the status, terminality and blocking of each. */
 export function openingProgressLines(snapshot, projectId) {
-  const pid = normaliseId(projectId);
-  const active = normaliseId(snapshot?.projectId) === pid ? (snapshot?.checkpoints || {}) : {};
-  return PROJECT_OPENING_LINES.map((line) => {
-    const entry = active[line.key] || null;
-    const state = entry?.state || OPENING_CHECKPOINT_STATE.PENDING;
-    return {
-      key: line.key,
-      label: line.label,
-      state,
-      outcome: state === OPENING_CHECKPOINT_STATE.PENDING
-        ? null
-        : (entry?.outcome || normaliseOutcome(null, state)),
-      timedOut: entry?.timedOut === true,
-      detail: entry?.detail || null,
-    };
-  });
+  return buildRestoreChecklist({ snapshot, projectId })
+    .rows.filter((row) => row.displayed)
+    .map(restoreRowToLine);
 }
 
 /**
@@ -129,79 +125,63 @@ export function openingCheckpointWarnings(snapshot, projectId) {
  */
 export function deriveOpeningReadinessFor(snapshot, projectId, context = {}) {
   const pid = normaliseId(projectId);
-  const lines = openingProgressLines(snapshot, pid);
+  const checklist = buildRestoreChecklist({ snapshot, projectId: pid });
+  const release = deriveRestoreRelease(checklist.rows);
+  const lines = checklist.rows.filter((row) => row.displayed).map(restoreRowToLine);
+
+  const nonTerminalRows = checklist.rows.filter((row) => !row.terminal);
+  const base = {
+    release: release.release,
+    checklist: checklist.rows,
+    blockingKeys: release.blockingRows.map((row) => row.key),
+    holdLabels: release.holdLabels,
+    releaseReason: release.reason,
+    entrySurface: checklist.entrySurface,
+    attempt: checklist.attempt,
+    lines,
+    warnings: openingCheckpointWarnings(snapshot, pid),
+    begun: checklist.begun,
+  };
 
   if (!pid) {
     return {
-      holding: false, begun: false, pending: [], pendingCritical: [], pendingSupporting: [],
+      ...base, holding: false, pending: [], pendingCritical: [], pendingSupporting: [],
       pendingLabels: [], closed: true, timedOut: false, minVisibleElapsed: true,
-      phase: OPENING_PHASE.IDLE, canContinueWithWarning: false, entrySurface: null,
-      attempt: 0, lines, warnings: [],
+      phase: OPENING_PHASE.IDLE, canContinueWithWarning: false, checklist: [], release: false,
     };
   }
-
-  const entrySurface = snapshot?.entrySurface || null;
-  const criticalKeys = criticalOpeningCheckpointKeys(entrySurface);
-  const attempt = Number(snapshot?.attempt) || 0;
-  const warnings = openingCheckpointWarnings(snapshot, pid);
 
   // Opened earlier in this session: never show the panel again.
   if (context.satisfied === true) {
     return {
-      holding: false, begun: false, pending: [], pendingCritical: [], pendingSupporting: [],
+      ...base, holding: false, pending: [], pendingCritical: [], pendingSupporting: [],
       pendingLabels: [], closed: true, timedOut: false, minVisibleElapsed: true,
-      phase: OPENING_PHASE.READY, canContinueWithWarning: false, entrySurface,
-      attempt, lines, warnings,
+      phase: OPENING_PHASE.READY, canContinueWithWarning: false,
     };
   }
 
-  // A project is selected but its opening has not begun yet. Hold, so not even
-  // one frame of the previous or partially-restored state can appear.
-  if (normaliseId(snapshot?.projectId) !== pid) {
-    return {
-      holding: true,
-      begun: false,
-      pending: [...PROJECT_OPENING_CHECKPOINT_KEYS],
-      pendingCritical: [...criticalKeys],
-      pendingSupporting: PROJECT_OPENING_CHECKPOINT_KEYS.filter((key) => !criticalKeys.includes(key)),
-      pendingLabels: PROJECT_OPENING_CHECKPOINT_KEYS.map(labelForCheckpoint),
-      closed: false,
-      timedOut: false,
-      minVisibleElapsed: false,
-      phase: OPENING_PHASE.RESTORING,
-      canContinueWithWarning: false,
-      entrySurface,
-      attempt,
-      lines,
-      warnings,
-    };
-  }
-
-  const pending = pendingOpeningCheckpointKeys(snapshot);
-  const pendingCritical = pending.filter((key) => criticalKeys.includes(key));
-  const pendingSupporting = pending.filter((key) => !criticalKeys.includes(key));
-  const timedOut = snapshot.timedOut === true;
-  const holding = !snapshot.closed && (!snapshot.minVisibleElapsed || pendingCritical.length > 0);
+  // The minimum visible time can only ever hold the panel LONGER than the
+  // checklist's own answer — it is never a reason to close. A project whose
+  // opening has not begun yet cannot take credit for the previous project's.
+  const minVisibleElapsed = checklist.begun && snapshot?.minVisibleElapsed === true;
+  const holding = !release.release || !minVisibleElapsed;
+  const timedOut = checklist.begun && snapshot?.timedOut === true;
 
   return {
+    ...base,
     holding,
-    begun: true,
-    pending,
-    pendingCritical,
-    pendingSupporting,
-    pendingLabels: pending.map(labelForCheckpoint),
-    closed: snapshot.closed === true,
+    pending: nonTerminalRows.map((row) => row.key),
+    pendingCritical: nonTerminalRows.filter((row) => row.blocking).map((row) => row.key),
+    pendingSupporting: nonTerminalRows.filter((row) => !row.blocking).map((row) => row.key),
+    pendingLabels: nonTerminalRows.map((row) => row.label),
+    closed: !holding,
     timedOut,
-    minVisibleElapsed: snapshot.minVisibleElapsed === true,
+    minVisibleElapsed,
     phase: !holding
       ? OPENING_PHASE.READY
       : timedOut
         ? OPENING_PHASE.STILL_RESTORING
         : OPENING_PHASE.RESTORING,
-    canContinueWithWarning: false,
-    entrySurface,
-    attempt,
-    lines,
-    warnings,
+    canContinueWithWarning: holding && release.canContinueWithWarning,
   };
 }

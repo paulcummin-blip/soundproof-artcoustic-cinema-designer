@@ -33,9 +33,17 @@
 //      only answers for RP22/bass when it actually states the bass authority;
 //      otherwise the stage is reported as out of date, so a report can never
 //      read a half-settled live state as the saved authority.
-//   2. Bass is never released while it is still calculating: while a bass
-//      analysis is genuinely running for this project the stage is held as
-//      restoring, so the panel cannot close underneath it.
+//   2. Bass is never released while it is still working. While the saved bass
+//      authority is being restored the stage is held as hydrating, and while a
+//      bass analysis is genuinely running for a version that HAS saved bass it is
+//      held as calculating — both non-terminal, so the panel cannot close
+//      underneath them. A version with no saved bass resolves honestly as "not
+//      calculated yet" and never waits on a live calculation it has nothing to
+//      protect.
+//
+// Each row also states whether it BLOCKS the release and which authority it was
+// read from, so the checklist (projectRestoreChecklist.js) can decide when the
+// panel may close without guessing.
 //
 // Every check is bounded: a failed read resolves that stage with a reason.
 
@@ -87,10 +95,14 @@ const BASS_WATCH_INTERVAL_MS = 500;
 // ── Stage resolutions ─────────────────────────────────────────────────────
 const ready = (detail) => ({ state: CHECKPOINT.READY, outcome: OUTCOME.READY, detail });
 const notGenerated = (detail) => ({ state: CHECKPOINT.UNAVAILABLE, outcome: OUTCOME.NOT_GENERATED, detail });
+const notCalculated = (detail) => ({ state: CHECKPOINT.UNAVAILABLE, outcome: OUTCOME.NOT_CALCULATED, detail });
 const notApplicable = (detail) => ({ state: CHECKPOINT.UNAVAILABLE, outcome: OUTCOME.NOT_APPLICABLE, detail });
 const stale = (detail) => ({ state: CHECKPOINT.UNAVAILABLE, outcome: OUTCOME.STALE, detail });
 const failed = (detail) => ({ state: CHECKPOINT.UNAVAILABLE, outcome: OUTCOME.FAILED, detail });
-const restoring = (detail) => ({ state: CHECKPOINT.PENDING, outcome: null, detail });
+// Non-terminal stages say precisely what they are doing, so the panel never
+// shows "Restoring" for a row that is actually hydrating or calculating.
+const hydrating = (detail) => ({ state: CHECKPOINT.PENDING, outcome: null, status: "hydrating", detail });
+const calculating = (detail) => ({ state: CHECKPOINT.PENDING, outcome: null, status: "calculating", detail });
 
 /**
  * One report's source state, in the opening vocabulary. The states come from the
@@ -130,6 +142,10 @@ export default function ProjectOpeningResolver({ projectId, entrySurface = null 
   // The authority's own answer for bass, re-applied whenever a live bass
   // analysis settles. Held in a ref so the watcher below never re-reads it.
   const bassAuthorityRef = useRef(null);
+  // Whether this version's bass rows block the release. Conservative until the
+  // reads below have answered: waiting to learn is never worse than opening on a
+  // half-restored bass authority.
+  const bassBlockingRef = useRef(true);
 
   // ── 1 · Begin the opening (idempotent) ──────────────────────────────────
   useEffect(() => {
@@ -163,7 +179,10 @@ export default function ProjectOpeningResolver({ projectId, entrySurface = null 
         ? ready(seats > 0
           ? `Room dimensions and ${seats} seating position${seats === 1 ? "" : "s"} restored.`
           : "Room dimensions restored — no seating positions saved yet.")
-        : failed("The saved design carries no room dimensions."),
+        // A version that has never had room dimensions entered is an unfinished
+        // project, not a failure: it opens (terminal, named) so the designer can
+        // enter them, rather than holding the panel on something no retry fixes.
+        : notGenerated("This saved version has no room dimensions yet — enter them in the Room Designer."),
       speakerLayout: speakers > 0
         ? ready(`${speakers} loudspeaker${speakers === 1 ? "" : "s"}${subs > 0 ? ` and ${subs} subwoofer${subs === 1 ? "" : "s"}` : ""} restored.`)
         : ready("No loudspeaker layout is saved for this project."),
@@ -254,6 +273,13 @@ export default function ProjectOpeningResolver({ projectId, entrySurface = null 
       if (cancelled) return;
 
       const bankCount = Number.isFinite(Number(bank?.count)) ? Number(bank.count) : 0;
+
+      // The authority a report is generated against. A report can only be tied to
+      // an authority whose identity is known, so this is the report-authority row.
+      const reportAuthorityFingerprint = publication?.engineering_fingerprint
+        || localSnapshot?.engineeringFingerprint
+        || null;
+
       const identityCheck = verifySourceIdentity({
         projectId,
         versionId,
@@ -277,7 +303,7 @@ export default function ProjectOpeningResolver({ projectId, entrySurface = null 
           recalculationPending: readBassPendingIndicator(projectId),
           unavailable: readAsdrUnavailableIndicator(projectId),
           reportGeneratedAt: publication?.published_at || localSnapshot?.publishedAt || null,
-          sourceFingerprint: publication?.engineering_fingerprint || localSnapshot?.engineeringFingerprint || null,
+          sourceFingerprint: reportAuthorityFingerprint,
         })
         : null;
 
@@ -299,8 +325,19 @@ export default function ProjectOpeningResolver({ projectId, entrySurface = null 
         && (bassAuthority.authoritative === true || bassAuthority.structurallyComplete === true);
       const bassHydrationSettled = !versionId || isBassAuthorityHydrationSettled(projectId, versionId);
 
+      // Does this version actually have saved bass to restore? That answer is what
+      // makes the bass rows blocking: a version with saved bass waits for it, and a
+      // version that has never been calculated resolves as "not calculated yet".
+      const durableSummary = publication?.engineering_summary || null;
+      const bassSaved = bassAuthorityRestored
+        || statesBassAuthority(durableSummary)
+        || bankCount > 0;
+      // Until hydration settles we do not yet know — so the rows stay blocking,
+      // because waiting to learn is never worse than opening half-restored.
+      const bassBlocks = !bassHydrationSettled || bassSaved;
+
       const bassStage = !bassHydrationSettled
-        ? restoring("Restoring the saved bass authority for this design version.")
+        ? hydrating("Restoring the saved bass authority for this design version.")
         : restored
           ? ready(bassAuthorityRestored
             ? "Performance is current — the saved bass result is restored, nothing recalculates."
@@ -311,21 +348,39 @@ export default function ProjectOpeningResolver({ projectId, entrySurface = null 
               ? stale(PARTIAL_LIVE_DETAIL)
               : bassAuthorityRestored
                 ? notGenerated("Bass is calculated for this version but no engineering result is published yet — open the design to publish it.")
-                : notGenerated("No saved bass result — bass performance requires recalculation.");
+                : notCalculated("Bass has not been calculated for this version yet.");
 
       bassAuthorityRef.current = bassStage;
+      bassBlockingRef.current = bassBlocks;
+
+      const reportAuthorityStage = !versionId
+        ? notApplicable("No saved design version — there is no report authority to restore.")
+        : reportAuthorityFingerprint
+          ? ready(`Report authority restored — reports are tied to ${reportAuthorityFingerprint}.`)
+          : notGenerated("No published engineering authority for this version yet — reports are generated from a new publication.");
 
       resolveProjectOpeningCheckpoints({
         rp22: rp22Stage,
-        bass: bassStage,
+
+        // The saved bass rows BLOCK the release while this version has saved bass
+        // to restore (and until we know whether it does): the authority a report
+        // reads must be restored before the project — or a report — is released.
+        bass: { ...bassStage, blocking: bassBlocks },
 
         bassTargetBank: !versionId
           ? notApplicable("No saved design version — there is no target bank to restore.")
           : bankCount >= P14_TARGET_BANK_SIZE
-            ? ready(`All ${P14_TARGET_BANK_SIZE} saved target results restored.`)
+            ? { ...ready(`All ${P14_TARGET_BANK_SIZE} saved target results restored.`), blocking: true }
             : bankCount > 0
-              ? ready(`${bankCount} of ${P14_TARGET_BANK_SIZE} saved target results restored; the rest rebuild when bass is next calculated.`)
-              : notGenerated("No saved target bank for this design — targets rebuild when bass is next calculated."),
+              ? { ...ready(`${bankCount} of ${P14_TARGET_BANK_SIZE} saved target results restored; the rest rebuild when bass is next calculated.`), blocking: true }
+              : {
+                ...notCalculated(bassSaved
+                  ? "No saved target bank alongside the saved bass result — the targets rebuild when bass is next calculated."
+                  : "No saved target bank for this design — targets are calculated when bass is next run."),
+                blocking: bassBlocks,
+              },
+
+        reportAuthority: reportAuthorityStage,
 
         visualReport: reports
           ? reportStageStatus(reports.reports.visual, "Visual Report has not been generated for this version.")
@@ -376,23 +431,29 @@ export default function ProjectOpeningResolver({ projectId, entrySurface = null 
         stop();
         return;
       }
-      if (readBassPendingIndicator(projectId)) {
-        resolveProjectOpeningCheckpoint("bass", restoring(
-          "Bass analysis is still running for this project — the saved result is restored when it settles.",
-        ));
-        return;
-      }
       // The saved bass authority must finish restoring before the stage is
       // released: a half-restored authority is never reported as ready, and the
       // project is never handed to a report on one.
       if (versionId && !isBassAuthorityHydrationSettled(projectId, versionId)) {
-        resolveProjectOpeningCheckpoint("bass", restoring(
+        resolveProjectOpeningCheckpoint("bass", hydrating(
           "Restoring the saved bass authority for this design version.",
         ));
         return;
       }
+      // A live calculation holds the stage only when this version HAS saved bass
+      // to protect. A version with nothing saved has nothing to wait for, so it
+      // resolves honestly rather than holding the project on a background run.
+      if (readBassPendingIndicator(projectId) && bassBlockingRef.current) {
+        resolveProjectOpeningCheckpoint("bass", calculating(
+          "Bass analysis is still running for this project — the saved result is restored when it settles.",
+        ));
+        return;
+      }
       if (bassAuthorityRef.current) {
-        resolveProjectOpeningCheckpoint("bass", bassAuthorityRef.current);
+        resolveProjectOpeningCheckpoint("bass", {
+          ...bassAuthorityRef.current,
+          blocking: bassBlockingRef.current,
+        });
       }
     };
 

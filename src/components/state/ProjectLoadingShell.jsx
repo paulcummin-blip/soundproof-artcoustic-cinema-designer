@@ -6,6 +6,7 @@
 // project is being opened.
 
 import React from "react";
+import { RESTORE_STATUS_LABEL } from "@/components/state/projectRestoreChecklist";
 
 const FONT_BODY = "'Didact Gothic', 'Century Gothic', sans-serif";
 
@@ -24,26 +25,19 @@ function Bar({ width = "100%", height = 12 }) {
   );
 }
 
-// One progress line: what is being restored, and how it finished. A completed
-// stage says HOW it finished — Ready, Not generated yet, Not applicable, Out of
-// date or Unavailable — so "nothing is saved for this yet" can never look like a
-// failure, and a failure can never look like an empty project. The detail
-// sentence is carried as a tooltip so the panel stays calm.
-const OUTCOME_TEXT = {
-  ready: "Ready",
-  "not-generated": "Not generated yet",
-  "not-applicable": "Not applicable",
-  stale: "Out of date",
-  failed: "Unavailable",
-};
-
-const WARNING_OUTCOMES = ["stale", "failed"];
-
-function OpeningLine({ label, state, outcome, detail }) {
-  const done = state === "ready";
-  const known = state === "unavailable";
-  const warned = known && WARNING_OUTCOMES.includes(outcome);
-  const statusText = done ? "Ready" : known ? (OUTCOME_TEXT[outcome] || "Not available") : "Restoring";
+// One progress line: what is being restored, and how it finished. The status text
+// comes straight from the restore checklist's vocabulary, so a row can only say
+// "Restoring" while it really is still restoring — and a row that is holding the
+// project is marked as required, so the panel always names what it is waiting for.
+//
+// A completed stage says HOW it finished — Ready, Not generated yet, Not
+// calculated yet, Not applicable, Out of date or Unavailable — so "nothing is
+// saved for this yet" can never look like a failure, and a failure can never look
+// like an empty project. The detail sentence is carried as a tooltip.
+function OpeningLine({ label, status, terminal, blocking, detail }) {
+  const warned = terminal && (status === "stale" || status === "failed");
+  const done = terminal && !warned;
+  const statusText = RESTORE_STATUS_LABEL[status] || "Restoring";
   const statusColour = done ? "#213428" : warned ? "#8A4B12" : "#8B7F76";
 
   return (
@@ -57,11 +51,25 @@ function OpeningLine({ label, state, outcome, detail }) {
           height: 8,
           borderRadius: 4,
           flexShrink: 0,
-          background: done ? "#213428" : warned ? "#B4732A" : known ? "#8B7F76" : "#B9B2A8",
-          animation: done || known ? "none" : "project-shell-dot 1.2s ease-in-out infinite",
+          background: done ? "#213428" : warned ? "#B4732A" : terminal ? "#8B7F76" : "#B9B2A8",
+          animation: terminal ? "none" : "project-shell-dot 1.2s ease-in-out infinite",
         }}
       />
       <span style={{ flex: 1 }}>{label}</span>
+      {blocking === true && !terminal && (
+        <span
+          style={{
+            fontSize: 10,
+            color: "#8A4B12",
+            border: "1px solid #E2D9C6",
+            borderRadius: 4,
+            padding: "1px 5px",
+            whiteSpace: "nowrap",
+          }}
+        >
+          required
+        </span>
+      )}
       <span style={{ fontSize: 11, color: statusColour, fontWeight: done || warned ? 700 : 500 }}>
         {statusText}
       </span>
@@ -131,6 +139,7 @@ export default function ProjectLoadingShell({
   projectClientName = null,
   projectReference = null,
   lines = [],
+  heldByLabels = [],
   label = "Your project",
   compact = false,
   phase = "restoring",
@@ -220,11 +229,21 @@ export default function ProjectLoadingShell({
               <OpeningLine
                 key={line.key}
                 label={line.label}
-                state={line.state}
-                outcome={line.outcome}
+                status={line.status}
+                terminal={line.terminal}
+                blocking={line.blocking}
                 detail={line.detail}
               />
             ))}
+          </div>
+        )}
+
+        {/* What the panel is waiting for, named. If a row above still says
+            Restoring, it appears here — the project cannot open on it. */}
+        {heldByLabels.length > 0 && (
+          <div style={{ marginTop: 12, fontSize: 12, color: "#8A4B12", lineHeight: 1.5 }}>
+            This project opens once every row above has finished restoring. Still
+            waiting for {heldByLabels.join(", ")}.
           </div>
         )}
 

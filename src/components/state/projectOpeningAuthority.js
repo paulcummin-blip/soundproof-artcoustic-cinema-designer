@@ -9,11 +9,17 @@
 // nor hang (an unknown state shown as if it were the truth).
 //
 // Every stage ends in a definite outcome — ready, not generated yet, not
-// applicable, out of date, or failed with a reason. "Still restoring" is NOT a
-// completed stage, so a stage that never confirms keeps the panel open; it is
-// never silently resolved into a finished project. When the wait runs long the
-// panel says so and offers Retry, and it will only continue on an explicit,
-// warned decision — and never past a critical stage.
+// calculated yet, not applicable, out of date, or failed with a reason. "Still
+// restoring" (and hydrating/calculating/pending/checking) is NOT a completed
+// stage, so a stage that never confirms keeps the panel open; it is never
+// silently resolved into a finished project. When the wait runs long the panel
+// says so and offers Retry, and it will only continue on an explicit, warned
+// decision — and never past a structural stage.
+//
+// THE release rule lives in projectRestoreChecklist.js: the panel closes exactly
+// when every restore row is terminal and every blocking row is in an allowed
+// terminal state. Time is never a release condition — the minimum visible time
+// can only hold the panel longer.
 //
 // Read-only: nothing here calculates, recalculates, generates a report, starts a
 // worker or writes to the database. It only records what other authorities
@@ -24,7 +30,7 @@ import { useMemo, useSyncExternalStore } from "react";
 import {
   OPENING_CHECKPOINT_OUTCOME,
   OPENING_CHECKPOINT_STATE,
-  criticalOpeningCheckpointKeys,
+  nonBypassableOpeningCheckpointKeys,
   normaliseId,
   normaliseOutcome,
 } from "./projectOpeningStages.js";
@@ -33,6 +39,10 @@ import {
   deriveOpeningReadinessFor,
   pendingOpeningCheckpointKeys,
 } from "./projectOpeningReadiness.js";
+import {
+  buildRestoreChecklist,
+  deriveRestoreRelease,
+} from "./projectRestoreChecklist.js";
 
 // Re-exported so the panel, the resolver and the tests keep one import site for
 // the whole opening contract.
@@ -45,8 +55,10 @@ export {
   OUTCOME_VALUES,
   WARNING_OUTCOMES,
   criticalOpeningCheckpointKeys,
+  nonBypassableOpeningCheckpointKeys,
   openingCheckpointStage,
   openingEntrySurfaceForPath,
+  savedBassCheckpointKeys,
 } from "./projectOpeningStages.js";
 export {
   PROJECT_OPENING_CHECKPOINT_KEYS,
@@ -55,6 +67,19 @@ export {
   openingProgressLines,
   pendingOpeningCheckpointKeys,
 } from "./projectOpeningReadiness.js";
+export {
+  RESTORE_ALLOWED_BLOCKING_TERMINAL_STATUSES,
+  RESTORE_NON_TERMINAL_STATUSES,
+  RESTORE_ROWS,
+  RESTORE_STATUS,
+  RESTORE_STATUS_LABEL,
+  RESTORE_TERMINAL_STATUSES,
+  blockingRestoreRowKeys,
+  buildRestoreChecklist,
+  deriveRestoreRelease,
+  isRestoreRowBlocking,
+  isRestoreStatusTerminal,
+} from "./projectRestoreChecklist.js";
 
 /** The panel never flashes: it stays for at least this long. */
 export const PROJECT_OPENING_MIN_VISIBLE_MS = 900;
@@ -63,7 +88,7 @@ export const PROJECT_OPENING_MIN_VISIBLE_MS = 900;
  * A dependency that will not confirm within this window stops being waited on
  * silently: the panel says it is still restoring and offers Retry. It never
  * opens the project by itself — an unresolved stage is not a completed stage.
- * A still-unresolved critical stage cannot be continued past at all.
+ * A still-unresolved structural stage cannot be continued past at all.
  */
 export const PROJECT_OPENING_TIMEOUT_MS = 8000;
 
@@ -279,10 +304,12 @@ export function retryProjectOpening(options = {}) {
  * Open the project while a stage is still restoring — the explicit, warned
  * path offered on the panel once the wait has run long.
  *
- * Refused while any CRITICAL stage is still restoring: a project is never
- * released without its design, saved calculation authority or bass performance.
- * It is allowed only when the unresolved stages are supporting ones (report
- * sources, the target bank, pricing), which then appear as visible warnings.
+ * Refused while a STRUCTURAL stage is still restoring: without the project
+ * record, its active version or its saved geometry there is no project to open,
+ * so this offers nothing to continue past. Everything else may be continued past
+ * on an explicit decision: each unresolved row is then recorded as FAILED with a
+ * visible warning, which is a terminal state — the panel closes because the
+ * checklist finished, not because a timer ran out.
  *
  * @returns {boolean} whether the project was opened
  */
@@ -291,7 +318,7 @@ export function continueProjectOpeningWithWarning() {
 
   const pending = pendingOpeningCheckpointKeys(state);
   if (pending.length === 0) return false;
-  if (pending.some((key) => criticalOpeningCheckpointKeys(state.entrySurface).includes(key))) {
+  if (pending.some((key) => nonBypassableOpeningCheckpointKeys().includes(key))) {
     return false;
   }
 
@@ -302,6 +329,7 @@ export function continueProjectOpeningWithWarning() {
       outcome: OPENING_CHECKPOINT_OUTCOME.FAILED,
       detail: TIMEOUT_DETAIL,
       timedOut: true,
+      safeToContinue: true,
     };
   });
 
@@ -320,11 +348,15 @@ export function resolveProjectOpeningCheckpoint(key, resolved) {
  * ignored, and an unchanged value does not notify (this runs during a project
  * open, so it must stay quiet unless something genuinely moved).
  *
- * Each entry may state `outcome` (how a completed stage finished) and
- * `timedOut`. An entry that states neither is normalised from its state, so a
- * caller can never leave a stage in an unreadable limbo.
+ * Each entry may state `outcome` (how a completed stage finished), `timedOut`,
+ * `status` (the precise non-terminal state, e.g. hydrating or calculating) and
+ * `blocking` (whether this stage holds the release for THIS version — the
+ * saved-bass rows can only be answered by the resolver). An entry that states
+ * none of them is normalised from its state, so a caller can never leave a stage
+ * in an unreadable limbo.
  *
- * @param {Record<string, {state: string, outcome?: string, detail?: string|null, timedOut?: boolean}>} entries
+ * @param {Record<string, {state: string, outcome?: string, detail?: string|null,
+ *   timedOut?: boolean, status?: string, blocking?: boolean, safeToContinue?: boolean}>} entries
  */
 export function resolveProjectOpeningCheckpoints(entries) {
   if (!entries || !state.projectId) return;
@@ -346,6 +378,11 @@ export function resolveProjectOpeningCheckpoints(entries) {
         : normaliseOutcome(value.outcome, nextState),
       detail: value.detail || null,
       ...(value.timedOut ? { timedOut: true } : {}),
+      // A precise non-terminal state is only meaningful while the stage is
+      // genuinely still resolving.
+      ...(nextState === OPENING_CHECKPOINT_STATE.PENDING && value.status ? { status: value.status } : {}),
+      ...(typeof value.blocking === "boolean" ? { blocking: value.blocking } : {}),
+      ...(value.safeToContinue === true ? { safeToContinue: true } : {}),
     };
     const previous = checkpoints[key];
     if (
@@ -353,7 +390,10 @@ export function resolveProjectOpeningCheckpoints(entries) {
       && previous.state === next.state
       && previous.outcome === next.outcome
       && previous.detail === next.detail
+      && previous.status === next.status
+      && previous.blocking === next.blocking
       && (previous.timedOut === true) === (next.timedOut === true)
+      && (previous.safeToContinue === true) === (next.safeToContinue === true)
     ) return;
     checkpoints[key] = next;
     changed = true;
@@ -366,18 +406,24 @@ export function resolveProjectOpeningCheckpoints(entries) {
 }
 
 /**
- * Open once the saved design and commercial editing baseline are safe. Output
- * stages (engineering, bass, reports and proposal source) may still be loading
- * or absent: that is a valid unfinished project, and each output surface owns
- * its strict completeness gate.
+ * Open the project — and only when the restore checklist says so.
+ *
+ * The release decision is the checklist's, not a timer's: every row must have
+ * reached a terminal state, and every blocking row must be in an allowed terminal
+ * state (a blocking failure needs the designer's explicit, warned decision — see
+ * continueProjectOpeningWithWarning). A row still restoring therefore keeps the
+ * project behind the panel, which is what stops a report or a proposal being
+ * opened on a half-restored authority.
+ *
+ * "Nothing saved for this stage yet" is terminal: an unfinished project opens so
+ * the designer can finish it, and its own surfaces say what is missing.
  */
 function closeIfResolved() {
   if (state.closed || !state.projectId) return;
   if (!state.minVisibleElapsed) return;
-  const critical = criticalOpeningCheckpointKeys(state.entrySurface);
-  const pendingCritical = pendingOpeningCheckpointKeys(state)
-    .filter((key) => critical.includes(key));
-  if (pendingCritical.length > 0) return;
+  const checklist = buildRestoreChecklist({ snapshot: state, projectId: state.projectId });
+  const { release } = deriveRestoreRelease(checklist.rows);
+  if (!release) return;
   state = { ...state, closed: true };
   markSatisfied(state.projectId);
 }
@@ -399,10 +445,11 @@ export function dismissProjectOpeningWarnings(projectId) {
  * (which projects have already opened in this browser) and keeps the signature
  * every consumer uses.
  *
- * Phases: 'restoring' while an edit-safe opening authority is still resolving,
- * 'still-restoring' once that wait runs long, and 'ready' when the editable
- * project may be shown. Report and proposal completeness is enforced by those
- * surfaces after opening, never by preventing Room Designer access.
+ * Phases: 'restoring' while the restore checklist still has a non-terminal row,
+ * 'still-restoring' once that wait runs long, and 'ready' when the checklist has
+ * released the project. The release rule itself lives in
+ * projectRestoreChecklist.js — if a row still says Restoring, the project is not
+ * loaded and the panel stays up.
  */
 export function deriveOpeningReadiness(snapshot, projectId) {
   const pid = normaliseId(projectId);

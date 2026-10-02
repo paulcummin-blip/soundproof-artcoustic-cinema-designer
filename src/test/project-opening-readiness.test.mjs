@@ -9,14 +9,14 @@
 //   TEST 2   The panel does not close before the minimum visible duration
 //   TEST 3   It closes once every stage is definite and the minimum elapsed
 //   TEST 4   The timeout never opens the project — it says it is still restoring
-//   TEST 5   Bass still restoring keeps the panel open (the reported bug)
-//   TEST 6   Only supporting stages may be continued past, and with a warning
+//   TEST 5   A bass row still restoring holds the panel; an uncalculated bass does not
+//   TEST 6   Commercial hydration must resolve; a failure is warned, not fatal
 //   TEST 7   Retry re-arms every stage and keeps the panel open
 //   TEST 8   "Not generated yet" is not a warning; a failure is
-//   TEST 9   Route entry makes that surface's report source a required stage
+//   TEST 9   A report route makes that surface's report source a required row
 //   TEST 10  A project already opened in this session never shows the panel again
 //   TEST 11  A newly selected project holds before its opening has even begun
-//   TEST 12  The panel publishes the nine requested progress lines, in order
+//   TEST 12  The panel publishes the requested progress lines, in order
 //   TEST 13  The gate, panel, resolver and warnings are wired to this authority
 // ---------------------------------------------------------------------------
 import { test } from 'node:test';
@@ -33,6 +33,7 @@ import {
   PROJECT_OPENING_LINES,
   PROJECT_OPENING_MIN_VISIBLE_MS,
   PROJECT_OPENING_TIMEOUT_MS,
+  RESTORE_STATUS_LABEL,
   _resetProjectOpeningForTest,
   beginProjectOpening,
   continueProjectOpeningWithWarning,
@@ -139,41 +140,107 @@ test('TEST 4 — the timeout never opens the project: it reports that it is stil
     });
 });
 
-test('TEST 5 — unfinished bass never prevents the editable project opening', () => {
+test('TEST 5 — a bass row still restoring holds the panel; an uncalculated bass does not', () => {
+  // This version HAS saved bass: the row is blocking, so the project cannot open
+  // underneath a bass authority that is still restoring.
   start();
-  resolveAllExcept('bass', entry(OPENING_CHECKPOINT_STATE.READY, OPENING_CHECKPOINT_OUTCOME.READY));
+  resolveAllExcept('bass', {
+    ...entry(OPENING_CHECKPOINT_STATE.READY, OPENING_CHECKPOINT_OUTCOME.READY),
+    blocking: true,
+  });
 
-  const opened = openState();
-  assert.equal(opened.holding, false, 'the project opens while bass remains unfinished');
-  assert.equal(getProjectOpening().closed, true, 'Room Designer is available to finish bass');
-  assert.deepEqual(opened.pendingCritical, [], 'bass is not an opening-critical stage');
-  const bassLine = openingProgressLines(getProjectOpening(), PROJECT).find((line) => line.key === 'bass');
-  assert.equal(bassLine.state, OPENING_CHECKPOINT_STATE.PENDING, 'bass remains honestly unfinished');
-  assert.equal(bassLine.label, 'Bass performance', 'the output retains its named background state');
-});
+  const held = openState();
+  assert.equal(held.holding, true, 'the panel holds while the saved bass authority is still restoring');
+  assert.equal(getProjectOpening().closed, false, 'the project is not released');
+  assert.ok(held.pendingCritical.includes('bass'), 'bass is a blocking row for this version');
+  assert.ok(held.holdLabels.includes('Bass performance'), 'the panel names what it is waiting for');
 
-test('TEST 6 — edit-safe commercial hydration still blocks, output hydration does not', () => {
-  // Pricing/autosave are critical because opening before them can write defaults.
-  start();
-  resolveAllExcept('pricing', entry(OPENING_CHECKPOINT_STATE.READY, OPENING_CHECKPOINT_OUTCOME.READY));
-  markProjectOpeningTimedOut();
+  const heldLine = openingProgressLines(getProjectOpening(), PROJECT).find((line) => line.key === 'bass');
+  assert.equal(heldLine.terminal, false, 'the row is honestly not finished');
+  assert.equal(heldLine.blocking, true, 'and it is marked as holding the project');
+  assert.equal(RESTORE_STATUS_LABEL[heldLine.status], 'Restoring', 'the row says Restoring because it IS restoring');
 
-  assert.equal(openState().canContinueWithWarning, false, 'there is no escape hatch past pricing hydration');
-  assert.equal(continueProjectOpeningWithWarning(), false, 'the continue is refused');
-  assert.equal(getProjectOpening().closed, false, 'the project stays closed until editing is safe');
+  resolveProjectOpeningCheckpoints({
+    bass: { ...entry(OPENING_CHECKPOINT_STATE.READY, OPENING_CHECKPOINT_OUTCOME.READY), blocking: true },
+  });
+  assert.equal(openState().holding, false, 'the restored bass authority releases the panel');
 
-  // A calculation/output stage is not an opening precondition.
+  // A version that has never been calculated resolves as "not calculated yet" —
+  // terminal, so an unfinished project still opens for continued work.
   _resetProjectOpeningForTest();
   beginProjectOpening(PROJECT, { versionId: VERSION, minVisibleMs: 0, timeoutMs: 0 });
   resolveAllExcept('bass', entry(OPENING_CHECKPOINT_STATE.READY, OPENING_CHECKPOINT_OUTCOME.READY));
+  resolveProjectOpeningCheckpoints({
+    bass: {
+      state: OPENING_CHECKPOINT_STATE.UNAVAILABLE,
+      outcome: OPENING_CHECKPOINT_OUTCOME.NOT_CALCULATED,
+      blocking: false,
+      detail: 'Bass has not been calculated for this version yet.',
+    },
+    bassTargetBank: {
+      state: OPENING_CHECKPOINT_STATE.UNAVAILABLE,
+      outcome: OPENING_CHECKPOINT_OUTCOME.NOT_CALCULATED,
+      blocking: false,
+      detail: 'No saved target bank for this design.',
+    },
+  });
 
   const opened = openState();
-  assert.equal(opened.holding, false, 'unfinished bass does not block the project');
-  assert.equal(
-    openingProgressLines(getProjectOpening(), PROJECT).find((line) => line.key === 'bass').state,
-    OPENING_CHECKPOINT_STATE.PENDING,
+  assert.equal(opened.holding, false, 'an uncalculated bass is terminal and opens the project');
+  assert.equal(getProjectOpening().closed, true, 'Room Designer is available to calculate it');
+  const bassLine = openingProgressLines(getProjectOpening(), PROJECT).find((line) => line.key === 'bass');
+  assert.equal(bassLine.terminal, true, 'the row has finished');
+  assert.equal(bassLine.status, 'not-calculated', 'it says HOW it finished');
+  assert.equal(RESTORE_STATUS_LABEL[bassLine.status], 'Not calculated yet');
+  assert.equal(bassLine.label, 'Bass performance', 'the output retains its named background state');
+});
+
+test('TEST 6 — commercial hydration must reach a terminal state; a failure is warned, not fatal', () => {
+  const ready = entry(OPENING_CHECKPOINT_STATE.READY, OPENING_CHECKPOINT_OUTCOME.READY);
+
+  // While pricing is still restoring, the panel holds: no row may be left
+  // Restoring while the project opens.
+  start();
+  resolveAllExcept('pricing', ready);
+  assert.equal(openState().holding, true, 'a row still restoring keeps the panel open');
+  assert.equal(getProjectOpening().closed, false, 'the project is not released on an unfinished row');
+
+  // A failed restore is terminal and non-blocking: the designer is told, and the
+  // write path (guardCommercialSave) independently refuses to save against an
+  // unproven commercial baseline, so nothing can be overwritten while it stands.
+  resolveProjectOpeningCheckpoints({
+    pricing: {
+      state: OPENING_CHECKPOINT_STATE.UNAVAILABLE,
+      outcome: OPENING_CHECKPOINT_OUTCOME.FAILED,
+      detail: 'Priced selections were not confirmed for this version.',
+    },
+    autosaveBaseline: {
+      state: OPENING_CHECKPOINT_STATE.UNAVAILABLE,
+      outcome: OPENING_CHECKPOINT_OUTCOME.FAILED,
+      detail: 'Editing baseline not confirmed — saving stays paused until it is.',
+    },
+  });
+
+  const opened = openState();
+  assert.equal(opened.holding, false, 'the failed row is terminal, so it no longer holds the project');
+  assert.equal(getProjectOpening().closed, true);
+  assert.ok(!opened.blockingKeys.includes('pricing'), 'pricing is not a blocking row');
+  assert.deepEqual(
+    openingCheckpointWarnings(getProjectOpening(), PROJECT).map((warning) => warning.key),
+    ['pricing'],
+    'the failure is warned about, never silent',
   );
-  assert.equal(isProjectOpeningSatisfied(PROJECT), true);
+
+  // The structural rows are not bypassable: without the saved geometry there is
+  // no project to open, so there is nothing to continue past.
+  _resetProjectOpeningForTest();
+  beginProjectOpening(PROJECT, { versionId: VERSION, minVisibleMs: 0, timeoutMs: 0 });
+  resolveAllExcept('roomSeating', ready);
+  markProjectOpeningTimedOut();
+
+  assert.equal(openState().canContinueWithWarning, false, 'there is no escape hatch past the saved geometry');
+  assert.equal(continueProjectOpeningWithWarning(), false, 'the continue is refused');
+  assert.equal(getProjectOpening().closed, false, 'the project stays closed without its saved geometry');
 });
 
 test('TEST 7 — Retry re-arms every stage, clears the notice and keeps the panel open', () => {
@@ -217,22 +284,37 @@ test('TEST 8 — "not generated yet" is not a warning; a failure is', () => {
   assert.equal(getProjectOpening().checkpoints.pricing.outcome, OPENING_CHECKPOINT_OUTCOME.FAILED, 'the fact is not erased');
 });
 
-test('TEST 9 — report routes open, then their own completeness gates decide availability', () => {
+test('TEST 9 — a report route makes that surface\'s report source a required row', () => {
   assert.equal(openingEntrySurfaceForPath('/RP22Report'), OPENING_ENTRY_SURFACE.TECHNICAL_REPORT);
   assert.equal(openingEntrySurfaceForPath('/RP22ClientReport'), OPENING_ENTRY_SURFACE.VISUAL_REPORT);
   assert.equal(openingEntrySurfaceForPath('/ProposalCentre'), OPENING_ENTRY_SURFACE.PROPOSAL);
   assert.equal(openingEntrySurfaceForPath('/RoomDesigner'), null);
 
   const technicalKeys = criticalOpeningCheckpointKeys(OPENING_ENTRY_SURFACE.TECHNICAL_REPORT);
-  assert.ok(!technicalKeys.includes('technicalReport'), 'the report source is not a global opening precondition');
-  assert.ok(!technicalKeys.includes('bass'), 'unfinished bass does not block access to the project');
-  assert.ok(technicalKeys.includes('pricing'), 'commercial hydration remains opening-critical');
-  assert.equal(openingCheckpointStage('pricing'), 'critical');
-  assert.equal(openingCheckpointStage('bass'), 'supporting');
+  assert.ok(technicalKeys.includes('technicalReport'), 'the Technical Report source is required on this route');
+  assert.ok(technicalKeys.includes('rp22') && technicalKeys.includes('reportAuthority'), 'the saved authority and report metadata are required');
+  assert.equal(openingCheckpointStage('bass'), 'critical', 'the saved-bass rows are blocking unless the version has none');
+  assert.equal(openingCheckpointStage('pricing'), 'supporting', 'pricing never blocks the release');
+  assert.equal(openingCheckpointStage('visualReport'), 'supporting', 'another surface\'s report source does not block this route');
+  assert.equal(openingCheckpointStage('visualReport', OPENING_ENTRY_SURFACE.VISUAL_REPORT), 'critical');
 
+  // Arriving at the Technical Report holds the panel until its source is terminal.
+  // The page then renders its own explicit not-ready state — never blank cards
+  // built from a half-restored authority.
   start({ entrySurface: OPENING_ENTRY_SURFACE.TECHNICAL_REPORT });
   resolveAllExcept('technicalReport', entry(OPENING_CHECKPOINT_STATE.READY, OPENING_CHECKPOINT_OUTCOME.READY));
-  assert.equal(openState().holding, false, 'the page opens so it can show its explicit not-ready state');
+  assert.equal(openState().holding, true, 'the report source is required for this route');
+  assert.equal(getProjectOpening().closed, false, 'the report is not rendered on a half-restored source');
+
+  resolveProjectOpeningCheckpoints({
+    technicalReport: {
+      state: OPENING_CHECKPOINT_STATE.UNAVAILABLE,
+      outcome: OPENING_CHECKPOINT_OUTCOME.NOT_GENERATED,
+      detail: 'Technical Report has not been generated for this version.',
+    },
+  });
+
+  assert.equal(openState().holding, false, 'a terminal "not generated yet" opens the route, which then names what is missing');
   assert.equal(isProjectOpeningSatisfied(PROJECT), true);
 });
 
@@ -261,7 +343,7 @@ test('TEST 11 — a newly selected project holds before its opening has even beg
   assert.equal(deriveOpeningReadiness(getProjectOpening(), null).holding, false, 'no project means no panel');
 });
 
-test('TEST 12 — the panel publishes the nine requested progress lines, in order', () => {
+test('TEST 12 — the panel publishes the requested progress lines, in order', () => {
   start();
   const labels = PROJECT_OPENING_LINES.map((line) => line.label);
   assert.deepEqual(labels, [
@@ -270,6 +352,7 @@ test('TEST 12 — the panel publishes the nine requested progress lines, in orde
     'RP22 / RP23 results',
     'Bass performance',
     'Bass target bank',
+    'Report authority',
     'Visual Report',
     'Technical Report',
     'Proposal source data',
@@ -277,9 +360,21 @@ test('TEST 12 — the panel publishes the nine requested progress lines, in orde
   ]);
 
   const lines = openingProgressLines(getProjectOpening(), PROJECT);
-  assert.equal(lines.length, 9);
-  lines.forEach((line) => assert.equal(line.state, OPENING_CHECKPOINT_STATE.PENDING, `${line.key} starts restoring`));
+  assert.equal(lines.length, PROJECT_OPENING_LINES.length);
+  lines.forEach((line) => {
+    assert.equal(line.terminal, false, `${line.key} starts unfinished`);
+    assert.equal(line.state, OPENING_CHECKPOINT_STATE.PENDING, `${line.key} starts restoring`);
+    assert.equal(line.status, 'restoring', `${line.key} says exactly that it is restoring`);
+    assert.equal(line.outcome, null, `${line.key} has no outcome yet`);
+  });
+  // The rows that are not drawn still gate the release.
   assert.ok(PROJECT_OPENING_CHECKPOINT_KEYS.includes('autosaveBaseline'), 'the autosave baseline also gates opening');
+  assert.ok(PROJECT_OPENING_CHECKPOINT_KEYS.includes('metadata'), 'the project record also gates opening');
+  assert.equal(
+    PROJECT_OPENING_CHECKPOINT_KEYS.length,
+    PROJECT_OPENING_LINES.length + 4,
+    'the four internal rows gate the release without being drawn',
+  );
 });
 
 test('TEST 13 — the gate, panel, resolver and warnings are wired to this authority', () => {
@@ -290,37 +385,59 @@ test('TEST 13 — the gate, panel, resolver and warnings are wired to this autho
   const warnings = read('src/components/state/ProjectOpeningWarnings.jsx');
   const hydrator = read('src/components/state/ProjectDesignHydrator.jsx');
   const commercial = read('src/components/state/commercialHydrationAuthority.js');
+  const saver = read('src/components/hooks/useProjectLoader.jsx');
+  const checklist = read('src/components/state/projectRestoreChecklist.js');
+  const authority = read('src/components/state/projectOpeningAuthority.js');
 
+  // The gate is the panel's only switch, and it is driven by the checklist.
   assert.ok(gate.includes('useProjectOpening') && gate.includes('opening.holding'), 'the gate holds on the opening authority');
   assert.ok(gate.includes('ProjectOpeningResolver'), 'the gate mounts the resolver');
   assert.ok(gate.includes('entrySurface='), 'the gate tells the opening which route it was entered through');
   assert.ok(gate.includes('ProjectOpeningWarnings'), 'the gate shows the warning the project opened with');
   assert.ok(gate.includes('retryProjectOpening'), 'the panel can re-ask');
   assert.ok(gate.includes('canContinueWithWarning'), 'the panel only offers the warned continue when the authority allows it');
+  assert.ok(gate.includes('heldByLabels'), 'the panel is told which rows are holding the project');
+  assert.ok(gate.includes('opening.holdLabels'), 'and it takes them from the release decision');
 
+  // The panel says HOW each row finished, in the checklist's own words.
   assert.ok(shell.includes('Loading Project'), 'the panel states Loading Project');
   assert.ok(
     shell.includes('Restoring saved design, performance results, reports and pricing.'),
     'the panel carries the requested sentence',
   );
   assert.ok(shell.includes('lines.map'), 'the panel renders the progress lines');
-  assert.ok(shell.includes('Not generated yet') && shell.includes('Out of date'), 'a stage says HOW it finished');
+  assert.ok(shell.includes('RESTORE_STATUS_LABEL'), 'the status words come from the restore vocabulary');
+  assert.ok(shell.includes('line.terminal') && shell.includes('line.blocking'), 'the panel shows terminality and blocking');
   assert.ok(shell.includes('StillRestoringNotice'), 'the panel has the still-restoring notice');
   assert.ok(shell.includes('onContinueWithWarning'), 'the notice offers the warned continue');
   assert.ok(warnings.includes('warning.detail'), 'the warning strip names what did not resolve');
+
+  // The release rule itself: every row terminal, and allowed for the blocking rows.
+  assert.ok(checklist.includes('RESTORE_NON_TERMINAL_STATUSES'), 'the non-terminal vocabulary lives in the checklist');
+  assert.ok(checklist.includes('RESTORE_ALLOWED_BLOCKING_TERMINAL_STATUSES'), 'and so does what a blocking row may finish on');
+  assert.ok(checklist.includes('nonTerminalRows.length === 0'), 'the release requires every row to be terminal');
+  assert.ok(!checklist.includes('setTimeout'), 'no timer takes part in the release decision');
+  assert.ok(!checklist.includes('minVisibleMs'), 'and neither does the minimum visible time');
+  assert.ok(authority.includes('buildRestoreChecklist') && authority.includes('deriveRestoreRelease'), 'the authority closes only on the checklist');
+  assert.ok(authority.includes('nonBypassableOpeningCheckpointKeys'), 'the structural rows cannot be continued past');
+  assert.ok(authority.includes('safeToContinue'), 'an explicit continue marks the rows it releases');
 
   assert.ok(resolver.includes('fetchDurablePublication'), 'bass/RP22 authority is read from the durable publication');
   assert.ok(resolver.includes('resolveProposalSource'), 'report and proposal source states use the canonical resolver');
   assert.ok(resolver.includes('hydrateTargetCache'), 'the P14 target bank is restored (not recalculated)');
   assert.ok(resolver.includes('statesBassAuthority'), 'a partial live handoff is never reported as a restored authority');
   assert.ok(resolver.includes('readBassPendingIndicator'), 'bass that is still calculating holds its stage');
-  assert.ok(resolver.includes('restoring('), 'and holds it as restoring, never as finished');
+  assert.ok(resolver.includes('hydrating(') && resolver.includes('calculating('), 'and says precisely which it is doing');
+  assert.ok(resolver.includes('reportAuthority'), 'the report authority metadata is a tracked row');
+  assert.ok(resolver.includes('blocking: bassBlocks'), 'the saved-bass rows state whether they block this version');
   assert.ok(resolver.includes('attempt'), 'the resolver re-reads on Retry');
   assert.ok(!resolver.includes('setTargetCacheEntry'), 'the resolver never writes target results');
   assert.ok(!resolver.includes('publishBassPendingIndicator'), 'the resolver never publishes a pending bass state');
   assert.ok(!resolver.includes('publishDesignReviewHandoff'), 'the resolver never publishes authoritative results');
 
   assert.ok(commercial.includes('getActiveCommercialAuthority'), 'pricing readiness reads the commercial authority');
+  assert.ok(commercial.includes('guardCommercialSave'), 'and the save path is guarded independently of the panel');
+  assert.ok(saver.includes('guardCommercialSave('), 'the writer refuses a save against an unproven baseline');
   assert.ok(hydrator.includes('markCommercialHydrated'), 'the hydrator marks the priced selections as loaded');
   assert.ok(
     hydrator.includes('isCommercialHydrationComplete') && hydrator.includes('commercialReady'),

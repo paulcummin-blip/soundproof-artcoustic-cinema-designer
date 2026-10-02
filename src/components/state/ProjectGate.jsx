@@ -14,6 +14,7 @@
 
 import React from "react";
 import { Link } from "react-router-dom";
+import log from "@/components/utils/logger";
 import {
   useCanonicalProject,
   retryProjectHydration,
@@ -72,12 +73,38 @@ export default function ProjectGate({ children, requiresDesign = true }) {
   const projectName = hydration.identity?.name || null;
   const projectClientName = hydration.identity?.clientName || null;
   const projectReference = hydration.identity?.projectReference || null;
-  // The opening panel is held by the project opening authority: it stays until
-  // every restore stage has a definite outcome — ready, not generated yet, not
-  // applicable, out of date, or failed with a warning. "The record has loaded" is
-  // not enough, and neither is "the wait ran long": a stage that is still
-  // restoring keeps the panel open.
+  // The opening panel is held by the restore checklist: it stays until EVERY row
+  // has reached a terminal state — ready, loaded, complete, current, out of date,
+  // not generated yet, not calculated yet, not applicable, or failed with a
+  // visible warning. "The record has loaded" is not enough, and neither is "the
+  // wait ran long": a row that is still restoring keeps the panel open, which is
+  // what stops a report or a proposal being opened on a half-restored authority.
   const opening = useProjectOpening(hydration.projectId || null);
+
+  // One line per opening decision, so a support conversation can see exactly which
+  // rows held the panel and what released it. No engineering values, no PII.
+  React.useEffect(() => {
+    if (!hydration.projectId) return;
+    const held = opening.holdLabels.length > 0
+      ? ` waiting for: ${opening.holdLabels.join(", ")}`
+      : "";
+    const released = opening.checklist
+      .filter((row) => row.blocking)
+      .map((row) => `${row.label}=${row.status}`)
+      .join(", ");
+    log.debug(
+      `[ProjectGate] opening ${opening.holding ? "held" : "released"} `
+      + `(attempt ${opening.attempt}, phase ${opening.phase})`
+      + (opening.holding ? held : ` — required rows: ${released}`),
+    );
+  }, [
+    hydration.projectId,
+    opening.holding,
+    opening.phase,
+    opening.attempt,
+    opening.holdLabels,
+    opening.checklist,
+  ]);
 
   // Opening straight into a report or proposal route makes that surface's source
   // data a required stage for the open — the designer is arriving to read it.
@@ -193,6 +220,7 @@ export default function ProjectGate({ children, requiresDesign = true }) {
         projectClientName={projectClientName}
         projectReference={projectReference}
         lines={opening.lines}
+        heldByLabels={opening.holdLabels}
         phase={opening.phase}
         stillRestoringTitle={PROJECT_OPENING_STILL_RESTORING_TITLE}
         stillRestoringLabels={opening.pendingLabels}
