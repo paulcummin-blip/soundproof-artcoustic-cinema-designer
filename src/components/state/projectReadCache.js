@@ -65,6 +65,10 @@ export function readProjectAnalysisCacheRecord(projectId, versionId, options) {
   const version = normalise(versionId);
   const key = pairKey(project, version);
   if (!project || !version) return Promise.resolve(null);
+  // A persisted project briefly renders with the unsaved `free` sentinel while
+  // its active version is resolving. Reading project::free is guaranteed to be
+  // superseded moments later and doubled every cold-open cache read.
+  if (project !== "free" && version === "free") return Promise.resolve(null);
   return singleFlight(analysisReads, key, async () => {
     counters.ProjectAnalysisCache += 1;
     readHistory.push({ entity: "ProjectAnalysisCache", key });
