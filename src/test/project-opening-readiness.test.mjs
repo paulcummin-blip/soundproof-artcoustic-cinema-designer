@@ -139,51 +139,37 @@ test('TEST 4 — the timeout never opens the project: it reports that it is stil
     });
 });
 
-test('TEST 5 — bass still restoring keeps the panel open, and releases it when it settles', () => {
+test('TEST 5 — unfinished bass never prevents the editable project opening', () => {
   start();
   resolveAllExcept('bass', entry(OPENING_CHECKPOINT_STATE.READY, OPENING_CHECKPOINT_OUTCOME.READY));
 
-  const restoring = openState();
-  assert.equal(restoring.holding, true, 'the panel holds while bass is still restoring');
-  assert.equal(getProjectOpening().closed, false, 'the project must not appear while bass restores');
-  assert.deepEqual(restoring.pendingCritical, ['bass'], 'bass is a critical stage');
-  assert.ok(restoring.pendingLabels.includes('Bass performance'), 'the panel names bass as restoring');
-
-  // Bass settles.
-  resolveProjectOpeningCheckpoints({
-    bass: entry(OPENING_CHECKPOINT_STATE.READY, OPENING_CHECKPOINT_OUTCOME.READY, 'Saved bass restored.'),
-  });
-  assert.equal(openState().holding, false, 'the project opens once bass has settled');
-  assert.equal(getProjectOpening().closed, true);
+  const opened = openState();
+  assert.equal(opened.holding, false, 'the project opens while bass remains unfinished');
+  assert.equal(getProjectOpening().closed, true, 'Room Designer is available to finish bass');
+  assert.deepEqual(opened.pendingCritical, [], 'bass is not an opening-critical stage');
+  assert.deepEqual(opened.pendingSupporting, ['bass'], 'bass still reports its background state');
+  assert.ok(opened.pendingLabels.includes('Bass performance'), 'the pending output remains visible to consumers');
 });
 
-test('TEST 6 — only supporting stages may be continued past, and with a warning', () => {
-  // A still-restoring CRITICAL stage cannot be continued past, ever.
+test('TEST 6 — edit-safe commercial hydration still blocks, output hydration does not', () => {
+  // Pricing/autosave are critical because opening before them can write defaults.
   start();
-  resolveAllExcept('bass', entry(OPENING_CHECKPOINT_STATE.READY, OPENING_CHECKPOINT_OUTCOME.READY));
-  markProjectOpeningTimedOut();
-
-  assert.equal(openState().canContinueWithWarning, false, 'no escape hatch past a critical stage');
-  assert.equal(continueProjectOpeningWithWarning(), false, 'the continue is refused');
-  assert.equal(getProjectOpening().closed, false, 'the project stays closed');
-
-  // A still-restoring SUPPORTING stage may be, and it opens with a warning.
-  _resetProjectOpeningForTest();
-  beginProjectOpening(PROJECT, { versionId: VERSION, minVisibleMs: 0, timeoutMs: 0 });
   resolveAllExcept('pricing', entry(OPENING_CHECKPOINT_STATE.READY, OPENING_CHECKPOINT_OUTCOME.READY));
   markProjectOpeningTimedOut();
 
-  const offered = openState();
-  assert.equal(offered.canContinueWithWarning, true, 'pricing alone may be continued past');
-  assert.deepEqual(offered.pendingSupporting, ['pricing']);
-  assert.equal(continueProjectOpeningWithWarning(), true, 'the project opens with a warning');
-  assert.equal(isProjectOpeningSatisfied(PROJECT), true);
+  assert.equal(openState().canContinueWithWarning, false, 'there is no escape hatch past pricing hydration');
+  assert.equal(continueProjectOpeningWithWarning(), false, 'the continue is refused');
+  assert.equal(getProjectOpening().closed, false, 'the project stays closed until editing is safe');
 
-  const warnings = openingCheckpointWarnings(getProjectOpening(), PROJECT);
-  assert.equal(warnings.length, 1, 'exactly the unresolved stage is warned about');
-  assert.equal(warnings[0].key, 'pricing');
-  assert.equal(warnings[0].timedOut, true);
-  assert.ok(warnings[0].detail, 'the warning carries a reason');
+  // A calculation/output stage is not an opening precondition.
+  _resetProjectOpeningForTest();
+  beginProjectOpening(PROJECT, { versionId: VERSION, minVisibleMs: 0, timeoutMs: 0 });
+  resolveAllExcept('bass', entry(OPENING_CHECKPOINT_STATE.READY, OPENING_CHECKPOINT_OUTCOME.READY));
+
+  const opened = openState();
+  assert.equal(opened.holding, false, 'unfinished bass does not block the project');
+  assert.deepEqual(opened.pendingSupporting, ['bass']);
+  assert.equal(isProjectOpeningSatisfied(PROJECT), true);
 });
 
 test('TEST 7 — Retry re-arms every stage, clears the notice and keeps the panel open', () => {
@@ -227,29 +213,23 @@ test('TEST 8 — "not generated yet" is not a warning; a failure is', () => {
   assert.equal(getProjectOpening().checkpoints.pricing.outcome, OPENING_CHECKPOINT_OUTCOME.FAILED, 'the fact is not erased');
 });
 
-test('TEST 9 — entering through a report route makes that report source a required stage', () => {
+test('TEST 9 — report routes open, then their own completeness gates decide availability', () => {
   assert.equal(openingEntrySurfaceForPath('/RP22Report'), OPENING_ENTRY_SURFACE.TECHNICAL_REPORT);
   assert.equal(openingEntrySurfaceForPath('/RP22ClientReport'), OPENING_ENTRY_SURFACE.VISUAL_REPORT);
   assert.equal(openingEntrySurfaceForPath('/ProposalCentre'), OPENING_ENTRY_SURFACE.PROPOSAL);
   assert.equal(openingEntrySurfaceForPath('/RoomDesigner'), null);
 
   const technicalKeys = criticalOpeningCheckpointKeys(OPENING_ENTRY_SURFACE.TECHNICAL_REPORT);
-  assert.ok(technicalKeys.includes('technicalReport'), 'the Technical Report source is required on that route');
-  assert.ok(technicalKeys.includes('bass'), 'and so is the saved bass authority');
-  assert.ok(
-    !criticalOpeningCheckpointKeys(null).includes('technicalReport'),
-    'opening through the Room Designer does not make a report source required',
-  );
-  assert.equal(openingCheckpointStage('pricing'), 'supporting');
-  assert.equal(openingCheckpointStage('bass'), 'critical');
+  assert.ok(!technicalKeys.includes('technicalReport'), 'the report source is not a global opening precondition');
+  assert.ok(!technicalKeys.includes('bass'), 'unfinished bass does not block access to the project');
+  assert.ok(technicalKeys.includes('pricing'), 'commercial hydration remains opening-critical');
+  assert.equal(openingCheckpointStage('pricing'), 'critical');
+  assert.equal(openingCheckpointStage('bass'), 'supporting');
 
-  // The route-specific requirement is enforced by the same rule as everywhere
-  // else: the required stage may not be continued past while it is restoring.
   start({ entrySurface: OPENING_ENTRY_SURFACE.TECHNICAL_REPORT });
   resolveAllExcept('technicalReport', entry(OPENING_CHECKPOINT_STATE.READY, OPENING_CHECKPOINT_OUTCOME.READY));
-  markProjectOpeningTimedOut();
-  assert.equal(openState().canContinueWithWarning, false, 'a report route waits for its own source');
-  assert.equal(continueProjectOpeningWithWarning(), false);
+  assert.equal(openState().holding, false, 'the page opens so it can show its explicit not-ready state');
+  assert.equal(isProjectOpeningSatisfied(PROJECT), true);
 });
 
 test('TEST 10 — a project already opened in this session never shows the panel again', () => {
