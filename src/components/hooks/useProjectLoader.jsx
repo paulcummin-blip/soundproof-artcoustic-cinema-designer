@@ -2,6 +2,7 @@
 import { useState, useCallback, useEffect, useRef } from "react";
 import { Project } from "@/entities/Project";
 import { base44 } from "@/api/base44Client";
+import { readProjectRecord, readProjectVersionRecord, invalidateProjectRead } from "@/components/state/projectReadCache";
 import { mergeProjectAndVersion, buildDesignState, buildSharedUpdate } from "@/lib/versionAuthority";
 import { serializeProject } from "@/components/utils/serializeProject";
 import { resolveAbfuserQuantityFromProject } from "@/components/utils/abfuserQuantityMigration";
@@ -323,10 +324,10 @@ appState, // Pass appState directly for setters
     beginDesignHydration(id);
     try {
       // AbortController signal is not directly supported by the SDK, but the operation is fast.
-      const projects = await Project.filter({ id }, '-updated_date', 1);
+      const project = await readProjectRecord(id);
 
-      if (Array.isArray(projects) && projects.length) {
-      let p = projects[0] || null;
+      if (project) {
+      let p = project;
       if (globalThis.__B44_LOGS) console.log('[RD] loadProject result', { projectIdState, id: p?.id, name: p?.name });
 
       // ─── Version migration & loading ──────────────────────────────────
@@ -338,16 +339,17 @@ appState, // Pass appState directly for setters
         if (!p?.active_version_id) {
           const migRes = await base44.functions.invoke('migrateProjectVersions', { project_id: id });
           if (migRes?.data?.version_id) {
-            const reloaded = await Project.filter({ id }, '-updated_date', 1);
-            if (reloaded?.length) p = reloaded[0];
+            invalidateProjectRead(id);
+            const reloaded = await readProjectRecord(id);
+            if (reloaded) p = reloaded;
           }
         }
         if (p?.active_version_id) {
           activeVersionIdRef.current = p.active_version_id;
           appState?.setActiveVersionId?.(p.active_version_id);
-          const versions = await base44.entities.ProjectVersion.filter({ id: p.active_version_id });
-          if (versions?.length > 0) {
-            mergedP = mergeProjectAndVersion(p, versions[0]);
+          const version = await readProjectVersionRecord(p.active_version_id);
+          if (version) {
+            mergedP = mergeProjectAndVersion(p, version);
           }
         }
       } catch (versionErr) {
