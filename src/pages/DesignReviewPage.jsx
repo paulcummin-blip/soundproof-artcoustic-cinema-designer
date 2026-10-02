@@ -20,8 +20,9 @@
  */
 
 import React, { useEffect, useState, useCallback, useMemo } from "react";
-import { useParams, useSearchParams } from "react-router-dom";
+import { Link, useParams, useSearchParams } from "react-router-dom";
 import { useActiveProjectId } from "@/components/state/project-session";
+import { useCanonicalProject } from "@/components/state/projectHydrationStore";
 import { useAppState } from "@/components/AppStateProvider";
 import { hydrateProjectIntoAppState } from "@/components/utils/hydrateProjectIntoAppState";
 import { mergeProjectAndVersion } from "@/lib/versionAuthority";
@@ -49,12 +50,41 @@ const COLORS = {
 
 const FONT_BODY = "'Didact Gothic', 'Century Gothic', sans-serif";
 
+function ReportReadinessPanel({ title, message, projectId, missing = [] }) {
+  const backTo = projectId
+    ? `/RoomDesigner?projectId=${encodeURIComponent(projectId)}`
+    : "/Projects";
+  return (
+    <div
+      data-technical-report-readiness="blocked"
+      style={{ minHeight: "70vh", display: "flex", alignItems: "center", justifyContent: "center", padding: 24, background: COLORS.bg, fontFamily: FONT_BODY }}
+    >
+      <div style={{ width: "100%", maxWidth: 620, padding: "28px 32px", borderRadius: 10, border: "1px solid #E6E4DD", background: "#FFFFFF" }}>
+        <div style={{ fontSize: 20, fontWeight: 700, color: COLORS.primary }}>{title}</div>
+        <div style={{ marginTop: 10, fontSize: 13, lineHeight: 1.55, color: COLORS.body }}>{message}</div>
+        {missing.length > 0 && (
+          <div style={{ marginTop: 14, fontSize: 12, lineHeight: 1.6, color: COLORS.muted }}>
+            Missing results: {missing.join(", ")}.
+          </div>
+        )}
+        <Link
+          to={backTo}
+          style={{ display: "inline-block", marginTop: 20, padding: "9px 16px", borderRadius: 6, background: COLORS.primary, color: "#FFFFFF", textDecoration: "none", fontSize: 13, fontWeight: 700 }}
+        >
+          Back to Room Designer
+        </Link>
+      </div>
+    </div>
+  );
+}
+
 export default function DesignReviewPage() {
   const app = useAppState();
   const [geometryReadyProjectId, setGeometryReadyProjectId] = useState(null);
   const { projectId: routeProjectId } = useParams();
   const [searchParams] = useSearchParams();
   const activeProjectId = useActiveProjectId();
+  const canonicalProject = useCanonicalProject();
   const projectId =
     routeProjectId ||
     searchParams.get("projectId") ||
@@ -67,7 +97,10 @@ export default function DesignReviewPage() {
 
   // The active version is resolved from the loaded Project record — the
   // version-scoped authority and every consumer below read the same identity.
-  const activeVersionId = projectDetails?.active_version_id || null;
+  const canonicalVersionId = String(canonicalProject.projectId || "") === String(projectId || "")
+    ? canonicalProject.identity?.activeVersionId || null
+    : null;
+  const activeVersionId = projectDetails?.active_version_id || canonicalVersionId || null;
 
   // ── Version-scoped engineering authority (durable first) ────────────────
   // Design Review reads the settled result from the DB Published Engineering
@@ -192,6 +225,35 @@ export default function DesignReviewPage() {
   const handleFilterChange = useCallback((filter) => {
     setActiveFilter(filter);
   }, []);
+
+  const reportRestoring = !!projectId && (loadingProject || (!!activeVersionId && asdrAuthority.loading));
+  const missingResults = [
+    ...(asdrAuthority.reportCompleteness?.missingParameterKeys || []),
+    ...(asdrAuthority.reportCompleteness?.incompleteSeatParameterKeys || []),
+  ].map((key) => key === "screen" ? "RP23 screen assessment" : String(key).toUpperCase());
+
+  if (reportRestoring) {
+    return (
+      <ReportReadinessPanel
+        title="Still restoring saved report results"
+        message="The Technical Report is waiting for the saved engineering and bass authority for this design version. No partial report has been opened or saved."
+        projectId={projectId}
+      />
+    );
+  }
+
+  if (!!projectId && (!activeVersionId || !asdrAuthority.reportComplete)) {
+    return (
+      <ReportReadinessPanel
+        title="Technical Report not ready"
+        message={!activeVersionId
+          ? "This project has no saved design version yet. Continue the design in Room Designer before opening the Technical Report."
+          : (asdrAuthority.reportCompleteness?.reason || "The saved engineering assessment is incomplete. Continue the design before opening the Technical Report.")}
+        projectId={projectId}
+        missing={[...new Set(missingResults)]}
+      />
+    );
+  }
 
   return (
     <div style={{
