@@ -366,13 +366,18 @@ export function resolveProjectOpeningCheckpoints(entries) {
 }
 
 /**
- * The project is open as soon as every checkpoint has a definite state and the
- * panel has been visible long enough to read.
+ * Open once the saved design and commercial editing baseline are safe. Output
+ * stages (engineering, bass, reports and proposal source) may still be loading
+ * or absent: that is a valid unfinished project, and each output surface owns
+ * its strict completeness gate.
  */
 function closeIfResolved() {
   if (state.closed || !state.projectId) return;
   if (!state.minVisibleElapsed) return;
-  if (pendingOpeningCheckpointKeys(state).length > 0) return;
+  const critical = criticalOpeningCheckpointKeys(state.entrySurface);
+  const pendingCritical = pendingOpeningCheckpointKeys(state)
+    .filter((key) => critical.includes(key));
+  if (pendingCritical.length > 0) return;
   state = { ...state, closed: true };
   markSatisfied(state.projectId);
 }
@@ -394,10 +399,10 @@ export function dismissProjectOpeningWarnings(projectId) {
  * (which projects have already opened in this browser) and keeps the signature
  * every consumer uses.
  *
- * Phases: 'restoring' while any stage is still resolving, 'still-restoring' once
- * the wait has run long, 'ready' when the project may be shown. The project
- * opens only when every stage has a definite outcome — or when the designer
- * explicitly continues past supporting stages that are still restoring.
+ * Phases: 'restoring' while an edit-safe opening authority is still resolving,
+ * 'still-restoring' once that wait runs long, and 'ready' when the editable
+ * project may be shown. Report and proposal completeness is enforced by those
+ * surfaces after opening, never by preventing Room Designer access.
  */
 export function deriveOpeningReadiness(snapshot, projectId) {
   const pid = normaliseId(projectId);
