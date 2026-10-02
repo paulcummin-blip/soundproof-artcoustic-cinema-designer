@@ -81,6 +81,24 @@ export function useProposalSourceStatus({
       sourceFingerprint: publication?.engineering_fingerprint || authority.snapshot?.engineeringFingerprint || null,
     });
 
+    if (authority.readFailed) {
+      const reason = authority.readError || 'Saved engineering authority could not be read.';
+      const failed = { ...provisional, state: PROPOSAL_SOURCE_STATE.FAILED, ready: false };
+      return {
+        ...failed,
+        message: reason,
+        reports: Object.fromEntries(
+          Object.entries(failed.reports).map(([key, report]) => [key, {
+            ...report,
+            state: PROPOSAL_SOURCE_STATE.FAILED,
+            status: 'Read failed',
+            reason,
+            action: 'Retry saved engineering read',
+          }]),
+        ),
+      };
+    }
+
     // A dangling pointer with no publication behind it is stale, not missing:
     // something was generated and has since been superseded.
     if (!hasSource && pointer) {
@@ -108,12 +126,16 @@ export function useProposalSourceStatus({
     publication,
     pointer,
     authority.snapshot,
+    authority.readFailed,
+    authority.readError,
     engineeringSnapshot,
   ]);
 
   return {
     status,
     loading: loading || authority.loading,
+    readFailed: authority.readFailed,
+    retry: authority.retry,
   };
 }
 
