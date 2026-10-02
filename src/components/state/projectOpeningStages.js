@@ -82,13 +82,10 @@ export const OPENING_PHASE = Object.freeze({
 });
 
 /**
- * Critical stages block the project from being released. While one of these is
- * still restoring the project stays behind the panel — there is no "open
- * anyway" path, because opening without them is what let a report render from
- * half-restored authority.
- *
- * The remaining stages must also reach a definite outcome before the panel
- * closes, but a failure in one of them is a warning rather than a block.
+ * Critical stages are only the authorities required to open and safely edit the
+ * project. Calculated engineering results and report/proposal sources are not
+ * opening preconditions: an unfinished project must open so the designer can
+ * complete them. Their own surfaces enforce the strict completeness gate.
  */
 const CRITICAL_CHECKPOINT_KEYS = Object.freeze([
   "metadata",
@@ -96,18 +93,18 @@ const CRITICAL_CHECKPOINT_KEYS = Object.freeze([
   "roomSeating",
   "speakerLayout",
   "seatPriorities",
-  "rp22",
-  "bass",
+  "pricing",
+  "autosaveBaseline",
 ]);
 
-/** Stages that must resolve, but may resolve as a visible warning. */
+/** Output stages are informative during opening; they never block Room Designer. */
 const SUPPORTING_CHECKPOINT_KEYS = Object.freeze([
+  "rp22",
+  "bass",
   "bassTargetBank",
   "visualReport",
   "technicalReport",
   "proposalSource",
-  "pricing",
-  "autosaveBaseline",
 ]);
 
 /**
@@ -121,9 +118,9 @@ export const OPENING_ENTRY_SURFACE = Object.freeze({
 });
 
 const ENTRY_SURFACE_MATCHERS = Object.freeze([
-  { surface: OPENING_ENTRY_SURFACE.TECHNICAL_REPORT, path: "/RP22Report", critical: ["technicalReport"] },
-  { surface: OPENING_ENTRY_SURFACE.VISUAL_REPORT, path: "/RP22ClientReport", critical: ["visualReport"] },
-  { surface: OPENING_ENTRY_SURFACE.PROPOSAL, path: "/ProposalCentre", critical: ["proposalSource"] },
+  { surface: OPENING_ENTRY_SURFACE.TECHNICAL_REPORT, path: "/RP22Report" },
+  { surface: OPENING_ENTRY_SURFACE.VISUAL_REPORT, path: "/RP22ClientReport" },
+  { surface: OPENING_ENTRY_SURFACE.PROPOSAL, path: "/ProposalCentre" },
 ]);
 
 /** Which report/proposal surface a route opens, for route-specific gating. */
@@ -136,12 +133,12 @@ export function openingEntrySurfaceForPath(pathname) {
 }
 
 /**
- * The critical stages for this opening — the base set plus the surface the
- * designer entered through.
+ * The critical stages for opening the editable project. Report/proposal routes
+ * deliberately use the same set: once the project is open, those pages show
+ * their own explicit "not ready" state until every required result is saved.
  */
-export function criticalOpeningCheckpointKeys(entrySurface = null) {
-  const extra = ENTRY_SURFACE_MATCHERS.find((entry) => entry.surface === entrySurface)?.critical || [];
-  return [...CRITICAL_CHECKPOINT_KEYS, ...extra];
+export function criticalOpeningCheckpointKeys(_entrySurface = null) {
+  return [...CRITICAL_CHECKPOINT_KEYS];
 }
 
 /** Is one stage critical (blocking) or supporting (warning at most)? */
