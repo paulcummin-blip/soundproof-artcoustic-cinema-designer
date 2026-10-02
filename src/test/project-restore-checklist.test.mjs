@@ -193,11 +193,11 @@ test('D — entering the Visual Report waits for the Visual Report source', () =
   // restoring, so the panel holds for it rather than closing on a live "Restoring".
   const elsewhere = releaseFor({ visualReport: entryFor('restoring') });
   assert.equal(elsewhere.release, false, 'a row that is still working always holds the panel');
-  assert.equal(
-    elsewhere.blockingRows.find((row) => row.key === 'visualReport').blocking,
-    false,
-    'but it only blocks the release on its own route',
-  );
+  const elsewhereRow = buildRestoreChecklist({
+    snapshot: snapshotWith({ visualReport: entryFor('restoring') }),
+    projectId: PROJECT,
+  }).rows.find((row) => row.key === 'visualReport');
+  assert.equal(elsewhereRow.blocking, false, 'but it only blocks the release on its own route');
 });
 
 test('E — entering the Technical Report never renders on a half-restored bass authority', () => {
@@ -245,7 +245,7 @@ test('G — a failed pricing restore is terminal, non-blocking and warned', () =
 
   // The remaining required rows are still satisfied, so reports are unaffected.
   assert.deepEqual(release.blockingFailures, []);
-  assert.ok(!release.blockingRows.some((row) => row.key === 'pricing'));
+  assert.equal(rows.find((row) => row.key === 'pricing').blocking, false, 'pricing is never a required row');
 });
 
 test('H — a saved bass authority still pending keeps the panel closed', () => {

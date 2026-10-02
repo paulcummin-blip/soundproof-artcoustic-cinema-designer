@@ -331,7 +331,7 @@ test('TEST 10 — a project already opened in this session never shows the panel
 
   const reopened = deriveOpeningReadiness(getProjectOpening(), PROJECT);
   assert.equal(reopened.holding, false, 'SPA navigation inside an open project does not re-gate');
-  assert.equal(reopened.lines.length, 9, 'the panel can still describe the project');
+  assert.equal(reopened.lines.length, PROJECT_OPENING_LINES.length, 'the panel can still describe the project');
 });
 
 test('TEST 11 — a newly selected project holds before its opening has even begun', () => {

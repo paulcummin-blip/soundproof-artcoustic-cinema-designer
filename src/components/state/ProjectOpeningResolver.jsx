@@ -407,11 +407,13 @@ export default function ProjectOpeningResolver({ projectId, entrySurface = null 
     };
   }, [projectId, versionId, designReady, attempt]);
 
-  // ── 4 · Bass is never released while it is still calculating ────────────
-  // While a bass analysis is genuinely running for this project the stage is
-  // held as restoring, so the panel cannot close and hand a report a
-  // half-restored bass authority. When it settles, the authority's own answer is
-  // re-applied — this watcher never decides a result of its own.
+  // ── 4 · Bass is never released while it is still working ────────────────
+  // While the saved authority is hydrating the stage is held as hydrating, and
+  // while a bass analysis is genuinely running for a version that has saved bass
+  // it is held as calculating — both non-terminal, so the panel cannot close and
+  // hand a report a half-restored bass authority. When it settles, the
+  // authority's own answer is re-applied — this watcher never decides a result of
+  // its own.
   useEffect(() => {
     if (!projectId) return undefined;
 
