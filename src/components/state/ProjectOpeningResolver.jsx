@@ -192,6 +192,24 @@ export default function ProjectOpeningResolver({ projectId, entrySurface = null 
 
     let cancelled = false;
 
+    // Commercial hydration is an edit-safety prerequisite, not an engineering
+    // output. Resolve it before any network-backed publication or target-bank
+    // read so a slow/limited report restore can never keep an otherwise safe,
+    // unfinished project out of Room Designer.
+    const commercialLoaded = isCommercialHydrationComplete(
+      getActiveCommercialAuthority(),
+      projectId,
+      versionId,
+    );
+    resolveProjectOpeningCheckpoints({
+      pricing: commercialLoaded
+        ? ready("Priced selections and price basis restored.")
+        : failed("Priced selections were not confirmed for this version."),
+      autosaveBaseline: commercialLoaded
+        ? ready("Editing baseline established — no default state is written during load.")
+        : failed("Editing baseline not confirmed — saving stays paused until it is."),
+    });
+
     (async () => {
       const localSnapshot = versionId ? readDesignReviewHandoff(projectId, versionId) : null;
 
@@ -263,12 +281,6 @@ export default function ProjectOpeningResolver({ projectId, entrySurface = null 
         })
         : null;
 
-      const commercialLoaded = isCommercialHydrationComplete(
-        getActiveCommercialAuthority(),
-        projectId,
-        versionId,
-      );
-
       const rp22Stage = restored
         ? ready("RP22 and RP23 results restored from the saved analysis.")
         : durableStale
@@ -332,14 +344,6 @@ export default function ProjectOpeningResolver({ projectId, entrySurface = null 
                 ? failed("Proposal source reports are unavailable for this version.")
                 : notGenerated("No proposal source yet — the Visual and Technical Reports have not been generated for this version."))
           : notApplicable("No saved design version — no proposal source data."),
-
-        pricing: commercialLoaded
-          ? ready("Priced selections and price basis restored.")
-          : failed("Priced selections were not confirmed for this version."),
-
-        autosaveBaseline: commercialLoaded
-          ? ready("Editing baseline established — no default state is written during load.")
-          : failed("Editing baseline not confirmed — saving stays paused until it is."),
       });
     })();
 
