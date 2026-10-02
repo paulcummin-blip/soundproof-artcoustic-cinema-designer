@@ -14,7 +14,10 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useAppState } from "@/components/AppStateProvider";
-import { base44 } from "@/api/base44Client";
+import {
+  readProjectRecord,
+  readProjectVersionRecord,
+} from "@/components/state/projectReadCache";
 import { mergeProjectAndVersion } from "@/lib/versionAuthority";
 import { hydrateProjectIntoAppState } from "@/components/utils/hydrateProjectIntoAppState";
 import { useAnalysisSpeakers } from "@/components/hooks/useAnalysisSpeakers";
@@ -105,9 +108,8 @@ export function useClientReportAuthority(projectId) {
       setHydratedProjectId(projectId);
       // Shared app state already holds this project's saved design state.
       completeDesignHydration(projectId);
-      base44.entities.Project.filter({ id: projectId }).then((results) => {
+      readProjectRecord(projectId).then((p) => {
         if (cancelled) return;
-        const p = Array.isArray(results) && results.length > 0 ? results[0] : null;
         if (!p) return;
         setProjectDetails({
           id: p.id,
@@ -126,9 +128,8 @@ export function useClientReportAuthority(projectId) {
     setHydrating(true);
     beginDesignHydration(projectId);
 
-    base44.entities.Project.filter({ id: projectId }).then(async (results) => {
+    readProjectRecord(projectId).then(async (p) => {
       if (cancelled) return;
-      const p = Array.isArray(results) && results.length > 0 ? results[0] : null;
       if (!p) {
         setProjectDetails(null);
         setHydrating(false);
@@ -150,10 +151,9 @@ export function useClientReportAuthority(projectId) {
       const activeVersionId = p.active_version_id;
       if (activeVersionId) {
         try {
-          const versions = await base44.entities.ProjectVersion.filter({ id: activeVersionId });
+          const v = await readProjectVersionRecord(activeVersionId);
           if (cancelled) return;
-          if (versions && versions.length > 0) {
-            const v = versions[0];
+          if (v) {
             merged = mergeProjectAndVersion(p, v);
             setVersionNumber(typeof v.version_number === "number" ? v.version_number : null);
             setVersionName(typeof v.version_name === "string" ? v.version_name : null);
@@ -655,6 +655,9 @@ export function useClientReportAuthority(projectId) {
     reportComplete: engineeringAuthority.reportComplete,
     reportCompleteness: engineeringAuthority.reportCompleteness,
     bassRestoreFailed: engineeringAuthority.bassRestoreFailed,
+    readFailed: engineeringAuthority.readFailed,
+    readError: engineeringAuthority.readError || engineeringAuthority.bassRestoreError || null,
+    retry: engineeringAuthority.retry,
     allSeatSplMetrics,
     authoritativeSeat,
     seatingPositions,
