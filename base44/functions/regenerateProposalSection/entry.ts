@@ -1,5 +1,5 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.44';
-import { buildWritingStyleContract } from '../../shared/reportWritingStyleContract.js';
+import { buildWritingStyleContract, mentionsDesignIndex } from '../../shared/reportWritingStyleContract.js';
 import { COMPARISON_REPORT_INSTRUCTIONS } from '../../shared/systemDesignSummarySections.js';
 import { formatVersionEvidenceForPrompt } from '../../shared/comparisonEvidence.js';
 import { formatComparisonTableForPrompt } from '../../shared/comparisonTable.js';
@@ -33,6 +33,13 @@ const ACTION_INSTRUCTIONS: Record<string, string> = {
   technical: 'Make the section more technical and engineering-focused, with precise terminology.',
   client_friendly: 'Make the section more accessible and client-friendly, with less jargon.',
 };
+
+/**
+ * A section written before the Design Index rule existed may still carry the
+ * index in its stored copy. Refining that section must remove the mention, not
+ * preserve it, so this note is added when the stored copy carries one.
+ */
+const DESIGN_INDEX_CLEANUP_NOTE = 'The current section content names the Design Index, a design score, a design rating or a percentage. Design Index is an internal designer diagnostic: remove it from the section and make the same point from the design evidence (spatial resolution, dynamic range, timbre matching, the screen and speaker relationship, seating coverage, product choice and reason, or a clearly supported RP22 result). Do not invent a replacement score and do not state a percentage.';
 
 /**
  * Regenerate a single proposal section.
@@ -169,6 +176,7 @@ export default async function(req) {
       '=== INSTRUCTION ===',
       actionInstruction,
       sectionNote,
+      mentionsDesignIndex(currentBody) ? DESIGN_INDEX_CLEANUP_NOTE : '',
       proposal.proposal_type === 'comparison' ? COMPARISON_REPORT_INSTRUCTIONS : '',
       '',
       '=== CONSTRAINT ===',

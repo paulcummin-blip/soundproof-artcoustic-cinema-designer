@@ -133,6 +133,56 @@ export const DESIGN_LED_BLOCKED_PHRASES = [
 ];
 
 /**
+ * THE DESIGN INDEX IS INTERNAL. It is a designer diagnostic, never a
+ * client-facing result: it is not mentioned in proposal copy, not a Key
+ * Performance Highlights row, not evidence in a System Design Summary or
+ * Comparison, and never expressed as a percentage.
+ *
+ * These two rules are the contract's hard rules, stated exactly as approved.
+ */
+export const DESIGN_INDEX_HARD_RULES = [
+  'Never mention Design Index in client-facing proposal copy. Design Index is an internal designer diagnostic and must remain internal.',
+  'Never express Design Index as a percentage in proposal copy.',
+].join('\n');
+
+/**
+ * The names and shapes that would give the internal Design Index away in
+ * client-facing copy. Shared by the evidence builder, the table row builders and
+ * the frontend row guard, so the exclusion has one authority.
+ */
+export const DESIGN_INDEX_BANNED_TERMS = [
+  'Design Index',
+  'Design Performance Index',
+  'Design Score',
+  'Design Rating',
+  'Primary score',
+  'Primary index',
+  '(Primary)',
+];
+
+/** True when a client-facing row is about the internal Design Index. */
+export function isDesignIndexRow(row) {
+  if (!row) return false;
+  const key = String(row.key || '').trim().toLowerCase();
+  if (key === 'dpi' || key.startsWith('dpi_') || key === 'design_index') return true;
+  const label = `${row.area || ''} ${row.label || ''}`.toLowerCase();
+  return DESIGN_INDEX_BANNED_TERMS.some((term) => label.includes(term.toLowerCase()));
+}
+
+/**
+ * True when client-facing copy names the internal Design Index, or states a
+ * design result as a percentage.
+ *
+ * Used by the regeneration path (so refining an older section removes the
+ * mention instead of preserving it) and by the copy guard tests.
+ */
+export function mentionsDesignIndex(text) {
+  const source = String(text || '').toLowerCase();
+  if (DESIGN_INDEX_BANNED_TERMS.some((term) => source.includes(term.toLowerCase()))) return true;
+  return /\b\d+(?:\.\d+)?\s*(?:%|per ?cent)/.test(source);
+}
+
+/**
  * The designer-led, room-focused voice for the System Design reports. Mandatory.
  *
  * The reader may be a homeowner, an architect, an interior designer or a
@@ -198,8 +248,8 @@ export const NEUTRAL_VOICE_SUBSTITUTIONS = [
 /**
  * The writing rules the model must follow, in report order: what the report is
  * for, the design philosophy, the priorities, how to treat products, room
- * constraints, value and performance, the Design Index, language and the final
- * self-check.
+ * constraints, value and performance, the Design Index exclusion, language and
+ * the final self-check.
  */
 
 const WHAT_THE_REPORT_MUST_ANSWER = [
@@ -263,6 +313,15 @@ const PRODUCT_REFERENCES = [
   '- Never invent a product, a specification or a price.',
 ].join('\n');
 
+const DESIGN_INDEX_RULES = [
+  '=== DESIGN INDEX (INTERNAL ONLY) ===',
+  ...DESIGN_INDEX_HARD_RULES.split('\n').map((rule) => `- ${rule}`),
+  `- Never write any of these in the prose or in a table cell: ${DESIGN_INDEX_BANNED_TERMS.join(', ')}.`,
+  '- The index is a designer diagnostic. It is not a client-facing result, it is not an RP22 score, and it is never evidence in a section, a table row or a recommendation.',
+  '- Where a paragraph previously rested on the index, make the point from the design evidence instead: spatial resolution, dynamic range, timbre matching, the screen and speaker relationship, seating coverage, product choice and reason, or a clearly supported RP22 result.',
+  '- Do not invent a replacement score, and never state a percentage as a design result.',
+].join('\n');
+
 const CONSTRAINTS_AND_VALUE = [
   '=== ROOM CONSTRAINTS ===',
   '- Use the real room constraints as part of the design story: windows, doors, low ceiling, rear wall proximity, multiple seating rows, furniture, cabinetry, sightlines, room width and room length.',
@@ -276,11 +335,7 @@ const CONSTRAINTS_AND_VALUE = [
   '- Explain what the additional investment buys: more headroom, higher Dynamic Range, more channels, better Spatial Resolution, more overhead positions, front wides, better bass consistency, and better performance across more seats.',
   '- Never describe a higher specification as excessive. It is the logical result of pursuing higher performance.',
   '',
-  '=== DESIGN PERFORMANCE INDEX ===',
-  '- The Sound Proof Design Performance Index is Sound Proof\'s own overall measure. It appears in the tables as its own labelled row, calculated by Sound Proof.',
-  '- Never call it an RP22 score, never describe it as a percentage, and never place it beside an RP22 level as if it were one.',
-  '- Treat it as supporting evidence: it may support a point the RP22 results already make, but it never replaces an RP22 result and is never the basis of a recommendation on its own.',
-  '- Never lead a section with it, and never let it contradict an RP22 result or a limitation.',
+  DESIGN_INDEX_RULES,
 ].join('\n');
 
 const LANGUAGE = [
@@ -351,7 +406,7 @@ const FINAL_SELF_CHECK = [
   '11. Are all banned words and phrases removed?',
   '12. Is every number supported by the supplied Sound Proof data?',
   '13. Is the room, the design or the system the subject of every sentence, with no direct address to the client and no marketing, consultant or AI phrasing left?',
-  '14. Is no internal score, index or percentage stated as a figure anywhere?',
+  '14. Is the Design Index, a design score, a design rating or any percentage completely absent, in the prose and in every table cell?',
   '15. Does no section end with a generic closing phrase?',
   '16. Is there no markdown, hashtag or asterisk in the response?',
   '17. Is there no "you", "your", "we designed" or "we recommend" anywhere in the prose?',

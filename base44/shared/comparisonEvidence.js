@@ -10,6 +10,8 @@
  *
  * Excluded parameters (P8, P15, P20, P21) and assumed parameters can never
  * appear: they are filtered by the existing rules and are listed as excluded.
+ * The Design Index is also internal: it is never supplied to the writer here,
+ * never a comparison row and never expressed as a percentage.
  *
  * Pure: no React, no side effects.
  */
@@ -21,7 +23,6 @@ import {
   resolveBassEvidence,
   splitParameterEvidence,
 } from './adiReportEvidenceRules.js';
-import { readDesignIndex, describeDesignIndex } from './designPerformanceIndex.js';
 
 function compose(...parts) {
   const clean = parts.map((part) => (part == null ? '' : String(part).trim())).filter(Boolean);
@@ -84,7 +85,6 @@ export function buildVersionEvidence({
       spatial_resolution_evidence: [],
       timbre_matching_evidence: [],
       bass_evidence_if_reliable: null,
-      design_index: { primary: null, secondary: null, all_seat: null },
       limitations: [],
       reliable_evidence: [],
       excluded_evidence: [],
@@ -96,7 +96,6 @@ export function buildVersionEvidence({
   const room = snapshot.room || {};
   const system = snapshot.system || {};
   const viewing = snapshot.viewing || {};
-  const index = readDesignIndex(snapshot);
 
   const limitations = [];
   if (Array.isArray(snapshot.rp22?.weaknesses)) {
@@ -181,7 +180,6 @@ export function buildVersionEvidence({
         p19: bassEvidence.p19 ? describeEvidenceRow(bassEvidence.p19) : null,
       }
       : null,
-    design_index: index,
     limitations,
     reliable_evidence: parameterEvidence.used.map((row) => row.parameter_id),
     excluded_evidence: excluded,
@@ -260,11 +258,6 @@ export function formatVersionEvidenceForPrompt(versions) {
       for (const row of rows) {
         lines.push(`  ${row.label} (P${row.parameter_id}): ${row.text}`);
       }
-    }
-
-    const indexLine = describeDesignIndex(version.design_index);
-    if (indexLine) {
-      lines.push(`Design Performance Index (supporting evidence only, never an RP22 score): ${indexLine}`);
     }
 
     if (version.limitations?.length > 0) {

@@ -7,8 +7,8 @@
  *   1. buildEngineeringEvidence() — a compact, deterministic text block of the
  *      Sound Proof calculated results, injected into every report prompt so
  *      the model writes about the real parameters, levels and values.
- *      The Design Index is deliberately excluded: it is an internal score and
- *      must never reach client-facing copy.
+ *      The Design Index is deliberately excluded: it is an internal designer
+ *      diagnostic and must never reach client-facing copy.
  *
  *   2. selectHighlightRows() — the Key Performance Highlights table rows.
  *      The Result column is read straight out of calculated data here, in the
@@ -29,7 +29,8 @@
  *   - Parameters excluded from client-facing reports (P8, P15, P20, P21) are
  *     never offered to the writer, and neither is any result that is not
  *     reliable: unreliable results are listed as not used instead.
- *   - The Design Index stays internal and is never supplied as a value.
+ *   - The Design Index is internal: it is never supplied as a value, never a
+ *     highlight row and never evidence in the prose.
  *
  * Pure: no React, no side effects, no runtime-specific APIs.
  */
@@ -43,8 +44,7 @@ import {
   resolveBassEvidence,
   splitParameterEvidence,
 } from './adiReportEvidenceRules.js';
-import { DESIGN_LED_VOICE_RULES } from './reportWritingStyleContract.js';
-import { readDesignIndex, describeDesignIndex, designIndexHighlightRows } from './designPerformanceIndex.js';
+import { DESIGN_LED_VOICE_RULES, DESIGN_INDEX_HARD_RULES, isDesignIndexRow } from './reportWritingStyleContract.js';
 
 function compose(...parts) {
   const clean = parts
@@ -163,14 +163,11 @@ export function buildEngineeringEvidence(snapshot) {
     );
   }
 
-  // ── Design Performance Index (supporting evidence) ──
-  // Sound Proof's own index of the overall result. It is supplied as supporting
-  // evidence, always labelled as the Design Performance Index: never as an RP22
-  // score, never as a percentage, and never as the basis of a recommendation.
-  const designIndexLine = describeDesignIndex(readDesignIndex(snapshot));
-  if (designIndexLine) {
-    lines.push('', `Design Performance Index (Sound Proof index, supporting evidence only, never an RP22 score): ${designIndexLine}`);
-  }
+  // ── Design Index: deliberately withheld ──
+  // It is an internal designer diagnostic, so no value from snapshot.rp22.dpi is
+  // supplied to the writer. The rule is stated instead, so a point that used to
+  // rest on the index is made from the design evidence above.
+  lines.push('', DESIGN_INDEX_HARD_RULES, 'Design Index values are not supplied to this report. Make every point from the design evidence above.');
 
   // ── Bass availability ──
   // When nothing reliable exists the writer is told so, rather than being left
@@ -277,14 +274,13 @@ export function selectHighlightRows(snapshot) {
   const EVIDENCE_ORDER = [2, 4, 5, 7, 9, 12, 13, 14, 16, 17, 18, 19, 6, 10];
   for (const parameterId of EVIDENCE_ORDER) pushParameter(parameterId);
 
-  // The Design Performance Index is carried as its own labelled row, as
-  // supporting evidence for the overall result. It is read from calculated data
-  // here and is never written by the model.
-  for (const row of designIndexHighlightRows(snapshot)) candidates.push(row);
+  // The Design Index is an internal designer diagnostic, so it is never a row
+  // here; a row arriving from older data is dropped by the shared guard.
+  const clientFacing = candidates.filter((row) => !isDesignIndexRow(row));
 
   // Only the most useful results are carried, and the Result column is read
   // from calculated data.
-  return orderHighlightRows(candidates).slice(0, HIGHLIGHT_ROW_LIMIT);
+  return orderHighlightRows(clientFacing).slice(0, HIGHLIGHT_ROW_LIMIT);
 }
 
 /** JSON schema for the highlights prose response. */
@@ -339,6 +335,7 @@ export function buildHighlightsPrompt(evidence, rows) {
     '- Reference only the results shown in the table above. Do not mention a parameter, a level or a measurement that is not in it.',
     '- Say what the result means for the room, not what the parameter is called, and do not explain an obvious result.',
     '- Never write a cell for an assumed parameter, and never reference P8, P15 or P20.',
+    '- Never mention the Design Index, a design score, a design rating or a percentage: it is an internal designer diagnostic, not a client-facing result.',
     '- Use the voice above: keep the room, the design, the system and the listening result as the subject. Never address the client as "you", and never write "we designed" or "we recommend".',
   ].join('\n');
 }

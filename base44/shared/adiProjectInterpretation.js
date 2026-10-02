@@ -321,7 +321,7 @@ export function buildProjectInterpretation(params = {}) {
     designation: rp22.dpi?.primary?.designation ?? null,
     internal_only: true,
     client_facing: false,
-    use: 'Supporting evidence only. Never presented as a score, a percentage or an RP22 level.',
+    use: 'Internal designer diagnostic only. Never mentioned, quoted, scored or expressed as a percentage in client-facing copy.',
   };
 
   const emphasis = typeof clientBrief === 'string' && clientBrief.trim() ? clientBrief.trim() : null;
@@ -474,7 +474,7 @@ export function formatInterpretationForPrompt(interpretation) {
     '- Reference a parameter only where it is the clearest evidence for something the client will hear.',
     '- Do not work through the results one by one, and do not quote a level without explaining what it means.',
     '- Never mention anything listed under "' + NOT_USED_HEADING + '".',
-    '- The Design Index is internal: use it only to judge which structure is genuinely the strength, and never state it, or any score or percentage, in the text.',
+    '- Never mention the Design Index, a design score, a design rating or any percentage. It is an internal designer diagnostic and is never part of the report.',
     '=== END ADI PROJECT INTERPRETATION ===',
   ].join('\n');
 }

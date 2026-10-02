@@ -1,5 +1,6 @@
 import React from 'react';
 import { proposalRoleStyle } from '@/components/proposal/typography/proposalTypography';
+import { excludeDesignIndexRows } from '@/components/proposal/designIndexRowAuthority';
 
 /**
  * KeyPerformanceHighlightsTable
@@ -13,8 +14,12 @@ import { proposalRoleStyle } from '@/components/proposal/typography/proposalTypo
  * Every cell is read verbatim from calculated Sound Proof data stored on the
  * section: for a summary the calculated rows, for a comparison the calculated
  * comparison rows (one value per version, plus the derived change). This
- * component never derives, rounds, regrades or recalculates a value, and the
- * Design Performance Index rows are calculated rows like any other.
+ * component never derives, rounds, regrades or recalculates a value.
+ *
+ * The Design Index is an internal designer diagnostic, so it is never a row
+ * here. A proposal generated before that rule existed still carries the row in
+ * stored data, and the guard below drops it on the way to the editor, the
+ * preview and the PDF. The stored record is never modified.
  *
  * Used by the Proposal Editor and by the print/PDF document, so both show
  * exactly the same table. The `kph-table` class is the print stylesheet hook.
@@ -50,10 +55,12 @@ export default function KeyPerformanceHighlightsTable({
   className = '',
 }) {
   const options = Array.isArray(comparisonVersions) ? comparisonVersions : [];
-  const comparison = options.length >= 2 && Array.isArray(comparisonRows) && comparisonRows.length > 0;
+  // The internal Design Index is never a client-facing row.
+  const visibleComparisonRows = excludeDesignIndexRows(comparisonRows);
+  const comparison = options.length >= 2 && visibleComparisonRows.length > 0;
 
   if (comparison) {
-    const showChange = comparisonRows.some((row) => row.change !== null && row.change !== undefined);
+    const showChange = visibleComparisonRows.some((row) => row.change !== null && row.change !== undefined);
     return (
       <div className={className}>
         <table className="kph-table w-full border-collapse">
@@ -69,7 +76,7 @@ export default function KeyPerformanceHighlightsTable({
             </tr>
           </thead>
           <tbody>
-            {comparisonRows.map((row, index) => (
+            {visibleComparisonRows.map((row, index) => (
               <tr key={row.key || index}>
                 <td className={`${CELL} text-[#1B1A1A]`} style={proposalRoleStyle('body')}>{row.area}</td>
                 {options.map((column, optionIndex) => (
@@ -97,7 +104,7 @@ export default function KeyPerformanceHighlightsTable({
     );
   }
 
-  const list = (rows || []).filter((row) => row && (row.area || row.result));
+  const list = excludeDesignIndexRows(rows).filter((row) => row && (row.area || row.result));
   if (list.length === 0) return null;
 
   return (

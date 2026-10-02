@@ -13,6 +13,9 @@
  *   - P8, P15, P20, P21, assumed parameters, and unavailable, stale, unreliable
  *     or unassessed results never appear, because the evidence rules never
  *     supply them;
+ *   - the internal Design Index is never a row: it is a designer diagnostic, not
+ *     a client-facing result, and a table stored before that rule existed has
+ *     its Design Index rows dropped before it reaches a writer;
  *   - the change column is DERIVED from the values, never written by the model.
  *
  * Columns:
@@ -23,6 +26,8 @@
  *
  * Pure: no React, no side effects.
  */
+
+import { isDesignIndexRow } from './reportWritingStyleContract.js';
 
 export const COMPARISON_ROW_ORDER = Object.freeze([
   'screen_size',
@@ -41,9 +46,6 @@ export const COMPARISON_ROW_ORDER = Object.freeze([
   'p17',
   'p18',
   'p19',
-  'dpi_primary',
-  'dpi_secondary',
-  'dpi_all_seat',
 ]);
 
 const ROW_LABELS = Object.freeze({
@@ -63,9 +65,6 @@ const ROW_LABELS = Object.freeze({
   p17: 'Surround and overhead timbre (P17)',
   p18: 'Bass extension (P18)',
   p19: 'Bass response (P19)',
-  dpi_primary: 'Design Performance Index (primary seat)',
-  dpi_secondary: 'Design Performance Index (secondary seats)',
-  dpi_all_seat: 'Design Performance Index (all seats)',
 });
 
 /** The reliable value one version carries for a row, or null. */
@@ -101,11 +100,6 @@ function readRowValue(evidence, rowKey) {
   }
 
   if (rowKey === 'system_layout') return evidence.system_format_short || evidence.system_format || null;
-
-  if (rowKey.startsWith('dpi_')) {
-    const scope = rowKey === 'dpi_all_seat' ? 'all_seat' : rowKey.replace('dpi_', '');
-    return evidence.design_index?.[scope]?.text || null;
-  }
 
   if (rowKey === 'p14') return evidence.bass_evidence_if_reliable?.p14?.text || null;
   if (rowKey === 'p18') return evidence.bass_evidence_if_reliable?.p18?.text || null;
@@ -211,7 +205,9 @@ export function buildComparisonTable(versions) {
     });
   }
 
-  return { rows, versions: columns };
+  // The internal Design Index is never a client-facing row, whatever a stored
+  // table carries.
+  return { rows: rows.filter((row) => !isDesignIndexRow(row)), versions: columns };
 }
 
 /**
@@ -219,7 +215,10 @@ export function buildComparisonTable(versions) {
  * never restates or contradicts it with a different number.
  */
 export function formatComparisonTableForPrompt(table) {
-  const rows = table?.rows || [];
+  // A table stored before the rule existed may still carry the internal Design
+  // Index, so its rows are dropped here too: a regenerated section must never
+  // see the index, and must never be able to restate it.
+  const rows = (table?.rows || []).filter((row) => !isDesignIndexRow(row));
   if (rows.length === 0) {
     return '=== COMPARISON TABLE ===\nNo calculated differences were found between the selected versions. Explain what stays the same and do not claim a difference.';
   }

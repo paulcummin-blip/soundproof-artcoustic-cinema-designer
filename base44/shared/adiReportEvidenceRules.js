@@ -294,11 +294,6 @@ export const HIGHLIGHT_PRIORITY = Object.freeze([
   'p19',
   'p16',
   'p17',
-  // The Design Performance Index is supporting evidence, carried as its own
-  // labelled row after the RP22 results it supports.
-  'dpi_primary',
-  'dpi_secondary',
-  'dpi_all_seat',
   'p6',
   'p10',
 ]);

@@ -9,7 +9,8 @@
 //   · excluded parameters (P8, P15, P20, P21) and assumed parameters never
 //     appear anywhere;
 //   · the change column is derived from the values, in the app;
-//   · the Design Performance Index appears as supporting evidence only.
+//   · the internal Design Index never appears at all: not in the evidence, not in
+//     the table, and never as a percentage, whatever the snapshot carries.
 //
 // The last test prints the generated table and prompt so the values can be
 // reviewed by eye.
@@ -229,9 +230,6 @@ function expectedCell(evidence, key) {
   if (key === 'p14') return evidence.bass_evidence_if_reliable.p14.text;
   if (key === 'p18') return evidence.bass_evidence_if_reliable.p18.text;
   if (key === 'p19') return evidence.bass_evidence_if_reliable.p19.text;
-  if (key === 'dpi_primary') return evidence.design_index.primary.text;
-  if (key === 'dpi_secondary') return evidence.design_index.secondary.text;
-  if (key === 'dpi_all_seat') return evidence.design_index.all_seat.text;
   const parameterId = Number(String(key).replace('p', ''));
   return evidence.rp22_results.find((row) => Number(row.parameter_id) === parameterId)?.text;
 }
@@ -247,7 +245,7 @@ test('the comparison payload carries frozen evidence for every selected version'
     'version_id', 'version_name', 'project_identity', 'system_format', 'screen_data',
     'seating_data', 'speaker_package', 'subwoofer_package', 'rp22_results', 'rp23_results',
     'dynamic_range_evidence', 'spatial_resolution_evidence', 'timbre_matching_evidence',
-    'bass_evidence_if_reliable', 'design_index', 'limitations', 'reliable_evidence',
+    'bass_evidence_if_reliable', 'limitations', 'reliable_evidence',
     'excluded_evidence',
   ];
   for (const entry of evidence) {
@@ -255,6 +253,9 @@ test('the comparison payload carries frozen evidence for every selected version'
     for (const key of requiredKeys) {
       assert.ok(key in entry, `evidence entry is missing ${key}`);
     }
+    // The Design Index is internal: it is never handed to the writer, so no
+    // version's evidence carries it.
+    assert.ok(!('design_index' in entry), 'the Design Index must never be supplied as evidence');
     assert.ok(entry.spatial_resolution_evidence.length > 0, 'each version carries its own Spatial Resolution evidence');
     assert.ok(entry.dynamic_range_evidence.length > 0);
     assert.ok(entry.timbre_matching_evidence.length > 0);
@@ -294,9 +295,16 @@ test('the comparison table is calculated from each version and never invents a v
   assert.ok(!keys.includes('p5'), 'an identical result is not a comparison row');
   // A parameter one version does not carry is never invented for it.
   assert.ok(!keys.includes('p7') && !keys.includes('p9'), 'an unassessed parameter is never invented');
-  // The Design Performance Index is carried as supporting evidence.
-  assert.ok(keys.includes('dpi_primary') && keys.includes('dpi_all_seat'));
-  assert.ok(!keys.includes('dpi_secondary'), 'an identical secondary scope is not a row');
+  // The Design Index is internal designer data. The snapshots carry it (asserted
+  // in the test below); the comparison table must not, in any scope.
+  assert.ok(!keys.some((key) => /^dpi/i.test(key)), `no Design Index row may appear, got ${keys.join(', ')}`);
+  for (const row of table.rows) {
+    assert.doesNotMatch(
+      row.area,
+      /design\s+(performance\s+)?index|design\s+(score|rating)/i,
+      `${row.key} is a Design Index row`,
+    );
+  }
 });
 
 test('excluded and assumed parameters never reach the evidence or the table', () => {
@@ -347,8 +355,8 @@ test('the change column is derived from the values, not written', () => {
   // A measured change is stated as a difference in the same unit.
   assert.equal(byKey.get('screen_size').change, '+30"');
   assert.equal(byKey.get('p18').change, '-8 Hz');
-  // A plain number is stated as a difference.
-  assert.equal(byKey.get('dpi_primary').change, '+10');
+  // The internal Design Index is not a row, so it has no change cell.
+  assert.ok(!byKey.has('dpi_primary'), 'the Design Index is never a comparison row');
   // Formats are stated as the two formats, never as a stray number.
   assert.equal(byKey.get('system_layout').change, '5.1 → 9.4.6');
   // A tolerance is never turned into a difference of one side.
@@ -382,8 +390,31 @@ test('the comparison payload and table contain no em dash and no marketing langu
   for (const banned of ['World-class', 'Optimise', 'Seamless', 'Revolutionary', 'Unparalleled']) {
     assert.ok(!text.includes(banned), `"${banned}" must not appear in the supplied tables`);
   }
-  // The Design Index is never described as an RP22 score.
-  assert.match(text, /Design Performance Index \(supporting evidence only, never an RP22 score\)/);
+  // The internal Design Index never reaches the writer through this path.
+  assert.doesNotMatch(text, /design\s+(performance\s+)?index|design\s+(score|rating)/i);
+});
+
+test('a version snapshot may carry internal Design Index data while the table omits it', () => {
+  // Both fixtures carry a live Design Index for every scope.
+  assert.equal(OPTION_A.rp22.dpi.primary.available, true, 'the fixture snapshot carries internal Design Index data');
+  assert.equal(OPTION_A.rp22.dpi.all_seat.available, true);
+  assert.equal(OPTION_B.rp22.dpi.primary.available, true);
+
+  const evidence = evidenceFor([OPTION_A, OPTION_B]);
+  const table = buildComparisonTable(evidence);
+  const text = [
+    formatVersionEvidenceForPrompt(evidence),
+    formatComparisonTableForPrompt(table),
+  ].join('\n');
+
+  // The index travels nowhere: no key, no value line, no scope, no designation.
+  for (const entry of evidence) {
+    assert.ok(!('design_index' in entry));
+  }
+  assert.doesNotMatch(text, /design\s+(performance\s+)?index|design\s+(score|rating)/i);
+  assert.doesNotMatch(text, /primary seat \d/, 'no seat-scoped index value is supplied');
+  assert.doesNotMatch(text, /\bGood\b/, 'the index designation is never supplied');
+  assert.doesNotMatch(text, /\b\d+(?:\.\d+)?\s*(?:%|per ?cent)/i, 'no index percentage is supplied');
 });
 
 test('describeChange never invents a comparison', () => {
