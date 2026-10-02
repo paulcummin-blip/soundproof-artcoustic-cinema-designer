@@ -124,15 +124,6 @@ function markSatisfied(projectId) {
   if (pid) satisfiedProjects.add(pid);
 }
 
-/** The checkpoint map with every key awaiting resolution. */
-function startState() {
-  const checkpoints = {};
-  PROJECT_OPENING_CHECKPOINT_KEYS.forEach((key) => {
-    checkpoints[key] = { state: OPENING_CHECKPOINT_STATE.PENDING, detail: null };
-  });
-  return checkpoints;
-}
-
 export function getProjectOpening() {
   return state;
 }

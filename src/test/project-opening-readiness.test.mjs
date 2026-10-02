@@ -33,6 +33,7 @@ import {
   isProjectOpeningSatisfied,
   markOpeningMinVisibleElapsed,
   openingProgressLines,
+  resetProjectOpening,
   resolveProjectOpeningCheckpoints,
 } from '../components/state/projectOpeningAuthority.js';
 
@@ -108,10 +109,15 @@ test('TEST 5 — a project already opened in this session never shows the panel 
   resolveAll();
   assert.equal(isProjectOpeningSatisfied(PROJECT), true);
 
-  _resetProjectOpeningForTest();
-  beginProjectOpening(PROJECT, { versionId: VERSION });
+  // The open panel state is gone (it is not kept for an open project), but the
+  // session knowledge that this project opened must survive it.
+  resetProjectOpening();
+  assert.equal(beginProjectOpening(PROJECT, { versionId: VERSION }), undefined, 'no new opening is started');
+  assert.equal(getProjectOpening().projectId, null, 'no panel state is created again');
+
   const reopened = deriveOpeningReadiness(getProjectOpening(), PROJECT);
   assert.equal(reopened.holding, false, 'SPA navigation inside an open project does not re-gate');
+  assert.equal(reopened.lines.length, 9, 'the panel can still describe the project');
 });
 
 test('TEST 6 — a newly selected project holds before its opening has even begun', () => {
