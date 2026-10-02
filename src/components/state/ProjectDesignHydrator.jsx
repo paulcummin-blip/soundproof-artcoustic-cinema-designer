@@ -17,7 +17,7 @@
 // and the project is marked loaded immediately.
 
 import { useEffect } from "react";
-import { base44 } from "@/api/base44Client";
+import { readProjectRecord, readProjectVersionRecord } from "@/components/state/projectReadCache";
 import { useAppState } from "@/components/AppStateProvider";
 import { mergeProjectAndVersion } from "@/lib/versionAuthority";
 import { hydrateProjectIntoAppState } from "@/components/utils/hydrateProjectIntoAppState";
@@ -85,9 +85,8 @@ export default function ProjectDesignHydrator({ projectId }) {
 
     (async () => {
       try {
-        const results = await base44.entities.Project.filter({ id: projectId });
+        const project = await readProjectRecord(projectId);
         if (cancelled) return;
-        const project = Array.isArray(results) && results.length > 0 ? results[0] : null;
         if (!project) {
           failDesignHydration(projectId, "Project not found");
           return;
@@ -98,10 +97,10 @@ export default function ProjectDesignHydrator({ projectId }) {
         let merged = project;
         if (project.active_version_id) {
           try {
-            const versions = await base44.entities.ProjectVersion.filter({ id: project.active_version_id });
+            const version = await readProjectVersionRecord(project.active_version_id);
             if (cancelled) return;
-            if (Array.isArray(versions) && versions.length > 0) {
-              merged = mergeProjectAndVersion(project, versions[0]);
+            if (version) {
+              merged = mergeProjectAndVersion(project, version);
             }
           } catch (versionError) {
             console.warn("[ProjectDesignHydrator] Version fetch failed, using project fields:", versionError);
