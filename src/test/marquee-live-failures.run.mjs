@@ -14,10 +14,6 @@ const {
 } = await import("../components/engineering/restoredBassOverlay.js");
 const { assessEngineeringReportCompleteness } = await import("../components/engineering/engineeringReportCompleteness.js");
 const {
-  buildPersistedBassAuthority,
-  resolvePersistedBassAuthority,
-} = await import("../components/room/bass/completedBassResultPersistence.js");
-const {
   createBassAnalysisResult,
   createBassParameterResult,
 } = await import("../components/room/bass/bassAnalysisContract.js");
