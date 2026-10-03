@@ -71,7 +71,7 @@ function IdentityValue({
         className="proposal-cover-label"
         style={{
           fontFamily: PROPOSAL_FONT_HEADING,
-          fontSize: 9,
+          fontSize: 8,
           fontWeight: 600,
           letterSpacing: '0.26em',
           textTransform: 'uppercase',
@@ -85,9 +85,11 @@ function IdentityValue({
         style={{
           fontFamily: PROPOSAL_FONT_HEADING,
           // The project name is the cover title and takes the proposal title
-          // role. A reference code is metadata and keeps its own small size.
+          // role, at a cover scale that never dominates the page. A reference
+          // code is metadata and keeps its own small size.
           ...(heading
             ? {
+                fontSize: 26,
                 fontWeight: 300,
                 letterSpacing: PROPOSAL_TRACKING_HEADING,
                 lineHeight: PROPOSAL_LEADING_HEADING,
@@ -182,7 +184,8 @@ export default function ProposalCoverPage({
               className="proposal-cover-partner"
               style={{
                 fontFamily: PROPOSAL_FONT_HEADING,
-                fontSize: 15,
+                // The dealer sits below the project name in the hierarchy.
+                fontSize: 13,
                 fontWeight: 400,
                 letterSpacing: '0.08em',
                 lineHeight: 1.3,
@@ -193,7 +196,7 @@ export default function ProposalCoverPage({
             </div>
           )}
 
-          <div style={{ marginTop: dealerName ? 28 : 0, width: '100%' }}>
+          <div style={{ marginTop: dealerName ? 24 : 0, width: '100%' }}>
             <IdentityValue
               label="Project"
               value={projectName}
@@ -203,11 +206,11 @@ export default function ProposalCoverPage({
           </div>
 
           {hasReference && (
-            <div style={{ marginTop: 26, width: '100%' }}>
+            <div style={{ marginTop: 22, width: '100%' }}>
               <IdentityValue
                 label="Reference"
                 value={String(projectReference).trim()}
-                valueSize={12}
+                valueSize={11}
                 valueSpacing="0.10em"
               />
             </div>

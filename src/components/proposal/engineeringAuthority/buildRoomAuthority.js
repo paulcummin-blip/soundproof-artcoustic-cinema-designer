@@ -7,6 +7,7 @@
  */
 
 import { CONFIDENCE, withConfidence, SOURCE } from './confidence';
+import { resolveCanonicalScreen } from '@/components/models/screen/canonicalScreenSize';
 
 function interpretScreen(project) {
   const screenSize = Number(project?.screen_size) || null;
@@ -18,8 +19,11 @@ function interpretScreen(project) {
   const screenWall = project?.screen_wall || 'front';
   const mountMode = project?.screen_mount_mode || 'baffle';
   const floatDepthM = Number(project?.float_depth_m) || 0;
+  // The designer's screen is stored as a viewable width; a report states the
+  // diagonal. One canonical resolution, used by every section of every report.
+  const canonical = resolveCanonicalScreen(project);
 
-  if (!screenSize && !manualDims) {
+  if (!screenSize && !manualDims && !canonical) {
     return {
       size_inches: null,
       aspect_ratio: aspectRatio,
@@ -36,24 +40,35 @@ function interpretScreen(project) {
   if (manualDims && manualWidthM && manualHeightM) {
     widthM = manualWidthM;
     heightM = manualHeightM;
-  } else if (screenSize) {
-    const diagM = screenSize * 0.0254;
-    if (aspectRatio === '2.35:1') {
-      widthM = diagM / Math.sqrt(1 + (1 / 2.35) ** 2);
-      heightM = widthM / 2.35;
+  } else if (screenSize || canonical) {
+    const viewableWidthInches = canonical?.widthInches ?? null;
+    if (viewableWidthInches) {
+      // Geometry from the canonical viewable width: no conversion guesswork.
+      widthM = viewableWidthInches * 0.0254;
+      heightM = aspectRatio === '2.35:1' ? widthM / 2.35 : widthM * 9 / 16;
     } else {
-      widthM = diagM / Math.sqrt(1 + (9 / 16) ** 2);
-      heightM = widthM * 9 / 16;
+      // Legacy record with only a stored diagonal.
+      const diagM = screenSize * 0.0254;
+      if (aspectRatio === '2.35:1') {
+        widthM = diagM / Math.sqrt(1 + (1 / 2.35) ** 2);
+        heightM = widthM / 2.35;
+      } else {
+        widthM = diagM / Math.sqrt(1 + (9 / 16) ** 2);
+        heightM = widthM * 9 / 16;
+      }
     }
   }
 
   const sizeText = manualDims
     ? `${manualWidthM.toFixed(2)}m × ${manualHeightM.toFixed(2)}m (manual)`
-    : `${screenSize}" (${aspectRatio})`;
+    : canonical
+      ? `${canonical.diagonalInches}" diagonal, ${canonical.widthInches}" viewable width (${aspectRatio})`
+      : `${screenSize}" (${aspectRatio})`;
 
   return {
-    size_inches: screenSize,
+    size_inches: canonical?.diagonalInches ?? screenSize,
     aspect_ratio: aspectRatio,
+    viewable_width_inches: canonical?.widthInches ?? null,
     height_from_floor_m: heightFromFloor,
     manual_dimensions: manualDims,
     manual_width_m: manualDims ? manualWidthM : null,

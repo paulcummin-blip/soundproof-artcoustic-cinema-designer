@@ -98,6 +98,15 @@ export const BANNED_WORDS = [
   'Ideation',
   'Pain point',
   'Deliverables',
+  // Report copy: claims that read as marketing rather than as design
+  // explanation, and section labels that are never a real section.
+  'Reference-grade',
+  'Reference grade',
+  'Fluidly',
+  'Unified approach',
+  'Future considerations',
+  'Fully immersive',
+  'Truly cinematic',
   'Quick win',
   'Elevator pitch',
   'Framework',

@@ -20,6 +20,9 @@ import { resolveDealerBrandPresentation } from '@/components/account/defaultDeal
 import { resolveDealerIdentityName } from '@/components/account/dealerIdentityDisplay';
 import ProposalWorkspaceToolbar from '@/components/proposal/ProposalWorkspaceToolbar';
 import ProposalCoverPage from '@/components/proposal/cover/ProposalCoverPage';
+import ProjectImagesBlock, { projectGalleryImages } from '@/components/proposal/ProjectImagesBlock';
+import { ASSET_SLOT, resolveAssetSlot } from '@/components/proposal/assetSlotAuthority';
+import { prepareSectionBody } from '@/components/proposal/sectionBodyAuthority';
 import ProposalPrintDocument from '@/components/proposal/export/ProposalPrintDocument';
 import ProposalPrintStyles from '@/components/proposal/export/ProposalPrintStyles';
 import { useProposalExport } from '@/components/proposal/export/useProposalExport';
@@ -60,6 +63,9 @@ export default function ProposalEditor() {
     coverImageUrl: null,
     heroImageUrl: null,
     logoUrl: null,
+    // Every image uploaded or selected for the project. The cover is one of
+    // them; the Project Images section shows the rest, in gallery order.
+    projectImages: [],
   });
 
   // Proposal context — project/client/dealer metadata for the workspace toolbar
@@ -72,13 +78,10 @@ export default function ProposalEditor() {
       proposalRecord.account_id
         ? base44.entities.BrandAsset.filter({ account_id: proposalRecord.account_id })
         : Promise.resolve([]),
+      // Every image for the project, in one read: the cover and the Project
+      // Images section are both resolved from the same gallery.
       proposalRecord.project_id
-        ? base44.entities.ProposalAsset.filter({
-            project_id: proposalRecord.project_id,
-            // The cover is found by its gallery slot as well as by the legacy
-            // type, so a cover image uploaded under either model is used.
-            $or: [{ slot: 'cover' }, { asset_type: 'cover_image' }],
-          })
+        ? base44.entities.ProposalAsset.filter({ project_id: proposalRecord.project_id })
         : Promise.resolve([]),
       proposalRecord.account_id
         ? base44.entities.Account.filter({ id: proposalRecord.account_id })
@@ -86,7 +89,8 @@ export default function ProposalEditor() {
     ]);
     const project = projectResult.status === 'fulfilled' ? projectResult.value?.[0] : null;
     const brand = brandResult.status === 'fulfilled' ? brandResult.value?.[0] : null;
-    const cover = coverResult.status === 'fulfilled' ? coverResult.value?.[0] : null;
+    const projectImages = coverResult.status === 'fulfilled' ? (coverResult.value || []) : [];
+    const cover = projectImages.find((asset) => resolveAssetSlot(asset) === ASSET_SLOT.COVER) || null;
     const account = accountResult.status === 'fulfilled' ? accountResult.value?.[0] : null;
     // Resolves the dealer's own hero/logo when set, otherwise the approved
     // Sound Proof / Artcoustic defaults — so the cover is always professional.
@@ -104,6 +108,7 @@ export default function ProposalEditor() {
       coverImageUrl: cover?.file_url || null,
       heroImageUrl: presentation.heroBg,
       logoUrl: presentation.dealerLogo,
+      projectImages,
     });
   }, []);
 
@@ -726,7 +731,7 @@ export default function ProposalEditor() {
                   </div>
                 )}
 
-                {isActive && def.canEditBody && !archived && (
+                {isActive && def.canEditBody && section.section_type !== 'room_images' && !archived && (
                   <div className="mb-3">
                     <SectionToolbar
                       section={section}
@@ -754,9 +759,36 @@ export default function ProposalEditor() {
                   </div>
                 )}
 
-                {def.canEditBody ? (
+                {section.section_type === 'room_images' ? (
+                  /* Project Images is imagery only: the uploaded project images,
+                     never generated narrative. */
+                  <div>
+                    <ProjectImagesBlock images={projectContext.projectImages} />
+                    <div
+                      className="flex items-center justify-between gap-4 mt-3 text-[11px] text-[#625143]"
+                      style={{ fontFamily: 'Didact Gothic, sans-serif' }}
+                    >
+                      <span>
+                        {projectGalleryImages(projectContext.projectImages).length > 0
+                          ? `${projectGalleryImages(projectContext.projectImages).length} project image${projectGalleryImages(projectContext.projectImages).length === 1 ? '' : 's'} selected`
+                          : 'No project images selected.'}
+                      </span>
+                      {proposal?.project_id && (
+                        <a
+                          href={`/ProjectProposalAssets?projectId=${proposal.project_id}`}
+                          className="underline underline-offset-2 hover:text-[#213428]"
+                        >
+                          Manage project images
+                        </a>
+                      )}
+                    </div>
+                  </div>
+                ) : def.canEditBody ? (
                   <InlineRichTextEditor
-                    html={section.body}
+                    html={prepareSectionBody(section.body, {
+                      title: section.title,
+                      sectionType: section.section_type,
+                    })}
                     // In manual edit mode nothing auto-saves: Save commits and
                     // Cancel discards. Outside it, the normal autosave applies.
                     onSave={editingThisSection ? undefined : (html, editedAt) => handleBodySave(section.id, html, editedAt)}
@@ -923,6 +955,7 @@ export default function ProposalEditor() {
         heroImageUrl={projectContext.heroImageUrl}
         logoUrl={projectContext.logoUrl}
         sections={sections}
+        projectImages={projectContext.projectImages}
       />
       <ProposalPrintStyles />
     </div>

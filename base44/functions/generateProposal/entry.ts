@@ -361,7 +361,11 @@ export default async function(req) {
     // ── Generate content for each editable section in parallel ──
     const editableIndices = sectionRecords
       .map((section, index) => ({ section, index }))
-      .filter(({ index }) => sectionDefs[index]?.canEditBody);
+      .filter(({ index }) => sectionDefs[index]?.canEditBody)
+      // Project Images carries no generated copy at all: the section shows the
+      // images the designer uploaded for the project, and nothing is written
+      // underneath them.
+      .filter(({ section }) => !(usesSystemStructure && section.section_type === 'room_images'));
 
     const generationResults = await Promise.allSettled(
       editableIndices.map(({ section }) => {
@@ -510,8 +514,9 @@ function buildProjectContext(project, narrativeGoal, brandAsset, clientBrief, en
     : buildEngineeringEvidence(engineeringSnapshot);
   // Project facts are read from the REPORT — the frozen snapshot built from the
   // current version — never from the legacy project row, so a proposal can
-  // never describe another version's screen, room or layout. The project row is
-  // only a last-resort fallback when the report carries no value at all.
+  // never describe another version's screen, room or layout. The legacy screen
+  // is not used as a fallback either: a report either states the screen the
+  // design actually has, in every section, or states none at all.
   const snapshotRoom = engineeringSnapshot?.room || {};
   const snapshotSystem = engineeringSnapshot?.system || {};
   const legacyRoom = [project.room_width, project.room_length, project.room_height]
@@ -519,7 +524,7 @@ function buildProjectContext(project, narrativeGoal, brandAsset, clientBrief, en
     .join(' × ');
   const roomDimensions = snapshotRoom.dimensions_text
     || (legacyRoom ? `${legacyRoom} m` : 'Not specified');
-  const screenSize = snapshotRoom.size_inches ?? project.screen_size ?? '';
+  const screenSize = snapshotRoom.size_inches ?? '';
   const aspectRatio = snapshotRoom.aspect_ratio || project.aspect_ratio || '';
   const dolbyConfig = snapshotSystem.channel_layout?.configuration_text || project.dolby_config || '';
   const speakersByRole = project.selected_speakers_by_role || {};
@@ -550,7 +555,9 @@ function buildProjectContext(project, narrativeGoal, brandAsset, clientBrief, en
     `Report fingerprint: ${sourceIdentity?.engineering_fingerprint || ''}`,
     `Reports generated: ${sourceIdentity?.published_at || ''}`,
     `Room Dimensions: ${roomDimensions}`,
-    `Screen: ${screenSize}" ${aspectRatio}`,
+    screenSize
+      ? `Screen: ${screenSize}" ${aspectRatio} (this is the screen for this report: never state, convert or infer another screen size anywhere in the report)`
+      : 'Screen: not stated in this report — never state a screen size',
     `Speaker Configuration: ${dolbyConfig}`,
     speakerInfo ? `Speakers: ${speakerInfo}` : '',
     subInfo ? `Subwoofers: ${subInfo}` : '',

@@ -24,9 +24,11 @@ export default function ProposalPrintStyles() {
       }
 
       @media print {
+        /* No page margin: the cover image bleeds to the paper edge, and the
+           content margins live on the section blocks below. */
         @page {
           size: A4 portrait;
-          margin: 18mm;
+          margin: 0;
         }
 
         /* Hide the whole application (sidebar, hero, editor) and any
@@ -48,10 +50,11 @@ export default function ProposalPrintStyles() {
         /* No blanket font-family here: a wildcard family would flatten the
            heading roles. Families are set per role below and on the cover. */
 
-        /* ── Cover — one full page of imagery, bled to the paper edge ── */
+        /* ── Cover — one full page of imagery, edge to edge ── */
         body.proposal-export-mode .proposal-print-cover {
-          margin: -18mm -18mm 18mm;
-          height: 296mm;
+          width: 210mm;
+          height: 297mm;
+          margin: 0;
           break-after: page;
           page-break-after: always;
           break-inside: avoid;
@@ -59,9 +62,19 @@ export default function ProposalPrintStyles() {
           overflow: hidden;
         }
 
-        /* ── Sections — flow content, never fixed-height ── */
+        /* ── Sections — flow content, never fixed-height. The 18mm document
+           margin lives here, because the page itself has none. ── */
         body.proposal-export-mode .proposal-print-section {
+          padding: 0 18mm;
           margin-bottom: 10mm;
+        }
+
+        body.proposal-export-mode .proposal-print-section:first-of-type {
+          padding-top: 16mm;
+        }
+
+        body.proposal-export-mode .proposal-print-section:last-of-type {
+          padding-bottom: 18mm;
         }
 
         body.proposal-export-mode .proposal-print-section__title {
@@ -148,6 +161,70 @@ export default function ProposalPrintStyles() {
           page-break-inside: avoid;
         }
 
+        /* A table header repeats if the table ever continues on a new page. */
+        body.proposal-export-mode .kph-table thead {
+          display: table-header-group;
+        }
+
+        /* ── Key Performance Highlights — one section, one page ──
+           The whole block is kept together: it moves to the next page rather
+           than splitting across two. */
+        body.proposal-export-mode .proposal-print-section--highlights {
+          break-inside: avoid;
+          page-break-inside: avoid;
+        }
+
+        body.proposal-export-mode .proposal-print-section--highlights .proposal-print-section__title,
+        body.proposal-export-mode .proposal-print-section--highlights .proposal-print-section__body {
+          break-after: avoid;
+          page-break-after: avoid;
+        }
+
+        /* ── Project Images — imagery only, on its own page ── */
+        body.proposal-export-mode .proposal-print-section--images {
+          break-before: page;
+          page-break-before: always;
+        }
+
+        body.proposal-export-mode .proposal-images {
+          margin-top: 2mm;
+        }
+
+        body.proposal-export-mode .proposal-images__figure {
+          margin: 0 0 6mm;
+          break-inside: avoid;
+          page-break-inside: avoid;
+        }
+
+        body.proposal-export-mode .proposal-images__figure img {
+          display: block;
+          width: 100%;
+          object-fit: cover;
+          background: #F5F4F0;
+        }
+
+        body.proposal-export-mode .proposal-images__lead img {
+          height: 110mm;
+        }
+
+        body.proposal-export-mode .proposal-images__grid {
+          display: grid;
+          grid-template-columns: 1fr 1fr;
+          gap: 6mm;
+        }
+
+        body.proposal-export-mode .proposal-images__grid .proposal-images__figure img {
+          height: 74mm;
+        }
+
+        body.proposal-export-mode .proposal-images__caption {
+          margin-top: 2mm;
+        }
+
+        body.proposal-export-mode .proposal-images__empty {
+          margin: 4mm 0 0;
+        }
+
         /* ── Canonical report typography ────────────────────────────────
            The exported proposal document consumes the shared typography
            system, so the PDF matches the Visual and Technical Reports:
@@ -205,24 +282,36 @@ ${buildReportTypographyCss({ scope: '.proposal-print-portal', profile: 'a4', pre
           text-transform: uppercase;
         }
 
-        /* ── Cover — the proposal title in the header face at title scale ── */
+        /* ── Cover typography — the cover has its own sizes. The document
+           title scale is deliberately NOT used here: the project name is
+           identity, not the hero of the page. ── */
         body.proposal-export-mode .proposal-print-cover .proposal-cover-name {
           font-family: var(--report-font-heading) !important;
-          font-size: var(--report-title-size) !important;
+          font-size: 26pt !important;
           font-weight: 300 !important;
-          letter-spacing: var(--report-heading-tracking) !important;
-          line-height: var(--report-heading-leading) !important;
+          letter-spacing: 0.06em !important;
+          line-height: 1.2 !important;
           text-transform: uppercase;
           overflow-wrap: anywhere;
         }
 
-        body.proposal-export-mode .proposal-print-cover .proposal-cover-label,
+        /* The dealer is smaller than the project name. */
         body.proposal-export-mode .proposal-print-cover .proposal-cover-partner {
           font-family: var(--report-font-heading) !important;
-          font-size: var(--report-subheader-size) !important;
+          font-size: 12pt !important;
           font-weight: 300 !important;
-          letter-spacing: var(--report-heading-tracking) !important;
-          line-height: var(--report-heading-leading) !important;
+          letter-spacing: 0.08em !important;
+          line-height: 1.3 !important;
+          text-transform: uppercase;
+        }
+
+        /* The label above a value is a caption, not a heading. */
+        body.proposal-export-mode .proposal-print-cover .proposal-cover-label {
+          font-family: var(--report-font-heading) !important;
+          font-size: 8pt !important;
+          font-weight: 300 !important;
+          letter-spacing: 0.26em !important;
+          line-height: 1.3 !important;
           text-transform: uppercase;
         }
 

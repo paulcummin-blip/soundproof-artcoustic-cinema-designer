@@ -39,6 +39,7 @@ export const REPORT_PDF_TYPE = Object.freeze({
   TECHNICAL: "Technical",
   PROPOSAL: "Proposal",
   SYSTEM_DESIGN_SUMMARY: "System Design Summary",
+  SYSTEM_DESIGN_COMPARISON: "System Design Comparison",
 });
 
 /** Characters no filesystem accepts — Windows is the strictest of the two. */
@@ -149,4 +150,25 @@ export function buildVisualReportTitle(projectName, version, details = {}) {
  */
 export function buildTechnicalReportTitle(projectName, version, details = {}) {
   return buildReportFilename(REPORT_PDF_TYPE.TECHNICAL, projectName, version, details);
+}
+
+/**
+ * The report-type token for a Proposal record's `proposal_type`, so every
+ * client design report names the document it actually is:
+ *   system_summary → System Design Summary
+ *   comparison     → System Design Comparison
+ *   single (legacy) → Proposal
+ */
+export function proposalReportTypeToken(proposalType) {
+  if (proposalType === "system_summary") return REPORT_PDF_TYPE.SYSTEM_DESIGN_SUMMARY;
+  if (proposalType === "comparison") return REPORT_PDF_TYPE.SYSTEM_DESIGN_COMPARISON;
+  return REPORT_PDF_TYPE.PROPOSAL;
+}
+
+/**
+ * Proposal / System Design report filename. Delegates to buildReportFilename
+ * with the report type token for the proposal's own type.
+ */
+export function buildProposalReportTitle(projectName, proposalType, details = {}) {
+  return buildReportFilename(proposalReportTypeToken(proposalType), projectName, null, details);
 }

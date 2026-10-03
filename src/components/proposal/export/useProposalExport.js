@@ -16,7 +16,7 @@
  */
 
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { buildReportFilename } from '@/components/report/reportPdfTitle';
+import { buildProposalReportTitle } from '@/components/report/reportPdfTitle';
 
 const PRINT_TIMEOUT_MS = 60000;
 const EXPORT_BODY_CLASS = 'proposal-export-mode';
@@ -120,10 +120,11 @@ export function useProposalExport({
       }
 
       originalTitleRef.current = document.title;
-      document.title = buildReportFilename(
-        'Proposal',
+      // The shared filename helper, with the report type this proposal is:
+      // Proposal / System Design Summary / System Design Comparison.
+      document.title = buildProposalReportTitle(
         projectName || proposal?.title || 'Proposal',
-        null,
+        proposal?.proposal_type,
         { dealerName, projectReference }
       );
 

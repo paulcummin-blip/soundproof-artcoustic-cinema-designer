@@ -1,20 +1,24 @@
 import React from 'react';
 import { proposalRoleStyle } from '@/components/proposal/typography/proposalTypography';
 import { excludeDesignIndexRows } from '@/components/proposal/designIndexRowAuthority';
+import { buildHighlightDisplayRows } from '@/components/proposal/keyPerformanceHighlightsAuthority';
 
 /**
  * KeyPerformanceHighlightsTable
  * -----------------------------
  * The measured summary table of a System Design report.
  *
- * Single Summary:      Performance area | Result | What the room gains
+ * Single Summary:      Performance area | Parameter | Result | What the room gains
  * Comparison:          Performance area | Option A | Option B | What changes
  *                      (one column per selected version)
  *
- * Every cell is read verbatim from calculated Sound Proof data stored on the
- * section: for a summary the calculated rows, for a comparison the calculated
- * comparison rows (one value per version, plus the derived change). This
- * component never derives, rounds, regrades or recalculates a value.
+ * Every cell is read from calculated Sound Proof data stored on the section:
+ * for a summary the calculated rows, for a comparison the calculated comparison
+ * rows (one value per version, plus the derived change). This component never
+ * derives, regrades or recalculates a value. The summary's Performance area,
+ * Parameter source and display rounding come from
+ * keyPerformanceHighlightsAuthority, which also guarantees the "What the room
+ * gains" column is populated on every row.
  *
  * The Design Index is an internal designer diagnostic, so it is never a row
  * here. A proposal generated before that rule existed still carries the row in
@@ -35,9 +39,10 @@ import { excludeDesignIndexRows } from '@/components/proposal/designIndexRowAuth
  */
 
 const SUMMARY_COLUMNS = [
-  { key: 'area', label: 'Performance area' },
-  { key: 'result', label: 'Result' },
-  { key: 'what_the_room_gains', label: 'What the room gains' },
+  { key: 'area', label: 'Performance area', width: '17%' },
+  { key: 'parameter', label: 'Parameter', width: '21%' },
+  { key: 'result', label: 'Result', width: '18%' },
+  { key: 'gain', label: 'What the room gains', width: '44%' },
 ];
 
 const CELL = 'px-3 py-2 align-top border-b border-[#EAE8E3]';
@@ -104,7 +109,7 @@ export default function KeyPerformanceHighlightsTable({
     );
   }
 
-  const list = excludeDesignIndexRows(rows).filter((row) => row && (row.area || row.result));
+  const list = buildHighlightDisplayRows(rows);
   if (list.length === 0) return null;
 
   return (
@@ -113,24 +118,29 @@ export default function KeyPerformanceHighlightsTable({
         <thead>
           <tr>
             {SUMMARY_COLUMNS.map((column) => (
-              <th key={column.key} className={HEAD} style={proposalRoleStyle('label')}>
+              <th
+                key={column.key}
+                className={HEAD}
+                style={{ ...proposalRoleStyle('label'), width: column.width }}
+              >
                 {column.label}
               </th>
             ))}
           </tr>
         </thead>
         <tbody>
-          {list.map((row, index) => (
-            <tr key={row.key || index}>
+          {list.map((row) => (
+            <tr key={row.key}>
               <td className={`${CELL} text-[#1B1A1A]`} style={proposalRoleStyle('body')}>{row.area}</td>
-              <td className={`${CELL} text-[#3E4349]`} style={proposalRoleStyle('body')}>{row.result}</td>
-              <td className={`${CELL} text-[#625143]`} style={proposalRoleStyle('body')}>{row.what_the_room_gains ?? row.what_you_hear}</td>
+              <td className={`${CELL} text-[#3E4349]`} style={proposalRoleStyle('body')}>{row.parameter}</td>
+              <td className={`${CELL} text-[#1B1A1A]`} style={proposalRoleStyle('body')}>{row.result}</td>
+              <td className={`${CELL} text-[#625143]`} style={proposalRoleStyle('body')}>{row.gain}</td>
             </tr>
           ))}
         </tbody>
       </table>
       <p className="mt-2 text-[#8A8477]" style={proposalRoleStyle('caption')}>
-        Every value calculated by Sound Proof. RP22 levels and measured results are shown as assessed.
+        Every result calculated by Sound Proof. Levels and measured results are shown as assessed, rounded to whole degrees, dB and Hz.
       </p>
     </div>
   );
