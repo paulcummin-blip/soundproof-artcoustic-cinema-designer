@@ -128,6 +128,13 @@ export const BANNED_WORDS = [
   'High-performance foundation',
   'Expansive audio',
   'Unified sound',
+  // Over-used, unspecific language flagged against the approved tone references.
+  'Convincing sense of movement',
+  'Future-proof',
+  'Future-ready',
+  'Future proof',
+  'Future ready',
+  'Generic upgrade',
 ];
 
 /**
@@ -288,6 +295,21 @@ export const NEUTRAL_VOICE_SUBSTITUTIONS = [
  * constraints, value and performance, the Design Index exclusion, language and
  * the final self-check.
  */
+
+const TONE_REFERENCE = [
+  '=== TONE (matched against approved earlier summaries, do not deviate) ===',
+  'Write like an experienced cinema designer explaining the room to a client. Not like marketing copy, not like a consultant, not like a generic AI proposal, not like a brochure or a sales deck.',
+  'Target: clear, direct, practical, grounded, technically credible, positive where supported, honest about limitations.',
+  'The approved earlier summaries work because they start with the actual room, screen and system; explain why the system suits that room; use RP22/RP23 evidence only when it helps the client understand the design; highlight positives without overstating; explain compromises calmly; use short, direct paragraphs; and avoid generic premium language.',
+  '',
+  'REPLACE GENERIC CLAIMS WITH SPECIFIC DESIGN LOGIC:',
+  '- Instead of "The system provides a convincing sense of movement," write: "Fifteen discrete channels give the processor real loudspeaker positions around and above the audience. This helps effects move through the room rather than jumping between widely spaced speakers."',
+  '- Instead of "The room delivers a reference-style experience," write: "The screen and loudspeaker layout give this room the scale of a dedicated cinema, particularly through the central seats."',
+  '- Instead of "The system is designed for future growth," write only if relevant: "If more output is required later, the natural upgrade would be to move further up the same loudspeaker family while keeping the room layout intact." Otherwise omit the point.',
+  '',
+  '=== SYSTEM DESIGN SUMMARY OPENING (mandatory shape) ===',
+  'The opening paragraphs must be concrete to this project before any evaluative language. Cover, using the real project values and in this rough order: screen size and format, system layout (configuration and channel count), seating arrangement, the main loudspeaker families used, and what the design is trying to achieve for this specific room. Only after that may the prose characterise the result.',
+].join('\n');
 
 const WHAT_THE_REPORT_MUST_ANSWER = [
   '=== WHAT THE REPORT MUST ANSWER ===',
@@ -458,7 +480,9 @@ const FINAL_SELF_CHECK = [
   '21. Is there no post-design clever recommendation anywhere, including a placement change, an added product, a processor change or a calibration change?',
   '22. Is the report still built around Spatial Resolution, Dynamic Range and Timbre Matching?',
   '23. Are the parameters used as evidence rather than as the story?',
-  ...WRITING_AUTHORITY_SELF_CHECK.map((question, index) => `${24 + index}. ${question}`),
+  '24. Does the opening state the real screen size/format, system layout, seating arrangement and main product families before any evaluative language?',
+  '25. Is every generic claim ("convincing sense of movement", "reference-style", "future-proof", "strong foundation") replaced with the specific channel count, position or mechanism that actually causes it, or removed?',
+  ...WRITING_AUTHORITY_SELF_CHECK.map((question, index) => `${26 + index}. ${question}`),
 ].join('\n');
 
 /**
@@ -470,6 +494,8 @@ export function buildWritingStyleContract() {
     '=== WRITING STYLE CONTRACT (applies to every sentence of generated prose) ===',
     '',
     SOUND_PROOF_WRITING_AUTHORITY,
+    '',
+    TONE_REFERENCE,
     '',
     WHAT_THE_REPORT_MUST_ANSWER,
     '',
