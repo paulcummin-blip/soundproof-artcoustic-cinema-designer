@@ -147,7 +147,23 @@ check("accepted restored bass carries non-zero score multipliers", () => {
   summary.primary.seatIds = ["s1"];
   summary.parameterAuthority.p14 = { state: "provisional", scope: "room", level: null, rawValue: null };
   summary.parameterAuthority.p18 = { state: "provisional", scope: "room", level: null, rawValue: null };
-  summary.parameterAuthority.p19 = { state: "provisional", scope: "room", level: null, rawValue: null };
+  // Reproduce the live legacy shape: the completed P19 result exists, but its
+  // authority is still labelled seat-scoped with zero score metadata.
+  summary.roomResultsByParameter[19] = {
+    status: "complete",
+    value: 0.9755,
+    formatted: "±0 dB",
+    level: "L4",
+  };
+  summary.parameterAuthority.p19 = {
+    state: "scored",
+    scope: "seat",
+    level: "L4",
+    rawValue: 0.9755,
+    multiplier: 0,
+    effectiveWeight: 0,
+    seats: { s1: { state: "provisional", level: null } },
+  };
   summary.parameterAuthority.p20 = {
     state: "provisional",
     scope: "seat",
@@ -166,6 +182,12 @@ check("accepted restored bass carries non-zero score multipliers", () => {
   assert.ok(restored.parameterAuthority.p14.multiplier > 0);
   assert.ok(restored.parameterAuthority.p18.multiplier > 0);
   assert.ok(restored.parameterAuthority.p19.multiplier > 0, JSON.stringify(restored.parameterAuthority.p19));
+  assert.equal(restored.parameterAuthority.p19.scope, "room");
+  assert.equal(restored.parameterAuthority.p19.seats, null);
+  const p19Contribution = restored.project?.scorecard?.contributions?.find((row) => row.key === "p19");
+  assert.ok(p19Contribution, JSON.stringify(restored.project?.scorecard));
+  assert.ok(p19Contribution.effectiveWeight > 0, JSON.stringify(p19Contribution));
+  assert.ok(p19Contribution.earnedPoints > 0, JSON.stringify(p19Contribution));
   assert.ok(restored.parameterAuthority.p20.seats.s1.multiplier > 0);
   assert.ok(restored.parameterAuthority.p20.seats.s2.multiplier > 0);
 });
