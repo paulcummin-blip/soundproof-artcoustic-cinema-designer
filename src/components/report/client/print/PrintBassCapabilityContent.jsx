@@ -301,7 +301,7 @@ export default function PrintBassCapabilityContent({ bassPerformance }) {
             </div>
             <div style={{ fontSize: 11, color: "#3E4349", marginTop: 2 }}>
               {p18Hz != null
-                ? `${p18Hz.toFixed(0)} Hz low-frequency extension`
+                ? `${Math.floor(p18Hz)} Hz low-frequency extension`
                 : "Low-frequency extension"}
             </div>
             <div style={{ fontSize: 10, color: "#625143", marginTop: 4 }}>
