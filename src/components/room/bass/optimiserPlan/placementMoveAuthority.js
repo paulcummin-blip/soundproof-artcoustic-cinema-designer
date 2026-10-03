@@ -18,6 +18,8 @@
 // maths, no optimiser scoring and no RP22 definition.
 // ---------------------------------------------------------------------------
 
+import { subwooferGroupNoun } from "./placementPlausibilityAuthority.js";
+
 /** The fixed explanation of what the lever means. */
 export const PLACEMENT_DEFINITION =
   "Placement means moving the physical subwoofer locations.";
@@ -76,9 +78,10 @@ const roundMm = (mm) => {
   return Math.max(50, Math.round(mm / 50) * 50);
 };
 
-const groupNoun = (group) => (group === "front"
-  ? "the front subs"
-  : group === "rear" ? "the rear subs" : "the subwoofers");
+// Quantity-aware: one front subwoofer is stated as "the front subwoofer", two as
+// "the front subwoofers". With no layout census to read, the neutral plural is
+// kept rather than a quantity being invented.
+const groupNoun = (group, layoutCounts = null) => subwooferGroupNoun(group, layoutCounts);
 
 const wallNoun = (group) => (group === "front"
   ? "the front wall"
@@ -149,10 +152,14 @@ function centreX(rows, roomDims) {
  * @param {object} params
  * @param {Array} params.changes - the persisted placement changes (fromX/fromY → toX/toY)
  * @param {object|null} [params.roomDims] - { widthM, lengthM, heightM }, optional
+ * @param {object|null} [params.layoutCounts] - { front, rear, total, known }: the
+ *   subwoofer census of the CURRENT layout, so the wording names one subwoofer as
+ *   one. Omitted → the neutral plural.
  * @returns {object|null} null when no change can be described
- *   { practical, theoreticalReason, movementLabel, wallStatement, movementMm, moves }
+ *   { practical, theoreticalReason, movementLabel, wallStatement, movementMm, moves,
+ *     movesByGroup, unambiguous }
  */
-export function describePlacementMove({ changes = [], roomDims = null } = {}) {
+export function describePlacementMove({ changes = [], roomDims = null, layoutCounts = null } = {}) {
   const rows = (Array.isArray(changes) ? changes : [])
     .map((change) => {
       const fromX = num(change?.fromX);
@@ -173,9 +180,24 @@ export function describePlacementMove({ changes = [], roomDims = null } = {}) {
 
   const practical = rows.every((row) => row.practical);
   const centre = centreX(rows, roomDims);
-  const outward = centre != null
-    ? rows.every((row) => Math.abs(num(row.change.toX) - centre) > Math.abs(num(row.change.fromX) - centre))
-    : true;
+  // One movement in one direction, or none: a change set whose rows do not all
+  // move the same way is not a single physical move.
+  const outwardCount = centre != null
+    ? rows.filter((row) => Math.abs(num(row.change.toX) - centre) > Math.abs(num(row.change.fromX) - centre)).length
+    : 0;
+  const inwardCount = centre != null
+    ? rows.filter((row) => Math.abs(num(row.change.toX) - centre) < Math.abs(num(row.change.fromX) - centre)).length
+    : 0;
+  const outward = centre != null ? outwardCount === rows.length : true;
+  const unambiguous = centre == null
+    || outwardCount === rows.length
+    || inwardCount === rows.length;
+  // How many subwoofers move on each wall — the evidence a symmetry check reads.
+  const movesByGroup = rows.reduce((counts, row) => {
+    if (row.group === "front") counts.front += 1;
+    else if (row.group === "rear") counts.rear += 1;
+    return counts;
+  }, { front: 0, rear: 0 });
 
   const distances = rows.map((row) => row.distanceMm).filter((value) => value != null);
   const movementMm = distances.length
@@ -183,11 +205,12 @@ export function describePlacementMove({ changes = [], roomDims = null } = {}) {
     : null;
 
   const wallPhrase = orderedGroups(rows)
-    .map((group) => `${groupNoun(group)} ${outward ? "wider along" : "along"} ${wallNoun(group)}`)
+    .map((group) => `${groupNoun(group, layoutCounts)} ${outward ? "wider along" : "along"} ${wallNoun(group)}`)
     .join(" and ");
   const directionPhrase = outward
     ? "toward the nearest side wall"
-    : centre != null ? "toward the centre of the room" : "along the wall";
+    : !unambiguous ? "along the walls"
+      : centre != null ? "toward the centre of the room" : "along the wall";
   const distancePhrase = movementMm != null ? `approximately ${movementMm} mm ` : "";
 
   const movementLabel = wallPhrase
@@ -203,6 +226,10 @@ export function describePlacementMove({ changes = [], roomDims = null } = {}) {
       ? "Front and rear subs stay on their own wall — the movement is along the wall."
       : null,
     movementMm,
+    // Whether the change set is ONE movement in ONE direction, and how many
+    // subwoofers move on each wall.
+    unambiguous,
+    movesByGroup,
     moves: rows.map((row) => ({
       subId: row.change?.subId || null,
       label: row.change?.label || row.change?.subId || null,
