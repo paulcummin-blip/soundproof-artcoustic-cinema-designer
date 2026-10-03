@@ -218,7 +218,7 @@ export default function ReportStatePanel({
     <div style={cardStyle}>
       <h2 style={headingStyle}>{reportLabel} not ready</h2>
       <p style={{ ...textStyle, marginTop: 12 }}>
-        This project has not been fully assessed yet.
+        {reason || "This project has not been fully assessed yet."}
       </p>
       <p style={{ ...textStyle, marginTop: 6 }}>
         Complete the missing items below before generating the client report.
