@@ -79,6 +79,75 @@ describe('proposal PDF filename', () => {
       'Sound Proof - Artcoustic Cinema Designer - System Design Summary - Lords Hall'
     );
   });
+
+  // ── Acceptance: Marquee, with and without a project reference ──────────────
+
+  it('A. Marquee with no project reference omits the reference segment', () => {
+    assert.equal(
+      buildProposalReportTitle('Marquee Home', 'system_summary', {
+        dealerName: 'Ribble AV',
+        projectReference: null,
+      }),
+      'Sound Proof - Artcoustic Cinema Designer - System Design Summary - Ribble AV - Marquee Home'
+    );
+    assert.equal(
+      buildProposalReportTitle('Marquee Home', 'system_summary', {
+        dealerName: 'Ribble AV',
+        projectReference: '',
+      }),
+      'Sound Proof - Artcoustic Cinema Designer - System Design Summary - Ribble AV - Marquee Home'
+    );
+  });
+
+  it('B. Marquee with reference "MH-001" states it last', () => {
+    assert.equal(
+      buildProposalReportTitle('Marquee Home', 'system_summary', {
+        dealerName: 'Ribble AV',
+        projectReference: 'MH-001',
+      }),
+      'Sound Proof - Artcoustic Cinema Designer - System Design Summary - Ribble AV - Marquee Home - MH-001'
+    );
+  });
+
+  it('C. a comparison report names System Design Comparison exactly once', () => {
+    const name = buildProposalReportTitle('Marquee Home', 'comparison', {
+      dealerName: 'Ribble AV',
+      projectReference: 'MH-001',
+    });
+    assert.equal(
+      name,
+      'Sound Proof - Artcoustic Cinema Designer - System Design Comparison - Ribble AV - Marquee Home - MH-001'
+    );
+    assert.equal((name.match(/System Design Comparison/g) || []).length, 1);
+  });
+
+  it('D. carries no platform name, no generic word and no browser title', () => {
+    const names = [
+      buildProposalReportTitle('Marquee Home', 'system_summary', {}),
+      buildProposalReportTitle('Marquee Home', 'comparison', { projectReference: 'MH-001' }),
+    ];
+    names.forEach((name) => {
+      assert.ok(!/base\s*44/i.test(name), name);
+      assert.ok(!/\bSoundProof\b/.test(name), name);
+      assert.ok(!/\bdownload\b/i.test(name), name);
+      assert.ok(!/\buntitled proposal\b/i.test(name), name);
+      assert.ok(name.startsWith('Sound Proof - Artcoustic Cinema Designer - '), name);
+      assert.equal(/\s{2,}/.test(name), false, name);
+      assert.equal(/[<>:"/\\|?*]/.test(name), false, name);
+    });
+  });
+
+  it('D. strips a host-tab title that leaked into the dealer or the reference', () => {
+    // The exact string the platform host tab used to contribute.
+    const polluted = 'SoundProof - Artcoustic Cinema Designer _ Base44';
+    const name = buildProposalReportTitle('Marquee Home', 'system_summary', {
+      dealerName: polluted,
+      projectReference: polluted,
+    });
+    assert.ok(!/base\s*44/i.test(name), name);
+    assert.ok(name.includes('System Design Summary'), name);
+    assert.ok(name.includes('Marquee Home'), name);
+  });
 });
 
 describe('numeric display policy', () => {

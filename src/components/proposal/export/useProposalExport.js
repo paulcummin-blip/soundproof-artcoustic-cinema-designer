@@ -21,6 +21,12 @@ import {
   applyPrintDocumentTitle,
   restorePrintDocumentTitle,
 } from '@/components/report/printDocumentTitle';
+import {
+  openProposalPrintWindow,
+  printProposalInWindow,
+  closeProposalPrintWindow,
+  findPrintNode,
+} from './proposalPrintWindow';
 
 const PRINT_TIMEOUT_MS = 60000;
 const EXPORT_BODY_CLASS = 'proposal-export-mode';
@@ -72,6 +78,8 @@ export function useProposalExport({
 
   const printingRef = useRef(false);
   const cleanupTimeoutRef = useRef(null);
+  // The app-owned window the pack is printed from, when one could be opened.
+  const printWindowRef = useRef(null);
 
   const cleanup = useCallback(() => {
     if (printingRef.current) {
@@ -83,6 +91,8 @@ export function useProposalExport({
       // Restores the app title and the host tab title, whichever were replaced.
       restorePrintDocumentTitle();
     }
+    closeProposalPrintWindow(printWindowRef.current);
+    printWindowRef.current = null;
     if (cleanupTimeoutRef.current) {
       clearTimeout(cleanupTimeoutRef.current);
       cleanupTimeoutRef.current = null;
@@ -97,6 +107,8 @@ export function useProposalExport({
       if (cleanupTimeoutRef.current) clearTimeout(cleanupTimeoutRef.current);
       document.body.classList.remove(EXPORT_BODY_CLASS);
       restorePrintDocumentTitle();
+      closeProposalPrintWindow(printWindowRef.current);
+      printWindowRef.current = null;
     };
   }, [cleanup]);
 
@@ -115,22 +127,52 @@ export function useProposalExport({
     printingRef.current = true;
     setExporting(true);
 
+    // The shared filename helper, with the report type this proposal is:
+    // System Design Summary / System Design Comparison / Proposal.
+    const title = buildProposalReportTitle(
+      projectName || proposal?.title || 'Proposal',
+      proposal?.proposal_type,
+      { dealerName, projectReference }
+    );
+
+    // A saved PDF is named after the TOP-LEVEL document's title. Inside a host
+    // page (the platform preview) that document belongs to the host, and its
+    // title cannot be written from here — the export would be named after the
+    // host tab. So the pack is printed from a window of this app's own origin,
+    // which carries the shared filename as its title. Opened synchronously,
+    // while the click still counts as a user gesture.
+    const printWindow = openProposalPrintWindow(title);
+    printWindowRef.current = printWindow;
+
     try {
       if (document.fonts && document.fonts.ready) {
         await document.fonts.ready;
       }
 
-      // The shared filename helper, with the report type this proposal is:
-      // System Design Summary / System Design Comparison / Proposal. Applied to
-      // the app document AND the host tab, because the browser names the saved
-      // PDF after the top-level document title.
-      applyPrintDocumentTitle(
-        buildProposalReportTitle(
-          projectName || proposal?.title || 'Proposal',
-          proposal?.proposal_type,
-          { dealerName, projectReference }
-        )
-      );
+      const printNode = findPrintNode();
+      if (printWindow && printNode) {
+        const printed = await printProposalInWindow(printWindow, {
+          title,
+          node: printNode,
+          onDone: cleanup,
+        });
+        if (printed) {
+          // The window closes itself when the dialog finishes. Settle the button
+          // state in case the dialog is left open.
+          cleanupTimeoutRef.current = setTimeout(() => {
+            printingRef.current = false;
+            setExporting(false);
+          }, PRINT_TIMEOUT_MS);
+          return;
+        }
+      }
+
+      // Fallback — popup blocked or the pack is not mounted: print in-page, on
+      // the app document and on the host tab where it is reachable.
+      closeProposalPrintWindow(printWindowRef.current);
+      printWindowRef.current = null;
+
+      applyPrintDocumentTitle(title);
 
       document.body.classList.add(EXPORT_BODY_CLASS);
 
