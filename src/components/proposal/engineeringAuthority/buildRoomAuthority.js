@@ -7,7 +7,7 @@
  */
 
 import { CONFIDENCE, withConfidence, SOURCE } from './confidence';
-import { resolveCanonicalScreen } from '@/components/models/screen/canonicalScreenSize';
+import { resolveCanonicalScreen, resolveStatedScreenSize } from '@/components/models/screen/canonicalScreenSize';
 
 function interpretScreen(project) {
   const screenSize = Number(project?.screen_size) || null;
@@ -26,6 +26,7 @@ function interpretScreen(project) {
   if (!screenSize && !manualDims && !canonical) {
     return {
       size_inches: null,
+      diagonal_inches: null,
       aspect_ratio: aspectRatio,
       height_from_floor_m: heightFromFloor,
       manual_dimensions: false,
@@ -59,14 +60,19 @@ function interpretScreen(project) {
     }
   }
 
-  const sizeText = manualDims
-    ? `${manualWidthM.toFixed(2)}m × ${manualHeightM.toFixed(2)}m (manual)`
-    : canonical
-      ? `${canonical.diagonalInches}" diagonal, ${canonical.widthInches}" viewable width (${aspectRatio})`
-      : `${screenSize}" (${aspectRatio})`;
+  // The size a client-facing surface states: the designed screen itself, exactly
+  // as the Room Designer states it (a television by its nominal size, a
+  // projection screen by its viewable width). The diagonal is reference only and
+  // is never stated as the screen size, so a report or an ADI example can never
+  // quote a screen size the designer did not set.
+  const statedSize = resolveStatedScreenSize(project) ?? screenSize;
+  const sizeText = statedSize
+    ? `${statedSize}" ${aspectRatio}${manualDims ? ', manual dimensions' : ''}`
+    : 'Screen not configured';
 
   return {
-    size_inches: canonical?.diagonalInches ?? screenSize,
+    size_inches: statedSize,
+    diagonal_inches: canonical?.diagonalInches ?? null,
     aspect_ratio: aspectRatio,
     viewable_width_inches: canonical?.widthInches ?? null,
     height_from_floor_m: heightFromFloor,

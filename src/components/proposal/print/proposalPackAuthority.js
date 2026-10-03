@@ -165,7 +165,11 @@ export function buildAtAGlanceCards({ snapshot, projectName, dealerName, project
     {
       label: 'Screen',
       value: screen.size_inches ? `${screen.size_inches}" ${screen.aspect_ratio || ''}`.trim() : null,
-      hint: screen.viewable_width_inches ? `${screen.viewable_width_inches}" viewable width` : null,
+      // The viewable width is only worth stating when it differs from the screen
+      // size already given (for example a television, sold by its nominal size).
+      hint: Number(screen.viewable_width_inches) && Number(screen.viewable_width_inches) !== Number(screen.size_inches)
+        ? `${screen.viewable_width_inches}" viewable width`
+        : null,
     },
     {
       label: 'Seating',

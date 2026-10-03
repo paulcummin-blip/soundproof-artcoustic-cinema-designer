@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Lightbulb, RefreshCw } from 'lucide-react';
 import { base44 } from '@/api/base44Client';
+import log from '@/components/utils/logger';
 
 /**
  * ADI narrative focus suggestions for the Client Brief step.
@@ -10,6 +11,14 @@ import { base44 } from '@/api/base44Client';
  * results. They guide the wording and emphasis of the client report only — they
  * never change an engineering result, RP22 value, Design Index, table value or
  * recommendation.
+ *
+ * Every chip is validated against that same snapshot before it is shown: an
+ * example whose number does not match this version — a screen size the project
+ * does not have, a level a result did not achieve, an invented channel count,
+ * subwoofer count, dB, Hz or angle — is rewritten without the number or dropped,
+ * so a chip can never state a value the project does not contain. A chip
+ * assembled by Sound Proof from the calculated screen size and results is shown
+ * first, and the model only adds to those.
  *
  * When no calculated result is available, generic examples are shown instead.
  */
@@ -29,7 +38,7 @@ const GENERIC_EXAMPLES = [
   'Client prefers reference cinema',
   'Client dislikes visible equipment',
   'Explain compromises',
-  'Explain why Level 4 is not achievable',
+  'Explain the room constraints',
   'Highlight future expansion',
 ];
 
@@ -64,6 +73,9 @@ export default function AdiSuggestionChips({
       });
       if (requestRef.current !== token) return;
       const list = response?.data?.suggestions || [];
+      // Per-chip diagnostics: the chip text, the source fields and values it came
+      // from, and whether it passed, was rewritten or was rejected.
+      log.debug('[AdiSuggestionChips] validated examples', response?.data?.diagnostics || []);
       setSuggestions(list);
       setFailed(list.length === 0);
     } catch (error) {
@@ -115,7 +127,7 @@ export default function AdiSuggestionChips({
 
       {usingCalculatedResults && (
         <p className="text-[11px] text-[#8A8477] mb-3">
-          {"These examples are based on this project's calculated design results."}
+          {"These examples are based on this project's calculated design results. Any number they state is checked against this version before display."}
         </p>
       )}
 

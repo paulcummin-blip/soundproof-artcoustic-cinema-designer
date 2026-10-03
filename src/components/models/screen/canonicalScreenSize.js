@@ -5,15 +5,19 @@
  *
  * The Room Designer stores its screen as a VIEWABLE WIDTH: design_state
  * `screen_size` is the viewable width in inches, a TV preset or TV width in mm
- * overrides it, and a manual width/height override wins over both. A
- * client-facing report states the screen the way the industry does, as the
- * DIAGONAL in inches.
+ * overrides it, and a manual width/height override wins over both.
  *
- * So the diagonal is derived once, here, from the canonical effective viewable
- * width — the same width authority the Room Designer and every report already
- * use (resolveEffectiveScreen). Nothing about the design is calculated here: it
- * only converts the screen the designer set into the number a report states, so
- * every section of every report states the same screen.
+ * A client-facing surface states the screen the way the designer's design does:
+ * a television by its nominal size (an 83" TV) and a projection screen by its
+ * viewable width (a 170" wide 2.35:1 screen). resolveStatedScreenSize() is that
+ * number, resolved once here from the canonical effective viewable width — the
+ * same width authority the Room Designer and every report already use
+ * (resolveEffectiveScreen). The diagonal is derived alongside it for reference.
+ *
+ * Nothing about the design is calculated here: it only resolves the screen the
+ * designer set into the number a client-facing surface states, so every section
+ * of every report and every ADI example states the same screen — the designer's
+ * own screen size, never a re-derivation of it.
  *
  * Pure: no React, no side effects.
  */
@@ -93,6 +97,28 @@ export function resolveCanonicalScreen(project) {
     aspectRatio,
     text: `${diagonalInches}" diagonal (${width}" viewable width) ${aspectRatio}`,
   };
+}
+
+/** True when the design's screen is a television rather than a projection screen. */
+export function isTelevisionScreen(project) {
+  return Boolean(project?.tv_preset_key) || Number(project?.tv_width_mm) > 0;
+}
+
+/**
+ * The screen size a client-facing surface states.
+ *
+ * The number the designer's own design states: a television by its nominal size
+ * (an 83" TV) and a projection screen by its viewable width (a 170" wide 2.35:1
+ * screen). A report and an ADI example therefore state the screen the designer
+ * specified, never a conversion of it.
+ *
+ * @returns {number|null}
+ */
+export function resolveStatedScreenSize(project) {
+  const canonical = resolveCanonicalScreen(project);
+  const stored = Number(project?.screen_size) || null;
+  if (!canonical) return stored;
+  return isTelevisionScreen(project) ? canonical.diagonalInches : canonical.widthInches;
 }
 
 export default resolveCanonicalScreen;
