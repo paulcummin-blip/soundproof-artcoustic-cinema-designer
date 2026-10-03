@@ -58,6 +58,7 @@ export default function ProposalEditor() {
   const [savingEdit, setSavingEdit] = useState(false);
   const [projectContext, setProjectContext] = useState({
     projectName: null,
+    clientName: null,
     dealerName: null,
     projectReference: null,
     coverImageUrl: null,
@@ -103,6 +104,7 @@ export default function ProposalEditor() {
     const dealerName = resolveDealerIdentityName(account, brand);
     setProjectContext({
       projectName: project?.name || null,
+      clientName: project?.client_name || null,
       dealerName,
       projectReference: project?.project_reference || null,
       coverImageUrl: cover?.file_url || null,
@@ -806,6 +808,8 @@ export default function ProposalEditor() {
                     <div className="rounded-xl overflow-hidden shadow-lg" style={{ aspectRatio: '4/5' }}>
                       <ProposalCoverPage
                         projectName={projectContext.projectName || proposal?.title}
+                        clientName={projectContext.clientName}
+                        reportTypeLabel={typeLabel}
                         dealerName={projectContext.dealerName}
                         projectReference={projectContext.projectReference}
                         coverImageUrl={projectContext.coverImageUrl}

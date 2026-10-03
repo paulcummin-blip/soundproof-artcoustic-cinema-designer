@@ -68,6 +68,16 @@ export const PROPOSAL_SCREEN_SIZES = {
 /** Roles that are set in the header face. */
 export const PROPOSAL_HEADING_ROLES = ['title', 'header', 'subheader', 'label'];
 
+/**
+ * Cover identity scale. The cover title is balanced against the cover layout,
+ * not set at the document title scale: the project name is identity, never the
+ * hero of the page.
+ */
+export const PROPOSAL_COVER_SIZES = {
+  name: 'clamp(22px, 2.1vw, 30px)',
+  type: 'clamp(10px, 0.7vw, 12px)',
+};
+
 /** The A4 roles, read from the shared profile (title 60 / header 22 / subheader 14 / body 9). */
 export const PROPOSAL_A4_SIZES = REPORT_PROFILES.a4;
 
@@ -137,9 +147,11 @@ ${s} {
   font-family: ${PROPOSAL_FONT_BODY};
 }
 
-/* Cover — the proposal title takes the header face at title scale */
-${s} .proposal-cover-name {${headingDecls(sizes.title)}
+/* Cover — identity at cover scale, balanced against the cover layout */
+${s} .proposal-cover-name {${headingDecls(PROPOSAL_COVER_SIZES.name)}
   overflow-wrap: anywhere;
+}
+${s} .proposal-cover-type {${headingDecls(PROPOSAL_COVER_SIZES.type)}
 }
 ${s} .proposal-cover-label {${headingDecls(sizes.label)}
 }

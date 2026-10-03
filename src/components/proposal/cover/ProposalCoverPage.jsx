@@ -11,9 +11,9 @@
  *      white text stays readable
  *   2. top third — the stacked Sound Proof × partner lockup, using the same
  *      brand hierarchy as the app header (see BrandLockup)
- *   3. middle / lower-middle — dealer name (partner/dealer accounts only), then
- *      the project name and project reference. Deliberately small: the project
- *      name is identity, never the visual hero of the cover.
+ *   3. middle / lower-middle — the report type, then the project name, client,
+ *      dealer and project reference. Deliberately small: the project name is
+ *      identity, never the visual hero of the cover.
  *   4. bottom — the generated date and the approved Sound Proof strap line
  *
  * The cover carries NO document title. The document type is metadata and lives
@@ -113,8 +113,10 @@ function IdentityValue({
 
 export default function ProposalCoverPage({
   projectName,
+  clientName,
   dealerName,
   projectReference,
+  reportTypeLabel,
   coverImageUrl,
   heroImageUrl,
   logoUrl,
@@ -179,6 +181,40 @@ export default function ProposalCoverPage({
             padding: '0 32px',
           }}
         >
+          {/* The report type is stated once, quietly, above the identity. */}
+          {reportTypeLabel && (
+            <div
+              className="proposal-cover-type"
+              style={{
+                fontFamily: PROPOSAL_FONT_HEADING,
+                fontSize: 10,
+                fontWeight: 400,
+                letterSpacing: '0.24em',
+                textTransform: 'uppercase',
+                color: WHITE,
+                opacity: 0.85,
+                marginBottom: 18,
+              }}
+            >
+              {reportTypeLabel}
+            </div>
+          )}
+
+          <div style={{ width: '100%' }}>
+            <IdentityValue
+              label="Project"
+              value={projectName}
+              heading
+              valueClass="proposal-cover-name"
+            />
+          </div>
+
+          {clientName && (
+            <div style={{ marginTop: 20, width: '100%' }}>
+              <IdentityValue label="Client" value={clientName} valueSize={13} />
+            </div>
+          )}
+
           {dealerName && (
             <div
               className="proposal-cover-partner"
@@ -190,23 +226,15 @@ export default function ProposalCoverPage({
                 letterSpacing: '0.08em',
                 lineHeight: 1.3,
                 color: WHITE,
+                marginTop: 18,
               }}
             >
               {dealerName}
             </div>
           )}
 
-          <div style={{ marginTop: dealerName ? 24 : 0, width: '100%' }}>
-            <IdentityValue
-              label="Project"
-              value={projectName}
-              heading
-              valueClass="proposal-cover-name"
-            />
-          </div>
-
           {hasReference && (
-            <div style={{ marginTop: 22, width: '100%' }}>
+            <div style={{ marginTop: 20, width: '100%' }}>
               <IdentityValue
                 label="Reference"
                 value={String(projectReference).trim()}
