@@ -73,6 +73,8 @@ Then cover, in this order:
 Do not open with an equipment list, and do not describe a product in isolation unless you are explaining why that product was chosen.
 
 Use the supplied Sound Proof calculated data wherever it applies, and never invent a value.
+
+This section is prose only. Do not write a list, a table, a highlights list or a performance summary of any kind, and do not introduce the Key Performance Highlights table: the report has one structured evidence section, and this is not it.
 3 to 4 short paragraphs.`,
 
   spatial_resolution: `Explain Spatial Resolution as the result of speaker count and speaker positions, and what that means for how sound moves around and above the listener.
@@ -140,6 +142,8 @@ Where the design is strongest, say so plainly. State any clear limitation honest
 For a modest system, explain the benefits clearly, do not claim more than the evidence shows, and point to sensible upgrades. For a high performance system, state the quality clearly and do not undersell it.
 
 Do not repeat the previous sections. Do not end with a generic closing phrase. The final paragraphs should leave the reader confident that the design decisions are deliberate.
+
+This section is prose only. Never repeat the Key Performance Highlights table, never list its rows, and do not write a list, a table or a second performance summary: that table is the report's one structured evidence section. Name the strongest part of the design and the main compromise in the prose instead.
 2 to 4 short paragraphs.`,
 
   room_images: `Write a brief introduction for the project images section, in the voice above. The images follow this introduction. 1 paragraph.`,

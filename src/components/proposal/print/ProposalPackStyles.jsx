@@ -324,6 +324,86 @@ export default function ProposalPackStyles() {
           break-inside: avoid;
           page-break-inside: avoid;
         }
+
+        /* No heading is left at the foot of a page: a title always keeps the
+           first paragraph or table that belongs to it. */
+        body.proposal-export-mode .proposal-print-portal .pp-block__title {
+          break-after: avoid;
+          page-break-after: avoid;
+        }
+
+        /* A designed block is never split down the middle of a page. */
+        body.proposal-export-mode .proposal-print-portal .pp-block,
+        body.proposal-export-mode .proposal-print-portal .pp-table,
+        body.proposal-export-mode .proposal-print-portal .pp-editorial {
+          break-inside: avoid;
+          page-break-inside: avoid;
+        }
+
+        /* ── Key Performance Highlights — one section, one page, never split ──
+           The row count is capped to what fits a page, so the section never
+           needs to continue and the table never breaks mid-row. ── */
+        body.proposal-export-mode .proposal-print-portal .pp-page--highlights,
+        body.proposal-export-mode .proposal-print-portal .pp-page--highlights .pp-body,
+        body.proposal-export-mode .proposal-print-portal .pp-page--highlights .kph-table {
+          break-inside: avoid;
+          page-break-inside: avoid;
+        }
+
+        /* ── Project Images — image-led, one dominant image per page ── */
+        body.proposal-export-mode .proposal-print-portal .pp-page--images {
+          break-inside: avoid;
+          page-break-inside: avoid;
+        }
+        body.proposal-export-mode .proposal-print-portal .pp-gallery {
+          display: flex;
+          flex-direction: column;
+          gap: 5mm;
+          break-inside: avoid;
+          page-break-inside: avoid;
+        }
+        body.proposal-export-mode .proposal-print-portal .pp-gallery__figure {
+          margin: 0;
+          break-inside: avoid;
+          page-break-inside: avoid;
+        }
+        body.proposal-export-mode .proposal-print-portal .pp-gallery__figure img {
+          display: block;
+          width: 100%;
+          object-fit: cover;
+          background: var(--pp-surface-2);
+        }
+        body.proposal-export-mode .proposal-print-portal .pp-gallery__caption {
+          margin: 1.5mm 0 0 !important;
+        }
+        body.proposal-export-mode .proposal-print-portal .pp-gallery__support {
+          display: grid;
+          grid-template-columns: 1fr 1fr;
+          gap: 6mm;
+          break-inside: avoid;
+          page-break-inside: avoid;
+        }
+        /* Three images: a hero image with two supporting images below it. */
+        body.proposal-export-mode .proposal-print-portal .pp-gallery--3 .pp-gallery__hero img {
+          height: 146mm;
+        }
+        body.proposal-export-mode .proposal-print-portal .pp-gallery--3 .pp-gallery__support img {
+          height: 82mm;
+        }
+        /* Two images: a dominant image with one supporting image below it. */
+        body.proposal-export-mode .proposal-print-portal .pp-gallery--2 .pp-gallery__hero img {
+          height: 162mm;
+        }
+        body.proposal-export-mode .proposal-print-portal .pp-gallery--2 .pp-gallery__support {
+          grid-template-columns: 1fr;
+        }
+        body.proposal-export-mode .proposal-print-portal .pp-gallery--2 .pp-gallery__support img {
+          height: 68mm;
+        }
+        /* One image: it is the page. */
+        body.proposal-export-mode .proposal-print-portal .pp-gallery--1 .pp-gallery__hero img {
+          height: 244mm;
+        }
       }
     `}</style>
   );

@@ -339,6 +339,7 @@ export function buildHighlightsPrompt(evidence, rows) {
     '- Never invent a value, a product or a result. If a cell needs a number, use only the numbers shown in that row.',
     '- Reference only the results shown in the table above. Do not mention a parameter, a level or a measurement that is not in it.',
     '- Say what the result means for the room, not what the parameter is called, and do not explain an obvious result.',
+    "- Where a row's result is Level 1 or Level 2, never describe it as excellent, outstanding or a strength: state plainly what that result gives the room and what limits it.",
     '- Never write a cell for an assumed parameter, and never reference P8, P15 or P21.',
     '- A bass consistency row appears only where it is shown in the table above. Its cell explains more even bass across the seating area. Where there is no such row, write nothing about bass consistency and never suggest moving or adding subwoofers.',
     '- Never mention the Design Index, a design score, a design rating or a percentage: it is an internal designer diagnostic, not a client-facing result.',

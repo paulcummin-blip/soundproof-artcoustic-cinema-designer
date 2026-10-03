@@ -22,26 +22,7 @@ import React from 'react';
 import ProposalPageHeader from '@/components/proposal/print/ProposalPageHeader';
 import { proposalRoleStyle } from '@/components/proposal/typography/proposalTypography';
 
-/** The most images one page carries before a further image page is used. */
-export const IMAGES_PER_PAGE = 3;
-
-/**
- * The images grouped into pages. Up to three images stay together on one page;
- * beyond that the gallery continues on further image pages.
- *
- * @param {Array} images
- * @returns {Array<Array>}
- */
-export function imagePagesFor(images = []) {
-  const list = Array.isArray(images) ? images : [];
-  if (list.length === 0) return [];
-  if (list.length <= IMAGES_PER_PAGE) return [list];
-  const pages = [];
-  for (let index = 0; index < list.length; index += IMAGES_PER_PAGE) {
-    pages.push(list.slice(index, index + IMAGES_PER_PAGE));
-  }
-  return pages;
-}
+export { IMAGES_PER_PAGE, imagePagesFor } from '@/components/proposal/print/imagePageLayout';
 
 function GalleryFigure({ asset, className = '' }) {
   if (!asset?.file_url) return null;

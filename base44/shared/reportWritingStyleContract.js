@@ -123,6 +123,11 @@ export const BANNED_WORDS = [
   'In conclusion',
   'To sum up',
   'Not just X, but Y',
+  // Claims that read as a brochure rather than a design explanation.
+  'Reference-style',
+  'High-performance foundation',
+  'Expansive audio',
+  'Unified sound',
 ];
 
 /**
@@ -325,6 +330,7 @@ const CHALLENGE_ASSUMPTIONS = [
   '- If a large screen needs careful projector selection, say so clearly.',
   '- If a lower-cost option keeps the same tonal consistency but gives up Dynamic Range, explain that trade-off plainly.',
   '- If a higher specification is genuinely stronger, explain what the extra investment buys.',
+  '- Where a result is Level 1 or Level 2, never present it as a strength: say plainly what it gives the room and what limits it, and never call it excellent, outstanding or ideal.',
 ].join('\n');
 
 const THEMES = [
@@ -402,6 +408,7 @@ const LANGUAGE = [
   '- "Optimise" or "optimize", except when describing literal engineering optimisation of the system.',
   '- Making a lower-cost option sound poor when it is still a valid design.',
   '- Quoting a level without explaining what the client experiences because of it.',
+  '- Repeating the same descriptive word through a section, for example "immersive" or "cinematic" more than once.',
   '- Any closing phrase that restates the report.',
 ].join('\n');
 

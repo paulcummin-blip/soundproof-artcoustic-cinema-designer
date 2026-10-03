@@ -22,7 +22,8 @@ import React from 'react';
 import ProposalCoverPage from '@/components/proposal/cover/ProposalCoverPage';
 import KeyPerformanceHighlightsTable from '@/components/proposal/KeyPerformanceHighlightsTable';
 import ProjectImagesBlock, { projectGalleryImages } from '@/components/proposal/ProjectImagesBlock';
-import ProjectImagesPage, { imagePagesFor } from '@/components/proposal/print/ProjectImagesPage';
+import ProjectImagesPage from '@/components/proposal/print/ProjectImagesPage';
+import { imagePagesFor } from '@/components/proposal/print/imagePageLayout';
 import AtAGlancePage from '@/components/proposal/print/AtAGlancePage';
 import RoomAndBriefPage from '@/components/proposal/print/RoomAndBriefPage';
 import MethodPage from '@/components/proposal/print/MethodPage';
@@ -123,6 +124,9 @@ export default function ProposalPackDocument({
       const body = prepareSectionBody(section.body, {
         title,
         sectionType: section.section_type,
+        // The printed page is prose only outside the single evidence table: a
+        // highlight list inside a section is repetition of that table.
+        proseOnly: true,
       });
 
       if (section.section_type === 'room_images') {

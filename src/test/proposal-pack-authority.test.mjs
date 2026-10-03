@@ -112,7 +112,10 @@ describe('at a glance page', () => {
 
   it('summarises the room, screen, seating and system from the calculated data', () => {
     assert.equal(byLabel.get('Room size').value, '7.0m × 5.0m × 2.6m (L × W × H)');
-    assert.equal(byLabel.get('Screen').value, '169" 16:9');
+    // The screen is stated with its terminology: the viewable image width, and
+    // the overall screen assembly named separately where the two differ.
+    assert.equal(byLabel.get('Screen').value, '147" viewable 16:9 image');
+    assert.equal(byLabel.get('Screen').hint, '169" overall screen assembly');
     assert.equal(byLabel.get('Seating').value, '8 seats · 2 rows');
     assert.equal(byLabel.get('System layout').value, '9.4.6');
     assert.equal(byLabel.get('System layout').hint, '15 discrete channels · 4 subwoofers');

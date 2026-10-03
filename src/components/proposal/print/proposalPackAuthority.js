@@ -133,21 +133,24 @@ export function screenStatement(screen = {}) {
     return { value: aspect ? `${stated}" ${aspect} screen` : `${stated}" screen`, hint: null };
   }
 
+  // The overall screen assembly is the derived diagonal where the snapshot
+  // carries one; where it does not, the stated size is the assembly whenever it
+  // differs from the viewable width. That is what a snapshot written before the
+  // diagonal was recorded holds, so an older saved report reads the same way.
+  const assembly = diagonal || (stated && viewable && stated !== viewable ? stated : null);
+
   // The viewable image width is the figure a projection screen is designed and
   // bought by. Where the snapshot carries no viewable width, the stated size
   // stands on its own rather than being labelled as something it may not be.
-  const imageWidth = viewable || (stated && diagonal && stated !== diagonal ? stated : null);
-  const overall = diagonal && imageWidth && diagonal !== imageWidth ? diagonal : null;
-
-  if (imageWidth) {
+  if (viewable) {
     return {
-      value: aspect ? `${imageWidth}" viewable ${aspect} image` : `${imageWidth}" viewable image`,
-      hint: overall ? `${overall}" overall screen assembly` : null,
+      value: aspect ? `${viewable}" viewable ${aspect} image` : `${viewable}" viewable image`,
+      hint: assembly && assembly !== viewable ? `${assembly}" overall screen assembly` : null,
     };
   }
   return {
     value: stated ? (aspect ? `${stated}" ${aspect} screen` : `${stated}" screen`) : null,
-    hint: overall ? `${overall}" overall screen assembly` : null,
+    hint: assembly && stated && assembly !== stated ? `${assembly}" overall screen assembly` : null,
   };
 }
 
