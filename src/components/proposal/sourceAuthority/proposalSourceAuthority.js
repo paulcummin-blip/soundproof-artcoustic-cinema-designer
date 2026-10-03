@@ -142,6 +142,7 @@ export function resolveReportSourceState({
  * @param {boolean} [params.unavailable]
  * @param {string|null} [params.reportGeneratedAt]
  * @param {string|null} [params.sourceFingerprint]
+ * @param {string|null} [params.sourceOutOfDateReason] exact shared authority blocker
  * @returns {Object} source status
  */
 export function resolveProposalSource({
@@ -156,11 +157,12 @@ export function resolveProposalSource({
   unavailable = false,
   reportGeneratedAt = null,
   sourceFingerprint = null,
+  sourceOutOfDateReason = null,
 } = {}) {
   const reportInputs = {
     hasSource,
     identityVerified,
-    designMovedOn,
+    designMovedOn: designMovedOn || !!sourceOutOfDateReason,
     recalculationPending,
     unavailable,
   };
@@ -174,6 +176,17 @@ export function resolveProposalSource({
     [PROPOSAL_SOURCE_REPORT.VISUAL]: buildReportStatus('visual', state, identityMismatches),
     [PROPOSAL_SOURCE_REPORT.TECHNICAL]: buildReportStatus('technical', state, identityMismatches),
   };
+  if (sourceOutOfDateReason) {
+    Object.keys(reports).forEach((key) => {
+      reports[key] = {
+        ...reports[key],
+        state: PROPOSAL_SOURCE_STATE.STALE,
+        status: describeSourceState(PROPOSAL_SOURCE_STATE.STALE),
+        reason: sourceOutOfDateReason,
+        action: `Generate ${reports[key].label}`,
+      };
+    });
+  }
 
   return {
     projectId,
@@ -184,7 +197,7 @@ export function resolveProposalSource({
     rule: PROPOSAL_SOURCE_RULE,
     reports,
     blockers: ready ? [] : buildBlockers(reports),
-    message: ready ? null : PROPOSAL_SOURCE_REQUIRED_MESSAGE,
+    message: ready ? null : (sourceOutOfDateReason || PROPOSAL_SOURCE_REQUIRED_MESSAGE),
     reportGeneratedAt: reportGeneratedAt || null,
     sourceFingerprint: sourceFingerprint || null,
   };
