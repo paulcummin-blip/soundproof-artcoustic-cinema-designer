@@ -15,6 +15,7 @@ export const REQUIRED_RP22_PARAMETER_KEYS = Object.freeze(
 );
 
 const TERMINAL_STATES = new Set(["scored", "na", "not_applicable"]);
+const REQUIRED_BASS_PARAMETER_KEYS = Object.freeze(["p14", "p18", "p19", "p20"]);
 
 function normalizedState(value) {
   return String(value || "").trim().toLowerCase();
@@ -120,6 +121,16 @@ export function assessEngineeringReportCompleteness(summary) {
     if (!allSeatsTerminal) incompleteSeatParameterKeys.push(key);
   }
 
+  // A preserved previous bass contract is useful in Bass UI for comparison,
+  // but it is never current report evidence. Fail closed even if an older
+  // engineering publication already carried terminal-looking bass rows.
+  const bassAuthorityOutOfDate = summary.bassAuthorityCurrent === false;
+  if (bassAuthorityOutOfDate) {
+    for (const key of REQUIRED_BASS_PARAMETER_KEYS) {
+      if (!missingParameterKeys.includes(key)) missingParameterKeys.push(key);
+    }
+  }
+
   // RP23/screen is required when the published authority includes it.
   if (parameters.screen) {
     const screen = parameters.screen;
@@ -141,7 +152,12 @@ export function assessEngineeringReportCompleteness(summary) {
     incompleteSeatParameterKeys,
     reason: complete
       ? null
-      : `Complete the remaining assessment before generating reports or proposals: ${labels.join(", ")}.`,
+      : bassAuthorityOutOfDate
+        ? (summary.bassAuthorityMessage
+          || "Saved bass analysis is out of date. Update Bass Performance before generating reports.")
+        : `Complete the remaining assessment before generating reports or proposals: ${labels.join(", ")}.`,
+    bassAuthorityOutOfDate,
+    bassAuthorityRejectionReason: summary.bassAuthorityRejectionReason || null,
   };
 }
 
