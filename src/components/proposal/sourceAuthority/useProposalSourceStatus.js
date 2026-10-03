@@ -79,6 +79,9 @@ export function useProposalSourceStatus({
       unavailable: readAsdrUnavailableIndicator(projectId),
       reportGeneratedAt: publication?.published_at || authority.snapshot?.publishedAt || null,
       sourceFingerprint: publication?.engineering_fingerprint || authority.snapshot?.engineeringFingerprint || null,
+      sourceOutOfDateReason: authority.bassAuthorityOutOfDate
+        ? authority.reportCompleteness?.reason
+        : null,
     });
 
     if (authority.readFailed) {
@@ -128,6 +131,8 @@ export function useProposalSourceStatus({
     authority.snapshot,
     authority.readFailed,
     authority.readError,
+    authority.bassAuthorityOutOfDate,
+    authority.reportCompleteness,
     engineeringSnapshot,
   ]);
 
