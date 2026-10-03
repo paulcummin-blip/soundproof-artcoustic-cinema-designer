@@ -31,6 +31,7 @@ import {
 import { buildComplianceBassPresentation } from "@/components/room/bass/bassCompliancePresentation";
 import { statesBassResultEntry } from "@/components/engineering/versionedEngineeringAuthority";
 import { summariseEngineeringResults } from "@/components/engineering/engineeringSummaryAuthority";
+import { describeBassReconciliationStaleness } from "@/components/room/bass/bassReconciliationStatus";
 import {
   LEVEL_MULTIPLIERS,
   PARAM_WEIGHTS,
@@ -114,12 +115,18 @@ export function applyRestoredBassAuthority(summary, { projectId, versionId, comp
   const currentness = assessRestoredBassAuthorityCurrentness(authority);
   if (!currentness.current) {
     if (!currentness.outOfDate) return summary;
+    // Name what moved when reconciliation compared the rebuilt identity's inputs
+    // with the saved ones — "out of date" alone gives the designer nothing to act
+    // on.
+    const moved = describeBassReconciliationStaleness(projectId, versionId);
     return {
       ...summary,
       bassAuthoritySource: "restored-durable-bass-authority-rejected",
       bassAuthorityCurrent: false,
       bassAuthorityRejectionReason: currentness.reason,
-      bassAuthorityMessage: SAVED_BASS_OUT_OF_DATE_MESSAGE,
+      bassAuthorityMessage: moved
+        ? `${SAVED_BASS_OUT_OF_DATE_MESSAGE} Changed since this result: ${moved}.`
+        : SAVED_BASS_OUT_OF_DATE_MESSAGE,
     };
   }
 

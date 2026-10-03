@@ -21,6 +21,7 @@ import { hydrateRecommendation } from "@/components/recommendationEngine/recomme
 import { queueBassAuthorityWrite, resetBassAuthorityWriteQueue } from "./bassAuthorityWriteQueue";
 import { readProjectAnalysisCacheRecord } from "@/components/state/projectReadCache";
 import { findSavedContractForFingerprint, parseTargetCacheBank } from "./bassIdentityReconciliation";
+import { publishBassReconciliationStatus } from "./bassReconciliationStatus";
 
 export {
   BASS_AUTHORITY_STATUS,
@@ -682,7 +683,7 @@ export function useCompletedBassContract(projectId, versionId) {
  *
  * @returns {Promise<{ matched: boolean, fingerprint: string|null, source: string|null, reason: string|null }>}
  */
-export async function reconcileBassAuthorityWithPersisted(projectId, versionId, { identity = null, requestedP14Identity = null } = {}) {
+export async function reconcileBassAuthorityWithPersisted(projectId, versionId, { identity = null, requestedP14Identity = null, verifyIdentity = null } = {}) {
   assertNotAuthoritativeReadOnly('reconcileBassAuthorityWithPersisted', 'reconcile-bass-authority');
   const key = projectKey(projectId, versionId);
   const fingerprint = identity?.cacheKey || null;
@@ -699,6 +700,13 @@ export async function reconcileBassAuthorityWithPersisted(projectId, versionId, 
     record = await readProjectAnalysisCacheRecord(projectId, versionId);
   } catch (e) {
     return { matched: false, fingerprint, source: null, reason: "cache-record-unavailable" };
+  }
+  // The identity may have moved while the record was being read (hydration still
+  // settling, a design edit in flight). A contract is never promoted from an
+  // identity that no longer describes the live design — the caller re-checks it
+  // here, before anything is published or written.
+  if (typeof verifyIdentity === "function" && verifyIdentity() !== true) {
+    return { matched: false, fingerprint, source: null, reason: "identity-changed-during-read", writeAttempted: false };
   }
   const bank = parseTargetCacheBank(record?.target_cache);
   const match = findSavedContractForFingerprint({
@@ -723,8 +731,19 @@ export async function reconcileBassAuthorityWithPersisted(projectId, versionId, 
   if (!published) {
     return { matched: false, fingerprint, source: match.source, reason: "saved-contract-rejected-by-authority-gate" };
   }
-  // Durable: status complete + current_fingerprint = the matched contract.
+  // Durable: status complete + current_fingerprint = the matched contract. The
+  // write queue reports its own outcome into the reconciliation status, so a
+  // failed persistence surfaces instead of silently leaving the row stale.
   await syncCachedCompactBassAuthority(projectId, versionId, match.contract);
+  publishBassReconciliationStatus(projectId, versionId, {
+    matched: true,
+    matchSource: match.source,
+    matchedFingerprint: fingerprint,
+    matchedTargetKey: match.targetKey || null,
+    writeAttempted: true,
+    authorityStatusAfter: BASS_AUTHORITY_STATUS.AUTHORITATIVE,
+    authorityCurrentFingerprintAfter: fingerprint,
+  });
   return {
     matched: true,
     fingerprint,
@@ -732,6 +751,7 @@ export async function reconcileBassAuthorityWithPersisted(projectId, versionId, 
     targetKey: match.targetKey || null,
     reason: null,
     contract: match.contract,
+    writeAttempted: true,
   };
 }
 

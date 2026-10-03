@@ -29,6 +29,7 @@ import { retryCompletedBassAuthority, useCompletedBassAuthority } from '@/compon
 import { invalidateProjectAnalysisCacheRead, readProjectVersionRecord } from '@/components/state/projectReadCache';
 import { applyRestoredBassAuthority } from './restoredBassOverlay';
 import { assessEngineeringReportCompleteness } from './engineeringReportCompleteness';
+import { useSharedBassAuthorityReconciliation } from '@/components/room/bass/useSharedBassAuthorityReconciliation';
 
 export function useVersionedEngineeringAuthority(projectId, versionId) {
   const [localSnapshot, setLocalSnapshot] = useState(
@@ -104,6 +105,11 @@ export function useVersionedEngineeringAuthority(projectId, versionId) {
   // bass results of a saved summary that does not state them, from the restored
   // contract, so a report never has to wait for the Bass section to hydrate.
   const completedBassAuthority = useCompletedBassAuthority(projectId || 'free', versionId || 'free');
+  // Bass-authority reconciliation runs on THIS shared path, so a report, Design
+  // Review or proposal source read opened directly repairs the same saved row the
+  // Room Designer would — without the Room Designer or any bass panel mounting.
+  // Identity only: it calculates nothing and never starts a worker.
+  useSharedBassAuthorityReconciliation(projectId, versionId);
   const composedSnapshot = composeAuthoritySnapshot({ localSnapshot, durableSnapshot });
   const composedSummary = extractEngineeringSummary(composedSnapshot);
   const restoredSummary = applyRestoredBassAuthority(

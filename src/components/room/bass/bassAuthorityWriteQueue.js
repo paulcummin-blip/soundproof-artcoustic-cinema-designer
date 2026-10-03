@@ -1,5 +1,6 @@
 import { base44 } from "@/api/base44Client";
 import { invalidateProjectAnalysisCacheRead } from "@/components/state/projectReadCache";
+import { publishBassReconciliationStatus } from "./bassReconciliationStatus";
 
 /**
  * Coalesced ProjectAnalysisCache writes for the completed bass authority.
@@ -75,14 +76,23 @@ async function flushQueuedBassAuthorityWrite(key) {
   if (pending.timer) clearTimeout(pending.timer);
   const { record, payload, signature, resolvers } = pending;
   const chain = (writeChains.get(key) || Promise.resolve()).then(async () => {
+    const [projectId, versionId] = String(key).split("::");
     try {
       if (record?.id) await base44.entities.ProjectAnalysisCache.update(record.id, payload);
       else await base44.entities.ProjectAnalysisCache.create(payload);
-      const [projectId, versionId] = String(key).split("::");
       invalidateProjectAnalysisCacheRead(projectId, versionId);
       writtenSignatures.set(key, signature);
+      // Runtime proof: the authority reached the database, and the shared read
+      // cache was invalidated so the next report read sees it.
+      publishBassReconciliationStatus(projectId, versionId, { writeSucceeded: true, writeError: null });
       return true;
     } catch (e) {
+      // The promotion did not persist: the in-memory authority stays current for
+      // this session, and the next open must reconcile again. Never silent.
+      publishBassReconciliationStatus(projectId, versionId, {
+        writeSucceeded: false,
+        writeError: e?.message || String(e),
+      });
       return false;
     }
   });

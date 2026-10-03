@@ -7,8 +7,8 @@
 // ---------------
 // A persisted bass authority row carries a current_fingerprint written by a
 // previous session. Nothing on the restore path ever recomputed that identity
-// from the design being opened, so a key produced from unsettled inputs — before
-// the room, reference listening position, subwoofer instances, resolved
+// from the design actually being opened, so a key produced from unsettled inputs
+// — before the room, reference listening position, subwoofer instances, resolved
 // subwoofer capability, usable LF limit, transition frequency or P14 target had
 // resolved — was restored verbatim as "out of date" on every open, even when a
 // valid saved contract for the real design sat in the same cache record (the P14
@@ -17,18 +17,23 @@
 // This hook owns:
 //   · the identity-readiness gate  — no identity is produced, compared or
 //     persisted until every identity input is genuinely resolved;
-//   · the identity-stability gate  — the identity must be observed unchanged
-//     across two consecutive settled renders before any decision is taken;
 //   · the reconciliation effect    — compare the rebuilt identity against the
-//     saved contracts and, on a match, promote the saved contract to CURRENT.
+//     saved contracts and, on a match, promote the saved contract to CURRENT;
+//   · the async identity guard     — re-verify the identity immediately before a
+//     match is promoted, so a contract is never promoted from an identity that
+//     moved while the cache record was being read.
+//
+// Eligibility is "every identity input is resolved and a key can be built from
+// them". There is deliberately NO "observed across two renders" latch: a React
+// effect re-runs only when its dependencies change, so a latch that waits for a
+// second execution after the identity settles can never close — which made
+// reconciliation permanently unreachable. The safety the latch was meant to
+// provide is enforced by the async identity guard instead.
 //
 // It never calculates, regrades or recomputes anything, and it changes no
 // acoustics: a match uses the saved contract exactly as stored.
-//
-// The extracted module keeps BassBackgroundAnalysisOwner within its size budget
-// while the logic stays one cohesive, testable unit.
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef } from "react";
 import { safeConsole } from "@/components/utils/safeConsole";
 import {
   buildBassIdentity,
@@ -41,13 +46,25 @@ import {
   setFingerprintInputDigest,
 } from "./p14TargetCache";
 import { reconcileBassAuthorityWithPersisted } from "./completedBassResultStore";
+import { publishBassReconciliationStatus } from "./bassReconciliationStatus";
 
 export function useBassAuthorityReconciliation({
   scopeId = "free",
   versionId = "free",
   projectHydrationReady = false,
   authorityHydrationSettled = false,
+  // Whether THIS surface owns the hydrated P14 target bank. It gates only the
+  // diagnostic digest written beside the bank — never reconciliation itself.
+  // A report route passes false: the bank is read from the same cache record by
+  // the store, and a surface that does not own the bank must not write to it.
   targetCacheHydrated = false,
+  // Where this instance runs (room_designer / shared_restore), for diagnostics.
+  reconciliationSource = null,
+  // Reported for runtime proof only. It is deliberately NOT a gate: in the Room
+  // Designer it means the room-physics worker has produced its curve, which only
+  // happens after a calculation — requiring it would reintroduce recalculation
+  // on open. Identity readiness is what this hook actually needs.
+  inputsValid = null,
   cacheKey = null,
   baseDesignFingerprint = null,
   fingerprints = null,
@@ -87,47 +104,64 @@ export function useBassAuthorityReconciliation({
   );
   const identityInputsReady = projectHydrationReady && identityReadiness.ready;
 
-  // ── Identity stability ────────────────────────────────────────────────
-  // Observed unchanged across two consecutive settled renders. Event-driven —
-  // no timers.
-  const [identityStable, setIdentityStable] = useState(false);
-  const observationRef = useRef({ fingerprint: null, count: 0 });
+  // Eligible as soon as every identity input is resolved and a key can be built
+  // from them (no fallback/default values remain — each one is a readiness input).
+  const identityEligible = identityInputsReady && !!cacheKey;
+
+  // Hook-mounted proof, written before any eligibility test, so "never mounted"
+  // is distinguishable from "mounted but not yet eligible".
   useEffect(() => {
-    const observed = observationRef.current;
-    if (!identityInputsReady || !cacheKey) {
-      observed.fingerprint = null;
-      observed.count = 0;
-      if (identityStable) setIdentityStable(false);
-      return;
-    }
-    if (observed.fingerprint === cacheKey) {
-      observed.count += 1;
-      if (observed.count >= 2 && !identityStable) setIdentityStable(true);
-      return;
-    }
-    observed.fingerprint = cacheKey;
-    observed.count = 1;
-    if (identityStable) setIdentityStable(false);
-  }, [identityInputsReady, cacheKey, identityStable]);
+    publishBassReconciliationStatus(scopeId, versionId, {
+      hookMounted: true,
+      source: reconciliationSource,
+    });
+  }, [scopeId, versionId, reconciliationSource]);
+
+  const digest = useMemo(
+    () => (identityEligible ? JSON.stringify(buildFingerprintInputDigest(fingerprintInputs, requested)) : null),
+    [identityEligible, fingerprintInputs, requested],
+  );
+  // Readable after the async read: the guard compares the identity as it is NOW
+  // against the identity the match was computed from.
+  const latestIdentityRef = useRef({ cacheKey: null, digest: null });
+  latestIdentityRef.current = { cacheKey, digest };
 
   // ── Reconciliation ────────────────────────────────────────────────────
   const reconciliationRef = useRef({ fingerprint: null, matched: null, source: null, reason: null, differences: null });
   useEffect(() => {
-    if (!projectHydrationReady || !authorityHydrationSettled || !targetCacheHydrated) return;
-    if (!identityInputsReady || !identityStable) return;
-    if (!cacheKey || !fingerprints || !targetKey || !baseDesignFingerprint) return;
+    if (!projectHydrationReady || !authorityHydrationSettled) return;
+    if (!identityEligible) return;
+    if (!fingerprints || !targetKey || !baseDesignFingerprint) return;
     if (manualRequestActive || calculationInProgress) return;
     if (reconciliationRef.current.fingerprint === cacheKey) return;
 
     const alreadyCurrent = authorityStatus === "AUTHORITATIVE" && authorityCurrentFingerprint === cacheKey;
     reconciliationRef.current = { fingerprint: cacheKey, matched: null, source: null, reason: null, differences: null };
 
-    // Record this identity's inputs going forward so a real design change can
-    // name the input that moved instead of only saying "out of date".
-    const digest = buildFingerprintInputDigest(fingerprintInputs, requested);
+    publishBassReconciliationStatus(scopeId, versionId, {
+      hookMounted: true,
+      source: reconciliationSource,
+      identityReady: true,
+      inputsValid: inputsValid === true,
+      cacheKeyBuilt: true,
+      cacheKey,
+      matched: null,
+      matchSource: null,
+      reason: "reconciling",
+      writeAttempted: false,
+      writeSucceeded: null,
+      differences: null,
+      authorityStatusBefore: authorityStatus,
+      authorityCurrentFingerprintBefore: authorityCurrentFingerprint,
+    });
+
     if (alreadyCurrent) {
-      setFingerprintInputDigest(scopeId, versionId, cacheKey, digest);
       reconciliationRef.current = { fingerprint: cacheKey, matched: true, source: "already-current", reason: null, differences: null };
+      publishBassReconciliationStatus(scopeId, versionId, {
+        matched: true,
+        matchSource: "already-current",
+        reason: null,
+      });
       return;
     }
 
@@ -139,12 +173,23 @@ export function useBassAuthorityReconciliation({
       targetKey,
       optimiserVersions,
     });
-    safeConsole.log("bass-authority-reconcile", JSON.stringify({ projectId: scopeId, versionId, identity }));
+    safeConsole.log("bass-authority-reconcile", JSON.stringify({ projectId: scopeId, versionId, source: reconciliationSource, identity }));
 
-    reconcileBassAuthorityWithPersisted(scopeId, versionId, { identity, requestedP14Identity: requested })
+    const callFingerprint = cacheKey;
+    const callDigest = digest;
+
+    reconcileBassAuthorityWithPersisted(scopeId, versionId, {
+      identity,
+      requestedP14Identity: requested,
+      // Re-verified after the cache read: if the live identity no longer matches
+      // the one this match was built from, the result is discarded and the next
+      // eligible identity is awaited.
+      verifyIdentity: () => latestIdentityRef.current.cacheKey === callFingerprint
+        && latestIdentityRef.current.digest === callDigest,
+    })
       .then((outcome) => {
         if (!outcome || outcome.fingerprint !== cacheKey) return;
-        const differences = !outcome.matched && outcome.reason === "no-saved-contract-for-rebuilt-identity"
+        const differences = !outcome.matched && outcome.reason === "no-saved-contract-for-rebuilt-identity" && targetCacheHydrated
           ? describeFingerprintDifferences(digest, getFingerprintInputDigest(scopeId, versionId, authorityCurrentFingerprint))
           : null;
         reconciliationRef.current = {
@@ -154,14 +199,31 @@ export function useBassAuthorityReconciliation({
           reason: outcome.reason || null,
           differences,
         };
-        if (outcome.matched) {
+        if (outcome.matched && targetCacheHydrated) {
           setFingerprintInputDigest(scopeId, versionId, cacheKey, digest);
         }
+        publishBassReconciliationStatus(scopeId, versionId, {
+          source: reconciliationSource,
+          identityReady: true,
+          inputsValid: inputsValid === true,
+          cacheKeyBuilt: true,
+          cacheKey,
+          matched: !!outcome.matched,
+          matchSource: outcome.source || null,
+          matchedFingerprint: outcome.contract?.job?.resultFingerprint || null,
+          matchedTargetKey: outcome.targetKey || null,
+          reason: outcome.reason || null,
+          writeAttempted: outcome.writeAttempted === true,
+          differences,
+          authorityStatusAfter: outcome.matched ? "AUTHORITATIVE" : null,
+          authorityCurrentFingerprintAfter: outcome.matched ? callFingerprint : null,
+        });
         safeConsole.log("bass-authority-reconcile-outcome", JSON.stringify({
           projectId: scopeId,
           versionId,
+          source: reconciliationSource,
           matched: !!outcome.matched,
-          source: outcome.source || null,
+          source_: outcome.source || null,
           reason: outcome.reason || null,
           targetKey: outcome.targetKey || null,
           differences,
@@ -171,9 +233,7 @@ export function useBassAuthorityReconciliation({
   }, [
     projectHydrationReady,
     authorityHydrationSettled,
-    targetCacheHydrated,
-    identityInputsReady,
-    identityStable,
+    identityEligible,
     cacheKey,
     fingerprints,
     targetKey,
@@ -187,9 +247,13 @@ export function useBassAuthorityReconciliation({
     scopeId,
     versionId,
     optimiserVersions,
+    digest,
+    reconciliationSource,
+    targetCacheHydrated,
+    inputsValid,
   ]);
 
-  return { identityReadiness, identityInputsReady, identityStable, reconciliationRef };
+  return { identityReadiness, identityInputsReady };
 }
 
 export default useBassAuthorityReconciliation;

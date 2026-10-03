@@ -370,12 +370,14 @@ export default function BassBackgroundAnalysisOwner({ children, scopeId = "free"
   // authority without calculating anything. No match keeps the authority stale
   // and records which identity inputs moved. A stale decision can no longer be
   // taken from a fingerprint produced before hydration completed.
-  const { identityInputsReady, identityStable } = useBassAuthorityReconciliation({
+  const { identityInputsReady } = useBassAuthorityReconciliation({
     scopeId,
     versionId,
     projectHydrationReady: isProjectHydrationReady,
     authorityHydrationSettled: bassAuthorityHydrationSettled,
     targetCacheHydrated,
+    reconciliationSource: "room_designer",
+    inputsValid,
     cacheKey,
     baseDesignFingerprint,
     fingerprints,
@@ -604,7 +606,11 @@ export default function BassBackgroundAnalysisOwner({ children, scopeId = "free"
     // before hydration completed, or from an identity that has not been observed
     // stable across two settled renders. This is what stops a false key being
     // written from unsettled inputs and then restored as permanent "out of date".
-    const identityDecisionEligible = isProjectHydrationReady && identityInputsReady && identityStable;
+    // Eligibility is "the identity is fully resolved", not "observed twice": the
+    // two-render latch this replaced could never close (a React effect re-runs
+    // only when its dependencies change), which also silently disabled genuine
+    // stale-marking after a real design change.
+    const identityDecisionEligible = isProjectHydrationReady && identityInputsReady;
     const observedBaseDesign = completedBassAuthority?.contract?.fingerprints?.baseDesign || null;
     const physicalDesignChanged = identityDecisionEligible
       && bassAuthorityHydrationSettled
@@ -683,7 +689,6 @@ export default function BassBackgroundAnalysisOwner({ children, scopeId = "free"
     OPTIMISER_VERSION_SIGNATURE,
     isProjectHydrationReady,
     identityInputsReady,
-    identityStable,
   ]);
 
   // FIX 2: Restore lock release — when coherence is observed after a restore
