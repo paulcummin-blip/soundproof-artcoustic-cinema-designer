@@ -86,6 +86,22 @@ function authoritativeContract() {
   return contract;
 }
 
+function currentAuthority() {
+  const resolved = resolvePersistedBassAuthority(
+    "marquee::v1",
+    buildPersistedBassAuthority(null, FP, authoritativeContract()),
+  );
+  return {
+    ...resolved,
+    status: "complete",
+    authorityStatus: "AUTHORITATIVE",
+    currentFingerprint: FP,
+    structurallyComplete: true,
+    authoritative: true,
+    exportable: true,
+  };
+}
+
 check("stale preserved bass cannot clear report missing keys", () => {
   const summary = baseSummary();
   const staleAuthority = {
@@ -111,11 +127,7 @@ check("stale preserved bass cannot clear report missing keys", () => {
 });
 
 check("only exact current authoritative fingerprint is accepted", () => {
-  const contract = authoritativeContract();
-  const authority = resolvePersistedBassAuthority(
-    "marquee::v1",
-    buildPersistedBassAuthority(null, FP, contract),
-  );
+  const authority = currentAuthority();
   assert.deepEqual(
     assessRestoredBassAuthorityCurrentness(authority),
     { current: true, outOfDate: false, reason: null },
@@ -129,10 +141,7 @@ check("only exact current authoritative fingerprint is accepted", () => {
 });
 
 check("accepted restored bass carries non-zero score multipliers", () => {
-  const authority = resolvePersistedBassAuthority(
-    "marquee::v1",
-    buildPersistedBassAuthority(null, FP, authoritativeContract()),
-  );
+  const authority = currentAuthority();
   const summary = baseSummary();
   summary.project.seatIds = ["s1", "s2"];
   summary.primary.seatIds = ["s1"];
