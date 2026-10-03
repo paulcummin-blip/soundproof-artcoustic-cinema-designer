@@ -69,7 +69,8 @@ const SNAPSHOT = {
       { seat_id: 'r1-c', horizontal_angle_deg: 63.2, rp23_level: 'L4' },
       { seat_id: 'r1-l', horizontal_angle_deg: 78.4, rp23_level: 'L1' },
       { seat_id: 'r1-r', horizontal_angle_deg: 49.1, rp23_level: 'L3' },
-      { seat_id: 'r2-c', horizontal_angle_deg: 45.3, rp23_level: 'L3' },
+      // Marquee-style row-2 value: 44.2° is displayed as 45° by rp23DisplayAngleDeg.
+      { seat_id: 'r2-c', horizontal_angle_deg: 44.2, rp23_level: 'L3' },
       { seat_id: 'r2-l', horizontal_angle_deg: 68.7, rp23_level: 'L1' },
       { seat_id: 'r2-r', horizontal_angle_deg: 43.8, rp23_level: 'L2' },
       { seat_id: 'rsp', horizontal_angle_deg: 50.0, rp23_level: 'L4' },
