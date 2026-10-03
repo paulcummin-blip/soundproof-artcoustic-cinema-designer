@@ -64,7 +64,9 @@ import { resolveSeatPriority } from "@/components/utils/seatPriorityAuthority";
 import { isAssessedLevel } from "@/components/report/client/visualReportSeatStyle";
 import { useReportSnapshot } from "@/components/report/useReportSnapshot";
 import ReportSnapshotBanner from "@/components/report/ReportSnapshotBanner";
+import ReportGateDiagnosticsPanel from "@/components/report/ReportGateDiagnosticsPanel";
 import {
+  REPORT_SNAPSHOT_STATUS,
   REPORT_SNAPSHOT_TYPE,
   buildSnapshotPayload,
   currentSourceFingerprints,
@@ -1097,6 +1099,11 @@ export default function RP22ClientReport() {
           regenerating={reportSnapshot.saving}
           onRegenerate={reportSnapshot.regenerate}
         />
+        {reportSnapshot.status !== REPORT_SNAPSHOT_STATUS.CURRENT && (
+          <div className="client-report-screen-only">
+            <ReportGateDiagnosticsPanel diagnostics={gateDiagnostics} />
+          </div>
+        )}
         {!projectId ? (
           <div className="client-report-screen-only" style={{
             background: "#FFFFFF",
