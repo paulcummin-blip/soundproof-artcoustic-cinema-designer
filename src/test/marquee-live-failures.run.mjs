@@ -87,15 +87,12 @@ function authoritativeContract() {
 }
 
 function currentAuthority() {
-  const resolved = resolvePersistedBassAuthority(
-    "marquee::v1",
-    buildPersistedBassAuthority(null, FP, authoritativeContract()),
-  );
   return {
-    ...resolved,
+    projectId: "marquee::v1",
     status: "complete",
     authorityStatus: "AUTHORITATIVE",
     currentFingerprint: FP,
+    contract: authoritativeContract(),
     structurallyComplete: true,
     authoritative: true,
     exportable: true,
