@@ -826,7 +826,7 @@ export default function RP22ClientReport() {
     ? (Number(priceSummary.incompletePriceCount) > 0 ? "incomplete" : "ok")
     : "unknown";
 
-  const readinessBase = deriveReportReadiness({
+  const derivedReadiness = deriveReportReadiness({
     hydrating,
     roomDims,
     placedSpeakers,
@@ -835,6 +835,26 @@ export default function RP22ClientReport() {
     pricingStatus,
     elapsedSeconds: stateSeconds,
   });
+  const staleBassParameterKeys = authority.reportCompleteness?.bassAuthorityOutOfDate
+    ? [...new Set([
+        ...(authority.reportCompleteness?.missingParameterKeys || []),
+        ...(authority.reportCompleteness?.incompleteSeatParameterKeys || []),
+      ])].filter((key) => ["p14", "p18", "p19", "p20"].includes(key))
+    : [];
+  const readinessBase = staleBassParameterKeys.length
+    ? {
+        ...derivedReadiness,
+        state: REPORT_STATE.NOT_READY,
+        missing: staleBassParameterKeys.map((key) => ({
+          key,
+          label: key.toUpperCase(),
+          action: "Update Bass Performance in Room Designer.",
+        })),
+        nextAction: "Update Bass Performance before generating reports.",
+        reason: authority.reportCompleteness?.reason,
+        canExport: false,
+      }
+    : derivedReadiness;
 
   const { exporting, error: exportError, handleExport } = useClientReportPdfExport({
     activePageCount: readinessBase.state === REPORT_STATE.READY ? activePages.length : 0,
