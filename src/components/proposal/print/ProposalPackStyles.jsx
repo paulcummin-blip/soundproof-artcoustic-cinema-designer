@@ -124,6 +124,22 @@ export default function ProposalPackStyles() {
         margin-top: 1.8mm;
       }
 
+      /* ── At a glance: the fact groups and their headings ── */
+      .proposal-print-portal .pp-facts-group {
+        margin-top: 7mm;
+      }
+      .proposal-print-portal .pp-facts-group__title {
+        font-family: var(--pp-heading) !important;
+        font-size: 8.5pt !important;
+        letter-spacing: 0.2em !important;
+        text-transform: uppercase !important;
+        color: var(--pp-green) !important;
+        margin: 0 0 3mm !important;
+      }
+      /* A card stating two labelled figures (the screen) holds both on one line
+         rather than wrapping mid-phrase. */
+      .proposal-print-portal .pp-card--span2 { grid-column: span 2; }
+
       /* ── Metric (evidence) cards ── */
       .proposal-print-portal .pp-metrics {
         display: grid;
@@ -341,6 +357,13 @@ export default function ProposalPackStyles() {
         body.proposal-export-mode .proposal-print-portal .pp-block,
         body.proposal-export-mode .proposal-print-portal .pp-table,
         body.proposal-export-mode .proposal-print-portal .pp-editorial {
+          break-inside: avoid;
+          page-break-inside: avoid;
+        }
+
+        /* ── At a glance — one page that is never split across two ── */
+        body.proposal-export-mode .proposal-print-portal .pp-page--glance,
+        body.proposal-export-mode .proposal-print-portal .pp-page--glance .pp-facts-group {
           break-inside: avoid;
           page-break-inside: avoid;
         }

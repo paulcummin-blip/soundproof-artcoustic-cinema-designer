@@ -22,7 +22,7 @@ import {
 } from '../base44/shared/adiNarrativeAuthority.js';
 import { selectHighlightRows } from '../base44/shared/engineeringSnapshotEvidence.js';
 import { buildHighlightDisplayRows } from '../src/components/proposal/keyPerformanceHighlightsAuthority.js';
-import { buildAtAGlanceCards } from '../src/components/proposal/print/proposalPackAuthority.js';
+import { buildAtAGlance } from '../src/components/proposal/print/proposalPackAuthority.js';
 import { resolveStatedScreenSize } from '../src/components/models/screen/canonicalScreenSize.js';
 
 /** A Marquee-class version: a 170" wide 2.35:1 screen (185" diagonal). */
@@ -237,8 +237,8 @@ describe('D. other numeric checks', () => {
 describe('E. generated report consistency', () => {
   it('gives the report and the chips the same screen size', () => {
     const chipText = buildAuthorityChips(marqueeFacts).find((chip) => /screen/.test(chip.label)).label;
-    const cards = buildAtAGlanceCards({ snapshot: marqueeSnapshot(), projectName: 'Marquee' });
-    const packScreen = cards.find((card) => card.label === 'Screen').value;
+    const glance = buildAtAGlance({ snapshot: marqueeSnapshot(), projectName: 'Marquee' });
+    const packScreen = glance.roomCards.find((card) => card.label === 'Screen').value;
     const highlightScreen = buildHighlightDisplayRows(selectHighlightRows(marqueeSnapshot()))
       .find((row) => row.key === 'screen_size').result;
 

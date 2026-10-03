@@ -115,11 +115,11 @@ export function parameterReferenceList() {
  * The screen as the client-facing statement, so no page can state one figure
  * while another implies a different one.
  *
- * A projection screen is stated by its viewable image width (170" viewable
- * 2.35:1 image) with the overall screen assembly given separately (185" overall
- * screen assembly). A television is stated by its nominal size, which is how a
- * television is bought, and needs no second figure. Both figures are read from
- * the frozen snapshot: nothing is converted here.
+ * A projection screen is stated by its viewable image width (170" 2.35:1
+ * viewable image) with the overall screen assembly given separately (185"
+ * overall screen assembly). A television is stated by its nominal size, which is
+ * how a television is bought, and needs no second figure. Both figures are read
+ * from the frozen snapshot: nothing is converted here.
  *
  * @returns {{ value: string|null, hint: string|null }}
  */
@@ -144,7 +144,7 @@ export function screenStatement(screen = {}) {
   // stands on its own rather than being labelled as something it may not be.
   if (viewable) {
     return {
-      value: aspect ? `${viewable}" viewable ${aspect} image` : `${viewable}" viewable image`,
+      value: aspect ? `${viewable}" ${aspect} viewable image` : `${viewable}" viewable image`,
       hint: assembly && assembly !== viewable ? `${assembly}" overall screen assembly` : null,
     };
   }
@@ -164,19 +164,6 @@ export function buildEvidenceCards(rows, sectionType) {
   if (!keys) return [];
   const byKey = new Map(buildHighlightDisplayRows(rows).map((row) => [row.key, row]));
   return keys.map((key) => byKey.get(key)).filter(Boolean);
-}
-
-/** The selected system in one line: the speaker families in the design. */
-export function buildSystemHeadline(snapshot, limit = 4) {
-  const roles = Array.isArray(snapshot?.system?.product_roles) ? snapshot.system.product_roles : [];
-  const labels = [];
-  for (const role of roles) {
-    const label = role?.model_label || role?.model_key;
-    if (label && !labels.includes(label)) labels.push(label);
-  }
-  if (labels.length === 0) return null;
-  const shown = labels.slice(0, limit).join(' · ');
-  return labels.length > limit ? `${shown} +${labels.length - limit}` : shown;
 }
 
 /**
@@ -209,54 +196,12 @@ export function roomSizeStatement(room = {}) {
   return { value: cleaned ? `${cleaned} m` : null, hint: 'L × W × H' };
 }
 
-/**
- * The screen as the at-a-glance card states it: the figure the screen is bought
- * by and the format, with the terminology on one short line underneath.
- *
- *   projection: value: '170" 2.35:1'   hint: 'Viewable image'
- *   television: value: '83" 16:9'      hint: 'Nominal size'
- *
- * The full sentence form (screenStatement) stays the authority for the pages
- * that have room for it; this is the same two values, stated briefly.
- */
-export function screenGlanceStatement(screen = {}) {
-  const viewable = Number(screen.viewable_width_inches) || null;
-  const stated = Number(screen.size_inches) || null;
-  const aspect = screen.aspect_ratio ? String(screen.aspect_ratio) : null;
-
-  if (screen.television === true && stated) {
-    return { value: aspect ? `${stated}" ${aspect}` : `${stated}"`, hint: 'Nominal size' };
-  }
-  if (viewable) {
-    return { value: aspect ? `${viewable}" ${aspect}` : `${viewable}"`, hint: 'Viewable image' };
-  }
-  if (stated) {
-    return { value: aspect ? `${stated}" ${aspect}` : `${stated}"`, hint: null };
-  }
-  return { value: null, hint: null };
-}
-
 /** True when a product role is a subwoofer, which has its own card. */
 function isSubwooferRole(role) {
   const key = String(role?.role || '').toLowerCase();
   const description = String(role?.role_description || '').toLowerCase();
   const category = String(role?.category || '').toLowerCase();
   return key === 'subwoofer' || description.includes('subwoofer') || category.includes('subwoofer');
-}
-
-/**
- * The loudspeaker families in the design, one per line, in the design's own
- * order. Subwoofers are excluded: they are stated on their own card.
- */
-export function loudspeakerFamilies(snapshot) {
-  const roles = Array.isArray(snapshot?.system?.product_roles) ? snapshot.system.product_roles : [];
-  const labels = [];
-  for (const role of roles) {
-    if (isSubwooferRole(role)) continue;
-    const label = role?.model_label || role?.model_key;
-    if (label && !labels.includes(label)) labels.push(label);
-  }
-  return labels;
 }
 
 /** The subwoofers as one clean line: "2 × SUB4-12", with the models when mixed. */
@@ -285,127 +230,167 @@ export function subwooferGlanceStatement(system = {}) {
   return { value: `${count} subwoofer${count === 1 ? '' : 's'}`, hint: null };
 }
 
+/** The short form of the specified treatment: "8 Abfuser panels". */
+export function treatmentGlanceStatement(treatment = {}) {
+  const quantity = Number(treatment?.quantity) || 0;
+  if (treatment?.enabled !== true || quantity <= 0) return null;
+  return `${quantity} Abfuser panel${quantity === 1 ? '' : 's'}`;
+}
+
 /**
- * The at-a-glance cards: clean project facts only.
+ * The viewing geometry as one compact fact: the floor the seating achieves and
+ * the horizontal angle range across the seats, in whole degrees.
  *
- * Each card is a label and its value, with a second line only where it states
- * the same fact more precisely (the axis order, the screen terminology, the row
- * count, the subwoofer models, the viewing standard). Nothing here comments on
- * the design, and no card carries a sentence.
+ *   value: "L3 · 44° to 63°"
+ *
+ * Built from the viewing authority's own per-seat angles. Nothing is graded or
+ * recalculated here.
  */
-export function buildAtAGlanceCards({ snapshot, projectName, dealerName, projectReference, generatedDate }) {
+export function viewingGlanceStatement(viewing = {}) {
+  const angles = (Array.isArray(viewing?.per_seat) ? viewing.per_seat : [])
+    .map((seat) => Number(seat?.horizontal_angle_deg))
+    .filter(Number.isFinite);
+  if (angles.length === 0) return { value: null, hint: null };
+
+  const minimum = Math.round(Math.min(...angles));
+  const maximum = Math.round(Math.max(...angles));
+  const range = minimum === maximum ? `${minimum}°` : `${minimum}° to ${maximum}°`;
+  const floor = viewing?.primary_floor || viewing?.project_floor || null;
+  return { value: floor ? `${floor} · ${range}` : range, hint: null };
+}
+
+/** The compact package label for each group of channel roles. */
+const PACKAGE_GROUP_LABELS = Object.freeze({
+  lcr: 'LCR',
+  centre_soundbar: 'Centre',
+  surround: 'Surrounds / wides',
+  rear_surround: 'Surrounds / wides',
+  front_wide: 'Surrounds / wides',
+  overhead: 'Overheads',
+});
+
+const PACKAGE_GROUP_ORDER = Object.freeze(['LCR', 'Centre', 'Surrounds / wides', 'Overheads']);
+
+/**
+ * The selected package, one row per group of channel roles: what each group is,
+ * and the model chosen for it. The subwoofers are stated once, as the count and
+ * the model in the design.
+ */
+export function buildPackageRows(snapshot) {
+  const system = snapshot?.system || {};
+  const groups = new Map();
+
+  for (const role of Array.isArray(system.product_roles) ? system.product_roles : []) {
+    if (isSubwooferRole(role)) continue;
+    const key = String(role?.role || '').toLowerCase();
+    const label = PACKAGE_GROUP_LABELS[key] || role?.role_description || role?.role || null;
+    const model = role?.model_label || role?.model_key || null;
+    if (!label || !model) continue;
+    const models = groups.get(label) || [];
+    if (!models.includes(model)) models.push(model);
+    groups.set(label, models);
+  }
+
+  const rank = (label) => {
+    const index = PACKAGE_GROUP_ORDER.indexOf(label);
+    return index === -1 ? PACKAGE_GROUP_ORDER.length : index;
+  };
+
+  const rows = [...groups.keys()]
+    .sort((a, b) => rank(a) - rank(b))
+    .map((label) => ({ role: label, model: groups.get(label).join(' · ') }));
+
+  const subwoofers = subwooferGlanceStatement(system);
+  if (subwoofers.value) rows.push({ role: 'Subwoofers', model: subwoofers.value });
+  return rows;
+}
+
+/**
+ * The one-line design brief: the room's own constraint, as the engineering
+ * authority states it. Omitted when the snapshot states none, so the page never
+ * carries commentary of its own.
+ */
+export function designBriefNote(snapshot) {
+  const text = statementValue(snapshot?.room?.acoustic_implication);
+  if (!text) return null;
+  const trimmed = String(text).trim();
+  return trimmed || null;
+}
+
+/**
+ * The at-a-glance page model: the project, the room and screen, the system and
+ * the selected package, in the order the page reads. This is the whole of the
+ * page that orients the client: the room and the brief are stated here once and
+ * nowhere else.
+ *
+ * Every value is a fact read from the frozen snapshot or the proposal's own
+ * context. No card carries a sentence, a product count or a publication date.
+ */
+export function buildAtAGlance({ snapshot, projectName, dealerName, projectReference, generatedDate }) {
   const room = snapshot?.room || {};
   const screen = room.screen || {};
   const seating = room.seating || {};
   const system = snapshot?.system || {};
   const configuration = system.configuration || {};
+  const layout = system.channel_layout || {};
   const version = snapshot?.version || {};
   const size = roomSizeStatement(room);
-  const screenCard = screenGlanceStatement(screen);
-  const speakers = loudspeakerFamilies(snapshot);
-  const subwoofers = subwooferGlanceStatement(system);
+  const screenCard = screenStatement(screen);
+  const viewing = viewingGlanceStatement(snapshot?.viewing);
   const seats = Number(seating.total_seats) || null;
   const rows = Number(seating.row_count) || null;
+  const channels = Number(layout.total_discrete) || null;
 
-  const cards = [
+  const projectCards = [
     { label: 'Project', value: projectName || statementValue(snapshot?.project?.project_name) || null },
     { label: 'Client', value: statementValue(snapshot?.project?.client_name) || null },
     {
       label: 'Dealer',
       value: dealerName || statementValue(snapshot?.project?.dealer_company) || statementValue(snapshot?.dealer?.company_name) || 'Sound Proof',
     },
-    { label: 'Room size', value: size.value, hint: size.hint },
-    { label: 'Screen', value: screenCard.value, hint: screenCard.hint },
-    {
-      label: 'Seating',
-      value: seats ? `${seats} seat${seats === 1 ? '' : 's'}` : null,
-      hint: rows ? `${rows} row${rows === 1 ? '' : 's'}` : null,
-    },
-    { label: 'System layout', value: configuration.dolby_config || null },
-    { label: 'Loudspeakers', value: speakers.length > 0 ? speakers.join('\n') : null },
-    { label: 'Subwoofers', value: subwoofers.value, hint: subwoofers.hint },
     { label: 'Project reference', value: projectReference || null },
     {
       label: 'Design version',
       value: version.name ? `${version.name}${version.number ? ` · V${version.number}` : ''}` : null,
     },
-    { label: 'Modelled against', value: 'CEDIA/CTA-RP22', hint: 'RP23' },
-    { label: 'Prepared by', value: dealerName || 'Sound Proof' },
     { label: 'Date', value: ukDate(generatedDate) },
   ];
 
-  // A card with no value is left out rather than printed empty.
-  return cards.filter((card) => card.value);
-}
-
-/** The room and brief facts, and the product package rows. */
-export function buildRoomBriefFacts(snapshot) {
-  const room = snapshot?.room || {};
-  const screen = room.screen || {};
-  const seating = room.seating || {};
-  const viewing = snapshot?.viewing || {};
-  const treatment = room.acoustic_treatment || {};
-  const system = snapshot?.system || {};
-
-  const facts = [
-    {
-      label: 'Room',
-      value: room.dimensions_text || null,
-      hint: room.volume_m3 ? `${room.volume_m3} m³` : null,
-    },
-    {
-      label: 'Room form',
-      value: statementValue(room.classification) || null,
-      hint: statementValue(room.ratio) || null,
-    },
-    {
-      // Stated with the same terminology as the at-a-glance page. The screen
-      // wall construction has its own fact below, so the hint carries the
-      // overall screen assembly instead of repeating it.
-      label: 'Screen',
-      value: screenStatement(screen).value,
-      hint: screenStatement(screen).hint,
-    },
+  const roomCards = [
+    { label: 'Room size', value: size.value, hint: size.hint },
+    // The screen states both figures the design sets: the viewable image the
+    // screen is bought by, and the overall assembly it needs. It spans two
+    // columns so neither line has to wrap.
+    { label: 'Screen', value: screenCard.value, hint: screenCard.hint, span: 2 },
     {
       label: 'Seating',
-      value: seating.total_seats
-        ? `${seating.total_seats} seats · ${seating.row_count || 1} rows`
-        : null,
-      hint: seating.row_spacing_m ? `${seating.row_spacing_m}m row spacing` : null,
+      value: seats ? `${seats} seat${seats === 1 ? '' : 's'}` : null,
+      hint: rows ? `${rows} row${rows === 1 ? '' : 's'}` : null,
     },
-    {
-      label: 'Viewing',
-      value: viewing.available ? viewing.summary : null,
-      hint: viewing.primary_floor ? `Primary seats ${viewing.primary_floor}` : null,
-    },
-    {
-      label: 'Screen wall',
-      value: statementValue(room.screen_wall?.construction_type) || null,
-      hint: statementValue(room.screen_wall?.detail) || null,
-    },
+    { label: 'Viewing geometry', value: viewing.value, hint: viewing.hint },
     {
       label: 'Acoustic treatment',
-      value: treatment.enabled ? treatment.interpretation : 'None specified',
-      hint: treatment.enabled ? null : 'The room is designed to perform without added treatment.',
+      value: treatmentGlanceStatement(room.acoustic_treatment),
+      hint: null,
     },
-    {
-      label: 'Room constraint',
-      value: statementValue(room.acoustic_implication) || null,
-      wide: true,
-    },
-    {
-      label: 'System',
-      value: system.configuration?.text || null,
-      wide: true,
-    },
-  ].filter((fact) => fact.value);
+  ];
 
-  const products = (Array.isArray(system.product_roles) ? system.product_roles : []).map((role) => ({
-    role: role.role_description || role.role || '',
-    model: role.model_label || role.model_key || '',
-  }));
+  const systemCards = [
+    {
+      label: 'System layout',
+      value: configuration.dolby_config || null,
+      hint: channels ? `${channels} discrete channels` : null,
+    },
+  ];
 
-  return { facts, products };
+  // A card with no value is left out rather than printed empty.
+  return {
+    projectCards: projectCards.filter((card) => card.value),
+    roomCards: roomCards.filter((card) => card.value),
+    systemCards: systemCards.filter((card) => card.value),
+    packageRows: buildPackageRows(snapshot),
+    briefNote: designBriefNote(snapshot),
+  };
 }
 
-export default buildAtAGlanceCards;
+export default buildAtAGlance;

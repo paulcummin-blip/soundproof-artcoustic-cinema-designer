@@ -14,8 +14,7 @@ import {
 } from '../src/components/proposal/keyPerformanceHighlightsAuthority.js';
 import { prepareSectionBody } from '../src/components/proposal/sectionBodyAuthority.js';
 import {
-  buildAtAGlanceCards,
-  buildRoomBriefFacts,
+  buildAtAGlance,
   screenStatement,
 } from '../src/components/proposal/print/proposalPackAuthority.js';
 import { imagePagesFor, IMAGES_PER_PAGE } from '../src/components/proposal/print/imagePageLayout.js';
@@ -146,14 +145,14 @@ describe('Prose-only sections on the printed page', () => {
 describe('Screen terminology', () => {
   it('states a projection screen by its viewable image width and names the assembly', () => {
     expect(screenStatement(PROJECTION_SCREEN)).toEqual({
-      value: '170" viewable 2.35:1 image',
+      value: '170" 2.35:1 viewable image',
       hint: '185" overall screen assembly',
     });
   });
 
   it('states the same screen for a saved snapshot written before the labelling change', () => {
     expect(screenStatement({ ...PROJECTION_SCREEN, size_inches: 185 })).toEqual({
-      value: '170" viewable 2.35:1 image',
+      value: '170" 2.35:1 viewable image',
       hint: '185" overall screen assembly',
     });
   });
@@ -168,23 +167,39 @@ describe('Screen terminology', () => {
     })).toEqual({ value: '83" 16:9 screen', hint: null });
   });
 
-  it('states the same screen values on every page, briefly on the at a glance page', () => {
-    const card = buildAtAGlanceCards({ snapshot: SCREEN_SNAPSHOT, projectName: 'Marquee' })
-      .find((entry) => entry.label === 'Screen');
-    const fact = buildRoomBriefFacts(SCREEN_SNAPSHOT).facts
-      .find((entry) => entry.label === 'Screen');
-    // The at a glance card is the short form of the same two values; the room
-    // and brief page keeps the full terminology.
-    expect(card.value).toBe('170" 2.35:1');
-    expect(card.hint).toBe('Viewable image');
-    expect(fact.value).toBe('170" viewable 2.35:1 image');
-    expect(fact.hint).toBe('185" overall screen assembly');
+  it('states both figures once, on the screen card of the one page', () => {
+    const card = buildAtAGlance({ snapshot: SCREEN_SNAPSHOT, projectName: 'Marquee' })
+      .roomCards.find((entry) => entry.label === 'Screen');
+    expect(card.value).toBe('170" 2.35:1 viewable image');
+    expect(card.hint).toBe('185" overall screen assembly');
+    // The card spans two columns so neither line has to wrap.
+    expect(card.span).toBe(2);
   });
 
   it('never states an unlabelled screen size', () => {
     const text = `${screenStatement(PROJECTION_SCREEN).value} ${screenStatement(PROJECTION_SCREEN).hint}`;
     expect(text).toMatch(/viewable/);
     expect(text).toMatch(/overall screen assembly/);
+  });
+});
+
+describe('One page for the project facts', () => {
+  const pack = fs.readFileSync(
+    new URL('../src/components/proposal/print/ProposalPackDocument.jsx', import.meta.url),
+    'utf8'
+  );
+
+  it('composes the at a glance page and no separate room and brief page', () => {
+    expect(pack).toContain('<AtAGlancePage');
+    expect(pack).not.toContain('RoomAndBriefPage');
+    expect(fs.existsSync(new URL('../src/components/proposal/print/RoomAndBriefPage.jsx', import.meta.url)))
+      .toBe(false);
+  });
+
+  it('carries the project facts and the room facts on that one page', () => {
+    const glance = buildAtAGlance({ snapshot: SCREEN_SNAPSHOT, projectName: 'Marquee' });
+    expect(glance.projectCards.length).toBeGreaterThan(0);
+    expect(glance.roomCards.length).toBeGreaterThan(0);
   });
 });
 
@@ -225,6 +240,10 @@ describe('Print break rules in the pack stylesheet', () => {
     expect(css).toMatch(/pp-block__title[\s\S]*break-after: avoid/);
     expect(css).toMatch(/pp-header[\s\S]*break-after: avoid/);
     expect(css).toMatch(/pp-table[\s\S]*break-inside: avoid/);
+  });
+
+  it('keeps the one at a glance page whole', () => {
+    expect(css).toMatch(/pp-page--glance[\s\S]*break-inside: avoid/);
   });
 
   it('gives the image pages their own page and keeps them whole', () => {

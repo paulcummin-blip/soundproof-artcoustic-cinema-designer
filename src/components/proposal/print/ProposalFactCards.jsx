@@ -18,7 +18,10 @@ export default function ProposalFactCards({ cards = [], columns = 3, className =
   return (
     <div className={`pp-cards pp-cards--${columns} ${className}`.trim()}>
       {list.map((card) => (
-        <div key={card.label} className={`pp-card${card.wide ? ' pp-card--wide' : ''}`}>
+        <div
+          key={card.label}
+          className={`pp-card${card.wide ? ' pp-card--wide' : ''}${card.span === 2 ? ' pp-card--span2' : ''}`}
+        >
           <div className="pp-card__label" style={proposalRoleStyle('label')}>
             {card.label}
           </div>

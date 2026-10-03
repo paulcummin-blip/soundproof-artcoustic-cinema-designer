@@ -1,10 +1,10 @@
 /**
  * Acceptance tests for the designed client specification pack.
  *
- * Covers: the at-a-glance summary fields, the room and brief facts and product
- * package, the per-structure evidence cards (correct parameters only, whole
- * numbers, every gain populated), the approved method and appendix copy, and
- * the rule that no pack copy invents a value or names the platform.
+ * Covers: the at-a-glance page (project, room, screen, viewing, system and the
+ * package, stated once), the per-structure evidence cards (correct parameters
+ * only, whole numbers, every gain populated), the approved method and appendix
+ * copy, and the rule that no pack copy invents a value or names the platform.
  *
  * Pure: no React, no database, no browser.
  *
@@ -17,10 +17,8 @@ import { describe, it } from 'vitest';
 import {
   APPENDIX_PAGE,
   METHOD_PAGE,
-  buildAtAGlanceCards,
+  buildAtAGlance,
   buildEvidenceCards,
-  buildRoomBriefFacts,
-  buildSystemHeadline,
   parameterReferenceList,
   ukDate,
 } from '../../src/components/proposal/print/proposalPackAuthority.js';
@@ -56,12 +54,21 @@ const SNAPSHOT = {
     },
     channel_layout: { total_discrete: 15, subwoofer_count: 4 },
     product_roles: [
-      { role_description: 'Left/Centre/Right (screen wall)', model_label: 'EVOLVE 2-1' },
-      { role_description: 'Side surround', model_label: 'SL-EVOLVE 1-1' },
-      { role_description: 'Subwoofer', model_label: 'SUB2-12' },
+      { role: 'lcr', role_description: 'Left/Centre/Right (screen wall)', model_label: 'EVOLVE 2-1' },
+      { role: 'surround', role_description: 'Side surround', model_label: 'SL-EVOLVE 1-1' },
+      { role: 'subwoofer', role_description: 'Subwoofer', model_label: 'SUB2-12' },
     ],
   },
-  viewing: { available: true, summary: 'L4 · 55.5°', primary_floor: 'L4', project_floor: 'L4' },
+  viewing: {
+    available: true,
+    summary: 'Viewing angles calculated for 8 seats. Horizontal viewing angle ranges from 47° to 56°.',
+    primary_floor: 'L4',
+    project_floor: 'L4',
+    per_seat: [
+      { seat_id: 's1', horizontal_angle_deg: 55.5, rp23_level: 'L4' },
+      { seat_id: 's2', horizontal_angle_deg: 47.2, rp23_level: 'L4' },
+    ],
+  },
   products: [{ model_key: 'evolve-2-1' }, { model_key: 'sl-evolve-1-1' }],
 };
 
@@ -77,97 +84,112 @@ const ROWS = [
   { key: 'p20', area: 'Bass consistency', result: 'L3 · 5.6 dB', what_the_room_gains: '' },
 ];
 
+const GLANCE = buildAtAGlance({
+  snapshot: SNAPSHOT,
+  projectName: 'Lords Hall',
+  dealerName: 'Ribble AV',
+  projectReference: 'LH-001',
+  generatedDate: '2026-09-14',
+});
+
+const ALL_CARDS = [...GLANCE.projectCards, ...GLANCE.roomCards, ...GLANCE.systemCards];
+const byLabel = new Map(ALL_CARDS.map((card) => [card.label, card]));
+
 describe('at a glance page', () => {
-  const cards = buildAtAGlanceCards({
-    snapshot: SNAPSHOT,
-    projectName: 'Lords Hall',
-    dealerName: 'Ribble AV',
-    projectReference: 'LH-001',
-    generatedDate: '2026-09-14',
-  });
-  const byLabel = new Map(cards.map((card) => [card.label, card]));
-
-  it('carries the orienting fields the client needs', () => {
-    [
-      'Project',
-      'Client',
-      'Dealer',
-      'Room size',
-      'Screen',
-      'Seating',
-      'System layout',
-      'Loudspeakers',
-      'Subwoofers',
-      'Project reference',
-      'Design version',
-      'Modelled against',
-      'Prepared by',
-      'Date',
-    ].forEach((label) => assert.ok(byLabel.has(label), label));
-  });
-
-  it('states the assessment basis, the preparing party and the date', () => {
-    assert.equal(byLabel.get('Modelled against').value, 'CEDIA/CTA-RP22');
-    assert.equal(byLabel.get('Modelled against').hint, 'RP23');
-    assert.equal(byLabel.get('Prepared by').value, 'Ribble AV');
-    assert.equal(byLabel.get('Date').value, '14/09/2026');
+  it('carries the project facts the client needs', () => {
+    ['Project', 'Client', 'Dealer', 'Project reference', 'Design version', 'Date'].forEach((label) => {
+      assert.ok(byLabel.has(label), label);
+    });
+    assert.equal(byLabel.get('Project').value, 'Lords Hall');
+    assert.equal(byLabel.get('Project reference').value, 'LH-001');
     assert.equal(byLabel.get('Design version').value, 'Current Design · V1');
+    assert.equal(byLabel.get('Date').value, '14/09/2026');
   });
 
-  it('states each fact briefly, with no commentary inside a card', () => {
+  it('states the room, screen, seating and viewing geometry as facts', () => {
     assert.equal(byLabel.get('Room size').value, '7.0 × 5.0 × 2.6 m');
     assert.equal(byLabel.get('Room size').hint, 'L × W × H');
-    assert.equal(byLabel.get('Screen').value, '147" 16:9');
-    assert.equal(byLabel.get('Screen').hint, 'Viewable image');
+    assert.equal(byLabel.get('Screen').value, '147" 16:9 viewable image');
+    assert.equal(byLabel.get('Screen').hint, '169" overall screen assembly');
     assert.equal(byLabel.get('Seating').value, '8 seats');
     assert.equal(byLabel.get('Seating').hint, '2 rows');
-    assert.equal(byLabel.get('System layout').value, '9.4.6');
+    // Whole degrees, and never the viewing authority's prose sentence.
+    assert.equal(byLabel.get('Viewing geometry').value, 'L4 · 47° to 56°');
+  });
 
-    // No card carries a sentence, a count of products, a publication date or a
-    // room classification: a fact card states its fact and nothing else.
-    cards.forEach((card) => {
+  it('states the layout and the channel count on the system card', () => {
+    assert.equal(byLabel.get('System layout').value, '9.4.6');
+    assert.equal(byLabel.get('System layout').hint, '15 discrete channels');
+  });
+
+  it('states the selected package once, grouped by channel role', () => {
+    assert.deepEqual(GLANCE.packageRows, [
+      { role: 'LCR', model: 'EVOLVE 2-1' },
+      { role: 'Surrounds / wides', model: 'SL-EVOLVE 1-1' },
+      { role: 'Subwoofers', model: '4 × SUB2-12' },
+    ]);
+  });
+
+  it('states the room’s own constraint as one short brief line', () => {
+    assert.equal(GLANCE.briefNote, 'Standard modal distribution in this room.');
+    assert.ok(!GLANCE.briefNote.includes('\n'));
+  });
+
+  it('keeps every card to a fact, with no commentary', () => {
+    ALL_CARDS.forEach((card) => {
       const text = `${card.value} ${card.hint || ''}`;
       assert.ok(!/rectangular room|near-cubic|golden ratio/i.test(text), card.label);
       assert.ok(!/products specified/i.test(text), card.label);
       assert.ok(!/published/i.test(text), card.label);
       assert.ok(!/\bRP23 viewing\b/i.test(text), card.label);
+      assert.ok(!/auto-calculated/i.test(text), card.label);
+      // No card carries a sentence: a value is a figure, a name or a short label.
+      assert.ok(text.split(/\s+/).length <= 6, `${card.label}: ${text}`);
     });
   });
 
-  it('names the loudspeaker families on their own card, one per line', () => {
-    assert.equal(byLabel.get('Loudspeakers').value, 'EVOLVE 2-1\nSL-EVOLVE 1-1');
-    assert.equal(buildSystemHeadline(SNAPSHOT), 'EVOLVE 2-1 · SL-EVOLVE 1-1 · SUB2-12');
-  });
-
-  it('states the subwoofers as a count and their model', () => {
-    assert.equal(byLabel.get('Subwoofers').value, '4 × SUB2-12');
+  it('leaves out the facts that would repeat another page or card', () => {
+    ['Loudspeakers', 'Modelled against', 'Prepared by', 'Room form', 'Room', 'Viewing', 'Acoustic treatment']
+      .forEach((label) => assert.ok(!byLabel.has(label), label));
+    assert.deepEqual(GLANCE.systemCards.map((card) => card.label), ['System layout']);
   });
 
   it('never prints an empty card and never names the platform', () => {
-    cards.forEach((card) => assert.ok(card.value, card.label));
-    assert.ok(!JSON.stringify(cards).toLowerCase().includes('base44'));
+    ALL_CARDS.forEach((card) => assert.ok(card.value, card.label));
+    assert.ok(!JSON.stringify(GLANCE).toLowerCase().includes('base44'));
+  });
+
+  it('says nothing about treatment when none is specified, and states it briefly when it is', () => {
+    const withTreatment = buildAtAGlance({
+      snapshot: {
+        ...SNAPSHOT,
+        room: { ...SNAPSHOT.room, acoustic_treatment: { enabled: true, quantity: 8 } },
+      },
+      projectName: 'Lords Hall',
+    });
+    const treatment = withTreatment.roomCards.find((card) => card.label === 'Acoustic treatment');
+    assert.equal(treatment.value, '8 Abfuser panels');
+    assert.equal(treatment.hint, null);
   });
 });
 
-describe('room and brief page', () => {
-  const { facts, products } = buildRoomBriefFacts(SNAPSHOT);
-  const byLabel = new Map(facts.map((fact) => [fact.label, fact]));
+describe('no fact is stated twice', () => {
+  it('never repeats a value across the cards and the package', () => {
+    const cardValues = ALL_CARDS.map((card) => card.value);
+    assert.equal(new Set(cardValues).size, cardValues.length);
 
-  it('states the room, screen, seating, viewing and package', () => {
-    ['Room', 'Room form', 'Screen', 'Seating', 'Viewing', 'Screen wall', 'System'].forEach((label) => {
-      assert.ok(byLabel.has(label), label);
+    // The speaker models are stated in the package and nowhere in a card.
+    const packageModels = GLANCE.packageRows.map((row) => row.model);
+    cardValues.forEach((value) => {
+      packageModels.forEach((model) => {
+        assert.ok(!value.includes(model.split(' · ')[0]) || value === model, value);
+      });
     });
-    assert.equal(byLabel.get('Seating').value, '8 seats · 2 rows');
-    assert.equal(products.length, 3);
-    assert.equal(products[0].model, 'EVOLVE 2-1');
   });
 
-  it('records the room constraint rather than hiding it', () => {
-    assert.ok(byLabel.get('Room constraint').value.includes('modal'));
-  });
-
-  it('says so plainly when no treatment is specified', () => {
-    assert.equal(byLabel.get('Acoustic treatment').value, 'None specified');
+  it('keeps one card per label', () => {
+    const labels = ALL_CARDS.map((card) => card.label);
+    assert.equal(new Set(labels).size, labels.length);
   });
 });
 
