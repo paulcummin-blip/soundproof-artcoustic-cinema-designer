@@ -20,7 +20,7 @@
 // and administrative metadata that is shared across all versions.
 //
 // Administrative (always editable, propagates instantly):
-//   name, client_name, project_status, notes
+//   name, client_name, project_reference, project_status, notes
 //
 // Physical room definition (editable with confirmation, propagates to all):
 //   roomDims, room_length, room_width, room_height, room_orientation,
@@ -41,6 +41,7 @@ const SHARED_PROJECT_FIELDS = new Set([
   // Administrative
   "name",
   "client_name",
+  "project_reference",
   "project_status",
   "notes",
   // Physical room
@@ -122,6 +123,10 @@ export function mergeProjectAndVersion(project, version) {
     // Shared fields from the Project override any stale copies in design_state
     name: project.name,
     client_name: project.client_name,
+    // The designer's own reference always wins over a stale copy that may have
+    // been left in design_state. An empty reference stays empty: the client
+    // name is never substituted for it.
+    project_reference: project.project_reference,
     project_status: project.project_status,
     notes: project.notes,
     roomDims: project.roomDims,

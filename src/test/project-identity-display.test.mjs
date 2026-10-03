@@ -26,6 +26,9 @@ import {
   resolveDealerIdentity,
   resolveIdentityFields,
 } from '@/components/projects/projectIdentityAuthority.js';
+import { mergeProjectAndVersion } from '@/lib/versionAuthority.js';
+import { buildAtAGlance } from '@/components/proposal/print/proposalPackAuthority.js';
+import { buildReportFilename } from '@/components/report/reportPdfTitle.js';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const SRC = join(here, '..');
@@ -35,7 +38,10 @@ const read = (path) => readFileSync(join(SRC, path), 'utf8');
 const MARQUEE_HOME_PROJECT = {
   name: 'Marquee Home',
   client_name: '34 AR',
-  project_reference: '34 AR',
+  // Client name and project reference are separate fields. This project has no
+  // reference of its own, so the reference stays empty and is never filled in
+  // from the client name.
+  project_reference: '',
   dealer_name: null,
   account_id: '6a2690efdfb8492ee7facc01',
 };
@@ -53,8 +59,10 @@ describe('PROJECT FIELDS TRACED', () => {
     });
 
     expect(fields.client).toBe('34 AR');
-    expect(fields.reference).toBe('34 AR');
-    expect(fields.hasReference).toBe(true);
+    // Nothing was entered as a reference, so nothing is shown and nothing is
+    // invented from the client name.
+    expect(fields.hasReference).toBe(false);
+    expect(fields.reference).toBe(IDENTITY_NOT_SPECIFIED);
   });
 
   it('never hides an existing project reference', () => {
@@ -134,10 +142,21 @@ describe('ACCEPTANCE PROJECT — MARQUEE HOME', () => {
     reference: MARQUEE_HOME_PROJECT.project_reference,
   });
 
-  it('shows the project, its client and its reference', () => {
+  it('shows the project and its client, and hides the empty reference', () => {
     expect(fields.project).toBe('Marquee Home');
     expect(fields.client).toBe('34 AR');
-    expect(fields.reference).toBe('34 AR');
+    expect(fields.hasReference).toBe(false);
+    expect(fields.reference).not.toBe(fields.client);
+  });
+
+  it('shows an entered reference exactly as it was typed', () => {
+    const withReference = resolveIdentityFields({
+      projectName: MARQUEE_HOME_PROJECT.name,
+      client: MARQUEE_HOME_PROJECT.client_name,
+      reference: 'MH-001',
+    });
+    expect(withReference.reference).toBe('MH-001');
+    expect(withReference.hasReference).toBe(true);
   });
 
   it('adds no dealer field to the display contract', () => {
@@ -267,5 +286,67 @@ describe('NO LAYOUT OVERFLOW', () => {
   it('does not truncate the project, client or reference values', () => {
     const line = read('components/projects/ProjectIdentityLine.jsx');
     expect(line).not.toMatch(/textOverflow|ellipsis|truncate/);
+  });
+});
+
+describe('THE REFERENCE IS NEVER THE CLIENT NAME', () => {
+  // A version whose saved design state still carries an old copy of the
+  // reference. The project record is the authority; the stale copy must lose.
+  const version = { id: 'v1', design_state: { project_reference: 'STALE-COPY' } };
+
+  it('carries the stored reference from the project record through the version merge', () => {
+    const merged = mergeProjectAndVersion(
+      { ...MARQUEE_HOME_PROJECT, project_reference: 'MH-001' },
+      version,
+    );
+    expect(merged.project_reference).toBe('MH-001');
+  });
+
+  it('keeps an empty reference empty and rejects the stale design-state copy', () => {
+    const merged = mergeProjectAndVersion(MARQUEE_HOME_PROJECT, version);
+    expect(merged.project_reference).toBe('');
+    expect(merged.project_reference).not.toBe(MARQUEE_HOME_PROJECT.client_name);
+  });
+
+  it('reads the reference as a shared project field, not version design state', () => {
+    const authority = read('lib/versionAuthority.js');
+    expect(authority).toMatch(/"project_reference",/);
+    expect(authority).toMatch(/project_reference: project\.project_reference/);
+  });
+
+  it('carries no reference card on At a Glance until one is entered', () => {
+    const snapshot = { project: { project_name: 'Marquee Home', client_name: '34 AR' } };
+    const blank = buildAtAGlance({ snapshot, projectName: 'Marquee Home', projectReference: '' });
+    // The card is left out entirely rather than printed empty or filled in
+    // from the client name.
+    expect(blank.projectCards.some((card) => card.label === 'Project reference')).toBe(false);
+
+    const filled = buildAtAGlance({
+      snapshot,
+      projectName: 'Marquee Home',
+      projectReference: 'MH-001',
+    });
+    expect(filled.projectCards.find((card) => card.label === 'Project reference').value).toBe('MH-001');
+  });
+
+  it('adds no reference segment to the exported filename until one is entered', () => {
+    const details = { dealerName: 'Ribble AV' };
+    const blank = buildReportFilename('Visual', 'Marquee Home', null, {
+      ...details,
+      projectReference: '',
+    });
+    expect(blank).not.toContain('34 AR');
+    expect(blank.endsWith('Marquee Home')).toBe(true);
+
+    const filled = buildReportFilename('Visual', 'Marquee Home', null, {
+      ...details,
+      projectReference: 'MH-001',
+    });
+    expect(filled.endsWith('MH-001')).toBe(true);
+  });
+
+  it('shows the proposal cover reference only when one exists', () => {
+    const cover = read('components/proposal/cover/ProposalCoverPage.jsx');
+    expect(cover).toMatch(/const hasReference = !!\(projectReference/);
   });
 });
