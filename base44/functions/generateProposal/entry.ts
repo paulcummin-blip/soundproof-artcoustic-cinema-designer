@@ -7,6 +7,7 @@ import { buildEngineeringEvidence, selectHighlightRows, mergeHighlightRows, buil
 import { buildProjectInterpretation, formatInterpretationForPrompt, formatInterpretationForLog } from '../../shared/adiProjectInterpretation.js';
 import { compareInterpretations, formatComparisonInterpretationForPrompt } from '../../shared/adiReportComparison.js';
 import { loadCacheRecord, findPublication } from '../../shared/publishedEngineeringAuthority.js';
+import { resolveReportLayout } from '../../shared/highChannelDensityRule.js';
 
 // The blocking rule, worded identically to the client authority
 // (src/components/proposal/sourceAuthority/proposalSourceAuthority.js). The
@@ -358,6 +359,13 @@ export default async function(req) {
         && section.section_type === HIGHLIGHTS_SECTION_TYPE
         && highlightRows.length > 0);
 
+    // ── The layout authority for this report ──
+    // The high-channel-density upgrade rule (9.1.6, or 15 or more discrete
+    // channels) then applies to every prompt this report builds, so no section
+    // can offer added speakers or an improved horizontal spacing result as a
+    // future upgrade. It reads the frozen snapshot: nothing is recalculated.
+    const reportLayout = resolveReportLayout(engineering_snapshot);
+
     // ── Generate content for each editable section in parallel ──
     const editableIndices = sectionRecords
       .map((section, index) => ({ section, index }))
@@ -378,7 +386,7 @@ export default async function(req) {
               interpretationBlock,
               projectContext,
               buildComparisonHighlightsPrompt(),
-              buildWritingStyleContract(),
+              buildWritingStyleContract(reportLayout),
             ].filter(Boolean).join('\n\n'),
             response_json_schema: COMPARISON_HIGHLIGHTS_SCHEMA,
           });
@@ -388,13 +396,13 @@ export default async function(req) {
             prompt: [
               interpretationBlock,
               buildHighlightsPrompt(projectContext, highlightRows),
-              buildWritingStyleContract(),
+              buildWritingStyleContract(reportLayout),
             ].filter(Boolean).join('\n\n'),
             response_json_schema: HIGHLIGHTS_JSON_SCHEMA,
           });
         }
         return base44.integrations.Core.InvokeLLM({
-          prompt: buildSectionPrompt(sectionDef, projectContext, resolvedType, interpretationBlock),
+          prompt: buildSectionPrompt(sectionDef, projectContext, resolvedType, interpretationBlock, reportLayout),
         });
       })
     );
@@ -582,9 +590,9 @@ function buildProjectContext(project, narrativeGoal, brandAsset, clientBrief, en
   ].filter(Boolean).join('\n');
 }
 
-function buildSectionPrompt(sectionDef, projectContext, proposalType, interpretationBlock = '') {
+function buildSectionPrompt(sectionDef, projectContext, proposalType, interpretationBlock = '', layout = null) {
   const sectionInstruction = proposalType !== 'single'
-    ? getSystemSummarySectionPrompt(sectionDef.type, sectionDef.title)
+    ? getSystemSummarySectionPrompt(sectionDef.type, sectionDef.title, layout)
     : SECTION_PROMPTS[sectionDef.type] || `Write the ${sectionDef.title} section. 2-3 paragraphs.`;
 
   return [
@@ -607,6 +615,6 @@ function buildSectionPrompt(sectionDef, projectContext, proposalType, interpreta
     'Write in British English.',
     'Do not mention prices.',
     '',
-    buildWritingStyleContract(),
+    buildWritingStyleContract(layout),
   ].join('\n');
 }

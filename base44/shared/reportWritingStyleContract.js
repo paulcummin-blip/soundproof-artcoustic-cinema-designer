@@ -33,6 +33,7 @@
 import { PROPOSAL_STAGE_BOUNDARY } from './proposalStageBoundary.js';
 import { P20_USE_RULE, P20_OMIT_RULE } from './adiReportEvidenceRules.js';
 import { SOUND_PROOF_WRITING_AUTHORITY, WRITING_AUTHORITY_SELF_CHECK } from './soundProofWritingAuthority.js';
+import { buildHighChannelContractBlock } from './highChannelDensityRule.js';
 
 /** Banned words and phrases. Never used in generated prose. */
 export const BANNED_WORDS = [
@@ -489,7 +490,11 @@ const FINAL_SELF_CHECK = [
  * The style contract text injected into every System Design report prompt.
  * @returns {string}
  */
-export function buildWritingStyleContract() {
+export function buildWritingStyleContract(options = {}) {
+  // The high-channel-density upgrade rule applies only to a high-density design
+  // (9.1.6, or 15 or more discrete channels). It is '' for every other design, so
+  // a lower-channel report keeps its supported upgrade guidance.
+  const highChannelBlock = buildHighChannelContractBlock(options);
   return [
     '=== WRITING STYLE CONTRACT (applies to every sentence of generated prose) ===',
     '',
@@ -528,6 +533,7 @@ export function buildWritingStyleContract() {
     '',
     FINAL_SELF_CHECK,
     '',
+    ...(highChannelBlock ? [highChannelBlock, ''] : []),
     '=== OUTPUT FORMAT ===',
     'Return structured report content only, suitable for the app editor.',
     'Do not include markdown formatting.',

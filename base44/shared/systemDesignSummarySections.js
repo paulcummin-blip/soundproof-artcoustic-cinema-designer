@@ -22,6 +22,7 @@
  */
 
 import { UPGRADE_PATH_RULE, PROPOSAL_STAGE_RULE } from './proposalStageBoundary.js';
+import { buildHighChannelSectionRule } from './highChannelDensityRule.js';
 
 export const HIGHLIGHTS_SECTION_TYPE = 'key_performance_highlights';
 
@@ -154,10 +155,19 @@ This section is prose only. Never repeat the Key Performance Highlights table, n
  * @param {string} sectionTitle
  * @returns {string} writing instruction for one System Design report section
  */
-export function getSystemSummarySectionPrompt(sectionType, sectionTitle) {
+export function getSystemSummarySectionPrompt(sectionType, sectionTitle, layout = null) {
   const instruction = SYSTEM_SUMMARY_SECTION_PROMPTS[sectionType]
     || `Write the ${sectionTitle} section of a client-facing system design report. 2 to 3 short paragraphs.`;
   // Every section is part of one client-facing explanation of a completed
   // design, so the proposal-stage and upgrade-path rules apply to all of them.
-  return [instruction, '', PROPOSAL_STAGE_RULE, '', UPGRADE_PATH_RULE].join('\n');
+  // For a high-channel-count design the high-density rule follows, which
+  // suspends any "note a sensible upgrade path" line in that section.
+  return [
+    instruction,
+    '',
+    PROPOSAL_STAGE_RULE,
+    '',
+    UPGRADE_PATH_RULE,
+    buildHighChannelSectionRule(layout),
+  ].filter(Boolean).join('\n');
 }

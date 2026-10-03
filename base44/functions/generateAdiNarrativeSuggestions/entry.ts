@@ -23,6 +23,7 @@ import { createClientFromRequest } from 'npm:@base44/sdk@0.8.52';
 import { buildEngineeringEvidence } from '../../shared/engineeringSnapshotEvidence.js';
 import { buildAuthorityChips, resolveNarrativeChips } from '../../shared/adiNarrativeAuthority.js';
 import { buildNarrativeFacts, buildNarrativeFactsBlock } from '../../shared/adiNarrativeFacts.js';
+import { resolveReportLayout } from '../../shared/highChannelDensityRule.js';
 
 const FALLBACK_MESSAGE = 'Calculate the project to get examples powered by Artcoustic Design Intelligence.';
 
@@ -53,7 +54,7 @@ const REPORT_TYPE_LABELS = {
   system_summary: 'a System Design Summary covering one design version',
 };
 
-function buildPrompt({ evidence, factsBlock, authorityChips, proposalType, versionCount, projectName }) {
+function buildPrompt({ evidence, factsBlock, authorityChips, proposalType, versionCount, projectName, highDensity }) {
   return [
     evidence,
     '',
@@ -81,7 +82,12 @@ function buildPrompt({ evidence, factsBlock, authorityChips, proposalType, versi
     '- Every chip must be supported by a fact in the calculated data above. Never invent a result, value, level or seat count.',
     '- Only name a level (for example Level 4) when that exact level appears in the data for that parameter. Never suggest a level the design cannot reach.',
     '- Never describe the design as state-of-the-art, reference or flawless unless the data shows the top levels across the pillars.',
-    '- Only suggest upgrades the designer could genuinely add: more overhead channels, more subwoofers, additional surround positions, pre-wiring for future channels, or acoustic treatment. Never suggest something the project facts contradict.',
+    highDensity
+      ? '- This design already uses a high channel count (9.1.6, or 15 or more discrete channels), so never suggest more speakers, more channels, more overhead positions, additional surround positions or improved horizontal spacing, and never offer any of them as a future upgrade. Where the spacing result is limited, suggest explaining it as a room and layout constraint instead.'
+      : '- Only suggest upgrades the designer could genuinely add: more overhead channels, more subwoofers, additional surround positions, pre-wiring for future channels, or acoustic treatment. Never suggest something the project facts contradict.',
+    highDensity
+      ? '- Never write "if greater precision in the side-to-side soundstage is required in the future", and never suggest closing the gaps between the surround channels.'
+      : '',
     '- Mention cost only when the data shows a choice to make, or when the report compares versions. If a saving would reduce performance against the design target, present it as a compromise, never as a free win.',
     '- Where the data shows a weak or limiting area, prefer a chip that explains it honestly.',
     '- For bass, cover seat-to-seat consistency and control, not output alone, whenever P20 or the seat spread is present.',
@@ -146,6 +152,7 @@ export default async function (req) {
             ? body.selected_version_ids.length
             : 1,
           projectName: snapshot?.project?.name || null,
+          highDensity: resolveReportLayout(snapshot).highDensity,
         }),
         response_json_schema: SUGGESTIONS_JSON_SCHEMA,
       });

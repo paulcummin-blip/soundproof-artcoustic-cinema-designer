@@ -1,5 +1,6 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.44';
 import { buildWritingStyleContract, mentionsDesignIndex } from '../../shared/reportWritingStyleContract.js';
+import { resolveReportLayout, mentionsHighChannelSpacingUpgrade, HIGH_CHANNEL_CLEANUP_NOTE } from '../../shared/highChannelDensityRule.js';
 import { COMPARISON_REPORT_INSTRUCTIONS } from '../../shared/systemDesignSummarySections.js';
 import { formatVersionEvidenceForPrompt } from '../../shared/comparisonEvidence.js';
 import { formatComparisonTableForPrompt } from '../../shared/comparisonTable.js';
@@ -109,6 +110,19 @@ export default async function(req) {
     // regenerated section can never drift away from the calculated results.
     const evidence = buildEngineeringEvidence(proposal.engineering_snapshot);
 
+    // The layout authority behind the high-channel-density upgrade rule: the
+    // snapshot this report was written from wins, and the project's own
+    // configuration is only a fallback for a report saved before it existed.
+    const snapshotLayout = resolveReportLayout(proposal.engineering_snapshot);
+    const reportLayout = snapshotLayout.highDensity
+      ? snapshotLayout
+      : resolveReportLayout({
+        system: {
+          channel_layout: { total_discrete: snapshotLayout.channelCount },
+          configuration: { dolby_config: snapshotLayout.configuration || project?.dolby_config || null },
+        },
+      });
+
     // A comparison regenerates from the SAME frozen per-version evidence and
     // calculated table the report was generated from, so a refined section can
     // never drift to a single version's results.
@@ -177,6 +191,7 @@ export default async function(req) {
       actionInstruction,
       sectionNote,
       mentionsDesignIndex(currentBody) ? DESIGN_INDEX_CLEANUP_NOTE : '',
+      reportLayout.highDensity && mentionsHighChannelSpacingUpgrade(currentBody) ? HIGH_CHANNEL_CLEANUP_NOTE : '',
       proposal.proposal_type === 'comparison' ? COMPARISON_REPORT_INSTRUCTIONS : '',
       '',
       '=== CONSTRAINT ===',
@@ -193,7 +208,7 @@ export default async function(req) {
       'Write in British English.',
       'Do not mention prices.',
       '',
-      buildWritingStyleContract(),
+      buildWritingStyleContract(reportLayout),
     ].join('\n');
 
     // ── Invoke LLM ──

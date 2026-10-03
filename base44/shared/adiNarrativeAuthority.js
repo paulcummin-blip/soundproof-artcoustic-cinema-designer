@@ -33,6 +33,7 @@ import {
   normaliseNumber,
   numberSet,
 } from './adiNarrativeFacts.js';
+import { isHighChannelDensityLayout, mentionsHighChannelSpacingUpgrade } from './highChannelDensityRule.js';
 
 /** The generic screen example, used when this version states no screen. */
 export const SCREEN_GENERIC_CHIP = 'Emphasise the screen scale and viewing geometry';
@@ -222,6 +223,17 @@ export function validateNarrativeChip(label, facts) {
   if (!text) return { status: 'rejected', violations: [{ rule: 'empty_chip' }] };
   if (!facts || facts.available !== true) {
     return { status: 'rejected', violations: [{ rule: 'no_authority' }] };
+  }
+
+  // A high-channel-count design has no speaker-count or spacing upgrade to offer.
+  // A chip suggesting one would present a room geometry constraint as a simple
+  // upgrade path, so it is rejected here rather than shown to the designer.
+  if (isHighChannelDensityLayout({ channelCount: facts.channels?.total, configuration: facts.channels?.configuration })
+    && mentionsHighChannelSpacingUpgrade(text)) {
+    return {
+      status: 'rejected',
+      violations: [{ rule: 'high_channel_upgrade', value: text, allowed: null }],
+    };
   }
 
   let working = text;
