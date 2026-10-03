@@ -96,34 +96,51 @@ describe('at a glance page', () => {
       'Screen',
       'Seating',
       'System layout',
-      'Recommended system',
+      'Loudspeakers',
+      'Subwoofers',
       'Project reference',
-      'Design reference',
+      'Design version',
       'Modelled against',
       'Prepared by',
+      'Date',
     ].forEach((label) => assert.ok(byLabel.has(label), label));
   });
 
-  it('states the assessment basis and the preparing party', () => {
-    assert.equal(byLabel.get('Modelled against').value, 'CEDIA/CTA-RP22 and RP23');
+  it('states the assessment basis, the preparing party and the date', () => {
+    assert.equal(byLabel.get('Modelled against').value, 'CEDIA/CTA-RP22');
+    assert.equal(byLabel.get('Modelled against').hint, 'RP23');
     assert.equal(byLabel.get('Prepared by').value, 'Ribble AV');
-    assert.equal(byLabel.get('Prepared by').hint, '14/09/2026');
+    assert.equal(byLabel.get('Date').value, '14/09/2026');
+    assert.equal(byLabel.get('Design version').value, 'Current Design · V1');
   });
 
-  it('summarises the room, screen, seating and system from the calculated data', () => {
-    assert.equal(byLabel.get('Room size').value, '7.0m × 5.0m × 2.6m (L × W × H)');
-    // The screen is stated with its terminology: the viewable image width, and
-    // the overall screen assembly named separately where the two differ.
-    assert.equal(byLabel.get('Screen').value, '147" viewable 16:9 image');
-    assert.equal(byLabel.get('Screen').hint, '169" overall screen assembly');
-    assert.equal(byLabel.get('Seating').value, '8 seats · 2 rows');
+  it('states each fact briefly, with no commentary inside a card', () => {
+    assert.equal(byLabel.get('Room size').value, '7.0 × 5.0 × 2.6 m');
+    assert.equal(byLabel.get('Room size').hint, 'L × W × H');
+    assert.equal(byLabel.get('Screen').value, '147" 16:9');
+    assert.equal(byLabel.get('Screen').hint, 'Viewable image');
+    assert.equal(byLabel.get('Seating').value, '8 seats');
+    assert.equal(byLabel.get('Seating').hint, '2 rows');
     assert.equal(byLabel.get('System layout').value, '9.4.6');
-    assert.equal(byLabel.get('System layout').hint, '15 discrete channels · 4 subwoofers');
+
+    // No card carries a sentence, a count of products, a publication date or a
+    // room classification: a fact card states its fact and nothing else.
+    cards.forEach((card) => {
+      const text = `${card.value} ${card.hint || ''}`;
+      assert.ok(!/rectangular room|near-cubic|golden ratio/i.test(text), card.label);
+      assert.ok(!/products specified/i.test(text), card.label);
+      assert.ok(!/published/i.test(text), card.label);
+      assert.ok(!/\bRP23 viewing\b/i.test(text), card.label);
+    });
   });
 
-  it('names the selected system from the product roles', () => {
-    assert.equal(byLabel.get('Recommended system').value, 'EVOLVE 2-1 · SL-EVOLVE 1-1 · SUB2-12');
+  it('names the loudspeaker families on their own card, one per line', () => {
+    assert.equal(byLabel.get('Loudspeakers').value, 'EVOLVE 2-1\nSL-EVOLVE 1-1');
     assert.equal(buildSystemHeadline(SNAPSHOT), 'EVOLVE 2-1 · SL-EVOLVE 1-1 · SUB2-12');
+  });
+
+  it('states the subwoofers as a count and their model', () => {
+    assert.equal(byLabel.get('Subwoofers').value, '4 × SUB2-12');
   });
 
   it('never prints an empty card and never names the platform', () => {

@@ -38,11 +38,9 @@ export default function AtAGlancePage({
         title="At a glance"
         lead="The design summary, the room it is designed for, and the system that has been specified."
       />
+      {/* Facts only: the prediction and assessment basis belongs to Method and
+          Notes, not to the page that orients the client. */}
       <ProposalFactCards cards={cards} columns={3} />
-      <p className="pp-note">
-        Performance is modelled against CEDIA/CTA-RP22 and RP23. The results in this
-        document are predicted from the room model and the published product data.
-      </p>
     </section>
   );
 }

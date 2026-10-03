@@ -168,15 +168,17 @@ describe('Screen terminology', () => {
     })).toEqual({ value: '83" 16:9 screen', hint: null });
   });
 
-  it('uses the same wording on every page that states the screen', () => {
+  it('states the same screen values on every page, briefly on the at a glance page', () => {
     const card = buildAtAGlanceCards({ snapshot: SCREEN_SNAPSHOT, projectName: 'Marquee' })
       .find((entry) => entry.label === 'Screen');
     const fact = buildRoomBriefFacts(SCREEN_SNAPSHOT).facts
       .find((entry) => entry.label === 'Screen');
-    expect(card.value).toBe('170" viewable 2.35:1 image');
-    expect(card.hint).toBe('185" overall screen assembly');
-    expect(fact.value).toBe(card.value);
-    expect(fact.hint).toBe(card.hint);
+    // The at a glance card is the short form of the same two values; the room
+    // and brief page keeps the full terminology.
+    expect(card.value).toBe('170" 2.35:1');
+    expect(card.hint).toBe('Viewable image');
+    expect(fact.value).toBe('170" viewable 2.35:1 image');
+    expect(fact.hint).toBe('185" overall screen assembly');
   });
 
   it('never states an unlabelled screen size', () => {

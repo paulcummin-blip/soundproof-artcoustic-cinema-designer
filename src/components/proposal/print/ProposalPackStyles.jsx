@@ -92,7 +92,8 @@ export default function ProposalPackStyles() {
       .proposal-print-portal .pp-card {
         background: var(--pp-surface);
         border: 1px solid var(--pp-rule);
-        padding: 5mm;
+        padding: 4.5mm 5mm;
+        min-width: 0;
         break-inside: avoid;
         page-break-inside: avoid;
       }
@@ -106,10 +107,14 @@ export default function ProposalPackStyles() {
       }
       .proposal-print-portal .pp-card__value {
         font-family: var(--pp-body) !important;
-        font-size: 11.5pt !important;
-        line-height: 1.35 !important;
+        font-size: 11pt !important;
+        line-height: 1.3 !important;
         color: var(--pp-ink) !important;
         margin-top: 2.5mm;
+        /* A value that states several facts (the speaker families) keeps its
+           own line breaks; every other value stays on one line. */
+        white-space: pre-line;
+        overflow-wrap: normal;
       }
       .proposal-print-portal .pp-card__hint {
         font-family: var(--pp-body) !important;
