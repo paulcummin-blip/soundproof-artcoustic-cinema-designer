@@ -143,17 +143,17 @@ describe('Prose-only sections on the printed page', () => {
 });
 
 describe('Screen terminology', () => {
-  it('states a projection screen by its viewable image width and names the assembly', () => {
+  it('states a projection screen by its viewable image width alone', () => {
     expect(screenStatement(PROJECTION_SCREEN)).toEqual({
       value: '170" 2.35:1 viewable image',
-      hint: '185" overall screen assembly',
+      hint: null,
     });
   });
 
   it('states the same screen for a saved snapshot written before the labelling change', () => {
     expect(screenStatement({ ...PROJECTION_SCREEN, size_inches: 185 })).toEqual({
       value: '170" 2.35:1 viewable image',
-      hint: '185" overall screen assembly',
+      hint: null,
     });
   });
 
@@ -167,19 +167,21 @@ describe('Screen terminology', () => {
     })).toEqual({ value: '83" 16:9 screen', hint: null });
   });
 
-  it('states both figures once, on the screen card of the one page', () => {
+  it('states a projection screen by its viewable image alone', () => {
     const card = buildAtAGlance({ snapshot: SCREEN_SNAPSHOT, projectName: 'Marquee' })
       .roomCards.find((entry) => entry.label === 'Screen');
     expect(card.value).toBe('170" 2.35:1 viewable image');
-    expect(card.hint).toBe('185" overall screen assembly');
-    // The card spans two columns so neither line has to wrap.
-    expect(card.span).toBe(2);
+    // The overall assembly the screen needs behind it is manufacturing detail:
+    // it belongs in the technical data, not on the client's summary card.
+    expect(card.hint).toBeUndefined();
+    expect(card.span).toBeUndefined();
   });
 
-  it('never states an unlabelled screen size', () => {
-    const text = `${screenStatement(PROJECTION_SCREEN).value} ${screenStatement(PROJECTION_SCREEN).hint}`;
-    expect(text).toMatch(/viewable/);
-    expect(text).toMatch(/overall screen assembly/);
+  it('never states an unlabelled or secondary screen size', () => {
+    const statement = screenStatement(PROJECTION_SCREEN);
+    expect(statement.value).toMatch(/viewable/);
+    expect(statement.hint).toBeNull();
+    expect(JSON.stringify(statement)).not.toMatch(/overall screen assembly/);
   });
 });
 

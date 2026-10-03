@@ -15,6 +15,8 @@
  */
 
 import { buildHighlightDisplayRows } from '../keyPerformanceHighlightsAuthority';
+import { resolveViewingRows } from './snapshotViewingRows';
+import { rp23DisplayAngleDeg } from '@/components/utils/viewingAngleUtils';
 
 /** Unwrap an Engineering Authority { statement, confidence, source } value. */
 export function statementValue(value) {
@@ -115,42 +117,39 @@ export function parameterReferenceList() {
  * The screen as the client-facing statement, so no page can state one figure
  * while another implies a different one.
  *
- * A projection screen is stated by its viewable image width (170" 2.35:1
- * viewable image) with the overall screen assembly given separately (185"
- * overall screen assembly). A television is stated by its nominal size, which is
- * how a television is bought, and needs no second figure. Both figures are read
- * from the frozen snapshot: nothing is converted here.
+ * A projection screen is stated by its viewable image width — the figure the
+ * screen is designed and bought by:
  *
- * @returns {{ value: string|null, hint: string|null }}
+ *   "170" 2.35:1 viewable image"
+ *
+ * The overall screen assembly the screen needs behind it is manufacturing detail,
+ * not a client-facing fact, so no client surface carries it: it lives in the
+ * technical and admin data. A television is stated by its nominal size, which is
+ * how a television is bought.
+ *
+ * Read from the frozen snapshot: nothing is converted here.
+ *
+ * @returns {{ value: string|null, hint: null }}
  */
 export function screenStatement(screen = {}) {
   const viewable = Number(screen.viewable_width_inches) || null;
-  const diagonal = Number(screen.diagonal_inches) || null;
   const stated = Number(screen.size_inches) || null;
   const aspect = screen.aspect_ratio ? String(screen.aspect_ratio) : null;
 
   if (screen.television === true && stated) {
     return { value: aspect ? `${stated}" ${aspect} screen` : `${stated}" screen`, hint: null };
   }
-
-  // The overall screen assembly is the derived diagonal where the snapshot
-  // carries one; where it does not, the stated size is the assembly whenever it
-  // differs from the viewable width. That is what a snapshot written before the
-  // diagonal was recorded holds, so an older saved report reads the same way.
-  const assembly = diagonal || (stated && viewable && stated !== viewable ? stated : null);
-
-  // The viewable image width is the figure a projection screen is designed and
-  // bought by. Where the snapshot carries no viewable width, the stated size
-  // stands on its own rather than being labelled as something it may not be.
+  // Where the snapshot carries no viewable width, the stated size stands on its
+  // own rather than being labelled as something it may not be.
   if (viewable) {
     return {
       value: aspect ? `${viewable}" ${aspect} viewable image` : `${viewable}" viewable image`,
-      hint: assembly && assembly !== viewable ? `${assembly}" overall screen assembly` : null,
+      hint: null,
     };
   }
   return {
     value: stated ? (aspect ? `${stated}" ${aspect} screen` : `${stated}" screen`) : null,
-    hint: assembly && stated && assembly !== stated ? `${assembly}" overall screen assembly` : null,
+    hint: null,
   };
 }
 
@@ -168,12 +167,15 @@ export function buildEvidenceCards(rows, sectionType) {
 
 /**
  * The room size as the at-a-glance card states it: the three dimensions in one
- * clean line, with the axis order named once underneath.
+ * clean line.
  *
- *   value: "7.3 × 5.2 × 2.8 m"   hint: "L × W × H"
+ *   value: "7.29 × 5.18 × 2.8 m"
  *
- * Read from the snapshot's own numbers where it carries them, otherwise from the
- * dimension text the snapshot already states. Nothing is measured or converted.
+ * The axis order is not restated on the card. The dimensions read length × width
+ * × height in that order, which is how every other surface in the app states
+ * them, so a second line naming the axes only takes space. Read from the
+ * snapshot's own numbers where it carries them, otherwise from the dimension text
+ * the snapshot already states. Nothing is measured or converted.
  */
 export function roomSizeStatement(room = {}) {
   const dimensions = room.dimensions || {};
@@ -182,7 +184,7 @@ export function roomSizeStatement(room = {}) {
   const height = Number(dimensions.height_m) || null;
 
   if (length && width && height) {
-    return { value: `${length} × ${width} × ${height} m`, hint: 'L × W × H' };
+    return { value: `${length} × ${width} × ${height} m`, hint: null };
   }
 
   const text = room.dimensions_text;
@@ -193,7 +195,7 @@ export function roomSizeStatement(room = {}) {
     .replace(/\s*×\s*/g, ' × ')
     .replace(/\s+/g, ' ')
     .trim();
-  return { value: cleaned ? `${cleaned} m` : null, hint: 'L × W × H' };
+  return { value: cleaned ? `${cleaned} m` : null, hint: null };
 }
 
 /** True when a product role is a subwoofer, which has its own card. */
@@ -238,25 +240,34 @@ export function treatmentGlanceStatement(treatment = {}) {
 }
 
 /**
- * The viewing geometry as one compact fact: the floor the seating achieves and
- * the horizontal angle range across the seats, in whole degrees.
+ * The viewing geometry as the pack states it: one line per seating row, because
+ * RP23 is a per-row result. A single level for the whole room would contradict
+ * the report whenever the rows differ, so no level is ever stated for the room.
  *
- *   value: "L3 · 44° to 63°"
+ *   value: "Row 1 · 63° · RP23 L4
+ *           Row 2 · 45° · RP23 L3"
  *
- * Built from the viewing authority's own per-seat angles. Nothing is graded or
- * recalculated here.
+ * Read from the snapshot's own seats and its published viewing results, one
+ * representative seat per row. Whole degrees. Nothing is averaged.
  */
-export function viewingGlanceStatement(viewing = {}) {
-  const angles = (Array.isArray(viewing?.per_seat) ? viewing.per_seat : [])
+export function viewingGlanceStatement(snapshot) {
+  const rows = resolveViewingRows(snapshot);
+  if (rows.length > 0) {
+    return { value: rows.map((row) => row.line).join('\n'), hint: null };
+  }
+
+  // No per-row authority behind the snapshot: state the angle spread alone. A
+  // level is withheld rather than assigned to the room as a whole.
+  const angles = (Array.isArray(snapshot?.viewing?.per_seat) ? snapshot.viewing.per_seat : [])
     .map((seat) => Number(seat?.horizontal_angle_deg))
     .filter(Number.isFinite);
   if (angles.length === 0) return { value: null, hint: null };
 
-  const minimum = Math.round(Math.min(...angles));
-  const maximum = Math.round(Math.max(...angles));
-  const range = minimum === maximum ? `${minimum}°` : `${minimum}° to ${maximum}°`;
-  const floor = viewing?.primary_floor || viewing?.project_floor || null;
-  return { value: floor ? `${floor} · ${range}` : range, hint: null };
+  // Whole degrees as the app displays them, rather than plain rounding.
+  const displayed = angles.map((angle) => rp23DisplayAngleDeg(angle) ?? Math.round(angle));
+  const minimum = Math.min(...displayed);
+  const maximum = Math.max(...displayed);
+  return { value: minimum === maximum ? `${minimum}°` : `${minimum}° to ${maximum}°`, hint: null };
 }
 
 /** The compact package label for each group of channel roles. */
@@ -306,81 +317,51 @@ export function buildPackageRows(snapshot) {
 }
 
 /**
- * The one-line design brief: the room's own constraint, as the engineering
- * authority states it. Omitted when the snapshot states none, so the page never
- * carries commentary of its own.
- */
-export function designBriefNote(snapshot) {
-  const text = statementValue(snapshot?.room?.acoustic_implication);
-  if (!text) return null;
-  const trimmed = String(text).trim();
-  return trimmed || null;
-}
-
-/**
- * The at-a-glance page model: the project, the room and screen, the system and
- * the selected package, in the order the page reads. This is the whole of the
- * page that orients the client: the room and the brief are stated here once and
- * nowhere else.
+ * The at-a-glance page model: the project, the room and screen, and the system
+ * with the selected package, in the order the page reads.
  *
  * Every value is a fact read from the frozen snapshot or the proposal's own
- * context. No card carries a sentence, a product count or a publication date.
+ * context. A card states one fact and nothing else: no second line of
+ * explanation, no count that repeats another card, and no restatement of the
+ * dealer, who is named on the cover. The room's modelled acoustic implication is
+ * not reprinted here either — it is a modelled classification, not a brief the
+ * designer wrote.
  */
-export function buildAtAGlance({ snapshot, projectName, dealerName, projectReference, generatedDate }) {
+export function buildAtAGlance({ snapshot, projectName, projectReference, generatedDate }) {
   const room = snapshot?.room || {};
   const screen = room.screen || {};
   const seating = room.seating || {};
   const system = snapshot?.system || {};
   const configuration = system.configuration || {};
-  const layout = system.channel_layout || {};
   const version = snapshot?.version || {};
   const size = roomSizeStatement(room);
   const screenCard = screenStatement(screen);
-  const viewing = viewingGlanceStatement(snapshot?.viewing);
+  const viewing = viewingGlanceStatement(snapshot);
   const seats = Number(seating.total_seats) || null;
-  const rows = Number(seating.row_count) || null;
-  const channels = Number(layout.total_discrete) || null;
 
   const projectCards = [
     { label: 'Project', value: projectName || statementValue(snapshot?.project?.project_name) || null },
     { label: 'Client', value: statementValue(snapshot?.project?.client_name) || null },
-    {
-      label: 'Dealer',
-      value: dealerName || statementValue(snapshot?.project?.dealer_company) || statementValue(snapshot?.dealer?.company_name) || 'Sound Proof',
-    },
     { label: 'Project reference', value: projectReference || null },
     {
       label: 'Design version',
       value: version.name ? `${version.name}${version.number ? ` · V${version.number}` : ''}` : null,
     },
-    { label: 'Date', value: ukDate(generatedDate) },
+    { label: 'Prepared date', value: ukDate(generatedDate) },
   ];
 
   const roomCards = [
-    { label: 'Room size', value: size.value, hint: size.hint },
-    // The screen states both figures the design sets: the viewable image the
-    // screen is bought by, and the overall assembly it needs. It spans two
-    // columns so neither line has to wrap.
-    { label: 'Screen', value: screenCard.value, hint: screenCard.hint, span: 2 },
-    {
-      label: 'Seating',
-      value: seats ? `${seats} seat${seats === 1 ? '' : 's'}` : null,
-      hint: rows ? `${rows} row${rows === 1 ? '' : 's'}` : null,
-    },
-    { label: 'Viewing geometry', value: viewing.value, hint: viewing.hint },
-    {
-      label: 'Acoustic treatment',
-      value: treatmentGlanceStatement(room.acoustic_treatment),
-      hint: null,
-    },
+    { label: 'Room size', value: size.value },
+    { label: 'Screen', value: screenCard.value },
+    { label: 'Seating', value: seats ? `${seats} seat${seats === 1 ? '' : 's'}` : null },
+    // One line per row, each with its own RP23 level: the row count is stated
+    // here rather than on the seating card.
+    { label: 'Viewing geometry', value: viewing.value },
+    { label: 'Acoustic treatment', value: treatmentGlanceStatement(room.acoustic_treatment) },
   ];
 
   const systemCards = [
-    {
-      label: 'System layout',
-      value: configuration.dolby_config || null,
-      hint: channels ? `${channels} discrete channels` : null,
-    },
+    { label: 'System layout', value: configuration.dolby_config || null },
   ];
 
   // A card with no value is left out rather than printed empty.
@@ -389,7 +370,6 @@ export function buildAtAGlance({ snapshot, projectName, dealerName, projectRefer
     roomCards: roomCards.filter((card) => card.value),
     systemCards: systemCards.filter((card) => card.value),
     packageRows: buildPackageRows(snapshot),
-    briefNote: designBriefNote(snapshot),
   };
 }
 

@@ -69,8 +69,8 @@ export default function ProposalPackDocument({
 
   const canonical = getSectionsForProposalType(reportType);
   const glance = isDesignedPack
-    ? buildAtAGlance({ snapshot, projectName, dealerName, projectReference, generatedDate })
-    : { projectCards: [], roomCards: [], systemCards: [], packageRows: [], briefNote: null };
+    ? buildAtAGlance({ snapshot, projectName, projectReference, generatedDate })
+    : { projectCards: [], roomCards: [], systemCards: [], packageRows: [] };
   const gallery = projectGalleryImages(projectImages);
   const hasImagesSection = canonical.some((def) => def.type === 'room_images');
 
@@ -94,7 +94,6 @@ export default function ProposalPackDocument({
         number={takeNumber()}
         snapshot={snapshot}
         projectName={projectName}
-        dealerName={dealerName}
         projectReference={projectReference}
         generatedDate={generatedDate}
       />

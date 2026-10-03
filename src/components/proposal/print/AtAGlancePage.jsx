@@ -1,12 +1,13 @@
 /**
  * AtAGlancePage
  * -------------
- * The one page that orients the client: the project, the room and screen, the
- * system and the specified package, closing with the design's own constraint as
- * a single short note.
+ * The one page that orients the client: the project, the room and screen, and the
+ * system with the specified package.
  *
- * This page carries the room and the brief as well: there is no second page
- * restating the same facts under another heading.
+ * Every card states one fact and nothing else: no second line of explanation, no
+ * count that repeats another card, and no restatement of the dealer, who is named
+ * on the cover. The viewing geometry is stated one row at a time, because RP23 is
+ * a per-row result.
  *
  * Every field is read from the frozen engineering snapshot or the proposal's own
  * context. Nothing is written by AI and nothing is calculated here.
@@ -22,14 +23,12 @@ export default function AtAGlancePage({
   number,
   snapshot,
   projectName,
-  dealerName,
   projectReference,
   generatedDate,
 }) {
-  const { projectCards, roomCards, systemCards, packageRows, briefNote } = buildAtAGlance({
+  const { projectCards, roomCards, systemCards, packageRows } = buildAtAGlance({
     snapshot,
     projectName,
-    dealerName,
     projectReference,
     generatedDate,
   });
@@ -46,7 +45,6 @@ export default function AtAGlancePage({
         number={number}
         kicker="System design"
         title="At a glance"
-        lead="The project, the room it is designed for, and the system that has been specified."
       />
 
       <div className="pp-facts-group">
@@ -57,14 +55,6 @@ export default function AtAGlancePage({
       <div className="pp-facts-group">
         <h3 className="pp-facts-group__title">Room and screen</h3>
         <ProposalFactCards cards={roomCards} columns={3} />
-        {/* The one line of the room's own constraint, stated by the engineering
-            authority. No other commentary belongs on this page. */}
-        {briefNote ? (
-          <div className="pp-note">
-            <div className="pp-note__title">Design brief</div>
-            <p className="pp-note__text">{briefNote}</p>
-          </div>
-        ) : null}
       </div>
 
       <div className="pp-facts-group">

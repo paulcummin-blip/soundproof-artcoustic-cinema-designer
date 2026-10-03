@@ -29,6 +29,7 @@ const SNAPSHOT = {
   version: { name: 'Current Design', number: 1 },
   identity: { generatedAt: '2026-09-14T10:00:00.000Z' },
   room: {
+    dimensions: { length_m: 7.0, width_m: 5.0, height_m: 2.6 },
     dimensions_text: '7.0m × 5.0m × 2.6m (L × W × H)',
     volume_m3: 91,
     classification: { statement: 'rectangular room' },
@@ -59,14 +60,24 @@ const SNAPSHOT = {
       { role: 'subwoofer', role_description: 'Subwoofer', model_label: 'SUB2-12' },
     ],
   },
+  // Two rows over 5.0 m: the centre seat of each row (2.5 m) is the seat the
+  // report states its RP23 row by.
+  seats: [
+    { id: 's1', row: 1, column: 1, position: { x: 2.5 } },
+    { id: 's1l', row: 1, column: 0, position: { x: 1.4 } },
+    { id: 's2', row: 2, column: 1, position: { x: 2.5 } },
+    { id: 's2r', row: 2, column: 2, position: { x: 3.6 } },
+  ],
   viewing: {
     available: true,
-    summary: 'Viewing angles calculated for 8 seats. Horizontal viewing angle ranges from 47° to 56°.',
+    summary: 'Viewing angles calculated for 8 seats. Horizontal viewing angle ranges from 44° to 72°.',
     primary_floor: 'L4',
     project_floor: 'L4',
     per_seat: [
       { seat_id: 's1', horizontal_angle_deg: 55.5, rp23_level: 'L4' },
-      { seat_id: 's2', horizontal_angle_deg: 47.2, rp23_level: 'L4' },
+      { seat_id: 's1l', horizontal_angle_deg: 72.4, rp23_level: 'L1' },
+      { seat_id: 's2', horizontal_angle_deg: 44.2, rp23_level: 'L3' },
+      { seat_id: 's2r', horizontal_angle_deg: 66.1, rp23_level: 'L1' },
     ],
   },
   products: [{ model_key: 'evolve-2-1' }, { model_key: 'sl-evolve-1-1' }],
@@ -96,30 +107,46 @@ const ALL_CARDS = [...GLANCE.projectCards, ...GLANCE.roomCards, ...GLANCE.system
 const byLabel = new Map(ALL_CARDS.map((card) => [card.label, card]));
 
 describe('at a glance page', () => {
-  it('carries the project facts the client needs', () => {
-    ['Project', 'Client', 'Dealer', 'Project reference', 'Design version', 'Date'].forEach((label) => {
+  it('carries the project facts the client needs, and no dealer card', () => {
+    ['Project', 'Client', 'Project reference', 'Design version', 'Prepared date'].forEach((label) => {
       assert.ok(byLabel.has(label), label);
     });
+    // The dealer is named on the cover of the pack: repeating it here only
+    // confuses and takes a card.
+    assert.ok(!byLabel.has('Dealer'));
     assert.equal(byLabel.get('Project').value, 'Lords Hall');
+    assert.equal(byLabel.get('Client').value, 'Mr Clarke');
     assert.equal(byLabel.get('Project reference').value, 'LH-001');
     assert.equal(byLabel.get('Design version').value, 'Current Design · V1');
-    assert.equal(byLabel.get('Date').value, '14/09/2026');
+    assert.equal(byLabel.get('Prepared date').value, '14/09/2026');
   });
 
-  it('states the room, screen, seating and viewing geometry as facts', () => {
-    assert.equal(byLabel.get('Room size').value, '7.0 × 5.0 × 2.6 m');
-    assert.equal(byLabel.get('Room size').hint, 'L × W × H');
+  it('states the room, screen and seating as single facts', () => {
+    assert.equal(byLabel.get('Room size').value, '7 × 5 × 2.6 m');
     assert.equal(byLabel.get('Screen').value, '147" 16:9 viewable image');
-    assert.equal(byLabel.get('Screen').hint, '169" overall screen assembly');
     assert.equal(byLabel.get('Seating').value, '8 seats');
-    assert.equal(byLabel.get('Seating').hint, '2 rows');
-    // Whole degrees, and never the viewing authority's prose sentence.
-    assert.equal(byLabel.get('Viewing geometry').value, 'L4 · 47° to 56°');
+    // The axis order and the assembly size are secondary lines rather than
+    // facts, and the row count belongs with the viewing geometry, where it is
+    // used. No card carries a second line.
+    ['Room size', 'Screen', 'Seating'].forEach((label) => {
+      assert.equal(byLabel.get(label).hint, undefined, label);
+    });
   });
 
-  it('states the layout and the channel count on the system card', () => {
+  it('states the viewing geometry one row at a time, with each row’s own level', () => {
+    // Whole degrees, the values the report states for each row, and never one
+    // level for the room.
+    assert.equal(
+      byLabel.get('Viewing geometry').value,
+      'Row 1 · 56° · RP23 L4\nRow 2 · 45° · RP23 L3'
+    );
+    assert.equal(byLabel.get('Viewing geometry').hint, undefined);
+    assert.ok(!/^L[1-4]\b/.test(byLabel.get('Viewing geometry').value));
+  });
+
+  it('states the system layout alone on the system card', () => {
     assert.equal(byLabel.get('System layout').value, '9.4.6');
-    assert.equal(byLabel.get('System layout').hint, '15 discrete channels');
+    assert.equal(byLabel.get('System layout').hint, undefined);
   });
 
   it('states the selected package once, grouped by channel role', () => {
@@ -130,9 +157,11 @@ describe('at a glance page', () => {
     ]);
   });
 
-  it('states the room’s own constraint as one short brief line', () => {
-    assert.equal(GLANCE.briefNote, 'Standard modal distribution in this room.');
-    assert.ok(!GLANCE.briefNote.includes('\n'));
+  it('never reprints the room’s modelled commentary as a design brief', () => {
+    // The acoustic implication is a modelled classification, not a brief the
+    // designer wrote, so no brief block appears on the page at all.
+    assert.ok(!('briefNote' in GLANCE));
+    assert.ok(!JSON.stringify(GLANCE).includes('Standard modal distribution'));
   });
 
   it('keeps every card to a fact, with no commentary', () => {
@@ -143,10 +172,13 @@ describe('at a glance page', () => {
       assert.ok(!/published/i.test(text), card.label);
       assert.ok(!/\bRP23 viewing\b/i.test(text), card.label);
       assert.ok(!/auto-calculated/i.test(text), card.label);
-      // No card carries a sentence: a value is a figure, a name or a short label,
-      // and its hint is the same kind of fact rather than a line of prose.
-      [card.value, card.hint].filter(Boolean).forEach((field) => {
-        assert.ok(field.split(/\s+/).length <= 6, `${card.label}: ${field}`);
+      // No card carries a sentence and no card carries a second explanatory line:
+      // every value is a figure, a name or a short label, and a value that states
+      // one fact per seating row states each of those rows on its own line.
+      assert.equal(card.hint, undefined, card.label);
+      String(card.value).split('\n').forEach((line) => {
+        const words = line.replace(/·/g, ' ').split(/\s+/).filter(Boolean);
+        assert.ok(words.length <= 6, `${card.label}: ${line}`);
       });
     });
   });
@@ -172,7 +204,7 @@ describe('at a glance page', () => {
     });
     const treatment = withTreatment.roomCards.find((card) => card.label === 'Acoustic treatment');
     assert.equal(treatment.value, '8 Abfuser panels');
-    assert.equal(treatment.hint, null);
+    assert.equal(treatment.hint, undefined);
   });
 });
 
