@@ -74,9 +74,12 @@ export default function ClientReportPage({ children, isFirst, projectDetails, lo
         .client-report-page[data-category-first="false"] .client-report-print-heading__title { display: none; }
         .client-report-page[data-category-first="false"] .client-report-print-heading { margin-bottom: 2mm; }
       `}</style>
-      {/* Print-only header (first page) */}
+      {/* First-page masthead — logo, report title and project metadata, with the
+          divider beneath them. Sized and placed as the Technical Report's cover,
+          and identical on screen and in the exported PDF, so the report opens on
+          its own first page with no separate cover page above it. */}
       {isFirst && (
-        <div className="client-report-page__header client-report-print-only">
+        <div className="client-report-page__header">
           <img src={logoUrl} alt="Sound Proof" />
           <div className="client-report-page__header-title">Visual Report</div>
           <div className="client-report-page__header-meta">
@@ -117,8 +120,10 @@ export default function ClientReportPage({ children, isFirst, projectDetails, lo
             <div className="client-report-print-heading">
               <h1 className="client-report-print-heading__title">Design Summary</h1>
             </div>
+            {/* The summary statement sits centred, with its own breathing room
+                below the heading rather than crowding it. */}
             {printData.coverageSentence && (
-              <div style={{ padding: "0 24px", marginBottom: 12 }}>
+              <div style={{ padding: "0 24px", marginTop: "8mm", marginBottom: "4mm", textAlign: "center" }}>
                 <Rp22SeatCoverageSentence sentence={printData.coverageSentence} variant="print" />
               </div>
             )}

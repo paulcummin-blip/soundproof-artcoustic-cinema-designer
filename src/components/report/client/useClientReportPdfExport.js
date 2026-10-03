@@ -3,16 +3,16 @@
  * ------------------------
  * Export lifecycle hook for the Visual Report PDF.
  *
- * With the dedicated print composition (three document regions per page),
- * the SVG scales via CSS to fill the drawing region — no JS transform
- * or measurement is needed. The hook simply:
- *   - waits for fonts and logo
- *   - adds the print-mode body class
- *   - waits two animation frames for layout to settle
- *   - calls window.print()
- *   - cleans up after print
+ * The export prints from a top-level window the app owns (see
+ * `@/components/report/reportPrintWindow`), opened on the shared report
+ * filename. That is what names the saved PDF after the report —
+ * "Sound Proof - Artcoustic Cinema Designer - Visual - …" — instead of the host
+ * tab the app happens to be running in. When the browser refuses the window
+ * (a pop-up blocker), the export falls back to printing in place with the
+ * report title applied to the app and host documents.
  *
- * Does NOT use html2canvas, jsPDF, raster screenshots, or JS scaling.
+ * The SVG scales via CSS to fill the drawing region — no JS transform, no
+ * html2canvas, no jsPDF, no raster screenshots.
  */
 
 import { useState, useCallback, useRef, useEffect } from "react";
@@ -21,11 +21,23 @@ import {
   applyPrintDocumentTitle,
   restorePrintDocumentTitle,
 } from "@/components/report/printDocumentTitle";
+import {
+  findReportPrintNode,
+  openReportPrintWindow,
+  printReportInWindow,
+  closeReportPrintWindow,
+} from "@/components/report/reportPrintWindow";
 
 // Version metadata is optional — only present when the project has a saved
 // named design version. The filename helper appends it when meaningful.
 
 const PRINT_TIMEOUT_MS = 60000;
+/** The report's own root, printed into the app-owned window. */
+const PRINT_NODE_SELECTOR = ".client-report-root";
+/** Print mode class the Visual Report stylesheet is written against. */
+const PRINT_BODY_CLASS = "client-report-printing";
+/** The report root paints a light page backdrop on screen; print on white. */
+const PRINT_WINDOW_CSS = "@media print {\n    .client-report-root { background: #FFFFFF !important; min-height: 0 !important; }\n  }";
 
 function decodeLogo(url) {
   return new Promise((resolve) => {
@@ -64,13 +76,17 @@ export function useClientReportPdfExport({
   const [error, setError] = useState(null);
   const printingRef = useRef(false);
   const cleanupTimeoutRef = useRef(null);
+  // The app-owned window the report is printed from, when one could be opened.
+  const printWindowRef = useRef(null);
 
   const cleanup = useCallback(() => {
     if (printingRef.current) {
       printingRef.current = false;
       setExporting(false);
     }
-    document.body.classList.remove("client-report-printing");
+    if (typeof document !== "undefined") {
+      document.body.classList.remove(PRINT_BODY_CLASS);
+    }
     restorePrintDocumentTitle();
     if (cleanupTimeoutRef.current) {
       clearTimeout(cleanupTimeoutRef.current);
@@ -84,12 +100,25 @@ export function useClientReportPdfExport({
     return () => {
       window.removeEventListener("afterprint", handler);
       if (cleanupTimeoutRef.current) clearTimeout(cleanupTimeoutRef.current);
+      closeReportPrintWindow(printWindowRef.current);
+      printWindowRef.current = null;
     };
   }, [cleanup]);
 
   const handleExport = useCallback(async () => {
     if (exporting || printingRef.current) return;
     if (activePageCount === 0) return;
+
+    const title = buildVisualReportTitle(
+      projectName,
+      { number: versionNumber, name: versionName },
+      { dealerName, projectReference }
+    );
+
+    // Open the app-owned print window FIRST, synchronously, while the browser
+    // still treats this as a user gesture. The window is opened on the report
+    // filename, so the saved PDF is named by the report itself.
+    printWindowRef.current = openReportPrintWindow(title);
 
     printingRef.current = true;
     setExporting(true);
@@ -105,22 +134,34 @@ export function useClientReportPdfExport({
       const logoReady = await decodeLogo(logoUrl);
       if (!logoReady) {
         setError("PDF preparation failed because the Sound Proof logo could not be loaded. Please try again.");
+        closeReportPrintWindow(printWindowRef.current);
+        printWindowRef.current = null;
         cleanup();
         return;
       }
 
-      // 3. Add print-mode body class so the print layout and page dimensions exist
-      document.body.classList.add("client-report-printing");
+      // 3. Print from the app-owned window. Nothing about the report's layout
+      // changes: the same stylesheets and the same print composition are used.
+      if (printWindowRef.current) {
+        const printed = await printReportInWindow(printWindowRef.current, {
+          title,
+          node: findReportPrintNode(PRINT_NODE_SELECTOR),
+          bodyClass: PRINT_BODY_CLASS,
+          extraCss: PRINT_WINDOW_CSS,
+          onDone: cleanup,
+        });
+        if (printed) {
+          printWindowRef.current = null;
+          return;
+        }
+        closeReportPrintWindow(printWindowRef.current);
+        printWindowRef.current = null;
+      }
 
-      // 4. Set the report filename as the print title, on the app document and
-      // the host tab alike, because this report is exported from the workspace.
-      applyPrintDocumentTitle(
-        buildVisualReportTitle(
-          projectName,
-          { number: versionNumber, name: versionName },
-          { dealerName, projectReference }
-        )
-      );
+      // 4. Fallback: print in place, with the report title applied to the app
+      // document and the host tab alike.
+      document.body.classList.add(PRINT_BODY_CLASS);
+      applyPrintDocumentTitle(title);
 
       // 5. Wait two animation frames for print layout to settle
       await new Promise((resolve) =>
@@ -136,6 +177,8 @@ export function useClientReportPdfExport({
       window.print();
     } catch (err) {
       setError("PDF preparation failed. Please try again.");
+      closeReportPrintWindow(printWindowRef.current);
+      printWindowRef.current = null;
       cleanup();
     }
   }, [exporting, activePageCount, projectName, logoUrl, dealerName, projectReference, versionNumber, versionName, cleanup]);

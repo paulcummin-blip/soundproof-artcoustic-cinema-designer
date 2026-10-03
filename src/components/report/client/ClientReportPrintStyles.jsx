@@ -25,6 +25,45 @@ import { buildReportTypographyCss } from "@/components/report/typography/reportT
 export default function ClientReportPrintStyles() {
   return (
     <style>{`
+      /* ── First-page masthead — the report's own first page header. Shown on
+         screen and in the PDF alike, with the logo sized and centred exactly as
+         the Technical Report's cover (62mm), so both reports open the same way. ── */
+      .client-report-page__header {
+        text-align: center;
+        padding-bottom: 4mm;
+        border-bottom: 1px solid #DCDBD6;
+        margin-bottom: 6mm;
+      }
+
+      .client-report-page__header img {
+        width: 62mm;
+        max-width: 100%;
+        height: auto;
+        object-fit: contain;
+        display: block;
+        margin: 0 auto 3mm;
+      }
+
+      .client-report-page__header-title {
+        font-size: 15pt;
+        font-weight: 600;
+        color: #213428;
+        font-family: "Futura PT Light", "Century Gothic", sans-serif;
+        margin: 0 0 1.5mm 0;
+        letter-spacing: 0.01em;
+      }
+
+      .client-report-page__header-meta {
+        font-size: 9pt;
+        color: #625143;
+        font-family: "Didact Gothic", "Century Gothic", sans-serif;
+        line-height: 1.5;
+      }
+
+      .client-report-page__header-meta span {
+        white-space: nowrap;
+      }
+
       /* ── Screen: hide print-only elements ── */
       .client-report-print-only {
         display: none !important;
@@ -38,7 +77,6 @@ export default function ClientReportPrintStyles() {
       /* ── Pre-print measurement phase: body class added before window.print() ── */
       body.client-report-printing {
         background: #FFFFFF !important;
-        --client-report-logo-height: 23mm;
       }
 
       body.client-report-printing .client-report-screen-only {
@@ -88,7 +126,7 @@ export default function ClientReportPrintStyles() {
       body.client-report-printing .client-report-page__header {
         grid-row: 1;
         align-self: start;
-        max-height: 44mm;
+        max-height: 54mm;
         overflow: hidden;
         padding-bottom: 2mm;
         border-bottom: 1px solid #DCDBD6;
@@ -96,8 +134,9 @@ export default function ClientReportPrintStyles() {
       }
 
       body.client-report-printing .client-report-page__header img {
-        height: var(--client-report-logo-height, 23mm);
-        width: auto;
+        width: 62mm;
+        max-width: 100%;
+        height: auto;
         object-fit: contain;
         margin-bottom: 2mm;
         margin-left: auto;
@@ -372,7 +411,7 @@ export default function ClientReportPrintStyles() {
         .client-report-page__header {
           grid-row: 1;
           align-self: start;
-          max-height: 44mm;
+          max-height: 54mm;
           overflow: hidden;
           padding-bottom: 2mm;
           border-bottom: 1px solid #DCDBD6;
@@ -380,8 +419,9 @@ export default function ClientReportPrintStyles() {
         }
 
         .client-report-page__header img {
-          height: var(--client-report-logo-height, 23mm);
-          width: auto;
+          width: 62mm;
+          max-width: 100%;
+          height: auto;
           object-fit: contain;
           margin-bottom: 2mm;
           margin-left: auto;

@@ -19,7 +19,6 @@
 import React, { useMemo } from "react";
 import { MessageCircle, Headphones, ChevronUp, Waves, Zap } from "lucide-react";
 import Rp22SeatCoverageSentence from "@/components/report/Rp22SeatCoverageSentence";
-import { LOGO_URL } from "@/components/report/ReportCover";
 
 const ICONS = { MessageCircle, Headphones, ChevronUp, Waves, Zap };
 
@@ -76,12 +75,7 @@ export default function ClientDesignHighlights({ highlights, print, recommendati
   return (
     <div style={containerStyle}>
       {!print && (
-        <div style={{ marginBottom: 20, textAlign: "center" }}>
-          <img
-            src={LOGO_URL}
-            alt="Sound Proof"
-            style={{ width: 290, height: "auto", objectFit: "contain", marginBottom: 12, display: "block", margin: "0 auto" }}
-          />
+        <div style={{ marginBottom: 24, textAlign: "center" }}>
           <h1 style={{
             margin: 0,
             fontSize: 34,
@@ -95,7 +89,7 @@ export default function ClientDesignHighlights({ highlights, print, recommendati
         </div>
       )}
       {!print && coverageSentence && (
-        <div style={{ marginBottom: 20 }}>
+        <div style={{ marginTop: 22, marginBottom: 24, textAlign: "center" }}>
           <Rp22SeatCoverageSentence sentence={coverageSentence} variant="screen" />
         </div>
       )}
