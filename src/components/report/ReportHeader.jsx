@@ -8,7 +8,8 @@ import { isCadExportReady } from './cadExportReadiness';
 import ReportCover from './ReportCover';
 import BackToProposalLink from './BackToProposalLink';
 import { readProposalContext, withProposalContext } from './proposalReportContext';
-import { applyPrintDocumentTitle, restorePrintDocumentTitle } from '@/components/report/printDocumentTitle';
+import { restorePrintDocumentTitle } from '@/components/report/printDocumentTitle';
+import { openTechnicalReportPrintWindow } from '@/components/report/technical/technicalReportPrintWindow';
 
 export default function ReportHeader({
     app,
@@ -43,9 +44,17 @@ export default function ReportHeader({
     aimToggles,
     exportDisabled = false,
     exportDisabledMessage = "Bass analysis updating",
-    // The report's own export filename. The stalled-export fallback prints too,
-    // so it must print under the same name rather than the browser tab's title.
+    // The report's own export filename. It names the app-owned print window
+    // opened on the export click, so the saved PDF identifies itself: brand,
+    // report type, dealer, project and reference.
     printTitle = null,
+    // The app-owned print window, opened on the click while the browser still
+    // treats the action as a user gesture, and filled by the report when it prints.
+    printWindowRef = null,
+    // Prints the report under its own filename. Every print path — including the
+    // stalled-export fallback below — goes through it, so no path can fall back
+    // to naming the file after the browser tab.
+    onPrintFallback = null,
 }) {
     const navigate = useNavigate();
 
@@ -100,6 +109,15 @@ export default function ReportHeader({
         if (exportDisabled || exportGuardRef.current.active) return;
         exportGuardRef.current = { active: true, startedAt: Date.now() };
 
+        // Open the app-owned print window NOW, synchronously on the click, while
+        // the browser still treats this as a user gesture. The capture pipeline
+        // that follows takes long enough that a later window.open would be blocked
+        // as an unwanted pop-up — and this window is what names the saved PDF
+        // after the report instead of after the host tab.
+        if (printWindowRef && !printWindowRef.current) {
+            printWindowRef.current = openTechnicalReportPrintWindow(printTitle);
+        }
+
         try {
             setScreenMetricsForPrint(resolveScreenMetricsSnapshot());
             setScreenMetricsStatus("Ready");
@@ -122,9 +140,8 @@ export default function ReportHeader({
             setIsPrinting(false);
             setExportStatus("Export stalled — opening Print fallback…");
             try {
-                if (printTitle) applyPrintDocumentTitle(printTitle);
                 alert("PDF export stalled. We'll open Print instead. In the print window choose 'Save as PDF'.");
-                setTimeout(() => window.print(), 250);
+                onPrintFallback();
             } catch (err) {
                 alert("Export stalled and Print fallback couldn't open. Please try again.");
             }

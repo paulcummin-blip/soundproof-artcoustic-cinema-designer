@@ -73,6 +73,12 @@ import { resolveSeatPriority, getPrimarySeats, getSecondarySeats } from '@/compo
 import Rp22SeatCoverageSentence from '@/components/report/Rp22SeatCoverageSentence';
 import { buildTechnicalReportTitle } from '@/components/report/reportPdfTitle';
 import { applyPrintDocumentTitle, restorePrintDocumentTitle } from '@/components/report/printDocumentTitle';
+import {
+    findTechnicalReportPrintNode,
+    openTechnicalReportPrintWindow,
+    printTechnicalReportInWindow,
+    closeTechnicalReportPrintWindow,
+} from '@/components/report/technical/technicalReportPrintWindow';
 import AboutSoundProofReportPage from '@/components/report/AboutSoundProofReportPage';
 import { readDesignReviewHandoff, subscribeDesignReviewHandoff } from '@/components/state/designReviewHandoff';
 import { useVersionedEngineeringAuthority } from '@/components/engineering/useVersionedEngineeringAuthority';
@@ -426,6 +432,58 @@ function RP22ReportInner() {
     const exportGuardRef = React.useRef({ active: false, startedAt: 0 });
     const exportTimeoutRef = React.useRef(null);
     const EXPORT_TIMEOUT_MS = 60000;
+    // The app-owned print window the export click opened, when one could be opened.
+    const printWindowRef = React.useRef(null);
+
+    /**
+     * Print the report under its own filename.
+     *
+     * The export click opens the app-owned print window up front — a window
+     * opened after the capture pipeline would be blocked as an unwanted pop-up.
+     * Every Technical Report print path goes through here: while that window is
+     * available the report is printed from it, so the browser names the saved PDF
+     * after the report; otherwise it prints in place, applying the report title to
+     * the app document and the host tab exactly as before.
+     */
+    const printTechnicalReport = React.useCallback(() => {
+        const printWindow = printWindowRef.current;
+        printWindowRef.current = null;
+
+        const onDone = () => {
+            setAutoPrintDone(true);
+            setExportStatus("Done");
+            setExportDebug(d => ({ ...d, isPrinting: false, printReady: false }));
+            setIsPrinting(false);
+            setPlanImageDataUrl(null);
+            setPlanDimsImageDataUrl(null);
+            setPlanSpeakerDimsImageDataUrl(null);
+            printLockRef.current = false;
+            if (cleanupTimeoutRef.current) { clearTimeout(cleanupTimeoutRef.current); cleanupTimeoutRef.current = null; }
+            exportGuardRef.current.active = false;
+        };
+
+        const printInPlace = () => {
+            applyPrintDocumentTitle(technicalReportPrintTitle);
+            window.addEventListener("afterprint", () => setAutoPrintDone(true), { once: true });
+            window.print();
+        };
+
+        if (!printWindow) {
+            printInPlace();
+            return;
+        }
+
+        printTechnicalReportInWindow(printWindow, {
+            title: technicalReportPrintTitle,
+            node: findTechnicalReportPrintNode(),
+            onDone,
+        }).then((printed) => {
+            if (printed) return;
+            // The window could not be used: fall back to printing in place.
+            closeTechnicalReportPrintWindow(printWindow);
+            printInPlace();
+        });
+    }, [technicalReportPrintTitle]);
 
     // Cleanup on afterprint
     useEffect(() => {
@@ -445,13 +503,15 @@ function RP22ReportInner() {
         window.addEventListener('afterprint', cleanup);
         return () => {
             window.removeEventListener('afterprint', cleanup);
+            closeTechnicalReportPrintWindow(printWindowRef.current);
+            printWindowRef.current = null;
             if (cleanupTimeoutRef.current) clearTimeout(cleanupTimeoutRef.current);
             if (exportTimeoutRef.current) clearTimeout(exportTimeoutRef.current);
         };
     }, []);
 
     // Plan capture hooks
-    usePlanCapture({ isPrinting, planImageDataUrl, setPlanImageDataUrl, planDimsImageDataUrl, setPlanDimsImageDataUrl, planSpeakerDimsImageDataUrl, setPlanSpeakerDimsImageDataUrl, setExportStatus, exportTimeoutRef, exportGuardRef, setIsPrinting, debugPlanCapture, printTitle: technicalReportPrintTitle });
+    usePlanCapture({ isPrinting, planImageDataUrl, setPlanImageDataUrl, planDimsImageDataUrl, setPlanDimsImageDataUrl, planSpeakerDimsImageDataUrl, setPlanSpeakerDimsImageDataUrl, setExportStatus, exportTimeoutRef, exportGuardRef, setIsPrinting, debugPlanCapture, onPrintFallback: printTechnicalReport });
 
     // autoPrint: when navigated from Design Review with ?autoPrint=1, auto-trigger
     // the print pipeline once the report is hydrated and ready.
@@ -532,6 +592,8 @@ function RP22ReportInner() {
             if (!explicitProjectId || reportReadyProjectId !== explicitProjectId || reportHydrating) {
                 logAutoPrintBlock('print trigger: project identity mismatch guard', 440);
                 setExportStatus("Print cancelled — project identity mismatch.");
+                closeTechnicalReportPrintWindow(printWindowRef.current);
+                printWindowRef.current = null;
                 setIsPrinting(false);
                 setPrintReady(false);
                 printLockRef.current = false;
@@ -540,6 +602,8 @@ function RP22ReportInner() {
             if (!projectIdMatch || bassScopeId !== explicitProjectId || bassReportPending || bassRestoreFailed || reportDataIncomplete) {
                 logAutoPrintBlock('print trigger: bass authority project mismatch or restore incomplete', 441);
                 setExportStatus("Print cancelled — bass authority project mismatch.");
+                closeTechnicalReportPrintWindow(printWindowRef.current);
+                printWindowRef.current = null;
                 setIsPrinting(false);
                 setPrintReady(false);
                 printLockRef.current = false;
@@ -554,11 +618,17 @@ function RP22ReportInner() {
             if (exportTimeoutRef.current) clearTimeout(exportTimeoutRef.current);
             exportTimeoutRef.current = null;
             exportGuardRef.current.active = false;
-            // The report's own filename, applied to the app document and the
-            // host tab, so the saved PDF is never named after the workspace tab.
-            applyPrintDocumentTitle(technicalReportPrintTitle);
-            window.addEventListener("afterprint", () => setAutoPrintDone(true), { once: true });
-            window.print();
+            // A window opened here may still be honoured while the click that
+            // started the export is recent — the Design Review route has no click
+            // of its own to open one on. When the browser refuses it, printing
+            // falls back to the in-place path inside printTechnicalReport().
+            if (!printWindowRef.current) {
+                printWindowRef.current = openTechnicalReportPrintWindow(technicalReportPrintTitle);
+            }
+            // The report's own filename, printed from the app-owned window when
+            // one could be opened, so the saved PDF is named by the report rather
+            // than by the host tab the app is running in.
+            printTechnicalReport();
             cleanupTimeoutRef.current = setTimeout(() => {
                 if (isPrinting) {
                     setIsPrinting(false); setPlanImageDataUrl(null);
@@ -1228,6 +1298,8 @@ function RP22ReportInner() {
                         exportTimeoutRef={exportTimeoutRef}
                         EXPORT_TIMEOUT_MS={EXPORT_TIMEOUT_MS}
                         printTitle={technicalReportPrintTitle}
+                        printWindowRef={printWindowRef}
+                        onPrintFallback={printTechnicalReport}
                         resolveScreenMetricsSnapshot={resolveScreenMetricsSnapshot}
                         setScreenMetricsForPrint={setScreenMetricsForPrint}
                         setScreenMetricsStatus={setScreenMetricsStatus}
