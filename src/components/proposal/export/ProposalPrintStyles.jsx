@@ -79,6 +79,13 @@ export default function ProposalPrintStyles() {
           padding-bottom: 16mm;
         }
 
+        /* The fact-card page carries its own dense card grid, so it takes a
+           slightly shorter top margin while still sitting clear of the paper
+           edge and keeping its one-page rule. */
+        body.proposal-export-mode .proposal-print-section.pp-page--glance {
+          padding-top: 16mm;
+        }
+
         body.proposal-export-mode .proposal-print-section__title {
           font-size: 16pt;
           font-weight: 600;

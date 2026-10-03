@@ -172,6 +172,9 @@ describe('C. Project Images is a visualisation page', () => {
     expect(PACK).toMatch(/\.pp-gallery__hero \{\s*margin: 0 0 8mm/);
     expect(PACK).toMatch(/\.pp-page--images \.pp-header \{\s*margin-bottom: 8mm/);
     expect(PRINT).toMatch(/proposal-print-section\.pp-page--images \{\s*padding-top: 14mm/);
+    // The fact-card page keeps its own one-page rule with a shorter top margin.
+    expect(PRINT).toMatch(/proposal-print-section\.pp-page--glance \{\s*padding-top: 16mm/);
+    expect(PACK).toMatch(/pp-page--glance[\s\S]*break-inside: avoid/);
   });
 
   it('gives one to eight images clean layouts, always hero first', () => {
