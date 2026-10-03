@@ -71,6 +71,7 @@ import { DEFAULT_TERRITORY, getTerritoryConfig } from '@/components/pricing/terr
 import { resolveSeatPriority, getPrimarySeats, getSecondarySeats } from '@/components/utils/seatPriorityAuthority';
 import Rp22SeatCoverageSentence from '@/components/report/Rp22SeatCoverageSentence';
 import { buildTechnicalReportTitle } from '@/components/report/reportPdfTitle';
+import { applyPrintDocumentTitle, restorePrintDocumentTitle } from '@/components/report/printDocumentTitle';
 import AboutSoundProofReportPage from '@/components/report/AboutSoundProofReportPage';
 import { readDesignReviewHandoff, subscribeDesignReviewHandoff } from '@/components/state/designReviewHandoff';
 import { useVersionedEngineeringAuthority } from '@/components/engineering/useVersionedEngineeringAuthority';
@@ -420,7 +421,6 @@ function RP22ReportInner() {
     );
     const [debugPlanCapture, setDebugPlanCapture] = useState(false);
     const printLockRef = React.useRef(false);
-    const originalPrintTitleRef = React.useRef(null);
     const cleanupTimeoutRef = React.useRef(null);
     const exportGuardRef = React.useRef({ active: false, startedAt: 0 });
     const exportTimeoutRef = React.useRef(null);
@@ -436,10 +436,7 @@ function RP22ReportInner() {
             setPlanDimsImageDataUrl(null);
             setPlanSpeakerDimsImageDataUrl(null);
             printLockRef.current = false;
-            if (originalPrintTitleRef.current !== null) {
-                document.title = originalPrintTitleRef.current;
-                originalPrintTitleRef.current = null;
-            }
+            restorePrintDocumentTitle();
             if (cleanupTimeoutRef.current) { clearTimeout(cleanupTimeoutRef.current); cleanupTimeoutRef.current = null; }
             if (exportTimeoutRef.current) { clearTimeout(exportTimeoutRef.current); exportTimeoutRef.current = null; }
             exportGuardRef.current.active = false;
@@ -556,10 +553,9 @@ function RP22ReportInner() {
             if (exportTimeoutRef.current) clearTimeout(exportTimeoutRef.current);
             exportTimeoutRef.current = null;
             exportGuardRef.current.active = false;
-            if (originalPrintTitleRef.current === null) {
-                originalPrintTitleRef.current = document.title;
-            }
-            document.title = technicalReportPrintTitle;
+            // The report's own filename, applied to the app document and the
+            // host tab, so the saved PDF is never named after the workspace tab.
+            applyPrintDocumentTitle(technicalReportPrintTitle);
             window.addEventListener("afterprint", () => setAutoPrintDone(true), { once: true });
             window.print();
             cleanupTimeoutRef.current = setTimeout(() => {

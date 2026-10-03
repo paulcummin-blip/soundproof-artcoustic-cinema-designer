@@ -1,5 +1,6 @@
 // Handles the three SVG→PNG capture effects for RP22 report export.
 import { useEffect } from 'react';
+import { applyPrintDocumentTitle } from '@/components/report/printDocumentTitle';
 
 function captureOnePlan({ selector, isPrinting, imageDataUrl, setImageDataUrl, setExportStatus, exportTimeoutRef, exportGuardRef, setIsPrinting, debugPlanCapture, label, printTitle = null }) {
     // Capture state must only ever be null (pending) or string (captured/skipped).
@@ -95,7 +96,9 @@ function captureOnePlan({ selector, isPrinting, imageDataUrl, setImageDataUrl, s
                 setIsPrinting(false);
                 // This fallback prints directly, so it must print under the
                 // report's own filename rather than the browser tab's title.
-                if (printTitle) document.title = printTitle;
+                // Applied to the host tab too: the browser names the saved PDF
+                // after the top-level document title.
+                if (printTitle) applyPrintDocumentTitle(printTitle);
                 setTimeout(() => window.print(), 250);
             }
         }

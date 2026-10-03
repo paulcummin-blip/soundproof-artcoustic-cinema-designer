@@ -8,6 +8,7 @@ import { isCadExportReady } from './cadExportReadiness';
 import ReportCover from './ReportCover';
 import BackToProposalLink from './BackToProposalLink';
 import { readProposalContext, withProposalContext } from './proposalReportContext';
+import { applyPrintDocumentTitle, restorePrintDocumentTitle } from '@/components/report/printDocumentTitle';
 
 export default function ReportHeader({
     app,
@@ -47,18 +48,11 @@ export default function ReportHeader({
     printTitle = null,
 }) {
     const navigate = useNavigate();
-    const fallbackTitleRef = React.useRef(null);
 
     // Restore the tab's own title once the fallback print dialog has closed.
     React.useEffect(() => {
-        const restore = () => {
-            if (fallbackTitleRef.current !== null) {
-                document.title = fallbackTitleRef.current;
-                fallbackTitleRef.current = null;
-            }
-        };
-        window.addEventListener('afterprint', restore);
-        return () => window.removeEventListener('afterprint', restore);
+        window.addEventListener('afterprint', restorePrintDocumentTitle);
+        return () => window.removeEventListener('afterprint', restorePrintDocumentTitle);
     }, []);
 
     const urlProjectId = typeof window !== 'undefined'
@@ -128,10 +122,7 @@ export default function ReportHeader({
             setIsPrinting(false);
             setExportStatus("Export stalled — opening Print fallback…");
             try {
-                if (printTitle && fallbackTitleRef.current === null) {
-                    fallbackTitleRef.current = document.title;
-                    document.title = printTitle;
-                }
+                if (printTitle) applyPrintDocumentTitle(printTitle);
                 alert("PDF export stalled. We'll open Print instead. In the print window choose 'Save as PDF'.");
                 setTimeout(() => window.print(), 250);
             } catch (err) {

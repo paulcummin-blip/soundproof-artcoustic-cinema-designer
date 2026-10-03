@@ -17,6 +17,10 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { buildProposalReportTitle } from '@/components/report/reportPdfTitle';
+import {
+  applyPrintDocumentTitle,
+  restorePrintDocumentTitle,
+} from '@/components/report/printDocumentTitle';
 
 const PRINT_TIMEOUT_MS = 60000;
 const EXPORT_BODY_CLASS = 'proposal-export-mode';
@@ -68,7 +72,6 @@ export function useProposalExport({
 
   const printingRef = useRef(false);
   const cleanupTimeoutRef = useRef(null);
-  const originalTitleRef = useRef(null);
 
   const cleanup = useCallback(() => {
     if (printingRef.current) {
@@ -77,10 +80,8 @@ export function useProposalExport({
     }
     if (typeof document !== 'undefined') {
       document.body.classList.remove(EXPORT_BODY_CLASS);
-      if (originalTitleRef.current !== null) {
-        document.title = originalTitleRef.current;
-        originalTitleRef.current = null;
-      }
+      // Restores the app title and the host tab title, whichever were replaced.
+      restorePrintDocumentTitle();
     }
     if (cleanupTimeoutRef.current) {
       clearTimeout(cleanupTimeoutRef.current);
@@ -95,7 +96,7 @@ export function useProposalExport({
       window.removeEventListener('afterprint', handler);
       if (cleanupTimeoutRef.current) clearTimeout(cleanupTimeoutRef.current);
       document.body.classList.remove(EXPORT_BODY_CLASS);
-      if (originalTitleRef.current !== null) document.title = originalTitleRef.current;
+      restorePrintDocumentTitle();
     };
   }, [cleanup]);
 
@@ -119,13 +120,16 @@ export function useProposalExport({
         await document.fonts.ready;
       }
 
-      originalTitleRef.current = document.title;
       // The shared filename helper, with the report type this proposal is:
-      // Proposal / System Design Summary / System Design Comparison.
-      document.title = buildProposalReportTitle(
-        projectName || proposal?.title || 'Proposal',
-        proposal?.proposal_type,
-        { dealerName, projectReference }
+      // System Design Summary / System Design Comparison / Proposal. Applied to
+      // the app document AND the host tab, because the browser names the saved
+      // PDF after the top-level document title.
+      applyPrintDocumentTitle(
+        buildProposalReportTitle(
+          projectName || proposal?.title || 'Proposal',
+          proposal?.proposal_type,
+          { dealerName, projectReference }
+        )
       );
 
       document.body.classList.add(EXPORT_BODY_CLASS);

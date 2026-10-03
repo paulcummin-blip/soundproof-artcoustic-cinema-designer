@@ -17,6 +17,10 @@
 
 import { useState, useCallback, useRef, useEffect } from "react";
 import { buildVisualReportTitle } from "@/components/report/reportPdfTitle";
+import {
+  applyPrintDocumentTitle,
+  restorePrintDocumentTitle,
+} from "@/components/report/printDocumentTitle";
 
 // Version metadata is optional — only present when the project has a saved
 // named design version. The filename helper appends it when meaningful.
@@ -60,7 +64,6 @@ export function useClientReportPdfExport({
   const [error, setError] = useState(null);
   const printingRef = useRef(false);
   const cleanupTimeoutRef = useRef(null);
-  const originalTitleRef = useRef(null);
 
   const cleanup = useCallback(() => {
     if (printingRef.current) {
@@ -68,10 +71,7 @@ export function useClientReportPdfExport({
       setExporting(false);
     }
     document.body.classList.remove("client-report-printing");
-    if (originalTitleRef.current !== null) {
-      document.title = originalTitleRef.current;
-      originalTitleRef.current = null;
-    }
+    restorePrintDocumentTitle();
     if (cleanupTimeoutRef.current) {
       clearTimeout(cleanupTimeoutRef.current);
       cleanupTimeoutRef.current = null;
@@ -112,12 +112,14 @@ export function useClientReportPdfExport({
       // 3. Add print-mode body class so the print layout and page dimensions exist
       document.body.classList.add("client-report-printing");
 
-      // 4. Set temporary document title
-      originalTitleRef.current = document.title;
-      document.title = buildVisualReportTitle(
-        projectName,
-        { number: versionNumber, name: versionName },
-        { dealerName, projectReference }
+      // 4. Set the report filename as the print title, on the app document and
+      // the host tab alike, because this report is exported from the workspace.
+      applyPrintDocumentTitle(
+        buildVisualReportTitle(
+          projectName,
+          { number: versionNumber, name: versionName },
+          { dealerName, projectReference }
+        )
       );
 
       // 5. Wait two animation frames for print layout to settle
