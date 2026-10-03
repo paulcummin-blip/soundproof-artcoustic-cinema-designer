@@ -196,10 +196,20 @@ export function applyRestoredBassAuthority(summary, { projectId, versionId, comp
       rawValue: parameter.rawValue ?? existing.rawValue ?? null,
       restoredFromSavedBassAuthority: overlaidIds.has(id) || existing.restoredFromSavedBassAuthority === true,
     };
-    if (next.state !== existing.state || next.level !== existing.level) authorityRepaired = true;
+    if (next.state !== existing.state
+      || next.level !== existing.level
+      || next.multiplier !== existing.multiplier
+      || next.effectiveWeight !== existing.effectiveWeight
+      || next.mode !== existing.mode
+      || next.rawValue !== existing.rawValue) {
+      authorityRepaired = true;
+    }
 
-    // P19 is one RSP result, not a per-seat assessment.
-    if (id === 19 && overlaidIds.has(id)) {
+    // P19 is one RSP result, not a per-seat assessment. Repair legacy summaries
+    // that already contain the result but still label it as seat-scoped; without
+    // this repair the UI can display P19 while the canonical scorecard omits it.
+    if (id === 19 && scored) {
+      if (next.scope !== "room" || next.seats != null) authorityRepaired = true;
       next.scope = "room";
       next.seats = null;
     }
@@ -213,16 +223,26 @@ export function applyRestoredBassAuthority(summary, { projectId, versionId, comp
         const raw = Number(seat?.variationDbRaw);
         if (!seatId || !Number.isFinite(raw)) continue;
         const previous = seats[seatId] || {};
+        const seatLevel = normaliseLevel(seat.level) || previous.level || null;
+        const seatMultiplier = LEVEL_MULTIPLIERS[seatLevel] ?? previous.multiplier ?? 0;
         if (previous.state === "scored"
           && statesBassResultEntry({ value: previous.rawValue, formatted: previous.formatted })) {
+          if (previous.level !== seatLevel || previous.multiplier !== seatMultiplier) {
+            seats[seatId] = {
+              ...previous,
+              level: seatLevel,
+              multiplier: seatMultiplier,
+              restoredFromSavedBassAuthority: true,
+            };
+            authorityRepaired = true;
+          }
           continue;
         }
-        const seatLevel = normaliseLevel(seat.level) || previous.level || null;
         seats[seatId] = {
           ...previous,
           state: "scored",
           level: seatLevel,
-          multiplier: LEVEL_MULTIPLIERS[seatLevel] ?? previous.multiplier ?? 0,
+          multiplier: seatMultiplier,
           rawValue: raw,
           reason: null,
           restoredFromSavedBassAuthority: true,
