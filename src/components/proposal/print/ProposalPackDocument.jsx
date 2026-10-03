@@ -22,6 +22,7 @@ import React from 'react';
 import ProposalCoverPage from '@/components/proposal/cover/ProposalCoverPage';
 import KeyPerformanceHighlightsTable from '@/components/proposal/KeyPerformanceHighlightsTable';
 import ProjectImagesBlock, { projectGalleryImages } from '@/components/proposal/ProjectImagesBlock';
+import ProjectImagesPage, { imagePagesFor } from '@/components/proposal/print/ProjectImagesPage';
 import AtAGlancePage from '@/components/proposal/print/AtAGlancePage';
 import RoomAndBriefPage from '@/components/proposal/print/RoomAndBriefPage';
 import MethodPage from '@/components/proposal/print/MethodPage';
@@ -125,12 +126,28 @@ export default function ProposalPackDocument({
       });
 
       if (section.section_type === 'room_images') {
-        pages.push(
-          <section key={section.id} className="proposal-print-section pp-page pp-page--images">
-            <ProposalPageHeader number={takeNumber()} kicker="Visualisation" title={title} />
-            <ProjectImagesBlock images={projectImages} />
-          </section>
-        );
+        // Image-led: one image page per group of images, so four or more images
+        // become further image pages instead of shrinking everything to fit.
+        const imagePages = imagePagesFor(gallery.map(({ asset }) => asset));
+        if (imagePages.length === 0) {
+          pages.push(
+            <section key={section.id} className="proposal-print-section pp-page pp-page--images">
+              <ProposalPageHeader number={takeNumber()} kicker="Visualisation" title={title} />
+              <ProjectImagesBlock images={projectImages} />
+            </section>
+          );
+          return;
+        }
+        imagePages.forEach((pageImages, index) => {
+          pages.push(
+            <ProjectImagesPage
+              key={`${section.id}:${index}`}
+              number={takeNumber()}
+              title={title}
+              images={pageImages}
+            />
+          );
+        });
         return;
       }
 

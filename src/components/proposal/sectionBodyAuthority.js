@@ -97,12 +97,33 @@ export function limitSentences(html, max = 3) {
  * @param {{ title?: string, sectionType?: string }} section
  * @returns {string}
  */
+/**
+ * The sections that print as prose only. Each of these has its own designed
+ * evidence (the structure cards) or is the narrative around the single
+ * structured table, so a list or a table inside the prose would repeat it.
+ * The stored body is never modified: the rule applies to the printed page only.
+ */
+const PROSE_ONLY_SECTIONS = new Set([
+  'system_design_summary',
+  'spatial_resolution',
+  'dynamic_range',
+  'timbre_matching',
+  'overall_design',
+]);
+
 export function prepareSectionBody(html, section = {}) {
   const deduped = stripDuplicateLeadingHeading(html, section.title);
-  if (section.sectionType !== 'key_performance_highlights') return deduped;
-  // The structured calculated table is the only table in this section, and the
-  // introduction stays a short piece of prose.
-  return limitSentences(stripListAndTableBlocks(deduped), 3);
+  if (section.sectionType === 'key_performance_highlights') {
+    // The structured calculated table is the only table in this section, and the
+    // introduction stays a short piece of prose.
+    return limitSentences(stripListAndTableBlocks(deduped), 3);
+  }
+  // On the printed page the prose sections carry prose only: a highlight list
+  // inside a section is repetition of the one evidence table.
+  if (section.proseOnly && PROSE_ONLY_SECTIONS.has(section.sectionType)) {
+    return stripListAndTableBlocks(deduped);
+  }
+  return deduped;
 }
 
 export default prepareSectionBody;

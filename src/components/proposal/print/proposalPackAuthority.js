@@ -112,6 +112,46 @@ export function parameterReferenceList() {
 }
 
 /**
+ * The screen as the client-facing statement, so no page can state one figure
+ * while another implies a different one.
+ *
+ * A projection screen is stated by its viewable image width (170" viewable
+ * 2.35:1 image) with the overall screen assembly given separately (185" overall
+ * screen assembly). A television is stated by its nominal size, which is how a
+ * television is bought, and needs no second figure. Both figures are read from
+ * the frozen snapshot: nothing is converted here.
+ *
+ * @returns {{ value: string|null, hint: string|null }}
+ */
+export function screenStatement(screen = {}) {
+  const viewable = Number(screen.viewable_width_inches) || null;
+  const diagonal = Number(screen.diagonal_inches) || null;
+  const stated = Number(screen.size_inches) || null;
+  const aspect = screen.aspect_ratio ? String(screen.aspect_ratio) : null;
+
+  if (screen.television === true && stated) {
+    return { value: aspect ? `${stated}" ${aspect} screen` : `${stated}" screen`, hint: null };
+  }
+
+  // The viewable image width is the figure a projection screen is designed and
+  // bought by. Where the snapshot carries no viewable width, the stated size
+  // stands on its own rather than being labelled as something it may not be.
+  const imageWidth = viewable || (stated && diagonal && stated !== diagonal ? stated : null);
+  const overall = diagonal && imageWidth && diagonal !== imageWidth ? diagonal : null;
+
+  if (imageWidth) {
+    return {
+      value: aspect ? `${imageWidth}" viewable ${aspect} image` : `${imageWidth}" viewable image`,
+      hint: overall ? `${overall}" overall screen assembly` : null,
+    };
+  }
+  return {
+    value: stated ? (aspect ? `${stated}" ${aspect} screen` : `${stated}" screen`) : null,
+    hint: overall ? `${overall}" overall screen assembly` : null,
+  };
+}
+
+/**
  * The evidence cards for one design structure section.
  * Only that structure's own parameters appear, and only where the design has a
  * calculated result for them.
@@ -163,13 +203,11 @@ export function buildAtAGlanceCards({ snapshot, projectName, dealerName, project
       hint: statementValue(room.classification) || null,
     },
     {
+      // The screen is always stated with its terminology: the viewable image
+      // width, with the overall screen assembly named separately.
       label: 'Screen',
-      value: screen.size_inches ? `${screen.size_inches}" ${screen.aspect_ratio || ''}`.trim() : null,
-      // The viewable width is only worth stating when it differs from the screen
-      // size already given (for example a television, sold by its nominal size).
-      hint: Number(screen.viewable_width_inches) && Number(screen.viewable_width_inches) !== Number(screen.size_inches)
-        ? `${screen.viewable_width_inches}" viewable width`
-        : null,
+      value: screenStatement(screen).value,
+      hint: screenStatement(screen).hint,
     },
     {
       label: 'Seating',
@@ -225,11 +263,12 @@ export function buildRoomBriefFacts(snapshot) {
       hint: statementValue(room.ratio) || null,
     },
     {
+      // Stated with the same terminology as the at-a-glance page. The screen
+      // wall construction has its own fact below, so the hint carries the
+      // overall screen assembly instead of repeating it.
       label: 'Screen',
-      value: screen.size_inches
-        ? `${screen.size_inches}" ${screen.aspect_ratio || ''}`.trim()
-        : null,
-      hint: screen.mount_mode ? `${screen.mount_mode === 'floating' ? 'floating' : 'baffle wall'} mount` : null,
+      value: screenStatement(screen).value,
+      hint: screenStatement(screen).hint,
     },
     {
       label: 'Seating',

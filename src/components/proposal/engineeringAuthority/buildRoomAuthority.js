@@ -7,7 +7,11 @@
  */
 
 import { CONFIDENCE, withConfidence, SOURCE } from './confidence';
-import { resolveCanonicalScreen, resolveStatedScreenSize } from '@/components/models/screen/canonicalScreenSize';
+import {
+  isTelevisionScreen,
+  resolveCanonicalScreen,
+  resolveStatedScreenSize,
+} from '@/components/models/screen/canonicalScreenSize';
 
 function interpretScreen(project) {
   const screenSize = Number(project?.screen_size) || null;
@@ -27,6 +31,7 @@ function interpretScreen(project) {
     return {
       size_inches: null,
       diagonal_inches: null,
+      television: false,
       aspect_ratio: aspectRatio,
       height_from_floor_m: heightFromFloor,
       manual_dimensions: false,
@@ -75,6 +80,9 @@ function interpretScreen(project) {
     diagonal_inches: canonical?.diagonalInches ?? null,
     aspect_ratio: aspectRatio,
     viewable_width_inches: canonical?.widthInches ?? null,
+    // A television is known by its nominal size; a projection screen by its
+    // viewable image width. Reports label the two differently.
+    television: isTelevisionScreen(project),
     height_from_floor_m: heightFromFloor,
     manual_dimensions: manualDims,
     manual_width_m: manualDims ? manualWidthM : null,
