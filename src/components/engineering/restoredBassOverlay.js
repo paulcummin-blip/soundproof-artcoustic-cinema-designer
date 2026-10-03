@@ -27,8 +27,6 @@ import {
   BASS_AUTHORITY_STATUS,
   bassContractMatchesRequestedP14,
   getCompletedBassAuthority,
-  isAuthoritativeBassContract,
-  isStructurallyCompleteBassContract,
 } from "@/components/room/bass/completedBassResultStore";
 import { buildComplianceBassPresentation } from "@/components/room/bass/bassCompliancePresentation";
 import { statesBassResultEntry } from "@/components/engineering/versionedEngineeringAuthority";
@@ -82,11 +80,15 @@ export function assessRestoredBassAuthorityCurrentness(authority) {
   if (authority?.authoritative !== true || authority?.exportable !== true) {
     return { current: false, outOfDate: true, reason: "authority-not-reliable" };
   }
-  if (authority?.structurallyComplete !== true || !isStructurallyCompleteBassContract(contract)) {
+  // These flags are produced only by resolvePersistedBassAuthority(), which
+  // applies the current cache/instance/metric schema checks and validates the
+  // canonical metric-publication receipt. Reuse that one authority decision
+  // instead of duplicating its physics/schema logic here.
+  if (authority?.structurallyComplete !== true) {
     return { current: false, outOfDate: true, reason: "contract-incomplete-or-schema-unsupported" };
   }
-  if (!isAuthoritativeBassContract(contract)) {
-    return { current: false, outOfDate: true, reason: "contract-publication-not-authoritative" };
+  if (!["ready", "complete"].includes(contract?.job?.status)) {
+    return { current: false, outOfDate: true, reason: "contract-job-not-complete" };
   }
   if (!currentFingerprint || !resultFingerprint || currentFingerprint !== resultFingerprint) {
     return { current: false, outOfDate: true, reason: "active-design-fingerprint-mismatch" };
