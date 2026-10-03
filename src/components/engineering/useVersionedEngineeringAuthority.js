@@ -30,6 +30,7 @@ import { invalidateProjectAnalysisCacheRead, readProjectVersionRecord } from '@/
 import { applyRestoredBassAuthority } from './restoredBassOverlay';
 import { assessEngineeringReportCompleteness } from './engineeringReportCompleteness';
 import { useSharedBassAuthorityReconciliation } from '@/components/room/bass/useSharedBassAuthorityReconciliation';
+import { useBassReconciliationStatus } from '@/components/room/bass/bassReconciliationStatus';
 
 export function useVersionedEngineeringAuthority(projectId, versionId) {
   const [localSnapshot, setLocalSnapshot] = useState(
@@ -110,6 +111,8 @@ export function useVersionedEngineeringAuthority(projectId, versionId) {
   // Room Designer would — without the Room Designer or any bass panel mounting.
   // Identity only: it calculates nothing and never starts a worker.
   useSharedBassAuthorityReconciliation(projectId, versionId);
+  // No-match and eligibility outcomes also refresh the gate, not just promotions.
+  useBassReconciliationStatus(projectId, versionId);
   const composedSnapshot = composeAuthoritySnapshot({ localSnapshot, durableSnapshot });
   const composedSummary = extractEngineeringSummary(composedSnapshot);
   const restoredSummary = applyRestoredBassAuthority(

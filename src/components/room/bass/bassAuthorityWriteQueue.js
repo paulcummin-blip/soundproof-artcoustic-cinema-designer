@@ -41,9 +41,15 @@ export function queueBassAuthorityWrite(key, signature, record, payload) {
   const rowSignature = rowAuthoritySignature(record);
   if (rowSignature && rowSignature === rowAuthoritySignature(payload)) {
     writtenSignatures.set(key, signature);
-    return Promise.resolve(null);
+    const [projectId, versionId] = String(key).split("::");
+    publishBassReconciliationStatus(projectId, versionId, { writeSucceeded: true, writeError: null, writeDisposition: "already-persisted" });
+    return Promise.resolve(true);
   }
-  if (writtenSignatures.get(key) === signature) return Promise.resolve(null);
+  if (writtenSignatures.get(key) === signature) {
+    const [projectId, versionId] = String(key).split("::");
+    publishBassReconciliationStatus(projectId, versionId, { writeSucceeded: true, writeError: null, writeDisposition: "already-persisted" });
+    return Promise.resolve(true);
+  }
 
   let pending = pendingWrites.get(key);
   if (!pending) {

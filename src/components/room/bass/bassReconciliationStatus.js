@@ -16,7 +16,19 @@
  * it — it exists to be looked at.
  */
 
+import { useSyncExternalStore } from "react";
+
 const statusByKey = new Map();
+const listeners = new Set();
+const EMPTY_STATUS = Object.freeze({});
+
+export function useBassReconciliationStatus(projectId, versionId) {
+  return useSyncExternalStore(
+    (listener) => { listeners.add(listener); return () => listeners.delete(listener); },
+    () => readBassReconciliationStatus(projectId, versionId) || EMPTY_STATUS,
+    () => EMPTY_STATUS,
+  );
+}
 
 const scopeKey = (projectId, versionId) =>
   `${String(projectId || "free")}::${String(versionId || "free")}`;
@@ -27,6 +39,7 @@ export function publishBassReconciliationStatus(projectId, versionId, patch) {
   if (key === "free::free") return null;
   const next = { ...(statusByKey.get(key) || {}), ...patch, updatedAtMs: Date.now() };
   statusByKey.set(key, next);
+  listeners.forEach((listener) => listener());
   if (typeof window !== "undefined") {
     window.__SP_BASS_RECONCILIATION__ = { scope: key, ...next };
   }

@@ -445,15 +445,19 @@ export function syncCachedCompactBassAuthority(projectId, versionId, compactCont
         status: persisted.status,
         completed_by_fingerprint: persisted.completedByFingerprint,
       };
-      // Coalesced: the row is written once the burst of publishes settles, and
-      // never when the row already holds this authority.
-      queueBassAuthorityWrite(key, signature, record, payload);
+      // Await the durable outcome; promotion itself has already notified readers.
+      publishBassReconciliationStatus(projectId, versionId, { writeAttempted: true });
+      await queueBassAuthorityWrite(key, signature, record, payload);
       const resolved = resolvePersistedBassAuthority(key, persisted);
       if (resolved?.authoritative) {
         return setMemory(projectId, versionId, resolved);
       }
       return memoryByProject.get(key) || resolved;
     } catch (e) {
+      syncSignatures.delete(key);
+      publishBassReconciliationStatus(projectId, versionId, {
+        writeSucceeded: false, writeError: e?.message || String(e),
+      });
       return null;
     }
   });
@@ -709,6 +713,15 @@ export async function reconcileBassAuthorityWithPersisted(projectId, versionId, 
     return { matched: false, fingerprint, source: null, reason: "identity-changed-during-read", writeAttempted: false };
   }
   const bank = parseTargetCacheBank(record?.target_cache);
+  const selectedBankFingerprint = bank.targets?.[identity?.selectedTarget?.targetKey]?.job?.resultFingerprint || null;
+  publishBassReconciliationStatus(projectId, versionId, {
+    bassRowReceived: !!record,
+    targetBankReceived: !!record?.target_cache,
+    bankTargetCount: Object.keys(bank.targets).length,
+    bankBaseDesignFingerprint: bank.baseDesignFingerprint,
+    selectedBankFingerprint,
+  });
+  if (!record) return { matched: false, fingerprint, source: null, reason: "missing bass row", writeAttempted: false };
   const match = findSavedContractForFingerprint({
     completedByFingerprint: record?.completed_by_fingerprint || {},
     bankTargets: bank.targets,
@@ -719,7 +732,7 @@ export async function reconcileBassAuthorityWithPersisted(projectId, versionId, 
       matched: false,
       fingerprint,
       source: null,
-      reason: "no-saved-contract-for-rebuilt-identity",
+      reason: `no-saved-contract-for-rebuilt-identity: exact key not found in completed snapshots or ${Object.keys(bank.targets).length} bank targets; selected saved key ${selectedBankFingerprint || "absent"}; base design ${bank.baseDesignFingerprint === identity?.baseDesignFingerprint ? "matches" : "differs"}`,
       persistedFingerprint: record?.current_fingerprint || null,
       bankBaseDesignFingerprint: bank.baseDesignFingerprint || null,
       bankTargetCount: Object.keys(bank.targets || {}).length,

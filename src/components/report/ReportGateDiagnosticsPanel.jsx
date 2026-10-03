@@ -11,6 +11,7 @@
 
 import React from "react";
 import { buildReportGateDiagnosticRows } from "./reportGateDiagnostics";
+import BassReconciliationDiagnosticRows from "@/components/report/BassReconciliationDiagnosticRows";
 
 const PANEL = {
   marginTop: 20,
@@ -50,6 +51,7 @@ export default function ReportGateDiagnosticsPanel({ diagnostics = null }) {
     <details style={PANEL}>
       <summary style={SUMMARY}>Report gate diagnostics</summary>
       <div style={{ marginTop: 10 }}>
+        <BassReconciliationDiagnosticRows projectId={diagnostics.project_id} versionId={diagnostics.version_id} gateResult={diagnostics.gate_result} />
         {rows.map(([label, value]) => (
           <div key={label} style={ROW}>
             <span style={LABEL}>{label}</span>

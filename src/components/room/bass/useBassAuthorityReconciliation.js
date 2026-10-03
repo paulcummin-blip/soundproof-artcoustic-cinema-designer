@@ -126,6 +126,26 @@ export function useBassAuthorityReconciliation({
   const latestIdentityRef = useRef({ cacheKey: null, digest: null });
   latestIdentityRef.current = { cacheKey, digest };
 
+  // Publish every eligibility exit; a mounted hook must never fail silently.
+  useEffect(() => {
+    const blocked = !scopeId || scopeId === "free" || !versionId || versionId === "free" ? "missing projectId/versionId"
+      : !projectHydrationReady ? "missing design state"
+        : !authorityHydrationSettled ? "missing bass row: hydration pending"
+          : !identityEligible ? (identityReadiness.reason || "identity not ready")
+            : !fingerprints || !targetKey || !baseDesignFingerprint ? "effect guard false: missing fingerprint context"
+              : manualRequestActive || calculationInProgress ? "effect guard false: calculation active" : null;
+    publishBassReconciliationStatus(scopeId, versionId, {
+      designStateReceived: projectHydrationReady,
+      identityReady: identityEligible,
+      identityMissing: identityReadiness.missing,
+      inputsValid: inputsValid === true,
+      cacheKeyBuilt: !!cacheKey,
+      cacheKey,
+      baseDesignFingerprint,
+      ...(blocked ? { ran: false, reason: blocked, authorityStatusBefore: authorityStatus, authorityStatusAfter: authorityStatus } : {}),
+    });
+  }, [scopeId, versionId, projectHydrationReady, authorityHydrationSettled, identityEligible, identityReadiness, inputsValid, cacheKey, baseDesignFingerprint, fingerprints, targetKey, manualRequestActive, calculationInProgress, authorityStatus]);
+
   // ── Reconciliation ────────────────────────────────────────────────────
   const reconciliationRef = useRef({ fingerprint: null, matched: null, source: null, reason: null, differences: null });
   useEffect(() => {
@@ -147,6 +167,7 @@ export function useBassAuthorityReconciliation({
       cacheKey,
       matched: null,
       matchSource: null,
+      ran: true,
       reason: "reconciling",
       writeAttempted: false,
       writeSucceeded: null,
@@ -160,7 +181,9 @@ export function useBassAuthorityReconciliation({
       publishBassReconciliationStatus(scopeId, versionId, {
         matched: true,
         matchSource: "already-current",
-        reason: null,
+        matchedFingerprint: cacheKey,
+        authorityStatusAfter: authorityStatus,
+        reason: "already-current",
       });
       return;
     }
@@ -189,7 +212,7 @@ export function useBassAuthorityReconciliation({
     })
       .then((outcome) => {
         if (!outcome || outcome.fingerprint !== cacheKey) return;
-        const differences = !outcome.matched && outcome.reason === "no-saved-contract-for-rebuilt-identity" && targetCacheHydrated
+        const differences = !outcome.matched && outcome.reason?.startsWith("no-saved-contract-for-rebuilt-identity") && targetCacheHydrated
           ? describeFingerprintDifferences(digest, getFingerprintInputDigest(scopeId, versionId, authorityCurrentFingerprint))
           : null;
         reconciliationRef.current = {
@@ -215,7 +238,7 @@ export function useBassAuthorityReconciliation({
           reason: outcome.reason || null,
           writeAttempted: outcome.writeAttempted === true,
           differences,
-          authorityStatusAfter: outcome.matched ? "AUTHORITATIVE" : null,
+          authorityStatusAfter: outcome.matched ? "AUTHORITATIVE" : authorityStatus,
           authorityCurrentFingerprintAfter: outcome.matched ? callFingerprint : null,
         });
         safeConsole.log("bass-authority-reconcile-outcome", JSON.stringify({
@@ -229,7 +252,12 @@ export function useBassAuthorityReconciliation({
           differences,
         }));
       })
-      .catch(() => { /* opportunistic: reconciliation never fails the open */ });
+      .catch((error) => {
+        publishBassReconciliationStatus(scopeId, versionId, {
+          ran: true, matched: false, reason: `reconciliation-error: ${error?.message || String(error)}`,
+          authorityStatusAfter: authorityStatus,
+        });
+      });
   }, [
     projectHydrationReady,
     authorityHydrationSettled,

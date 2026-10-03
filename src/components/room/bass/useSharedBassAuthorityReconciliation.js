@@ -19,7 +19,10 @@
 // It calculates nothing, grades nothing, and never writes the P14 target bank
 // (that bank belongs to the Room Designer surface).
 
-import { useMemo } from "react";
+import { useEffect, useMemo } from "react";
+import { readProjectAnalysisCacheRecord } from "@/components/state/projectReadCache";
+import { parseTargetCacheBank } from "@/components/room/bass/bassIdentityReconciliation";
+import { publishBassReconciliationStatus } from "@/components/room/bass/bassReconciliationStatus";
 import { useAppState } from "@/components/AppStateProvider";
 import { useAuthoritativeBassResponse } from "./useAuthoritativeBassResponse";
 import { useCompletedBassAuthority } from "./completedBassResultStore";
@@ -52,6 +55,27 @@ export function useSharedBassAuthorityReconciliation(projectId, versionId) {
   // room-physics worker and never publishes a result.
   const authoritative = useAuthoritativeBassResponse({ appState, frontSubsLive, rearSubsLive });
   const completedBassAuthority = useCompletedBassAuthority(scopeId, scopeVersionId);
+
+  // Observe the same deduplicated durable row even when identity eligibility fails.
+  useEffect(() => {
+    if (!projectId || !versionId) return;
+    let cancelled = false;
+    readProjectAnalysisCacheRecord(projectId, versionId).then((record) => {
+      if (cancelled) return;
+      const bank = parseTargetCacheBank(record?.target_cache);
+      publishBassReconciliationStatus(projectId, versionId, {
+        bassRowReceived: !!record,
+        targetBankReceived: !!record?.target_cache,
+        bankTargetCount: Object.keys(bank.targets).length,
+        bankBaseDesignFingerprint: bank.baseDesignFingerprint,
+      });
+    }).catch((error) => {
+      if (!cancelled) publishBassReconciliationStatus(projectId, versionId, {
+        bassRowReceived: false, reason: `missing bass row: ${error?.message || String(error)}`,
+      });
+    });
+    return () => { cancelled = true; };
+  }, [projectId, versionId]);
 
   const cacheKey = useMemo(
     () => (authoritative.fingerprints ? buildBassResultCacheKey(authoritative.fingerprints.calibration) : null),

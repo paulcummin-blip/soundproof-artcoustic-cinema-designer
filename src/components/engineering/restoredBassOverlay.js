@@ -31,7 +31,7 @@ import {
 import { buildComplianceBassPresentation } from "@/components/room/bass/bassCompliancePresentation";
 import { statesBassResultEntry } from "@/components/engineering/versionedEngineeringAuthority";
 import { summariseEngineeringResults } from "@/components/engineering/engineeringSummaryAuthority";
-import { describeBassReconciliationStaleness } from "@/components/room/bass/bassReconciliationStatus";
+import { describeBassReconciliationStaleness, readBassReconciliationStatus } from "@/components/room/bass/bassReconciliationStatus";
 import {
   LEVEL_MULTIPLIERS,
   PARAM_WEIGHTS,
@@ -119,14 +119,16 @@ export function applyRestoredBassAuthority(summary, { projectId, versionId, comp
     // with the saved ones — "out of date" alone gives the designer nothing to act
     // on.
     const moved = describeBassReconciliationStaleness(projectId, versionId);
+    const reconciliation = readBassReconciliationStatus(projectId, versionId);
+    const diagnosticReason = reconciliation?.reason ? ` Reconciliation: ${reconciliation.reason}.` : "";
     return {
       ...summary,
       bassAuthoritySource: "restored-durable-bass-authority-rejected",
       bassAuthorityCurrent: false,
       bassAuthorityRejectionReason: currentness.reason,
-      bassAuthorityMessage: moved
+      bassAuthorityMessage: (moved
         ? `${SAVED_BASS_OUT_OF_DATE_MESSAGE} Changed since this result: ${moved}.`
-        : SAVED_BASS_OUT_OF_DATE_MESSAGE,
+        : SAVED_BASS_OUT_OF_DATE_MESSAGE) + diagnosticReason,
     };
   }
 
@@ -264,7 +266,13 @@ export function applyRestoredBassAuthority(summary, { projectId, versionId, comp
     parameterAuthority[key] = next;
   }
 
-  if (!overlaid && !authorityRepaired) return summary;
+  if (!overlaid && !authorityRepaired) return {
+    ...summary,
+    bassAuthoritySource: "restored-durable-bass-authority",
+    bassAuthorityCurrent: true,
+    bassAuthorityRejectionReason: null,
+    bassAuthorityMessage: null,
+  };
 
   // Rebuild only the derived rating/report views from the already-published
   // parameter grades. This is not a bass recalculation: it prevents an old
