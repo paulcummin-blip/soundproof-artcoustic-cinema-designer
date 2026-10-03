@@ -202,6 +202,18 @@ export const HIGHLIGHT_PRINT_PRIORITY = Object.freeze([
   'p11',
 ]);
 
+/**
+ * The rows that describe the room and the system the client is buying. They are
+ * never the rows a trimmed table drops: the screen size, the system layout and
+ * the viewing result state what the design is, so every page that quotes them
+ * quotes the same figure. Measured results fill the remaining places.
+ */
+export const HIGHLIGHT_ROOM_FACT_KEYS = Object.freeze([
+  'screen_size',
+  'system_layout',
+  'rp23_viewing',
+]);
+
 /** The order the performance areas are read in, top to bottom. */
 const AREA_ORDER = Object.freeze([
   HIGHLIGHT_AREA.VIEWING,
@@ -242,6 +254,12 @@ export function selectTableRows(rows = [], limit = HIGHLIGHT_DISPLAY_LIMIT) {
     taken.add(row.key);
     chosen.push(row);
   };
+
+  // The room and system facts are carried whatever else is trimmed.
+  for (const row of ranked) {
+    if (chosen.length >= limit) break;
+    if (HIGHLIGHT_ROOM_FACT_KEYS.includes(String(row.key))) take(row);
+  }
 
   // One row per performance area first, so no assessed area disappears.
   const areasTaken = new Set();

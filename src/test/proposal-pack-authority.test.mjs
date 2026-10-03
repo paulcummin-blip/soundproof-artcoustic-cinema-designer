@@ -143,8 +143,11 @@ describe('at a glance page', () => {
       assert.ok(!/published/i.test(text), card.label);
       assert.ok(!/\bRP23 viewing\b/i.test(text), card.label);
       assert.ok(!/auto-calculated/i.test(text), card.label);
-      // No card carries a sentence: a value is a figure, a name or a short label.
-      assert.ok(text.split(/\s+/).length <= 6, `${card.label}: ${text}`);
+      // No card carries a sentence: a value is a figure, a name or a short label,
+      // and its hint is the same kind of fact rather than a line of prose.
+      [card.value, card.hint].filter(Boolean).forEach((field) => {
+        assert.ok(field.split(/\s+/).length <= 6, `${card.label}: ${field}`);
+      });
     });
   });
 
