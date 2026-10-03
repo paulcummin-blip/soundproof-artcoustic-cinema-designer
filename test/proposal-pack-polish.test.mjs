@@ -15,7 +15,7 @@ import {
 import { prepareSectionBody } from '../src/components/proposal/sectionBodyAuthority.js';
 import {
   buildAtAGlanceCards,
-  buildRoomBriefFacts,
+  buildSelectedPackageRows,
   screenStatement,
 } from '../src/components/proposal/print/proposalPackAuthority.js';
 import { imagePagesFor, IMAGES_PER_PAGE } from '../src/components/proposal/print/imagePageLayout.js';
@@ -168,23 +168,83 @@ describe('Screen terminology', () => {
     })).toEqual({ value: '83" 16:9 screen', hint: null });
   });
 
-  it('states the same screen values on every page, briefly on the at a glance page', () => {
+  it('states the screen once, in full, on the combined at a glance page', () => {
     const card = buildAtAGlanceCards({ snapshot: SCREEN_SNAPSHOT, projectName: 'Marquee' })
       .find((entry) => entry.label === 'Screen');
-    const fact = buildRoomBriefFacts(SCREEN_SNAPSHOT).facts
-      .find((entry) => entry.label === 'Screen');
-    // The at a glance card is the short form of the same two values; the room
-    // and brief page keeps the full terminology.
-    expect(card.value).toBe('170" 2.35:1');
-    expect(card.hint).toBe('Viewable image');
-    expect(fact.value).toBe('170" viewable 2.35:1 image');
-    expect(fact.hint).toBe('185" overall screen assembly');
+    expect(card.value).toBe('170" viewable 2.35:1 image');
+    expect(card.hint).toBe('185" overall screen assembly');
   });
 
   it('never states an unlabelled screen size', () => {
     const text = `${screenStatement(PROJECTION_SCREEN).value} ${screenStatement(PROJECTION_SCREEN).hint}`;
     expect(text).toMatch(/viewable/);
     expect(text).toMatch(/overall screen assembly/);
+  });
+});
+
+describe('the at a glance and the room and brief pages are one page', () => {
+  const MARQUEE = {
+    ...SCREEN_SNAPSHOT,
+    project: { project_name: 'Marquee', client_name: '34 AR' },
+    room: {
+      ...SCREEN_SNAPSHOT.room,
+      dimensions: { length_m: 7.3, width_m: 5.2, height_m: 2.8 },
+      seating: { total_seats: 9, row_count: 2 },
+    },
+    system: {
+      configuration: { dolby_config: '9.1.6', total_discrete_channels: 15 },
+      channel_layout: { subwoofer_count: 2 },
+      subwoofer_strategy: { count: 2, models: ['sub4-12'] },
+      product_roles: [
+        { role: 'lcr', role_description: 'Left/Centre/Right (screen wall)', model_label: 'Q6-3' },
+      ],
+    },
+    viewing: {
+      available: true,
+      per_seat: [
+        { horizontal_angle_deg: 44.2 },
+        { horizontal_angle_deg: 51.6 },
+        { horizontal_angle_deg: 62.7 },
+      ],
+      primary_floor: 'L3',
+      project_floor: 'L3',
+      summary: 'Viewing angles calculated for 9 seats. Horizontal viewing angle ranges from 44° to 63°.',
+    },
+  };
+
+  it('no longer ships a separate room and brief page', () => {
+    const page = new URL('../src/components/proposal/print/RoomAndBriefPage.jsx', import.meta.url);
+    expect(fs.existsSync(page)).toBe(false);
+  });
+
+  it('carries the project, room, screen, seating and system facts on one page', () => {
+    const cards = buildAtAGlanceCards({
+      snapshot: MARQUEE, projectName: 'Marquee', projectReference: '34 AR', generatedDate: '2026-10-03',
+    });
+    const labels = cards.map((card) => card.label);
+
+    ['Project', 'Client', 'Dealer', 'Project reference', 'Room size', 'Screen', 'Seating',
+      'Viewing geometry', 'System layout'].forEach((label) => expect(labels).toContain(label));
+
+    // The viewing geometry the page states is the same figure the evidence table
+    // carries, so the two pages cannot disagree.
+    const viewing = cards.find((card) => card.label === 'Viewing geometry');
+    expect(viewing.value).toBe('L3 · 44° to 63°');
+    expect(viewing.hint).toBe('Horizontal viewing angle');
+
+    // Nothing is stated twice and nothing noisy is carried over from the page
+    // this one replaced: no product count, no publication date, no second set of
+    // product cards beside the package table.
+    expect(labels).not.toContain('Loudspeakers');
+    expect(labels).not.toContain('Prepared by');
+    expect(labels).not.toContain('Modelled against');
+  });
+
+  it('states the package once, compactly, as the table on that page', () => {
+    expect(buildSelectedPackageRows(MARQUEE)).toEqual([
+      { role: 'LCR', model: 'Q6-3' },
+      { role: 'Subwoofers', model: '2 × SUB4-12' },
+    ]);
   });
 });
 

@@ -209,54 +209,12 @@ export function roomSizeStatement(room = {}) {
   return { value: cleaned ? `${cleaned} m` : null, hint: 'L × W × H' };
 }
 
-/**
- * The screen as the at-a-glance card states it: the figure the screen is bought
- * by and the format, with the terminology on one short line underneath.
- *
- *   projection: value: '170" 2.35:1'   hint: 'Viewable image'
- *   television: value: '83" 16:9'      hint: 'Nominal size'
- *
- * The full sentence form (screenStatement) stays the authority for the pages
- * that have room for it; this is the same two values, stated briefly.
- */
-export function screenGlanceStatement(screen = {}) {
-  const viewable = Number(screen.viewable_width_inches) || null;
-  const stated = Number(screen.size_inches) || null;
-  const aspect = screen.aspect_ratio ? String(screen.aspect_ratio) : null;
-
-  if (screen.television === true && stated) {
-    return { value: aspect ? `${stated}" ${aspect}` : `${stated}"`, hint: 'Nominal size' };
-  }
-  if (viewable) {
-    return { value: aspect ? `${viewable}" ${aspect}` : `${viewable}"`, hint: 'Viewable image' };
-  }
-  if (stated) {
-    return { value: aspect ? `${stated}" ${aspect}` : `${stated}"`, hint: null };
-  }
-  return { value: null, hint: null };
-}
-
-/** True when a product role is a subwoofer, which has its own card. */
+/** True when a product role is a subwoofer, which is stated on its own row. */
 function isSubwooferRole(role) {
   const key = String(role?.role || '').toLowerCase();
   const description = String(role?.role_description || '').toLowerCase();
   const category = String(role?.category || '').toLowerCase();
   return key === 'subwoofer' || description.includes('subwoofer') || category.includes('subwoofer');
-}
-
-/**
- * The loudspeaker families in the design, one per line, in the design's own
- * order. Subwoofers are excluded: they are stated on their own card.
- */
-export function loudspeakerFamilies(snapshot) {
-  const roles = Array.isArray(snapshot?.system?.product_roles) ? snapshot.system.product_roles : [];
-  const labels = [];
-  for (const role of roles) {
-    if (isSubwooferRole(role)) continue;
-    const label = role?.model_label || role?.model_key;
-    if (label && !labels.includes(label)) labels.push(label);
-  }
-  return labels;
 }
 
 /** The subwoofers as one clean line: "2 × SUB4-12", with the models when mixed. */
@@ -286,26 +244,59 @@ export function subwooferGlanceStatement(system = {}) {
 }
 
 /**
- * The at-a-glance cards: clean project facts only.
+ * The viewing geometry as the at-a-glance card states it: the RP23 level the
+ * design reaches and the horizontal viewing angle the seating actually covers.
+ *
+ *   value: "L3 · 44° to 63°"   hint: "Horizontal viewing angle"
+ *
+ * Read from the published per-seat viewing results the snapshot already carries.
+ * Nothing is measured, converted or re-graded here, and the angles are stated as
+ * whole degrees.
+ */
+export function viewingGlanceStatement(viewing = {}) {
+  const angles = (Array.isArray(viewing.per_seat) ? viewing.per_seat : [])
+    .map((seat) => Number(seat?.horizontal_angle_deg))
+    .filter((angle) => Number.isFinite(angle));
+  if (angles.length === 0) return { value: null, hint: null };
+
+  const minimum = Math.round(Math.min(...angles));
+  const maximum = Math.round(Math.max(...angles));
+  const range = minimum === maximum ? `${minimum}°` : `${minimum}° to ${maximum}°`;
+  const level = viewing.project_floor ? String(viewing.project_floor) : null;
+
+  return {
+    value: level ? `${level} · ${range}` : range,
+    hint: 'Horizontal viewing angle',
+  };
+}
+
+/**
+ * The at-a-glance cards: the essential project facts, the room and screen the
+ * design answers, and the system that has been specified.
  *
  * Each card is a label and its value, with a second line only where it states
  * the same fact more precisely (the axis order, the screen terminology, the row
- * count, the subwoofer models, the viewing standard). Nothing here comments on
- * the design, and no card carries a sentence.
+ * count, the viewing terminology, the discrete channel count). Nothing here
+ * comments on the design, and no card carries a sentence.
  */
 export function buildAtAGlanceCards({ snapshot, projectName, dealerName, projectReference, generatedDate }) {
   const room = snapshot?.room || {};
   const screen = room.screen || {};
   const seating = room.seating || {};
+  const treatment = room.acoustic_treatment || {};
   const system = snapshot?.system || {};
   const configuration = system.configuration || {};
   const version = snapshot?.version || {};
   const size = roomSizeStatement(room);
-  const screenCard = screenGlanceStatement(screen);
-  const speakers = loudspeakerFamilies(snapshot);
-  const subwoofers = subwooferGlanceStatement(system);
+  const screenCard = screenStatement(screen);
+  const viewing = viewingGlanceStatement(snapshot?.viewing || {});
   const seats = Number(seating.total_seats) || null;
   const rows = Number(seating.row_count) || null;
+  const discreteChannels = Number(configuration.total_discrete_channels)
+    || Number(system.channel_layout?.total_discrete)
+    || null;
+  const treatmentQuantity = Number(treatment.quantity) || 0;
+  const treatmentProduct = String(treatment.product || 'Abfuser').split(' ').pop();
 
   const cards = [
     { label: 'Project', value: projectName || statementValue(snapshot?.project?.project_name) || null },
@@ -314,6 +305,12 @@ export function buildAtAGlanceCards({ snapshot, projectName, dealerName, project
       label: 'Dealer',
       value: dealerName || statementValue(snapshot?.project?.dealer_company) || statementValue(snapshot?.dealer?.company_name) || 'Sound Proof',
     },
+    { label: 'Project reference', value: projectReference || null },
+    {
+      label: 'Design version',
+      value: version.name ? `${version.name}${version.number ? ` · V${version.number}` : ''}` : null,
+    },
+    { label: 'Date', value: ukDate(generatedDate) },
     { label: 'Room size', value: size.value, hint: size.hint },
     { label: 'Screen', value: screenCard.value, hint: screenCard.hint },
     {
@@ -321,91 +318,118 @@ export function buildAtAGlanceCards({ snapshot, projectName, dealerName, project
       value: seats ? `${seats} seat${seats === 1 ? '' : 's'}` : null,
       hint: rows ? `${rows} row${rows === 1 ? '' : 's'}` : null,
     },
-    { label: 'System layout', value: configuration.dolby_config || null },
-    { label: 'Loudspeakers', value: speakers.length > 0 ? speakers.join('\n') : null },
-    { label: 'Subwoofers', value: subwoofers.value, hint: subwoofers.hint },
-    { label: 'Project reference', value: projectReference || null },
+    { label: 'Viewing geometry', value: viewing.value, hint: viewing.hint },
     {
-      label: 'Design version',
-      value: version.name ? `${version.name}${version.number ? ` · V${version.number}` : ''}` : null,
+      label: 'System layout',
+      value: configuration.dolby_config || null,
+      hint: discreteChannels ? `${discreteChannels} discrete channels` : null,
     },
-    { label: 'Modelled against', value: 'CEDIA/CTA-RP22', hint: 'RP23' },
-    { label: 'Prepared by', value: dealerName || 'Sound Proof' },
-    { label: 'Date', value: ukDate(generatedDate) },
+    {
+      // Stated only where the design specifies treatment, and by quantity alone:
+      // the explanation belongs to the acoustic treatment page, not to a card.
+      label: 'Acoustic treatment',
+      value: treatment.enabled && treatmentQuantity > 0
+        ? `${treatmentQuantity} ${treatmentProduct} panel${treatmentQuantity === 1 ? '' : 's'}`
+        : null,
+    },
   ];
 
   // A card with no value is left out rather than printed empty.
   return cards.filter((card) => card.value);
 }
 
-/** The room and brief facts, and the product package rows. */
-export function buildRoomBriefFacts(snapshot) {
+/** The channel groups the package is stated by, in design order. */
+const PACKAGE_BUCKETS = Object.freeze([
+  { key: 'lcr', label: 'LCR', roles: Object.freeze(['lcr', 'centre_soundbar']) },
+  { key: 'surround', label: 'Surrounds / wides', roles: Object.freeze(['surround', 'rear_surround', 'front_wide']) },
+  { key: 'overhead', label: 'Overheads', roles: Object.freeze(['overhead']) },
+]);
+
+/**
+ * The channel group a product role belongs to, from its role key where the
+ * snapshot carries one and from its description otherwise, so a snapshot written
+ * before the role keys were stored still groups into the same package rows.
+ */
+const ROLE_GROUP_KEYWORDS = Object.freeze([
+  { key: 'lcr', words: Object.freeze(['left/centre/right', 'centre channel']) },
+  { key: 'overhead', words: Object.freeze(['overhead']) },
+  { key: 'surround', words: Object.freeze(['surround', 'front wide']) },
+]);
+
+function roleGroupKey(role) {
+  const key = String(role?.role || '').toLowerCase();
+  if (key) return key;
+  const description = String(role?.role_description || '').toLowerCase();
+  for (const group of ROLE_GROUP_KEYWORDS) {
+    if (group.words.some((word) => description.includes(word))) return group.key;
+  }
+  return '';
+}
+
+/**
+ * The selected package as a compact table: each channel group and the model
+ * chosen for it, with the subwoofer count on its own row. Read only from the
+ * frozen snapshot's product roles and its subwoofer strategy, so the package is
+ * stated once and never re-listed per channel.
+ */
+export function buildSelectedPackageRows(snapshot) {
+  const system = snapshot?.system || {};
+  const roles = Array.isArray(system.product_roles) ? system.product_roles : [];
+  const grouped = new Set();
+  const rows = [];
+
+  for (const bucket of PACKAGE_BUCKETS) {
+    const models = [];
+    for (const role of roles) {
+      if (isSubwooferRole(role)) continue;
+      if (!bucket.roles.includes(roleGroupKey(role))) continue;
+      grouped.add(role);
+      const label = role?.model_label || role?.model_key;
+      if (label && !models.includes(label)) models.push(label);
+    }
+    if (models.length > 0) rows.push({ role: bucket.label, model: models.join(' + ') });
+  }
+
+  // A role no channel group covers still names its own product.
+  for (const role of roles) {
+    if (grouped.has(role) || isSubwooferRole(role)) continue;
+    const model = role?.model_label || role?.model_key;
+    if (model) rows.push({ role: role?.role_description || role?.role || '', model });
+  }
+
+  const subwoofers = subwooferGlanceStatement(system);
+  if (subwoofers.value) rows.push({ role: 'Subwoofers', model: subwoofers.value });
+
+  return rows.filter((row) => row.role && row.model);
+}
+
+/**
+ * The design brief note: one or two short lines, and only where the design
+ * itself has something to say. The first line is the design question the room
+ * and the seating set, and the second is the room constraint the engineering
+ * summary states. Nothing else is written here, and no number is invented.
+ */
+export function buildDesignBriefNote(snapshot) {
   const room = snapshot?.room || {};
   const screen = room.screen || {};
-  const seating = room.seating || {};
-  const viewing = snapshot?.viewing || {};
-  const treatment = room.acoustic_treatment || {};
-  const system = snapshot?.system || {};
+  const rows = Number(room.seating?.row_count) || 0;
+  const aspect = screen.aspect_ratio ? String(screen.aspect_ratio) : null;
+  const viewable = Number(screen.viewable_width_inches) || 0;
+  const wideScreen = (aspect && aspect.startsWith('2.3')) || viewable >= 150;
 
-  const facts = [
-    {
-      label: 'Room',
-      value: room.dimensions_text || null,
-      hint: room.volume_m3 ? `${room.volume_m3} m³` : null,
-    },
-    {
-      label: 'Room form',
-      value: statementValue(room.classification) || null,
-      hint: statementValue(room.ratio) || null,
-    },
-    {
-      // Stated with the same terminology as the at-a-glance page. The screen
-      // wall construction has its own fact below, so the hint carries the
-      // overall screen assembly instead of repeating it.
-      label: 'Screen',
-      value: screenStatement(screen).value,
-      hint: screenStatement(screen).hint,
-    },
-    {
-      label: 'Seating',
-      value: seating.total_seats
-        ? `${seating.total_seats} seats · ${seating.row_count || 1} rows`
-        : null,
-      hint: seating.row_spacing_m ? `${seating.row_spacing_m}m row spacing` : null,
-    },
-    {
-      label: 'Viewing',
-      value: viewing.available ? viewing.summary : null,
-      hint: viewing.primary_floor ? `Primary seats ${viewing.primary_floor}` : null,
-    },
-    {
-      label: 'Screen wall',
-      value: statementValue(room.screen_wall?.construction_type) || null,
-      hint: statementValue(room.screen_wall?.detail) || null,
-    },
-    {
-      label: 'Acoustic treatment',
-      value: treatment.enabled ? treatment.interpretation : 'None specified',
-      hint: treatment.enabled ? null : 'The room is designed to perform without added treatment.',
-    },
-    {
-      label: 'Room constraint',
-      value: statementValue(room.acoustic_implication) || null,
-      wide: true,
-    },
-    {
-      label: 'System',
-      value: system.configuration?.text || null,
-      wide: true,
-    },
-  ].filter((fact) => fact.value);
+  const lines = [];
+  if (rows >= 2) {
+    lines.push(aspect && wideScreen
+      ? `Two rows and a ${aspect} screen make viewing geometry and seat-to-seat consistency the key design questions.`
+      : 'Two rows make seat-to-seat consistency across the seating area a key design question.');
+  } else if (rows === 1 && aspect && wideScreen) {
+    lines.push(`A single row and a ${aspect} screen put viewing distance at the centre of the design.`);
+  }
 
-  const products = (Array.isArray(system.product_roles) ? system.product_roles : []).map((role) => ({
-    role: role.role_description || role.role || '',
-    model: role.model_label || role.model_key || '',
-  }));
+  const constraint = statementValue(room.acoustic_implication);
+  if (constraint) lines.push(constraint);
 
-  return { facts, products };
+  return lines.slice(0, 2);
 }
 
 export default buildAtAGlanceCards;

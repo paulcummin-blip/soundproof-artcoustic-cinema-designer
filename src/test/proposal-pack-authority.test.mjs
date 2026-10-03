@@ -18,8 +18,9 @@ import {
   APPENDIX_PAGE,
   METHOD_PAGE,
   buildAtAGlanceCards,
+  buildDesignBriefNote,
   buildEvidenceCards,
-  buildRoomBriefFacts,
+  buildSelectedPackageRows,
   buildSystemHeadline,
   parameterReferenceList,
   ukDate,
@@ -53,15 +54,22 @@ const SNAPSHOT = {
     configuration: {
       dolby_config: '9.4.6',
       text: '9.4.6 Dolby Atmos configuration (9 bed channels, 4 subwoofers, 6 overhead channels)',
+      total_discrete_channels: 15,
     },
     channel_layout: { total_discrete: 15, subwoofer_count: 4 },
     product_roles: [
-      { role_description: 'Left/Centre/Right (screen wall)', model_label: 'EVOLVE 2-1' },
-      { role_description: 'Side surround', model_label: 'SL-EVOLVE 1-1' },
-      { role_description: 'Subwoofer', model_label: 'SUB2-12' },
+      { role: 'lcr', role_description: 'Left/Centre/Right (screen wall)', model_label: 'EVOLVE 2-1' },
+      { role: 'surround', role_description: 'Side surround', model_label: 'SL-EVOLVE 1-1' },
+      { role: 'subwoofer', role_description: 'Subwoofer', model_label: 'SUB2-12' },
     ],
   },
-  viewing: { available: true, summary: 'L4 · 55.5°', primary_floor: 'L4', project_floor: 'L4' },
+  viewing: {
+    available: true,
+    per_seat: [{ horizontal_angle_deg: 47.4 }, { horizontal_angle_deg: 61.8 }],
+    primary_floor: 'L4',
+    project_floor: 'L4',
+    summary: 'Viewing angles calculated for 2 seats. Horizontal viewing angle ranges from 47° to 62°.',
+  },
   products: [{ model_key: 'evolve-2-1' }, { model_key: 'sl-evolve-1-1' }],
 };
 
@@ -92,55 +100,61 @@ describe('at a glance page', () => {
       'Project',
       'Client',
       'Dealer',
+      'Project reference',
+      'Design version',
+      'Date',
       'Room size',
       'Screen',
       'Seating',
+      'Viewing geometry',
       'System layout',
-      'Loudspeakers',
-      'Subwoofers',
-      'Project reference',
-      'Design version',
-      'Modelled against',
-      'Prepared by',
-      'Date',
     ].forEach((label) => assert.ok(byLabel.has(label), label));
   });
 
-  it('states the assessment basis, the preparing party and the date', () => {
-    assert.equal(byLabel.get('Modelled against').value, 'CEDIA/CTA-RP22');
-    assert.equal(byLabel.get('Modelled against').hint, 'RP23');
-    assert.equal(byLabel.get('Prepared by').value, 'Ribble AV');
-    assert.equal(byLabel.get('Date').value, '14/09/2026');
+  it('states the project reference, the design version and the date', () => {
+    assert.equal(byLabel.get('Project reference').value, 'LH-001');
     assert.equal(byLabel.get('Design version').value, 'Current Design · V1');
+    assert.equal(byLabel.get('Date').value, '14/09/2026');
+  });
+
+  it('states the room, screen, seating and viewing geometry as facts', () => {
+    assert.equal(byLabel.get('Room size').value, '7.0 × 5.0 × 2.6 m');
+    assert.equal(byLabel.get('Room size').hint, 'L × W × H');
+    // The canonical screen wording is the page's only screen statement: the
+    // viewable image the screen is designed by, and the overall assembly.
+    assert.equal(byLabel.get('Screen').value, '147" viewable 16:9 image');
+    assert.equal(byLabel.get('Screen').hint, '169" overall screen assembly');
+    assert.equal(byLabel.get('Seating').value, '8 seats');
+    assert.equal(byLabel.get('Seating').hint, '2 rows');
+    assert.equal(byLabel.get('Viewing geometry').value, 'L4 · 47° to 62°');
+    assert.equal(byLabel.get('Viewing geometry').hint, 'Horizontal viewing angle');
+  });
+
+  it('states the system layout and how many channels it carries', () => {
+    assert.equal(byLabel.get('System layout').value, '9.4.6');
+    assert.equal(byLabel.get('System layout').hint, '15 discrete channels');
   });
 
   it('states each fact briefly, with no commentary inside a card', () => {
-    assert.equal(byLabel.get('Room size').value, '7.0 × 5.0 × 2.6 m');
-    assert.equal(byLabel.get('Room size').hint, 'L × W × H');
-    assert.equal(byLabel.get('Screen').value, '147" 16:9');
-    assert.equal(byLabel.get('Screen').hint, 'Viewable image');
-    assert.equal(byLabel.get('Seating').value, '8 seats');
-    assert.equal(byLabel.get('Seating').hint, '2 rows');
-    assert.equal(byLabel.get('System layout').value, '9.4.6');
+    // Treatment is not specified in this design, so the card is left out rather
+    // than printing a sentence about what is absent.
+    assert.ok(!byLabel.has('Acoustic treatment'), 'Acoustic treatment');
 
-    // No card carries a sentence, a count of products, a publication date or a
-    // room classification: a fact card states its fact and nothing else.
+    // No card carries a sentence, a count of products, a publication date, a
+    // room classification or an explanation: a fact card states its fact only.
     cards.forEach((card) => {
       const text = `${card.value} ${card.hint || ''}`;
       assert.ok(!/rectangular room|near-cubic|golden ratio/i.test(text), card.label);
       assert.ok(!/products specified/i.test(text), card.label);
       assert.ok(!/published/i.test(text), card.label);
+      assert.ok(!/auto-calculated/i.test(text), card.label);
+      assert.ok(!/none specified/i.test(text), card.label);
       assert.ok(!/\bRP23 viewing\b/i.test(text), card.label);
     });
   });
 
-  it('names the loudspeaker families on their own card, one per line', () => {
-    assert.equal(byLabel.get('Loudspeakers').value, 'EVOLVE 2-1\nSL-EVOLVE 1-1');
+  it('names the speaker families in one headline, in the design order', () => {
     assert.equal(buildSystemHeadline(SNAPSHOT), 'EVOLVE 2-1 · SL-EVOLVE 1-1 · SUB2-12');
-  });
-
-  it('states the subwoofers as a count and their model', () => {
-    assert.equal(byLabel.get('Subwoofers').value, '4 × SUB2-12');
   });
 
   it('never prints an empty card and never names the platform', () => {
@@ -149,25 +163,44 @@ describe('at a glance page', () => {
   });
 });
 
-describe('room and brief page', () => {
-  const { facts, products } = buildRoomBriefFacts(SNAPSHOT);
-  const byLabel = new Map(facts.map((fact) => [fact.label, fact]));
-
-  it('states the room, screen, seating, viewing and package', () => {
-    ['Room', 'Room form', 'Screen', 'Seating', 'Viewing', 'Screen wall', 'System'].forEach((label) => {
-      assert.ok(byLabel.has(label), label);
-    });
-    assert.equal(byLabel.get('Seating').value, '8 seats · 2 rows');
-    assert.equal(products.length, 3);
-    assert.equal(products[0].model, 'EVOLVE 2-1');
+describe('the package and the brief on the same page', () => {
+  it('states the package once, grouped by channel, in design order', () => {
+    assert.deepEqual(buildSelectedPackageRows(SNAPSHOT), [
+      { role: 'LCR', model: 'EVOLVE 2-1' },
+      { role: 'Surrounds / wides', model: 'SL-EVOLVE 1-1' },
+      { role: 'Subwoofers', model: '4 × SUB2-12' },
+    ]);
   });
 
-  it('records the room constraint rather than hiding it', () => {
-    assert.ok(byLabel.get('Room constraint').value.includes('modal'));
+  it('groups a snapshot written before the role keys were stored the same way', () => {
+    const legacy = {
+      ...SNAPSHOT,
+      system: {
+        ...SNAPSHOT.system,
+        product_roles: [
+          { role_description: 'Left/Centre/Right (screen wall)', model_label: 'EVOLVE 2-1' },
+          { role_description: 'Side surround', model_label: 'SL-EVOLVE 1-1' },
+          { role_description: 'Overhead/height', model_label: 'ARCHITECT 2-1' },
+        ],
+      },
+    };
+    assert.deepEqual(buildSelectedPackageRows(legacy).map((row) => row.role), [
+      'LCR',
+      'Surrounds / wides',
+      'Overheads',
+      'Subwoofers',
+    ]);
   });
 
-  it('says so plainly when no treatment is specified', () => {
-    assert.equal(byLabel.get('Acoustic treatment').value, 'None specified');
+  it('states the design question the seating sets, and the room constraint', () => {
+    const note = buildDesignBriefNote(SNAPSHOT);
+    assert.equal(note.length, 2);
+    assert.ok(/two rows/i.test(note[0]));
+    assert.ok(/modal/i.test(note[1]));
+  });
+
+  it('writes no note at all when the design has nothing to say', () => {
+    assert.deepEqual(buildDesignBriefNote({}), []);
   });
 });
 

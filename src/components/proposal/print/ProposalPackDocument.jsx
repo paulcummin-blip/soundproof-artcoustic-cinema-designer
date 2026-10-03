@@ -9,8 +9,8 @@
  *   - the report's own section set is the structure authority: one page per
  *     section type, in report order, so a duplicated or legacy section can
  *     never print twice.
- *   - the designed front pages (at a glance, the room and the brief, method) and
- *     the method notes are built from the frozen engineering snapshot and fixed
+ *   - the designed front pages (at a glance, method) and the method notes are
+ *     built from the frozen engineering snapshot and fixed
  *     approved copy. They are not AI-written.
  *   - every page is numbered, and every page starts on its own page when
  *     printed.
@@ -25,7 +25,6 @@ import ProjectImagesBlock, { projectGalleryImages } from '@/components/proposal/
 import ProjectImagesPage from '@/components/proposal/print/ProjectImagesPage';
 import { imagePagesFor } from '@/components/proposal/print/imagePageLayout';
 import AtAGlancePage from '@/components/proposal/print/AtAGlancePage';
-import RoomAndBriefPage from '@/components/proposal/print/RoomAndBriefPage';
 import MethodPage from '@/components/proposal/print/MethodPage';
 import AppendixPage from '@/components/proposal/print/AppendixPage';
 import ProposalPageHeader from '@/components/proposal/print/ProposalPageHeader';
@@ -34,7 +33,6 @@ import ProposalPackStyles from '@/components/proposal/print/ProposalPackStyles';
 import {
   buildAtAGlanceCards,
   buildEvidenceCards,
-  buildRoomBriefFacts,
   statementValue,
 } from '@/components/proposal/print/proposalPackAuthority';
 import { getSectionsForProposalType } from '@/components/proposal/proposalSections';
@@ -73,11 +71,7 @@ export default function ProposalPackDocument({
   const glanceCards = isDesignedPack
     ? buildAtAGlanceCards({ snapshot, projectName, dealerName, projectReference, generatedDate })
     : [];
-  const { facts, products } = isDesignedPack
-    ? buildRoomBriefFacts(snapshot)
-    : { facts: [], products: [] };
   const gallery = projectGalleryImages(projectImages);
-  const editorialImageUrl = gallery[0]?.asset?.file_url || null;
   const hasImagesSection = canonical.some((def) => def.type === 'room_images');
 
   // Page order, with the numbers assigned as the pages are composed.
@@ -96,17 +90,6 @@ export default function ProposalPackDocument({
         dealerName={dealerName}
         projectReference={projectReference}
         generatedDate={generatedDate}
-      />
-    );
-  }
-
-  if (facts.length > 0 || products.length > 0) {
-    pages.push(
-      <RoomAndBriefPage
-        key="room"
-        number={takeNumber()}
-        snapshot={snapshot}
-        editorialImageUrl={editorialImageUrl}
       />
     );
   }
