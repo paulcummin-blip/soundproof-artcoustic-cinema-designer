@@ -165,7 +165,7 @@ check("accepted restored bass carries non-zero score multipliers", () => {
   assert.equal(restored.bassAuthorityCurrent, true);
   assert.ok(restored.parameterAuthority.p14.multiplier > 0);
   assert.ok(restored.parameterAuthority.p18.multiplier > 0);
-  assert.ok(restored.parameterAuthority.p19.multiplier > 0);
+  assert.ok(restored.parameterAuthority.p19.multiplier > 0, JSON.stringify(restored.parameterAuthority.p19));
   assert.ok(restored.parameterAuthority.p20.seats.s1.multiplier > 0);
   assert.ok(restored.parameterAuthority.p20.seats.s2.multiplier > 0);
 });
