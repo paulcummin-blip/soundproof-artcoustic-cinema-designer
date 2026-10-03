@@ -12,6 +12,7 @@ import { resolveBassLifecycleState, BASS_LIFECYCLE_STATE, BASS_LIFECYCLE_COPY, B
 import { useOptimiseWorkflowState } from "./optimiseWorkflow/optimiseWorkflowStore";
 import { createDiagToken, recordDiagStage } from "./bassDiagTokenTrace";
 import { computeBaseDesignFingerprint, buildP14TargetKey, buildP14TargetCombinations } from "./p14TargetDefinitions";
+import { useBassAuthorityReconciliation } from "./useBassAuthorityReconciliation";
 import { useTargetCacheEntry, useTargetCacheProgress, useTargetBankIdentity, clearTargetCacheForDesign, hydrateTargetCache, setTargetCacheEntry, flushTargetCachePersistence, useRestoreLock, clearRestoreLock, getRestoreLock, getTargetBankSnapshot } from "./p14TargetCache";
 import { resolveBankIdentityCoherence, resolveLifecycleWithBankIdentity, shouldProtectBankFromSeed } from "./bankIdentityCoherence";
 import { resolveRestoredAuthorityRebuild } from "./bda/restoreRecoveryAuthority";
@@ -205,6 +206,10 @@ export default function BassBackgroundAnalysisOwner({ children, scopeId = "free"
     return buildP14TargetKey(requested.p14TargetBasis, requested.requestedLevel);
   }, [requested.p14TargetBasis, requested.requestedLevel]);
 
+  // Identity readiness, identity stability and the bass-authority
+  // reconciliation effect all live in useBassAuthorityReconciliation
+  // (called below, after the calculation state it depends on is known).
+
   // The eight-target acoustic family is independent of the P18 grading view.
   // Minimum/Recommended P18 is recomputed from achieved extension at display
   // time, so changing that selector neither rebuilds nor restarts this queue.
@@ -354,6 +359,41 @@ export default function BassBackgroundAnalysisOwner({ children, scopeId = "free"
       || lifecycle.status === "queued"
       || lifecycle.status === "calculating"
     );
+
+  // ── Bass authority reconciliation — the missing restore step ──────────
+  // Once the design is fully hydrated and its identity has been stable across
+  // two settled renders, the identity is rebuilt from THAT design and compared
+  // against the saved contracts (completed snapshot map first, then every
+  // contract in the P14 target bank). A match promotes the saved contract to
+  // CURRENT/AUTHORITATIVE and rewrites the row's current_fingerprint, so
+  // reports, the Design Rating and the P14/P18/P19/P20 badges read a current
+  // authority without calculating anything. No match keeps the authority stale
+  // and records which identity inputs moved. A stale decision can no longer be
+  // taken from a fingerprint produced before hydration completed.
+  const { identityInputsReady, identityStable } = useBassAuthorityReconciliation({
+    scopeId,
+    versionId,
+    projectHydrationReady: isProjectHydrationReady,
+    authorityHydrationSettled: bassAuthorityHydrationSettled,
+    targetCacheHydrated,
+    cacheKey,
+    baseDesignFingerprint,
+    fingerprints,
+    fingerprintInputs,
+    requested,
+    targetKey,
+    roomDims,
+    rspPosition,
+    seatingPositions,
+    sources,
+    usableLfHz: designEqSystemLimits?.usableLfHz,
+    optimisationTransitionHz,
+    optimiserVersions: BASS_OPTIMISER_VERSIONS,
+    authorityStatus: completedBassAuthority?.authorityStatus || null,
+    authorityCurrentFingerprint: completedBassAuthority?.currentFingerprint || null,
+    manualRequestActive: !!manualAnalysisRequest,
+    calculationInProgress,
+  });
 
   const placementPreviewActive = hasPublishedContract
     && publishedContractIsStale
@@ -560,8 +600,14 @@ export default function BassBackgroundAnalysisOwner({ children, scopeId = "free"
     // design. Compare the published contract's baseDesign fingerprint against
     // the current baseDesignFingerprint. Old contracts without baseDesign fall
     // back to the target-specific comparison (preserves existing behaviour).
+    // Guardrail: a stale decision is never taken from a fingerprint produced
+    // before hydration completed, or from an identity that has not been observed
+    // stable across two settled renders. This is what stops a false key being
+    // written from unsettled inputs and then restored as permanent "out of date".
+    const identityDecisionEligible = isProjectHydrationReady && identityInputsReady && identityStable;
     const observedBaseDesign = completedBassAuthority?.contract?.fingerprints?.baseDesign || null;
-    const physicalDesignChanged = bassAuthorityHydrationSettled
+    const physicalDesignChanged = identityDecisionEligible
+      && bassAuthorityHydrationSettled
       && !!baseDesignFingerprint
       && (observedBaseDesign
         ? observedBaseDesign !== baseDesignFingerprint
@@ -583,10 +629,15 @@ export default function BassBackgroundAnalysisOwner({ children, scopeId = "free"
       && !manualAnalysisRequest
       && completedBassAuthority?.authorityStatus === BASS_AUTHORITY_STATUS.UPDATING
     ) {
-      setColdReloadRecovered(true);
       if (completedBassAuthority.contract) {
-        markBassAuthorityStale(scopeId, versionId, cacheKey);
+        // Only write the current key once the identity itself is eligible —
+        // this path persists a fingerprint just like the stale path.
+        if (identityDecisionEligible) {
+          setColdReloadRecovered(true);
+          markBassAuthorityStale(scopeId, versionId, cacheKey);
+        }
       } else {
+        setColdReloadRecovered(true);
         markBassAuthorityBlocked(scopeId, versionId);
       }
     }
@@ -630,6 +681,9 @@ export default function BassBackgroundAnalysisOwner({ children, scopeId = "free"
     manualAnalysisRequest,
     manualRequestMatchesCurrent,
     OPTIMISER_VERSION_SIGNATURE,
+    isProjectHydrationReady,
+    identityInputsReady,
+    identityStable,
   ]);
 
   // FIX 2: Restore lock release — when coherence is observed after a restore

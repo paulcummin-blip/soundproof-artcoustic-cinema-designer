@@ -14,6 +14,7 @@ import {
 } from "@/components/room/bass/canonicalBassResult";
 import { buildCurveSignature } from "@/components/room/bass/bassResultAuthority";
 import { cloneCorrectionTrace } from "@/components/room/bass/correctionTraceAuthority";
+import { findSavedContractForFingerprint } from "@/components/room/bass/bassIdentityReconciliation";
 
 export { COMPLETED_BASS_CACHE_VERSION };
 
@@ -490,10 +491,20 @@ export function buildPersistedBassAuthority(existing, currentFingerprint, contra
       completedByFingerprint[compact.job.resultFingerprint] = compact;
     }
   }
-  const bounded = Object.fromEntries(Object.entries(completedByFingerprint)
-    .sort(([, left], [, right]) => Number(right?.job?.completedAtMs || 0) - Number(left?.job?.completedAtMs || 0))
-    .slice(0, 3));
+  // The snapshot map stays bounded, but the CURRENT fingerprint's contract is
+  // never evicted by the cap. The P14 target bank in the same cache record still
+  // holds every verified contract, and a restore must be able to reconcile the
+  // row back to CURRENT — a cap that hides the matching contract made a valid
+  // saved result permanently invisible.
+  const MAX_COMPLETED_SNAPSHOTS = 8;
   const fingerprint = currentFingerprint || compact?.job?.resultFingerprint || previous.currentFingerprint || null;
+  const orderedKeys = Object.keys(completedByFingerprint)
+    .sort((left, right) => Number(completedByFingerprint[right]?.job?.completedAtMs || 0) - Number(completedByFingerprint[left]?.job?.completedAtMs || 0));
+  const keptKeys = orderedKeys.slice(0, MAX_COMPLETED_SNAPSHOTS);
+  if (fingerprint && completedByFingerprint[fingerprint] && !keptKeys.includes(fingerprint)) {
+    keptKeys[keptKeys.length - 1] = fingerprint;
+  }
+  const bounded = Object.fromEntries(keptKeys.map((key) => [key, completedByFingerprint[key]]));
   const matching = fingerprint ? bounded[fingerprint] || null : null;
   return {
     version: COMPLETED_BASS_CACHE_VERSION,
@@ -536,7 +547,7 @@ export function buildHydratedPersistedWrapper(record) {
  * Cache isolation: records without the correct instanceAuthorityVersion are
  * treated as stale and rejected. Old CFG-keyed results always miss.
  */
-export function resolvePersistedBassAuthority(projectId, persisted) {
+export function resolvePersistedBassAuthority(projectId, persisted, { bankTargets = null } = {}) {
   const state = persisted && typeof persisted === "object" ? persisted : {};
 
   // Cache isolation: reject records without the current cache, instance, and metric generations.
@@ -568,7 +579,23 @@ export function resolvePersistedBassAuthority(projectId, persisted) {
     )
   );
 
-  const matchingCurrent = currentFingerprint ? validSnapshots[currentFingerprint] || null : null;
+  const snapshotCurrent = currentFingerprint ? validSnapshots[currentFingerprint] || null : null;
+  // Bank rescue — consult target_cache.targets before declaring anything stale.
+  // The completed-snapshot map is capped, but the P14 target bank in the SAME
+  // cache record holds every verified contract for this design. A persisted
+  // current_fingerprint the bank still holds is a real saved contract: the
+  // parent row's stale/updating flag is metadata written when the identity was
+  // produced, not evidence that the design moved on.
+  const bankCandidate = !snapshotCurrent && currentFingerprint
+    ? findSavedContractForFingerprint({ bankTargets, fingerprint: currentFingerprint }).contract
+    : null;
+  const bankCurrent = bankCandidate
+    && bankCandidate.instanceAuthorityVersion === INSTANCE_AUTHORITY_VERSION
+    && bankCandidate.version === BASS_ANALYSIS_CONTRACT_VERSION
+    && bankCandidate.metricSchemaVersion === RP22_BASS_METRIC_SCHEMA_VERSION
+    ? bankCandidate
+    : null;
+  const matchingCurrent = snapshotCurrent || bankCurrent || null;
   // Reconcile contradictory parent metadata on hydration. A matching child
   // that independently satisfies the full authoritative contract must win
   // over a stale/updating parent flag; otherwise an already-complete result
@@ -625,6 +652,8 @@ export function resolvePersistedBassAuthority(projectId, persisted) {
     status: isCurrentAuthority ? "complete" : (effectiveStatus === "uncalculated" && !structurallyComplete ? "uncalculated" : effectiveStatus === "stale" ? "stale" : "updating"),
     authorityStatus,
     currentFingerprint,
+    // Which saved store the current authority came from — proof for diagnostics.
+    authoritySource: snapshotCurrent ? "completed_by_fingerprint" : (bankCurrent ? "target_cache" : null),
     contract: structurallyComplete ? contract : null,
     structurallyComplete,
     authoritative,

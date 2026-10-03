@@ -56,7 +56,7 @@ function projectKey(projectId, versionId) { return bassCacheKey(projectId, versi
 function ensureCache(projectId, versionId) {
   const key = projectKey(projectId, versionId);
   if (!cacheByProject.has(key)) {
-    cacheByProject.set(key, { metricSchemaVersion: RP22_BASS_METRIC_SCHEMA_VERSION, baseDesignFingerprint: null, targets: {} });
+    cacheByProject.set(key, { metricSchemaVersion: RP22_BASS_METRIC_SCHEMA_VERSION, baseDesignFingerprint: null, targets: {}, fingerprintDigests: {} });
   }
   return cacheByProject.get(key);
 }
@@ -352,6 +352,41 @@ export function getTargetBankIdentity(projectId, versionId) {
   };
 }
 
+// ── Fingerprint-input digests ────────────────────────────────────────────
+// A named, rounded copy of the inputs behind one result fingerprint, kept
+// alongside the bank. It is a DIAGNOSTIC record only — never an authority and
+// never used for matching. Its purpose is that a future genuine mismatch can
+// name the input that moved ("subwoofer layout changed") instead of only saying
+// "out of date". Digests are per identity and survive bank resets.
+const MAX_FINGERPRINT_DIGESTS = 8;
+
+export function setFingerprintInputDigest(projectId, versionId, fingerprint, digest) {
+  if (!fingerprint || !digest) return false;
+  const cache = ensureCache(projectId, versionId);
+  const digests = cache.fingerprintDigests || {};
+  const previous = digests[fingerprint];
+  if (previous && JSON.stringify(previous.values) === JSON.stringify(digest)) return false;
+  const next = {
+    ...digests,
+    [fingerprint]: { values: digest, storedAtMs: Date.now() },
+  };
+  const keys = Object.keys(next)
+    .sort((left, right) => Number(next[right]?.storedAtMs || 0) - Number(next[left]?.storedAtMs || 0));
+  if (keys.length > MAX_FINGERPRINT_DIGESTS) {
+    keys.slice(MAX_FINGERPRINT_DIGESTS).forEach((key) => { delete next[key]; });
+  }
+  cache.fingerprintDigests = next;
+  notify();
+  scheduleSync(projectId, versionId, {});
+  return true;
+}
+
+export function getFingerprintInputDigest(projectId, versionId, fingerprint) {
+  if (!fingerprint) return null;
+  const cache = ensureCache(projectId, versionId);
+  return cache.fingerprintDigests?.[fingerprint]?.values || null;
+}
+
 /**
  * Restore a previously-captured target bank snapshot into the cache for the
  * given baseDesignFingerprint. Used by Restore Previous Design (Fix 2) so the
@@ -382,7 +417,7 @@ export async function hydrateTargetCache(projectId, versionId) {
     if (!record?.target_cache) return;
     const stored = typeof record.target_cache === 'string' ? JSON.parse(record.target_cache) : record.target_cache;
     if (!stored || stored.metricSchemaVersion !== RP22_BASS_METRIC_SCHEMA_VERSION || !stored.baseDesignFingerprint) {
-      cacheByProject.set(key, { metricSchemaVersion: RP22_BASS_METRIC_SCHEMA_VERSION, baseDesignFingerprint: null, targets: {} });
+      cacheByProject.set(key, { metricSchemaVersion: RP22_BASS_METRIC_SCHEMA_VERSION, baseDesignFingerprint: null, targets: {}, fingerprintDigests: {} });
       notify();
       return;
     }
@@ -402,6 +437,7 @@ export async function hydrateTargetCache(projectId, versionId) {
       metricSchemaVersion: RP22_BASS_METRIC_SCHEMA_VERSION,
       baseDesignFingerprint: stored.baseDesignFingerprint,
       targets: stored.targets || {},
+      fingerprintDigests: stored.fingerprintDigests || {},
     });
     persistedSignatures.set(key, JSON.stringify(cacheByProject.get(key)));
     notify();

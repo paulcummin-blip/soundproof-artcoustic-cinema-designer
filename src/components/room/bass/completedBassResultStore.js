@@ -20,6 +20,7 @@ import { assertNotAuthoritativeReadOnly } from "@/components/state/authoritative
 import { hydrateRecommendation } from "@/components/recommendationEngine/recommendationPersistence";
 import { queueBassAuthorityWrite, resetBassAuthorityWriteQueue } from "./bassAuthorityWriteQueue";
 import { readProjectAnalysisCacheRecord } from "@/components/state/projectReadCache";
+import { findSavedContractForFingerprint, parseTargetCacheBank } from "./bassIdentityReconciliation";
 
 export {
   BASS_AUTHORITY_STATUS,
@@ -586,7 +587,11 @@ export async function hydrateCompletedBassAuthority(projectId, versionId, { forc
   try {
     const record = await readProjectAnalysisCacheRecord(projectId, versionId, { force });
     const persisted = buildHydratedPersistedWrapper(record);
-    const next = resolvePersistedBassAuthority(key, persisted);
+    // The SAME cache record carries the P14 target bank. Pass it so a
+    // current_fingerprint the capped completed-snapshot map no longer holds is
+    // still recognised as a saved contract for this design instead of stale.
+    const bank = parseTargetCacheBank(record?.target_cache);
+    const next = resolvePersistedBassAuthority(key, persisted, { bankTargets: bank.targets });
     if (current?.authoritative && current?.contract && !next?.authoritative) {
       return current;
     }
@@ -651,6 +656,83 @@ export function useCompletedBassAuthority(projectId, versionId) {
 
 export function useCompletedBassContract(projectId, versionId) {
   return useCompletedBassAuthority(projectId, versionId).contract;
+}
+
+/**
+ * Reconcile the persisted bass authority against the identity REBUILT from the
+ * fully hydrated design.
+ *
+ * This is the restore step the persisted row could never perform on its own: the
+ * row stores a fingerprint, not the design inputs, so only a live identity can
+ * prove whether a saved contract still describes the design being opened. On a
+ * match the saved contract is promoted to CURRENT/AUTHORITATIVE and the row is
+ * rewritten with status complete and current_fingerprint = the matched contract,
+ * so reports, the Design Rating and the P14/P18/P19/P20 badges read a current
+ * authority on this and every future open.
+ *
+ * Nothing is calculated, regraded, or recomputed — the saved contract is used
+ * exactly as stored. On no match the authority stays stale and the caller can
+ * report which inputs moved (from the stored input digest).
+ *
+ * Match order (first match wins):
+ *   1. completed_by_fingerprint[rebuilt fingerprint]
+ *   2. the P14 target bank in the same cache record (any target key) — the bank
+ *      holds every verified contract for the design, including any the capped
+ *      completed map has evicted.
+ *
+ * @returns {Promise<{ matched: boolean, fingerprint: string|null, source: string|null, reason: string|null }>}
+ */
+export async function reconcileBassAuthorityWithPersisted(projectId, versionId, { identity = null, requestedP14Identity = null } = {}) {
+  assertNotAuthoritativeReadOnly('reconcileBassAuthorityWithPersisted', 'reconcile-bass-authority');
+  const key = projectKey(projectId, versionId);
+  const fingerprint = identity?.cacheKey || null;
+  if (key === "free::free") return { matched: false, fingerprint, source: null, reason: "free-scope" };
+  if (!fingerprint) return { matched: false, fingerprint: null, source: null, reason: "missing-rebuilt-identity" };
+
+  const current = memoryByProject.get(key);
+  if (current?.authoritative && current?.contract && current?.currentFingerprint === fingerprint) {
+    return { matched: true, fingerprint, source: "memory", reason: null, contract: current.contract };
+  }
+
+  let record = null;
+  try {
+    record = await readProjectAnalysisCacheRecord(projectId, versionId);
+  } catch (e) {
+    return { matched: false, fingerprint, source: null, reason: "cache-record-unavailable" };
+  }
+  const bank = parseTargetCacheBank(record?.target_cache);
+  const match = findSavedContractForFingerprint({
+    completedByFingerprint: record?.completed_by_fingerprint || {},
+    bankTargets: bank.targets,
+    fingerprint,
+  });
+  if (!match?.contract) {
+    return {
+      matched: false,
+      fingerprint,
+      source: null,
+      reason: "no-saved-contract-for-rebuilt-identity",
+      persistedFingerprint: record?.current_fingerprint || null,
+      bankBaseDesignFingerprint: bank.baseDesignFingerprint || null,
+      bankTargetCount: Object.keys(bank.targets || {}).length,
+    };
+  }
+  // Validated by the SAME gates as any publication: authoritative, graph
+  // complete, and matching the P14 target currently selected.
+  const published = publishCachedCompactBassContract(projectId, versionId, match.contract, fingerprint, requestedP14Identity);
+  if (!published) {
+    return { matched: false, fingerprint, source: match.source, reason: "saved-contract-rejected-by-authority-gate" };
+  }
+  // Durable: status complete + current_fingerprint = the matched contract.
+  await syncCachedCompactBassAuthority(projectId, versionId, match.contract);
+  return {
+    matched: true,
+    fingerprint,
+    source: match.source,
+    targetKey: match.targetKey || null,
+    reason: null,
+    contract: match.contract,
+  };
 }
 
 /**
