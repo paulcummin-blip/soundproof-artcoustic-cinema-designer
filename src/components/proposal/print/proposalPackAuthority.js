@@ -166,7 +166,7 @@ export function buildEvidenceCards(rows, sectionType) {
   const keys = STRUCTURE_PARAMETER_KEYS[sectionType];
   if (!keys) return [];
   const byKey = new Map(
-    buildHighlightDisplayRows(rows, { limit: keys.length }).map((row) => [row.key, row])
+    buildHighlightDisplayRows(rows, { limit: rows.length || keys.length }).map((row) => [row.key, row])
   );
   return keys.map((key) => byKey.get(key)).filter(Boolean);
 }
