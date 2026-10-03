@@ -568,6 +568,8 @@ export default function ProposalEditor() {
     proposal,
     sections,
     projectName: projectContext.projectName,
+    dealerName: projectContext.dealerName,
+    projectReference: projectContext.projectReference,
   });
 
   // ── Render ──

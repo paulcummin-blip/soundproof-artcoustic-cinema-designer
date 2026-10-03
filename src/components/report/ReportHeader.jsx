@@ -42,8 +42,24 @@ export default function ReportHeader({
     aimToggles,
     exportDisabled = false,
     exportDisabledMessage = "Bass analysis updating",
+    // The report's own export filename. The stalled-export fallback prints too,
+    // so it must print under the same name rather than the browser tab's title.
+    printTitle = null,
 }) {
     const navigate = useNavigate();
+    const fallbackTitleRef = React.useRef(null);
+
+    // Restore the tab's own title once the fallback print dialog has closed.
+    React.useEffect(() => {
+        const restore = () => {
+            if (fallbackTitleRef.current !== null) {
+                document.title = fallbackTitleRef.current;
+                fallbackTitleRef.current = null;
+            }
+        };
+        window.addEventListener('afterprint', restore);
+        return () => window.removeEventListener('afterprint', restore);
+    }, []);
 
     const urlProjectId = typeof window !== 'undefined'
         ? new URLSearchParams(window.location.search).get('projectId')
@@ -112,6 +128,10 @@ export default function ReportHeader({
             setIsPrinting(false);
             setExportStatus("Export stalled — opening Print fallback…");
             try {
+                if (printTitle && fallbackTitleRef.current === null) {
+                    fallbackTitleRef.current = document.title;
+                    document.title = printTitle;
+                }
                 alert("PDF export stalled. We'll open Print instead. In the print window choose 'Save as PDF'.");
                 setTimeout(() => window.print(), 250);
             } catch (err) {

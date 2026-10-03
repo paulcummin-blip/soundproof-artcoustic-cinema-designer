@@ -110,6 +110,19 @@ function RP22ReportInner() {
     const [reportVersionName, setReportVersionName] = useState(null);
     const [reportHydrating, setReportHydrating] = useState(true);
     const [reportReadyProjectId, setReportReadyProjectId] = useState(null);
+
+    // ONE filename for this report. The print dialog's Save-as-PDF default and
+    // the stalled-export fallback both use exactly this string, so a downloaded
+    // Technical Report always identifies itself: brand, report type, dealer,
+    // project and reference.
+    const technicalReportPrintTitle = buildTechnicalReportTitle(
+        projectDetails?.name,
+        { number: reportVersionNumber, name: reportVersionName },
+        {
+            dealerName: projectDetails?.dealer_name || null,
+            projectReference: projectDetails?.project_reference || null,
+        }
+    );
     const showDesignRating = useSyncExternalStore(subscribeAsdrVisibility, getAsdrVisibility);
 
     // ── ASDR recommendation wiring ───────────────────────────────────────
@@ -440,7 +453,7 @@ function RP22ReportInner() {
     }, []);
 
     // Plan capture hooks
-    usePlanCapture({ isPrinting, planImageDataUrl, setPlanImageDataUrl, planDimsImageDataUrl, setPlanDimsImageDataUrl, planSpeakerDimsImageDataUrl, setPlanSpeakerDimsImageDataUrl, setExportStatus, exportTimeoutRef, exportGuardRef, setIsPrinting, debugPlanCapture });
+    usePlanCapture({ isPrinting, planImageDataUrl, setPlanImageDataUrl, planDimsImageDataUrl, setPlanDimsImageDataUrl, planSpeakerDimsImageDataUrl, setPlanSpeakerDimsImageDataUrl, setExportStatus, exportTimeoutRef, exportGuardRef, setIsPrinting, debugPlanCapture, printTitle: technicalReportPrintTitle });
 
     // autoPrint: when navigated from Design Review with ?autoPrint=1, auto-trigger
     // the print pipeline once the report is hydrated and ready.
@@ -546,7 +559,7 @@ function RP22ReportInner() {
             if (originalPrintTitleRef.current === null) {
                 originalPrintTitleRef.current = document.title;
             }
-            document.title = buildTechnicalReportTitle(projectDetails?.name, { number: reportVersionNumber, name: reportVersionName });
+            document.title = technicalReportPrintTitle;
             window.addEventListener("afterprint", () => setAutoPrintDone(true), { once: true });
             window.print();
             cleanupTimeoutRef.current = setTimeout(() => {
@@ -1217,6 +1230,7 @@ function RP22ReportInner() {
                         exportGuardRef={exportGuardRef}
                         exportTimeoutRef={exportTimeoutRef}
                         EXPORT_TIMEOUT_MS={EXPORT_TIMEOUT_MS}
+                        printTitle={technicalReportPrintTitle}
                         resolveScreenMetricsSnapshot={resolveScreenMetricsSnapshot}
                         setScreenMetricsForPrint={setScreenMetricsForPrint}
                         setScreenMetricsStatus={setScreenMetricsStatus}

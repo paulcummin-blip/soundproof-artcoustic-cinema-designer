@@ -45,7 +45,17 @@ function decodeLogo(url) {
   });
 }
 
-export function useClientReportPdfExport({ activePageCount, projectName, logoUrl, versionNumber, versionName }) {
+export function useClientReportPdfExport({
+  activePageCount,
+  projectName,
+  logoUrl,
+  versionNumber,
+  versionName,
+  // Dealer and project reference are optional filename segments: the shared
+  // helper omits them when they are unavailable.
+  dealerName = null,
+  projectReference = null,
+}) {
   const [exporting, setExporting] = useState(false);
   const [error, setError] = useState(null);
   const printingRef = useRef(false);
@@ -104,7 +114,11 @@ export function useClientReportPdfExport({ activePageCount, projectName, logoUrl
 
       // 4. Set temporary document title
       originalTitleRef.current = document.title;
-      document.title = buildVisualReportTitle(projectName, { number: versionNumber, name: versionName });
+      document.title = buildVisualReportTitle(
+        projectName,
+        { number: versionNumber, name: versionName },
+        { dealerName, projectReference }
+      );
 
       // 5. Wait two animation frames for print layout to settle
       await new Promise((resolve) =>
@@ -122,7 +136,7 @@ export function useClientReportPdfExport({ activePageCount, projectName, logoUrl
       setError("PDF preparation failed. Please try again.");
       cleanup();
     }
-  }, [exporting, activePageCount, projectName, logoUrl, cleanup]);
+  }, [exporting, activePageCount, projectName, logoUrl, dealerName, projectReference, versionNumber, versionName, cleanup]);
 
   return { exporting, error, handleExport };
 }

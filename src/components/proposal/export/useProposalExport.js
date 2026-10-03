@@ -54,7 +54,14 @@ export function resolveProposalExportReadiness({ proposal, sections }) {
   return null;
 }
 
-export function useProposalExport({ proposal, sections, projectName }) {
+export function useProposalExport({
+  proposal,
+  sections,
+  projectName,
+  // Optional filename segments: the shared helper omits them when unavailable.
+  dealerName = null,
+  projectReference = null,
+}) {
   const [exporting, setExporting] = useState(false);
   const [error, setError] = useState(null);
   const [blockedReason, setBlockedReason] = useState(null);
@@ -115,7 +122,9 @@ export function useProposalExport({ proposal, sections, projectName }) {
       originalTitleRef.current = document.title;
       document.title = buildReportFilename(
         'Proposal',
-        projectName || proposal?.title || 'Proposal'
+        projectName || proposal?.title || 'Proposal',
+        null,
+        { dealerName, projectReference }
       );
 
       document.body.classList.add(EXPORT_BODY_CLASS);
@@ -134,7 +143,7 @@ export function useProposalExport({ proposal, sections, projectName }) {
       );
       cleanup();
     }
-  }, [proposal, sections, projectName, cleanup]);
+  }, [proposal, sections, projectName, dealerName, projectReference, cleanup]);
 
   return { exporting, error, blockedReason, handleExport };
 }
