@@ -174,6 +174,8 @@ export function useVersionedEngineeringAuthority(projectId, versionId) {
     bassHydrationPending,
     bassRestoreFailed,
     bassAuthorityStatus: completedBassAuthority?.authorityStatus || null,
+    bassAuthorityOutOfDate: reportCompleteness.bassAuthorityOutOfDate === true,
+    bassAuthorityRejectionReason: reportCompleteness.bassAuthorityRejectionReason || null,
     reportCompleteness,
     reportComplete: reportCompleteness.complete,
     durable,
