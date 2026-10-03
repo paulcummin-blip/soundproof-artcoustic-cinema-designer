@@ -32,10 +32,10 @@ import { buildImageAuthority } from '../components/proposal/engineeringAuthority
 const asset = (id, asset_type, order_index = 0) => ({ id, asset_type, order_index, file_url: `https://files/${id}.jpg` });
 
 describe('the gallery labels are the simple model', () => {
-  it('offers Cover Image then Image 1 to Image 10, and nothing else', () => {
+  it('offers Cover Image, then Image 1 as the hero image, then Image 2 to Image 10', () => {
     expect(ASSET_SLOT_OPTIONS.map((option) => option.label)).toEqual([
       'Cover Image',
-      'Image 1',
+      'Image 1 (Hero Image)',
       'Image 2',
       'Image 3',
       'Image 4',
