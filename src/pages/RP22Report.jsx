@@ -32,6 +32,7 @@ import ReportPrintStyles from '../components/report/ReportPrintStyles';
 import ReportTypographyStyles from '@/components/report/typography/ReportTypographyStyles';
 import { REPORT_FONT_BODY } from '@/components/report/typography/reportTypography';
 import RP22ReportParameterGrid from '../components/report/RP22ReportParameterGrid';
+import BassResponseGraphSection from '../components/report/technical/BassResponseGraphSection';
 import TechnicalReportNotice from '../components/report/technical/TechnicalReportNotice';
 import ReportGateDiagnosticsPanel from '@/components/report/ReportGateDiagnosticsPanel';
 import { buildReportGateDiagnostics } from '@/components/report/reportGateDiagnostics';
@@ -1301,6 +1302,22 @@ function RP22ReportInner() {
                         </CardContent>
                     </Card>
 
+                    {/* ── Bass response graphs — Technical Report only. Rendered
+                        only when the saved bass authority is CURRENT and carries a
+                        finished graph payload; stale or absent bass renders nothing
+                        (the report's own gates already block in that case). ── */}
+                    <BassResponseGraphSection
+                        contract={completedBassAuthority?.contract || null}
+                        authoritative={completedBassAuthority?.authoritative === true}
+                        seats={seats}
+                        roomDims={{
+                            widthM: stableDimensions.width,
+                            lengthM: stableDimensions.length,
+                            heightM: stableDimensions.height,
+                        }}
+                        variant="screen"
+                    />
+
                     {/* ── Screen-only scoped ASDR header ── */}
                     {showDesignRating && scopedRatings && (
                         <div style={{
@@ -1442,6 +1459,21 @@ function RP22ReportInner() {
                         <section id="pdf-room-parameters">
                             <RP22ReportParameterGrid {...parameterGridProps} variant="print" />
                         </section>
+
+                        {/* ── Bass response graph pages — one full-width graph per
+                            printed page, drawn only from the current saved bass
+                            authority. Technical Report only. ── */}
+                        <BassResponseGraphSection
+                            contract={completedBassAuthority?.contract || null}
+                            authoritative={completedBassAuthority?.authoritative === true}
+                            seats={seats}
+                            roomDims={{
+                                widthM: stableDimensions.width,
+                                lengthM: stableDimensions.length,
+                                heightM: stableDimensions.height,
+                            }}
+                            variant="print"
+                        />
 
                         {/* ── Drawing set: every page uses one fixed printable frame ── */}
                         <ReportDrawingPage

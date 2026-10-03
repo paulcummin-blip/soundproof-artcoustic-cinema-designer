@@ -16,9 +16,10 @@
 // not-ready and the report renders nothing — a stale or absent result is never
 // drawn as a current one.
 //
-// Smoothing: the report plots the authority curves unsmoothed. Fractional-octave
-// smoothing is a live-graph display preference, not an engineering value, so the
-// report shows the published curve exactly as it was published.
+// Smoothing: the report applies the SAME default display smoothing the Expert
+// Curve View opens with (1/3 octave). It is a display transform only — no
+// engineering value changes — and it is what makes the printed curve read like
+// the curve the designer sees.
 // ---------------------------------------------------------------------------
 
 import { buildBassGraphSeries } from "@/components/room/bass/bassGraphDomainBuilder";
@@ -29,6 +30,7 @@ import {
 import { buildRp22GraphMarkers } from "@/components/room/bass/rp22GraphMarkers";
 import { resolveOptimisationTransitionHz } from "@/components/room/bass/optimisationTransitionAuthority";
 import { getPrimarySeats } from "@/components/utils/seatPriorityAuthority";
+import { formatSeatPillLabel } from "@/components/utils/seatLabel";
 
 /** The graph's own axis policy — the same 70–140 dB window the app graph locks. */
 export const REPORT_BASS_GRAPH_Y_DOMAIN = [70, 140];
@@ -40,6 +42,9 @@ export const RSP_GRAPH_NOTE = "RSP response is the reference bass response used 
 
 /** Colour-independent caps so the page stays readable. */
 export const REPORT_PRIMARY_SEAT_LIMIT = 8;
+
+/** The display smoothing the Expert Curve View opens with (1/3 octave). */
+export const REPORT_GRAPH_SMOOTHING = "third";
 
 const finite = (value) => value !== null && value !== "" && Number.isFinite(Number(value));
 
@@ -118,7 +123,7 @@ export function buildReportBassGraphs({
     multiSeries: [],
     selectedSeatIds: [],
     showRealSeatOverlays: false,
-    smoothingMode: "none",
+    smoothingMode: REPORT_GRAPH_SMOOTHING,
     operatingLevelOffsetDb,
   });
   const rspSeries = pickSeries(rspBuilt, RSP_PAGE_KINDS);
@@ -140,7 +145,7 @@ export function buildReportBassGraphs({
       multiSeries: [],
       selectedSeatIds: plottedIds,
       showRealSeatOverlays: false,
-      smoothingMode: "none",
+      smoothingMode: REPORT_GRAPH_SMOOTHING,
       operatingLevelOffsetDb,
     })
     : [];
@@ -157,12 +162,8 @@ export function buildReportBassGraphs({
     ...seatSeries.filter((entry) => entry.kind === "house-curve").slice(0, 1),
   ];
 
-  const primarySeatLabel = (seatId) => {
-    const seat = primarySeats.find((candidate) => candidate?.id === seatId);
-    const row = seat?.row ?? seat?.rowNumber;
-    const index = seat?.indexInRow ?? seat?.column;
-    return row != null && index != null ? `R${row}S${index}` : seatId;
-  };
+  // The canonical seat label the bass graph itself uses (seat-r1-c1 → R1S1).
+  const primarySeatLabel = (seatId) => formatSeatPillLabel(seatId);
 
   return {
     ready: rspSeries.length > 0,

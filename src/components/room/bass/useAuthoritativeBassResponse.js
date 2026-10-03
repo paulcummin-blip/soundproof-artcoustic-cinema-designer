@@ -16,6 +16,7 @@ import {
 } from "@/components/utils/subwooferCapability";
 import { buildAuthoritativeRspPosition } from "./authoritativeRspPosition";
 import { buildCanonicalRoomResponse, canonicalRoomResponseCurve as extractRoomResponseCurve } from "./buildCanonicalRoomResponse";
+import { resolveOptimisationTransitionHz } from "./optimisationTransitionAuthority";
 
 // ── INSTRUMENTATION (diagnostic only — no behaviour change) ──────────────
 let __authWorkerIdCounter = 0;
@@ -491,10 +492,12 @@ export function useAuthoritativeBassResponse({ appState, frontSubsLive, rearSubs
       amplifierAuthority: getPerSubwooferAmplifierAuthority(sources, amplifierPowerPerSubW),
     };
   }, [sources, amplifierPowerPerSubW]);
-  const optimisationTransitionHz = useMemo(() => {
-    const volume = Number(roomDims?.widthM) * Number(roomDims?.lengthM) * Number(roomDims?.heightM);
-    return volume > 0 ? 2000 * Math.sqrt(0.4 / volume) : 120;
-  }, [roomDims?.widthM, roomDims?.lengthM, roomDims?.heightM]);
+  // The modal → statistical transition marker. Defined once, in the shared
+  // authority, so the live graph and the Technical Report graph always agree.
+  const optimisationTransitionHz = useMemo(
+    () => resolveOptimisationTransitionHz(roomDims),
+    [roomDims?.widthM, roomDims?.lengthM, roomDims?.heightM],
+  );
   const requested = useMemo(() => deriveRequestedCalibrationConfig({ splConfig, optimisationTransitionHz, designEqSystemLimits }), [splConfig, optimisationTransitionHz, designEqSystemLimits]);
   const p14TargetBasis = requested.p14TargetBasis;
   const productCapabilities = useMemo(() => sources.map((sub) => {

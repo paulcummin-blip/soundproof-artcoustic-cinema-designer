@@ -264,6 +264,19 @@ export default function ReportPrintStyles() {
                     page-break-before: always;
                 }
 
+                /* Bass response graph pages — one full-width graph per printed page,
+                   with the heading, legend and explanation kept with the graph. */
+                .rp22-report .rp22-bass-graph-page {
+                    break-before: page;
+                    page-break-before: always;
+                    break-inside: avoid;
+                    page-break-inside: avoid;
+                }
+                .rp22-report .rp22-bass-graph-page svg {
+                    width: 100% !important;
+                    height: auto !important;
+                }
+
                 /* Override inline min-heights to fit 3 cards per page */
                 .rp22-report .rp22-param-page .rp22-card-wrap > div,
                 .rp22-report .rp22-param-page .rp22-card-wrap > div > div {
