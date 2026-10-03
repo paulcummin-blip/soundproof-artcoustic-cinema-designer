@@ -23,20 +23,103 @@
  * restored from the durable contract.
  */
 
-import { getCompletedBassAuthority } from "@/components/room/bass/completedBassResultStore";
+import {
+  BASS_AUTHORITY_STATUS,
+  bassContractMatchesRequestedP14,
+  getCompletedBassAuthority,
+  isAuthoritativeBassContract,
+  isStructurallyCompleteBassContract,
+} from "@/components/room/bass/completedBassResultStore";
 import { buildComplianceBassPresentation } from "@/components/room/bass/bassCompliancePresentation";
 import { statesBassResultEntry } from "@/components/engineering/versionedEngineeringAuthority";
 import { summariseEngineeringResults } from "@/components/engineering/engineeringSummaryAuthority";
+import {
+  LEVEL_MULTIPLIERS,
+  PARAM_WEIGHTS,
+} from "@/components/report/technical/artcousticSystemDesignRating";
 
 /** The bass parameters the reports read (P19 is RSP-scoped, P20 is per seat). */
 const BASS_PARAM_IDS = [14, 18, 19, 20];
 
 const hasLevel = (level) => level != null && level !== "—" && level !== "";
 
+const normaliseLevel = (level) => {
+  const text = String(level ?? "").trim().toUpperCase();
+  if (/^L[1-4]$/.test(text) || text === "FAIL") return text;
+  const numeric = Number(level);
+  return Number.isFinite(numeric) && numeric >= 1 && numeric <= 4
+    ? `L${Math.round(numeric)}`
+    : null;
+};
+
+export const SAVED_BASS_OUT_OF_DATE_MESSAGE =
+  "Saved bass analysis is out of date. Update Bass Performance before generating reports.";
+
+/**
+ * Fail-closed currentness check for report/proposal use.
+ *
+ * The completed-bass store deliberately preserves the previous contract while
+ * the active design is stale/updating so Bass UI can explain the old result.
+ * Reports may use that contract only when the store has independently promoted
+ * it to the current, reliable authority for the active fingerprint.
+ */
+export function assessRestoredBassAuthorityCurrentness(authority) {
+  const contract = authority?.contract || null;
+  if (!contract) {
+    return { current: false, outOfDate: false, reason: "missing-completed-contract" };
+  }
+
+  const currentFingerprint = authority?.currentFingerprint || null;
+  const resultFingerprint = contract?.job?.resultFingerprint || null;
+  const currentJobFingerprint = contract?.job?.currentJobFingerprint || null;
+
+  if (authority?.status !== "complete") {
+    return { current: false, outOfDate: true, reason: `authority-status-${authority?.status || "unknown"}` };
+  }
+  if (authority?.authorityStatus !== BASS_AUTHORITY_STATUS.AUTHORITATIVE) {
+    return { current: false, outOfDate: true, reason: `authority-${authority?.authorityStatus || "unknown"}` };
+  }
+  if (authority?.authoritative !== true || authority?.exportable !== true) {
+    return { current: false, outOfDate: true, reason: "authority-not-reliable" };
+  }
+  if (authority?.structurallyComplete !== true || !isStructurallyCompleteBassContract(contract)) {
+    return { current: false, outOfDate: true, reason: "contract-incomplete-or-schema-unsupported" };
+  }
+  if (!isAuthoritativeBassContract(contract)) {
+    return { current: false, outOfDate: true, reason: "contract-publication-not-authoritative" };
+  }
+  if (!currentFingerprint || !resultFingerprint || currentFingerprint !== resultFingerprint) {
+    return { current: false, outOfDate: true, reason: "active-design-fingerprint-mismatch" };
+  }
+  if (!currentJobFingerprint || currentJobFingerprint !== currentFingerprint) {
+    return { current: false, outOfDate: true, reason: "contract-job-fingerprint-mismatch" };
+  }
+
+  // v4+ calculation fingerprints include the selected P14 target identity.
+  // When a caller also supplies the explicit requested identity, enforce the
+  // existing contract-level comparison as a second, readable guard.
+  if (authority?.requestedP14Identity
+    && !bassContractMatchesRequestedP14(contract, authority.requestedP14Identity)) {
+    return { current: false, outOfDate: true, reason: "selected-target-identity-mismatch" };
+  }
+
+  return { current: true, outOfDate: false, reason: null };
+}
+
 export function applyRestoredBassAuthority(summary, { projectId, versionId, completedBassAuthority = null } = {}) {
   if (!summary || !projectId || !versionId) return summary;
   const authority = completedBassAuthority || getCompletedBassAuthority(projectId, versionId);
-  if (!authority?.contract) return summary;
+  const currentness = assessRestoredBassAuthorityCurrentness(authority);
+  if (!currentness.current) {
+    if (!currentness.outOfDate) return summary;
+    return {
+      ...summary,
+      bassAuthoritySource: "restored-durable-bass-authority-rejected",
+      bassAuthorityCurrent: false,
+      bassAuthorityRejectionReason: currentness.reason,
+      bassAuthorityMessage: SAVED_BASS_OUT_OF_DATE_MESSAGE,
+    };
+  }
 
   let presentation = null;
   try {
@@ -94,11 +177,20 @@ export function applyRestoredBassAuthority(summary, { projectId, versionId, comp
     const existing = parameterAuthority[key];
     if (!parameter || !existing) continue;
 
-    const scored = hasLevel(parameter.level);
+    const level = normaliseLevel(parameter.level);
+    const scored = hasLevel(level);
+    const mode = parameter.targetBasis || existing.mode || existing.targetBasis || null;
+    const baseWeight = PARAM_WEIGHTS[key];
+    const effectiveWeight = key === "p14" && mode === "recommended"
+      ? baseWeight + 2
+      : baseWeight;
     const next = {
       ...existing,
       state: scored ? "scored" : existing.state,
-      level: scored ? parameter.level : existing.level,
+      level: scored ? level : existing.level,
+      multiplier: scored ? (LEVEL_MULTIPLIERS[level] ?? existing.multiplier ?? 0) : existing.multiplier,
+      effectiveWeight: Number.isFinite(effectiveWeight) ? effectiveWeight : existing.effectiveWeight,
+      mode,
       rawValue: parameter.rawValue ?? existing.rawValue ?? null,
       restoredFromSavedBassAuthority: overlaidIds.has(id) || existing.restoredFromSavedBassAuthority === true,
     };
@@ -123,10 +215,12 @@ export function applyRestoredBassAuthority(summary, { projectId, versionId, comp
           && statesBassResultEntry({ value: previous.rawValue, formatted: previous.formatted })) {
           continue;
         }
+        const seatLevel = normaliseLevel(seat.level) || previous.level || null;
         seats[seatId] = {
           ...previous,
           state: "scored",
-          level: Number.isFinite(Number(seat.level)) ? `L${Math.max(1, Number(seat.level))}` : previous.level,
+          level: seatLevel,
+          multiplier: LEVEL_MULTIPLIERS[seatLevel] ?? previous.multiplier ?? 0,
           rawValue: raw,
           reason: null,
           restoredFromSavedBassAuthority: true,
@@ -217,6 +311,9 @@ export function applyRestoredBassAuthority(summary, { projectId, versionId, comp
     // Provenance: consumers and diagnostics can see these bass values came from
     // the restored durable bass authority rather than the saved summary.
     bassAuthoritySource: "restored-durable-bass-authority",
+    bassAuthorityCurrent: true,
+    bassAuthorityRejectionReason: null,
+    bassAuthorityMessage: null,
   };
 }
 
