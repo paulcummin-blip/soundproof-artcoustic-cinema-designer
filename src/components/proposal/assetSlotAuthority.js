@@ -58,7 +58,12 @@ export const IMAGE_SLOT_KEYS = Object.freeze([
 /** Every slot the page offers, cover first. */
 export const ASSET_SLOT_OPTIONS = Object.freeze([
   { slot: ASSET_SLOT.COVER, label: "Cover Image" },
-  ...IMAGE_SLOT_KEYS.map((slot, index) => ({ slot, label: `Image ${index + 1}` })),
+  // Image 1 is the hero image: it leads the Project Images page of the report,
+  // so its slot says so wherever the gallery is labelled.
+  ...IMAGE_SLOT_KEYS.map((slot, index) => ({
+    slot,
+    label: index === 0 ? 'Image 1 (Hero Image)' : `Image ${index + 1}`,
+  })),
 ]);
 
 /** Where an image from the older labelled model belongs in the simple gallery. */

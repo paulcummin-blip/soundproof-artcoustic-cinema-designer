@@ -62,19 +62,21 @@ export default function ProposalPrintStyles() {
           overflow: hidden;
         }
 
-        /* ── Sections — flow content, never fixed-height. The 18mm document
-           margin lives here, because the page itself has none. ── */
+        /* ── Sections — flow content, never fixed-height. The page frame lives
+           here, because the page itself has no margin (the cover bleeds).
+           Every content page carries the same top margin, so prose sits placed
+           on the sheet instead of being pushed to the top of it, and a bottom
+           margin is always kept so no page reads as an overflow of text. ── */
         body.proposal-export-mode .proposal-print-section {
-          padding: 0 18mm;
-          margin-bottom: 10mm;
+          padding: 22mm 18mm 20mm;
+          margin-bottom: 0;
         }
 
-        body.proposal-export-mode .proposal-print-section:first-of-type {
-          padding-top: 16mm;
-        }
-
-        body.proposal-export-mode .proposal-print-section:last-of-type {
-          padding-bottom: 18mm;
+        /* An imagery page is led by the image rather than by text: it takes a
+           shorter top margin and gives that space to the hero image. */
+        body.proposal-export-mode .proposal-print-section.pp-page--images {
+          padding-top: 14mm;
+          padding-bottom: 16mm;
         }
 
         body.proposal-export-mode .proposal-print-section__title {
@@ -132,17 +134,18 @@ export default function ProposalPrintStyles() {
           color: #213428;
         }
 
-        /* ── Key Performance Highlights table ── */
+        /* ── Key Performance Highlights table — compact so the trimmed table
+           keeps every row on the one page that carries its heading. ── */
         body.proposal-export-mode .kph-table {
           width: 100%;
           border-collapse: collapse;
-          margin-top: 4mm;
-          font-size: 10pt;
+          margin-top: 5mm;
+          font-size: 8.5pt;
         }
 
         body.proposal-export-mode .kph-table th {
           text-align: left;
-          padding: 2mm 3mm;
+          padding: 1.8mm 2.5mm;
           background: #F5F4F0;
           color: #213428;
           font-weight: 600;
@@ -150,7 +153,7 @@ export default function ProposalPrintStyles() {
         }
 
         body.proposal-export-mode .kph-table td {
-          padding: 2mm 3mm;
+          padding: 1.8mm 2.5mm;
           color: #3E4349;
           border-bottom: 1px solid #EAE8E3;
           vertical-align: top;
@@ -175,9 +178,20 @@ export default function ProposalPrintStyles() {
         }
 
         body.proposal-export-mode .proposal-print-section--highlights .proposal-print-section__title,
-        body.proposal-export-mode .proposal-print-section--highlights .proposal-print-section__body {
+        body.proposal-export-mode .proposal-print-section--highlights .pp-header,
+        body.proposal-export-mode .proposal-print-section--highlights .pp-body {
           break-after: avoid;
           page-break-after: avoid;
+        }
+
+        /* The table is never separated from the heading above it: it may not
+           start a new page while its own title sits on the previous one. */
+        body.proposal-export-mode .proposal-print-section--highlights .pp-header__rule,
+        body.proposal-export-mode .proposal-print-section--highlights .kph-table {
+          break-before: avoid;
+          page-break-before: avoid;
+          break-inside: avoid;
+          page-break-inside: avoid;
         }
 
         /* ── Project Images — imagery only, on its own page ── */

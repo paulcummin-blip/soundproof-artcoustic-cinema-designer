@@ -54,9 +54,11 @@ describe('Key Performance Highlights — one page, best rows only', () => {
   const rows = buildHighlightDisplayRows(MARQUEE_ROWS);
 
   it('never carries more rows than fit one printed page', () => {
-    expect(HIGHLIGHT_DISPLAY_LIMIT).toBeLessThanOrEqual(10);
+    // Eleven rows is the most the compact table fits on the one page that also
+    // carries its heading.
+    expect(HIGHLIGHT_DISPLAY_LIMIT).toBeLessThanOrEqual(11);
     expect(rows.length).toBeLessThanOrEqual(HIGHLIGHT_DISPLAY_LIMIT);
-    expect(rows.length).toBe(10);
+    expect(rows.length).toBe(11);
   });
 
   it('keeps every assessed performance area in the trimmed table', () => {
@@ -65,13 +67,13 @@ describe('Key Performance Highlights — one page, best rows only', () => {
       .forEach((area) => expect(areas.has(area)).toBe(true));
   });
 
-  it('chooses the most useful rows, dropping only the two lowest priorities', () => {
+  it('chooses the most useful rows, dropping only the lowest priority', () => {
     const keys = rows.map((row) => row.key);
     ['rp23_viewing', 'p2', 'p4', 'p5', 'p7', 'p9', 'p12', 'p13', 'p16', 'p18']
       .forEach((key) => expect(keys).toContain(key));
-    // Keeping one row for every assessed area costs the two lowest-priority
-    // results (P14 and P17), rather than losing a whole area.
-    expect(keys).not.toContain('p14');
+    // Keeping one row for every assessed area is what the trim protects: only
+    // the lowest-priority result (P17) is dropped rather than a whole area.
+    expect(keys).toContain('p14');
     expect(keys).not.toContain('p17');
   });
 

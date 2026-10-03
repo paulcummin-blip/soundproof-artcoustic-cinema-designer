@@ -172,7 +172,7 @@ const FALLBACK_GAIN = 'Part of how this system performs as a whole in the room.'
  * split, so the table holds the best few results rather than every result: a
  * long table that breaks across two pages reads as an accident.
  */
-export const HIGHLIGHT_DISPLAY_LIMIT = 10;
+export const HIGHLIGHT_DISPLAY_LIMIT = 11;
 
 /**
  * The order rows are chosen in when a design has more results than the table
@@ -294,7 +294,7 @@ const MODEST_GAIN = Object.freeze({
   p2: 'The channel count follows the system format the room is designed to, so movement is built from the positions this room allows.',
   p3: 'The screen speakers sit where the room and the screen allow, so dialogue stays anchored to the picture.',
   p4: 'Screen level consistency is set by the room and the screen wall, so the front stage holds together without being perfectly even seat to seat.',
-  p5: 'This is the main spatial compromise. Movement around the room remains strong, but the spacing between speakers is limited by the room layout.',
+  p5: 'This is the main spatial compromise, and it is a room geometry constraint: the spacing between speakers is set by the room layout and the practical speaker positions, not by a simple upgrade. Movement around the room remains strong.',
   p6: 'The surround speakers are matched in level as far as the seating positions and the room allow.',
   p7: 'The front wide positions bridge the screen and the side speakers as far as the room geometry allows.',
   p9: 'Overhead spacing is set by the ceiling height and the seating layout, so sound above the seats is even rather than ideal.',

@@ -138,6 +138,9 @@ export const HIGH_CHANNEL_UPGRADE_RULE = [
   'NEVER WRITE THIS (forbidden, and anything with the same meaning):',
   `- "${HIGH_CHANNEL_FORBIDDEN_SENTENCE}"`,
   '- "If greater precision in the side-to-side soundstage is required later, adding surround speakers would close the gaps between them."',
+  '- "If greater overhead movement becomes a priority later, the natural upgrade would be a middle overhead pair."',
+  '- "Adding a middle pair of height speakers would be a natural upgrade."',
+  '- "More overhead positions would expand the height layer in the future."',
   'WRITE THIS INSTEAD (approved wording):',
   `- "${HIGH_CHANNEL_PREFERRED_SENTENCE}"`,
 ].join('\n');

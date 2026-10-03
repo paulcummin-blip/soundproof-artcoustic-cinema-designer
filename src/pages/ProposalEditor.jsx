@@ -23,6 +23,7 @@ import ProposalCoverPage from '@/components/proposal/cover/ProposalCoverPage';
 import ProjectImagesBlock, { projectGalleryImages } from '@/components/proposal/ProjectImagesBlock';
 import { ASSET_SLOT, resolveAssetSlot } from '@/components/proposal/assetSlotAuthority';
 import { prepareSectionBody } from '@/components/proposal/sectionBodyAuthority';
+import { isHighChannelDesign } from '@/components/proposal/highChannelLayoutAuthority';
 import ProposalPrintDocument from '@/components/proposal/export/ProposalPrintDocument';
 import ProposalPrintStyles from '@/components/proposal/export/ProposalPrintStyles';
 import { useProposalExport } from '@/components/proposal/export/useProposalExport';
@@ -790,6 +791,8 @@ export default function ProposalEditor() {
                     html={prepareSectionBody(section.body, {
                       title: section.title,
                       sectionType: section.section_type,
+                      // The editor preview shows the same copy the PDF prints.
+                      highChannel: isHighChannelDesign(proposal?.engineering_snapshot),
                     })}
                     // In manual edit mode nothing auto-saves: Save commits and
                     // Cancel discards. Outside it, the normal autosave applies.

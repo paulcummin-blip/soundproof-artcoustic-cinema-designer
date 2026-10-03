@@ -35,15 +35,17 @@ export default function ProposalPackStyles() {
         --pp-body: var(--report-font-body, "Didact Gothic", "Century Gothic", sans-serif);
       }
 
-      /* ── Page header: number, kicker, tracked title, lead, rule ── */
+      /* ── Page header: number, kicker, tracked title, lead, rule. The rule is
+         followed by a generous gap, so the body of every page sits placed rather
+         than pushed up under the heading. ── */
       .proposal-print-portal .pp-header {
-        margin: 0 0 9mm;
+        margin: 0 0 14mm;
       }
       .proposal-print-portal .pp-header__meta {
         display: flex;
         align-items: baseline;
         gap: 4mm;
-        margin-bottom: 3.5mm;
+        margin-bottom: 5mm;
       }
       .proposal-print-portal .pp-header__number {
         font-family: var(--pp-heading) !important;
@@ -79,7 +81,7 @@ export default function ProposalPackStyles() {
       .proposal-print-portal .pp-header__rule {
         height: 1px;
         background: var(--pp-rule);
-        margin-top: 6mm;
+        margin-top: 7mm;
       }
 
       /* ── Fact cards ── */
@@ -293,6 +295,22 @@ export default function ProposalPackStyles() {
         margin: 2.5mm 0 0 !important;
       }
 
+      /* ── Image pages: the hero image leads, with deliberate space above and
+         below it, and the supporting images sit under it rather than beside it.
+         ── */
+      .proposal-print-portal .pp-gallery {
+        margin-top: 8mm;
+      }
+      .proposal-print-portal .pp-gallery__hero {
+        margin: 0 0 8mm;
+      }
+      .proposal-print-portal .pp-gallery__support {
+        margin-bottom: 2mm;
+      }
+      .proposal-print-portal .pp-page--images .pp-header {
+        margin-bottom: 8mm;
+      }
+
       /* ── Editorial image ── */
       .proposal-print-portal .pp-editorial {
         margin: 8mm 0 0;
@@ -307,15 +325,32 @@ export default function ProposalPackStyles() {
         background: var(--pp-surface);
       }
 
-      /* ── Prose column: never a full-width wall of text ── */
+      /* ── Prose column: never a full-width wall of text. One type scale for
+         every narrative page, so no section reads narrower, larger or tighter
+         than its neighbour. ── */
+      .proposal-print-portal {
+        --pp-body-size: 11pt;
+        --pp-body-leading: 1.55;
+        --pp-paragraph-gap: 4.2mm;
+      }
       .proposal-print-portal .pp-body {
-        max-width: 150mm;
+        max-width: 148mm;
         font-family: var(--pp-body) !important;
-        font-size: 11pt !important;
-        line-height: 1.6 !important;
+        font-size: var(--pp-body-size) !important;
+        line-height: var(--pp-body-leading) !important;
         color: var(--pp-slate) !important;
       }
       .proposal-print-portal .pp-body > *:first-child { margin-top: 0; }
+      .proposal-print-portal .pp-body p {
+        margin: 0 0 var(--pp-paragraph-gap) !important;
+      }
+      .proposal-print-portal .pp-body p:last-child { margin-bottom: 0 !important; }
+      .proposal-print-portal .pp-body h2,
+      .proposal-print-portal .pp-body h3 {
+        margin: 0 0 3mm !important;
+        break-after: avoid;
+        page-break-after: avoid;
+      }
 
       /* ── Print page behaviour ── */
       @media print {
@@ -386,7 +421,7 @@ export default function ProposalPackStyles() {
         body.proposal-export-mode .proposal-print-portal .pp-gallery {
           display: flex;
           flex-direction: column;
-          gap: 5mm;
+          gap: 0;
           break-inside: avoid;
           page-break-inside: avoid;
         }
@@ -411,26 +446,28 @@ export default function ProposalPackStyles() {
           break-inside: avoid;
           page-break-inside: avoid;
         }
-        /* Three images: a hero image with two supporting images below it. */
+        /* Three images: a hero image with two supporting images below it. The
+           hero is the subject of the page and keeps deliberate space under it;
+           the two supporting images sit beneath it without competing. */
         body.proposal-export-mode .proposal-print-portal .pp-gallery--3 .pp-gallery__hero img {
-          height: 146mm;
+          height: 140mm;
         }
         body.proposal-export-mode .proposal-print-portal .pp-gallery--3 .pp-gallery__support img {
-          height: 82mm;
+          height: 70mm;
         }
         /* Two images: a dominant image with one supporting image below it. */
         body.proposal-export-mode .proposal-print-portal .pp-gallery--2 .pp-gallery__hero img {
-          height: 162mm;
+          height: 150mm;
         }
         body.proposal-export-mode .proposal-print-portal .pp-gallery--2 .pp-gallery__support {
           grid-template-columns: 1fr;
         }
         body.proposal-export-mode .proposal-print-portal .pp-gallery--2 .pp-gallery__support img {
-          height: 68mm;
+          height: 56mm;
         }
         /* One image: it is the page. */
         body.proposal-export-mode .proposal-print-portal .pp-gallery--1 .pp-gallery__hero img {
-          height: 244mm;
+          height: 200mm;
         }
       }
     `}</style>

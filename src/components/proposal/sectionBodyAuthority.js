@@ -17,6 +17,8 @@
  * Pure: no React, no side effects, no document access.
  */
 
+import { stripHighChannelUpgradeCopy } from '@/components/proposal/highChannelLayoutAuthority';
+
 const LEADING_HEADING = /^\s*<h([1-4])[^>]*>([\s\S]*?)<\/h\1>\s*/i;
 const ANY_TAG = /<[^>]*>/g;
 const ENTITIES = { '&nbsp;': ' ', '&amp;': '&', '&quot;': '"', '&#39;': "'", '&apos;': "'" };
@@ -90,6 +92,49 @@ export function limitSentences(html, max = 3) {
   return sliced.replace(/<[^>]*$/, '').trim();
 }
 
+/** Plain text of a body: tags, entities and extra spaces removed. */
+export function plainTextOf(html) {
+  if (html === null || html === undefined) return '';
+  let text = String(html).replace(ANY_TAG, ' ');
+  Object.entries(ENTITIES).forEach(([entity, replacement]) => {
+    text = text.split(entity).join(replacement);
+  });
+  return text.replace(/\s+/g, ' ').trim();
+}
+
+/** How many sentences a piece of copy carries. */
+export function countSentences(html) {
+  const text = plainTextOf(html);
+  if (!text) return 0;
+  const ends = text.match(/[.!?](?=\s|$)/g);
+  return ends ? ends.length : 1;
+}
+
+/** The most paragraphs a narrative page prints, and the longest one it prints. */
+export const PROSE_PARAGRAPH_LIMIT = 3;
+export const PARAGRAPH_SENTENCE_LIMIT = 4;
+
+/**
+ * Keep at most `maxParagraphs` paragraphs, and no paragraph longer than
+ * `maxSentences`. Headings and other blocks stay where they are, so a page is
+ * shortened rather than rebuilt. Presentation only: the stored body is untouched.
+ */
+export function limitProseParagraphs(
+  html,
+  maxParagraphs = PROSE_PARAGRAPH_LIMIT,
+  maxSentences = PARAGRAPH_SENTENCE_LIMIT,
+) {
+  if (typeof html !== 'string' || !html.trim()) return '';
+  let seen = 0;
+  return html.replace(/<p[^>]*>[\s\S]*?<\/p>/gi, (paragraph) => {
+    seen += 1;
+    if (seen > maxParagraphs) return '';
+    const close = /<\/p>$/i.test(paragraph) ? '</p>' : '';
+    const limited = limitSentences(paragraph, maxSentences);
+    return close && !limited.endsWith(close) ? `${limited}${close}` : limited;
+  });
+}
+
 /**
  * The body of one section, ready to render.
  *
@@ -113,17 +158,22 @@ const PROSE_ONLY_SECTIONS = new Set([
 
 export function prepareSectionBody(html, section = {}) {
   const deduped = stripDuplicateLeadingHeading(html, section.title);
+  // A high-channel-count design never carries an added-speaker or spacing
+  // upgrade, whatever an older stored body still says: the copy is cleaned on the
+  // way to the page and the stored record is never rewritten.
+  const cleaned = section.highChannel ? stripHighChannelUpgradeCopy(deduped) : deduped;
   if (section.sectionType === 'key_performance_highlights') {
     // The structured calculated table is the only table in this section, and the
     // introduction stays a short piece of prose.
-    return limitSentences(stripListAndTableBlocks(deduped), 3);
+    return limitSentences(stripListAndTableBlocks(cleaned), 3);
   }
   // On the printed page the prose sections carry prose only: a highlight list
-  // inside a section is repetition of the one evidence table.
+  // inside a section is repetition of the one evidence table. They are also held
+  // to a few short paragraphs, so no page reads as a squeezed block of text.
   if (section.proseOnly && PROSE_ONLY_SECTIONS.has(section.sectionType)) {
-    return stripListAndTableBlocks(deduped);
+    return limitProseParagraphs(stripListAndTableBlocks(cleaned));
   }
-  return deduped;
+  return cleaned;
 }
 
 export default prepareSectionBody;
