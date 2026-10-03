@@ -389,7 +389,7 @@ export default function ClientBassCapability({ bassPerformance }) {
             marginTop: 4,
           }}>
             {p18Hz != null
-              ? `${p18Hz.toFixed(0)} Hz low-frequency extension`
+              ? `${Math.floor(p18Hz)} Hz low-frequency extension`
               : "Low-frequency extension"}
           </div>
           <div style={{
