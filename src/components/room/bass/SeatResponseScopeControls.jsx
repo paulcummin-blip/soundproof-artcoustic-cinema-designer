@@ -23,7 +23,6 @@ export default function SeatResponseScopeControls({ rspPosition, orderedSeats = 
     <div style={{ display: "flex", gap: 5, alignItems: "center", flexWrap: "wrap" }}>
       {rspPosition && <button type="button" onClick={onSelectRsp} style={pillStyle(selectedSeatIds.includes("rsp"), "#16A34A")}>RSP</button>}
       {orderedSeats.length > 1 && <button type="button" onClick={onSelectAll} style={pillStyle(allSelected, "#213428")}>All seats</button>}
-      <span style={{ fontSize: 10, color: "#8B7F76", fontFamily: "monospace" }}>Select response to compare raw → EQ → target</span>
     </div>
     {[...rows.entries()].sort(([a], [b]) => a - b).map(([row, seats]) => <div key={row} style={{ display: "flex", gap: 5, flexWrap: "wrap" }}>
       {seats.map((seat, index) => {
