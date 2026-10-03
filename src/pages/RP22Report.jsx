@@ -1302,22 +1302,6 @@ function RP22ReportInner() {
                         </CardContent>
                     </Card>
 
-                    {/* ── Bass response graphs — Technical Report only. Rendered
-                        only when the saved bass authority is CURRENT and carries a
-                        finished graph payload; stale or absent bass renders nothing
-                        (the report's own gates already block in that case). ── */}
-                    <BassResponseGraphSection
-                        contract={completedBassAuthority?.contract || null}
-                        authoritative={completedBassAuthority?.authoritative === true}
-                        seats={seats}
-                        roomDims={{
-                            widthM: stableDimensions.width,
-                            lengthM: stableDimensions.length,
-                            heightM: stableDimensions.height,
-                        }}
-                        variant="screen"
-                    />
-
                     {/* ── Screen-only scoped ASDR header ── */}
                     {showDesignRating && scopedRatings && (
                         <div style={{
@@ -1342,6 +1326,23 @@ function RP22ReportInner() {
                         applied in the Bass Optimiser workflow, before report
                         generation. ── */}
                     <TechnicalEngineeringSummaryNote />
+
+                    {/* ── Bass response graphs — the final technical evidence pages,
+                        placed after the RP22 parameter flow so they never interrupt
+                        it. Rendered only when the saved bass authority is CURRENT
+                        and carries a finished graph payload; stale or absent bass
+                        renders nothing (the report's own gates already block). ── */}
+                    <BassResponseGraphSection
+                        contract={completedBassAuthority?.contract || null}
+                        authoritative={completedBassAuthority?.authoritative === true}
+                        seats={seats}
+                        roomDims={{
+                            widthM: stableDimensions.width,
+                            lengthM: stableDimensions.length,
+                            heightM: stableDimensions.height,
+                        }}
+                        variant="screen"
+                    />
 
                 </div>
                 )}
@@ -1459,21 +1460,6 @@ function RP22ReportInner() {
                         <section id="pdf-room-parameters">
                             <RP22ReportParameterGrid {...parameterGridProps} variant="print" />
                         </section>
-
-                        {/* ── Bass response graph pages — one full-width graph per
-                            printed page, drawn only from the current saved bass
-                            authority. Technical Report only. ── */}
-                        <BassResponseGraphSection
-                            contract={completedBassAuthority?.contract || null}
-                            authoritative={completedBassAuthority?.authoritative === true}
-                            seats={seats}
-                            roomDims={{
-                                widthM: stableDimensions.width,
-                                lengthM: stableDimensions.length,
-                                heightM: stableDimensions.height,
-                            }}
-                            variant="print"
-                        />
 
                         {/* ── Drawing set: every page uses one fixed printable frame ── */}
                         <ReportDrawingPage
@@ -1612,6 +1598,22 @@ function RP22ReportInner() {
                                 </ReportDrawingPage>
                             </>
                         )}
+
+                        {/* ── Bass response graph pages — the final technical evidence
+                            pages, immediately before the closing About Sound Proof
+                            page. One full-width graph per printed page, drawn only
+                            from the current saved bass authority. ── */}
+                        <BassResponseGraphSection
+                            contract={completedBassAuthority?.contract || null}
+                            authoritative={completedBassAuthority?.authoritative === true}
+                            seats={seats}
+                            roomDims={{
+                                widthM: stableDimensions.width,
+                                lengthM: stableDimensions.length,
+                                heightM: stableDimensions.height,
+                            }}
+                            variant="print"
+                        />
 
                         {/* ── About Sound Proof — final page (fixed brand closing page) ── */}
                         <section

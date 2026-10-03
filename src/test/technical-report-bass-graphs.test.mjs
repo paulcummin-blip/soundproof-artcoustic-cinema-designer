@@ -10,6 +10,7 @@
 //   TEST 6  Technical Report only — the Visual Report and System Design Summary
 //           never import the graph section
 //   TEST 7  Transition frequency has ONE definition, shared by both graphs
+//   TEST 8  Placement — the final technical evidence pages, before About Sound Proof
 //
 // The graphs themselves are built by the app's own builders
 // (buildFinishedGraphOptimisationResult → buildBassGraphSeries), so their values
@@ -136,4 +137,30 @@ test('TEST 7 — the transition frequency is derived once for both graphs', () =
   const live = read('src/components/room/bass/useAuthoritativeBassResponse.js');
   assert.ok(live.includes('resolveOptimisationTransitionHz'), 'live graph uses the shared definition');
   assert.ok(!live.includes('2000 * Math.sqrt'), 'live graph no longer inlines the formula');
+});
+
+// ── TEST 8 — placement in the report ───────────────────────────────────────
+test('TEST 8 — the graphs are the final technical evidence, before About Sound Proof', () => {
+  const report = read('src/pages/RP22Report.jsx');
+
+  // Print order: RP22 parameter pages → graphs → About Sound Proof.
+  const paramsAt = report.indexOf('id="pdf-room-parameters"');
+  const printGraphAt = report.lastIndexOf('<BassResponseGraphSection');
+  const aboutAt = report.indexOf('id="pdf-about-sound-proof"');
+  assert.ok(paramsAt > 0 && aboutAt > 0, 'the parameter and About blocks are both present');
+  assert.ok(printGraphAt > paramsAt, 'the printed graphs follow the RP22 parameter pages');
+  assert.ok(printGraphAt < aboutAt, 'the printed graphs precede About Sound Proof');
+
+  // Screen: the graphs follow the whole parameter flow instead of interrupting it.
+  const screenGraphAt = report.indexOf('<BassResponseGraphSection');
+  assert.ok(screenGraphAt > report.indexOf('<RP22ReportParameterGrid {...parameterGridProps} />'),
+    'the on-screen graphs follow the parameter grid');
+  assert.ok(screenGraphAt > report.indexOf('<TechnicalEngineeringSummaryNote />'),
+    'the on-screen graphs close the technical evidence');
+
+  // The titles the report prints.
+  const section = read('src/components/report/technical/BassResponseGraphSection.jsx');
+  assert.ok(section.includes('BASS RESPONSE GRAPHS'), 'section title present');
+  assert.ok(section.includes('RSP BASS RESPONSE VS TARGET'), 'page 1 title present');
+  assert.ok(section.includes('PRIMARY SEATS BASS RESPONSE'), 'page 2 title present');
 });
