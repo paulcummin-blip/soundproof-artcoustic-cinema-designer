@@ -137,18 +137,28 @@ export default function RoomDesignerHeader({
   const identity = projectHydration.identity;
 
   const effectiveProjectId = activeProjectId || projectIdState || null;
+  const { activeVersionId } = useProjectVersions(effectiveProjectId);
 
-  const handleDesignReviewClick = () => {
-    if (effectiveProjectId) {
-      navigate(`/DesignReview?projectId=${effectiveProjectId}`);
+  // Base44 preview mirrors the iframe path into its outer route. A client-side
+  // path-only transition could update that outer route while leaving the Room
+  // Designer tree mounted. Load the same explicit project/version URL used by a
+  // direct report open so the router and ProjectGate start from one identity.
+  const openReport = (pathname) => {
+    if (!effectiveProjectId) return;
+    const params = new URLSearchParams();
+    params.set("projectId", effectiveProjectId);
+    if (activeVersionId) params.set("versionId", activeVersionId);
+    const url = `${pathname}?${params.toString()}`;
+    if (typeof window !== "undefined") {
+      window.location.assign(url);
+    } else {
+      navigate(url);
     }
   };
 
-  const handleClientReportClick = () => {
-    if (effectiveProjectId) {
-      navigate(`/RP22ClientReport?projectId=${effectiveProjectId}`);
-    }
-  };
+  const handleDesignReviewClick = () => openReport("/DesignReview");
+
+  const handleClientReportClick = () => openReport("/RP22ClientReport");
 
   const handleProductCadFilesClick = () => {
     window.open(PRODUCT_CAD_FILES_URL, "_blank", "noopener,noreferrer");
