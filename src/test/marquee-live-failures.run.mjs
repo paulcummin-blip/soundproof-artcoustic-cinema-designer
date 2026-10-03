@@ -83,6 +83,13 @@ function authoritativeContract() {
     canonicalMetricPublicationValid: true,
     publicationRejectionReason: null,
   };
+  contract.bassResult = {
+    P19: { status: "complete", level: 4, value: 0.9755 },
+    P20: { status: "complete", level: 1, value: 16.9169 },
+    seatResults: {
+      P20: contract.selectedCandidate.perSeatP20Results,
+    },
+  };
   return contract;
 }
 
