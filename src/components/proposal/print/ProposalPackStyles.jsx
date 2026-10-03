@@ -299,7 +299,7 @@ export default function ProposalPackStyles() {
          below it, and the supporting images sit under it rather than beside it.
          ── */
       .proposal-print-portal .pp-gallery {
-        margin-top: 8mm;
+        margin-top: 6mm;
       }
       .proposal-print-portal .pp-gallery__hero {
         margin: 0 0 8mm;
@@ -308,7 +308,7 @@ export default function ProposalPackStyles() {
         margin-bottom: 2mm;
       }
       .proposal-print-portal .pp-page--images .pp-header {
-        margin-bottom: 8mm;
+        margin-bottom: 6mm;
       }
 
       /* ── Editorial image ── */
@@ -446,14 +446,29 @@ export default function ProposalPackStyles() {
           break-inside: avoid;
           page-break-inside: avoid;
         }
-        /* Three images: a hero image with two supporting images below it. The
-           hero is the subject of the page and keeps deliberate space under it;
-           the two supporting images sit beneath it without competing. */
+        /* The image heights are a page budget, not a preference: the page frame
+           is 297mm with 12mm above and 14mm below, the heading takes about 30mm,
+           and what is left is shared out so the hero image is 55 to 65 per cent
+           of the image area and nothing is ever pushed onto a second page. */
+        /* Three images: a full-width hero image with two supporting images below
+           it. The hero is the subject of the page and keeps deliberate space
+           under it; the two supporting images sit beneath it without competing. */
         body.proposal-export-mode .proposal-print-portal .pp-gallery--3 .pp-gallery__hero img {
-          height: 140mm;
+          height: 132mm;
         }
         body.proposal-export-mode .proposal-print-portal .pp-gallery--3 .pp-gallery__support img {
-          height: 70mm;
+          height: 84mm;
+        }
+        /* Four images: the hero image full width, with three supporting images
+           in one row beneath it. */
+        body.proposal-export-mode .proposal-print-portal .pp-gallery--4 .pp-gallery__hero img {
+          height: 128mm;
+        }
+        body.proposal-export-mode .proposal-print-portal .pp-gallery--4 .pp-gallery__support {
+          grid-template-columns: repeat(3, 1fr);
+        }
+        body.proposal-export-mode .proposal-print-portal .pp-gallery--4 .pp-gallery__support img {
+          height: 68mm;
         }
         /* Two images: a dominant image with one supporting image below it. */
         body.proposal-export-mode .proposal-print-portal .pp-gallery--2 .pp-gallery__hero img {

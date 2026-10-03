@@ -157,11 +157,17 @@ export function screenStatement(screen = {}) {
  * The evidence cards for one design structure section.
  * Only that structure's own parameters appear, and only where the design has a
  * calculated result for them.
+ *
+ * The cards read the section's own parameters in full: the eight-row cap belongs
+ * to the one-page evidence table, not to a page that carries one card per
+ * parameter.
  */
 export function buildEvidenceCards(rows, sectionType) {
   const keys = STRUCTURE_PARAMETER_KEYS[sectionType];
   if (!keys) return [];
-  const byKey = new Map(buildHighlightDisplayRows(rows).map((row) => [row.key, row]));
+  const byKey = new Map(
+    buildHighlightDisplayRows(rows, { limit: keys.length }).map((row) => [row.key, row])
+  );
   return keys.map((key) => byKey.get(key)).filter(Boolean);
 }
 

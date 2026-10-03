@@ -75,8 +75,20 @@ export default function ProposalPrintStyles() {
         /* An imagery page is led by the image rather than by text: it takes a
            shorter top margin and gives that space to the hero image. */
         body.proposal-export-mode .proposal-print-section.pp-page--images {
-          padding-top: 14mm;
-          padding-bottom: 16mm;
+          padding-top: 12mm;
+          padding-bottom: 14mm;
+        }
+
+        /* The evidence page is one block — heading, table header, rows and
+           footnote — so it takes a shorter top margin than a prose page and a
+           tighter gap under its heading, which is what lets every row sit on the
+           single page that carries the title. */
+        body.proposal-export-mode .proposal-print-section.pp-page--highlights {
+          padding-top: 16mm;
+        }
+
+        body.proposal-export-mode .proposal-print-section--highlights .pp-header {
+          margin-bottom: 6mm;
         }
 
         /* The fact-card page carries its own dense card grid, so it takes a
@@ -141,18 +153,29 @@ export default function ProposalPrintStyles() {
           color: #213428;
         }
 
-        /* ── Key Performance Highlights table — compact so the trimmed table
-           keeps every row on the one page that carries its heading. ── */
+        /* ── Key Performance Highlights table — a fixed grid so no column can
+           widen and wrap a second line, which is what made the table taller than
+           the page it has to share with its heading. ── */
         body.proposal-export-mode .kph-table {
           width: 100%;
           border-collapse: collapse;
           margin-top: 5mm;
-          font-size: 8.5pt;
         }
+
+        /* The four columns of the summary table, on a fixed grid: a compact
+           Result column and a "What the room gains" column that reads in one or
+           two lines. A comparison table keeps its own option columns. */
+        body.proposal-export-mode .kph-table--summary {
+          table-layout: fixed;
+        }
+        body.proposal-export-mode .kph-table--summary th:nth-child(1) { width: 15%; }
+        body.proposal-export-mode .kph-table--summary th:nth-child(2) { width: 21%; }
+        body.proposal-export-mode .kph-table--summary th:nth-child(3) { width: 22%; }
+        body.proposal-export-mode .kph-table--summary th:nth-child(4) { width: 42%; }
 
         body.proposal-export-mode .kph-table th {
           text-align: left;
-          padding: 1.8mm 2.5mm;
+          padding: 1.2mm 2mm;
           background: #F5F4F0;
           color: #213428;
           font-weight: 600;
@@ -160,15 +183,25 @@ export default function ProposalPrintStyles() {
         }
 
         body.proposal-export-mode .kph-table td {
-          padding: 1.8mm 2.5mm;
+          padding: 1.2mm 2mm;
           color: #3E4349;
           border-bottom: 1px solid #EAE8E3;
           vertical-align: top;
+          overflow-wrap: break-word;
         }
 
         body.proposal-export-mode .kph-table tr {
           break-inside: avoid;
           page-break-inside: avoid;
+        }
+
+        /* The footnote belongs to the block: it stays with the last row. */
+        body.proposal-export-mode .proposal-print-section--highlights p {
+          margin: 2mm 0 0;
+          font-size: 7.5pt;
+          line-height: 1.4;
+          break-before: avoid;
+          page-break-before: avoid;
         }
 
         /* A table header repeats if the table ever continues on a new page. */
@@ -289,17 +322,19 @@ ${buildReportTypographyCss({ scope: '.proposal-print-portal', profile: 'a4', pre
 
         body.proposal-export-mode .proposal-print-portal .kph-table {
           font-family: var(--report-font-body) !important;
-          font-size: var(--report-body-size);
-          letter-spacing: var(--report-body-tracking);
-          line-height: var(--report-body-leading);
+          /* Smaller than the report body on purpose: eight rows, a header row
+             and a footnote share the page with the section heading. */
+          font-size: 8pt;
+          letter-spacing: 0;
+          line-height: 1.35;
         }
 
         body.proposal-export-mode .proposal-print-portal .kph-table th {
           font-family: var(--report-font-heading) !important;
-          font-size: var(--report-subheader-size);
+          font-size: 7.5pt;
           font-weight: 300;
-          letter-spacing: var(--report-heading-tracking);
-          line-height: var(--report-heading-leading);
+          letter-spacing: 0.06em;
+          line-height: 1.25;
           text-transform: uppercase;
         }
 

@@ -31,12 +31,9 @@ import {
   mentionsHighChannelUpgrade,
   stripHighChannelUpgradeCopy,
 } from '../components/proposal/highChannelLayoutAuthority.js';
-import {
-  HIGHLIGHTS_INTRO_MAX_ROWS,
-  shouldPrintHighlightsIntro,
-} from '../components/proposal/highlightsPageAuthority.js';
 import { ASSET_SLOT, ASSET_SLOT_OPTIONS, slotLabel } from '../components/proposal/assetSlotAuthority.js';
 import { IMAGES_PER_PAGE, imagePagesFor } from '../components/proposal/print/imagePageLayout.js';
+import { compactViewingResult } from '../components/proposal/print/snapshotViewingRows.js';
 
 // The repository root: the stylesheet checks read the files as they ship.
 const REPO = new URL('../../', import.meta.url);
@@ -123,31 +120,74 @@ describe('B. Key Performance Highlights stays on one page', () => {
   });
 
   it('compacts the table so the trimmed rows fit, and stays readable', () => {
-    expect(PRINT).toMatch(/\.kph-table \{[\s\S]*font-size: 8\.5pt/);
-    expect(PRINT).toMatch(/\.kph-table th \{[\s\S]*padding: 1\.8mm 2\.5mm/);
-    expect(PRINT).toMatch(/\.kph-table td \{\s*padding: 1\.8mm 2\.5mm/);
-    expect(Number(PRINT.match(/font-size: 8\.5pt/)[0].replace(/\D/g, ''))).toBeGreaterThan(8);
+    // A fixed grid for the summary table: no column can widen and wrap a
+    // second line.
+    expect(PRINT).toMatch(/\.kph-table--summary \{\s*table-layout: fixed/);
+    expect(PRINT).toMatch(/\.kph-table--summary th:nth-child\(3\) \{ width: 22%; \}/);
+    expect(PRINT).toMatch(/\.kph-table--summary th:nth-child\(4\) \{ width: 42%; \}/);
+    expect(PRINT).toMatch(/\.kph-table th \{\s*text-align: left;\s*padding: 1\.2mm 2mm/);
+    expect(PRINT).toMatch(/\.kph-table td \{\s*padding: 1\.2mm 2mm/);
+    // Readable, and deliberately smaller than the report body: eight rows, a
+    // header row and a footnote share the page with the heading.
+    expect(PRINT).toMatch(/\.proposal-print-portal \.kph-table \{[\s\S]*font-size: 8pt/);
+    expect(PRINT).toMatch(/\.proposal-print-portal \.kph-table th \{[\s\S]*font-size: 7\.5pt/);
+    expect(PRINT).toMatch(/\.proposal-print-portal \.kph-table th \{[\s\S]*font-size: 7\.5pt/);
+    // The footnote belongs to the block and stays with the last row.
+    expect(PRINT).toMatch(/proposal-print-section--highlights p \{\s*margin: 2mm 0 0;\s*font-size: 7\.5pt/);
   });
 
-  it('carries the eleven most useful rows, by assessed area', () => {
-    expect(HIGHLIGHT_DISPLAY_LIMIT).toBeLessThanOrEqual(11);
+  it('carries the eight rows the System Design Summary prints, by assessed area', () => {
+    expect(HIGHLIGHT_DISPLAY_LIMIT).toBe(8);
     const rows = buildHighlightDisplayRows(MARQUEE_ROWS);
-    expect(rows.length).toBe(11);
+    expect(rows.length).toBe(8);
     expect(rows[0].area).toBe('Viewing Geometry');
-    ['rp23_viewing', 'p2', 'p4', 'p5', 'p7', 'p12', 'p13', 'p14', 'p16', 'p18']
-      .forEach((key) => expect(rows.map((row) => row.key)).toContain(key));
-    // The lowest-priority result gives up its place before an assessed area does.
-    expect(rows.map((row) => row.key)).not.toContain('p17');
+    // The eight places go to these results, in this order.
+    expect(rows.map((row) => row.key)).toEqual([
+      'rp23_viewing', 'p2', 'p4', 'p5', 'p12', 'p14', 'p16', 'p18',
+    ]);
+    // The screen size and the channel layout are not exempt: P2 already states
+    // how many physical speaker positions the room is built with.
+    expect(rows.map((row) => row.key)).not.toContain('system_layout');
+    expect(rows.map((row) => row.key)).not.toContain('screen_size');
   });
 
-  it('prints the introduction only when the table leaves room for it', () => {
-    expect(HIGHLIGHTS_INTRO_MAX_ROWS).toBe(10);
-    expect(shouldPrintHighlightsIntro({ body: '<p>One short sentence.</p>', rowCount: 10 })).toBe(true);
-    expect(shouldPrintHighlightsIntro({ body: '<p>One short sentence.</p>', rowCount: 11 })).toBe(false);
-    expect(shouldPrintHighlightsIntro({ body: '<p>First sentence. Second sentence.</p>', rowCount: 4 })).toBe(false);
-    expect(shouldPrintHighlightsIntro({ body: '', rowCount: 0 })).toBe(false);
-    // The document reads that rule, so the table never follows a page break.
-    expect(DOC).toMatch(/shouldPrintHighlightsIntro\(\{ body, rowCount \}\)/);
+  it('states the viewing geometry in one compact line, from the published angles', () => {
+    const snapshot = {
+      room: { dimensions: { width_m: 6 } },
+      seats: [
+        { id: 'row-1', row: 1, position: { x: 3 }, is_reference: false },
+        { id: 'row-2', row: 2, position: { x: 3 }, is_reference: false },
+      ],
+      viewing: {
+        per_seat: [
+          { seat_id: 'row-1', horizontal_angle_deg: 63.2, rp23_level: 'L4' },
+          { seat_id: 'row-2', horizontal_angle_deg: 44.6, rp23_level: 'L3' },
+        ],
+      },
+    };
+    const compact = compactViewingResult(snapshot);
+    expect(compact).toBe('Row 1 L4, 63° / Row 2 L3, 45°');
+    // Whole degrees only: no angle decimal reaches the page.
+    expect(compact).not.toMatch(/\d+\.\d/);
+    // The result column states it, and the stored sentence prints when the
+    // snapshot carries no per-seat geometry.
+    const withCompact = buildHighlightDisplayRows(MARQUEE_ROWS, { viewingResult: compact });
+    expect(withCompact.find((row) => row.key === 'rp23_viewing').result).toBe(compact);
+    const without = buildHighlightDisplayRows(MARQUEE_ROWS);
+    expect(without.find((row) => row.key === 'rp23_viewing').result)
+      .toBe('L3 · 44° to 63°');
+  });
+
+  it('carries no introduction above the table', () => {
+    // The table is self-explanatory, and the introduction was what pushed the
+    // table onto the page after its own title.
+    expect(DOC).not.toMatch(/shouldPrintHighlightsIntro|showIntro/);
+    const highlightsBlock = DOC.slice(
+      DOC.indexOf("section.section_type === 'key_performance_highlights'"),
+      DOC.indexOf('const evidence =')
+    );
+    expect(highlightsBlock).not.toMatch(/pp-body|dangerouslySetInnerHTML|showIntro/);
+    expect(highlightsBlock).toContain('KeyPerformanceHighlightsTable');
     expect(DOC).toContain('pp-page--highlights proposal-print-section--highlights');
   });
 });
@@ -161,17 +201,26 @@ describe('C. Project Images is a visualisation page', () => {
 
   it('makes the hero full width and larger than its supporting images', () => {
     expect(PACK).toMatch(/pp-gallery__figure img \{\s*display: block;\s*width: 100%/);
-    expect(PACK).toMatch(/pp-gallery--3 \.pp-gallery__hero img \{\s*height: 140mm/);
-    expect(PACK).toMatch(/pp-gallery--3 \.pp-gallery__support img \{\s*height: 70mm/);
+    // Three images: the hero is 55 to 65 per cent of the image area, and the
+    // whole page's images still fit one sheet.
+    expect(PACK).toMatch(/pp-gallery--3 \.pp-gallery__hero img \{\s*height: 132mm/);
+    expect(PACK).toMatch(/pp-gallery--3 \.pp-gallery__support img \{\s*height: 84mm/);
     expect(PACK).toMatch(/pp-gallery--2 \.pp-gallery__hero img \{\s*height: 150mm/);
     expect(PACK).toMatch(/pp-gallery--1 \.pp-gallery__hero img \{\s*height: 200mm/);
+    // Four images: a hero image with three supporting images in one row.
+    expect(PACK).toMatch(/pp-gallery--4 \.pp-gallery__hero img \{\s*height: 128mm/);
+    expect(PACK).toMatch(/pp-gallery--4 \.pp-gallery__support \{\s*grid-template-columns: repeat\(3, 1fr\)/);
   });
 
   it('leaves deliberate space above and below the hero image', () => {
-    expect(PACK).toMatch(/\.pp-gallery \{\s*margin-top: 8mm/);
+    expect(PACK).toMatch(/\.pp-gallery \{\s*margin-top: 6mm/);
     expect(PACK).toMatch(/\.pp-gallery__hero \{\s*margin: 0 0 8mm/);
-    expect(PACK).toMatch(/\.pp-page--images \.pp-header \{\s*margin-bottom: 8mm/);
-    expect(PRINT).toMatch(/proposal-print-section\.pp-page--images \{\s*padding-top: 14mm/);
+    expect(PACK).toMatch(/\.pp-page--images \.pp-header \{\s*margin-bottom: 6mm/);
+    expect(PRINT).toMatch(/proposal-print-section\.pp-page--images \{\s*padding-top: 12mm/);
+    // The evidence page takes a shorter top margin too, so the whole block has
+    // room for every row inside one page.
+    expect(PRINT).toMatch(/proposal-print-section\.pp-page--highlights \{\s*padding-top: 16mm/);
+    expect(PRINT).toMatch(/proposal-print-section--highlights \.pp-header \{\s*margin-bottom: 6mm/);
     // The fact-card page keeps its own one-page rule with a shorter top margin.
     expect(PRINT).toMatch(/proposal-print-section\.pp-page--glance \{\s*padding-top: 16mm/);
     expect(PACK).toMatch(/pp-page--glance[\s\S]*break-inside: avoid/);

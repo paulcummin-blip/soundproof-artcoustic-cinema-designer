@@ -54,11 +54,11 @@ describe('Key Performance Highlights — one page, best rows only', () => {
   const rows = buildHighlightDisplayRows(MARQUEE_ROWS);
 
   it('never carries more rows than fit one printed page', () => {
-    // Eleven rows is the most the compact table fits on the one page that also
-    // carries its heading.
-    expect(HIGHLIGHT_DISPLAY_LIMIT).toBeLessThanOrEqual(11);
+    // Eight rows is the most the table carries on the one page that also holds
+    // its heading, its header row and its footnote.
+    expect(HIGHLIGHT_DISPLAY_LIMIT).toBe(8);
     expect(rows.length).toBeLessThanOrEqual(HIGHLIGHT_DISPLAY_LIMIT);
-    expect(rows.length).toBe(11);
+    expect(rows.length).toBe(8);
   });
 
   it('keeps every assessed performance area in the trimmed table', () => {
@@ -67,14 +67,14 @@ describe('Key Performance Highlights — one page, best rows only', () => {
       .forEach((area) => expect(areas.has(area)).toBe(true));
   });
 
-  it('chooses the most useful rows, dropping only the lowest priority', () => {
+  it('chooses the most useful rows, dropping the rest', () => {
     const keys = rows.map((row) => row.key);
-    ['rp23_viewing', 'p2', 'p4', 'p5', 'p7', 'p9', 'p12', 'p13', 'p16', 'p18']
+    ['rp23_viewing', 'p2', 'p4', 'p5', 'p12', 'p14', 'p16', 'p18']
       .forEach((key) => expect(keys).toContain(key));
-    // Keeping one row for every assessed area is what the trim protects: only
-    // the lowest-priority result (P17) is dropped rather than a whole area.
-    expect(keys).toContain('p14');
-    expect(keys).not.toContain('p17');
+    // The screen size and the channel layout give up their places: P2 already
+    // states how many physical speaker positions the room is built with.
+    ['p7', 'p9', 'p13', 'p17', 'screen_size', 'system_layout']
+      .forEach((key) => expect(keys).not.toContain(key));
   });
 
   it('reads by performance area, with the viewing result first', () => {
@@ -92,11 +92,13 @@ describe('Key Performance Highlights — one page, best rows only', () => {
     const p5 = rows.find((row) => row.key === 'p5');
     expect(p5.result).toBe('L1 · 48°');
     expect(p5.gain).not.toMatch(/excellent/i);
-    expect(p5.gain).toMatch(/compromise/i);
+    expect(p5.gain).toMatch(/room geometry constraint/i);
   });
 
   it('states a Level 2 result honestly and keeps usable prose', () => {
-    const p7 = rows.find((row) => row.key === 'p7');
+    // A Level 2 row is not one of the eight the trimmed table carries, so the
+    // honesty rule is read from the full set.
+    const p7 = buildHighlightDisplayRows(MARQUEE_ROWS, { limit: 20 }).find((row) => row.key === 'p7');
     expect(p7.result).toBe('L2 · 6°');
     expect(p7.gain).toMatch(/bridges the front stage/i);
     expect(p7.gain).not.toMatch(/outstanding|excellent/i);

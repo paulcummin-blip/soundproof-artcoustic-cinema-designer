@@ -239,13 +239,21 @@ describe('E. generated report consistency', () => {
     const chipText = buildAuthorityChips(marqueeFacts).find((chip) => /screen/.test(chip.label)).label;
     const glance = buildAtAGlance({ snapshot: marqueeSnapshot(), projectName: 'Marquee' });
     const packScreen = glance.roomCards.find((card) => card.label === 'Screen').value;
-    const highlightScreen = buildHighlightDisplayRows(selectHighlightRows(marqueeSnapshot()))
-      .find((row) => row.key === 'screen_size').result;
 
-    [chipText, packScreen, highlightScreen].forEach((text) => {
+    [chipText, packScreen].forEach((text) => {
       expect(text).toMatch(/\b170\b/);
       expect(text).not.toContain('185');
     });
+
+    // The evidence table no longer states the screen size: it carries the eight
+    // results that describe the design, and the screen scale is already stated
+    // on the at-a-glance page. Where the row is included it still states the
+    // designer's own screen, never the derived diagonal.
+    const allRows = buildHighlightDisplayRows(selectHighlightRows(marqueeSnapshot()), { limit: 20 });
+    const trimmed = buildHighlightDisplayRows(selectHighlightRows(marqueeSnapshot()));
+    expect(trimmed.find((row) => row.key === 'screen_size')).toBeUndefined();
+    expect(allRows.find((row) => row.key === 'screen_size').result).toMatch(/\b170\b/);
+    expect(allRows.find((row) => row.key === 'screen_size').result).not.toContain('185');
   });
 
   it('states the designer’s screen size in every case: television by nominal size, projection screen by width', () => {

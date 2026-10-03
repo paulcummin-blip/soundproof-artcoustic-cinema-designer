@@ -35,6 +35,10 @@ import { buildHighlightDisplayRows } from '@/components/proposal/keyPerformanceH
  * - comparisonRows: Array<{ key, area, values: string[], change: string|null }>
  * - comparisonVersions: Array<{ version_id, label, version_name }> — the option
  *   columns, in report order
+ * - viewingResult: the compact per-row RP23 line ('Row 1 L4, 63° / Row 2 L3,
+ *   45°') from the published per-seat angles. Stated in the Result column in
+ *   place of the longer stored sentence, so the row holds one line. Null prints
+ *   the stored result unchanged.
  * - className: optional wrapper class
  */
 
@@ -57,6 +61,7 @@ export default function KeyPerformanceHighlightsTable({
   rows,
   comparisonRows,
   comparisonVersions,
+  viewingResult = null,
   className = '',
 }) {
   const options = Array.isArray(comparisonVersions) ? comparisonVersions : [];
@@ -109,12 +114,12 @@ export default function KeyPerformanceHighlightsTable({
     );
   }
 
-  const list = buildHighlightDisplayRows(rows);
+  const list = buildHighlightDisplayRows(rows, { viewingResult });
   if (list.length === 0) return null;
 
   return (
     <div className={className}>
-      <table className="kph-table w-full border-collapse">
+      <table className="kph-table kph-table--summary w-full border-collapse">
         <thead>
           <tr>
             {SUMMARY_COLUMNS.map((column) => (

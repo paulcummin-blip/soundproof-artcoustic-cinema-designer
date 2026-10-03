@@ -52,19 +52,19 @@ const ROW_PRESENTATION = Object.freeze({
     area: HIGHLIGHT_AREA.VIEWING,
     parameter: 'RP23 viewing',
     unit: DISPLAY_UNIT.DEGREES,
-    gain: 'Places the seating inside the viewing angle the screen was specified for, so the picture holds up across the room.',
+    gain: 'Shows how the screen scale works across both seating rows.',
   },
   system_layout: {
     area: HIGHLIGHT_AREA.SPATIAL,
     parameter: 'Channel layout',
     unit: DISPLAY_UNIT.NONE,
-    gain: 'The channel layout the room is built for, so sound travels around and above the seats as the mix intends.',
+    gain: 'More speaker positions around and above the seats.',
   },
   p2: {
     area: HIGHLIGHT_AREA.SPATIAL,
     parameter: 'P2 discrete channels',
     unit: DISPLAY_UNIT.NONE,
-    gain: 'More discrete channels give more precise movement between the screen, side and rear speakers.',
+    gain: 'More speaker positions around and above the seats.',
   },
   p3: {
     area: HIGHLIGHT_AREA.SPATIAL,
@@ -76,7 +76,7 @@ const ROW_PRESENTATION = Object.freeze({
     area: HIGHLIGHT_AREA.SPATIAL,
     parameter: 'P4 screen consistency',
     unit: DISPLAY_UNIT.DB,
-    gain: 'Keeps the screen sound consistent from seat to seat, so the front stage holds together across the room.',
+    gain: 'Keeps dialogue and screen effects stable across the seating area.',
   },
   p5: {
     area: HIGHLIGHT_AREA.SPATIAL,
@@ -118,7 +118,7 @@ const ROW_PRESENTATION = Object.freeze({
     area: HIGHLIGHT_AREA.DYNAMIC,
     parameter: 'P12 screen Dynamic Range',
     unit: DISPLAY_UNIT.DB,
-    gain: 'Strong headroom on the screen channels for demanding film soundtracks.',
+    gain: 'Strong front-stage headroom for demanding soundtracks.',
   },
   p13: {
     area: HIGHLIGHT_AREA.DYNAMIC,
@@ -130,7 +130,7 @@ const ROW_PRESENTATION = Object.freeze({
     area: HIGHLIGHT_AREA.DYNAMIC,
     parameter: 'P14 LFE/subwoofer Dynamic Range',
     unit: DISPLAY_UNIT.DB,
-    gain: 'The low-frequency channel carries the deepest effects without running out of output.',
+    gain: 'Low-frequency output supports the scale of the room.',
   },
   p16: {
     area: HIGHLIGHT_AREA.TIMBRE,
@@ -168,49 +168,55 @@ const ROW_PRESENTATION = Object.freeze({
 const FALLBACK_GAIN = 'Part of how this system performs as a whole in the room.';
 
 /**
- * The most rows the printed table carries. The section is one page and is never
- * split, so the table holds the best few results rather than every result: a
- * long table that breaks across two pages reads as an accident.
+ * The most rows the printed table carries. The System Design Summary table is
+ * one indivisible printed block — its heading, its header row and every row sit
+ * on a single page — so it carries the eight most useful results and no more.
+ * A concise table that holds together reads as designed; a longer one that
+ * breaks across two pages reads as an accident.
  */
-export const HIGHLIGHT_DISPLAY_LIMIT = 11;
+export const HIGHLIGHT_DISPLAY_LIMIT = 8;
 
 /**
  * The order rows are chosen in when a design has more results than the table
- * carries: the viewing result first, then the spatial results, then headroom,
- * bass and tone. A row that is not listed is chosen last.
+ * carries. The eight places go to the results that carry the design: the
+ * viewing geometry, then the spatial results, then headroom, bass and tone.
+ *
+ * The screen size row and the channel layout row are deliberately not exempt:
+ * the screen scale is already stated on the at-a-glance page, and P2 already
+ * states how many physical speaker positions the room is built with. A row that
+ * is not listed is chosen last.
  */
 export const HIGHLIGHT_PRINT_PRIORITY = Object.freeze([
   'rp23_viewing',
   'p2',
   'p4',
   'p5',
-  'p7',
-  'p9',
   'p12',
-  'p13',
   'p14',
   'p18',
   'p16',
+  'p7',
+  'p9',
+  'p13',
   'p17',
   'p19',
   'p20',
-  'screen_size',
-  'system_layout',
   'p3',
   'p6',
   'p10',
   'p11',
+  'screen_size',
+  'system_layout',
 ]);
 
 /**
- * The rows that describe the room and the system the client is buying. They are
- * never the rows a trimmed table drops: the screen size, the system layout and
- * the viewing result state what the design is, so every page that quotes them
- * quotes the same figure. Measured results fill the remaining places.
+ * The rows that are never the ones a trimmed table drops. Only the viewing
+ * result qualifies: it is the client's own seat geometry, stated once in the
+ * table and nowhere else. Every other row, including the screen size and the
+ * channel layout, gives up its place to a more useful result when the eight
+ * places are filled.
  */
 export const HIGHLIGHT_ROOM_FACT_KEYS = Object.freeze([
-  'screen_size',
-  'system_layout',
   'rp23_viewing',
 ]);
 
@@ -279,6 +285,15 @@ export function selectTableRows(rows = [], limit = HIGHLIGHT_DISPLAY_LIMIT) {
 /** The shortest generated sentence treated as a real "what the room gains" cell. */
 const MIN_GAIN_LENGTH = 20;
 
+/**
+ * The most characters a stored "What the room gains" sentence may carry and
+ * still print. The column holds two printed lines at the table's size: a longer
+ * sentence would wrap to three or four and make the table taller than the page
+ * it has to share with its heading, so it is replaced by the approved line for
+ * that parameter. The stored sentence is never modified - only what prints.
+ */
+const MAX_PRINTED_GAIN = 96;
+
 /** A result at RP22 Level 1 or Level 2 is stated plainly, never as a strength. */
 const LOW_GRADE = /\bL[12]\b/i;
 
@@ -294,7 +309,7 @@ const MODEST_GAIN = Object.freeze({
   p2: 'The channel count follows the system format the room is designed to, so movement is built from the positions this room allows.',
   p3: 'The screen speakers sit where the room and the screen allow, so dialogue stays anchored to the picture.',
   p4: 'Screen level consistency is set by the room and the screen wall, so the front stage holds together without being perfectly even seat to seat.',
-  p5: 'This is the main spatial compromise, and it is a room geometry constraint: the spacing between speakers is set by the room layout and the practical speaker positions, not by a simple upgrade. Movement around the room remains strong.',
+  p5: 'Main room geometry constraint: the speaker spacing is set by the room layout, not by a simple upgrade, and the design already uses high speaker density.',
   p6: 'The surround speakers are matched in level as far as the seating positions and the room allow.',
   p7: 'The front wide positions bridge the screen and the side speakers as far as the room geometry allows.',
   p9: 'Overhead spacing is set by the ceiling height and the seating layout, so sound above the seats is even rather than ideal.',
@@ -336,22 +351,37 @@ function usableGain(row) {
  * The rows the table renders.
  *
  * @param {Array} rows - calculated highlight rows from the section metadata
- * @param {{ limit?: number }} [options]
+ * @param {{ limit?: number, viewingResult?: string|null }} [options]
+ *   viewingResult — the compact per-row RP23 line ('Row 1 L4, 63° / Row 2 L3,
+ *   45°'), built from the published per-seat angles by the same authority the
+ *   reports read. It states in one line the geometry the stored sentence
+ *   describes, so the Result column stays narrow. Nothing is derived here: when
+ *   no compact line is supplied the stored result prints as it always has.
  * @returns {Array<{ key, area, parameter, result, gain }>} display rows
  */
 export function buildHighlightDisplayRows(rows, options = {}) {
   const limit = Number.isFinite(options.limit) ? options.limit : HIGHLIGHT_DISPLAY_LIMIT;
+  const compactViewing = String(options.viewingResult || '').trim();
   const display = excludeDesignIndexRows(rows)
     .filter((row) => row && (row.area || row.result || row.key))
     .map((row, index) => {
       const key = String(row.key || `row_${index}`);
       const presentation = ROW_PRESENTATION[key] || null;
-      const result = formatResultText(row.result, presentation?.unit ?? DISPLAY_UNIT.NONE);
+      const calculated = formatResultText(row.result, presentation?.unit ?? DISPLAY_UNIT.NONE);
+      const result = key === 'rp23_viewing' && compactViewing ? compactViewing : calculated;
       const generated = usableGain(row);
-      // A Level 1 or Level 2 result is stated plainly: a generated sentence that
-      // reads as a strength (or a missing one) is replaced by the honest line.
+      const approved = presentation?.gain || FALLBACK_GAIN;
+      // A generated sentence prints only when it is short enough to hold the
+      // column at one or two lines. A longer one is replaced by the approved
+      // line for the parameter, so no single row can stretch the table off the
+      // page it shares with its heading. The stored sentence is never changed.
+      const short = Boolean(generated) && generated.length <= MAX_PRINTED_GAIN;
+      const proposed = short ? generated : approved;
+      // A Level 1 or Level 2 result is stated plainly: a sentence that reads as a
+      // strength, or one long enough to need trimming, gives way to the honest
+      // line for that parameter.
       const lowGrade = LOW_GRADE.test(String(row.result || ''));
-      const oversold = !generated || OVERSELL.test(generated);
+      const oversold = OVERSELL.test(proposed);
       return {
         key,
         area: highlightAreaFor(key, row.area),
@@ -359,9 +389,9 @@ export function buildHighlightDisplayRows(rows, options = {}) {
         result,
         // The column is never blank: the approved line for the parameter stands
         // in whenever the generated sentence is missing or too thin to use.
-        gain: lowGrade && oversold
-          ? (MODEST_GAIN[key] || presentation?.gain || FALLBACK_GAIN)
-          : (generated || presentation?.gain || FALLBACK_GAIN),
+        gain: lowGrade && (!short || oversold)
+          ? (MODEST_GAIN[key] || proposed)
+          : proposed,
       };
     })
     .filter((row) => Boolean(row.area && (row.result || row.parameter)));

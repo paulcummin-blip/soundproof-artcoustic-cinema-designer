@@ -38,8 +38,7 @@ import {
 import { getSectionsForProposalType } from '@/components/proposal/proposalSections';
 import { prepareSectionBody } from '@/components/proposal/sectionBodyAuthority';
 import { isHighChannelDesign } from '@/components/proposal/highChannelLayoutAuthority';
-import { shouldPrintHighlightsIntro } from '@/components/proposal/highlightsPageAuthority';
-import { buildHighlightDisplayRows } from '@/components/proposal/keyPerformanceHighlightsAuthority';
+import { compactViewingResult } from '@/components/proposal/print/snapshotViewingRows';
 import { getProposalTypeLabel } from '@/components/proposal/proposalTypes';
 
 const STRUCTURE_SECTIONS = new Set(['spatial_resolution', 'dynamic_range', 'timbre_matching']);
@@ -65,6 +64,10 @@ export default function ProposalPackDocument({
   // prints an added-speaker or spacing upgrade: a report generated before that
   // rule existed is cleaned on the way to the page.
   const highChannel = isHighChannelDesign(snapshot);
+  // The viewing geometry the table states in one line, taken from the published
+  // per-seat angles. Null when the snapshot carries none: the stored result is
+  // printed instead.
+  const viewingResult = compactViewingResult(snapshot);
 
   // One stored section per type: the first wins, so nothing prints twice.
   const byType = new Map();
@@ -155,13 +158,11 @@ export default function ProposalPackDocument({
       if (section.section_type === 'key_performance_highlights') {
         const isComparison = Array.isArray(section.metadata?.comparison_rows)
           && section.metadata.comparison_rows.length > 0;
-        // The heading, the table and every row stay on one page, so the
-        // introduction prints only when the table leaves room for it: the table
-        // is self-explanatory and never starts on the page after its own title.
-        const rowCount = isComparison
-          ? section.metadata.comparison_rows.length
-          : buildHighlightDisplayRows(section.metadata?.highlight_rows).length;
-        const showIntro = shouldPrintHighlightsIntro({ body, rowCount });
+        // The heading, the table header, every row and the footnote are one
+        // indivisible printed block on one page. The section carries no
+        // introduction of its own: the table is self-explanatory, and an
+        // introduction is exactly what pushed the table onto the page after its
+        // own title.
         pages.push(
           <section
             key={section.id}
@@ -172,13 +173,11 @@ export default function ProposalPackDocument({
               kicker="Evidence"
               title={isComparison ? 'System comparison' : title}
             />
-            {showIntro ? (
-              <div className="pp-body" dangerouslySetInnerHTML={{ __html: body }} />
-            ) : null}
             <KeyPerformanceHighlightsTable
               rows={section.metadata?.highlight_rows}
               comparisonRows={section.metadata?.comparison_rows}
               comparisonVersions={section.metadata?.comparison_versions}
+              viewingResult={isComparison ? null : viewingResult}
             />
           </section>
         );

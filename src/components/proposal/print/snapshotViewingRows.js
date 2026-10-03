@@ -113,4 +113,27 @@ export function resolveViewingRows(snapshot) {
     .filter(Boolean);
 }
 
+/**
+ * The same per-row geometry as one compact line, for the single Result cell of
+ * the Key Performance Highlights table:
+ *
+ *   'Row 1 L4, 63° / Row 2 L3, 45°'
+ *
+ * Whole degrees as the app displays them. A row with no published level states
+ * its angle alone, and a room whose per-seat geometry is not published returns
+ * null, so the caller falls back to the stored result rather than inventing one.
+ *
+ * @returns {string|null}
+ */
+export function compactViewingResult(snapshot) {
+  const rows = resolveViewingRows(snapshot);
+  if (rows.length === 0) return null;
+  return rows
+    .map((row) => {
+      const levelAndAngle = [row.level, row.angleText].filter(Boolean).join(', ');
+      return `Row ${row.rowNumber} ${levelAndAngle}`;
+    })
+    .join(' / ');
+}
+
 export default resolveViewingRows;

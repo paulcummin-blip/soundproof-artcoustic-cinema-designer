@@ -3,6 +3,7 @@ import { useSearchParams, Link, Navigate } from 'react-router-dom';
 import { base44 } from '@/api/base44Client';
 import { getSectionDef } from '@/components/proposal/proposalSections';
 import KeyPerformanceHighlightsTable from '@/components/proposal/KeyPerformanceHighlightsTable';
+import { compactViewingResult } from '@/components/proposal/print/snapshotViewingRows';
 import { getProposalTypeLabel } from '@/components/proposal/proposalTypes';
 import InlineRichTextEditor from '@/components/proposal/InlineRichTextEditor';
 import SectionToolbar from '@/components/proposal/SectionToolbar';
@@ -847,6 +848,7 @@ export default function ProposalEditor() {
                     rows={section.metadata?.highlight_rows}
                     comparisonRows={section.metadata?.comparison_rows}
                     comparisonVersions={section.metadata?.comparison_versions}
+                    viewingResult={compactViewingResult(proposal?.engineering_snapshot)}
                     className="mt-4"
                   />
                 )}
