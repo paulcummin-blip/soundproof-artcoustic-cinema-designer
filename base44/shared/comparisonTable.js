@@ -42,6 +42,9 @@ export const COMPARISON_ROW_ORDER = Object.freeze([
   // The equipment is a comparison area in its own right: two systems can be
   // graded alike and still be built from different speakers and subwoofers.
   'speakers',
+  'lcr',
+  'surrounds',
+  'overheads',
   'subwoofers',
   'amplification',
   'seating',
@@ -66,6 +69,9 @@ const ROW_LABELS = Object.freeze({
   rp23_viewing: 'Viewing angle / RP23',
   system_layout: 'System layout',
   speakers: 'Speaker package',
+  lcr: 'LCR',
+  surrounds: 'Surrounds / wides',
+  overheads: 'Overheads',
   subwoofers: 'Subwoofers',
   amplification: 'Amplification',
   seating: 'Seating',
@@ -134,6 +140,12 @@ function readRowValue(evidence, rowKey) {
     return lines.length > 0 ? lines.join(' · ') : null;
   }
 
+  const packageRoles = { lcr: ['lcr', 'centre_soundbar'], surrounds: ['surround', 'rear_surround', 'front_wide'], overheads: ['overhead'] };
+  if (packageRoles[rowKey]) {
+    const models = (evidence.speaker_package || []).filter((role) => packageRoles[rowKey].includes(role.role)).map((role) => role.model).filter(Boolean);
+    return [...new Set(models)].join(' · ') || null;
+  }
+
   if (rowKey === 'subwoofers') {
     const subwoofers = evidence.subwoofer_package || {};
     return subwoofers.strategy || subwoofers.summary || null;
@@ -146,6 +158,7 @@ function readRowValue(evidence, rowKey) {
   if (rowKey === 'p14') return evidence.bass_evidence_if_reliable?.p14?.text || null;
   if (rowKey === 'p18') return evidence.bass_evidence_if_reliable?.p18?.text || null;
   if (rowKey === 'p19') return evidence.bass_evidence_if_reliable?.p19?.text || null;
+  if (rowKey === 'p20') return evidence.comparison_p20?.text || evidence.bass_evidence_if_reliable?.p20?.text || (evidence.rp22_results || []).find((row) => Number(row.parameter_id) === 20)?.text || null;
 
   const parameterId = Number(rowKey.replace('p', ''));
   if (!Number.isFinite(parameterId)) return null;

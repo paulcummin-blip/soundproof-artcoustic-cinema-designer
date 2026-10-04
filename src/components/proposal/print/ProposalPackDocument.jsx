@@ -19,6 +19,7 @@
  */
 
 import React from 'react';
+import { resolveComparisonDisplay } from '@/components/proposal/comparisonDisplayAuthority';
 import ProposalCoverPage from '@/components/proposal/cover/ProposalCoverPage';
 import KeyPerformanceHighlightsTable from '@/components/proposal/KeyPerformanceHighlightsTable';
 import ProjectImagesBlock, { projectGalleryImages } from '@/components/proposal/ProjectImagesBlock';
@@ -85,12 +86,9 @@ export default function ProposalPackDocument({
   // the same calculated comparison rows the Key Differences table prints: one
   // block per selected version, never one version standing in for them all.
   const highlightsSection = byType.get('key_performance_highlights');
-  const comparisonRows = reportType === 'comparison'
-    ? highlightsSection?.metadata?.comparison_rows || null
-    : null;
-  const comparisonVersions = reportType === 'comparison'
-    ? highlightsSection?.metadata?.comparison_versions || null
-    : null;
+  const comparisonDisplay = resolveComparisonDisplay(highlightsSection?.metadata?.comparison_rows, highlightsSection?.metadata?.comparison_versions, proposal?.metadata?.comparison_table);
+  const comparisonRows = reportType === 'comparison' ? comparisonDisplay.rows : null;
+  const comparisonVersions = reportType === 'comparison' ? comparisonDisplay.versions : null;
   const hasComparisonGlance = Array.isArray(comparisonRows)
     && comparisonRows.length > 0
     && (Array.isArray(comparisonVersions) ? comparisonVersions : []).length >= 2;
@@ -205,8 +203,8 @@ export default function ProposalPackDocument({
             />
             <KeyPerformanceHighlightsTable
               rows={section.metadata?.highlight_rows}
-              comparisonRows={section.metadata?.comparison_rows}
-              comparisonVersions={section.metadata?.comparison_versions}
+              comparisonRows={comparisonRows}
+              comparisonVersions={comparisonVersions}
               comparisonExpected={isComparisonKind}
               viewingResult={isComparison ? null : viewingResult}
             />

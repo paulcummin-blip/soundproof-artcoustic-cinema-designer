@@ -989,6 +989,7 @@ export default function ProposalEditor() {
                     comparisonRows={section.metadata?.comparison_rows}
                     comparisonVersions={section.metadata?.comparison_versions}
                     comparisonExpected={proposal?.proposal_type === 'comparison'}
+                    proposalComparisonTable={proposal?.metadata?.comparison_table}
                     viewingResult={compactViewingResult(proposal?.engineering_snapshot)}
                     className="mt-4"
                   />

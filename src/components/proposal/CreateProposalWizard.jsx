@@ -195,13 +195,11 @@ export default function CreateProposalWizard({ onCreated, onCancel, regenerateFr
           snapshot: engineeringSnapshot,
         }];
 
-      const missingSnapshots = versionSnapshots.filter((entry) => !entry.snapshot);
+      const missingSnapshots = versionSnapshots.filter((entry) => !entry.snapshot || entry.snapshot.available !== true);
       if (missingSnapshots.length > 0) {
-        setError(
-          `No calculated engineering result was found for ${missingSnapshots
-            .map((entry) => entry.version_name || entry.version_id)
-            .join(', ')}. Open each version in Room Designer and calculate it before generating this report.`,
-        );
+        setError(proposalType === 'comparison'
+          ? 'Comparison evidence could not be built for both selected versions. Regenerate the Visual and Technical Reports for each version, then try again.'
+          : `No calculated engineering result was found for ${missingSnapshots.map((entry) => entry.version_name || entry.version_id).join(', ')}.`);
         return;
       }
 

@@ -1,4 +1,5 @@
 import React from 'react';
+import { resolveComparisonDisplay } from '@/components/proposal/comparisonDisplayAuthority';
 import { proposalRoleStyle } from '@/components/proposal/typography/proposalTypography';
 import { excludeDesignIndexRows } from '@/components/proposal/designIndexRowAuthority';
 import {
@@ -70,12 +71,14 @@ export default function KeyPerformanceHighlightsTable({
   comparisonRows,
   comparisonVersions,
   comparisonExpected = false,
+  proposalComparisonTable = null,
   viewingResult = null,
   className = '',
 }) {
-  const options = Array.isArray(comparisonVersions) ? comparisonVersions : [];
+  const display = resolveComparisonDisplay(comparisonRows, comparisonVersions, proposalComparisonTable);
+  const options = display.versions;
   // The internal Design Index is never a client-facing row.
-  const visibleComparisonRows = excludeDesignIndexRows(comparisonRows);
+  const visibleComparisonRows = excludeDesignIndexRows(display.rows);
   const comparison = options.length >= 2 && visibleComparisonRows.length > 0;
   // A comparison whose table could not be built says so on the page. A heading
   // with nothing under it reads as a section that failed silently, which is
@@ -86,8 +89,7 @@ export default function KeyPerformanceHighlightsTable({
     return (
       <div className={className}>
         <p className="text-[#8A8477]" style={proposalRoleStyle('body')}>
-          No calculated comparison values are available for the selected versions, so no comparison table is shown.
-          Calculate both versions in Sound Proof, then generate this report again.
+          Comparison evidence could not be built for both selected versions. Regenerate the Visual and Technical Reports for each version, then try again.
         </p>
       </div>
     );
@@ -111,8 +113,7 @@ export default function KeyPerformanceHighlightsTable({
                   {optionHeading(column, index)}
                 </th>
               ))}
-              <th className={HEAD} style={proposalRoleStyle('label')}>What changes</th>
-              <th className={HEAD} style={proposalRoleStyle('label')}>Client meaning</th>
+              <th className={HEAD} style={proposalRoleStyle('label')}>What this means</th>
             </tr>
           </thead>
           <tbody>
@@ -129,17 +130,14 @@ export default function KeyPerformanceHighlightsTable({
                   </td>
                 ))}
                 <td className={`${cell} text-[#625143]`} style={proposalRoleStyle('body')}>
-                  {changeCellText(row, options.length)}
-                </td>
-                <td className={`${cell} text-[#625143]`} style={proposalRoleStyle('body')}>
-                  {comparisonClientMeaning(row)}
+                  {row.identical ? 'Same / No change. ' : ''}{comparisonClientMeaning(row)}
                 </td>
               </tr>
             ))}
           </tbody>
         </table>
         <p className="mt-2 text-[#8A8477]" style={proposalRoleStyle('caption')}>
-          Every value calculated by Sound Proof for each version. The change column is derived from those values.
+          Values are read from each version’s frozen Sound Proof evidence. Matching results are retained as Same / No change.
         </p>
       </div>
     );

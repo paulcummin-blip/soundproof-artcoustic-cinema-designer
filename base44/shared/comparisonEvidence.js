@@ -25,6 +25,7 @@ import {
   plainLanguageName,
   resolveBassEvidence,
   splitParameterEvidence,
+  readReliableResult,
 } from './adiReportEvidenceRules.js';
 
 function compose(...parts) {
@@ -142,7 +143,7 @@ export function buildVersionEvidence({
       : null),
     // The short form is used for the comparison table's System layout row, so a
     // change between formats reads as a format change.
-    system_format_short: system.configuration?.text || (system.channel_layout?.total_discrete
+    system_format_short: system.configuration?.dolby_config || system.configuration?.text || (system.channel_layout?.total_discrete
       ? `${system.channel_layout.total_discrete} channels`
       : null),
     screen_data: {
@@ -169,7 +170,9 @@ export function buildVersionEvidence({
       }))
       : [],
     subwoofer_package: {
-      strategy: system.subwoofer_strategy?.strategy_text || null,
+      strategy: system.subwoofer_strategy?.count && system.subwoofer_strategy?.models?.length
+        ? `${system.subwoofer_strategy.count} × ${[...new Set(system.subwoofer_strategy.models)].map((model) => String(model).toUpperCase()).join(' / ')}`
+        : system.subwoofer_strategy?.strategy_text || null,
       summary: snapshot.bass?.subwoofer_strategy_summary || null,
     },
     // The amplification the version specifies, as a clean comparable figure. The
@@ -180,6 +183,9 @@ export function buildVersionEvidence({
     amplification: system.amplification?.specified === true && Number(system.amplification?.power_w)
       ? `${Number(system.amplification.power_w)} W`
       : null,
+    // Comparisons disclose assessed weak P20 results neutrally; positive narrative
+    // claims still follow the unchanged report evidence rules.
+    comparison_p20: readReliableResult((snapshot.rp22?.parameter_headlines || []).find((row) => Number(row.parameter_id) === 20)),
     rp22_results: parameterEvidence.used.map(describeEvidenceRow),
     rp23_results: {
       available: viewing.available === true,

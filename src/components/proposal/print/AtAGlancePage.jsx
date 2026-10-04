@@ -87,12 +87,18 @@ export default function AtAGlancePage({
       ) : null}
 
       {isComparison ? (
-        comparison.versionGroups.map((group) => (
-          <div className="pp-facts-group" key={group.name}>
-            <h3 className="pp-facts-group__title">{group.name}</h3>
-            <ProposalFactCards cards={group.cards} columns={3} />
-          </div>
-        ))
+        <div className="pp-comparison-options">
+          {comparison.versionGroups.map((group) => (
+            <div className="pp-comparison-option" key={group.name}>
+              <h3 className="pp-facts-group__title">{group.name}</h3>
+              <dl>{group.cards.map((card) => (
+                <div className="pp-comparison-option__row" key={card.label}>
+                  <dt>{card.label}</dt><dd>{card.value}</dd>
+                </div>
+              ))}</dl>
+            </div>
+          ))}
+        </div>
       ) : (
         <div className="pp-facts-group">
           <h3 className="pp-facts-group__title">System</h3>

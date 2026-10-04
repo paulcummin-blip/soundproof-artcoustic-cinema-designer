@@ -388,6 +388,10 @@ export function changeCellText(row, optionCount) {
 
 export function comparisonClientMeaning(row) {
   const key = String(row?.key || '').trim();
+  const equipmentMeaning = { lcr: 'The screen-speaker specification sets front-stage capability.', surrounds: 'These speakers carry effects around the listening area.', overheads: 'These speakers carry the height layer.', subwoofers: 'The count and model change the bass system; output is compared in P14.', system_layout: 'The channel format defines the sound positions.' };
+  if (equipmentMeaning[key]) return equipmentMeaning[key];
+  if (key === 'p20') return 'Measured seat-to-seat variation; lower variation means less difference between seats.';
+  if (key === 'p19') return 'Deviation from the bass target at the reference seating position.';
   const approved = ROW_PRESENTATION[key]?.gain || FALLBACK_GAIN;
   const stated = (Array.isArray(row?.values) ? row.values : []).map((value) => String(value)).join(' ');
   const low = LOW_GRADE.test(stated);

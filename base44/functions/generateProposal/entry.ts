@@ -144,7 +144,7 @@ export default async function(req) {
       return Response.json({ error: 'Unsupported proposal_type.' }, { status: 400 });
     }
     const expectedVersionCountValid = resolvedType === 'comparison'
-      ? resolvedVersionIds.length >= 2
+      ? resolvedVersionIds.length >= 2 && new Set(resolvedVersionIds).size === resolvedVersionIds.length
       : resolvedVersionIds.length === 1;
     if (!expectedVersionCountValid) {
       return Response.json({
@@ -242,9 +242,7 @@ export default async function(req) {
       });
       if (missingEvidence.length > 0) {
         return Response.json({
-          error: 'A System Design Comparison needs the calculated engineering evidence for every selected version. '
-            + `No evidence for: ${missingEvidence.map((id) => versionLabelById.get(id) || id).join(', ')}. `
-            + 'Open each version in Room Designer and calculate it first.',
+          error: 'Comparison evidence could not be built for both selected versions. Regenerate the Visual and Technical Reports for each version, then try again.',
           missing_version_ids: missingEvidence,
         }, { status: 409 });
       }
@@ -255,9 +253,7 @@ export default async function(req) {
       // the reason instead of producing an empty section.
       if (comparisonTable.rows.length === 0) {
         return Response.json({
-          error: 'No calculated result is shared by every selected version, so the comparison table cannot be built. '
-            + 'Every version needs a calculated result for the same performance areas. '
-            + 'Calculate both versions in Room Designer, then generate the comparison again.',
+          error: 'Comparison evidence could not be built for both selected versions. Regenerate the Visual and Technical Reports for each version, then try again.',
           comparison_versions: comparisonTable.versions,
         }, { status: 409 });
       }

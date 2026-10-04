@@ -30,16 +30,21 @@ const COMPARISON_PROJECT_CARD_LABELS = Object.freeze([
  * seating, the viewing geometry and the acoustic treatment are all assessed per
  * design version, so they are stated in that version's own block.
  */
-const COMPARISON_ROOM_CARD_LABELS = Object.freeze(['Room size']);
+const COMPARISON_ROOM_CARD_LABELS = Object.freeze(['Room size', 'Screen', 'Seating', 'Viewing geometry', 'Acoustic treatment']);
 
 /** The comparison rows that carry the facts the at-a-glance page states. */
 export const GLANCE_ROW_LABELS = Object.freeze([
   { key: 'system_layout', label: 'System layout' },
-  { key: 'speakers', label: 'Speakers' },
+  { key: 'lcr', label: 'LCR' },
+  { key: 'surrounds', label: 'Surrounds / wides' },
+  { key: 'overheads', label: 'Overheads' },
   { key: 'subwoofers', label: 'Subwoofers' },
-  { key: 'seating', label: 'Seating' },
-  { key: 'screen_size', label: 'Screen' },
-  { key: 'rp23_viewing', label: 'Viewing geometry' },
+  { key: 'p12', label: 'Screen Dynamic Range / P12' },
+  { key: 'p13', label: 'Non-screen Dynamic Range / P13' },
+  { key: 'p14', label: 'LFE / subwoofer Dynamic Range / P14' },
+  { key: 'p18', label: 'Bass extension / P18' },
+  { key: 'p19', label: 'Bass response at RSP / P19' },
+  { key: 'p20', label: 'Bass consistency / P20' },
 ]);
 
 const cardsFrom = (cards, labels) => (Array.isArray(cards) ? cards : [])

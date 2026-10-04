@@ -142,6 +142,12 @@ export default function ProposalPackStyles() {
          rather than wrapping mid-phrase. */
       .proposal-print-portal .pp-card--span2 { grid-column: span 2; }
 
+      .proposal-print-portal .pp-comparison-options { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6mm; margin-top: 6mm; break-inside: avoid; }
+      .proposal-print-portal .pp-comparison-option { border-top: 2px solid var(--pp-green); padding-top: 4mm; }
+      .proposal-print-portal .pp-comparison-option__row { padding: 1.8mm 0; border-bottom: 1px solid var(--pp-rule); }
+      .proposal-print-portal .pp-comparison-option__row dt { font-family: var(--pp-heading); font-size: 7.5pt; color: var(--pp-warm); }
+      .proposal-print-portal .pp-comparison-option__row dd { margin: 1mm 0 0; font-family: var(--pp-body); font-size: 10pt; line-height: 1.25; color: var(--pp-ink); }
+
       /* ── Metric (evidence) cards ── */
       .proposal-print-portal .pp-metrics {
         display: grid;
