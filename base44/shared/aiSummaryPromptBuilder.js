@@ -21,6 +21,7 @@
  */
 
 import { NEUTRAL_VOICE_RULES } from './reportWritingStyleContract.js';
+import { isHighChannelDensityLayout } from './highChannelDensityRule.js';
 import { SOUND_PROOF_WRITING_AUTHORITY } from './soundProofWritingAuthority.js';
 import { summariseSubwooferConfiguration } from './subwooferConfigurationSummary.js';
 
@@ -100,6 +101,31 @@ function formatSubwoofers(system) {
   return `${count} (${(system?.subwooferModels || []).join(", ") || "—"})`;
 }
 
+/**
+ * The Parameter 2 / spacing rule for a high-channel-count design, or '' when the
+ * rule does not apply.
+ *
+ * A 9.x.6 design is already at the top RP22 level for P2, so the summary states
+ * that and moves on: it never presents the layout as a room-geometry limitation,
+ * never offers more channels, and never raises processor or AV amplifier channel
+ * capability or cost. Every payload in the set must be high density.
+ */
+export function buildHighChannelSummaryRule(payloads) {
+  const list = (Array.isArray(payloads) ? payloads : [payloads]).filter(Boolean);
+  if (list.length === 0) return '';
+  const allHighDensity = list.every((payload) => isHighChannelDensityLayout({
+    configuration: payload?.system?.dolbyLayout || null,
+    channelCount: payload?.system?.totalDiscreteChannels ?? payload?.system?.channelCount ?? null,
+  }));
+  if (!allHighDensity) return '';
+  return [
+    'HIGH-CHANNEL-DENSITY RULE (applies to this summary):',
+    '- Parameter 2 (decoder/renderer capability and the number of discretely rendered speakers, excluding subwoofers) is already at the top RP22 level for this layout: state it as achieved and move on. Never present it as limited or as a constraint.',
+    '- P5, P7, P9 and P10 are speaker-position and seat-geometry results. Where one of those is limited, say that the practical speaker positions and the seat geometry set the result. Never attribute it to the channel count.',
+    '- Never present this layout as constrained by the room geometry, never suggest adding speakers or channels, and never mention AV processor or amplifier channel capability or cost.',
+  ].join('\n');
+}
+
 export function buildSingleSummaryPrompt(payload) {
   const { identity, project, system, categoryFloors, parameters, bass, assumptions, viewing } = payload || {};
 
@@ -111,6 +137,7 @@ ${SOUND_PROOF_WRITING_AUTHORITY}
 ${NEUTRAL_VOICE_RULES}
 - Do NOT use these words: ${FORBIDDEN_WORDS.join(", ")}.
 - Structure the summary around the three RP22 performance areas: Spatial Resolution, Dynamic Range, Timbre Matching.
+${buildHighChannelSummaryRule(payload)}
 - Do NOT produce a parameter-by-parameter dump. Explain what the design does well, where performance varies by seat, what trade-offs exist, and what is materially different between Primary and Secondary seats.
 - Do not invent design constraints that are not in the project data.
 - Do not invent missing values.
@@ -186,7 +213,8 @@ ${NEUTRAL_VOICE_RULES}
 - Do NOT use these words: ${FORBIDDEN_WORDS.join(", ")}.
 - Do NOT simply choose a "winner". Explain factual differences and the benefit/trade-off of the higher specified version where supported by the data.
 - Structure the comparison around: Spatial Resolution, Dynamic Range, Timbre Matching.
-- Also compare: speaker products, channel count, subwoofer configuration, screen/viewing result, authoritative bass result.
+- Also compare: speaker products, subwoofer configuration, screen/viewing result, authoritative bass result. Where every version shares the same channel layout, state that layout as a shared strength rather than as a difference.
+${buildHighChannelSummaryRule(payloads)}
 - Do not invent missing values.
 - Copy every L1/L2/L3/L4/FAIL result exactly. Never regrade, round, reinterpret, or replace a category floor with a parameter floor.
 - Never state an internal score, index or percentage. Sound Proof scores and the Design Index are internal only, they are not a percentage, and they never appear in client-facing text.

@@ -1,6 +1,6 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.44';
 import { buildWritingStyleContract, mentionsDesignIndex } from '../../shared/reportWritingStyleContract.js';
-import { resolveReportLayout, mentionsHighChannelSpacingUpgrade, HIGH_CHANNEL_CLEANUP_NOTE } from '../../shared/highChannelDensityRule.js';
+import { resolveReportLayout, mentionsHighChannelCopyDefect, HIGH_CHANNEL_CLEANUP_NOTE } from '../../shared/highChannelDensityRule.js';
 import { COMPARISON_REPORT_INSTRUCTIONS, resolveSectionTitle } from '../../shared/systemDesignSummarySections.js';
 import { formatVersionEvidenceForPrompt } from '../../shared/comparisonEvidence.js';
 import { formatComparisonTableForPrompt } from '../../shared/comparisonTable.js';
@@ -197,7 +197,7 @@ export default async function(req) {
       actionInstruction,
       sectionNote,
       mentionsDesignIndex(currentBody) ? DESIGN_INDEX_CLEANUP_NOTE : '',
-      reportLayout.highDensity && mentionsHighChannelSpacingUpgrade(currentBody) ? HIGH_CHANNEL_CLEANUP_NOTE : '',
+      reportLayout.highDensity && mentionsHighChannelCopyDefect(currentBody) ? HIGH_CHANNEL_CLEANUP_NOTE : '',
       proposal.proposal_type === 'comparison' ? COMPARISON_REPORT_INSTRUCTIONS : '',
       '',
       '=== CONSTRAINT ===',

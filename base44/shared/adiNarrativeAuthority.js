@@ -33,7 +33,13 @@ import {
   normaliseNumber,
   numberSet,
 } from './adiNarrativeFacts.js';
-import { isHighChannelDensityLayout, mentionsHighChannelSpacingUpgrade } from './highChannelDensityRule.js';
+import {
+  isHighChannelDensityLayout,
+  mentionsHighChannelSpacingUpgrade,
+  mentionsRoomGeometryConstraintClaim,
+  mentionsProcessorCostClaim,
+  HIGH_CHANNEL_PREFERRED_SENTENCE,
+} from './highChannelDensityRule.js';
 
 /** The generic screen example, used when this version states no screen. */
 export const SCREEN_GENERIC_CHIP = 'Emphasise the screen scale and viewing geometry';
@@ -236,14 +242,29 @@ export function validateNarrativeChip(label, facts) {
   }
 
   // A high-channel-count design has no speaker-count or spacing upgrade to offer.
-  // A chip suggesting one would present a room geometry constraint as a simple
-  // upgrade path, so it is rejected here rather than shown to the designer.
-  if (isHighChannelDensityLayout({ channelCount: facts.channels?.total, configuration: facts.channels?.configuration })
-    && mentionsHighChannelSpacingUpgrade(text)) {
-    return {
-      status: 'rejected',
-      violations: [{ rule: 'high_channel_upgrade', value: text, allowed: null }],
-    };
+  // Parameter 2 is already at the top RP22 level for this layout, so a chip that
+  // presents the layout as a room-geometry limitation, or that raises processor
+  // or amplifier channel capability or cost, is rejected here rather than shown
+  // to the designer.
+  if (isHighChannelDensityLayout({ channelCount: facts.channels?.total, configuration: facts.channels?.configuration })) {
+    if (mentionsHighChannelSpacingUpgrade(text)) {
+      return {
+        status: 'rejected',
+        violations: [{ rule: 'high_channel_upgrade', value: text, allowed: null }],
+      };
+    }
+    if (mentionsRoomGeometryConstraintClaim(text)) {
+      return {
+        status: 'rejected',
+        violations: [{ rule: 'high_channel_geometry_constraint', value: text, allowed: HIGH_CHANNEL_PREFERRED_SENTENCE }],
+      };
+    }
+    if (mentionsProcessorCostClaim(text)) {
+      return {
+        status: 'rejected',
+        violations: [{ rule: 'high_channel_processor_cost', value: text, allowed: null }],
+      };
+    }
   }
 
   let working = text;

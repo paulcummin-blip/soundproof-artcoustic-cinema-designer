@@ -9,7 +9,8 @@
  *   C  Project Images is a visualisation page: Image 1 is the hero, full width,
  *      with deliberate space above and below it, and further pages for 4 to 8
  *   D  a 9.1.6 / 15-channel design carries no added-speaker, middle-overhead-pair
- *      or future-spacing upgrade, and states P5 as a room geometry constraint
+ *      or future-spacing upgrade, and states P5 as a speaker-position and
+ *      seat-geometry result rather than as a limitation of the channel count
  */
 import { describe, it, expect } from 'vitest';
 import fs from 'node:fs';
@@ -26,6 +27,7 @@ import {
   prepareSectionBody,
 } from '../components/proposal/sectionBodyAuthority.js';
 import {
+  HIGH_CHANNEL_LEGACY_CONSTRAINT_SENTENCE,
   HIGH_CHANNEL_PREFERRED_SENTENCE,
   isHighChannelDesign,
   mentionsHighChannelUpgrade,
@@ -259,7 +261,7 @@ describe('D. no forbidden upgrade wording for a 9.1.6 / 15-channel design', () =
     expect(cleaned).toContain('The room is designed around a 9.1.6 layout.');
   });
 
-  it('states a removed spacing upgrade as a room geometry constraint instead', () => {
+  it('replaces a removed spacing upgrade with the approved position wording', () => {
     const body = '<p>Horizontal spacing is limited by the room, and improving it later would need more speakers.</p>';
     const cleaned = stripHighChannelUpgradeCopy(body);
     expect(cleaned).toContain(HIGH_CHANNEL_PREFERRED_SENTENCE);
@@ -291,10 +293,22 @@ describe('D. no forbidden upgrade wording for a 9.1.6 / 15-channel design', () =
     })).toBe(body);
   });
 
-  it('states a limited P5 result as a room geometry constraint', () => {
+  it('states a limited P5 result as a speaker-position and seat result', () => {
     const rows = buildHighlightDisplayRows([{ key: 'p5', area: 'Horizontal spacing', result: 'L1 · 48°' }]);
-    expect(rows[0].gain).toMatch(/room geometry constraint/i);
-    expect(rows[0].gain).not.toMatch(/excellent|outstanding/i);
+    expect(rows[0].gain).toMatch(/practical speaker positions and the seat geometry/i);
+    expect(rows[0].gain).not.toMatch(/room geometry constraint|upgrade|processor|amplifier/i);
+  });
+
+  it('replaces the legacy room-geometry-constraint paragraph in an older body', () => {
+    const cleaned = stripHighChannelUpgradeCopy(`<p>${HIGH_CHANNEL_LEGACY_CONSTRAINT_SENTENCE}</p>`);
+    expect(cleaned).not.toMatch(/room geometry constraint/i);
+    expect(cleaned).toContain(HIGH_CHANNEL_PREFERRED_SENTENCE);
+  });
+
+  it('removes a processor or amplifier cost claim from an older body', () => {
+    const cleaned = stripHighChannelUpgradeCopy('<p>Processor limitations are why this layout stops here. The room is designed around a 9.1.6 layout.</p>');
+    expect(cleaned).not.toMatch(/processor/i);
+    expect(cleaned).toContain('9.1.6');
   });
 
   it('names the middle overhead pair as forbidden in the writing rule itself', () => {

@@ -32,6 +32,10 @@ import {
   buildAuthorityChips,
   validateNarrativeChip,
 } from './adiNarrativeAuthority.js';
+import {
+  isHighChannelDensityLayout,
+  NAMED_HIGH_DENSITY_LAYOUT,
+} from './highChannelDensityRule.js';
 
 /** How many comparison examples the authority offers. The remaining slots are
  *  reserved for examples that hold identically in every selected version. */
@@ -262,12 +266,31 @@ export function buildComparisonAuthorityChips(versions = []) {
     ));
   }
 
-  extras.push(chip(
-    words.upgrades,
-    `Compares what each of the ${list.length} selected versions adds over the others.`,
-    ['selected versions'],
-    list.map((entry, index) => versionName(entry, index)),
-  ));
+  // A comparison whose versions all use a high-channel-count layout has no
+  // channel or spacing upgrade to compare. The shared layout is the point
+  // instead: it is already at the top RP22 level for discrete channel
+  // capability, so it is offered as a strength the options have in common.
+  const sharedHighDensityLayout = list.every((entry) => isHighChannelDensityLayout({
+    channelCount: entry?.facts?.channels?.total,
+    configuration: entry?.facts?.channels?.configuration,
+  }));
+
+  if (sharedHighDensityLayout) {
+    const sharedConfiguration = list[0]?.facts?.channels?.configuration || NAMED_HIGH_DENSITY_LAYOUT;
+    extras.push(chip(
+      `Highlight the shared ${sharedConfiguration} layout`,
+      `Every selected version already uses the same high-channel-count layout, which is the top RP22 level for discrete channel capability.`,
+      ['snapshot.system.channel_layout (every selected version)'],
+      list.map((entry, index) => versionName(entry, index)),
+    ));
+  } else {
+    extras.push(chip(
+      words.upgrades,
+      `Compares what each of the ${list.length} selected versions adds over the others.`,
+      ['selected versions'],
+      list.map((entry, index) => versionName(entry, index)),
+    ));
+  }
 
   if (everyVersion(list, resultLine)) {
     extras.push(chip(

@@ -10,11 +10,24 @@
  * When a design already uses a high channel count, 9.1.6 or any layout with 15
  * or more discrete channels, "add more speakers" and "improve the horizontal
  * spacing" are NOT upgrade paths. At that density the design is not short of
- * speakers, and any further improvement depends on the room architecture, the
- * practical speaker positions available, the seating geometry, the processor,
- * the aesthetics and the installation. Presenting that as a simple future
- * upgrade misrepresents the engineering reality, so this module forbids it and
- * gives the approved alternative wording.
+ * speakers, and any further improvement depends on the practical speaker
+ * positions available, the seating geometry, the room architecture, the
+ * aesthetics and the installation. Presenting that as a simple future upgrade
+ * misrepresents the engineering reality, so this module forbids it and gives the
+ * approved alternative wording.
+ *
+ * PARAMETER 2 AND THE SPACING PARAMETERS ARE SEPARATE RESULTS.
+ * Parameter 2 is decoder/renderer capability and the number of discretely
+ * rendered speakers, excluding subwoofers. A 9.x.6 layout is already at the top
+ * RP22 level for P2, so P2 is stated as achieved and the report moves on. P5,
+ * P7, P9 and P10 are speaker-position and seat-geometry results: where one of
+ * those is limited, it is explained by the practical speaker positions and the
+ * seat geometry, never by the channel count and never as a room-geometry
+ * limitation of the system.
+ *
+ * NEVER RAISE THE PROCESSOR. Why a design generally stops at 9.x.6 belongs to
+ * processor / AV amplifier channel capability and what more channels would cost.
+ * That is never a client-facing engineering point, and this module forbids it.
  *
  * Below the threshold the rule does not apply at all: a lower-channel design
  * (5.1, 5.1.2, 7.1.4) may still carry a supported upgrade suggestion under the
@@ -33,8 +46,59 @@ export const NAMED_HIGH_DENSITY_LAYOUT = '9.1.6';
 /** The exact sentence the rule forbids, kept verbatim so it can be tested for. */
 export const HIGH_CHANNEL_FORBIDDEN_SENTENCE = 'If greater precision in the side-to-side soundstage is required in the future, the primary potential for improvement lies in the physical placement of these units to further close the gaps between the surround channels.';
 
-/** The approved wording for a limited horizontal spacing result in this design. */
-export const HIGH_CHANNEL_PREFERRED_SENTENCE = 'The horizontal spacing result is mainly a consequence of the room layout and the practical speaker positions available. The design already uses a high channel count, so this should be understood as a room geometry constraint rather than a simple upgrade path.';
+/**
+ * The approved wording when a spacing result (P5, P7, P9, P10) is limited.
+ * It states the mechanism — the practical speaker positions and the seat
+ * geometry — and says plainly that the channel count is not the cause. It never
+ * calls the system constrained and never implies a channel upgrade.
+ */
+export const HIGH_CHANNEL_PREFERRED_SENTENCE = 'The spacing between the channels is set by the practical speaker positions and the seat geometry rather than by the channel count.';
+
+/**
+ * The paragraph this module used to prescribe, kept verbatim so it can be
+ * recognised and removed: it presented a limited spacing result as a room
+ * geometry constraint and pointed at an upgrade path, which is not the right
+ * interpretation for a 9.x.6 system.
+ */
+export const HIGH_CHANNEL_LEGACY_CONSTRAINT_SENTENCE = 'The horizontal spacing result is mainly a consequence of the room layout and the practical speaker positions available. The design already uses a high channel count, so this should be understood as a room geometry constraint rather than a simple upgrade path.';
+
+/**
+ * The layout facts of a live system object, as opposed to a frozen snapshot.
+ * Used where a surface holds the system rather than the report's snapshot.
+ */
+export function systemLayout(system) {
+  const source = system || {};
+  const layout = source.channel_layout || source.channelLayout || {};
+  const configuration = layout.configuration_text || layout.configurationText
+    || source.configuration?.dolby_config || source.dolbyLayout || null;
+  const raw = layout.total_discrete ?? layout.totalDiscrete
+    ?? source.configuration?.total_discrete_channels ?? null;
+  const channelCount = raw === null || raw === undefined || raw === ''
+    ? null
+    : (Number.isFinite(Number(raw)) ? Number(raw) : null);
+  return {
+    channelCount,
+    configuration,
+    highDensity: isHighChannelDensityLayout({ channelCount, configuration }),
+  };
+}
+
+/**
+ * Parameter 2 stated cleanly for a high-channel-count design: the level it
+ * already achieves, in the words the client story uses. Accepts a frozen
+ * snapshot, a resolved layout or a configuration string.
+ */
+export function highChannelP2Sentence(layout) {
+  const facts = typeof layout === 'string'
+    ? resolveReportLayout({ system: { configuration: { dolby_config: layout } } })
+    : (layout && layout.system ? resolveReportLayout(layout) : normaliseLayout(layout));
+  const configuration = facts.configuration || NAMED_HIGH_DENSITY_LAYOUT;
+  const channelCount = Number(facts.channelCount);
+  const subject = Number.isFinite(channelCount) && channelCount > 0
+    ? `The ${configuration} layout provides ${channelCount} discrete main channels`
+    : `The ${configuration} layout provides a high-density immersive speaker configuration`;
+  return `${subject} and achieves the top RP22 level for discrete channel capability.`;
+}
 
 /**
  * Discrete channels stated by a channel layout such as '9.1.6'.
@@ -104,6 +168,54 @@ export function mentionsHighChannelSpacingUpgrade(text) {
   return SPACING_SUBJECT_RE.test(withoutNegatedUpgrade) && FUTURE_INTENT_RE.test(withoutNegatedUpgrade);
 }
 
+/** Plain text of a piece of copy: tags removed, whitespace collapsed. */
+function plainCopy(text) {
+  return String(text || '')
+    .replace(/<[^>]*>/g, ' ')
+    .replace(/&nbsp;/g, ' ')
+    .replace(/&amp;/g, '&')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+const ROOM_SUBJECT_RE = /\b(?:room geometry|room layout|the room|geometry|layout)\b/i;
+const CONSTRAINT_WORD_RE = /\b(?:constraint|constraints|constrained|limitation|limitations|limited|limits?|restrict\w*|caps?\b|ceiling)\b/i;
+const SPACING_OR_CHANNEL_RE = /\b(?:spacing|side[-\s]to[-\s]side|discrete (?:channels?|speakers?|outputs?)|channel count|channels?|surround channels?|overhead (?:channels?|positions?)|speaker positions?)\b/i;
+const PROCESSOR_SUBJECT_RE = /\b(?:av\s+processor|a\/v\s+processor|processor|pre[-\s]?amp\w*|receiver|amplifier|amplifiers|amp)\b/i;
+const PROCESSOR_CLAIM_RE = /\b(?:limit\w*|constrain\w*|restrict\w*|capabilit\w*|channel count|cost\w*|expens\w*|afford\w*|budget)\b/i;
+
+/**
+ * Copy that presents the layout, the spacing or the channel count as a
+ * room-geometry limitation. That framing is not the right interpretation for a
+ * 9.x.6 system: a limited spacing result is set by the practical speaker
+ * positions and the seat geometry, and Parameter 2 is already achieved.
+ */
+export function mentionsRoomGeometryConstraintClaim(text) {
+  const source = plainCopy(text);
+  if (!source) return false;
+  if (source.toLowerCase().includes(HIGH_CHANNEL_LEGACY_CONSTRAINT_SENTENCE.toLowerCase())) return true;
+  return ROOM_SUBJECT_RE.test(source)
+    && CONSTRAINT_WORD_RE.test(source)
+    && SPACING_OR_CHANNEL_RE.test(source);
+}
+
+/**
+ * Copy that raises AV processor or amplifier channel capability, or its cost, as
+ * the reason a design stops where it does. Never a client-facing point.
+ */
+export function mentionsProcessorCostClaim(text) {
+  const source = plainCopy(text);
+  if (!source) return false;
+  return PROCESSOR_SUBJECT_RE.test(source) && PROCESSOR_CLAIM_RE.test(source);
+}
+
+/** Any high-channel copy defect this design must not carry. */
+export function mentionsHighChannelCopyDefect(text) {
+  return mentionsHighChannelSpacingUpgrade(text)
+    || mentionsRoomGeometryConstraintClaim(text)
+    || mentionsProcessorCostClaim(text);
+}
+
 /** The forbidden sentence, or anything close enough to be the same sentence. */
 export function containsForbiddenHighChannelSentence(text) {
   const normalise = (value) => String(value || '')
@@ -128,7 +240,10 @@ export function containsForbiddenHighChannelSentence(text) {
 export const HIGH_CHANNEL_UPGRADE_RULE = [
   '=== HIGH-CHANNEL-DENSITY UPGRADE RULE (hard rule for this design) ===',
   `This design is already a high-channel-count layout: ${NAMED_HIGH_DENSITY_LAYOUT}, or any layout with ${HIGH_DENSITY_MIN_DISCRETE_CHANNELS} or more discrete channels.`,
-  'At this speaker density the design is not short of speakers or channels, and more speakers are not a realistic upgrade path. Any further improvement would depend on the room architecture, the practical speaker positions available, the seating geometry, the processor, the aesthetics and the installation. It must never be presented as a simple upgrade.',
+  'At this speaker density the design is not short of speakers or channels, and more speakers are not a realistic upgrade path. Any further improvement would depend on the practical speaker positions available, the seating geometry, the room architecture, the aesthetics and the installation. It must never be presented as a simple upgrade.',
+  'PARAMETER 2 IS SEPARATE FROM THE SPACING PARAMETERS, AND ALREADY ACHIEVED. Parameter 2 is decoder/renderer capability and the number of discretely rendered speakers, excluding subwoofers. At this layout the design reaches the top RP22 level for P2: state that once, plainly, as achieved, and move on. Never present P2 as limited, and never offer more channels as the way to improve any spatial result.',
+  'THE SPACING PARAMETERS ARE POSITION AND SEAT RESULTS. P5, P7, P9 and P10 are set by where the speakers can physically go and where the seats are. Where one of those is limited, explain it as the practical speaker positions and the seat geometry — never as a limitation of the channel count, never as a room-geometry constraint on the system, and never as something an added channel would fix.',
+  'NEVER MENTION THE PROCESSOR OR THE AMPLIFIER. Why a design generally stops at this layout belongs to processor and AV amplifier channel capability and what more channels would cost. That is never a client-facing engineering point: do not raise it, and do not imply it.',
   '- Never suggest adding speakers, more channels, more overhead positions, front wides or additional surround positions as a future upgrade.',
   '- Never suggest improving horizontal spacing (P5), closing the gaps between the surround channels, or tightening the spacing between adjacent speakers as a future upgrade.',
   '- Never imply that there is an easy fix for the spacing or the channel density.',
@@ -141,8 +256,12 @@ export const HIGH_CHANNEL_UPGRADE_RULE = [
   '- "If greater overhead movement becomes a priority later, the natural upgrade would be a middle overhead pair."',
   '- "Adding a middle pair of height speakers would be a natural upgrade."',
   '- "More overhead positions would expand the height layer in the future."',
+  `- "${HIGH_CHANNEL_LEGACY_CONSTRAINT_SENTENCE}"`,
+  '- "The design is constrained by the room geometry, so the channel count is as good as it can be."',
+  '- "Processor limitations are why this layout stops here." / "A more capable amplifier would cost too much."',
   'WRITE THIS INSTEAD (approved wording):',
   `- "${HIGH_CHANNEL_PREFERRED_SENTENCE}"`,
+  `- "${highChannelP2Sentence({ configuration: NAMED_HIGH_DENSITY_LAYOUT, channelCount: HIGH_DENSITY_MIN_DISCRETE_CHANNELS })}"`,
 ].join('\n');
 
 /**
@@ -174,7 +293,8 @@ export function buildHighChannelContractBlock(layout) {
     HIGH_CHANNEL_UPGRADE_RULE,
     '',
     `This design's layout: ${resolved.stated}.`,
-    'Run this check before returning: does any sentence offer added speakers, more channels, or improved spacing between channels as a future improvement? If it does, rewrite it as a room and layout constraint, or remove it.',
+    `This design's Parameter 2 position: ${highChannelP2Sentence(resolved)}`,
+    'Run this check before returning: does any sentence offer added speakers, more channels, or improved spacing between channels as a future improvement, call the design constrained by the room or by its channel count, or mention processor or amplifier capability or cost? If it does, rewrite it as the practical speaker positions and the seat geometry setting the result, state Parameter 2 as achieved, or remove it.',
   ].join('\n');
 }
 
@@ -190,8 +310,10 @@ export function buildHighChannelSectionRule(layout) {
     '=== HIGH-CHANNEL-DENSITY UPGRADE RULE (applies to this section) ===',
     `This design already uses a high channel count (${NAMED_HIGH_DENSITY_LAYOUT}, ${HIGH_DENSITY_MIN_DISCRETE_CHANNELS} or more discrete channels), so any instruction above to note a sensible upgrade path does not apply to the speaker layout or the spacing between channels.`,
     'Do not suggest adding speakers, more channels or more overhead positions, do not suggest improving horizontal spacing (P5) as a future upgrade, and never write "if greater precision is required later".',
-    'Where horizontal spacing or the spacing between channels is limited, state it as a room and layout constraint and say what causes it, as approved:',
+    `Parameter 2 is already achieved at this layout: ${highChannelP2Sentence(normaliseLayout(layout))} State it plainly once and do not present it as limited.`,
+    'Where horizontal spacing or the spacing between channels is limited, state that the practical speaker positions and the seat geometry set the result rather than the channel count, as approved:',
     `"${HIGH_CHANNEL_PREFERRED_SENTENCE}"`,
+    'Never call the design constrained by the room or by its channel count, and never raise processor or AV amplifier channel capability or cost.',
   ].join('\n');
 }
 
@@ -201,10 +323,10 @@ export function buildHighChannelSectionRule(layout) {
  * must remove it rather than preserve it.
  */
 export const HIGH_CHANNEL_CLEANUP_NOTE = [
-  'The current section content offers added speakers or improved spacing between channels as a future upgrade, which is not permitted for this design: it already uses a high channel count.',
-  'Rewrite that passage as a room and layout constraint, as approved:',
+  'The current section content offers added speakers or improved spacing between channels as a future upgrade, presents a spatial result as a room-geometry constraint, or raises processor or amplifier capability or cost. None of that is permitted for this design: it already uses a high channel count, and Parameter 2 is already achieved at this layout.',
+  'Rewrite that passage as the practical speaker positions and the seat geometry setting the result, as approved:',
   `"${HIGH_CHANNEL_PREFERRED_SENTENCE}"`,
-  'Do not offer adding speakers, more channels or more overhead positions, do not offer an improved horizontal spacing result in the future, and do not imply there is an easy fix.',
+  'State Parameter 2 as achieved, do not offer adding speakers, more channels or more overhead positions, do not offer an improved horizontal spacing result in the future, do not imply there is an easy fix, and do not mention processor or amplifier capability or cost.',
 ].join('\n');
 
 export default HIGH_CHANNEL_UPGRADE_RULE;

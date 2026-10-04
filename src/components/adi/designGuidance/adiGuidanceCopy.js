@@ -26,6 +26,7 @@
 // ---------------------------------------------------------------------------
 
 import { ADI_FACTOR_KIND } from "./adiLimitingFactorRules";
+import { isHighChannelSystem } from "@/components/proposal/highChannelLayoutAuthority";
 
 // ── Formatting helpers ───────────────────────────────────────────────────
 
@@ -189,14 +190,28 @@ const BUILDERS = {
   },
 
   // P2 / P3 / P7 / P11 — loudspeaker layout and zoning
-  "p2": ({ candidate, evidence }) => ({
-    whatIsWrong: `The number of discretely rendered speakers is the limiting factor: the layout renders ${candidate?.parameter?.value != null ? `${candidate.parameter.value} discrete outputs` : "fewer discrete outputs than the layout requires"}, giving P2 ${levelPhrase(candidate?.level)}.`,
-    whyItIsHappening: `A layout with fewer discrete channels cannot reproduce the intended object panning between the speakers it does not have, so the spatial result is limited before any speaker is optimised.`,
-    changeFirst: `Add the missing speaker positions in priority order — surrounds, then heights — rather than upgrading the speaker models in the positions you already have.`,
-    expectedImprovement: `Each added discrete position raises the achievable spatial resolution and moves P2 up a level, which lifts the Spatial Resolution category with it.`,
-    remainingLimitation: `If the room or the budget caps the channel count, the achievable spatial resolution is capped with it; the design should then target the level the layout can genuinely support.`,
-    lowerValueChanges: `Upgrading the existing speakers does not add channels${runnerUpText(evidence?.runnerUpCandidate, evidence) ? `; ${runnerUpText(evidence?.runnerUpCandidate, evidence)} is the next result to address` : ""}.`,
-  }),
+  //
+  // A high-channel-count layout is already at the top RP22 level for P2, and the
+  // spacing parameters are position and seat results. Neither is presented as a
+  // channel-count problem: more channels are never offered, and processor or
+  // amplifier capability and cost are never raised.
+  "p2": ({ candidate, evidence }) => (isHighChannelSystem(evidence?.system)
+    ? {
+      whatIsWrong: `The layout is settled at this speaker density, which is the top RP22 level for discrete channel capability: Parameter 2 is achieved here rather than limited.`,
+      whyItIsHappening: `At this density the design is not short of speaker positions. What a seat hears at the spacing parameters is set by where the speakers can physically go and where the seats are, not by the number of channels.`,
+      changeFirst: `Work the position results instead — P5, P7, P9 and P10 respond to speaker position, aiming and seat geometry, and none of them needs another channel.`,
+      expectedImprovement: `Re-positioning or re-aiming the existing speakers moves the spacing parameters without adding a channel, and leaves Parameter 2 where it already is.`,
+      remainingLimitation: `The practical speaker positions and the seat geometry set the ceiling that remains; a higher channel count would not raise it.`,
+      lowerValueChanges: `Upgrading the speaker models does not change a position result either${runnerUpText(evidence?.runnerUpCandidate, evidence) ? `; ${runnerUpText(evidence?.runnerUpCandidate, evidence)} is the next result to address` : ""}.`,
+    }
+    : {
+      whatIsWrong: `The number of discretely rendered speakers is the limiting factor: the layout renders ${candidate?.parameter?.value != null ? `${candidate.parameter.value} discrete outputs` : "fewer discrete outputs than the layout requires"}, giving P2 ${levelPhrase(candidate?.level)}.`,
+      whyItIsHappening: `A layout with fewer discrete channels cannot reproduce the intended object panning between the speakers it does not have, so the spatial result is limited before any speaker is optimised.`,
+      changeFirst: `Add the missing speaker positions in priority order — surrounds, then heights — rather than upgrading the speaker models in the positions you already have.`,
+      expectedImprovement: `Each added discrete position raises the achievable spatial resolution and moves P2 up a level, which lifts the Spatial Resolution category with it.`,
+      remainingLimitation: `If the room or the budget caps the channel count, the achievable spatial resolution is capped with it; the design should then target the level the layout can genuinely support.`,
+      lowerValueChanges: `Upgrading the existing speakers does not add channels${runnerUpText(evidence?.runnerUpCandidate, evidence) ? `; ${runnerUpText(evidence?.runnerUpCandidate, evidence)} is the next result to address` : ""}.`,
+    }),
   "p3": ({ candidate, evidence }) => zoningCopy({ candidate, evidence, subject: "screen-wall", count: candidate?.parameter?.value }),
   "p11": ({ candidate, evidence }) => zoningCopy({ candidate, evidence, subject: "surround, wide and height", count: candidate?.parameter?.value }),
   "p7": ({ candidate, evidence }) => ({

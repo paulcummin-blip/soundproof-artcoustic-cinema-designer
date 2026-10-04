@@ -92,7 +92,8 @@ describe('Key Performance Highlights — one page, best rows only', () => {
     const p5 = rows.find((row) => row.key === 'p5');
     expect(p5.result).toBe('L1 · 48°');
     expect(p5.gain).not.toMatch(/excellent/i);
-    expect(p5.gain).toMatch(/room geometry constraint/i);
+    expect(p5.gain).toMatch(/practical speaker positions and the seat geometry/i);
+    expect(p5.gain).not.toMatch(/room geometry constraint|upgrade/i);
   });
 
   it('states a Level 2 result honestly and keeps usable prose', () => {

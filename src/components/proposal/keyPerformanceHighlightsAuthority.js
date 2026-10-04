@@ -320,7 +320,7 @@ const MODEST_GAIN = Object.freeze({
   p2: 'The channel count follows the system format the room is designed to, so movement is built from the positions this room allows.',
   p3: 'The screen speakers sit where the room and the screen allow, so dialogue stays anchored to the picture.',
   p4: 'Screen level consistency is set by the room and the screen wall, so the front stage holds together without being perfectly even seat to seat.',
-  p5: 'Main room geometry constraint: the speaker spacing is set by the room layout, not by a simple upgrade, and the design already uses high speaker density.',
+  p5: 'The spacing between the listener-level speakers is set by the practical speaker positions and the seat geometry rather than by the channel count.',
   p6: 'The surround speakers are matched in level as far as the seating positions and the room allow.',
   p7: 'The front wide positions bridge the screen and the side speakers as far as the room geometry allows.',
   p9: 'Overhead spacing is set by the ceiling height and the seating layout, so sound above the seats is even rather than ideal.',

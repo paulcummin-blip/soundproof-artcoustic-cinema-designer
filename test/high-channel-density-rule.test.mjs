@@ -3,16 +3,18 @@
  * ------------------------------------------------
  * A 9.1.6 (15 discrete channel) design already has high speaker density, so
  * "add speakers" and "improve P5 / horizontal spacing" are not real upgrade
- * paths: any further improvement depends on the room architecture, the practical
- * speaker positions, the seating geometry, the processor, the aesthetics and the
- * installation. No client-facing surface may present it as a simple future
- * improvement. Below that density the rule is absent, so a supported upgrade
- * suggestion may still appear.
+ * paths: further improvement depends on the practical speaker positions, the
+ * seating geometry, the room architecture, the aesthetics and the installation.
+ * No client-facing surface may present it as a simple future improvement, as a
+ * room-geometry limitation, or as a processor / amplifier cost question. Below
+ * that density the rule is absent, so a supported upgrade suggestion may appear.
  *
  * The request's acceptance cases, as deterministic checks:
  *   1, 2, 3, 4  a 9.1.6 report's contract carries the hard rule, no added-speaker
  *               or P5 upgrade can be written, and the forbidden sentence is banned
- *   5           P5 is described only as a room and layout constraint
+ *   5           P5 is described by the speaker positions and the seat geometry,
+ *               never as a room-geometry limitation of the system
+ *   5b          Parameter 2 is stated as already achieved at the top RP22 level
  *   6, 7        a 5.1 / 5.1.2 design keeps its supported upgrade guidance
  */
 import { describe, it, expect } from 'vitest';
@@ -20,12 +22,17 @@ import { describe, it, expect } from 'vitest';
 import {
   HIGH_CHANNEL_FORBIDDEN_SENTENCE,
   HIGH_CHANNEL_PREFERRED_SENTENCE,
+  HIGH_CHANNEL_LEGACY_CONSTRAINT_SENTENCE,
   HIGH_CHANNEL_UPGRADE_RULE,
   HIGH_CHANNEL_CLEANUP_NOTE,
   HIGH_DENSITY_MIN_DISCRETE_CHANNELS,
   containsForbiddenHighChannelSentence,
+  highChannelP2Sentence,
   isHighChannelDensityLayout,
+  mentionsHighChannelCopyDefect,
   mentionsHighChannelSpacingUpgrade,
+  mentionsProcessorCostClaim,
+  mentionsRoomGeometryConstraintClaim,
   parseDiscreteChannelCount,
   resolveReportLayout,
 } from '../base44/shared/highChannelDensityRule.js';
@@ -142,10 +149,26 @@ describe('C. the forbidden sentence', () => {
   });
 });
 
-describe('D. P5 is a room and layout constraint, not an upgrade path', () => {
+describe('D. P5 is a speaker-position and seat result, not an upgrade path', () => {
   it('prescribes the approved wording', () => {
     expect(marqueeContract).toContain(HIGH_CHANNEL_PREFERRED_SENTENCE);
-    expect(marqueeContract).toContain('state it as a room and layout constraint');
+    expect(marqueeContract).toContain('state that the practical speaker positions and the seat geometry set the result rather than the channel count');
+    expect(marqueeContract).not.toContain('state it as a room and layout constraint');
+  });
+
+  it('replaces the room-geometry-constraint paragraph it used to prescribe', () => {
+    expect(marqueeContract).toContain(HIGH_CHANNEL_LEGACY_CONSTRAINT_SENTENCE);
+    expect(marqueeContract).toContain('room-geometry constraint on the system');
+    expect(mentionsRoomGeometryConstraintClaim(HIGH_CHANNEL_LEGACY_CONSTRAINT_SENTENCE)).toBe(true);
+    expect(mentionsRoomGeometryConstraintClaim(HIGH_CHANNEL_PREFERRED_SENTENCE)).toBe(false);
+    expect(mentionsHighChannelCopyDefect(HIGH_CHANNEL_LEGACY_CONSTRAINT_SENTENCE)).toBe(true);
+  });
+
+  it('keeps processor and amplifier capability and cost out of the rule', () => {
+    expect(marqueeContract).toContain('NEVER MENTION THE PROCESSOR OR THE AMPLIFIER');
+    expect(mentionsProcessorCostClaim('Processor limitations are why this layout stops here.')).toBe(true);
+    expect(mentionsProcessorCostClaim('The cost of a more capable AV amplifier rules this out.')).toBe(true);
+    expect(mentionsProcessorCostClaim('Fifteen discrete channels give the processor real loudspeaker positions around and above the audience.')).toBe(false);
   });
 
   it('does not flag the approved wording as an upgrade suggestion', () => {
@@ -159,6 +182,33 @@ describe('D. P5 is a room and layout constraint, not an upgrade path', () => {
   it('does flag an added-speaker or spacing upgrade', () => {
     expect(mentionsHighChannelSpacingUpgrade('More surround speakers could be added later to close the gaps between channels.')).toBe(true);
     expect(mentionsHighChannelSpacingUpgrade('Improving the horizontal spacing is the main opportunity left in this design.')).toBe(true);
+  });
+});
+
+describe('D2. Parameter 2 is already achieved and is kept out of the spacing results', () => {
+  it('states the layout and its top RP22 level, once', () => {
+    const sentence = highChannelP2Sentence(marqueeLayout);
+    expect(sentence).toBe('The 9.1.6 layout provides 15 discrete main channels and achieves the top RP22 level for discrete channel capability.');
+    expect(marqueeContract).toContain(sentence);
+    expect(marqueeContract).toContain('PARAMETER 2 IS SEPARATE FROM THE SPACING PARAMETERS');
+    expect(marqueeContract).toContain('never offer more channels as the way to improve any spatial result');
+  });
+
+  it('separates P2 from P5, P7, P9 and P10', () => {
+    expect(marqueeContract).toContain('THE SPACING PARAMETERS ARE POSITION AND SEAT RESULTS');
+    expect(marqueeContract).toContain('never as a limitation of the channel count');
+  });
+
+  it('carries the P2 position and the spacing wording into the section prompt', () => {
+    const prompt = getSystemSummarySectionPrompt('spatial_resolution', 'Spatial Resolution', marqueeLayout);
+    expect(prompt).toContain(highChannelP2Sentence(marqueeLayout));
+    expect(prompt).toContain('state that the practical speaker positions and the seat geometry set the result');
+    expect(prompt).not.toContain('room and layout constraint');
+  });
+
+  it('leaves a lower-channel design without the P2 statement', () => {
+    expect(lowContract).not.toContain('PARAMETER 2 IS SEPARATE FROM THE SPACING PARAMETERS');
+    expect(getSystemSummarySectionPrompt('spatial_resolution', 'Spatial Resolution', lowLayout)).not.toContain('PARAMETER 2 IS SEPARATE');
   });
 });
 
@@ -226,9 +276,19 @@ describe('H. ADI narrative examples cannot offer the upgrade', () => {
     }
   });
 
-  it('accepts the constraint framing, and the same upgrade chip on a 5.1.2 design', () => {
+  it('rejects the room-geometry-constraint framing and any processor / cost chip for a 9.1.6 design', () => {
     const constraint = validateNarrativeChip('Explain the horizontal spacing result as a room layout constraint', marqueeFacts);
-    expect(constraint.status).toBe('passed');
+    expect(constraint.status).toBe('rejected');
+    expect(constraint.violations.map((violation) => violation.rule)).toContain('high_channel_geometry_constraint');
+
+    const processor = validateNarrativeChip('Explain the processor channel limit', marqueeFacts);
+    expect(processor.status).toBe('rejected');
+    expect(processor.violations.map((violation) => violation.rule)).toContain('high_channel_processor_cost');
+  });
+
+  it('accepts the position framing, and the same upgrade chip on a 5.1.2 design', () => {
+    const spacing = validateNarrativeChip('Explain the horizontal spacing result from the speaker positions', marqueeFacts);
+    expect(spacing.status).toBe('passed');
 
     const lowChip = validateNarrativeChip('Suggest adding more overhead channels', lowFacts);
     expect(lowChip.status).toBe('passed');

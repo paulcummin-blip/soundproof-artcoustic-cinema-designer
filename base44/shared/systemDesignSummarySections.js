@@ -192,6 +192,7 @@ export const SYSTEM_OPTIONS_SUMMARY_PROMPT = `Open the comparison by introducing
 Write one short opening paragraph that:
 - states how many system options the report compares, naming each one with its exact supplied version name
 - states once what every option shares - the room, the screen and the seating layout - where the supplied data shows they are the same, and says the differences lie elsewhere
+- where every option uses the same channel layout, states that shared layout as a strength the options have in common (it is already at the top RP22 level for discrete channel capability), not as a difference and never as a limitation
 - names, in one sentence, where those differences lie: system scale, loudspeaker and subwoofer specification, and the performance that follows
 
 Then write one short paragraph for each option, in the supplied version order. Lead each one with an <h3> heading that is exactly that version's supplied name, followed by that option's own facts: the system format, the loudspeaker package, the subwoofer arrangement, and the performance result that follows. Say plainly what that option is.

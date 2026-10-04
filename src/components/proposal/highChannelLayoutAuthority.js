@@ -23,8 +23,19 @@
 /** The channel count at which the rule applies. 9.1.6 is 9 bed + 6 overhead = 15. */
 export const HIGH_DENSITY_MIN_DISCRETE_CHANNELS = 15;
 
-/** The approved wording: the spacing limitation stated as a room constraint. */
-export const HIGH_CHANNEL_PREFERRED_SENTENCE = 'The horizontal spacing result is mainly a consequence of the room layout and the practical speaker positions available. The design already uses a high channel count, so this should be understood as a room geometry constraint rather than a simple upgrade path.';
+/**
+ * The approved wording for a limited spacing result: it is set by the practical
+ * speaker positions and the seat geometry, and the channel count is not the
+ * cause. Never a limitation claim, never a channel upgrade.
+ */
+export const HIGH_CHANNEL_PREFERRED_SENTENCE = 'The spacing between the channels is set by the practical speaker positions and the seat geometry rather than by the channel count.';
+
+/**
+ * The paragraph this module used to prescribe, kept verbatim so a stored body
+ * that still carries it is replaced rather than printed: it presented a limited
+ * spacing result as a room geometry constraint and pointed at an upgrade path.
+ */
+export const HIGH_CHANNEL_LEGACY_CONSTRAINT_SENTENCE = 'The horizontal spacing result is mainly a consequence of the room layout and the practical speaker positions available. The design already uses a high channel count, so this should be understood as a room geometry constraint rather than a simple upgrade path.';
 
 /** Discrete channels stated by a layout such as '9.1.6' (bed + overhead). */
 export function parseDiscreteChannelCount(configuration) {
@@ -41,6 +52,23 @@ export function isHighChannelDesign(snapshot) {
   const layout = system.channel_layout || {};
   const configuration = layout.configuration_text || system.configuration?.dolby_config || null;
   const raw = layout.total_discrete ?? system.configuration?.total_discrete_channels ?? null;
+  const count = raw === null || raw === undefined || raw === '' ? null : Number(raw);
+  if (Number.isFinite(count)) return count >= HIGH_DENSITY_MIN_DISCRETE_CHANNELS;
+  const parsed = parseDiscreteChannelCount(configuration);
+  return parsed !== null && parsed >= HIGH_DENSITY_MIN_DISCRETE_CHANNELS;
+}
+
+/**
+ * True when a live system object carries a high-channel-count layout, as opposed
+ * to a report's frozen snapshot. Same figures, same threshold.
+ */
+export function isHighChannelSystem(system) {
+  const source = system || {};
+  const layout = source.channel_layout || source.channelLayout || {};
+  const configuration = layout.configuration_text || layout.configurationText
+    || source.configuration?.dolby_config || source.dolbyLayout || null;
+  const raw = layout.total_discrete ?? layout.totalDiscrete
+    ?? source.configuration?.total_discrete_channels ?? null;
   const count = raw === null || raw === undefined || raw === '' ? null : Number(raw);
   if (Number.isFinite(count)) return count >= HIGH_DENSITY_MIN_DISCRETE_CHANNELS;
   const parsed = parseDiscreteChannelCount(configuration);
@@ -77,6 +105,44 @@ export function mentionsHighChannelUpgrade(text) {
   // wording, so the negation is removed before the intent test.
   const withoutNegation = source.replace(NEGATED_UPGRADE_RE, ' ');
   return SPACING_SUBJECT_RE.test(withoutNegation) && FUTURE_INTENT_RE.test(withoutNegation);
+}
+
+const ROOM_SUBJECT_RE = /\b(?:room geometry|room layout|the room|geometry|layout)\b/i;
+const CONSTRAINT_WORD_RE = /\b(?:constraint|constraints|constrained|limitation|limitations|limited|limits?|restrict\w*|caps?\b|ceiling)\b/i;
+const SPACING_OR_CHANNEL_RE = /\b(?:spacing|side[-\s]to[-\s]side|discrete (?:channels?|speakers?|outputs?)|channel count|channels?|surround channels?|overhead (?:channels?|positions?)|speaker positions?)\b/i;
+const PROCESSOR_SUBJECT_RE = /\b(?:av\s+processor|a\/v\s+processor|processor|pre[-\s]?amp\w*|receiver|amplifier|amplifiers|amp)\b/i;
+const PROCESSOR_CLAIM_RE = /\b(?:limit\w*|constrain\w*|restrict\w*|capabilit\w*|channel count|cost\w*|expens\w*|afford\w*|budget)\b/i;
+
+/**
+ * Copy that presents the layout, the spacing or the channel count as a
+ * room-geometry limitation. That is not the right interpretation for a 9.x.6
+ * system: a limited spacing result is set by the practical speaker positions and
+ * the seat geometry, and Parameter 2 is already achieved.
+ */
+export function mentionsRoomGeometryConstraintClaim(text) {
+  const source = plainText(text);
+  if (!source) return false;
+  if (source.toLowerCase().includes(HIGH_CHANNEL_LEGACY_CONSTRAINT_SENTENCE.toLowerCase())) return true;
+  return ROOM_SUBJECT_RE.test(source)
+    && CONSTRAINT_WORD_RE.test(source)
+    && SPACING_OR_CHANNEL_RE.test(source);
+}
+
+/**
+ * Copy that raises AV processor or amplifier channel capability, or its cost, as
+ * the reason the design stops where it does. Never a client-facing point.
+ */
+export function mentionsProcessorCostClaim(text) {
+  const source = plainText(text);
+  if (!source) return false;
+  return PROCESSOR_SUBJECT_RE.test(source) && PROCESSOR_CLAIM_RE.test(source);
+}
+
+/** Any high-channel copy defect this design must not carry. */
+export function mentionsHighChannelCopyDefect(text) {
+  return mentionsHighChannelUpgrade(text)
+    || mentionsRoomGeometryConstraintClaim(text)
+    || mentionsProcessorCostClaim(text);
 }
 
 /** The sentence a piece of copy limits: horizontal spacing, in whatever words. */
@@ -148,6 +214,14 @@ function cleanSegmentBlock(block) {
       if (isSpacingSentence(text)) droppedSpacing = true;
       continue;
     }
+    // The room-geometry-constraint paragraph, and any processor or amplifier
+    // capability or cost claim, are never printed for this design either: the
+    // spacing result is a position and seat result, and P2 is already achieved.
+    if (mentionsRoomGeometryConstraintClaim(text)) {
+      if (isSpacingSentence(text)) droppedSpacing = true;
+      continue;
+    }
+    if (mentionsProcessorCostClaim(text)) continue;
     if (isSpacingSentence(text)) spacingStated = true;
     kept.push(segment);
   }
@@ -191,9 +265,21 @@ export function stripHighChannelUpgradeCopy(html) {
   out += source.slice(cursor);
 
   // Copy outside a paragraph (a stray line) is cleaned in the same way.
-  if (mentionsHighChannelUpgrade(out)) {
-    const kept = segmentSentences(out)
-      .filter((segment) => !mentionsHighChannelUpgrade(segment));
+  if (mentionsHighChannelCopyDefect(out)) {
+    const kept = [];
+    for (const segment of segmentSentences(out)) {
+      const text = plainText(segment);
+      if (!text) {
+        kept.push(segment);
+        continue;
+      }
+      if (mentionsHighChannelCopyDefect(text)) {
+        if (isSpacingSentence(text)) droppedSpacing = true;
+        continue;
+      }
+      if (isSpacingSentence(text)) spacingStated = true;
+      kept.push(segment);
+    }
     out = rebalanceInlineTags(kept.join(''));
   }
 
