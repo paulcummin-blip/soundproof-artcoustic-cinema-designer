@@ -1,5 +1,8 @@
 import React from 'react';
-import { REPORT_FONT_BODY } from '@/components/report/typography/reportTypography';
+import {
+    REPORT_FONT_BODY,
+    REPORT_SECTION_HEADING_GAP_PRINT,
+} from '@/components/report/typography/reportTypography';
 
 export default function ReportPrintStyles() {
     return (
@@ -97,6 +100,16 @@ export default function ReportPrintStyles() {
 
                 #pdf-cover .rp22-cover-stack {
                   gap: 4mm !important;
+                }
+
+                /* ── One section-heading rhythm ────────────────────────────
+                   Every Technical Report section heading is followed by the
+                   same gap before its copy, so no section reads tighter than
+                   another. The marked headings sit inside fixed-height page
+                   frames, so the canonical gap is applied over their own
+                   inline rhythm rather than relying on it. */
+                .rp22-report [data-report-section-heading="true"] {
+                    margin-bottom: ${REPORT_SECTION_HEADING_GAP_PRINT} !important;
                 }
 
                 html, body, #root, #__next {
@@ -354,10 +367,6 @@ export default function ReportPrintStyles() {
                    it may break only between complete category groups. */
                 .rp22-report .tech-asdr-scorecard {
                     padding: 6mm 10mm 3mm 10mm !important;
-                }
-
-                .rp22-report .tech-asdr-scorecard-heading {
-                    margin-bottom: 3mm !important;
                 }
 
                 .rp22-report .tech-asdr-categories {

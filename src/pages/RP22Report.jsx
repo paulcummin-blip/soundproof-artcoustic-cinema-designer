@@ -30,7 +30,10 @@ import { resolveRspScreenFrontPlaneM, resolveRspScreenWidthM } from '@/component
 // Extracted child components
 import ReportPrintStyles from '../components/report/ReportPrintStyles';
 import ReportTypographyStyles from '@/components/report/typography/ReportTypographyStyles';
-import { REPORT_FONT_BODY } from '@/components/report/typography/reportTypography';
+import {
+    REPORT_FONT_BODY,
+    REPORT_SECTION_HEADING_GAP_PX,
+} from '@/components/report/typography/reportTypography';
 import RP22ReportParameterGrid from '../components/report/RP22ReportParameterGrid';
 import BassResponseGraphSection from '../components/report/technical/BassResponseGraphSection';
 import TechnicalReportNotice from '../components/report/technical/TechnicalReportNotice';
@@ -1435,7 +1438,7 @@ function RP22ReportInner() {
                                 <ReportCover variant="print" project={projectDetails} />
                                 {/* RP22 explanation */}
                                 <div style={{ maxWidth: '185mm', margin: '0 auto', paddingTop: '5mm', fontFamily: REPORT_FONT_BODY, fontSize: '10pt', color: '#3E4349', lineHeight: 1.55, textAlign: 'left' }}>
-                                    <div style={{ fontWeight: 700, color: '#1B1A1A', marginBottom: '3mm', fontSize: '11pt' }}>CEDIA RP22 - Immersive Audio Performance Levels</div>
+                                    <div data-report-section-heading="true" style={{ fontWeight: 700, color: '#1B1A1A', fontSize: '11pt' }}>CEDIA RP22 - Immersive Audio Performance Levels</div>
                                     <div><strong>Level 1</strong> – The minimum level of performance necessary to convey basic artistic intent.</div>
                                     <div><strong>Level 2</strong> – A higher level of performance that more accurately conveys artistic intent.</div>
                                     <div><strong>Level 3</strong> – Meets or exceeds reference commercial cinema exhibition standards.</div>
@@ -1444,7 +1447,7 @@ function RP22ReportInner() {
                                 </div>
                                 {/* RP23 explanation */}
                                 <div style={{ maxWidth: '185mm', margin: '0 auto', marginTop: '5mm', paddingTop: '5mm', borderTop: '1px solid #D9D5CE', fontFamily: REPORT_FONT_BODY, fontSize: '10pt', color: '#3E4349', lineHeight: 1.55, textAlign: 'left' }}>
-                                    <div style={{ fontWeight: 700, color: '#1B1A1A', marginBottom: '3mm', fontSize: '11pt' }}>RP23 - Image Performance</div>
+                                    <div data-report-section-heading="true" style={{ fontWeight: 700, color: '#1B1A1A', fontSize: '11pt' }}>RP23 - Image Performance</div>
                                     <div>CEDIA's forthcoming RP23 document will address best practice for image. Currently, we only have the size of the images based on the horizontal viewing angle, and the brightness which is known.</div>
                                     {coverageSentence && (
                                         <Rp22SeatCoverageSentence sentence={coverageSentence} variant="cover" />
