@@ -122,7 +122,10 @@ function SvgDrawing({ svgW, svgH, pad, room, screen, projector, rowData }) {
       {/* Floor line */}
       <line x1={rx0} y1={ry0} x2={rx1} y2={ry0} {...STROKE.floor} />
 
-      {/* Vertical viewing comfort guides — drawn behind sightlines */}
+      {/* Vertical viewing comfort guides — drawn behind sightlines.
+          The ±15° comfort angle is carried by its two dotted guides alone: the
+          shaded triangle they used to fill was visually heavy and the guides
+          already state the geometry. The angle values themselves are unchanged. */}
       {rowData.map((row, i) => {
         const ex = toX(row.eyeY);
         const ez = toY(row.eyeZ);
@@ -133,11 +136,6 @@ function SvgDrawing({ svgW, svgH, pad, room, screen, projector, rowData }) {
         const lowerY = toY(lowerZ);
         return (
           <g key={`comfort-${row.rowNumber}`}>
-            <polygon
-              points={`${ex},${ez} ${stx},${upperY} ${stx},${lowerY}`}
-              fill="#4B5563"
-              opacity="0.05"
-            />
             <line x1={ex} y1={ez} x2={stx} y2={upperY} {...STROKE.comfort} />
             <line x1={ex} y1={ez} x2={stx} y2={lowerY} {...STROKE.comfort} />
             {i === 0 && (
