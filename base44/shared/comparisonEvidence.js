@@ -172,6 +172,14 @@ export function buildVersionEvidence({
       strategy: system.subwoofer_strategy?.strategy_text || null,
       summary: snapshot.bass?.subwoofer_strategy_summary || null,
     },
+    // The amplification the version specifies, as a clean comparable figure. The
+    // dynamic range grades are delivered by the speakers, the subwoofers and the
+    // power behind them, so the power is part of the comparison rather than
+    // background detail. Read from the snapshot's own statement: never inferred,
+    // and null when the version states no power.
+    amplification: system.amplification?.specified === true && Number(system.amplification?.power_w)
+      ? `${Number(system.amplification.power_w)} W`
+      : null,
     rp22_results: parameterEvidence.used.map(describeEvidenceRow),
     rp23_results: {
       available: viewing.available === true,
@@ -253,6 +261,7 @@ export function formatVersionEvidenceForPrompt(versions) {
         .join(' | ')}`);
     }
     if (version.subwoofer_package?.strategy) lines.push(`Subwoofers: ${version.subwoofer_package.strategy}`);
+    if (version.amplification) lines.push(`Amplification: ${version.amplification}`);
     if (version.rp23_results?.summary) lines.push(`RP23 viewing: ${version.rp23_results.summary}`);
 
     for (const structure of REPORT_STRUCTURES) {

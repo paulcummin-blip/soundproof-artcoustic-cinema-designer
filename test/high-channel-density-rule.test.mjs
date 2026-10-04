@@ -347,11 +347,14 @@ describe('I. Parameter 2 is already achieved, and a spacing result is a position
     expect(labels.some((label) => /shared 9\.1\.6 layout/i.test(label))).toBe(true);
     expect(labels.some((label) => /upgrade/i.test(label))).toBe(false);
 
+    // A comparison never carries an upgrade chip, at either density: what the
+    // options change is the layout and the equipment, and the report explains
+    // that in its own sections.
     const lowLabels = buildComparisonAuthorityChips([
       { version_name: 'A', facts: lowFacts },
       { version_name: 'B', facts: lowFacts },
     ]).map((entry) => entry.label);
-    expect(lowLabels.some((label) => /upgrade/i.test(label))).toBe(true);
+    expect(lowLabels.some((label) => /upgrade/i.test(label))).toBe(false);
   });
 
   it('describes a limited P5 result by its positions and leaves the Result untouched', () => {

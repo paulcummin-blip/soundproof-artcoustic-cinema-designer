@@ -80,6 +80,8 @@ export const COMPARISON_REPORT_INSTRUCTIONS = [
   'Where one option is clearly stronger, explain why, without attacking the alternative.',
   'Where one option improves bass consistency across the seating area, explain that as more even bass between seats: less difference between the strongest and weakest seat. Never describe the other option as wrong, and never present the comparison as a correction.',
   'Do not automatically recommend the largest system unless the evidence supports it.',
+  'The calculated comparison table is the authority on what differs. Never say two options are the same, equivalent or unchanged in an area where the table states different values, and never describe the options as performing alike where the table shows a difference.',
+  'Write to the decision: state what changes, what it gives the room, and what the client is choosing between. Short, direct sentences. Lead with the differences and keep the shared ground brief.',
   'Never present the comparison as an equipment table, and never rank the options as "best".',
   'Write about the system options, never about one system: say "both versions use", "the Level 1 version uses" or "the Level 4 version adds", and never "this design", "the system" or "the selected system".',
   'Name each option by the exact version name supplied. State a fact the options share once, as shared, rather than repeating it for each option.',

@@ -81,6 +81,19 @@ export default function ProposalPackDocument({
     });
 
   const canonical = getSectionsForProposalType(reportType);
+  // A comparison covers several versions, so its at-a-glance page is built from
+  // the same calculated comparison rows the Key Differences table prints: one
+  // block per selected version, never one version standing in for them all.
+  const highlightsSection = byType.get('key_performance_highlights');
+  const comparisonRows = reportType === 'comparison'
+    ? highlightsSection?.metadata?.comparison_rows || null
+    : null;
+  const comparisonVersions = reportType === 'comparison'
+    ? highlightsSection?.metadata?.comparison_versions || null
+    : null;
+  const hasComparisonGlance = Array.isArray(comparisonRows)
+    && comparisonRows.length > 0
+    && (Array.isArray(comparisonVersions) ? comparisonVersions : []).length >= 2;
   const glance = isDesignedPack
     ? buildAtAGlance({ snapshot, projectName, projectReference, generatedDate })
     : { projectCards: [], roomCards: [], systemCards: [], packageRows: [] };
@@ -98,7 +111,8 @@ export default function ProposalPackDocument({
   const hasGlanceContent = glance.projectCards.length > 0
     || glance.roomCards.length > 0
     || glance.systemCards.length > 0
-    || glance.packageRows.length > 0;
+    || glance.packageRows.length > 0
+    || hasComparisonGlance;
 
   if (hasGlanceContent) {
     pages.push(
@@ -109,6 +123,8 @@ export default function ProposalPackDocument({
         projectName={projectName}
         projectReference={projectReference}
         generatedDate={generatedDate}
+        comparisonRows={comparisonRows}
+        comparisonVersions={comparisonVersions}
       />
     );
   }

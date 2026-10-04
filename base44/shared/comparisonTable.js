@@ -8,8 +8,13 @@
  * the single-report table the experience cell of each row.
  *
  * Row rules:
- *   - only client-facing differences are carried: a row appears only when every
- *     version has a reliable value AND the values are not identical;
+ *   - EVERY assessed comparison area is carried: a row appears whenever every
+ *     version has a reliable value, whether or not the values differ. An area
+ *     the versions share is a comparison result and states "No change" rather
+ *     than being dropped, so a client is never shown a partial picture of two
+ *     systems that also agree in places. The table is never truncated;
+ *   - the differences lead, then the areas the versions share, each group in
+ *     performance order;
  *   - P8, P15, P21, assumed parameters, and unavailable, stale, unreliable or
  *     unassessed results never appear, because the evidence rules never supply
  *     them. Bass consistency (P20) appears when the P20 rule admits it, which is
@@ -34,6 +39,12 @@ export const COMPARISON_ROW_ORDER = Object.freeze([
   'screen_size',
   'rp23_viewing',
   'system_layout',
+  // The equipment is a comparison area in its own right: two systems can be
+  // graded alike and still be built from different speakers and subwoofers.
+  'speakers',
+  'subwoofers',
+  'amplification',
+  'seating',
   'p2',
   'p4',
   'p5',
@@ -50,17 +61,14 @@ export const COMPARISON_ROW_ORDER = Object.freeze([
   'p20',
 ]);
 
-/**
- * The most rows the printed comparison table carries. It is one indivisible
- * block on one page, so it shows the differences first and fills the remaining
- * places with the areas both versions share.
- */
-export const COMPARISON_ROW_LIMIT = 10;
-
 const ROW_LABELS = Object.freeze({
   screen_size: 'Screen size',
   rp23_viewing: 'Viewing angle / RP23',
   system_layout: 'System layout',
+  speakers: 'Speaker package',
+  subwoofers: 'Subwoofers',
+  amplification: 'Amplification',
+  seating: 'Seating',
   p2: 'Discrete channels (P2)',
   p4: 'Screen consistency (P4)',
   p5: 'Horizontal spacing (P5)',
@@ -110,6 +118,30 @@ function readRowValue(evidence, rowKey) {
   }
 
   if (rowKey === 'system_layout') return evidence.system_format_short || evidence.system_format || null;
+
+  if (rowKey === 'speakers') {
+    // The speakers each version is actually specified with, position by
+    // position: the package is a comparison area, not background detail.
+    const roles = Array.isArray(evidence.speaker_package) ? evidence.speaker_package : [];
+    const lines = [];
+    for (const role of roles) {
+      const model = role?.model || null;
+      if (!model) continue;
+      const label = role.role_description || role.role || null;
+      const line = label ? `${label}: ${model}` : String(model);
+      if (!lines.includes(line)) lines.push(line);
+    }
+    return lines.length > 0 ? lines.join(' · ') : null;
+  }
+
+  if (rowKey === 'subwoofers') {
+    const subwoofers = evidence.subwoofer_package || {};
+    return subwoofers.strategy || subwoofers.summary || null;
+  }
+
+  if (rowKey === 'amplification') return evidence.amplification || null;
+
+  if (rowKey === 'seating') return evidence.seating_data?.interpretation || null;
 
   if (rowKey === 'p14') return evidence.bass_evidence_if_reliable?.p14?.text || null;
   if (rowKey === 'p18') return evidence.bass_evidence_if_reliable?.p18?.text || null;
@@ -168,9 +200,13 @@ export function describeChange(firstValue, secondValue) {
     if (comparable) {
       const delta = Math.round((secondMeasure.amount - firstMeasure.amount) * 100) / 100;
       if (delta !== 0) {
-        const sign = delta > 0 ? '+' : '-';
-        const unit = firstMeasure.unit ? ` ${firstMeasure.unit}` : '';
-        return `${sign}${Math.abs(delta)}${unit}`;
+      const sign = delta > 0 ? '+' : '-';
+      // A unit that is a word is spaced from the number (-8 Hz). A symbol
+      // attaches to it, so an inch or a degree change never prints detached.
+      const unit = firstMeasure.unit
+        ? (/^[a-zA-Z]/.test(firstMeasure.unit) ? ` ${firstMeasure.unit}` : firstMeasure.unit)
+        : '';
+      return `${sign}${Math.abs(delta)}${unit}`;
       }
     }
   }
@@ -223,12 +259,12 @@ export function buildComparisonTable(versions) {
     });
   }
 
-  // The table is one printed block on one page, so it carries the limit and no
-  // more. The differences lead: they are what the comparison is for, and the
-  // areas both versions share fill the remaining places.
-  const ordered = [...compared.filter((row) => !row.identical), ...compared.filter((row) => row.identical)]
-    .slice(0, COMPARISON_ROW_LIMIT)
-    .sort((a, b) => COMPARISON_ROW_ORDER.indexOf(a.key) - COMPARISON_ROW_ORDER.indexOf(b.key));
+  // Every assessed area is carried and no row is truncated: a table that showed
+  // only some of the assessed areas left the client reading a whole system from
+  // a partial table. The differences lead, because they are what the comparison
+  // is for, and each group stays in performance order (the compared list is
+  // built by walking COMPARISON_ROW_ORDER, so filtering preserves that order).
+  const ordered = [...compared.filter((row) => !row.identical), ...compared.filter((row) => row.identical)];
 
   // The internal Design Index is never a client-facing row, whatever a stored
   // table carries.
@@ -290,6 +326,8 @@ export function buildComparisonHighlightsPrompt() {
     'RULES:',
     '- Do not write a table, a row or a value.',
     '- Do not restate a table value and do not describe a difference the table does not show.',
-    '- Do not say which option is better here: this is the introduction only, and the section that follows explains the differences in order (what stays the same, what changes, what the room gains or gives up).',
+    '- Do not say which option is better here: this is the introduction only, and the section that follows explains the differences in order (what changes, what the room gains or gives up, and what stays the same).',
+    '- Never say the options are the same, equivalent or unchanged where the table shows a difference, and never state a difference the table does not show.',
+    '- Write to the decision: what the client is choosing between, in short direct sentences.',
   ].join('\n');
 }

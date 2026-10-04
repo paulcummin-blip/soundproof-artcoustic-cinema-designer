@@ -227,6 +227,15 @@ function expectedCell(evidence, key) {
     return `${evidence.rp23_results.primary_floor} · ${evidence.rp23_results.summary}`;
   }
   if (key === 'system_layout') return evidence.system_format_short;
+  if (key === 'speakers') {
+    const lines = (evidence.speaker_package || [])
+      .map((role) => (role.role_description || role.role ? `${role.role_description || role.role}: ${role.model}` : role.model))
+      .filter(Boolean);
+    return lines.length > 0 ? lines.join(' · ') : null;
+  }
+  if (key === 'subwoofers') return evidence.subwoofer_package?.strategy || evidence.subwoofer_package?.summary || null;
+  if (key === 'amplification') return evidence.amplification || null;
+  if (key === 'seating') return evidence.seating_data?.interpretation || null;
   if (key === 'p14') return evidence.bass_evidence_if_reliable.p14.text;
   if (key === 'p18') return evidence.bass_evidence_if_reliable.p18.text;
   if (key === 'p19') return evidence.bass_evidence_if_reliable.p19.text;
@@ -378,7 +387,10 @@ test('three versions produce one column each and no change column', () => {
   assert.equal(table.rows.length > 0, true);
   for (const row of table.rows) {
     assert.equal(row.values.length, 3, `${row.key} carries a value per version`);
-    assert.equal(row.change, null, 'no single change column is claimed for three options');
+    assert.ok(
+      row.change === null || row.change === 'No change',
+      'no single change is claimed for three options, and a shared value still says so',
+    );
   }
 
   const prompt = formatComparisonTableForPrompt(table);

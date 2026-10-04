@@ -60,6 +60,30 @@ const ROW_PRESENTATION = Object.freeze({
     unit: DISPLAY_UNIT.NONE,
     gain: 'More speaker positions around and above the seats.',
   },
+  speakers: {
+    area: HIGHLIGHT_AREA.SPATIAL,
+    parameter: 'Speaker package',
+    unit: DISPLAY_UNIT.NONE,
+    gain: 'The speakers specified for each position, which is what the spatial results are delivered with.',
+  },
+  subwoofers: {
+    area: HIGHLIGHT_AREA.BASS,
+    parameter: 'Subwoofer package',
+    unit: DISPLAY_UNIT.NONE,
+    gain: 'The subwoofers specified, which set the low-frequency output the room gets.',
+  },
+  amplification: {
+    area: HIGHLIGHT_AREA.DYNAMIC,
+    parameter: 'Amplification',
+    unit: DISPLAY_UNIT.NONE,
+    gain: 'The power behind the speakers, which is what the dynamic range results are delivered with.',
+  },
+  seating: {
+    area: HIGHLIGHT_AREA.VIEWING,
+    parameter: 'Seating',
+    unit: DISPLAY_UNIT.NONE,
+    gain: 'The seats the design was assessed across.',
+  },
   p2: {
     area: HIGHLIGHT_AREA.SPATIAL,
     parameter: 'P2 discrete channels',

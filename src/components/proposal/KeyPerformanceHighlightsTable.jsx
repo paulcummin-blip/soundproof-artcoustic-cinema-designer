@@ -94,6 +94,12 @@ export default function KeyPerformanceHighlightsTable({
   }
 
   if (comparison) {
+    // Every assessed area is carried, so a comparison of two fully assessed
+    // designs carries more rows than the single-report table. The rows tighten
+    // rather than the table being cut: it stays one printed block on one page,
+    // and no assessed area is dropped to make it fit.
+    const dense = visibleComparisonRows.length > 10;
+    const cell = dense ? 'px-2 py-1 align-top border-b border-[#EAE8E3]' : CELL;
     return (
       <div className={className}>
         <table className="kph-table w-full border-collapse">
@@ -112,20 +118,20 @@ export default function KeyPerformanceHighlightsTable({
           <tbody>
             {visibleComparisonRows.map((row, index) => (
               <tr key={row.key || index}>
-                <td className={`${CELL} text-[#1B1A1A]`} style={proposalRoleStyle('body')}>{row.area}</td>
+                <td className={`${cell} text-[#1B1A1A]`} style={proposalRoleStyle('body')}>{row.area}</td>
                 {options.map((column, optionIndex) => (
                   <td
                     key={`${row.key || index}:${column.version_id || optionIndex}`}
-                    className={`${CELL} text-[#3E4349]`}
+                    className={`${cell} text-[#3E4349]`}
                     style={proposalRoleStyle('body')}
                   >
                     {row.values?.[optionIndex] || '—'}
                   </td>
                 ))}
-                <td className={`${CELL} text-[#625143]`} style={proposalRoleStyle('body')}>
+                <td className={`${cell} text-[#625143]`} style={proposalRoleStyle('body')}>
                   {changeCellText(row, options.length)}
                 </td>
-                <td className={`${CELL} text-[#625143]`} style={proposalRoleStyle('body')}>
+                <td className={`${cell} text-[#625143]`} style={proposalRoleStyle('body')}>
                   {comparisonClientMeaning(row)}
                 </td>
               </tr>

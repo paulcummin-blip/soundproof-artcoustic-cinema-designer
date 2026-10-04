@@ -56,17 +56,24 @@ test('TEST 1 — an area both versions share is carried as a row', () => {
 });
 
 // ── TEST 2 — the table stays one printed block ────────────────────────────
-test('TEST 2 — the differences lead, and the table stays within its limit', () => {
+test('TEST 2 — the differences lead, and every assessed area is carried', () => {
   const source = read('base44/shared/comparisonTable.js');
 
-  assert.ok(source.includes('COMPARISON_ROW_LIMIT'), 'the printed limit exists');
   assert.ok(
-    source.includes('.filter((row) => !row.identical), ...compared.filter((row) => row.identical)'),
-    'the differences fill the table before the areas both versions share',
+    !source.includes('COMPARISON_ROW_LIMIT'),
+    'the table is never truncated, so an assessed area cannot be cut out of it',
   );
   assert.ok(
-    source.includes('COMPARISON_ROW_ORDER.indexOf(a.key) - COMPARISON_ROW_ORDER.indexOf(b.key)'),
-    'and the table still reads in performance order',
+    source.includes('.filter((row) => !row.identical), ...compared.filter((row) => row.identical)'),
+    'the differences lead, and the areas both versions share follow them',
+  );
+  assert.ok(
+    source.includes('for (const key of COMPARISON_ROW_ORDER)'),
+    'every assessed area is built, in performance order',
+  );
+  assert.ok(
+    source.includes("'speakers'") && source.includes("'subwoofers'") && source.includes("'seating'"),
+    'the specified speakers, subwoofers and seating are comparison areas of their own',
   );
   // Every row needs a reliable value from every version.
   assert.ok(source.includes('if (values.some((value) => !value)) continue;'), 'a row is only carried when every version carries it');
