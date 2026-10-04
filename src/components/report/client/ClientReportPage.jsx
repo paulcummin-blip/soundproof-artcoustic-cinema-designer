@@ -30,6 +30,7 @@ import ClientNonScreenDynamicRange from "@/components/report/client/ClientNonScr
 import ClientScreenSeating from "@/components/report/client/ClientScreenSeating";
 import Rp22SeatCoverageSentence from "@/components/report/Rp22SeatCoverageSentence";
 import { getSeatGradeColors } from "@/components/report/client/visualReportSeatStyle";
+import ReportPrintHeader from '@/components/report/ReportPrintHeader';
 
 // Level → canonical grade colour for P12/P13 print result badges.
 // Derived from RP22_GRADE_TOKENS — the same authority as grading pills.
@@ -41,11 +42,10 @@ function printLevelColor(lvl) {
 export default function ClientReportPage({ children, isFirst, projectDetails, logoUrl, pageId, printData }) {
   const projectName = projectDetails?.name || "Untitled";
   const clientName = projectDetails?.client_name || "";
-  const projectId = projectDetails?.id || "";
   const createdDate = projectDetails?.created_date;
 
-  // Short project reference from ID (first 8 chars of UUID)
-  const projectRef = projectId ? String(projectId).substring(0, 8).toUpperCase() : "";
+  // Only the dealer-assigned Project reference is a report reference.
+  const projectRef = projectDetails?.project_reference?.trim() || "";
 
   // Format created date only when valid
   let createdDateStr = "";
@@ -80,9 +80,10 @@ export default function ClientReportPage({ children, isFirst, projectDetails, lo
           its own first page with no separate cover page above it. */}
       {isFirst && (
         <div className="client-report-page__header">
-          <img src={logoUrl} alt="Sound Proof" />
-          <div className="client-report-page__header-title">Visual Report</div>
-          <div className="client-report-page__header-meta">
+          <ReportPrintHeader title="Visual Report" project={projectDetails} className="client-report-print-only" />
+          <img className="client-report-screen-only" src={logoUrl} alt="Sound Proof" />
+          <div className="client-report-page__header-title client-report-screen-only">Visual Report</div>
+          <div className="client-report-page__header-meta client-report-screen-only">
             <span>{[
               projectName,
               clientName || null,

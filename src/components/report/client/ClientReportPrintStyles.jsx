@@ -21,6 +21,7 @@
 
 import React from "react";
 import { buildReportTypographyCss } from "@/components/report/typography/reportTypography";
+import { REPORT_PRINT_HEADER } from '@/components/report/reportPrintHeader';
 
 export default function ClientReportPrintStyles() {
   return (
@@ -36,7 +37,7 @@ export default function ClientReportPrintStyles() {
       }
 
       .client-report-page__header img {
-        width: 62mm;
+        width: ${REPORT_PRINT_HEADER.logoWidthMm}mm;
         max-width: 100%;
         height: auto;
         object-fit: contain;
@@ -126,15 +127,15 @@ export default function ClientReportPrintStyles() {
       body.client-report-printing .client-report-page__header {
         grid-row: 1;
         align-self: start;
-        max-height: 54mm;
-        overflow: hidden;
-        padding-bottom: 2mm;
-        border-bottom: 1px solid #DCDBD6;
-        margin-bottom: 3mm;
+        max-height: none;
+        overflow: visible;
+        padding-bottom: 0;
+        border-bottom: 0;
+        margin-bottom: 0;
       }
 
       body.client-report-printing .client-report-page__header img {
-        width: 62mm;
+        width: ${REPORT_PRINT_HEADER.logoWidthMm}mm;
         max-width: 100%;
         height: auto;
         object-fit: contain;
@@ -411,15 +412,15 @@ export default function ClientReportPrintStyles() {
         .client-report-page__header {
           grid-row: 1;
           align-self: start;
-          max-height: 54mm;
-          overflow: hidden;
-          padding-bottom: 2mm;
-          border-bottom: 1px solid #DCDBD6;
-          margin-bottom: 3mm;
+          max-height: none;
+          overflow: visible;
+          padding-bottom: 0;
+          border-bottom: 0;
+          margin-bottom: 0;
         }
 
         .client-report-page__header img {
-          width: 62mm;
+          width: ${REPORT_PRINT_HEADER.logoWidthMm}mm;
           max-width: 100%;
           height: auto;
           object-fit: contain;

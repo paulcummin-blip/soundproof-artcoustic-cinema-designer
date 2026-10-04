@@ -130,7 +130,7 @@ export function useProposalExport({
     // The shared filename helper, with the report type this proposal is:
     // System Design Summary / System Design Comparison / Proposal.
     const title = buildProposalReportTitle(
-      projectName || proposal?.title || 'Proposal',
+      projectName,
       proposal?.proposal_type,
       { dealerName, projectReference }
     );

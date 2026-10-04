@@ -129,14 +129,14 @@ test('TEST 5 — the report starts on its own first page', () => {
 // ── TEST 6 — first-page masthead matches the Technical Report ──────────────
 test('TEST 6 — the first-page logo matches the Technical Report cover', () => {
   const styles = read('src/components/report/client/ClientReportPrintStyles.jsx');
-  assert.equal((styles.match(/width: 62mm;/g) || []).length >= 3, true,
-    'logo sized at 62mm on screen, in print mode and in print media');
+  assert.ok(styles.includes('REPORT_PRINT_HEADER.logoWidthMm'), 'screen masthead uses shared dimensions');
+  assert.ok(!styles.includes('width: 62mm;'), 'no duplicated logo width');
   assert.ok(!styles.includes('--client-report-logo-height'), 'the old smaller logo height is gone');
-  assert.ok((styles.match(/max-height: 54mm/g) || []).length === 2, 'header height allows the larger logo');
+  assert.ok(!styles.includes('max-height: 54mm'), 'the shared print masthead is not clipped');
 
-  // The Technical Report cover is the sizing authority: 62mm wide, centred.
   const cover = read('src/components/report/ReportCover.jsx');
-  assert.ok(cover.includes("width: '62mm'"), 'Technical Report cover uses 62mm');
+  assert.ok(cover.includes('<ReportPrintHeader'), 'Technical Report uses the shared print component');
+  assert.ok(!cover.includes("width: '62mm'"), 'no independent Technical logo width');
 
   // The masthead is no longer print-only: the first page shows it on screen too.
   const page = read('src/components/report/client/ClientReportPage.jsx');

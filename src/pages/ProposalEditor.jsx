@@ -28,6 +28,7 @@ import { isHighChannelDesign } from '@/components/proposal/highChannelLayoutAuth
 import ProposalPrintDocument from '@/components/proposal/export/ProposalPrintDocument';
 import ProposalPrintStyles from '@/components/proposal/export/ProposalPrintStyles';
 import { useProposalExport } from '@/components/proposal/export/useProposalExport';
+import { resolveReportFilenameDetails } from '@/components/report/reportFilenameIdentity';
 import { Loader2, ChevronLeft, Archive, RotateCcw } from 'lucide-react';
 
 const SAVE_STATUS = { IDLE: 'idle', SAVING: 'saving', SAVED: 'saved', FAILED: 'failed', UNSAVED: 'unsaved' };
@@ -108,6 +109,7 @@ export default function ProposalEditor() {
       projectName: project?.name || null,
       clientName: project?.client_name || null,
       dealerName,
+      filenameDealerName: resolveReportFilenameDetails(project, account).dealerName,
       projectReference: project?.project_reference || null,
       coverImageUrl: cover?.file_url || null,
       heroImageUrl: presentation.heroBg,
@@ -577,7 +579,7 @@ export default function ProposalEditor() {
     proposal,
     sections,
     projectName: projectContext.projectName,
-    dealerName: projectContext.dealerName,
+    dealerName: projectContext.filenameDealerName,
     projectReference: projectContext.projectReference,
   });
 

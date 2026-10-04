@@ -72,6 +72,7 @@ import { DEFAULT_TERRITORY, getTerritoryConfig } from '@/components/pricing/terr
 import { resolveSeatPriority, getPrimarySeats, getSecondarySeats } from '@/components/utils/seatPriorityAuthority';
 import Rp22SeatCoverageSentence from '@/components/report/Rp22SeatCoverageSentence';
 import { buildTechnicalReportTitle } from '@/components/report/reportPdfTitle';
+import useReportFilenameIdentity from '@/components/report/useReportFilenameIdentity';
 import { applyPrintDocumentTitle, restorePrintDocumentTitle } from '@/components/report/printDocumentTitle';
 import {
     findTechnicalReportPrintNode,
@@ -123,13 +124,11 @@ function RP22ReportInner() {
     // the stalled-export fallback both use exactly this string, so a downloaded
     // Technical Report always identifies itself: brand, report type, dealer,
     // project and reference.
+    const filenameIdentity = useReportFilenameIdentity(projectDetails);
     const technicalReportPrintTitle = buildTechnicalReportTitle(
         projectDetails?.name,
         { number: reportVersionNumber, name: reportVersionName },
-        {
-            dealerName: projectDetails?.dealer_name || null,
-            projectReference: projectDetails?.project_reference || null,
-        }
+        filenameIdentity
     );
     const showDesignRating = useSyncExternalStore(subscribeAsdrVisibility, getAsdrVisibility);
 
@@ -317,6 +316,8 @@ function RP22ReportInner() {
                     created_date: p.created_date,
                     updated_date: p.updated_date,
                     account_id: p.account_id || null,
+                    dealer_name: p.dealer_name || null,
+                    project_reference: p.project_reference || null,
                     active_version_id: p.active_version_id || null,
                 });
             }).catch(() => { /* non-blocking metadata fetch */ });
@@ -349,6 +350,9 @@ function RP22ReportInner() {
                 notes: p.notes,
                 created_date: p.created_date,
                 updated_date: p.updated_date,
+                account_id: p.account_id || null,
+                dealer_name: p.dealer_name || null,
+                project_reference: p.project_reference || null,
                 active_version_id: p.active_version_id || null,
             });
             // Merge with the active ProjectVersion so per-version design fields
@@ -536,7 +540,7 @@ function RP22ReportInner() {
             setReportProjectError("Project could not be resolved for Technical Report.");
             return;
         }
-        if (reportHydrating || reportReadyProjectId !== explicitProjectId) {
+        if (!filenameIdentity.ready || reportHydrating || reportReadyProjectId !== explicitProjectId) {
             logAutoPrintBlock(reportHydrating ? 'reportHydrating = true' : 'reportReadyProjectId mismatch', 391);
             return;
         }
@@ -558,7 +562,7 @@ function RP22ReportInner() {
         setPlanDimsImageDataUrl(null);
         setPlanSpeakerDimsImageDataUrl(null);
         setIsPrinting(true);
-    }, [autoPrintRequested, reportHydrating, explicitProjectId, reportReadyProjectId, isPrinting, authorityReportPending, bassReportPending, bassRestoreFailed, reportDataIncomplete]);
+    }, [autoPrintRequested, reportHydrating, explicitProjectId, reportReadyProjectId, isPrinting, authorityReportPending, bassReportPending, bassRestoreFailed, reportDataIncomplete, filenameIdentity.ready]);
 
     // Mark printReady when all captures are done
     useEffect(() => {
@@ -1310,7 +1314,7 @@ function RP22ReportInner() {
                         setPlanDimsImageDataUrl={setPlanDimsImageDataUrl}
                         setPlanSpeakerDimsImageDataUrl={setPlanSpeakerDimsImageDataUrl}
                         setIsPrinting={setIsPrinting}
-                        exportDisabled={reportHydrating || (explicitProjectId && reportReadyProjectId !== explicitProjectId) || authorityReportPending || bassReportPending || bassRestoreFailed || reportDataIncomplete || recommendationsPending || !designAssessmentComplete}
+                        exportDisabled={!filenameIdentity.ready || reportHydrating || (explicitProjectId && reportReadyProjectId !== explicitProjectId) || authorityReportPending || bassReportPending || bassRestoreFailed || reportDataIncomplete || recommendationsPending || !designAssessmentComplete}
                         exportDisabledMessage={reportDataIncomplete ? reportDataIncompleteReason : (!designAssessmentComplete ? "Complete assessment to export PDF" : (authorityReportPending ? "Engineering summary loading" : (recommendationsPending ? "Recommendations evaluating" : "Report loading")))}
                         lcrAngleInfo={(() => {
                             // Compute LCR angles exactly as Plan View does:
@@ -1428,9 +1432,9 @@ function RP22ReportInner() {
                         <section id="pdf-cover">
                             {/* ── Page 1: Logo + title + RP22/RP23 explanations ── */}
                             <div className="print-summary report-page-block report-page-block--cover" data-report-block="cover" data-report-page-start="true">
-                                <ReportCover variant="print" />
+                                <ReportCover variant="print" project={projectDetails} />
                                 {/* RP22 explanation */}
-                                <div style={{ maxWidth: '185mm', margin: '0 auto', paddingTop: '5mm', borderTop: '1px solid #D9D5CE', fontFamily: REPORT_FONT_BODY, fontSize: '10pt', color: '#3E4349', lineHeight: 1.55, textAlign: 'left' }}>
+                                <div style={{ maxWidth: '185mm', margin: '0 auto', paddingTop: '5mm', fontFamily: REPORT_FONT_BODY, fontSize: '10pt', color: '#3E4349', lineHeight: 1.55, textAlign: 'left' }}>
                                     <div style={{ fontWeight: 700, color: '#1B1A1A', marginBottom: '3mm', fontSize: '11pt' }}>CEDIA RP22 - Immersive Audio Performance Levels</div>
                                     <div><strong>Level 1</strong> – The minimum level of performance necessary to convey basic artistic intent.</div>
                                     <div><strong>Level 2</strong> – A higher level of performance that more accurately conveys artistic intent.</div>

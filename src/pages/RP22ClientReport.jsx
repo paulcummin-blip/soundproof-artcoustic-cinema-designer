@@ -23,6 +23,7 @@ import ClientReportPage from "@/components/report/client/ClientReportPage";
 import ClientReportPrintStyles from "@/components/report/client/ClientReportPrintStyles";
 import ReportTypographyStyles from "@/components/report/typography/ReportTypographyStyles";
 import { useClientReportPdfExport } from "@/components/report/client/useClientReportPdfExport";
+import useReportFilenameIdentity from '@/components/report/useReportFilenameIdentity';
 import { selectClientDesignHighlights } from "@/components/report/client/selectClientDesignHighlights";
 import ClientDesignHighlights from "@/components/report/client/ClientDesignHighlights";
 import ClientRecommendedSeatingPosition from "@/components/report/client/ClientRecommendedSeatingPosition";
@@ -858,16 +859,17 @@ export default function RP22ClientReport() {
       }
     : derivedReadiness;
 
+  const filenameIdentity = useReportFilenameIdentity(projectDetails);
   const { exporting, error: exportError, handleExport } = useClientReportPdfExport({
-    activePageCount: readinessBase.state === REPORT_STATE.READY ? activePages.length : 0,
+    activePageCount: readinessBase.state === REPORT_STATE.READY && filenameIdentity.ready ? activePages.length : 0,
     projectName: projectDetails?.name,
     logoUrl: LOGO_URL,
     versionNumber,
     versionName,
     // The exported filename names the dealer and the project reference when
     // the project carries them, so the file identifies itself out of context.
-    dealerName: projectDetails?.dealer_name || null,
-    projectReference: projectDetails?.project_reference || null,
+    dealerName: filenameIdentity.dealerName,
+    projectReference: filenameIdentity.projectReference,
   });
 
   // A failed export resolves the report to the canonical Failed state.
@@ -1067,7 +1069,7 @@ export default function RP22ClientReport() {
           <Button
             type="button"
             onClick={handleExport}
-            disabled={!reportReady || activePages.length === 0 || exporting}
+            disabled={!reportReady || !filenameIdentity.ready || activePages.length === 0 || exporting}
             className="client-report-screen-only"
             style={{
               fontFamily: "Didact Gothic, Century Gothic, sans-serif",
