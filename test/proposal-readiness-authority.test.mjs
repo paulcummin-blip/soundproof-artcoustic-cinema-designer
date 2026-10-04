@@ -52,6 +52,7 @@
  */
 
 import assert from 'node:assert/strict';
+import { test as vitestTest } from 'vitest';
 
 import {
   READINESS_VERB as SHARED_VERB,
@@ -618,4 +619,9 @@ test('15. reports without a calculated result still block, naming that result', 
 const failures = results.filter((line) => line.startsWith('FAIL'));
 console.log(results.join('\n'));
 console.log(`\n${results.length - failures.length}/${results.length} checks passed`);
-if (failures.length > 0) process.exitCode = 1;
+
+// Registered with vitest so the file is collected and reported as a test run
+// (the checks above run at import, and this asserts every one of them passed).
+vitestTest('proposal readiness authority — every acceptance check passes', () => {
+  assert.equal(failures.length, 0, `\n${failures.join('\n')}`);
+});

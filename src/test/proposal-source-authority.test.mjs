@@ -178,8 +178,8 @@ test('the proposal builder reads the source status and blocks generation', () =>
   assert.match(WIZARD, /const sourceReady = sourceStatus\?\.ready === true/);
   assert.match(WIZARD, /if \(!sourceReady\) \{/, 'generate is guarded');
   assert.match(WIZARD, /sourceStatus\?\.message/, 'the blocker message is surfaced');
-  assert.match(WIZARD, /<ProposalSourcePanel[\s\S]*status=\{sourceStatus\}/, 'source status is shown');
-  assert.match(WIZARD, /\|\| !sourceReady\}/, 'the Generate button is disabled until the reports are current');
+  assert.match(WIZARD, /<VersionReadinessTable[\s\S]*gate=\{readiness\}/, 'the same per-version readiness result is shown on the review step');
+  assert.match(WIZARD, /\|\| !readiness\.ready\}/, 'the Generate button is disabled until every selected version is current');
   assert.match(WIZARD, /written from the current Visual and Technical Report data/);
 });
 
@@ -238,7 +238,7 @@ test('the AI prompt is given the report identity and report-only facts', () => {
   assert.match(GENERATE, /Report fingerprint: \$\{sourceIdentity\?\.engineering_fingerprint/);
   assert.match(GENERATE, /Reports generated: \$\{sourceIdentity\?\.published_at/);
   // Facts read from the report, never the legacy project row.
-  assert.match(GENERATE, /const screenSize = snapshotRoom\.size_inches \?\? project\.screen_size/);
+  assert.match(GENERATE, /const screenSize = snapshotRoom\.size_inches \?\? ''/);
   assert.match(GENERATE, /const aspectRatio = snapshotRoom\.aspect_ratio \|\| project\.aspect_ratio/);
   assert.match(GENERATE, /snapshotSystem\.channel_layout\?\.configuration_text/);
 });

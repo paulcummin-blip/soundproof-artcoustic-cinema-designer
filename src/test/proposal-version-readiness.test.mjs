@@ -22,7 +22,6 @@ import path from 'node:path';
 import {
   PROPOSAL_READINESS_READY_COPY,
   PROPOSAL_READINESS_TITLE,
-  READINESS_CLAUSE,
   READINESS_COLUMNS,
   READINESS_STATE,
   buildReadinessCell,
@@ -30,7 +29,6 @@ import {
   resolveVersionReadinessRow,
   versionDisplayName,
 } from '../components/proposal/sourceAuthority/proposalReadinessAuthority.js';
-import { PROPOSAL_SOURCE_REQUIRED_MESSAGE } from '../components/proposal/sourceAuthority/proposalSourceAuthority.js';
 import {
   PROPOSAL_LIBRARY_SOURCE_LABEL,
   PROPOSAL_LIBRARY_SOURCE_STATE,
@@ -82,7 +80,7 @@ test('TEST 1 — a comparison is judged per version, never from the first select
   expect(gate.rows).toHaveLength(2);
   expect(gate.blockers).toHaveLength(1);
   expect(gate.blockers[0].source).toBe('technical');
-  expect(gate.message).toContain('Level 4 version is missing Technical Report');
+  expect(gate.message).toContain('Level 4 version is missing the Technical Report');
   expect(gate.message).not.toContain('Original Design');
 });
 
@@ -112,7 +110,10 @@ test('TEST 3 — the version count the report type requires is part of readiness
 
   expect(gate.versionCountValid).toBe(false);
   expect(gate.ready).toBe(false);
-  expect(gate.message).toBe(PROPOSAL_SOURCE_REQUIRED_MESSAGE);
+  // The count is the block, so no source is named missing: the table states the
+  // count requirement and the wizard keeps its own copy for this case.
+  expect(gate.message).toBeNull();
+  expect(gate.blockedVersions).toEqual([]);
   expect(TABLE).toContain('Select the number of versions this report type requires');
 });
 
@@ -156,11 +157,11 @@ test('TEST 5 — the blocking message names every blocked version and the source
   const gate = resolveProposalReadinessGate({ rows, minVersions: 2 });
 
   expect(gate.message).toBe(
-    'Level 4 version is missing Technical Report. Wides trial has stale bass authority',
+    'Level 4 version is missing the Technical Report. Wides trial has a stale bass authority.',
   );
   expect(gate.blockers.map((blocker) => blocker.sentence)).toEqual([
-    'Level 4 version is missing Technical Report',
-    'Wides trial has stale bass authority',
+    'Level 4 version is missing the Technical Report',
+    'Wides trial has a stale bass authority',
   ]);
   // The engine column names what is actually missing, never a generic phrase.
   expect(gate.blockers[1].label).toBe('bass authority');
@@ -211,15 +212,14 @@ test('TEST 7 — Step 5 shows the same table, every version by name, and gates G
 /* ── TEST 8 — the server agrees ───────────────────────────────────────── */
 
 test('TEST 8 — the server states the same clauses and returns named per-version blockers', () => {
-  // The clause wording lives in both places (the frontend cannot import from
-  // base44/), so it must agree verbatim.
-  for (const clause of Object.values(READINESS_CLAUSE)) {
-    expect(SERVER).toContain(clause);
-  }
-  expect(SERVER).toContain('function buildSourceBlockerSentence(');
-  expect(SERVER).toContain("error: sentences.join('. ') || PROPOSAL_SOURCE_REQUIRED_MESSAGE,");
-  expect(SERVER).toContain('source_blockers: sourceBlockers,');
-  expect(SERVER).toContain('version_label: versionLabelById.get(versionId) || null,');
+  // The wording now lives in ONE module: the server imports the same shared
+  // authority the client mirrors, so the clauses cannot drift apart, and both
+  // sides state the block per version and per source.
+  expect(SERVER).toContain("} from '../../shared/proposalReadinessAuthority.js';");
+  expect(SERVER).toContain('resolveProposalReadinessGate({ rows: readinessRows, minVersions: 1 })');
+  expect(SERVER).toContain('error: readinessGate.message || PROPOSAL_SOURCE_REQUIRED_MESSAGE,');
+  expect(SERVER).toContain('source_blockers: readinessGate.rows');
+  expect(SERVER).toContain('version_name: row.versionName,');
 });
 
 /* ── TEST 9 — the library groups by project ───────────────────────────── */
