@@ -150,11 +150,15 @@ test('TEST 7 — the transition frequency is derived once for both graphs', () =
 test('TEST 8 — the graphs are the final technical evidence, before About Sound Proof', () => {
   const report = read('src/pages/RP22Report.jsx');
 
-  // Print order: RP22 parameter pages → graphs → About Sound Proof.
+  // Print order: RP22 parameter pages → graphs → About Sound Proof. The closing
+  // page is its own gated block (it renders only with resolved copy), so the
+  // report anchors it by component and the block carries the page identity.
   const paramsAt = report.indexOf('id="pdf-room-parameters"');
   const printGraphAt = report.lastIndexOf('<BassResponseGraphSection');
-  const aboutAt = report.indexOf('id="pdf-about-sound-proof"');
+  const aboutAt = report.indexOf('<TechnicalAboutSoundProofSection');
+  const aboutBlock = read('src/components/report/technical/TechnicalAboutSoundProofSection.jsx');
   assert.ok(paramsAt > 0 && aboutAt > 0, 'the parameter and About blocks are both present');
+  assert.ok(aboutBlock.includes('id="pdf-about-sound-proof"'), 'the closing page keeps its print identity');
   assert.ok(printGraphAt > paramsAt, 'the printed graphs follow the RP22 parameter pages');
   assert.ok(printGraphAt < aboutAt, 'the printed graphs precede About Sound Proof');
 

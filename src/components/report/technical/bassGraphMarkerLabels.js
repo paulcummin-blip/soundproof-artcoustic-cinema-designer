@@ -76,10 +76,31 @@ export function buildMarkerLabelLayout(entries = [], { plotLeft, plotRight, firs
   // ── One combined, row-stacked, border-safe label per group ──
   const rowEnds = [];
   return groups.map((group) => {
+    // A marker may carry a line without a name — an internal boundary the report
+    // draws but does not name. It keeps its line and contributes no wording, so a
+    // label can never state internal vocabulary, and if no name is left there is
+    // no label at all (just the line).
+    const named = group.names
+      .map((name, index) => ({ name: String(name ?? "").trim(), frequency: group.frequencies[index] }))
+      .filter((entry) => entry.name.length > 0);
+
+    if (named.length === 0) {
+      return {
+        key: group.key,
+        text: "",
+        color: group.color,
+        lines: group.lines,
+        labelX: group.x,
+        labelY: null,
+        row: null,
+        box: null,
+      };
+    }
+
     const frequency = Math.round(
-      group.frequencies.reduce((sum, value) => sum + value, 0) / group.frequencies.length,
+      named.reduce((sum, entry) => sum + entry.frequency, 0) / named.length,
     );
-    const text = `${group.names.join(" / ")} ≈ ${frequency} Hz`;
+    const text = `${named.map((entry) => entry.name).join(" / ")} ≈ ${frequency} Hz`;
     const width = markerLabelWidth(text);
 
     // Prefer the right of the marker line; flip to its left when the label would

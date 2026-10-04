@@ -463,7 +463,7 @@ export default function ClientReportPage({ children, isFirst, projectDetails, lo
           <PrintPerSeatPerformanceContent rows={printData.seatRows} rsp={printData.rsp} />
         )}
         {printData?.type === "about-sound-proof" && (
-          <AboutSoundProofReportPage />
+          <AboutSoundProofReportPage html={printData.aboutHtml} />
         )}
       </div>
 

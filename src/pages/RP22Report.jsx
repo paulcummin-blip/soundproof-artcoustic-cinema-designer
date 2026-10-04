@@ -83,7 +83,7 @@ import {
     printTechnicalReportInWindow,
     closeTechnicalReportPrintWindow,
 } from '@/components/report/technical/technicalReportPrintWindow';
-import AboutSoundProofReportPage from '@/components/report/AboutSoundProofReportPage';
+import TechnicalAboutSoundProofSection from '@/components/report/technical/TechnicalAboutSoundProofSection';
 import { readDesignReviewHandoff, subscribeDesignReviewHandoff } from '@/components/state/designReviewHandoff';
 import { useVersionedEngineeringAuthority } from '@/components/engineering/useVersionedEngineeringAuthority';
 import { useCompletedBassAuthority } from '@/components/room/bass/completedBassResultStore';
@@ -1694,16 +1694,10 @@ function RP22ReportInner() {
                             variant="print"
                         />
 
-                        {/* ── About Sound Proof — final page (fixed brand closing page) ── */}
-                        <section
-                          id="pdf-about-sound-proof"
-                          className="report-page-block report-page-block--summary"
-                          data-report-block="about-sound-proof"
-                          data-report-page-start="true"
-                          style={{ background: '#FFFFFF', padding: 0, margin: 0 }}
-                        >
-                            <AboutSoundProofReportPage />
-                        </section>
+                        {/* ── About Sound Proof — the closing brand page. It is
+                            rendered only once its copy is available, so the export
+                            never carries a "Loading…" or empty final page. ── */}
+                        <TechnicalAboutSoundProofSection />
 
                     </div>
                 </div>

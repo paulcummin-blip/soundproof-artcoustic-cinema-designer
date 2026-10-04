@@ -7,6 +7,11 @@
  *
  * Print-safe: the parent wrapper provides the page frame and page-break
  * rules. This component fills the available space with the content.
+ *
+ * Never printed while unresolved: the page renders only once its copy exists, so
+ * an export can never capture a "Loading…" sheet or an empty page. Callers that
+ * have already read the canonical content pass it in as `html` and the page
+ * renders synchronously, with no read of its own.
  */
 import React from "react";
 import { LOGO_URL } from "@/components/report/ReportCover";
@@ -21,8 +26,26 @@ import {
   REPORT_FONT_BODY as FONT_BODY,
 } from '@/components/report/typography/reportTypography';
 
-export default function AboutSoundProofReportPage({ variant = "full" }) {
+export default function AboutSoundProofReportPage({ variant = "full", html: providedHtml }) {
+  if (providedHtml !== undefined) {
+    return <AboutSoundProofView variant={variant} html={providedHtml} />;
+  }
+  return <ConnectedAboutSoundProof variant={variant} />;
+}
+
+/** Reads the canonical content itself; renders nothing until it is resolved. */
+function ConnectedAboutSoundProof({ variant }) {
   const { html, loading } = usePublicationContent("about_sound_proof");
+  if (loading || !hasAboutContent(html)) return null;
+  return <AboutSoundProofView variant={variant} html={html} />;
+}
+
+/** Content is printable only when it actually says something. */
+function hasAboutContent(html) {
+  return typeof html === "string" && html.trim().length > 0;
+}
+
+function AboutSoundProofView({ variant = "full", html }) {
   // compact = the Visual Report's brand closing section: logo, heading and the
   // published copy. The copy is always ONE clean column of simple paragraphs —
   // never a newspaper-style multi-column block — so it reads as ordinary
@@ -33,6 +56,10 @@ export default function AboutSoundProofReportPage({ variant = "full" }) {
   // line height and collapsed spacer blocks, so the whole article fits one A4
   // report page instead of drifting down the sheet.
   const compact = variant === "compact";
+
+  // Nothing to show is nothing to print: an unresolved page is never laid out, so
+  // no caller can place an empty page shell (or a waiting label) on paper.
+  if (!hasAboutContent(html)) return null;
 
   return (
     <div
@@ -92,11 +119,9 @@ export default function AboutSoundProofReportPage({ variant = "full" }) {
         About Sound Proof
       </h1>
 
-      {/* Body copy — canonical published content */}
-      {loading ? (
-        <div style={{ fontSize: "10pt", color: "#625143" }}>Loading…</div>
-      ) : (
-        <div
+      {/* Body copy — canonical published content. This page only renders once the
+          copy is resolved, so there is no waiting state to be printed. */}
+      <div
           className="about-sound-proof-copy"
           style={{
             maxWidth: compact ? "150mm" : "160mm",
@@ -123,8 +148,7 @@ export default function AboutSoundProofReportPage({ variant = "full" }) {
             variant="print"
             style={{ width: "100%", fontSize: "9.5pt", lineHeight: 1.55 }}
           />
-        </div>
-      )}
+      </div>
     </div>
   );
 }

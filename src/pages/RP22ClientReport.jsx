@@ -52,6 +52,7 @@ import { selectClientPerSeatPerformance } from "@/components/report/client/selec
 import ClientP7FrontWides from "@/components/report/client/ClientP7FrontWides";
 import { selectClientP7FrontWides } from "@/components/report/client/selectClientP7FrontWides";
 import AboutSoundProofReportPage from "@/components/report/AboutSoundProofReportPage";
+import { usePublicationContent } from "@/components/publicationContent/usePublicationContent";
 import { LOGO_URL } from "@/components/report/ReportCover";
 import { Button } from "@/components/ui/button";
 import { ArrowLeft, FileText, Download } from "lucide-react";
@@ -287,6 +288,13 @@ export default function RP22ClientReport() {
   // 1 Project overview · 2 Key performance highlights · 3 ADI Design Summary
   // 4 Dynamic Range · 5 Spatial Resolution · 6 Timbre Matching
   // 7 Practical limitations and upgrades · 8 Short About Sound Proof
+  // The closing About Sound Proof page exists only once its copy is resolved: a
+  // page still waiting would be laid out as an empty sheet and printed blank, so
+  // an unresolved page is left out of the report entirely.
+  const aboutSoundProof = usePublicationContent("about_sound_proof");
+  const aboutSoundProofHtml = aboutSoundProof.loading ? null : aboutSoundProof.html;
+  const aboutSoundProofReady = typeof aboutSoundProofHtml === "string" && aboutSoundProofHtml.trim().length > 0;
+
   const activePages = useMemo(() => {
     const overviewPages = [];
     const dynamicPages = [];
@@ -761,23 +769,27 @@ export default function RP22ClientReport() {
         });
       });
     }
-    // About Sound Proof — the short brand closing section, always last.
-    closingPages.push({
-      id: "about-sound-proof",
-      category: "About Sound Proof",
-      visual: (
-        <div style={{
-          background: "#FFFFFF",
-          borderRadius: 16,
-          padding: "28px 32px",
-          boxShadow: "0 2px 12px rgba(0, 0, 0, 0.06)",
-          border: "1px solid #DCDBD6",
-        }}>
-          <AboutSoundProofReportPage variant="compact" />
-        </div>
-      ),
-      printData: { type: "about-sound-proof" },
-    });
+    // About Sound Proof — the short brand closing section, always last. It is
+    // added only when its copy has resolved, so the report never shows or prints
+    // a loading or blank closing page.
+    if (aboutSoundProofReady) {
+      closingPages.push({
+        id: "about-sound-proof",
+        category: "About Sound Proof",
+        visual: (
+          <div style={{
+            background: "#FFFFFF",
+            borderRadius: 16,
+            padding: "28px 32px",
+            boxShadow: "0 2px 12px rgba(0, 0, 0, 0.06)",
+            border: "1px solid #DCDBD6",
+          }}>
+            <AboutSoundProofReportPage variant="compact" html={aboutSoundProofHtml} />
+          </div>
+        ),
+        printData: { type: "about-sound-proof", aboutHtml: aboutSoundProofHtml },
+      });
+    }
 
     return [
       ...overviewPages,
@@ -788,7 +800,7 @@ export default function RP22ClientReport() {
       ...summaryPages,
       ...closingPages,
     ];
-  }, [p5Snapshot, p5SeatResults, p9Snapshot, p9Overhead, bestListeningArea, timbreConsistency, frontSoundstage, nonScreenSoundstage, highlights, screenSeating, hasSeatingPosition, recommendedSeatingPosition, bassPerformance, roomDims, rsp, rspSourceLabel, screenFrontPlaneM, screenWidthM, screen, placedSpeakers, appState?.acousticTreatmentEnabled, appState?.selectedAbfuserQty, coverageSentence, reportGeometry, reportSystem, perSeatPerformance, projectId]);
+  }, [p5Snapshot, p5SeatResults, p9Snapshot, p9Overhead, bestListeningArea, timbreConsistency, frontSoundstage, nonScreenSoundstage, highlights, screenSeating, hasSeatingPosition, recommendedSeatingPosition, bassPerformance, roomDims, rsp, rspSourceLabel, screenFrontPlaneM, screenWidthM, screen, placedSpeakers, appState?.acousticTreatmentEnabled, appState?.selectedAbfuserQty, coverageSentence, reportGeometry, reportSystem, perSeatPerformance, aboutSoundProofReady, aboutSoundProofHtml, projectId]);
 
   // Each category heading is printed once. The first page of a category keeps
   // its heading; continuation pages never repeat the major category heading.

@@ -129,10 +129,11 @@ test('the published copy passes through unchanged', () => {
 test('the printed page (PDF) keeps rendering the page', () => {
   const printPage = fs.readFileSync('src/components/report/client/ClientReportPage.jsx', 'utf8');
   assert.ok(printPage.includes('AboutSoundProofReportPage'), 'the PDF page still renders the About page');
-  assert.ok(printPage.includes('AboutSoundProofReportPage />'), 'the PDF page renders it with its default (full) layout');
+  assert.ok(printPage.includes('<AboutSoundProofReportPage html={printData.aboutHtml} />'),
+    'the PDF page renders the resolved copy it is handed (never a waiting state)');
   // The same single page serves the Visual Report's on-screen closing section.
   const visualReport = fs.readFileSync('src/pages/RP22ClientReport.jsx', 'utf8');
-  assert.ok(visualReport.includes('<AboutSoundProofReportPage variant="compact" />'),
+  assert.ok(visualReport.includes('<AboutSoundProofReportPage variant="compact" html={aboutSoundProofHtml} />'),
     'the Visual Report still renders the closing section');
 });
 

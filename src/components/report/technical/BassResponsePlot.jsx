@@ -81,8 +81,11 @@ export default function BassResponsePlot({
     finite(markers.transitionHz)
       ? { key: "transition", frequency: Number(markers.transitionHz), shortName: "Transition / Schroeder", color: "#625143" }
       : null,
+    // The limiting frequency keeps its marker LINE but is never named: "Limiting"
+    // is internal vocabulary, and the boundary is already named once by the
+    // transition / Schroeder marker when the two lines sit together.
     finite(markers.limitingFrequencyHz)
-      ? { key: "limiting", frequency: Number(markers.limitingFrequencyHz), shortName: "Limiting", color: "#B45309" }
+      ? { key: "limiting", frequency: Number(markers.limitingFrequencyHz), shortName: "", color: "#B45309" }
       : null,
     finite(markers.p18FrequencyHz)
       ? { key: "p18", frequency: Number(markers.p18FrequencyHz), shortName: "P18 −3 dB", color: "#1D4ED8" }
@@ -176,9 +179,11 @@ export default function BassResponsePlot({
               strokeDasharray="5 4"
             />
           ))}
-          <text x={marker.labelX} y={marker.labelY} fill={marker.color} fontSize={LABEL_FONT_SIZE} fontWeight="600">
-            {marker.text}
-          </text>
+          {marker.text && (
+            <text x={marker.labelX} y={marker.labelY} fill={marker.color} fontSize={LABEL_FONT_SIZE} fontWeight="600">
+              {marker.text}
+            </text>
+          )}
         </g>
       ))}
 
