@@ -108,7 +108,7 @@ export default function ClientReportPage({ children, isFirst, projectDetails, lo
         )}
         {printData?.type === "highlights" && (
           <>
-            <div className="client-report-print-heading">
+            <div className="client-report-print-heading client-report-print-heading--centered">
               <h1 className="client-report-print-heading__title">Design Summary</h1>
             </div>
             {/* The summary statement sits centred, with its own breathing room

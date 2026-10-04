@@ -248,6 +248,14 @@ export default function ClientReportPrintStyles() {
         max-width: 100%;
       }
 
+      /* The first-page Design Summary heading is centred so it sits in line with
+         the centred report masthead above it. Every other section heading keeps
+         its left alignment. Typography, tracking, colour and spacing are
+         unchanged — only its horizontal position on the page. */
+      body.client-report-printing .client-report-print-heading--centered {
+        text-align: center;
+      }
+
       /* ── Drawing region — fills remaining space, SVG centred ── */
       body.client-report-printing .client-report-print-drawing {
         flex: 1;
@@ -531,6 +539,13 @@ export default function ClientReportPrintStyles() {
           overflow-wrap: break-word;
           word-break: break-word;
           max-width: 100%;
+        }
+
+        /* The first-page Design Summary heading is centred so it sits in line
+           with the centred report masthead above it. Every other section heading
+           keeps its left alignment. */
+        .client-report-print-heading--centered {
+          text-align: center;
         }
 
         /* ── Drawing region — fills remaining space, SVG centred ── */
