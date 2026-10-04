@@ -1,28 +1,31 @@
 /**
- * proposalReadinessAuthority.js
- * -----------------------------
- * THE shared per-version proposal readiness authority.
+ * proposalReadinessAuthority.js  (shared)
+ * ---------------------------------------
+ * THE ONE proposal readiness authority, on the server side of the boundary.
  *
- * A System Design Comparison is built from EVERY selected version, so its
- * readiness must be decided per version — never from the first selected version
- * alone, and never from one report of one version.
+ * A proposal is generated from the CURRENT reports and the published engineering
+ * result of EVERY selected version, so readiness is decided per version, per
+ * source — never from the first selected version alone, from one report, or from
+ * a source the server cannot see.
  *
- * Per version it states four things:
- *   Visual Report        saved report for project + version + report type
- *   Technical Report     saved report for project + version + report type
- *   Engineering Authority  the version's published engineering result
- *   the blocking reason, naming the version and the source that blocks
+ * Per version it states exactly three things:
+ *   Visual Report          the saved report for project + version + report type
+ *   Technical Report       the saved report for project + version + report type
+ *   Engineering result     the version's PUBLISHED engineering result
  *
- * The report cells are judged by the SAME fingerprint comparison the report
- * pages use (reportSnapshotAuthority), so this gate and a report's own Current
- * badge can never disagree.
+ * The report cells are judged by the same fingerprint comparison the report
+ * pages use (both sides compare only fingerprints that BOTH sides state, so an
+ * unreadable fingerprint never manufactures staleness), and the engineering cell
+ * is judged by the published publication alone — never by a browser-session
+ * handoff, which the server cannot read.
  *
- * States per cell: Current / Stale / Missing / Incomplete / Unavailable /
- * Checking. A read still in flight is Checking — it is never reported as
- * Missing, and the fixed generic sentence is never used to describe it.
+ * The frontend cannot import from base44/ and vice versa, so
+ * src/components/proposal/sourceAuthority/proposalReadinessAuthority.js mirrors
+ * this derivation and a test asserts the two agree word for word. This module is
+ * the reference: states, labels, clauses, sentence shape and the version name.
  *
- * Derivation only: recalculates nothing, generates no report content, reads no
- * entity. Pure — no React, no side effects, no runtime APIs.
+ * Derivation only: recalculates nothing, generates no report content, writes
+ * nothing. Pure — no React, no side effects, no runtime APIs.
  */
 
 /** The readiness state of one cell, one version or the whole gate. */
@@ -60,9 +63,13 @@ export const READINESS_COLUMNS = Object.freeze([
 ]);
 
 /**
- * The clause every blocking sentence is built from. Mirrored verbatim in
- * base44/functions/generateProposal/entry.ts (the frontend cannot import from
- * base44/, so the wording lives in both places and a test asserts parity).
+ * The verb that introduces a state's clause. It is stated ONCE per state, so a
+ * sentence with two things wrong reads as prose instead of repeating itself:
+ *   "Level 1 version is missing Visual and Technical Reports and the calculated
+ *    engineering result."
+ *   "Level 4 version has a stale Visual Report and a stale Technical Report."
+ * Mirrored verbatim in
+ * src/components/proposal/sourceAuthority/proposalReadinessAuthority.js.
  */
 export const READINESS_VERB = Object.freeze({
   [READINESS_STATE.MISSING]: 'is missing',
@@ -70,6 +77,13 @@ export const READINESS_VERB = Object.freeze({
   [READINESS_STATE.INCOMPLETE]: 'has',
   [READINESS_STATE.UNAVAILABLE]: 'has',
 });
+
+/**
+ * The label both reports are stated under when BOTH are missing — the only case
+ * stated as a single item: "Level 1 version is missing Visual and Technical
+ * Reports."
+ */
+export const READINESS_COMBINED_REPORT_LABEL = 'Visual and Technical Reports';
 
 /** Panel heading for the readiness table. */
 export const PROPOSAL_READINESS_TITLE = 'Version readiness';
@@ -83,8 +97,23 @@ export const PROPOSAL_READINESS_READY_COPY =
 export const PROPOSAL_READINESS_RULE =
   'Every selected version must have current reports and engineering results = the proposal can be generated.';
 
-/** The two report labels merged when both reports are in the same state. */
-export const READINESS_COMBINED_REPORT_LABEL = 'Visual and Technical Reports';
+/** The published-engineering result states, as read from the version pointer. */
+export const PUBLICATION_STATUS = Object.freeze({
+  PUBLISHED: 'published',
+  NOT_CALCULATED: 'not_calculated',
+  STALE: 'stale',
+  READ_FAILED: 'read_failed',
+});
+
+/** The saved-report payload generation. A payload from another one is not usable. */
+export const REPORT_SNAPSHOT_SCHEMA_VERSION = 1;
+
+/** The fingerprints both sides compare, in report order. */
+export const SNAPSHOT_FINGERPRINT_KEYS = Object.freeze([
+  'engineeringFingerprint',
+  'calculationFingerprint',
+  'seatPriorityFingerprint',
+]);
 
 /**
  * Blocking labels per source and state. The engineering column states what the
@@ -102,27 +131,19 @@ export function blockerLabel({ source, state }) {
 
 /**
  * The version name the designer saved — `Level 4 version`, `Original Design` —
- * stated exactly, with no slot suffix. The stored name is the identity: a version
- * called "Level 4 version" is never written as "Level 4 version · V4", and a
- * "V1"-style marker only ever appears when it is part of the saved name itself.
- * A version with no usable name falls back to the slot, then to "Version".
+ * stated exactly, with NO slot suffix. A version called "Level 1 version" is
+ * never written as "Level 1 version · V2". A version with no usable name falls
+ * back to the slot, then to "Version".
  */
-export function versionDisplayName({ version_name: name = null, version_number: number = null } = {}) {
-  const trimmed = typeof name === 'string' ? name.trim() : '';
-  if (trimmed) return trimmed;
-  return number ? `Version ${number}` : 'Version';
+export function versionDisplayName(version = {}) {
+  const name = typeof version?.version_name === 'string' ? version.version_name.trim() : '';
+  const number = Number(version?.version_number);
+  const hasNumber = Number.isFinite(number) && number > 0;
+  if (name) return name;
+  return hasNumber ? `Version ${number}` : 'Version';
 }
 
-/**
- * One report cell's state, from the saved report and the fingerprint
- * comparison the report page itself uses.
- *
- * @param {Object} params
- * @param {boolean} params.hasSaved        a saved report exists for this version
- * @param {string|null} params.snapshotStatus 'current' | 'stale' | 'none'
- * @param {boolean} [params.checking]
- * @returns {string} READINESS_STATE
- */
+/** One report cell's state, from the saved report and its fingerprint comparison. */
 export function resolveReportCellState({ hasSaved = false, snapshotStatus = null, checking = false } = {}) {
   if (checking) return READINESS_STATE.CHECKING;
   if (!hasSaved) return READINESS_STATE.MISSING;
@@ -144,6 +165,106 @@ export function buildReadinessCell({ state, generatedAt = null, reason = null })
   };
 }
 
+/** Normalise a partial fingerprint set into the canonical three-key shape. */
+export function buildSourceFingerprints(input = {}) {
+  const source = (input && typeof input === 'object') ? input : {};
+  const asText = (value) => {
+    if (typeof value !== 'string') return null;
+    const trimmed = value.trim();
+    return trimmed.length > 0 ? trimmed : null;
+  };
+  return {
+    engineeringFingerprint: asText(source.engineeringFingerprint),
+    calculationFingerprint: asText(source.calculationFingerprint),
+    seatPriorityFingerprint: asText(source.seatPriorityFingerprint),
+  };
+}
+
+/**
+ * Compare the fingerprints a saved report was generated from against the ones
+ * read now. A fingerprint stated on only one side is never compared, so an
+ * unreadable fingerprint never manufactures staleness.
+ */
+export function compareSourceFingerprints(saved, current) {
+  const savedFp = buildSourceFingerprints(saved);
+  const currentFp = buildSourceFingerprints(current);
+  const changed = [];
+  const compared = [];
+
+  for (const key of SNAPSHOT_FINGERPRINT_KEYS) {
+    const before = savedFp[key];
+    const now = currentFp[key];
+    if (!before || !now) continue;
+    compared.push(key);
+    if (before !== now) changed.push(key);
+  }
+
+  return { changed, compared };
+}
+
+/**
+ * Whether a saved report can be restored: it must carry a payload and be written
+ * under the current payload generation.
+ */
+export function isSavedReportRestorable(snapshot) {
+  if (!snapshot || typeof snapshot !== 'object') return false;
+  if (Number(snapshot.report_schema_version) !== REPORT_SNAPSHOT_SCHEMA_VERSION) return false;
+  const payload = snapshot.payload;
+  return !!payload && typeof payload === 'object' && !Array.isArray(payload) && Object.keys(payload).length > 0;
+}
+
+/** One saved report → its readiness cell. */
+export function resolveSavedReportCell({ saved = null, currentFingerprints = null } = {}) {
+  if (!isSavedReportRestorable(saved)) {
+    return buildReadinessCell({ state: READINESS_STATE.MISSING });
+  }
+  const { changed } = compareSourceFingerprints(saved.source_fingerprints, currentFingerprints);
+  return buildReadinessCell({
+    state: changed.length > 0 ? READINESS_STATE.STALE : READINESS_STATE.CURRENT,
+    generatedAt: saved.generated_at || null,
+  });
+}
+
+/** The fingerprints describing the project AS IT STANDS NOW, from the publication. */
+export function buildCurrentSourceFingerprints({
+  engineeringFingerprint = null,
+  calculationFingerprint = null,
+  seatPriorityFingerprint = null,
+} = {}) {
+  return buildSourceFingerprints({
+    engineeringFingerprint,
+    calculationFingerprint,
+    seatPriorityFingerprint,
+  });
+}
+
+/**
+ * One version's engineering cell — judged by the PUBLISHED result alone.
+ * A browser-session handoff is never consulted here: the server cannot see one,
+ * so neither may the table.
+ */
+export function resolveEngineeringCell({ publication = null, publicationStatus = PUBLICATION_STATUS.NOT_CALCULATED } = {}) {
+  if (publicationStatus === PUBLICATION_STATUS.READ_FAILED) {
+    return buildReadinessCell({ state: READINESS_STATE.UNAVAILABLE, reason: 'The saved engineering result could not be read.' });
+  }
+  if (publication) {
+    return buildReadinessCell({
+      state: READINESS_STATE.CURRENT,
+      generatedAt: publication.published_at || null,
+    });
+  }
+  if (publicationStatus === PUBLICATION_STATUS.STALE) {
+    return buildReadinessCell({
+      state: READINESS_STATE.STALE,
+      reason: 'The saved engineering result no longer matches this version. Recalculate it in Room Designer.',
+    });
+  }
+  return buildReadinessCell({
+    state: READINESS_STATE.MISSING,
+    reason: 'No saved engineering result was found for this version.',
+  });
+}
+
 /** The object phrase a state's verb is said of. */
 export function statePhrase(state, label) {
   if (label === READINESS_COMBINED_REPORT_LABEL) return label;
@@ -160,7 +281,6 @@ export function buildClause(state, label) {
 
 /**
  * The blockers of one version, each carrying its own sentence clause.
- *
  * @returns {Array<{source, state, label, clause, sentence}>}
  */
 export function buildVersionBlockers({ versionName, visual, technical, engineering }) {
@@ -169,13 +289,7 @@ export function buildVersionBlockers({ versionName, visual, technical, engineeri
     if (!cell || cell.current || cell.checking) return;
     const label = blockerLabel({ source, state: cell.state });
     const clause = buildClause(cell.state, label);
-    blockers.push({
-      source,
-      state: cell.state,
-      label,
-      clause,
-      sentence: `${versionName} ${clause}`,
-    });
+    blockers.push({ source, state: cell.state, label, clause, sentence: `${versionName} ${clause}` });
   };
 
   push(READINESS_SOURCE.VISUAL, visual);
@@ -227,12 +341,8 @@ export function buildBlockingSentence({ versionName, visual, technical, engineer
 /**
  * One version's readiness row.
  *
- * @param {Object} params
- * @param {string} params.versionId
- * @param {string} params.versionName
- * @param {Object} params.cells  — { visual, technical, engineering } readiness cells
- * @returns {Object} row — the saved version name, the three source statuses,
- *   the blocking reasons and the sentence.
+ * @returns {Object} row — version_id, the saved version name, the three source
+ *   statuses, the per-source cells, the blocking reasons and the sentence.
  */
 export function resolveVersionReadinessRow({ versionId, versionName, versionNumber = null, cells = {} }) {
   const visual = cells.visual || buildReadinessCell({ state: READINESS_STATE.MISSING });
@@ -257,6 +367,37 @@ export function resolveVersionReadinessRow({ versionId, versionName, versionNumb
     ready: !checking && blockers.length === 0,
     checking,
   };
+}
+
+/**
+ * The ONE per-version readiness rule, from the version's stored sources.
+ * Both the server gate and the Step 5 table call this.
+ *
+ * @param {Object} params
+ * @param {Object|null} params.version            the ProjectVersion record
+ * @param {Object} params.savedReports           { visual, technical } saved reports
+ * @param {Object|null} params.publication        the published engineering publication
+ * @param {string} params.publicationStatus      PUBLICATION_STATUS
+ * @param {Object|null} params.currentFingerprints
+ * @returns {Object} readiness row
+ */
+export function resolveVersionReadiness({
+  version = null,
+  savedReports = {},
+  publication = null,
+  publicationStatus = PUBLICATION_STATUS.NOT_CALCULATED,
+  currentFingerprints = null,
+} = {}) {
+  return resolveVersionReadinessRow({
+    versionId: version?.id || null,
+    versionName: versionDisplayName(version || {}),
+    versionNumber: version?.version_number ?? null,
+    cells: {
+      visual: resolveSavedReportCell({ saved: savedReports?.visual || null, currentFingerprints }),
+      technical: resolveSavedReportCell({ saved: savedReports?.technical || null, currentFingerprints }),
+      engineering: resolveEngineeringCell({ publication, publicationStatus }),
+    },
+  });
 }
 
 /** The named sentence for the whole gate: one sentence per blocked version. */
@@ -289,7 +430,7 @@ export function resolveProposalReadinessGate({
     && (maxVersions == null || list.length <= maxVersions);
   const blocked = list.filter((row) => !row.ready);
   const ready = !checking && versionCountValid && blocked.length === 0;
-  const message = buildReadinessMessage(blocked);
+  const message = ready || checking ? null : buildReadinessMessage(blocked);
 
   return {
     available: list.length > 0,
@@ -297,8 +438,6 @@ export function resolveProposalReadinessGate({
     ready,
     rows: list,
     versionCountValid,
-    // Every blocked version and the source that blocks it, so the panel and the
-    // Generate gate always name the same version and the same missing item.
     blockedVersions: blocked.map((row) => ({
       version_id: row.versionId,
       version_name: row.versionName,
@@ -310,8 +449,8 @@ export function resolveProposalReadinessGate({
       reason: row.blockingSentence,
     })),
     blockers: blocked.flatMap((row) => row.blockers),
-    // While the read is in flight nothing is missing: the table says Checking
-    // and no blocking sentence is shown, because none is known yet.
+    // While the read is in flight nothing is missing: the table says Checking and
+    // no blocking sentence is shown, because none is known yet.
     message: ready || checking ? null : message,
     detail: ready
       ? PROPOSAL_READINESS_READY_COPY

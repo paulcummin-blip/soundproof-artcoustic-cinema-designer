@@ -9,43 +9,26 @@ import { compareInterpretations, formatComparisonInterpretationForPrompt } from 
 import { loadCacheRecord, findPublication } from '../../shared/publishedEngineeringAuthority.js';
 import { resolveReportLayout } from '../../shared/highChannelDensityRule.js';
 
-// The blocking rule, worded identically to the client authority
+// ── ONE proposal readiness authority ──
+// The gate below is decided by the SAME per-version rule the Step 5 table shows
+// (src/components/proposal/sourceAuthority/proposalReadinessAuthority.js mirrors
+// this module and a test asserts the two agree word for word). It states, per
+// selected version, the Visual Report, the Technical Report and the published
+// engineering result, and it names the version by the name the designer saved —
+// never as "Level 1 version · V2".
+import {
+  PUBLICATION_STATUS,
+  resolveProposalReadinessGate,
+  resolveVersionReadiness,
+} from '../../shared/proposalReadinessAuthority.js';
+
+// The generic blocking rule — the wording the client authority uses when a
+// block cannot be attributed to a named version and source.
 // (src/components/proposal/sourceAuthority/proposalSourceAuthority.js). The
 // frontend cannot import from base44/ and vice versa, so the sentence lives in
 // both places and a test asserts they match.
 const PROPOSAL_SOURCE_REQUIRED_MESSAGE =
   'Generate the Visual and Technical Reports before creating a proposal. This ensures the proposal uses the current project data and RP22 results.';
-
-// The per-version blocking clause, worded identically to the client authority
-// (src/components/proposal/sourceAuthority/proposalReadinessAuthority.js —
-// READINESS_CLAUSE). The frontend cannot import from base44/ and vice versa, so
-// the wording lives in both places and a test asserts the two agree. A blocked
-// generation names every version and what it is missing.
-const READINESS_CLAUSE = {
-  missing: 'is missing {label}',
-  stale: 'has stale {label}',
-  incomplete: 'has incomplete {label}',
-  unavailable: 'has unreadable {label}',
-};
-
-/** `Original Design · V1` — the name a version is known by, plus its slot. */
-function versionDisplayName(record) {
-  const name = typeof record?.version_name === 'string' ? record.version_name.trim() : '';
-  const number = Number(record?.version_number);
-  const hasNumber = Number.isFinite(number) && number > 0;
-  if (name && hasNumber) return `${name} · V${number}`;
-  if (name) return name;
-  return hasNumber ? `Version ${number}` : 'Version';
-}
-
-/** One blocked version's sentence, e.g. `Level 4 version · V2 is missing Visual Report`. */
-function buildSourceBlockerSentence(version, reason) {
-  const name = versionDisplayName(version);
-  const label = 'Visual and Technical Reports';
-  const clause = (reason === 'stale' ? READINESS_CLAUSE.stale : READINESS_CLAUSE.missing)
-    .replace('{label}', label);
-  return `${name} ${clause}`;
-}
 
 const SECTIONS = [
   { type: 'cover', key: 'cover', title: 'Cover', canEditBody: false },
@@ -265,40 +248,68 @@ export default async function(req) {
       }
     }
 
-    // ── SOURCE AUTHORITY: no current reports, no proposal ──
-    // A proposal is downstream of the generated Visual and Technical Reports.
-    // Both are rendered from the version's current Published Engineering result,
-    // so that publication is the gate: without it there is nothing to interpret,
-    // and with a dangling pointer the report no longer matches the design.
+    // ── SOURCE AUTHORITY: no current sources, no proposal ──
+    // A proposal is downstream of the generated Visual and Technical Reports,
+    // both of which are rendered from the version's published engineering
+    // result. Every selected version is judged on those three sources by the one
+    // shared readiness authority — the same verdict, for the same version, in
+    // the same words as the Step 5 table. The engineering source is the PUBLISHED
+    // result alone: a browser-session handoff is not visible here and so is never
+    // accepted as readiness.
+    const savedReportByKey = new Map();
+    const savedReportRows = await base44.entities.ReportSnapshot.filter({ project_id }, '-generated_at', 200);
+    (Array.isArray(savedReportRows) ? savedReportRows : []).forEach((row) => {
+      const key = `${row.version_id}::${row.report_type}`;
+      if (!savedReportByKey.has(key)) savedReportByKey.set(key, row);
+    });
+
     const versionPublicationById = new Map();
-    const sourceBlockers = [];
     for (const versionId of resolvedVersionIds) {
       const versionRecord = (projectVersions || []).find((version) => version.id === versionId);
       const pointer = String(versionRecord?.published_fingerprint || '').trim();
       const cacheRecord = pointer ? await loadCacheRecord(base44, project_id, versionId) : null;
       const publication = pointer && cacheRecord ? findPublication(cacheRecord, pointer) : null;
-      if (publication) {
-        versionPublicationById.set(versionId, publication);
-      } else {
-        sourceBlockers.push({
-          version_id: versionId,
-          version_label: versionLabelById.get(versionId) || null,
-          reason: pointer ? 'stale' : 'missing',
-        });
-      }
+      if (publication) versionPublicationById.set(versionId, publication);
     }
-    if (sourceBlockers.length > 0) {
-      // Name every blocked version and what it is missing, so the client shows
-      // the same verdict the per-version readiness table does.
-      const sentences = sourceBlockers
-        .map((blocker) => buildSourceBlockerSentence(
-          (projectVersions || []).find((version) => version.id === blocker.version_id),
-          blocker.reason,
-        ))
-        .filter(Boolean);
+
+    const readinessRows = resolvedVersionIds.map((versionId) => {
+      const versionRecord = (projectVersions || []).find((version) => version.id === versionId) || null;
+      const pointer = String(versionRecord?.published_fingerprint || '').trim();
+      const publication = versionPublicationById.get(versionId) || null;
+      return resolveVersionReadiness({
+        version: versionRecord,
+        savedReports: {
+          visual: savedReportByKey.get(`${versionId}::visual`) || null,
+          technical: savedReportByKey.get(`${versionId}::technical`) || null,
+        },
+        publication,
+        publicationStatus: pointer
+          ? (publication ? PUBLICATION_STATUS.PUBLISHED : PUBLICATION_STATUS.STALE)
+          : PUBLICATION_STATUS.NOT_CALCULATED,
+        currentFingerprints: {
+          engineeringFingerprint: publication?.engineering_fingerprint || null,
+          calculationFingerprint: publication?.provenance?.bass_fingerprint || null,
+          seatPriorityFingerprint: publication?.engineering_summary?.seatPriorityFingerprint || null,
+        },
+      });
+    });
+
+    const readinessGate = resolveProposalReadinessGate({ rows: readinessRows, minVersions: 1 });
+    if (!readinessGate.ready) {
+      // Name every blocked version and what it is ACTUALLY missing, from the same
+      // authority the client's readiness table reads, so the panel and the gate
+      // can never contradict one another.
       return Response.json({
-        error: sentences.join('. ') || PROPOSAL_SOURCE_REQUIRED_MESSAGE,
-        source_blockers: sourceBlockers,
+        error: readinessGate.message || PROPOSAL_SOURCE_REQUIRED_MESSAGE,
+        source_blockers: readinessGate.rows
+          .filter((row) => !row.ready)
+          .flatMap((row) => row.blockers.map((blocker) => ({
+            version_id: row.versionId,
+            version_name: row.versionName,
+            source: blocker.source,
+            state: blocker.state,
+            label: blocker.label,
+          }))),
       }, { status: 409 });
     }
 

@@ -7,9 +7,16 @@
  *   - the saved report per project + version + report type (ReportSnapshot),
  *     judged by the SAME fingerprint comparison the report pages use, so this
  *     gate and a report's own Current badge can never disagree
- *   - the version's engineering authority (published engineering result plus
- *     report completeness), read through buildSelectedVersionSnapshots — the
- *     same reader the wizard uses at generation time
+ *   - the version's PUBLISHED engineering result, read from the one durable
+ *     authority (ProjectVersion.published_fingerprint → the publication) — the
+ *     same source the server's gate reads. A browser-session handoff is never
+ *     consulted: the server cannot see one, so the table must never report
+ *     Current on account of it.
+ *
+ * ONE authority: the derivation lives in proposalReadinessAuthority (mirrored by
+ * base44/shared/proposalReadinessAuthority.js, which the server gate uses). The
+ * panel, the blocking text, the Generate gate and the server therefore all state
+ * the same verdict, for the same version, in the saved version's own name.
  *
  * It recalculates nothing and generates no report content. Reading only.
  *
@@ -21,8 +28,11 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { base44 } from '@/api/base44Client';
-import { buildSelectedVersionSnapshots } from '@/components/proposal/engineeringAuthority/buildSelectedVersionSnapshots';
-import { extractEngineeringSummary } from '@/components/engineering/versionedEngineeringAuthority';
+import {
+  buildDurableSnapshot,
+  extractEngineeringSummary,
+  fetchDurablePublication,
+} from '@/components/engineering/versionedEngineeringAuthority';
 import {
   REPORT_SNAPSHOT_STATUS,
   currentSourceFingerprints,
@@ -37,21 +47,34 @@ import {
   versionDisplayName,
 } from './proposalReadinessAuthority';
 
-/** Engineering authority state per version → a readiness cell. */
-function buildEngineeringCell(entry) {
-  const state = entry?.engineeringState || (entry?.snapshot ? READINESS_STATE.CURRENT : READINESS_STATE.MISSING);
-  switch (state) {
-    case READINESS_STATE.CURRENT:
-      return buildReadinessCell({ state: READINESS_STATE.CURRENT, generatedAt: entry?.publishedAt || null });
-    case READINESS_STATE.STALE:
-      return buildReadinessCell({ state: READINESS_STATE.STALE, reason: entry?.engineeringReason || null });
-    case READINESS_STATE.INCOMPLETE:
-      return buildReadinessCell({ state: READINESS_STATE.INCOMPLETE, reason: entry?.engineeringReason || null });
-    case READINESS_STATE.UNAVAILABLE:
-      return buildReadinessCell({ state: READINESS_STATE.UNAVAILABLE, reason: entry?.engineeringReason || null });
-    default:
-      return buildReadinessCell({ state: READINESS_STATE.MISSING, reason: entry?.engineeringReason || null });
+/**
+ * The durable published-engineering read → a readiness cell. This is the same
+ * rule the server gate applies: a publication is Current, a pointer with no
+ * publication is Stale, nothing is Missing, a failed read is Unavailable.
+ */
+function buildEngineeringCell(durable) {
+  if (durable?.readState === 'failed') {
+    return buildReadinessCell({
+      state: READINESS_STATE.UNAVAILABLE,
+      reason: 'The saved engineering result could not be read.',
+    });
   }
+  if (durable?.publication) {
+    return buildReadinessCell({
+      state: READINESS_STATE.CURRENT,
+      generatedAt: durable.publication.published_at || null,
+    });
+  }
+  if (durable?.status === 'stale') {
+    return buildReadinessCell({
+      state: READINESS_STATE.STALE,
+      reason: 'The saved engineering result no longer matches this version. Recalculate it in Room Designer.',
+    });
+  }
+  return buildReadinessCell({
+    state: READINESS_STATE.MISSING,
+    reason: 'No saved engineering result was found for this version.',
+  });
 }
 
 function reportCell(saved, currentFingerprints) {
@@ -89,12 +112,15 @@ export function useProposalReadiness({ projectId = null, versionIds = [] } = {})
 
     (async () => {
       try {
-        const [versionRecords, snapshotPage] = await Promise.all([
+        const [versionRecords, snapshotPage, durableReads] = await Promise.all([
           base44.entities.ProjectVersion.filter({ project_id: projectId }),
           base44.entities.ReportSnapshot.filter(
             { project_id: projectId, version_id: { $in: ids } },
             { sort: '-generated_at', limit: 200 },
           ),
+          // The durable published-engineering read, one per selected version,
+          // shared with every other consumer of the authority (session-cached).
+          Promise.all(ids.map((versionId) => fetchDurablePublication(projectId, versionId))),
         ]);
         if (cancelled) return;
 
@@ -111,30 +137,34 @@ export function useProposalReadiness({ projectId = null, versionIds = [] } = {})
           if (!savedByKey.has(key)) savedByKey.set(key, row);
         });
 
-        const entries = await buildSelectedVersionSnapshots({ projectId, versionIds: ids });
-        if (cancelled) return;
-
         const liveSeatPriorityFingerprint = readSeatPriorityFingerprint(projectId);
         const nextRows = ids.map((versionId, index) => {
-          const entry = entries.find((item) => String(item.version_id) === String(versionId)) || null;
           const version = versionsById.get(versionId) || null;
+          const durable = durableReads[index] || null;
+          // The current fingerprints come from the publication this version has
+          // actually saved — the same values the server gate compares against.
+          const durableSnapshot = durable?.publication
+            ? buildDurableSnapshot({
+              projectId,
+              versionId,
+              publication: durable.publication,
+              designState: version?.design_state,
+            })
+            : null;
           const currentFingerprints = currentSourceFingerprints({
-            authoritySnapshot: entry?.authoritySnapshot || null,
-            engineeringSummary: extractEngineeringSummary(entry?.authoritySnapshot || null),
+            authoritySnapshot: durableSnapshot,
+            engineeringSummary: extractEngineeringSummary(durableSnapshot),
             liveSeatPriorityFingerprint,
           });
 
           return resolveVersionReadinessRow({
             versionId,
-            versionName: versionDisplayName(version || {
-              version_name: entry?.version_name || null,
-              version_number: index + 1,
-            }),
+            versionName: versionDisplayName(version || { version_number: index + 1 }),
             versionNumber: version?.version_number ?? index + 1,
             cells: {
               visual: reportCell(savedByKey.get(`${versionId}::visual`), currentFingerprints),
               technical: reportCell(savedByKey.get(`${versionId}::technical`), currentFingerprints),
-              engineering: buildEngineeringCell(entry),
+              engineering: buildEngineeringCell(durable),
             },
           });
         });
