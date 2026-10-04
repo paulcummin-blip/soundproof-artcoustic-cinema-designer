@@ -11,13 +11,26 @@
  * Per version it states exactly three things:
  *   Visual Report          the saved report for project + version + report type
  *   Technical Report       the saved report for project + version + report type
- *   Engineering result     the version's PUBLISHED engineering result
+ *   Engineering result     the version's PUBLISHED engineering result, or the
+ *                          version's completed calculation authority
  *
  * The report cells are judged by the same fingerprint comparison the report
  * pages use (both sides compare only fingerprints that BOTH sides state, so an
- * unreadable fingerprint never manufactures staleness), and the engineering cell
- * is judged by the published publication alone — never by a browser-session
- * handoff, which the server cannot read.
+ * unreadable fingerprint never manufactures staleness).
+ *
+ * The engineering cell is judged by durable evidence only — never by a
+ * browser-session handoff, which the server cannot read. Two durable forms of
+ * the SAME result are accepted, because they are the sources a report is
+ * rendered from:
+ *   1. the published engineering publication (ProjectVersion.published_fingerprint
+ *      → ProjectAnalysisCache.engineering_publications), and
+ *   2. the version's completed calculation authority
+ *      (ProjectAnalysisCache.completed_by_fingerprint for the version's own
+ *      current fingerprint) — the calculated engineering result a Technical
+ *      Report is generated from when no separate publication row exists.
+ * Without (2) a version whose Technical Report is Current could still read
+ * Missing here, which is the contradiction this module exists to prevent: the
+ * two states must never disagree.
  *
  * The frontend cannot import from base44/ and vice versa, so
  * src/components/proposal/sourceAuthority/proposalReadinessAuthority.js mirrors
@@ -107,6 +120,26 @@ export const PUBLICATION_STATUS = Object.freeze({
 
 /** The saved-report payload generation. A payload from another one is not usable. */
 export const REPORT_SNAPSHOT_SCHEMA_VERSION = 1;
+
+/**
+ * Where a version's calculated engineering result was found, so the evidence
+ * behind a Current engineering cell is always stated:
+ *   completed_calculation_authority — the version's own current fingerprint has
+ *     a completed result in its analysis cache.
+ *   report_source_authority — the fingerprint the saved Technical Report was
+ *     generated from is still held by the analysis cache.
+ */
+export const CALCULATION_AUTHORITY_SOURCE = Object.freeze({
+  COMPLETED_AUTHORITY: 'completed_calculation_authority',
+  REPORT_SOURCE: 'report_source_authority',
+});
+
+/** A fingerprint that is present and usable, else null. */
+function asFingerprint(value) {
+  if (typeof value !== 'string') return null;
+  const trimmed = value.trim();
+  return trimmed.length > 0 ? trimmed : null;
+}
 
 /** The fingerprints both sides compare, in report order. */
 export const SNAPSHOT_FINGERPRINT_KEYS = Object.freeze([
@@ -239,19 +272,84 @@ export function buildCurrentSourceFingerprints({
 }
 
 /**
- * One version's engineering cell — judged by the PUBLISHED result alone.
+ * The version's completed calculation authority, read from its
+ * ProjectAnalysisCache record — the calculated engineering result a Technical
+ * Report is generated from. Pure: it reads the record it is GIVEN and nothing
+ * else, so the same record yields the same answer on both sides of the boundary.
+ *
+ * The version's own current fingerprint is preferred. When that fingerprint
+ * carries no completed result, the fingerprint the saved Technical Report was
+ * generated from is accepted if the cache still holds it — the report's own
+ * source authority, which is what "the engineering result is not missing" means.
+ *
+ * @returns {{fingerprint, source, completedAt}|null}
+ */
+export function resolveCalculationAuthority({ cacheRecord = null, savedTechnicalReport = null } = {}) {
+  const record = (cacheRecord && typeof cacheRecord === 'object' && !Array.isArray(cacheRecord))
+    ? cacheRecord
+    : null;
+  if (!record) return null;
+
+  const snapshots = (record.completed_by_fingerprint
+    && typeof record.completed_by_fingerprint === 'object'
+    && !Array.isArray(record.completed_by_fingerprint))
+    ? record.completed_by_fingerprint
+    : {};
+
+  const foundFor = (fingerprint) => {
+    const key = asFingerprint(fingerprint);
+    if (!key) return null;
+    const entry = snapshots[key];
+    return (entry && typeof entry === 'object') ? { fingerprint: key, entry } : null;
+  };
+
+  // The result's own completion time, when the record states one.
+  const completedAtOf = (entry) => {
+    const ms = Number(entry?.job?.completedAtMs);
+    if (!Number.isFinite(ms) || ms <= 0) return null;
+    const date = new Date(ms);
+    return Number.isNaN(date.getTime()) ? null : date.toISOString();
+  };
+
+  const authority = (found, source) => (found
+    ? { fingerprint: found.fingerprint, source, completedAt: completedAtOf(found.entry) }
+    : null);
+
+  const current = authority(foundFor(record.current_fingerprint), CALCULATION_AUTHORITY_SOURCE.COMPLETED_AUTHORITY);
+  if (current) return current;
+
+  const stated = buildSourceFingerprints(savedTechnicalReport?.source_fingerprints).calculationFingerprint;
+  return authority(foundFor(stated), CALCULATION_AUTHORITY_SOURCE.REPORT_SOURCE);
+}
+
+/**
+ * One version's engineering cell — judged by durable evidence alone.
  * A browser-session handoff is never consulted here: the server cannot see one,
  * so neither may the table.
+ *
+ * A published publication and a completed calculation authority are the SAME
+ * calculated engineering result stated two ways, so either one reads Current.
+ * Only when neither exists can the cell be Missing or Stale.
  */
-export function resolveEngineeringCell({ publication = null, publicationStatus = PUBLICATION_STATUS.NOT_CALCULATED } = {}) {
-  if (publicationStatus === PUBLICATION_STATUS.READ_FAILED) {
-    return buildReadinessCell({ state: READINESS_STATE.UNAVAILABLE, reason: 'The saved engineering result could not be read.' });
-  }
+export function resolveEngineeringCell({
+  publication = null,
+  publicationStatus = PUBLICATION_STATUS.NOT_CALCULATED,
+  calculationAuthority = null,
+} = {}) {
   if (publication) {
     return buildReadinessCell({
       state: READINESS_STATE.CURRENT,
       generatedAt: publication.published_at || null,
     });
+  }
+  if (calculationAuthority?.fingerprint) {
+    return buildReadinessCell({
+      state: READINESS_STATE.CURRENT,
+      generatedAt: calculationAuthority.completedAt || null,
+    });
+  }
+  if (publicationStatus === PUBLICATION_STATUS.READ_FAILED) {
+    return buildReadinessCell({ state: READINESS_STATE.UNAVAILABLE, reason: 'The saved engineering result could not be read.' });
   }
   if (publicationStatus === PUBLICATION_STATUS.STALE) {
     return buildReadinessCell({
@@ -261,7 +359,7 @@ export function resolveEngineeringCell({ publication = null, publicationStatus =
   }
   return buildReadinessCell({
     state: READINESS_STATE.MISSING,
-    reason: 'No saved engineering result was found for this version.',
+    reason: 'No saved engineering result was found for this version. Calculate this version in Room Designer.',
   });
 }
 
@@ -379,6 +477,8 @@ export function resolveVersionReadinessRow({ versionId, versionName, versionNumb
  * @param {Object|null} params.publication        the published engineering publication
  * @param {string} params.publicationStatus      PUBLICATION_STATUS
  * @param {Object|null} params.currentFingerprints
+ * @param {Object|null} params.calculationAuthority  the version's completed
+ *        calculation authority, as returned by resolveCalculationAuthority
  * @returns {Object} readiness row
  */
 export function resolveVersionReadiness({
@@ -387,6 +487,7 @@ export function resolveVersionReadiness({
   publication = null,
   publicationStatus = PUBLICATION_STATUS.NOT_CALCULATED,
   currentFingerprints = null,
+  calculationAuthority = null,
 } = {}) {
   return resolveVersionReadinessRow({
     versionId: version?.id || null,
@@ -395,7 +496,7 @@ export function resolveVersionReadiness({
     cells: {
       visual: resolveSavedReportCell({ saved: savedReports?.visual || null, currentFingerprints }),
       technical: resolveSavedReportCell({ saved: savedReports?.technical || null, currentFingerprints }),
-      engineering: resolveEngineeringCell({ publication, publicationStatus }),
+      engineering: resolveEngineeringCell({ publication, publicationStatus, calculationAuthority }),
     },
   });
 }

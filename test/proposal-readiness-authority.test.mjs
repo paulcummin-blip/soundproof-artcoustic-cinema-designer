@@ -12,24 +12,39 @@
  * described that block as missing REPORTS, and named the version with a slot
  * suffix ("· V2").
  *
+ * The second defect (Marquee Home, Step 3) is the one tested hardest here:
+ *   Level 1 version read "Visual Current / Technical Current / Engineering
+ *   Missing". Its calculated engineering result was never missing — it is the
+ *   completed result in the version's own ProjectAnalysisCache, which is exactly
+ *   what its Technical Report was generated from. Only a SEPARATE published
+ *   publication row was absent, so the engineering column was reading a
+ *   different source from the Technical Report beside it.
+ *
  * The stored truth for Marquee Home is in the fixtures below:
  *   Level 4 version (slot 1) — published engineering result + current reports
- *   Level 1 version (slot 2) — reports current, NO published engineering result
+ *   Level 1 version (slot 2) — reports current, completed calculation authority
+ *     in ProjectAnalysisCache, NO separate published publication
  *
- * So the verdict must name Level 1 version, its saved name, and the source that
- * is actually missing — and the panel, the blocking text, the Generate gate and
- * the server must all state exactly that.
+ * The three columns must therefore agree, version by version: a Technical Report
+ * that reads Current can never sit beside an engineering column reading Missing.
  *
  *   TEST 1  Both modules derive the same rows, sentences and gate (parity)
  *   TEST 2  Both modules share one vocabulary (no drift in the copy)
  *   TEST 3  Marquee Home Level 4 version: everything Current, gate ready
- *   TEST 4  Marquee Home Level 1 version: reports Current, engineering Missing
+ *   TEST 4  Marquee Home Level 1 version: everything Current, gate ready
  *   TEST 5  The gate message is the panel's own sentence (one authority)
  *   TEST 6  No false missing-report warning; the real source is named
  *   TEST 7  A stale report names that report, per version
  *   TEST 8  Both reports missing → one combined clause
  *   TEST 9  Saved version names only — never "· V2"
  *   TEST 10 Generate is enabled only when every selected version is Current
+ *   TEST 11 The engineering cell follows durable results, never a handoff
+ *   TEST 12 A report cell is judged by the fingerprints both sides state
+ *   TEST 13 The engineering result resolves from the completed calculation
+ *           authority the Technical Report was generated from
+ *   TEST 14 Client and server resolve the same engineering result
+ *   TEST 15 A version with reports but no calculated result still blocks, and
+ *           names the calculated engineering result as what is missing
  *
  * Pure: no React, no database.
  *
@@ -44,10 +59,12 @@ import {
   READINESS_COMBINED_REPORT_LABEL as SHARED_COMBINED_LABEL,
   READINESS_STATUS_TEXT as SHARED_STATUS_TEXT,
   PROPOSAL_READINESS_READY_COPY as SHARED_READY_COPY,
+  CALCULATION_AUTHORITY_SOURCE as SHARED_CALC_SOURCE,
   READINESS_STATE,
   PUBLICATION_STATUS,
   buildReadinessCell,
   blockerLabel as sharedBlockerLabel,
+  resolveCalculationAuthority as sharedCalculationAuthority,
   resolveEngineeringCell,
   resolveProposalReadinessGate,
   resolveSavedReportCell,
@@ -61,7 +78,10 @@ import {
   READINESS_COMBINED_REPORT_LABEL as CLIENT_COMBINED_LABEL,
   READINESS_STATUS_TEXT as CLIENT_STATUS_TEXT,
   PROPOSAL_READINESS_READY_COPY as CLIENT_READY_COPY,
+  CALCULATION_AUTHORITY_SOURCE as CLIENT_CALC_SOURCE,
   blockerLabel as clientBlockerLabel,
+  resolveCalculationAuthority as clientCalculationAuthority,
+  resolveEngineeringCell as clientEngineeringCell,
   resolveProposalReadinessGate as clientGate,
   resolveVersionReadinessRow as clientRow,
   versionDisplayName as clientVersionDisplayName,
@@ -123,25 +143,73 @@ const LEVEL_4_SOURCES = {
   },
 };
 
+/**
+ * The Level 1 version's calculated engineering result.
+ *
+ * ProjectAnalysisCache.completed_by_fingerprint holds the completed bass result
+ * for the version's OWN current fingerprint — the same fingerprint the saved
+ * reports state as their source (see the trace below, taken from the stored
+ * Marquee Home records). The version has no separate published publication.
+ */
+const CALC_FINGERPRINT =
+  'cal:v8:395d1a338da6c449|mode:canonical-physics-eq|protocol:bass-optimiser-protocol-v1'
+  + '|pool:bass-optimiser-pool-v41-physically-qualified-p18'
+  + '|engine:house-curve-shape-fit-v41-physically-qualified-p18|result-schema:34|metric-schema:21';
+const CALC_COMPLETED_AT_MS = 1791108297487;
+
+const LEVEL_1_VISUAL = savedReport({
+  generatedAt: '2026-10-04T10:07:51.482Z',
+  fingerprints: { engineeringFingerprint: null, calculationFingerprint: CALC_FINGERPRINT, seatPriorityFingerprint: SEAT_PRIORITY },
+});
+
+const LEVEL_1_TECHNICAL = savedReport({
+  generatedAt: '2026-10-04T15:48:40.816Z',
+  fingerprints: { engineeringFingerprint: null, calculationFingerprint: CALC_FINGERPRINT, seatPriorityFingerprint: SEAT_PRIORITY },
+});
+
+const LEVEL_1_CACHE = {
+  version_id: LEVEL_1_VERSION.id,
+  status: 'complete',
+  current_fingerprint: CALC_FINGERPRINT,
+  completed_by_fingerprint: {
+    [CALC_FINGERPRINT]: {
+      version: 'bass-analysis-contract',
+      metricSchemaVersion: 21,
+      job: { status: 'complete', completedAtMs: CALC_COMPLETED_AT_MS },
+    },
+  },
+};
+
 const LEVEL_1_SOURCES = {
   version: LEVEL_1_VERSION,
-  savedReports: {
-    visual: savedReport({
-      generatedAt: '2026-10-04T10:07:51.482Z',
-      fingerprints: { engineeringFingerprint: null, calculationFingerprint: 'cal:v8:395d1a338da6c449', seatPriorityFingerprint: SEAT_PRIORITY },
-    }),
-    technical: savedReport({
-      generatedAt: '2026-10-04T15:48:40.816Z',
-      fingerprints: { engineeringFingerprint: null, calculationFingerprint: 'cal:v8:395d1a338da6c449', seatPriorityFingerprint: SEAT_PRIORITY },
-    }),
-  },
+  savedReports: { visual: LEVEL_1_VISUAL, technical: LEVEL_1_TECHNICAL },
   publication: null,
   publicationStatus: PUBLICATION_STATUS.NOT_CALCULATED,
+  currentFingerprints: {
+    engineeringFingerprint: null,
+    calculationFingerprint: CALC_FINGERPRINT,
+    seatPriorityFingerprint: SEAT_PRIORITY,
+  },
+  calculationAuthority: sharedCalculationAuthority({
+    cacheRecord: LEVEL_1_CACHE,
+    savedTechnicalReport: LEVEL_1_TECHNICAL,
+  }),
+};
+
+/**
+ * The same version with its completed result gone: reports still saved, but the
+ * analysis cache holds nothing for it and it has no publication. This is the
+ * only shape in which the engineering column may read Missing — and then the
+ * sentence must name the calculated engineering result.
+ */
+const UNBACKED_SOURCES = {
+  ...LEVEL_1_SOURCES,
   currentFingerprints: {
     engineeringFingerprint: null,
     calculationFingerprint: null,
     seatPriorityFingerprint: SEAT_PRIORITY,
   },
+  calculationAuthority: null,
 };
 
 /** The same row, assembled the way the Step 5 table assembles it. */
@@ -235,13 +303,22 @@ test('3. Level 4 version reads Current everywhere and does not block', () => {
 
 // ── 4. Marquee Home Level 1 version ─────────────────────────────────────────
 
-test('4. Level 1 version: reports Current, engineering source Missing', () => {
+test('4. Level 1 version reads Current everywhere and does not block', () => {
   const row = resolveVersionReadiness(LEVEL_1_SOURCES);
+  assert.equal(row.versionId, LEVEL_1_VERSION.id);
   assert.equal(row.versionName, 'Level 1 version');
   assert.equal(row.visual_report_status, 'Current');
   assert.equal(row.technical_report_status, 'Current');
-  assert.equal(row.engineering_result_status, 'Missing');
-  assert.equal(row.ready, false);
+  assert.equal(row.engineering_result_status, 'Current');
+  assert.equal(row.blockingSentence, null);
+  assert.equal(row.ready, true);
+  // The engineering cell states the completed result's own time.
+  assert.equal(row.engineering.generatedAt, new Date(CALC_COMPLETED_AT_MS).toISOString());
+
+  const gate = resolveProposalReadinessGate({ rows: [row] });
+  assert.equal(gate.ready, true);
+  assert.equal(gate.message, null);
+  assert.equal(gate.blockedVersions.length, 0);
 });
 
 // ── 5. One authority: gate message is the panel's own sentence ──────────────

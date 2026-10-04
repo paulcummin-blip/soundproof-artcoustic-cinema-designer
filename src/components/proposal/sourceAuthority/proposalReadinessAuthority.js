@@ -10,7 +10,10 @@
  * Per version it states four things:
  *   Visual Report        saved report for project + version + report type
  *   Technical Report     saved report for project + version + report type
- *   Engineering Authority  the version's published engineering result
+ *   Engineering Authority  the version's published engineering result, or its
+ *                          completed calculation authority — the SAME calculated
+ *                          engineering result a Technical Report is generated
+ *                          from, so the two columns can never disagree
  *   the blocking reason, naming the version and the source that blocks
  *
  * The report cells are judged by the SAME fingerprint comparison the report
@@ -85,6 +88,126 @@ export const PROPOSAL_READINESS_RULE =
 
 /** The two report labels merged when both reports are in the same state. */
 export const READINESS_COMBINED_REPORT_LABEL = 'Visual and Technical Reports';
+
+/** The published-engineering result states, as read from the version pointer. */
+export const PUBLICATION_STATUS = Object.freeze({
+  PUBLISHED: 'published',
+  NOT_CALCULATED: 'not_calculated',
+  STALE: 'stale',
+  READ_FAILED: 'read_failed',
+});
+
+/**
+ * Where a version's calculated engineering result was found, so the evidence
+ * behind a Current engineering cell is always stated:
+ *   completed_calculation_authority — the version's own current fingerprint has
+ *     a completed result in its analysis cache.
+ *   report_source_authority — the fingerprint the saved Technical Report was
+ *     generated from is still held by the analysis cache.
+ */
+export const CALCULATION_AUTHORITY_SOURCE = Object.freeze({
+  COMPLETED_AUTHORITY: 'completed_calculation_authority',
+  REPORT_SOURCE: 'report_source_authority',
+});
+
+/** A fingerprint that is present and usable, else null. */
+function asFingerprint(value) {
+  if (typeof value !== 'string') return null;
+  const trimmed = value.trim();
+  return trimmed.length > 0 ? trimmed : null;
+}
+
+/**
+ * The version's completed calculation authority, read from its
+ * ProjectAnalysisCache record — the calculated engineering result a Technical
+ * Report is generated from. Pure: it reads the record it is GIVEN and nothing
+ * else, so the same record yields the same answer on both sides of the boundary.
+ *
+ * The version's own current fingerprint is preferred. When that fingerprint
+ * carries no completed result, the fingerprint the saved Technical Report was
+ * generated from is accepted if the cache still holds it — the report's own
+ * source authority, which is what "the engineering result is not missing" means.
+ *
+ * @returns {{fingerprint, source, completedAt}|null}
+ */
+export function resolveCalculationAuthority({ cacheRecord = null, savedTechnicalReport = null } = {}) {
+  const record = (cacheRecord && typeof cacheRecord === 'object' && !Array.isArray(cacheRecord))
+    ? cacheRecord
+    : null;
+  if (!record) return null;
+
+  const snapshots = (record.completed_by_fingerprint
+    && typeof record.completed_by_fingerprint === 'object'
+    && !Array.isArray(record.completed_by_fingerprint))
+    ? record.completed_by_fingerprint
+    : {};
+
+  const foundFor = (fingerprint) => {
+    const key = asFingerprint(fingerprint);
+    if (!key) return null;
+    const entry = snapshots[key];
+    return (entry && typeof entry === 'object') ? { fingerprint: key, entry } : null;
+  };
+
+  // The result's own completion time, when the record states one.
+  const completedAtOf = (entry) => {
+    const ms = Number(entry?.job?.completedAtMs);
+    if (!Number.isFinite(ms) || ms <= 0) return null;
+    const date = new Date(ms);
+    return Number.isNaN(date.getTime()) ? null : date.toISOString();
+  };
+
+  const authority = (found, source) => (found
+    ? { fingerprint: found.fingerprint, source, completedAt: completedAtOf(found.entry) }
+    : null);
+
+  const current = authority(foundFor(record.current_fingerprint), CALCULATION_AUTHORITY_SOURCE.COMPLETED_AUTHORITY);
+  if (current) return current;
+
+  const stated = asFingerprint(savedTechnicalReport?.source_fingerprints?.calculationFingerprint);
+  return authority(foundFor(stated), CALCULATION_AUTHORITY_SOURCE.REPORT_SOURCE);
+}
+
+/**
+ * One version's engineering cell — judged by durable evidence alone.
+ * A browser-session handoff is never consulted here: the server cannot see one,
+ * so neither may the table.
+ *
+ * A published publication and a completed calculation authority are the SAME
+ * calculated engineering result stated two ways, so either one reads Current.
+ * Only when neither exists can the cell be Missing or Stale.
+ */
+export function resolveEngineeringCell({
+  publication = null,
+  publicationStatus = PUBLICATION_STATUS.NOT_CALCULATED,
+  calculationAuthority = null,
+} = {}) {
+  if (publication) {
+    return buildReadinessCell({
+      state: READINESS_STATE.CURRENT,
+      generatedAt: publication.published_at || null,
+    });
+  }
+  if (calculationAuthority?.fingerprint) {
+    return buildReadinessCell({
+      state: READINESS_STATE.CURRENT,
+      generatedAt: calculationAuthority.completedAt || null,
+    });
+  }
+  if (publicationStatus === PUBLICATION_STATUS.READ_FAILED) {
+    return buildReadinessCell({ state: READINESS_STATE.UNAVAILABLE, reason: 'The saved engineering result could not be read.' });
+  }
+  if (publicationStatus === PUBLICATION_STATUS.STALE) {
+    return buildReadinessCell({
+      state: READINESS_STATE.STALE,
+      reason: 'The saved engineering result no longer matches this version. Recalculate it in Room Designer.',
+    });
+  }
+  return buildReadinessCell({
+    state: READINESS_STATE.MISSING,
+    reason: 'No saved engineering result was found for this version. Calculate this version in Room Designer.',
+  });
+}
 
 /**
  * Blocking labels per source and state. The engineering column states what the

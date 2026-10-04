@@ -7,11 +7,13 @@
  *   - the saved report per project + version + report type (ReportSnapshot),
  *     judged by the SAME fingerprint comparison the report pages use, so this
  *     gate and a report's own Current badge can never disagree
- *   - the version's PUBLISHED engineering result, read from the one durable
- *     authority (ProjectVersion.published_fingerprint → the publication) — the
- *     same source the server's gate reads. A browser-session handoff is never
- *     consulted: the server cannot see one, so the table must never report
- *     Current on account of it.
+ *   - the version's calculated engineering result, read from the two durable
+ *     forms of the same result: the PUBLISHED engineering publication
+ *     (ProjectVersion.published_fingerprint → the publication) and the version's
+ *     COMPLETED calculation authority (ProjectAnalysisCache.completed_by_fingerprint)
+ *     — the calculated result a Technical Report is generated from. A
+ *     browser-session handoff is never consulted: the server cannot see one, so
+ *     the table must never report Current on account of it.
  *
  * ONE authority: the derivation lives in proposalReadinessAuthority (mirrored by
  * base44/shared/proposalReadinessAuthority.js, which the server gate uses). The
@@ -39,42 +41,29 @@ import {
   resolveSnapshotStatus,
 } from '@/components/report/reportSnapshotAuthority';
 import { readSeatPriorityFingerprint } from '@/components/state/designReviewHandoff';
+import { readProjectAnalysisCacheRecord } from '@/components/state/projectReadCache';
 import {
+  PUBLICATION_STATUS,
   READINESS_STATE,
   buildReadinessCell,
+  resolveCalculationAuthority,
+  resolveEngineeringCell,
   resolveReportCellState,
   resolveVersionReadinessRow,
   versionDisplayName,
 } from './proposalReadinessAuthority';
 
 /**
- * The durable published-engineering read → a readiness cell. This is the same
- * rule the server gate applies: a publication is Current, a pointer with no
- * publication is Stale, nothing is Missing, a failed read is Unavailable.
+ * The durable published-engineering read → the publication status the shared
+ * engineering cell is judged by. This is the same rule the server gate applies:
+ * a failed read is Unavailable, a pointer with no publication is Stale, nothing
+ * is Missing.
  */
-function buildEngineeringCell(durable) {
-  if (durable?.readState === 'failed') {
-    return buildReadinessCell({
-      state: READINESS_STATE.UNAVAILABLE,
-      reason: 'The saved engineering result could not be read.',
-    });
-  }
-  if (durable?.publication) {
-    return buildReadinessCell({
-      state: READINESS_STATE.CURRENT,
-      generatedAt: durable.publication.published_at || null,
-    });
-  }
-  if (durable?.status === 'stale') {
-    return buildReadinessCell({
-      state: READINESS_STATE.STALE,
-      reason: 'The saved engineering result no longer matches this version. Recalculate it in Room Designer.',
-    });
-  }
-  return buildReadinessCell({
-    state: READINESS_STATE.MISSING,
-    reason: 'No saved engineering result was found for this version.',
-  });
+function publicationStatusOf(durable) {
+  if (durable?.readState === 'failed') return PUBLICATION_STATUS.READ_FAILED;
+  if (durable?.publication) return PUBLICATION_STATUS.PUBLISHED;
+  if (durable?.status === 'stale') return PUBLICATION_STATUS.STALE;
+  return PUBLICATION_STATUS.NOT_CALCULATED;
 }
 
 function reportCell(saved, currentFingerprints) {
@@ -112,7 +101,7 @@ export function useProposalReadiness({ projectId = null, versionIds = [] } = {})
 
     (async () => {
       try {
-        const [versionRecords, snapshotPage, durableReads] = await Promise.all([
+        const [versionRecords, snapshotPage, durableReads, cacheRecords] = await Promise.all([
           base44.entities.ProjectVersion.filter({ project_id: projectId }),
           base44.entities.ReportSnapshot.filter(
             { project_id: projectId, version_id: { $in: ids } },
@@ -121,6 +110,10 @@ export function useProposalReadiness({ projectId = null, versionIds = [] } = {})
           // The durable published-engineering read, one per selected version,
           // shared with every other consumer of the authority (session-cached).
           Promise.all(ids.map((versionId) => fetchDurablePublication(projectId, versionId))),
+          // The version's completed calculation authority — the calculated
+          // engineering result a Technical Report is generated from. Read
+          // through the same session-cached project read the report path uses.
+          Promise.all(ids.map((versionId) => readProjectAnalysisCacheRecord(projectId, versionId))),
         ]);
         if (cancelled) return;
 
@@ -141,6 +134,15 @@ export function useProposalReadiness({ projectId = null, versionIds = [] } = {})
         const nextRows = ids.map((versionId, index) => {
           const version = versionsById.get(versionId) || null;
           const durable = durableReads[index] || null;
+          const savedTechnical = savedByKey.get(`${versionId}::technical`) || null;
+          // The version's calculated engineering result: the publication when it
+          // has one, otherwise the completed calculation authority of the SAME
+          // design its Technical Report was generated from. Both are durable, and
+          // both are read by the server gate too.
+          const calculationAuthority = resolveCalculationAuthority({
+            cacheRecord: cacheRecords[index] || null,
+            savedTechnicalReport: savedTechnical,
+          });
           // The current fingerprints come from the publication this version has
           // actually saved — the same values the server gate compares against.
           const durableSnapshot = durable?.publication
@@ -151,11 +153,19 @@ export function useProposalReadiness({ projectId = null, versionIds = [] } = {})
               designState: version?.design_state,
             })
             : null;
-          const currentFingerprints = currentSourceFingerprints({
+          const savedFingerprints = currentSourceFingerprints({
             authoritySnapshot: durableSnapshot,
             engineeringSummary: extractEngineeringSummary(durableSnapshot),
             liveSeatPriorityFingerprint,
           });
+          const currentFingerprints = {
+            ...savedFingerprints,
+            // The bass fingerprint of the version's current design. Without it a
+            // report is compared against nothing and can read Current by default.
+            calculationFingerprint: savedFingerprints.calculationFingerprint
+              || calculationAuthority?.fingerprint
+              || null,
+          };
 
           return resolveVersionReadinessRow({
             versionId,
@@ -163,8 +173,12 @@ export function useProposalReadiness({ projectId = null, versionIds = [] } = {})
             versionNumber: version?.version_number ?? index + 1,
             cells: {
               visual: reportCell(savedByKey.get(`${versionId}::visual`), currentFingerprints),
-              technical: reportCell(savedByKey.get(`${versionId}::technical`), currentFingerprints),
-              engineering: buildEngineeringCell(durable),
+              technical: reportCell(savedTechnical, currentFingerprints),
+              engineering: resolveEngineeringCell({
+                publication: durable?.publication || null,
+                publicationStatus: publicationStatusOf(durable),
+                calculationAuthority,
+              }),
             },
           });
         });

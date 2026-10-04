@@ -18,6 +18,7 @@ import { resolveReportLayout } from '../../shared/highChannelDensityRule.js';
 // never as "Level 1 version · V2".
 import {
   PUBLICATION_STATUS,
+  resolveCalculationAuthority,
   resolveProposalReadinessGate,
   resolveVersionReadiness,
 } from '../../shared/proposalReadinessAuthority.js';
@@ -264,10 +265,15 @@ export default async function(req) {
     });
 
     const versionPublicationById = new Map();
+    const cacheRecordByVersionId = new Map();
     for (const versionId of resolvedVersionIds) {
       const versionRecord = (projectVersions || []).find((version) => version.id === versionId);
       const pointer = String(versionRecord?.published_fingerprint || '').trim();
-      const cacheRecord = pointer ? await loadCacheRecord(base44, project_id, versionId) : null;
+      // The cache row is read for EVERY selected version, not only for one that
+      // has a publication pointer: it holds the version's completed calculation
+      // authority, the calculated engineering result its Technical Report renders.
+      const cacheRecord = await loadCacheRecord(base44, project_id, versionId);
+      if (cacheRecord) cacheRecordByVersionId.set(versionId, cacheRecord);
       const publication = pointer && cacheRecord ? findPublication(cacheRecord, pointer) : null;
       if (publication) versionPublicationById.set(versionId, publication);
     }
@@ -276,11 +282,19 @@ export default async function(req) {
       const versionRecord = (projectVersions || []).find((version) => version.id === versionId) || null;
       const pointer = String(versionRecord?.published_fingerprint || '').trim();
       const publication = versionPublicationById.get(versionId) || null;
+      const savedTechnical = savedReportByKey.get(`${versionId}::technical`) || null;
+      // The version's calculated engineering result: the publication when it has
+      // one, otherwise the completed calculation authority of the SAME design its
+      // Technical Report was generated from — the rule the client applies too.
+      const calculationAuthority = resolveCalculationAuthority({
+        cacheRecord: cacheRecordByVersionId.get(versionId) || null,
+        savedTechnicalReport: savedTechnical,
+      });
       return resolveVersionReadiness({
         version: versionRecord,
         savedReports: {
           visual: savedReportByKey.get(`${versionId}::visual`) || null,
-          technical: savedReportByKey.get(`${versionId}::technical`) || null,
+          technical: savedTechnical,
         },
         publication,
         publicationStatus: pointer
@@ -288,9 +302,14 @@ export default async function(req) {
           : PUBLICATION_STATUS.NOT_CALCULATED,
         currentFingerprints: {
           engineeringFingerprint: publication?.engineering_fingerprint || null,
-          calculationFingerprint: publication?.provenance?.bass_fingerprint || null,
+          // The bass fingerprint of the version's current design: without it a
+          // saved report is compared against nothing on that key.
+          calculationFingerprint: publication?.provenance?.bass_fingerprint
+            || calculationAuthority?.fingerprint
+            || null,
           seatPriorityFingerprint: publication?.engineering_summary?.seatPriorityFingerprint || null,
         },
+        calculationAuthority,
       });
     });
 
