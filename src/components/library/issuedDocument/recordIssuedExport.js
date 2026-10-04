@@ -236,6 +236,25 @@ export async function storeIssuedDocument({ identity, snapshot }) {
   return { record, pendingKey };
 }
 
+/**
+ * Record an issued document in the background, after the export has already
+ * been triggered. Never throws: a failure is reported to the designer, with the
+ * exact step that failed and the reason it gave, and no Library asset is
+ * created.
+ */
+export function recordIssuedExportInBackground({ identity, snapshot }) {
+  void (async () => {
+    const pendingKey = pendingExportKey({ projectId: identity?.projectId, documentType: identity?.documentType, filename: normalizeFilename(identity?.filename) });
+    try {
+      const { record } = await storeIssuedDocument({ identity, snapshot });
+      clearPendingExport(pendingKey);
+      announceStored(identity, record);
+    } catch (error) {
+      reportStorageFailure({ failure: error, pendingKey, identity });
+    }
+  })();
+}
+
 /** Tell an open Project Library the row has landed, and say so. */
 function announceStored(issued, record) {
   notifyIssuedExportStored(record?.project_id || issued?.projectId);
@@ -289,25 +308,6 @@ function reportStorageFailure({ failure, pendingKey, identity }) {
         }
       : {}),
   });
-}
-
-/**
- * Record an issued document in the background, after the export has already
- * been triggered. Never throws: a failure is reported to the designer, with the
- * exact step that failed and the reason it gave, and no Library asset is
- * created.
- */
-export function recordIssuedExportInBackground({ identity, snapshot }) {
-  void (async () => {
-    const pendingKey = pendingExportKey({ projectId: identity?.projectId, documentType: identity?.documentType, filename: normalizeFilename(identity?.filename) });
-    try {
-      const { record } = await storeIssuedDocument({ identity, snapshot });
-      clearPendingExport(pendingKey);
-      announceStored(identity, record);
-    } catch (error) {
-      reportStorageFailure({ failure: error, pendingKey, identity });
-    }
-  })();
 }
 
 /**

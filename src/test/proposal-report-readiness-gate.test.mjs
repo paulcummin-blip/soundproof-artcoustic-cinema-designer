@@ -242,9 +242,12 @@ test('the Versions step advances only when EVERY selected version has current re
   // The hard block lands when the step is left, naming the blocked versions.
   expect(WIZARD).toMatch(/if \(step === 2 && versionsValid && !readiness\.ready\) \{/);
   expect(WIZARD).toMatch(/setBlockedAttempt\(true\)/);
-  // Step 5 shows the same result, and its Generate action is gated on it.
+  // Step 5 shows the same result, and its Generate action is gated on it: the
+  // readiness result is one of the named reasons that disable Generate, and the
+  // button carries those reasons and nothing else.
   expect(WIZARD).toMatch(/<VersionReadinessTable[\s\S]{0,200}gate=\{readiness\}/);
-  expect(WIZARD).toMatch(/\|\| !readiness\.ready\}/);
+  expect(WIZARD).toMatch(/if \(!readiness\.ready\) {\n\s+return readiness\.message/);
+  expect(WIZARD).toMatch(/disabled=\{!!generateBlockReason\}/);
 });
 
 test('the Versions step renders the per-version readiness table beside the version cards', () => {

@@ -3,6 +3,7 @@ import { proposalRoleStyle } from '@/components/proposal/typography/proposalTypo
 import { excludeDesignIndexRows } from '@/components/proposal/designIndexRowAuthority';
 import {
   buildHighlightDisplayRows,
+  changeCellText,
   comparisonClientMeaning,
 } from '@/components/proposal/keyPerformanceHighlightsAuthority';
 
@@ -118,7 +119,7 @@ export default function KeyPerformanceHighlightsTable({
                   </td>
                 ))}
                 <td className={`${CELL} text-[#625143]`} style={proposalRoleStyle('body')}>
-                  {row.change || 'No change'}
+                  {changeCellText(row, options.length)}
                 </td>
                 <td className={`${CELL} text-[#625143]`} style={proposalRoleStyle('body')}>
                   {comparisonClientMeaning(row)}

@@ -348,6 +348,20 @@ const MODEST_GAIN = Object.freeze({
  * @param {{ key?: string, values?: string[] }} row
  * @returns {string}
  */
+/**
+ * What the change column says for one comparison row.
+ *
+ * An area every version shares is stated plainly as unchanged. A change is
+ * stated only where it was derived from two comparable values; otherwise the
+ * row points the client at the values rather than inventing a change, and never
+ * claims there is none.
+ */
+export function changeCellText(row, optionCount) {
+  if (row?.identical === true) return 'No change';
+  if (row?.change) return String(row.change);
+  return Number(optionCount) === 2 ? 'Values differ' : 'See values';
+}
+
 export function comparisonClientMeaning(row) {
   const key = String(row?.key || '').trim();
   const approved = ROW_PRESENTATION[key]?.gain || FALLBACK_GAIN;

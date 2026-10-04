@@ -211,13 +211,15 @@ export function buildComparisonTable(versions) {
       area: ROW_LABELS[key] || key,
       values: normalised,
       // A row both versions share is stated once, as itself: an unchanged area
-      // is a real comparison result, not a missing one. The change column is
-      // then null and the report says plainly that nothing changes here.
+      // is a real comparison result, not a missing one, so it says so in the
+      // change column rather than being dropped from the table.
       identical,
-      // The change column is meaningful for two options only.
-      change: !identical && normalised.length === 2
-        ? describeChange(normalised[0], normalised[1])
-        : null,
+      // The change column is derived from two comparable values. With more than
+      // two options a single change cell would have to choose a pairing, so the
+      // column stays empty there and the client reads the values themselves.
+      change: identical
+        ? 'No change'
+        : (normalised.length === 2 ? describeChange(normalised[0], normalised[1]) : null),
     });
   }
 

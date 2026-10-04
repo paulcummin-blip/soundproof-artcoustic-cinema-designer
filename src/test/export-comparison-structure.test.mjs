@@ -23,6 +23,7 @@
 //   TEST 8  the backend refuses to write a comparison with no table
 //   TEST 9  Generate Proposal cannot be disabled without saying why
 //   TEST 10 the editor opens only on a proposal whose sections are saved
+//   TEST 11 the change column never claims a change that was not derived
 // ---------------------------------------------------------------------------
 import { test } from 'vitest';
 import assert from 'node:assert/strict';
@@ -31,6 +32,7 @@ import path from 'node:path';
 
 import {
   buildHighlightDisplayRows,
+  changeCellText,
   comparisonClientMeaning,
 } from '../components/proposal/keyPerformanceHighlightsAuthority.js';
 
@@ -47,10 +49,10 @@ test('TEST 1 — an area both versions share is carried as a row', () => {
   );
   assert.ok(source.includes('identical'), 'the row records that the versions match here');
   assert.ok(
-    source.includes('!identical && normalised.length === 2'),
-    'a change is derived only where the values genuinely differ',
+    source.includes("? 'No change'"),
+    'a shared area states that it does not change instead of leaving the cell empty',
   );
-  assert.ok(source.includes('describeChange(normalised[0], normalised[1])'), 'and it is derived from the values');
+  assert.ok(source.includes('describeChange(normalised[0], normalised[1])'), 'and a real change is derived from the values');
 });
 
 // ── TEST 2 — the table stays one printed block ────────────────────────────
@@ -142,7 +144,7 @@ test('TEST 7 — the highlights page says so when no comparison table could be b
     'and states the reason on the page instead of printing nothing under the heading',
   );
   assert.ok(table.includes('Client meaning'), 'the comparison table carries the client-meaning column');
-  assert.ok(table.includes("row.change || 'No change'"), 'an unchanged area is stated as unchanged');
+  assert.ok(table.includes('changeCellText(row, options.length)'), 'an unchanged area is stated as unchanged');
 
   const pack = read('src/components/proposal/print/ProposalPackDocument.jsx');
   assert.ok(pack.includes('comparisonExpected={isComparisonKind}'), 'the printed pack knows when a comparison was asked for');
@@ -197,4 +199,24 @@ test('TEST 10 — the editor handoff is confirmed before it opens', () => {
   assert.ok(authority.includes('proposal_type'), 'the saved report type is checked');
   assert.ok(authority.includes('order_index'), 'the section order is checked');
   assert.ok(authority.includes('key_performance_highlights'), 'the highlights section must exist');
+});
+
+// ── TEST 11 — the change column is never an invented change ───────────────
+test('TEST 11 — the change column states only what was derived', () => {
+  assert.equal(changeCellText({ identical: true, change: 'No change' }, 2), 'No change');
+  assert.equal(
+    changeCellText({ identical: false, change: 'Level rises from L2 to L4' }, 2),
+    'Level rises from L2 to L4',
+    'a derived change is stated as derived',
+  );
+  assert.equal(
+    changeCellText({ identical: false, change: null }, 2),
+    'Values differ',
+    'with no derived change the column never claims there is none',
+  );
+  assert.equal(
+    changeCellText({ identical: false, change: null }, 3),
+    'See values',
+    'with more than two options the client reads the values themselves',
+  );
 });

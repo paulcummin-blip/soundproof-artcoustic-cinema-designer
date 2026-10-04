@@ -190,10 +190,11 @@ test('TEST 7 — Step 5 shows the same table, every version by name, and gates G
   expect(WIZARD).toContain('label="Versions"');
   expect(WIZARD).toContain('values={readinessRows.length > 0');
   expect(WIZARD).toContain('readinessRows.map((row) => row.versionName)');
-  // Generate is disabled while any selected version is not ready…
-  expect(WIZARD).toContain('|| !readiness.ready}');
-  // …and refuses to run without it, showing the named message.
+  // Generate is disabled while any selected version is not ready: readiness is
+  // one of the named reasons the button carries, and the reason is shown.
   expect(WIZARD).toContain('if (!readiness.ready) {');
+  expect(WIZARD).toContain('disabled={!!generateBlockReason}');
+  expect(WIZARD).toContain('{generateBlockReason}');
   expect(WIZARD).toContain('Every selected version needs its current reports before this proposal can be generated.');
 
   // The table states the three columns and the reported state of each.

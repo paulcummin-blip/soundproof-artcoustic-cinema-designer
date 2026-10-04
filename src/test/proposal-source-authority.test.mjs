@@ -179,7 +179,8 @@ test('the proposal builder reads the source status and blocks generation', () =>
   assert.match(WIZARD, /if \(!sourceReady\) \{/, 'generate is guarded');
   assert.match(WIZARD, /sourceStatus\?\.message/, 'the blocker message is surfaced');
   assert.match(WIZARD, /<VersionReadinessTable[\s\S]*gate=\{readiness\}/, 'the same per-version readiness result is shown on the review step');
-  assert.match(WIZARD, /\|\| !readiness\.ready\}/, 'the Generate button is disabled until every selected version is current');
+  assert.match(WIZARD, /if \(!readiness\.ready\) \{[\s\S]{0,120}?return readiness\.message/, 'the same readiness result is one of the named reasons Generate is blocked');
+  assert.match(WIZARD, /disabled=\{!!generateBlockReason\}/, 'the Generate button is disabled until every selected version is current');
   assert.match(WIZARD, /written from the current Visual and Technical Report data/);
 });
 

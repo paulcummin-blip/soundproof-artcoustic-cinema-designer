@@ -291,8 +291,15 @@ test('the comparison table is calculated from each version and never invents a v
   }
 
   const keys = table.rows.map((row) => row.key);
-  // Identical results are not differences, so they are not rows.
-  assert.ok(!keys.includes('p5'), 'an identical result is not a comparison row');
+  // A result both versions share IS a comparison result: the row is carried and
+  // states that this area does not change. Dropping it left a comparison of two
+  // similar versions with no table at all.
+  assert.ok(keys.includes('p5'), 'an identical result is carried as an unchanged row');
+  assert.equal(
+    table.rows.find((row) => row.key === 'p5').change,
+    'No change',
+    'an unchanged row says so in the change column',
+  );
   // A parameter one version does not carry is never invented for it.
   assert.ok(!keys.includes('p7') && !keys.includes('p9'), 'an unassessed parameter is never invented');
   // The Design Index is internal designer data. The snapshots carry it (asserted
