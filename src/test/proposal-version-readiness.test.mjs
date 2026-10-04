@@ -28,6 +28,7 @@ import {
   buildReadinessCell,
   resolveProposalReadinessGate,
   resolveVersionReadinessRow,
+  versionDisplayName,
 } from '../components/proposal/sourceAuthority/proposalReadinessAuthority.js';
 import { PROPOSAL_SOURCE_REQUIRED_MESSAGE } from '../components/proposal/sourceAuthority/proposalSourceAuthority.js';
 import {
@@ -285,9 +286,10 @@ test('TEST 10 — a saved proposal reads Current, Source changed or Missing sour
   });
   expect(changed.state).toBe(PROPOSAL_LIBRARY_SOURCE_STATE.SOURCE_CHANGED);
   expect(changed.label).toBe('Source changed');
-  // Only the version that moved is named — the current one is not blamed.
-  expect(changed.changedVersionNames).toEqual(['Level 4 version · V2']);
-  expect(changed.reason).toBe('Level 4 version · V2 was regenerated after this proposal');
+  // Only the version that moved is named — the current one is not blamed, and it
+  // is named by the exact saved version name, with no slot suffix.
+  expect(changed.changedVersionNames).toEqual(['Level 4 version']);
+  expect(changed.reason).toBe('Level 4 version was regenerated after this proposal');
 
   const missingSource = resolveProposalSourceState({
     proposal: { id: 'c', selected_version_ids: ['v2'] },
@@ -352,4 +354,39 @@ test('TEST 11 — regeneration creates a linked revision and never overwrites th
   );
   expect(groups[0].proposals.map((proposal) => proposal.id)).toEqual(['b', 'a']);
   expect(read('src/components/proposal/library/RevisionBadge.jsx')).toContain('regenerated from latest source');
+});
+
+/* ── TEST 12 — comparison rows state the exact saved version names ─────── */
+
+test('TEST 12 — a comparison’s readiness rows and cards state the exact saved version names', () => {
+  // Two selected versions, named exactly as the designer saved them.
+  const level4 = resolveVersionReadinessRow({
+    versionId: 'v1',
+    versionName: versionDisplayName({ version_name: 'Level 4 version', version_number: 4 }),
+    versionNumber: 4,
+    cells: {},
+  });
+  const original = resolveVersionReadinessRow({
+    versionId: 'v2',
+    versionName: versionDisplayName({ version_name: 'Original Design', version_number: 1 }),
+    versionNumber: 1,
+    cells: {},
+  });
+
+  const gate = resolveProposalReadinessGate({ rows: [level4, original], minVersions: 2, maxVersions: 3 });
+  expect(gate.rows.map((row) => row.versionName)).toEqual(['Level 4 version', 'Original Design']);
+  // Every row is named by its exact saved name, and no row carries a V-slot label.
+  for (const row of gate.rows) {
+    expect(row.versionName).not.toMatch(/·\s*V\d/);
+    expect(row.blockingSentence).toContain(row.versionName);
+  }
+  expect(gate.message).toContain('Level 4 version is missing');
+  expect(gate.message).toContain('Original Design is missing');
+
+  // A proposal card shows EVERY version it was built from, by saved name.
+  const card = read('src/components/proposal/ProposalCard.jsx');
+  expect(card).toContain('versionNames.map');
+  const library = read('src/components/proposal/library/useProposalLibrary.js');
+  expect(library).toContain('savedName || `Version ${number}`');
+  expect(library).not.toContain('· V${');
 });

@@ -9,6 +9,9 @@
 //   TEST 5  The first-page line is one line, and never invents a client/reference
 //   TEST 6  Neither report page can build a version-less filename or line
 //   TEST 7  Proposal Centre states the version its report status belongs to
+//   TEST 8  A System Design Summary states the exact saved version name
+//   TEST 9  A System Design Comparison names every version
+//   TEST 10 The saved version name is read on every report load route
 // ---------------------------------------------------------------------------
 import { test } from 'vitest';
 import assert from 'node:assert/strict';
@@ -18,6 +21,8 @@ import path from 'node:path';
 import {
   buildVisualReportTitle,
   buildTechnicalReportTitle,
+  buildProposalReportTitle,
+  buildProposalVersionSegment,
 } from '../components/report/reportPdfTitle.js';
 import { clientReportHeaderMeta } from '../components/report/client/clientReportHeaderMeta.js';
 import { reportHeaderMetadata } from '../components/report/reportPrintHeader.js';
@@ -180,9 +185,16 @@ test('TEST 6 — both report pages state the version on their first page and in 
 
 // ── TEST 7 — Proposal Centre report status names the version ───────────────
 test('TEST 7 — Proposal Centre states which version each report status belongs to', () => {
-  assert.equal(versionDisplayName({ version_name: 'Original Design', version_number: 1 }), 'Original Design · V1');
-  assert.equal(versionDisplayName({ version_name: LEVEL_4.name, version_number: 4 }), 'Level 4 version · V4');
+  // The saved name IS the identity, stated exactly: no slot marker is appended,
+  // so a version called "Level 4 version" is never written "Level 4 version · V4".
+  assert.equal(versionDisplayName({ version_name: 'Original Design', version_number: 1 }), 'Original Design');
+  assert.equal(versionDisplayName({ version_name: LEVEL_4.name, version_number: 4 }), 'Level 4 version');
   assert.equal(versionDisplayName({ version_name: '  ', version_number: 3 }), 'Version 3');
+  assert.equal(
+    versionDisplayName({ version_name: 'Twin SUB2-12', version_number: 2 }),
+    'Twin SUB2-12',
+    'no V-slot suffix is ever appended to a saved version name',
+  );
 
   const readiness = read('src/components/proposal/sourceAuthority/useProposalReadiness.js');
   assert.ok(readiness.includes('versionDisplayName('), 'each readiness row is named by its version');
@@ -194,4 +206,98 @@ test('TEST 7 — Proposal Centre states which version each report status belongs
     assert.ok(read('src/components/proposal/sourceAuthority/proposalReadinessAuthority.js').includes(column),
       `the readiness columns include the ${column}`);
   }
+});
+
+// ── TEST 8 — a System Design Summary ───────────────────────────────────────
+test('TEST 8 — a System Design Summary states the exact saved version name on its cover and in its filename', () => {
+  const versionNames = [LEVEL_4.name];
+
+  assert.equal(buildProposalVersionSegment(versionNames), 'Level 4 version');
+  assert.equal(
+    buildProposalReportTitle(MARQUEE, 'system_summary', { ...DETAILS, versionNames }),
+    'Sound Proof - Artcoustic Cinema Designer - System Design Summary - Sound Proof - Marquee Home'
+      + ' - 34 AR - Level 4 version',
+  );
+
+  // The cover says "Version" and the stored name, never a generic slot label.
+  const block = read('src/components/proposal/cover/CoverVersionBlock.jsx');
+  assert.ok(block.includes("comparing ? 'Comparing' : 'Version'"), 'one version is labelled Version');
+  assert.ok(block.includes('{name}'), 'the saved name is printed exactly as stored');
+
+  const cover = read('src/components/proposal/cover/ProposalCoverPage.jsx');
+  assert.ok(cover.includes('<CoverVersionBlock versionNames={versionNames} />'),
+    'the cover page renders the version block');
+
+  // The on-screen cover, the printed pack and the exported filename are given
+  // the same saved names, so they cannot state different versions.
+  const pack = read('src/components/proposal/print/ProposalPackDocument.jsx');
+  assert.ok(pack.includes('versionNames = []') && pack.includes('versionNames={versionNames}'),
+    'the printed pack carries the saved names onto its cover');
+  const editor = read('src/pages/ProposalEditor.jsx');
+  assert.ok(editor.includes('versionNames={proposalVersionNames}'), 'the editor passes the saved names');
+  assert.ok(editor.includes('versionNames: proposalVersionNames'), 'the export is given the saved names');
+  const exportHook = read('src/components/proposal/export/useProposalExport.js');
+  assert.ok(exportHook.includes('versionNames = []') && exportHook.includes('{ ...identitySegments, versionNames }'),
+    'the filename is built from the saved names');
+});
+
+// ── TEST 9 — a System Design Comparison ────────────────────────────────────
+test('TEST 9 — a System Design Comparison names every version, on the cover and in the filename', () => {
+  const versionNames = [LEVEL_4.name, 'Level 1 version'];
+
+  assert.equal(buildProposalVersionSegment(versionNames), 'Comparing Level 4 version and Level 1 version');
+  assert.equal(
+    buildProposalReportTitle(MARQUEE, 'comparison', { ...DETAILS, versionNames }),
+    'Sound Proof - Artcoustic Cinema Designer - System Design Comparison - Sound Proof - Marquee Home'
+      + ' - 34 AR - Comparing Level 4 version and Level 1 version',
+  );
+  assert.ok(
+    buildProposalReportTitle(MARQUEE, 'comparison', { ...DETAILS, versionNames }).includes('Level 4 version')
+      && buildProposalReportTitle(MARQUEE, 'comparison', { ...DETAILS, versionNames }).includes('Level 1 version'),
+    'both compared versions are named',
+  );
+
+  // Three or more are listed in full; a very long set shortens cleanly.
+  assert.equal(
+    buildProposalVersionSegment(['Alpha Design', 'Beta Design', 'Gamma Design']),
+    'Comparing Alpha Design, Beta Design and Gamma Design',
+  );
+  const long = [
+    'Reference Design With An Exceptionally Long Saved Version Name',
+    'Second Very Long Saved Version Name',
+  ];
+  assert.equal(buildProposalVersionSegment(long), `Comparing ${long[0]} vs ${long[1]}`);
+  assert.ok(buildProposalVersionSegment(long).length < 200, 'the comparison segment stays filename-sized');
+
+  // A comparison with no known names states no version rather than a generic one.
+  assert.equal(buildProposalVersionSegment([]), '');
+  assert.equal(
+    buildProposalReportTitle(MARQUEE, 'comparison', DETAILS),
+    'Sound Proof - Artcoustic Cinema Designer - System Design Comparison - Sound Proof - Marquee Home - 34 AR',
+  );
+
+  // Several versions are listed one per line under a "Comparing" label.
+  const block = read('src/components/proposal/cover/CoverVersionBlock.jsx');
+  assert.ok(block.includes("comparing ? 'Comparing' : 'Version'"), 'the label switches to Comparing');
+  assert.ok(block.includes('names.map'), 'every selected version is listed by name');
+});
+
+// ── TEST 10 — every load route states the saved version name ───────────────
+test('TEST 10 — both reports read the saved version name on the in-session route too', () => {
+  for (const file of [
+    'src/components/report/client/useClientReportAuthority.jsx',
+    'src/pages/RP22Report.jsx',
+  ]) {
+    const source = read(file);
+    assert.ok(source.includes('readActiveVersionIdentity'), `${file} imports the shared version reader`);
+    assert.ok(source.includes('const version = await readActiveVersionIdentity(p);'),
+      `${file} reads the saved version name on the in-session route`);
+    assert.ok(source.includes('readProjectVersionRecord'), `${file} still reads it on the cold route`);
+  }
+
+  // The name comes from the stored ProjectVersion record — the designer's own
+  // name — and an unreadable one is left unstated rather than guessed.
+  const identity = read('src/components/report/activeVersionIdentity.js');
+  assert.ok(identity.includes('version_name'), 'the name is the stored version_name');
+  assert.ok(identity.includes('readProjectVersionRecord'), 'read from the ProjectVersion record');
 });

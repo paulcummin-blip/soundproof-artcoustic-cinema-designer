@@ -15,9 +15,14 @@
  * The design version is ALWAYS stated when a version is supplied: a project can
  * hold several versions and Proposal Centre compares them, so an exported report
  * must say which design it documents. A blank saved name falls back to
- * "Version <slot>", or "Version 1" when the slot is unknown too. A caller that
- * supplies no version at all (a proposal document, versioned by its own label)
- * states none. See reportVersionIdentity.js.
+ * "Version <slot>", or "Version 1" when the slot is unknown too. See
+ * reportVersionIdentity.js.
+ *
+ * A proposal document is versioned by the versions it was built from rather than
+ * by the report's own design version, supplied as `details.versionNames`: one
+ * version states its exact saved name, several state what is being compared —
+ * "Comparing Level 4 version and Level 1 version", shortened to "A vs B" when
+ * that is too long. A caller that supplies neither states no version.
  *
  * The dealer, client name and project reference are optional: when they are not
  * available the segment is omitted entirely rather than filled with a
@@ -153,6 +158,9 @@ export function buildReportFilename(reportType, projectName, version, details = 
   appendSegment(segments, details?.projectReference);
 
   appendSegment(segments, buildVersionSegment(version));
+  // A proposal document states the design versions it was built from, in place of
+  // the report's own single design version. See buildProposalVersionSegment.
+  appendSegment(segments, details?.versionSegment);
 
   return segments.join(SEPARATOR);
 }
@@ -195,10 +203,52 @@ export function proposalReportTypeToken(proposalType) {
   return REPORT_PDF_TYPE.PROPOSAL;
 }
 
+/** The longest a comparison segment may be before it shortens to "A vs B". */
+export const COMPARISON_SEGMENT_MAX_LENGTH = 64;
+
+/** The version names as filename-safe, non-empty segments, in selection order. */
+function normaliseVersionNames(names) {
+  return (Array.isArray(names) ? names : [names])
+    .map((name) => sanitiseVersionName(name))
+    .filter(Boolean);
+}
+
+/**
+ * The version segment of a proposal document's filename.
+ *
+ *   one version   "Level 4 version"
+ *   two or more   "Comparing Level 4 version and Level 1 version"
+ *                 "Comparing A vs B" when the full form would be too long
+ *
+ * @param {string[]} versionNames - the saved names of the versions selected
+ * @returns {string} "" when no name is known
+ */
+export function buildProposalVersionSegment(versionNames) {
+  const names = normaliseVersionNames(versionNames);
+  if (names.length === 0) return "";
+  if (names.length === 1) return names[0];
+
+  const full = names.length === 2
+    ? `Comparing ${names[0]} and ${names[1]}`
+    : `Comparing ${names.slice(0, -1).join(", ")} and ${names[names.length - 1]}`;
+  if (full.length <= COMPARISON_SEGMENT_MAX_LENGTH) return full;
+
+  return `Comparing ${names.join(" vs ")}`;
+}
+
 /**
  * Proposal / System Design report filename. Delegates to buildReportFilename
- * with the report type token for the proposal's own type.
+ * with the report type token for the proposal's own type, stating the exact
+ * saved names of the versions the document was built from.
+ *
+ * @param {string} projectName
+ * @param {string} proposalType - single | comparison | system_summary
+ * @param {{dealerName?, clientName?, projectReference?, versionNames?: string[]}} [details]
  */
 export function buildProposalReportTitle(projectName, proposalType, details = {}) {
-  return buildReportFilename(proposalReportTypeToken(proposalType), projectName, null, details);
+  const names = normaliseVersionNames(details?.versionNames);
+  return buildReportFilename(proposalReportTypeToken(proposalType), projectName, null, {
+    ...details,
+    versionSegment: names.length > 0 ? buildProposalVersionSegment(names) : "",
+  });
 }

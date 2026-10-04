@@ -608,6 +608,15 @@ export default function ProposalEditor() {
     return () => { cancelled = true; };
   }, [proposal?.selected_version_ids, proposal?.version_id]);
 
+  // The exact saved version names this document is built from, in selection
+  // order: the version name for a summary, every name for a comparison. Read
+  // from the same stored records the images are labelled with, so the cover, the
+  // printed pack and the exported filename all state one identity.
+  const proposalVersionNames = useMemo(
+    () => proposalVersionIds(proposal).map((versionId) => versionNameById.get(versionId)).filter(Boolean),
+    [proposal?.selected_version_ids, proposal?.version_id, versionNameById],
+  );
+
   // The images this document composes with: the versions it covers first, then
   // the project-wide gallery for anything they leave free.
   const packImages = useMemo(() => resolvePackImages({
@@ -631,6 +640,8 @@ export default function ProposalEditor() {
     dealerName: projectContext.filenameDealerName,
     clientName: projectContext.filenameClientName,
     projectReference: projectContext.projectReference,
+    // The exact saved version names this document was built from.
+    versionNames: proposalVersionNames,
     // Exporting this proposal also stores the issued PDF in the project library.
     // Drafts and editable revisions stay in the Proposal Centre; only the PDF
     // that was actually exported becomes a library asset.
@@ -875,6 +886,7 @@ export default function ProposalEditor() {
                       <ProposalCoverPage
                         projectName={projectContext.projectName || proposal?.title}
                         clientName={projectContext.clientName}
+                        versionNames={proposalVersionNames}
                         reportTypeLabel={typeLabel}
                         dealerName={projectContext.dealerName}
                         projectReference={projectContext.projectReference}
@@ -1022,6 +1034,7 @@ export default function ProposalEditor() {
         projectName={projectContext.projectName || proposal?.title}
         dealerName={projectContext.dealerName}
         projectReference={projectContext.projectReference}
+        versionNames={proposalVersionNames}
         coverImageUrl={projectContext.coverImageUrl}
         heroImageUrl={projectContext.heroImageUrl}
         logoUrl={projectContext.logoUrl}

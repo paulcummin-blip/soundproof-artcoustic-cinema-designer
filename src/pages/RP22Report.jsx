@@ -23,6 +23,7 @@ import {
     readProjectRecord,
     readProjectVersionRecord,
 } from '@/components/state/projectReadCache';
+import { readActiveVersionIdentity } from '@/components/report/activeVersionIdentity';
 import { useEffectiveRsp } from '@/components/room/rsp/useEffectiveRsp';
 import { resolveDesignatedRspSeat, resolveRowDerivedRspYByMode } from '@/components/room/rsp/rspInputResolver';
 import { resolveRspScreenFrontPlaneM, resolveRspScreenWidthM } from '@/components/room/rsp/screenGeometryResolver';
@@ -322,7 +323,7 @@ function RP22ReportInner() {
         if (sharedProviderReady) {
             setReportHydrating(false);
             setReportReadyProjectId(explicitProjectId);
-            readProjectRecord(explicitProjectId).then((p) => {
+            readProjectRecord(explicitProjectId).then(async (p) => {
                 if (cancelled) return;
                 if (!p) return;
                 setProjectDetails({
@@ -338,6 +339,13 @@ function RP22ReportInner() {
                     project_reference: p.project_reference || null,
                     active_version_id: p.active_version_id || null,
                 });
+                // The fast path states the version exactly as the full load does:
+                // the saved version name is read here too, so an in-session export
+                // or front page never falls back to a generic version label.
+                const version = await readActiveVersionIdentity(p);
+                if (cancelled) return;
+                setReportVersionNumber(version.number);
+                setReportVersionName(version.name);
             }).catch(() => { /* non-blocking metadata fetch */ });
             return () => { cancelled = true; };
         }

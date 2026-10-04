@@ -76,6 +76,9 @@ export function useProposalExport({
   dealerName = null,
   clientName = null,
   projectReference = null,
+  // The exact saved names of the design versions this document was built from:
+  // one name for a single-version document, every name for a comparison.
+  versionNames = [],
   // When supplied, an issued copy of the exported PDF is stored in the project
   // library in the background. The export itself is unchanged; drafts never
   // reach the library, only the PDF the designer actually exported.
@@ -136,12 +139,14 @@ export function useProposalExport({
     printingRef.current = true;
     setExporting(true);
 
-    // The shared filename helper, with the report type this proposal is:
-    // System Design Summary / System Design Comparison / Proposal.
+    // The shared filename helper, with the report type this proposal is —
+    // System Design Summary / System Design Comparison / Proposal — and the
+    // exact saved names of the versions it was built from.
+    const identitySegments = { dealerName, clientName, projectReference };
     const title = buildProposalReportTitle(
       projectName,
       proposal?.proposal_type,
-      { dealerName, clientName, projectReference }
+      { ...identitySegments, versionNames }
     );
 
     // A saved PDF is named after the TOP-LEVEL document's title. Inside a host
@@ -211,7 +216,7 @@ export function useProposalExport({
       );
       cleanup();
     }
-  }, [proposal, sections, projectName, dealerName, clientName, projectReference, issuedDocument, cleanup]);
+  }, [proposal, sections, projectName, dealerName, clientName, projectReference, versionNames, issuedDocument, cleanup]);
 
   return { exporting, error, blockedReason, handleExport };
 }

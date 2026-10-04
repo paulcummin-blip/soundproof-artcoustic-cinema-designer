@@ -18,6 +18,7 @@ import {
   readProjectRecord,
   readProjectVersionRecord,
 } from "@/components/state/projectReadCache";
+import { readActiveVersionIdentity } from "@/components/report/activeVersionIdentity";
 import { mergeProjectAndVersion } from "@/lib/versionAuthority";
 import { hydrateProjectIntoAppState } from "@/components/utils/hydrateProjectIntoAppState";
 import { useAnalysisSpeakers } from "@/components/hooks/useAnalysisSpeakers";
@@ -108,7 +109,7 @@ export function useClientReportAuthority(projectId) {
       setHydratedProjectId(projectId);
       // Shared app state already holds this project's saved design state.
       completeDesignHydration(projectId);
-      readProjectRecord(projectId).then((p) => {
+      readProjectRecord(projectId).then(async (p) => {
         if (cancelled) return;
         if (!p) return;
         setProjectDetails({
@@ -121,6 +122,13 @@ export function useClientReportAuthority(projectId) {
           account_id: p.account_id || null,
         });
         setVersionId(p.active_version_id || null);
+        // The fast path states the version exactly as the full load does: the
+        // saved version name is read here too, so an in-session export or front
+        // page never falls back to a generic version label.
+        const version = await readActiveVersionIdentity(p);
+        if (cancelled) return;
+        setVersionNumber(version.number);
+        setVersionName(version.name);
       }).catch(() => { /* non-blocking metadata fetch */ });
       return () => { cancelled = true; };
     }

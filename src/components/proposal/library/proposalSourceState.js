@@ -94,7 +94,10 @@ export function resolveProposalSourceState({ proposal, versionsById = new Map(),
   const versionStates = versionIds.map((versionId, index) => {
     const version = versionsById.get(versionId) || null;
     const number = version?.version_number ?? index + 1;
-    const name = version?.version_name ? `${version.version_name} · V${number}` : `Version ${number}`;
+    // The saved version name is the identity, stated exactly: no slot suffix is
+    // added, so a version called "Level 4 version" is never shown as V4.
+    const savedName = typeof version?.version_name === 'string' ? version.version_name.trim() : '';
+    const name = savedName || `Version ${number}`;
     const versionState = resolveVersionSourceState({
       version,
       savedReports: savedReportsByVersionId.get(versionId) || {},

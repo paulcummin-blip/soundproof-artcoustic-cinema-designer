@@ -31,6 +31,7 @@ import React from 'react';
 import { useBrandImage } from '@/components/account/useBrandImage';
 import { APPROVED_DEALER_BRANDING } from '@/components/account/defaultDealerBranding';
 import BrandLockup from '@/components/ui/BrandLockup';
+import CoverVersionBlock from '@/components/proposal/cover/CoverVersionBlock';
 import { REPORT_FONT_BODY as FONT } from '@/components/report/typography/reportTypography';
 import {
   PROPOSAL_FONT_HEADING,
@@ -116,6 +117,9 @@ export default function ProposalCoverPage({
   clientName,
   dealerName,
   projectReference,
+  // The exact saved names of the design versions this document was built from:
+  // one name for a single-version document, every name for a comparison.
+  versionNames = [],
   reportTypeLabel,
   coverImageUrl,
   heroImageUrl,
@@ -241,6 +245,14 @@ export default function ProposalCoverPage({
                 valueSize={11}
                 valueSpacing="0.10em"
               />
+            </div>
+          )}
+
+          {/* The design version this document documents — the exact saved name,
+              or every version named when two or more are being compared. */}
+          {versionNames.length > 0 && (
+            <div style={{ marginTop: 20, width: '100%' }}>
+              <CoverVersionBlock versionNames={versionNames} />
             </div>
           )}
         </div>

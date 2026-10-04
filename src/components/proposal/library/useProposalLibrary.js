@@ -114,11 +114,16 @@ export function useProposalLibrary({ projectFilter = null } = {}) {
 
   useEffect(() => { load(); }, [load]);
 
-  /** The version names a proposal was built from, in selection order. */
+  /**
+   * The version names a proposal was built from, in selection order — the exact
+   * saved names the version selector shows, with no slot suffix added. A version
+   * with no saved name falls back to its slot number.
+   */
   const versionNamesFor = useCallback((proposal) => proposalVersionIds(proposal).map((versionId, index) => {
     const version = versionsById.get(versionId) || null;
     const number = version?.version_number ?? index + 1;
-    return version?.version_name ? `${version.version_name} · V${number}` : `Version ${number}`;
+    const savedName = typeof version?.version_name === 'string' ? version.version_name.trim() : '';
+    return savedName || `Version ${number}`;
   }), [versionsById]);
 
   /** Proposals grouped by project, most recently updated group first. */

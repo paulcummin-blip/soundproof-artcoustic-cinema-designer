@@ -48,6 +48,9 @@ export default function ProposalPackDocument({
   projectName,
   dealerName,
   projectReference,
+  // The exact saved names of the versions this document was built from: one name
+  // for a single-version document, every name for a comparison.
+  versionNames = [],
   coverImageUrl,
   heroImageUrl,
   logoUrl,
@@ -217,6 +220,7 @@ export default function ProposalPackDocument({
           clientName={clientName}
           dealerName={dealerName}
           projectReference={projectReference}
+          versionNames={versionNames}
           reportTypeLabel={reportTypeLabel}
           coverImageUrl={coverImageUrl}
           heroImageUrl={heroImageUrl}

@@ -98,10 +98,15 @@ export function blockerLabel({ source, state }) {
   return 'engineering authority';
 }
 
-/** `Original Design · V1` — the name the version is known by, plus its slot. */
+/**
+ * The version name the designer saved — `Level 4 version`, `Original Design` —
+ * stated exactly, with no slot suffix. The stored name is the identity: a version
+ * called "Level 4 version" is never written as "Level 4 version · V4", and a
+ * "V1"-style marker only ever appears when it is part of the saved name itself.
+ * A version with no usable name falls back to the slot, then to "Version".
+ */
 export function versionDisplayName({ version_name: name = null, version_number: number = null } = {}) {
   const trimmed = typeof name === 'string' ? name.trim() : '';
-  if (trimmed && number) return `${trimmed} · V${number}`;
   if (trimmed) return trimmed;
   return number ? `Version ${number}` : 'Version';
 }
