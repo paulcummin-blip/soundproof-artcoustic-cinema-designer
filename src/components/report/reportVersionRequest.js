@@ -16,14 +16,13 @@
  * authority, and a page that was asked for a version must not silently render
  * another one.
  *
- * The version NAME is read from the ProjectVersion record itself rather than
- * carried in the URL, so a report and its exported filename state the exact name
- * the designer saved — there is no second copy of the name to disagree with it.
+ * The version NAME is read from the ProjectVersion record itself (see
+ * readVersionIdentity in activeVersionIdentity) rather than carried in the URL,
+ * so a report and its exported filename state the exact name the designer saved
+ * — there is no second copy of the name to disagree with it.
  *
- * Pure except readRequestedVersionIdentity, which only reads.
+ * Pure: no reads, no writes, no runtime APIs.
  */
-
-import { readProjectVersionRecord } from '@/components/state/projectReadCache';
 
 /** The version parameter the Library's report actions pass. */
 export const REPORT_VERSION_PARAM = 'versionId';
@@ -57,32 +56,6 @@ export function readRequestedVersionId(searchParams) {
  */
 export function resolveReportVersionId({ requestedVersionId = null, activeVersionId = null } = {}) {
   return requestedVersionId || activeVersionId || null;
-}
-
-/**
- * The requested version's saved identity — id, slot number and exact name.
- *
- * A name that cannot be read is left absent rather than guessed, so a report
- * never states a version name it could not read.
- *
- * @param {string|null} versionId
- * @returns {Promise<{versionId: string|null, number: number|null, name: string|null}>}
- */
-export async function readRequestedVersionIdentity(versionId) {
-  if (!versionId) return { versionId: null, number: null, name: null };
-
-  try {
-    const version = await readProjectVersionRecord(versionId);
-    const name = typeof version?.version_name === 'string' ? version.version_name.trim() : '';
-    return {
-      versionId,
-      number: typeof version?.version_number === 'number' ? version.version_number : null,
-      name: name || null,
-    };
-  } catch (error) {
-    console.warn('[reportVersionRequest] version identity unavailable:', error?.message || error);
-    return { versionId, number: null, name: null };
-  }
 }
 
 /**

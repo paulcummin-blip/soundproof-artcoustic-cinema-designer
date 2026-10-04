@@ -24,20 +24,23 @@ import { readProjectVersionRecord } from '@/components/state/projectReadCache';
 export const NO_VERSION_IDENTITY = Object.freeze({ versionId: null, number: null, name: null });
 
 /**
- * The active version's id, slot number and exact saved name.
+ * ONE version's id, slot number and exact saved name — whichever version a
+ * report was asked for, not only the project's active one. Read from the
+ * ProjectVersion record itself, so a version the designer called "Level 4
+ * version" is never reported as "Version 1" or "V4".
  *
- * @param {{active_version_id?: string}|null} project - the Project record
+ * @param {string|null} versionId
  * @returns {Promise<{versionId: string|null, number: number|null, name: string|null}>}
  */
-export async function readActiveVersionIdentity(project) {
-  const versionId = project?.active_version_id || null;
-  if (!versionId) return { ...NO_VERSION_IDENTITY };
+export async function readVersionIdentity(versionId) {
+  const id = versionId || null;
+  if (!id) return { ...NO_VERSION_IDENTITY };
 
   try {
-    const version = await readProjectVersionRecord(versionId);
+    const version = await readProjectVersionRecord(id);
     const name = typeof version?.version_name === 'string' ? version.version_name.trim() : '';
     return {
-      versionId,
+      versionId: id,
       number: typeof version?.version_number === 'number' ? version.version_number : null,
       name: name || null,
     };
@@ -45,6 +48,16 @@ export async function readActiveVersionIdentity(project) {
     // The version name is a label, not a calculation: an unreadable record
     // leaves it unstated, so the report never names a version it could not read.
     console.warn('[activeVersionIdentity] version name unavailable:', error?.message || error);
-    return { versionId, number: null, name: null };
+    return { versionId: id, number: null, name: null };
   }
+}
+
+/**
+ * The active version's id, slot number and exact saved name.
+ *
+ * @param {{active_version_id?: string}|null} project - the Project record
+ * @returns {Promise<{versionId: string|null, number: number|null, name: string|null}>}
+ */
+export async function readActiveVersionIdentity(project) {
+  return readVersionIdentity(project?.active_version_id || null);
 }

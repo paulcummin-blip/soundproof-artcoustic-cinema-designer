@@ -3,10 +3,10 @@
 // ACCEPTANCE — the Project Library's Generated Reports listing.
 //
 //   TEST 1  A report regenerated five times lists ONE current live row
-//   TEST 2  Three exports of the same report list three issued rows
-//   TEST 3  Regenerating after an export updates the live row, keeps the
-//           exports, and marks them "Older export" / "Source changed since
-//           export"
+//   TEST 2  Three exports of the same report list ONE issued row: the latest
+//   TEST 3  Regenerating after an export updates the live row and the latest
+//           export is judged against it ("Older export" / "Source changed since
+//           export") while the older copies stay in storage, unlisted
 //   TEST 4  A Visual Report export and a Technical Report export never stand
 //           in for one another
 //   TEST 5  Level 4 version and Level 1 version are judged inside their own
@@ -26,6 +26,7 @@ import {
   collapseLiveReports,
   liveReportKey,
   resolveExportLiveState,
+  selectLatestExports,
 } from '../components/library/librarySourceStatus.js';
 import { isSnapshotRestorable } from '../components/report/reportSnapshotAuthority.js';
 
@@ -83,11 +84,13 @@ const liveRows = (snapshots) => collapseLiveReports(snapshots)
   }))
   .sort((a, b) => LIVE_REPORT_TYPES.indexOf(a.reportType) - LIVE_REPORT_TYPES.indexOf(b.reportType));
 
-/** The issued rows one version group shows: every export, newest first. */
-const issuedRows = (records, versionId) => records
-  .filter((record) => (record.version_id || null) === versionId)
-  .slice()
-  .sort((a, b) => String(b.exported_at || '').localeCompare(String(a.exported_at || '')));
+/**
+ * The issued rows one version group shows: the LATEST export of each report
+ * type. An older export of the same version and type is not listed.
+ */
+const issuedRows = (records, versionId) => selectLatestExports(
+  records.filter((record) => (record.version_id || null) === versionId),
+).map((entry) => entry?.record || entry);
 
 const VERSION_4 = { id: 'version-4', version_name: 'Level 4 version', published_fingerprint: 'ENG-1' };
 const VERSION_1 = { id: 'version-1', version_name: 'Level 1 version', published_fingerprint: 'ENG-1' };
@@ -117,7 +120,7 @@ test('TEST 1 — a Technical Report regenerated five times lists ONE current liv
 
 /* ── TEST 2 — every exported PDF stays listed ───────────────────────────── */
 
-test('TEST 2 — three exports of the same report list three issued rows, newest first', () => {
+test('TEST 2 — three exports of the same report list ONE issued row: the latest', () => {
   const exports = [
     issued('export-1', { exportedAt: '2026-10-02T10:00:00.000Z' }),
     issued('export-2', { exportedAt: '2026-10-03T10:00:00.000Z' }),
@@ -125,23 +128,39 @@ test('TEST 2 — three exports of the same report list three issued rows, newest
   ];
 
   const rows = issuedRows(exports, 'version-4');
-  assert.equal(rows.length, 3, 'only exported PDFs may appear more than once');
-  assert.deepEqual(rows.map((row) => row.id), ['export-3', 'export-2', 'export-1'], 'newest first');
+  assert.equal(rows.length, 1, 'ONE exported PDF per version and report type');
+  assert.equal(rows[0].id, 'export-3', 'the latest export is the row');
 
-  // No live report of this type: the export's own source state is stated, and
-  // a superseded export is named as such rather than dropped.
-  const live = saved('snap-1', 'version-4', 'technical', '2026-10-01T09:00:00.000Z');
+  // The Library holds one PDF, not one per export: the older copies are still
+  // in storage (they are never deleted or overwritten), they are simply not
+  // listed. Supersession is still derivable for them.
+  assert.ok(exports.some((record) => record.id === 'export-1'), 'the older copy stays in storage');
+  const superseded = resolveExportLiveState({ record: exports[1], version: VERSION_4, superseded: true });
+  assert.equal(superseded.label, LIBRARY_SOURCE_LABEL.superseded, 'a newer export of the same report');
+
+  // No live report of this type: the export's own source state is stated.
   const withoutLive = resolveExportLiveState({ record: rows[0], version: VERSION_4, liveReport: null });
   assert.equal(withoutLive.label, LIBRARY_SOURCE_LABEL.current);
 
+  // It matches the live report of its own version and type: "Same as current".
+  const live = saved('snap-1', 'version-4', 'technical', '2026-10-01T09:00:00.000Z');
   const matched = resolveExportLiveState({ record: rows[0], version: VERSION_4, liveReport: {
     generatedAt: live.generated_at,
     sourceFingerprints: live.source_fingerprints,
   } });
   assert.equal(matched.label, LIBRARY_SOURCE_LABEL.same_as_current);
 
-  const superseded = resolveExportLiveState({ record: rows[1], version: VERSION_4, superseded: true });
-  assert.equal(superseded.label, LIBRARY_SOURCE_LABEL.superseded, 'a newer export of the same report');
+  // A second export of the SAME version and report type never adds a row, and
+  // neither does a Visual Report export of the same version.
+  const withVisual = exports.concat([issued('export-visual', {
+    documentType: 'visual',
+    exportedAt: '2026-10-05T10:00:00.000Z',
+  })]);
+  assert.deepEqual(
+    issuedRows(withVisual, 'version-4').map((row) => row.document_type).sort(),
+    ['technical', 'visual'],
+    'one row per report type, never one per export',
+  );
 });
 
 /* ── TEST 3 — regenerating after exporting ──────────────────────────────── */
@@ -171,13 +190,22 @@ test('TEST 3 — regenerating after exporting updates the live row and marks the
 
   const liveReport = { generatedAt: after.generated_at, sourceFingerprints: after.source_fingerprints };
   const kept = issuedRows(exports, 'version-4');
-  assert.equal(kept.length, 2, 'the older exported PDFs remain');
+  assert.equal(kept.length, 1, 'the Library lists the latest export only');
+  assert.equal(kept[0].id, 'export-2', 'the newest of the two exports');
   assert.deepEqual(
     kept.map((record) => resolveExportLiveState({ record, version: VERSION_4, liveReport }).label),
-    [EXPORT_SOURCE_CHANGED_LABEL, EXPORT_SOURCE_CHANGED_LABEL],
+    [EXPORT_SOURCE_CHANGED_LABEL],
     'the design moved on: "Source changed since export"',
   );
   assert.equal(EXPORT_SOURCE_CHANGED_LABEL, 'Source changed since export', 'the exact wording');
+
+  // The older export is unlisted but keeps its own label authority: it is still
+  // judged against the same version and report type it was issued for.
+  assert.equal(
+    resolveExportLiveState({ record: exports[0], version: VERSION_4, liveReport }).label,
+    EXPORT_SOURCE_CHANGED_LABEL,
+    'the unlisted older export is judged the same way',
+  );
 
   // Regenerated from the SAME source: the export is older, not out of date.
   const sameSource = saved('snap-3', 'version-4', 'technical', '2026-10-06T09:00:00.000Z', 'ENG-1');
@@ -187,7 +215,7 @@ test('TEST 3 — regenerating after exporting updates the live row and marks the
       version: VERSION_4,
       liveReport: { generatedAt: sameSource.generated_at, sourceFingerprints: sameSource.source_fingerprints },
     }).label),
-    ['Older export', 'Older export'],
+    ['Older export'],
   );
 });
 

@@ -41,8 +41,8 @@ import {
   failDesignHydration,
   useCanonicalProject,
 } from "@/components/state/projectHydrationStore";
+import { readVersionIdentity } from "@/components/report/activeVersionIdentity";
 import {
-  readRequestedVersionIdentity,
   resolveReportVersionId,
   sharedHydrationMatchesRequest,
 } from "@/components/report/reportVersionRequest";
@@ -150,7 +150,7 @@ export function useClientReportAuthority(projectId, requestedVersionId = null) {
         // The fast path states the version exactly as the full load does: the
         // saved version name is read here too, so an in-session export or front
         // page never falls back to a generic version label.
-        const version = await readRequestedVersionIdentity(resolvedVersionId);
+        const version = await readVersionIdentity(resolvedVersionId);
         if (cancelled) return;
         setVersionNumber(version.number);
         setVersionName(version.name);

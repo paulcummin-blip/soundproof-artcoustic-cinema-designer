@@ -24,9 +24,9 @@ import {
     readProjectVersionRecord,
 } from '@/components/state/projectReadCache';
 import { useCanonicalProject } from '@/components/state/projectHydrationStore';
+import { readVersionIdentity } from '@/components/report/activeVersionIdentity';
 import {
     readRequestedVersionId,
-    readRequestedVersionIdentity,
     resolveReportVersionId,
     sharedHydrationMatchesRequest,
 } from '@/components/report/reportVersionRequest';
@@ -375,7 +375,7 @@ function RP22ReportInner() {
                 // The fast path states the version exactly as the full load does:
                 // the saved version name is read here too, so an in-session export
                 // or front page never falls back to a generic version label.
-                const version = await readRequestedVersionIdentity(
+                const version = await readVersionIdentity(
                     resolveReportVersionId({
                         requestedVersionId,
                         activeVersionId: p.active_version_id,
@@ -424,10 +424,16 @@ function RP22ReportInner() {
                 project_reference: p.project_reference || null,
                 active_version_id: p.active_version_id || null,
             });
-            // Merge with the active ProjectVersion so per-version design fields
-            // come from design_state, not from the legacy Project position.
+            // Merge with the version this report was ASKED FOR — the explicit
+            // request first, the project's active version only as the fallback.
+            // Per-version design fields come from that version's design_state,
+            // never from the legacy Project position and never from whichever
+            // version the Room Designer happens to have loaded.
             let merged = p;
-            const versionId = p.active_version_id;
+            const versionId = resolveReportVersionId({
+                requestedVersionId,
+                activeVersionId: p.active_version_id,
+            });
             if (versionId) {
                 try {
                     const v = await readProjectVersionRecord(versionId);
@@ -479,6 +485,7 @@ function RP22ReportInner() {
                 setDesignatedRspSeatId: app.setDesignatedRspSeatId,
             });
             setReportReadyProjectId(p.id);
+            setReportReadyVersionId(versionId || null);
             setReportHydrating(false);
         }).catch(() => {
             if (cancelled) return;
@@ -491,7 +498,7 @@ function RP22ReportInner() {
         return () => {
             cancelled = true;
         };
-    }, [explicitProjectId]);
+    }, [explicitProjectId, requestedVersionId]);
 
     const [printReady, setPrintReady] = useState(false);
     const printReportRef = useRef(null);
