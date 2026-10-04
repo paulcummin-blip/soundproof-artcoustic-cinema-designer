@@ -75,6 +75,7 @@ import { DEFAULT_TERRITORY, getTerritoryConfig } from '@/components/pricing/terr
 import { resolveSeatPriority, getPrimarySeats, getSecondarySeats } from '@/components/utils/seatPriorityAuthority';
 import Rp22SeatCoverageSentence from '@/components/report/Rp22SeatCoverageSentence';
 import { buildTechnicalReportTitle } from '@/components/report/reportPdfTitle';
+import { reportHeaderMetadata } from '@/components/report/reportPrintHeader';
 import useReportFilenameIdentity from '@/components/report/useReportFilenameIdentity';
 import { applyPrintDocumentTitle, restorePrintDocumentTitle } from '@/components/report/printDocumentTitle';
 import {
@@ -133,6 +134,14 @@ function RP22ReportInner() {
         { number: reportVersionNumber, name: reportVersionName },
         filenameIdentity
     );
+
+    // The Technical Report's first page states the same identity line as the
+    // Visual Report — Project, Client, Version, Reference, Date — read from the
+    // one shared builder, naming the design version this report documents.
+    const technicalFirstPageMeta = reportHeaderMetadata(projectDetails, {
+        number: reportVersionNumber,
+        name: reportVersionName,
+    });
     const showDesignRating = useSyncExternalStore(subscribeAsdrVisibility, getAsdrVisibility);
 
     // ── ASDR recommendation wiring ───────────────────────────────────────
@@ -1435,7 +1444,7 @@ function RP22ReportInner() {
                         <section id="pdf-cover">
                             {/* ── Page 1: Logo + title + RP22/RP23 explanations ── */}
                             <div className="print-summary report-page-block report-page-block--cover" data-report-block="cover" data-report-page-start="true">
-                                <ReportCover variant="print" project={projectDetails} />
+                                <ReportCover variant="print" project={projectDetails} meta={technicalFirstPageMeta} />
                                 {/* RP22 explanation */}
                                 <div style={{ maxWidth: '185mm', margin: '0 auto', paddingTop: '5mm', fontFamily: REPORT_FONT_BODY, fontSize: '10pt', color: '#3E4349', lineHeight: 1.55, textAlign: 'left' }}>
                                     <div data-report-section-heading="true" style={{ fontWeight: 700, color: '#1B1A1A', fontSize: '11pt', marginBottom: `${REPORT_SECTION_HEADING_GAP_PX}px` }}>CEDIA RP22 - Immersive Audio Performance Levels</div>

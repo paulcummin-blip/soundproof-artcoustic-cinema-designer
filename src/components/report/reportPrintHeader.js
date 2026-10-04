@@ -1,3 +1,5 @@
+import { reportFirstPageMeta } from './reportFirstPageMeta.js';
+
 // Physical A4 masthead dimensions shared by Visual and Technical exports.
 export const REPORT_PRINT_HEADER = Object.freeze({
   logoWidthMm: 62,
@@ -19,7 +21,14 @@ export const REPORT_STRAPLINE = Object.freeze({
   sub: 'Powered by Artcoustic Design Intelligence (ADI)',
 });
 
-export function reportHeaderMetadata(project = {}) {
-  return [project.name, project.project_reference?.trim() ? `Ref: ${project.project_reference.trim()}` : null]
-    .filter(Boolean).join(' · ');
+/**
+ * The first-page metadata line for a report's cover: Project · Client ·
+ * Version · Reference · Date, composed by the shared builder so the Technical
+ * Report, the Visual Report and their exported PDFs state one identity.
+ *
+ * @param {Object} project - the Project record
+ * @param {{number?: number, name?: string}|null} [version] - the design version this report belongs to
+ */
+export function reportHeaderMetadata(project = {}, version = null) {
+  return reportFirstPageMeta(project, version);
 }

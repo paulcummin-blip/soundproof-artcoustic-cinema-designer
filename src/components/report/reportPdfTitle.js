@@ -6,11 +6,18 @@
  * generators must never build their own filenames.
  *
  * Required format:
- *   Sound Proof - Artcoustic Cinema Designer - <Report Type>[ - <Dealer>] - <Project Name>[ - <Client Name>][ - <Project Reference>][ - v<N> <Version Name>]
+ *   Sound Proof - Artcoustic Cinema Designer - <Report Type>[ - <Dealer>] - <Project Name>[ - <Client Name>][ - <Project Reference>] - <Version Name>[ V<N>]
  *
  * Examples:
- *   Sound Proof - Artcoustic Cinema Designer - Visual - Ribble AV - Lords Hall - Noble Projects - LH-001
- *   Sound Proof - Artcoustic Cinema Designer - Technical - Sound Proof - Marquee Home - 34 AR
+ *   Sound Proof - Artcoustic Cinema Designer - Visual - Sound Proof - Marquee Home - 34 AR - Level 4 version
+ *   Sound Proof - Artcoustic Cinema Designer - Technical - Sound Proof - Marquee Home - Noble Projects - 34 AR - Original Design V1
+ *
+ * The design version is ALWAYS stated when a version is supplied: a project can
+ * hold several versions and Proposal Centre compares them, so an exported report
+ * must say which design it documents. A blank saved name falls back to
+ * "Version <slot>", or "Version 1" when the slot is unknown too. A caller that
+ * supplies no version at all (a proposal document, versioned by its own label)
+ * states none. See reportVersionIdentity.js.
  *
  * The dealer, client name and project reference are optional: when they are not
  * available the segment is omitted entirely rather than filled with a
@@ -30,6 +37,8 @@
  * trimmed, and any reference to the platform the app is built on ("Base44") is
  * stripped — an exported client filename never names the platform.
  */
+
+import { reportVersionFilenameSegment } from './reportVersionIdentity.js';
 
 const BRAND = "Sound Proof";
 const PRODUCT = "Artcoustic Cinema Designer";
@@ -89,20 +98,19 @@ export function sanitiseVersionName(name) {
 }
 
 /**
- * The version segment for a filename, e.g. "v2 Twin SUB2-12".
+ * The version segment for a filename, e.g. "Level 4 version" or
+ * "Original Design V1".
  *
- * Appended only when the designer saved a named version: the baseline V1
- * "Current Design" is the default, not a saved design, so it is not stated.
+ * Always stated when a version is supplied — see reportVersionIdentity.js for
+ * the name, slot-marker and fallback rules. A caller that states no version at
+ * all states none.
  *
  * @param {{ number: number, name: string } | null | undefined} version
  * @returns {string} "" or the version segment
  */
 function buildVersionSegment(version) {
   if (!version) return "";
-  const safeName = sanitiseVersionName(version.name);
-  if (!safeName || safeName === "Current Design") return "";
-  const numPart = Number.isFinite(version.number) ? `v${version.number} ` : "";
-  return `${numPart}${safeName}`.trim();
+  return sanitiseFilenameSegment(reportVersionFilenameSegment(version), "");
 }
 
 /**
@@ -128,7 +136,7 @@ function appendSegment(segments, value) {
  *
  * @param {string} reportType - "Visual", "Technical", "Proposal", …
  * @param {string} projectName - the project's name
- * @param {{ number: number, name: string } | null | undefined} [version] - optional saved version
+ * @param {{ number: number, name: string } | null | undefined} [version] - the design version this report documents
  * @param {{ dealerName?: string, projectReference?: string } | null} [details] - optional segments
  * @returns {string} filename title (no .pdf extension)
  */

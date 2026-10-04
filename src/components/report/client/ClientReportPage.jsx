@@ -68,10 +68,11 @@ const PRINTABLE_PAGE_TYPES = new Set([
   "about-sound-proof",
 ]);
 
-export default function ClientReportPage({ children, isFirst, projectDetails, logoUrl, pageId, printData }) {
+export default function ClientReportPage({ children, isFirst, projectDetails, logoUrl, pageId, printData, version = null }) {
   // One project metadata line, composed once for the masthead: the same words
-  // on screen and in the exported PDF.
-  const metaLine = clientReportHeaderMeta(projectDetails);
+  // on screen and in the exported PDF, including the design version this report
+  // documents.
+  const metaLine = clientReportHeaderMeta(projectDetails, version);
 
   const categoryFirst = printData?.categoryFirst !== false;
   // A page with no printable composition is never laid out for paper.

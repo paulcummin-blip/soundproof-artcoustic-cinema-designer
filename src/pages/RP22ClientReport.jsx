@@ -885,6 +885,13 @@ export default function RP22ClientReport() {
       }
     : derivedReadiness;
 
+  // The design version this report belongs to. One object states it on the
+  // first page and in the exported filename, so the two can never disagree.
+  const reportVersion = useMemo(
+    () => ({ number: versionNumber, name: versionName }),
+    [versionNumber, versionName]
+  );
+
   const filenameIdentity = useReportFilenameIdentity(projectDetails);
   const { exporting, error: exportError, handleExport } = useClientReportPdfExport({
     activePageCount: readinessBase.state === REPORT_STATE.READY && filenameIdentity.ready ? activePages.length : 0,
@@ -1189,6 +1196,7 @@ export default function RP22ClientReport() {
               projectDetails={projectDetails}
               logoUrl={LOGO_URL}
               printData={page.printData}
+              version={reportVersion}
             >
               {page.visual}
             </ClientReportPage>
