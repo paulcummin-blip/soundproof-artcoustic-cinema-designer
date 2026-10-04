@@ -38,6 +38,32 @@ const CONTENT_WIDTH_MM = A4_WIDTH_MM - PAGE_MARGIN_MM * 2;
 const CONTENT_HEIGHT_MM = A4_HEIGHT_MM - PAGE_MARGIN_MM * 2;
 /** Sub-millimetre rounding is not a fidelity failure. */
 const FIT_TOLERANCE_MM = 2;
+
+/**
+ * The paper a composition prints on when it does not declare its own.
+ *
+ * A report page frame is the printable CONTENT area: the capture document is
+ * exactly A4 less the 12mm page margin the report stylesheets declare, and the
+ * frame is placed back inside that margin. This is the paper every stored
+ * report PDF has always used — it is the default so a report is unchanged.
+ *
+ * A proposal pack paints the whole A4 sheet itself (its print stylesheet sets
+ * `@page { margin: 0 }` and the cover bleeds to the paper edge), so it declares
+ * a full-bleed A4 frame and is measured, and stored, at 210 × 297mm.
+ */
+const DEFAULT_PAGE_FRAME = Object.freeze({
+  widthMm: CONTENT_WIDTH_MM,
+  heightMm: CONTENT_HEIGHT_MM,
+  marginMm: PAGE_MARGIN_MM,
+});
+
+function resolvePageFrame(pageFrame) {
+  return {
+    widthMm: Number(pageFrame?.widthMm) > 0 ? Number(pageFrame.widthMm) : DEFAULT_PAGE_FRAME.widthMm,
+    heightMm: Number(pageFrame?.heightMm) > 0 ? Number(pageFrame.heightMm) : DEFAULT_PAGE_FRAME.heightMm,
+    marginMm: Number.isFinite(Number(pageFrame?.marginMm)) ? Number(pageFrame.marginMm) : DEFAULT_PAGE_FRAME.marginMm,
+  };
+}
 const RENDER_SCALE = 2;
 const CAPTURE_VIEWPORT_HEIGHT_PX = 4000;
 
@@ -83,11 +109,11 @@ const CAPTURE_OVERRIDES = `
   .client-report-screen-only, .screen-only, .no-print { display: none !important; }
 `;
 
-function createCaptureFrame(documentHtml) {
+function createCaptureFrame(documentHtml, frameWidthMm = CONTENT_WIDTH_MM) {
   const frame = document.createElement('iframe');
   frame.setAttribute('aria-hidden', 'true');
   frame.setAttribute('title', 'Issued document capture');
-  frame.style.cssText = `position:fixed;left:-20000px;top:0;width:${CONTENT_WIDTH_MM}mm;height:${CAPTURE_VIEWPORT_HEIGHT_PX}px;border:0;background:#FFFFFF;`;
+  frame.style.cssText = `position:fixed;left:-20000px;top:0;width:${frameWidthMm}mm;height:${CAPTURE_VIEWPORT_HEIGHT_PX}px;border:0;background:#FFFFFF;`;
   document.body.appendChild(frame);
 
   const frameDocument = frame.contentDocument;
@@ -178,15 +204,21 @@ function pageSizeMm(element) {
  * @param {string} params.nodeHtml  the cloned print composition
  * @param {string} params.pageSelector the page frames inside it
  * @param {string} params.bodyClass  the export body class
+ * @param {{widthMm: number, heightMm: number, marginMm: number}} [params.pageFrame]
+ *   the paper the composition prints on; omitted, the report content-area
+ *   default is used, so a report is captured exactly as it always was
  * @returns {Promise<{blob: Blob, pageCount: number}>}
  */
-export async function captureCompositionToPdf({ nodeHtml, pageSelector, bodyClass = '' }) {
+export async function captureCompositionToPdf({ nodeHtml, pageSelector, bodyClass = '', pageFrame = null }) {
   if (!nodeHtml || !pageSelector) {
     throw new Error('The print composition could not be captured.');
   }
 
+  const paper = resolvePageFrame(pageFrame);
   const styles = captureStylesMarkup();
-  const frame = createCaptureFrame(captureDocumentHtml({ nodeHtml, bodyClass, styles }));
+  // The frame is laid out at the paper width the composition prints at, so a
+  // frame measures as it does on paper instead of reflowing to a narrower box.
+  const frame = createCaptureFrame(captureDocumentHtml({ nodeHtml, bodyClass, styles }), paper.widthMm);
 
   try {
     await waitForFrameAssets(frame);
@@ -199,8 +231,10 @@ export async function captureCompositionToPdf({ nodeHtml, pageSelector, bodyClas
 
     pages.forEach((page, index) => {
       const { widthMm, heightMm } = pageSizeMm(page);
-      if (widthMm > CONTENT_WIDTH_MM + FIT_TOLERANCE_MM || heightMm > CONTENT_HEIGHT_MM + FIT_TOLERANCE_MM) {
-        throw new Error(`Page ${index + 1} does not fit the printed page area.`);
+      if (widthMm > paper.widthMm + FIT_TOLERANCE_MM || heightMm > paper.heightMm + FIT_TOLERANCE_MM) {
+        throw new Error(
+          `Page ${index + 1} does not fit the printed page area (measured ${Math.round(widthMm)}×${Math.round(heightMm)}mm on a ${paper.widthMm}×${paper.heightMm}mm sheet).`,
+        );
       }
     });
 

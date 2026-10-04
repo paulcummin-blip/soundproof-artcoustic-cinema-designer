@@ -44,6 +44,21 @@ export const PROPOSAL_DOCUMENT_TYPES = Object.freeze([
 ]);
 
 /**
+ * The paper a composition prints on, when it is not the report default.
+ *
+ * A report page frame is the printable CONTENT area: the report stylesheets
+ * declare a 12mm page margin, so a frame measures A4 less that margin and is
+ * placed back inside it. A proposal pack paints the whole A4 sheet itself its
+ * print stylesheet declares `@page { margin: 0 }` and the cover bleeds to the
+ * paper edge — so its frames are full A4, stored full-bleed, exactly as printed.
+ */
+const PROPOSAL_PAGE_FRAME = Object.freeze({
+  widthMm: 210,
+  heightMm: 297,
+  marginMm: 0,
+});
+
+/**
  * The print composition each document is exported from.
  *
  * nodeSelector — the mounted print composition the export prints. The capture
@@ -54,6 +69,9 @@ export const PROPOSAL_DOCUMENT_TYPES = Object.freeze([
  * bodyClass    — the export body class the composition's print layout is
  *   written against, applied to the capture document so the page frames lay
  *   out at their printed size.
+ * pageFrame    — the paper those frames are measured and stored on. Omitted by
+ *   the reports, which use the capture's content-area default (A4 less the 12mm
+ *   page margin) — the paper every stored report PDF has always used.
  */
 export const ISSUED_DOCUMENT_COMPOSITION = Object.freeze({
   [ISSUED_DOCUMENT_TYPE.VISUAL]: Object.freeze({
@@ -75,16 +93,19 @@ export const ISSUED_DOCUMENT_COMPOSITION = Object.freeze({
     nodeSelector: '.proposal-print-portal',
     pageSelector: '.proposal-print-portal > .proposal-print-cover, .proposal-print-portal > .pp-page',
     bodyClass: 'proposal-export-mode',
+    pageFrame: PROPOSAL_PAGE_FRAME,
   }),
   [ISSUED_DOCUMENT_TYPE.PROPOSAL]: Object.freeze({
     nodeSelector: '.proposal-print-portal',
     pageSelector: '.proposal-print-portal > .proposal-print-cover, .proposal-print-portal > .pp-page',
     bodyClass: 'proposal-export-mode',
+    pageFrame: PROPOSAL_PAGE_FRAME,
   }),
   [ISSUED_DOCUMENT_TYPE.COMPARISON]: Object.freeze({
     nodeSelector: '.proposal-print-portal',
     pageSelector: '.proposal-print-portal > .proposal-print-cover, .proposal-print-portal > .pp-page',
     bodyClass: 'proposal-export-mode',
+    pageFrame: PROPOSAL_PAGE_FRAME,
   }),
 });
 
