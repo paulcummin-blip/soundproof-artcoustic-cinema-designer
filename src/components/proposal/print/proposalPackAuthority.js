@@ -165,8 +165,13 @@ export function screenStatement(screen = {}) {
 export function buildEvidenceCards(rows, sectionType) {
   const keys = STRUCTURE_PARAMETER_KEYS[sectionType];
   if (!keys) return [];
+  // A section that carries no stored calculated rows (a proposal generated
+  // before the rows were stored, or one whose section metadata is absent) has no
+  // evidence cards. That is a quiet page, never a failure: the page still prints
+  // its own prose, and the pack must not throw on it.
+  const list = Array.isArray(rows) ? rows : [];
   const byKey = new Map(
-    buildHighlightDisplayRows(rows, { limit: rows.length || keys.length }).map((row) => [row.key, row])
+    buildHighlightDisplayRows(list, { limit: list.length || keys.length }).map((row) => [row.key, row])
   );
   return keys.map((key) => byKey.get(key)).filter(Boolean);
 }
