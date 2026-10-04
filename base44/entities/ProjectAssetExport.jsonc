@@ -1,0 +1,257 @@
+{
+  "name": "ProjectAssetExport",
+  "type": "object",
+  "description": "One issued document: a PDF the designer exported from the app and that Project Library keeps as a fixed, read-only project asset. A report or proposal remains the live, editable authority where it is created; this record is the copy that was actually issued, kept so the exact document sent to a client is never lost when the design or the document is regenerated later. Append-only: an exported document is never updated in place, never overwritten and never deleted. Supersession is derived at read time \u2014 a newer export of the same document type, version and source is the current one, and every earlier export stays available and is shown as superseded by newer export. Background generation and previewing never create a record: capture happens only on an explicit export action.",
+  "properties": {
+    "project_id": {
+      "type": "string",
+      "description": "ID of the Project this issued document belongs to. Project Library is scoped to one project, so every read filters on this field."
+    },
+    "account_id": {
+      "type": "string",
+      "description": "Denormalized account_id from the parent Project, used for RLS. Must be set at creation time from the parent Project's account_id."
+    },
+    "document_type": {
+      "type": "string",
+      "enum": [
+        "visual",
+        "technical",
+        "system_design_summary",
+        "proposal",
+        "comparison"
+      ],
+      "description": "Which issued document this is: a Visual Report, a Technical Report, a System Design Summary, a single-version Proposal, or a System Design Comparison. Decides which Library section and label the asset appears under."
+    },
+    "title": {
+      "type": "string",
+      "description": "The document's own name at export time \u2014 the proposal title, or the report type label for a report."
+    },
+    "filename": {
+      "type": "string",
+      "description": "The exact filename the document was exported under, including its .pdf extension. Shown and re-downloaded verbatim, so the stored file is named exactly as the file the designer saved."
+    },
+    "version_id": {
+      "type": "string",
+      "description": "ID of the ProjectVersion this document was exported for. Null for a document that covers more than one version \u2014 those list every version in selected_version_ids.",
+      "nullable": true
+    },
+    "selected_version_ids": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "default": [],
+      "description": "Every ProjectVersion the document covers. One entry for a single-version report or proposal; two or more for a comparison. Version names are resolved from these ids when the asset is listed."
+    },
+    "source_record_id": {
+      "type": "string",
+      "description": "ID of the live record this document was exported from \u2014 the saved report (ReportSnapshot) or the proposal (Proposal). Links the issued asset to the editable authority it was issued from, so supersession is judged within one source.",
+      "nullable": true
+    },
+    "file_uri": {
+      "type": "string",
+      "description": "Storage URI of the stored PDF in the app's private files area. Open and Download sign a short-lived URL from it at click time. Null when the file was stored publicly instead.",
+      "nullable": true
+    },
+    "file_url": {
+      "type": "string",
+      "description": "Public URL of the stored PDF. Only set when private storage was unavailable for this export. Null for a normally stored issued document.",
+      "nullable": true
+    },
+    "exported_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "When the designer exported this document. The newest export of a document type, version and source is the current one; every earlier one is superseded by newer export."
+    },
+    "exported_by": {
+      "type": "string",
+      "description": "Name or email of the user who exported the document.",
+      "nullable": true
+    },
+    "source_fingerprints": {
+      "type": "object",
+      "description": "The source inputs this document was issued against: engineeringFingerprint, calculationFingerprint and seatPriorityFingerprint. Compared against the version's current published pointer to tell whether the project has moved on since the document was issued \u2014 the document itself is never modified.",
+      "properties": {}
+    },
+    "source_status_at_export": {
+      "type": "string",
+      "enum": [
+        "current",
+        "source_changed",
+        "missing_source"
+      ],
+      "description": "The source state the document was issued under, recorded at export time: current, source changed, or missing source. Kept as issued evidence even after the project later moves on."
+    },
+    "page_count": {
+      "type": "number",
+      "description": "Number of pages in the stored PDF, for reference in the Library. Null when the count could not be read.",
+      "nullable": true
+    },
+    "superseded_by_id": {
+      "type": "string",
+      "description": "Reserved for a future server-side supersession write. Null today: Superseded by newer export is derived at read time from exported_at within the same document type, version and source, so no issued record ever has to be modified.",
+      "nullable": true
+    }
+  },
+  "required": [
+    "project_id",
+    "account_id",
+    "document_type",
+    "filename",
+    "exported_at"
+  ],
+  "rls": {
+    "read": {
+      "$or": [
+        {
+          "$and": [
+            {
+              "data.account_id": "{{user.data.account_id}}"
+            },
+            {
+              "data.account_id": {
+                "$nin": [
+                  null,
+                  ""
+                ]
+              }
+            },
+            {
+              "$or": [
+                {
+                  "user_condition": {
+                    "data.access_level": "FULL_ACCESS"
+                  }
+                },
+                {
+                  "user_condition": {
+                    "data.access_level": "SOUND_PROOF_ONLY"
+                  }
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        }
+      ]
+    },
+    "create": {
+      "$or": [
+        {
+          "$and": [
+            {
+              "data.account_id": "{{user.data.account_id}}"
+            },
+            {
+              "data.account_id": {
+                "$nin": [
+                  null,
+                  ""
+                ]
+              }
+            },
+            {
+              "$or": [
+                {
+                  "user_condition": {
+                    "data.access_level": "FULL_ACCESS"
+                  }
+                },
+                {
+                  "user_condition": {
+                    "data.access_level": "SOUND_PROOF_ONLY"
+                  }
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        }
+      ]
+    },
+    "update": {
+      "$or": [
+        {
+          "$and": [
+            {
+              "data.account_id": "{{user.data.account_id}}"
+            },
+            {
+              "data.account_id": {
+                "$nin": [
+                  null,
+                  ""
+                ]
+              }
+            },
+            {
+              "$or": [
+                {
+                  "user_condition": {
+                    "data.access_level": "FULL_ACCESS"
+                  }
+                },
+                {
+                  "user_condition": {
+                    "data.access_level": "SOUND_PROOF_ONLY"
+                  }
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        }
+      ]
+    },
+    "delete": {
+      "$or": [
+        {
+          "$and": [
+            {
+              "data.account_id": "{{user.data.account_id}}"
+            },
+            {
+              "data.account_id": {
+                "$nin": [
+                  null,
+                  ""
+                ]
+              }
+            },
+            {
+              "$or": [
+                {
+                  "user_condition": {
+                    "data.access_level": "FULL_ACCESS"
+                  }
+                },
+                {
+                  "user_condition": {
+                    "data.access_level": "SOUND_PROOF_ONLY"
+                  }
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        }
+      ]
+    }
+  }
+}

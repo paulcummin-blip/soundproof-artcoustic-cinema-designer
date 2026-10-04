@@ -27,6 +27,10 @@ import {
   closeProposalPrintWindow,
   findPrintNode,
 } from './proposalPrintWindow';
+import {
+  recordIssuedExportInBackground,
+  snapshotIssuedComposition,
+} from '@/components/library/issuedDocument/recordIssuedExport';
 
 const PRINT_TIMEOUT_MS = 60000;
 const EXPORT_BODY_CLASS = 'proposal-export-mode';
@@ -72,6 +76,10 @@ export function useProposalExport({
   dealerName = null,
   clientName = null,
   projectReference = null,
+  // When supplied, an issued copy of the exported PDF is stored in the project
+  // library in the background. The export itself is unchanged; drafts never
+  // reach the library, only the PDF the designer actually exported.
+  issuedDocument = null,
 }) {
   const [exporting, setExporting] = useState(false);
   const [error, setError] = useState(null);
@@ -145,6 +153,18 @@ export function useProposalExport({
     const printWindow = openProposalPrintWindow(title);
     printWindowRef.current = printWindow;
 
+    // The issued copy is taken from the SAME composition this export prints and
+    // stored in the background, so the export dialog opens exactly as it did.
+    if (issuedDocument?.documentType) {
+      const issuedSnapshot = snapshotIssuedComposition(issuedDocument.documentType);
+      if (issuedSnapshot) {
+        recordIssuedExportInBackground({
+          identity: { ...issuedDocument, filename: title },
+          snapshot: issuedSnapshot,
+        });
+      }
+    }
+
     try {
       if (document.fonts && document.fonts.ready) {
         await document.fonts.ready;
@@ -191,7 +211,7 @@ export function useProposalExport({
       );
       cleanup();
     }
-  }, [proposal, sections, projectName, dealerName, clientName, projectReference, cleanup]);
+  }, [proposal, sections, projectName, dealerName, clientName, projectReference, issuedDocument, cleanup]);
 
   return { exporting, error, blockedReason, handleExport };
 }

@@ -27,6 +27,10 @@ import {
   printReportInWindow,
   closeReportPrintWindow,
 } from "@/components/report/reportPrintWindow";
+import {
+  recordIssuedExportInBackground,
+  snapshotIssuedComposition,
+} from "@/components/library/issuedDocument/recordIssuedExport";
 
 // Version metadata is optional — only present when the project has a saved
 // named design version. The filename helper appends it when meaningful.
@@ -72,6 +76,9 @@ export function useClientReportPdfExport({
   dealerName = null,
   clientName = null,
   projectReference = null,
+  // When supplied, an issued copy of the exported PDF is stored in the project
+  // library in the background. The export itself is unchanged.
+  issuedDocument = null,
 }) {
   const [exporting, setExporting] = useState(false);
   const [error, setError] = useState(null);
@@ -124,6 +131,19 @@ export function useClientReportPdfExport({
     printingRef.current = true;
     setExporting(true);
     setError(null);
+
+    // The issued copy is taken from the SAME composition this export prints and
+    // stored in the background. The export is never delayed by it, and a storage
+    // failure never costs the designer the PDF they exported.
+    if (issuedDocument?.documentType) {
+      const issuedSnapshot = snapshotIssuedComposition(issuedDocument.documentType);
+      if (issuedSnapshot) {
+        recordIssuedExportInBackground({
+          identity: { ...issuedDocument, filename: title },
+          snapshot: issuedSnapshot,
+        });
+      }
+    }
 
     try {
       // 1. Wait for fonts
@@ -182,7 +202,7 @@ export function useClientReportPdfExport({
       printWindowRef.current = null;
       cleanup();
     }
-  }, [exporting, activePageCount, projectName, logoUrl, dealerName, clientName, projectReference, versionNumber, versionName, cleanup]);
+  }, [exporting, activePageCount, projectName, logoUrl, dealerName, clientName, projectReference, versionNumber, versionName, issuedDocument, cleanup]);
 
   return { exporting, error, handleExport };
 }

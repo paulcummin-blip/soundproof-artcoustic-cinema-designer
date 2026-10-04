@@ -66,6 +66,7 @@ import { useAppState } from "@/components/AppStateProvider";
 import { resolveSeatPriority } from "@/components/utils/seatPriorityAuthority";
 import { isAssessedLevel } from "@/components/report/client/visualReportSeatStyle";
 import { useReportSnapshot } from "@/components/report/useReportSnapshot";
+import { ISSUED_DOCUMENT_TYPE } from "@/components/library/issuedDocument/issuedDocumentTypes";
 import ReportSnapshotBanner from "@/components/report/ReportSnapshotBanner";
 import ReportGateDiagnosticsPanel from "@/components/report/ReportGateDiagnosticsPanel";
 import {
@@ -905,6 +906,23 @@ export default function RP22ClientReport() {
     dealerName: filenameIdentity.dealerName,
     clientName: filenameIdentity.clientName,
     projectReference: filenameIdentity.projectReference,
+    // Exporting this report also stores the issued PDF in the project library.
+    // The source identity is resolved at export time, in the background.
+    issuedDocument: {
+      projectId,
+      accountId: projectDetails?.account_id || null,
+      documentType: ISSUED_DOCUMENT_TYPE.VISUAL,
+      title: 'Visual Report',
+      resolveSource: () => ({
+        versionId: authority.versionId || null,
+        selectedVersionIds: authority.versionId ? [authority.versionId] : [],
+        sourceRecordId: reportSnapshot.saved?.id || null,
+        sourceFingerprints: snapshotFingerprints,
+        sourceStatusAtExport: reportSnapshot.status === REPORT_SNAPSHOT_STATUS.STALE
+          ? 'source_changed'
+          : 'current',
+      }),
+    },
   });
 
   // A failed export resolves the report to the canonical Failed state.

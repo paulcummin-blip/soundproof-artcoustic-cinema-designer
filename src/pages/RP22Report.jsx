@@ -85,6 +85,11 @@ import {
     closeTechnicalReportPrintWindow,
 } from '@/components/report/technical/technicalReportPrintWindow';
 import TechnicalAboutSoundProofSection from '@/components/report/technical/TechnicalAboutSoundProofSection';
+import { ISSUED_DOCUMENT_TYPE } from '@/components/library/issuedDocument/issuedDocumentTypes';
+import {
+    recordIssuedExportInBackground,
+    snapshotIssuedComposition,
+} from '@/components/library/issuedDocument/recordIssuedExport';
 import { readDesignReviewHandoff, subscribeDesignReviewHandoff } from '@/components/state/designReviewHandoff';
 import { useVersionedEngineeringAuthority } from '@/components/engineering/useVersionedEngineeringAuthority';
 import { useCompletedBassAuthority } from '@/components/room/bass/completedBassResultStore';
@@ -465,6 +470,31 @@ function RP22ReportInner() {
         const printWindow = printWindowRef.current;
         printWindowRef.current = null;
 
+        // Exporting this report also stores the issued PDF in the project
+        // library, from the SAME print composition, in the background. The
+        // export itself is never delayed and never depends on storage.
+        const issuedSnapshot = snapshotIssuedComposition(ISSUED_DOCUMENT_TYPE.TECHNICAL);
+        if (issuedSnapshot) {
+            recordIssuedExportInBackground({
+                identity: {
+                    projectId: explicitProjectId,
+                    accountId: projectDetails?.account_id || null,
+                    documentType: ISSUED_DOCUMENT_TYPE.TECHNICAL,
+                    title: 'Technical Report',
+                    filename: technicalReportPrintTitle,
+                    versionId: reportVersionId,
+                    selectedVersionIds: reportVersionId ? [reportVersionId] : [],
+                    sourceRecordId: reportSnapshot.saved?.id || null,
+                    sourceFingerprints: snapshotFingerprints,
+                    sourceStatusAtExport: reportSnapshot.status === REPORT_SNAPSHOT_STATUS.STALE
+                        ? 'source_changed'
+                        : 'current',
+                    exportedBy: reportUser?.full_name || reportUser?.email || null,
+                },
+                snapshot: issuedSnapshot,
+            });
+        }
+
         const onDone = () => {
             setAutoPrintDone(true);
             setExportStatus("Done");
@@ -499,7 +529,15 @@ function RP22ReportInner() {
             closeTechnicalReportPrintWindow(printWindow);
             printInPlace();
         });
-    }, [technicalReportPrintTitle]);
+    }, [
+        technicalReportPrintTitle,
+        explicitProjectId,
+        projectDetails,
+        reportVersionId,
+        reportSnapshot,
+        snapshotFingerprints,
+        reportUser,
+    ]);
 
     // Cleanup on afterprint
     useEffect(() => {

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { useSearchParams, Link, Navigate } from 'react-router-dom';
 import { base44 } from '@/api/base44Client';
 import { getSectionDef } from '@/components/proposal/proposalSections';
@@ -28,6 +28,11 @@ import { isHighChannelDesign } from '@/components/proposal/highChannelLayoutAuth
 import ProposalPrintDocument from '@/components/proposal/export/ProposalPrintDocument';
 import ProposalPrintStyles from '@/components/proposal/export/ProposalPrintStyles';
 import { useProposalExport } from '@/components/proposal/export/useProposalExport';
+import { proposalVersionIds } from '@/components/proposal/library/proposalSourceState';
+import { documentTypeForProposalType } from '@/components/library/issuedDocument/issuedDocumentTypes';
+import { resolveProposalExportSource } from '@/components/library/issuedDocument/proposalExportSource';
+import { resolvePackImages } from '@/components/library/imageScopeAuthority';
+import { buildVersionNameMap } from '@/components/library/libraryVersionLabels';
 import { resolveReportFilenameDetails, logReportExportIdentity } from '@/components/report/reportFilenameIdentity';
 import { proposalReportTypeToken } from '@/components/report/reportPdfTitle';
 import { Loader2, ChevronLeft, Archive, RotateCcw } from 'lucide-react';
@@ -575,6 +580,42 @@ export default function ProposalEditor() {
     }
   };
 
+  // ── Version names — for the images this document may use ──
+  // A version-specific image is only ever composed in with the version it
+  // belongs to plainly named, so its name is read alongside the gallery.
+  const [versionNameById, setVersionNameById] = useState(new Map());
+  useEffect(() => {
+    const versionIds = proposalVersionIds(proposal);
+    if (versionIds.length === 0) {
+      setVersionNameById(new Map());
+      return undefined;
+    }
+    let cancelled = false;
+    (async () => {
+      try {
+        const result = await base44.entities.ProjectVersion.filter(
+          { id: { $in: versionIds } },
+          { fields: ['version_name'], limit: 10 },
+        );
+        const records = Array.isArray(result) ? result : (result?.items || []);
+        if (!cancelled) setVersionNameById(buildVersionNameMap(records));
+      } catch (versionError) {
+        // The name is a label only: an unreadable name leaves the image
+        // unlabelled rather than showing a wrong one.
+        console.warn('[ProposalEditor] version names unavailable:', versionError?.message || versionError);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [proposal?.selected_version_ids, proposal?.version_id]);
+
+  // The images this document composes with: the versions it covers first, then
+  // the project-wide gallery for anything they leave free.
+  const packImages = useMemo(() => resolvePackImages({
+    assets: projectContext.projectImages,
+    versionIds: proposalVersionIds(proposal),
+    versionNameById,
+  }), [projectContext.projectImages, proposal?.selected_version_ids, proposal?.version_id, versionNameById]);
+
   // ── Export — full proposal PDF ──
   // Exports the whole proposal (every enabled section). Section-level export is
   // not implemented, so it is deliberately not exposed.
@@ -590,6 +631,16 @@ export default function ProposalEditor() {
     dealerName: projectContext.filenameDealerName,
     clientName: projectContext.filenameClientName,
     projectReference: projectContext.projectReference,
+    // Exporting this proposal also stores the issued PDF in the project library.
+    // Drafts and editable revisions stay in the Proposal Centre; only the PDF
+    // that was actually exported becomes a library asset.
+    issuedDocument: {
+      projectId: proposal?.project_id || null,
+      accountId: proposal?.account_id || null,
+      documentType: documentTypeForProposalType(proposal?.proposal_type),
+      title: proposal?.title || 'Proposal',
+      resolveSource: () => resolveProposalExportSource(proposal),
+    },
   });
 
   // ── Render ──
@@ -778,14 +829,14 @@ export default function ProposalEditor() {
                   /* Project Images is imagery only: the uploaded project images,
                      never generated narrative. */
                   <div>
-                    <ProjectImagesBlock images={projectContext.projectImages} />
+                    <ProjectImagesBlock images={packImages} />
                     <div
                       className="flex items-center justify-between gap-4 mt-3 text-[11px] text-[#625143]"
                       style={{ fontFamily: 'Didact Gothic, sans-serif' }}
                     >
                       <span>
-                        {projectGalleryImages(projectContext.projectImages).length > 0
-                          ? `${projectGalleryImages(projectContext.projectImages).length} project image${projectGalleryImages(projectContext.projectImages).length === 1 ? '' : 's'} selected`
+                        {projectGalleryImages(packImages).length > 0
+                          ? `${projectGalleryImages(packImages).length} project image${projectGalleryImages(packImages).length === 1 ? '' : 's'} selected`
                           : 'No project images selected.'}
                       </span>
                       {proposal?.project_id && (
@@ -975,7 +1026,7 @@ export default function ProposalEditor() {
         heroImageUrl={projectContext.heroImageUrl}
         logoUrl={projectContext.logoUrl}
         sections={sections}
-        projectImages={projectContext.projectImages}
+        projectImages={packImages}
       />
       <ProposalPrintStyles />
     </div>
