@@ -2157,6 +2157,8 @@ function RoomDesignerWithState() {
         projectIdState={projectIdState}
         activeProjectId={activeProjectId}
         isProjectMode={isProjectMode}
+        handleSaveProject={triggerSaveProject}
+        loadedVersionId={appState?.activeVersionId || null}
       />
 
       {/* Persistent Workspace View selector — always visible across all three modes. */}
