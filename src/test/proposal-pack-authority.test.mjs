@@ -263,6 +263,17 @@ describe('structure evidence cards', () => {
   it('returns nothing for a section with no parameter set', () => {
     assert.deepEqual(buildEvidenceCards(ROWS, 'overall_design'), []);
   });
+
+  it('returns nothing, and never throws, for a section with no stored rows', () => {
+    // The production failure: a structure section generated without calculated
+    // rows (absent metadata) reached the pack and threw reading rows.length,
+    // which took the whole Proposal Editor down with it.
+    assert.deepEqual(buildEvidenceCards(undefined, 'spatial_resolution'), []);
+    assert.deepEqual(buildEvidenceCards(null, 'dynamic_range'), []);
+    assert.deepEqual(buildEvidenceCards([], 'timbre_matching'), []);
+    assert.deepEqual(buildEvidenceCards('not-an-array', 'spatial_resolution'), []);
+    assert.deepEqual(buildEvidenceCards(undefined, 'overall_design'), []);
+  });
 });
 
 describe('approved explainer copy', () => {

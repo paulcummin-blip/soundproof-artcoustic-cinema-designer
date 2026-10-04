@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
-import { useSearchParams, Link, Navigate } from 'react-router-dom';
+import { useSearchParams, useNavigate, Link, Navigate } from 'react-router-dom';
 import { base44 } from '@/api/base44Client';
 import { getSectionDef } from '@/components/proposal/proposalSections';
 import KeyPerformanceHighlightsTable from '@/components/proposal/KeyPerformanceHighlightsTable';
@@ -35,6 +35,14 @@ import { buildVersionNameMap } from '@/components/library/libraryVersionLabels';
 import { resolveReportFilenameDetails, logReportExportIdentity } from '@/components/report/reportFilenameIdentity';
 import { proposalReportTypeToken } from '@/components/report/reportPdfTitle';
 import { Loader2, ChevronLeft, Archive, RotateCcw } from 'lucide-react';
+import ProposalEditorState from '@/components/proposal/editor/ProposalEditorState';
+import ProposalRenderBoundary from '@/components/proposal/editor/ProposalRenderBoundary';
+import {
+  PROPOSAL_EDITOR_STATE,
+  GENERATION_POLL_LIMIT,
+  resolveProposalEditorState,
+  resolveProposalContextNotice,
+} from '@/components/proposal/editor/proposalEditorStateAuthority';
 
 const SAVE_STATUS = { IDLE: 'idle', SAVING: 'saving', SAVED: 'saved', FAILED: 'failed', UNSAVED: 'unsaved' };
 
@@ -48,11 +56,17 @@ const SAVE_STATUS = { IDLE: 'idle', SAVING: 'saving', SAVED: 'saved', FAILED: 'f
 export default function ProposalEditor() {
   const [searchParams] = useSearchParams();
   const proposalId = searchParams.get('proposalId');
+  const navigate = useNavigate();
 
   const [proposal, setProposal] = useState(null);
   const [sections, setSections] = useState([]);
   const [activeSectionKey, setActiveSectionKey] = useState(null);
   const [loading, setLoading] = useState(true);
+  // Why the proposal could not be read, stated plainly rather than left blank.
+  const [loadError, setLoadError] = useState(null);
+  const [loadErrorDetail, setLoadErrorDetail] = useState(null);
+  // How long the editor has waited for a generating proposal's sections.
+  const [pollCount, setPollCount] = useState(0);
   const [showNotes, setShowNotes] = useState(false);
   const [saveStatuses, setSaveStatuses] = useState({});
   const [dirtySections, setDirtySections] = useState(new Set());
@@ -143,6 +157,8 @@ export default function ProposalEditor() {
     try {
       const proposalRecord = await base44.entities.Proposal.get(proposalId);
       setProposal(proposalRecord);
+      setLoadError(null);
+      setLoadErrorDetail(null);
       if (proposalRecord) {
         setClientBrief(proposalRecord.client_brief || '');
         await loadProjectContext(proposalRecord);
@@ -154,10 +170,18 @@ export default function ProposalEditor() {
         );
         setSections(sorted);
         if (sorted.length > 0 && !activeSectionKey) {
-          setActiveSectionKey(sorted[0].section_key);
+          // Open on the first section the editor can actually show.
+          const firstReadable = sorted.find((s) => getSectionDef(s.section_type));
+          setActiveSectionKey((firstReadable || sorted[0]).section_key);
         }
       }
     } catch (err) {
+      // A failed read is stated, never swallowed into an empty page.
+      const status = err?.response?.status ?? err?.status ?? null;
+      setLoadError(status === 404 ? 'not_found' : 'load_failed');
+      setLoadErrorDetail(err?.message || null);
+      setProposal(null);
+      setSections([]);
       console.error('Failed to load proposal:', err);
     } finally {
       setLoading(false);
@@ -167,6 +191,24 @@ export default function ProposalEditor() {
   useEffect(() => {
     load();
   }, [load]);
+
+  // A new proposal starts its own wait.
+  useEffect(() => {
+    setPollCount(0);
+  }, [proposalId]);
+
+  // ── Wait for the sections of a generating proposal ──
+  // The editor re-reads the record until its sections are written, so it can
+  // never open onto a proposal whose content has not been saved yet.
+  useEffect(() => {
+    if (proposal?.status !== 'generating') return undefined;
+    if (pollCount >= GENERATION_POLL_LIMIT) return undefined;
+    const timer = setTimeout(() => {
+      setPollCount((count) => count + 1);
+      load();
+    }, 4000);
+    return () => clearTimeout(timer);
+  }, [proposal?.status, pollCount, load]);
 
   // ── Auto-save section body ──
   // One server-owned persistence path handles normal autosave and keepalive
@@ -657,38 +699,53 @@ export default function ProposalEditor() {
   });
 
   // ── Render ──
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center min-h-screen bg-[#F5F4F0]">
-        <Loader2 className="w-6 h-6 text-[#625143] animate-spin" />
-      </div>
-    );
-  }
-
+  // The editor states its condition before it draws the document: it is loading,
+  // waiting for the sections, or reporting why it cannot show the proposal. It is
+  // never blank, and every state carries a way back to the Proposal Centre.
   if (!proposalId) {
     return <Navigate to="/ProposalCentre" replace />;
   }
 
-  if (proposal?.status === 'generating') {
+  const goToProposalCentre = () => navigate('/ProposalCentre');
+  const goToRegeneration = () => navigate(`/ProposalCentre?regenerateFrom=${proposalId}`);
+  const readableSections = sections.filter((s) => !!getSectionDef(s.section_type));
+  const editorView = resolveProposalEditorState({
+    loading,
+    loadError,
+    loadErrorDetail,
+    proposal,
+    sections,
+    readableSections,
+    timedOut: pollCount >= GENERATION_POLL_LIMIT,
+  });
+
+  if (editorView.state !== PROPOSAL_EDITOR_STATE.READY) {
     return (
-      <div className="flex flex-col items-center justify-center min-h-screen bg-[#F5F4F0]">
-        <Loader2 className="w-8 h-8 text-[#213428] animate-spin mb-4" />
-        <h3
-          className="text-lg font-bold text-[#1B1A1A]"
-          style={{ fontFamily: 'Didact Gothic, sans-serif' }}
-        >
-          Generating Proposal
-        </h3>
-        <p className="text-sm text-[#625143] mt-2">Sound Proof is generating your complete proposal.</p>
-      </div>
+      <ProposalEditorState
+        title={editorView.title}
+        message={editorView.message}
+        reason={editorView.reason}
+        showSpinner={editorView.showSpinner}
+        actions={editorView.actions}
+        onRetry={load}
+        onRegenerate={goToRegeneration}
+        onReturn={goToProposalCentre}
+      />
     );
   }
 
-  const visibleSections = sections.filter((s) => s.is_enabled !== false);
+  // A project this proposal points at that cannot be read is stated above the
+  // document; the saved proposal content is still shown.
+  const contextNotice = resolveProposalContextNotice({
+    projectReadFailed: !!proposal?.project_id && !projectContext.projectName,
+  });
+
+  const visibleSections = readableSections.filter((s) => s.is_enabled !== false);
   const typeLabel = getProposalTypeLabel(proposal?.proposal_type);
   const hasUnsavedChanges = dirtySections.size > 0;
 
   return (
+    <ProposalRenderBoundary onReturn={goToProposalCentre}>
     <div className="flex flex-col h-screen bg-[#F5F4F0] overflow-hidden">
       <ProposalWorkspaceToolbar
         title={proposal?.title || 'Proposal'}
@@ -747,6 +804,12 @@ export default function ProposalEditor() {
             body, Century Gothic fallback. */}
         <ProposalTypographyStyles />
         <div className="proposal-preview max-w-3xl mx-auto px-12 py-16">
+          {contextNotice && (
+            <div className="mb-4 text-xs text-[#7A6640] flex items-start gap-1.5">
+              <span className="w-1.5 h-1.5 rounded-full bg-[#A79E8C] mt-1" />
+              {contextNotice}
+            </div>
+          )}
           {archived && (
             <div className="mb-8 rounded-lg border border-[#A79E8C] bg-[#F5F4F0] px-6 py-4 flex items-center justify-between">
               <div>
@@ -1045,5 +1108,6 @@ export default function ProposalEditor() {
       />
       <ProposalPrintStyles />
     </div>
+    </ProposalRenderBoundary>
   );
 }
