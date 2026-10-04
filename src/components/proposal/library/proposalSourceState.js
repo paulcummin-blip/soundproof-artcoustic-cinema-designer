@@ -132,4 +132,36 @@ export function resolveProposalSourceState({ proposal, versionsById = new Map(),
   };
 }
 
+/**
+ * The saved proposals grouped by project, most recently updated group first.
+ *
+ * Pure, so the grouping the Proposal Library presents can be tested without a
+ * database: every proposal appears in exactly one group, under its project's
+ * name.
+ *
+ * @param {Array} proposals
+ * @param {Map<string, Object>} projectsById
+ * @returns {Array<{projectId: string, projectName: string, proposals: Array}>}
+ */
+export function groupProposalsByProject(proposals = [], projectsById = new Map()) {
+  const byProject = new Map();
+  (Array.isArray(proposals) ? proposals : []).forEach((proposal) => {
+    const key = proposal.project_id || 'unassigned';
+    if (!byProject.has(key)) byProject.set(key, []);
+    byProject.get(key).push(proposal);
+  });
+
+  return [...byProject.entries()]
+    .map(([projectId, items]) => ({
+      projectId,
+      projectName: projectsById.get(projectId)?.name || 'Unlinked project',
+      proposals: items.sort((a, b) => String(b.updated_date || '').localeCompare(String(a.updated_date || ''))),
+    }))
+    .sort((a, b) => {
+      const aDate = a.proposals[0]?.updated_date || '';
+      const bDate = b.proposals[0]?.updated_date || '';
+      return String(bDate).localeCompare(String(aDate));
+    });
+}
+
 export default resolveProposalSourceState;

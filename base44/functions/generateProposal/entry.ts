@@ -16,6 +16,37 @@ import { resolveReportLayout } from '../../shared/highChannelDensityRule.js';
 const PROPOSAL_SOURCE_REQUIRED_MESSAGE =
   'Generate the Visual and Technical Reports before creating a proposal. This ensures the proposal uses the current project data and RP22 results.';
 
+// The per-version blocking clause, worded identically to the client authority
+// (src/components/proposal/sourceAuthority/proposalReadinessAuthority.js —
+// READINESS_CLAUSE). The frontend cannot import from base44/ and vice versa, so
+// the wording lives in both places and a test asserts the two agree. A blocked
+// generation names every version and what it is missing.
+const READINESS_CLAUSE = {
+  missing: 'is missing {label}',
+  stale: 'has stale {label}',
+  incomplete: 'has incomplete {label}',
+  unavailable: 'has unreadable {label}',
+};
+
+/** `Original Design · V1` — the name a version is known by, plus its slot. */
+function versionDisplayName(record) {
+  const name = typeof record?.version_name === 'string' ? record.version_name.trim() : '';
+  const number = Number(record?.version_number);
+  const hasNumber = Number.isFinite(number) && number > 0;
+  if (name && hasNumber) return `${name} · V${number}`;
+  if (name) return name;
+  return hasNumber ? `Version ${number}` : 'Version';
+}
+
+/** One blocked version's sentence, e.g. `Level 4 version · V2 is missing Visual Report`. */
+function buildSourceBlockerSentence(version, reason) {
+  const name = versionDisplayName(version);
+  const label = 'Visual and Technical Reports';
+  const clause = (reason === 'stale' ? READINESS_CLAUSE.stale : READINESS_CLAUSE.missing)
+    .replace('{label}', label);
+  return `${name} ${clause}`;
+}
+
 const SECTIONS = [
   { type: 'cover', key: 'cover', title: 'Cover', canEditBody: false },
   { type: 'executive_summary', key: 'executive_summary', title: 'Executive Summary', canEditBody: true },
@@ -72,7 +103,7 @@ export default async function(req) {
     if (!user) return Response.json({ error: 'Unauthorized' }, { status: 401 });
 
     const body = await req.json();
-    const { request_id, project_id, version_id, account_id, narrative_goal, proposal_type, selected_version_ids, client_brief, engineering_snapshot, engineering_snapshots } = body;
+    const { request_id, project_id, version_id, account_id, narrative_goal, proposal_type, selected_version_ids, client_brief, engineering_snapshot, engineering_snapshots, parent_proposal_id } = body;
 
     if (!request_id) return Response.json({ error: 'request_id required' }, { status: 400 });
     if (!project_id) return Response.json({ error: 'project_id required' }, { status: 400 });
@@ -147,6 +178,31 @@ export default async function(req) {
 
     // For backward compatibility, version_id = first selected version.
     const legacyVersionId = resolvedVersionIds[0] || null;
+
+    // ── Revision link ──
+    // Regenerating a saved proposal creates a NEW proposal linked to the one it
+    // revises. The original is never modified: not its sections, not its status,
+    // and not its current-version flag, so a proposal that has already been sent
+    // stays exactly as it was and stays visible.
+    let parentProposal = null;
+    let revisionNumber = 1;
+    const parentProposalId = typeof parent_proposal_id === 'string' ? parent_proposal_id.trim() : '';
+    if (parentProposalId) {
+      const parents = await base44.entities.Proposal.filter({ id: parentProposalId });
+      parentProposal = parents?.[0] || null;
+      if (!parentProposal) {
+        return Response.json({
+          error: 'The proposal this regeneration was started from no longer exists.',
+        }, { status: 404 });
+      }
+      if (String(parentProposal.project_id) !== String(project_id)) {
+        return Response.json({
+          error: 'The proposal this regeneration was started from belongs to another project.',
+        }, { status: 400 });
+      }
+      const parentVersion = Number(parentProposal.version);
+      revisionNumber = (Number.isFinite(parentVersion) && parentVersion > 0 ? parentVersion : 1) + 1;
+    }
 
     // ── STAGE 1: ADI project interpretation ──
     // Before any client-facing text is written, ADI reads the selected version
@@ -232,8 +288,16 @@ export default async function(req) {
       }
     }
     if (sourceBlockers.length > 0) {
+      // Name every blocked version and what it is missing, so the client shows
+      // the same verdict the per-version readiness table does.
+      const sentences = sourceBlockers
+        .map((blocker) => buildSourceBlockerSentence(
+          (projectVersions || []).find((version) => version.id === blocker.version_id),
+          blocker.reason,
+        ))
+        .filter(Boolean);
       return Response.json({
-        error: PROPOSAL_SOURCE_REQUIRED_MESSAGE,
+        error: sentences.join('. ') || PROPOSAL_SOURCE_REQUIRED_MESSAGE,
         source_blockers: sourceBlockers,
       }, { status: 409 });
     }
@@ -286,6 +350,13 @@ export default async function(req) {
       status: 'generating',
       narrative_goal: narrative_goal || 'luxury_cinema',
       client_brief: client_brief || '',
+      // A regeneration is a linked revision, never an overwrite: this record
+      // points at the proposal it revises, and the original is left untouched.
+      ...(parentProposal ? {
+        parent_proposal_id: parentProposal.id,
+        version: revisionNumber,
+        version_label: `Revision ${revisionNumber}`,
+      } : {}),
       // The frozen Engineering Snapshot assembled by the frontend. The snapshot
       // is frozen at generation time, so later Room Designer edits do NOT
       // silently change an existing proposal.

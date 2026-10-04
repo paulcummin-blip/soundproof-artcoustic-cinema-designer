@@ -202,7 +202,7 @@ export function buildReadinessMessage(rows = []) {
   const sentences = (Array.isArray(rows) ? rows : [])
     .map((row) => row?.blockingSentence)
     .filter(Boolean);
-  return sentences.length > 0 ? sentences.join(' ') : null;
+  return sentences.length > 0 ? sentences.join('. ') : null;
 }
 
 /**

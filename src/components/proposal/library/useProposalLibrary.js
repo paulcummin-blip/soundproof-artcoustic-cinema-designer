@@ -12,7 +12,11 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { base44 } from '@/api/base44Client';
-import { proposalVersionIds, resolveProposalSourceState } from './proposalSourceState';
+import {
+  groupProposalsByProject,
+  proposalVersionIds,
+  resolveProposalSourceState,
+} from './proposalSourceState';
 
 const REPORT_TYPES = ['visual', 'technical'];
 
@@ -118,26 +122,10 @@ export function useProposalLibrary({ projectFilter = null } = {}) {
   }), [versionsById]);
 
   /** Proposals grouped by project, most recently updated group first. */
-  const groups = useMemo(() => {
-    const byProject = new Map();
-    proposals.forEach((proposal) => {
-      const key = proposal.project_id || 'unassigned';
-      if (!byProject.has(key)) byProject.set(key, []);
-      byProject.get(key).push(proposal);
-    });
-
-    return [...byProject.entries()]
-      .map(([projectId, items]) => ({
-        projectId,
-        projectName: projectsById.get(projectId)?.name || 'Unlinked project',
-        proposals: items.sort((a, b) => String(b.updated_date || '').localeCompare(String(a.updated_date || ''))),
-      }))
-      .sort((a, b) => {
-        const aDate = a.proposals[0]?.updated_date || '';
-        const bDate = b.proposals[0]?.updated_date || '';
-        return String(bDate).localeCompare(String(aDate));
-      });
-  }, [proposals, projectsById]);
+  const groups = useMemo(
+    () => groupProposalsByProject(proposals, projectsById),
+    [proposals, projectsById],
+  );
 
   return {
     proposals,

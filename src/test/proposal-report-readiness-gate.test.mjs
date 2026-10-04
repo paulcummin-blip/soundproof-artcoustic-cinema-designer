@@ -232,16 +232,25 @@ test('Compliance cold restore uses complete versioned authority without mounting
   expect(ROOM_DESIGNER).toMatch(/: \(appDesignRating\?\.engineeringSummary \?\? null\)/);
 });
 
-test('the Versions step cannot advance without both current reports', () => {
-  expect(WIZARD).toMatch(/resolveReportGate\(\{ status: sourceStatus, loading: sourceLoading \}\)/);
-  expect(WIZARD).toMatch(/versionsValid && reportGate\.ready, \/\/ step 2/);
-  expect(WIZARD).toMatch(/reportGate=\{reportGate\}/);
+test('the Versions step advances only when EVERY selected version has current reports', () => {
+  // ONE per-version readiness result drives the step — never the first selected
+  // version alone.
+  expect(WIZARD).toMatch(/useProposalReadiness\(\{/);
+  expect(WIZARD).toMatch(/resolveProposalReadinessGate\(\{/);
+  // Choosing versions stays smooth: the gate is not what enables Next.
+  expect(WIZARD).toMatch(/versionsValid, \/\/ step 2/);
+  // The hard block lands when the step is left, naming the blocked versions.
+  expect(WIZARD).toMatch(/if \(step === 2 && versionsValid && !readiness\.ready\) \{/);
+  expect(WIZARD).toMatch(/setBlockedAttempt\(true\)/);
+  // Step 5 shows the same result, and its Generate action is gated on it.
+  expect(WIZARD).toMatch(/<VersionReadinessTable[\s\S]{0,200}gate=\{readiness\}/);
+  expect(WIZARD).toMatch(/\|\| !readiness\.ready\}/);
 });
 
-test('the Versions step renders the readiness block beside the version cards', () => {
-  expect(VERSIONS_STEP).toMatch(/import ReportReadinessGate from '@\/components\/proposal\/wizard\/ReportReadinessGate'/);
-  expect(VERSIONS_STEP).toMatch(/<ReportReadinessGate gate=\{reportGate\} \/>/);
-  expect(VERSIONS_STEP).toMatch(/reportGate = null/);
+test('the Versions step renders the per-version readiness table beside the version cards', () => {
+  expect(VERSIONS_STEP).toMatch(/import VersionReadinessTable from '@\/components\/proposal\/sourceAuthority\/VersionReadinessTable'/);
+  expect(VERSIONS_STEP).toMatch(/<VersionReadinessTable gate=\{readiness\} projectId=\{projectId\} \/>/);
+  expect(VERSIONS_STEP).toMatch(/readiness = null/);
 });
 
 test('the copy is exact: the blocking sentence while blocked, the promise once current', () => {

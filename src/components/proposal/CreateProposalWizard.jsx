@@ -393,7 +393,7 @@ export default function CreateProposalWizard({ onCreated, onCancel, regenerateFr
         {step === STEPS.length - 1 && (
           <button
             onClick={handleGenerate}
-            disabled={!canProceed[0] || !canProceed[2] || !canProceed[3] || snapshotLoading || !engineeringSnapshot || !sourceReady}
+            disabled={!canProceed[0] || !canProceed[2] || !canProceed[3] || snapshotLoading || !engineeringSnapshot || !sourceReady || !readiness.ready}
             className="px-6 py-2.5 text-xs uppercase tracking-[0.14em] text-white disabled:opacity-40 transition-colors hover:bg-[#3E4349]"
             style={{ backgroundColor: '#213428', fontFamily: 'Didact Gothic, sans-serif' }}
           >
