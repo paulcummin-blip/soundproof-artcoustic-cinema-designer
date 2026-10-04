@@ -27,6 +27,10 @@ import { useAppState } from "@/components/AppStateProvider";
 import { hydrateProjectIntoAppState } from "@/components/utils/hydrateProjectIntoAppState";
 import { mergeProjectAndVersion } from "@/lib/versionAuthority";
 import { readDesignReviewHandoff, subscribeDesignReviewHandoff } from "@/components/state/designReviewHandoff";
+import {
+  readRequestedVersionId,
+  resolveReportVersionId,
+} from "@/components/report/reportVersionRequest";
 import { useVersionedEngineeringAuthority } from "@/components/engineering/useVersionedEngineeringAuthority";
 import {
   readProjectRecord,
@@ -114,7 +118,15 @@ export default function DesignReviewPage() {
   const canonicalVersionId = String(canonicalProject.projectId || "") === String(projectId || "")
     ? canonicalProject.identity?.activeVersionId || null
     : null;
-  const activeVersionId = projectDetails?.active_version_id || canonicalVersionId || null;
+  // The version this page was ASKED for wins. The Visual Report, the Room
+  // Designer and the Project Library all pass the version being viewed, so a
+  // review opened for one version can never resolve another version's design.
+  // The active version is only the fallback for a page opened without one.
+  const requestedVersionId = readRequestedVersionId(searchParams);
+  const activeVersionId = resolveReportVersionId({
+    requestedVersionId,
+    activeVersionId: projectDetails?.active_version_id || canonicalVersionId || null,
+  });
 
   // ── Version-scoped engineering authority (durable first) ────────────────
   // Design Review reads the settled result from the DB Published Engineering
@@ -171,10 +183,11 @@ export default function DesignReviewPage() {
     readProjectRecord(projectId).then(async (p) => {
       if (cancelled) return;
       if (p) {
-        // Merge with the active ProjectVersion so per-version design fields
-        // come from design_state, not from the legacy Project position.
+        // Merge with the requested ProjectVersion — the version this page was
+        // opened for — so per-version design fields come from its design_state,
+        // not from the legacy Project position or another version.
         let merged = p;
-        const versionId = p.active_version_id;
+        const versionId = requestedVersionId || p.active_version_id;
         if (versionId) {
           try {
             const version = await readProjectVersionRecord(versionId);
@@ -203,7 +216,9 @@ export default function DesignReviewPage() {
       if (!cancelled) setLoadingProject(false);
     });
     return () => { cancelled = true; };
-  }, [projectId]);
+    // The requested version is part of the identity this read resolves: a new
+    // version in the URL reads that version's record, never the previous one's.
+  }, [projectId, requestedVersionId]);
 
   // Keep the persistent sidebar on the same project-scoped price snapshot,
   // including on a direct/new-tab Design Review load.
@@ -300,7 +315,7 @@ export default function DesignReviewPage() {
           justifyContent: "flex-end",
           marginBottom: 16,
         }}>
-          <DesignReviewActions projectId={projectId} />
+          <DesignReviewActions projectId={projectId} versionId={activeVersionId} />
         </div>
 
         {/* Project Summary card */}

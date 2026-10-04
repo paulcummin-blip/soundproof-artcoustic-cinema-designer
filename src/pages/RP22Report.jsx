@@ -56,6 +56,7 @@ import {
 } from '@/components/report/reportSnapshotAuthority';
 import { readSeatPriorityFingerprint } from '@/components/state/designReviewHandoff';
 import ReportHeader from '../components/report/ReportHeader';
+import TechnicalReportNavBar from '@/components/report/TechnicalReportNavBar';
 import ReportCover from '../components/report/ReportCover';
 import ReportCountsDashboard from '../components/report/ReportCountsDashboard';
 import ProjectDetailsCard from '../components/report/ProjectDetailsCard';
@@ -1392,6 +1393,14 @@ function RP22ReportInner() {
                     </div>
                 ) : (
                 <div className="max-w-7xl mx-auto space-y-6">
+                    {/* Screen-only navigation. Every link carries the version
+                        being viewed and, when the report came from the Project
+                        Library, the route back to it. */}
+                    <TechnicalReportNavBar
+                        projectId={explicitProjectId}
+                        versionId={reportVersionId}
+                    />
+
                     <ReportHeader
                         app={app}
                         seats={seats}

@@ -26,8 +26,8 @@ import { reportTypeLabel } from '@/components/report/reportSnapshotAuthority';
 import {
   PROPOSAL_SOURCE_REPORT,
   PROPOSAL_SOURCE_REPORT_ROUTE,
-  buildReportActionUrl,
 } from '@/components/proposal/sourceAuthority/proposalSourceAuthority';
+import { buildLibraryReportActionUrl } from '@/components/report/reportLibraryContext';
 import LiveReportRow from './LiveReportRow';
 import ExportedDocumentRow from './ExportedDocumentRow';
 import {
@@ -75,11 +75,15 @@ export default function ProjectLibraryReportsSection({
    * the row it was clicked in. The version is passed explicitly and is the only
    * authority the report page reads; nothing here consults the loaded Room
    * Designer version.
+   *
+   * The URL also carries the Library context, so the report keeps the designer's
+   * place: it can return to this version's section, and the two report types stay
+   * paired on this version rather than the version loaded in the Room Designer.
    */
   const openVersionReport = (reportType, versionId) => {
     const route = PROPOSAL_SOURCE_REPORT_ROUTE[reportType];
     if (!route || !versionId) return;
-    navigate(buildReportActionUrl({ route, projectId, versionId }));
+    navigate(buildLibraryReportActionUrl({ route, projectId, versionId }));
   };
 
   if (versions.length === 0) {

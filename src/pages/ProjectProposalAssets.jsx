@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { useAuth } from '@/lib/AuthContext';
 import { useCanonicalProject } from '@/components/state/projectHydrationStore';
 import ProjectVersionIdentityLine from '@/components/projects/ProjectVersionIdentityLine';
@@ -16,6 +17,10 @@ import { REPORT_FONT_BODY } from '@/components/report/typography/reportTypograph
  * were exported and issued. It is scoped to the project that is open: images
  * upload straight into it, and reports and proposals are still created, edited
  * and regenerated where they live. The Library keeps the fixed documents.
+ *
+ * The section shown and the version section scrolled to can be requested in the
+ * URL (?tab=reports&versionId=…), which is how a report opened from here brings
+ * the designer back to the place they left. Both are read-only presentation.
  */
 export default function ProjectProposalAssets() {
   const { user } = useAuth();
@@ -24,8 +29,27 @@ export default function ProjectProposalAssets() {
   const activeVersionId = canonical.identity?.activeVersionId || null;
   const accountId = user?.access_context?.account?.id || user?.account_id || null;
 
-  const [activeTab, setActiveTab] = useState(PROJECT_LIBRARY_TAB.IMAGES);
+  // A report opened from this Library comes back here carrying the tab and the
+  // version it belongs to (?tab=reports&versionId=…), so the designer lands on
+  // the same version's section rather than at the top of the images tab. The
+  // Library is opened without those parameters in every other route, so the
+  // default section is unchanged.
+  const [searchParams] = useSearchParams();
+  const [activeTab, setActiveTab] = useState(
+    searchParams.get('tab') === PROJECT_LIBRARY_TAB.REPORTS
+      ? PROJECT_LIBRARY_TAB.REPORTS
+      : PROJECT_LIBRARY_TAB.IMAGES,
+  );
+  const focusVersionId = searchParams.get('versionId');
   const library = useProjectLibraryAssets({ projectId });
+
+  // Bring the returned version's section into view once its rows are loaded.
+  useEffect(() => {
+    if (!focusVersionId || library.loading || activeTab !== PROJECT_LIBRARY_TAB.REPORTS) return;
+    const section = Array.from(document.querySelectorAll('[data-library-version]'))
+      .find((element) => element.getAttribute('data-library-version') === focusVersionId);
+    if (section) section.scrollIntoView({ block: 'start' });
+  }, [focusVersionId, library.loading, activeTab]);
 
   return (
     <div className="min-h-screen bg-[#F5F4F0] p-6 lg:p-8">

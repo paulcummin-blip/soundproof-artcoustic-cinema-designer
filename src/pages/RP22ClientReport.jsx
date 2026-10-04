@@ -60,7 +60,13 @@ import { ArrowLeft, FileText, Download } from "lucide-react";
 import ReportStatePanel from "@/components/report/ReportStatePanel";
 import { buildReportGateDiagnostics } from "@/components/report/reportGateDiagnostics";
 import BackToProposalLink from "@/components/report/BackToProposalLink";
-import { readProposalContext, withProposalContext } from "@/components/report/proposalReportContext";
+import { readProposalContext } from "@/components/report/proposalReportContext";
+import BackToProjectLibraryLink from "@/components/report/BackToProjectLibraryLink";
+import {
+  buildReportPairingUrl,
+  readLibraryContext,
+  REPORT_ROUTE,
+} from "@/components/report/reportLibraryContext";
 import { readRequestedVersionId } from "@/components/report/reportVersionRequest";
 import { deriveReportReadiness, REPORT_STATE } from "@/components/report/reportReadinessAuthority";
 import { useAppState } from "@/components/AppStateProvider";
@@ -1032,15 +1038,22 @@ export default function RP22ClientReport() {
   };
 
   // The Visual and Technical Reports are one pairing: moving between them must
-  // not drop the proposal context, or the way back would disappear mid-report.
+  // not drop the version being viewed, nor either return route. The shared
+  // pairing builder carries project, version and both contexts — the version is
+  // the one this report is showing, never the version loaded in the designer.
   const currentProposalContext = () => readProposalContext(searchParams);
+  const currentLibraryContext = () => readLibraryContext(searchParams);
+  const viewedVersionId = authority.versionId || requestedVersionId || null;
 
   const handleTechnicalReport = () => {
     if (!projectId) return;
-    navigate(withProposalContext(
-      `/DesignReview?projectId=${projectId}`,
-      currentProposalContext()
-    ));
+    navigate(buildReportPairingUrl({
+      route: REPORT_ROUTE.DESIGN_REVIEW,
+      projectId,
+      versionId: viewedVersionId,
+      libraryContext: currentLibraryContext(),
+      proposalContext: currentProposalContext(),
+    }));
   };
 
   const handleOpenBassSimulation = () => {
@@ -1090,6 +1103,13 @@ export default function RP22ClientReport() {
           )}
         </div>
         <div style={{ display: "flex", gap: 12 }}>
+          {/* Library context only — absent when the report was opened from the project
+              flow. The primary return route when it came from the Project Library. */}
+          <BackToProjectLibraryLink
+            className="client-report-screen-only"
+            projectId={projectId}
+            versionId={viewedVersionId}
+          />
           {/* Proposal context only — absent when the report was opened from the project flow */}
           <BackToProposalLink className="client-report-screen-only" />
           <Button

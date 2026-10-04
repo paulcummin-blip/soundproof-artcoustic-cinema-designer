@@ -3,10 +3,11 @@
  * -----------------------
  * Stage D — Export action buttons for the Design Review header.
  *
- * Four actions:
- *   1. Back to Project  → navigate to Room Designer
- *   2. Visual Report    → navigate to RP22ClientReport
- *   3. Download Technical Report (PDF) → navigate to /RP22Report?projectId=X&autoPrint=1
+ * Actions — each carries the version being viewed and every return route, so a
+ * review opened for one version only ever leads to that version's surfaces:
+ *   1. Back to Project / Back to Project Library → the surface the review came from
+ *   2. Visual Report    → navigate to RP22ClientReport, same project and version
+ *   3. Download Technical Report (PDF) → navigate to /RP22Report?…&autoPrint=1
  *      (RP22Report owns the print/capture pipeline — no logic duplicated)
  *   4. Download CAD Overlay → uses standalone generateSVG/generateDXF utilities
  *      with live room data from useAppState (no second engine mount)
@@ -18,7 +19,13 @@ import { useAppState } from "@/components/AppStateProvider";
 import { ArrowLeft, Eye, FileText, Download } from "lucide-react";
 import { generateSVG, generateDXF, downloadTextFile } from "@/components/utils/cadExport";
 import BackToProposalLink from "@/components/report/BackToProposalLink";
-import { readProposalContext, withProposalContext } from "@/components/report/proposalReportContext";
+import BackToProjectLibraryLink from "@/components/report/BackToProjectLibraryLink";
+import { readProposalContext } from "@/components/report/proposalReportContext";
+import {
+  buildReportPairingUrl,
+  readLibraryContext,
+  REPORT_ROUTE,
+} from "@/components/report/reportLibraryContext";
 
 const FONT = "'Futura PT Light', 'Century Gothic', sans-serif";
 
@@ -37,7 +44,7 @@ const BTN_BASE = {
   transition: "background 0.15s",
 };
 
-export default function DesignReviewActions({ projectId }) {
+export default function DesignReviewActions({ projectId, versionId = null }) {
   const navigate = useNavigate();
   const app = useAppState();
   const [showCadMenu, setShowCadMenu] = useState(false);
@@ -48,26 +55,37 @@ export default function DesignReviewActions({ projectId }) {
   };
 
   // The Design Review is the technical report surface reached from the Visual
-  // Report, so the proposal context is carried on through it rather than dropped.
-  const currentProposalContext = () => readProposalContext(
-    typeof window !== "undefined" ? window.location.search : ""
-  );
+  // Report, so the version being viewed and both return routes are carried on
+  // through it rather than dropped. Every link is built by the shared pairing
+  // authority: the loaded Room Designer version is never consulted, so a report
+  // opened for one version can never lead to another version's report.
+  const currentQuery = () => (typeof window !== "undefined" ? window.location.search : "");
+  const currentProposalContext = () => readProposalContext(currentQuery());
+  const currentLibraryContext = () => readLibraryContext(currentQuery());
 
   const handleVisualReport = () => {
     if (!projectId) return;
-    navigate(withProposalContext(
-      `/RP22ClientReport?projectId=${projectId}`,
-      currentProposalContext()
-    ));
+    navigate(buildReportPairingUrl({
+      route: REPORT_ROUTE.VISUAL,
+      projectId,
+      versionId,
+      libraryContext: currentLibraryContext(),
+      proposalContext: currentProposalContext(),
+    }));
   };
 
   const handleTechnicalPdf = () => {
     if (!projectId) return;
-    // RP22Report owns the full print/capture pipeline — autoPrint triggers it
-    navigate(withProposalContext(
-      `/RP22Report?projectId=${projectId}&autoPrint=1`,
-      currentProposalContext()
-    ));
+    // RP22Report owns the full print/capture pipeline — autoPrint triggers it,
+    // for this same version and no other.
+    navigate(buildReportPairingUrl({
+      route: REPORT_ROUTE.TECHNICAL,
+      projectId,
+      versionId,
+      libraryContext: currentLibraryContext(),
+      proposalContext: currentProposalContext(),
+      extraParams: { autoPrint: '1' },
+    }));
   };
 
   // Gather CAD overlay data from live appState
@@ -105,6 +123,9 @@ export default function DesignReviewActions({ projectId }) {
 
   return (
     <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+      {/* Library context only — the primary return route when the review was
+          opened from the Project Library. */}
+      <BackToProjectLibraryLink projectId={projectId} versionId={versionId} />
       {/* Proposal context only — absent when the review was opened from the project flow */}
       <BackToProposalLink />
       <button
