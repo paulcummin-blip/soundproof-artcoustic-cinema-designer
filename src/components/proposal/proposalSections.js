@@ -52,6 +52,41 @@ export function getSectionsForProposalType(proposalType) {
   return proposalType === 'single' ? PROPOSAL_SECTIONS : SYSTEM_SUMMARY_SECTIONS;
 }
 
+/**
+ * The section titles a COMPARISON report uses in place of the single-system
+ * ones.
+ *
+ * A comparison is not describing one system: it presents multiple SYSTEM
+ * OPTIONS and explains how they differ, so two of its sections are named for
+ * what they actually do. A single-version report keeps its own titles and is
+ * never renamed.
+ *
+ * The backend mirrors this map in
+ * base44/shared/systemDesignSummarySections.js (the two cannot import from each
+ * other) and a test asserts the two agree word for word.
+ */
+export const COMPARISON_SECTION_TITLES = Object.freeze({
+  system_design_summary: 'System Options Summary',
+  key_performance_highlights: 'Key Differences',
+});
+
+/**
+ * The title one section carries for a report type. Only a comparison renames a
+ * section: every other report type keeps the title it was generated with.
+ */
+export function resolveSectionTitle(sectionType, title, proposalType) {
+  if (proposalType !== 'comparison') return title;
+  return COMPARISON_SECTION_TITLES[sectionType] || title;
+}
+
+/** The editor's own name for one section, for the report type being edited. */
+export function getSectionLabel(sectionType, proposalType) {
+  if (proposalType === 'comparison' && COMPARISON_SECTION_TITLES[sectionType]) {
+    return COMPARISON_SECTION_TITLES[sectionType];
+  }
+  return getSectionDef(sectionType)?.label || sectionType;
+}
+
 export const NARRATIVE_GOALS = [
   { value: 'luxury_cinema', label: 'Luxury Cinema', description: 'Premium home cinema experience' },
   { value: 'family_media_room', label: 'Family Media Room', description: 'Accessible family entertainment' },

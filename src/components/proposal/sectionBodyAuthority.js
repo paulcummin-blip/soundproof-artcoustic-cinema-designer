@@ -113,6 +113,12 @@ export function countSentences(html) {
 /** The most paragraphs a narrative page prints, and the longest one it prints. */
 export const PROSE_PARAGRAPH_LIMIT = 3;
 export const PARAGRAPH_SENTENCE_LIMIT = 4;
+/**
+ * A comparison's opening section introduces EVERY option in turn, so it carries
+ * a list of the options and one paragraph per option rather than the
+ * single-system page's three-paragraph limit.
+ */
+export const COMPARISON_PROSE_PARAGRAPH_LIMIT = 6;
 
 /**
  * Keep at most `maxParagraphs` paragraphs, and no paragraph longer than
@@ -171,7 +177,15 @@ export function prepareSectionBody(html, section = {}) {
   // inside a section is repetition of the one evidence table. They are also held
   // to a few short paragraphs, so no page reads as a squeezed block of text.
   if (section.proseOnly && PROSE_ONLY_SECTIONS.has(section.sectionType)) {
-    return limitProseParagraphs(stripListAndTableBlocks(cleaned));
+    // The one exception is a comparison's opening section: it introduces each
+    // system option in turn, so it keeps its own list of the options and one
+    // paragraph per option.
+    const isComparisonSummary = section.proposalType === 'comparison'
+      && section.sectionType === 'system_design_summary';
+    return limitProseParagraphs(
+      isComparisonSummary ? cleaned : stripListAndTableBlocks(cleaned),
+      isComparisonSummary ? COMPARISON_PROSE_PARAGRAPH_LIMIT : PROSE_PARAGRAPH_LIMIT,
+    );
   }
   return cleaned;
 }

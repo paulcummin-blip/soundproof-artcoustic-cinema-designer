@@ -58,6 +58,7 @@ const PAGE_LABELS = {
 };
 
 import { REPORT_FONT_BODY as FONT } from '@/components/report/typography/reportTypography';
+import { resolveSectionTitle } from '@/components/proposal/proposalSections';
 
 function TextLines({ widths = ['100%', '92%', '96%', '70%'], color = '#E5E1D8', gap = '8%' }) {
   return (
@@ -94,7 +95,7 @@ function PageThumb({ label, children, bg = '#FBFAF7' }) {
   );
 }
 
-function renderPage(pageKey, form, pubLabel) {
+function renderPage(pageKey, form, pubLabel, sectionLabel) {
   const primary = form.primary_colour || '#213428';
   const secondary = form.secondary_colour || '#3E4349';
   const accent = form.accent_colour || '#625143';
@@ -142,7 +143,7 @@ function renderPage(pageKey, form, pubLabel) {
             01
           </div>
           <div className="text-[13px] mb-3" style={{ color: primary, fontFamily: FONT }}>
-            {PAGE_LABELS[pageKey]}
+            {sectionLabel}
           </div>
           <div className="h-px w-8 mb-5" style={{ backgroundColor: accent }} />
           <TextLines widths={['100%', '94%', '88%', '60%']} />
@@ -163,7 +164,7 @@ function renderPage(pageKey, form, pubLabel) {
             02
           </div>
           <div className="text-[13px] mb-3" style={{ color: primary, fontFamily: FONT }}>
-            {PAGE_LABELS[pageKey]}
+            {sectionLabel}
           </div>
           <div className="h-px w-8 mb-5" style={{ backgroundColor: accent }} />
           <div className="mb-4" style={{ height: '38%', backgroundColor: softBlock }} />
@@ -200,7 +201,7 @@ function renderPage(pageKey, form, pubLabel) {
             05
           </div>
           <div className="text-[13px] mb-3" style={{ color: primary, fontFamily: FONT }}>
-            {PAGE_LABELS[pageKey]}
+            {sectionLabel}
           </div>
           <div className="h-px w-8 mb-5" style={{ backgroundColor: accent }} />
           {[0, 1].map((row) => (
@@ -222,7 +223,7 @@ function renderPage(pageKey, form, pubLabel) {
             07
           </div>
           <div className="text-[13px] mb-3" style={{ color: primary, fontFamily: FONT }}>
-            {PAGE_LABELS[pageKey]}
+            {sectionLabel}
           </div>
           <div className="h-px w-8 mb-5" style={{ backgroundColor: accent }} />
           <div className="mb-3" style={{ height: '34%', backgroundColor: softBlock }} />
@@ -279,11 +280,16 @@ export default function PublicationPreview({ form }) {
 
       {/* Multi-page thumbnail stack */}
       <div className="flex flex-col gap-7">
-        {pages.map((pageKey) => (
-          <PageThumb key={pageKey} label={PAGE_LABELS[pageKey]}>
-            {renderPage(pageKey, form, pubLabel)}
-          </PageThumb>
-        ))}
+        {pages.map((pageKey) => {
+          // A comparison names its own sections, so the preview shows the same
+          // titles the report will print.
+          const sectionLabel = resolveSectionTitle(pageKey, PAGE_LABELS[pageKey], pubType);
+          return (
+            <PageThumb key={pageKey} label={sectionLabel}>
+              {renderPage(pageKey, form, pubLabel, sectionLabel)}
+            </PageThumb>
+          );
+        })}
       </div>
     </div>
   );

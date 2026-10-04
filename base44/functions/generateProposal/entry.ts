@@ -1,6 +1,6 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.49';
 import { buildWritingStyleContract } from '../../shared/reportWritingStyleContract.js';
-import { SYSTEM_SUMMARY_SECTIONS, HIGHLIGHTS_SECTION_TYPE, getSystemSummarySectionPrompt, COMPARISON_REPORT_INSTRUCTIONS } from '../../shared/systemDesignSummarySections.js';
+import { SYSTEM_SUMMARY_SECTIONS, HIGHLIGHTS_SECTION_TYPE, getSystemSummarySectionPrompt, COMPARISON_REPORT_INSTRUCTIONS, resolveSectionTitle } from '../../shared/systemDesignSummarySections.js';
 import { buildSelectedVersionEvidence, formatVersionEvidenceForPrompt } from '../../shared/comparisonEvidence.js';
 import { buildComparisonTable, formatComparisonTableForPrompt, buildComparisonHighlightsPrompt, COMPARISON_HIGHLIGHTS_SCHEMA } from '../../shared/comparisonTable.js';
 import { buildEngineeringEvidence, selectHighlightRows, mergeHighlightRows, buildHighlightsPrompt, HIGHLIGHTS_JSON_SCHEMA } from '../../shared/engineeringSnapshotEvidence.js';
@@ -428,7 +428,9 @@ export default async function(req) {
         account_id: effectiveAccountId,
         section_type: s.type,
         section_key: s.key,
-        title: s.title,
+        // A comparison names its own sections: it presents system options and
+        // compares them, so it is never titled as a single system design.
+        title: resolveSectionTitle(s.type, s.title, resolvedType),
         body: '',
         dealer_notes: '',
         order_index: i,

@@ -35,7 +35,7 @@ import {
   buildEvidenceCards,
   statementValue,
 } from '@/components/proposal/print/proposalPackAuthority';
-import { getSectionsForProposalType } from '@/components/proposal/proposalSections';
+import { getSectionsForProposalType, resolveSectionTitle } from '@/components/proposal/proposalSections';
 import { prepareSectionBody } from '@/components/proposal/sectionBodyAuthority';
 import { isHighChannelDesign } from '@/components/proposal/highChannelLayoutAuthority';
 import { compactViewingResult } from '@/components/proposal/print/snapshotViewingRows';
@@ -123,6 +123,11 @@ export default function ProposalPackDocument({
       const section = byType.get(def.type);
       if (!section) return;
       const title = section.title || def.title;
+      // A comparison names its own sections — the report presents system options
+      // and compares them, so no page is titled as a single system design. The
+      // stored title is what the body was written against, so it is still the
+      // one the duplicate-heading rule matches on.
+      const displayTitle = resolveSectionTitle(section.section_type, title, reportType);
       const body = prepareSectionBody(section.body, {
         title,
         sectionType: section.section_type,
@@ -130,6 +135,7 @@ export default function ProposalPackDocument({
         // highlight list inside a section is repetition of that table.
         proseOnly: true,
         highChannel,
+        proposalType: reportType,
       });
 
       if (section.section_type === 'room_images') {
@@ -139,7 +145,7 @@ export default function ProposalPackDocument({
         if (imagePages.length === 0) {
           pages.push(
             <section key={section.id} className="proposal-print-section pp-page pp-page--images">
-              <ProposalPageHeader number={takeNumber()} kicker="Visualisation" title={title} />
+              <ProposalPageHeader number={takeNumber()} kicker="Visualisation" title={displayTitle} />
               <ProjectImagesBlock images={projectImages} />
             </section>
           );
@@ -150,7 +156,7 @@ export default function ProposalPackDocument({
             <ProjectImagesPage
               key={`${section.id}:${index}`}
               number={takeNumber()}
-              title={title}
+              title={displayTitle}
               images={pageImages}
             />
           );
@@ -178,8 +184,8 @@ export default function ProposalPackDocument({
           >
             <ProposalPageHeader
               number={takeNumber()}
-              kicker="Evidence"
-              title={isComparisonKind ? 'System comparison' : title}
+              kicker={isComparisonKind ? 'Comparison' : 'Evidence'}
+              title={displayTitle}
             />
             <KeyPerformanceHighlightsTable
               rows={section.metadata?.highlight_rows}
@@ -202,7 +208,7 @@ export default function ProposalPackDocument({
           key={section.id}
           className={`proposal-print-section pp-page pp-page--${section.section_type}`}
         >
-          <ProposalPageHeader number={takeNumber()} kicker="Design" title={title} />
+          <ProposalPageHeader number={takeNumber()} kicker="Design" title={displayTitle} />
           {body ? (
             <div className="pp-body" dangerouslySetInnerHTML={{ __html: body }} />
           ) : null}

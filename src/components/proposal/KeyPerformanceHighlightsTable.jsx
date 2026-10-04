@@ -56,9 +56,13 @@ const SUMMARY_COLUMNS = [
 const CELL = 'px-3 py-2 align-top border-b border-[#EAE8E3]';
 const HEAD = 'px-3 py-2 text-left text-[#213428] bg-[#F5F4F0] border-b border-[#DCDBD6]';
 
+/**
+ * The heading of one option column. The official saved version name is the
+ * heading: "Option A · Level 1 version" states the position as well as the name,
+ * and the position is already carried by the column order.
+ */
 function optionHeading(column, index) {
-  const label = column?.label || `Option ${String.fromCharCode(65 + index)}`;
-  return column?.version_name ? `${label} · ${column.version_name}` : label;
+  return column?.version_name || column?.label || `Option ${String.fromCharCode(65 + index)}`;
 }
 
 export default function KeyPerformanceHighlightsTable({

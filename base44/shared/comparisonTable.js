@@ -281,7 +281,7 @@ export const COMPARISON_HIGHLIGHTS_SCHEMA = {
  */
 export function buildComparisonHighlightsPrompt() {
   return [
-    'Write the introduction to the Key Performance Highlights section of a System Design Comparison.',
+    'Write the introduction to the Key Differences section of a System Design Comparison, which compares multiple system options rather than describing one system.',
     '',
     'The comparison table below is already calculated by Sound Proof, one column per selected version. It follows your introduction in the report.',
     '',

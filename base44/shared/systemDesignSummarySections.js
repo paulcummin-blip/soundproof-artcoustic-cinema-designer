@@ -26,6 +26,37 @@ import { buildHighChannelSectionRule } from './highChannelDensityRule.js';
 
 export const HIGHLIGHTS_SECTION_TYPE = 'key_performance_highlights';
 
+/**
+ * The section titles a COMPARISON report uses in place of the single-system
+ * ones.
+ *
+ * A comparison is not describing one system. It presents multiple SYSTEM
+ * OPTIONS and explains how they differ, so two of its sections are named for
+ * what they actually do:
+ *
+ *   System Design Summary       -> System Options Summary
+ *   Key Performance Highlights  -> Key Differences
+ *
+ * A single-version report keeps its own titles and is never renamed.
+ *
+ * The frontend mirrors this map in
+ * src/components/proposal/proposalSections.js (the two cannot import from each
+ * other) and a test asserts the two agree word for word.
+ */
+export const COMPARISON_SECTION_TITLES = Object.freeze({
+  system_design_summary: 'System Options Summary',
+  [HIGHLIGHTS_SECTION_TYPE]: 'Key Differences',
+});
+
+/**
+ * The title one section carries for a report type. Only a comparison renames a
+ * section: every other report type keeps the title it was written with.
+ */
+export function resolveSectionTitle(sectionType, title, proposalType = 'system_summary') {
+  if (proposalType !== 'comparison') return title;
+  return COMPARISON_SECTION_TITLES[sectionType] || title;
+}
+
 /** The editable sections of a System Design report, in report order. */
 export const SYSTEM_SUMMARY_SECTIONS = [
   { type: 'cover', key: 'cover', title: 'Cover', canEditBody: false },
@@ -50,6 +81,8 @@ export const COMPARISON_REPORT_INSTRUCTIONS = [
   'Where one option improves bass consistency across the seating area, explain that as more even bass between seats: less difference between the strongest and weakest seat. Never describe the other option as wrong, and never present the comparison as a correction.',
   'Do not automatically recommend the largest system unless the evidence supports it.',
   'Never present the comparison as an equipment table, and never rank the options as "best".',
+  'Write about the system options, never about one system: say "both versions use", "the Level 1 version uses" or "the Level 4 version adds", and never "this design", "the system" or "the selected system".',
+  'Name each option by the exact version name supplied. State a fact the options share once, as shared, rather than repeating it for each option.',
 ].join('\n');
 
 /**
@@ -151,12 +184,39 @@ This section is prose only. Never repeat the Key Performance Highlights table, n
 };
 
 /**
+ * The opening section of a COMPARISON report: it introduces the system options
+ * side by side, so the report never reads as if there were one system.
+ */
+export const SYSTEM_OPTIONS_SUMMARY_PROMPT = `Open the comparison by introducing the system options the client is choosing between. This report compares options, so it never describes one system and never says "this design", "the system" or "the selected system".
+
+Write one short opening paragraph that:
+- states how many system options the report compares, naming each one with its exact supplied version name
+- states once what every option shares - the room, the screen and the seating layout - where the supplied data shows they are the same, and says the differences lie elsewhere
+- names, in one sentence, where those differences lie: system scale, loudspeaker and subwoofer specification, and the performance that follows
+
+Then write one short paragraph for each option, in the supplied version order. Lead each one with an <h3> heading that is exactly that version's supplied name, followed by that option's own facts: the system format, the loudspeaker package, the subwoofer arrangement, and the performance result that follows. Say plainly what that option is.
+
+Describe the options and do not choose between them here: do not rank them, recommend one, or express a preference.
+
+State what is shared once, at the start, rather than repeating it in each option's paragraph.
+
+Do not restate the comparison table's values and do not write a second performance summary: the differences themselves are stated in the Key Differences section that follows.
+
+Use only the supplied Sound Proof calculated data and never invent a value.
+1 opening paragraph, then one short paragraph per option.`;
+
+/**
  * @param {string} sectionType
  * @param {string} sectionTitle
+ * @param {object|null} layout
+ * @param {string} proposalType - 'comparison' writes the section as multiple
+ *   system options; every other type writes it as the one system.
  * @returns {string} writing instruction for one System Design report section
  */
-export function getSystemSummarySectionPrompt(sectionType, sectionTitle, layout = null) {
-  const instruction = SYSTEM_SUMMARY_SECTION_PROMPTS[sectionType]
+export function getSystemSummarySectionPrompt(sectionType, sectionTitle, layout = null, proposalType = 'system_summary') {
+  const instruction = proposalType === 'comparison' && sectionType === 'system_design_summary'
+    ? SYSTEM_OPTIONS_SUMMARY_PROMPT
+    : SYSTEM_SUMMARY_SECTION_PROMPTS[sectionType]
     || `Write the ${sectionTitle} section of a client-facing system design report. 2 to 3 short paragraphs.`;
   // Every section is part of one client-facing explanation of a completed
   // design, so the proposal-stage and upgrade-path rules apply to all of them.

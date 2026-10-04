@@ -420,7 +420,7 @@ test('the comparison follows the same voice, then what changes, then the consequ
 test('the comparison introduction is design-led and writes no value', () => {
   const prompt = buildComparisonHighlightsPrompt();
 
-  assert.match(prompt, /Write the introduction to the Key Performance Highlights section of a System Design Comparison\./);
+  assert.match(prompt, /Write the introduction to the Key Differences section of a System Design Comparison\./);
   assert.match(prompt, /design-led voice defined in the style contract/);
   assert.match(prompt, /what the room gains or gives up/);
   assert.match(prompt, /Do not write a table, a row or a value\./);

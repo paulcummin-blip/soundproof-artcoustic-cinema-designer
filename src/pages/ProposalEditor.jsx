@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { useSearchParams, useNavigate, Link, Navigate } from 'react-router-dom';
 import { base44 } from '@/api/base44Client';
-import { getSectionDef } from '@/components/proposal/proposalSections';
+import { getSectionDef, getSectionLabel, resolveSectionTitle } from '@/components/proposal/proposalSections';
 import KeyPerformanceHighlightsTable from '@/components/proposal/KeyPerformanceHighlightsTable';
 import { compactViewingResult } from '@/components/proposal/print/snapshotViewingRows';
 import { getProposalTypeLabel } from '@/components/proposal/proposalTypes';
@@ -793,6 +793,7 @@ export default function ProposalEditor() {
             onToggleVisibility={handleToggleVisibility}
             onReorder={handleReorder}
             readOnly={archived}
+            proposalType={proposal?.proposal_type}
           />
         </div>
       </div>
@@ -859,7 +860,7 @@ export default function ProposalEditor() {
                       className="proposal-section-title text-[#1B1A1A]"
                       style={proposalRoleStyle('header')}
                     >
-                      {section.title}
+                      {resolveSectionTitle(section.section_type, section.title, proposal?.proposal_type)}
                     </h2>
                     {isManuallyEdited(section) && (
                       <span
@@ -1062,7 +1063,7 @@ export default function ProposalEditor() {
           <div className="space-y-3 text-sm">
             <div>
               <div className="text-xs text-[#625143]">Section Type</div>
-              <div className="text-[#1B1A1A]">{getSectionDef(activeSection.section_type)?.label}</div>
+              <div className="text-[#1B1A1A]">{getSectionLabel(activeSection.section_type, proposal?.proposal_type)}</div>
             </div>
             <div>
               <div className="text-xs text-[#625143]">Status</div>

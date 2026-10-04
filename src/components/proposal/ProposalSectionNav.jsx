@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Eye, EyeOff, GripVertical } from 'lucide-react';
-import { getSectionDef } from '@/components/proposal/proposalSections';
+import { getSectionDef, getSectionLabel } from '@/components/proposal/proposalSections';
 
 /**
  * Left navigation panel for the Proposal Editor.
@@ -14,7 +14,7 @@ import { getSectionDef } from '@/components/proposal/proposalSections';
  * - onReorder: (reorderedSections) => void
  * - readOnly: boolean
  */
-export default function ProposalSectionNav({ sections, activeSectionKey, onSelect, onToggleVisibility, onReorder, readOnly = false }) {
+export default function ProposalSectionNav({ sections, activeSectionKey, onSelect, onToggleVisibility, onReorder, readOnly = false, proposalType = null }) {
   const sorted = [...sections].sort((a, b) => (a.order_index || 0) - (b.order_index || 0));
   const [dragIndex, setDragIndex] = useState(null);
 
@@ -62,7 +62,7 @@ export default function ProposalSectionNav({ sections, activeSectionKey, onSelec
           >
             <GripVertical className="w-3 h-3 opacity-30 group-hover:opacity-60" />
             <span className="flex-1 text-sm" style={{ fontFamily: 'Didact Gothic, sans-serif' }}>
-              {def.label}
+              {getSectionLabel(section.section_type, proposalType)}
             </span>
             {def.canHide && !readOnly && (
               <button

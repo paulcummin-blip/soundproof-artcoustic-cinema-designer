@@ -1,7 +1,7 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.44';
 import { buildWritingStyleContract, mentionsDesignIndex } from '../../shared/reportWritingStyleContract.js';
 import { resolveReportLayout, mentionsHighChannelSpacingUpgrade, HIGH_CHANNEL_CLEANUP_NOTE } from '../../shared/highChannelDensityRule.js';
-import { COMPARISON_REPORT_INSTRUCTIONS } from '../../shared/systemDesignSummarySections.js';
+import { COMPARISON_REPORT_INSTRUCTIONS, resolveSectionTitle } from '../../shared/systemDesignSummarySections.js';
 import { formatVersionEvidenceForPrompt } from '../../shared/comparisonEvidence.js';
 import { formatComparisonTableForPrompt } from '../../shared/comparisonTable.js';
 import { buildEngineeringEvidence } from '../../shared/engineeringSnapshotEvidence.js';
@@ -153,7 +153,13 @@ export default async function(req) {
     console.log(`[regenerateProposalSection] ADI stage 1 interpretation | ${formatInterpretationForLog(interpretation)}`);
 
     // ── Build the regeneration prompt ──
-    const sectionTitle = SECTION_TITLES[section.section_type] || section.title || 'Section';
+    // A comparison names its own sections (System Options Summary, Key
+    // Differences), so a refined section is never written as a single system.
+    const sectionTitle = resolveSectionTitle(
+      section.section_type,
+      SECTION_TITLES[section.section_type] || section.title || 'Section',
+      proposal.proposal_type,
+    );
     const currentBody = stripHtml(section.body || '');
     const dealerNotes = section.dealer_notes || '';
     const briefText = effectiveBrief.trim();
