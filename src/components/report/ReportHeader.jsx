@@ -7,7 +7,9 @@ import { generateSVG, generateDXF, downloadTextFile } from '../utils/cadExport';
 import { isCadExportReady } from './cadExportReadiness';
 import ReportCover from './ReportCover';
 import BackToProposalLink from './BackToProposalLink';
-import { readProposalContext, withProposalContext } from './proposalReportContext';
+import { readProposalContext } from './proposalReportContext';
+import { buildReportPairingUrl, readLibraryContext, REPORT_ROUTE } from './reportLibraryContext';
+import { readRequestedVersionId } from './reportVersionRequest';
 import { restorePrintDocumentTitle } from '@/components/report/printDocumentTitle';
 import { openTechnicalReportPrintWindow } from '@/components/report/technical/technicalReportPrintWindow';
 
@@ -92,17 +94,24 @@ export default function ReportHeader({
     };
 
     // The Visual and Technical Reports are one pairing: moving between them must
-    // not drop the proposal context, or the way back would disappear mid-report.
-    const currentProposalContext = () => readProposalContext(
+    // carry the whole report context — the version being viewed, the way back to
+    // the Project Library when the report came from it, and the proposal context
+    // — so no hop falls back to the Room Designer's active version and no way
+    // back disappears mid-report. One shared authority builds every hop.
+    const currentSearchParams = () => new URLSearchParams(
         typeof window !== 'undefined' ? window.location.search : ''
     );
 
     const handleClientReport = () => {
         if (!activeProjectId) return;
-        navigate(withProposalContext(
-            `/RP22ClientReport?projectId=${activeProjectId}`,
-            currentProposalContext()
-        ));
+        const searchParams = currentSearchParams();
+        navigate(buildReportPairingUrl({
+            route: REPORT_ROUTE.VISUAL,
+            projectId: activeProjectId,
+            versionId: readRequestedVersionId(searchParams),
+            libraryContext: readLibraryContext(searchParams),
+            proposalContext: readProposalContext(searchParams),
+        }));
     };
 
     const handleExportPDF = () => {

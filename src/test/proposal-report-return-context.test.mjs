@@ -127,21 +127,35 @@ test('Proposal Centre report links carry the proposal context', () => {
 
 test('the Visual Report shows the way back and preserves it when moving on', () => {
   expect(VISUAL_PAGE).toMatch(/<BackToProposalLink className="client-report-screen-only" \/>/);
-  expect(VISUAL_PAGE).toMatch(/withProposalContext\(\s*`\/DesignReview\?projectId=\$\{projectId\}`,\s*currentProposalContext\(\)\s*\)/);
+  // The pairing hop is built by the shared report context authority, so the
+  // proposal context rides along with the version being viewed and the Library
+  // return — one builder, no hand-written URL to drop any of them.
+  expect(VISUAL_PAGE).toMatch(/buildReportPairingUrl\(\{/);
+  expect(VISUAL_PAGE).toMatch(/route: REPORT_ROUTE\.DESIGN_REVIEW/);
+  expect(VISUAL_PAGE).toMatch(/versionId: viewedVersionId/);
   expect(VISUAL_PAGE).toMatch(/const currentProposalContext = \(\) => readProposalContext\(searchParams\);/);
 });
 
 test('the Technical Report shows the way back and preserves it when moving on', () => {
   expect(TECH_HEADER).toMatch(/<BackToProposalLink \/>/);
-  expect(TECH_HEADER).toMatch(/withProposalContext\(\s*`\/RP22ClientReport\?projectId=\$\{activeProjectId\}`,\s*currentProposalContext\(\)\s*\)/);
+  // The header's own Visual hop goes through the same authority, so it carries
+  // the version being viewed rather than the designer's loaded version.
+  expect(TECH_HEADER).toMatch(/buildReportPairingUrl\(\{/);
+  expect(TECH_HEADER).toMatch(/route: REPORT_ROUTE\.VISUAL/);
+  expect(TECH_HEADER).toMatch(/versionId: readRequestedVersionId\(searchParams\)/);
+  expect(TECH_HEADER).toMatch(/proposalContext: readProposalContext\(searchParams\)/);
   // and it is the header the Technical Report page renders
   expect(TECH_PAGE).toMatch(/<ReportHeader/);
 });
 
 test('the Design Review carries the context between the two reports', () => {
   expect(REVIEW_ACTIONS).toMatch(/<BackToProposalLink \/>/);
-  expect(REVIEW_ACTIONS).toMatch(/withProposalContext\(\s*`\/RP22ClientReport\?projectId=\$\{projectId\}`,\s*currentProposalContext\(\)\s*\)/);
-  expect(REVIEW_ACTIONS).toMatch(/withProposalContext\(\s*`\/RP22Report\?projectId=\$\{projectId\}&autoPrint=1`,\s*currentProposalContext\(\)\s*\)/);
+  // Both hops — back to the Visual, and the Technical PDF — go through the shared
+  // pairing authority for the version the Design Review was opened for.
+  expect(REVIEW_ACTIONS).toMatch(/route: REPORT_ROUTE\.VISUAL/);
+  expect(REVIEW_ACTIONS).toMatch(/route: REPORT_ROUTE\.TECHNICAL/);
+  expect(REVIEW_ACTIONS).toMatch(/extraParams: \{ autoPrint: '1' \}/);
+  expect(REVIEW_ACTIONS).toMatch(/proposalContext: currentProposalContext\(\)/);
 });
 
 /* ── App navigation only ──────────────────────────────────────────────── */

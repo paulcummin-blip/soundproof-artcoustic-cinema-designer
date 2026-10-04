@@ -138,7 +138,13 @@ test('TEST 5 — every Technical Report print path prints from the app-owned win
   // Path 5 — Design Review's "Download Technical Report" delegates to the report,
   // so there is no separate print/title path to name the file.
   const review = read('src/components/designreview/DesignReviewActions.jsx');
-  assert.ok(review.includes('/RP22Report?projectId=') && review.includes('autoPrint=1'), 'delegates to the report');
+  // The hop is built by the shared report context authority now, which carries
+  // the version being viewed as well as the print flag — still the same single
+  // delegation to the report's own pipeline.
+  assert.ok(
+    review.includes('REPORT_ROUTE.TECHNICAL') && review.includes('autoPrint'),
+    'delegates to the report',
+  );
   assert.ok(!review.includes('window.print()'), 'no second print path');
   assert.ok(!review.includes('applyPrintDocumentTitle'), 'no second title path');
 });
