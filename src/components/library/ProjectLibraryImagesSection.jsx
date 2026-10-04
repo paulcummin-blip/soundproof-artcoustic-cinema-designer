@@ -14,10 +14,7 @@
 import React, { useMemo } from 'react';
 import { REPORT_FONT_BODY } from '@/components/report/typography/reportTypography';
 import ProposalAssetsPanel from '@/components/proposal/ProposalAssetsPanel';
-import {
-  IMAGE_SCOPE_FILTER,
-  groupImagesByScope,
-} from './imageScopeAuthority';
+import { IMAGE_SCOPE_FILTER } from './imageScopeAuthority';
 
 const FILTERS = [
   { key: IMAGE_SCOPE_FILTER.ALL, label: 'All images' },
@@ -85,5 +82,3 @@ export default function ProjectLibraryImagesSection({
     </div>
   );
 }
-
-export { groupImagesByScope };
