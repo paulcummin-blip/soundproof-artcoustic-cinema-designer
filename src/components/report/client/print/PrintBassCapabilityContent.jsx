@@ -10,8 +10,9 @@
 import React from "react";
 import { RP22_GRADE_TOKENS } from "@/components/utils/rp22Colors";
 import { isAssessedLevel } from "../visualReportSeatStyle";
-import { P18_THRESHOLDS_BY_BASIS } from "@/components/utils/p18ExtensionAuthority";
 import { Check } from "lucide-react";
+import BassExtensionScale from "../BassExtensionScale";
+import BassResultCallout from "../BassResultCallout";
 
 import {
   REPORT_FONT_HEADING as HEADING_FONT,
@@ -96,97 +97,6 @@ function P14LevelProgression({ selectedLevel, pass }) {
   );
 }
 
-function P18FrequencyScale({ achievedHz, targetBasis }) {
-  const basis = targetBasis === "recommended" ? "recommended" : "minimum";
-  const thresholds = P18_THRESHOLDS_BY_BASIS[basis];
-  const hz = Number(achievedHz);
-  const hasHz = Number.isFinite(hz) && hz > 0;
-
-  const SCALE_MIN = 15;
-  const SCALE_MAX = 35;
-  const tickMarks = [15, 20, 25, 30, 35];
-
-  const achievedPct = hasHz
-    ? Math.max(0, Math.min(100, ((Math.min(hz, SCALE_MAX) - SCALE_MIN) / (SCALE_MAX - SCALE_MIN)) * 100))
-    : null;
-
-  const boundaryPcts = Object.entries(thresholds).map(([level, thresholdHz]) => ({
-    level,
-    hz: thresholdHz,
-    pct: ((thresholdHz - SCALE_MIN) / (SCALE_MAX - SCALE_MIN)) * 100,
-  }));
-
-  return (
-    <div style={{ width: "100%", maxWidth: 430, marginTop: 10, padding: "0 10px", boxSizing: "border-box" }}>
-      <div style={{ position: "relative", height: 22, marginBottom: 2 }}>
-        <div style={{
-          position: "absolute",
-          top: 8,
-          left: 0,
-          right: 0,
-          height: 2,
-          background: "#DCDBD6",
-          borderRadius: 2,
-        }} />
-        {boundaryPcts.map((b) => (
-          <div key={b.level} style={{
-            position: "absolute",
-            top: 5,
-            left: `${b.pct}%`,
-            width: 1,
-            height: 9,
-            background: "#B3A89B",
-            transform: "translateX(-0.5px)",
-          }} />
-        ))}
-        {achievedPct != null && (
-          <div style={{
-            position: "absolute",
-            top: 3,
-            left: `${achievedPct}%`,
-            transform: "translateX(-50%)",
-          }}>
-            <div style={{
-              width: 12,
-              height: 12,
-              borderRadius: "50%",
-              background: "#213428",
-              border: "2px solid #FFFFFF",
-            }} />
-          </div>
-        )}
-      </div>
-      <div style={{ position: "relative", height: 14 }}>
-        {tickMarks.map((tick) => {
-          const pct = ((tick - SCALE_MIN) / (SCALE_MAX - SCALE_MIN)) * 100;
-          return (
-            <div key={tick} style={{
-              position: "absolute",
-              left: `${pct}%`,
-              transform: tick === SCALE_MIN ? "translateX(0)" : tick === SCALE_MAX ? "translateX(-100%)" : "translateX(-50%)",
-              fontSize: 8,
-              color: "#8A8580",
-              fontFamily: BODY_FONT,
-              whiteSpace: "nowrap",
-            }}>
-              {tick}
-            </div>
-          );
-        })}
-      </div>
-      <div style={{
-        marginTop: 2,
-        textAlign: "right",
-        fontSize: 8,
-        color: "#8A8580",
-        fontFamily: BODY_FONT,
-      }}>
-        Frequency (Hz)
-      </div>
-    </div>
-  );
-}
-
 export default function PrintBassCapabilityContent({ bassPerformance }) {
   if (!bassPerformance) return null;
 
@@ -238,8 +148,8 @@ export default function PrintBassCapabilityContent({ bassPerformance }) {
         flexDirection: "column",
         alignItems: "center",
         justifyContent: "center",
-        gap: 20,
-        padding: "8px 16px",
+        gap: 34,
+        padding: "14px 16px",
         fontFamily: BODY_FONT,
       }}>
         {/* P14 */}
@@ -287,7 +197,7 @@ export default function PrintBassCapabilityContent({ bassPerformance }) {
               color: "#625143",
               textTransform: "uppercase",
               letterSpacing: "0.06em",
-              marginBottom: 2,
+              marginBottom: 3,
             }}>
               P18 — Low-Frequency Extension
             </div>
@@ -299,15 +209,11 @@ export default function PrintBassCapabilityContent({ bassPerformance }) {
             }}>
               P18 — {p18LevelLabel}
             </div>
-            <div style={{ fontSize: 11, color: "#3E4349", marginTop: 2 }}>
-              {p18Hz != null
-                ? `${Math.floor(p18Hz)} Hz low-frequency extension`
-                : "Low-frequency extension"}
-            </div>
-            <div style={{ fontSize: 10, color: "#625143", marginTop: 4 }}>
+            <BassResultCallout achievedHz={p18Hz} achievedLevel={p18?.achievedLevel} variant="print" />
+            <BassExtensionScale achievedHz={p18Hz} targetBasis={p18?.targetBasis} variant="print" />
+            <div style={{ fontSize: 10, color: "#625143", marginTop: 8 }}>
               {p18BasisLabel} grading basis
             </div>
-            <P18FrequencyScale achievedHz={p18Hz} targetBasis={p18?.targetBasis} />
           </div>
         )}
       </div>
