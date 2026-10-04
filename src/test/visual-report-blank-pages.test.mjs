@@ -51,7 +51,7 @@ function declaredPrintableTypes() {
 
 // Pages the wrapper has no print composition for: they carry nothing on paper,
 // so they are shown on screen only and dropped from the printed report.
-const SCREEN_ONLY_PAGE_TYPES = ['acoustic-treatment', 'adi-design-summary'];
+const SCREEN_ONLY_PAGE_TYPES = ['adi-design-summary'];
 
 // ── TEST 1 — the declared set and the print branches agree ─────────────────
 test('TEST 1 — every print composition is declared in the printable set', () => {

@@ -39,6 +39,7 @@ import { selectClientNonScreenDynamicRange } from "@/components/report/client/se
 import ClientScreenSeating from "@/components/report/client/ClientScreenSeating";
 import { selectClientScreenSeating } from "@/components/report/client/selectClientScreenSeating";
 import ClientAcousticTreatment from "@/components/report/client/ClientAcousticTreatment";
+import { buildClientAcousticTreatmentPage } from "@/components/report/client/acousticTreatmentPageAuthority";
 import ClientBassCapability from "@/components/report/client/ClientBassCapability";
 import ClientBassResponse from "@/components/report/client/ClientBassResponse";
 import ClientP19RspPresentation from "@/components/report/client/ClientP19RspPresentation";
@@ -709,10 +710,23 @@ export default function RP22ClientReport() {
         },
       });
     }
-    // Acoustic Treatment — shown whenever treatment is enabled. The page carries
-    // the ADI recommendation and the separate included quantity, so it does not
-    // depend on a quantity having been accepted into pricing.
-    if (appState?.acousticTreatmentEnabled) {
+    // Acoustic Treatment — a real printed page whenever the design carries
+    // treatment. ONE authority decides both the quantity the page may state (the
+    // design's included quantity, the same number pricing follows) and whether
+    // the page exists: with treatment switched off, or no quantity anywhere to
+    // state, the page is not added at all — so it can never print as an empty
+    // sheet, and never as a loading page.
+    const acousticTreatmentPage = buildClientAcousticTreatmentPage({
+      roomDims,
+      seatingPositions,
+      placedSpeakers,
+      rsp,
+      acousticTreatmentEnabled: appState?.acousticTreatmentEnabled === true,
+      selectedAbfuserQty: Number(appState?.selectedAbfuserQty) || 0,
+      legacyAutoQuantity: Number(appState?.legacyAbfuserAutoQty) || 0,
+      abfuserQtySource: appState?.abfuserQtySource || null,
+    });
+    if (acousticTreatmentPage.hasPage) {
       const reportPriceSummary = (() => {
         const summary = typeof window !== "undefined" ? window.__ROOM_DESIGNER_PRICE__ : null;
         return summary && projectId && String(summary.projectId || "") === String(projectId)
@@ -727,6 +741,7 @@ export default function RP22ClientReport() {
         acousticTreatmentEnabled: true,
         selectedAbfuserQty: Number(appState?.selectedAbfuserQty) || 0,
         legacyAutoQuantity: Number(appState?.legacyAbfuserAutoQty) || 0,
+        abfuserQtySource: appState?.abfuserQtySource || null,
         // Quantity consistency: the report reads the same canonical quantity the
         // priced schedule uses, and warns rather than contradicting it.
         pricedAbfuserQty: Number(appState?.selectedAbfuserQty) || 0,
@@ -800,7 +815,7 @@ export default function RP22ClientReport() {
       ...summaryPages,
       ...closingPages,
     ];
-  }, [p5Snapshot, p5SeatResults, p9Snapshot, p9Overhead, bestListeningArea, timbreConsistency, frontSoundstage, nonScreenSoundstage, highlights, screenSeating, hasSeatingPosition, recommendedSeatingPosition, bassPerformance, roomDims, rsp, rspSourceLabel, screenFrontPlaneM, screenWidthM, screen, placedSpeakers, appState?.acousticTreatmentEnabled, appState?.selectedAbfuserQty, coverageSentence, reportGeometry, reportSystem, perSeatPerformance, aboutSoundProofReady, aboutSoundProofHtml, projectId]);
+  }, [p5Snapshot, p5SeatResults, p9Snapshot, p9Overhead, bestListeningArea, timbreConsistency, frontSoundstage, nonScreenSoundstage, highlights, screenSeating, hasSeatingPosition, recommendedSeatingPosition, bassPerformance, roomDims, rsp, rspSourceLabel, screenFrontPlaneM, screenWidthM, screen, placedSpeakers, appState?.acousticTreatmentEnabled, appState?.selectedAbfuserQty, appState?.abfuserQtySource, coverageSentence, reportGeometry, reportSystem, perSeatPerformance, aboutSoundProofReady, aboutSoundProofHtml, projectId]);
 
   // Each category heading is printed once. The first page of a category keeps
   // its heading; continuation pages never repeat the major category heading.

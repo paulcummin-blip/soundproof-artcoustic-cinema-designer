@@ -21,6 +21,7 @@ import PrintP2Content from "@/components/report/client/print/PrintP2Content";
 import PrintP7Content from "@/components/report/client/print/PrintP7Content";
 import AboutSoundProofReportPage from "@/components/report/AboutSoundProofReportPage";
 import PrintPerSeatPerformanceContent from "@/components/report/client/print/PrintPerSeatPerformanceContent";
+import PrintAcousticTreatmentContent from "@/components/report/client/print/PrintAcousticTreatmentContent";
 import ClientDesignHighlights from "@/components/report/client/ClientDesignHighlights";
 import ClientRecommendedSeatingPosition from "@/components/report/client/ClientRecommendedSeatingPosition";
 import ClientBestListeningArea from "@/components/report/client/ClientBestListeningArea";
@@ -63,6 +64,7 @@ const PRINTABLE_PAGE_TYPES = new Set([
   "bass-response",
   "p19-rsp",
   "per-seat-performance",
+  "acoustic-treatment",
   "about-sound-proof",
 ]);
 
@@ -461,6 +463,13 @@ export default function ClientReportPage({ children, isFirst, projectDetails, lo
         )}
         {printData?.type === "per-seat-performance" && (
           <PrintPerSeatPerformanceContent rows={printData.seatRows} rsp={printData.rsp} />
+        )}
+        {/* Acoustic Treatment — the printed treatment page. Its content and its
+            quantity come from the acoustic treatment page authority, and the page
+            itself is only ever added to the report when the design carries
+            treatment, so this composition always has something to print. */}
+        {printData?.type === "acoustic-treatment" && (
+          <PrintAcousticTreatmentContent {...printData} />
         )}
         {printData?.type === "about-sound-proof" && (
           <AboutSoundProofReportPage html={printData.aboutHtml} />
