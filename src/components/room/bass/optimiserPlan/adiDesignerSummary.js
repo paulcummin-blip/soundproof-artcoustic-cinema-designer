@@ -19,7 +19,7 @@
 // Engineer Details disclosure reads the raw plan and evidence directly.
 // ---------------------------------------------------------------------------
 
-import { OPTIMISER_EVIDENCE_STATUS_LABEL } from "./optimiserPlanConstants.js";
+import { OPTIMISER_EVIDENCE_STATUS_LABEL, OPTIMISER_LEVER } from "./optimiserPlanConstants.js";
 import { leverLabel, OPTIMISER_FAMILY_SEQUENCE } from "./optimiserLeverOrder.js";
 import {
   OPTIMISER_LEVER_VERDICT,
@@ -37,7 +37,14 @@ import {
   buildFamilyLedgerRows,
 } from "./optimiserFamilyLedgerRows.js";
 import { PLACEMENT_THEORETICAL_NOTE, describePlacementMove } from "./placementMoveAuthority.js";
-import { resolvePlacementRecommendation } from "./placementRecommendationAuthority.js";
+import {
+  PLACEMENT_CREDIBILITY,
+  subwooferGroupCounts,
+} from "./placementPlausibilityAuthority.js";
+import {
+  resolvePlacementGate,
+  resolvePlacementRecommendation,
+} from "./placementRecommendationAuthority.js";
 import { LEVER_APPLY_LABEL, LEVER_UNDO_LABEL } from "./optimiserPlanLeverApply.js";
 import { buildLiveFamilyRows } from "./optimiserLiveProgress.js";
 import { ADI_BASS_OPTIMISER_LABEL } from "./resolveAdiOptimiserJourney.js";
@@ -140,10 +147,14 @@ function p20Line(level, deviation) {
  * legal. A lever that was evaluated but is below the gate is never presented as
  * a recommendation — it is reported as tested with no useful improvement.
  */
-function resolveRecommendedLever(planView) {
+function resolveRecommendedLever(planView, { suppressedLeverKeys = [] } = {}) {
   const rows = Array.isArray(planView?.levers) ? planView.levers : [];
   const baseline = planView?.baseline || null;
-  const offerable = rows.filter((row) => leverIsOfferable(row, baseline));
+  // A lever the professional plausibility gate refuses is not a recommendation,
+  // however mathematical its improvement: it can never become the one change the
+  // card offers to apply.
+  const offerable = rows.filter((row) => leverIsOfferable(row, baseline)
+    && !suppressedLeverKeys.includes(leverKeyOf(row)));
   if (offerable.length !== 1) return null;
   return leverKeyOf(offerable[0]);
 }
@@ -197,7 +208,14 @@ function seatingRecommendationDetail({ row, baseline = null, currentP20 = null }
  */
 export function buildTestedOptionRows(
   planView,
-  { recommendedLever = null, appliedLever = null, liveRows = null, roomDims = null } = {},
+  {
+    recommendedLever = null,
+    appliedLever = null,
+    liveRows = null,
+    roomDims = null,
+    layoutCounts = null,
+    placementPlausibility = null,
+  } = {},
 ) {
   if (Array.isArray(liveRows) && liveRows.length) return liveRows;
   const lastKey = leverOrder()[leverOrder().length - 1] || null;
@@ -212,6 +230,8 @@ export function buildTestedOptionRows(
     const row = findLeverRow(planView, key);
     const label = displayLabel(key);
     const isLast = key === lastKey;
+    // The professional plausibility gate applies to the placement lever only.
+    const plausibility = key === OPTIMISER_LEVER.PLACEMENT ? placementPlausibility : null;
     const evaluated = row?.evaluated === true;
     const hasChanges = Array.isArray(row?.changes) && row.changes.length > 0;
 
@@ -225,7 +245,7 @@ export function buildTestedOptionRows(
       // screen" — beside its evaluated effect, in whole dB.
       const movement = row?.seating?.movementLabel
         || row?.movementLabel
-        || describePlacementMove({ changes: row?.changes, roomDims })?.movementLabel
+        || describePlacementMove({ changes: row?.changes, roomDims, layoutCounts })?.movementLabel
         || null;
       const effect = shortPhrase(describeLeverEffect(row?.effect));
       return {
@@ -352,6 +372,27 @@ export function buildTestedOptionRows(
           outcome: row?.theoreticalReason
             ? `${PLACEMENT_THEORETICAL_NOTE} ${row.theoreticalReason}`
             : PLACEMENT_THEORETICAL_NOTE,
+          action: null,
+        };
+      }
+      // The professional plausibility gate outranks the mathematical verdict. A
+      // change it refuses is stated as a non-actionable note — never as a
+      // recommendation, and never with an Apply.
+      if (plausibility?.credibility === PLACEMENT_CREDIBILITY.SUPPRESSED) {
+        return {
+          key,
+          label,
+          status: ADI_ROW_STATUS.TESTED,
+          outcome: plausibility.suitabilityNote || ADI_ROW_OUTCOME.NO_USEFUL,
+          action: null,
+        };
+      }
+      if (plausibility?.credibility === PLACEMENT_CREDIBILITY.REVIEW) {
+        return {
+          key,
+          label,
+          status: plausibility.status || ADI_ROW_STATUS.TESTED,
+          outcome: plausibility.suitabilityNote || ADI_ROW_OUTCOME.NO_USEFUL,
           action: null,
         };
       }
@@ -546,11 +587,28 @@ export function buildAdiDesignerSummary({
   // never established against the published result may be applied.
   const parityBlocked = parityBlocksApply(planView?.baselineParity);
 
-  const recommendedLever = resolveRecommendedLever(planView);
+  // ── The final professional plausibility gate ──
+  // Read once, against the layout the designer actually has, so the recommended
+  // lever, the "What ADI tested" rows and the placement panel all pass through
+  // one gate and can never disagree about the same evaluated change.
+  const layoutCounts = subwooferGroupCounts(instances, roomDims);
+  const placementPlausibility = resolvePlacementGate({ planView, roomDims, layoutCounts })?.verdict || null;
+  const placementSuppressed = placementPlausibility?.credibility === PLACEMENT_CREDIBILITY.SUPPRESSED;
+
+  const recommendedLever = resolveRecommendedLever(planView, {
+    suppressedLeverKeys: placementSuppressed ? [OPTIMISER_LEVER.PLACEMENT] : [],
+  });
   const apply = resolveApplyPermission({ planView, presentation, recommendedLever, currentP20, parityBlocked });
   const undo = resolveUndoPermission({ planView, appliedLever });
   const liveRows = running ? buildLiveFamilyRows(liveProgress) : null;
-  const leverRows = buildTestedOptionRows(planView, { recommendedLever, appliedLever, liveRows, roomDims });
+  const leverRows = buildTestedOptionRows(planView, {
+    recommendedLever,
+    appliedLever,
+    liveRows,
+    roomDims,
+    layoutCounts,
+    placementPlausibility,
+  });
 
   const baselineDeviation = wholeNumberDeviation(planView?.baseline?.p20VariationDb ?? null);
   const baselineLevel = planView?.baseline?.p20Level ?? null;
@@ -639,6 +697,7 @@ export function buildAdiDesignerSummary({
       appliedDirection,
       currentP20,
       parityBlocked,
+      layoutCounts,
     }),
     actions: {
       canApply: apply.allowed,

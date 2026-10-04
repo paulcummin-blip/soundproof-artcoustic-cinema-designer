@@ -21,6 +21,8 @@ export default function PlacementRecommendationSection({
   roomDims = null,
   presentation = null,
   leverOutcome = null,
+  subwooferInstances = null,
+  layoutCounts = null,
   busy = false,
   onApplyLever = null,
   onUndoLever = null,
@@ -34,8 +36,12 @@ export default function PlacementRecommendationSection({
       presentation,
       appliedLever: leverOutcome?.appliedLever ?? null,
       appliedDirection: leverOutcome?.direction ?? null,
+      // The current layout, so the professional plausibility gate judges the
+      // evaluated move against the design the designer actually has.
+      subwooferInstances,
+      layoutCounts,
     }),
-    [planView, roomDims, presentation, leverOutcome],
+    [planView, roomDims, presentation, leverOutcome, subwooferInstances, layoutCounts],
   );
 
   const lever = (planView?.levers || [])
