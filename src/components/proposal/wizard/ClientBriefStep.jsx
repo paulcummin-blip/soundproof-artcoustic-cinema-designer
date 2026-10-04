@@ -1,5 +1,6 @@
 import React from 'react';
 import AdiSuggestionChips from '@/components/proposal/wizard/AdiSuggestionChips';
+import { appendSelectedPrompts } from '@/components/proposal/wizard/clientBriefChips';
 
 /**
  * Step 4 — Client Brief & Narrative Focus.
@@ -16,6 +17,9 @@ import AdiSuggestionChips from '@/components/proposal/wizard/AdiSuggestionChips'
  *
  * The brief is optional — the user can proceed without it and the report
  * will generate with a default professional narrative.
+ *
+ * Example chips are multi-select: the user marks several, then adds them all at
+ * once. Until then the brief is untouched.
  */
 export default function ClientBriefStep({
   value,
@@ -28,11 +32,13 @@ export default function ClientBriefStep({
   versionsLoading,
   snapshotLoading,
 }) {
-  const handleExampleClick = (example) => {
-    const current = (value || '').trim();
-    const prefix = current && !current.endsWith('\n') ? '\n' : '';
-    const next = current ? `${current}${prefix}• ${example}` : `• ${example}`;
-    onChange(next);
+  // The confirmed chip prompts are inserted together, as bullets, and a prompt
+  // the brief already contains is never added again. Returns what was added and
+  // what was already there so the chips can say so.
+  const handleAddSelected = (examples) => {
+    const result = appendSelectedPrompts(value, examples);
+    if (result.added.length > 0) onChange(result.next);
+    return result;
   };
 
   return (
@@ -67,7 +73,7 @@ export default function ClientBriefStep({
         versionSnapshots={versionSnapshots}
         versionsLoading={versionsLoading}
         snapshotLoading={snapshotLoading}
-        onAdd={handleExampleClick}
+        onAddSelected={handleAddSelected}
       />
 
       <div className="mt-6 p-3 bg-[#F5F4F0] border-l-2 border-[#213428] rounded-r">

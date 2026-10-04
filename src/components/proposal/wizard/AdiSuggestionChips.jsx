@@ -1,7 +1,8 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { Lightbulb, RefreshCw } from 'lucide-react';
+import { Check, Lightbulb, RefreshCw } from 'lucide-react';
 import { base44 } from '@/api/base44Client';
 import log from '@/components/utils/logger';
+import { toggleChipSelection } from '@/components/proposal/wizard/clientBriefChips';
 
 /**
  * ADI narrative focus suggestions for the Client Brief step.
@@ -27,6 +28,12 @@ import log from '@/components/utils/logger';
  * though it applied to the whole comparison.
  *
  * When no calculated result is available, generic examples are shown instead.
+ *
+ * Chips are multi-select and purely local: clicking one only marks it selected —
+ * nothing is written to the Client Brief until the user presses "Add selected to
+ * brief", which returns the prompts that were added and those already present.
+ * Selecting a chip never regenerates the examples; only Refresh examples, a
+ * version change, a proposal type change or a readiness change does.
  */
 const GENERIC_EXAMPLES = [
   'Dynamic impact',
@@ -59,12 +66,40 @@ export default function AdiSuggestionChips({
   versionSnapshots = [],
   snapshotLoading = false,
   versionsLoading = false,
-  onAdd,
+  onAddSelected,
 }) {
   const [suggestions, setSuggestions] = useState([]);
   const [loading, setLoading] = useState(false);
   const [failed, setFailed] = useState(false);
+  // Local, unconfirmed chip selection: cleared when the examples themselves
+  // change, and handed to the brief only when the user confirms.
+  const [selected, setSelected] = useState([]);
+  const [duplicateNotice, setDuplicateNotice] = useState(null);
   const requestRef = useRef(0);
+
+  const toggleChip = (label) => {
+    setDuplicateNotice(null);
+    setSelected((current) => toggleChipSelection(current, label));
+  };
+
+  const clearSelection = () => {
+    setSelected([]);
+    setDuplicateNotice(null);
+  };
+
+  const confirmSelection = () => {
+    if (selected.length === 0) return;
+    const result = onAddSelected?.(selected) || {};
+    const duplicates = result.duplicates || [];
+    setDuplicateNotice(
+      duplicates.length === 0
+        ? null
+        : duplicates.length === 1
+          ? `Already in the brief: ${duplicates[0]}`
+          : `Already in the brief: ${duplicates.slice(0, 2).join(', ')}${duplicates.length > 2 ? ` and ${duplicates.length - 2} more` : ''}`,
+    );
+    setSelected([]);
+  };
 
   // In comparison mode the examples are built from EVERY selected version, so a
   // comparison is never described from one version's facts alone.
@@ -126,6 +161,12 @@ export default function AdiSuggestionChips({
     }
   }, [hasResults, load]);
 
+  // New examples invalidate what was selected against the old ones.
+  useEffect(() => {
+    setSelected([]);
+    setDuplicateNotice(null);
+  }, [suggestions]);
+
   const usingCalculatedResults = hasResults && !failed && suggestions.length > 0;
   const failedWithData = hasResults && failed;
   const chips = usingCalculatedResults
@@ -182,18 +223,53 @@ export default function AdiSuggestionChips({
 
       {!busy && (
         <div className="flex flex-wrap gap-2">
-          {chips.map((chip) => (
-            <button
-              key={chip.label}
-              type="button"
-              title={chip.reason || undefined}
-              onClick={() => onAdd(chip.label)}
-              className="px-3 py-1.5 text-xs text-[#3E4349] bg-[#F5F4F0] border border-[#E5E1D8] rounded-full hover:bg-[#213428] hover:text-white hover:border-[#213428] transition-colors"
-            >
-              {chip.label}
-            </button>
-          ))}
+          {chips.map((chip) => {
+            const isSelected = selected.includes(chip.label);
+            return (
+              <button
+                key={chip.label}
+                type="button"
+                title={chip.reason || undefined}
+                aria-pressed={isSelected}
+                onClick={() => toggleChip(chip.label)}
+                className={`inline-flex items-center gap-1.5 px-3 py-1.5 text-xs rounded-full border transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[#213428]/40 focus-visible:ring-offset-1 ${
+                  isSelected
+                    ? 'bg-[#213428] text-white border-[#213428] font-semibold'
+                    : 'text-[#3E4349] bg-[#F5F4F0] border-[#E5E1D8] hover:bg-[#213428] hover:text-white hover:border-[#213428]'
+                }`}
+              >
+                {isSelected && <Check className="w-3 h-3" />}
+                {chip.label}
+              </button>
+            );
+          })}
         </div>
+      )}
+
+      {!busy && selected.length > 0 && (
+        <div className="mt-3 flex flex-wrap items-center gap-3">
+          <span className="text-[11px] font-semibold text-[#625143]">
+            {selected.length} selected
+          </span>
+          <button
+            type="button"
+            onClick={confirmSelection}
+            className="px-3 py-1.5 text-xs font-semibold text-white bg-[#213428] rounded-md hover:bg-[#2C4436] transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[#213428]/40 focus-visible:ring-offset-1"
+          >
+            Add selected to brief
+          </button>
+          <button
+            type="button"
+            onClick={clearSelection}
+            className="text-[11px] text-[#625143] underline underline-offset-2 hover:text-[#213428] transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[#213428]/40 rounded"
+          >
+            Clear selection
+          </button>
+        </div>
+      )}
+
+      {!busy && duplicateNotice && (
+        <p className="mt-2 text-[11px] text-[#8A5A2B]">{duplicateNotice}</p>
       )}
     </div>
   );
