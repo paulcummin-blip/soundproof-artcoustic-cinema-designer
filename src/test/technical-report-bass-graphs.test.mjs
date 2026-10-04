@@ -26,6 +26,7 @@ import { renderToStaticMarkup } from 'react-dom/server';
 
 import { buildReportBassGraphs } from '../components/report/technical/bassResponseGraphAuthority.js';
 import BassResponseGraphSection from '../components/report/technical/BassResponseGraphSection.jsx';
+import { buildMarkerLabelLayout } from '../components/report/technical/bassGraphMarkerLabels.js';
 import { resolveOptimisationTransitionHz } from '../components/room/bass/optimisationTransitionAuthority.js';
 import { REPORT_BASS_GRAPH_Y_DOMAIN, REPORT_GRAPH_SMOOTHING } from '../components/report/technical/bassResponseGraphAuthority.js';
 
@@ -187,8 +188,14 @@ test('TEST 9 — the RSP page plots the RSP room response and nothing else', () 
   // The mandated page copy, and no leftover caption from the comparison page.
   assert.ok(source.includes('The RSP trace shows the predicted low-frequency response at the reference seating position.'),
     'the mandated RSP explanation is present');
-  assert.ok(source.includes('below the room transition region.'),
-    'the mandated RSP explanation is complete');
+  // ONE sentence only: the paragraph ends at that first full stop, and the
+  // transition-region sentence is gone.
+  const rspExplanation = source.match(/RSP_ROOM_RESPONSE_EXPLANATION = "([^"]*)"/)?.[1] ?? '';
+  assert.equal(rspExplanation,
+    'The RSP trace shows the predicted low-frequency response at the reference seating position.',
+    'the RSP paragraph is the single mandated sentence');
+  assert.equal((rspExplanation.match(/\./g) || []).length, 1, 'no second explanatory sentence');
+  assert.ok(!source.includes('below the room transition region'), 'the transition sentence is removed');
   assert.ok(!source.includes('RSP_GRAPH_NOTE'), 'the old comparison-page caption is gone');
   assert.ok(/note: null,/.test(source), 'the RSP page carries no second caption');
 
@@ -283,6 +290,47 @@ test('TEST 11 — the rendered RSP page shows one RSP room response trace', () =
     'the mandated paragraph');
   assert.ok(rspPage.includes('Frequency (Hz)') && rspPage.includes('SPL (dB)'), 'both axes are labelled');
   assert.ok(rspPage.includes('>150</text>'), 'the log frequency axis keeps its upper decade label');
-  assert.ok(rspPage.includes('Transition ≈'), 'the transition marker is kept');
+  assert.ok(rspPage.includes('Transition / Schroeder ≈'), 'the transition / Schroeder marker is kept');
   assert.ok(rspPage.includes('width="100%"'), 'the graph spans the full page width');
+});
+
+// ── TEST 12 — marker labels never clash or leave the plot box ──────────────
+test('TEST 12 — marker labels are combined, stacked and border-safe', () => {
+  const box = { plotLeft: 92, plotRight: 1172, firstRowY: 54 };
+
+  // Transition and Schroeder on the same position: ONE combined label, with both
+  // marker lines still drawn.
+  const coincident = buildMarkerLabelLayout(
+    [
+      { key: 'transition', frequency: 123, x: 700, shortName: 'Transition / Schroeder', color: '#625143' },
+      { key: 'limiting', frequency: 124, x: 706, shortName: 'Limiting', color: '#B45309' },
+    ],
+    box,
+  );
+  assert.equal(coincident.length, 1, 'coincident markers share one label');
+  assert.ok(coincident[0].text.startsWith('Transition / Schroeder / Limiting ≈'),
+    `the combined label names both markers: ${coincident[0].text}`);
+  assert.deepEqual(coincident[0].lines, [700, 706], 'both marker lines are kept');
+
+  // Close but distinct markers stack onto separate rows instead of overlapping.
+  const stacked = buildMarkerLabelLayout(
+    [
+      { key: 'transition', frequency: 123, x: 700, shortName: 'Transition / Schroeder', color: '#625143' },
+      { key: 'limiting', frequency: 60, x: 760, shortName: 'Limiting', color: '#B45309' },
+    ],
+    box,
+  );
+  assert.equal(stacked.length, 2, 'distinct markers keep their own labels');
+  const [first, second] = stacked;
+  const overlaps = first.box.left < second.box.right && second.box.left < first.box.right
+    && first.box.top < second.box.bottom && second.box.top < first.box.bottom;
+  assert.ok(!overlaps, 'the two labels do not touch');
+
+  // A marker at the right-hand edge keeps its label inside the plot border.
+  const edge = buildMarkerLabelLayout(
+    [{ key: 'limiting', frequency: 195, x: box.plotRight - 6, shortName: 'Limiting', color: '#B45309' }],
+    box,
+  );
+  assert.ok(edge[0].box.left >= box.plotLeft && edge[0].box.right <= box.plotRight,
+    'the label stays inside the plot border');
 });

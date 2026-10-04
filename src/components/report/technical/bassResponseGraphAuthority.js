@@ -41,7 +41,10 @@ export const REPORT_BASS_GRAPH_X_DOMAIN_WIDE = [15, 300];
 export const RSP_ROOM_RESPONSE_LABEL = "RSP room response";
 
 /** The mandated explanatory paragraph on the RSP Room Response page. */
-export const RSP_ROOM_RESPONSE_EXPLANATION = "The RSP trace shows the predicted low-frequency response at the reference seating position. This is the reference position used when assessing bass response below the room transition region.";
+// One sentence, and only one sentence: the page states what the trace is and
+// stops there. The graph's own markers carry the transition-region detail, so
+// the paragraph never repeats it.
+export const RSP_ROOM_RESPONSE_EXPLANATION = "The RSP trace shows the predicted low-frequency response at the reference seating position.";
 
 /** Colour-independent caps so the page stays readable. */
 export const REPORT_PRIMARY_SEAT_LIMIT = 8;

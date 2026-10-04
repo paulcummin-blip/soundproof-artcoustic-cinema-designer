@@ -13,6 +13,7 @@
 
 import React from "react";
 import { REPORT_FONT_BODY } from "@/components/report/typography/reportTypography";
+import { buildMarkerLabelLayout, LABEL_FONT_SIZE } from "./bassGraphMarkerLabels";
 
 const VIEW_W = 1200;
 const VIEW_H = 700;
@@ -74,19 +75,30 @@ export default function BassResponsePlot({
 
   const band = markers.assessmentBand || {};
   const bandVisible = finite(band.startHz) && finite(band.endHz) && band.endHz > band.startHz;
+  // The transition line IS the Schroeder-style marker (one shared definition in
+  // optimisationTransitionAuthority), so it is named once in that one label.
   const markerLines = [
     finite(markers.transitionHz)
-      ? { frequency: Number(markers.transitionHz), label: `Transition ≈ ${Math.round(Number(markers.transitionHz))} Hz`, color: "#625143" }
+      ? { key: "transition", frequency: Number(markers.transitionHz), shortName: "Transition / Schroeder", color: "#625143" }
       : null,
     finite(markers.limitingFrequencyHz)
-      ? { frequency: Number(markers.limitingFrequencyHz), label: `Limiting ≈ ${Math.round(Number(markers.limitingFrequencyHz))} Hz`, color: "#B45309" }
+      ? { key: "limiting", frequency: Number(markers.limitingFrequencyHz), shortName: "Limiting", color: "#B45309" }
       : null,
     finite(markers.p18FrequencyHz)
-      ? { frequency: Number(markers.p18FrequencyHz), label: `P18 −3 dB ≈ ${Math.round(Number(markers.p18FrequencyHz))} Hz`, color: "#1D4ED8" }
+      ? { key: "p18", frequency: Number(markers.p18FrequencyHz), shortName: "P18 −3 dB", color: "#1D4ED8" }
       : null,
   ]
     .filter(Boolean)
-    .filter((marker) => marker.frequency >= xDomain[0] && marker.frequency <= xDomain[1]);
+    .filter((marker) => marker.frequency >= xDomain[0] && marker.frequency <= xDomain[1])
+    .map((marker) => ({ ...marker, x: xScale(marker.frequency, xDomain) }));
+
+  // Where each label goes: combined when markers coincide, stacked when they are
+  // close, and never outside the plot box.
+  const markerLabels = buildMarkerLabelLayout(markerLines, {
+    plotLeft: MARGIN.left,
+    plotRight: MARGIN.left + PLOT_W,
+    firstRowY: MARGIN.top + 16,
+  });
 
   return (
     <svg
@@ -145,19 +157,22 @@ export default function BassResponsePlot({
         />
       ))}
 
-      {markerLines.map((marker) => (
-        <g key={marker.label}>
-          <line
-            x1={xScale(marker.frequency, xDomain)}
-            x2={xScale(marker.frequency, xDomain)}
-            y1={MARGIN.top}
-            y2={MARGIN.top + PLOT_H}
-            stroke={marker.color}
-            strokeWidth="1.5"
-            strokeDasharray="5 4"
-          />
-          <text x={xScale(marker.frequency, xDomain) + 5} y={MARGIN.top + 16} fill={marker.color} fontSize="15" fontWeight="600">
-            {marker.label}
+      {markerLabels.map((marker) => (
+        <g key={marker.key}>
+          {marker.lines.map((x, index) => (
+            <line
+              key={`${marker.key}-line-${index}`}
+              x1={x}
+              x2={x}
+              y1={MARGIN.top}
+              y2={MARGIN.top + PLOT_H}
+              stroke={marker.color}
+              strokeWidth="1.5"
+              strokeDasharray="5 4"
+            />
+          ))}
+          <text x={marker.labelX} y={marker.labelY} fill={marker.color} fontSize={LABEL_FONT_SIZE} fontWeight="600">
+            {marker.text}
           </text>
         </g>
       ))}
