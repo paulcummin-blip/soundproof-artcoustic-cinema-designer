@@ -47,6 +47,7 @@ import {
   splitParameterEvidence,
 } from './adiReportEvidenceRules.js';
 import { DESIGN_LED_VOICE_RULES, DESIGN_INDEX_HARD_RULES, isDesignIndexRow } from './reportWritingStyleContract.js';
+import { summariseSubwooferConfiguration } from './subwooferConfigurationSummary.js';
 
 function compose(...parts) {
   const clean = parts
@@ -98,6 +99,12 @@ export function buildEngineeringEvidence(snapshot) {
   }
   if (system.subwoofer_strategy?.strategy_text) {
     lines.push(`Subwoofers: ${system.subwoofer_strategy.strategy_text}`);
+  }
+  // The configuration is stated from this version's own subwoofer instances, so
+  // the writer and the example chips state the same count and front/rear layout.
+  const subwoofers = summariseSubwooferConfiguration(system);
+  if (subwoofers.humanReadableSummary) {
+    lines.push(`Subwoofer configuration: ${subwoofers.humanReadableSummary}`);
   }
   if (system.amplification?.specified) lines.push(`Amplification: ${system.amplification.text}`);
   if (snapshot.product_coherence?.text) lines.push(`Speaker families: ${snapshot.product_coherence.text}`);

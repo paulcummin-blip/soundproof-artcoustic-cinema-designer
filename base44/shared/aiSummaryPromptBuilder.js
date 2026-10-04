@@ -22,6 +22,7 @@
 
 import { NEUTRAL_VOICE_RULES } from './reportWritingStyleContract.js';
 import { SOUND_PROOF_WRITING_AUTHORITY } from './soundProofWritingAuthority.js';
+import { summariseSubwooferConfiguration } from './subwooferConfigurationSummary.js';
 
 const FORBIDDEN_WORDS = [
   "poor", "bad", "needs improvement", "should upgrade",
@@ -87,6 +88,18 @@ function formatBass(bass) {
  * @param {Object} payload - From buildAiSummaryPayload
  * @returns {string}
  */
+/**
+ * The subwoofer configuration as one statement: "2 × SUB4-12 · 1 front / 1 rear
+ * layout". Read from the payload's own subwoofer instances, so the prompt states
+ * the same count and layout the example chips state.
+ */
+function formatSubwoofers(system) {
+  const summary = summariseSubwooferConfiguration(system);
+  if (summary.humanReadableSummary) return summary.humanReadableSummary;
+  const count = system?.subwooferCount || 0;
+  return `${count} (${(system?.subwooferModels || []).join(", ") || "—"})`;
+}
+
 export function buildSingleSummaryPrompt(payload) {
   const { identity, project, system, categoryFloors, parameters, bass, assumptions, viewing } = payload || {};
 
@@ -157,7 +170,7 @@ export function buildComparisonSummaryPrompt({ payloads, versionLabels }) {
 - Category Floors Secondary: ${formatCategoryFloors(payload?.categoryFloors?.secondary)}
 - Bass: ${formatBass(payload?.bass)}
 - Design assumptions: ${formatAssumptions(payload?.assumptions)}
-- Subwoofers: ${payload?.system?.subwooferCount || 0} (${(payload?.system?.subwooferModels || []).join(", ") || "—"})
+- Subwoofers: ${formatSubwoofers(payload?.system)}
 - Screen: ${payload?.system?.screen?.size || "—"}" ${payload?.system?.screen?.aspectRatio || ""}
 - Viewing: ${payload?.viewing?.summary || "Not calculated"}`;
   }).join("\n\n");

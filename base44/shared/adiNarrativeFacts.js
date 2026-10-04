@@ -20,6 +20,7 @@ import {
   resolveBassEvidence,
   splitParameterEvidence,
 } from './adiReportEvidenceRules.js';
+import { summariseSubwooferConfiguration } from './subwooferConfigurationSummary.js';
 
 export const NUMBER_RE = /\d+(?:\.\d+)*/g;
 
@@ -95,10 +96,16 @@ export function buildNarrativeFacts(snapshot) {
   };
   screen.available = Number.isFinite(screen.sizeInches) || screenRaw.manual_dimensions === true;
 
+  // The subwoofer configuration is read from this version's own subwoofer
+  // instances — the same active subs the analysis, pricing and reports use.
+  // The Dolby notation digit is never the count: in 9.1.6 the 1 is one LFE
+  // channel, not one subwoofer.
+  const subwoofers = summariseSubwooferConfiguration(system);
+
   const channels = {
     total: toNumber(layout.total_discrete) ?? toNumber(system.configuration?.total_discrete_channels),
     configuration: system.configuration?.dolby_config ? String(system.configuration.dolby_config) : null,
-    subwooferCount: toNumber(layout.subwoofer_count) ?? toNumber(system.subwoofer_strategy?.count),
+    subwooferCount: subwoofers.available ? subwoofers.totalSubwooferCount : null,
   };
 
   const seating = {
@@ -192,6 +199,7 @@ export function buildNarrativeFacts(snapshot) {
     available,
     screen,
     channels,
+    subwoofers,
     seating,
     viewing: {
       available: snapshot?.viewing?.available === true,
@@ -226,9 +234,7 @@ export function buildNarrativeFactsBlock(facts) {
     const parts = [
       facts.channels.configuration ? `${facts.channels.configuration} layout` : null,
       Number.isFinite(facts.channels.total) ? `${facts.channels.total} discrete channels` : null,
-      Number.isFinite(facts.channels.subwooferCount)
-        ? `${facts.channels.subwooferCount} subwoofer${facts.channels.subwooferCount === 1 ? '' : 's'}`
-        : null,
+      facts.subwoofers?.humanReadableSummary || null,
     ].filter(Boolean);
     lines.push(`System: ${parts.join(', ')}`);
   }

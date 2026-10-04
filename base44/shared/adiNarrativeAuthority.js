@@ -174,12 +174,22 @@ export function buildAuthorityChips(facts) {
     ));
   }
 
-  if (Number.isFinite(channels.subwooferCount) && channels.subwooferCount > 0) {
+  // The subwoofer example states this version's own configuration — the count and
+  // the front/rear layout read from its subwoofer instances. A version with no
+  // active subwoofer gets no subwoofer example at all, never an invented one.
+  const subs = facts.subwoofers || {};
+  if (Number.isFinite(subs.totalSubwooferCount) && subs.totalSubwooferCount > 0) {
+    const total = subs.totalSubwooferCount;
+    const layout = subs.layoutLabel ? ` ${subs.layoutLabel}` : '';
     chips.push(chip(
-      `Explain the ${channels.subwooferCount} subwoofer configuration`,
-      'Subwoofer count calculated for this version.',
-      ['snapshot.system.channel_layout.subwoofer_count'],
-      [String(channels.subwooferCount)],
+      total === 1
+        ? `Explain the single${layout} subwoofer configuration`
+        : `Explain the ${total} subwoofer${layout} configuration`,
+      subs.humanReadableSummary
+        ? `Subwoofer configuration in this version: ${subs.humanReadableSummary}.`
+        : 'Subwoofer configuration read from this version.',
+      ['snapshot.system.subwoofer_strategy.instances', 'snapshot.system.subwoofer_strategy.count'],
+      [String(total), ...(subs.modelLabel ? [subs.modelLabel] : [])],
     ));
   }
 

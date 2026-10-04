@@ -46,13 +46,18 @@ export function buildSystemAuthority(project, _version, placedSpeakers) {
   const dolbyConfig = parseDolbyConfig(project?.dolby_config);
   const speakersByRole = resolveSpeakerModelsByRole(project, placedSpeakers);
   const subwooferInstances = Array.isArray(project?.subwooferInstances) ? project.subwooferInstances : [];
+  const enabledSubs = subwooferInstances.filter((s) => s.enabled !== false);
   const ampPower = Number(project?.amplifier_power) || null;
   const overhead = resolveOverheadModel(project);
 
-  // Build channel layout from dolby config
+  // Build channel layout from dolby config. The subwoofer count is the number of
+  // subwoofers this version actually has, taken from its own instances — the same
+  // figure the analysis, pricing and reports use. The Dolby notation digit is one
+  // LFE channel (9.1.6 → 1), never a subwoofer count, so it is kept separately.
   const channelLayout = {
     bed_channels: dolbyConfig.bed,
-    subwoofer_count: dolbyConfig.sub,
+    subwoofer_count: enabledSubs.length,
+    dolby_subwoofer_channels: dolbyConfig.sub,
     overhead_channels: dolbyConfig.overhead,
     total_discrete: dolbyConfig.bed + dolbyConfig.overhead,
     configuration_text: dolbyConfig.text,
@@ -74,13 +79,15 @@ export function buildSystemAuthority(project, _version, placedSpeakers) {
   }
 
   // Subwoofer strategy
-  const enabledSubs = subwooferInstances.filter((s) => s.enabled !== false);
   const subwooferStrategy = {
     count: enabledSubs.length,
     models: [...new Set(enabledSubs.map((s) => s.model).filter(Boolean))],
     instances: enabledSubs.map((s) => ({
       id: s.id,
       model: s.model,
+      // The group travels with the instance so the subwoofer summary can state
+      // the front/rear layout without re-deciding which side a sub is on.
+      group: s.legacyGroup ?? s.group ?? null,
       position: s.position ? { x: s.position.x, y: s.position.y } : null,
       bottom_height_m: s.bottomHeightM ?? 0,
       rotation_deg: s.rotationDeg ?? 0,

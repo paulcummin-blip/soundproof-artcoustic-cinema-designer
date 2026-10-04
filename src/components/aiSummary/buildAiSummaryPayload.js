@@ -179,6 +179,12 @@ function extractSystemInfo(snapshot, projectDetails) {
     system.subwooferCount = enabled.length;
     const models = [...new Set(enabled.map((s) => s?.model).filter(Boolean))];
     if (models.length) system.subwooferModels = models;
+    // The grouped instances travel with the payload so the shared subwoofer
+    // summary states the same count and front/rear layout the chips state.
+    system.subwooferInstances = enabled.map((s) => ({
+      model: s?.model || null,
+      group: s?.legacyGroup || s?.group || null,
+    }));
   }
 
   // Screen info
