@@ -74,7 +74,11 @@ export default function TechnicalAsdrScorecard({
       }}
     >
       {/* ── Page heading ── */}
-      <div className="tech-asdr-scorecard-heading" style={{ marginBottom: "5mm" }}>
+      <div
+        className="tech-asdr-scorecard-heading"
+        data-report-section-heading="true"
+        style={{ marginBottom: "5mm" }}
+      >
         <div
           style={{
             fontFamily: FONT_HEADING,

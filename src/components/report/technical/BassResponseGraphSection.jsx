@@ -70,7 +70,13 @@ function GraphPage({ id, blockName, title, explanation, graph, note, first = fal
         ...(first ? {} : { breakBefore: "page", pageBreakBefore: "always" }),
       }}
     >
-      <header style={{ borderBottom: "1px solid #DCDBD6", paddingBottom: "3mm", marginBottom: "4mm" }}>
+      {/* Marked: one section-heading rule gives this title the same gap above
+          and below the divider line, and keeps the header rendering in the
+          printed PDF instead of being treated as app chrome. */}
+      <header
+        data-report-section-heading="true"
+        style={{ borderBottom: "1px solid #DCDBD6", paddingBottom: "3mm", marginBottom: "4mm" }}
+      >
         <div style={{ fontFamily: REPORT_FONT_HEADING, fontSize: "15pt", fontWeight: 700, color: "#1B1A1A", letterSpacing: "0.06em" }}>
           {title}
         </div>

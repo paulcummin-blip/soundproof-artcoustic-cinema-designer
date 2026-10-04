@@ -58,13 +58,16 @@ export const REPORT_LEADING_BODY = 1.4;
 /**
  * The vertical space between a report section heading and the copy beneath it.
  *
- * One value governs every section: screen output states the gap in px, the
- * printed PDF carries the same distance in millimetres. The Technical Report
- * applies it through the `data-report-section-heading` rule in
- * ReportPrintStyles, so no section can be set tighter than any other.
+ * One value governs every section on every Technical Report surface: screen
+ * output states the gap in px, the printed PDF carries the same distance in
+ * millimetres. ReportPrintStyles applies it to every element carrying the
+ * `data-report-section-heading` marker — on screen and in print — and states
+ * the print rule last in its stylesheet so no component-level heading margin
+ * can outrank it.
  */
-export const REPORT_SECTION_HEADING_GAP_PX = 14;
-export const REPORT_SECTION_HEADING_GAP_PRINT = '4mm';
+export const REPORT_SECTION_HEADING_GAP_PX = 18;
+/** 4.8 mm ≈ 18 px — the printed statement of the same gap. */
+export const REPORT_SECTION_HEADING_GAP_PRINT = '4.8mm';
 
 /* ── Profiles ──────────────────────────────────────────────────────────── */
 

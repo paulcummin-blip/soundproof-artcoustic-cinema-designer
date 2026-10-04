@@ -75,8 +75,10 @@ export default function AboutSoundProofReportPage({ variant = "full" }) {
         }}
       />
 
-      {/* Heading */}
+      {/* Heading — marked so the Technical Report's one section-heading rule
+          sets the gap below it in the printed PDF as well as on screen. */}
       <h1
+        data-report-section-heading="true"
         style={{
           fontFamily: FONT_HEADING,
           fontSize: compact ? "13pt" : "15pt",

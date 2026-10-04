@@ -51,8 +51,12 @@ export default function TechnicalParameterPage({ params, children, isFirst = fal
         </div>
       )}
 
-      {/* Category heading bar — part of the same atomic page as its cards */}
+      {/* Category heading bar — the parameter group heading. Marked so the
+          report's one section-heading rule sets the gap below it (in the PDF as
+          well as on screen); that rule takes the space from the frame's own
+          empty bottom padding, so no card can be pushed out of the page. */}
       <div
+        data-report-section-heading="true"
         style={{
           display: "flex",
           alignItems: "center",

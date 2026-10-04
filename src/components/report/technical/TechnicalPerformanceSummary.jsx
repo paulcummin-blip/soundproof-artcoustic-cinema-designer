@@ -202,8 +202,10 @@ export default function TechnicalPerformanceSummary({
         color: COLORS.body,
       }}
     >
-      {/* ── Page heading ── */}
-      <div style={{ marginBottom: "6mm" }}>
+      {/* ── Page heading ──
+          Marked so the Technical Report's one section-heading rule sets the
+          gap below it in the exported PDF as well as on screen. */}
+      <div data-report-section-heading="true" style={{ marginBottom: "6mm" }}>
         <div
           style={{
             fontFamily: FONT_HEADING,

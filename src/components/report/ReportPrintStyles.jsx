@@ -1,6 +1,7 @@
 import React from 'react';
 import {
     REPORT_FONT_BODY,
+    REPORT_SECTION_HEADING_GAP_PX,
     REPORT_SECTION_HEADING_GAP_PRINT,
 } from '@/components/report/typography/reportTypography';
 
@@ -103,14 +104,12 @@ export default function ReportPrintStyles() {
                 }
 
                 /* ── One section-heading rhythm ────────────────────────────
-                   Every Technical Report section heading is followed by the
-                   same gap before its copy, so no section reads tighter than
-                   another. The marked headings sit inside fixed-height page
-                   frames, so the canonical gap is applied over their own
-                   inline rhythm rather than relying on it. */
-                .rp22-report [data-report-section-heading="true"] {
-                    margin-bottom: ${REPORT_SECTION_HEADING_GAP_PRINT} !important;
-                }
+                   Every Technical Report section heading carries the
+                   data-report-section-heading marker and takes the gap below
+                   it from ONE rule, declared at the very end of this
+                   stylesheet so no component-level heading margin can outrank
+                   it. The same gap is declared for the screen surface near the
+                   top of the sheet, so the preview shows what the PDF carries. */
 
                 html, body, #root, #__next {
                     background: #FFFFFF !important;
@@ -417,6 +416,14 @@ export default function ReportPrintStyles() {
             }
 
             .screen-only { display: block; }
+
+            /* ── The same section-heading rhythm on screen ─────────────────
+               The gap below a marked section heading is declared in px for the
+               preview, taken from the one shared authority, so the spacing the
+               designer reviews is the spacing the exported PDF carries. */
+            .rp22-report [data-report-section-heading="true"] {
+                margin-bottom: ${REPORT_SECTION_HEADING_GAP_PX}px !important;
+            }
 
             .print-root {
                 background: #FFFFFF;
@@ -821,12 +828,17 @@ export default function ReportPrintStyles() {
                 text-transform: uppercase !important;
               }
 
+              /* The three-card parameter frame keeps the same content budget.
+                 The group heading's canonical gap (4.8 mm) is reclaimed to
+                 within 0.1 mm from the frame's own padding (3 mm top and
+                 2.5 mm bottom, both empty space above and below the cards),
+                 so no card can be pushed out of the page. */
               .rp22-report .tech-param-page,
               .rp22-report .tech-param-page--first {
                 min-height: 272mm !important;
                 height: 272mm !important;
                 max-height: 272mm !important;
-                padding: 3mm 2.5mm 2.5mm 2.5mm !important;
+                padding: 0.8mm 2.5mm 0 2.5mm !important;
                 overflow: hidden !important;
                 break-inside: avoid-page !important;
                 page-break-inside: avoid !important;
@@ -921,6 +933,36 @@ export default function ReportPrintStyles() {
               letter-spacing: var(--report-body-tracking) !important;
               line-height: var(--report-body-leading) !important;
               text-transform: none !important;
+              }
+
+              /* ── Canonical section-heading rhythm (authoritative) ─────────
+                 ONE gap below every Technical Report section heading: the
+                 page-1 RP22 and RP23 intros, the Project & System Overview,
+                 RP22 Performance Summary and Design Rating headings, the
+                 parameter group heading, the bass graph headings and the About
+                 Sound Proof heading. Declared last in this stylesheet, in its
+                 own print block, so it outranks every earlier heading margin —
+                 the compact ones included. A marked heading is also a document
+                 heading, so the chrome rule that hides header elements never
+                 swallows one. */
+              @media print {
+                .rp22-report [data-report-section-heading="true"] {
+                  margin-bottom: ${REPORT_SECTION_HEADING_GAP_PRINT} !important;
+                }
+
+                /* A marked heading that happens to be a header element is a
+                   document heading, not app chrome: the chrome-hiding rule
+                   above must not swallow it. Every other marked heading keeps
+                   its own display, so no heading row is flattened. */
+                .rp22-report header[data-report-section-heading="true"] {
+                  display: block !important;
+                }
+
+                /* Where a divider line follows the heading, the line takes the
+                   same gap above it as the copy takes below it. */
+                .rp22-report .rp22-bass-graph-page > header {
+                  padding-bottom: ${REPORT_SECTION_HEADING_GAP_PRINT} !important;
+                }
               }
               `}</style>
               );
