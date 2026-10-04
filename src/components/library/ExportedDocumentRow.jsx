@@ -49,11 +49,11 @@ export default function ExportedDocumentRow({
 
   return (
     <div
-      className="flex flex-wrap items-start justify-between gap-4 border-t border-[#EFECE4] py-4"
+      className="flex flex-col gap-3 border-t border-[#EFECE4] py-4 sm:flex-row sm:items-start sm:justify-between sm:gap-6"
       data-issued-document={record.id}
       data-superseded={superseded ? 'true' : 'false'}
     >
-      <div className="flex items-start gap-3 min-w-0">
+      <div className="flex min-w-0 flex-1 items-start gap-3">
         <FileText className="w-4 h-4 mt-0.5 shrink-0 text-[#8A8477]" />
         <div className="min-w-0">
           <div
@@ -73,11 +73,15 @@ export default function ExportedDocumentRow({
         </div>
       </div>
 
-      <div className="flex items-center gap-4 shrink-0">
-        <LibraryStatusLabel
-          state={statusState || (superseded ? LIBRARY_SOURCE_STATE.SUPERSEDED : LIBRARY_SOURCE_STATE.CURRENT)}
-          label={statusLabel}
-        />
+      <div className="flex shrink-0 items-center gap-4 sm:justify-end">
+        {/* A fixed status slot keeps Open and Download in the same column on
+            every row, however long the individual state label is. */}
+        <div className="sm:min-w-[11rem]">
+          <LibraryStatusLabel
+            state={statusState || (superseded ? LIBRARY_SOURCE_STATE.SUPERSEDED : LIBRARY_SOURCE_STATE.CURRENT)}
+            label={statusLabel}
+          />
+        </div>
         <button
           type="button"
           onClick={() => run(openIssuedDocument, 'open')}
