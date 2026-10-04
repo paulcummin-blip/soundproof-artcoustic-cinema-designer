@@ -7,14 +7,18 @@
  * Project-wide     — the images that apply to the whole project
  * Current version  — the images that apply only to the version now open
  *
- * Uploading is unchanged; it simply happens inside whichever scope is on screen,
- * and every card carries its own scope label and scope choice.
+ * The upload scope above the grid is the authority for every new image: the
+ * designer chooses Project-wide or the version that is open, each empty slot
+ * states the scope it will write to, and every filled card carries its own scope
+ * label and scope choice. The filter below only decides what is listed — it
+ * never decides where an upload goes.
  */
 
 import React, { useMemo } from 'react';
 import { REPORT_FONT_BODY } from '@/components/report/typography/reportTypography';
 import ProposalAssetsPanel from '@/components/proposal/ProposalAssetsPanel';
-import { IMAGE_SCOPE_FILTER } from './imageScopeAuthority';
+import ImageUploadScopeControl from './ImageUploadScopeControl';
+import { IMAGE_SCOPE, IMAGE_SCOPE_FILTER } from './imageScopeAuthority';
 
 const FILTERS = [
   { key: IMAGE_SCOPE_FILTER.ALL, label: 'All images' },
@@ -29,6 +33,10 @@ export default function ProjectLibraryImagesSection({
   versionNameById = new Map(),
   versions = [],
 }) {
+  // The upload scope decides where a NEW image is written. It is deliberately
+  // separate from the filter below, which only decides what is listed — so an
+  // image is never uploaded to a scope the designer did not choose.
+  const [uploadScope, setUploadScope] = React.useState(IMAGE_SCOPE.PROJECT);
   const [filter, setFilter] = React.useState(IMAGE_SCOPE_FILTER.PROJECT);
 
   const activeVersionName = activeVersionId ? (versionNameById.get(activeVersionId) || null) : null;
@@ -43,7 +51,22 @@ export default function ProjectLibraryImagesSection({
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-wrap items-center justify-between gap-4">
+      {/* Where new uploads are used — the authority for every upload below. */}
+      <ImageUploadScopeControl
+        value={uploadScope}
+        onChange={setUploadScope}
+        activeVersionId={activeVersionId}
+        activeVersionName={activeVersionName}
+      />
+
+      {/* What is listed. A filter only: it never changes where an upload goes. */}
+      <div className="flex flex-wrap items-center gap-3">
+        <span
+          className="text-xs uppercase tracking-[0.14em] text-[#625143] shrink-0"
+          style={{ fontFamily: REPORT_FONT_BODY }}
+        >
+          Filter images
+        </span>
         <div className="flex items-center gap-1 p-1 rounded-lg bg-[#F5F4F0] border border-[#E5E1D8]">
           {FILTERS.map(({ key, label }) => {
             const disabled = key === IMAGE_SCOPE_FILTER.VERSION && !activeVersionId;
@@ -63,18 +86,13 @@ export default function ProjectLibraryImagesSection({
             );
           })}
         </div>
-
-        {activeVersionName && (
-          <span className="text-xs text-[#8A8477]" style={{ fontFamily: REPORT_FONT_BODY }}>
-            Current version: {activeVersionName}
-          </span>
-        )}
       </div>
 
       <ProposalAssetsPanel
         projectId={projectId}
         accountId={accountId}
         activeVersionId={activeVersionId}
+        uploadScope={uploadScope}
         scopeFilter={filter}
         versionNameById={versionNameById}
         versionOptions={versionOptions}

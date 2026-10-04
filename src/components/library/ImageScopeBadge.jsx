@@ -13,8 +13,10 @@ import { IMAGE_SCOPE, resolveImageVersionId } from './imageScopeAuthority';
 export default function ImageScopeBadge({ asset, versionNameById = new Map(), className = '' }) {
   const versionId = resolveImageVersionId(asset);
   const versionName = versionId ? versionNameById.get(versionId) : null;
+  // The saved name already reads as a version ("Level 1 version"), so it is
+  // shown exactly as saved and never suffixed again.
   const label = versionId
-    ? `${versionName || 'Version'} version`
+    ? (versionName || 'Version-specific')
     : 'Project-wide';
   const Icon = versionId ? MonitorPlay : Layers;
 

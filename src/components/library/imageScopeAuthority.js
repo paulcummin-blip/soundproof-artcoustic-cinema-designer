@@ -184,12 +184,34 @@ export function resolvePackImages({ assets = [], versionIds = [], versionNameByI
   return [...projectWide, ...perVersion];
 }
 
-/** The small scope label an image card carries. */
+/**
+ * The small scope label an image card carries: the exact saved version name for
+ * a version-specific image, "Project-wide" otherwise. The saved name already
+ * reads as a version ("Level 1 version"), so it is never suffixed again.
+ */
 export function imageScopeLabel(asset, versionNameById = new Map()) {
   const versionId = resolveImageVersionId(asset);
   if (!versionId) return IMAGE_SCOPE_LABEL[IMAGE_SCOPE.PROJECT];
-  const name = versionNameById.get(versionId);
-  return name ? `${name} version` : 'Version-specific';
+  return versionNameById.get(versionId) || 'Version-specific';
+}
+
+/**
+ * Where a NEW upload goes, from the Library's explicit upload-scope control.
+ *
+ * The chosen scope is the authority — never the gallery a card happens to sit
+ * in — so an image is never written to a scope the designer did not choose. The
+ * version scope needs the version that is open; without one it reads as
+ * project-wide, which is also the default.
+ */
+export function resolveUploadTarget({ uploadScope = IMAGE_SCOPE.PROJECT, activeVersionId = null } = {}) {
+  if (uploadScope === IMAGE_SCOPE.VERSION && activeVersionId) {
+    return {
+      scope: IMAGE_SCOPE.VERSION,
+      versionId: activeVersionId,
+      scopeKey: scopeKeyFor(IMAGE_SCOPE.VERSION, activeVersionId),
+    };
+  }
+  return { scope: IMAGE_SCOPE.PROJECT, versionId: null, scopeKey: 'project' };
 }
 
 export default resolveScopedSlotAssignments;

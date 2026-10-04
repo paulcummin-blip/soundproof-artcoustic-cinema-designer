@@ -10,9 +10,11 @@ import {
 import {
   IMAGE_SCOPE,
   IMAGE_SCOPE_FILTER,
+  IMAGE_SCOPE_LABEL,
   groupImagesByScope,
   imageScopeLabel,
   resolveScopedSlotAssignments,
+  resolveUploadTarget,
 } from '@/components/library/imageScopeAuthority';
 import ImageScopeBadge from '@/components/library/ImageScopeBadge';
 import ImageScopeSelect from '@/components/library/ImageScopeSelect';
@@ -28,12 +30,17 @@ import ImageScopeSelect from '@/components/library/ImageScopeSelect';
  * Props:
  * - projectId: string (null if no active project)
  * - accountId: string (null for admin)
+ * - uploadScope: 'project' | 'version' — where a NEW image is written. The
+ *   chosen scope is the authority; it is never inferred from the gallery shown,
+ *   and the gallery it writes to is always on screen.
+ * - scopeFilter: what is listed.
  */
 export default function ProposalAssetsPanel({
   projectId,
   accountId,
   activeVersionId = null,
   scopeFilter = IMAGE_SCOPE_FILTER.ALL,
+  uploadScope = IMAGE_SCOPE.PROJECT,
   versionNameById = new Map(),
 }) {
   const [assets, setAssets] = useState([]);
@@ -62,6 +69,13 @@ export default function ProposalAssetsPanel({
   }, [load]);
 
   const grouped = useMemo(() => groupImagesByScope(assets), [assets]);
+
+  // Where a new upload goes: the upload scope the designer chose, never the
+  // gallery a card happens to sit in.
+  const uploadTarget = useMemo(
+    () => resolveUploadTarget({ uploadScope, activeVersionId }),
+    [uploadScope, activeVersionId],
+  );
 
   // The galleries on screen: the project-wide gallery, and each version's own.
   // Each scope fills its own Cover Image and Image 1 to Image 10, so an image
@@ -96,8 +110,24 @@ export default function ProposalAssetsPanel({
       }));
     }
 
+    // A new image is written to the chosen scope, so that scope's gallery is
+    // always on screen — an upload can never land somewhere invisible.
+    if (!list.some((group) => group.key === uploadTarget.scopeKey)) {
+      list.push({
+        key: uploadTarget.scopeKey,
+        scope: uploadTarget.scope,
+        versionId: uploadTarget.versionId,
+        label: uploadTarget.scope === IMAGE_SCOPE.VERSION
+          ? imageScopeLabel({ scope: IMAGE_SCOPE.VERSION, version_id: uploadTarget.versionId }, versionNameById)
+          : IMAGE_SCOPE_LABEL[IMAGE_SCOPE.PROJECT],
+        assets: uploadTarget.scope === IMAGE_SCOPE.VERSION
+          ? (grouped.versions.find((entry) => entry.versionId === uploadTarget.versionId)?.assets || [])
+          : grouped.project,
+      });
+    }
+
     return list;
-  }, [grouped, scopeFilter, activeVersionId, versionNameById]);
+  }, [grouped, scopeFilter, activeVersionId, versionNameById, uploadTarget]);
 
   const assignmentsFor = useCallback(
     (group) => resolveScopedSlotAssignments(assets, group.key),
@@ -125,8 +155,9 @@ export default function ProposalAssetsPanel({
           order_index: slotNumber(slot) ?? 0,
           category: 'Other',
           proposal_importance: 'Preferred',
-          scope: group.scope,
-          version_id: group.scope === IMAGE_SCOPE.VERSION ? group.versionId : null,
+          // The chosen upload scope is written — never the gallery clicked.
+          scope: uploadTarget.scope,
+          version_id: uploadTarget.versionId,
         });
       }
       await load();
@@ -242,17 +273,35 @@ export default function ProposalAssetsPanel({
                       caption={existing?.caption || ''}
                       onCaptionChange={(cap) => handleCaption(group, slot, cap)}
                     />
-                    {existing && (
-                      <div className="mt-3 flex flex-wrap items-center justify-between gap-2 border-t border-[#EFECE4] pt-3">
-                        <ImageScopeBadge asset={existing} versionNameById={versionNameById} />
-                        <ImageScopeSelect
-                          asset={existing}
-                          activeVersionId={activeVersionId}
-                          activeVersionName={versionNameById.get(activeVersionId) || null}
-                          onChange={(nextScope) => handleScopeChange(existing, nextScope)}
-                        />
-                      </div>
-                    )}
+                    {/* Every card states its scope: a filled card the scope the
+                        image is used by, an empty slot the scope a new upload
+                        will be written to. */}
+                    <div className="mt-3 flex flex-wrap items-center justify-between gap-2 border-t border-[#EFECE4] pt-3">
+                      {existing ? (
+                        <>
+                          <ImageScopeBadge asset={existing} versionNameById={versionNameById} />
+                          <ImageScopeSelect
+                            asset={existing}
+                            activeVersionId={activeVersionId}
+                            activeVersionName={versionNameById.get(activeVersionId) || null}
+                            onChange={(nextScope) => handleScopeChange(existing, nextScope)}
+                          />
+                        </>
+                      ) : (
+                        <>
+                          <span
+                            className="text-[11px] uppercase tracking-[0.12em] text-[#A79E8C]"
+                            style={{ fontFamily: 'Didact Gothic, sans-serif' }}
+                          >
+                            New upload
+                          </span>
+                          <ImageScopeBadge
+                            asset={{ scope: uploadTarget.scope, version_id: uploadTarget.versionId }}
+                            versionNameById={versionNameById}
+                          />
+                        </>
+                      )}
+                    </div>
                   </div>
                 );
               })}
