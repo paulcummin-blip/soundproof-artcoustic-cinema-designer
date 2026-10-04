@@ -25,6 +25,7 @@
 
 import html2canvas from 'html2canvas';
 import { jsPDF } from 'jspdf';
+import { installCanvasGradientGuard, neutraliseDegenerateGradients } from './canvasGradientGuard';
 
 const MM_PER_INCH = 25.4;
 const CSS_PX_PER_INCH = 96;
@@ -220,6 +221,9 @@ export async function captureCompositionToPdf({ nodeHtml, pageSelector, bodyClas
   // frame measures as it does on paper instead of reflowing to a narrower box.
   const frame = createCaptureFrame(captureDocumentHtml({ nodeHtml, bodyClass, styles }), paper.widthMm);
 
+  // Installed for the duration of this capture only, and always restored.
+  let gradientGuard = null;
+
   try {
     await waitForFrameAssets(frame);
 
@@ -237,6 +241,15 @@ export async function captureCompositionToPdf({ nodeHtml, pageSelector, bodyClas
         );
       }
     });
+
+    // A gradient painted on a box that measures nothing has a zero-length
+    // gradient line, which html2canvas turns into a non-finite colour stop and
+    // the browser throws on — aborting the capture and costing the designer
+    // their Project Library copy. Such a box paints nothing, so the degenerate
+    // gradient is removed from the capture clone (the document is unchanged),
+    // and the guard keeps any other non-finite stop from aborting the capture.
+    const degenerateGradients = neutraliseDegenerateGradients(scope);
+    gradientGuard = installCanvasGradientGuard();
 
     const pdf = new jsPDF({ unit: 'mm', format: 'a4', orientation: 'portrait' });
     const win = frame.contentWindow;
@@ -273,8 +286,23 @@ export async function captureCompositionToPdf({ nodeHtml, pageSelector, bodyClas
       );
     }
 
-    return { blob: pdf.output('blob'), pageCount: pages.length };
+    return {
+      blob: pdf.output('blob'),
+      pageCount: pages.length,
+      // What the capture had to sanitise, so a storage failure can name it.
+      captureDiagnostics: {
+        degenerateGradients,
+        sanitisedStops: gradientGuard ? gradientGuard.sanitisedStops() : [],
+      },
+    };
   } finally {
+    if (gradientGuard) {
+      try {
+        gradientGuard.restore();
+      } catch {
+        // The canvas API is already unguarded.
+      }
+    }
     try {
       frame.remove();
     } catch {

@@ -58,6 +58,38 @@ export const STORAGE_FAILURE_MESSAGE = 'PDF downloaded, but Project Library stor
 const RETRY_TOAST_MS = 60000;
 
 /**
+ * One export action, one notification.
+ *
+ * A single export can reach the print path more than once: each of the Technical
+ * Report's drawing captures falls back to printing, and every entry to
+ * printTechnicalReport issues its own storage attempt. Two identical attempts
+ * must not become two identical toasts, and must not store the same export
+ * twice — so both are keyed on the export's own identity: the project, the
+ * version, the document type, the filename and the step that failed.
+ */
+const FAILURE_NOTICE_WINDOW_MS = RETRY_TOAST_MS;
+const attemptsInFlight = new Set();
+const failureNoticesShown = new Map();
+
+/** The identity one export attempt is deduped under. */
+function exportAttemptKey(identity = {}) {
+  const versions = Array.isArray(identity.selectedVersionIds) && identity.selectedVersionIds.length > 0
+    ? identity.selectedVersionIds.join(',')
+    : (identity.versionId || '');
+  return [
+    identity.projectId || '',
+    identity.documentType || '',
+    versions,
+    normalizeFilename(identity.filename),
+  ].join('|');
+}
+
+/** The identity one failure notice is deduped under, including the step. */
+function failureNoticeKey(identity = {}, stage) {
+  return `${exportAttemptKey(identity)}|${stage || EXPORT_STORAGE_STAGE.UNKNOWN}`;
+}
+
+/**
  * Clone the print composition the export prints, synchronously, at click time —
  * before any export state clears the composition from the page.
  *
@@ -141,7 +173,15 @@ async function captureIssuedDocument({ identity, snapshot }) {
     });
   }
 
-  return { issued, filename, blob: captured.blob, pageCount: captured.pageCount };
+  return {
+    issued,
+    filename,
+    blob: captured.blob,
+    pageCount: captured.pageCount,
+    // Whatever the capture had to sanitise travels with the attempt, so a
+    // failure can name the exact element that produced a degenerate gradient.
+    captureDiagnostics: captured.captureDiagnostics || null,
+  };
 }
 
 /**
@@ -227,8 +267,8 @@ export async function storeIssuedDocument({ identity, snapshot }) {
     retryExport: identity?.retryExport || null,
   });
 
-  const { issued, filename, blob, pageCount } = await captureIssuedDocument({ identity, snapshot });
-  updatePendingExport(pendingKey, { issued, filename, blob, pageCount });
+  const { issued, filename, blob, pageCount, captureDiagnostics } = await captureIssuedDocument({ identity, snapshot });
+  updatePendingExport(pendingKey, { issued, filename, blob, pageCount, captureDiagnostics });
 
   const stored = await uploadIssuedPdf({ blob, filename });
   const record = await insertIssuedRow({ issued, filename, pageCount, fileUri: stored.file_uri });
@@ -243,6 +283,12 @@ export async function storeIssuedDocument({ identity, snapshot }) {
  * created.
  */
 export function recordIssuedExportInBackground({ identity, snapshot }) {
+  const attemptKey = exportAttemptKey(identity);
+  // The same export action can arrive here twice. One action stores one copy,
+  // and reports once: the second entry is the same document, not a second one.
+  if (attemptsInFlight.has(attemptKey)) return false;
+  attemptsInFlight.add(attemptKey);
+
   void (async () => {
     const pendingKey = pendingExportKey({ projectId: identity?.projectId, documentType: identity?.documentType, filename: normalizeFilename(identity?.filename) });
     try {
@@ -251,8 +297,12 @@ export function recordIssuedExportInBackground({ identity, snapshot }) {
       announceStored(identity, record);
     } catch (error) {
       reportStorageFailure({ failure: error, pendingKey, identity });
+    } finally {
+      attemptsInFlight.delete(attemptKey);
     }
   })();
+
+  return true;
 }
 
 /** Tell an open Project Library the row has landed, and say so. */
@@ -274,12 +324,23 @@ function reportStorageFailure({ failure, pendingKey, identity }) {
   const issued = held?.issued || identity || {};
   const filename = held?.filename || identity?.filename || null;
 
+  // The same failure, for the same export and the same step, is reported once.
+  // A second entry for one export action — the Technical Report's drawing
+  // captures each fall back to printing — stays silent instead of stacking an
+  // identical red toast on top of the first.
+  const noticeKey = failureNoticeKey({ ...issued, filename }, identified.stage);
+  const shownAt = failureNoticesShown.get(noticeKey);
+  if (shownAt && Date.now() - shownAt < FAILURE_NOTICE_WINDOW_MS) return;
+  if (failureNoticesShown.size > 20) failureNoticesShown.clear();
+  failureNoticesShown.set(noticeKey, Date.now());
+
   writeExportStorageDiagnostic(buildExportStorageDiagnostic({
     failure: identified,
     identity: { ...issued, filename },
     filename,
     storagePath: identified.storagePath,
     partial: identified.partial,
+    captureDiagnostics: held?.captureDiagnostics || null,
   }));
 
   const retryMode = resolveRetryMode({
@@ -308,6 +369,16 @@ function reportStorageFailure({ failure, pendingKey, identity }) {
         }
       : {}),
   });
+
+  // Dismissing the notice clears the record of it, so a retry that fails again
+  // is still reported — the dedupe only covers notices still on screen.
+  const dismiss = handle?.dismiss;
+  if (typeof dismiss === 'function') {
+    handle.dismiss = () => {
+      failureNoticesShown.delete(noticeKey);
+      return dismiss();
+    };
+  }
 }
 
 /**

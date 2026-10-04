@@ -187,6 +187,9 @@ export function buildExportStorageDiagnostic({
   storagePath = null,
   partial = 'none',
   exportId = null,
+  // What the capture itself had to sanitise (a degenerate gradient, a
+  // non-finite colour stop), when it had anything to sanitise.
+  captureDiagnostics = null,
   occurredAt = new Date(),
 } = {}) {
   const identified = asExportStorageError(failure);
@@ -204,6 +207,7 @@ export function buildExportStorageDiagnostic({
     reason_code: identified.reasonCode,
     reason: exportStorageReason(identified),
     error_message: identified.detail || identified.cause?.message || null,
+    capture_diagnostics: captureDiagnostics || null,
     partial: partial || identified.partial || 'none',
     occurred_at: (occurredAt instanceof Date ? occurredAt : new Date(occurredAt)).toISOString(),
   };
