@@ -291,10 +291,14 @@ test('TEST 10 — both reports read the saved version name on the in-session rou
     'src/pages/RP22Report.jsx',
   ]) {
     const source = read(file);
-    assert.ok(source.includes('readActiveVersionIdentity'), `${file} imports the shared version reader`);
-    assert.ok(source.includes('const version = await readActiveVersionIdentity(p);'),
+    assert.ok(source.includes('readVersionIdentity'), `${file} imports the shared version reader`);
+    assert.ok(source.includes('const version = await readVersionIdentity('),
       `${file} reads the saved version name on the in-session route`);
     assert.ok(source.includes('readProjectVersionRecord'), `${file} still reads it on the cold route`);
+    // The version read is the version ASKED FOR — the request is resolved
+    // explicitly, never taken from whichever version is loaded.
+    assert.ok(source.includes('requestedVersionId'), `${file} reads the requested version`);
+    assert.ok(source.includes('resolveReportVersionId'), `${file} resolves the request explicitly`);
   }
 
   // The name comes from the stored ProjectVersion record — the designer's own
