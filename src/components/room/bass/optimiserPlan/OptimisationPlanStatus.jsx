@@ -51,7 +51,11 @@ const signedMs = (value) => {
 };
 
 /** A verdict pill: a rejected lever must never look actionable. */
-function verdictPillStyle(verdict) {
+function verdictPillStyle(verdict, plausibility = null) {
+  // The professional plausibility gate outranks the mathematical verdict: a
+  // change it refuses is never presented with the recommended styling.
+  if (plausibility?.credibility === "suppressed") return { background: "#F2F1EE", border: "#D9D5CE", color: "#625143" };
+  if (plausibility?.credibility === "review") return { background: "#FBF3E4", border: "#E0C48F", color: "#8A5A2B" };
   if (verdict === OPTIMISER_LEVER_VERDICT.RECOMMENDED) return { background: "#E7F0E9", border: "#9DB8A4", color: "#213428" };
   if (verdict === OPTIMISER_LEVER_VERDICT.TRADE_OFF) return { background: "#FBF3E4", border: "#E0C48F", color: "#8A5A2B" };
   if (verdict === OPTIMISER_LEVER_VERDICT.REJECTED) return { background: "#FBEAEA", border: "#E0A9A9", color: "#B91C1C" };
@@ -299,7 +303,7 @@ export default function OptimisationPlanStatus({
               <span className="text-[11px] font-semibold text-[#1B1A1A]">{lever.title || lever.label}</span>
               <span
                 className="text-[10px] px-2 py-0.5 rounded-full border whitespace-nowrap"
-                style={verdictPillStyle(lever.verdict)}
+                style={verdictPillStyle(lever.verdict, lever.plausibility)}
               >
                 {lever.verdictLabel}
               </span>

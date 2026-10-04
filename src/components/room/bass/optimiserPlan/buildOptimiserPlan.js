@@ -29,6 +29,7 @@ import {
   seatingDestinationsValid,
 } from "./optimiserSeatingEvidence.js";
 import { describePlacementMove } from "./placementMoveAuthority.js";
+import { subwooferGroupCounts } from "./placementPlausibilityAuthority.js";
 
 const num = (value) => (Number.isFinite(Number(value)) ? Number(value) : null);
 const round = (value, digits = 2) => (value == null ? null : Number(Number(value).toFixed(digits)));
@@ -369,7 +370,13 @@ export function buildOptimiserPlan({
   if (positionResult) {
     const changes = placementChanges({ positionResult, instances });
     if (changes.length > 0) {
-      const move = describePlacementMove({ changes, roomDims });
+      // Stated with the layout's own quantities — one front subwoofer is never
+      // called "front subs".
+      const move = describePlacementMove({
+        changes,
+        roomDims,
+        layoutCounts: subwooferGroupCounts(instances, roomDims),
+      });
       levers[OPTIMISER_LEVER.PLACEMENT] = {
         lever: OPTIMISER_LEVER.PLACEMENT,
         evidenceStatus: OPTIMISER_LEVER_EVIDENCE.EVALUATED,
@@ -522,6 +529,10 @@ export function buildOptimiserPlan({
       || ((winner?.isPositionCandidate || (!winner && positionResult)) ? "position" : null),
     // --- 2. baseline result ---
     baseline: baselineSummary,
+    // The subwoofer census of the layout this run evaluated: the evidence the
+    // professional plausibility gate reads to know what counts as a symmetrical
+    // layout. Read-only, and never used as a design input.
+    layoutCounts: subwooferGroupCounts(instances, roomDims),
     // --- 3. combined winning candidate ---
     // Null when the run confirmed no single winner: the retained lever above is
     // then the whole offer, and no combined candidate is claimed.

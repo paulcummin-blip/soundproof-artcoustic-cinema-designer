@@ -31,6 +31,13 @@ import { resolveLeverApplyMap } from "./optimiserPlanLeverApply.js";
 import { leverLabel, leverTitle } from "./optimiserLeverOrder.js";
 import { resolveLeverVerdict } from "./optimiserLeverVerdict.js";
 import {
+  PLACEMENT_BLOCKED_STATUS,
+  PLACEMENT_CREDIBILITY,
+  assessPlacementPlausibility,
+  subwooferGroupCounts,
+} from "./placementPlausibilityAuthority.js";
+import { describePlacementMove } from "./placementMoveAuthority.js";
+import {
   BASELINE_PARITY_COPY,
   BASELINE_PARITY_STATUS,
   parityBlocksApply,
@@ -179,6 +186,7 @@ export function resolveOptimiserPlanStatus({
       levers: [],
       individualEffectsEvaluated: false,
       baseline: plan.baseline || null,
+      layoutCounts: plan.layoutCounts || null,
       combined: null,
       combinedEffect: null,
       combinedTradeOff: null,
@@ -263,6 +271,37 @@ export function resolveOptimiserPlanStatus({
       : (applyState?.applyBlockedReason || null);
     lever.canUndo = applyState?.canUndo === true;
     lever.undoLabel = applyState?.undoLabel || null;
+
+    // ── The final professional plausibility gate (placement) ──
+    // A mathematical improvement is not a recommendation. Placement is judged by
+    // what it would physically do to THIS layout: a change that breaks the
+    // layout's symmetry, that damages another metric, or that cannot be stated as
+    // one credible move is never offered, never badged and never applyable —
+    // whatever the mathematical verdict says. Read-only: it evaluates nothing.
+    lever.plausibility = null;
+    // A movement outside the practical envelope keeps its own stated handling.
+    if (lever.key === OPTIMISER_LEVER.PLACEMENT && lever.practical !== false) {
+      const counts = plan.layoutCounts || subwooferGroupCounts(instances, null);
+      const plausibility = assessPlacementPlausibility({
+        effect: lever.effect || null,
+        baseline: plan.baseline || null,
+        move: describePlacementMove({ changes: lever.changes || [], layoutCounts: counts }),
+        layoutCounts: counts,
+      });
+      if (plausibility.credibility !== PLACEMENT_CREDIBILITY.APPROVED) {
+        lever.plausibility = {
+          credibility: plausibility.credibility,
+          status: plausibility.status,
+          note: plausibility.suitabilityNote,
+        };
+        lever.canApply = false;
+        lever.applyBlockedReason = plausibility.suitabilityNote || lever.applyBlockedReason;
+        lever.verdictLabel = plausibility.credibility === PLACEMENT_CREDIBILITY.SUPPRESSED
+          ? PLACEMENT_BLOCKED_STATUS
+          : plausibility.status;
+        lever.verdictSummary = plausibility.suitabilityNote || lever.verdictSummary;
+      }
+    }
   }
 
   const appliedCount = levers.filter((lever) => lever.state === OPTIMISER_LEVER_STATE.APPLIED).length;
@@ -296,6 +335,9 @@ export function resolveOptimiserPlanStatus({
     individualEffectsEvaluated: plan.individualEffectsEvaluated === true,
     baselineParity,
     baseline: plan.baseline || null,
+    // The subwoofer census the run evaluated, so every surface can judge the
+    // evaluated move against the layout it was measured in.
+    layoutCounts: plan.layoutCounts || null,
     combined: plan.combined
       ? {
         candidateId: plan.combined.candidateId || null,

@@ -38,12 +38,20 @@ import {
   PLACEMENT_UNDONE_MESSAGE,
   describePlacementMove,
 } from "./placementMoveAuthority.js";
+import {
+  PLACEMENT_CREDIBILITY,
+  assessPlacementPlausibility,
+  subwooferGroupCounts,
+} from "./placementPlausibilityAuthority.js";
 
 /** What the panel is stating. */
 export const PLACEMENT_KIND = Object.freeze({
   RECOMMENDED: "recommended",
   PREVIOUS: "previous",
   APPLIED: "applied",
+  // A real but small improvement, stated as a non-actionable note: no
+  // Recommended badge, no Apply, and no physical move to carry out.
+  NOTE: "note",
 });
 
 const num = (value) => {
@@ -62,6 +70,48 @@ function magnitudeText(delta) {
 
 const findPlacementLever = (planView) => (Array.isArray(planView?.levers) ? planView.levers : [])
   .find((lever) => (lever?.key ?? lever?.lever) === OPTIMISER_LEVER.PLACEMENT) || null;
+
+/**
+ * THE FINAL PROFESSIONAL PLAUSIBILITY GATE.
+ *
+ * It runs after the optimiser has found a mathematical improvement and before
+ * anything is offered, badged or applied: the physical move (in the layout's own
+ * quantities), the evaluated effect and the layout census go in, and one verdict
+ * comes out. A change it refuses is never shown as a recommendation.
+ *
+ * The layout census is the CURRENT design's, so a move that breaks the symmetry
+ * of what the designer actually has is judged against that layout — falling back
+ * to the census saved with the run only when the live layout is not supplied.
+ */
+export function resolvePlacementGate({
+  planView = null,
+  roomDims = null,
+  layoutCounts = null,
+  subwooferInstances = null,
+  seats = null,
+  baselineSeats = null,
+} = {}) {
+  const lever = findPlacementLever(planView);
+  if (!lever) return null;
+  const counts = layoutCounts
+    || (Array.isArray(subwooferInstances) ? subwooferGroupCounts(subwooferInstances, roomDims) : null)
+    || planView?.layoutCounts
+    || null;
+  const move = describePlacementMove({
+    changes: lever.changes || [],
+    roomDims,
+    layoutCounts: counts,
+  });
+  const verdict = assessPlacementPlausibility({
+    effect: lever.effect || null,
+    baseline: planView?.baseline || null,
+    move,
+    layoutCounts: counts,
+    seats: seats || lever.seats || lever.effect?.seats || null,
+    baselineSeats: baselineSeats || planView?.baseline?.seats || null,
+  });
+  return { lever, move, verdict, layoutCounts: counts };
+}
 
 /** The placement family's own measured attempt, from the run evidence. */
 function placementEvidenceFromRun(planView) {
@@ -183,7 +233,12 @@ function previousSummary(evidence) {
  * @param {object|null} [params.presentation] - the canonical optimiser presentation state
  * @param {string|null} [params.appliedLever] - the lever just applied/undone, if any
  * @param {string|null} [params.appliedDirection] - "to" (applied) or "from" (undone)
- * @returns {object|null} null when there is nothing to state about placement
+ * @param {object|null} [params.layoutCounts] - subwooferGroupCounts() of the CURRENT layout
+ * @param {Array|null} [params.subwooferInstances] - the CURRENT layout, when counts are not supplied
+ * @param {Array|null} [params.seats] - per-seat evidence after the move, when the run kept it
+ * @param {Array|null} [params.baselineSeats] - per-seat evidence before the move
+ * @returns {object|null} null when there is nothing to state about placement, or
+ *   when the plausibility gate refuses to offer the evaluated change
  */
 export function resolvePlacementRecommendation({
   planView = null,
@@ -193,6 +248,10 @@ export function resolvePlacementRecommendation({
   appliedDirection = null,
   currentP20 = null,
   parityBlocked = false,
+  layoutCounts = null,
+  subwooferInstances = null,
+  seats = null,
+  baselineSeats = null,
 } = {}) {
   const lever = findPlacementLever(planView);
   const baseline = planView?.baseline || null;
@@ -231,7 +290,18 @@ export function resolvePlacementRecommendation({
     };
   }
 
-  const move = describePlacementMove({ changes: lever.changes || [], roomDims });
+  // ONE gate for the whole resolution: the physical move in the layout's own
+  // quantities, the evaluated effect, and the professional plausibility verdict.
+  const gate = resolvePlacementGate({
+    planView,
+    roomDims,
+    layoutCounts,
+    subwooferInstances,
+    seats,
+    baselineSeats,
+  });
+  const move = gate?.move || null;
+  const plausibility = gate?.verdict || null;
   const practical = lever.practical !== false && move?.practical !== false;
   const verdict = resolveLeverVerdict({
     effect: lever.effect || null,
@@ -317,9 +387,35 @@ export function resolvePlacementRecommendation({
   // does not allow to be applied (a trade-off, a rejection, no useful
   // improvement) is never presented here: the lever row states it instead.
   if (verdict.applyAllowed !== true) return null;
+
+  // ── The final professional plausibility gate ──
+  // A mathematical improvement is not a recommendation. Before anything is
+  // offered, badged or applied, the move must survive the design-professional
+  // check: a move that breaks the symmetry of the layout, that damages another
+  // metric, or that cannot be described as one credible physical move is not
+  // shown as a recommendation at all.
+  if (!plausibility || plausibility.credibility === PLACEMENT_CREDIBILITY.SUPPRESSED) return null;
+
+  // A real but small improvement is stated as a non-actionable note: no badge,
+  // no Apply, and no physical move offered as an automatic placement change.
+  if (plausibility.credibility === PLACEMENT_CREDIBILITY.REVIEW) {
+    return {
+      ...base,
+      kind: PLACEMENT_KIND.NOTE,
+      status: plausibility.status,
+      summary: plausibility.reviewSummary,
+      expected: expectedRows({ baseline, effect: lever.effect }),
+      move: null,
+      notice: plausibility.suitabilityNote,
+      canApply: false,
+      canUndo: false,
+      canRerun: false,
+    };
+  }
+
   // Parity first: an evaluation whose baseline was never established against the
   // published result is evidence, never an offer.
-  const canApply = parityBlocked !== true && lever.canApply === true;
+  const canApply = parityBlocked !== true && lever.canApply === true && plausibility.applyAllowed === true;
 
   return {
     ...base,

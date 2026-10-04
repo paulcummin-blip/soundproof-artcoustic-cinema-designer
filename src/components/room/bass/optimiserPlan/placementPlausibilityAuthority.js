@@ -43,6 +43,9 @@ export const PLACEMENT_CREDIBILITY = Object.freeze({
 /** Stated on a weak option that the designer may look at, but never apply. */
 export const PLACEMENT_REVIEW_STATUS = "Minor option to review";
 
+/** Stated instead of "Recommended" on a change this gate refuses to offer. */
+export const PLACEMENT_BLOCKED_STATUS = "Not recommended";
+
 /** Below this, no placement change is recommended. */
 export const PLACEMENT_IMPROVEMENT_THRESHOLD_DB = 3;
 
@@ -65,15 +68,25 @@ const num = (value) => {
  * The ACTIVE subwoofer census of the current layout: how many subwoofers are
  * mounted on the front wall and on the rear wall. A disabled subwoofer is not
  * part of the layout that moves.
+ *
+ * @param {Array} instances - the layout's subwoofer instances
+ * @param {object|null} [roomDims] - { lengthM }: with no stamped wall group, the
+ *   wall a subwoofer stands on is read from which half of the room it sits in.
  */
-export function subwooferGroupCounts(instances = []) {
+export function subwooferGroupCounts(instances = [], roomDims = null) {
   const rows = Array.isArray(instances) ? instances : [];
+  const lengthM = num(roomDims?.lengthM);
   const counts = { front: 0, rear: 0, total: 0, known: false };
   for (const instance of rows) {
     if (!instance || instance.enabled === false) continue;
     counts.total += 1;
-    if (instance.legacyGroup === "front") counts.front += 1;
-    else if (instance.legacyGroup === "rear") counts.rear += 1;
+    let group = instance.legacyGroup;
+    if (group !== "front" && group !== "rear" && lengthM != null) {
+      const y = num(instance.position?.y);
+      if (y != null) group = y < lengthM / 2 ? "front" : "rear";
+    }
+    if (group === "front") counts.front += 1;
+    else if (group === "rear") counts.rear += 1;
   }
   counts.known = counts.total > 0;
   return counts;

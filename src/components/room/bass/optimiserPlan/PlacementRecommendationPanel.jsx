@@ -26,6 +26,8 @@ const STATUS_STYLE = {
   [PLACEMENT_KIND.RECOMMENDED]: { background: "#E7F0E9", border: "#9DB8A4", color: "#213428" },
   [PLACEMENT_KIND.APPLIED]: { background: "#213428", border: "#213428", color: "#FFFFFF" },
   [PLACEMENT_KIND.PREVIOUS]: { background: "#FBF3E4", border: "#E0C48F", color: "#8A5A2B" },
+  // A small improvement stated as a note: neutral, never the recommended green.
+  [PLACEMENT_KIND.NOTE]: { background: "#F2F1EE", border: "#D9D5CE", color: "#625143" },
 };
 
 export default function PlacementRecommendationPanel({

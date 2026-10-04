@@ -204,9 +204,18 @@ export function describePlacementMove({ changes = [], roomDims = null, layoutCou
     ? roundMm(distances.reduce((sum, value) => sum + value, 0) / distances.length)
     : null;
 
-  const wallPhrase = orderedGroups(rows)
-    .map((group) => `${groupNoun(group, layoutCounts)} ${outward ? "wider along" : "along"} ${wallNoun(group)}`)
-    .join(" and ");
+  // A one-front / one-rear layout moved as a matched pair is stated as the pair
+  // it is — the arrangement the designer actually built.
+  const matchedFrontRearPair = layoutCounts?.known === true
+    && num(layoutCounts.front) === 1
+    && num(layoutCounts.rear) === 1
+    && movesByGroup.front === 1
+    && movesByGroup.rear === 1;
+  const wallPhrase = matchedFrontRearPair
+    ? `the front/rear pair ${outward ? "wider along their walls" : "along their walls"}`
+    : orderedGroups(rows)
+      .map((group) => `${groupNoun(group, layoutCounts)} ${outward ? "wider along" : "along"} ${wallNoun(group)}`)
+      .join(" and ");
   const directionPhrase = outward
     ? "toward the nearest side wall"
     : !unambiguous ? "along the walls"
