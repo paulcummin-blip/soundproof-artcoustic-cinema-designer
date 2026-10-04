@@ -4,7 +4,7 @@
 //
 //   TEST 1  Visual Report: front page and filename state the version
 //   TEST 2  Technical Report: front page and filename state the version
-//   TEST 3  The version segment rules (name, slot marker, blank fallback)
+//   TEST 3  The version segment rules (saved name stated exactly, blank fallback)
 //   TEST 4  Filenames still carry dealer, project, client and reference
 //   TEST 5  The first-page line is one line, and never invents a client/reference
 //   TEST 6  Neither report page can build a version-less filename or line
@@ -50,7 +50,7 @@ const TECHNICAL_PREFIX = 'Sound Proof - Artcoustic Cinema Designer - Technical -
 test('TEST 1 — the Visual Report states its design version on the front page and in the filename', () => {
   assert.equal(
     buildVisualReportTitle(MARQUEE, ORIGINAL, DETAILS),
-    `${VISUAL_PREFIX} - 34 AR - Original Design V1`,
+    `${VISUAL_PREFIX} - 34 AR - Original Design`,
   );
   assert.equal(
     buildVisualReportTitle(MARQUEE, LEVEL_4, DETAILS),
@@ -68,7 +68,7 @@ test('TEST 1 — the Visual Report states its design version on the front page a
 test('TEST 2 — the Technical Report states the same version on its front page and in the filename', () => {
   assert.equal(
     buildTechnicalReportTitle(MARQUEE, ORIGINAL, DETAILS),
-    `${TECHNICAL_PREFIX} - 34 AR - Original Design V1`,
+    `${TECHNICAL_PREFIX} - 34 AR - Original Design`,
   );
   assert.equal(
     buildTechnicalReportTitle(MARQUEE, LEVEL_4, DETAILS),
@@ -90,15 +90,17 @@ test('TEST 2 — the Technical Report states the same version on its front page 
 });
 
 // ── TEST 3 — the version segment rules ─────────────────────────────────────
-test('TEST 3 — the version segment states the name, adds the slot once, and never goes blank', () => {
+test('TEST 3 — the version segment states the saved name exactly, and never goes blank', () => {
   const barePrefix = 'Sound Proof - Artcoustic Cinema Designer - Technical - Marquee Home - ';
   const segment = (version) => buildTechnicalReportTitle(MARQUEE, version, {})
     .replace(barePrefix, '');
 
-  assert.equal(segment(ORIGINAL), 'Original Design V1', 'the original design is identifiable as V1');
-  assert.equal(segment(LEVEL_4), 'Level 4 version', 'a name that already states its number is not doubled');
-  assert.equal(segment({ number: 2, name: 'Twin SUB2-12' }), 'Twin SUB2-12 V2');
-  assert.equal(segment({ number: 3, name: 'Current Design' }), 'Current Design V3');
+  // The name the designer saved is the identity, verbatim: no version slot
+  // marker is ever appended to it.
+  assert.equal(segment(ORIGINAL), 'Original Design', 'no V1 is appended to a saved name');
+  assert.equal(segment(LEVEL_4), 'Level 4 version');
+  assert.equal(segment({ number: 2, name: 'Twin SUB2-12' }), 'Twin SUB2-12', 'no V2 is appended');
+  assert.equal(segment({ number: 3, name: 'Current Design' }), 'Current Design', 'no V3 is appended');
   assert.equal(segment({ number: null, name: '' }), 'Version 1', 'blank name falls back to Version 1');
   assert.equal(segment({ number: 3, name: '   ' }), 'Version 3', 'blank name falls back to the stored slot');
   assert.equal(segment({ number: null, name: null }), 'Version 1');

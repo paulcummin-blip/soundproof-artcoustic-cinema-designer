@@ -68,10 +68,10 @@ const readyRow = (versionId, versionName, versionNumber) => resolveVersionReadin
 /* ── TEST 1 — a comparison is judged per version ───────────────────────── */
 
 test('TEST 1 — a comparison is judged per version, never from the first selected version', () => {
-  const ready = readyRow('v1', 'Original Design · V1', 1);
+  const ready = readyRow('v1', 'Original Design', 1);
   const blocked = resolveVersionReadinessRow({
     versionId: 'v2',
-    versionName: 'Level 4 version · V2',
+    versionName: 'Level 4 version',
     versionNumber: 2,
     cells: { visual: current(), technical: missing(), engineering: current() },
   });
@@ -82,14 +82,14 @@ test('TEST 1 — a comparison is judged per version, never from the first select
   expect(gate.rows).toHaveLength(2);
   expect(gate.blockers).toHaveLength(1);
   expect(gate.blockers[0].source).toBe('technical');
-  expect(gate.message).toContain('Level 4 version · V2 is missing Technical Report');
-  expect(gate.message).not.toContain('Original Design · V1');
+  expect(gate.message).toContain('Level 4 version is missing Technical Report');
+  expect(gate.message).not.toContain('Original Design');
 });
 
 /* ── TEST 2 — all versions current ────────────────────────────────────── */
 
 test('TEST 2 — every selected version current reads ready, with the ready copy', () => {
-  const rows = [readyRow('v1', 'Original Design · V1', 1), readyRow('v2', 'Level 4 version · V2', 2)];
+  const rows = [readyRow('v1', 'Original Design', 1), readyRow('v2', 'Level 4 version', 2)];
   const gate = resolveProposalReadinessGate({ rows, minVersions: 2, maxVersions: 3 });
 
   expect(gate.available).toBe(true);
@@ -106,7 +106,7 @@ test('TEST 2 — every selected version current reads ready, with the ready copy
 
 test('TEST 3 — the version count the report type requires is part of readiness', () => {
   const gate = resolveProposalReadinessGate({
-    rows: [readyRow('v1', 'Original Design · V1', 1)],
+    rows: [readyRow('v1', 'Original Design', 1)],
     minVersions: 2,
   });
 
@@ -121,7 +121,7 @@ test('TEST 3 — the version count the report type requires is part of readiness
 test('TEST 4 — a read in flight reads Checking, and nothing is reported as missing', () => {
   const row = resolveVersionReadinessRow({
     versionId: 'v1',
-    versionName: 'Original Design · V1',
+    versionName: 'Original Design',
     versionNumber: 1,
     cells: { visual: checking(), technical: checking(), engineering: checking() },
   });
@@ -139,16 +139,16 @@ test('TEST 4 — a read in flight reads Checking, and nothing is reported as mis
 
 test('TEST 5 — the blocking message names every blocked version and the source that blocks it', () => {
   const rows = [
-    readyRow('v1', 'Original Design · V1', 1),
+    readyRow('v1', 'Original Design', 1),
     resolveVersionReadinessRow({
       versionId: 'v2',
-      versionName: 'Level 4 version · V2',
+      versionName: 'Level 4 version',
       versionNumber: 2,
       cells: { visual: current(), technical: missing(), engineering: current() },
     }),
     resolveVersionReadinessRow({
       versionId: 'v3',
-      versionName: 'Wides trial · V3',
+      versionName: 'Wides trial',
       versionNumber: 3,
       cells: { visual: current(), technical: current(), engineering: stale() },
     }),
@@ -156,11 +156,11 @@ test('TEST 5 — the blocking message names every blocked version and the source
   const gate = resolveProposalReadinessGate({ rows, minVersions: 2 });
 
   expect(gate.message).toBe(
-    'Level 4 version · V2 is missing Technical Report. Wides trial · V3 has stale bass authority',
+    'Level 4 version is missing Technical Report. Wides trial has stale bass authority',
   );
   expect(gate.blockers.map((blocker) => blocker.sentence)).toEqual([
-    'Level 4 version · V2 is missing Technical Report',
-    'Wides trial · V3 has stale bass authority',
+    'Level 4 version is missing Technical Report',
+    'Wides trial has stale bass authority',
   ]);
   // The engine column names what is actually missing, never a generic phrase.
   expect(gate.blockers[1].label).toBe('bass authority');

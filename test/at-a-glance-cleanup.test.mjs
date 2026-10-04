@@ -108,7 +108,8 @@ describe('A–B. what the page carries', () => {
     assert.equal(card('Project').value, 'Marquee Home');
     assert.equal(card('Client').value, '34 AR');
     assert.equal(card('Project reference').value, '34 AR');
-    assert.equal(card('Design version').value, 'Original Design · V1');
+    // The saved version name only: no slot marker is appended.
+    assert.equal(card('Design version').value, 'Original Design');
     assert.equal(card('Prepared date').value, '03/10/2026');
 
     const withoutReference = buildAtAGlance({

@@ -160,16 +160,17 @@ describe('the optional segments', () => {
 
   it('states the design version at the end, including the baseline version', () => {
     // A project can hold several versions and Proposal Centre compares them, so
-    // an exported report always names the version it documents.
+    // an exported report always names the version it documents — as the saved
+    // name exactly, with no version slot marker appended.
     const named = buildVisualReportTitle('Lords Hall', { number: 2, name: 'Twin SUB2-12' }, {
       projectReference: 'LH-001',
     });
     assert.equal(
       named,
-      'Sound Proof - Artcoustic Cinema Designer - Visual - Lords Hall - LH-001 - Twin SUB2-12 V2',
+      'Sound Proof - Artcoustic Cinema Designer - Visual - Lords Hall - LH-001 - Twin SUB2-12',
     );
     const baseline = buildVisualReportTitle('Lords Hall', { number: 1, name: 'Current Design' });
-    assert.equal(baseline, 'Sound Proof - Artcoustic Cinema Designer - Visual - Lords Hall - Current Design V1');
+    assert.equal(baseline, 'Sound Proof - Artcoustic Cinema Designer - Visual - Lords Hall - Current Design');
   });
 });
 

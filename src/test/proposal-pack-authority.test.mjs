@@ -117,7 +117,8 @@ describe('at a glance page', () => {
     assert.equal(byLabel.get('Project').value, 'Lords Hall');
     assert.equal(byLabel.get('Client').value, 'Mr Clarke');
     assert.equal(byLabel.get('Project reference').value, 'LH-001');
-    assert.equal(byLabel.get('Design version').value, 'Current Design · V1');
+    // The saved version name only: no slot marker is appended.
+    assert.equal(byLabel.get('Design version').value, 'Current Design');
     assert.equal(byLabel.get('Prepared date').value, '14/09/2026');
   });
 

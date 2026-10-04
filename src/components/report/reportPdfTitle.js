@@ -6,16 +6,17 @@
  * generators must never build their own filenames.
  *
  * Required format:
- *   Sound Proof - Artcoustic Cinema Designer - <Report Type>[ - <Dealer>] - <Project Name>[ - <Client Name>][ - <Project Reference>] - <Version Name>[ V<N>]
+ *   Sound Proof - Artcoustic Cinema Designer - <Report Type>[ - <Dealer>] - <Project Name>[ - <Client Name>][ - <Project Reference>] - <Version Name>
  *
  * Examples:
  *   Sound Proof - Artcoustic Cinema Designer - Visual - Sound Proof - Marquee Home - 34 AR - Level 4 version
- *   Sound Proof - Artcoustic Cinema Designer - Technical - Sound Proof - Marquee Home - Noble Projects - 34 AR - Original Design V1
+ *   Sound Proof - Artcoustic Cinema Designer - Technical - Sound Proof - Marquee Home - Noble Projects - 34 AR - Original Design
  *
  * The design version is ALWAYS stated when a version is supplied: a project can
  * hold several versions and Proposal Centre compares them, so an exported report
- * must say which design it documents. A blank saved name falls back to
- * "Version <slot>", or "Version 1" when the slot is unknown too. See
+ * must say which design it documents. The version is written as the saved name
+ * exactly — no version slot marker is ever appended. A blank saved name falls
+ * back to "Version <slot>", or "Version 1" when the slot is unknown too. See
  * reportVersionIdentity.js.
  *
  * A proposal document is versioned by the versions it was built from rather than
@@ -103,12 +104,12 @@ export function sanitiseVersionName(name) {
 }
 
 /**
- * The version segment for a filename, e.g. "Level 4 version" or
- * "Original Design V1".
+ * The version segment for a filename: the saved version name stated exactly,
+ * e.g. "Level 4 version" or "Original Design".
  *
  * Always stated when a version is supplied — see reportVersionIdentity.js for
- * the name, slot-marker and fallback rules. A caller that states no version at
- * all states none.
+ * the name and fallback rules. A caller that states no version at all states
+ * none.
  *
  * @param {{ number: number, name: string } | null | undefined} version
  * @returns {string} "" or the version segment

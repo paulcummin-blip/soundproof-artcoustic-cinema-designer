@@ -13,8 +13,11 @@
  *   name    the designer's version name
  *           → "Version <n>" when only the slot is known
  *           → "Version 1" when nothing at all is known
- *   marker  the slot ("V1"), stated only when the name does not already carry
- *           that number, so a number is never doubled.
+ *
+ * The saved name IS the identity: no version slot marker is ever appended, on a
+ * first page or in a filename, so a version called "Level 4 version" is never
+ * written "Level 4 version · V4" and one called "Original Design" is never
+ * written "Original Design V1".
  *
  * Pure module: no React, no side effects, no runtime APIs.
  */
@@ -52,18 +55,14 @@ export function reportVersionMetaStatement(version) {
 }
 
 /**
- * The version segment of a filename: the version name, with the slot marker
- * appended as "V<n>" only when the name does not already state that number as a
- * standalone number — "Original Design V1", but "Level 4 version" (the name
- * already says 4), while "Twin SUB2-12" still states its slot as V2.
+ * The version segment of a filename: the saved version name, stated exactly.
+ * No slot marker is ever appended — the name the designer saved is the identity
+ * every surface states, so "Original Design" is never written "Original Design
+ * V1". A blank saved name falls back through reportVersionName.
  *
  * @param {{number?: number, name?: string}|null} [version]
  * @returns {string}
  */
 export function reportVersionFilenameSegment(version) {
-  const name = reportVersionName(version);
-  const number = versionNumber(version);
-  if (!number) return name;
-  const statesSlot = new RegExp(`(^|[^0-9A-Za-z])${number}([^0-9A-Za-z]|$)`).test(name);
-  return statesSlot ? name : `${name} V${number}`;
+  return reportVersionName(version);
 }

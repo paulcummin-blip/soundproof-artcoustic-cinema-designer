@@ -350,8 +350,11 @@ export function buildAtAGlance({ snapshot, projectName, projectReference, genera
     { label: 'Client', value: statementValue(snapshot?.project?.client_name) || null },
     { label: 'Project reference', value: projectReference || null },
     {
+      // The saved version name IS the identity: stated exactly, with no version
+      // slot marker appended, so "Level 4 version" is never written
+      // "Level 4 version · V4". No saved name leaves the card out.
       label: 'Design version',
-      value: version.name ? `${version.name}${version.number ? ` · V${version.number}` : ''}` : null,
+      value: version.name || null,
     },
     { label: 'Prepared date', value: ukDate(generatedDate) },
   ];
