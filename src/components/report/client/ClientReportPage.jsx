@@ -41,16 +41,43 @@ function printLevelColor(lvl) {
   return grade.isFail ? grade.border : grade.text;
 }
 
+// The page types this wrapper composes for print. A page whose print
+// composition is not implemented carries nothing on paper, so it must never be
+// laid out as an empty A4 page shell — that shell is exactly what a printer
+// emits as a blank page. Such a page is dropped from the print layout (see
+// `client-report-page--no-print` in the print stylesheet) while the on-screen
+// report keeps showing it unchanged.
+const PRINTABLE_PAGE_TYPES = new Set([
+  "p5",
+  "p9",
+  "highlights",
+  "best-listening-area",
+  "timbre-consistency",
+  "front-soundstage-dynamic-range",
+  "non-screen-dynamic-range",
+  "screen-seating",
+  "p2-system-architecture",
+  "p7-front-wides",
+  "seating-position",
+  "bass-capability",
+  "bass-response",
+  "p19-rsp",
+  "per-seat-performance",
+  "about-sound-proof",
+]);
+
 export default function ClientReportPage({ children, isFirst, projectDetails, logoUrl, pageId, printData }) {
   // One project metadata line, composed once for the masthead: the same words
   // on screen and in the exported PDF.
   const metaLine = clientReportHeaderMeta(projectDetails);
 
   const categoryFirst = printData?.categoryFirst !== false;
+  // A page with no printable composition is never laid out for paper.
+  const prints = PRINTABLE_PAGE_TYPES.has(printData?.type);
 
   return (
     <div
-      className={`client-report-page print-avoid-break${isFirst ? " client-report-page--first" : ""}`}
+      className={`client-report-page print-avoid-break${isFirst ? " client-report-page--first" : ""}${prints ? "" : " client-report-page--no-print"}`}
       data-page-id={pageId}
       data-category-first={categoryFirst ? "true" : "false"}
     >

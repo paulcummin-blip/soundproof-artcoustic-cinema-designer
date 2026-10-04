@@ -163,6 +163,16 @@ export default function ClientReportPrintStyles() {
         break-after: auto !important;
       }
 
+      /* ── Pages with no printable composition ──────────────────────────────
+         A report page the wrapper cannot compose for paper (for example a
+         screen-only summary) carries no content on the printed page. Left in
+         the print layout it would print as an empty A4 shell — a blank page.
+         It is removed from the print layout entirely; the on-screen report is
+         unaffected and the page still appears there. */
+      body.client-report-printing .client-report-page--no-print {
+        display: none !important;
+      }
+
       /* ── Header (first page only) ── */
       body.client-report-printing .client-report-page__header {
         grid-row: 1;
@@ -454,6 +464,13 @@ export default function ClientReportPrintStyles() {
         .client-report-page:last-child {
           page-break-after: auto !important;
           break-after: auto !important;
+        }
+
+        /* ── Pages with no printable composition ──────────────────────────
+           A page with no printable content is dropped from the print layout,
+           so the export never contains its empty page shell as a blank page. */
+        .client-report-page--no-print {
+          display: none !important;
         }
 
         /* ── Header (first page only) ── */
