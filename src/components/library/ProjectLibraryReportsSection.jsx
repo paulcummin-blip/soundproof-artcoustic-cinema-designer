@@ -3,11 +3,14 @@
  * ---------------------------
  * The active project's Generated Reports, per design version.
  *
- * Each version lists the reports it currently holds — the live report, which is
- * opened or regenerated where it is generated — and beneath them the PDFs that
- * were exported and are kept as fixed issued documents. A report that has been
- * regenerated does not replace an exported PDF: the issued file stays, marked
- * superseded by newer export.
+ * Each version lists, in two groups:
+ *   Current live reports  ONE row per report type — the newest report that
+ *                         version holds, opened or regenerated where it is
+ *                         generated. Every earlier generation is left out.
+ *   Exported PDFs         every PDF that was exported, newest first, each kept
+ *                         as a fixed read-only issued document that is never
+ *                         overwritten or removed. Each one is judged against the
+ *                         live report of its own version and report type.
  */
 
 import React from 'react';
@@ -21,7 +24,7 @@ import {
 } from '@/components/proposal/sourceAuthority/proposalSourceAuthority';
 import LiveReportRow from './LiveReportRow';
 import ExportedDocumentRow from './ExportedDocumentRow';
-import { liveReportStatusLabel } from './librarySourceStatus';
+import { liveReportStatusLabel, resolveExportLiveState } from './librarySourceStatus';
 
 function SectionHeading({ children }) {
   return (
@@ -74,10 +77,15 @@ export default function ProjectLibraryReportsSection({
   return (
     <div className="space-y-12">
       {versions.map((version) => {
+        // The live reports are already one per report type (the newest), and the
+        // keyed map is how each exported PDF finds the live report it is judged
+        // against — its own version and its own report type, never another's.
         const live = liveReports.filter((report) => report.versionId === version.id);
-        const issued = reportExports.filter(({ record }) => (
-          (record.version_id || null) === version.id
-        ));
+        const liveByType = new Map(live.map((report) => [report.reportType, report]));
+        const issued = reportExports
+          .filter(({ record }) => (record.version_id || null) === version.id)
+          .slice()
+          .sort((a, b) => String(b.record.exported_at || '').localeCompare(String(a.record.exported_at || '')));
 
         if (live.length === 0 && issued.length === 0) return null;
 
@@ -90,7 +98,10 @@ export default function ProjectLibraryReportsSection({
               </h2>
             </div>
 
-            {live.length > 0 && (
+            <SectionHeading>Current live reports</SectionHeading>
+            {live.length === 0 ? (
+              <EmptyNote>No report has been generated for this version yet.</EmptyNote>
+            ) : (
               <div className="border-t border-[#E5E1D8]">
                 {live.map((report) => (
                   <LiveReportRow
@@ -113,17 +124,25 @@ export default function ProjectLibraryReportsSection({
               {issued.length === 0 ? (
                 <EmptyNote>No PDF has been exported for this version yet.</EmptyNote>
               ) : (
-                issued.map(({ record, superseded }) => (
-                  <ExportedDocumentRow
-                    key={record.id}
-                    record={record}
-                    versionText={versionNameById.get(version.id) || null}
-                    statusLabel={superseded ? undefined : liveReportStatusLabel(
-                      record.source_status_at_export === 'current' ? 'current' : 'stale',
-                    )}
-                    superseded={superseded}
-                  />
-                ))
+                issued.map(({ record, superseded }) => {
+                  const state = resolveExportLiveState({
+                    record,
+                    version,
+                    liveReport: liveByType.get(record.document_type) || null,
+                    superseded,
+                  });
+
+                  return (
+                    <ExportedDocumentRow
+                      key={record.id}
+                      record={record}
+                      versionText={versionNameById.get(version.id) || null}
+                      statusState={state.state}
+                      statusLabel={state.label}
+                      superseded={superseded}
+                    />
+                  );
+                })
               )}
             </div>
           </section>

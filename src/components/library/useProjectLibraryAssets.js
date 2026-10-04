@@ -8,7 +8,8 @@
  * Three server-side reads, each filtered to the project:
  *   - the project's design versions (the names every row is labelled with, and
  *     the published pointer each issued document is judged against)
- *   - the saved reports for those versions (the Current live report rows)
+ *   - the saved reports for those versions (the Current live report rows: the
+ *     newest report per version and report type, never every generation)
  *   - the issued documents (the exported PDFs this Library holds)
  *
  * Supersession and source state are derived from what was read — no issued
@@ -21,7 +22,7 @@ import {
   REPORT_DOCUMENT_TYPES,
   PROPOSAL_DOCUMENT_TYPES,
 } from '@/components/library/issuedDocument/issuedDocumentTypes';
-import { markSuperseded } from '@/components/library/librarySourceStatus';
+import { collapseLiveReports, markSuperseded } from '@/components/library/librarySourceStatus';
 import { buildVersionNameMap } from '@/components/library/libraryVersionLabels';
 import { isSnapshotRestorable } from '@/components/report/reportSnapshotAuthority';
 
@@ -84,8 +85,13 @@ export function useProjectLibraryAssets({ projectId }) {
   );
   const versionNameById = useMemo(() => buildVersionNameMap(versions), [versions]);
 
-  /** One row per saved report: the version's current live report. */
-  const liveReports = useMemo(() => savedReports
+  /**
+   * ONE row per project version and report type: the newest saved report for
+   * that version and type. A report regenerated five times still produces one
+   * row — the earlier generations are never listed — and the rows read in the
+   * order the report types are declared.
+   */
+  const liveReports = useMemo(() => collapseLiveReports(savedReports)
     .filter((snapshot) => LIVE_REPORT_TYPES.includes(snapshot.report_type))
     .filter(isSnapshotRestorable)
     .map((snapshot) => ({
@@ -97,7 +103,9 @@ export function useProjectLibraryAssets({ projectId }) {
       status: snapshot.status || 'current',
       sourceRecordId: snapshot.id,
       sourceFingerprints: snapshot.source_fingerprints || {},
-    })), [savedReports]);
+    }))
+    .sort((a, b) => LIVE_REPORT_TYPES.indexOf(a.reportType) - LIVE_REPORT_TYPES.indexOf(b.reportType)),
+  [savedReports]);
 
   const markedExports = useMemo(() => markSuperseded(issuedExports), [issuedExports]);
 

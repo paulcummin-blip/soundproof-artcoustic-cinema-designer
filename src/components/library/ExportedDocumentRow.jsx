@@ -5,6 +5,10 @@
  * asset. It offers Open and Download only: an issued document is never
  * overwritten and is never deleted from here.
  *
+ * The row's state is stated by the caller — the same library vocabulary every
+ * other row uses — so an exported report can read "Same as current", "Older
+ * export", "Source changed since export" or "Superseded by newer export".
+ *
  * The row owns its own open/download state, so it can be dropped into any
  * section without prop plumbing.
  */
@@ -18,7 +22,13 @@ import { issuedDocumentLabel } from '@/components/library/issuedDocument/issuedD
 import { downloadIssuedDocument, openIssuedDocument } from '@/components/library/issuedDocument/issuedDocumentActions';
 import { formatLibraryDate } from './libraryFormat';
 
-export default function ExportedDocumentRow({ record, versionText, statusLabel, superseded = false }) {
+export default function ExportedDocumentRow({
+  record,
+  versionText,
+  statusState,
+  statusLabel,
+  superseded = false,
+}) {
   const [busy, setBusy] = useState(null);
   const [failure, setFailure] = useState(null);
 
@@ -65,7 +75,7 @@ export default function ExportedDocumentRow({ record, versionText, statusLabel, 
 
       <div className="flex items-center gap-4 shrink-0">
         <LibraryStatusLabel
-          state={superseded ? LIBRARY_SOURCE_STATE.SUPERSEDED : LIBRARY_SOURCE_STATE.CURRENT}
+          state={statusState || (superseded ? LIBRARY_SOURCE_STATE.SUPERSEDED : LIBRARY_SOURCE_STATE.CURRENT)}
           label={statusLabel}
         />
         <button

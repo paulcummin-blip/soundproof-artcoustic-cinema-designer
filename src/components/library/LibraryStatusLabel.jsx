@@ -2,7 +2,8 @@
  * LibraryStatusLabel
  * ------------------
  * The compact state label an asset row carries: Current live report, Exported
- * PDF, Current, Source changed, Missing source, Superseded by newer export.
+ * PDF, Current, Source changed, Missing source, Same as current, Older export,
+ * Superseded by newer export.
  *
  * Presentation only.
  */
@@ -17,6 +18,8 @@ const STATE_STYLE = {
   [LIBRARY_SOURCE_STATE.SOURCE_CHANGED]: { colour: '#7A5A10', Icon: AlertTriangle },
   [LIBRARY_SOURCE_STATE.MISSING_SOURCE]: { colour: '#7A2E10', Icon: CircleSlash },
   [LIBRARY_SOURCE_STATE.SUPERSEDED]: { colour: '#8A8477', Icon: History },
+  [LIBRARY_SOURCE_STATE.SAME_AS_CURRENT]: { colour: '#213428', Icon: Check },
+  [LIBRARY_SOURCE_STATE.OLDER_EXPORT]: { colour: '#8A8477', Icon: History },
   'live-report': { colour: '#213428', Icon: Check },
   'exported-pdf': { colour: '#625143', Icon: FileDown },
 };
