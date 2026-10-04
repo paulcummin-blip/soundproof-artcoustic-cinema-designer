@@ -109,6 +109,8 @@ export function mentionsHighChannelUpgrade(text) {
 
 const ROOM_SUBJECT_RE = /\b(?:room geometry|room layout|the room|geometry|layout)\b/i;
 const CONSTRAINT_WORD_RE = /\b(?:constraint|constraints|constrained|limitation|limitations|limited|limits?|restrict\w*|caps?\b|ceiling)\b/i;
+/** A spacing result attributed to the room itself rather than to the positions. */
+const ROOM_CAUSAL_RE = /\b(?:consequence|result|set|decided|determined|governed|dictated|fixed)\b[^.]{0,40}\b(?:room layout|room geometry|the room|the room's)\b/i;
 const SPACING_OR_CHANNEL_RE = /\b(?:spacing|side[-\s]to[-\s]side|discrete (?:channels?|speakers?|outputs?)|channel count|channels?|surround channels?|overhead (?:channels?|positions?)|speaker positions?)\b/i;
 const PROCESSOR_SUBJECT_RE = /\b(?:av\s+processor|a\/v\s+processor|processor|pre[-\s]?amp\w*|receiver|amplifier|amplifiers|amp)\b/i;
 const PROCESSOR_CLAIM_RE = /\b(?:limit\w*|constrain\w*|restrict\w*|capabilit\w*|channel count|cost\w*|expens\w*|afford\w*|budget)\b/i;
@@ -123,9 +125,9 @@ export function mentionsRoomGeometryConstraintClaim(text) {
   const source = plainText(text);
   if (!source) return false;
   if (source.toLowerCase().includes(HIGH_CHANNEL_LEGACY_CONSTRAINT_SENTENCE.toLowerCase())) return true;
-  return ROOM_SUBJECT_RE.test(source)
-    && CONSTRAINT_WORD_RE.test(source)
-    && SPACING_OR_CHANNEL_RE.test(source);
+  if (!SPACING_OR_CHANNEL_RE.test(source)) return false;
+  if (ROOM_CAUSAL_RE.test(source)) return true;
+  return ROOM_SUBJECT_RE.test(source) && CONSTRAINT_WORD_RE.test(source);
 }
 
 /**

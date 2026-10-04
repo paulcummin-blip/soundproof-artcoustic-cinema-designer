@@ -181,6 +181,8 @@ function plainCopy(text) {
 const ROOM_SUBJECT_RE = /\b(?:room geometry|room layout|the room|geometry|layout)\b/i;
 const CONSTRAINT_WORD_RE = /\b(?:constraint|constraints|constrained|limitation|limitations|limited|limits?|restrict\w*|caps?\b|ceiling)\b/i;
 const SPACING_OR_CHANNEL_RE = /\b(?:spacing|side[-\s]to[-\s]side|discrete (?:channels?|speakers?|outputs?)|channel count|channels?|surround channels?|overhead (?:channels?|positions?)|speaker positions?)\b/i;
+/** A spacing result attributed to the room itself rather than to the positions. */
+const ROOM_CAUSAL_RE = /\b(?:consequence|result|set|decided|determined|governed|dictated|fixed)\b[^.]{0,40}\b(?:room layout|room geometry|the room|the room's)\b/i;
 const PROCESSOR_SUBJECT_RE = /\b(?:av\s+processor|a\/v\s+processor|processor|pre[-\s]?amp\w*|receiver|amplifier|amplifiers|amp)\b/i;
 const PROCESSOR_CLAIM_RE = /\b(?:limit\w*|constrain\w*|restrict\w*|capabilit\w*|channel count|cost\w*|expens\w*|afford\w*|budget)\b/i;
 
@@ -194,9 +196,9 @@ export function mentionsRoomGeometryConstraintClaim(text) {
   const source = plainCopy(text);
   if (!source) return false;
   if (source.toLowerCase().includes(HIGH_CHANNEL_LEGACY_CONSTRAINT_SENTENCE.toLowerCase())) return true;
-  return ROOM_SUBJECT_RE.test(source)
-    && CONSTRAINT_WORD_RE.test(source)
-    && SPACING_OR_CHANNEL_RE.test(source);
+  if (!SPACING_OR_CHANNEL_RE.test(source)) return false;
+  if (ROOM_CAUSAL_RE.test(source)) return true;
+  return ROOM_SUBJECT_RE.test(source) && CONSTRAINT_WORD_RE.test(source);
 }
 
 /**
@@ -249,7 +251,7 @@ export const HIGH_CHANNEL_UPGRADE_RULE = [
   '- Never imply that there is an easy fix for the spacing or the channel density.',
   '- Never write "if greater precision is required later", and never frame the spacing or the channel density as a straightforward future improvement.',
   '- Future upgrade suggestions should be rare in this report. Include one only when the designer has supplied it explicitly in the emphasis notes or the design brief. Never invent an upgrade path from an RP22 parameter.',
-  'If horizontal spacing or the spacing between channels is limited in this design, state it as a room and layout constraint: what the room, the seating geometry and the practical speaker positions allow, and what that means in the room. Do not present it as a limitation that a simple change would remove.',
+  'If horizontal spacing or the spacing between channels is limited in this design, state what sets the result: the practical speaker positions and the seating geometry, and what that means in the room. Never call the design constrained by the room, never attribute the result to the channel count, and never present it as a limitation that a simple change would remove.',
   'NEVER WRITE THIS (forbidden, and anything with the same meaning):',
   `- "${HIGH_CHANNEL_FORBIDDEN_SENTENCE}"`,
   '- "If greater precision in the side-to-side soundstage is required later, adding surround speakers would close the gaps between them."',

@@ -37,6 +37,11 @@ import {
   resolveReportLayout,
 } from '../base44/shared/highChannelDensityRule.js';
 import { buildWritingStyleContract } from '../base44/shared/reportWritingStyleContract.js';
+import { buildComparisonAuthorityChips } from '../base44/shared/adiComparisonNarrativeChips.js';
+import { buildHighChannelSummaryRule } from '../base44/shared/aiSummaryPromptBuilder.js';
+import { buildHighlightDisplayRows } from '../src/components/proposal/keyPerformanceHighlightsAuthority.js';
+import { buildAdiGuidanceCopy } from '../src/components/adi/designGuidance/adiGuidanceCopy.js';
+import { ADI_FACTOR_KIND } from '../src/components/adi/designGuidance/adiLimitingFactorRules.js';
 import { getSystemSummarySectionPrompt } from '../base44/shared/systemDesignSummarySections.js';
 import { UPGRADE_PATH_RULE } from '../base44/shared/proposalStageBoundary.js';
 import { buildNarrativeFacts } from '../base44/shared/adiNarrativeFacts.js';
@@ -152,8 +157,11 @@ describe('C. the forbidden sentence', () => {
 describe('D. P5 is a speaker-position and seat result, not an upgrade path', () => {
   it('prescribes the approved wording', () => {
     expect(marqueeContract).toContain(HIGH_CHANNEL_PREFERRED_SENTENCE);
-    expect(marqueeContract).toContain('state that the practical speaker positions and the seat geometry set the result rather than the channel count');
+    expect(marqueeContract).toContain('rewrite it as the practical speaker positions and the seat geometry setting the result');
+    expect(marqueeContract).toContain('state what sets the result: the practical speaker positions and the seating geometry');
     expect(marqueeContract).not.toContain('state it as a room and layout constraint');
+    const sectionPrompt = getSystemSummarySectionPrompt('spatial_resolution', 'Spatial Resolution', marqueeLayout);
+    expect(sectionPrompt).toContain('state that the practical speaker positions and the seat geometry set the result rather than the channel count');
   });
 
   it('replaces the room-geometry-constraint paragraph it used to prescribe', () => {
@@ -292,5 +300,65 @@ describe('H. ADI narrative examples cannot offer the upgrade', () => {
 
     const lowChip = validateNarrativeChip('Suggest adding more overhead channels', lowFacts);
     expect(lowChip.status).toBe('passed');
+  });
+});
+
+describe('I. Parameter 2 is already achieved, and a spacing result is a position result', () => {
+  const guidanceText = (block) => Object.values(block || {}).join(' ');
+
+  /** The ADI P2 guidance for a system with the given layout. */
+  const p2Guidance = (configuration) => guidanceText(buildAdiGuidanceCopy({
+    kind: ADI_FACTOR_KIND.CAPABILITY,
+    key: 'p2',
+    candidate: {
+      key: 'p2',
+      number: 2,
+      area: 'Discrete channel capability',
+      level: 'L1',
+      parameter: { value: 15 },
+    },
+    evidence: { system: { configuration: { dolby_config: configuration } } },
+  }));
+
+  it('states the top level for 9.1.6 and offers no added channel', () => {
+    const guidance = p2Guidance('9.1.6');
+    expect(guidance).toMatch(/top RP22 level for discrete channel capability/i);
+    expect(guidance).not.toMatch(/add the missing speaker positions/i);
+    expect(guidance).not.toMatch(/processor|amplifier/i);
+    expect(guidance).not.toMatch(/\bL1\b|\bL2\b|\bFAIL\b/);
+  });
+
+  it('keeps the additional-channel advice below the threshold', () => {
+    expect(p2Guidance('5.1.2')).toMatch(/Add the missing speaker positions/i);
+  });
+
+  it('carries the P2 rule into the AI client summary, only for a high-density set', () => {
+    expect(buildHighChannelSummaryRule([{ system: { dolbyLayout: '9.1.6' } }]))
+      .toContain('already at the top RP22 level for this layout');
+    expect(buildHighChannelSummaryRule([{ system: { dolbyLayout: '5.1.2' } }])).toBe('');
+  });
+
+  it('offers a shared layout as a comparison strength, and no upgrade chip', () => {
+    const marqueeVersions = [
+      { version_name: 'Level 1 version', facts: marqueeFacts },
+      { version_name: 'Level 4 version', facts: marqueeFacts },
+    ];
+    const labels = buildComparisonAuthorityChips(marqueeVersions).map((entry) => entry.label);
+    expect(labels.some((label) => /shared 9\.1\.6 layout/i.test(label))).toBe(true);
+    expect(labels.some((label) => /upgrade/i.test(label))).toBe(false);
+
+    const lowLabels = buildComparisonAuthorityChips([
+      { version_name: 'A', facts: lowFacts },
+      { version_name: 'B', facts: lowFacts },
+    ]).map((entry) => entry.label);
+    expect(lowLabels.some((label) => /upgrade/i.test(label))).toBe(true);
+  });
+
+  it('describes a limited P5 result by its positions and leaves the Result untouched', () => {
+    const rows = buildHighlightDisplayRows([{ key: 'p5', area: 'Horizontal spacing', result: 'L1 · 48°' }]);
+    expect(rows[0].result).toBe('L1 · 48°');
+    expect(rows[0].gain).toMatch(/practical speaker positions and the seat geometry/i);
+    expect(rows[0].gain).not.toMatch(/room geometry constraint|upgrade|processor|amplifier/i);
+    expect(rows[0].gain).toMatch(/rather than by the channel count/i);
   });
 });
