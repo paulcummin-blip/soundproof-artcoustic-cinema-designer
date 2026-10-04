@@ -16,8 +16,9 @@
  * document is ever modified by a Library read.
  */
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { base44 } from '@/api/base44Client';
+import { subscribeIssuedExportStored } from '@/components/library/issuedExportSignal';
 import {
   REPORT_DOCUMENT_TYPES,
   PROPOSAL_DOCUMENT_TYPES,
@@ -43,7 +44,18 @@ export function useProjectLibraryAssets({ projectId }) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
-  const load = useCallback(async () => {
+  // Guards against overlapping reads: a background export landing while a read
+  // is already in flight simply waits for the next one.
+  const inFlight = useRef(false);
+
+  /**
+   * Read the project's versions, saved reports and issued documents.
+   *
+   * `silent` re-reads without raising the loading state, so a refresh triggered
+   * by a just-stored export or by returning to the tab never flashes the Loading
+   * state over the rows already on screen.
+   */
+  const load = useCallback(async ({ silent = false } = {}) => {
     if (!projectId) {
       setVersions([]);
       setSavedReports([]);
@@ -51,8 +63,10 @@ export function useProjectLibraryAssets({ projectId }) {
       setLoading(false);
       return;
     }
+    if (inFlight.current) return;
 
-    setLoading(true);
+    inFlight.current = true;
+    if (!silent) setLoading(true);
     setError(null);
     try {
       const [versionPage, snapshotPage, exportPage] = await Promise.all([
@@ -77,11 +91,38 @@ export function useProjectLibraryAssets({ projectId }) {
       console.error('[ProjectLibrary] Failed to load project assets:', loadError);
       setError(loadError);
     } finally {
+      inFlight.current = false;
       setLoading(false);
     }
   }, [projectId]);
 
   useEffect(() => { load(); }, [load]);
+
+  // A document stored while this Library is open is listed as soon as it exists.
+  // The export is recorded in the background after the download, so the row can
+  // land after this page has already read.
+  useEffect(
+    () => subscribeIssuedExportStored((storedProjectId) => {
+      if (!projectId || storedProjectId !== projectId) return;
+      load({ silent: true });
+    }),
+    [load, projectId],
+  );
+
+  // Returning to the tab — an export made in another tab, or a return from a
+  // report — reads again rather than showing what was true when it was opened.
+  useEffect(() => {
+    const refresh = () => {
+      if (typeof document !== 'undefined' && document.hidden) return;
+      load({ silent: true });
+    };
+    window.addEventListener('focus', refresh);
+    document.addEventListener('visibilitychange', refresh);
+    return () => {
+      window.removeEventListener('focus', refresh);
+      document.removeEventListener('visibilitychange', refresh);
+    };
+  }, [load]);
 
   const versionById = useMemo(
     () => new Map(versions.map((version) => [version.id, version])),

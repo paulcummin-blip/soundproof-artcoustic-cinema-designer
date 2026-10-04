@@ -17,6 +17,7 @@
 import { base44 } from '@/api/base44Client';
 import { toast } from '@/components/ui/use-toast';
 import { captureCompositionToPdf } from '@/components/library/compositionCapture';
+import { notifyIssuedExportStored } from '@/components/library/issuedExportSignal';
 import { ISSUED_DOCUMENT_COMPOSITION, issuedDocumentLabel } from './issuedDocumentTypes';
 
 export const STORAGE_FAILURE_MESSAGE = 'PDF was exported but could not be stored in Project Library';
@@ -96,6 +97,9 @@ export function recordIssuedExportInBackground({ identity, snapshot }) {
   void (async () => {
     try {
       const record = await storeIssuedDocument({ identity, snapshot });
+      // An open Project Library reads again as soon as the row exists, so a
+      // designer who exported and went straight back sees what they exported.
+      notifyIssuedExportStored(record?.project_id || identity.projectId);
       toast({
         title: 'Stored in Project Library',
         description: `${issuedDocumentLabel(identity.documentType)} · ${record.filename}`,
