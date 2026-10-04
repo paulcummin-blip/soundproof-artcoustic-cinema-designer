@@ -70,6 +70,7 @@ export function useProposalExport({
   projectName,
   // Optional filename segments: the shared helper omits them when unavailable.
   dealerName = null,
+  clientName = null,
   projectReference = null,
 }) {
   const [exporting, setExporting] = useState(false);
@@ -132,7 +133,7 @@ export function useProposalExport({
     const title = buildProposalReportTitle(
       projectName,
       proposal?.proposal_type,
-      { dealerName, projectReference }
+      { dealerName, clientName, projectReference }
     );
 
     // A saved PDF is named after the TOP-LEVEL document's title. Inside a host
@@ -190,7 +191,7 @@ export function useProposalExport({
       );
       cleanup();
     }
-  }, [proposal, sections, projectName, dealerName, projectReference, cleanup]);
+  }, [proposal, sections, projectName, dealerName, clientName, projectReference, cleanup]);
 
   return { exporting, error, blockedReason, handleExport };
 }

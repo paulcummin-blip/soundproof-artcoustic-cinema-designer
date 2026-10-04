@@ -6,16 +6,19 @@
  * generators must never build their own filenames.
  *
  * Required format:
- *   Sound Proof - Artcoustic Cinema Designer - <Report Type>[ - <Dealer>] - <Project Name>[ - <Project Reference>][ - v<N> <Version Name>]
+ *   Sound Proof - Artcoustic Cinema Designer - <Report Type>[ - <Dealer>] - <Project Name>[ - <Client Name>][ - <Project Reference>][ - v<N> <Version Name>]
  *
  * Examples:
- *   Sound Proof - Artcoustic Cinema Designer - Visual - Ribble AV - Lords Hall - LH-001
- *   Sound Proof - Artcoustic Cinema Designer - Technical - Richer Sounds Nottingham - Clarke - RSN-CLARKE
+ *   Sound Proof - Artcoustic Cinema Designer - Visual - Ribble AV - Lords Hall - Noble Projects - LH-001
+ *   Sound Proof - Artcoustic Cinema Designer - Technical - Sound Proof - Marquee Home - 34 AR
  *
- * The dealer and the project reference are optional: when they are not
+ * The dealer, client name and project reference are optional: when they are not
  * available the segment is omitted entirely rather than filled with a
- * placeholder. "Visual" or "Technical" is ALWAYS present, and the project name
- * is always present (falling back to "Untitled Project").
+ * placeholder. Client name and project reference are independent — a blank one
+ * never borrows the other's value — and an identical value repeated in the two
+ * adjacent fields is written once only. "Visual" or "Technical" is ALWAYS
+ * present, and the project name is always present (falling back to "Untitled
+ * Project").
  *
  * The browser's "Save as PDF" dialog uses document.title as the default
  * filename and appends the .pdf extension itself, so the title helpers return
@@ -65,6 +68,9 @@ export function sanitiseFilenameSegment(value, fallback = "") {
     .replace(ILLEGAL_FILENAME_CHARS, " ")
     // En/em dashes read as separators in a filename, so they become hyphens.
     .replace(/[\u2013\u2014]/g, "-")
+    // Possessive apostrophes read poorly in a shared filename, so they drop:
+    // "Lord's Hall" exports as "Lords Hall".
+    .replace(/[\u2018\u2019']/g, "")
     .replace(/\s+/g, " ")
     .replace(/^[-\s]+/, "")
     .replace(/[-\s]+$/, "")
@@ -100,6 +106,24 @@ function buildVersionSegment(version) {
 }
 
 /**
+ * Add one sanitised segment to the filename.
+ *
+ * An empty value adds nothing, and a value identical to the segment before it
+ * is written once: the same figure entered as both the client name and the
+ * project reference ("34 AR") appears as one segment, never "… - 34 AR - 34 AR".
+ *
+ * @param {string[]} segments - the filename segments being built, mutated
+ * @param {*} value - the raw value for this segment
+ */
+function appendSegment(segments, value) {
+  const segment = sanitiseFilenameSegment(value, "");
+  if (!segment) return;
+  const previous = segments[segments.length - 1];
+  if (previous && previous.toLowerCase() === segment.toLowerCase()) return;
+  segments.push(segment);
+}
+
+/**
  * Build the standardised Sound Proof report filename (without the extension).
  *
  * @param {string} reportType - "Visual", "Technical", "Proposal", …
@@ -113,16 +137,14 @@ export function buildReportFilename(reportType, projectName, version, details = 
   const segments = [BRAND, PRODUCT];
   if (type) segments.push(type);
 
-  const dealer = sanitiseFilenameSegment(details?.dealerName, "");
-  if (dealer) segments.push(dealer);
+  appendSegment(segments, details?.dealerName);
+  appendSegment(segments, sanitiseProjectName(projectName));
+  // Client name and project reference are separate project fields: each is
+  // written only when it holds a value of its own.
+  appendSegment(segments, details?.clientName);
+  appendSegment(segments, details?.projectReference);
 
-  segments.push(sanitiseProjectName(projectName));
-
-  const reference = sanitiseFilenameSegment(details?.projectReference, "");
-  if (reference) segments.push(reference);
-
-  const versionSegment = buildVersionSegment(version);
-  if (versionSegment) segments.push(versionSegment);
+  appendSegment(segments, buildVersionSegment(version));
 
   return segments.join(SEPARATOR);
 }

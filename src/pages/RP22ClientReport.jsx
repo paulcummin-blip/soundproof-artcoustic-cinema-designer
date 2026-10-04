@@ -866,9 +866,11 @@ export default function RP22ClientReport() {
     logoUrl: LOGO_URL,
     versionNumber,
     versionName,
-    // The exported filename names the dealer and the project reference when
-    // the project carries them, so the file identifies itself out of context.
+    // The exported filename names every populated project identity field —
+    // dealer, project name, client name and reference — so the file identifies
+    // itself out of context.
     dealerName: filenameIdentity.dealerName,
+    clientName: filenameIdentity.clientName,
     projectReference: filenameIdentity.projectReference,
   });
 

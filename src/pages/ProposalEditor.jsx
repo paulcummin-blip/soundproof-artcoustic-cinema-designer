@@ -28,7 +28,8 @@ import { isHighChannelDesign } from '@/components/proposal/highChannelLayoutAuth
 import ProposalPrintDocument from '@/components/proposal/export/ProposalPrintDocument';
 import ProposalPrintStyles from '@/components/proposal/export/ProposalPrintStyles';
 import { useProposalExport } from '@/components/proposal/export/useProposalExport';
-import { resolveReportFilenameDetails } from '@/components/report/reportFilenameIdentity';
+import { resolveReportFilenameDetails, logReportExportIdentity } from '@/components/report/reportFilenameIdentity';
+import { proposalReportTypeToken } from '@/components/report/reportPdfTitle';
 import { Loader2, ChevronLeft, Archive, RotateCcw } from 'lucide-react';
 
 const SAVE_STATUS = { IDLE: 'idle', SAVING: 'saving', SAVED: 'saved', FAILED: 'failed', UNSAVED: 'unsaved' };
@@ -63,6 +64,8 @@ export default function ProposalEditor() {
     projectName: null,
     clientName: null,
     dealerName: null,
+    filenameDealerName: null,
+    filenameClientName: null,
     projectReference: null,
     coverImageUrl: null,
     heroImageUrl: null,
@@ -105,11 +108,16 @@ export default function ProposalEditor() {
     // Artcoustic default name is not a fallback either — Artcoustic is the
     // partner brand in the lockup, not the dealer.
     const dealerName = resolveDealerIdentityName(account, brand);
+    // Every populated project identity field is carried into the exported
+    // filename: dealer/account, project name, client name and reference.
+    const filenameDetails = resolveReportFilenameDetails(project, account);
+    logReportExportIdentity(filenameDetails, proposalReportTypeToken(proposalRecord.proposal_type));
     setProjectContext({
       projectName: project?.name || null,
       clientName: project?.client_name || null,
       dealerName,
-      filenameDealerName: resolveReportFilenameDetails(project, account).dealerName,
+      filenameDealerName: filenameDetails.dealerName,
+      filenameClientName: filenameDetails.clientName,
       projectReference: project?.project_reference || null,
       coverImageUrl: cover?.file_url || null,
       heroImageUrl: presentation.heroBg,
@@ -580,6 +588,7 @@ export default function ProposalEditor() {
     sections,
     projectName: projectContext.projectName,
     dealerName: projectContext.filenameDealerName,
+    clientName: projectContext.filenameClientName,
     projectReference: projectContext.projectReference,
   });
 

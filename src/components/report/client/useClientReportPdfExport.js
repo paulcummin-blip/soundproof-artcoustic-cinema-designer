@@ -67,9 +67,10 @@ export function useClientReportPdfExport({
   logoUrl,
   versionNumber,
   versionName,
-  // Dealer and project reference are optional filename segments: the shared
-  // helper omits them when they are unavailable.
+  // Dealer, client name and project reference are optional filename segments:
+  // the shared helper omits them when they are unavailable.
   dealerName = null,
+  clientName = null,
   projectReference = null,
 }) {
   const [exporting, setExporting] = useState(false);
@@ -112,7 +113,7 @@ export function useClientReportPdfExport({
     const title = buildVisualReportTitle(
       projectName,
       { number: versionNumber, name: versionName },
-      { dealerName, projectReference }
+      { dealerName, clientName, projectReference }
     );
 
     // Open the app-owned print window FIRST, synchronously, while the browser
@@ -181,7 +182,7 @@ export function useClientReportPdfExport({
       printWindowRef.current = null;
       cleanup();
     }
-  }, [exporting, activePageCount, projectName, logoUrl, dealerName, projectReference, versionNumber, versionName, cleanup]);
+  }, [exporting, activePageCount, projectName, logoUrl, dealerName, clientName, projectReference, versionNumber, versionName, cleanup]);
 
   return { exporting, error, handleExport };
 }
