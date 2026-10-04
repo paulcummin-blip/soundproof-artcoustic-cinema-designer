@@ -10,6 +10,7 @@ import ClientBriefStep from '@/components/proposal/wizard/ClientBriefStep';
 import GenerateStep from '@/components/proposal/wizard/GenerateStep';
 import { useVersionedEngineeringSnapshot } from '@/components/proposal/engineeringAuthority/useVersionedEngineeringSnapshot';
 import { buildSelectedVersionSnapshots } from '@/components/proposal/engineeringAuthority/buildSelectedVersionSnapshots';
+import { useSelectedVersionSnapshots } from '@/components/proposal/engineeringAuthority/useSelectedVersionSnapshots';
 import { useProposalSourceStatus } from '@/components/proposal/sourceAuthority/useProposalSourceStatus';
 import { useProposalReadiness } from '@/components/proposal/sourceAuthority/useProposalReadiness';
 import { resolveProposalReadinessGate } from '@/components/proposal/sourceAuthority/proposalReadinessAuthority';
@@ -74,6 +75,21 @@ export default function CreateProposalWizard({ onCreated, onCancel, regenerateFr
     error: snapshotError,
     version: selectedVersion,
   } = useVersionedEngineeringSnapshot(selectedProjectId, snapshotVersionId);
+
+  // ── Comparison-mode Client Brief examples ──
+  // In comparison mode the Brief examples are built from EVERY selected
+  // version's own frozen snapshot, read from the same published authority the
+  // report is generated from. Single-version proposals need nothing here.
+  const {
+    versions: selectedVersionSnapshots,
+    loading: selectedVersionsLoading,
+  } = useSelectedVersionSnapshots({
+    projectId: selectedProjectId,
+    versionIds: selectedVersionIds,
+    primaryVersionId: snapshotVersionId,
+    primarySnapshot: engineeringSnapshot,
+    enabled: step >= 3 && selectedVersionIds.length > 1,
+  });
 
   // ── Proposal Source Data ──
   // The proposal is downstream of the generated Visual and Technical Reports.
@@ -317,6 +333,8 @@ export default function CreateProposalWizard({ onCreated, onCancel, regenerateFr
           selectedVersionIds={selectedVersionIds}
           proposalType={proposalType}
           engineeringSnapshot={engineeringSnapshot}
+          versionSnapshots={selectedVersionSnapshots}
+          versionsLoading={selectedVersionsLoading}
           snapshotLoading={snapshotLoading}
         />
       )}

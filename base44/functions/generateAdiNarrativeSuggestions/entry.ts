@@ -22,6 +22,7 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.52';
 import { buildEngineeringEvidence } from '../../shared/engineeringSnapshotEvidence.js';
 import { buildAuthorityChips, resolveNarrativeChips } from '../../shared/adiNarrativeAuthority.js';
+import { buildComparisonAuthorityChips, resolveComparisonNarrativeChips } from '../../shared/adiComparisonNarrativeChips.js';
 import { buildNarrativeFacts, buildNarrativeFactsBlock } from '../../shared/adiNarrativeFacts.js';
 import { resolveReportLayout } from '../../shared/highChannelDensityRule.js';
 
@@ -96,6 +97,57 @@ function buildPrompt({ evidence, factsBlock, authorityChips, proposalType, versi
   ].filter(Boolean).join('\n');
 }
 
+/**
+ * The comparison brief: every selected version's own frozen evidence, and the
+ * rule that a suggestion is about the versions together — never one version's
+ * fact presented as though it applied to the whole comparison.
+ */
+function buildComparisonPrompt({ versions, authorityChips, projectName }) {
+  const names = versions.map((entry, index) => entry.version_name || entry.version_id || `Version ${index + 1}`);
+  const blocks = versions.map((entry, index) => [
+    `=== VERSION: ${names[index]} ===`,
+    buildEngineeringEvidence(entry.snapshot),
+    '',
+    buildNarrativeFactsBlock(entry.facts),
+  ].join('\n'));
+
+  const highDensityEverywhere = versions.every(
+    (entry) => resolveReportLayout(entry.snapshot).highDensity,
+  );
+
+  return [
+    blocks.join('\n\n'),
+    '',
+    '=== ALREADY INCLUDED (never repeat or reword these) ===',
+    ...authorityChips.map((chip) => `- ${chip.label}`),
+    '',
+    '=== TASK ===',
+    `You are the Artcoustic Design Intelligence (ADI) assistant inside Sound Proof, helping a cinema designer brief a System Design Comparison${projectName ? ` for ${projectName}` : ''} covering ${versions.length} design versions: ${names.join(', ')}.`,
+    '',
+    'Suggest narrative focus points for the Client Brief, and do not repeat the examples already listed above. The brief shapes the wording, emphasis and structure of the report only. It never changes an engineering result.',
+    '',
+    `Return up to ${MAX_AI_SUGGESTIONS} suggestions. Each suggestion is one short chip label (4 to 9 words, starting with Compare, Explain, Highlight, Emphasise, Mention, Show or Suggest) plus a short reason naming the calculated facts it relies on.`,
+    '',
+    'This is a comparison, so every suggestion must be about the selected versions together.',
+    '',
+    'RULES:',
+    '- Every suggestion must compare the selected versions, or state a fact that is true of EVERY selected version. Never write a suggestion that states one version\'s fact as though it applied to the whole comparison.',
+    '- Prefer the areas the comparison is built on: dynamic range, bass layout, spatial resolution, speaker layout, screen and seating experience, viewing experience, system scale, upgrade benefits, which system is stronger.',
+    `- Name a version only by its exact saved name (${names.join(', ')}).`,
+    '- State only values that appear in the version blocks above. Every number is checked against every selected version before the designer sees the chip.',
+    '- A value belonging to one selected version may appear only in a comparison with another version\'s value. A suggestion that states one version\'s figure as the single fact of the report is discarded.',
+    '- A fact stated without comparison wording must hold in every selected version, or it is discarded.',
+    '- Never invent a difference between versions. Where the versions match on an area, say that they match instead of inventing a change.',
+    '- Never suggest a screen size, level, layout, seat count, subwoofer count, dB or Hz figure that is not in the version blocks above.',
+    '- Where the data shows a weak or limiting area in one version, prefer a chip that explains it honestly as a difference between the options.',
+    highDensityEverywhere
+      ? '- Every selected version already uses a high channel count (9.1.6, or 15 or more discrete channels), so never suggest more speakers, more channels, more overhead positions, additional surround positions or improved horizontal spacing, and never offer any of them as a future upgrade.'
+      : '- Only suggest upgrades the designer could genuinely add. Never suggest something the version facts contradict.',
+    '- Plain, client-report useful language. No marketing language.',
+    '- Never output generic labels or anything like: Dynamic impact, Dialogue clarity, Family friendly, Music performance, Future upgrade path, Interior design, Acoustic treatment benefits.',
+  ].filter(Boolean).join('\n');
+}
+
 function normaliseSuggestions(raw) {
   const list = Array.isArray(raw?.suggestions) ? raw.suggestions : [];
   const seen = new Set();
@@ -124,6 +176,51 @@ export default async function (req) {
 
     const body = await req.json().catch(() => ({}));
     const snapshot = body?.engineering_snapshot || null;
+
+    // ── Comparison mode ──
+    // Two or more selected versions arrive with their own frozen snapshot, so
+    // every example is built and checked against all of them. One version's
+    // facts are never offered as though they applied to the whole comparison.
+    const versionEntries = (Array.isArray(body?.version_snapshots) ? body.version_snapshots : [])
+      .filter((entry) => entry?.snapshot?.available === true)
+      .map((entry) => ({
+        version_id: entry?.version_id || null,
+        version_name: entry?.version_name || null,
+        snapshot: entry.snapshot,
+        facts: buildNarrativeFacts(entry.snapshot),
+      }))
+      .filter((entry) => entry.facts.available);
+
+    if (versionEntries.length >= 2) {
+      const authorityChips = buildComparisonAuthorityChips(versionEntries);
+
+      let comparisonAiChips = [];
+      try {
+        const result = await base44.integrations.Core.InvokeLLM({
+          prompt: buildComparisonPrompt({
+            versions: versionEntries,
+            authorityChips,
+            projectName: versionEntries[0]?.snapshot?.project?.name || snapshot?.project?.name || null,
+          }),
+          response_json_schema: SUGGESTIONS_JSON_SCHEMA,
+        });
+        comparisonAiChips = normaliseSuggestions(result);
+      } catch (error) {
+        console.error('[generateAdiNarrativeSuggestions] ADI comparison suggestions unavailable, grounded examples only:', error?.message);
+      }
+
+      const { suggestions, diagnostics } = resolveComparisonNarrativeChips({
+        aiChips: comparisonAiChips,
+        versions: versionEntries,
+      });
+      if (suggestions.length === 0) return unavailable();
+
+      for (const entry of diagnostics) {
+        console.log('[ADI narrative chip]', JSON.stringify(entry));
+      }
+
+      return Response.json({ available: true, mode: 'comparison', suggestions, diagnostics });
+    }
 
     // No calculated result for the selected version — the wizard shows its
     // generic examples instead, so there is nothing to generate.

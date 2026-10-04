@@ -20,6 +20,12 @@ import log from '@/components/utils/logger';
  * assembled by Sound Proof from the calculated screen size and results is shown
  * first, and the model only adds to those.
  *
+ * In comparison mode (two or more selected versions) the examples follow the
+ * proposal mode: each selected version contributes its own frozen snapshot, the
+ * examples compare the selected versions, and a fact is only stated normally
+ * when it holds in every one of them. A single-version fact is never offered as
+ * though it applied to the whole comparison.
+ *
  * When no calculated result is available, generic examples are shown instead.
  */
 const GENERIC_EXAMPLES = [
@@ -43,20 +49,40 @@ const GENERIC_EXAMPLES = [
 ];
 
 const FALLBACK_MESSAGE = 'Calculate the project to get examples powered by Artcoustic Design Intelligence.';
+const COMPARISON_INCOMPLETE_MESSAGE = 'Examples for a comparison need a calculated engineering result for every selected version.';
 
 export default function AdiSuggestionChips({
   projectId,
   selectedVersionIds = [],
   proposalType,
   engineeringSnapshot,
+  versionSnapshots = [],
   snapshotLoading = false,
+  versionsLoading = false,
   onAdd,
 }) {
   const [suggestions, setSuggestions] = useState([]);
   const [loading, setLoading] = useState(false);
   const [failed, setFailed] = useState(false);
   const requestRef = useRef(0);
-  const hasResults = engineeringSnapshot?.available === true;
+
+  // In comparison mode the examples are built from EVERY selected version, so a
+  // comparison is never described from one version's facts alone.
+  const selectedVersionCount = (versionSnapshots || []).length;
+  const comparisonSelected = selectedVersionCount > 1;
+  const comparisonEntries = (versionSnapshots || [])
+    .filter((entry) => entry?.snapshot?.available === true)
+    .map((entry) => ({
+      version_id: entry.version_id,
+      version_name: entry.version_name || null,
+      snapshot: entry.snapshot,
+    }));
+  const comparisonReady = comparisonSelected && comparisonEntries.length === selectedVersionCount;
+  const comparisonKey = comparisonEntries.map((entry) => entry.version_id).join('|');
+  const comparisonEntriesRef = useRef(comparisonEntries);
+  comparisonEntriesRef.current = comparisonEntries;
+  const comparisonIncomplete = comparisonSelected && !comparisonReady;
+  const hasResults = comparisonSelected ? comparisonReady : engineeringSnapshot?.available === true;
 
   const load = useCallback(async () => {
     if (!hasResults) return;
@@ -70,6 +96,9 @@ export default function AdiSuggestionChips({
         proposal_type: proposalType,
         selected_version_ids: selectedVersionIds,
         engineering_snapshot: engineeringSnapshot,
+        // In comparison mode the function receives every selected version's own
+        // frozen snapshot and builds its examples from all of them.
+        version_snapshots: comparisonSelected ? comparisonEntriesRef.current : [],
       });
       if (requestRef.current !== token) return;
       const list = response?.data?.suggestions || [];
@@ -86,7 +115,7 @@ export default function AdiSuggestionChips({
     } finally {
       if (requestRef.current === token) setLoading(false);
     }
-  }, [hasResults, projectId, proposalType, selectedVersionIds, engineeringSnapshot]);
+  }, [hasResults, projectId, proposalType, selectedVersionIds, engineeringSnapshot, comparisonSelected, comparisonKey]);
 
   useEffect(() => {
     if (hasResults) {
@@ -102,7 +131,7 @@ export default function AdiSuggestionChips({
   const chips = usingCalculatedResults
     ? suggestions.map((item) => ({ label: item.label, reason: item.reason }))
     : GENERIC_EXAMPLES.map((label) => ({ label, reason: null }));
-  const busy = snapshotLoading || loading;
+  const busy = snapshotLoading || versionsLoading || loading;
 
   return (
     <div className="mt-6">
@@ -127,23 +156,27 @@ export default function AdiSuggestionChips({
 
       {usingCalculatedResults && (
         <p className="text-[11px] text-[#8A8477] mb-3">
-          {"These examples are based on this project's calculated design results. Any number they state is checked against this version before display."}
+          {comparisonSelected
+            ? `These examples compare the ${selectedVersionCount} selected versions. Any number they state is checked against every selected version before display.`
+            : "These examples are based on this project's calculated design results. Any number they state is checked against this version before display."}
         </p>
       )}
 
       {busy && (
         <p className="text-[11px] text-[#8A8477] mb-3">
-          {snapshotLoading
-            ? 'Reading the published engineering result…'
+          {snapshotLoading || versionsLoading
+            ? 'Reading the published engineering results for the selected versions…'
             : "Reading this design's results…"}
         </p>
       )}
 
       {!busy && !usingCalculatedResults && (
         <p className="text-[11px] text-[#8A8477] mb-3">
-          {failedWithData
-            ? 'Examples could not be generated from this design — general examples shown.'
-            : FALLBACK_MESSAGE}
+          {comparisonIncomplete
+            ? COMPARISON_INCOMPLETE_MESSAGE
+            : failedWithData
+              ? 'Examples could not be generated from this design — general examples shown.'
+              : FALLBACK_MESSAGE}
         </p>
       )}
 

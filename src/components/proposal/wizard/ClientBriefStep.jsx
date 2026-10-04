@@ -10,7 +10,9 @@ import AdiSuggestionChips from '@/components/proposal/wizard/AdiSuggestionChips'
  * values, Design Ratings, or recommendations.
  *
  * Suggestions under the brief are ADI-generated from this project's
- * calculated design results (see AdiSuggestionChips).
+ * calculated design results (see AdiSuggestionChips). When two or more versions
+ * are selected, the suggestions compare those versions and are read from each
+ * selected version's own frozen snapshot.
  *
  * The brief is optional — the user can proceed without it and the report
  * will generate with a default professional narrative.
@@ -22,6 +24,8 @@ export default function ClientBriefStep({
   selectedVersionIds,
   proposalType,
   engineeringSnapshot,
+  versionSnapshots,
+  versionsLoading,
   snapshotLoading,
 }) {
   const handleExampleClick = (example) => {
@@ -60,6 +64,8 @@ export default function ClientBriefStep({
         selectedVersionIds={selectedVersionIds}
         proposalType={proposalType}
         engineeringSnapshot={engineeringSnapshot}
+        versionSnapshots={versionSnapshots}
+        versionsLoading={versionsLoading}
         snapshotLoading={snapshotLoading}
         onAdd={handleExampleClick}
       />
