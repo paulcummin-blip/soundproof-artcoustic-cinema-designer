@@ -129,8 +129,8 @@ export const ADI_OPTIMISER_COPY = Object.freeze({
     "Will compare: individual lever benefit · combined benefit · P19 impact · output/headroom trade-off · worst seat and limiting frequency",
   /** The short pre-run summary shown under the calculation count. */
   PRE_RUN_SUMMARY:
-    "It checks delay, gain, phase and polarity before suggesting physical changes such as moving "
-    + "subwoofers or seats.",
+    "ADI checks calibration and design options first, then suggests physical changes only when they "
+    + "produce a meaningful and credible improvement.",
   /** The collapsed disclosure's title. */
   DISCLOSURE_TITLE: "What ADI will test",
   /** Label above the per-family estimate inside the disclosure. */

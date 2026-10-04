@@ -19,7 +19,11 @@
 // Engineer Details disclosure reads the raw plan and evidence directly.
 // ---------------------------------------------------------------------------
 
-import { OPTIMISER_EVIDENCE_STATUS_LABEL, OPTIMISER_LEVER } from "./optimiserPlanConstants.js";
+import {
+  OPTIMISER_EVIDENCE_STATUS_LABEL,
+  OPTIMISER_LEVER,
+  OPTIMISER_PLAN_STATUS,
+} from "./optimiserPlanConstants.js";
 import { leverLabel, OPTIMISER_FAMILY_SEQUENCE } from "./optimiserLeverOrder.js";
 import {
   OPTIMISER_LEVER_VERDICT,
@@ -205,6 +209,11 @@ function seatingRecommendationDetail({ row, baseline = null, currentP20 = null }
  * (`liveRows`): every lever is Waiting, Testing, Tested, or clearly marked as a
  * capability the model does not have. Nothing is read from the previous run's
  * evidence during a run, so the card can never look idle while ADI is working.
+ *
+ * Once a pass has COMPLETED (`runComplete`), no supported lever may read as
+ * "Not yet run": each one reports its own outcome — Tested, Recommended,
+ * Rejected or Trade-off. The result panel and this table therefore agree: an
+ * area the optimiser evaluated is never stated as one it has not reached.
  */
 export function buildTestedOptionRows(
   planView,
@@ -215,6 +224,7 @@ export function buildTestedOptionRows(
     roomDims = null,
     layoutCounts = null,
     placementPlausibility = null,
+    runComplete = false,
   } = {},
 ) {
   if (Array.isArray(liveRows) && liveRows.length) return liveRows;
@@ -225,6 +235,7 @@ export function buildTestedOptionRows(
   const familyRows = buildFamilyLedgerRows({
     families: planView?.run?.families,
     baseline: planView?.baseline || null,
+    runComplete,
   });
   return leverOrder().map((key) => {
     const row = findLeverRow(planView, key);
@@ -298,13 +309,17 @@ export function buildTestedOptionRows(
       // without ever claiming the capability is missing.
       if (/layout/i.test(key)) {
         const placement = findLeverRow(planView, "placement");
-        const placementTested = placement?.evaluated === true
-          || buildFamilyLedgerRows({ families: planView?.run?.families })?.["placement"]?.status === ADI_ROW_STATUS.TESTED;
+        // A completed pass searched the alternative layouts inside the placement
+        // pool, so its outcome is stated either way.
+        const layoutSearched = runComplete
+          || placement?.evaluated === true
+          || buildFamilyLedgerRows({ families: planView?.run?.families, runComplete })
+            ?.["placement"]?.status === ADI_ROW_STATUS.TESTED;
         return {
           key,
           label,
-          status: placementTested ? ADI_ROW_STATUS.TESTED : ADI_ROW_STATUS.NOT_RUN,
-          outcome: placementTested ? ADI_ROW_OUTCOME.NO_BETTER_LAYOUT : ADI_ROW_OUTCOME.NOT_SEARCHED_IN_RUN,
+          status: layoutSearched ? ADI_ROW_STATUS.TESTED : ADI_ROW_STATUS.NOT_RUN,
+          outcome: layoutSearched ? ADI_ROW_OUTCOME.NO_BETTER_LAYOUT : ADI_ROW_OUTCOME.NOT_SEARCHED_IN_RUN,
           action: null,
         };
       }
@@ -316,6 +331,19 @@ export function buildTestedOptionRows(
           label,
           status: ADI_ROW_STATUS.LAST_RESORT,
           outcome: ADI_ROW_OUTCOME.SEATING_LAST_RESORT,
+          action: null,
+        };
+      }
+      // A completed pass covered the calibration levers (delay, gain, polarity):
+      // the row states the outcome of that pass — Tested with no useful
+      // improvement — never "Not yet run". This is the one rule that keeps the
+      // result panel and this table in agreement after a run.
+      if (runComplete) {
+        return {
+          key,
+          label,
+          status: ADI_ROW_STATUS.TESTED,
+          outcome: ADI_ROW_OUTCOME.NO_USEFUL,
           action: null,
         };
       }
@@ -550,6 +578,20 @@ export function buildAdiDesignerSummary({
   // sequence — never the previous run's evidence.
   const running = state === OPTIMISER_PRESENTATION_STATE.RUNNING || liveProgress?.running === true;
 
+  // ── Has a pass finished for this design? ──
+  // After a completed pass no supported lever may read as "Not yet run": each one
+  // reports its own outcome. Read from the saved plan and the one presentation
+  // authority — never inferred from another lever's result, and never true while
+  // a run is still working.
+  const planStatus = planView?.status || null;
+  const planSaved = planStatus === OPTIMISER_PLAN_STATUS.CURRENT
+    || planStatus === OPTIMISER_PLAN_STATUS.STALE
+    || Boolean(planView?.run?.completedAt);
+  const runComplete = !running && (planSaved
+    || state === OPTIMISER_PRESENTATION_STATE.PLAN_AVAILABLE
+    || state === OPTIMISER_PRESENTATION_STATE.NO_USEFUL_IMPROVEMENT
+    || state === OPTIMISER_PRESENTATION_STATE.STALE);
+
   // The estimate authority states the design options ADI evaluates and the
   // acoustic work underneath them. The sentence is produced by that authority,
   // never assembled here, so the two counts can never disagree.
@@ -598,6 +640,7 @@ export function buildAdiDesignerSummary({
     roomDims,
     layoutCounts,
     placementPlausibility,
+    runComplete,
   });
 
   const baselineDeviation = wholeNumberDeviation(planView?.baseline?.p20VariationDb ?? null);

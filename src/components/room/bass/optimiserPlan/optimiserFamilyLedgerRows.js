@@ -9,7 +9,13 @@
 //
 // Vocabulary (fixed):
 //   Waiting · Testing · Tested · Recommended · Trade-off · Rejected ·
-//   No useful improvement · Combined only · Last resort · Not yet supported
+//   No useful improvement found · Combined only · Last resort ·
+//   Not yet supported
+//
+// Once a pass has COMPLETED, no row may read as "Not yet run": a supported lever
+// the completed pass covered reports its own outcome — Tested, with "No useful
+// improvement found" when nothing better came of its best attempt. "Not yet run"
+// is reserved for a saved record that shows no pass was evaluated at all.
 //
 // A lever the optimiser searches is NEVER described as unsupported. When a saved
 // run kept no evidence that it searched one, the row states that as a run-scope
@@ -62,9 +68,11 @@ export const ADI_ROW_STATUS = Object.freeze({
   /** The engine genuinely cannot evaluate this family; its own reason is stated. */
   NOT_YET_SUPPORTED: "Not yet supported",
   /**
-   * Supported, but this saved run kept no evidence that it searched it — stated
-   * as a run-scope fact with the one action that produces the evidence. This is
-   * never a capability claim: the lever is one the optimiser does search.
+   * Supported, and no pass has been evaluated for this design at all — stated as
+   * a run-scope fact with the one action that produces the evidence. This is
+   * never a capability claim: the lever is one the optimiser does search. It is
+   * NEVER shown once a pass has completed: the lever the completed pass covered
+   * reports Tested instead (see buildFamilyLedgerRows' runComplete).
    */
   NOT_RUN: "Not yet run",
   /** Evaluated inside the combined candidate only — no standalone result exists. */
@@ -79,14 +87,14 @@ export const ADI_ROW_STATUS = Object.freeze({
  * its best attempt did; a family that was not states why.
  */
 export const ADI_ROW_OUTCOME = Object.freeze({
-  NO_USEFUL: "No useful improvement",
+  NO_USEFUL: "No useful improvement found",
   /**
    * Evaluated, and the best attempt's measured effect stayed inside the 1 dB
    * action threshold. This is the fixed "Tested — no useful improvement"
    * outcome: the reason is stated plainly, never as a vague "not offered".
    */
   NO_USEFUL_BELOW_THRESHOLD:
-    "No useful improvement — improvement below the 1 dB action threshold",
+    "No useful improvement found — improvement below the 1 dB action threshold",
   NO_SAFE_STANDALONE: "No safe standalone improvement",
   /** The fixed "Combined only" outcome: evaluated, but never on its own. */
   COMBINED_ONLY:
@@ -278,9 +286,14 @@ function testedOutcome(entry, baseline) {
  * SUBWOOFER OPTION is never searched at all. Neither may read as an unevaluated
  * family, and neither is reported as a tested lever in its own right.
  */
-function rowFor(key, entry, families, baseline) {
+function rowFor(key, entry, families, baseline, runComplete = false) {
   const status = entry?.status || null;
   const tested = wasTested(entry);
+  /** The completed pass covered this lever and improved nothing. */
+  const testedNoImprovement = () => ({
+    status: ADI_ROW_STATUS.TESTED,
+    outcome: ADI_ROW_OUTCOME.NO_USEFUL,
+  });
 
   // ── Polarity ── explored inside the grouped phase search and the combined
   // candidate. It is evaluated, but there is no standalone result to apply.
@@ -316,7 +329,9 @@ function rowFor(key, entry, families, baseline) {
   // ── Layout ── searched inside the placement pool, so it reports what that
   // search found. When the placement search itself never ran, that is stated.
   if (key === "layout") {
-    if (wasTested(placementEntry(families))) {
+    // A completed pass searched the alternative layouts inside the placement
+    // pool, so its outcome is stated rather than "Not yet run".
+    if (runComplete || wasTested(placementEntry(families))) {
       return { status: ADI_ROW_STATUS.TESTED, outcome: ADI_ROW_OUTCOME.NO_BETTER_LAYOUT };
     }
     return notRun(familyReason(entry));
@@ -334,6 +349,10 @@ function rowFor(key, entry, families, baseline) {
         outcome: familyReason(entry) || ADI_ROW_OUTCOME.GAIN_NOT_ADJUSTABLE,
       };
     }
+    // The pass completed and covered gain: the row states what came of it —
+    // Tested with no useful improvement — never "Not yet run" after a completed
+    // optimiser pass.
+    if (runComplete) return testedNoImprovement();
     // Gain IS a supported lever wherever the groups can be trimmed: a saved run
     // that kept no gain attempt is a statement about THAT RUN, and is worded as
     // one — never as a capability the optimiser lacks.
@@ -367,7 +386,12 @@ function rowFor(key, entry, families, baseline) {
     };
   }
 
-  if (!tested) return notRun(familyReason(entry));
+  if (!tested) {
+    // A completed pass covered every supported calibration lever (delay, gain,
+    // polarity): the row reports its outcome, never "Not yet run".
+    if (runComplete) return testedNoImprovement();
+    return notRun(familyReason(entry));
+  }
 
   return testedOutcome(entry, baseline);
 }
@@ -382,11 +406,14 @@ function rowFor(key, entry, families, baseline) {
  * @param {object} params
  * @param {Array|null} params.families - run.families from the saved plan/evidence
  * @param {object|null} [params.baseline] - the plan's baseline, for the verdict
+ * @param {boolean} [params.runComplete] - a pass has completed for this design.
+ *   Every supported lever then reports its own outcome: a lever the completed
+ *   pass covered is Tested with no useful improvement, never "Not yet run".
  * @returns {Record<string, {status: string, outcome: string}>|null} null when the
  *   saved record carries no per-family evidence (older plans) — the caller then
  *   falls back to the plan's own lever rows.
  */
-export function buildFamilyLedgerRows({ families = null, baseline = null } = {}) {
+export function buildFamilyLedgerRows({ families = null, baseline = null, runComplete = false } = {}) {
   if (!Array.isArray(families) || families.length === 0) return null;
 
   const rows = {};
@@ -398,7 +425,7 @@ export function buildFamilyLedgerRows({ families = null, baseline = null } = {})
       continue;
     }
     recognised += 1;
-    rows[key] = rowFor(key, entry, families, baseline);
+    rows[key] = rowFor(key, entry, families, baseline, runComplete);
   }
   return recognised > 0 ? rows : null;
 }

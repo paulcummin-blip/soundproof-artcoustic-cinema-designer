@@ -1,7 +1,16 @@
 // AdiTestedOptionsTable.jsx
 // ---------------------------------------------------------------------------
-// "What ADI tested" — the eight levers, always in the fixed least-intrusive
-// order (delay, gain, phase, polarity, placement, layout, sub option, seating).
+// "What ADI tested" — the levers ADI evaluates, in the fixed least-intrusive
+// order (delay · gain · polarity · placement · layout · seating), with the
+// low-frequency absorption advice row appended after them. A capability the
+// optimiser does not evaluate is never a row here.
+//
+// Two rules this table only obeys, never decides:
+//   • Once a pass has completed, no row reads "Not yet run": every supported
+//     lever states its own outcome (Tested · Recommended · Rejected ·
+//     Trade-off · Combined only · Not applicable · Not yet supported).
+//   • Only a Recommended row carries an Apply. Tested, Trade-off, Rejected,
+//     theoretical-only and advice rows carry their own note or nothing at all.
 //
 // Presentation only: no ids, no coordinates, no decimals, no paragraphs. Every
 // value arrives from adiDesignerSummary.js, which reads the saved plan.

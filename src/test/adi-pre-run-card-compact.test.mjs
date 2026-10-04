@@ -68,8 +68,10 @@ describe('PRE-RUN COPY SHORTENED', () => {
   it('keeps the visible copy to the short summary', () => {
     expect(ADI_OPTIMISER_COPY.NO_PLAN.split(' ').length).toBeLessThan(15);
     expect(ADI_OPTIMISER_COPY.PRE_RUN_SUMMARY).toBe(
-      'It checks delay, gain, phase and polarity before suggesting physical changes such as moving subwoofers or seats.',
+      'ADI checks calibration and design options first, then suggests physical changes only when they produce a meaningful and credible improvement.',
     );
+    // Phase is not part of the optimiser's search, so the summary never names it.
+    expect(ADI_OPTIMISER_COPY.PRE_RUN_SUMMARY).not.toMatch(/phase/i);
   });
 
   it('renders the short summary under the count', () => {
