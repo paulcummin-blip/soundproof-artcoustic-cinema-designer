@@ -43,6 +43,7 @@ import { useReportSnapshot } from '@/components/report/useReportSnapshot';
 import ReportSnapshotBanner from '@/components/report/ReportSnapshotBanner';
 import {
     REPORT_SNAPSHOT_TYPE,
+    REPORT_SNAPSHOT_STATUS,
     buildSnapshotPayload,
     currentSourceFingerprints,
 } from '@/components/report/reportSnapshotAuthority';
