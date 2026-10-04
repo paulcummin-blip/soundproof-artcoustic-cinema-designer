@@ -12,7 +12,6 @@ import { confirmProposalSectionsSaved } from '@/components/proposal/wizard/propo
 import { useVersionedEngineeringSnapshot } from '@/components/proposal/engineeringAuthority/useVersionedEngineeringSnapshot';
 import { buildSelectedVersionSnapshots } from '@/components/proposal/engineeringAuthority/buildSelectedVersionSnapshots';
 import { useSelectedVersionSnapshots } from '@/components/proposal/engineeringAuthority/useSelectedVersionSnapshots';
-import { useProposalSourceStatus } from '@/components/proposal/sourceAuthority/useProposalSourceStatus';
 import { useProposalReadiness } from '@/components/proposal/sourceAuthority/useProposalReadiness';
 import { resolveProposalReadinessGate } from '@/components/proposal/sourceAuthority/proposalReadinessAuthority';
 import VersionReadinessTable from '@/components/proposal/sourceAuthority/VersionReadinessTable';
@@ -95,29 +94,22 @@ export default function CreateProposalWizard({ onCreated, onCancel, regenerateFr
     enabled: step >= 3 && selectedVersionIds.length > 1,
   });
 
-  // ── Proposal Source Data ──
-  // The proposal is downstream of the generated Visual and Technical Reports.
-  // Generation is blocked until a current report source exists for the version.
-  const {
-    status: sourceStatus,
-    loading: sourceLoading,
-    readFailed: sourceReadFailed,
-    retry: retrySourceRead,
-  } = useProposalSourceStatus({
-    projectId: selectedProjectId,
-    versionId: snapshotVersionId,
-    version: selectedVersion,
-    engineeringSnapshot,
-    loading: snapshotLoading,
-  });
-  const sourceReady = sourceStatus?.ready === true;
-
   // ── Shared per-version readiness (Step 3 and Step 5) ──
   // ONE readiness result covering EVERY selected version: the same rows drive
   // the version-selection warnings, the Step 5 table, the blocking message and
   // the Generate button. A System Design Comparison is judged per version, never
   // from the first selected version alone.
-  const { rows: readinessRows, loading: readinessLoading } = useProposalReadiness({
+  // ONE authority. This single result drives the Step 3 warning, the Step 5
+  // table, the blocking message and the Generate button — the same rule the
+  // server gate applies. There is deliberately no second, legacy report-ready
+  // boolean: that is exactly what allowed the panel to read Current while the
+  // Generate button claimed the reports were missing.
+  const {
+    rows: readinessRows,
+    loading: readinessLoading,
+    error: readinessError,
+    retry: retryReadiness,
+  } = useProposalReadiness({
     projectId: selectedProjectId,
     versionIds: selectedVersionIds,
   });
@@ -168,12 +160,8 @@ export default function CreateProposalWizard({ onCreated, onCancel, regenerateFr
 
   const handleGenerate = async () => {
     if (generationInFlightRef.current || !selectedProjectId || selectedVersionIds.length === 0) return;
-    // Source authority: no current reports, no proposal.
-    if (!sourceReady) {
-      setError(sourceStatus?.message || snapshotError || null);
-      return;
-    }
-    // Every selected version must be ready — named version by version.
+    // Source authority: no current reports, no proposal. ONE authority decides
+    // this, so the button can never disagree with the panel above it.
     if (!readiness.ready) {
       setError(readiness.message
         || 'Every selected version needs its current reports before this proposal can be generated.');
@@ -308,13 +296,16 @@ export default function CreateProposalWizard({ onCreated, onCancel, regenerateFr
     }
     if (readinessLoading || snapshotLoading) return 'Checking the selected versions…';
     if (selectedVersionIds.length > 1 && selectedVersionsLoading) return 'Reading the selected versions…';
-    // Every selected version is judged by its own readiness, never by the first
-    // one alone: a comparison is not held up by a single-version requirement.
+    // Every selected version is judged by its own readiness — ONE authority,
+    // the same result the table above shows. A separate legacy source boolean
+    // is never consulted: it is what let the panel read Current while the
+    // button claimed the reports were missing. A comparison is not held up by a
+    // single-version requirement.
+    if (readinessError) {
+      return 'The saved reports and engineering results could not be read. Retry the read, then generate the proposal.';
+    }
     if (!readiness.ready) {
       return readiness.message || 'Every selected version needs its current reports before this proposal can be generated.';
-    }
-    if (!sourceReady) {
-      return sourceStatus?.message || 'This version has no current Visual and Technical reports yet. Generate those reports first.';
     }
     // A comparison is generated from each version's own frozen evidence, which
     // is read and verified when generation starts — so the versions are the
@@ -404,7 +395,7 @@ export default function CreateProposalWizard({ onCreated, onCancel, regenerateFr
             gate={readiness}
             projectId={selectedProjectId}
             className="mb-8"
-            onRetry={sourceReadFailed ? retrySourceRead : null}
+            onRetry={readinessError ? retryReadiness : null}
           />
           <div className="mb-10">
             <ReviewRow label="Project" value={selectedProjectId ? 'Selected' : '—'} />

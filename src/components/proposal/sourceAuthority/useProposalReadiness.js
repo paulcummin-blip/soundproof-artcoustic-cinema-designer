@@ -28,7 +28,7 @@
  * @returns {{ rows, gate, loading, error }}
  */
 
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { base44 } from '@/api/base44Client';
 import {
   buildDurableSnapshot,
@@ -89,6 +89,12 @@ export function useProposalReadiness({ projectId = null, versionIds = [] } = {})
   // Bumped when a saved report lands, so the read below runs again and the table
   // shows the report that has just been generated rather than the state before it.
   const [refreshToken, setRefreshToken] = useState(0);
+  /**
+   * Read again from the same authorities, for the one retry a failed read
+   * offers. The wizard's retry action is this, and nothing else: the read that
+   * decides the table and the Generate button is a single read.
+   */
+  const retry = useCallback(() => setRefreshToken((value) => value + 1), []);
 
   useEffect(() => {
     if (!projectId) return undefined;
@@ -212,7 +218,7 @@ export function useProposalReadiness({ projectId = null, versionIds = [] } = {})
     return () => { cancelled = true; };
   }, [projectId, idsKey, refreshToken]);
 
-  return { rows, loading, error };
+  return { rows, loading, error, retry };
 }
 
 export default useProposalReadiness;

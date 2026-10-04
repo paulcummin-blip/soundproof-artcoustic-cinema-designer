@@ -135,9 +135,12 @@ test("H — Proposal Centre is passive until the wizard owns readiness", () => {
   const centre = read("src/pages/ProposalCentre.jsx");
   const wizard = read("src/components/proposal/CreateProposalWizard.jsx");
   assert.equal(centre.includes("useVersionedEngineeringSnapshot"), false);
-  assert.equal(centre.includes("useProposalSourceStatus"), false);
+  assert.equal(centre.includes("useProposalReadiness"), false);
   assert.match(wizard, /useVersionedEngineeringSnapshot\(/);
-  assert.match(wizard, /useProposalSourceStatus\(/);
+  // The wizard owns readiness through the ONE shared per-version authority, and
+  // consults no second, legacy report-ready gate.
+  assert.match(wizard, /useProposalReadiness\(/);
+  assert.equal(wizard.includes("useProposalSourceStatus"), false);
 });
 
 test("I — open-time target work is disarmed and sweep writes are batched", () => {
