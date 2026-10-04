@@ -75,28 +75,37 @@ export default function ProposalAssetsPanel({
   // The galleries on screen: the project-wide gallery, and each version's own.
   // Each scope fills its own Cover Image and Image 1 to Image 10, so an image
   // assigned to a version never displaces the project-wide image in that slot.
+  // The galleries on screen, from the Library's scope. 'all' lists every gallery
+  // the project holds — the project-wide gallery first, then each version that
+  // has images of its own. A named scope shows that gallery alone, even while it
+  // is still empty, so its slots can be filled.
   const groups = useMemo(() => {
     const list = [];
-    if (scopeFilter !== IMAGE_SCOPE_FILTER.VERSION) {
+    const scopedVersionKey = typeof scopeFilter === 'string' && scopeFilter.startsWith('version:')
+      ? scopeFilter
+      : (scopeFilter === IMAGE_SCOPE_FILTER.VERSION && activeVersionId ? `version:${activeVersionId}` : null);
+
+    if (!scopedVersionKey) {
       list.push({
         key: 'project',
         scope: IMAGE_SCOPE.PROJECT,
         versionId: null,
-        label: 'Project-wide',
+        label: IMAGE_SCOPE_LABEL[IMAGE_SCOPE.PROJECT],
         assets: grouped.project,
       });
     }
 
-    if (scopeFilter !== IMAGE_SCOPE_FILTER.PROJECT) {
-      const targets = scopeFilter === IMAGE_SCOPE_FILTER.VERSION
-        ? grouped.versions.filter((entry) => entry.versionId === activeVersionId)
-        : grouped.versions;
-      // In the current-version view the version's gallery is shown even while it
-      // is empty, so an image can be uploaded into it.
-      if (scopeFilter === IMAGE_SCOPE_FILTER.VERSION && activeVersionId && targets.length === 0) {
-        targets.push({ versionId: activeVersionId, assets: [] });
-      }
-      targets.forEach((entry) => list.push({
+    if (scopedVersionKey) {
+      const versionId = scopedVersionKey.slice('version:'.length);
+      list.push({
+        key: scopedVersionKey,
+        scope: IMAGE_SCOPE.VERSION,
+        versionId,
+        label: imageScopeLabel({ scope: IMAGE_SCOPE.VERSION, version_id: versionId }, versionNameById),
+        assets: grouped.versions.find((entry) => entry.versionId === versionId)?.assets || [],
+      });
+    } else if (scopeFilter !== IMAGE_SCOPE_FILTER.PROJECT) {
+      grouped.versions.forEach((entry) => list.push({
         key: `version:${entry.versionId}`,
         scope: IMAGE_SCOPE.VERSION,
         versionId: entry.versionId,
@@ -105,24 +114,8 @@ export default function ProposalAssetsPanel({
       }));
     }
 
-    // A new image is written to the chosen scope, so that scope's gallery is
-    // always on screen — an upload can never land somewhere invisible.
-    if (!list.some((group) => group.key === uploadTarget.scopeKey)) {
-      list.push({
-        key: uploadTarget.scopeKey,
-        scope: uploadTarget.scope,
-        versionId: uploadTarget.versionId,
-        label: uploadTarget.scope === IMAGE_SCOPE.VERSION
-          ? imageScopeLabel({ scope: IMAGE_SCOPE.VERSION, version_id: uploadTarget.versionId }, versionNameById)
-          : IMAGE_SCOPE_LABEL[IMAGE_SCOPE.PROJECT],
-        assets: uploadTarget.scope === IMAGE_SCOPE.VERSION
-          ? (grouped.versions.find((entry) => entry.versionId === uploadTarget.versionId)?.assets || [])
-          : grouped.project,
-      });
-    }
-
     return list;
-  }, [grouped, scopeFilter, activeVersionId, versionNameById, uploadTarget]);
+  }, [grouped, scopeFilter, activeVersionId, versionNameById]);
 
   const assignmentsFor = useCallback(
     (group) => resolveScopedSlotAssignments(assets, group.key),
@@ -241,8 +234,10 @@ export default function ProposalAssetsPanel({
         const { bySlot, surplus, assets: scopedAssets } = assignmentsFor(group);
         return (
           <section key={group.key} className="space-y-4" data-image-group={group.key}>
-            {groups.length > 1 && (
-              <div className="flex items-baseline justify-between gap-4 border-t border-[#E5E1D8] pt-6">
+            {/* The section states, in the saved version's own words, what its
+                slots are used by. */}
+            <div className="border-t border-[#E5E1D8] pt-6">
+              <div className="flex items-baseline justify-between gap-4">
                 <h3
                   className="text-[13px] uppercase tracking-[0.16em] text-[#625143]"
                   style={{ fontFamily: 'Didact Gothic, sans-serif' }}
@@ -253,7 +248,12 @@ export default function ProposalAssetsPanel({
                   {scopedAssets.length} {scopedAssets.length === 1 ? 'image' : 'images'}
                 </span>
               </div>
-            )}
+              <p className="text-xs text-[#8A8477] mt-1" style={{ fontFamily: 'Didact Gothic, sans-serif' }}>
+                {group.scope === IMAGE_SCOPE.VERSION
+                  ? `Images in this section are used by ${group.label} only.`
+                  : 'Images in this section are used by every design version.'}
+              </p>
+            </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               {ASSET_SLOT_OPTIONS.map(({ slot, label }) => {
@@ -277,9 +277,9 @@ export default function ProposalAssetsPanel({
                           <ImageScopeBadge asset={existing} versionNameById={versionNameById} />
                           <ImageScopeSelect
                             asset={existing}
+                            versions={versions}
                             activeVersionId={activeVersionId}
-                            activeVersionName={versionNameById.get(activeVersionId) || null}
-                            onChange={(nextScope) => handleScopeChange(existing, nextScope)}
+                            onChange={(nextScopeKey) => handleScopeChange(existing, nextScopeKey)}
                           />
                         </>
                       ) : (
@@ -291,7 +291,7 @@ export default function ProposalAssetsPanel({
                             New upload
                           </span>
                           <ImageScopeBadge
-                            asset={{ scope: uploadTarget.scope, version_id: uploadTarget.versionId }}
+                            asset={{ scope: group.scope, version_id: group.versionId }}
                             versionNameById={versionNameById}
                           />
                         </>

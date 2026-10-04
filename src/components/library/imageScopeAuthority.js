@@ -244,6 +244,32 @@ export function resolvePackImages({ assets = [], versionIds = [], versionNameByI
 }
 
 /**
+ * The cover image a document built for these versions uses.
+ *
+ * One version — that version's own cover if it has one, otherwise the
+ * project-wide cover, so a version without a cover of its own still opens with
+ * the project's shared image.
+ *
+ * A comparison — the shared project-wide cover, then the first covered version
+ * that has a cover of its own.
+ *
+ * @returns {Object|null} the cover asset, or null when there is none
+ */
+export function resolveCoverAsset(assets = [], versionIds = []) {
+  const list = Array.isArray(assets) ? assets : [];
+  const coverOf = (scopeKey) => resolveScopedSlotAssignments(list, scopeKey).bySlot[ASSET_SLOT.COVER] || null;
+  const projectCover = coverOf('project');
+
+  const ids = (Array.isArray(versionIds) ? versionIds : []).filter(Boolean);
+  if (ids.length === 0) return projectCover;
+
+  const versionCovers = ids.map((versionId) => coverOf(versionScopeKey(versionId)));
+  if (ids.length === 1) return versionCovers[0] || projectCover;
+
+  return projectCover || versionCovers.find(Boolean) || null;
+}
+
+/**
  * The small scope label an image card carries: the exact saved version name for
  * a version-specific image, "Project-wide" otherwise. The saved name already
  * reads as a version ("Level 1 version"), so it is never suffixed again.

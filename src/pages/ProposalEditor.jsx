@@ -22,7 +22,6 @@ import { resolveDealerIdentityName } from '@/components/account/dealerIdentityDi
 import ProposalWorkspaceToolbar from '@/components/proposal/ProposalWorkspaceToolbar';
 import ProposalCoverPage from '@/components/proposal/cover/ProposalCoverPage';
 import ProjectImagesBlock, { projectGalleryImages } from '@/components/proposal/ProjectImagesBlock';
-import { ASSET_SLOT, resolveAssetSlot } from '@/components/proposal/assetSlotAuthority';
 import { prepareSectionBody } from '@/components/proposal/sectionBodyAuthority';
 import { isHighChannelDesign } from '@/components/proposal/highChannelLayoutAuthority';
 import ProposalPrintDocument from '@/components/proposal/export/ProposalPrintDocument';
@@ -31,7 +30,7 @@ import { useProposalExport } from '@/components/proposal/export/useProposalExpor
 import { proposalVersionIds } from '@/components/proposal/library/proposalSourceState';
 import { documentTypeForProposalType } from '@/components/library/issuedDocument/issuedDocumentTypes';
 import { resolveProposalExportSource } from '@/components/library/issuedDocument/proposalExportSource';
-import { resolvePackImages } from '@/components/library/imageScopeAuthority';
+import { resolveCoverAsset, resolvePackImages } from '@/components/library/imageScopeAuthority';
 import { buildVersionNameMap } from '@/components/library/libraryVersionLabels';
 import { resolveReportFilenameDetails, logReportExportIdentity } from '@/components/report/reportFilenameIdentity';
 import { proposalReportTypeToken } from '@/components/report/reportPdfTitle';
@@ -102,7 +101,10 @@ export default function ProposalEditor() {
     const project = projectResult.status === 'fulfilled' ? projectResult.value?.[0] : null;
     const brand = brandResult.status === 'fulfilled' ? brandResult.value?.[0] : null;
     const projectImages = coverResult.status === 'fulfilled' ? (coverResult.value || []) : [];
-    const cover = projectImages.find((asset) => resolveAssetSlot(asset) === ASSET_SLOT.COVER) || null;
+    // The cover for THIS document: the covered version's own cover first, and
+    // the project-wide cover when that version has none. A comparison opens with
+    // the shared project-wide cover.
+    const cover = resolveCoverAsset(projectImages, proposalVersionIds(proposalRecord));
     const account = accountResult.status === 'fulfilled' ? accountResult.value?.[0] : null;
     // Resolves the dealer's own hero/logo when set, otherwise the approved
     // Sound Proof / Artcoustic defaults — so the cover is always professional.

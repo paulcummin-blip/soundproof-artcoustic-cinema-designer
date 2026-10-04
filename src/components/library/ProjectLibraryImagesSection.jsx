@@ -16,7 +16,7 @@
  * design version.
  */
 
-import React, { useMemo } from 'react';
+import React from 'react';
 import ProposalAssetsPanel from '@/components/proposal/ProposalAssetsPanel';
 import ImageUploadScopeControl from './ImageUploadScopeControl';
 import { IMAGE_SCOPE_FILTER } from './imageScopeAuthority';
@@ -30,16 +30,6 @@ export default function ProjectLibraryImagesSection({
 }) {
   const [scopeKey, setScopeKey] = React.useState(IMAGE_SCOPE_FILTER.ALL);
 
-  const activeVersionName = activeVersionId ? (versionNameById.get(activeVersionId) || null) : null;
-
-  const versionOptions = useMemo(
-    () => versions.map((version) => ({
-      id: version.id,
-      name: version.version_name || `Version ${version.version_number}`,
-    })),
-    [versions],
-  );
-
   return (
     <div className="space-y-6">
       <ImageUploadScopeControl
@@ -47,7 +37,6 @@ export default function ProjectLibraryImagesSection({
         onChange={setScopeKey}
         versions={versions}
         activeVersionId={activeVersionId}
-        activeVersionName={activeVersionName}
       />
 
       <ProposalAssetsPanel
@@ -56,7 +45,6 @@ export default function ProjectLibraryImagesSection({
         activeVersionId={activeVersionId}
         scopeFilter={scopeKey}
         versions={versions}
-        versionOptions={versionOptions}
         versionNameById={versionNameById}
       />
     </div>
