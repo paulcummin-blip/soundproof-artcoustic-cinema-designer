@@ -136,6 +136,9 @@ function RP22ReportInner() {
     const [reportVersionName, setReportVersionName] = useState(null);
     const [reportHydrating, setReportHydrating] = useState(true);
     const [reportReadyProjectId, setReportReadyProjectId] = useState(null);
+    // The version the ready flag was set for, so opening a DIFFERENT version of
+    // the same project re-hydrates instead of reusing the previous version.
+    const [reportReadyVersionId, setReportReadyVersionId] = useState(null);
 
     // ONE filename for this report. The print dialog's Save-as-PDF default and
     // the stalled-export fallback both use exactly this string, so a downloaded
@@ -335,15 +338,24 @@ function RP22ReportInner() {
         // details (name/client) are fetched non-blocking for the header.
         // Hard refresh fails this check (isProjectHydrationReady=false) and
         // falls through to the full fetch/hydrate path below.
+        // The shortcut may only be taken when the shared state holds the version
+        // this report was ASKED FOR. A request for another version hydrates that
+        // version explicitly, so an in-session load can never answer a Level 4
+        // request with the loaded Level 1 design.
         const sharedProviderReady =
             activeProjectId === explicitProjectId &&
             app?.isProjectHydrationReady === true &&
+            sharedHydrationMatchesRequest({
+                requestedVersionId,
+                hydratedVersionId: sharedHydratedVersionId,
+            }) &&
             Number.isFinite(Number(app?.roomDims?.widthM)) &&
             Number.isFinite(Number(app?.roomDims?.lengthM));
 
         if (sharedProviderReady) {
             setReportHydrating(false);
             setReportReadyProjectId(explicitProjectId);
+            setReportReadyVersionId(reportVersionId || null);
             readProjectRecord(explicitProjectId).then(async (p) => {
                 if (cancelled) return;
                 if (!p) return;
@@ -363,7 +375,12 @@ function RP22ReportInner() {
                 // The fast path states the version exactly as the full load does:
                 // the saved version name is read here too, so an in-session export
                 // or front page never falls back to a generic version label.
-                const version = await readActiveVersionIdentity(p);
+                const version = await readRequestedVersionIdentity(
+                    resolveReportVersionId({
+                        requestedVersionId,
+                        activeVersionId: p.active_version_id,
+                    }),
+                );
                 if (cancelled) return;
                 setReportVersionNumber(version.number);
                 setReportVersionName(version.name);
@@ -371,13 +388,18 @@ function RP22ReportInner() {
             return () => { cancelled = true; };
         }
 
-        if (reportReadyProjectId === explicitProjectId && reportHydrating === false) {
+        // Ready for this exact project AND this exact version.
+        if (reportReadyProjectId === explicitProjectId
+            && reportReadyVersionId === (reportVersionId || null)
+            && reportHydrating === false) {
             return;
         }
 
-        if (reportReadyProjectId !== explicitProjectId) {
+        if (reportReadyProjectId !== explicitProjectId
+            || reportReadyVersionId !== (reportVersionId || null)) {
             setReportHydrating(true);
             setReportReadyProjectId(null);
+            setReportReadyVersionId(null);
         }
 
         readProjectRecord(explicitProjectId).then(async (p) => {
