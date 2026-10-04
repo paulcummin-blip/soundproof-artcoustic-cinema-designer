@@ -37,8 +37,11 @@ export const REPORT_BASS_GRAPH_Y_DOMAIN = [70, 140];
 export const REPORT_BASS_GRAPH_X_DOMAIN = [15, 200];
 export const REPORT_BASS_GRAPH_X_DOMAIN_WIDE = [15, 300];
 
-/** The mandated note on the RSP page. */
-export const RSP_GRAPH_NOTE = "RSP response is the reference bass response used for P19.";
+/** The RSP Room Response page's single legend entry — its only trace. */
+export const RSP_ROOM_RESPONSE_LABEL = "RSP room response";
+
+/** The mandated explanatory paragraph on the RSP Room Response page. */
+export const RSP_ROOM_RESPONSE_EXPLANATION = "The RSP trace shows the predicted low-frequency response at the reference seating position. This is the reference position used when assessing bass response below the room transition region.";
 
 /** Colour-independent caps so the page stays readable. */
 export const REPORT_PRIMARY_SEAT_LIMIT = 8;
@@ -48,8 +51,11 @@ export const REPORT_GRAPH_SMOOTHING = "third";
 
 const finite = (value) => value !== null && value !== "" && Number.isFinite(Number(value));
 
-/** The series the report plots, chosen by kind from the app's own builder output. */
-const RSP_PAGE_KINDS = ["room-response", "post-eq", "house-curve"];
+/** The series the report plots, chosen by kind from the app's own builder output.
+ *  The RSP page is NOT a comparison page: it plots the room response at the
+ *  reference seat and nothing else. The corrected (after-EQ) curve and the
+ *  house-curve target belong to the Primary Seats page. */
+const RSP_PAGE_KINDS = ["room-response"];
 const PRIMARY_PAGE_KINDS = ["post-eq", "house-curve"];
 
 function pickSeries(series, kinds) {
@@ -126,7 +132,10 @@ export function buildReportBassGraphs({
     smoothingMode: REPORT_GRAPH_SMOOTHING,
     operatingLevelOffsetDb,
   });
-  const rspSeries = pickSeries(rspBuilt, RSP_PAGE_KINDS);
+  // One trace only. The label is the page's own wording for that curve.
+  const rspSeries = pickSeries(rspBuilt, RSP_PAGE_KINDS)
+    .slice(0, 1)
+    .map((entry) => ({ ...entry, label: RSP_ROOM_RESPONSE_LABEL }));
   const rspCorrected = rspBuilt.find((entry) => entry?.kind === "post-eq") || null;
   const targetSeries = rspBuilt.find((entry) => entry?.kind === "house-curve") || null;
 
@@ -165,9 +174,13 @@ export function buildReportBassGraphs({
   // The canonical seat label the bass graph itself uses (seat-r1-c1 → R1S1).
   const primarySeatLabel = (seatId) => formatSeatPillLabel(seatId);
 
+  // A page is drawn from whatever curve it actually has: an older saved contract
+  // without the room-response curve must not hide the Primary Seats page.
+  const hasAnyCurve = rspSeries.length > 0 || primarySeries.length > 0;
+
   return {
-    ready: rspSeries.length > 0,
-    reason: rspSeries.length > 0 ? null : "no-curves",
+    ready: hasAnyCurve,
+    reason: hasAnyCurve ? null : "no-curves",
     transitionHz,
     limitingFrequencyHz: finite(markers.p19WorstFrequencyHz) ? Number(markers.p19WorstFrequencyHz) : null,
     p18FrequencyHz: finite(markers.p18FrequencyHz) ? Number(markers.p18FrequencyHz) : null,
@@ -180,7 +193,9 @@ export function buildReportBassGraphs({
       xDomain: resolveXDomain(rspSeries),
       yDomain: REPORT_BASS_GRAPH_Y_DOMAIN,
       series: rspSeries,
-      note: RSP_GRAPH_NOTE,
+      // No second line of copy: the page's explanation already states what the
+      // trace is, and this page carries no target or EQ to caption.
+      note: null,
     },
     primary: {
       xDomain: resolveXDomain(primarySeries.length ? primarySeries : rspSeries),

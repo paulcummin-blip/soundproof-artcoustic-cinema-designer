@@ -161,6 +161,128 @@ test('TEST 8 — the graphs are the final technical evidence, before About Sound
   // The titles the report prints.
   const section = read('src/components/report/technical/BassResponseGraphSection.jsx');
   assert.ok(section.includes('BASS RESPONSE GRAPHS'), 'section title present');
-  assert.ok(section.includes('RSP BASS RESPONSE VS TARGET'), 'page 1 title present');
+  assert.ok(section.includes('RSP ROOM RESPONSE'), 'page 1 title present');
   assert.ok(section.includes('PRIMARY SEATS BASS RESPONSE'), 'page 2 title present');
+});
+
+// ── TEST 9 — the RSP Room Response page carries ONE trace ──────────────────
+// This page shows the bass behaviour at the reference seat. It is not a
+// comparison page: no after-EQ curve and no house-curve target are drawn on it.
+test('TEST 9 — the RSP page plots the RSP room response and nothing else', () => {
+  const source = read('src/components/report/technical/bassResponseGraphAuthority.js');
+  const section = read('src/components/report/technical/BassResponseGraphSection.jsx');
+
+  // Kinds: the room response only. The after-EQ curve and the target stay on
+  // the Primary Seats page, where a comparison between seats is the point.
+  assert.ok(/const RSP_PAGE_KINDS = \["room-response"\];/.test(source),
+    'the RSP page plots the room response only');
+  assert.ok(source.includes('const PRIMARY_PAGE_KINDS = ["post-eq", "house-curve"];'),
+    'the Primary Seats page still plots the after-EQ curve and the target');
+  assert.ok(source.includes('.slice(0, 1)'), 'a single RSP trace is kept');
+
+  // One legend entry, named the way the page states it.
+  assert.ok(source.includes('RSP_ROOM_RESPONSE_LABEL = "RSP room response"'),
+    'the legend entry is the RSP room response');
+
+  // The mandated page copy, and no leftover caption from the comparison page.
+  assert.ok(source.includes('The RSP trace shows the predicted low-frequency response at the reference seating position.'),
+    'the mandated RSP explanation is present');
+  assert.ok(source.includes('below the room transition region.'),
+    'the mandated RSP explanation is complete');
+  assert.ok(!source.includes('RSP_GRAPH_NOTE'), 'the old comparison-page caption is gone');
+  assert.ok(/note: null,/.test(source), 'the RSP page carries no second caption');
+
+  // The page title, drawn from the same authority, and the single-trace guard
+  // that keeps the Primary Seats page rendering if the RSP curve is absent.
+  assert.ok(section.includes('title="RSP ROOM RESPONSE"'), 'the RSP page heading is RSP ROOM RESPONSE');
+  assert.ok(section.includes('explanation={RSP_ROOM_RESPONSE_EXPLANATION}'),
+    'the page renders the mandated paragraph');
+  assert.ok(section.includes('hasRspCurve'), 'the RSP page is drawn only when its curve exists');
+});
+
+// ── TEST 10 — the single RSP trace is built from the saved contract ────────
+test('TEST 10 — the built RSP graph holds exactly one room-response trace', () => {
+  const curve = (offset) => Array.from({ length: 7 }, (_, index) => ({
+    frequency: [20, 30, 40, 60, 80, 100, 150][index],
+    spl: 96 + offset + (index % 2 ? -2 : 2),
+  }));
+  const contract = {
+    graphPayload: {
+      postEqRspCurve: curve(6),
+      correctionCurve: curve(0),
+      roomResponseCurve: curve(0),
+      productionHouseCurveTarget: curve(4),
+      correctionStartHz: 20,
+      correctionEndHz: 150,
+      designEqFitProfile: 'identity',
+      operatingLevelOffsetDb: 0,
+    },
+  };
+
+  const graphs = buildReportBassGraphs({ contract, authoritative: true, seats: [{ id: 'seat-r1-c1' }] });
+  assert.equal(graphs.ready, true);
+  assert.equal(graphs.rsp.series.length, 1, 'one trace only');
+  assert.equal(graphs.rsp.series[0].kind, 'room-response', 'the trace is the RSP room response');
+  assert.equal(graphs.rsp.series[0].label, 'RSP room response', 'the legend entry');
+  assert.equal(graphs.rsp.note, null, 'no second caption on the RSP page');
+
+  // The Primary Seats page keeps its reference curve and its target.
+  const primaryKinds = graphs.primary.series.map((entry) => entry.kind);
+  assert.ok(primaryKinds.includes('post-eq'), 'the Primary Seats page still plots after-EQ curves');
+  assert.ok(primaryKinds.includes('house-curve'), 'the Primary Seats page still plots the target');
+});
+
+// ── TEST 11 — what the RSP page actually renders ───────────────────────────
+test('TEST 11 — the rendered RSP page shows one RSP room response trace', () => {
+  const points = (offset) => Array.from({ length: 7 }, (_, i) => ({
+    frequency: [20, 30, 40, 60, 80, 100, 150][i],
+    spl: 96 + offset + (i % 2 ? -3 : 3),
+  }));
+  const contract = {
+    graphPayload: {
+      postEqRspCurve: points(6),
+      correctionCurve: points(0),
+      roomResponseCurve: points(0),
+      productionHouseCurveTarget: points(4),
+      correctionStartHz: 20,
+      correctionEndHz: 150,
+      designEqFitProfile: 'identity',
+      operatingLevelOffsetDb: 0,
+    },
+  };
+
+  const markup = renderToStaticMarkup(
+    React.createElement(BassResponseGraphSection, {
+      contract,
+      authoritative: true,
+      seats: [{ id: 'seat-r1-c1' }],
+      variant: 'print',
+    }),
+  );
+
+  const start = markup.indexOf('data-report-block="bass-response-rsp"');
+  const end = markup.indexOf('data-report-block="bass-response-primary-seats"');
+  assert.ok(start > 0 && end > start, 'both graph pages are rendered');
+  const rspPage = markup.slice(start, end);
+
+  // AC 3 — one response line only.
+  assert.equal((rspPage.match(/<path /g) || []).length, 1, 'exactly one trace is drawn');
+
+  // AC 4 — the legend references the RSP room response and nothing else.
+  assert.ok(rspPage.includes('RSP room response'), 'the legend names the RSP room response');
+  assert.ok(!rspPage.includes('after EQ'), 'no after-EQ legend entry');
+  assert.ok(!rspPage.includes('House-curve target'), 'no house-curve target legend entry');
+  assert.ok(!rspPage.includes('Room / layout response'), 'no reference-only room/layout entry');
+
+  // AC 5 — the EQ and the target are not on this page.
+  assert.ok(!rspPage.includes('rsp-eq'), 'no after-EQ trace on this page');
+
+  // AC 6 and the kept elements: heading, paragraph, axes, log x, marker, width.
+  assert.ok(rspPage.includes('RSP ROOM RESPONSE'), 'the page heading');
+  assert.ok(rspPage.includes('The RSP trace shows the predicted low-frequency response at the reference seating position.'),
+    'the mandated paragraph');
+  assert.ok(rspPage.includes('Frequency (Hz)') && rspPage.includes('SPL (dB)'), 'both axes are labelled');
+  assert.ok(rspPage.includes('>150</text>'), 'the log frequency axis keeps its upper decade label');
+  assert.ok(rspPage.includes('Transition ≈'), 'the transition marker is kept');
+  assert.ok(rspPage.includes('width="100%"'), 'the graph spans the full page width');
 });

@@ -2,7 +2,7 @@
 // ---------------------------------------------------------------------------
 // The Technical Report's bass response graph pages:
 //
-//   Page A — RSP Bass Response vs Target
+//   Page A — RSP Room Response       (one trace: the RSP room response)
 //   Page B — Primary Seats Bass Response
 //
 // Every curve comes from bassResponseGraphAuthority, which reads the saved
@@ -16,7 +16,10 @@
 // ---------------------------------------------------------------------------
 
 import React, { useMemo } from "react";
-import { buildReportBassGraphs } from "./bassResponseGraphAuthority";
+import {
+  buildReportBassGraphs,
+  RSP_ROOM_RESPONSE_EXPLANATION,
+} from "./bassResponseGraphAuthority";
 import BassResponsePlot from "./BassResponsePlot";
 import {
   REPORT_FONT_BODY,
@@ -123,17 +126,23 @@ export default function BassResponseGraphSection({
     assessmentBand: graphs.assessmentBand,
   };
 
+  // The RSP page carries a single trace. It is drawn only when that trace
+  // exists; the Primary Seats page is unaffected either way.
+  const hasRspCurve = Array.isArray(graphs.rsp?.series) && graphs.rsp.series.length > 0;
+
   const pages = (
     <>
-      <GraphPage
-        id="pdf-bass-response-rsp"
-        blockName="bass-response-rsp"
-        title="RSP BASS RESPONSE VS TARGET"
-        explanation="The subwoofers have been positioned and assessed against the selected house target so the reference seat receives bass that is predicted to be deep, controlled and correctly scaled for the room. The graph shows how the predicted response follows the target through the low-frequency range, including the areas where room behaviour has the strongest effect."
-        graph={{ ...graphs.rsp, markers: { ...shared, limitingFrequencyHz: graphs.limitingFrequencyHz } }}
-        note={graphs.rsp.note}
-        first={variant !== "print"}
-      />
+      {hasRspCurve && (
+        <GraphPage
+          id="pdf-bass-response-rsp"
+          blockName="bass-response-rsp"
+          title="RSP ROOM RESPONSE"
+          explanation={RSP_ROOM_RESPONSE_EXPLANATION}
+          graph={{ ...graphs.rsp, markers: { ...shared, limitingFrequencyHz: graphs.limitingFrequencyHz } }}
+          note={graphs.rsp.note}
+          first={variant !== "print"}
+        />
+      )}
       <GraphPage
         id="pdf-bass-response-primary-seats"
         blockName="bass-response-primary-seats"
@@ -141,6 +150,7 @@ export default function BassResponseGraphSection({
         explanation="This graph shows how the main listening seats are predicted to compare against the target and against each other. The aim is not only output, but consistency: the layout has been designed to reduce large differences between seats, so low-frequency impact remains powerful and controlled across the primary listening area."
         graph={{ ...graphs.primary, markers: shared }}
         note={graphs.primary.note}
+        first={!hasRspCurve && variant !== "print"}
       />
     </>
   );
