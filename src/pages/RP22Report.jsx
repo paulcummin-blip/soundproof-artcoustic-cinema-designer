@@ -1694,9 +1694,11 @@ function RP22ReportInner() {
                             variant="print"
                         />
 
-                        {/* ── About Sound Proof — the closing brand page. It is
-                            rendered only once its copy is available, so the export
-                            never carries a "Loading…" or empty final page. ── */}
+                        {/* ── About Sound Proof — the closing brand page, and a
+                            mandatory part of the report: it always renders, from
+                            the published copy or the built-in fallback, so the
+                            export never carries a "Loading…" page, never a blank
+                            page, and never leaves the page out. ── */}
                         <TechnicalAboutSoundProofSection />
 
                     </div>

@@ -8,15 +8,17 @@
  * Print-safe: the parent wrapper provides the page frame and page-break
  * rules. This component fills the available space with the content.
  *
- * Never printed while unresolved: the page renders only once its copy exists, so
- * an export can never capture a "Loading…" sheet or an empty page. Callers that
- * have already read the canonical content pass it in as `html` and the page
- * renders synchronously, with no read of its own.
+ * MANDATORY closing page of both reports, and always print-ready. The copy it
+ * renders comes from a single authority (aboutSoundProofCopy): the published
+ * copy when it says something, otherwise the built-in copy bundled with the app.
+ * The fallback is available synchronously, so the page always has complete copy
+ * to print — it is never blank, never a "Loading…" sheet, and never omitted.
  */
 import React from "react";
 import { LOGO_URL } from "@/components/report/ReportCover";
 import { usePublicationContent } from "@/components/publicationContent/usePublicationContent";
 import PublicationContentHtml from "@/components/publicationContent/PublicationContentHtml";
+import { resolveAboutSoundProofHtml } from "@/components/publicationContent/aboutSoundProofCopy";
 
 const BRAND_GREEN = "#213428";
 const TEXT_DARK = "#1B1A1A";
@@ -33,16 +35,14 @@ export default function AboutSoundProofReportPage({ variant = "full", html: prov
   return <ConnectedAboutSoundProof variant={variant} />;
 }
 
-/** Reads the canonical content itself; renders nothing until it is resolved. */
+/**
+ * Reads the canonical content itself. The copy is never awaited: the hook seeds
+ * the bundled fallback and the page resolves published-copy-or-fallback, so this
+ * form has complete copy on its very first render.
+ */
 function ConnectedAboutSoundProof({ variant }) {
-  const { html, loading } = usePublicationContent("about_sound_proof");
-  if (loading || !hasAboutContent(html)) return null;
+  const { html } = usePublicationContent("about_sound_proof");
   return <AboutSoundProofView variant={variant} html={html} />;
-}
-
-/** Content is printable only when it actually says something. */
-function hasAboutContent(html) {
-  return typeof html === "string" && html.trim().length > 0;
 }
 
 function AboutSoundProofView({ variant = "full", html }) {
@@ -57,9 +57,10 @@ function AboutSoundProofView({ variant = "full", html }) {
   // report page instead of drifting down the sheet.
   const compact = variant === "compact";
 
-  // Nothing to show is nothing to print: an unresolved page is never laid out, so
-  // no caller can place an empty page shell (or a waiting label) on paper.
-  if (!hasAboutContent(html)) return null;
+  // The copy to print: the published copy when it says something, otherwise the
+  // built-in fallback. This page is mandatory, so it never resolves to nothing —
+  // there is no waiting state and nothing empty to place on paper.
+  const copy = resolveAboutSoundProofHtml(html);
 
   return (
     <div
@@ -119,8 +120,9 @@ function AboutSoundProofView({ variant = "full", html }) {
         About Sound Proof
       </h1>
 
-      {/* Body copy — canonical published content. This page only renders once the
-          copy is resolved, so there is no waiting state to be printed. */}
+      {/* Body copy — the copy authority's answer: published copy, or the
+          built-in fallback. Always present, so there is no waiting state to be
+          printed. */}
       <div
           className="about-sound-proof-copy"
           style={{
@@ -144,7 +146,7 @@ function AboutSoundProofView({ variant = "full", html }) {
             .about-sound-proof-copy p:has(> br:only-child) { display: none; }
           `}</style>
           <PublicationContentHtml
-            html={html}
+            html={copy}
             variant="print"
             style={{ width: "100%", fontSize: "9.5pt", lineHeight: 1.55 }}
           />

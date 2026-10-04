@@ -11,13 +11,13 @@
  */
 
 export const DEFAULT_ABOUT_SOUND_PROOF_HTML = `
-<p>Sound Proof is a cinema design and performance prediction tool built around the principles of CEDIA RP22. It helps designers move beyond simply choosing loudspeakers and placing them in a room, and instead consider how the complete system is expected to perform for the people actually using it.</p>
-<p>RP22 separates audio performance into three key areas: <strong>Dynamic Range, Spatial Resolution and Timbre Matching</strong>. In an ideal world, every parameter would achieve the highest possible level. In practice, real projects involve compromise. Aesthetic requirements may limit loudspeaker size or placement. Practical constraints may affect seating positions, room layout or available locations. Financial considerations may determine how far a system can be taken.</p>
-<p>Sound Proof is designed to make those compromises <strong>visible and understandable</strong>.</p>
-<p>Rather than presenting RP22 as a pass-or-fail exercise, the app helps the designer explain where limitations exist, what they mean in real terms, and what changes would improve the result. This creates a more informed conversation with the client, allowing decisions to be made consciously rather than by accident.</p>
-<p>The objective is therefore <strong>not necessarily</strong> to force every parameter to Level 4. It is to achieve the <strong>highest appropriate</strong> performance level that the aesthetics, practicality and budget of the project allow. Done properly, that process leads to the right system for the room, the application and the client brief.</p>
-<p>Sound Proof combines the strict recommendations and performance intent of RP22 with unique raw engineering data from <strong>Artcoustic Loudspeakers</strong>. Instead of relying on generic loudspeaker assumptions, it models real Artcoustic products, including dispersion, x-max, sensitivity, impedance, phase, frequency curves and more, and predicts their expected in-room behaviour, capability and performance.</p>
-<p>The result is a design tool that brings together <strong>engineering credibility</strong> and <strong>client-facing clarity</strong>: helping professionals specify with greater confidence, demonstrate why a system has been designed in a particular way, and give clients a clear understanding of the choices behind their cinema.</p>
+<p>Sound Proof is a professional home cinema design assistant built around the engineering principles of CEDIA RP22.</p>
+<p>Its purpose is to help designers, integrators and dealers make better engineering decisions before a cinema is built. It predicts how a complete system is expected to perform, then presents those decisions in a way that can be explained clearly to clients.</p>
+<p>Sound Proof evaluates the cinema as a system. Room geometry, seating layout, loudspeaker selection, subwoofer placement, calibration prediction and acoustic performance are considered together.</p>
+<p>The RP22 parameters are not the objective of the design process. They are the evidence used to validate the quality of the design.</p>
+<p>The goal is not to force every room to Level 4. The goal is to achieve the highest appropriate performance that the room, the application, the aesthetics and the available budget allow.</p>
+<p>Sound Proof combines the performance intent of RP22 with detailed engineering data from Artcoustic Loudspeakers, so the design is based on real product behaviour rather than generic assumptions.</p>
+<p>Predicted performance should always be confirmed by final calibration on site.</p>
 `;
 
 /**

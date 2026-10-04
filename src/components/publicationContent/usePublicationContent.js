@@ -5,10 +5,13 @@
  * uses this hook to read the canonical published HTML for a given content_key.
  *
  * Behaviour:
+ *  - Starts from the application default from the registry (fallback), which is
+ *    bundled with the app and therefore available SYNCHRONOUSLY on the first
+ *    render — a consumer that prints immediately still has complete copy.
  *  - Fetches the PublicationContent record for the key.
  *  - If published_html exists and is non-empty, returns it (canonical source).
- *  - Otherwise returns the application default from the registry (fallback).
- *  - The app never displays an empty section.
+ *  - Otherwise the built-in default stands, so the section is never empty.
+ *  - The app never displays an empty section, and never waits to show copy.
  *
  * Returns: { html, loading, isCustom, refresh }
  */
@@ -17,7 +20,9 @@ import { base44 } from "@/api/base44Client";
 import { getDefaultContentHtml } from "./defaultContent";
 
 export function usePublicationContent(contentKey) {
-  const [html, setHtml] = useState(null);
+  // The bundled default is in place from the first render: consumers (reports,
+  // the About page) always have complete copy, with no waiting state.
+  const [html, setHtml] = useState(() => getDefaultContentHtml(contentKey) || null);
   const [loading, setLoading] = useState(true);
   const [isCustom, setIsCustom] = useState(false);
 

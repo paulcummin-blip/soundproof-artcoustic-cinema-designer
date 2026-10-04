@@ -5,9 +5,10 @@
 //   TEST 1  The bass graph's marker label never states "Limiting": the boundary
 //           reads "Transition / Schroeder ≈ 122 Hz", and the limiting line is
 //           still drawn.
-//   TEST 2  The closing About Sound Proof page is never exported while it is
-//           still loading, and never exported blank — it is either complete copy
-//           or the page does not exist, so the PDF gains no page for it.
+//   TEST 2  The closing About Sound Proof page is MANDATORY in both reports and
+//           always carries finished copy: the published copy, or the built-in
+//           fallback bundled with the app. It is never omitted, never blank and
+//           never exported as a waiting "Loading…" page.
 //
 // TEST 2 is asserted against the page sources: these components read the
 // canonical content through the SDK, which the node test environment cannot
@@ -24,6 +25,7 @@ import { renderToStaticMarkup } from 'react-dom/server';
 
 import BassResponsePlot from '../components/report/technical/BassResponsePlot.jsx';
 import { buildMarkerLabelLayout } from '../components/report/technical/bassGraphMarkerLabels.js';
+import { DEFAULT_ABOUT_SOUND_PROOF_HTML } from '../components/publicationContent/defaultContent.js';
 
 const ROOT = path.resolve(process.cwd());
 const read = (relative) => fs.readFileSync(path.join(ROOT, relative), 'utf8');
@@ -77,41 +79,49 @@ test('TEST 1 — the marker label reads Transition / Schroeder, never Limiting',
   assert.equal(dashLines, 2, 'transition and limiting lines are both drawn');
 });
 
-// ── TEST 2 — the About Sound Proof page is complete or absent ──────────────
-test('TEST 2 — About Sound Proof is printed complete, or not at all', () => {
+// ── TEST 2 — the About Sound Proof page is mandatory, and never blank ──────
+test('TEST 2 — About Sound Proof is always printed, with finished copy', () => {
   const aboutSource = read('src/components/report/AboutSoundProofReportPage.jsx');
 
-  // The page carries no waiting state at all, and cannot be rendered without
-  // copy: an unresolved page is never laid out, so no caller can place an empty
-  // page shell (or a "Loading…" label) on paper.
+  // The page carries no waiting state, and resolves its copy through the one copy
+  // authority — the published copy, or the built-in fallback. It can therefore
+  // never render nothing and never render a placeholder.
   assert.ok(!stripComments(aboutSource).includes('Loading'),
     'the page component renders no loading label to print');
-  assert.ok(aboutSource.includes('if (!hasAboutContent(html)) return null;'),
-    'the page renders nothing without resolved copy');
-  assert.ok(aboutSource.includes('if (loading || !hasAboutContent(html)) return null;'),
-    'a page reading its own content waits silently instead of printing a placeholder');
+  assert.ok(aboutSource.includes('const copy = resolveAboutSoundProofHtml(html);'),
+    'the page resolves published-copy-or-fallback before rendering');
+  assert.ok(!aboutSource.includes('return null'), 'the page is never omitted for want of copy');
   assert.ok(aboutSource.includes('html: providedHtml'),
-    'a caller that has resolved the copy hands it in, so the print document is synchronous');
+    'a caller that has already read the copy hands it in, so the print document is synchronous');
 
-  // The Technical Report's closing block is gated on resolved copy, so an
-  // unresolved page leaves no block behind to print as a blank final page.
+  // The Technical Report's closing block is a mandatory page: it always renders.
   const sectionSource = read('src/components/report/technical/TechnicalAboutSoundProofSection.jsx');
-  assert.ok(sectionSource.includes('const ready = !loading && typeof html === "string" && html.trim().length > 0;'),
-    'the block is gated on resolved content');
-  assert.ok(sectionSource.includes('if (!ready) return null;'), 'an unresolved page is omitted entirely');
+  assert.ok(!sectionSource.includes('return null'), 'the block is never omitted');
+  assert.ok(sectionSource.includes('const { html } = usePublicationContent("about_sound_proof");'),
+    'the copy is used as it arrives — it is never awaited');
   assert.ok(sectionSource.includes('id="pdf-about-sound-proof"'), 'the page keeps its print identity');
   assert.ok(sectionSource.includes('data-report-block="about-sound-proof"'), 'the page keeps its block marker');
   assert.ok(sectionSource.includes('data-report-page-start="true"'), 'the page keeps its page start');
 
-  // The Technical Report renders the gated block, and no longer renders the page
-  // directly (the direct form has no readiness gate of its own).
+  // The Technical Report renders the closing block, and not the page directly.
   const technicalReport = read('src/pages/RP22Report.jsx');
-  assert.ok(technicalReport.includes('<TechnicalAboutSoundProofSection />'), 'the gated About page is rendered');
-  assert.ok(!technicalReport.includes('<AboutSoundProofReportPage'), 'the ungated About page is gone');
+  assert.ok(technicalReport.includes('<TechnicalAboutSoundProofSection />'), 'the About page is rendered');
+  assert.ok(!technicalReport.includes('<AboutSoundProofReportPage'), 'the page is not rendered a second time');
 
-  // The Visual Report's closing page is added only once its copy has resolved,
-  // and the resolved copy is what the printed page renders.
+  // The Visual Report adds the closing page unconditionally, with the copy it
+  // resolved, so the page is always in the exported report.
   const visualReport = read('src/pages/RP22ClientReport.jsx');
-  assert.ok(visualReport.includes('if (aboutSoundProofReady) {'), 'the closing page is gated on resolved copy');
+  assert.ok(!visualReport.includes('if (aboutSoundProofReady)'), 'the closing page is no longer conditional');
+  assert.ok(visualReport.includes('id: "about-sound-proof"'), 'the closing page is always added');
   assert.ok(visualReport.includes('aboutHtml: aboutSoundProofHtml'), 'the resolved copy is handed to the page');
+
+  // The fallback is bundled with the app and has content, and the copy hook starts
+  // from it — so a print taken before the published read resolves still has copy.
+  assert.ok(DEFAULT_ABOUT_SOUND_PROOF_HTML.trim().length > 0,
+    'the built-in fallback copy ships with the app and is never empty');
+  assert.ok(!stripComments(DEFAULT_ABOUT_SOUND_PROOF_HTML).includes('Loading'),
+    'the fallback copy carries no loading state');
+  const hookSource = read('src/components/publicationContent/usePublicationContent.js');
+  assert.ok(hookSource.includes('useState(() => getDefaultContentHtml(contentKey) || null)'),
+    'the copy hook starts from the bundled fallback — synchronous, with no wait');
 });

@@ -80,8 +80,11 @@ test('the article fits one A4 report page', () => {
   // values the page actually sets, so a future change that lengthens the copy
   // styling has to re-justify itself here.
   const FRAME_H_MM = 271;
-  const COPY_CHARS = 3200;
-  const COPY_PARAGRAPHS = 11;
+  // The budget is driven by the copy itself, so any future change to the copy
+  // re-justifies its fit here rather than against a stale number.
+  const PLAIN_COPY = DEFAULT_ABOUT_SOUND_PROOF_HTML.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
+  const COPY_CHARS = PLAIN_COPY.length;
+  const COPY_PARAGRAPHS = (DEFAULT_ABOUT_SOUND_PROOF_HTML.match(/<p>/g) || []).length;
   const COLUMN_MM = 160;
   const FONT_PT = 9.5;
   const LINE_HEIGHT = 1.55;
@@ -111,9 +114,9 @@ test('brand typography is used', () => {
 });
 
 test('the published copy passes through unchanged', () => {
-  // The page hands the published HTML straight to the renderer — no rewriting.
-  assert.ok(SRC.includes('html={html}'), 'the page renders the published html unchanged');
-  assert.ok(!SRC.includes('replace('), 'the copy is never string-manipulated');
+  // The page hands the copy it resolved straight to the renderer — no rewriting.
+  assert.ok(SRC.includes('html={copy}'), 'the page renders the resolved copy unchanged');
+  assert.ok(!SRC.includes('replace('), 'the copy is never string-manipulated in the page');
   // The default copy still renders as paragraphs, one block per paragraph.
   const rendered = renderToStaticMarkup(
     React.createElement(PublicationContentHtml, { html: DEFAULT_ABOUT_SOUND_PROOF_HTML, variant: 'print' }),
@@ -122,8 +125,8 @@ test('the published copy passes through unchanged', () => {
   assert.ok(paragraphCount >= 6, 'the default copy is a multi-paragraph document');
   assert.equal(rendered.split('<p>').length - 1, paragraphCount, 'every default paragraph is still present');
   const text = textOf(rendered);
-  assert.ok(text.includes('Sound Proof is a cinema design and performance prediction tool built around the principles of CEDIA RP22.'), 'the opening line is unchanged');
-  assert.ok(text.includes('give clients a clear understanding of the choices behind their cinema.'), 'the closing line is unchanged');
+  assert.ok(text.includes('Sound Proof is a professional home cinema design assistant built around the engineering principles of CEDIA RP22.'), 'the opening line is unchanged');
+  assert.ok(text.includes('Predicted performance should always be confirmed by final calibration on site.'), 'the closing line is unchanged');
 });
 
 test('the printed page (PDF) keeps rendering the page', () => {
