@@ -324,7 +324,7 @@ test('4. Level 1 version reads Current everywhere and does not block', () => {
 // ── 5. One authority: gate message is the panel's own sentence ──────────────
 
 test('5. the gate message is the row sentence, verbatim', () => {
-  const rows = [resolveVersionReadiness(LEVEL_4_SOURCES), resolveVersionReadiness(LEVEL_1_SOURCES)];
+  const rows = [resolveVersionReadiness(LEVEL_4_SOURCES), resolveVersionReadiness(UNBACKED_SOURCES)];
   const gate = resolveProposalReadinessGate({ rows });
   assert.equal(gate.ready, false);
   assert.equal(gate.message, `${rows[1].blockingSentence}.`);
@@ -335,13 +335,21 @@ test('5. the gate message is the row sentence, verbatim', () => {
 
 // ── 6. The false warning is gone; the real source is named ──────────────────
 
-test('6. no false missing-report warning — the real source is named', () => {
-  const gate = resolveProposalReadinessGate({
+test('6. only a version with no calculated result is told so, by name', () => {
+  const unbacked = resolveProposalReadinessGate({
+    rows: [resolveVersionReadiness(LEVEL_4_SOURCES), resolveVersionReadiness(UNBACKED_SOURCES)],
+  });
+  assert.equal(unbacked.message, 'Level 1 version is missing the calculated engineering result.');
+  assert.doesNotMatch(unbacked.message, /Visual and Technical Reports/, 'the current reports are not claimed missing');
+  assert.doesNotMatch(unbacked.message, /Visual Report|Technical Report/);
+
+  // The stored truth: BOTH Marquee Home versions have their calculated result,
+  // so the sentence is never produced for either of them.
+  const stored = resolveProposalReadinessGate({
     rows: [resolveVersionReadiness(LEVEL_4_SOURCES), resolveVersionReadiness(LEVEL_1_SOURCES)],
   });
-  assert.equal(gate.message, 'Level 1 version is missing the calculated engineering result.');
-  assert.doesNotMatch(gate.message, /Visual and Technical Reports/, 'the current reports are not claimed missing');
-  assert.doesNotMatch(gate.message, /Visual Report|Technical Report/);
+  assert.equal(stored.ready, true);
+  assert.equal(stored.message, null);
 });
 
 // ── 7. A genuinely stale report is named, per version ───────────────────────
@@ -385,7 +393,7 @@ test('8. both reports missing reads as one clause', () => {
 // ── 9. Saved version names only ────────────────────────────────────────────
 
 test('9. the sentence uses the saved version name and no slot suffix', () => {
-  const row = resolveVersionReadiness(LEVEL_1_SOURCES);
+  const row = resolveVersionReadiness(UNBACKED_SOURCES);
   assert.match(row.blockingSentence, /^Level 1 version /);
   assert.doesNotMatch(row.blockingSentence, /·\s*V\d/, 'never "Level 1 version · V2"');
   assert.doesNotMatch(row.blockingSentence, /\bV\d\b/);
@@ -400,8 +408,17 @@ test('10. Generate is enabled only when every selected version is Current', () =
   assert.equal(allCurrent.ready, true, 'both versions current → Generate enabled');
   assert.equal(allCurrent.message, null);
 
-  const oneBlocked = resolveProposalReadinessGate({
+  // The stored truth: both Marquee Home versions are Current, so Generate is
+  // enabled for the real fixture — the pair the wizard is actually handed.
+  const storedPair = resolveProposalReadinessGate({
     rows: [resolveVersionReadiness(LEVEL_4_SOURCES), resolveVersionReadiness(LEVEL_1_SOURCES)],
+  });
+  assert.equal(storedPair.ready, true, 'both stored versions current → Next/Generate enabled');
+  assert.equal(storedPair.message, null);
+  assert.equal(storedPair.blockedVersions.length, 0);
+
+  const oneBlocked = resolveProposalReadinessGate({
+    rows: [resolveVersionReadiness(LEVEL_4_SOURCES), resolveVersionReadiness(UNBACKED_SOURCES)],
   });
   assert.equal(oneBlocked.ready, false, 'one blocked version → Generate disabled');
 
@@ -412,11 +429,26 @@ test('10. Generate is enabled only when every selected version is Current', () =
 
 // ── The per-source rules the server and the client share ───────────────────
 
-test('11. the engineering cell follows the published result, never a handoff', () => {
+test('11. the engineering cell follows durable results, never a handoff', () => {
   assert.equal(resolveEngineeringCell({ publication: LEVEL_4_PUBLICATION, publicationStatus: PUBLICATION_STATUS.PUBLISHED }).state, READINESS_STATE.CURRENT);
   assert.equal(resolveEngineeringCell({ publication: null, publicationStatus: PUBLICATION_STATUS.STALE }).state, READINESS_STATE.STALE);
   assert.equal(resolveEngineeringCell({ publication: null, publicationStatus: PUBLICATION_STATUS.NOT_CALCULATED }).state, READINESS_STATE.MISSING);
   assert.equal(resolveEngineeringCell({ publication: null, publicationStatus: PUBLICATION_STATUS.READ_FAILED }).state, READINESS_STATE.UNAVAILABLE);
+
+  // The version's completed calculation authority is the SAME calculated result
+  // a Technical Report renders, so it reads Current too — including when the
+  // separate publication pointer is stale or its read failed, because the
+  // result itself is present.
+  const authority = { fingerprint: CALC_FINGERPRINT, completedAt: new Date(CALC_COMPLETED_AT_MS).toISOString() };
+  for (const publicationStatus of [
+    PUBLICATION_STATUS.NOT_CALCULATED,
+    PUBLICATION_STATUS.STALE,
+    PUBLICATION_STATUS.READ_FAILED,
+  ]) {
+    const cell = resolveEngineeringCell({ publication: null, publicationStatus, calculationAuthority: authority });
+    assert.equal(cell.state, READINESS_STATE.CURRENT, `completed result reads Current (${publicationStatus})`);
+    assert.equal(cell.generatedAt, authority.completedAt);
+  }
 });
 
 test('12. a report cell is judged by the fingerprints both sides state', () => {
@@ -428,6 +460,157 @@ test('12. a report cell is judged by the fingerprints both sides state', () => {
   assert.equal(resolveSavedReportCell({ saved: { ...LEVEL_1_SOURCES.savedReports.visual, report_schema_version: 0 }, currentFingerprints: null }).state, READINESS_STATE.MISSING);
   // No saved report at all is Missing, never Current.
   assert.equal(resolveSavedReportCell({ saved: null, currentFingerprints: null }).state, READINESS_STATE.MISSING);
+});
+
+// ── 13. The completed calculation authority the Technical Report uses ───────
+
+test('13. the engineering result resolves from the completed calculation authority', () => {
+  // Marquee Home Level 1: the cache holds the completed result for the version's
+  // own current fingerprint, which IS the fingerprint its reports were generated
+  // from. That is the authority the Technical Report renders — not a separate row.
+  const found = sharedCalculationAuthority({
+    cacheRecord: LEVEL_1_CACHE,
+    savedTechnicalReport: LEVEL_1_TECHNICAL,
+  });
+  assert.equal(found.fingerprint, CALC_FINGERPRINT);
+  assert.equal(found.source, SHARED_CALC_SOURCE.COMPLETED_AUTHORITY);
+  assert.equal(found.completedAt, new Date(CALC_COMPLETED_AT_MS).toISOString());
+
+  // The version's own current fingerprint wins over the one the report states.
+  const newer = sharedCalculationAuthority({
+    cacheRecord: {
+      current_fingerprint: 'cal:v8:newer-design',
+      completed_by_fingerprint: { 'cal:v8:newer-design': { job: { completedAtMs: CALC_COMPLETED_AT_MS } }, [CALC_FINGERPRINT]: {} },
+    },
+    savedTechnicalReport: LEVEL_1_TECHNICAL,
+  });
+  assert.equal(newer.fingerprint, 'cal:v8:newer-design');
+  assert.equal(newer.source, SHARED_CALC_SOURCE.COMPLETED_AUTHORITY);
+
+  // A design that moved on, where the report's own source is all the cache still
+  // holds: the report's source authority is what "not missing" means here.
+  const fromReport = sharedCalculationAuthority({
+    cacheRecord: {
+      current_fingerprint: 'cal:v8:not-yet-calculated',
+      completed_by_fingerprint: { [CALC_FINGERPRINT]: { job: { completedAtMs: CALC_COMPLETED_AT_MS } } },
+    },
+    savedTechnicalReport: LEVEL_1_TECHNICAL,
+  });
+  assert.equal(fromReport.fingerprint, CALC_FINGERPRINT);
+  assert.equal(fromReport.source, SHARED_CALC_SOURCE.REPORT_SOURCE);
+
+  // Nothing calculated at all is genuinely missing.
+  assert.equal(sharedCalculationAuthority({ cacheRecord: null }), null);
+  assert.equal(sharedCalculationAuthority({
+    cacheRecord: { current_fingerprint: null, completed_by_fingerprint: {} },
+    savedTechnicalReport: LEVEL_1_TECHNICAL,
+  }), null);
+
+  // Technical Report Current + engineering Current: the two columns agree.
+  const row = resolveVersionReadiness(LEVEL_1_SOURCES);
+  assert.equal(row.technical_report_status, 'Current');
+  assert.equal(row.engineering_result_status, 'Current');
+  assert.equal(row.blockers.length, 0);
+  assert.equal(row.ready, true);
+});
+
+// ── 14. The client and the server resolve the same engineering result ───────
+
+test('14. client and server resolve the same engineering result', () => {
+  assert.deepEqual(CLIENT_CALC_SOURCE, SHARED_CALC_SOURCE);
+
+  const inputs = [
+    { cacheRecord: LEVEL_1_CACHE, savedTechnicalReport: LEVEL_1_TECHNICAL },
+    { cacheRecord: { current_fingerprint: CALC_FINGERPRINT, completed_by_fingerprint: {} }, savedTechnicalReport: LEVEL_1_TECHNICAL },
+    { cacheRecord: { current_fingerprint: null, completed_by_fingerprint: {} }, savedTechnicalReport: null },
+    { cacheRecord: null, savedTechnicalReport: LEVEL_1_TECHNICAL },
+  ];
+  for (const input of inputs) {
+    assert.deepEqual(
+      clientCalculationAuthority(input),
+      sharedCalculationAuthority(input),
+      'same calculation authority',
+    );
+  }
+
+  const cellInputs = [
+    { publication: LEVEL_4_PUBLICATION, publicationStatus: PUBLICATION_STATUS.PUBLISHED },
+    { publication: null, publicationStatus: PUBLICATION_STATUS.STALE },
+    { publication: null, publicationStatus: PUBLICATION_STATUS.NOT_CALCULATED },
+    { publication: null, publicationStatus: PUBLICATION_STATUS.READ_FAILED },
+    { publication: null, publicationStatus: PUBLICATION_STATUS.STALE, calculationAuthority: { fingerprint: CALC_FINGERPRINT, completedAt: null } },
+  ];
+  for (const input of cellInputs) {
+    assert.deepEqual(clientEngineeringCell(input), resolveEngineeringCell(input), 'same engineering cell');
+  }
+
+  // One row, assembled on both sides, reads identically.
+  const sharedRow = resolveVersionReadiness(LEVEL_1_SOURCES);
+  const clientRowResult = clientRow({
+    versionId: sharedRow.versionId,
+    versionName: sharedRow.versionName,
+    versionNumber: sharedRow.versionNumber,
+    cells: { visual: sharedRow.visual, technical: sharedRow.technical, engineering: sharedRow.engineering },
+  });
+  assert.equal(clientRowResult.engineering_result_status, sharedRow.engineering_result_status);
+  assert.equal(clientRowResult.ready, sharedRow.ready);
+  assert.equal(clientRowResult.blockingSentence, sharedRow.blockingSentence);
+});
+
+// ── 16. A version that has a publication keeps its publication's verdict ────
+
+test('16. a published version is left exactly as it was: every column Current', () => {
+  // Marquee Home Level 4 also has a completed calculation authority in its cache
+  // (the same row shape as Level 1's). Its publication is the evidence that
+  // speaks for it, so the engineering cell reads the publication's own time and
+  // the report columns keep comparing against the publication's fingerprints.
+  const level4Cache = {
+    current_fingerprint: CALC_FINGERPRINT,
+    completed_by_fingerprint: { [CALC_FINGERPRINT]: { job: { completedAtMs: CALC_COMPLETED_AT_MS } } },
+  };
+  const row = resolveVersionReadiness({
+    ...LEVEL_4_SOURCES,
+    calculationAuthority: sharedCalculationAuthority({
+      cacheRecord: level4Cache,
+      savedTechnicalReport: LEVEL_4_SOURCES.savedReports.technical,
+    }),
+  });
+  assert.equal(row.visual_report_status, 'Current');
+  assert.equal(row.technical_report_status, 'Current');
+  assert.equal(row.engineering_result_status, 'Current');
+  assert.equal(row.engineering.generatedAt, LEVEL_4_PUBLICATION.published_at);
+  assert.equal(row.ready, true);
+
+  // With a publication present the bass fingerprint is never taken from the
+  // cache, so a version whose publication states no bass fingerprint keeps the
+  // comparison it had: nothing is compared on that key.
+  const visualWithPublication = resolveSavedReportCell({
+    saved: LEVEL_4_SOURCES.savedReports.visual,
+    currentFingerprints: LEVEL_4_SOURCES.currentFingerprints,
+  });
+  assert.equal(visualWithPublication.state, READINESS_STATE.CURRENT);
+});
+
+// ── 15. A genuinely uncalculated version still blocks, by name ──────────────
+
+test('15. reports without a calculated result still block, naming that result', () => {
+  const row = resolveVersionReadiness(UNBACKED_SOURCES);
+  assert.equal(row.visual_report_status, 'Current');
+  assert.equal(row.technical_report_status, 'Current');
+  assert.equal(row.engineering_result_status, 'Missing');
+  assert.equal(row.engineering.reason, 'No saved engineering result was found for this version. Calculate this version in Room Designer.');
+  assert.equal(row.ready, false);
+  assert.deepEqual(row.blockers.map((blocker) => blocker.source), ['engineering']);
+
+  // The row, read by the client mirror, blocks with the same sentence.
+  const clientRowResult = clientRow({
+    versionId: row.versionId,
+    versionName: row.versionName,
+    versionNumber: row.versionNumber,
+    cells: { visual: row.visual, technical: row.technical, engineering: row.engineering },
+  });
+  assert.equal(clientRowResult.ready, row.ready);
+  assert.equal(clientRowResult.blockingSentence, row.blockingSentence);
 });
 
 // ── Report ─────────────────────────────────────────────────────────────────

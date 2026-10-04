@@ -302,10 +302,12 @@ export default async function(req) {
           : PUBLICATION_STATUS.NOT_CALCULATED,
         currentFingerprints: {
           engineeringFingerprint: publication?.engineering_fingerprint || null,
-          // The bass fingerprint of the version's current design: without it a
-          // saved report is compared against nothing on that key.
+          // When the version has no publication to speak for it, the completed
+          // calculation authority supplies its bass fingerprint, so a saved report
+          // is judged against the design the version actually holds. A version WITH
+          // a publication keeps the publication's own values, exactly as before.
           calculationFingerprint: publication?.provenance?.bass_fingerprint
-            || calculationAuthority?.fingerprint
+            || (publication ? null : calculationAuthority?.fingerprint)
             || null,
           seatPriorityFingerprint: publication?.engineering_summary?.seatPriorityFingerprint || null,
         },

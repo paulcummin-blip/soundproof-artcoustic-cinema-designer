@@ -9,6 +9,7 @@
  */
 
 import { base44 } from '@/api/base44Client';
+import { notifyReportSourceStored } from '@/components/proposal/sourceAuthority/reportSourceSignal';
 
 /** Read the saved report for one project version and report type. */
 export async function loadReportSnapshot({ projectId, versionId, reportType }) {
@@ -29,8 +30,15 @@ export async function loadReportSnapshot({ projectId, versionId, reportType }) {
  */
 export async function saveReportSnapshot({ existing = null, record }) {
   if (!record) return null;
-  if (existing?.id) {
-    return base44.entities.ReportSnapshot.update(existing.id, record);
-  }
-  return base44.entities.ReportSnapshot.create(record);
+  const saved = existing?.id
+    ? await base44.entities.ReportSnapshot.update(existing.id, record)
+    : await base44.entities.ReportSnapshot.create(record);
+  // One in-session announcement, so the proposal readiness read (which judges
+  // each version by its saved reports) knows a report has landed and reads again
+  // instead of reporting the version from before the report existed.
+  notifyReportSourceStored({
+    projectId: saved?.project_id || record.project_id || null,
+    versionId: saved?.version_id || record.version_id || null,
+  });
+  return saved;
 }

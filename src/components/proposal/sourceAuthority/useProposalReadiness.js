@@ -42,6 +42,7 @@ import {
 } from '@/components/report/reportSnapshotAuthority';
 import { readSeatPriorityFingerprint } from '@/components/state/designReviewHandoff';
 import { readProjectAnalysisCacheRecord } from '@/components/state/projectReadCache';
+import { subscribeReportSourceStored } from './reportSourceSignal';
 import {
   PUBLICATION_STATUS,
   READINESS_STATE,
@@ -85,6 +86,17 @@ export function useProposalReadiness({ projectId = null, versionIds = [] } = {})
   const [rows, setRows] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+  // Bumped when a saved report lands, so the read below runs again and the table
+  // shows the report that has just been generated rather than the state before it.
+  const [refreshToken, setRefreshToken] = useState(0);
+
+  useEffect(() => {
+    if (!projectId) return undefined;
+    return subscribeReportSourceStored((entry) => {
+      if (entry?.projectId && String(entry.projectId) !== String(projectId)) return;
+      setRefreshToken((value) => value + 1);
+    });
+  }, [projectId]);
 
   useEffect(() => {
     let cancelled = false;
@@ -160,10 +172,13 @@ export function useProposalReadiness({ projectId = null, versionIds = [] } = {})
           });
           const currentFingerprints = {
             ...savedFingerprints,
-            // The bass fingerprint of the version's current design. Without it a
-            // report is compared against nothing and can read Current by default.
+            // When the version has no publication to speak for it, the completed
+            // calculation authority supplies its bass fingerprint — so a report is
+            // compared against the design the version actually holds instead of
+            // against nothing. A version WITH a publication is left exactly as it
+            // was: its own publication states what the reports are judged against.
             calculationFingerprint: savedFingerprints.calculationFingerprint
-              || calculationAuthority?.fingerprint
+              || (durable?.publication ? null : calculationAuthority?.fingerprint)
               || null,
           };
 
@@ -195,7 +210,7 @@ export function useProposalReadiness({ projectId = null, versionIds = [] } = {})
     })();
 
     return () => { cancelled = true; };
-  }, [projectId, idsKey]);
+  }, [projectId, idsKey, refreshToken]);
 
   return { rows, loading, error };
 }
