@@ -31,10 +31,10 @@ export const ADI_LIVE_STATUS = Object.freeze({
   NOT_YET_SUPPORTED: "Not yet supported",
 });
 
-// The crossover-region phase row is constant: the model does not evaluate it, so
-// the row states that once with the reason, in its own place in the order.
-// Subwoofer model / quantity is not a row here — it is stated in Engineer
-// details.
+// Only levers the optimiser actually evaluates are rows here (delay, gain,
+// polarity, placement, layout, seating). Subwoofer model / quantity is not a row
+// — it is stated in Engineer details — and neither is a capability the optimiser
+// cannot test.
 
 /** The absorption row is advice, and is only resolved after the run. */
 export const ABSORPTION_ROW_KEY = "absorption";
@@ -135,9 +135,6 @@ export function buildLiveFamilyRows(live = {}) {
       ? testingOutcome(DELAY_LABEL) : null),
     row("gain", gainStatus, gainStatus === ADI_LIVE_STATUS.TESTING
       ? testingOutcome(GAIN_LABEL) : null),
-    // Phase / crossover-region alignment: stated where it sits in the order,
-    // with the reason it is not evaluated.
-    row("phase", ADI_LIVE_STATUS.NOT_YET_SUPPORTED, ADI_ROW_OUTCOME.PHASE_NOT_MODELLED),
     row("polarity", polarityStatus, null),
     row("placement", placementStatus, null),
     // An alternative layout is searched inside the placement pool, so it moves

@@ -119,7 +119,7 @@ export const ADI_ROW_OUTCOME = Object.freeze({
   THEORETICAL_PLACEMENT: "Theoretical option — not offered as default placement.",
   NO_BETTER_LAYOUT: "No better layout found",
   /** Stated for the crossover region — a capability the model does not have. */
-  PHASE_NOT_MODELLED: "Crossover-region model not available",
+
   /** Stated for the subwoofer model / quantity family. */
   COMPARE_SEPARATELY: "Compare subwoofer models separately",
   /** Stated for a supported lever this saved run kept no evidence of searching. */
@@ -136,7 +136,6 @@ export const ADI_ROW_OUTCOME = Object.freeze({
 const ROW_FAMILY = Object.freeze({
   delay: OPTIMISER_RUN_FAMILY.DELAY,
   gain: OPTIMISER_RUN_FAMILY.GAIN,
-  phase: OPTIMISER_RUN_FAMILY.PHASE,
   polarity: OPTIMISER_RUN_FAMILY.POLARITY,
   placement: OPTIMISER_RUN_FAMILY.PLACEMENT,
   layout: OPTIMISER_RUN_FAMILY.ADDITIONAL_POSITIONS,
@@ -282,20 +281,6 @@ function testedOutcome(entry, baseline) {
 function rowFor(key, entry, families, baseline) {
   const status = entry?.status || null;
   const tested = wasTested(entry);
-
-  // ── Phase / crossover-region alignment ── the model decides, not the run:
-  // the engine's phase search is subwoofer-only, so the crossover region is not
-  // evaluated at all. Stated as a capability the model does not have.
-  if (key === "phase") {
-    const region = entry?.crossoverRegion || null;
-    const regionEvaluated = region?.supported === true && region?.evaluated === true;
-    if (!regionEvaluated) {
-      return {
-        status: ADI_ROW_STATUS.NOT_YET_SUPPORTED,
-        outcome: ADI_ROW_OUTCOME.PHASE_NOT_MODELLED,
-      };
-    }
-  }
 
   // ── Polarity ── explored inside the grouped phase search and the combined
   // candidate. It is evaluated, but there is no standalone result to apply.

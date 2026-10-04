@@ -214,7 +214,8 @@ describe("a run that confirmed no winner still offers its placement result", () 
     });
     const row = summary.rows.find((candidate) => candidate.key === "placement");
     expect(row.status).toBe("Recommended");
-    expect(row.outcome).toContain("front subs wider along the front wall");
+    // Quantity-aware wording: this layout has two front subwoofers.
+    expect(row.outcome).toContain("front subwoofers wider along the front wall");
     expect(row.outcome).toMatch(/3 dB/);
     expect(summary.actions.canApply).toBe(true);
     expect(summary.actions.applyLabel).toBe("Apply placement");

@@ -2,10 +2,10 @@
 // ---------------------------------------------------------------------------
 // The running-state contract of the Bass Optimisation card.
 //
-// Product rule: while a run is in progress every lever in the fixed order is
-// Waiting, Testing or Tested — never "Not tested", and never the previous run's
-// rows. A lever the model does not evaluate (phase / crossover region) states
-// exactly that, with the reason, in its own row.
+// Product rule: while a run is in progress every lever the optimiser actually
+// tests is Waiting, Testing or Tested — never "Not tested", and never the
+// previous run's rows. A capability the model cannot evaluate is not a row at
+// all: the table never lists a lever it cannot test.
 // ---------------------------------------------------------------------------
 
 import { describe, it, expect } from "vitest";
@@ -25,10 +25,11 @@ import {
 } from "@/components/room/bass/optimiserPlan/optimiserLiveFamilies.js";
 import { OPTIMISER_LEVER_SEQUENCE } from "@/components/room/bass/optimiserPlan/optimiserLeverOrder.js";
 
-// The tested table while a run is in progress: every lever in the fixed
-// least-intrusive order, then the absorption advice row.
+// The tested table while a run is in progress: every lever the optimiser tests,
+// in the fixed least-intrusive order, then the absorption advice row. Phase is
+// not in it — the optimiser cannot evaluate it.
 const REQUIRED_ORDER = [
-  "Delay", "Gain", "Phase", "Polarity", "Placement",
+  "Delay", "Gain", "Polarity", "Placement",
   "Layout", "Seating", "Low-frequency absorption",
 ];
 
@@ -48,7 +49,7 @@ describe("running state — the live tested rows", () => {
 
   it("exports the same keys, in order", () => {
     expect(ADI_LIVE_ROW_KEYS).toEqual([
-      "delay", "gain", "phase", "polarity", "placement",
+      "delay", "gain", "polarity", "placement",
       "layout", "seating", "absorption",
     ]);
   });
@@ -60,19 +61,19 @@ describe("running state — the live tested rows", () => {
         expect(labels(rows)).not.toContain(label);
       }
       expect(rows.map((row) => row.key)).not.toContain("subwoofer_option");
-      // Phase is stated as not evaluated, with the reason — and it is the ONLY
-      // row that may say so while a run is in progress.
-      const unsupported = rows.filter(
-        (row) => /not yet supported/i.test(`${row.status} ${row.outcome || ""}`),
-      );
-      expect(unsupported.map((row) => row.key)).toEqual(["phase"]);
-      expect(unsupported[0].outcome).toMatch(/crossover-region model not available/i);
+      // No row states a capability the optimiser has not got: a lever it cannot
+      // test is not a row at all, and carries no crossover-region copy.
+      expect(rows.map((row) => row.key)).not.toContain("phase");
+      expect(rows.filter((row) => /not yet supported/i
+        .test(`${row.status} ${row.outcome || ""}`))).toEqual([]);
+      expect(rows.filter((row) => /crossover-region/i
+        .test(`${row.status} ${row.outcome || ""}`))).toEqual([]);
     }
   });
 
   it("keeps the outstanding capability stated, for Engineer details", () => {
     const notes = buildFutureCapabilityNotes();
-    // Phase is a stated row of its own, so it is never repeated here.
+    // The subwoofer decision is not a table row, so it is stated here instead.
     expect(notes.map((note) => note.key)).toEqual(["subwoofer_option"]);
     expect(notes[0].statement)
       .toBe(OPTIMISER_FUTURE_CAPABILITY.subwoofer_option.statement);
@@ -140,14 +141,13 @@ describe("running state — the live tested rows", () => {
     expect(statusOf(rows, "Seating")).toBe(ADI_LIVE_STATUS.TESTING);
   });
 
-  it("states phase third, where the lever sits in the order", () => {
-    // Phase is a row of its own, in position 3, stating what the model does and
-    // does not evaluate.
+  it("lists the tested levers in the fixed order, with no phase row", () => {
+    // The lever order still knows where phase sits; the card does not state it,
+    // because the optimiser cannot evaluate it.
     expect(OPTIMISER_LEVER_SEQUENCE.indexOf("phase")).toBe(2);
     const rows = buildLiveFamilyRows({ status: "running", phase: "reviewing" });
-    expect(labels(rows).indexOf("Phase")).toBe(2);
-    expect(statusOf(rows, "Phase")).toBe(ADI_LIVE_STATUS.NOT_YET_SUPPORTED);
-    expect(outcomeOf(rows, "Phase")).toMatch(/crossover-region model not available/i);
+    expect(labels(rows)).not.toContain("Phase");
+    expect(labels(rows).slice(0, 4)).toEqual(["Delay", "Gain", "Polarity", "Placement"]);
   });
 
   it("never shows a vague state or an Apply action while running", () => {

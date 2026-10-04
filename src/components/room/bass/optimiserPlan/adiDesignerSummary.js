@@ -76,12 +76,12 @@ const LABEL_OVERRIDE = Object.freeze({
 
 /**
  * The levers ADI reports on, always in the fixed least-intrusive order: delay,
- * gain, phase, polarity, placement, layout, seating. Low-frequency absorption
- * advice is appended as the final step afterwards.
+ * gain, polarity, placement, layout, seating. Low-frequency absorption advice is
+ * appended as the final step afterwards.
  *
- * Every lever is a row. One the model does not evaluate (phase / crossover
- * region) states that as "Not yet supported" with the reason; the subwoofer
- * model / quantity decision is stated in Engineer details instead.
+ * Every one of them is a row. A capability the optimiser cannot evaluate is not
+ * listed at all; the subwoofer model / quantity decision is stated in Engineer
+ * details instead.
  */
 const leverOrder = () => (
   Array.isArray(OPTIMISER_FAMILY_SEQUENCE) && OPTIMISER_FAMILY_SEQUENCE.length
@@ -281,16 +281,6 @@ export function buildTestedOptionRows(
     // so; a family this evaluation did not search says that, and never the
     // vague "Not tested", "Not evaluated" or "Not available".
     if (!evaluated) {
-      // The crossover region is not modelled at all.
-      if (/phase/i.test(key)) {
-        return {
-          key,
-          label,
-          status: ADI_ROW_STATUS.NOT_YET_SUPPORTED,
-          outcome: ADI_ROW_OUTCOME.PHASE_NOT_MODELLED,
-          action: null,
-        };
-      }
       // A different subwoofer model or quantity is a design decision, not a
       // search — it is never silently omitted, and it never claims the lever was
       // tested.

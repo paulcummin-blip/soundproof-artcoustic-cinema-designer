@@ -3,13 +3,13 @@
 // The default "What ADI tested" table.
 //
 // Product rule verified here:
-//   • every lever is a row, in the fixed least-intrusive order — delay, gain,
-//     phase, polarity, placement, layout, seating — with absorption advice last
+//   • every lever the optimiser tests is a row, in the fixed least-intrusive
+//     order — delay, gain, polarity, placement, layout, seating — with absorption
+//     advice last. Phase is NOT a row: the optimiser cannot evaluate it, so the
+//     table never lists it, and never carries a "Not yet supported" row
 //   • a lever the optimiser searches is NEVER described as unsupported: an
 //     evaluated one reports its own outcome (Tested · Recommended · Rejected ·
 //     Trade-off · Combined only), and seating reports its last-resort policy
-//   • "Not yet supported" is reserved for a capability the model genuinely
-//     lacks, and it carries the reason: phase / crossover-region alignment
 //   • a search that RAN (the engine's own stage counters) is Tested even when it
 //     confirmed no candidate — the Marquee "Not yet supported in this run"
 //     defect
@@ -50,8 +50,11 @@ import {
 import { OPTIMISER_FAMILY_SEQUENCE } from "@/components/room/bass/optimiserPlan/optimiserLeverOrder.js";
 import { OPTIMISER_PRESENTATION_STATE } from "@/components/room/bass/optimiserPlan/resolveOptimiserPresentationState.js";
 
-/** The levers the tested table states, in the fixed order. */
-const TABLE_KEYS = ["delay", "gain", "phase", "polarity", "placement", "layout", "seating"];
+/**
+ * The levers the tested table states, in the fixed order. Phase is not one of
+ * them: the optimiser does not evaluate it, so the table does not list it.
+ */
+const TABLE_KEYS = ["delay", "gain", "polarity", "placement", "layout", "seating"];
 
 /** A saved run ledger that records every family the run knows about. */
 const SAVED_FAMILIES = [
@@ -86,15 +89,17 @@ const labelOf = (rows, key) => rowFor(rows, key)?.label || null;
 const rowText = (row) => `${row.status} ${row.outcome || ""}`;
 
 describe("which levers the tested table states", () => {
-  it("names them, in the fixed order, with phase third", () => {
+  it("names them, in the fixed order, and never lists phase", () => {
     expect(OPTIMISER_LIVE_FAMILIES).toEqual(TABLE_KEYS);
+    // The run's family order still knows where phase sits; the table states only
+    // the levers the optimiser can actually test.
     expect(OPTIMISER_FAMILY_SEQUENCE.indexOf("phase")).toBe(2);
-    expect(OPTIMISER_LIVE_FAMILIES.indexOf("phase")).toBe(2);
+    expect(OPTIMISER_LIVE_FAMILIES.indexOf("phase")).toBe(-1);
   });
 
-  it("never treats the subwoofer model / quantity as a table lever", () => {
+  it("never treats an unevaluated capability as a table lever", () => {
     expect(isLiveFamily("subwoofer_option")).toBe(false);
-    expect(isLiveFamily("phase")).toBe(true);
+    expect(isLiveFamily("phase")).toBe(false);
     expect(isLiveFamily("layout")).toBe(true);
     expect(isLiveFamily("seating")).toBe(true);
   });
@@ -105,11 +110,11 @@ describe("the default tested table", () => {
 
   it("lists every lever in the fixed order, and never the subwoofer option", () => {
     expect(keysOf(rows())).toEqual(TABLE_KEYS);
-    expect(labelOf(rows(), "phase")).toBe("Phase");
+    expect(labelOf(rows(), "phase")).toBeNull();
     expect(rows().map((row) => row.label)).not.toContain("Sub option");
     expect(keysOf(buildLiveFamilyRows({ status: "running", phase: "calibrating" })))
-      .toEqual([...TABLE_KEYS.slice(0, 7), "absorption"]);
-    expect(ADI_LIVE_ROW_KEYS).toEqual([...TABLE_KEYS.slice(0, 7), "absorption"]);
+      .toEqual([...TABLE_KEYS, "absorption"]);
+    expect(ADI_LIVE_ROW_KEYS).toEqual([...TABLE_KEYS, "absorption"]);
   });
 
   it("reports an evaluated lever as tested, never as unsupported", () => {
@@ -142,18 +147,21 @@ describe("the default tested table", () => {
     expect(seating.outcome).toBe(ADI_ROW_OUTCOME.SEATING_LAST_RESORT);
   });
 
-  it("keeps 'Not yet supported' for the crossover region alone, with its reason", () => {
-    const unsupported = rows().filter((row) => row.status === ADI_ROW_STATUS.NOT_YET_SUPPORTED);
-    expect(unsupported.map((row) => row.key)).toEqual(["phase"]);
-    expect(unsupported[0].outcome).toBe(ADI_ROW_OUTCOME.PHASE_NOT_MODELLED);
-    expect(unsupported[0].outcome).toMatch(/crossover-region model not available/i);
+  it("states no 'Not yet supported' row at all", () => {
+    const table = rows();
+    expect(table.map((row) => row.key)).not.toContain("phase");
+    expect(table.filter((row) => row.status === ADI_ROW_STATUS.NOT_YET_SUPPORTED)).toEqual([]);
+    table.forEach((row) => {
+      expect(rowText(row)).not.toMatch(/crossover-region model not available/i);
+    });
   });
 
-  it("never says 'Not yet supported in this run', and never claims phase as tested", () => {
-    rows().forEach((row) => {
+  it("never says 'Not yet supported in this run', and never lists phase", () => {
+    const table = rows();
+    table.forEach((row) => {
       expect(rowText(row)).not.toMatch(/not yet supported in this run/i);
     });
-    expect(rowFor(rows(), "phase").status).not.toBe(ADI_ROW_STATUS.TESTED);
+    expect(rowFor(table, "phase")).toBeNull();
   });
 
   it("keeps the ledger to the stated levers", () => {
@@ -195,11 +203,9 @@ describe("a search that ran is Tested, however many candidates it confirmed", ()
     });
   });
 
-  it("still states seating's policy and the crossover region's limit", () => {
+  it("still states seating's policy, and no phase row", () => {
     expect(rowFor(rows, "seating").status).toBe(ADI_ROW_STATUS.LAST_RESORT);
-    const phase = rowFor(rows, "phase");
-    expect(phase.status).toBe(ADI_ROW_STATUS.NOT_YET_SUPPORTED);
-    expect(phase.outcome).toBe(ADI_ROW_OUTCOME.PHASE_NOT_MODELLED);
+    expect(rowFor(rows, "phase")).toBeNull();
   });
 });
 
@@ -217,11 +223,10 @@ describe("the card's tested table", () => {
   it("renders every lever, with no unsupported claim for a searched one", () => {
     const summary = summaryFor();
     expect(keysOf(summary.rows).slice(0, TABLE_KEYS.length)).toEqual(TABLE_KEYS);
+    expect(keysOf(summary.rows)).not.toContain("phase");
     summary.rows.forEach((row) => {
       expect(rowText(row)).not.toMatch(/not yet supported in this run/i);
-      if (row.status === ADI_ROW_STATUS.NOT_YET_SUPPORTED) {
-        expect(row.key).toBe("phase");
-      }
+      expect(row.status).not.toBe(ADI_ROW_STATUS.NOT_YET_SUPPORTED);
     });
   });
 
@@ -263,18 +268,15 @@ describe("the Engineer details disclosure", () => {
 });
 
 describe("no false tested claims", () => {
-  it("leaves the live-progress statuses to real work, and to the crossover region", () => {
+  it("leaves the live-progress statuses to real work", () => {
     const rows = buildLiveFamilyRows({ status: "running", phase: "reviewing" });
+    expect(rows.map((row) => row.key)).not.toContain("phase");
     rows.forEach((row) => {
       expect([
         ADI_LIVE_STATUS.WAITING,
         ADI_LIVE_STATUS.TESTING,
         ADI_LIVE_STATUS.TESTED,
-        ADI_LIVE_STATUS.NOT_YET_SUPPORTED,
       ]).toContain(row.status);
-      if (row.status === ADI_LIVE_STATUS.NOT_YET_SUPPORTED) {
-        expect(row.key).toBe("phase");
-      }
     });
   });
 });
