@@ -53,6 +53,33 @@ export function liveReportStatusLabel(snapshotStatus) {
     : LIBRARY_SOURCE_LABEL[LIBRARY_SOURCE_STATE.CURRENT];
 }
 
+/**
+ * The three states a version's report row can be in, as the Library states them:
+ * the report exists and matches the version, it exists but the design has moved
+ * on, or it has not been generated for this version at all.
+ */
+export const LIVE_REPORT_STATE = Object.freeze({
+  CURRENT: 'current',
+  STALE: 'stale',
+  MISSING: 'missing',
+});
+
+export const LIVE_REPORT_STATE_LABEL = Object.freeze({
+  [LIVE_REPORT_STATE.CURRENT]: 'Current',
+  [LIVE_REPORT_STATE.STALE]: 'Stale',
+  [LIVE_REPORT_STATE.MISSING]: 'Missing',
+});
+
+/** The state of one report row: no saved report is "Missing", never "Current". */
+export function resolveLiveReportState(snapshot) {
+  if (!snapshot) return LIVE_REPORT_STATE.MISSING;
+  return snapshot.status === 'stale' ? LIVE_REPORT_STATE.STALE : LIVE_REPORT_STATE.CURRENT;
+}
+
+export function liveReportStateLabel(state) {
+  return LIVE_REPORT_STATE_LABEL[state] || LIVE_REPORT_STATE_LABEL[LIVE_REPORT_STATE.CURRENT];
+}
+
 /** The version ids a document covers, oldest field first. */
 export function documentVersionIds(record) {
   if (!record) return [];
@@ -88,6 +115,52 @@ export function markSuperseded(records = []) {
     record,
     superseded: newestByKey.get(supersessionKey(record))?.id !== record.id,
   }));
+}
+
+/* ── Latest export per version and report type ─────────────────────────────── */
+
+/**
+ * The key two exports must share to be the same version-and-type slot:
+ * the document type plus the version (or version set) it covers. Unlike
+ * supersession this ignores the source record, because the Library keeps ONE
+ * exported PDF per version and report type however often the report behind it
+ * was regenerated.
+ */
+export function latestExportKey(record) {
+  const versions = documentVersionIds(record).slice().sort().join('+');
+  return `${record?.document_type || ''}::${versions}`;
+}
+
+/**
+ * The Latest exported PDFs: the newest export of each project version and
+ * document type, and nothing older.
+ *
+ * The Library's default view is the current state of each version, not the
+ * export history: an export that has been replaced by a newer one of the same
+ * version and type is left in storage, untouched, and is simply not listed.
+ * Reports are regenerated and re-exported quickly, so the older copies carry no
+ * value a designer needs to read day to day.
+ *
+ * @param {Array<{record: Object}|Object>} entries issued documents, in any order
+ * @returns {Array} the newest entry per version and document type, in input order
+ */
+export function selectLatestExports(entries = []) {
+  const list = Array.isArray(entries) ? entries : [];
+  const newestByKey = new Map();
+
+  list.forEach((entry) => {
+    const record = entry?.record || entry;
+    const key = latestExportKey(record);
+    const current = newestByKey.get(key);
+    if (!current || String(record?.exported_at || '') > String(current.exported_at || '')) {
+      newestByKey.set(key, record);
+    }
+  });
+
+  return list.filter((entry) => {
+    const record = entry?.record || entry;
+    return newestByKey.get(latestExportKey(record))?.id === record.id;
+  });
 }
 
 /**

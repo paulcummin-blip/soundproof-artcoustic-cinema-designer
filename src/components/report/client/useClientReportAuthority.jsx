@@ -18,7 +18,6 @@ import {
   readProjectRecord,
   readProjectVersionRecord,
 } from "@/components/state/projectReadCache";
-import { readActiveVersionIdentity } from "@/components/report/activeVersionIdentity";
 import { mergeProjectAndVersion } from "@/lib/versionAuthority";
 import { hydrateProjectIntoAppState } from "@/components/utils/hydrateProjectIntoAppState";
 import { useAnalysisSpeakers } from "@/components/hooks/useAnalysisSpeakers";
@@ -40,7 +39,13 @@ import {
   beginDesignHydration,
   completeDesignHydration,
   failDesignHydration,
+  useCanonicalProject,
 } from "@/components/state/projectHydrationStore";
+import {
+  readRequestedVersionIdentity,
+  resolveReportVersionId,
+  sharedHydrationMatchesRequest,
+} from "@/components/report/reportVersionRequest";
 
 // TV preset → viewable width in inches (matches RoomDesigner TV_KEY_TO_INCHES)
 const TV_KEY_TO_INCHES = { tv65: 55.55, tv77: 67.36, tv83: 72.52, tv100: 87.80 };
@@ -64,13 +69,19 @@ function resolveScreenVisibleWidthInches(screen) {
   return 120;
 }
 
-export function useClientReportAuthority(projectId) {
+export function useClientReportAuthority(projectId, requestedVersionId = null) {
   const app = useAppState();
   const activeProjectId = useActiveProjectId();
+  // The version the shared app state currently holds. The in-session shortcut
+  // (below) may only be used when it is the version this report was asked for.
+  const sharedHydratedVersionId = useCanonicalProject().identity?.activeVersionId || null;
 
   const [projectDetails, setProjectDetails] = useState(null);
   const [hydrating, setHydrating] = useState(true);
   const [hydratedProjectId, setHydratedProjectId] = useState(null);
+  // The version request that satisfied this hydration, so a request for another
+  // version is never answered with the already-hydrated one.
+  const [hydratedRequestVersionId, setHydratedRequestVersionId] = useState(null);
   const [versionId, setVersionId] = useState(null);
   const [versionNumber, setVersionNumber] = useState(null);
   const [versionName, setVersionName] = useState(null);
@@ -85,6 +96,7 @@ export function useClientReportAuthority(projectId) {
       setProjectDetails(null);
       setHydrating(false);
       setHydratedProjectId(null);
+      setHydratedRequestVersionId(null);
       setVersionId(null);
       setVersionNumber(null);
       setVersionName(null);
@@ -98,15 +110,24 @@ export function useClientReportAuthority(projectId) {
     // hydration and mark ready immediately. Project details fetched
     // non-blocking. Hard refresh fails this check and falls through to the
     // full fetch/hydrate path below.
+    // The shortcut may only be taken when the shared state holds the version
+    // this report was ASKED FOR. A request for another version always hydrates
+    // that version explicitly, so an in-session load can never answer a Level 4
+    // request with the loaded Level 1 design.
     const sharedProviderReady =
       activeProjectId === projectId &&
       app?.isProjectHydrationReady === true &&
+      sharedHydrationMatchesRequest({
+        requestedVersionId,
+        hydratedVersionId: sharedHydratedVersionId,
+      }) &&
       Number.isFinite(Number(app?.roomDims?.widthM)) &&
       Number.isFinite(Number(app?.roomDims?.lengthM));
 
     if (sharedProviderReady) {
       setHydrating(false);
       setHydratedProjectId(projectId);
+      setHydratedRequestVersionId(requestedVersionId || null);
       // Shared app state already holds this project's saved design state.
       completeDesignHydration(projectId);
       readProjectRecord(projectId).then(async (p) => {
@@ -121,11 +142,15 @@ export function useClientReportAuthority(projectId) {
           project_reference: p.project_reference || null,
           account_id: p.account_id || null,
         });
-        setVersionId(p.active_version_id || null);
+        const resolvedVersionId = resolveReportVersionId({
+          requestedVersionId,
+          activeVersionId: p.active_version_id,
+        });
+        setVersionId(resolvedVersionId);
         // The fast path states the version exactly as the full load does: the
         // saved version name is read here too, so an in-session export or front
         // page never falls back to a generic version label.
-        const version = await readActiveVersionIdentity(p);
+        const version = await readRequestedVersionIdentity(resolvedVersionId);
         if (cancelled) return;
         setVersionNumber(version.number);
         setVersionName(version.name);
@@ -133,7 +158,10 @@ export function useClientReportAuthority(projectId) {
       return () => { cancelled = true; };
     }
 
-    if (hydratedProjectId === projectId && !hydrating) return;
+    // Already hydrated for this exact project and this exact request.
+    if (hydratedProjectId === projectId
+      && hydratedRequestVersionId === (requestedVersionId || null)
+      && !hydrating) return;
 
     setHydrating(true);
     beginDesignHydration(projectId);
@@ -157,14 +185,20 @@ export function useClientReportAuthority(projectId) {
         project_reference: p.project_reference || null,
         account_id: p.account_id || null,
       });
-      setVersionId(p.active_version_id || null);
-      // Merge with the active ProjectVersion so per-version design fields
+      // The version this report was asked for: the explicit request first, the
+      // project's active version only as the fallback when none was requested.
+      // The Room Designer's loaded version is never consulted.
+      const resolvedVersionId = resolveReportVersionId({
+        requestedVersionId,
+        activeVersionId: p.active_version_id,
+      });
+      setVersionId(resolvedVersionId);
+      // Merge with THAT ProjectVersion so per-version design fields
       // come from design_state, not from the legacy Project position.
       let merged = p;
-      const activeVersionId = p.active_version_id;
-      if (activeVersionId) {
+      if (resolvedVersionId) {
         try {
-          const v = await readProjectVersionRecord(activeVersionId);
+          const v = await readProjectVersionRecord(resolvedVersionId);
           if (cancelled) return;
           if (v) {
             merged = mergeProjectAndVersion(p, v);
@@ -213,11 +247,14 @@ export function useClientReportAuthority(projectId) {
         setDesignatedRspSeatId: app.setDesignatedRspSeatId,
       });
       setHydratedProjectId(p.id);
+      setHydratedRequestVersionId(requestedVersionId || null);
       setHydrating(false);
+      // The identity states the version whose design state is now loaded, so
+      // every surface reading the shared state agrees with what it holds.
       completeDesignHydration(projectId, {
         name: p.name || null,
         clientName: p.client_name || null,
-        activeVersionId: p.active_version_id || null,
+        activeVersionId: resolvedVersionId,
       });
     }).catch((error) => {
       if (cancelled) return;
@@ -228,7 +265,7 @@ export function useClientReportAuthority(projectId) {
     });
 
     return () => { cancelled = true; };
-  }, [projectId]);
+  }, [projectId, requestedVersionId]);
 
   // ── 2) Derived room + screen geometry ───────────────────────────────────
   const roomDims = useMemo(() => ({

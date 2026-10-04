@@ -23,7 +23,13 @@ import {
     readProjectRecord,
     readProjectVersionRecord,
 } from '@/components/state/projectReadCache';
-import { readActiveVersionIdentity } from '@/components/report/activeVersionIdentity';
+import { useCanonicalProject } from '@/components/state/projectHydrationStore';
+import {
+    readRequestedVersionId,
+    readRequestedVersionIdentity,
+    resolveReportVersionId,
+    sharedHydrationMatchesRequest,
+} from '@/components/report/reportVersionRequest';
 import { useEffectiveRsp } from '@/components/room/rsp/useEffectiveRsp';
 import { resolveDesignatedRspSeat, resolveRowDerivedRspYByMode } from '@/components/room/rsp/rspInputResolver';
 import { resolveRspScreenFrontPlaneM, resolveRspScreenWidthM } from '@/components/room/rsp/screenGeometryResolver';
@@ -177,6 +183,16 @@ function RP22ReportInner() {
         null;
     const [reportProjectError, setReportProjectError] = useState(null);
 
+    // ── Report version authority ──────────────────────────────────────────
+    // The version this report was opened FOR. The Project Library's report row
+    // passes it explicitly; a page opened without one states the project's
+    // active version. The loaded Room Designer version is never consulted — a
+    // Level 4 row must open, generate and export the Level 4 report.
+    const requestedVersionId = readRequestedVersionId(searchParams);
+    // The version the shared app state already holds. The in-session shortcut
+    // may only be used when it is the version this report was asked for.
+    const sharedHydratedVersionId = useCanonicalProject().identity?.activeVersionId || null;
+
     // ── READ-ONLY handoff (event-driven snapshot, no polling) ──────────────
     // The Room Designer publishes its authoritative analysisResult, Design
     // Rating (roomDesignRating + scopedRatings + seatDesignRatings), and
@@ -188,7 +204,12 @@ function RP22ReportInner() {
     // for direct loads it is already in localStorage. A single useEffect read
     // suffices. A storage event listener covers the rare case where another
     // browser tab updates the project while the report is already open.
-    const reportVersionId = projectDetails?.active_version_id || null;
+    // The explicit request is the authority; the project's active version is
+    // only the fallback for a page opened without a version.
+    const reportVersionId = resolveReportVersionId({
+        requestedVersionId,
+        activeVersionId: projectDetails?.active_version_id || null,
+    });
 
     // ── Version-scoped engineering authority (durable first) ──────────────
     // The Technical Report reads the settled engineering result from the DB

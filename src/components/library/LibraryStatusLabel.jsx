@@ -11,10 +11,17 @@
 import React from 'react';
 import { Check, AlertTriangle, CircleSlash, FileDown, History } from 'lucide-react';
 import { REPORT_FONT_BODY } from '@/components/report/typography/reportTypography';
-import { LIBRARY_SOURCE_LABEL, LIBRARY_SOURCE_STATE } from './librarySourceStatus';
+import {
+  LIBRARY_SOURCE_LABEL,
+  LIBRARY_SOURCE_STATE,
+  LIVE_REPORT_STATE,
+} from './librarySourceStatus';
 
 const STATE_STYLE = {
   [LIBRARY_SOURCE_STATE.CURRENT]: { colour: '#213428', Icon: Check },
+  // A version's own report row: exists and matches, moved on, or not generated.
+  [LIVE_REPORT_STATE.STALE]: { colour: '#7A5A10', Icon: AlertTriangle },
+  [LIVE_REPORT_STATE.MISSING]: { colour: '#7A2E10', Icon: CircleSlash },
   [LIBRARY_SOURCE_STATE.SOURCE_CHANGED]: { colour: '#7A5A10', Icon: AlertTriangle },
   [LIBRARY_SOURCE_STATE.MISSING_SOURCE]: { colour: '#7A2E10', Icon: CircleSlash },
   [LIBRARY_SOURCE_STATE.SUPERSEDED]: { colour: '#8A8477', Icon: History },

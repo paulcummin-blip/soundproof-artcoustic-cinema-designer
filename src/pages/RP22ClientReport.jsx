@@ -61,6 +61,7 @@ import ReportStatePanel from "@/components/report/ReportStatePanel";
 import { buildReportGateDiagnostics } from "@/components/report/reportGateDiagnostics";
 import BackToProposalLink from "@/components/report/BackToProposalLink";
 import { readProposalContext, withProposalContext } from "@/components/report/proposalReportContext";
+import { readRequestedVersionId } from "@/components/report/reportVersionRequest";
 import { deriveReportReadiness, REPORT_STATE } from "@/components/report/reportReadinessAuthority";
 import { useAppState } from "@/components/AppStateProvider";
 import { resolveSeatPriority } from "@/components/utils/seatPriorityAuthority";
@@ -91,7 +92,13 @@ export default function RP22ClientReport() {
     [searchParams, sessionProjectId]
   );
 
-  const authority = useClientReportAuthority(projectId);
+  // The version this report was opened FOR. The Project Library's report row
+  // passes it explicitly; a page opened without one states the project's active
+  // version. The loaded Room Designer version is never consulted — that is what
+  // opened the wrong version's report.
+  const requestedVersionId = useMemo(() => readRequestedVersionId(searchParams), [searchParams]);
+
+  const authority = useClientReportAuthority(projectId, requestedVersionId);
   const engineeringSummary = authority.engineeringSummary || null;
   const p19SeatAuthority = engineeringSummary?.p19SeatAuthority || null;
   const appState = useAppState();

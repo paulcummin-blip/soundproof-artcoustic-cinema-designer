@@ -22,7 +22,11 @@ import {
   REPORT_DOCUMENT_TYPES,
   PROPOSAL_DOCUMENT_TYPES,
 } from '@/components/library/issuedDocument/issuedDocumentTypes';
-import { collapseLiveReports, markSuperseded } from '@/components/library/librarySourceStatus';
+import {
+  collapseLiveReports,
+  markSuperseded,
+  selectLatestExports,
+} from '@/components/library/librarySourceStatus';
 import { buildVersionNameMap } from '@/components/library/libraryVersionLabels';
 import { isSnapshotRestorable } from '@/components/report/reportSnapshotAuthority';
 
@@ -109,8 +113,17 @@ export function useProjectLibraryAssets({ projectId }) {
 
   const markedExports = useMemo(() => markSuperseded(issuedExports), [issuedExports]);
 
+  /**
+   * ONE exported PDF per project version and report type — the latest. An older
+   * export of the same version and type is left in storage untouched and is not
+   * listed: the Library states what each version holds now, not its export
+   * history. Proposals are NOT collapsed this way — two different issued
+   * proposals of the same version are separate documents, not revisions of one.
+   */
   const reportExports = useMemo(
-    () => markedExports.filter(({ record }) => REPORT_DOCUMENT_TYPES.includes(record.document_type)),
+    () => selectLatestExports(
+      markedExports.filter(({ record }) => REPORT_DOCUMENT_TYPES.includes(record.document_type)),
+    ),
     [markedExports],
   );
   const proposalExports = useMemo(

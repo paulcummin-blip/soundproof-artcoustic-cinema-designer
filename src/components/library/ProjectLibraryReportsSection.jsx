@@ -3,14 +3,19 @@
  * ---------------------------
  * The active project's Generated Reports, per design version.
  *
- * Each version lists, in two groups:
- *   Current live reports  ONE row per report type — the newest report that
- *                         version holds, opened or regenerated where it is
- *                         generated. Every earlier generation is left out.
- *   Exported PDFs         every PDF that was exported, newest first, each kept
- *                         as a fixed read-only issued document that is never
- *                         overwritten or removed. Each one is judged against the
- *                         live report of its own version and report type.
+ * Each design version lists, in two groups:
+ *
+ *   Current live reports   ONE row per report type, always shown — so the
+ *                         Library states whether each report EXISTS for this
+ *                         version. Current or Stale opens or regenerates it;
+ *                         Missing generates it. Every row's action carries the
+ *                         version of the section it stands in, so a Level 4 row
+ *                         acts on Level 4 and never on another version.
+ *
+ *   Exported PDFs         the LATEST exported PDF per report type. An earlier
+ *                         export of the same version and report type stays in
+ *                         storage but is not listed, and the row says "Same as
+ *                         current" when it still matches the live report.
  */
 
 import React from 'react';
@@ -19,12 +24,22 @@ import { FileText } from 'lucide-react';
 import { REPORT_FONT_BODY } from '@/components/report/typography/reportTypography';
 import { reportTypeLabel } from '@/components/report/reportSnapshotAuthority';
 import {
+  PROPOSAL_SOURCE_REPORT,
   PROPOSAL_SOURCE_REPORT_ROUTE,
   buildReportActionUrl,
 } from '@/components/proposal/sourceAuthority/proposalSourceAuthority';
 import LiveReportRow from './LiveReportRow';
 import ExportedDocumentRow from './ExportedDocumentRow';
-import { liveReportStatusLabel, resolveExportLiveState } from './librarySourceStatus';
+import {
+  liveReportStateLabel,
+  resolveExportLiveState,
+  resolveLiveReportState,
+  selectLatestExports,
+  LIVE_REPORT_STATE,
+} from './librarySourceStatus';
+
+/** The two report types every version states a row for, in reading order. */
+const REPORT_TYPES = [PROPOSAL_SOURCE_REPORT.VISUAL, PROPOSAL_SOURCE_REPORT.TECHNICAL];
 
 function SectionHeading({ children }) {
   return (
@@ -55,20 +70,24 @@ export default function ProjectLibraryReportsSection({
 }) {
   const navigate = useNavigate();
 
+  /**
+   * Open, generate or regenerate one report — always for the exact version of
+   * the row it was clicked in. The version is passed explicitly and is the only
+   * authority the report page reads; nothing here consults the loaded Room
+   * Designer version.
+   */
   const openVersionReport = (reportType, versionId) => {
     const route = PROPOSAL_SOURCE_REPORT_ROUTE[reportType];
-    if (!route) return;
+    if (!route || !versionId) return;
     navigate(buildReportActionUrl({ route, projectId, versionId }));
   };
 
-  const hasAnyAsset = liveReports.length > 0 || reportExports.length > 0;
-  if (!hasAnyAsset) {
+  if (versions.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center py-20">
         <FileText className="w-9 h-9 text-[#DCDBD6] mb-4" />
         <p className="text-sm text-[#8A8477] text-center max-w-md leading-relaxed" style={{ fontFamily: REPORT_FONT_BODY }}>
-          No reports yet. Generate the Visual Report or the Technical Report for a design version, then export it —
-          the exported PDF is kept here.
+          No design versions yet. Save a design version in the Room Designer and its reports appear here.
         </p>
       </div>
     );
@@ -77,18 +96,19 @@ export default function ProjectLibraryReportsSection({
   return (
     <div className="space-y-12">
       {versions.map((version) => {
-        // The live reports are already one per report type (the newest), and the
-        // keyed map is how each exported PDF finds the live report it is judged
-        // against — its own version and its own report type, never another's.
-        const live = liveReports.filter((report) => report.versionId === version.id);
-        const liveByType = new Map(live.map((report) => [report.reportType, report]));
-        const issued = reportExports
-          .filter(({ record }) => (record.version_id || null) === version.id)
-          .slice()
-          .sort((a, b) => String(b.record.exported_at || '').localeCompare(String(a.record.exported_at || '')));
+        // This version's own rows only. The live report of a type is judged
+        // against the export of the SAME type, and both belong to THIS version.
+        const liveByType = new Map(
+          liveReports
+            .filter((report) => report.versionId === version.id)
+            .map((report) => [report.reportType, report]),
+        );
 
-        if (live.length === 0 && issued.length === 0) return null;
-
+        // ONE exported PDF per report type: the latest. Older exports of the
+        // same version and type are not listed.
+        const issued = selectLatestExports(
+          reportExports.filter(({ record }) => (record.version_id || null) === version.id),
+        );
         return (
           <section key={version.id} data-library-version={version.id}>
             <div className="mb-4">
@@ -99,25 +119,27 @@ export default function ProjectLibraryReportsSection({
             </div>
 
             <SectionHeading>Current live reports</SectionHeading>
-            {live.length === 0 ? (
-              <EmptyNote>No report has been generated for this version yet.</EmptyNote>
-            ) : (
-              <div className="border-t border-[#E5E1D8]">
-                {live.map((report) => (
+            <div className="border-t border-[#E5E1D8]">
+              {REPORT_TYPES.map((reportType) => {
+                const report = liveByType.get(reportType) || null;
+                const state = resolveLiveReportState(report);
+                return (
                   <LiveReportRow
-                    key={report.id}
-                    reportLabel={reportTypeLabel(report.reportType)}
+                    key={reportType}
+                    reportLabel={reportTypeLabel(reportType)}
                     versionText={versionNameById.get(version.id) || null}
-                    generatedAt={report.generatedAt}
-                    generatedBy={report.generatedBy}
-                    statusLabel={liveReportStatusLabel(report.status)}
-                    sourceChanged={report.status === 'stale'}
-                    onOpen={() => openVersionReport(report.reportType, version.id)}
-                    onRegenerate={() => openVersionReport(report.reportType, version.id)}
+                    generatedAt={report?.generatedAt}
+                    generatedBy={report?.generatedBy}
+                    statusState={state}
+                    statusLabel={liveReportStateLabel(state)}
+                    hasReport={state !== LIVE_REPORT_STATE.MISSING}
+                    onOpen={() => openVersionReport(reportType, version.id)}
+                    onGenerate={() => openVersionReport(reportType, version.id)}
+                    onRegenerate={() => openVersionReport(reportType, version.id)}
                   />
-                ))}
-              </div>
-            )}
+                );
+              })}
+            </div>
 
             <div className="mt-6">
               <SectionHeading>Exported PDFs</SectionHeading>
