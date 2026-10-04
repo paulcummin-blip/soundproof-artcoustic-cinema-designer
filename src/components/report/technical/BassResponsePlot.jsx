@@ -144,7 +144,12 @@ export default function BassResponsePlot({
         />
       ))}
 
-      {series.map((entry) => (
+      {/* The target is drawn first so every seat trace and the RSP reference sit
+          above it — the measured evidence always leads the eye. */}
+      {[
+        ...series.filter((entry) => entry.kind === "house-curve"),
+        ...series.filter((entry) => entry.kind !== "house-curve"),
+      ].map((entry) => (
         <path
           key={entry.id}
           d={curvePath(entry.data || [], xDomain, yDomain)}

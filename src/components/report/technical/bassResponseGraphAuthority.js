@@ -31,6 +31,11 @@ import { buildRp22GraphMarkers } from "@/components/room/bass/rp22GraphMarkers";
 import { resolveOptimisationTransitionHz } from "@/components/room/bass/optimisationTransitionAuthority";
 import { getPrimarySeats } from "@/components/utils/seatPriorityAuthority";
 import { formatSeatPillLabel } from "@/components/utils/seatLabel";
+import {
+  REPORT_RSP_STYLE,
+  REPORT_TARGET_STYLE,
+  reportSeatStyle,
+} from "./reportBassSeriesStyle";
 
 /** The graph's own axis policy — the same 70–140 dB window the app graph locks. */
 export const REPORT_BASS_GRAPH_Y_DOMAIN = [70, 140];
@@ -135,10 +140,12 @@ export function buildReportBassGraphs({
     smoothingMode: REPORT_GRAPH_SMOOTHING,
     operatingLevelOffsetDb,
   });
-  // One trace only. The label is the page's own wording for that curve.
+  // One trace only. The label is the page's own wording for that curve, and it
+  // wears the report's RSP style — the same Sound Proof green the reference line
+  // uses on the Primary Seats page.
   const rspSeries = pickSeries(rspBuilt, RSP_PAGE_KINDS)
     .slice(0, 1)
-    .map((entry) => ({ ...entry, label: RSP_ROOM_RESPONSE_LABEL }));
+    .map((entry) => ({ ...entry, label: RSP_ROOM_RESPONSE_LABEL, ...REPORT_RSP_STYLE }));
   const rspCorrected = rspBuilt.find((entry) => entry?.kind === "post-eq") || null;
   const targetSeries = rspBuilt.find((entry) => entry?.kind === "house-curve") || null;
 
@@ -168,10 +175,24 @@ export function buildReportBassGraphs({
   const reference = rspCorrected
     ? pickSeries([{ ...rspCorrected, label: "RSP (reference)" }], ["post-eq"])[0]
     : null;
+  // Style by seat order, so a plotted Primary seat keeps its own colour and dash
+  // pattern whatever order the builders return its curve in.
+  const seatOrder = new Map(plottedIds.map((seatId, index) => [String(seatId), index]));
+  const styledSeats = seatSeries
+    .filter((entry) => entry.kind === "post-eq" && entry.seatId !== "rsp")
+    .map((entry, index) => ({
+      ...entry,
+      ...reportSeatStyle(seatOrder.has(String(entry.seatId)) ? seatOrder.get(String(entry.seatId)) : index),
+    }));
+  const styledTarget = seatSeries
+    .filter((entry) => entry.kind === "house-curve")
+    .slice(0, 1)
+    .map((entry) => ({ ...entry, ...REPORT_TARGET_STYLE }));
+
   const primarySeries = [
-    ...(reference ? [reference] : []),
-    ...seatSeries.filter((entry) => entry.kind === "post-eq" && entry.seatId !== "rsp"),
-    ...seatSeries.filter((entry) => entry.kind === "house-curve").slice(0, 1),
+    ...(reference ? [{ ...reference, ...REPORT_RSP_STYLE }] : []),
+    ...styledSeats,
+    ...styledTarget,
   ];
 
   // The canonical seat label the bass graph itself uses (seat-r1-c1 → R1S1).

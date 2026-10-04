@@ -27,8 +27,14 @@ import { renderToStaticMarkup } from 'react-dom/server';
 import { buildReportBassGraphs } from '../components/report/technical/bassResponseGraphAuthority.js';
 import BassResponseGraphSection from '../components/report/technical/BassResponseGraphSection.jsx';
 import { buildMarkerLabelLayout } from '../components/report/technical/bassGraphMarkerLabels.js';
+import {
+  REPORT_RSP_STYLE,
+  REPORT_SEAT_PALETTE,
+  REPORT_TARGET_STYLE,
+  reportSeatStyle,
+} from '../components/report/technical/reportBassSeriesStyle.js';
 import { resolveOptimisationTransitionHz } from '../components/room/bass/optimisationTransitionAuthority.js';
-import { REPORT_BASS_GRAPH_Y_DOMAIN, REPORT_GRAPH_SMOOTHING } from '../components/report/technical/bassResponseGraphAuthority.js';
+import { REPORT_BASS_GRAPH_Y_DOMAIN, REPORT_GRAPH_SMOOTHING, REPORT_PRIMARY_SEAT_LIMIT } from '../components/report/technical/bassResponseGraphAuthority.js';
 
 const ROOT = path.resolve(process.cwd());
 const read = (relative) => fs.readFileSync(path.join(ROOT, relative), 'utf8');
@@ -333,4 +339,73 @@ test('TEST 12 — marker labels are combined, stacked and border-safe', () => {
   );
   assert.ok(edge[0].box.left >= box.plotLeft && edge[0].box.right <= box.plotRight,
     'the label stays inside the plot border');
+});
+
+// ── TEST 13 — the Primary Seats page tells its traces apart ────────────────
+test('TEST 13 — seat traces differ in colour AND line style, muted and on brand', () => {
+  // The reference is the brand green, solid, and the heaviest line on the page.
+  assert.equal(REPORT_RSP_STYLE.color, '#4A7560', 'the RSP reference is Sound Proof green');
+  assert.equal(REPORT_RSP_STYLE.strokeDasharray, null, 'the reference is solid');
+
+  // The target is neutral, dashed, and lighter than everything it is compared with.
+  assert.equal(REPORT_TARGET_STYLE.strokeDasharray, '9 5', 'the target is dashed');
+  assert.ok(REPORT_TARGET_STYLE.strokeWidth < REPORT_RSP_STYLE.strokeWidth,
+    'the target is lighter than the reference');
+
+  // Every seat the page can plot: a unique colour + pattern pair, ranked between
+  // the target and the reference so neither loses its place.
+  const combos = [];
+  for (let index = 0; index < REPORT_PRIMARY_SEAT_LIMIT; index += 1) {
+    const style = reportSeatStyle(index);
+    assert.ok(REPORT_SEAT_PALETTE.includes(style.color), `seat ${index + 1} uses a palette colour`);
+    assert.ok(style.strokeWidth < REPORT_RSP_STYLE.strokeWidth, 'no seat trace outranks the reference');
+    assert.ok(style.strokeWidth > REPORT_TARGET_STYLE.strokeWidth, 'every seat trace outranks the target');
+    combos.push(`${style.color}|${style.strokeDasharray ?? 'solid'}`);
+  }
+  assert.equal(new Set(combos).size, combos.length, 'no two seats share a colour and pattern');
+  assert.ok(combos.some((combo) => !combo.endsWith('solid')), 'line style carries some of the difference');
+
+  // Muted: no saturated accent and no bright rainbow tone anywhere.
+  const chroma = (hex) => {
+    const [r, g, b] = [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16));
+    return (Math.max(r, g, b) - Math.min(r, g, b)) / 255;
+  };
+  for (const colour of [...REPORT_SEAT_PALETTE, REPORT_RSP_STYLE.color, REPORT_TARGET_STYLE.color]) {
+    assert.ok(chroma(colour) < 0.35, `${colour} stays muted`);
+  }
+
+  // Wiring: the page's series carry the report styles, and the plot draws the
+  // target behind every seat trace.
+  const authority = read('src/components/report/technical/bassResponseGraphAuthority.js');
+  assert.ok(authority.includes('reportSeatStyle('), 'plotted seats are styled by seat order');
+  assert.ok(authority.includes('...REPORT_RSP_STYLE') && authority.includes('...REPORT_TARGET_STYLE'),
+    'the reference and the target wear the report styles');
+
+  const plot = read('src/components/report/technical/BassResponsePlot.jsx');
+  assert.ok(plot.includes('entry.kind === "house-curve"'), 'the target is drawn behind the seat traces');
+
+  const points = (offset) => Array.from({ length: 7 }, (_, i) => ({
+    frequency: [20, 30, 40, 60, 80, 100, 150][i],
+    spl: 96 + offset + (i % 2 ? -3 : 3),
+  }));
+  const graphs = buildReportBassGraphs({
+    contract: {
+      graphPayload: {
+        postEqRspCurve: points(6),
+        correctionCurve: points(0),
+        roomResponseCurve: points(0),
+        productionHouseCurveTarget: points(4),
+        correctionStartHz: 20,
+        correctionEndHz: 150,
+        designEqFitProfile: 'identity',
+        operatingLevelOffsetDb: 0,
+      },
+    },
+    authoritative: true,
+    seats: [{ id: 'seat-r1-c1' }],
+  });
+  const reference = graphs.primary.series.find((entry) => entry.seatId === 'rsp');
+  const target = graphs.primary.series.find((entry) => entry.kind === 'house-curve');
+  assert.equal(reference.color, REPORT_RSP_STYLE.color, 'the reference line wears the RSP style');
+  assert.equal(target.strokeDasharray, REPORT_TARGET_STYLE.strokeDasharray, 'the target line wears the target style');
 });
