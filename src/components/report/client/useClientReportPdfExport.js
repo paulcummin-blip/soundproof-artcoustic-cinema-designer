@@ -86,6 +86,9 @@ export function useClientReportPdfExport({
   const cleanupTimeoutRef = useRef(null);
   // The app-owned window the report is printed from, when one could be opened.
   const printWindowRef = useRef(null);
+  // The export action itself, held stably so a failed Library storage can offer
+  // "Retry export and store" against this very export.
+  const retryExportRef = useRef(null);
 
   const cleanup = useCallback(() => {
     if (printingRef.current) {
@@ -136,13 +139,16 @@ export function useClientReportPdfExport({
     // stored in the background. The export is never delayed by it, and a storage
     // failure never costs the designer the PDF they exported.
     if (issuedDocument?.documentType) {
-      const issuedSnapshot = snapshotIssuedComposition(issuedDocument.documentType);
-      if (issuedSnapshot) {
-        recordIssuedExportInBackground({
-          identity: { ...issuedDocument, filename: title },
-          snapshot: issuedSnapshot,
-        });
-      }
+      recordIssuedExportInBackground({
+        identity: {
+          ...issuedDocument,
+          filename: title,
+          // A storage failure that could not be retried from the held PDF can
+          // re-run this export, and says so on the button that does it.
+          retryExport: () => retryExportRef.current?.(),
+        },
+        snapshot: snapshotIssuedComposition(issuedDocument.documentType),
+      });
     }
 
     try {
@@ -203,6 +209,8 @@ export function useClientReportPdfExport({
       cleanup();
     }
   }, [exporting, activePageCount, projectName, logoUrl, dealerName, clientName, projectReference, versionNumber, versionName, issuedDocument, cleanup]);
+
+  retryExportRef.current = handleExport;
 
   return { exporting, error, handleExport };
 }

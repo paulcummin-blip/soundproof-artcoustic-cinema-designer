@@ -987,6 +987,7 @@ export default function ProposalEditor() {
                     rows={section.metadata?.highlight_rows}
                     comparisonRows={section.metadata?.comparison_rows}
                     comparisonVersions={section.metadata?.comparison_versions}
+                    comparisonExpected={proposal?.proposal_type === 'comparison'}
                     viewingResult={compactViewingResult(proposal?.engineering_snapshot)}
                     className="mt-4"
                   />

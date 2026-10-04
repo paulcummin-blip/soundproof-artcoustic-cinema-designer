@@ -533,9 +533,10 @@ function RP22ReportInner() {
         // Exporting this report also stores the issued PDF in the project
         // library, from the SAME print composition, in the background. The
         // export itself is never delayed and never depends on storage.
-        const issuedSnapshot = snapshotIssuedComposition(ISSUED_DOCUMENT_TYPE.TECHNICAL);
-        if (issuedSnapshot) {
-            recordIssuedExportInBackground({
+        // The issued copy is taken from the SAME composition this export prints
+        // and stored in the background; a failure is reported with its reason,
+        // and a retry that cannot use a held PDF re-runs this very export.
+        recordIssuedExportInBackground({
                 identity: {
                     projectId: explicitProjectId,
                     accountId: projectDetails?.account_id || null,
@@ -551,9 +552,9 @@ function RP22ReportInner() {
                         : 'current',
                     exportedBy: reportUser?.full_name || reportUser?.email || null,
                 },
-                snapshot: issuedSnapshot,
+                snapshot: snapshotIssuedComposition(ISSUED_DOCUMENT_TYPE.TECHNICAL),
+                retryExport: printTechnicalReport,
             });
-        }
 
         const onDone = () => {
             setAutoPrintDone(true);

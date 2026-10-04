@@ -1,7 +1,10 @@
 import React from 'react';
 import { proposalRoleStyle } from '@/components/proposal/typography/proposalTypography';
 import { excludeDesignIndexRows } from '@/components/proposal/designIndexRowAuthority';
-import { buildHighlightDisplayRows } from '@/components/proposal/keyPerformanceHighlightsAuthority';
+import {
+  buildHighlightDisplayRows,
+  comparisonClientMeaning,
+} from '@/components/proposal/keyPerformanceHighlightsAuthority';
 
 /**
  * KeyPerformanceHighlightsTable
@@ -61,6 +64,7 @@ export default function KeyPerformanceHighlightsTable({
   rows,
   comparisonRows,
   comparisonVersions,
+  comparisonExpected = false,
   viewingResult = null,
   className = '',
 }) {
@@ -68,9 +72,23 @@ export default function KeyPerformanceHighlightsTable({
   // The internal Design Index is never a client-facing row.
   const visibleComparisonRows = excludeDesignIndexRows(comparisonRows);
   const comparison = options.length >= 2 && visibleComparisonRows.length > 0;
+  // A comparison whose table could not be built says so on the page. A heading
+  // with nothing under it reads as a section that failed silently, which is
+  // exactly what it would be.
+  const comparisonUnavailable = !comparison && (comparisonExpected || options.length >= 2);
+
+  if (comparisonUnavailable) {
+    return (
+      <div className={className}>
+        <p className="text-[#8A8477]" style={proposalRoleStyle('body')}>
+          No calculated comparison values are available for the selected versions, so no comparison table is shown.
+          Calculate both versions in Sound Proof, then generate this report again.
+        </p>
+      </div>
+    );
+  }
 
   if (comparison) {
-    const showChange = visibleComparisonRows.some((row) => row.change !== null && row.change !== undefined);
     return (
       <div className={className}>
         <table className="kph-table w-full border-collapse">
@@ -82,7 +100,8 @@ export default function KeyPerformanceHighlightsTable({
                   {optionHeading(column, index)}
                 </th>
               ))}
-              {showChange && <th className={HEAD} style={proposalRoleStyle('label')}>What changes</th>}
+              <th className={HEAD} style={proposalRoleStyle('label')}>What changes</th>
+              <th className={HEAD} style={proposalRoleStyle('label')}>Client meaning</th>
             </tr>
           </thead>
           <tbody>
@@ -98,11 +117,12 @@ export default function KeyPerformanceHighlightsTable({
                     {row.values?.[optionIndex] || '—'}
                   </td>
                 ))}
-                {showChange && (
-                  <td className={`${CELL} text-[#625143]`} style={proposalRoleStyle('body')}>
-                    {row.change || '—'}
-                  </td>
-                )}
+                <td className={`${CELL} text-[#625143]`} style={proposalRoleStyle('body')}>
+                  {row.change || 'No change'}
+                </td>
+                <td className={`${CELL} text-[#625143]`} style={proposalRoleStyle('body')}>
+                  {comparisonClientMeaning(row)}
+                </td>
               </tr>
             ))}
           </tbody>

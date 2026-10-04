@@ -301,6 +301,17 @@ const LOW_GRADE = /\bL[12]\b/i;
 const OVERSELL = /\b(excellent|outstanding|exceptional|superb|perfect|flawless|remarkable|impeccable|class[- ]leading|reference[- ]grade|unmatched|ideal)\b/i;
 
 /**
+ * The rows whose approved line is a claim about evenness across the seating
+ * area. Such a claim is only made when the result itself states a level that
+ * supports it: a design whose bass consistency was not assessed at Level 3 or
+ * Level 4 is never described as consistent seat to seat.
+ */
+const CONSISTENCY_ROW_KEYS = Object.freeze(['p4', 'p6', 'p10', 'p19', 'p20']);
+
+/** A result that states a level the evenness claim can stand on. */
+const SUPPORTED_GRADE = /\bL[34]\b/i;
+
+/**
  * The honest line for a Level 1 or Level 2 result. A low result is a real part
  * of the design, so it is stated as what it is and what limits it, never as a
  * strength and never as an apology.
@@ -324,6 +335,30 @@ const MODEST_GAIN = Object.freeze({
   p19: 'Bass response is even across the main seats rather than identical at every position.',
   p20: 'Bass level varies between seats as the room and the subwoofer positions allow.',
 });
+
+/**
+ * The client meaning of a comparison row — what the area gives the room, in the
+ * approved words for that parameter.
+ *
+ * The comparison table states values only, so this column is what the client
+ * reads them by. It follows the same honesty rule as the single-report table: a
+ * row either version carries at Level 1 or Level 2 is described by the modest
+ * line for that parameter, never by a line that reads as a strength.
+ *
+ * @param {{ key?: string, values?: string[] }} row
+ * @returns {string}
+ */
+export function comparisonClientMeaning(row) {
+  const key = String(row?.key || '').trim();
+  const approved = ROW_PRESENTATION[key]?.gain || FALLBACK_GAIN;
+  const stated = (Array.isArray(row?.values) ? row.values : []).map((value) => String(value)).join(' ');
+  const low = LOW_GRADE.test(stated);
+  // The same rule as the single-report table: a Level 1 or Level 2 result is
+  // never described as a strength, and an evenness claim needs a stated level
+  // that supports it.
+  const unsupportedClaim = CONSISTENCY_ROW_KEYS.includes(key) && !SUPPORTED_GRADE.test(stated);
+  return low || unsupportedClaim ? (MODEST_GAIN[key] || approved) : approved;
+}
 
 /** The performance area for a row. */
 export function highlightAreaFor(key, fallbackArea = null) {
@@ -380,7 +415,16 @@ export function buildHighlightDisplayRows(rows, options = {}) {
       // A Level 1 or Level 2 result is stated plainly: a sentence that reads as a
       // strength, or one long enough to need trimming, gives way to the honest
       // line for that parameter.
-      const lowGrade = LOW_GRADE.test(String(row.result || ''));
+      // A row's grade is read from its structured level when it carries one,
+      // and from its stated result otherwise: a result stated as a number is
+      // still a Level 1 or Level 2 result when the row's level says so.
+      const stated = `${row.level || ''} ${row.result || ''}`;
+      const lowGrade = LOW_GRADE.test(stated);
+      // A result that does not state a level at all supports no claim about
+      // evenness, so none is made: the row is described by the honest line for
+      // its parameter until its own report states a level that backs the claim.
+      const consistencyClaimUnsupported = CONSISTENCY_ROW_KEYS.includes(key)
+        && !SUPPORTED_GRADE.test(stated);
       const oversold = OVERSELL.test(proposed);
       return {
         key,
@@ -389,7 +433,7 @@ export function buildHighlightDisplayRows(rows, options = {}) {
         result,
         // The column is never blank: the approved line for the parameter stands
         // in whenever the generated sentence is missing or too thin to use.
-        gain: lowGrade && (!short || oversold)
+        gain: (consistencyClaimUnsupported || (lowGrade && (!short || oversold)))
           ? (MODEST_GAIN[key] || proposed)
           : proposed,
       };

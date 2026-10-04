@@ -7,7 +7,8 @@ import ProjectSelectStep from '@/components/proposal/wizard/ProjectSelectStep';
 import ProposalTypeStep from '@/components/proposal/wizard/ProposalTypeStep';
 import VersionSelectStep from '@/components/proposal/wizard/VersionSelectStep';
 import ClientBriefStep from '@/components/proposal/wizard/ClientBriefStep';
-import GenerateStep from '@/components/proposal/wizard/GenerateStep';
+import GenerateStep, { GENERATION_PHASE } from '@/components/proposal/wizard/GenerateStep';
+import { confirmProposalSectionsSaved } from '@/components/proposal/wizard/proposalHandoffAuthority';
 import { useVersionedEngineeringSnapshot } from '@/components/proposal/engineeringAuthority/useVersionedEngineeringSnapshot';
 import { buildSelectedVersionSnapshots } from '@/components/proposal/engineeringAuthority/buildSelectedVersionSnapshots';
 import { useSelectedVersionSnapshots } from '@/components/proposal/engineeringAuthority/useSelectedVersionSnapshots';
@@ -59,6 +60,9 @@ export default function CreateProposalWizard({ onCreated, onCancel, regenerateFr
   const [generating, setGenerating] = useState(false);
   const [error, setError] = useState(null);
   const [blockedAttempt, setBlockedAttempt] = useState(false);
+  // Which of the four generation states is on screen: preparing, writing,
+  // opening the editor, ready. Null when Step 5 has not started.
+  const [generationPhase, setGenerationPhase] = useState(null);
   const parentProposalId = regenerateFrom?.id || null;
   const generationInFlightRef = useRef(false);
   const creationRequestIdRef = useRef(null);
@@ -181,6 +185,7 @@ export default function CreateProposalWizard({ onCreated, onCancel, regenerateFr
     }
     generationInFlightRef.current = true;
     setGenerating(true);
+    setGenerationPhase(GENERATION_PHASE.PREPARING);
     setError(null);
     const requestId = creationRequestIdRef.current || createRequestId();
     creationRequestIdRef.current = requestId;
@@ -212,6 +217,7 @@ export default function CreateProposalWizard({ onCreated, onCancel, regenerateFr
         return;
       }
 
+      setGenerationPhase(GENERATION_PHASE.WRITING);
       const response = await base44.functions.invoke('generateProposal', {
         request_id: requestId,
         project_id: selectedProjectId,
@@ -234,6 +240,12 @@ export default function CreateProposalWizard({ onCreated, onCancel, regenerateFr
       });
       const proposalId = response?.data?.proposal_id;
       if (proposalId) {
+        // The editor reads a proposal and its sections, so it opens only once
+        // they are saved — never on the strength of the call returning.
+        setGenerationPhase(GENERATION_PHASE.OPENING);
+        const handoff = await confirmProposalSectionsSaved(proposalId);
+        if (!handoff.ok) throw new Error(handoff.reason);
+        setGenerationPhase(GENERATION_PHASE.READY);
         onCreated(proposalId);
       } else {
         throw new Error('No proposal ID returned');
@@ -244,6 +256,7 @@ export default function CreateProposalWizard({ onCreated, onCancel, regenerateFr
       if (errorData?.cleanup_succeeded === true) {
         creationRequestIdRef.current = null;
       }
+      setGenerationPhase(GENERATION_PHASE.FAILED);
       setError(errorData?.error || err?.message || 'Generation failed. Please try again.');
       setGenerating(false);
     } finally {
@@ -253,7 +266,17 @@ export default function CreateProposalWizard({ onCreated, onCancel, regenerateFr
 
   // ── Generating screen ──
   if (generating) {
-    return <GenerateStep error={error} onBack={() => setGenerating(false)} />;
+    return (
+      <GenerateStep
+        phase={generationPhase || GENERATION_PHASE.PREPARING}
+        error={error}
+        onRetry={handleGenerate}
+        onBack={() => {
+          setGenerating(false);
+          setGenerationPhase(null);
+        }}
+      />
+    );
   }
 
   const typeDef = getProposalType(proposalType);
@@ -269,6 +292,40 @@ export default function CreateProposalWizard({ onCreated, onCancel, regenerateFr
     versionsValid, // step 2
     true, // step 3 — client brief is optional
   ];
+
+  // Why Generate Proposal cannot be pressed, in words — or null when it can.
+  // One named reason, from the same authorities the generation itself uses: a
+  // disabled button is never left unexplained, and a reason is never stated for
+  // a condition that is not actually blocking.
+  const generateBlockReason = (() => {
+    if (!canProceed[0]) return 'Choose a project to generate a proposal for.';
+    if (!canProceed[1]) return 'Choose the report type to generate.';
+    if (!canProceed[2]) {
+      const minimum = selectedType?.minVersions || 1;
+      return minimum > 1
+        ? `Select at least ${minimum} versions to compare.`
+        : 'Select the version this proposal is for.';
+    }
+    if (readinessLoading || snapshotLoading) return 'Checking the selected versions…';
+    if (selectedVersionIds.length > 1 && selectedVersionsLoading) return 'Reading the selected versions…';
+    // Every selected version is judged by its own readiness, never by the first
+    // one alone: a comparison is not held up by a single-version requirement.
+    if (!readiness.ready) {
+      return readiness.message || 'Every selected version needs its current reports before this proposal can be generated.';
+    }
+    if (!sourceReady) {
+      return sourceStatus?.message || 'This version has no current Visual and Technical reports yet. Generate those reports first.';
+    }
+    // A comparison is generated from each version's own frozen evidence, which
+    // is read and verified when generation starts — so the versions are the
+    // requirement here, not one primary snapshot.
+    if (selectedVersionIds.length > 1) return null;
+    if (!engineeringSnapshot) {
+      return snapshotError
+        || 'This version has no calculated engineering result to freeze into the proposal. Open it in Room Designer and calculate it first.';
+    }
+    return null;
+  })();
 
   const handleNext = () => {
     if (step === 2 && versionsValid && !readiness.ready) {
@@ -411,12 +468,19 @@ export default function CreateProposalWizard({ onCreated, onCancel, regenerateFr
         {step === STEPS.length - 1 && (
           <button
             onClick={handleGenerate}
-            disabled={!canProceed[0] || !canProceed[2] || !canProceed[3] || snapshotLoading || !engineeringSnapshot || !sourceReady || !readiness.ready}
+            disabled={!!generateBlockReason}
             className="px-6 py-2.5 text-xs uppercase tracking-[0.14em] text-white disabled:opacity-40 transition-colors hover:bg-[#3E4349]"
             style={{ backgroundColor: '#213428', fontFamily: 'Didact Gothic, sans-serif' }}
           >
             Generate Proposal
           </button>
+        )}
+        {/* A disabled Generate Proposal always says why, in the same words the
+            gate itself is decided by. */}
+        {step === STEPS.length - 1 && generateBlockReason && (
+          <span role="alert" className="self-center text-xs text-[#7A2E10] max-w-md">
+            {generateBlockReason}
+          </span>
         )}
         {onCancel && (
           <button

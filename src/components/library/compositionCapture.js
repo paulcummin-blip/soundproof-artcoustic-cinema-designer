@@ -253,19 +253,19 @@ export async function captureCompositionToPdf({ nodeHtml, pageSelector, bodyClas
         scrollY: 0,
       });
 
-      let renderWidthMm = CONTENT_WIDTH_MM;
-      let renderHeightMm = (canvas.height / canvas.width) * CONTENT_WIDTH_MM;
-      if (renderHeightMm > CONTENT_HEIGHT_MM) {
-        renderHeightMm = CONTENT_HEIGHT_MM;
-        renderWidthMm = (canvas.width / canvas.height) * CONTENT_HEIGHT_MM;
+      let renderWidthMm = paper.widthMm;
+      let renderHeightMm = (canvas.height / canvas.width) * paper.widthMm;
+      if (renderHeightMm > paper.heightMm) {
+        renderHeightMm = paper.heightMm;
+        renderWidthMm = (canvas.width / canvas.height) * paper.heightMm;
       }
 
       if (index > 0) pdf.addPage();
       pdf.addImage(
         canvas.toDataURL('image/png'),
         'PNG',
-        PAGE_MARGIN_MM + (CONTENT_WIDTH_MM - renderWidthMm) / 2,
-        PAGE_MARGIN_MM,
+        paper.marginMm + (paper.widthMm - renderWidthMm) / 2,
+        paper.marginMm,
         renderWidthMm,
         renderHeightMm,
         undefined,

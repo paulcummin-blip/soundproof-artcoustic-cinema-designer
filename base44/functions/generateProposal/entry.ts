@@ -247,6 +247,19 @@ export default async function(req) {
           missing_version_ids: missingEvidence,
         }, { status: 409 });
       }
+
+      // A comparison without a table is not a comparison. The Key Performance
+      // Highlights section is a calculated table, never a prose page under a
+      // table's heading, so a table that cannot be built fails visibly here with
+      // the reason instead of producing an empty section.
+      if (comparisonTable.rows.length === 0) {
+        return Response.json({
+          error: 'No calculated result is shared by every selected version, so the comparison table cannot be built. '
+            + 'Every version needs a calculated result for the same performance areas. '
+            + 'Calculate both versions in Room Designer, then generate the comparison again.',
+          comparison_versions: comparisonTable.versions,
+        }, { status: 409 });
+      }
     }
 
     // ── SOURCE AUTHORITY: no current sources, no proposal ──

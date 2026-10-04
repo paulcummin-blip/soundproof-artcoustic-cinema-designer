@@ -159,7 +159,12 @@ export default function ProposalPackDocument({
       }
 
       if (section.section_type === 'key_performance_highlights') {
-        const isComparison = Array.isArray(section.metadata?.comparison_rows)
+        // A comparison report's highlights page is its comparison table. A
+        // report generated before the table travelled with the section still
+        // says so on the page rather than printing a heading over nothing.
+        const isComparisonKind = proposal?.proposal_type === 'comparison';
+        const isComparison = isComparisonKind
+          && Array.isArray(section.metadata?.comparison_rows)
           && section.metadata.comparison_rows.length > 0;
         // The heading, the table header, every row and the footnote are one
         // indivisible printed block on one page. The section carries no
@@ -174,12 +179,13 @@ export default function ProposalPackDocument({
             <ProposalPageHeader
               number={takeNumber()}
               kicker="Evidence"
-              title={isComparison ? 'System comparison' : title}
+              title={isComparisonKind ? 'System comparison' : title}
             />
             <KeyPerformanceHighlightsTable
               rows={section.metadata?.highlight_rows}
               comparisonRows={section.metadata?.comparison_rows}
               comparisonVersions={section.metadata?.comparison_versions}
+              comparisonExpected={isComparisonKind}
               viewingResult={isComparison ? null : viewingResult}
             />
           </section>

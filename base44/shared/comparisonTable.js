@@ -50,6 +50,13 @@ export const COMPARISON_ROW_ORDER = Object.freeze([
   'p20',
 ]);
 
+/**
+ * The most rows the printed comparison table carries. It is one indivisible
+ * block on one page, so it shows the differences first and fills the remaining
+ * places with the areas both versions share.
+ */
+export const COMPARISON_ROW_LIMIT = 10;
+
 const ROW_LABELS = Object.freeze({
   screen_size: 'Screen size',
   rp23_viewing: 'Viewing angle / RP23',
@@ -190,27 +197,40 @@ export function buildComparisonTable(versions) {
   const usable = list.length >= 2 && list.every((version) => version?.available === true);
   if (!usable) return { rows: [], versions: columns };
 
-  const rows = [];
+  const compared = [];
   for (const key of COMPARISON_ROW_ORDER) {
     const values = list.map((version) => readRowValue(version, key));
-    // Only useful client-facing differences: every version must carry a
-    // reliable value, and the values must actually differ.
+    // A row needs a reliable value for EVERY version: a version that was not
+    // assessed for this area is omitted rather than printed as a blank cell.
     if (values.some((value) => !value)) continue;
     const normalised = values.map((value) => String(value).trim());
-    if (new Set(normalised).size < 2) continue;
+    const identical = new Set(normalised).size < 2;
 
-    rows.push({
+    compared.push({
       key,
       area: ROW_LABELS[key] || key,
       values: normalised,
+      // A row both versions share is stated once, as itself: an unchanged area
+      // is a real comparison result, not a missing one. The change column is
+      // then null and the report says plainly that nothing changes here.
+      identical,
       // The change column is meaningful for two options only.
-      change: normalised.length === 2 ? describeChange(normalised[0], normalised[1]) : null,
+      change: !identical && normalised.length === 2
+        ? describeChange(normalised[0], normalised[1])
+        : null,
     });
   }
 
+  // The table is one printed block on one page, so it carries the limit and no
+  // more. The differences lead: they are what the comparison is for, and the
+  // areas both versions share fill the remaining places.
+  const ordered = [...compared.filter((row) => !row.identical), ...compared.filter((row) => row.identical)]
+    .slice(0, COMPARISON_ROW_LIMIT)
+    .sort((a, b) => COMPARISON_ROW_ORDER.indexOf(a.key) - COMPARISON_ROW_ORDER.indexOf(b.key));
+
   // The internal Design Index is never a client-facing row, whatever a stored
   // table carries.
-  return { rows: rows.filter((row) => !isDesignIndexRow(row)), versions: columns };
+  return { rows: ordered.filter((row) => !isDesignIndexRow(row)), versions: columns };
 }
 
 /**
