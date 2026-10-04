@@ -60,6 +60,57 @@ export function scopeKeyOfAsset(asset) {
   return scopeKeyFor(resolveImageScope(asset), resolveImageVersionId(asset));
 }
 
+/** The scope key of one explicit version's gallery. */
+export function versionScopeKey(versionId) {
+  return versionId ? `version:${versionId}` : 'project';
+}
+
+/**
+ * The Image Library's scopes, in order: Project-wide first, then every saved
+ * version under its exact saved name.
+ *
+ * Each entry carries the scope key that both the upload-scope control and the
+ * Library's filter use, so a version is chosen by name — never by a slot number,
+ * and never by switching the project's active design version.
+ *
+ * @returns {Array<{key: string, scope: string, versionId: string|null, label: string, description: string, isActiveVersion: boolean}>}
+ */
+export function imageScopeOptions({ versions = [], activeVersionId = null } = {}) {
+  const saved = (Array.isArray(versions) ? versions : [])
+    .filter((version) => version && version.id)
+    .slice()
+    .sort((a, b) => (a.version_number ?? 0) - (b.version_number ?? 0));
+
+  return [
+    {
+      key: 'project',
+      scope: IMAGE_SCOPE.PROJECT,
+      versionId: null,
+      label: IMAGE_SCOPE_LABEL[IMAGE_SCOPE.PROJECT],
+      description: 'Used by every design version: room renders, general project images and a shared cover.',
+      isActiveVersion: false,
+    },
+    ...saved.map((version) => ({
+      key: versionScopeKey(version.id),
+      scope: IMAGE_SCOPE.VERSION,
+      versionId: version.id,
+      // The saved name is the label authority. It is never rebuilt from a slot.
+      label: version.version_name || 'Version-specific',
+      description: 'Used only by this design version.',
+      isActiveVersion: version.id === activeVersionId,
+    })),
+  ];
+}
+
+/** The name one scope key states, from the project's saved version names. */
+export function imageScopeKeyLabel(scopeKey, versionNameById = new Map()) {
+  if (!scopeKey || scopeKey === 'project') return IMAGE_SCOPE_LABEL[IMAGE_SCOPE.PROJECT];
+  const versionId = String(scopeKey).startsWith('version:')
+    ? String(scopeKey).slice('version:'.length)
+    : null;
+  return versionId ? (versionNameById.get(versionId) || 'Version-specific') : IMAGE_SCOPE_LABEL[IMAGE_SCOPE.PROJECT];
+}
+
 /** The slot assignments of ONE scope. Each scope fills its own eleven slots. */
 export function resolveScopedSlotAssignments(assets = [], scopeKey = 'project') {
   const scoped = (Array.isArray(assets) ? assets : []).filter(
@@ -98,6 +149,12 @@ export function filterImagesByScope({ assets = [], filter = IMAGE_SCOPE_FILTER.A
   const list = Array.isArray(assets) ? assets : [];
   if (filter === IMAGE_SCOPE_FILTER.PROJECT) {
     return list.filter((asset) => !resolveImageVersionId(asset));
+  }
+  // One named version's gallery, chosen by name rather than by the open version.
+  if (typeof filter === 'string' && filter.startsWith('version:')) {
+    const versionId = filter.slice('version:'.length);
+    if (!versionId) return [];
+    return list.filter((asset) => resolveImageVersionId(asset) === versionId);
   }
   if (filter === IMAGE_SCOPE_FILTER.VERSION) {
     if (!activeVersionId) return [];
@@ -177,7 +234,9 @@ export function resolvePackImages({ assets = [], versionIds = [], versionNameByI
         slot,
         // The version this image belongs to travels with it, so a comparison
         // never shows a version-specific image without saying which version.
-        caption: [asset.caption, versionName ? `${versionName} version` : null].filter(Boolean).join(' · '),
+        // The label is the exact saved name — it is never suffixed again, which
+        // is what would turn "Level 1 version" into "Level 1 version version".
+        caption: [asset.caption, versionName || null].filter(Boolean).join(' · '),
       }));
   });
 
@@ -203,13 +262,28 @@ export function imageScopeLabel(asset, versionNameById = new Map()) {
  * version scope needs the version that is open; without one it reads as
  * project-wide, which is also the default.
  */
-export function resolveUploadTarget({ uploadScope = IMAGE_SCOPE.PROJECT, activeVersionId = null } = {}) {
-  if (uploadScope === IMAGE_SCOPE.VERSION && activeVersionId) {
-    return {
-      scope: IMAGE_SCOPE.VERSION,
-      versionId: activeVersionId,
-      scopeKey: scopeKeyFor(IMAGE_SCOPE.VERSION, activeVersionId),
-    };
+export function resolveUploadTarget({
+  uploadScope = IMAGE_SCOPE.PROJECT,
+  activeVersionId = null,
+  versionId = null,
+  scopeKey = null,
+} = {}) {
+  // The explicit scope key (Project-wide, or one named version) is the strongest
+  // statement and wins: a designer can upload to Level 4 version while Level 1
+  // version is the open version. It falls back to the legacy scope + the version
+  // that is open, and to project-wide when neither names a version.
+  const key = scopeKey
+    || versionScopeKey(versionId || (uploadScope === IMAGE_SCOPE.VERSION ? activeVersionId : null));
+
+  if (typeof key === 'string' && key.startsWith('version:')) {
+    const resolvedVersionId = key.slice('version:'.length);
+    if (resolvedVersionId) {
+      return {
+        scope: IMAGE_SCOPE.VERSION,
+        versionId: resolvedVersionId,
+        scopeKey: versionScopeKey(resolvedVersionId),
+      };
+    }
   }
   return { scope: IMAGE_SCOPE.PROJECT, versionId: null, scopeKey: 'project' };
 }

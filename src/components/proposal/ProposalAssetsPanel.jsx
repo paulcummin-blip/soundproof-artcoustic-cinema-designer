@@ -30,17 +30,19 @@ import ImageScopeSelect from '@/components/library/ImageScopeSelect';
  * Props:
  * - projectId: string (null if no active project)
  * - accountId: string (null for admin)
- * - uploadScope: 'project' | 'version' — where a NEW image is written. The
- *   chosen scope is the authority; it is never inferred from the gallery shown,
- *   and the gallery it writes to is always on screen.
- * - scopeFilter: what is listed.
+ * - scopeFilter: which gallery is shown — 'all', 'project', or one version's
+ *   scope key ('version:<id>'). The gallery shown IS the scope its slots write
+ *   to, and every card states that scope, so an image is never written to a
+ *   scope that is not on screen.
+ * - versions: the project's saved versions — the name authority, and the options
+ *   on each stored image's scope choice.
  */
 export default function ProposalAssetsPanel({
   projectId,
   accountId,
   activeVersionId = null,
   scopeFilter = IMAGE_SCOPE_FILTER.ALL,
-  uploadScope = IMAGE_SCOPE.PROJECT,
+  versions = [],
   versionNameById = new Map(),
 }) {
   const [assets, setAssets] = useState([]);
@@ -69,13 +71,6 @@ export default function ProposalAssetsPanel({
   }, [load]);
 
   const grouped = useMemo(() => groupImagesByScope(assets), [assets]);
-
-  // Where a new upload goes: the upload scope the designer chose, never the
-  // gallery a card happens to sit in.
-  const uploadTarget = useMemo(
-    () => resolveUploadTarget({ uploadScope, activeVersionId }),
-    [uploadScope, activeVersionId],
-  );
 
   // The galleries on screen: the project-wide gallery, and each version's own.
   // Each scope fills its own Cover Image and Image 1 to Image 10, so an image
@@ -155,9 +150,10 @@ export default function ProposalAssetsPanel({
           order_index: slotNumber(slot) ?? 0,
           category: 'Other',
           proposal_importance: 'Preferred',
-          // The chosen upload scope is written — never the gallery clicked.
-          scope: uploadTarget.scope,
-          version_id: uploadTarget.versionId,
+          // The scope of the section this card sits in is written, and the card
+          // states it — an image can never land in a scope that is not on screen.
+          scope: group.scope,
+          version_id: group.versionId,
         });
       }
       await load();
@@ -192,21 +188,20 @@ export default function ProposalAssetsPanel({
   };
 
   /**
-   * Move an image between the project-wide gallery and the current version's.
-   * The file, the caption, the record and the slot all stay as they are: the
-   * image only changes which scope it belongs to.
+   * Move an image between the project-wide gallery and any saved version's. The
+   * file, the caption, the record and the slot all stay as they are: the image
+   * only changes which scope it belongs to.
    */
-  const handleScopeChange = async (asset, nextScope) => {
+  const handleScopeChange = async (asset, nextScopeKey) => {
     if (!asset?.id) return;
-    const versionId = nextScope === IMAGE_SCOPE.VERSION ? activeVersionId : null;
-    if (nextScope === IMAGE_SCOPE.VERSION && !versionId) return;
+    const target = resolveUploadTarget({ scopeKey: nextScopeKey });
     try {
       await base44.entities.ProposalAsset.update(asset.id, {
-        scope: nextScope,
-        version_id: versionId,
+        scope: target.scope,
+        version_id: target.versionId,
       });
       setAssets((prev) => prev.map((a) => (
-        a.id === asset.id ? { ...a, scope: nextScope, version_id: versionId } : a
+        a.id === asset.id ? { ...a, scope: target.scope, version_id: target.versionId } : a
       )));
     } catch (err) {
       console.error('Failed to change image scope:', err);
