@@ -328,6 +328,7 @@ export function buildComparisonHighlightsPrompt() {
     '- Do not restate a table value and do not describe a difference the table does not show.',
     '- Do not say which option is better here: this is the introduction only, and the section that follows explains the differences in order (what changes, what the room gains or gives up, and what stays the same).',
     '- Never say the options are the same, equivalent or unchanged where the table shows a difference, and never state a difference the table does not show.',
+    '- State in one clause what the options share, then say where the differences lie: system scale, loudspeaker and subwoofer specification, and the performance that follows. Frame the decision, never describing equipment for its own sake.',
     '- Write to the decision: what the client is choosing between, in short direct sentences.',
   ].join('\n');
 }

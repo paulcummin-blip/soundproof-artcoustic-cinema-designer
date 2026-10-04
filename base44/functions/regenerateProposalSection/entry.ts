@@ -2,6 +2,7 @@ import { createClientFromRequest } from 'npm:@base44/sdk@0.8.44';
 import { buildWritingStyleContract, mentionsDesignIndex } from '../../shared/reportWritingStyleContract.js';
 import { resolveReportLayout, mentionsHighChannelCopyDefect, HIGH_CHANNEL_CLEANUP_NOTE } from '../../shared/highChannelDensityRule.js';
 import { COMPARISON_REPORT_INSTRUCTIONS, resolveSectionTitle } from '../../shared/systemDesignSummarySections.js';
+import { buildComparisonSectionRule } from '../../shared/comparisonStoryRule.js';
 import { formatVersionEvidenceForPrompt } from '../../shared/comparisonEvidence.js';
 import { formatComparisonTableForPrompt } from '../../shared/comparisonTable.js';
 import { buildEngineeringEvidence } from '../../shared/engineeringSnapshotEvidence.js';
@@ -198,7 +199,9 @@ export default async function(req) {
       sectionNote,
       mentionsDesignIndex(currentBody) ? DESIGN_INDEX_CLEANUP_NOTE : '',
       reportLayout.highDensity && mentionsHighChannelCopyDefect(currentBody) ? HIGH_CHANNEL_CLEANUP_NOTE : '',
-      proposal.proposal_type === 'comparison' ? COMPARISON_REPORT_INSTRUCTIONS : '',
+      proposal.proposal_type === 'comparison'
+        ? [COMPARISON_REPORT_INSTRUCTIONS, buildComparisonSectionRule(section.section_type)].filter(Boolean).join('\n\n')
+        : '',
       '',
       '=== CONSTRAINT ===',
       'The Client Brief influences narrative emphasis, wording, and structure ONLY.',

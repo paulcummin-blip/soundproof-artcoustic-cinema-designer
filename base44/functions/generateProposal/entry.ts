@@ -1,6 +1,7 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.49';
 import { buildWritingStyleContract } from '../../shared/reportWritingStyleContract.js';
 import { SYSTEM_SUMMARY_SECTIONS, HIGHLIGHTS_SECTION_TYPE, getSystemSummarySectionPrompt, COMPARISON_REPORT_INSTRUCTIONS, resolveSectionTitle } from '../../shared/systemDesignSummarySections.js';
+import { buildComparisonSectionRule } from '../../shared/comparisonStoryRule.js';
 import { buildSelectedVersionEvidence, formatVersionEvidenceForPrompt } from '../../shared/comparisonEvidence.js';
 import { buildComparisonTable, formatComparisonTableForPrompt, buildComparisonHighlightsPrompt, COMPARISON_HIGHLIGHTS_SCHEMA } from '../../shared/comparisonTable.js';
 import { buildEngineeringEvidence, selectHighlightRows, mergeHighlightRows, buildHighlightsPrompt, HIGHLIGHTS_JSON_SCHEMA } from '../../shared/engineeringSnapshotEvidence.js';
@@ -726,7 +727,13 @@ function buildSectionPrompt(sectionDef, projectContext, proposalType, interpreta
     `Write the "${sectionDef.title}" section of a professional home cinema design proposal.`,
     '',
     sectionInstruction,
-    proposalType === 'comparison' ? COMPARISON_REPORT_INSTRUCTIONS : '',
+    // A comparison carries its own rule as well as the shared comparison
+    // instructions: every difference is explained as what changed, which
+    // parameter carries it, what each option's value is, and what that gives the
+    // room.
+    proposalType === 'comparison'
+      ? [COMPARISON_REPORT_INSTRUCTIONS, buildComparisonSectionRule(sectionDef.type)].filter(Boolean).join('\n\n')
+      : '',
     '',
     'Format the response as HTML. Use <h2>, <h3>, <p>, <ul>, <li>, <strong>, <em> tags.',
     'Do NOT include the section title — only the body content.',
