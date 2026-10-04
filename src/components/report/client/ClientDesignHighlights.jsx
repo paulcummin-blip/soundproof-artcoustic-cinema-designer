@@ -19,6 +19,7 @@
 import React, { useMemo } from "react";
 import { MessageCircle, Headphones, ChevronUp, Waves, Zap } from "lucide-react";
 import Rp22SeatCoverageSentence from "@/components/report/Rp22SeatCoverageSentence";
+import { reportRoleStyle } from "@/components/report/typography/reportTypography";
 
 const ICONS = { MessageCircle, Headphones, ChevronUp, Waves, Zap };
 
@@ -76,14 +77,9 @@ export default function ClientDesignHighlights({ highlights, print, recommendati
     <div style={containerStyle}>
       {!print && (
         <div style={{ marginBottom: 24, textAlign: "center" }}>
-          <h1 style={{
-            margin: 0,
-            fontSize: 34,
-            fontWeight: 300,
-            color: "#213428",
-            letterSpacing: "0.01em",
-            fontFamily: "Futura PT Light, Century Gothic, sans-serif",
-          }}>
+          {/* A section heading one step below the report headline, never the
+              headline itself. */}
+          <h1 style={{ ...reportRoleStyle("subheader"), color: "#213428", margin: 0 }}>
             Design Summary
           </h1>
         </div>

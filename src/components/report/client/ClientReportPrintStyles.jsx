@@ -20,7 +20,12 @@
  */
 
 import React from "react";
-import { buildReportTypographyCss } from "@/components/report/typography/reportTypography";
+import {
+  buildReportTypographyCss,
+  REPORT_PROFILES,
+  REPORT_TRACKING_HEADING,
+  REPORT_LEADING_HEADING,
+} from "@/components/report/typography/reportTypography";
 import { REPORT_PRINT_HEADER } from '@/components/report/reportPrintHeader';
 
 export default function ClientReportPrintStyles() {
@@ -45,20 +50,55 @@ export default function ClientReportPrintStyles() {
         margin: 0 auto 3mm;
       }
 
-      .client-report-page__header-title {
-        font-size: 15pt;
+      /* The two brand positioning lines the Technical Report cover carries,
+         above the small rule and the report headline. */
+      .client-report-page__header-strapline {
+        font-size: 13px;
         font-weight: 600;
-        color: #213428;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+        color: #1B1A1A;
         font-family: "Futura PT Light", "Century Gothic", sans-serif;
-        margin: 0 0 1.5mm 0;
-        letter-spacing: 0.01em;
+        margin: 0;
       }
 
+      .client-report-page__header-strapline--sub {
+        font-size: 11px;
+        font-weight: 500;
+        letter-spacing: 0.08em;
+        color: #625143;
+        margin-top: 4px;
+      }
+
+      .client-report-page__header-rule {
+        width: 64px;
+        height: 1px;
+        background-color: #C1B6AD;
+        margin: 14px auto;
+      }
+
+      /* The report title is the masthead's headline — the same treatment the
+         Technical Report gives "RP22 Compliance Report". */
+      .client-report-page__header-title {
+        font-size: ${REPORT_PROFILES.a4.header};
+        font-weight: 300;
+        color: #213428;
+        font-family: "Futura PT Light", "Century Gothic", sans-serif;
+        text-transform: uppercase;
+        letter-spacing: ${REPORT_TRACKING_HEADING};
+        line-height: ${REPORT_LEADING_HEADING};
+        margin: 0 0 2mm 0;
+      }
+
+      /* Project metadata — one calm, centred, secondary line under the headline. */
       .client-report-page__header-meta {
-        font-size: 9pt;
+        font-size: ${REPORT_PROFILES.a4.meta};
         color: #625143;
         font-family: "Didact Gothic", "Century Gothic", sans-serif;
-        line-height: 1.5;
+        letter-spacing: 0.05em;
+        line-height: 1.4;
+        text-align: center;
+        margin-top: 1mm;
       }
 
       .client-report-page__header-meta span {
@@ -188,7 +228,7 @@ export default function ClientReportPrintStyles() {
 
       body.client-report-printing .client-report-print-heading__title {
         margin: 0;
-        font-size: 24pt;
+        font-size: var(--report-subheader-size);
         font-weight: 300;
         color: #213428;
         letter-spacing: 0.01em;
@@ -473,7 +513,7 @@ export default function ClientReportPrintStyles() {
 
         .client-report-print-heading__title {
           margin: 0;
-          font-size: 24pt;
+          font-size: var(--report-subheader-size);
           font-weight: 300;
           color: #213428;
           letter-spacing: 0.01em;
@@ -606,10 +646,21 @@ export default function ClientReportPrintStyles() {
          relationship. */
 ${buildReportTypographyCss({ scope: ".client-report-page", profile: "a4", prefix: "body.client-report-printing " })}
 
-      body.client-report-printing .client-report-page .client-report-page__header-title,
-      body.client-report-printing .client-report-page .client-report-print-heading__title {
+      body.client-report-printing .client-report-page .client-report-page__header-title {
         font-family: var(--report-font-heading) !important;
         font-size: var(--report-header-size) !important;
+        font-weight: 300 !important;
+        letter-spacing: var(--report-heading-tracking) !important;
+        line-height: var(--report-heading-leading) !important;
+        text-transform: uppercase !important;
+        color: #213428 !important;
+      }
+
+      /* Every section heading sits one clear step below the report headline, so
+         "Design Summary" never competes with "Visual Report". */
+      body.client-report-printing .client-report-page .client-report-print-heading__title {
+        font-family: var(--report-font-heading) !important;
+        font-size: var(--report-subheader-size) !important;
         font-weight: 300 !important;
         letter-spacing: var(--report-heading-tracking) !important;
         line-height: var(--report-heading-leading) !important;

@@ -23,9 +23,10 @@
  *     header     22pt   tracking +100   line height 1.2   uppercase
  *     subheader  14pt   tracking +100   line height 1.2   uppercase
  *     body        9pt   tracking  +50   line height 1.4   sentence case
+ *     meta        8pt   tracking  +50   line height 1.4   sentence case
  *
  *   Presentations (1920 x 1080)
- *     title      60pt   header 40pt   subheader 24pt   body 14pt
+ *     title 60pt   header 40pt   subheader 24pt   body 14pt   meta 12pt
  *
  * The relationship between title, header, subheader and body is fixed. A
  * consumer may adapt absolute sizes to its output format, but always through
@@ -63,6 +64,7 @@ export const REPORT_PROFILES = {
     header: '22pt',
     subheader: '14pt',
     body: '9pt',
+    meta: '8pt',
   },
   /** 16:9 presentation output (1920 x 1080). */
   presentation: {
@@ -72,6 +74,7 @@ export const REPORT_PROFILES = {
     header: '40pt',
     subheader: '24pt',
     body: '14pt',
+    meta: '12pt',
   },
 };
 
@@ -102,6 +105,7 @@ export function reportTypographyVars(profile = DEFAULT_REPORT_PROFILE) {
     '--report-header-size': resolved.header,
     '--report-subheader-size': resolved.subheader,
     '--report-body-size': resolved.body,
+    '--report-meta-size': resolved.meta,
     '--report-heading-tracking': REPORT_TRACKING_HEADING,
     '--report-body-tracking': REPORT_TRACKING_BODY,
     '--report-heading-leading': String(REPORT_LEADING_HEADING),

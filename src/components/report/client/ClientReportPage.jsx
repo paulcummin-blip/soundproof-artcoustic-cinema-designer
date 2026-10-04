@@ -31,6 +31,8 @@ import ClientScreenSeating from "@/components/report/client/ClientScreenSeating"
 import Rp22SeatCoverageSentence from "@/components/report/Rp22SeatCoverageSentence";
 import { getSeatGradeColors } from "@/components/report/client/visualReportSeatStyle";
 import ReportPrintHeader from '@/components/report/ReportPrintHeader';
+import { REPORT_STRAPLINE } from '@/components/report/reportPrintHeader';
+import { clientReportHeaderMeta } from '@/components/report/client/clientReportHeaderMeta';
 
 // Level → canonical grade colour for P12/P13 print result badges.
 // Derived from RP22_GRADE_TOKENS — the same authority as grading pills.
@@ -40,25 +42,9 @@ function printLevelColor(lvl) {
 }
 
 export default function ClientReportPage({ children, isFirst, projectDetails, logoUrl, pageId, printData }) {
-  const projectName = projectDetails?.name || "Untitled";
-  const clientName = projectDetails?.client_name || "";
-  const createdDate = projectDetails?.created_date;
-
-  // Only the dealer-assigned Project reference is a report reference.
-  const projectRef = projectDetails?.project_reference?.trim() || "";
-
-  // Format created date only when valid
-  let createdDateStr = "";
-  if (createdDate) {
-    const d = new Date(createdDate);
-    if (!isNaN(d.getTime())) {
-      createdDateStr = d.toLocaleDateString("en-GB", {
-        day: "2-digit",
-        month: "long",
-        year: "numeric",
-      });
-    }
-  }
+  // One project metadata line, composed once for the masthead: the same words
+  // on screen and in the exported PDF.
+  const metaLine = clientReportHeaderMeta(projectDetails);
 
   const categoryFirst = printData?.categoryFirst !== false;
 
@@ -74,22 +60,26 @@ export default function ClientReportPage({ children, isFirst, projectDetails, lo
         .client-report-page[data-category-first="false"] .client-report-print-heading__title { display: none; }
         .client-report-page[data-category-first="false"] .client-report-print-heading { margin-bottom: 2mm; }
       `}</style>
-      {/* First-page masthead — logo, report title and project metadata, with the
-          divider beneath them. Sized and placed as the Technical Report's cover,
-          and identical on screen and in the exported PDF, so the report opens on
-          its own first page with no separate cover page above it. */}
+      {/* First-page masthead — the Technical Report's cover structure: logo,
+          brand strapline, small rule, the report title as the main headline,
+          then one smaller centred project metadata line, closed by the masthead's
+          own divider. Identical on screen and in the exported PDF, so the report
+          opens on its own first page with no separate cover page above it. */}
       {isFirst && (
         <div className="client-report-page__header">
-          <ReportPrintHeader title="Visual Report" project={projectDetails} className="client-report-print-only" />
+          <ReportPrintHeader
+            title="Visual Report"
+            project={projectDetails}
+            meta={metaLine}
+            className="client-report-print-only"
+          />
           <img className="client-report-screen-only" src={logoUrl} alt="Sound Proof" />
+          <div className="client-report-page__header-strapline client-report-screen-only">{REPORT_STRAPLINE.title}</div>
+          <div className="client-report-page__header-strapline client-report-page__header-strapline--sub client-report-screen-only">{REPORT_STRAPLINE.sub}</div>
+          <div className="client-report-page__header-rule client-report-screen-only" />
           <div className="client-report-page__header-title client-report-screen-only">Visual Report</div>
           <div className="client-report-page__header-meta client-report-screen-only">
-            <span>{[
-              projectName,
-              clientName || null,
-              projectRef ? `Ref: ${projectRef}` : null,
-              createdDateStr || null,
-            ].filter(Boolean).join(" · ")}</span>
+            <span>{metaLine}</span>
           </div>
         </div>
       )}
