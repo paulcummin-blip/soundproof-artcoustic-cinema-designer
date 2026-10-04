@@ -66,7 +66,15 @@ export async function buildSelectedVersionSnapshots({
     // The primary version arrives already built by the wizard's snapshot hook,
     // so its snapshot is reused exactly as the single-report path uses it.
     if (primarySnapshot && String(versionId) === String(primaryVersionId)) {
-      results.push({ version_id: versionId, version_name: versionName, snapshot: primarySnapshot, source: 'primary' });
+      results.push({
+        version_id: versionId,
+        version_name: versionName,
+        snapshot: primarySnapshot,
+        source: 'primary',
+        authoritySnapshot: null,
+        engineeringState: 'current',
+        engineeringReason: null,
+      });
       continue;
     }
 
@@ -96,14 +104,20 @@ export async function buildSelectedVersionSnapshots({
         : baseAuthoritySnapshot;
 
       if (!engineeringSummary) {
+        const missingReason = authorityState === ENGINEERING_AUTHORITY_STATE.PUBLISHED_STALE
+          ? 'The published engineering result for this version is stale. Recalculate it in Room Designer.'
+          : MISSING_MESSAGE;
         results.push({
           version_id: versionId,
           version_name: versionName,
           snapshot: null,
           source: authorityState,
-          error: authorityState === ENGINEERING_AUTHORITY_STATE.PUBLISHED_STALE
-            ? 'The published engineering result for this version is stale. Recalculate it in Room Designer.'
-            : MISSING_MESSAGE,
+          error: missingReason,
+          authoritySnapshot: baseAuthoritySnapshot,
+          // READ_STALE means a publication existed and no longer matches the
+          // version; every other empty authority is simply not calculated yet.
+          engineeringState: authorityState === ENGINEERING_AUTHORITY_STATE.PUBLISHED_STALE ? 'stale' : 'missing',
+          engineeringReason: missingReason,
         });
         continue;
       }
@@ -116,6 +130,9 @@ export async function buildSelectedVersionSnapshots({
           snapshot: null,
           source: authorityState,
           error: reportCompleteness.reason || 'Complete every project assessment before generating this proposal.',
+          authoritySnapshot,
+          engineeringState: 'incomplete',
+          engineeringReason: reportCompleteness.reason || null,
         });
         continue;
       }
@@ -143,6 +160,11 @@ export async function buildSelectedVersionSnapshots({
         snapshot: snapshot?.available === false ? null : snapshot,
         source: durableSnapshot ? 'db-publication' : 'browser-handoff',
         error: snapshot?.available === false ? (snapshot.error || MISSING_MESSAGE) : null,
+        // The composed authority snapshot is what the current fingerprint set is
+        // derived from — the same values the report pages compare against.
+        authoritySnapshot,
+        engineeringState: snapshot?.available === false ? 'missing' : 'current',
+        engineeringReason: snapshot?.available === false ? (snapshot.error || MISSING_MESSAGE) : null,
       });
     } catch (error) {
       results.push({
@@ -151,6 +173,10 @@ export async function buildSelectedVersionSnapshots({
         snapshot: null,
         source: 'error',
         error: error?.message || MISSING_MESSAGE,
+        authoritySnapshot: null,
+        // A failed read is never reported as "not calculated".
+        engineeringState: 'unavailable',
+        engineeringReason: error?.message || MISSING_MESSAGE,
       });
     }
   }

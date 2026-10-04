@@ -2,22 +2,24 @@ import React, { useState, useEffect } from 'react';
 import { base44 } from '@/api/base44Client';
 import { Loader2, Check } from 'lucide-react';
 import { getProposalType } from '@/components/proposal/proposalTypes';
-import ReportReadinessGate from '@/components/proposal/wizard/ReportReadinessGate';
+import VersionReadinessTable from '@/components/proposal/sourceAuthority/VersionReadinessTable';
 
 /**
  * Step 3 — Select Version(s).
  * System Design Summary: exactly one version.
  * System Design Comparison: two or more versions.
  *
- * A proposal cannot be created from stale project data: this step is gated on
- * current Visual and Technical Reports for the selected version.
+ * A proposal cannot be created from stale project data, so the readiness of
+ * EVERY selected version is shown here while the designer chooses — warnings
+ * first, and the hard block when the step is left. The readiness result itself
+ * comes from one shared authority; this step only presents it.
  */
 export default function VersionSelectStep({
   projectId,
   proposalType,
   selectedVersionIds,
   onSelect,
-  reportGate = null,
+  readiness = null,
 }) {
   const [versions, setVersions] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -133,8 +135,8 @@ export default function VersionSelectStep({
         </p>
       )}
 
-      {/* Report readiness — the proposal is built from the current reports only. */}
-      <ReportReadinessGate gate={reportGate} />
+      {/* Per-version readiness — the proposal is built from current sources only. */}
+      <VersionReadinessTable gate={readiness} projectId={projectId} />
     </div>
   );
 }

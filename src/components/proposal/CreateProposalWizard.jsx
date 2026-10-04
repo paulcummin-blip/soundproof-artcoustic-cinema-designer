@@ -10,9 +10,10 @@ import ClientBriefStep from '@/components/proposal/wizard/ClientBriefStep';
 import GenerateStep from '@/components/proposal/wizard/GenerateStep';
 import { useVersionedEngineeringSnapshot } from '@/components/proposal/engineeringAuthority/useVersionedEngineeringSnapshot';
 import { buildSelectedVersionSnapshots } from '@/components/proposal/engineeringAuthority/buildSelectedVersionSnapshots';
-import ProposalSourcePanel from '@/components/proposal/sourceAuthority/ProposalSourcePanel';
 import { useProposalSourceStatus } from '@/components/proposal/sourceAuthority/useProposalSourceStatus';
-import { resolveReportGate } from '@/components/proposal/sourceAuthority/proposalReportReadinessGate';
+import { useProposalReadiness } from '@/components/proposal/sourceAuthority/useProposalReadiness';
+import { resolveProposalReadinessGate } from '@/components/proposal/sourceAuthority/proposalReadinessAuthority';
+import VersionReadinessTable from '@/components/proposal/sourceAuthority/VersionReadinessTable';
 
 const STEPS = [
   { key: 'project', label: 'Project' },
@@ -36,17 +37,28 @@ const STEPS = [
  * The wizard is project-agnostic. The Proposal Editor becomes a
  * publishing tool that loads by proposal ID, not by active project.
  */
-export default function CreateProposalWizard({ onCreated, onCancel }) {
+export default function CreateProposalWizard({ onCreated, onCancel, regenerateFrom = null }) {
   const { user } = useAuth();
   const accountId = user?.access_context?.account?.id || user?.account_id || null;
 
-  const [step, setStep] = useState(0);
-  const [selectedProjectId, setSelectedProjectId] = useState(null);
-  const [proposalType, setProposalType] = useState(null);
-  const [selectedVersionIds, setSelectedVersionIds] = useState([]);
-  const [clientBrief, setClientBrief] = useState('');
+  // Regeneration starts from the proposal it revises: project, report type,
+  // versions and client brief are carried across, and the new proposal is linked
+  // back to the original, which is never modified.
+  const [step, setStep] = useState(regenerateFrom ? 2 : 0);
+  const [selectedProjectId, setSelectedProjectId] = useState(regenerateFrom?.project_id || null);
+  const [proposalType, setProposalType] = useState(regenerateFrom?.proposal_type || null);
+  const [selectedVersionIds, setSelectedVersionIds] = useState(() => {
+    if (!regenerateFrom) return [];
+    const selected = Array.isArray(regenerateFrom.selected_version_ids)
+      ? regenerateFrom.selected_version_ids.filter(Boolean)
+      : [];
+    return selected.length > 0 ? selected : (regenerateFrom.version_id ? [regenerateFrom.version_id] : []);
+  });
+  const [clientBrief, setClientBrief] = useState(regenerateFrom?.client_brief || '');
   const [generating, setGenerating] = useState(false);
   const [error, setError] = useState(null);
+  const [blockedAttempt, setBlockedAttempt] = useState(false);
+  const parentProposalId = regenerateFrom?.id || null;
   const generationInFlightRef = useRef(false);
   const creationRequestIdRef = useRef(null);
 
@@ -80,22 +92,36 @@ export default function CreateProposalWizard({ onCreated, onCancel }) {
   });
   const sourceReady = sourceStatus?.ready === true;
 
-  // ── Step 3 readiness gate ──
-  // Current report snapshots are necessary but not sufficient: older partial
-  // snapshots may predate the strict completeness rule. The frozen engineering
-  // snapshot must also prove every required parameter is terminal.
-  const baseReportGate = resolveReportGate({ status: sourceStatus, loading: sourceLoading });
+  // ── Shared per-version readiness (Step 3 and Step 5) ──
+  // ONE readiness result covering EVERY selected version: the same rows drive
+  // the version-selection warnings, the Step 5 table, the blocking message and
+  // the Generate button. A System Design Comparison is judged per version, never
+  // from the first selected version alone.
+  const { rows: readinessRows, loading: readinessLoading } = useProposalReadiness({
+    projectId: selectedProjectId,
+    versionIds: selectedVersionIds,
+  });
+  const selectedType = getProposalType(proposalType);
+  const baseReadiness = resolveProposalReadinessGate({
+    rows: readinessRows,
+    loading: readinessLoading,
+    minVersions: selectedType?.minVersions || 1,
+    maxVersions: selectedType?.maxVersions ?? null,
+  });
+
+  // The frozen engineering snapshot of the primary version must exist before
+  // anything can be generated from it.
   const proposalDataReady = !snapshotLoading && !!engineeringSnapshot && !snapshotError;
-  const reportGate = {
-    ...baseReportGate,
-    checking: baseReportGate.checking || snapshotLoading,
-    ready: baseReportGate.ready && proposalDataReady,
-    message: baseReportGate.ready && !proposalDataReady
+  const readiness = {
+    ...baseReadiness,
+    checking: baseReadiness.checking || snapshotLoading,
+    ready: baseReadiness.ready && proposalDataReady,
+    message: baseReadiness.ready && !proposalDataReady && !snapshotLoading
       ? (snapshotError || 'Complete every project assessment before generating reports or proposals.')
-      : baseReportGate.message,
-    detail: baseReportGate.ready && !proposalDataReady
+      : baseReadiness.message,
+    detail: baseReadiness.ready && !proposalDataReady && !snapshotLoading
       ? 'Open this version in Room Designer, finish the remaining calculations, then regenerate the reports.'
-      : baseReportGate.detail,
+      : baseReadiness.detail,
   };
 
   const handleSelectProject = useCallback((projectId) => {
@@ -125,6 +151,12 @@ export default function CreateProposalWizard({ onCreated, onCancel }) {
     // Source authority: no current reports, no proposal.
     if (!sourceReady) {
       setError(sourceStatus?.message || snapshotError || null);
+      return;
+    }
+    // Every selected version must be ready — named version by version.
+    if (!readiness.ready) {
+      setError(readiness.message
+        || 'Every selected version needs its current reports before this proposal can be generated.');
       return;
     }
     if (!engineeringSnapshot) {
@@ -169,6 +201,9 @@ export default function CreateProposalWizard({ onCreated, onCancel }) {
         project_id: selectedProjectId,
         proposal_type: proposalType,
         selected_version_ids: selectedVersionIds,
+        // A regeneration creates a NEW linked revision. The original proposal is
+        // never modified.
+        parent_proposal_id: parentProposalId,
         account_id: accountId,
         narrative_goal: 'luxury_cinema',
         client_brief: clientBrief,
@@ -213,9 +248,20 @@ export default function CreateProposalWizard({ onCreated, onCancel }) {
   const canProceed = [
     !!selectedProjectId, // step 0
     !!proposalType, // step 1
-    versionsValid && reportGate.ready, // step 2 — both reports must be current
+    // Choosing versions stays smooth — the readiness table warns while the
+    // designer selects, and the hard block lands when Next is pressed.
+    versionsValid, // step 2
     true, // step 3 — client brief is optional
   ];
+
+  const handleNext = () => {
+    if (step === 2 && versionsValid && !readiness.ready) {
+      setBlockedAttempt(true);
+      return;
+    }
+    setBlockedAttempt(false);
+    setStep(step + 1);
+  };
 
   return (
     <div>
@@ -228,6 +274,13 @@ export default function CreateProposalWizard({ onCreated, onCancel }) {
       >
         Create Proposal
       </h2>
+
+      {parentProposalId && (
+        <p className="text-sm text-[#625143] leading-relaxed mb-10 -mt-6">
+          Regenerating from the original proposal. A new revision will be created and linked to it —
+          the original is kept exactly as it is.
+        </p>
+      )}
 
       <WizardStepper steps={STEPS} currentStep={step} />
 
@@ -251,7 +304,7 @@ export default function CreateProposalWizard({ onCreated, onCancel }) {
           proposalType={proposalType}
           selectedVersionIds={selectedVersionIds}
           onSelect={handleSelectVersions}
-          reportGate={reportGate}
+          readiness={readiness}
         />
       )}
 
@@ -271,10 +324,10 @@ export default function CreateProposalWizard({ onCreated, onCancel }) {
       {/* Step 4 — Review & Generate */}
       {step === 4 && (
         <div>
-          {/* Source status — the proposal is built from these reports only. */}
-          <ProposalSourcePanel
-            status={sourceStatus}
-            loading={sourceLoading}
+          {/* The same per-version readiness result as the Versions step. */}
+          <VersionReadinessTable
+            gate={readiness}
+            projectId={selectedProjectId}
             className="mb-8"
             onRetry={sourceReadFailed ? retrySourceRead : null}
           />
@@ -284,9 +337,11 @@ export default function CreateProposalWizard({ onCreated, onCancel }) {
               label="Report Type"
               value={typeDef?.label || '—'}
             />
-            <ReviewRow
+            <ReviewList
               label="Versions"
-              value={`${selectedVersionIds.length} selected`}
+              values={readinessRows.length > 0
+                ? readinessRows.map((row) => row.versionName)
+                : selectedVersionIds.map((versionId, index) => `Version ${index + 1}`)}
             />
             <ReviewRow
               label="Client Brief"
@@ -296,7 +351,7 @@ export default function CreateProposalWizard({ onCreated, onCancel }) {
           </div>
           <p className="text-sm text-[#8A8477] mb-4 leading-relaxed">
             Generate to create the proposal and open the editor. A complete first draft will be
-            written from the current Visual and Technical Report data for the selected version.
+            written from the current Visual and Technical Report data for the selected versions.
           </p>
           {snapshotLoading && (
             <p className="text-sm text-[#8A8477] mb-6">Reading the published engineering result…</p>
@@ -322,13 +377,18 @@ export default function CreateProposalWizard({ onCreated, onCancel }) {
         )}
         {step < STEPS.length - 1 && (
           <button
-            onClick={() => setStep(step + 1)}
+            onClick={handleNext}
             disabled={!canProceed[step]}
             className="px-6 py-2.5 text-xs uppercase tracking-[0.14em] text-white disabled:opacity-40 transition-colors hover:bg-[#3E4349]"
             style={{ backgroundColor: '#213428', fontFamily: 'Didact Gothic, sans-serif' }}
           >
             Next
           </button>
+        )}
+        {blockedAttempt && step === 2 && !readiness.ready && !readiness.checking && (
+          <span role="alert" className="self-center text-xs text-[#7A2E10]">
+            {readiness.message || 'Fix the blocked versions below to continue.'}
+          </span>
         )}
         {step === STEPS.length - 1 && (
           <button
@@ -356,6 +416,23 @@ export default function CreateProposalWizard({ onCreated, onCancel }) {
 function createRequestId() {
   return globalThis.crypto?.randomUUID?.()
     || `proposal-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+}
+
+/** A label with a stacked list of values — the versions the proposal covers. */
+function ReviewList({ label, values = [], last }) {
+  return (
+    <div className={`flex items-start justify-between gap-6 py-3 ${last ? '' : 'border-b border-[#E5E1D8]'}`}>
+      <span className="text-[11px] uppercase tracking-[0.12em] text-[#A79E8C] pt-0.5">{label}</span>
+      <ul
+        className="text-sm text-[#1B1A1A] text-right space-y-0.5"
+        style={{ fontFamily: 'Didact Gothic, sans-serif' }}
+      >
+        {values.length > 0
+          ? values.map((value) => <li key={value}>{value}</li>)
+          : <li>—</li>}
+      </ul>
+    </div>
+  );
 }
 
 function ReviewRow({ label, value, last }) {

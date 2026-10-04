@@ -1,16 +1,12 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
-import { Button } from '@/components/ui/button';
-import { FileText, Copy, Download, Archive, MoreVertical, Layers, Clock, Calendar, RotateCcw } from 'lucide-react';
+import { Loader2, Layers, Clock, Calendar, RotateCcw } from 'lucide-react';
 import { formatDistanceToNow, format } from 'date-fns';
 import ProposalStatusBadge from './ProposalStatusBadge';
+import ProposalLibraryActions from './library/ProposalLibraryActions';
+import ProposalSourceStateBadge from './library/ProposalSourceStateBadge';
+import RevisionBadge from './library/RevisionBadge';
 import { getProposalTypeLabel } from './proposalTypes';
 import { isArchived } from './proposalLifecycle';
 
@@ -20,23 +16,53 @@ import { isArchived } from './proposalLifecycle';
  * Props:
  * - proposal: Proposal record
  * - projectName: string | null  (resolved from Project lookup)
- * - versionLabel: string | null  (resolved from ProjectVersion lookup)
+ * - versionLabel: string | null  (single-version fallback label)
+ * - versionNames: string[]  (every version the proposal was built from)
+ * - sourceState: object | null  (Current / Source changed / Missing source)
  * - sectionCount: number  (count of ProposalSection records)
- * - onDuplicate: (proposal) => void
- * - onArchive: (proposal) => void
- * - onRestore: (proposal) => void  (restore from archived)
+ * - busy: boolean  (an action is running for this proposal)
+ * - onOpen / onRename / onDuplicate / onRegenerate / onExport / onArchive /
+ *   onRestore: (proposal) => void
  */
-function ProposalCard({ proposal, projectName, versionLabel, sectionCount, onDuplicate, onArchive, onRestore }) {
+function ProposalCard({
+  proposal,
+  projectName,
+  versionLabel,
+  versionNames = [],
+  sourceState = null,
+  sectionCount,
+  busy = false,
+  onOpen,
+  onRename,
+  onDuplicate,
+  onRegenerate,
+  onExport,
+  onArchive,
+  onRestore,
+}) {
   const navigate = useNavigate();
 
   if (!proposal) return null;
 
-  const handleOpen = () => {
+  const openProposal = () => {
     navigate(`/ProposalEditor?proposalId=${proposal.id}`);
+  };
+
+  const handleOpen = () => {
+    if (onOpen) onOpen(proposal);
+    else openProposal();
+  };
+
+  const handleRename = () => {
+    if (onRename) onRename(proposal);
   };
 
   const handleDuplicate = () => {
     if (onDuplicate) onDuplicate(proposal);
+  };
+
+  const handleRegenerate = () => {
+    if (onRegenerate) onRegenerate(proposal);
   };
 
   const handleArchive = () => {
@@ -48,8 +74,9 @@ function ProposalCard({ proposal, projectName, versionLabel, sectionCount, onDup
   };
 
   const handleExport = () => {
-    // Stage 4: PDF export. For now, navigate to the editor where export will live.
-    navigate(`/ProposalEditor?proposalId=${proposal.id}`);
+    // PDF export lives in the editor, which opens the saved proposal.
+    if (onExport) onExport(proposal);
+    else openProposal();
   };
 
   const archived = isArchived(proposal.status);
@@ -59,6 +86,11 @@ function ProposalCard({ proposal, projectName, versionLabel, sectionCount, onDup
 
   return (
     <Card className="bg-white border-[#DCDBD6] flex flex-col hover:border-[#A3A3A3] transition-colors duration-300 relative overflow-hidden">
+      {busy && (
+        <div className="absolute inset-0 z-10 flex items-center justify-center bg-white/60">
+          <Loader2 className="w-5 h-5 text-[#625143] animate-spin" />
+        </div>
+      )}
       <CardHeader>
         <div className="flex justify-between items-start">
           <div className="min-w-0 flex-1">
@@ -68,69 +100,49 @@ function ProposalCard({ proposal, projectName, versionLabel, sectionCount, onDup
             <p className="text-sm text-[#3E4349] font-body truncate">
               {projectName || 'No project linked'}
             </p>
-            <div className="mt-2 flex items-center gap-2">
+            <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1">
               <ProposalStatusBadge status={proposal.status} />
+              <RevisionBadge proposal={proposal} />
             </div>
           </div>
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button
-                variant="ghost"
-                size="icon"
-                className="text-[#3E4349] hover:text-[#1B1A1A] flex-shrink-0"
-                aria-label="Open proposal actions"
-              >
-                <MoreVertical className="w-4 h-4" />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="bg-white border-[#DCDBD6] text-[#1B1A1A]">
-              <DropdownMenuItem onClick={handleOpen} className="cursor-pointer hover:!bg-[#F8F8F7]">
-                <FileText className="w-4 h-4 mr-2" />
-                Open
-              </DropdownMenuItem>
-              {archived ? (
-                <>
-                  <DropdownMenuItem onClick={handleRestore} className="cursor-pointer hover:!bg-[#F8F8F7]">
-                    <RotateCcw className="w-4 h-4 mr-2" />
-                    Restore
-                  </DropdownMenuItem>
-                  <DropdownMenuItem onClick={handleExport} className="cursor-pointer hover:!bg-[#F8F8F7]">
-                    <Download className="w-4 h-4 mr-2" />
-                    Export PDF
-                  </DropdownMenuItem>
-                </>
-              ) : (
-                <>
-                  <DropdownMenuItem onClick={handleDuplicate} className="cursor-pointer hover:!bg-[#F8F8F7]">
-                    <Copy className="w-4 h-4 mr-2" />
-                    Duplicate
-                  </DropdownMenuItem>
-                  <DropdownMenuItem onClick={handleExport} className="cursor-pointer hover:!bg-[#F8F8F7]">
-                    <Download className="w-4 h-4 mr-2" />
-                    Export PDF
-                  </DropdownMenuItem>
-                  <DropdownMenuItem
-                    onClick={handleArchive}
-                    className="cursor-pointer !text-[#8A8477] hover:!bg-[#F5F4F0]"
-                  >
-                    <Archive className="w-4 h-4 mr-2" />
-                    Archive
-                  </DropdownMenuItem>
-                </>
-              )}
-            </DropdownMenuContent>
-          </DropdownMenu>
+          <ProposalLibraryActions
+            proposal={proposal}
+            archived={archived}
+            onOpen={handleOpen}
+            onRename={handleRename}
+            onDuplicate={handleDuplicate}
+            onRegenerate={handleRegenerate}
+            onExport={handleExport}
+            onArchive={handleArchive}
+            onRestore={handleRestore}
+          />
         </div>
       </CardHeader>
 
       <CardContent className="flex-grow space-y-2.5 font-body">
-        {/* Version label */}
-        <div className="flex items-center gap-2 text-sm text-[#3E4349]">
-          <Layers className="w-4 h-4 text-[#8A8477] flex-shrink-0" />
-          <span className="truncate">
-            {versionLabel || typeLabel}
-          </span>
+        {/* Every version this proposal was built from */}
+        <div className="flex items-start gap-2 text-sm text-[#3E4349]">
+          <Layers className="w-4 h-4 text-[#8A8477] flex-shrink-0 mt-0.5" />
+          {versionNames.length > 0 ? (
+            <ul className="min-w-0 space-y-0.5">
+              {versionNames.map((name) => (
+                <li key={name} className="truncate" title={name}>{name}</li>
+              ))}
+            </ul>
+          ) : (
+            <span className="truncate">{versionLabel || typeLabel}</span>
+          )}
         </div>
+
+        {/* Source state — whether the project has moved on since generation */}
+        {sourceState && (
+          <div className="pt-0.5">
+            <ProposalSourceStateBadge sourceState={sourceState} />
+            {sourceState.reason && (
+              <p className="text-[11px] text-[#8A8477] mt-1 leading-snug">{sourceState.reason}</p>
+            )}
+          </div>
+        )}
 
         {/* Created date */}
         {createdDate && (

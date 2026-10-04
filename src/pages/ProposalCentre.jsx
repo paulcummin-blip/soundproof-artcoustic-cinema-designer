@@ -4,14 +4,14 @@ import { useAuth } from '@/lib/AuthContext';
 import BrandAssetsPanel from '@/components/proposal/BrandAssetsPanel';
 import PlaceholderTab from '@/components/proposal/PlaceholderTab';
 import CreateProposalWizard from '@/components/proposal/CreateProposalWizard';
-import ProposalHistoryTab from '@/components/proposal/ProposalHistoryTab';
+import ProposalLibraryTab from '@/components/proposal/library/ProposalLibraryTab';
 import { Plus, ChevronLeft } from 'lucide-react';
 
 const TABS = [
   { key: 'brand', label: 'Brand Assets' },
   { key: 'templates', label: 'Templates' },
   { key: 'products', label: 'Product Intelligence' },
-  { key: 'history', label: 'Proposal History' },
+  { key: 'library', label: 'Proposal Library' },
 ];
 
 const PLACEHOLDER_CONTENT = {
@@ -25,11 +25,6 @@ const PLACEHOLDER_CONTENT = {
     description:
       'Structured manufacturer knowledge for every Artcoustic product — why each model exists, where it should be used, its strengths, honest compromises, and upgrade path. Feeds Proposal Intelligence, product comparisons, and the dealer assistant.',
   },
-  history: {
-    title: 'Proposal History',
-    description:
-      'All generated proposals will be listed here with their status, date, and linked project.',
-  },
 };
 
 import { REPORT_FONT_HEADING, REPORT_FONT_BODY } from '@/components/report/typography/reportTypography';
@@ -39,10 +34,18 @@ export default function ProposalCentre() {
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState('brand');
   const [showWizard, setShowWizard] = useState(false);
+  const [regenerateFrom, setRegenerateFrom] = useState(null);
   const accountId = user?.access_context?.account?.id || user?.account_id || null;
 
   const handleCreated = (proposalId) => {
+    setRegenerateFrom(null);
     navigate(`/ProposalEditor?proposalId=${proposalId}`);
+  };
+
+  /** Open the wizard — from scratch, or as a regeneration of a saved proposal. */
+  const openWizard = (sourceProposal = null) => {
+    setRegenerateFrom(sourceProposal);
+    setShowWizard(true);
   };
 
   // ── Wizard view ──
@@ -51,13 +54,17 @@ export default function ProposalCentre() {
       <div className="min-h-screen bg-[#FBFAF7]">
         <div className="max-w-3xl mx-auto px-8 lg:px-0 py-16">
           <button
-            onClick={() => setShowWizard(false)}
+            onClick={() => { setShowWizard(false); setRegenerateFrom(null); }}
             className="flex items-center gap-1.5 text-xs uppercase tracking-[0.18em] text-[#8A8477] hover:text-[#213428] mb-10 transition-colors"
           >
             <ChevronLeft className="w-3.5 h-3.5" />
             Proposal Centre
           </button>
-          <CreateProposalWizard onCreated={handleCreated} onCancel={() => setShowWizard(false)} />
+          <CreateProposalWizard
+            onCreated={handleCreated}
+            onCancel={() => { setShowWizard(false); setRegenerateFrom(null); }}
+            regenerateFrom={regenerateFrom}
+          />
         </div>
       </div>
     );
@@ -84,7 +91,7 @@ export default function ProposalCentre() {
             </p>
           </div>
           <button
-            onClick={() => setShowWizard(true)}
+            onClick={() => openWizard()}
             className="flex items-center gap-2 px-6 py-3 text-xs uppercase tracking-[0.14em] text-white shrink-0 mt-2 transition-colors hover:bg-[#3E4349]"
             style={{ backgroundColor: '#213428', fontFamily: REPORT_FONT_BODY }}
           >
@@ -116,10 +123,13 @@ export default function ProposalCentre() {
         </div>
 
         {activeTab === 'brand' && <BrandAssetsPanel accountId={accountId} />}
-        {activeTab === 'history' && (
-          <ProposalHistoryTab onCreateProposal={() => setShowWizard(true)} />
+        {activeTab === 'library' && (
+          <ProposalLibraryTab
+            onCreateProposal={() => openWizard()}
+            onRegenerate={(proposal) => openWizard(proposal)}
+          />
         )}
-        {activeTab !== 'brand' && activeTab !== 'history' && (
+        {activeTab !== 'brand' && activeTab !== 'library' && (
           <PlaceholderTab
             title={PLACEHOLDER_CONTENT[activeTab].title}
             description={PLACEHOLDER_CONTENT[activeTab].description}
