@@ -30,9 +30,29 @@ export async function loadReportSnapshot({ projectId, versionId, reportType }) {
  */
 export async function saveReportSnapshot({ existing = null, record }) {
   if (!record) return null;
-  const saved = existing?.id
-    ? await base44.entities.ReportSnapshot.update(existing.id, record)
+  // Resolve again at the write boundary: an unloaded/stale page must not
+  // create a duplicate or overwrite a different row from readiness's newest.
+  const canonical = await loadReportSnapshot({
+    projectId: record.project_id,
+    versionId: record.version_id,
+    reportType: record.report_type,
+  });
+  const target = canonical || existing;
+  const response = target?.id
+    ? await base44.entities.ReportSnapshot.update(target.id, record)
     : await base44.entities.ReportSnapshot.create(record);
+  const savedId = response?.id || target?.id;
+  if (!savedId) throw new Error('The saved report snapshot ID was not returned.');
+  // Announce only a database-confirmed save, never a local success object.
+  const saved = await base44.entities.ReportSnapshot.get(savedId);
+  if (saved?.id !== savedId
+    || saved.project_id !== record.project_id
+    || saved.version_id !== record.version_id
+    || saved.report_type !== record.report_type
+    || JSON.stringify(saved.payload?.reportEvidence ?? null)
+      !== JSON.stringify(record.payload?.reportEvidence ?? null)) {
+    throw new Error('Report evidence persistence could not be verified.');
+  }
   // One in-session announcement, so the proposal readiness read (which judges
   // each version by its saved reports) knows a report has landed and reads again
   // instead of reporting the version from before the report existed.
