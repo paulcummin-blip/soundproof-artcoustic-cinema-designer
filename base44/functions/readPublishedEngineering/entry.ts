@@ -6,6 +6,7 @@ import {
   findPublication,
   cleanPublicationForResponse,
 } from '../../shared/publishedEngineeringAuthority.js';
+import { auditEngineeringPublication } from '../../shared/publicationGateAuthority.js';
 
 /**
  * readPublishedEngineering
@@ -64,8 +65,9 @@ export default async function(req) {
 
     // Load + verify ownership
     let version;
+    let project;
     try {
-      ({ version } = await loadOwnedProjectVersion(
+      ({ project, version } = await loadOwnedProjectVersion(
         service, projectId, versionId, access,
       ));
     } catch (err) {
@@ -77,15 +79,28 @@ export default async function(req) {
     // Resolve the fingerprint: explicit > version pointer
     const fingerprint = explicitFingerprint || version.published_fingerprint || null;
 
+    // The acknowledgement travels with every read, so a report gate decides from
+    // the durable authority itself rather than inferring from a browser store.
+    const notPublished = auditEngineeringPublication(null, { expectedFingerprint: null });
+    const acknowledgementFor = (audit) => ({
+      status: audit.status,
+      durably_published: audit.durablyPublished === true,
+      complete: audit.complete === true,
+      fingerprint_matches: audit.fingerprintMatches === true,
+      missing: audit.missing,
+    });
+
     if (!fingerprint) {
       return Response.json({
         publication: null,
         status: 'not_calculated',
         version: {
           id: version.id,
+          version_name: version.version_name || null,
           published_fingerprint: version.published_fingerprint || null,
           published_at: version.published_at || null,
         },
+        acknowledgement: acknowledgementFor(notPublished),
       });
     }
 
@@ -101,17 +116,27 @@ export default async function(req) {
         status: 'stale',
         version: {
           id: version.id,
+          version_name: version.version_name || null,
           published_fingerprint: version.published_fingerprint || null,
           published_at: version.published_at || null,
         },
+        acknowledgement: acknowledgementFor(notPublished),
       });
     }
+
+    const audit = auditEngineeringPublication(publication, {
+      // The version pointer is the authority the publication must match.
+      expectedFingerprint: version.published_fingerprint || fingerprint,
+      project,
+      bassAuthorityAvailable: Object.keys(cacheRecord?.completed_by_fingerprint || {}).length > 0,
+    });
 
     return Response.json({
       publication: cleanPublicationForResponse(publication),
       status: 'published',
       version: {
         id: version.id,
+        version_name: version.version_name || null,
         published_fingerprint: version.published_fingerprint || null,
         published_at: version.published_at || null,
         published_engine_version: version.published_engine_version || null,
@@ -119,6 +144,7 @@ export default async function(req) {
         published_algorithm_version: version.published_algorithm_version || null,
         publication_reason: version.publication_reason || null,
       },
+      acknowledgement: acknowledgementFor(audit),
     });
   } catch (error) {
     return Response.json({

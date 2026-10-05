@@ -53,6 +53,10 @@ import {
 } from '@/components/proposal/engineeringAuthority/engineeringFingerprint';
 import { readDesignReviewHandoff } from '@/components/state/designReviewHandoff';
 import { statesBassAuthority } from '@/components/engineering/versionedEngineeringAuthority';
+import {
+  PUBLICATION_ATTEMPT,
+  recordPublicationAttempt,
+} from '@/components/engineering/publicationAcknowledgementStore';
 
 const PUBLISH_DEBOUNCE_MS = 2000;
 
@@ -150,7 +154,11 @@ export function useEngineeringPublicationEffect({
         // Read the presentation payload at fire time so it reflects the most
         // recent settled handoff publication.
         const reportSnapshot = buildReportSnapshot(projectId, versionId);
-        await base44.functions.invoke('publishEngineering', {
+        recordPublicationAttempt(projectId, versionId, {
+          status: PUBLICATION_ATTEMPT.PUBLISHING,
+          fingerprint: engineeringFingerprint,
+        });
+        const response = await base44.functions.invoke('publishEngineering', {
           project_id: projectId,
           version_id: versionId,
           engineering_summary: engineeringSummary,
@@ -167,10 +175,37 @@ export function useEngineeringPublicationEffect({
             bass_fingerprint: bassFingerprint || null,
           },
         });
-        lastPublishedFingerprintRef.current = engineeringFingerprint;
+        // The acknowledgement is the server's audit of the STORED publication,
+        // read back by fingerprint. Only an acknowledged write counts as
+        // published — a request that returned without one does not, and the
+        // report gate will say so instead of reporting Current.
+        const body = response?.data || response || {};
+        const acknowledgement = body.acknowledgement || null;
+        if (acknowledgement?.durably_published === true) {
+          lastPublishedFingerprintRef.current = engineeringFingerprint;
+          recordPublicationAttempt(projectId, versionId, {
+            status: PUBLICATION_ATTEMPT.ACKNOWLEDGED,
+            fingerprint: engineeringFingerprint,
+            publishedAt: body?.version?.published_at || null,
+          });
+        } else {
+          recordPublicationAttempt(projectId, versionId, {
+            status: PUBLICATION_ATTEMPT.FAILED,
+            fingerprint: engineeringFingerprint,
+            missing: acknowledgement?.missing || [],
+            message: body?.message
+              || `The saved assessment is incomplete (${(acknowledgement?.missing || []).map((item) => item?.label || item?.key).join(', ') || 'unknown reason'}).`,
+          });
+          console.error('[publishEngineering] not acknowledged:', body?.message || acknowledgement?.status || 'unknown');
+        }
       } catch (err) {
-        // Database publish failure does not block the UI or the browser
-        // handoff. Log for diagnostics; the next design change will retry.
+        // The write did not land: record it, so report generation stays blocked
+        // with the exact reason instead of appearing ready.
+        recordPublicationAttempt(projectId, versionId, {
+          status: PUBLICATION_ATTEMPT.FAILED,
+          fingerprint: engineeringFingerprint,
+          message: err?.message || 'The engineering assessment could not be saved.',
+        });
         console.error('[publishEngineering] DB publish failed:', err?.message || err);
       }
     }, PUBLISH_DEBOUNCE_MS);

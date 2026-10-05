@@ -23,6 +23,8 @@ import captureReportProposalSource from './captureReportProposalSource';
 import { buildReportEvidence, readStoredEvidence } from './reportEvidenceAuthority';
 import { buildParityRecord, checkReportEvidenceParity } from './reportEvidenceParity';
 import { loadReportSnapshot, saveReportSnapshot } from './reportSnapshotStore';
+import { fetchDurablePublication } from '@/components/engineering/versionedEngineeringAuthority';
+import { auditReportSaveAuthority } from '@/components/engineering/publicationGateAuthority';
 import {
   REPORT_SNAPSHOT_STATUS,
   buildSavedSourceFingerprints,
@@ -64,6 +66,9 @@ export function useReportSnapshot({
   // but is never proposal-ready.
   const [evidenceIncomplete, setEvidenceIncomplete] = useState(false);
   const [evidenceMismatches, setEvidenceMismatches] = useState([]);
+  // Why a report snapshot may not be written: no durable engineering publication
+  // for this version. Blocked reports say so instead of pretending to be current.
+  const [publicationBlocked, setPublicationBlocked] = useState(null);
 
   useEffect(() => () => { mountedRef.current = false; }, []);
 
@@ -111,6 +116,22 @@ export function useReportSnapshot({
     try {
       const version = await base44.entities.ProjectVersion.get(versionId);
       if (version?.project_id !== projectId) throw new Error('Report version does not belong to this project.');
+
+      // ── DURABLE AUTHORITY GATE ───────────────────────────────────────────
+      // A report snapshot may only exist when the engineering assessment has
+      // been durably published for this version. Read at generation time (not
+      // from any browser store), so a design calculated in this session but
+      // never saved can never produce a report that claims to be current.
+      const durableRead = await fetchDurablePublication(projectId, versionId, { force: true });
+      const saveGate = auditReportSaveAuthority(durableRead, {
+        versionName: version.version_name || null,
+      });
+      if (!saveGate.allowed) {
+        if (mountedRef.current) setPublicationBlocked(saveGate.reason);
+        console.warn('[reportSnapshot] generation blocked:', saveGate.reason);
+        return null;
+      }
+      if (mountedRef.current) setPublicationBlocked(null);
       // The report's own live authority is the geometry it renders from — the
       // loaded app state states the room dimensions and the screen
       // configuration, which the trimmed project details passed to this hook do
@@ -309,6 +330,9 @@ export function useReportSnapshot({
     evidence: storedEvidence,
     evidenceIncomplete: evidenceIncompleteNow,
     evidenceMismatches,
+    // Set when the report could not be saved because the engineering assessment
+    // has not been durably published for this version.
+    publicationBlocked,
     regenerate: persist,
   };
 }

@@ -31,6 +31,8 @@ import { applyRestoredBassAuthority } from './restoredBassOverlay';
 import { assessEngineeringReportCompleteness } from './engineeringReportCompleteness';
 import { useSharedBassAuthorityReconciliation } from '@/components/room/bass/useSharedBassAuthorityReconciliation';
 import { useBassReconciliationStatus } from '@/components/room/bass/bassReconciliationStatus';
+import { auditDurablePublication } from './publicationGateAuthority';
+import { usePublicationAttempt } from './publicationAcknowledgementStore';
 
 export function useVersionedEngineeringAuthority(projectId, versionId) {
   const [localSnapshot, setLocalSnapshot] = useState(
@@ -146,6 +148,30 @@ export function useVersionedEngineeringAuthority(projectId, versionId) {
   const reportCompleteness = assessEngineeringReportCompleteness(
     extractEngineeringSummary(snapshot),
   );
+
+  // ── DURABLE PUBLICATION GATE ─────────────────────────────────────────────
+  // A report or proposal may only be generated from a DURABLY PUBLISHED
+  // engineering assessment for this exact version. The browser handoff stays a
+  // preview path: it can show a design, but it can never be final report
+  // authority, so no report, reportEvidence or "Current" state is allowed
+  // without the publication the version pointer references.
+  const publicationAttempt = usePublicationAttempt(projectId, versionId);
+  const publicationGate = auditDurablePublication({
+    durable,
+    versionName: durable?.version?.version_name || null,
+    authorityComplete: reportCompleteness.complete,
+    authorityReason: reportCompleteness.reason,
+    attempt: publicationAttempt,
+  });
+  const gatedCompleteness = publicationGate.allowed
+    ? reportCompleteness
+    : {
+        ...reportCompleteness,
+        complete: false,
+        publicationBlocked: true,
+        publicationStatus: publicationGate.status,
+        reason: publicationGate.reason,
+      };
   const localHasSummary = !!extractEngineeringSummary(localSnapshot);
   const bassHydrationPending = !!projectId
     && !!versionId
@@ -185,8 +211,13 @@ export function useVersionedEngineeringAuthority(projectId, versionId) {
     bassAuthorityStatus: completedBassAuthority?.authorityStatus || null,
     bassAuthorityOutOfDate: reportCompleteness.bassAuthorityOutOfDate === true,
     bassAuthorityRejectionReason: reportCompleteness.bassAuthorityRejectionReason || null,
-    reportCompleteness,
-    reportComplete: reportCompleteness.complete,
+    reportCompleteness: gatedCompleteness,
+    reportComplete: gatedCompleteness.complete,
+    // The one durability verdict every report and proposal surface reads.
+    publicationGate,
+    publicationStatus: publicationGate.status,
+    durablyPublished: publicationGate.allowed,
+    publicationAttempt,
     durable,
     publication: durable?.publication || null,
     version: durable?.version || null,

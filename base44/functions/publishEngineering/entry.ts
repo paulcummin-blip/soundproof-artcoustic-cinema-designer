@@ -11,6 +11,10 @@ import {
   cleanCacheRecordForResponse,
   completeMissingBassResults,
 } from '../../shared/publishedEngineeringAuthority.js';
+import {
+  auditEngineeringPublication,
+  isPublishableEngineeringSummary,
+} from '../../shared/publicationGateAuthority.js';
 
 /**
  * publishEngineering
@@ -98,6 +102,19 @@ export default async function(req) {
     }
     if (!engineeringSummary || typeof engineeringSummary !== 'object') {
       return Response.json({ error: 'INVALID_REQUEST', message: 'engineering_summary object is required.' }, { status: 400 });
+    }
+
+    // ── FAIL CLOSED AT THE SOURCE ──────────────────────────────────────────
+    // A summary that does not carry the complete RP22 parameter authority is not
+    // an engineering publication. Nothing is written — no pointer, no publication
+    // — so a partial summary can never become the authority a report reads from.
+    const publishability = isPublishableEngineeringSummary(engineeringSummary);
+    if (!publishability.usable) {
+      return Response.json({
+        error: 'INCOMPLETE_ENGINEERING_SUMMARY',
+        missing: publishability.missing,
+        message: `This assessment is incomplete (${publishability.missing.join(', ')}). Nothing was saved — complete the assessment and try again.`,
+      }, { status: 422 });
     }
 
     const service = base44.asServiceRole;
@@ -223,11 +240,24 @@ export default async function(req) {
       );
     }
 
+    // ── EXPLICIT ACKNOWLEDGEMENT ───────────────────────────────────────────
+    // The caller confirms the durable write from the audit of the STORED
+    // publication (read back by fingerprint) plus the version pointer — never
+    // from the fact that this request returned. A report is only allowed to be
+    // generated when this acknowledgement says durably_published.
+    const storedPublication = findPublication(cacheRecord, fingerprint) || publication;
+    const audit = auditEngineeringPublication(storedPublication, {
+      expectedFingerprint: updatedVersion.published_fingerprint || fingerprint,
+      project,
+      bassAuthorityAvailable: Object.keys(cacheRecord?.completed_by_fingerprint || {}).length > 0,
+    });
+
     return Response.json({
       publication: cleanPublicationForResponse(publication),
       created,
       version: {
         id: updatedVersion.id,
+        version_name: version.version_name || null,
         published_fingerprint: updatedVersion.published_fingerprint,
         published_at: updatedVersion.published_at,
         published_engine_version: updatedVersion.published_engine_version,
@@ -236,6 +266,14 @@ export default async function(req) {
         publication_reason: updatedVersion.publication_reason,
       },
       cache: cleanCacheRecordForResponse(cacheRecord),
+      acknowledgement: {
+        status: audit.status,
+        durably_published: audit.durablyPublished === true,
+        complete: audit.complete === true,
+        fingerprint_matches: audit.fingerprintMatches === true,
+        missing: audit.missing,
+        publication_key: fingerprint,
+      },
     });
   } catch (error) {
     return Response.json({
