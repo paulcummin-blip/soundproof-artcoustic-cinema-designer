@@ -1,44 +1,9 @@
 /**
- * proposalReadinessAuthority.js  (shared)
- * ---------------------------------------
- * THE ONE proposal readiness authority, on the server side of the boundary.
- *
- * A proposal is generated from the CURRENT reports and the published engineering
- * result of EVERY selected version, so readiness is decided per version, per
- * source — never from the first selected version alone, from one report, or from
- * a source the server cannot see.
- *
- * Per version it states exactly three things:
- *   Visual Report          the saved report for project + version + report type
- *   Technical Report       the saved report for project + version + report type
- *   Engineering result     the version's PUBLISHED engineering result, or the
- *                          version's completed calculation authority
- *
- * The report cells are judged by the same fingerprint comparison the report
- * pages use (both sides compare only fingerprints that BOTH sides state, so an
- * unreadable fingerprint never manufactures staleness).
- *
- * The engineering cell is judged by durable evidence only — never by a
- * browser-session handoff, which the server cannot read. Two durable forms of
- * the SAME result are accepted, because they are the sources a report is
- * rendered from:
- *   1. the published engineering publication (ProjectVersion.published_fingerprint
- *      → ProjectAnalysisCache.engineering_publications), and
- *   2. the version's completed calculation authority
- *      (ProjectAnalysisCache.completed_by_fingerprint for the version's own
- *      current fingerprint) — the calculated engineering result a Technical
- *      Report is generated from when no separate publication row exists.
- * Without (2) a version whose Technical Report is Current could still read
- * Missing here, which is the contradiction this module exists to prevent: the
- * two states must never disagree.
- *
- * The frontend cannot import from base44/ and vice versa, so
- * src/components/proposal/sourceAuthority/proposalReadinessAuthority.js mirrors
- * this derivation and a test asserts the two agree word for word. This module is
- * the reference: states, labels, clauses, sentence shape and the version name.
- *
- * Derivation only: recalculates nothing, generates no report content, writes
- * nothing. Pure — no React, no side effects, no runtime APIs.
+ * Per-version proposal readiness. Current engineering authority requires a
+ * durable full publication resolved through this version's published pointer.
+ * Completed bass/calibration entries identify bass only; they never substitute
+ * for full engineering authority. Browser handoffs and historical report pages
+ * are not evidence recovery sources. Client/server vocabulary is kept in sync.
  */
 
 /** The readiness state of one cell, one version or the whole gate. */
