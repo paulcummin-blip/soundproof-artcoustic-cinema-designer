@@ -167,7 +167,7 @@ function buildSeating(captured) {
     screenPlaneM: captured?.room?.screen?.front_plane_m,
     seatResultsByParameter: captured?.report_seat_results || {},
     seatHudById: summary.seatHudById || {},
-    p19: summary.parameterSummaries?.project?.p19 || null,
+    p19: (captured?.report_parameters || []).find(entry => Number(entry.parameter_id) === 19 && /^L[1-4]$/.test(String(entry.level))) || null,
   });
   const rsp = captured?.room?.rsp || null;
   return { ...seating, rsp: rsp ? { mode: rsp.mode || null,
