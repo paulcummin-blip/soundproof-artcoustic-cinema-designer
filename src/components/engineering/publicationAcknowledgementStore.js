@@ -17,6 +17,9 @@
 import { useEffect, useState } from 'react';
 
 export const PUBLICATION_ATTEMPT = Object.freeze({
+  QUEUED: 'queued',
+  NOT_READY: 'not_ready',
+  CANCELLED: 'cancelled',
   PUBLISHING: 'publishing',
   ACKNOWLEDGED: 'acknowledged',
   FAILED: 'failed',
@@ -66,6 +69,8 @@ export function recordPublicationAttempt(projectId, versionId, attempt) {
     publishedAt: attempt?.publishedAt || null,
     missing: Array.isArray(attempt?.missing) ? attempt.missing : [],
     message: attempt?.message || null,
+    gates: Array.isArray(attempt?.gates) ? attempt.gates : [],
+    httpStatus: attempt?.httpStatus || null,
     at: new Date().toISOString(),
   };
   attempts.set(key, record);
