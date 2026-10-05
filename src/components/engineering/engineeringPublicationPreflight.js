@@ -32,6 +32,7 @@ export function engineeringPublicationPreflight({
     { key: 'hydration', label: 'Version loaded and minimum system selected', ok: ready === true },
     { key: 'rp22_terminal', label: 'RP22 P1–P21 terminal (verified bass or explicit N/A)', ok: provisional.length === 0, detail: provisional.join(', ') },
     { key: 'bass_current', label: 'Current verified bass / P19', ok: bassReady, detail: bassReady ? null : bassReason },
+    { key: 'p20_available', label: 'P20 seat results available', ok: engineeringSummary?.project?.reportCounts?.seatResultsByParameter?.p20?.some(row => row?.status === 'scored') === true },
     { key: 'design_rating', label: 'Publishable settled design rating', ok: isPublishable === true },
     { key: 'bass_summary', label: 'Bass results in engineering summary', ok: statesBassAuthority(engineeringSummary) },
     ...sectionReport.items.filter(item => item.key !== 'published_at'),
