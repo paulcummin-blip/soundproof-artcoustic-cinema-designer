@@ -17,6 +17,17 @@ import { resolveRp22DesignValue } from "@/components/utils/rp22/resolveRp22Desig
 // windows a seat's effective off-axis angle is graded against. Measured polar
 // data derives the windows only; it is never the seat's P17 dB score.
 import { resolveP17Windows, gradeOffAxisAngle } from "@/components/utils/rp22/p17CoverageWindows";
+// P17 OVERHEAD ACOUSTIC-AXIS GEOMETRY — the single authority for resolving a ceiling
+// speaker's acoustic axis (its built-in tilt aimed at the RSP) and the effective off-axis
+// angle measured from it. Also consumed by computeSeatHudMetrics, so every P17 path agrees
+// on the axis and no path subtracts the tilt as a scalar.
+import {
+  buildOverheadAimedFrame,
+  aimedFrameOffAxisDeg,
+  aimedAxisOffAxisDeg,
+  geometricCeilingAngleDeg,
+  resolveOverheadTiltDeg,
+} from "@/components/utils/rp22/overheadAcousticAxis";
 
 // P16/P17 RSP-normalisation logic version. Bumped when the seat-vs-RSP delta
 // construction changes (e.g. removal of the absolute-loss offset term). This
@@ -387,131 +398,12 @@ export function computeP16ForSeat(seat, allSpeakers, getSpeakerModelMeta, mlpPos
 }
 
 // --- P17 HELPERS ---
-
-// Map overhead models to their built-in tilt (towards the MLP), in degrees
-function getOverheadTiltDeg(modelKey) {
-  const key = (modelKey || "").toString().toLowerCase();
-
-  // Mikro: flat baffle, no tilt
-  if (key.includes("mikro")) return 0;
-
-  // Architect 2-1: ~5° angled tweeter
-  if (key.includes("architect-2-1")) return 5;
-
-  // Architect 4-2: ~5° angled tweeter
-  if (key.includes("architect-4-2")) return 5;
-
-  // Architect PAS2-2: ~20° angled baffle
-  if (key.includes("pas2-2") || key.includes("architect pas")) {
-    return 20;
-  }
-
-  // Default: no built-in tilt
-  return 0;
-}
+// The overhead built-in-tilt table and the acoustic-axis geometry live in
+// overheadAcousticAxis.js — one authority, shared with the seat-HUD metrics path.
 
 
 
-// ── P17 overhead aimed-axis geometry ───────────────────────────────────────
-// The built-in acoustic-axis tilt (5° Architect 2-1, 22° Spitfire Cloud, 20° PAS2-2) is
-// directed toward the RSP as a true 3D axis vector — NOT a scalar subtraction from the raw
-// vertical angle. The axis starts as the ceiling-normal (straight down) and is rotated by
-// `tiltDeg` in the vertical plane containing the speaker→RSP horizontal direction. This makes
-// the tilt benefit seats toward the RSP while seats away from the aiming direction no longer
-// receive a free angular discount.
-//
-// Speaker acoustic origin = cabinet centre at ceiling height (no tweeter/driver offset).
-function buildOverheadAimedFrame(speakerPos, rspPos, tiltDeg) {
-  if (!speakerPos || !rspPos) return null;
-  const spkX = Number(speakerPos.x);
-  const spkY = Number(speakerPos.y);
-  const rspX = Number(rspPos.x);
-  const rspY = Number(rspPos.y);
-  if (!Number.isFinite(spkX) || !Number.isFinite(spkY) || !Number.isFinite(rspX) || !Number.isFinite(rspY)) return null;
-
-  const t = Number.isFinite(Number(tiltDeg)) ? (Number(tiltDeg) * Math.PI) / 180 : 0;
-  const sinT = Math.sin(t);
-  const cosT = Math.cos(t);
-
-  // Horizontal unit vector from speaker toward RSP (the tilt direction).
-  const dx = rspX - spkX;
-  const dy = rspY - spkY;
-  const dh = Math.hypot(dx, dy);
-
-  // Speaker directly above the RSP — no preferred tilt direction. Collapse to the untilted
-  // (straight-down) axis with an arbitrary orthonormal frame.
-  if (dh <= 1e-6) {
-    return {
-      forward: { x: 0, y: 0, z: -1 },
-      up: { x: 0, y: 0, z: 1 },
-      right: { x: 1, y: 0, z: 0 },
-      tiltDeg: 0,
-      horizontalDir: { x: 0, y: 0 },
-    };
-  }
-
-  const Hx = dx / dh;
-  const Hy = dy / dh;
-
-  // forward = H·sin(t) + D·cos(t),  D = (0,0,-1)  → aimed acoustic axis (into the room)
-  const forward = { x: Hx * sinT, y: Hy * sinT, z: -cosT };
-  // up = (Hx·cos t, Hy·cos t, sin t)  → in the tilt plane, perpendicular to forward
-  const up = { x: Hx * cosT, y: Hy * cosT, z: sinT };
-  // right = (Hy, -Hx, 0)  → horizontal, perpendicular to the tilt plane (pitch axis)
-  const right = { x: Hy, y: -Hx, z: 0 };
-
-  return { forward, up, right, tiltDeg: Number.isFinite(Number(tiltDeg)) ? Number(tiltDeg) : 0, horizontalDir: { x: Hx, y: Hy } };
-}
-
-// Signed horizontal/vertical off-axis components (degrees) of a target direction relative to the
-// aimed frame. vertical = elevation in the tilt plane (fore/aft vs RSP aim); horizontal = azimuth
-// perpendicular to the tilt plane (left/right of RSP aim). Used to interrogate measured H/V polar
-// datasets relative to the AIMED axis (not room +Y).
-function aimedFrameOffAxisDeg(frame, targetVec) {
-  if (!frame || !targetVec) return { horizontalOffAxis: null, verticalOffAxis: null };
-  const vx = Number(targetVec.x), vy = Number(targetVec.y), vz = Number(targetVec.z);
-  if (!Number.isFinite(vx) || !Number.isFinite(vy) || !Number.isFinite(vz)) return { horizontalOffAxis: null, verticalOffAxis: null };
-  const m = Math.hypot(vx, vy, vz);
-  if (m <= 1e-9) return { horizontalOffAxis: 0, verticalOffAxis: 0 };
-  const v = { x: vx / m, y: vy / m, z: vz / m };
-
-  // Vertical component: project v into the tilt plane (remove the `right` component).
-  const dRight = dot3(v, frame.right);
-  const vVert = { x: v.x - dRight * frame.right.x, y: v.y - dRight * frame.right.y, z: v.z - dRight * frame.right.z };
-  const mVert = Math.hypot(vVert.x, vVert.y, vVert.z);
-  let verticalOffAxis = 0;
-  if (mVert > 1e-9) {
-    let c = dot3(frame.forward, vVert) / mVert;
-    c = Math.max(-1, Math.min(1, c));
-    verticalOffAxis = (Math.acos(c) * 180) / Math.PI;
-    if (dot3(vVert, frame.up) < 0) verticalOffAxis = -verticalOffAxis;
-  }
-
-  // Horizontal component: project v into the plane perpendicular to `up`.
-  const dUp = dot3(v, frame.up);
-  const vHoriz = { x: v.x - dUp * frame.up.x, y: v.y - dUp * frame.up.y, z: v.z - dUp * frame.up.z };
-  const mHoriz = Math.hypot(vHoriz.x, vHoriz.y, vHoriz.z);
-  let horizontalOffAxis = 0;
-  if (mHoriz > 1e-9) {
-    let c = dot3(frame.forward, vHoriz) / mHoriz;
-    c = Math.max(-1, Math.min(1, c));
-    horizontalOffAxis = (Math.acos(c) * 180) / Math.PI;
-    if (dot3(vHoriz, frame.right) < 0) horizontalOffAxis = -horizontalOffAxis;
-  }
-
-  return { horizontalOffAxis, verticalOffAxis };
-}
-
-// Total 3D off-axis angle (degrees, 0..180) between the aimed axis and a target vector.
-function aimedAxisOffAxisDeg(frame, targetVec) {
-  if (!frame || !targetVec) return 0;
-  const vx = Number(targetVec.x), vy = Number(targetVec.y), vz = Number(targetVec.z);
-  const m = Math.hypot(vx, vy, vz);
-  if (m <= 1e-9) return 0;
-  let c = dot3(frame.forward, { x: vx, y: vy, z: vz }) / m;
-  c = Math.max(-1, Math.min(1, c));
-  return (Math.acos(c) * 180) / Math.PI;
-}
+// (acoustic-axis frame + off-axis geometry moved to overheadAcousticAxis.js)
 
 /**
  * Compute the effective off-axis angle for a ceiling-mounted overhead speaker relative to the
@@ -565,7 +457,7 @@ function computeVerticalOffAxisDeg(speakerPos, seatPos, rspPos, earHeightM, mode
 
   // Get model metadata for built-in tilt and dispersion
   const meta = getSpeakerModelMeta(modelKey);
-  const tiltDeg = Number.isFinite(meta?.builtInTiltDeg) ? Number(meta.builtInTiltDeg) : (getOverheadTiltDeg(modelKey) ?? 0);
+  const tiltDeg = resolveOverheadTiltDeg(meta, modelKey);
 
   // ── Aimed acoustic axis (P17 overhead geometry authority) ──────────────────
   // The built-in tilt is directed toward the RSP as a true 3D axis vector, NOT a scalar
@@ -779,8 +671,11 @@ function computeSurroundLikeHfLoss({ speaker, seat, mlpPos, earHeightM, modelMet
     });
 
     if (!measured.missingMeasuredData) {
-      // offAxisDeg/rawAngleDeg for HUD + scoring: total 3D off-axis from the AIMED axis.
+      // offAxisDeg: total 3D off-axis from the AIMED ACOUSTIC AXIS — this is what grades.
       const totalOff = frame ? aimedAxisOffAxisDeg(frame, seatVec3) : 0;
+      // Geometric angle from ceiling vertical (straight down) to this seat. Display
+      // evidence only: never graded, never fed to the polar lookup.
+      const geometricAngleDeg = geometricCeilingAngleDeg(seatVec3);
       // P17 DESIGN GUIDE: the measured polar data supplies this model's coverage
       // windows only. The seat is graded by its effective angle against them — the
       // raw polar deviation is kept below as read-only diagnostics and never grades.
@@ -788,7 +683,12 @@ function computeSurroundLikeHfLoss({ speaker, seat, mlpPos, earHeightM, modelMet
       return {
         role,
         offAxisDeg: quantiseAngleDown(totalOff, 0.5),
-        rawAngleDeg: quantiseAngleDown(totalOff, 0.5),
+        // rawAngleDeg is the GEOMETRIC ceiling-vertical angle, as the estimated overhead
+        // path reports it, so the axis basis behind every angle is explicit.
+        rawAngleDeg: quantiseAngleDown(geometricAngleDeg, 0.5),
+        geometricAngleDeg: quantiseAngleDown(geometricAngleDeg, 0.5),
+        builtInTiltDeg: tiltDeg,
+        axisBasis: "acoustic_axis",
         lossDb: isNum(measured.maximumDeviationDb) ? Number(measured.maximumDeviationDb.toFixed(1)) : 0,
         measured: true,
         measuredDiagnostics: measured,
@@ -828,8 +728,11 @@ function computeSurroundLikeHfLoss({ speaker, seat, mlpPos, earHeightM, modelMet
 
     return {
       role,
-      offAxisDeg: quantiseAngleDown(vert.offAxisDeg, 0.5), // for scoring
-      rawAngleDeg: quantiseAngleDown((vert.rawAngleDeg ?? vert.offAxisDeg), 0.5), // for display
+      offAxisDeg: quantiseAngleDown(vert.offAxisDeg, 0.5), // effective, off the aimed axis
+      rawAngleDeg: quantiseAngleDown((vert.rawAngleDeg ?? vert.offAxisDeg), 0.5), // geometric ceiling angle
+      geometricAngleDeg: quantiseAngleDown((vert.rawAngleDeg ?? vert.offAxisDeg), 0.5),
+      builtInTiltDeg: isNum(vert.debug?.tiltDeg) ? Number(vert.debug.tiltDeg) : null,
+      axisBasis: "acoustic_axis",
       lossDb: Number(vert.lossDb.toFixed(1)),
       debug: vert.debug, // Pass through debug data
       ...coverage,
@@ -926,6 +829,7 @@ function computeSurroundLikeHfLoss({ speaker, seat, mlpPos, earHeightM, modelMet
       role,
       angleDeg: offAxis, // CRITICAL: must be quantised value for HUD display
       offAxisDeg: offAxis,
+      axisBasis: "wall_normal",   // bed-layer P17 is a horizontal-plane angle: no ceiling axis
       lossDb: Number(lossDb.toFixed(1)),
       isBeyondNonLcrLimit,
       coverageLimitDeg: nonLcrLimit,  // model −3 dB coverage half-window (diagnostic only)
@@ -1010,6 +914,10 @@ export function computeP17ForAllSeats({ seats, speakers, mlpPos, getSpeakerModel
     let worstWindows = null;
     let worstEvidenceType = null;
     let worstCause = null;
+    let decidingGeometricAngleDeg = null;
+    let decidingBuiltInTiltDeg = null;
+    let decidingAxisBasis = null;
+    let decidingRspGeometricAngleDeg = null;
     const beyondLimit = [];
     const perSpeaker = [];
     let p17HasNaAngles = false;
@@ -1056,6 +964,12 @@ export function computeP17ForAllSeats({ seats, speakers, mlpPos, getSpeakerModel
         angleDeg: resultAtSeat.offAxisDeg,
         rawAngleDeg: resultAtSeat.rawAngleDeg ?? resultAtSeat.offAxisDeg,
         rspAngleDeg: isNum(resultAtRsp?.offAxisDeg) ? Number(resultAtRsp.offAxisDeg.toFixed(1)) : null,
+        // ── Acoustic-axis evidence (read-only): the geometric ceiling angle, the product's
+        // built-in tilt and the axis the effective angle is measured from. Overheads only.
+        geometricAngleDeg: isNum(resultAtSeat.geometricAngleDeg) ? Number(resultAtSeat.geometricAngleDeg.toFixed(1)) : null,
+        rspGeometricAngleDeg: isNum(resultAtRsp?.geometricAngleDeg) ? Number(resultAtRsp.geometricAngleDeg.toFixed(1)) : null,
+        builtInTiltDeg: isNum(resultAtSeat.builtInTiltDeg) ? Number(resultAtSeat.builtInTiltDeg) : null,
+        axisBasis: resultAtSeat.axisBasis ?? null,
         lossDb: Number(delta.toFixed(1)),
         isBeyondNonLcrLimit,
         coverageLimitDeg: isNum(resultAtSeat.coverageLimitDeg) ? Number(resultAtSeat.coverageLimitDeg.toFixed(1)) : null,
@@ -1091,6 +1005,10 @@ export function computeP17ForAllSeats({ seats, speakers, mlpPos, getSpeakerModel
           bestLevelNumber = levelNumber;
           worstRole = resultAtSeat.role;
           worstAngleDeg = resultAtSeat.offAxisDeg;
+          decidingGeometricAngleDeg = isNum(resultAtSeat.geometricAngleDeg) ? Number(resultAtSeat.geometricAngleDeg.toFixed(1)) : null;
+          decidingBuiltInTiltDeg = isNum(resultAtSeat.builtInTiltDeg) ? Number(resultAtSeat.builtInTiltDeg) : null;
+          decidingAxisBasis = resultAtSeat.axisBasis ?? null;
+          decidingRspGeometricAngleDeg = isNum(resultAtRsp?.geometricAngleDeg) ? Number(resultAtRsp.geometricAngleDeg.toFixed(1)) : null;
           worstLossDb = isNum(resultAtSeat.windowDb) ? Number(resultAtSeat.windowDb.toFixed(1)) : null;
           worstWindows = resultAtSeat.windows ?? null;
           worstEvidenceType = resultAtSeat.evidenceType ?? null;
@@ -1126,8 +1044,13 @@ export function computeP17ForAllSeats({ seats, speakers, mlpPos, getSpeakerModel
       evidenceType: worstEvidenceType,           // measured-derived | estimated
       cause: worstCause,                         // within_l4_window … outside_usable_window
       worstRole,                                 // the channel that decided this seat's grade
-      worstAngleDeg: isNum(worstAngleDeg) ? Number(worstAngleDeg.toFixed(1)) : null,
+      worstAngleDeg: isNum(worstAngleDeg) ? Number(worstAngleDeg.toFixed(1)) : null, // effective, off the acoustic axis
       worstLossDb: isNum(worstLossDb) ? Number(worstLossDb.toFixed(1)) : null,
+      // ── Acoustic-axis evidence for the deciding channel (read-only, never graded) ──
+      geometricAngleDeg: decidingGeometricAngleDeg,       // angle from ceiling vertical to this seat
+      rspGeometricAngleDeg: decidingRspGeometricAngleDeg, // angle from ceiling vertical to the RSP
+      builtInTiltDeg: decidingBuiltInTiltDeg,             // the product's own built-in tilt
+      axisBasis: decidingAxisBasis,                        // acoustic_axis | wall_normal
       perSpeaker,
       p17HasNaAngles,
       // ── Read-only legacy diagnostics (never graded) ──
