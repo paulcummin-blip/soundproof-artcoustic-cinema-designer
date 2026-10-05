@@ -20,6 +20,8 @@
 
 import { REPORT_SNAPSHOT_TYPE, reportTypeLabel } from './reportSnapshotAuthority';
 import { PRODUCTS_SELECTED_ROWS } from './reportProductsSelected';
+import { validateReportEvidence as validateCompleteness } from '../../../base44/shared/reportEvidenceCompleteness.js';
+import { buildReportSeating } from '../../../base44/shared/reportEvidenceSeating.js';
 
 export const REPORT_EVIDENCE_VERSION = 1;
 
@@ -45,6 +47,7 @@ function asText(value) {
 }
 
 function asNumber(value) {
+  if (value === null || value === undefined || value === '') return null;
   const number = Number(value);
   return Number.isFinite(number) ? number : null;
 }
@@ -158,35 +161,18 @@ function viewingRow(entry, row) {
 
 function buildSeating(captured) {
   const seats = Array.isArray(captured?.seats) ? captured.seats : [];
-  const perSeat = Array.isArray(captured?.viewing?.per_seat) ? captured.viewing.per_seat : [];
-  const rows = [...new Set(seats.map((seat) => seat?.row).filter((row) => row !== null && row !== undefined))].sort((a, b) => a - b);
-  const primary = seats.filter((seat) => seat?.priority === 'primary').length;
-  const secondary = seats.filter((seat) => seat?.priority === 'secondary').length;
+  const summary = captured?.report_engineering_summary || {};
+  const seating = buildReportSeating({
+    seats, viewing: captured?.viewing?.per_seat || [],
+    screenPlaneM: captured?.room?.screen?.front_plane_m,
+    seatResultsByParameter: captured?.report_seat_results || {},
+    seatHudById: summary.seatHudById || {},
+    p19: summary.parameterSummaries?.project?.p19 || null,
+  });
   const rsp = captured?.room?.rsp || null;
-
-  // Every viewing row is stated once per row, taken from the version's own
-  // seats so the two never diverge.
-  const byRow = new Map();
-  for (const entry of perSeat) {
-    const row = asNumber(entry?.row ?? entry?.rowNumber);
-    if (row === null) continue;
-    if (!byRow.has(row)) byRow.set(row, entry);
-  }
-  const perRowViewing = [...byRow.entries()]
-    .sort((a, b) => a[0] - b[0])
-    .map(([row, entry]) => viewingRow(entry, row));
-
-  return {
-    rows,
-    row_count: rows.length,
-    seats: seats.length,
-    primary_seats: primary,
-    secondary_seats: secondary,
-    rsp: rsp ? { mode: rsp.mode || null, x_m: round(rsp.x_m, 2), y_m: round(rsp.y_m, 2) } : null,
-    per_row_viewing: perRowViewing,
-    per_seat: perSeat.map((entry) => viewingRow(entry, entry?.row)),
-    seat_ids: seats.map((seat) => seat?.id).filter(Boolean),
-  };
+  return { ...seating, rsp: rsp ? { mode: rsp.mode || null,
+    x_m: round(rsp.x_m ?? rsp.manual_x_m, 2),
+    y_m: round(rsp.y_m ?? rsp.manual_y_m, 2) } : null };
 }
 
 /** "Q8-5 × 3" / "SUB4-12 × 2 (front)" → the structured product it states. */
@@ -469,40 +455,8 @@ export function buildReportEvidence({ reportType, captured, sourceFingerprint = 
 }
 
 /** What is missing from an evidence payload before a proposal may use it. */
-export function validateReportEvidence(evidence, reportType = null) {
-  if (!evidence || typeof evidence !== 'object') return { complete: false, missing: ['reportEvidence'] };
-  const type = reportType || evidence.report_type || null;
-  const missing = [];
-  if (Number(evidence.evidence_version) !== REPORT_EVIDENCE_VERSION) missing.push('evidence_version');
-
-  const identity = evidence.identity || {};
-  if (!identity.project_id) missing.push('identity.project_id');
-  if (!identity.version_id) missing.push('identity.version_id');
-  if (!identity.report_type) missing.push('identity.report_type');
-  if (!identity.source_fingerprint) missing.push('identity.source_fingerprint');
-
-  const room = evidence.room || {};
-  if (room.length_m == null || room.width_m == null || room.height_m == null) missing.push('room');
-
-  const products = evidence.system?.products_selected;
-  if (!Array.isArray(products) || products.length === 0) missing.push('system.products_selected');
-
-  const index = evidence.parameter_index;
-  if (!index || typeof index !== 'object' || Object.keys(index).length === 0) missing.push('parameter_index');
-
-  for (const id of EVIDENCE_REQUIRED_PARAMETERS[type] || []) {
-    const entry = index?.[`P${id}`];
-    if (!entry || !/^L[1-4]$/.test(String(entry.level)) || entry.value == null || UNSTATED.test(String(entry.value))) {
-      missing.push(`parameter_index.P${id}`);
-    }
-  }
-
-  if (type === REPORT_SNAPSHOT_TYPE.VISUAL) {
-    if (!evidence.screen || !evidence.screen.screen_type) missing.push('screen');
-    if (!Array.isArray(evidence.seating?.per_seat)) missing.push('seating.per_seat');
-  }
-
-  return { complete: missing.length === 0, missing };
+export function validateReportEvidence(evidence, reportType = null, options = {}) {
+  return validateCompleteness(evidence, reportType, options);
 }
 
 /** The stored evidence of a saved report, or null when it carries none. */
