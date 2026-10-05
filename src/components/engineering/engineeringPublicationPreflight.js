@@ -13,7 +13,10 @@ export function engineeringPublicationPreflight({
     ...versions, provenance: { bass_fingerprint: bassReadiness.fingerprint },
   };
   const sectionReport = publicationSectionReport(candidate, {
-    project: { roomDims: designState?.roomDims, ...(designState?.screen || {}) },
+    project: { roomDims: designState?.roomDims,
+      screen_size: designState?.screen?.visibleWidthInches,
+      manual_width_m: designState?.screen?.manualWidthM,
+      tv_width_mm: designState?.screen?.tvWidthMm },
     bassAuthorityAvailable: bassReady,
   });
   const parameters = engineeringSummary?.parameterAuthority || {};
