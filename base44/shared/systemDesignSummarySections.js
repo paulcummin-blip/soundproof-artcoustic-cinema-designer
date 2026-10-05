@@ -117,7 +117,7 @@ This section is prose only. Do not write a list, a table, a highlights list or a
 
 Choose the two or three results that matter most for this room from the Spatial Resolution results present in the supplied Sound Proof calculated data, for example discrete channel count, screen consistency, horizontal spacing, surround level consistency, front wide position, overhead spacing and overhead level consistency. Do not work through them all.
 
-Name each chosen result in plain language with its achieved level and measured value exactly as supplied, using no more than one parameter code in the section, and explain what the room gains because of it.
+Name each chosen result in plain language with its achieved level and supplied value exactly as supplied (this is predicted or calculated data: never call it measured), using no more than one parameter code in the section, and explain what the room gains because of it.
 
 Evidence to choose from, where it was assessed reliably: discrete channel count (P2) for how many physical positions the sound can come from, screen consistency (P4) for stable dialogue and screen-channel agreement, horizontal spacing (P5) for movement between adjacent speakers, surround level consistency (P6), front wide position (P7) for movement between the screen and the side walls, overhead spacing (P9) for front-to-rear movement overhead, and overhead level consistency (P10). Do not mention P8.
 
@@ -163,7 +163,7 @@ Keep it practical. Mention a clear limitation honestly where the data shows one,
   // model. Only the introduction is written prose.
   [HIGHLIGHTS_SECTION_TYPE]: `Write the introduction to the Key Performance Highlights table in 1 or 2 short sentences, as simple HTML with a <p> tag.
 
-Say that this is the measured summary of the design, and that each row states what the result means in the room. Do not list the rows, do not restate a value, and do not write a table.
+Say that this is the calculated summary of the design (predicted, not measured), and that each row states what the result means in the room. Do not list the rows, do not restate a value, and do not write a table.
 
 If no calculated rows are supplied for this design, write 2 to 3 short paragraphs describing the performance this design delivers, using only the results present in the supplied Sound Proof calculated data, and still do not write a table.`,
 

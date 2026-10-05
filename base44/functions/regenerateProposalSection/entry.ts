@@ -9,6 +9,7 @@ import { formatVersionEvidenceForPrompt } from '../../shared/comparisonEvidence.
 import { formatComparisonTableForPrompt } from '../../shared/comparisonTable.js';
 import { buildEngineeringEvidence } from '../../shared/engineeringSnapshotEvidence.js';
 import { buildProjectInterpretation, formatInterpretationForPrompt, formatInterpretationForLog } from '../../shared/adiProjectInterpretation.js';
+import { sanitizeNarrativeHtml, p17DiffersAcrossVersions } from '../../shared/proposalNarrativeSanitizer.js';
 
 const SECTION_TITLES: Record<string, string> = {
   executive_summary: 'Executive Summary',
@@ -231,7 +232,7 @@ export default async function(req) {
       '=== CONSTRAINT ===',
       'The Client Brief influences narrative emphasis, wording, and structure ONLY.',
       'It must NEVER alter, contradict, or override any engineering result, RP22 value,',
-      'Design Rating, or recommendation. All measured values remain exactly as reported',
+      'Design Rating, or recommendation. All supplied values remain exactly as reported',
       'in the authoritative project data. If the client brief mentions a preference that',
       'conflicts with the engineering results, explain the engineering reality honestly',
       'rather than changing the results.',
@@ -248,7 +249,12 @@ export default async function(req) {
 
     // ── Invoke LLM ──
     const llmResult = await base44.integrations.Core.InvokeLLM({ prompt });
-    const html = typeof llmResult === 'string' ? llmResult : llmResult?.content || '';
+    const rawHtml = typeof llmResult === 'string' ? llmResult : llmResult?.content || '';
+    // The same narrative rules as first-draft generation: no AI-written table, no
+    // predicted result described as measured, no blanket tonal guarantee where the
+    // P17 evidence shows the options differ.
+    const p17Differs = proposal.proposal_type === 'comparison' && p17DiffersAcrossVersions(comparisonTable);
+    const html = sanitizeNarrativeHtml(rawHtml, { p17Differs, sectionType: section.section_type });
 
     // ── Update section ──
     await base44.entities.ProposalSection.update(section_id, {

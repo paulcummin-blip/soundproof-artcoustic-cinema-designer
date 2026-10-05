@@ -44,7 +44,7 @@ export const COMPARISON_REFERENCE_STYLE = [
   '=== HOW TO REFERENCE THE EVIDENCE ===',
   'Ground the story in the reports the client also holds, naturally and sparingly, for example:',
   '- "RP22 Parameter 12 in the Technical Report shows ..."',
-  '- "The Visual Report confirms ..."',
+  '- "The Visual Report shows ..."',
   '- "The P20 seat map shows ..."',
   '- "RP23 viewing geometry remains strong in both versions ..."',
   'Never cite a file name, a page number or a link, and use two or three references in a section at most rather than one in every paragraph.',
@@ -54,9 +54,10 @@ export const COMPARISON_REFERENCE_STYLE = [
 export const COMPARISON_LANGUAGE_RULES = [
   '=== LANGUAGE ===',
   'Never open a sentence with "The system is designed to", "This design provides", "The screen does", "The speakers do", "The subwoofers provide", "This ensures", "The system delivers" or "This allows".',
+  'Never write a table, a grid of values or a performance summary: the report renders its one calculated table itself. Never write "measured", "proven" or "confirmed" for a calculated result; use "predicted", "calculated" or "shown in the Technical Report".',
   'Never write "not just X, but Y". Never define an RP22 parameter at length, never list parameters dryly, and never make a claim without the value that supports it.',
   'Say "far higher", "much more" or "significantly" only together with the values that show it, and never at all where the difference is small.',
-  'Prefer: "The main upgrade is ...", "This matters because ...", "For the listener, that means ...", "The measured difference is ...", "Parameter 12 shows ...", "The Level 4 version gives the room ...", "The Level 1 version still keeps ...".',
+  'Prefer: "The main upgrade is ...", "This matters because ...", "For the listener, that means ...", "The calculated difference is ...", "Parameter 12 shows ...", "The Level 4 version gives the room ...", "The Level 1 version still keeps ...".',
 ].join('\n');
 
 /** What the options share, and how a shared result is presented. */

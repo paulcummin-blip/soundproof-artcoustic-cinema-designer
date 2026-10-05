@@ -144,7 +144,7 @@ export function buildEngineeringEvidence(snapshot) {
     }
   }
   if (structureLines.length > 0) {
-    lines.push('', 'RP22 evidence inside those structures (achieved level · measured result):', ...structureLines);
+    lines.push('', 'RP22 evidence inside those structures (achieved level · calculated result):', ...structureLines);
   } else {
     lines.push('', 'RP22 evidence: no result was assessed reliably for this design.');
   }
@@ -335,7 +335,7 @@ export function buildHighlightsPrompt(evidence, rows) {
     'Write the Key Performance Highlights section of a client-facing system design report, in the design-led voice defined in the style contract below.',
     '',
     'Return two things:',
-    'a) intro_html: one or two sentences introducing the section as the measured summary of this design, as simple HTML with a <p> tag. State that each row carries what the result gives the room. Do not list the rows.',
+    'a) intro_html: one or two sentences introducing the section as the calculated summary of this design, as simple HTML with a <p> tag. State that each row carries what the result gives the room. Do not list the rows, do not restate a value, and do not write a table.',
     'b) rows: one entry per row above, using its key exactly, giving the "What the room gains" cell.',
     '',
     'Each "What the room gains" cell is one short, specific sentence (about 15 words) describing what that result gives the room, in plain language. The numbers support the sentence. They are not the sentence.',

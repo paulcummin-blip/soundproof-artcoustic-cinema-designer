@@ -66,10 +66,10 @@ export function buildProjectContext(project, narrativeGoal, brandAsset, clientBr
     'room dimensions, seating, speaker layout, subwoofer layout, RP22 results,',
     'viewing results, SPL capability, bass results, limitations, or recommendations —',
     'from any other project, version, or earlier design.',
-    isComparison ? 'Calculated Sound Proof evidence is supplied for every selected version, and the comparison table is calculated for each of them. Never state or imply a measured result that is not in that evidence, and never state a difference the table does not show.' : '',
+    isComparison ? 'Calculated Sound Proof evidence is supplied for every selected version, and the comparison table is calculated for each of them. Every value is predicted or calculated, never measured in the room: describe it as predicted, modelled, calculated, or shown in the Technical Report. Never state a result that is not in that evidence, and never state a difference the table does not show.' : '',
     'The Client Brief influences narrative emphasis, wording, and structure ONLY.',
     'It must NEVER alter, contradict, or override any engineering result, RP22 value,',
-    'Design Rating, or recommendation. All measured values remain exactly as reported.',
+    'Design Rating, or recommendation. All supplied values remain exactly as reported.',
   ].filter(Boolean).join('\n');
 }
 export function buildSectionPrompt(sectionDef, projectContext, proposalType, interpretationBlock = '', layout = null) {

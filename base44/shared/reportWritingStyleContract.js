@@ -241,7 +241,7 @@ export const DESIGN_LED_VOICE_RULES = [
   '- Write in the active voice. Keep sentences short and natural.',
   '- Assume an intelligent reader. Never talk down, never over-explain an obvious result, and never explain what a result is when you can explain what it means.',
   '- Never write like a marketer, a consultant, an AI or an engineering specification.',
-  '- Never write like a detached technical audit either: the report explains the design intent and what it delivers, it does not only record what was measured.',
+  '- Never write like a detached technical audit either: the report explains the design intent and what it delivers, it does not only record the supplied results.',
   '- Calm, confident, measured, practical, grounded. Positive where the design supports it.',
   '',
   'PREFERRED CONSTRUCTIONS (write like this):',
@@ -410,7 +410,8 @@ const LANGUAGE = [
   '- Use practical, specific explanations.',
   '- Keep the room, the design, the system, the seating area and the listening result as the subject of the sentence.',
   '- Include numbers where they help: screen size, viewing distance, viewing angle, channel count, dBC capability, RP22 level, seat count.',
-  '- Carry at most one or two measured values in a paragraph.',
+  '- Carry at most one or two supplied values in a paragraph. Every value is predicted or calculated: never call it measured, proven or confirmed.',
+
   '- Vary how sentences open. Never repeat the same opening construction within a section.',
   '- Select the most relevant results for this room and write about those. Selection and meaning matter more than completeness.',
   '- Prefer short paragraphs.',
@@ -450,6 +451,8 @@ const HIGHLIGHTS_TABLE = [
 const REPORT_BEHAVIOUR = [
   '=== REPORT BEHAVIOUR ===',
   '- You write prose only. Sound Proof builds all table values from calculated data.',
+  '- Never write a table, a value grid or a second performance summary in a narrative section, and never repeat the calculated table: the report renders that one table itself.',
+  '- Every value is predicted, modelled or calculated. Never describe it as measured, proven or confirmed.',
   '- Never invent data.',
   '- Never change an RP22 or RP23 level, a dB value, a viewing angle, a distance or a product name.',
   '- If the evidence is missing, omit the claim.',
