@@ -6,6 +6,8 @@
  * are not evidence recovery sources. Client/server vocabulary is kept in sync.
  */
 
+import { validateReportEvidence } from '../../../../base44/shared/reportEvidenceCompleteness.js';
+
 /** The readiness state of one cell, one version or the whole gate. */
 export const READINESS_STATE = Object.freeze({
   CURRENT: 'current',
@@ -261,7 +263,7 @@ export function resolveEvidenceState(saved) {
   const evidence = saved?.payload?.reportEvidence;
   if (!evidence || typeof evidence !== 'object') return 'none';
   if (Number(evidence.evidence_version) !== REPORT_EVIDENCE_VERSION) return 'none';
-  return evidence.proposal_ready === true ? 'ready' : 'incomplete';
+  return validateReportEvidence(evidence, saved?.report_type || evidence.report_type).complete ? 'ready' : 'incomplete';
 }
 
 /**
