@@ -29,6 +29,7 @@
  */
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { validateReportEvidence } from '../../../../base44/shared/reportEvidenceCompleteness.js';
 import { base44 } from '@/api/base44Client';
 import {
   buildDurableSnapshot,
@@ -98,7 +99,8 @@ function reportCell(saved, currentFingerprints) {
     return buildReadinessCell({
       state: READINESS_STATE.INCOMPLETE,
       generatedAt: saved.generated_at,
-      reason: 'This report’s evidence does not match what the report shows. Regenerate it.',
+      reason: validateReportEvidence(saved.payload?.reportEvidence, saved.report_type).reason
+        || 'This report’s evidence does not match what the report shows. Regenerate it.',
     });
   }
 
