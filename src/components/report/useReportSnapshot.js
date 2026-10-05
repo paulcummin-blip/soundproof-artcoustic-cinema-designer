@@ -20,7 +20,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useAuth } from '@/lib/AuthContext';
 import { base44 } from '@/api/base44Client';
 import captureReportProposalSource from './captureReportProposalSource';
-import { buildReportEvidence, readStoredEvidence, validateReportEvidence } from './reportEvidenceAuthority';
+import { readStoredEvidence, validateReportEvidence } from './reportEvidenceAuthority';
 import { buildParityRecord, checkReportEvidenceParity } from './reportEvidenceParity';
 import { loadReportSnapshot, saveReportSnapshot } from './reportSnapshotStore';
 import { fetchDurablePublication } from '@/components/engineering/versionedEngineeringAuthority';
@@ -57,9 +57,6 @@ export function useReportSnapshot({
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const autoSaveKeyRef = useRef(null);
-  // Bumped when a legacy snapshot's proposal evidence has been recovered in
-  // place, so the backfill runs at most once per open report.
-  const evidenceBackfillKeyRef = useRef(null);
   const mountedRef = useRef(true);
   // Whether this report's evidence snapshot passed its parity check. A report
   // whose evidence disagrees with what the report itself shows is still saved,
