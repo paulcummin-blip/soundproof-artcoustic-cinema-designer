@@ -6,7 +6,7 @@
  * are not evidence recovery sources. Client/server vocabulary is kept in sync.
  */
 
-import { validateReportEvidence } from '../../../../base44/shared/reportEvidenceCompleteness.js';
+import { validateReportEvidence } from '../../../../shared/reportEvidenceCompleteness.js';
 
 /** The readiness state of one cell, one version or the whole gate. */
 export const READINESS_STATE = Object.freeze({
