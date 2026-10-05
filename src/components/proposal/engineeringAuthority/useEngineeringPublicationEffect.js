@@ -38,7 +38,8 @@
  * Failures are logged but do not block the UI or the browser handoff.
  */
 
-import { useEffect, useMemo, useRef } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { engineeringPublicationPreflight } from '@/components/engineering/engineeringPublicationPreflight';
 import { base44 } from '@/api/base44Client';
 import { ENGINEERING_AUTHORITY_VERSION } from '@/components/proposal/engineeringAuthority';
 import { ENGINEERING_SNAPSHOT_VERSION } from '@/components/proposal/engineeringAuthority/buildEngineeringSnapshot';
@@ -56,6 +57,7 @@ import { statesBassAuthority } from '@/components/engineering/versionedEngineeri
 import {
   PUBLICATION_ATTEMPT,
   recordPublicationAttempt,
+  usePublicationAttempt,
 } from '@/components/engineering/publicationAcknowledgementStore';
 
 const PUBLISH_DEBOUNCE_MS = 2000;
@@ -99,7 +101,11 @@ export function useEngineeringPublicationEffect({
   bassFingerprint,
   ready,
   designState,
+  bassReadiness,
+  retainedFromRefresh,
 }) {
+  const [retrySequence, setRetrySequence] = useState(0);
+  const attempt = usePublicationAttempt(projectId, versionId);
   const lastPublishedFingerprintRef = useRef(null);
   const debounceTimerRef = useRef(null);
 
@@ -116,6 +122,17 @@ export function useEngineeringPublicationEffect({
     });
   }, [designState]);
 
+  const preflight = engineeringPublicationPreflight({
+    projectId, versionId, ready, isPublishable, engineeringSummary,
+    engineeringFingerprint, bassReadiness, retainedFromRefresh, designState,
+    reportSnapshot: buildReportSnapshot(projectId, versionId),
+    versions: {
+      engine_version: ENGINEERING_AUTHORITY_VERSION,
+      rp22_version: String(RP22_BASS_METRIC_SCHEMA_VERSION),
+      algorithm_version: String(BASS_ANALYSIS_CONTRACT_VERSION),
+    },
+  });
+  const preflightKey = JSON.stringify(preflight);
   useEffect(() => {
     // Clear any pending debounce on input change
     if (debounceTimerRef.current) {
@@ -123,8 +140,11 @@ export function useEngineeringPublicationEffect({
       debounceTimerRef.current = null;
     }
 
-    // Gate: must have project, version, be hydrated, and be publishable
-    if (!projectId || !versionId || !ready || !isPublishable) {
+    if (!preflight.ready) {
+      recordPublicationAttempt(projectId, versionId, {
+        status: PUBLICATION_ATTEMPT.NOT_READY, fingerprint: engineeringFingerprint,
+        message: 'Not ready: ' + preflight.reason, missing: preflight.missing, gates: preflight.gates,
+      });
       return;
     }
 
@@ -149,7 +169,14 @@ export function useEngineeringPublicationEffect({
       return;
     }
 
+    recordPublicationAttempt(projectId, versionId, {
+      status: PUBLICATION_ATTEMPT.QUEUED, fingerprint: engineeringFingerprint,
+      message: 'Waiting for assessment to settle before publishing.', gates: preflight.gates,
+    });
+    let started = false;
     debounceTimerRef.current = setTimeout(async () => {
+      started = true;
+      debounceTimerRef.current = null;
       try {
         // Read the presentation payload at fire time so it reflects the most
         // recent settled handoff publication.
@@ -204,17 +231,25 @@ export function useEngineeringPublicationEffect({
         recordPublicationAttempt(projectId, versionId, {
           status: PUBLICATION_ATTEMPT.FAILED,
           fingerprint: engineeringFingerprint,
-          message: err?.message || 'The engineering assessment could not be saved.',
+          message: err?.response?.data?.message || err?.message || 'The engineering assessment could not be saved.',
+          missing: err?.response?.data?.acknowledgement?.missing || [],
+          httpStatus: err?.response?.status || null,
         });
         console.error('[publishEngineering] DB publish failed:', err?.message || err);
       }
-    }, PUBLISH_DEBOUNCE_MS);
+    }, retrySequence ? 0 : PUBLISH_DEBOUNCE_MS);
 
     return () => {
       if (debounceTimerRef.current) {
         clearTimeout(debounceTimerRef.current);
         debounceTimerRef.current = null;
+        if (!started) recordPublicationAttempt(projectId, versionId, {
+          status: PUBLICATION_ATTEMPT.CANCELLED, fingerprint: engineeringFingerprint,
+          message: 'Publication cancelled before sending: assessment changed or Room Designer closed. Reopen this version and publish the settled assessment.',
+        });
       }
     };
-  }, [projectId, versionId, ready, isPublishable, engineeringSummary, engineeringFingerprint, bassFingerprint]);
+  }, [projectId, versionId, ready, isPublishable, engineeringSummary, engineeringFingerprint, bassFingerprint, preflightKey, retrySequence]);
+  return { preflight, attempt, fingerprint: engineeringFingerprint,
+    publish: () => { lastPublishedFingerprintRef.current = null; setRetrySequence(value => value + 1); } };
 }
