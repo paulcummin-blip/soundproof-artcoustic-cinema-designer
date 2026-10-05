@@ -1,16 +1,10 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.49';
-import { buildWritingStyleContract } from '../../shared/reportWritingStyleContract.js';
-import { SYSTEM_SUMMARY_SECTIONS, HIGHLIGHTS_SECTION_TYPE, getSystemSummarySectionPrompt, COMPARISON_REPORT_INSTRUCTIONS, resolveSectionTitle } from '../../shared/systemDesignSummarySections.js';
-import { buildComparisonSectionRule } from '../../shared/comparisonStoryRule.js';
-import { buildProposalSalesVoice } from '../../shared/proposalSalesVoice.js';
+import { prepareProposalEvidence, prepareProposalInterpretation, generateProposalDraftContent } from '../../shared/proposalDraftPipeline.js';
+import { resolveSections, buildProjectContext } from '../../shared/proposalGenerationPrompts.js';
+import { HIGHLIGHTS_SECTION_TYPE, resolveSectionTitle } from '../../shared/systemDesignSummarySections.js';
 import { comparisonSectionMetadata, verifyComparisonPersisted } from '../../shared/comparisonPersistence.js';
-import { buildSelectedVersionEvidence, formatVersionEvidenceForPrompt } from '../../shared/comparisonEvidence.js';
-import { buildComparisonTable, formatComparisonTableForPrompt, buildComparisonHighlightsPrompt, COMPARISON_HIGHLIGHTS_SCHEMA } from '../../shared/comparisonTable.js';
-import { buildEngineeringEvidence, selectHighlightRows, mergeHighlightRows, buildHighlightsPrompt, HIGHLIGHTS_JSON_SCHEMA } from '../../shared/engineeringSnapshotEvidence.js';
-import { buildProjectInterpretation, formatInterpretationForPrompt, formatInterpretationForLog } from '../../shared/adiProjectInterpretation.js';
-import { compareInterpretations, formatComparisonInterpretationForPrompt } from '../../shared/adiReportComparison.js';
+import { formatInterpretationForLog } from '../../shared/adiProjectInterpretation.js';
 import { loadCacheRecord, findPublication } from '../../shared/publishedEngineeringAuthority.js';
-import { resolveReportLayout } from '../../shared/highChannelDensityRule.js';
 
 // ── ONE proposal readiness authority ──
 // The gate below is decided by the SAME per-version rule the Step 5 table shows
@@ -34,50 +28,7 @@ import {
 const PROPOSAL_SOURCE_REQUIRED_MESSAGE =
   'Generate the Visual and Technical Reports before creating a proposal. This ensures the proposal uses the current project data and RP22 results.';
 
-const SECTIONS = [
-  { type: 'cover', key: 'cover', title: 'Cover', canEditBody: false },
-  { type: 'executive_summary', key: 'executive_summary', title: 'Executive Summary', canEditBody: true },
-  { type: 'design_philosophy', key: 'design_philosophy', title: 'Design Philosophy', canEditBody: true },
-  { type: 'system_overview', key: 'system_overview', title: 'System Overview', canEditBody: true },
-  { type: 'room_images', key: 'room_images', title: 'Room Images', canEditBody: true },
-  { type: 'performance', key: 'performance', title: 'Performance', canEditBody: true },
-  { type: 'products', key: 'products', title: 'Products', canEditBody: true },
-  { type: 'comparison', key: 'comparison', title: 'Comparison', canEditBody: true },
-  { type: 'conclusion', key: 'conclusion', title: 'Conclusion', canEditBody: true },
-  { type: 'appendix', key: 'appendix', title: 'Appendix', canEditBody: true },
-];
-
-/**
- * The section set for a report type.
- *
- * Both current report types are client-facing reports built around the three
- * core RP22 design structures, so they share the System Design section set.
- * The legacy proposal section set is kept only for 'single' reports saved
- * before the two report types were merged.
- */
-function resolveSections(proposalType) {
-  return proposalType === 'single' ? SECTIONS : SYSTEM_SUMMARY_SECTIONS;
-}
-
-const GOAL_LABELS = {
-  luxury_cinema: 'Luxury Cinema',
-  family_media_room: 'Family Media Room',
-  reference_performance: 'Reference Performance',
-  best_value: 'Best Value',
-  future_proof: 'Future Proof',
-};
-
-const SECTION_PROMPTS = {
-  executive_summary: 'Write an executive summary introducing the project, the design intent, and the key outcomes. 2-3 paragraphs.',
-  design_philosophy: 'Write the design philosophy section explaining the approach to this cinema design — why these choices were made, the acoustic principles, and the design intent. 2-3 paragraphs.',
-  system_overview: 'Write the system overview section describing the speaker system, configuration, and key equipment. Use bullet lists for specifications. 2-3 paragraphs plus a bullet list.',
-  room_images: 'Write a brief introduction for the room images section. This section will be followed by project render images. 1 paragraph.',
-  performance: 'Write the performance section describing the expected acoustic performance, RP22 compliance approach, and bass response characteristics. 2-3 paragraphs.',
-  products: 'Write the products section describing the key products in the system. Use a bullet list for each product category. 2-3 paragraphs plus bullet lists.',
-  comparison: 'Write the comparison section comparing this design to typical alternatives, explaining the advantages of this approach. 2-3 paragraphs.',
-  conclusion: 'Write the conclusion section summarising the proposal, restating the value, and including a call to action. 2-3 paragraphs.',
-  appendix: 'Write the appendix introduction. This section will contain technical specifications and detailed data. 1 paragraph.',
-};
+// Section definitions and prompts are shared with the write-free preview pipeline.
 
 export default async function(req) {
   let base44 = null;
@@ -216,24 +167,7 @@ export default async function(req) {
     // A comparison report receives the frozen engineering evidence for EVERY
     // selected version, so neither the calculated comparison table nor the
     // narrative can ever fall back to a single version's results.
-    const versionEvidence = buildSelectedVersionEvidence(suppliedSnapshots.map((entry) => {
-      const versionId = entry?.version_id || entry?.versionId || null;
-      const record = (projectVersions || []).find((version) => version.id === versionId);
-      return {
-        version_id: versionId,
-        version_name: entry?.version_name || record?.version_name || null,
-        snapshot: entry?.snapshot || null,
-      };
-    }));
-    const comparisonTable = resolvedType === 'comparison'
-      ? buildComparisonTable(versionEvidence)
-      : { rows: [], versions: [] };
-    const comparisonEvidenceText = resolvedType === 'comparison'
-      ? [
-        formatVersionEvidenceForPrompt(versionEvidence),
-        formatComparisonTableForPrompt(comparisonTable),
-      ].join('\n\n')
-      : '';
+    const { versionEvidence, comparisonTable, comparisonEvidenceText } = prepareProposalEvidence(suppliedSnapshots, projectVersions || [], resolvedType);
 
     // A comparison is only generated from calculated evidence for every
     // version: a missing version would force an invented comparison value.
@@ -356,30 +290,9 @@ export default async function(req) {
       engineering_fingerprint: primaryPublication?.engineering_fingerprint || null,
       published_at: primaryPublication?.published_at || null,
     };
-    const interpretations = suppliedSnapshots.map((entry) => {
-      const versionId = entry?.version_id || entry?.versionId || null;
-      return {
-        label: entry?.label || versionLabelById.get(versionId) || null,
-        interpretation: buildProjectInterpretation({
-          snapshot: entry?.snapshot || null,
-          project,
-          clientBrief: client_brief,
-          reportType: resolvedType,
-          versions: resolvedVersionIds.map((id) => ({ id, label: versionLabelById.get(id) || null })),
-          reportLabel: versionLabelById.get(versionId) || null,
-        }),
-      };
+    const { primaryInterpretation, comparisonReading, interpretationBlock } = prepareProposalInterpretation({
+      suppliedSnapshots, project, client_brief, resolvedType, resolvedVersionIds, versionLabelById,
     });
-    const primaryInterpretation = interpretations[0]?.interpretation || null;
-    const comparisonReading = resolvedType === 'comparison' ? compareInterpretations(interpretations) : null;
-    const comparisonBlock = comparisonReading
-      && (comparisonReading.shared.length > 0 || comparisonReading.changes.length > 0)
-      ? formatComparisonInterpretationForPrompt(comparisonReading)
-      : '';
-    const interpretationBlock = [
-      formatInterpretationForPrompt(primaryInterpretation),
-      comparisonBlock,
-    ].filter(Boolean).join('\n\n');
     console.log(`[generateProposal] ADI stage 1 interpretation | ${formatInterpretationForLog(primaryInterpretation)}`);
 
     // ── Create Proposal record ──
@@ -449,7 +362,7 @@ export default async function(req) {
     // Report identity: the versions this report covers, in selection order.
     const reportVersions = resolvedVersionIds.map((id, index) => {
       const record = (projectVersions || []).find((version) => version.id === id);
-      return `Version ${record?.version_number ?? index + 1} - ${record?.version_name || 'Untitled'}`;
+      return record?.version_name || 'Untitled';
     });
     const projectContext = buildProjectContext(
       project,
@@ -463,114 +376,13 @@ export default async function(req) {
       comparisonEvidenceText,
     );
 
-    // ── Key Performance Highlights rows ──
-    // Read straight out of the frozen Engineering Snapshot. The AI writes the
-    // "What the room gains" cells only; it never sets or changes a Result value,
-    // and it never chooses which rows appear.
-    const usesSystemStructure = resolvedType !== 'single';
-    const isComparisonReport = resolvedType === 'comparison';
-    // A single report carries one calculated row per useful result. A
-    // comparison carries the calculated comparison table instead, so its
-    // highlight rows are never selected from one version.
-    const highlightRows = usesSystemStructure && !isComparisonReport
-      ? selectHighlightRows(engineering_snapshot)
-      : [];
-    const isComparisonHighlights = (section) => isComparisonReport
-      && section.section_type === HIGHLIGHTS_SECTION_TYPE
-      && comparisonTable.rows.length > 0;
-    const isHighlightsSection = (section) => isComparisonHighlights(section)
-      || (usesSystemStructure
-        && section.section_type === HIGHLIGHTS_SECTION_TYPE
-        && highlightRows.length > 0);
-
-    // ── The layout authority for this report ──
-    // The high-channel-density upgrade rule (9.1.6, or 15 or more discrete
-    // channels) then applies to every prompt this report builds, so no section
-    // can offer added speakers or an improved horizontal spacing result as a
-    // future upgrade. It reads the frozen snapshot: nothing is recalculated.
-    const reportLayout = resolveReportLayout(engineering_snapshot);
-
-    // ── Generate content for each editable section in parallel ──
-    const editableIndices = sectionRecords
-      .map((section, index) => ({ section, index }))
-      .filter(({ index }) => sectionDefs[index]?.canEditBody)
-      // Project Images carries no generated copy at all: the section shows the
-      // images the designer uploaded for the project, and nothing is written
-      // underneath them.
-      .filter(({ section }) => !(usesSystemStructure && section.section_type === 'room_images'));
-
-    const generationResults = await Promise.allSettled(
-      editableIndices.map(({ section }) => {
-        const sectionDef = sectionDefs.find((s) => s.type === section.section_type);
-        if (isComparisonHighlights(section)) {
-          // The comparison table is already calculated: the model writes the
-          // introduction only and never a value.
-          return base44.integrations.Core.InvokeLLM({
-            prompt: [
-              interpretationBlock,
-              projectContext,
-              buildComparisonHighlightsPrompt(),
-              buildWritingStyleContract(reportLayout),
-              buildProposalSalesVoice(section.section_type, resolvedType),
-            ].filter(Boolean).join('\n\n'),
-            response_json_schema: COMPARISON_HIGHLIGHTS_SCHEMA,
-          });
-        }
-        if (isHighlightsSection(section)) {
-          return base44.integrations.Core.InvokeLLM({
-            prompt: [
-              interpretationBlock,
-              buildHighlightsPrompt(projectContext, highlightRows),
-              buildWritingStyleContract(reportLayout),
-              buildProposalSalesVoice(section.section_type, resolvedType),
-            ].filter(Boolean).join('\n\n'),
-            response_json_schema: HIGHLIGHTS_JSON_SCHEMA,
-          });
-        }
-        return base44.integrations.Core.InvokeLLM({
-          prompt: buildSectionPrompt(sectionDef, projectContext, resolvedType, interpretationBlock, reportLayout),
-        });
-      })
-    );
-
-    const generatedContent = editableIndices.map(({ section }, index) => {
-      const result = generationResults[index];
-
-      if (isComparisonHighlights(section)) {
-        const payload = result.status === 'fulfilled' ? result.value : null;
-        const intro = String(payload?.intro_html || '').trim();
-        return {
-          section,
-          html: intro,
-          // The calculated table travels with the section: one column per
-          // selected version, every value read from that version's evidence.
-          metadata: comparisonSectionMetadata(comparisonTable),
-          failed: result.status === 'rejected' || intro.length === 0,
-        };
-      }
-      if (isHighlightsSection(section)) {
-        const payload = result.status === 'fulfilled' ? result.value : null;
-        const intro = String(payload?.intro_html || '').trim();
-        const rows = mergeHighlightRows(highlightRows, payload?.rows);
-        return {
-          section,
-          html: intro,
-          metadata: { highlight_rows: rows },
-          failed: result.status === 'rejected'
-            || intro.length === 0
-            || rows.every((row) => !(row.what_the_room_gains || row.what_you_hear)),
-        };
-      }
-
-      const html = result.status === 'fulfilled'
-        ? (typeof result.value === 'string' ? result.value : result.value?.content || '').trim()
-        : '';
-      return { section, html, metadata: null, failed: result.status === 'rejected' || html.length === 0 };
+    // Saved and preview drafts run the identical prompt assembly and LLM calls.
+    // This helper has no entity client and cannot persist anything.
+    const generatedContent = await generateProposalDraftContent({
+      invokeLLM: (args) => base44.integrations.Core.InvokeLLM(args),
+      sectionRecords, sectionDefs, resolvedType, engineering_snapshot,
+      comparisonTable, versionEvidence, projectContext, interpretationBlock,
     });
-    const failedSections = generatedContent.filter((item) => item.failed);
-    if (failedSections.length > 0) {
-      throw new Error(`Proposal generation failed for ${failedSections.length} section(s). No proposal was saved.`);
-    }
 
     // ── Update sections with generated content ──
     const generatedAt = new Date().toISOString();
@@ -638,119 +450,4 @@ async function rollbackCreatedProposal(base44, proposalId, knownSections = []) {
     }
     return false;
   }
-}
-
-function buildProjectContext(project, narrativeGoal, brandAsset, clientBrief, engineeringSnapshot, reportType = 'system_summary', reportVersions = [], sourceIdentity = null, versionEvidenceText = '') {
-  const goalLabel = GOAL_LABELS[narrativeGoal] || 'Luxury Cinema';
-  // A comparison carries the frozen evidence for EVERY selected version plus the
-  // calculated comparison table. A single report carries its own evidence.
-  const evidence = reportType === 'comparison' && versionEvidenceText
-    ? versionEvidenceText
-    : buildEngineeringEvidence(engineeringSnapshot);
-  // Project facts are read from the REPORT — the frozen snapshot built from the
-  // current version — never from the legacy project row, so a proposal can
-  // never describe another version's screen, room or layout. The legacy screen
-  // is not used as a fallback either: a report either states the screen the
-  // design actually has, in every section, or states none at all.
-  const snapshotRoom = engineeringSnapshot?.room || {};
-  const snapshotSystem = engineeringSnapshot?.system || {};
-  const legacyRoom = [project.room_width, project.room_length, project.room_height]
-    .filter((value) => value !== null && value !== undefined && value !== '')
-    .join(' × ');
-  const roomDimensions = snapshotRoom.dimensions_text
-    || (legacyRoom ? `${legacyRoom} m` : 'Not specified');
-  const screenSize = snapshotRoom.size_inches ?? '';
-  const aspectRatio = snapshotRoom.aspect_ratio || project.aspect_ratio || '';
-  const dolbyConfig = snapshotSystem.channel_layout?.configuration_text || project.dolby_config || '';
-  const speakersByRole = project.selected_speakers_by_role || {};
-  const speakerInfo = Object.entries(speakersByRole)
-    .map(([role, model]) => `${role}: ${model}`)
-    .join(', ');
-  const subwoofers = project.subwooferInstances || [];
-  const subInfo = subwoofers.length > 0
-    ? `${subwoofers.length}x ${subwoofers[0]?.model || 'Subwoofer'}`
-    : '';
-  const companyName = brandAsset?.company_name || '';
-  const briefText = (clientBrief || '').trim();
-
-  const isComparison = reportType === 'comparison';
-
-  return [
-    `Report Type: ${isComparison ? 'System Design Comparison' : 'System Design Summary'}`,
-    isComparison && reportVersions.length > 0 ? `Versions compared: ${reportVersions.join(' | ')}` : '',
-    isComparison && reportVersions.length > 0 ? `Calculated evidence supplied for every version: ${reportVersions.join(' | ')}` : '',
-    `Narrative Goal: ${goalLabel}`,
-    `Company: ${companyName}`,
-    `Project: ${project.name || ''}`,
-    `Client: ${project.client_name || ''}`,
-    // Report identity: which report, for which version, was written from.
-    `Report project id: ${sourceIdentity?.project_id || ''}`,
-    `Report version id: ${sourceIdentity?.version_id || ''}`,
-    `Report version: ${sourceIdentity?.version_label || ''}`,
-    `Report fingerprint: ${sourceIdentity?.engineering_fingerprint || ''}`,
-    `Reports generated: ${sourceIdentity?.published_at || ''}`,
-    ...(!isComparison ? [
-      `Room Dimensions: ${roomDimensions}`,
-      screenSize
-        ? `Screen: ${screenSize}" ${aspectRatio} (this is the screen for this report: never state, convert or infer another screen size anywhere in the report)`
-        : 'Screen: not stated in this report — never state a screen size',
-      `Speaker Configuration: ${dolbyConfig}`,
-      speakerInfo ? `Speakers: ${speakerInfo}` : '',
-      subInfo ? `Subwoofers: ${subInfo}` : '',
-    ] : []),
-    '',
-    evidence,
-    '',
-    '=== EMPHASIS NOTES / CLIENT BRIEF (narrative focus: guides emphasis only, never the facts) ===',
-    briefText || 'No specific emphasis notes provided. Use a balanced professional narrative.',
-    '',
-    '=== CONSTRAINT ===',
-    'Use only the supplied report data for project facts.',
-    'Never invent, infer, or carry over a project fact — screen size, aspect ratio,',
-    'room dimensions, seating, speaker layout, subwoofer layout, RP22 results,',
-    'viewing results, SPL capability, bass results, limitations, or recommendations —',
-    'from any other project, version, or earlier design.',
-    isComparison
-      ? 'Calculated Sound Proof evidence is supplied for every selected version, and the comparison table is calculated for each of them. Never state or imply a measured result that is not in that evidence, and never state a difference the table does not show.'
-      : '',
-    'The Client Brief influences narrative emphasis, wording, and structure ONLY.',
-    'It must NEVER alter, contradict, or override any engineering result, RP22 value,',
-    'Design Rating, or recommendation. All measured values remain exactly as reported.',
-  ].filter(Boolean).join('\n');
-}
-
-function buildSectionPrompt(sectionDef, projectContext, proposalType, interpretationBlock = '', layout = null) {
-  const sectionInstruction = proposalType !== 'single'
-    ? getSystemSummarySectionPrompt(sectionDef.type, sectionDef.title, layout, proposalType)
-    : SECTION_PROMPTS[sectionDef.type] || `Write the ${sectionDef.title} section. 2-3 paragraphs.`;
-
-  return [
-    // Stage 1 leads: the design story first, then the engineering evidence that
-    // supports it, then this section's instruction, with the style contract
-    // last so it is the final thing the model reads.
-    interpretationBlock,
-    '',
-    projectContext,
-    '',
-    '---',
-    '',
-    `Write the "${sectionDef.title}" section of a professional home cinema design proposal.`,
-    '',
-    sectionInstruction,
-    // A comparison carries its own rule as well as the shared comparison
-    // instructions: every difference is explained as what changed, which
-    // parameter carries it, what each option's value is, and what that gives the
-    // room.
-    proposalType === 'comparison'
-      ? [COMPARISON_REPORT_INSTRUCTIONS, buildComparisonSectionRule(sectionDef.type)].filter(Boolean).join('\n\n')
-      : '',
-    '',
-    'Format the response as HTML. Use <h2>, <h3>, <p>, <ul>, <li>, <strong>, <em> tags.',
-    'Do NOT include the section title — only the body content.',
-    'Write in British English.',
-    'Do not mention prices.',
-    '',
-    buildWritingStyleContract(layout),
-    buildProposalSalesVoice(sectionDef.type, proposalType),
-  ].join('\n');
 }
