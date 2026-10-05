@@ -45,26 +45,49 @@ export default function ReportSnapshotBanner({
   generatedBy = null,
   regenerating = false,
   onRegenerate = null,
+  // The report's own evidence did not agree with what the report shows, so a
+  // proposal may not read it. The report itself stays fully visible.
+  evidenceIncomplete = false,
+  evidenceMismatches = [],
   className = '',
 }) {
-  if (status !== REPORT_SNAPSHOT_STATUS.STALE) return null;
+  const stale = status === REPORT_SNAPSHOT_STATUS.STALE;
+  if (!stale && !evidenceIncomplete) return null;
 
   const when = formatGeneratedAt(generatedAt);
   const author = (typeof generatedBy === 'string' && generatedBy.trim()) ? generatedBy.trim() : null;
   const stamp = [when ? `Generated ${when}` : null, author ? `by ${author}` : null]
     .filter(Boolean)
     .join(' ');
+  const mismatchList = (Array.isArray(evidenceMismatches) ? evidenceMismatches : [])
+    .map((entry) => entry?.key || entry?.area)
+    .filter(Boolean)
+    .slice(0, 6);
 
   return (
     <div className={className} style={BANNER}>
       <AlertTriangle className="w-4 h-4 mt-[2px] flex-shrink-0" style={{ color: '#B08A3E' }} />
       <div style={{ flex: 1, minWidth: 0 }}>
-        <strong style={{ color: '#213428' }}>
-          This {reportTypeLabel(reportType)} was generated before the latest changes.
-        </strong>{' '}
-        {buildStaleSentence(changedKeys)}
-        {stamp ? ` ${stamp}.` : ''}{' '}
-        The saved report is shown unchanged. Regenerate it to bring it up to date.
+        {stale ? (
+          <>
+            <strong style={{ color: '#213428' }}>
+              This {reportTypeLabel(reportType)} was generated before the latest changes.
+            </strong>{' '}
+            {buildStaleSentence(changedKeys)}
+            {stamp ? ` ${stamp}.` : ''}{' '}
+            The saved report is shown unchanged. Regenerate it to bring it up to date.
+          </>
+        ) : (
+          <>
+            <strong style={{ color: '#213428' }}>
+              This {reportTypeLabel(reportType)} is incomplete for proposal use.
+            </strong>{' '}
+            The evidence saved with this report does not match the values the report shows
+            {mismatchList.length > 0 ? ` (${mismatchList.join(', ')})` : ''}.
+            A proposal cannot use this report until it is regenerated.
+            {stamp ? ` ${stamp}.` : ''}
+          </>
+        )}
       </div>
       {onRegenerate && (
         <button

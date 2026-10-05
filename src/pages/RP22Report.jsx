@@ -1324,6 +1324,8 @@ function RP22ReportInner() {
                     generatedBy={reportSnapshot.generatedBy}
                     regenerating={reportSnapshot.saving}
                     onRegenerate={reportSnapshot.regenerate}
+                    evidenceIncomplete={reportSnapshot.evidenceIncomplete}
+                    evidenceMismatches={reportSnapshot.evidenceMismatches}
                 />
             </div>
 

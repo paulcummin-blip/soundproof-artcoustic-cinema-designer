@@ -95,12 +95,26 @@ const SEAT_PRIORITY =
   'seat-r1-c1:secondary|seat-r1-c2:primary|seat-r1-c3:primary|seat-r1-c4:secondary'
   + '|seat-r2-c1:secondary|seat-r2-c2:secondary|seat-r2-c3:primary|seat-r2-c4:secondary|seat-r2-c5:secondary';
 
-/** A saved report carried under the current payload generation. */
+/** The proposal evidence a report saved under the current capture carries. */
+const reportEvidence = (versionId = 'v1') => ({
+  evidence_version: 1,
+  report_type: null,
+  identity: { project_id: 'p1', version_id: versionId, report_type: 'technical', source_fingerprint: 'eng:v1:c19ceb2efb6c3d9c' },
+  proposal_ready: true,
+  evidence_fingerprint: 're1-8c1f0f2a-2a0',
+});
+
+/**
+ * A saved report carried under the current payload generation: its pages, its
+ * frozen proposal source AND the machine-readable reportEvidence a proposal
+ * reads.
+ */
 const savedReport = ({ fingerprints, generatedAt }) => ({
   report_schema_version: 1,
   payload: {
     pages: [{ id: 'cover', category: 'cover' }],
     proposalSource: { report_source_version: 1, identity: {} },
+    reportEvidence: reportEvidence(),
   },
   source_fingerprints: fingerprints,
   generated_at: generatedAt,
@@ -109,8 +123,8 @@ const savedReport = ({ fingerprints, generatedAt }) => ({
 /**
  * The same report written BEFORE the proposal evidence capture existed: it has
  * its pages and its fingerprints, and it is stored current, but it carries no
- * payload.proposalSource. This is the legacy snapshot — the report exists and is
- * current, and only its proposal evidence needs refreshing.
+ * reportEvidence. This is the legacy snapshot — the report exists and is
+ * current, and only its proposal evidence needs a one-time refresh.
  */
 const legacyReport = ({ fingerprints, generatedAt }) => ({
   report_schema_version: 1,
@@ -647,20 +661,20 @@ const LEGACY_SOURCES = {
 
 test('17. a current snapshot without proposal evidence is Legacy, never Missing', () => {
   // Acceptance A: the snapshot exists, is stored current, and has no
-  // payload.proposalSource.
+  // reportEvidence.
   for (const report of [LEGACY_VISUAL, LEGACY_TECHNICAL]) {
     const cell = resolveSavedReportCell({
       saved: report,
       currentFingerprints: LEVEL_4_SOURCES.currentFingerprints,
     });
     assert.equal(cell.state, READINESS_STATE.LEGACY);
-    assert.equal(cell.status, 'Needs one-time refresh');
+    assert.equal(cell.status, 'Needs one-time evidence refresh');
     assert.notEqual(cell.status, 'Missing');
   }
 
   const row = resolveVersionReadiness(LEGACY_SOURCES);
-  assert.equal(row.visual_report_status, 'Needs one-time refresh');
-  assert.equal(row.technical_report_status, 'Needs one-time refresh');
+  assert.equal(row.visual_report_status, 'Needs one-time evidence refresh');
+  assert.equal(row.technical_report_status, 'Needs one-time evidence refresh');
   assert.equal(row.ready, false);
   // Acceptance E/2: the warning names the exact version and report, and reads as
   // a ONE-TIME refresh rather than recurring maintenance.
@@ -719,7 +733,7 @@ test('19. the client mirror derives the same legacy verdict, word for word', () 
   const clientResult = clientRow(rowInput);
   const sharedResult = sharedVersionReadinessRow(rowInput);
   assert.equal(clientResult.blockingSentence, sharedResult.blockingSentence);
-  assert.equal(clientResult.visual_report_status, 'Needs one-time refresh');
+  assert.equal(clientResult.visual_report_status, 'Needs one-time evidence refresh');
   assert.equal(clientResult.ready, false);
   assert.equal(sharedResult.ready, false);
 });

@@ -49,6 +49,7 @@ import {
   hasProposalEvidence,
   resolveCalculationAuthority,
   resolveEngineeringCell,
+  resolveEvidenceState,
   resolveVersionReadinessRow,
   versionDisplayName,
 } from './proposalReadinessAuthority';
@@ -86,11 +87,23 @@ function reportCell(saved, currentFingerprints) {
     return buildReadinessCell({ state: READINESS_STATE.STALE, generatedAt: saved.generated_at });
   }
 
+  // The proposal evidence this report carries — the only thing a proposal reads
+  // from it. A report whose evidence is stored but does not agree with what the
+  // report shows may not be used: it is Incomplete, not Missing.
+  const evidenceState = resolveEvidenceState(saved);
+  if (evidenceState === 'incomplete') {
+    return buildReadinessCell({
+      state: READINESS_STATE.INCOMPLETE,
+      generatedAt: saved.generated_at,
+      reason: 'This report’s evidence does not match what the report shows. Regenerate it.',
+    });
+  }
+
   // The design has not moved on, so this report can be used for a proposal. It
   // was written before the proposal evidence capture, so it carries no
-  // payload.proposalSource: a ONE-TIME evidence refresh — never a missing report
-  // and never recurring maintenance.
-  if (!hasProposalEvidence(saved)) {
+  // reportEvidence: a ONE-TIME evidence refresh — never a missing report and
+  // never recurring maintenance.
+  if (evidenceState !== 'ready') {
     return buildReadinessCell({
       state: READINESS_STATE.LEGACY,
       generatedAt: saved.generated_at,

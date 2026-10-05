@@ -34,9 +34,9 @@ export const READINESS_STATE = Object.freeze({
   STALE: 'stale',
   /**
    * The saved report EXISTS and is stored current, but it predates the proposal
-   * evidence capture: it carries no payload.proposalSource, which a comparison
-   * needs. The report is not missing and must never be described as missing —
-   * only its proposal evidence needs refreshing.
+   * evidence capture: it carries no stored reportEvidence, which a proposal
+   * reads. The report is not missing and must never be described as missing —
+   * only its proposal evidence needs a one-time refresh.
    */
   LEGACY: 'legacy',
   MISSING: 'missing',
@@ -49,7 +49,7 @@ export const READINESS_STATE = Object.freeze({
 export const READINESS_STATUS_TEXT = Object.freeze({
   [READINESS_STATE.CURRENT]: 'Current',
   [READINESS_STATE.STALE]: 'Stale',
-  [READINESS_STATE.LEGACY]: 'Needs one-time refresh',
+  [READINESS_STATE.LEGACY]: 'Needs one-time evidence refresh',
   [READINESS_STATE.MISSING]: 'Missing',
   [READINESS_STATE.INCOMPLETE]: 'Incomplete',
   [READINESS_STATE.UNAVAILABLE]: 'Unavailable',
@@ -105,6 +105,9 @@ export const PUBLICATION_STATUS = Object.freeze({
   STALE: 'stale',
   READ_FAILED: 'read_failed',
 });
+
+/** The reportEvidence payload generation a proposal may read. */
+export const REPORT_EVIDENCE_VERSION = 1;
 
 /**
  * Where a version's calculated engineering result was found, so the evidence
@@ -255,10 +258,13 @@ export function versionDisplayName({ version_name: name = null, version_number: 
  * @param {boolean} [params.checking]
  * @returns {string} READINESS_STATE
  */
-export function resolveReportCellState({ hasSaved = false, snapshotStatus = null, checking = false, legacy = false } = {}) {
+export function resolveReportCellState({ hasSaved = false, snapshotStatus = null, checking = false, legacy = false, incomplete = false } = {}) {
   if (checking) return READINESS_STATE.CHECKING;
   if (!hasSaved) return READINESS_STATE.MISSING;
   if (snapshotStatus === 'stale') return READINESS_STATE.STALE;
+  // The report exists and is current, but the evidence it carries may not be
+  // read: its parity check failed, so it is Incomplete rather than Missing.
+  if (incomplete) return READINESS_STATE.INCOMPLETE;
   // The report exists and is current; it simply predates the proposal evidence
   // capture, so it needs refreshing rather than being called Missing.
   if (legacy) return READINESS_STATE.LEGACY;
@@ -268,12 +274,30 @@ export function resolveReportCellState({ hasSaved = false, snapshotStatus = null
 }
 
 /**
- * Whether a saved report carries the proposal evidence payload a comparison is
- * generated from. A report written before that capture existed has pages and
- * fingerprints but no proposalSource — it is a legacy snapshot, not a missing one.
+ * The proposal evidence a saved report carries, and whether a proposal may read
+ * it:
+ *   'none'        no evidence stored at all, and not a usable one: a report
+ *                 written before the evidence capture. It is a LEGACY snapshot,
+ *                 never a missing one.
+ *   'incomplete'  evidence stored, but its parity check failed or it is missing
+ *                 required facts, so it may not be read until the report is
+ *                 regenerated.
+ *   'ready'       evidence stored and verified against the report itself.
+ */
+export function resolveEvidenceState(saved) {
+  const evidence = saved?.payload?.reportEvidence;
+  if (!evidence || typeof evidence !== 'object') return 'none';
+  if (Number(evidence.evidence_version) !== REPORT_EVIDENCE_VERSION) return 'none';
+  return evidence.proposal_ready === true ? 'ready' : 'incomplete';
+}
+
+/**
+ * Whether a saved report carries proposal evidence a proposal may read. A report
+ * written before that capture existed has pages and fingerprints but no evidence
+ * — it is a legacy snapshot, not a missing one.
  */
 export function hasProposalEvidence(saved) {
-  return !!saved?.payload?.proposalSource;
+  return resolveEvidenceState(saved) === 'ready';
 }
 
 /** A cell: its state, its display text and when it was generated. */

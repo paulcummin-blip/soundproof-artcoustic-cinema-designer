@@ -102,30 +102,63 @@ export function useReportSnapshot({
     try {
       const version = await base44.entities.ProjectVersion.get(versionId);
       if (version?.project_id !== projectId) throw new Error('Report version does not belong to this project.');
-      const captured = captureReportProposalSource({ projectId, versionId, ...reportSource,
-        project: { ...reportSource?.project, ...version.design_state, version_name: version.version_name },
-        presentation: reportSource?.presentation,
-      });
-      if (!captured) throw new Error('The report evidence is not ready to save.');
       // Saved with the version's published engineering fingerprint whenever the
       // handoff carried none, so the design this report was generated from is
       // stated in full and a later design change is detected. Saving this at
       // generation time is what keeps a new report Current for proposal
       // generation without it ever being opened again.
+      const savedFingerprints = buildSavedSourceFingerprints({
+        currentFingerprints: currentFp,
+        publishedFingerprint: version.published_fingerprint,
+      });
+      const captured = captureReportProposalSource({ projectId, versionId, ...reportSource,
+        project: { ...reportSource?.project, ...version.design_state, version_name: version.version_name },
+        presentation: reportSource?.presentation,
+        reportType,
+        sourceFingerprint: savedFingerprints,
+      });
+      if (!captured) throw new Error('The report evidence is not ready to save.');
+
+      // ── PARITY, before the evidence is marked proposal-ready ──
+      // The evidence is compared against what this report actually shows: every
+      // visible parameter value, every Products Selected row and every viewing
+      // value. A mismatch never fails the report — it is logged, the evidence is
+      // stored with proposal_ready = false, and the report is shown as incomplete
+      // for proposal use, so a proposal can never read evidence the report itself
+      // does not state.
+      const { reportEvidence, ...proposalSource } = captured;
+      const parity = checkReportEvidenceParity({ evidence: reportEvidence, captured, reportType });
+      if (!parity.passed) {
+        console.warn('[reportEvidence] parity check failed:', {
+          reportType,
+          missing: parity.missing,
+          mismatches: parity.mismatches,
+        });
+      }
+      const evidence = reportEvidence
+        ? { ...reportEvidence, proposal_ready: parity.passed === true }
+        : null;
+
       const record = buildSnapshotRecord({
         projectId,
         versionId,
         accountId,
         reportType,
-        sourceFingerprints: buildSavedSourceFingerprints({
-          currentFingerprints: currentFp,
-          publishedFingerprint: version.published_fingerprint,
-        }),
+        sourceFingerprints: savedFingerprints,
         generatedBy: user?.full_name || user?.email || null,
-        payload: { ...payload, proposalSource: captured },
+        payload: {
+          ...payload,
+          proposalSource,
+          reportEvidence: evidence,
+          evidence_parity: buildParityRecord(parity),
+        },
       });
       const written = await saveReportSnapshot({ existing: saved, record });
-      if (mountedRef.current) setSaved(written || { ...record, id: saved?.id || null });
+      if (mountedRef.current) {
+        setSaved(written || { ...record, id: saved?.id || null });
+        setEvidenceIncomplete(!parity.passed);
+        setEvidenceMismatches([...parity.mismatches, ...parity.missing.map((field) => ({ area: field }))]);
+      }
       return written;
     } catch (error) {
       console.warn('[reportSnapshot] save failed:', error?.message || error);
@@ -154,28 +187,65 @@ export function useReportSnapshot({
     persist();
   }, [loading, ready, payload, projectId, versionId, reportType, resolution.status, currentFp.engineeringFingerprint, reportSource, persist]);
 
-  // ── Compatibility path: recover the proposal evidence in place ───────────
-  // A saved report that is CURRENT but predates the proposal evidence capture
-  // carries no payload.proposalSource, so proposal comparison generation cannot
-  // read it. Opening the report augments that SAME record in place — same
-  // report, same fingerprints, plus the proposal evidence built from the same
-  // frozen engineering authority the report renders from. Nothing is
-  // regenerated, and no report content changes.
+  // ── Legacy path: recover the evidence from the report's OWN frozen source ──
+  // A report saved before the evidence capture carries no reportEvidence. Its own
+  // stored frozen source IS the authority it was generated from, so the evidence
+  // is derived from that stored source ALONE — offline, never from the current
+  // project. Nothing is regenerated and no report content changes: the same
+  // record gains the evidence it should have carried, once.
   //
-  // A report that is not current is left exactly as it is: Regenerate remains
-  // the only overwrite path for it, so a genuinely stale report is never
-  // silently refreshed.
+  // A report with NO stored frozen source cannot be recovered. It stays blocked
+  // as a legacy report whose evidence needs a one-time refresh, and only
+  // regenerating it from the current design can produce evidence.
   useEffect(() => {
-    if (loading || !ready || !payload || !projectId || !versionId || !reportType) return;
+    if (loading || !projectId || !versionId || !reportType) return;
+    if (!saved?.id) return;
     if (resolution.status !== REPORT_SNAPSHOT_STATUS.CURRENT) return;
-    if (saved?.payload?.proposalSource) return;
-    if (!reportSource?.project) return;
+    if (readStoredEvidence(saved)) return;
+    const stored = saved.payload?.proposalSource;
+    if (!stored) return;
 
-    const key = `${projectId}::${versionId}::${reportType}`;
+    const key = `${projectId}::${versionId}::${reportType}::evidence`;
     if (evidenceBackfillKeyRef.current === key) return;
     evidenceBackfillKeyRef.current = key;
-    persist();
-  }, [loading, ready, payload, projectId, versionId, reportType, resolution.status, saved, reportSource, persist]);
+
+    (async () => {
+      try {
+        const evidence = buildReportEvidence({
+          reportType,
+          captured: stored,
+          sourceFingerprint: saved.source_fingerprints,
+        });
+        if (!evidence) return;
+        const parity = checkReportEvidenceParity({ evidence, captured: stored, reportType });
+        const record = {
+          ...saved,
+          payload: {
+            ...saved.payload,
+            reportEvidence: { ...evidence, proposal_ready: parity.passed === true },
+            evidence_parity: buildParityRecord(parity),
+          },
+        };
+        const written = await saveReportSnapshot({ existing: saved, record });
+        if (!mountedRef.current) return;
+        setSaved(written || record);
+        setEvidenceIncomplete(!parity.passed);
+        setEvidenceMismatches([...parity.mismatches, ...parity.missing.map((field) => ({ area: field }))]);
+      } catch (error) {
+        // Recovery is best effort: a report that cannot be recovered stays
+        // blocked as a legacy report, and is never reported as missing.
+        console.warn('[reportEvidence] legacy recovery failed:', error?.message || error);
+      }
+    })();
+  }, [loading, saved, resolution.status, projectId, versionId, reportType]);
+
+  // The evidence this report carries, and whether a proposal may read it. Read
+  // from the SAVED report itself, so a report whose parity check failed shows as
+  // incomplete the moment it is opened — not only after a save in this session.
+  const storedEvidence = readStoredEvidence(saved);
+  const evidenceIncompleteNow = storedEvidence
+    ? storedEvidence.proposal_ready !== true
+    : evidenceIncomplete;
 
   return {
     saved,
@@ -185,6 +255,12 @@ export function useReportSnapshot({
     generatedBy: resolution.generatedBy,
     loading,
     saving,
+    // The report's own evidence snapshot, and whether it may be used by a
+    // proposal. A report whose parity check failed is still saved and fully
+    // visible here — it is simply never proposal-ready.
+    evidence: storedEvidence,
+    evidenceIncomplete: evidenceIncompleteNow,
+    evidenceMismatches,
     regenerate: persist,
   };
 }

@@ -39,6 +39,34 @@ function sameNumber(a, b, tolerance = 0.05) {
 }
 
 /**
+ * Whether two stated figures are the same figure. Identical text is the common
+ * case; beyond that the two are the same only when they carry the same number
+ * AND the same unit, so "42.1 Hz" and "42 Hz" are the same figure whereas
+ * "L3" and "L4" never are. Formatting alone never manufactures a failure.
+ */
+function sameStatedValue(a, b) {
+  const left = normaliseValue(a);
+  const right = normaliseValue(b);
+  if (left === right) return true;
+  if (!left || !right) return false;
+  const leftNumber = parseFloat(left);
+  const rightNumber = parseFloat(right);
+  if (!Number.isFinite(leftNumber) || !Number.isFinite(rightNumber)) return false;
+  const unitOf = (text) => text.replace(/[\d.\-+\s]/g, '');
+  if (unitOf(left) !== unitOf(right)) return false;
+  return Math.abs(leftNumber - rightNumber) <= 0.05;
+}
+
+/**
+ * The parameters parity BLOCKS on: the report type's own required set — for a
+ * Technical Report, P12 and P13 among them. A parameter outside that set is
+ * still compared and reported, but a difference there never blocks a proposal.
+ */
+function blockingParameterIds(reportType) {
+  return new Set(EVIDENCE_REQUIRED_PARAMETERS[reportType] || []);
+}
+
+/**
  * The parameters parity compares: the blocking set for the report type, plus
  * every other parameter the evidence states a second, independent value for.
  */
@@ -85,17 +113,19 @@ function productMismatches(evidence, captured) {
 
 function parameterMismatches(evidence, reportType) {
   const ids = comparableParameterIds(evidence, reportType);
+  const blockingIds = blockingParameterIds(reportType);
   const mismatches = [];
   for (const id of ids) {
     const entry = evidence?.parameter_index?.[`P${id}`];
     if (!entry) continue;
+    const blocking = blockingIds.has(id);
     // Only compared where the RP22 authority itself stated a figure: a
     // parameter the authority left unstated never manufactures a failure.
-    if (entry.authority_level && normaliseValue(entry.authority_level) !== normaliseValue(entry.level)) {
-      mismatches.push({ area: 'parameter_index', key: entry.key, evidence: entry.level, report: entry.authority_level });
+    if (entry.authority_level && !sameStatedValue(entry.authority_level, entry.level)) {
+      mismatches.push({ area: 'parameter_index', key: entry.key, evidence: entry.level, report: entry.authority_level, blocking });
     }
-    if (entry.authority_value && normaliseValue(entry.authority_value) !== normaliseValue(entry.value)) {
-      mismatches.push({ area: 'parameter_index', key: entry.key, evidence: entry.value, report: entry.authority_value });
+    if (entry.authority_value && !sameStatedValue(entry.authority_value, entry.value)) {
+      mismatches.push({ area: 'parameter_index', key: entry.key, evidence: entry.value, report: entry.authority_value, blocking });
     }
   }
   return mismatches;
@@ -136,13 +166,18 @@ export function checkReportEvidenceParity({ evidence, captured, reportType = nul
   const validation = validateReportEvidence(evidence, reportType);
   const mismatches = [
     ...parameterMismatches(evidence, reportType),
-    ...productMismatches(evidence, captured),
-    ...viewingMismatches(evidence, captured),
+    ...productMismatches(evidence, captured).map((entry) => ({ ...entry, blocking: true })),
+    ...viewingMismatches(evidence, captured).map((entry) => ({ ...entry, blocking: true })),
   ];
+  // A difference the report's own required parameters disagree on, or an
+  // incomplete evidence set, is what blocks a proposal. An advisory difference
+  // elsewhere is stated but does not block.
+  const blocking = mismatches.filter((entry) => entry.blocking !== false);
   return {
-    passed: validation.complete && mismatches.length === 0,
+    passed: validation.complete && blocking.length === 0,
     mismatches,
     missing: validation.missing,
+    blocking,
   };
 }
 

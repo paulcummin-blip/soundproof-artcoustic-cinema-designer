@@ -163,6 +163,15 @@ export default async function(req) {
       return Response.json({ error: error.message }, { status: 409 });
     }
     engineering_snapshot = suppliedSnapshots[0].snapshot;
+    // ── Evidence traceability ──
+    // The exact evidence each version's facts were read from: the Visual and
+    // Technical Report snapshots, the version, when the evidence was generated
+    // and its content fingerprint. A proposal that later disagrees with a report
+    // can therefore be traced back to the evidence it actually read.
+    const reportEvidenceCitations = suppliedSnapshots.map((entry) => ({
+      version_id: entry.version_id,
+      ...(entry.evidence?.citation || {}),
+    }));
     const versionLabelById = new Map(
       resolvedVersionIds.map((id, index) => {
         const record = (projectVersions || []).find((version) => version.id === id);
@@ -331,6 +340,8 @@ export default async function(req) {
       // design story a report was written from can be audited later.
       metadata: {
         project_interpretation: primaryInterpretation,
+        // The evidence this proposal was generated from, per version.
+        report_evidence: reportEvidenceCitations,
         ...(comparisonReading ? { comparison_reading: comparisonReading } : {}),
         // The comparison data contract: one frozen evidence entry per selected
         // version, plus the calculated table the report renders. Section

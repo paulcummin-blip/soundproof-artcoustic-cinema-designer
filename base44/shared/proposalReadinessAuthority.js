@@ -47,9 +47,9 @@ export const READINESS_STATE = Object.freeze({
   STALE: 'stale',
   /**
    * The saved report EXISTS and is stored current, but it predates the proposal
-   * evidence capture: it carries no payload.proposalSource, which a comparison
-   * needs. The report is not missing and must never be described as missing —
-   * only its proposal evidence needs refreshing.
+   * evidence capture: it carries no stored reportEvidence, which a proposal
+   * reads. The report is not missing and must never be described as missing —
+   * only its proposal evidence needs a one-time refresh.
    */
   LEGACY: 'legacy',
   MISSING: 'missing',
@@ -62,7 +62,7 @@ export const READINESS_STATE = Object.freeze({
 export const READINESS_STATUS_TEXT = Object.freeze({
   [READINESS_STATE.CURRENT]: 'Current',
   [READINESS_STATE.STALE]: 'Stale',
-  [READINESS_STATE.LEGACY]: 'Needs one-time refresh',
+  [READINESS_STATE.LEGACY]: 'Needs one-time evidence refresh',
   [READINESS_STATE.MISSING]: 'Missing',
   [READINESS_STATE.INCOMPLETE]: 'Incomplete',
   [READINESS_STATE.UNAVAILABLE]: 'Unavailable',
@@ -130,6 +130,9 @@ export const PUBLICATION_STATUS = Object.freeze({
 /** The saved-report payload generation. A payload from another one is not usable. */
 export const REPORT_SNAPSHOT_SCHEMA_VERSION = 1;
 
+/** The reportEvidence payload generation a proposal may read. */
+export const REPORT_EVIDENCE_VERSION = 1;
+
 /**
  * Where a version's calculated engineering result was found, so the evidence
  * behind a Current engineering cell is always stated:
@@ -186,10 +189,13 @@ export function versionDisplayName(version = {}) {
 }
 
 /** One report cell's state, from the saved report and its fingerprint comparison. */
-export function resolveReportCellState({ hasSaved = false, snapshotStatus = null, checking = false, legacy = false } = {}) {
+export function resolveReportCellState({ hasSaved = false, snapshotStatus = null, checking = false, legacy = false, incomplete = false } = {}) {
   if (checking) return READINESS_STATE.CHECKING;
   if (!hasSaved) return READINESS_STATE.MISSING;
   if (snapshotStatus === 'stale') return READINESS_STATE.STALE;
+  // The report exists and is current, but the evidence it carries may not be
+  // read: its parity check failed, so it is Incomplete rather than Missing.
+  if (incomplete) return READINESS_STATE.INCOMPLETE;
   // The report exists and is current; it simply predates the proposal evidence
   // capture, so it needs refreshing rather than being called Missing.
   if (legacy) return READINESS_STATE.LEGACY;
@@ -259,16 +265,34 @@ export function isSavedReportRestorable(snapshot) {
 }
 
 /**
- * Whether a saved report carries the proposal evidence payload a comparison is
- * generated from. A report written before that capture existed has pages and
- * fingerprints but no proposalSource — it is a legacy snapshot, not a missing one.
+ * The proposal evidence a saved report carries, and whether a proposal may read
+ * it:
+ *   'none'        no evidence stored at all, and not a usable one: a report
+ *                 written before the evidence capture. It is a LEGACY snapshot,
+ *                 never a missing one.
+ *   'incomplete'  evidence stored, but its parity check failed or it is missing
+ *                 required facts, so it may not be read until the report is
+ *                 regenerated.
+ *   'ready'       evidence stored and verified against the report itself.
+ */
+export function resolveEvidenceState(saved) {
+  const evidence = saved?.payload?.reportEvidence;
+  if (!evidence || typeof evidence !== 'object') return 'none';
+  if (Number(evidence.evidence_version) !== REPORT_EVIDENCE_VERSION) return 'none';
+  return evidence.proposal_ready === true ? 'ready' : 'incomplete';
+}
+
+/**
+ * Whether a saved report carries proposal evidence a proposal may read. A report
+ * written before that capture existed has pages and fingerprints but no evidence
+ * — it is a legacy snapshot, not a missing one.
  */
 export function hasProposalEvidence(saved) {
-  return !!saved?.payload?.proposalSource;
+  return resolveEvidenceState(saved) === 'ready';
 }
 
 /** One saved report → its readiness cell. */
-export function resolveSavedReportCell({ saved = null, currentFingerprints = null } = {}) {
+export function resolveSavedReportCell({ saved = null, currentFingerprints = null, evidenceState = null } = {}) {
   // No matching saved report for this project version and report type: Missing.
   if (!isSavedReportRestorable(saved)) {
     return buildReadinessCell({ state: READINESS_STATE.MISSING });
@@ -278,8 +302,18 @@ export function resolveSavedReportCell({ saved = null, currentFingerprints = nul
   if (changed.length > 0) {
     return buildReadinessCell({ state: READINESS_STATE.STALE, generatedAt: saved.generated_at || null });
   }
-  // The report exists and is current, but its proposal evidence was never
-  // captured: it needs refreshing, and it is never Missing.
+  // The evidence is stored, but it does not agree with what the report shows —
+  // or it is missing required facts. It may not be read until the report is
+  // regenerated, and the report is never called Missing.
+  if ((evidenceState || resolveEvidenceState(saved)) === 'incomplete') {
+    return buildReadinessCell({
+      state: READINESS_STATE.INCOMPLETE,
+      generatedAt: saved.generated_at || null,
+      reason: 'This report’s evidence does not match what the report shows. Regenerate it.',
+    });
+  }
+  // The report exists and is current, but its evidence was never captured: it
+  // needs refreshing, and it is never Missing.
   if (!hasProposalEvidence(saved)) {
     return buildReadinessCell({ state: READINESS_STATE.LEGACY, generatedAt: saved.generated_at || null });
   }
