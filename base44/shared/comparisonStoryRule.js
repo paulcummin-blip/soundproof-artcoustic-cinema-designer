@@ -69,7 +69,7 @@ export const COMPARISON_SHARED_GROUND_RULE = [
 /** How the bass difference is explained. */
 export const COMPARISON_BASS_RULE = [
   '=== BASS ===',
-  'Subwoofer count is never proof of an advantage. Explain output and impact from P14, depth from P18, RSP balance from P19 and seat consistency from P20 separately, using each option\'s own reliable evidence. More output does not imply deeper extension or more even bass. Describe only the margin the supplied results actually demonstrate.',
+  'Subwoofer count is never the point on its own. Explain the engineering margin the arrangement creates behind Parameters 14, 18, 19 and 20, and what that margin gives the room: deeper extension, more control, more authority, and bass that holds up at real cinema levels.',
   'Describe bass between seats as more even, with less difference between the strongest and weakest seat, only where the P20 result is supplied for every option as reliable, current and positive. Where it is not supplied, leave seat-to-seat consistency out entirely and never claim it. Never claim perfect bass, and never describe the smaller arrangement as inadequate.',
 ].join('\n');
 
@@ -108,7 +108,7 @@ const SECTION_FOCUS = Object.freeze({
   ].join('\n'),
 
   overall_design: [
-    'FOR THIS SECTION, bring the differences together for the decision. Name what the smaller option keeps and the principal supported advantage of the higher specification, using the evidence already discussed. Explain who each option suits. Be decisive about a demonstrated performance advantage without declaring one automatically best, belittling the alternative or repeating earlier sections.',
+    'FOR THIS SECTION, bring the differences together for the decision. Name where each option is strongest and what the smaller option still keeps, using the values already discussed and no new ones. Leave the client clear about what each option gives the room, without ranking one as best and without repeating the earlier sections.',
   ].join('\n'),
 });
 
