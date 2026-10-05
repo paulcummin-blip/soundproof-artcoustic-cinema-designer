@@ -335,22 +335,13 @@ test('3. Level 4 version reads Current everywhere and does not block', () => {
 
 // ── 4. Marquee Home Level 1 version ─────────────────────────────────────────
 
-test('4. Level 1 version reads Current everywhere and does not block', () => {
+test('4. Level 1 bass cache never substitutes for a saved engineering assessment', () => {
   const row = resolveVersionReadiness(LEVEL_1_SOURCES);
-  assert.equal(row.versionId, LEVEL_1_VERSION.id);
-  assert.equal(row.versionName, 'Level 1 version');
-  assert.equal(row.visual_report_status, 'Current');
-  assert.equal(row.technical_report_status, 'Current');
-  assert.equal(row.engineering_result_status, 'Current');
-  assert.equal(row.blockingSentence, null);
-  assert.equal(row.ready, true);
-  // The engineering cell states the completed result's own time.
-  assert.equal(row.engineering.generatedAt, new Date(CALC_COMPLETED_AT_MS).toISOString());
-
-  const gate = resolveProposalReadinessGate({ rows: [row] });
-  assert.equal(gate.ready, true);
-  assert.equal(gate.message, null);
-  assert.equal(gate.blockedVersions.length, 0);
+  assert.equal(row.engineering_result_status, 'Missing');
+  assert.match(row.engineering.reason, /Engineering assessment not saved/);
+  assert.equal(row.ready, false);
+  assert.equal(row.engineering.generatedAt, null);
+  assert.equal(resolveProposalReadinessGate({ rows: [row] }).ready, false);
 });
 
 // ── 5. One authority: gate message is the panel's own sentence ──────────────
@@ -380,8 +371,8 @@ test('6. only a version with no calculated result is told so, by name', () => {
   const stored = resolveProposalReadinessGate({
     rows: [resolveVersionReadiness(LEVEL_4_SOURCES), resolveVersionReadiness(LEVEL_1_SOURCES)],
   });
-  assert.equal(stored.ready, true);
-  assert.equal(stored.message, null);
+  assert.equal(stored.ready, false);
+  assert.match(stored.message, /Level 1 version/);
 });
 
 // ── 7. A genuinely stale report is named, per version ───────────────────────
@@ -445,9 +436,9 @@ test('10. Generate is enabled only when every selected version is Current', () =
   const storedPair = resolveProposalReadinessGate({
     rows: [resolveVersionReadiness(LEVEL_4_SOURCES), resolveVersionReadiness(LEVEL_1_SOURCES)],
   });
-  assert.equal(storedPair.ready, true, 'both stored versions current → Next/Generate enabled');
-  assert.equal(storedPair.message, null);
-  assert.equal(storedPair.blockedVersions.length, 0);
+  assert.equal(storedPair.ready, false, 'bass-only Level 1 → Generate blocked');
+  assert.match(storedPair.message, /Level 1 version/);
+  assert.equal(storedPair.blockedVersions.length, 1);
 
   const oneBlocked = resolveProposalReadinessGate({
     rows: [resolveVersionReadiness(LEVEL_4_SOURCES), resolveVersionReadiness(UNBACKED_SOURCES)],
@@ -478,8 +469,8 @@ test('11. the engineering cell follows durable results, never a handoff', () => 
     PUBLICATION_STATUS.READ_FAILED,
   ]) {
     const cell = resolveEngineeringCell({ publication: null, publicationStatus, calculationAuthority: authority });
-    assert.equal(cell.state, READINESS_STATE.CURRENT, `completed result reads Current (${publicationStatus})`);
-    assert.equal(cell.generatedAt, authority.completedAt);
+    assert.notEqual(cell.state, READINESS_STATE.CURRENT, `bass-only cache cannot read Current (${publicationStatus})`);
+    assert.equal(cell.generatedAt, null);
   }
 });
 
@@ -538,12 +529,12 @@ test('13. the engineering result resolves from the completed calculation authori
     savedTechnicalReport: LEVEL_1_TECHNICAL,
   }), null);
 
-  // Technical Report Current + engineering Current: the two columns agree.
+  // Historical report status does not establish durable engineering authority.
   const row = resolveVersionReadiness(LEVEL_1_SOURCES);
   assert.equal(row.technical_report_status, 'Current');
-  assert.equal(row.engineering_result_status, 'Current');
-  assert.equal(row.blockers.length, 0);
-  assert.equal(row.ready, true);
+  assert.equal(row.engineering_result_status, 'Missing');
+  assert.equal(row.blockers.length, 1);
+  assert.equal(row.ready, false);
 });
 
 // ── 14. The client and the server resolve the same engineering result ───────
@@ -629,7 +620,7 @@ test('15. reports without a calculated result still block, naming that result', 
   assert.equal(row.visual_report_status, 'Current');
   assert.equal(row.technical_report_status, 'Current');
   assert.equal(row.engineering_result_status, 'Missing');
-  assert.equal(row.engineering.reason, 'No saved engineering result was found for this version. Calculate this version in Room Designer.');
+  assert.equal(row.engineering.reason, 'Engineering assessment not saved. Assessment values may be displayed, but are not published. Verify bass and publish this version in Room Designer.');
   assert.equal(row.ready, false);
   assert.deepEqual(row.blockers.map((blocker) => blocker.source), ['engineering']);
 
