@@ -23,6 +23,7 @@ import captureReportProposalSource from './captureReportProposalSource';
 import { loadReportSnapshot, saveReportSnapshot } from './reportSnapshotStore';
 import {
   REPORT_SNAPSHOT_STATUS,
+  buildSavedSourceFingerprints,
   buildSnapshotRecord,
   buildSourceFingerprints,
   resolveSnapshotStatus,
@@ -99,12 +100,20 @@ export function useReportSnapshot({
         presentation: reportSource?.presentation,
       });
       if (!captured) throw new Error('The report evidence is not ready to save.');
+      // Saved with the version's published engineering fingerprint whenever the
+      // handoff carried none, so the design this report was generated from is
+      // stated in full and a later design change is detected. Saving this at
+      // generation time is what keeps a new report Current for proposal
+      // generation without it ever being opened again.
       const record = buildSnapshotRecord({
         projectId,
         versionId,
         accountId,
         reportType,
-        sourceFingerprints: currentFp,
+        sourceFingerprints: buildSavedSourceFingerprints({
+          currentFingerprints: currentFp,
+          publishedFingerprint: version.published_fingerprint,
+        }),
         generatedBy: user?.full_name || user?.email || null,
         payload: { ...payload, proposalSource: captured },
       });
@@ -122,15 +131,21 @@ export function useReportSnapshot({
   // ── Save on first generation only ───────────────────────────────────────
   // A stale saved report is left exactly as it is: keeping it visible and
   // marking it out of date is the point. Regenerate is the only overwrite path.
+  //
+  // The save waits for the project record the evidence capture reads. Waiting is
+  // what makes a freshly generated report Current for proposal generation on the
+  // SAME visit: saving without it would write a snapshot with no proposalSource
+  // and leave the report reading as one that must be opened again.
   useEffect(() => {
     if (loading || !ready || !payload || !projectId || !versionId || !reportType) return;
     if (resolution.status !== REPORT_SNAPSHOT_STATUS.NONE) return;
+    if (!reportSource?.project) return;
 
     const key = `${projectId}::${versionId}::${reportType}::${currentFp.engineeringFingerprint || 'na'}`;
     if (autoSaveKeyRef.current === key) return;
     autoSaveKeyRef.current = key;
     persist();
-  }, [loading, ready, payload, projectId, versionId, reportType, resolution.status, currentFp.engineeringFingerprint, persist]);
+  }, [loading, ready, payload, projectId, versionId, reportType, resolution.status, currentFp.engineeringFingerprint, reportSource, persist]);
 
   // ── Compatibility path: recover the proposal evidence in place ───────────
   // A saved report that is CURRENT but predates the proposal evidence capture
@@ -147,12 +162,13 @@ export function useReportSnapshot({
     if (loading || !ready || !payload || !projectId || !versionId || !reportType) return;
     if (resolution.status !== REPORT_SNAPSHOT_STATUS.CURRENT) return;
     if (saved?.payload?.proposalSource) return;
+    if (!reportSource?.project) return;
 
     const key = `${projectId}::${versionId}::${reportType}`;
     if (evidenceBackfillKeyRef.current === key) return;
     evidenceBackfillKeyRef.current = key;
     persist();
-  }, [loading, ready, payload, projectId, versionId, reportType, resolution.status, saved, persist]);
+  }, [loading, ready, payload, projectId, versionId, reportType, resolution.status, saved, reportSource, persist]);
 
   return {
     saved,

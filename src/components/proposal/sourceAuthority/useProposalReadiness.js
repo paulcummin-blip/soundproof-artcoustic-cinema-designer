@@ -36,9 +36,8 @@ import {
   fetchDurablePublication,
 } from '@/components/engineering/versionedEngineeringAuthority';
 import {
-  REPORT_SNAPSHOT_STATUS,
+  compareSourceFingerprints,
   currentSourceFingerprints,
-  resolveSnapshotStatus,
 } from '@/components/report/reportSnapshotAuthority';
 import { readSeatPriorityFingerprint } from '@/components/state/designReviewHandoff';
 import { readProjectAnalysisCacheRecord } from '@/components/state/projectReadCache';
@@ -47,9 +46,9 @@ import {
   PUBLICATION_STATUS,
   READINESS_STATE,
   buildReadinessCell,
+  hasProposalEvidence,
   resolveCalculationAuthority,
   resolveEngineeringCell,
-  resolveReportCellState,
   resolveVersionReadinessRow,
   versionDisplayName,
 } from './proposalReadinessAuthority';
@@ -67,7 +66,7 @@ function publicationStatusOf(durable) {
   return PUBLICATION_STATUS.NOT_CALCULATED;
 }
 
-function reportCell(saved, currentFingerprints, version) {
+function reportCell(saved, currentFingerprints) {
   // No saved report for this project version and report type: genuinely Missing.
   if (!saved) return buildReadinessCell({ state: READINESS_STATE.MISSING });
 
@@ -75,31 +74,30 @@ function reportCell(saved, currentFingerprints, version) {
   // project has moved past is Stale, not merely in need of a refresh.
   if (saved.status !== 'current') return buildReadinessCell({ state: READINESS_STATE.STALE });
 
-  // The report exists and is current, but it predates the proposal evidence
-  // capture — it carries no payload.proposalSource. That is a legacy snapshot
-  // that needs refreshing. It is never Missing: the report is not missing.
-  if (!saved.payload?.proposalSource) {
+  // Staleness is the SAME fingerprint comparison the report page's own Current
+  // badge uses: the design the report was generated from is compared with the
+  // design the version holds NOW. The version record's own modified time is
+  // never consulted — opening the project, exporting a PDF or storing a library
+  // asset all touch that record without changing the design, so it cannot say
+  // whether the report's source moved on. A fingerprint unreadable on either
+  // side never manufactures staleness.
+  const { changed } = compareSourceFingerprints(saved.source_fingerprints, currentFingerprints);
+  if (changed.length > 0) {
+    return buildReadinessCell({ state: READINESS_STATE.STALE, generatedAt: saved.generated_at });
+  }
+
+  // The design has not moved on, so this report can be used for a proposal. It
+  // was written before the proposal evidence capture, so it carries no
+  // payload.proposalSource: a ONE-TIME evidence refresh — never a missing report
+  // and never recurring maintenance.
+  if (!hasProposalEvidence(saved)) {
     return buildReadinessCell({
       state: READINESS_STATE.LEGACY,
       generatedAt: saved.generated_at,
-      reason: 'This report is current, but it needs refreshing for proposal comparison evidence.',
+      reason: 'This report is current, but it needs a one-time evidence refresh for proposal comparison.',
     });
   }
-
-  // The version has been edited since this report was generated.
-  if (new Date(saved.generated_at) < new Date(version?.updated_date)) {
-    return buildReadinessCell({ state: READINESS_STATE.STALE });
-  }
-  // A report with a captured source is not judged against a lagging publication.
-  if (saved.payload.proposalSource.report_source_version === 1) {
-    return buildReadinessCell({ state: READINESS_STATE.CURRENT, generatedAt: saved.generated_at });
-  }
-  const resolution = resolveSnapshotStatus({ saved, currentFingerprints });
-  const state = resolveReportCellState({
-    hasSaved: resolution.restorable,
-    snapshotStatus: resolution.status === REPORT_SNAPSHOT_STATUS.NONE ? null : resolution.status,
-  });
-  return buildReadinessCell({ state, generatedAt: resolution.generatedAt });
+  return buildReadinessCell({ state: READINESS_STATE.CURRENT, generatedAt: saved.generated_at });
 }
 
 export function useProposalReadiness({ projectId = null, versionIds = [] } = {}) {
@@ -218,8 +216,8 @@ export function useProposalReadiness({ projectId = null, versionIds = [] } = {})
             versionName: versionDisplayName(version || { version_number: index + 1 }),
             versionNumber: version?.version_number ?? index + 1,
             cells: {
-              visual: reportCell(savedByKey.get(`${versionId}::visual`), currentFingerprints, version),
-              technical: reportCell(savedTechnical, currentFingerprints, version),
+              visual: reportCell(savedByKey.get(`${versionId}::visual`), currentFingerprints),
+              technical: reportCell(savedTechnical, currentFingerprints),
               engineering: resolveEngineeringCell({
                 publication: durable?.publication || null,
                 publicationStatus: publicationStatusOf(durable),

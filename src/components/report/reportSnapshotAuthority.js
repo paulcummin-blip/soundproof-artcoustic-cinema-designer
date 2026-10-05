@@ -88,6 +88,24 @@ export function buildSourceFingerprints(input = {}) {
 }
 
 /**
+ * The fingerprints a report is SAVED with.
+ *
+ * The version's published engineering fingerprint is the one fingerprint the
+ * version pointer holds, and the one proposal readiness compares against, so it
+ * fills the engineering key whenever the handoff supplied none (a report
+ * generated from a browser handoff carries only the bass fingerprint). A version
+ * with no publication keeps null, so staleness is never manufactured from a
+ * fingerprint that does not exist.
+ */
+export function buildSavedSourceFingerprints({ currentFingerprints = null, publishedFingerprint = null } = {}) {
+  const current = buildSourceFingerprints(currentFingerprints);
+  return buildSourceFingerprints({
+    ...current,
+    engineeringFingerprint: current.engineeringFingerprint || asText(publishedFingerprint) || null,
+  });
+}
+
+/**
  * Compose the fingerprints describing the project AS IT STANDS NOW, from the
  * published authority plus the live seat-priority indicator. One implementation
  * so every report judges staleness the same way.

@@ -654,21 +654,23 @@ test('17. a current snapshot without proposal evidence is Legacy, never Missing'
       currentFingerprints: LEVEL_4_SOURCES.currentFingerprints,
     });
     assert.equal(cell.state, READINESS_STATE.LEGACY);
-    assert.equal(cell.status, 'Needs refresh');
+    assert.equal(cell.status, 'Needs one-time refresh');
     assert.notEqual(cell.status, 'Missing');
   }
 
   const row = resolveVersionReadiness(LEGACY_SOURCES);
-  assert.equal(row.visual_report_status, 'Needs refresh');
-  assert.equal(row.technical_report_status, 'Needs refresh');
+  assert.equal(row.visual_report_status, 'Needs one-time refresh');
+  assert.equal(row.technical_report_status, 'Needs one-time refresh');
   assert.equal(row.ready, false);
-  // Acceptance E/2: the warning names the exact version and report.
+  // Acceptance E/2: the warning names the exact version and report, and reads as
+  // a ONE-TIME refresh rather than recurring maintenance.
   assert.equal(
     row.blockingSentence,
-    'Level 4 version has a current Visual Report, but it needs refreshing for proposal comparison evidence. '
-    + 'Level 4 version has a current Technical Report, but it needs refreshing for proposal comparison evidence',
+    'Level 4 version has a current Visual Report, but it needs a one-time evidence refresh. '
+    + 'Level 4 version has a current Technical Report, but it needs a one-time evidence refresh',
   );
   assert.doesNotMatch(row.blockingSentence, /missing/i, 'a report that exists is never called missing');
+  assert.doesNotMatch(row.blockingSentence, /refresh(ing)? (the )?(build|proposal)/i, 'never described as recurring maintenance');
 
   // Acceptance F: Generate stays blocked while any selected version is Legacy.
   const gate = resolveProposalReadinessGate({ rows: [row] });
@@ -717,7 +719,7 @@ test('19. the client mirror derives the same legacy verdict, word for word', () 
   const clientResult = clientRow(rowInput);
   const sharedResult = sharedVersionReadinessRow(rowInput);
   assert.equal(clientResult.blockingSentence, sharedResult.blockingSentence);
-  assert.equal(clientResult.visual_report_status, 'Needs refresh');
+  assert.equal(clientResult.visual_report_status, 'Needs one-time refresh');
   assert.equal(clientResult.ready, false);
   assert.equal(sharedResult.ready, false);
 });

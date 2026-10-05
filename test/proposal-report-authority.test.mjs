@@ -8,7 +8,11 @@ import { buildSelectedVersionEvidence } from '../base44/shared/comparisonEvidenc
 import { buildComparisonTable } from '../base44/shared/comparisonTable.js';
 
 const ids = [12, 13, 14, 18, 19, 20];
-const version = (id) => ({ id, version_name: `Level ${id} version`, updated_date: '2026-10-05T10:00:00Z' });
+// No modified time on the fixture: a version record's own mtime is never
+// consulted, because it moves whenever the record is written for any reason.
+const version = (id, publishedFingerprint = null) => ({
+  id, version_name: `Level ${id} version`, published_fingerprint: publishedFingerprint,
+});
 const source = (id) => ({
   available: true,
   identity: { versionId: id },
@@ -25,9 +29,11 @@ const source = (id) => ({
     return { parameter_id, level, value, text: `${level} · ${value}` };
   }),
 });
-const report = (id, type) => ({
+const report = (id, type, engineeringFingerprint = null) => ({
   id: `${id}-${type}`, version_id: id, report_type: type, status: 'current',
-  generated_at: '2026-10-05T12:00:00Z', payload: { proposalSource: source(id) },
+  generated_at: '2026-10-05T12:00:00Z',
+  source_fingerprints: { engineeringFingerprint },
+  payload: { proposalSource: source(id) },
 });
 const db = (rows) => ({ ReportSnapshot: { filter: async (q) => ({ items: rows.filter((r) => r.version_id === q.version_id) }) } });
 const rows = ['4', '1'].flatMap((id) => ['technical', 'visual'].map((type) => report(id, type)));
@@ -62,7 +68,7 @@ test('E: missing, stale, legacy payload and missing P13 reject with named errors
   const legacy = structuredClone(rows); legacy[0].payload = {};
   await assert.rejects(
     readProposalReportEvidence(db(legacy), 'project', [version('4')]),
-    /Level 4 version: Technical Report exists, but needs refreshing for comparison evidence/,
+    /Level 4 version: Technical Report exists, but needs a one-time evidence refresh/,
   );
   const missing = structuredClone(rows);
   missing[0].payload.proposalSource.report_parameters = missing[0].payload.proposalSource.report_parameters.filter((r) => r.parameter_id !== 13);
@@ -81,8 +87,38 @@ test('no older report may replace the latest missing evidence', async () => {
   const latest = report('4', 'technical'); latest.payload = {};
   await assert.rejects(
     readProposalReportEvidence(db([latest, ...rows]), 'project', [version('4')]),
-    /Technical Report exists, but needs refreshing for comparison evidence/,
+    /Technical Report exists, but needs a one-time evidence refresh/,
   );
+});
+
+test('a version record touched without a design change keeps the report Current', async () => {
+  // The version pointer states the SAME engineering fingerprint the report was
+  // generated from, so the report is usable for a proposal later: opening the
+  // project, exporting a PDF or storing a library asset cannot make it Stale.
+  const versions = [version('4', 'eng:v1:same-design')];
+  const generated = ['4', '1'].flatMap((id) => ['technical', 'visual'].map((type) => report(id, type, 'eng:v1:same-design')));
+  const entries = await readProposalReportEvidence(db(generated), 'project', versions);
+  assert.equal(entries.length, 1);
+  assert.equal(entries[0].snapshot.identity.versionId, '4');
+  assert.equal(entries[0].snapshot.identity.technicalReportId, '4-technical');
+});
+
+test('a design change after generation makes the report Stale', async () => {
+  const versions = [version('4', 'eng:v1:new-design')];
+  const generated = ['4', '1'].flatMap((id) => ['technical', 'visual'].map((type) => report(id, type, 'eng:v1:old-design')));
+  await assert.rejects(
+    readProposalReportEvidence(db(generated), 'project', versions),
+    /Level 4 version: stale Technical Report\. The design changed after it was generated/,
+  );
+});
+
+test('an unreadable version fingerprint never manufactures staleness', async () => {
+  // No publication pointer on the version: nothing states the design moved on, so
+  // the report stays usable rather than being called Stale on no evidence.
+  const versions = [version('4', null)];
+  const generated = ['4', '1'].flatMap((id) => ['technical', 'visual'].map((type) => report(id, type, 'eng:v1:old-design')));
+  const entries = await readProposalReportEvidence(db(generated), 'project', versions);
+  assert.equal(entries.length, 1);
 });
 
 test('bass alternative values cannot override report parameters', () => {

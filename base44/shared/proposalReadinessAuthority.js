@@ -62,7 +62,7 @@ export const READINESS_STATE = Object.freeze({
 export const READINESS_STATUS_TEXT = Object.freeze({
   [READINESS_STATE.CURRENT]: 'Current',
   [READINESS_STATE.STALE]: 'Stale',
-  [READINESS_STATE.LEGACY]: 'Needs refresh',
+  [READINESS_STATE.LEGACY]: 'Needs one-time refresh',
   [READINESS_STATE.MISSING]: 'Missing',
   [READINESS_STATE.INCOMPLETE]: 'Incomplete',
   [READINESS_STATE.UNAVAILABLE]: 'Unavailable',
@@ -396,7 +396,7 @@ export function statePhrase(state, label) {
   if (label === READINESS_COMBINED_REPORT_LABEL) return label;
   if (state === READINESS_STATE.MISSING) return `the ${label}`;
   if (state === READINESS_STATE.STALE) return `a stale ${label}`;
-  if (state === READINESS_STATE.LEGACY) return `a current ${label}, but it needs refreshing for proposal comparison evidence`;
+  if (state === READINESS_STATE.LEGACY) return `a current ${label}, but it needs a one-time evidence refresh`;
   if (state === READINESS_STATE.INCOMPLETE) return `incomplete ${label}`;
   return `unreadable ${label}`;
 }
@@ -442,7 +442,7 @@ export function buildBlockingSentence({ versionName, visual, technical, engineer
     { cell: technical, label: 'Technical Report' },
   ]) {
     if (isBlocked(cell) && cell.state === READINESS_STATE.LEGACY) {
-      sentences.push(`${versionName} has a current ${label}, but it needs refreshing for proposal comparison evidence`);
+      sentences.push(`${versionName} has a current ${label}, but it needs a one-time evidence refresh`);
     }
   }
 
@@ -605,7 +605,7 @@ export function resolveProposalReadinessGate({
       ? PROPOSAL_READINESS_READY_COPY
       : checking
         ? 'Checking each selected version’s reports and engineering results…'
-        : 'Generate or refresh the named source for the blocked versions, then return to this step.',
+        : 'Generate the named source, or open the named legacy report once to refresh its evidence, then return to this step.',
   };
 }
 

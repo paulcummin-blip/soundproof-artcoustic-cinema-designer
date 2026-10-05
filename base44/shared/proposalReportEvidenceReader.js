@@ -26,17 +26,25 @@ function requireReport(row, version, type) {
   }
 
   // The report exists and is current, but predates the proposal evidence
-  // capture. It needs refreshing — it is never "missing".
+  // capture. It needs a ONE-TIME refresh — it is never "missing", and it is
+  // never described as recurring maintenance.
   if (!source) {
     throw new Error(
-      `${name}: ${type} Report exists, but needs refreshing for comparison evidence. `
-      + `Open the ${type} Report for this version to save its proposal evidence, then try again.`,
+      `${name}: ${type} Report exists, but needs a one-time evidence refresh for comparison evidence. `
+      + `Open the ${type} Report for this version once to save its proposal evidence, then try again.`,
     );
   }
 
-  const generatedAt = Date.parse(row.generated_at);
-  if (!Number.isFinite(generatedAt) || new Date(generatedAt) < new Date(version.updated_date)) {
-    throw new Error(`${name}: stale ${type} Report. Regenerate it before creating a proposal.`);
+  // The design the report was generated from is compared with the design the
+  // version holds NOW, by the one engineering fingerprint. The version record's
+  // own modified time is never consulted: opening the project, exporting a PDF
+  // or storing a library asset all touch that record without changing the
+  // design, so it cannot say whether the report's source moved on. When either
+  // side is unreadable, no staleness is manufactured.
+  const savedFingerprint = row.source_fingerprints?.engineeringFingerprint || null;
+  const publishedFingerprint = version.published_fingerprint || null;
+  if (savedFingerprint && publishedFingerprint && savedFingerprint !== publishedFingerprint) {
+    throw new Error(`${name}: stale ${type} Report. The design changed after it was generated. Regenerate it before creating a proposal.`);
   }
 
   if (source.report_source_version !== 1 || source.identity?.versionId !== version.id) {
