@@ -62,9 +62,9 @@ const evidence = (versionId, type, fingerprint = 'eng:v1:aaa', ready = true) => 
     room: { length_m: 6, width_m: 4.5, height_m: 2.4 },
     screen: { screen_type: 'Projection screen', format: '16:9', viewable_width_cm: 265.5 },
     seating: {
-      row_count: 1,
+      row_count: 1, seats: 1,
       per_seat: [{
-        row: 1, seat_id: 'r1c1', seat_label: 'Row 1 seat 1',
+        row: 1, column: 1, priority: 'primary', seat_id: 'r1c1', seat_label: 'Row 1 seat 1',
         distance_m: 3.2, horizontal_angle_deg: 0, vertical_angle_deg: 0, rp23_level: 'Level 4',
       }],
     },
@@ -189,7 +189,7 @@ test('acceptance table: panel state and proposal gate agree for all seven scenar
 
     assert.equal(row.technical.state, READINESS_STATE.INCOMPLETE);
     assert.notEqual(row.technical.status, 'Missing');
-    assert.match(row.technical.reason, /evidence does not match what the report shows/);
+    assert.match(row.technical.reason, /proposal_ready is missing/);
     assert.match(result.detail, /incomplete Technical Report evidence/);
     assert.doesNotMatch(result.detail, /missing Technical Report/);
   }
