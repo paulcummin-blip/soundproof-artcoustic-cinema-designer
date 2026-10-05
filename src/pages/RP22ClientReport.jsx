@@ -998,6 +998,8 @@ export default function RP22ClientReport() {
     reportType: REPORT_SNAPSHOT_TYPE.VISUAL,
     currentFingerprints: snapshotFingerprints,
     payload: snapshotPayload,
+    reportSource: { project: projectDetails, engineeringSummary, app: appState,
+      presentation: { seatingPositions, placedSpeakers, priceData: authority.authoritySnapshot?.priceData } },
     ready: reportReady && orderedPages.length > 0,
   });
 

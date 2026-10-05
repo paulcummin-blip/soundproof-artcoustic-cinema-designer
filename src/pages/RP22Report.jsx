@@ -286,6 +286,7 @@ function RP22ReportInner() {
         reportType: REPORT_SNAPSHOT_TYPE.TECHNICAL,
         currentFingerprints: snapshotFingerprints,
         payload: snapshotPayload,
+        reportSource: { project: projectDetails, engineeringSummary, app },
         ready: !!engineeringSummary && !authorityResolving && !reportHydrating && !bassReportPending && !bassRestoreFailed && !reportDataIncomplete,
     });
 

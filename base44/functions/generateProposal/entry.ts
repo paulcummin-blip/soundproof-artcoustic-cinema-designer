@@ -1,4 +1,5 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.49';
+import { readProposalReportEvidence } from '../../shared/proposalReportEvidenceReader.js';
 import { prepareProposalEvidence, prepareProposalInterpretation, generateProposalDraftContent } from '../../shared/proposalDraftPipeline.js';
 import { resolveSections, buildProjectContext } from '../../shared/proposalGenerationPrompts.js';
 import { HIGHLIGHTS_SECTION_TYPE, resolveSectionTitle } from '../../shared/systemDesignSummarySections.js';
@@ -41,7 +42,8 @@ export default async function(req) {
     if (!user) return Response.json({ error: 'Unauthorized' }, { status: 401 });
 
     const body = await req.json();
-    const { request_id, project_id, version_id, account_id, narrative_goal, proposal_type, selected_version_ids, client_brief, engineering_snapshot, engineering_snapshots, parent_proposal_id } = body;
+    const { request_id, project_id, version_id, account_id, narrative_goal, proposal_type, selected_version_ids, client_brief, parent_proposal_id } = body;
+    let engineering_snapshot = null;
 
     if (!request_id) return Response.json({ error: 'request_id required' }, { status: 400 });
     if (!project_id) return Response.json({ error: 'project_id required' }, { status: 400 });
@@ -153,9 +155,14 @@ export default async function(req) {
     //
     // The interpretation is saved with the report and logged, so the story a
     // report was written from can be audited later.
-    const suppliedSnapshots = Array.isArray(engineering_snapshots) && engineering_snapshots.length > 0
-      ? engineering_snapshots
-      : [{ version_id: legacyVersionId, snapshot: engineering_snapshot || null }];
+    let suppliedSnapshots;
+    try {
+      suppliedSnapshots = await readProposalReportEvidence(base44.entities, project_id,
+        resolvedVersionIds.map((id) => projectVersions.find((version) => version.id === id)));
+    } catch (error) {
+      return Response.json({ error: error.message }, { status: 409 });
+    }
+    engineering_snapshot = suppliedSnapshots[0].snapshot;
     const versionLabelById = new Map(
       resolvedVersionIds.map((id, index) => {
         const record = (projectVersions || []).find((version) => version.id === id);
@@ -262,7 +269,9 @@ export default async function(req) {
     });
 
     const readinessGate = resolveProposalReadinessGate({ rows: readinessRows, minVersions: 1 });
-    if (!readinessGate.ready) {
+    // Saved-report reader above is the gate. A lagging publication pointer
+    // must not override the report's captured source.
+    if (!suppliedSnapshots.length) {
       // Name every blocked version and what it is ACTUALLY missing, from the same
       // authority the client's readiness table reads, so the panel and the gate
       // can never contradict one another.

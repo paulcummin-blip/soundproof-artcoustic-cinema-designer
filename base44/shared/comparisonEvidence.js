@@ -103,6 +103,19 @@ export function buildVersionEvidence({
 
   const parameterEvidence = splitParameterEvidence(snapshot);
   const bassEvidence = resolveBassEvidence(snapshot);
+  if (snapshot.report_parameters) {
+    const admitted = snapshot.report_parameters.filter((row) => !EXCLUDED_PARAMETERS[row.parameter_id])
+      .map((row) => ({ ...row, label: plainLanguageName(row.parameter_id) }));
+    parameterEvidence.used = admitted;
+    for (const id of [14, 18, 19, 20]) {
+      bassEvidence[`p${id}`] = admitted.find((row) => row.parameter_id === id) || null;
+    }
+    bassEvidence.usable = [14, 18, 19, 20].map((id) => bassEvidence[`p${id}`]).filter(Boolean);
+    for (const structure of Object.keys(parameterEvidence.byStructure || {})) {
+      parameterEvidence.byStructure[structure] = (parameterEvidence.byStructure[structure] || [])
+        .map((row) => admitted.find((entry) => entry.parameter_id === row.parameter_id)).filter(Boolean);
+    }
+  }
   const room = snapshot.room || {};
   const system = snapshot.system || {};
   const viewing = snapshot.viewing || {};
@@ -134,6 +147,8 @@ export function buildVersionEvidence({
   return {
     ...base,
     available: true,
+    report_parameters: snapshot.report_parameters || null,
+    report_seat_results: snapshot.report_seat_results || null,
     project_identity: projectIdentity || {
       project: snapshot.project?.name || null,
       client: snapshot.project?.client_name || null,

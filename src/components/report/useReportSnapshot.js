@@ -18,6 +18,8 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useAuth } from '@/lib/AuthContext';
+import { base44 } from '@/api/base44Client';
+import captureReportProposalSource from './captureReportProposalSource';
 import { loadReportSnapshot, saveReportSnapshot } from './reportSnapshotStore';
 import {
   REPORT_SNAPSHOT_STATUS,
@@ -33,6 +35,7 @@ export function useReportSnapshot({
   reportType = null,
   currentFingerprints = null,
   payload = null,
+  reportSource = null,
   ready = false,
 }) {
   const { user } = useAuth();
@@ -86,6 +89,13 @@ export function useReportSnapshot({
 
     setSaving(true);
     try {
+      const version = await base44.entities.ProjectVersion.get(versionId);
+      if (version?.project_id !== projectId) throw new Error('Report version does not belong to this project.');
+      const captured = captureReportProposalSource({ projectId, versionId, ...reportSource,
+        project: { ...reportSource?.project, ...version.design_state, version_name: version.version_name },
+        presentation: reportSource?.presentation,
+      });
+      if (!captured) throw new Error('The report evidence is not ready to save.');
       const record = buildSnapshotRecord({
         projectId,
         versionId,
@@ -93,7 +103,7 @@ export function useReportSnapshot({
         reportType,
         sourceFingerprints: currentFp,
         generatedBy: user?.full_name || user?.email || null,
-        payload,
+        payload: { ...payload, proposalSource: captured },
       });
       const written = await saveReportSnapshot({ existing: saved, record });
       if (mountedRef.current) setSaved(written || { ...record, id: saved?.id || null });
@@ -104,20 +114,20 @@ export function useReportSnapshot({
     } finally {
       if (mountedRef.current) setSaving(false);
     }
-  }, [projectId, versionId, accountId, reportType, currentFp, payload, saved, user?.full_name, user?.email]);
+  }, [projectId, versionId, accountId, reportType, currentFp, payload, reportSource, saved, user?.full_name, user?.email]);
 
   // ── Save on first generation only ───────────────────────────────────────
   // A stale saved report is left exactly as it is: keeping it visible and
   // marking it out of date is the point. Regenerate is the only overwrite path.
   useEffect(() => {
-    if (!ready || !payload || !projectId || !versionId || !reportType) return;
+    if (loading || !ready || !payload || !projectId || !versionId || !reportType) return;
     if (resolution.status !== REPORT_SNAPSHOT_STATUS.NONE) return;
 
     const key = `${projectId}::${versionId}::${reportType}::${currentFp.engineeringFingerprint || 'na'}`;
     if (autoSaveKeyRef.current === key) return;
     autoSaveKeyRef.current = key;
     persist();
-  }, [ready, payload, projectId, versionId, reportType, resolution.status, currentFp.engineeringFingerprint, persist]);
+  }, [loading, ready, payload, projectId, versionId, reportType, resolution.status, currentFp.engineeringFingerprint, persist]);
 
   return {
     saved,

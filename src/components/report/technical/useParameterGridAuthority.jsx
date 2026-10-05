@@ -7,6 +7,7 @@
  */
 
 import React from "react";
+import { readReportParameter } from '@/components/report/reportParameterEvidence';
 import { resolveParamThresholds } from "@/components/report/technical/roomParameterLevelAuthority";
 import { formatP7Degrees, isP7Number } from "@/components/utils/rp22/p7DisplayAuthority";
 import { firstStatedPrimitive } from "@/components/utils/renderSafe";
@@ -79,37 +80,13 @@ export function useParameterGridAuthority({
     return out;
   }, [contributionsByKey, scorecardContributions]);
 
-  const getHudLevelForParam = React.useCallback((param) => {
-    const id = Number(param?.id);
-    const key = `p${id}`;
-    const room = roomResultFor(engineeringSummary, id);
-    return parameterSummaries[key]?.level || room?.level || "—";
-  }, [engineeringSummary, parameterSummaries]);
+  const getHudLevelForParam = React.useCallback((param) => (
+    readReportParameter(engineeringSummary, Number(param?.id)).level
+  ), [engineeringSummary]);
 
-  const getHudValueForParam = React.useCallback((param) => {
-    const id = Number(param?.id);
-    const key = `p${id}`;
-    const room = roomResultFor(engineeringSummary, id);
-    if (room) {
-      // P7 states whole degrees only (6.99° → 6°), whatever value the published
-      // result carries. Every other parameter is stated exactly as published.
-      if (isP7Number(id)) {
-        const wholeDegrees = formatP7Degrees(room.value ?? room.deviation ?? room.formatted);
-        if (wholeDegrees != null) return wholeDegrees;
-      }
-      return firstStatedPrimitive([room.formatted, room.hudLabel, room.value], "—");
-    }
-
-    if (id === 19) {
-      return engineeringSummary?.p19SeatAuthority?.project?.coverageSummary
-        ?? engineeringSummary?.project?.coverage?.sentence
-        ?? "NOT CALCULATED";
-    }
-
-    const primaryResult = (reportCounts.seatResultsByParameter?.[key] || [])
-      .find((seat) => String(seat.seatId) === String(primarySeatId));
-    return firstStatedPrimitive([primaryResult?.valueFormatted, primaryResult?.value], "Seat results");
-  }, [engineeringSummary, reportCounts, primarySeatId]);
+  const getHudValueForParam = React.useCallback((param) => (
+    readReportParameter(engineeringSummary, Number(param?.id)).value
+  ), [engineeringSummary]);
 
   const buildSeatGridData = React.useCallback((paramId) => {
     return adaptSeatRows(seatRowsFor(engineeringSummary, paramId), positionsById);

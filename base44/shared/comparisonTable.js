@@ -100,6 +100,9 @@ const ROW_LABELS = Object.freeze({
 /** The reliable value one version carries for a row, or null. */
 function readRowValue(evidence, rowKey) {
   if (!evidence?.available) return null;
+  if (/^p\d+$/.test(rowKey) && evidence.report_parameters) {
+    return evidence.report_parameters.find((row) => row.parameter_id === Number(rowKey.slice(1)))?.text || null;
+  }
 
   if (rowKey === 'screen_size') {
     const screen = evidence.screen_data || {};

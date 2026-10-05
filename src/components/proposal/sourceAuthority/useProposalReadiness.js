@@ -67,7 +67,16 @@ function publicationStatusOf(durable) {
   return PUBLICATION_STATUS.NOT_CALCULATED;
 }
 
-function reportCell(saved, currentFingerprints) {
+function reportCell(saved, currentFingerprints, version) {
+  if (!saved?.payload?.proposalSource) return buildReadinessCell({ state: READINESS_STATE.MISSING,
+    reason: 'Regenerate this report to save its authoritative parameter payload.' });
+  if (saved.status !== 'current' || new Date(saved.generated_at) < new Date(version?.updated_date)) {
+    return buildReadinessCell({ state: READINESS_STATE.STALE });
+  }
+  // A report with a captured source is not judged against a lagging publication.
+  if (saved.payload.proposalSource.report_source_version === 1) {
+    return buildReadinessCell({ state: READINESS_STATE.CURRENT, generatedAt: saved.generated_at });
+  }
   if (!saved) return buildReadinessCell({ state: READINESS_STATE.MISSING });
   const resolution = resolveSnapshotStatus({ saved, currentFingerprints });
   const state = resolveReportCellState({
@@ -193,8 +202,8 @@ export function useProposalReadiness({ projectId = null, versionIds = [] } = {})
             versionName: versionDisplayName(version || { version_number: index + 1 }),
             versionNumber: version?.version_number ?? index + 1,
             cells: {
-              visual: reportCell(savedByKey.get(`${versionId}::visual`), currentFingerprints),
-              technical: reportCell(savedTechnical, currentFingerprints),
+              visual: reportCell(savedByKey.get(`${versionId}::visual`), currentFingerprints, version),
+              technical: reportCell(savedTechnical, currentFingerprints, version),
               engineering: resolveEngineeringCell({
                 publication: durable?.publication || null,
                 publicationStatus: publicationStatusOf(durable),
