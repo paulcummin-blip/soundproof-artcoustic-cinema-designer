@@ -29,11 +29,68 @@ const source = (id) => ({
     return { parameter_id, level, value, text: `${level} · ${value}` };
   }),
 });
+/* ── The machine-readable evidence each report carries ───────────────────────
+   A proposal reads this and nothing else, so the fixture states it explicitly.
+   It is deliberately built from `source(id)` — the report's own frozen
+   proposalSource — exactly as a generated report builds it: one authority, two
+   readers. */
+const productsByLayer = () => ({
+  lcr: [{ role: 'LCR', model: 'Q8-5', quantity: 3, position: null }],
+  subwoofers: [{ role: 'Subwoofers', model: 'SUB4-12', quantity: 2, position: 'front' }],
+});
+
+const reportEvidence = (id, type, engineeringFingerprint = null) => {
+  const parameters = source(id).report_parameters.map((row) => ({
+    key: `P${row.parameter_id}`,
+    parameter_id: row.parameter_id,
+    title: `P${row.parameter_id}`,
+    area: 'RP22',
+    level: row.level,
+    value: row.value,
+    text: row.text,
+    unit: null,
+    context: null,
+    source: 'technical_report',
+  }));
+  return {
+    evidence_version: 1,
+    report_type: type,
+    identity: {
+      project_id: 'project',
+      version_id: id,
+      report_type: type,
+      source_fingerprint: engineeringFingerprint,
+      generated_at: '2026-10-05T12:00:00Z',
+    },
+    room: { length_m: 6, width_m: 4.5, height_m: 2.4 },
+    screen: { screen_type: 'Projection screen', format: '16:9', viewable_width_cm: 265.5 },
+    seating: {
+      row_count: 1,
+      per_seat: [{
+        row: 1, seat_id: 'r1c1', seat_label: 'Row 1 seat 1',
+        distance_m: 3.2, horizontal_angle_deg: 0, vertical_angle_deg: 0, rp23_level: 'Level 4',
+      }],
+    },
+    system: {
+      products_selected: Object.values(productsByLayer()).flat(),
+      products_selected_by_layer: productsByLayer(),
+    },
+    parameters,
+    parameter_index: Object.fromEntries(parameters.map((row) => [row.key, row])),
+    bass: { current: false, p14: null, p18: null, p19: null, p20: null },
+    proposal_ready: true,
+    evidence_fingerprint: `re1-evidence-${id}-${type}`,
+  };
+};
+
 const report = (id, type, engineeringFingerprint = null) => ({
   id: `${id}-${type}`, version_id: id, report_type: type, status: 'current',
   generated_at: '2026-10-05T12:00:00Z',
   source_fingerprints: { engineeringFingerprint },
-  payload: { proposalSource: source(id) },
+  payload: {
+    proposalSource: source(id),
+    reportEvidence: reportEvidence(id, type, engineeringFingerprint),
+  },
 });
 const db = (rows) => ({ ReportSnapshot: { filter: async (q) => ({ items: rows.filter((r) => r.version_id === q.version_id) }) } });
 const rows = ['4', '1'].flatMap((id) => ['technical', 'visual'].map((type) => report(id, type)));
@@ -54,8 +111,16 @@ test('C: all six key parameter levels and values equal saved report text', () =>
   }
 });
 
-test('D: Products Selected are copied unchanged', () => {
-  assert.deepEqual(entries[0].snapshot.system.products_selected, source('4').system.products_selected);
+test('D: Products Selected are read from the report evidence, unchanged', () => {
+  const products = entries[0].snapshot.system.products_selected;
+  assert.deepEqual(products.lcr, ['Q8-5 × 3'], 'the loudspeaker row is the evidence row');
+  assert.deepEqual(products.subwoofers, ['SUB4-12 × 2 (front)'], 'a positioned sub keeps its position');
+  assert.deepEqual(products.surrounds, ['None specified'], 'an absent layer is stated, never invented');
+  assert.deepEqual(
+    products.rows.map((row) => row.key),
+    ['lcr', 'surrounds', 'overheads', 'subwoofers', 'acoustic_treatment'],
+    'every layer the report prints is present, in report order',
+  );
   assert.deepEqual(table.rows.find((r) => r.key === 'lcr').values, ['Q8-5 × 3', 'Q8-5 × 3']);
 });
 
@@ -68,10 +133,18 @@ test('E: missing, stale, legacy payload and missing P13 reject with named errors
   const legacy = structuredClone(rows); legacy[0].payload = {};
   await assert.rejects(
     readProposalReportEvidence(db(legacy), 'project', [version('4')]),
-    /Level 4 version: Technical Report exists, but needs a one-time evidence refresh/,
+    /Level 4 version: Technical Report is current, but it needs a one-time evidence refresh/,
   );
+  // P13 is removed from the EVIDENCE only. The report's own frozen source still
+  // states it, so this proves the reader's P13 comes from the evidence.
   const missing = structuredClone(rows);
-  missing[0].payload.proposalSource.report_parameters = missing[0].payload.proposalSource.report_parameters.filter((r) => r.parameter_id !== 13);
+  missing[0].payload.reportEvidence.parameters = missing[0].payload.reportEvidence.parameters
+    .filter((r) => r.parameter_id !== 13);
+  delete missing[0].payload.reportEvidence.parameter_index.P13;
+  assert.ok(
+    missing[0].payload.proposalSource.report_parameters.some((r) => r.parameter_id === 13),
+    'the frozen source still states P13 — it is simply not what the proposal reads',
+  );
   await assert.rejects(readProposalReportEvidence(db(missing), 'project', [version('4')]), /Level 4 version: missing Technical Report parameter P13/);
 });
 
@@ -79,7 +152,7 @@ test('a legacy snapshot is never described as a missing report', async () => {
   const legacy = structuredClone(rows); legacy[0].payload = {};
   const error = await readProposalReportEvidence(db(legacy), 'project', [version('4')]).catch((e) => e);
   assert.match(error.message, /Level 4 version/);
-  assert.match(error.message, /Technical Report exists/);
+  assert.match(error.message, /Technical Report is current/);
   assert.doesNotMatch(error.message, /missing (Technical|Visual) Report/);
 });
 
@@ -87,7 +160,7 @@ test('no older report may replace the latest missing evidence', async () => {
   const latest = report('4', 'technical'); latest.payload = {};
   await assert.rejects(
     readProposalReportEvidence(db([latest, ...rows]), 'project', [version('4')]),
-    /Technical Report exists, but needs a one-time evidence refresh/,
+    /Technical Report is current, but it needs a one-time evidence refresh/,
   );
 });
 

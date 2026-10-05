@@ -133,17 +133,24 @@ function parametersFromEvidence(evidence) {
   const entries = Array.isArray(evidence.parameters) ? evidence.parameters : [];
   return entries
     .filter((entry) => Number.isFinite(Number(entry?.parameter_id)))
-    .map((entry) => ({
-      parameter_id: Number(entry.parameter_id),
-      key: entry.key || `P${entry.parameter_id}`,
-      title: asText(entry.title) || `P${entry.parameter_id}`,
-      area: asText(entry.area) || null,
-      level: asText(entry.level) || null,
-      value: entry.value ?? null,
-      unit: asText(entry.unit) || null,
-      context: asText(entry.context) || null,
-      source: asText(entry.source) || 'report_evidence',
-    }));
+    .map((entry) => {
+      const level = asText(entry.level) || null;
+      const value = entry.value ?? null;
+      return {
+        parameter_id: Number(entry.parameter_id),
+        key: entry.key || `P${entry.parameter_id}`,
+        title: asText(entry.title) || `P${entry.parameter_id}`,
+        area: asText(entry.area) || null,
+        level,
+        value,
+        // The report's own sentence for this parameter, read from the evidence.
+        // This is the value a proposal's P13 row prints.
+        text: asText(entry.text) || [level, asText(value)].filter(Boolean).join(' · ') || null,
+        unit: asText(entry.unit) || null,
+        context: asText(entry.context) || null,
+        source: asText(entry.source) || 'report_evidence',
+      };
+    });
 }
 
 /** The printed product rows, from the evidence's own per-layer statement. */

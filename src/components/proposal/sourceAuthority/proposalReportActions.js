@@ -61,7 +61,7 @@ export const PROPOSAL_REPORT_UI_STATE = Object.freeze({
 export const PROPOSAL_REPORT_STATUS_TEXT = Object.freeze({
   [PROPOSAL_REPORT_UI_STATE.CHECKING]: 'Checking…',
   [PROPOSAL_REPORT_UI_STATE.CURRENT]: 'Current',
-  [PROPOSAL_REPORT_UI_STATE.LEGACY]: 'Needs one-time refresh',
+  [PROPOSAL_REPORT_UI_STATE.LEGACY]: 'Needs one-time evidence refresh',
   [PROPOSAL_REPORT_UI_STATE.MISSING]: 'Missing',
   [PROPOSAL_REPORT_UI_STATE.STALE]: 'Stale',
   [PROPOSAL_REPORT_UI_STATE.FAILED]: 'Unavailable',

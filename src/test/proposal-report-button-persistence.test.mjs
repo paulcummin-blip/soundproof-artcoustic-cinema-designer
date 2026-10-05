@@ -218,7 +218,7 @@ test('the action label is identical in every runnable state', () => {
     label: 'Technical Report',
     uiState: PROPOSAL_REPORT_UI_STATE.LEGACY,
   }).label).toBe('Refresh Technical Report evidence');
-  expect(PROPOSAL_REPORT_STATUS_TEXT[PROPOSAL_REPORT_UI_STATE.LEGACY]).toBe('Needs one-time refresh');
+  expect(PROPOSAL_REPORT_STATUS_TEXT[PROPOSAL_REPORT_UI_STATE.LEGACY]).toBe('Needs one-time evidence refresh');
   expect(PROPOSAL_REPORT_STATUS_TEXT[PROPOSAL_REPORT_UI_STATE.LEGACY]).not.toBe('Missing');
 
   expect(resolveReportAction({ label: 'Technical Report', uiState: 'current' }).label)

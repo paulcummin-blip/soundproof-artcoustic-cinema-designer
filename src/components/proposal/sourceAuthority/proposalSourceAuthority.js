@@ -75,7 +75,7 @@ export function describeSourceState(state) {
     case PROPOSAL_SOURCE_STATE.FAILED:
       return 'Unavailable';
     case PROPOSAL_SOURCE_STATE.LEGACY:
-      return 'Needs one-time refresh';
+      return 'Needs one-time evidence refresh';
     case PROPOSAL_SOURCE_STATE.MISSING:
       return 'Missing';
     default:

@@ -90,6 +90,7 @@ test('a newly generated report saves everything proposal readiness reads', () =>
       presentation: {},
       pages: [],
       proposalSource: { report_source_version: 1, report_parameters: [] },
+      reportEvidence: { evidence_version: 1, proposal_ready: true, evidence_fingerprint: 're1-x' },
     },
   });
 
@@ -102,7 +103,8 @@ test('a newly generated report saves everything proposal readiness reads', () =>
   assert.equal(record.source_fingerprints.engineeringFingerprint, 'eng:v1:x');
   assert.ok(record.generated_at, 'the generated date is saved with the report');
   assert.equal(record.generated_by, 'Paul');
-  assert.ok(record.payload.proposalSource, 'the proposal evidence is saved with the report');
+  assert.ok(record.payload.proposalSource, 'the report keeps its own frozen source');
+  assert.ok(record.payload.reportEvidence, 'the machine-readable evidence is saved with the report');
 });
 
 /* ── 2. The save path itself ────────────────────────────────────────────── */
@@ -111,17 +113,18 @@ test('the proposal evidence is captured on the save path, not on a later visit',
   assert.match(HOOK, /captureReportProposalSource\(/, 'the report saves its own proposal evidence');
   assert.match(
     HOOK,
-    /payload: \{ \.\.\.payload, proposalSource: captured \}/,
-    'the evidence is written into the same payload as the report',
+    /reportEvidence: evidence,\n\s+evidence_parity: buildParityRecord\(parity\)/,
+    'the evidence is written into the same payload as the report, with its parity outcome',
   );
   assert.match(HOOK, /buildSavedSourceFingerprints\(/, 'the published engineering fingerprint is recorded');
   assert.match(HOOK, /publishedFingerprint: version\.published_fingerprint/);
 
-  // Both save paths wait for the project record the capture reads, so a report
+  // The report save waits for the project record the capture reads, so a report
   // generated on a fast in-session load still saves complete evidence NOW instead
-  // of leaving a snapshot that has to be opened again.
+  // of leaving a snapshot that has to be opened again. The evidence backfill does
+  // NOT wait for it: it reads the report's own stored frozen source only.
   const waits = HOOK.match(/if \(!reportSource\?\.project\) return;/g) || [];
-  assert.equal(waits.length, 2, 'the first save and the legacy backfill both wait for the project record');
+  assert.equal(waits.length, 1, 'the report save waits for the project record; the evidence backfill never does');
 });
 
 test('the legacy backfill augments a CURRENT report in place, and never a stale one', () => {
@@ -130,7 +133,12 @@ test('the legacy backfill augments a CURRENT report in place, and never a stale 
     /if \(resolution\.status !== REPORT_SNAPSHOT_STATUS\.CURRENT\) return;/,
     'a report the design has moved past is left to Regenerate, never silently refreshed',
   );
-  assert.match(HOOK, /if \(saved\?\.payload\?\.proposalSource\) return;/, 'a report that already has evidence is left alone');
+  assert.match(HOOK, /if \(readStoredEvidence\(saved\)\) return;/, 'a report that already carries evidence is left alone');
+  // The backfill reads the report's OWN stored frozen source. It never reads the
+  // live project, so a report opened after the design moved on cannot have its
+  // evidence rebuilt from the current design.
+  assert.match(HOOK, /const stored = saved\.payload\?\.proposalSource;/, 'recovery reads the report frozen source');
+  assert.match(HOOK, /captured: stored,/, 'the evidence is rebuilt from that stored source alone');
 });
 
 /* ── 3. What decides staleness ──────────────────────────────────────────── */
@@ -165,13 +173,13 @@ test('a legacy report reads as a one-time refresh in both the client and server 
     'base44/shared/proposalReadinessAuthority.js',
   ]) {
     const source = read(relative);
-    assert.match(source, /\[READINESS_STATE\.LEGACY\]: 'Needs one-time refresh'/);
+    assert.match(source, /\[READINESS_STATE\.LEGACY\]: 'Needs one-time evidence refresh'/);
     assert.match(source, /one-time evidence refresh/);
     assert.doesNotMatch(source, /but it needs refreshing for proposal comparison/);
   }
 });
 
 test('the legacy wording never describes a report that exists as missing', () => {
-  assert.match(READER, /Report exists, but needs a one-time evidence refresh/);
+  assert.match(READER, /Report is current, but it needs a one-time evidence refresh/);
   assert.doesNotMatch(READER, /missing .*Report exists/);
 });

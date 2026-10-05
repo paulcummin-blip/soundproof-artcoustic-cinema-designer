@@ -244,13 +244,18 @@ function buildParameters(captured, reportType, authorityHeadlines = null) {
       const headline = headlineById.get(id) || null;
       const statedRow = statedById.get(id) || null;
       const value = row.value ?? null;
+      const level = asText(row.level) || null;
       return {
         key: `P${id}`,
         parameter_id: id,
         title: asText(headline?.title) || asText(statedRow?.title) || `P${id}`,
         area: asText(headline?.category) || asText(statedRow?.category) || null,
-        level: asText(row.level) || null,
+        level,
         value,
+        // The report's own statement of this parameter, exactly as it prints it.
+        // A proposal reads this sentence, so its P13 can never be assembled from
+        // a different value than the Technical Report shows.
+        text: [level, asText(value)].filter(Boolean).join(' · ') || null,
         unit: inferUnit(value) || inferUnit(headline?.formatted_value),
         context: parameterContext(id),
         limiting_group: null,
