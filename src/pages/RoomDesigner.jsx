@@ -12,6 +12,7 @@ import { publishDesignReviewHandoff, publishBassPendingIndicator, clearBassPendi
 import { isRetainedSummaryStillValid } from "@/components/state/designRatingPublicationAuthority";
 import { buildSeatPriorityFingerprint } from "@/components/utils/seatScopeAuthority";
 import { useEngineeringPublicationEffect } from "@/components/proposal/engineeringAuthority/useEngineeringPublicationEffect";
+import EngineeringPublicationStatus from "@/components/engineering/EngineeringPublicationStatus";
 
 // Hooks and utils (kept eager; they are light and provide guards below)
 import { useRP22AnalysisEngine } from "@/components/hooks/useRP22AnalysisEngine";
@@ -2013,10 +2014,12 @@ function RoomDesignerWithState() {
     };
   }, [appState]);
 
-  useEngineeringPublicationEffect({
+  const engineeringPublication = useEngineeringPublicationEffect({
     projectId: resolvedProjectId || projectIdState || null,
     versionId: appState?.activeVersionId || null,
     isPublishable: appDesignRating?.isPublishable === true,
+    bassReadiness: appDesignRating?.bassReadiness,
+    retainedFromRefresh: appDesignRating?.retainedFromRefresh === true,
     engineeringSummary: appDesignRating?.engineeringSummary ?? null,
     bassFingerprint: appDesignRating?.bassReadiness?.fingerprint || null,
     ready: loadState?.phase === "loaded"
@@ -2160,6 +2163,9 @@ function RoomDesignerWithState() {
         handleSaveProject={triggerSaveProject}
         loadedVersionId={appState?.activeVersionId || null}
       />
+
+      {isProjectMode && <EngineeringPublicationStatus publication={engineeringPublication}
+        projectId={resolvedProjectId || projectIdState || null} versionId={appState?.activeVersionId || null} />}
 
       {/* Persistent Workspace View selector — always visible across all three modes. */}
       <WorkspaceViewSelector viewMode={viewMode} onViewModeChange={setViewMode} />
