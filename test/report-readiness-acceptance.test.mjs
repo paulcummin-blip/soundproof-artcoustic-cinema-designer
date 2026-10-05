@@ -120,6 +120,7 @@ const panel = (saved, currentFingerprints) => resolveVersionReadiness({
   version: VERSION,
   savedReports: saved,
   publication: PUBLICATION,
+  publicationStatus: 'published',
   currentFingerprints,
 });
 
