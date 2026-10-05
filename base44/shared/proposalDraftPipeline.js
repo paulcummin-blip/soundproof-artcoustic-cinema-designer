@@ -13,6 +13,7 @@ import { resolveReportLayout } from './highChannelDensityRule.js';
 import { buildSectionPrompt } from './proposalGenerationPrompts.js';
 import { buildProposalNarrativeEvidenceGuard } from './proposalNarrativeEvidenceGuard.js';
 import { sanitizeNarrativeHtml, p17DiffersAcrossVersions } from './proposalNarrativeSanitizer.js';
+import { buildExcludedParameterPolicy } from './clientFacingParameterAuthority.js';
 
 export function prepareProposalEvidence(suppliedSnapshots, projectVersions, resolvedType) {
   const versionEvidence = buildSelectedVersionEvidence(suppliedSnapshots.map(entry => {
@@ -43,8 +44,12 @@ export function prepareProposalInterpretation({ suppliedSnapshots, project, clie
   return { primaryInterpretation, comparisonReading, interpretationBlock };
 }
 
-export async function generateProposalDraftContent({ invokeLLM, sectionRecords, sectionDefs, resolvedType, engineering_snapshot, comparisonTable, versionEvidence = [], projectContext, interpretationBlock }) {
-  const guard = resolvedType === 'comparison' ? buildProposalNarrativeEvidenceGuard(comparisonTable, versionEvidence) : '';
+export async function generateProposalDraftContent({ invokeLLM, sectionRecords, sectionDefs, resolvedType, engineering_snapshot, comparisonTable, versionEvidence = [], projectContext, interpretationBlock, clientBrief = '', dealerNotes = '' }) {
+  // Assumed and administrative parameters (P8, P15, P21) are excluded from every
+  // client-facing surface: prompt, comparison table, highlights rows and prose.
+  // The designer can lift the exclusion for one of them, explicitly.
+  const parameterPolicy = buildExcludedParameterPolicy({ clientBrief, dealerNotes });
+  const guard = resolvedType === 'comparison' ? buildProposalNarrativeEvidenceGuard(comparisonTable, versionEvidence, parameterPolicy) : '';
   const guardedLLM = args => invokeLLM({ ...args, prompt: [args.prompt, guard].filter(Boolean).join('\n\n') });
   const usesSystemStructure = resolvedType !== 'single';
   const isComparisonReport = resolvedType === 'comparison';
@@ -73,17 +78,17 @@ export async function generateProposalDraftContent({ invokeLLM, sectionRecords, 
     const result = generationResults[index];
     if (isComparisonHighlights(section)) {
       const payload = result.status === 'fulfilled' ? result.value : null;
-      const intro = sanitizeNarrativeHtml(String(payload?.intro_html || '').trim(), { p17Differs, sectionType: section.section_type });
+      const intro = sanitizeNarrativeHtml(String(payload?.intro_html || '').trim(), { p17Differs, sectionType: section.section_type, parameterPolicy });
       return { section, html: intro, metadata: comparisonSectionMetadata(comparisonTable), failed: result.status === 'rejected' || intro.length === 0 };
     }
     if (isHighlightsSection(section)) {
       const payload = result.status === 'fulfilled' ? result.value : null;
-      const intro = sanitizeNarrativeHtml(String(payload?.intro_html || '').trim(), { p17Differs, sectionType: section.section_type });
+      const intro = sanitizeNarrativeHtml(String(payload?.intro_html || '').trim(), { p17Differs, sectionType: section.section_type, parameterPolicy });
       const rows = mergeHighlightRows(highlightRows,payload?.rows);
       return { section, html: intro, metadata: {highlight_rows:rows}, failed: result.status === 'rejected' || intro.length === 0 || rows.every(row => !(row.what_the_room_gains || row.what_you_hear)) };
     }
     const raw = result.status === 'fulfilled' ? (typeof result.value === 'string' ? result.value : result.value?.content || '').trim() : '';
-    const html = sanitizeNarrativeHtml(raw, { p17Differs, sectionType: section.section_type });
+    const html = sanitizeNarrativeHtml(raw, { p17Differs, sectionType: section.section_type, parameterPolicy });
     return { section,html,metadata:null,failed:result.status === 'rejected' || html.length === 0 };
   });
   const failedSections = generatedContent.filter(item => item.failed);

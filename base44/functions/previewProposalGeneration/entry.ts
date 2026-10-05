@@ -54,7 +54,7 @@ export default async function(req) {
     const sectionRecords = sectionDefs.map((s,index)=>({section_type:s.type,section_key:s.key,
       title:resolveSectionTitle(s.type,s.title,resolvedType),body:'',order_index:index,is_enabled:true}));
     const generatedContent = await generateProposalDraftContent({invokeLLM:args=>base44.integrations.Core.InvokeLLM(args),
-      sectionRecords,sectionDefs,resolvedType,engineering_snapshot,comparisonTable,versionEvidence,projectContext,interpretationBlock});
+      sectionRecords,sectionDefs,resolvedType,engineering_snapshot,comparisonTable,versionEvidence,projectContext,interpretationBlock,clientBrief:client_brief});
     const sections = sectionRecords.map(section=>{
       const generated=generatedContent.find(item=>item.section.section_key===section.section_key);
       return {...section,body:generated?.html || '',metadata:generated?.metadata || null,generated:!!generated};

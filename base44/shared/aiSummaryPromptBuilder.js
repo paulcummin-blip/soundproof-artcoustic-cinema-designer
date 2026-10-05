@@ -50,9 +50,17 @@ function formatBassSeatResults(perSeat) {
     .join("; ");
 }
 
-function formatAssumptions(assumptions) {
-  if (!assumptions) return "P15 Background noise floor: Assumed L2, design target NCB 22\nP21 Early reflections: Assumed L2; early reflections have not been measured.";
-  const p15 = assumptions.p15 || {};
+/**
+ * The supplied assumptions, or '' when the policy excludes them.
+ *
+ * Assumed / administrative parameters (P15, P21) add noise to a client-facing
+ * summary and are not decision points, so they are reported only when the
+ * designer explicitly asked about one of them, and always labelled as assumed.
+ */
+function formatAssumptions(assumptions, policy) {
+  const resolved = policy || buildExcludedParameterPolicy();
+  if (!resolved.allows('P15') && !resolved.allows('P21')) return '';
+  const p15 = assumptions?.p15 || {};
   const p21 = assumptions.p21 || {};
   const p15Status = p15.status || "Assumed";
   const p21Status = p21.status || "Assumed";
@@ -128,6 +136,8 @@ export function buildHighChannelSummaryRule(payloads) {
 
 export function buildSingleSummaryPrompt(payload) {
   const { identity, project, system, categoryFloors, parameters, bass, assumptions, viewing } = payload || {};
+  const parameterPolicy = buildExcludedParameterPolicy({ clientBrief: payload?.clientBrief || payload?.project?.clientBrief || '' });
+  const assumptionsBlock = formatAssumptions(assumptions, parameterPolicy);
 
   return `You are a professional home cinema design engineer writing a client-facing performance summary for a cinema design project. The summary must be factual, professional, and based ONLY on the engineering data provided below. Do not editorialise beyond the evidence.
 
@@ -147,7 +157,7 @@ ${buildHighChannelSummaryRule(payload)}
 - P14 is Dynamic Range. P18, P19, and P20 are Timbre Matching. Never describe P19 or P20 as Dynamic Range.
 - P20 is seat-to-seat bass consistency. If P20 is L1 or FAIL, state that consistency varies materially across seats; never call the bass response consistent, stable, uniform, or standardized across the room.
 - Keep engineering claims tied to a supplied value. If evidence is unavailable, omit the claim.
-- Report the supplied P15/P21 status exactly. When marked Assumed, state it once and do not describe it as calculated or measured. When marked Measured, use the measured result instead.
+- ${buildClientFacingParameterRule(parameterPolicy)}
 
 PROJECT DATA:
 - Project: ${project?.name || "—"}
@@ -162,8 +172,7 @@ RP22 CATEGORY FLOORS:
 BASS (when authoritative):
 ${formatBass(bass)}
 
-DESIGN ASSUMPTIONS:
-${formatAssumptions(assumptions)}
+${assumptionsBlock ? `DESIGN ASSUMPTIONS (designer-requested only):\n${assumptionsBlock}` : ''}
 
 VIEWING:
 ${viewing ? `${viewing.summary || "Calculated"} (Primary: ${viewing.primaryFloor || "—"}, Secondary: ${viewing.secondaryFloor || "—"})` : "Not calculated"}
@@ -189,15 +198,18 @@ Output the summary as clean text with markdown headings (## for sections, ### fo
  * @returns {string}
  */
 export function buildComparisonSummaryPrompt({ payloads, versionLabels }) {
+  const parameterPolicy = buildExcludedParameterPolicy({
+    clientBrief: [payloads?.[0]?.clientBrief, payloads?.[0]?.project?.clientBrief].filter(Boolean).join('\n'),
+  });
   const versionData = (payloads || []).map((payload, i) => {
     const label = (versionLabels || [])[i] || `Version ${i + 1}`;
+    const assumptionsText = formatAssumptions(payload?.assumptions, parameterPolicy);
     return `VERSION: ${label}
 - Project: ${payload?.project?.name || "—"}
 - Category Floors Primary: ${formatCategoryFloors(payload?.categoryFloors?.primary)}
 - Category Floors Secondary: ${formatCategoryFloors(payload?.categoryFloors?.secondary)}
 - Bass: ${formatBass(payload?.bass)}
-- Design assumptions: ${formatAssumptions(payload?.assumptions)}
-- Subwoofers: ${formatSubwoofers(payload?.system)}
+    ${assumptionsText ? `- Design assumptions (designer-requested only): ${assumptionsText}\n` : ''}- Subwoofers: ${formatSubwoofers(payload?.system)}
 - Screen: ${payload?.system?.screen?.size || "—"}" ${payload?.system?.screen?.aspectRatio || ""}
 - Viewing: ${payload?.viewing?.summary || "Not calculated"}`;
   }).join("\n\n");
@@ -221,7 +233,7 @@ ${buildHighChannelSummaryRule(payloads)}
 - RP22 category floors are the sole authority for the Spatial Resolution, Dynamic Range, and Timbre Matching comparison rows.
 - P14 is Dynamic Range. P18, P19, and P20 are Timbre Matching. Never describe P19 or P20 as Dynamic Range.
 - If P20 is L1 or FAIL, describe material seat-to-seat bass variation; never call the bass response consistent, stable, uniform, or standardized across the room.
-- Report each version's supplied background-noise and early-reflection status exactly; an Assumed result must not be described as measured.
+- ${buildClientFacingParameterRule(parameterPolicy)}
 
 VERSION DATA:
 ${versionData}

@@ -35,6 +35,7 @@
 
 import { isDesignIndexRow } from './reportWritingStyleContract.js';
 import comparisonClientMeaning from './comparisonClientMeaning.js';
+import { excludeExcludedClientParameterRows } from './clientFacingParameterAuthority.js';
 
 export const COMPARISON_ROW_ORDER = Object.freeze([
   'screen_size',
@@ -281,9 +282,11 @@ export function buildComparisonTable(versions) {
   // built by walking COMPARISON_ROW_ORDER, so filtering preserves that order).
   const ordered = [...compared.filter((row) => !row.identical), ...compared.filter((row) => row.identical)];
 
-  // The internal Design Index is never a client-facing row, whatever a stored
-  // table carries.
-  return { rows: ordered.filter((row) => !isDesignIndexRow(row)).map(row => ({
+  // The internal Design Index is never a client-facing row, and neither is an
+  // assumed or administrative parameter (P8, P15, P21), whatever a stored table
+  // carries. The stored record is never modified.
+  const clientFacing = excludeExcludedClientParameterRows(ordered.filter((row) => !isDesignIndexRow(row)));
+  return { rows: clientFacing.map(row => ({
     ...row, client_meaning: comparisonClientMeaning(row),
   })), versions: columns };
 }
@@ -296,7 +299,7 @@ export function formatComparisonTableForPrompt(table) {
   // A table stored before the rule existed may still carry the internal Design
   // Index, so its rows are dropped here too: a regenerated section must never
   // see the index, and must never be able to restate it.
-  const rows = (table?.rows || []).filter((row) => !isDesignIndexRow(row));
+  const rows = excludeExcludedClientParameterRows((table?.rows || []).filter((row) => !isDesignIndexRow(row)));
   if (rows.length === 0) {
     return '=== COMPARISON TABLE ===\nNo calculated differences were found between the selected versions. Explain what stays the same and do not claim a difference.';
   }

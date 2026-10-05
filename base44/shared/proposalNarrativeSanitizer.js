@@ -15,12 +15,18 @@
  *   3. a blanket tonal guarantee is removed when the P17 evidence shows the
  *      options differ, because the assessed results no longer support it
  *
+ *   4. a sentence referencing an assumed or administrative parameter (P8, P15,
+ *      P21) is removed, because those are not client decision points; the
+ *      designer can lift that exclusion explicitly, per parameter.
+ *
  * It only removes or rewrites wording. It never invents, changes or reorders a
  * value, a level, a parameter or a sentence's engineering meaning.
  *
  * Pure: no React, no SDK, no runtime-specific APIs. Safe in any backend function
  * and in the shared draft pipeline used by both the live and preview paths.
  */
+
+import { stripExcludedParameterSentences } from './clientFacingParameterAuthority.js';
 
 const TABLE_BLOCK = /<table\b[\s\S]*?<\/table>/gi;
 const TABLE_TAG = /<\/?(?:table|thead|tbody|tfoot|tr|th|td|caption|colgroup|col)\b[^>]*>/gi;
@@ -196,7 +202,8 @@ export function sanitizeNarrativeHtml(html, options = {}) {
   const withEvidenceLanguage = enforcePredictedLanguage(withoutTables);
   const withTonalRule = options.p17Differs ? removeBlanketTonalClaims(withEvidenceLanguage) : withEvidenceLanguage;
   const scoped = enforceSectionScope(withTonalRule, options.sectionType);
-  return enforceApprovedVocabulary(removeStraySectionHeadings(scoped));
+  const withoutAssumptions = stripExcludedParameterSentences(scoped, options.parameterPolicy);
+  return enforceApprovedVocabulary(removeStraySectionHeadings(withoutAssumptions));
 }
 
 export default sanitizeNarrativeHtml;

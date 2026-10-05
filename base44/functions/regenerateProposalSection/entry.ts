@@ -10,6 +10,7 @@ import { formatComparisonTableForPrompt } from '../../shared/comparisonTable.js'
 import { buildEngineeringEvidence } from '../../shared/engineeringSnapshotEvidence.js';
 import { buildProjectInterpretation, formatInterpretationForPrompt, formatInterpretationForLog } from '../../shared/adiProjectInterpretation.js';
 import { sanitizeNarrativeHtml, p17DiffersAcrossVersions } from '../../shared/proposalNarrativeSanitizer.js';
+import { buildExcludedParameterPolicy, buildClientFacingParameterRule } from '../../shared/clientFacingParameterAuthority.js';
 
 const SECTION_TITLES: Record<string, string> = {
   executive_summary: 'Executive Summary',
@@ -188,6 +189,9 @@ export default async function(req) {
     const currentBody = stripHtml(section.body || '');
     const dealerNotes = section.dealer_notes || '';
     const briefText = effectiveBrief.trim();
+    // An assumed or administrative parameter (P8, P15, P21) is only mentioned
+    // when the designer explicitly asked for it, in the brief or the notes.
+    const parameterPolicy = buildExcludedParameterPolicy({ clientBrief: briefText, dealerNotes });
     // The Key Performance Highlights table is built by Sound Proof from
     // calculated data. Only the introduction is written prose.
     const sectionNote = section.section_type === 'key_performance_highlights'
@@ -237,6 +241,8 @@ export default async function(req) {
       'conflicts with the engineering results, explain the engineering reality honestly',
       'rather than changing the results.',
       '',
+      buildClientFacingParameterRule(parameterPolicy),
+      '',
       '=== FORMATTING ===',
       'Format the response as HTML. Use <h2>, <h3>, <p>, <ul>, <li>, <strong>, <em> tags.',
       'Do NOT include the section title — only the body content.',
@@ -254,7 +260,7 @@ export default async function(req) {
     // predicted result described as measured, no blanket tonal guarantee where the
     // P17 evidence shows the options differ.
     const p17Differs = proposal.proposal_type === 'comparison' && p17DiffersAcrossVersions(comparisonTable);
-    const html = sanitizeNarrativeHtml(rawHtml, { p17Differs, sectionType: section.section_type });
+    const html = sanitizeNarrativeHtml(rawHtml, { p17Differs, sectionType: section.section_type, parameterPolicy });
 
     // ── Update section ──
     await base44.entities.ProposalSection.update(section_id, {

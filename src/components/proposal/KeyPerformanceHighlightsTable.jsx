@@ -1,7 +1,7 @@
 import React from 'react';
 import { resolveComparisonDisplay } from '@/components/proposal/comparisonDisplayAuthority';
 import { proposalRoleStyle } from '@/components/proposal/typography/proposalTypography';
-import { excludeDesignIndexRows } from '@/components/proposal/designIndexRowAuthority';
+import { excludeClientFacingRows } from '@/components/proposal/designIndexRowAuthority';
 import {
   buildHighlightDisplayRows,
   changeCellText,
@@ -89,8 +89,9 @@ export default function KeyPerformanceHighlightsTable({
 }) {
   const display = resolveComparisonDisplay(comparisonRows, comparisonVersions, proposalComparisonTable);
   const options = display.versions;
-  // The internal Design Index is never a client-facing row.
-  const visibleComparisonRows = excludeDesignIndexRows(display.rows);
+  // The internal Design Index and the assumed parameters (P8, P15, P21) are
+  // never client-facing rows.
+  const visibleComparisonRows = excludeClientFacingRows(display.rows);
   const comparison = options.length >= 2 && visibleComparisonRows.length > 0;
   // A comparison whose table could not be built says so on the page. A heading
   // with nothing under it reads as a section that failed silently, which is

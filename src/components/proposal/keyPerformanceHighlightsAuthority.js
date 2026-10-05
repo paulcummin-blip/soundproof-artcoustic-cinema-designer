@@ -22,7 +22,7 @@
  */
 
 import { DISPLAY_UNIT, formatResultText } from './displayValueFormat';
-import { excludeDesignIndexRows } from './designIndexRowAuthority';
+import { excludeClientFacingRows } from './designIndexRowAuthority';
 
 /** The performance areas a client-facing row may belong to, in table order. */
 export const HIGHLIGHT_AREA = Object.freeze({
@@ -441,7 +441,7 @@ function usableGain(row) {
 export function buildHighlightDisplayRows(rows, options = {}) {
   const limit = Number.isFinite(options.limit) ? options.limit : HIGHLIGHT_DISPLAY_LIMIT;
   const compactViewing = String(options.viewingResult || '').trim();
-  const display = excludeDesignIndexRows(rows)
+  const display = excludeClientFacingRows(rows)
     .filter((row) => row && (row.area || row.result || row.key))
     .map((row, index) => {
       const key = String(row.key || `row_${index}`);

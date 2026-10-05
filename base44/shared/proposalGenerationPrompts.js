@@ -4,6 +4,7 @@ import { SYSTEM_SUMMARY_SECTIONS, getSystemSummarySectionPrompt, COMPARISON_REPO
 import { buildComparisonSectionRule } from './comparisonStoryRule.js';
 import { buildProposalSalesVoice } from './proposalSalesVoice.js';
 import { buildEngineeringEvidence } from './engineeringSnapshotEvidence.js';
+import { buildExcludedParameterPolicy, buildClientFacingParameterRule } from './clientFacingParameterAuthority.js';
 
 const SECTIONS = [
   { type: 'cover', key: 'cover', title: 'Cover', canEditBody: false },
@@ -45,6 +46,9 @@ export function buildProjectContext(project, narrativeGoal, brandAsset, clientBr
   const subInfo = subwoofers.length > 0 ? `${subwoofers.length}x ${subwoofers[0]?.model || 'Subwoofer'}` : '';
   const companyName = brandAsset?.company_name || '';
   const briefText = (clientBrief || '').trim();
+  // Assumed and administrative parameters (P8, P15, P21) are excluded from every
+  // client-facing section unless the designer explicitly asked for one of them.
+  const parameterRule = buildClientFacingParameterRule(buildExcludedParameterPolicy({ clientBrief: briefText }));
   const isComparison = reportType === 'comparison';
   return [
     `Report Type: ${isComparison ? 'System Design Comparison' : 'System Design Summary'}`,
@@ -70,6 +74,7 @@ export function buildProjectContext(project, narrativeGoal, brandAsset, clientBr
     'The Client Brief influences narrative emphasis, wording, and structure ONLY.',
     'It must NEVER alter, contradict, or override any engineering result, RP22 value,',
     'Design Rating, or recommendation. All supplied values remain exactly as reported.',
+    '', parameterRule,
   ].filter(Boolean).join('\n');
 }
 export function buildSectionPrompt(sectionDef, projectContext, proposalType, interpretationBlock = '', layout = null) {

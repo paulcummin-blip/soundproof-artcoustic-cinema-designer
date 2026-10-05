@@ -13,9 +13,13 @@
  *   - a P17 difference is disclosed honestly, and the stronger option is named
  *   - no blanket tonal guarantee
  *   - the supported experience for each difference, and level one respected
+ *   - no assumed or administrative parameter (P8, P15, P21), unless the designer
+ *     explicitly asked for it
  *
  * Pure: no React, no SDK, no runtime-specific APIs.
  */
+
+import { buildExcludedParameterPolicy, buildClientFacingParameterRule } from './clientFacingParameterAuthority.js';
 
 /** The approved evidence vocabulary for calculated (not measured) results. */
 const EVIDENCE_VOCABULARY_RULE = [
@@ -64,9 +68,10 @@ function higherValueIndex(values = []) {
 /**
  * @param {{versions?: Array, rows?: Array}} comparisonTable - frozen comparison table
  * @param {Array} versionEvidence - per-version frozen evidence
+ * @param {object} [parameterPolicy] - excluded-parameter policy for this proposal
  * @returns {string} the final constraint block, or '' when there is no comparison
  */
-export function buildProposalNarrativeEvidenceGuard(table, versionEvidence = []) {
+export function buildProposalNarrativeEvidenceGuard(table, versionEvidence = [], parameterPolicy = null) {
   if (!table?.versions?.length) return '';
   const names = table.versions.map(version => version.version_name || version.label);
   const rows = table.rows || [];
@@ -93,6 +98,7 @@ export function buildProposalNarrativeEvidenceGuard(table, versionEvidence = [])
     TABLE_RULE,
     EVIDENCE_VOCABULARY_RULE,
     SECTION_FOCUS_RULE,
+    buildClientFacingParameterRule(parameterPolicy || buildExcludedParameterPolicy()),
     BASS_SEPARATION_RULE,
     supportedExperiences.length ? `WHAT EACH SUPPORTED DIFFERENCE MEANS:\n- ${supportedExperiences.join('\n- ')}` : '',
     'SHARED DISCRETE CHANNEL CAPABILITY: where every option shares the same layout and the same top P2 level, state it as a strength both options already hold and say plainly that the upgrade is not more channels: it is what those channels can deliver.',
@@ -110,7 +116,7 @@ export function buildProposalNarrativeEvidenceGuard(table, versionEvidence = [])
       : 'P20: NO POSITIVE CLAIM IS AUTHORISED. The P20 evidence is absent, weak or excluded from positive narrative. Any P20 row in the table is neutral disclosure only. Say: "Any added subwoofers give the more powerful option more output capability and more placement tools for calibration, but seat-to-seat consistency should only be claimed where P20 evidence is available." Never say more even bass, improved bass consistency, less seat-to-seat variation, or that the subwoofers were chosen for consistency.',
     'LEVEL 1 MUST BE RESPECTED: it remains a credible 9.1.6 cinema design. Say what it keeps before saying what the higher option adds. It is more powerful where the evidence supports it, not a compromise to be corrected.',
     'NO GUARANTEED OUTCOMES: never promise clear dialogue, distortion-free playback, perfect coverage, uniform bass or a guaranteed listening result. Say what the design supports and what the client should expect.',
-    'FINAL SILENT CHECK: no table, no "measured"/"proven"/"confirmed", no unsupported P20 claim, bass concepts kept separate, the P17 trade-off stated with the stronger option named, no blanket tonal guarantee, all values exact and attached to the right option, and the stronger option compelling but never overstated. Return premium, calm, specific, evidence-led prose.',
+    'FINAL SILENT CHECK: no table, no "measured"/"proven"/"confirmed", no unsupported P20 claim, no assumed or administrative parameter unless the designer asked for it, bass concepts kept separate, the P17 trade-off stated with the stronger option named, no blanket tonal guarantee, all values exact and attached to the right option, and the stronger option compelling but never overstated. Return premium, calm, specific, evidence-led prose.',
   ].filter(Boolean).join('\n\n');
 }
 

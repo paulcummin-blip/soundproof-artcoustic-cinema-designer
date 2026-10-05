@@ -16,6 +16,11 @@
  * base44/shared/reportWritingStyleContract.js (DESIGN_INDEX_BANNED_TERMS and
  * isDesignIndexRow). The app shell cannot import a shared backend module, so the
  * terms are repeated here and a test asserts the two lists stay identical.
+ *
+ * The same mirror carries the excluded client-facing parameters (P8, P15, P21)
+ * from base44/shared/clientFacingParameterAuthority.js: an assumed or
+ * administrative parameter is never a client-facing row either, whatever an
+ * older stored table carries.
  */
 
 export const DESIGN_INDEX_BANNED_TERMS = [
@@ -28,6 +33,13 @@ export const DESIGN_INDEX_BANNED_TERMS = [
   '(Primary)',
 ];
 
+/** The assumed / administrative parameters no proposal may show. */
+export const EXCLUDED_CLIENT_PARAMETER_CODES = ['P8', 'P15', 'P21'];
+
+const EXCLUDED_CLIENT_PARAMETER_IDS = [8, 15, 21];
+
+const EXCLUDED_CLIENT_PARAMETER_ROW_PATTERN = /\bP8\b|\bP15\b|\bP21\b|\bParameter\s*(?:8|15|21)\b|background noise|noise floor|up-?firing|elevation speaker/i;
+
 /** True when a row is about the internal Design Index rather than a design result. */
 export function isDesignIndexRow(row) {
   if (!row) return false;
@@ -39,9 +51,27 @@ export function isDesignIndexRow(row) {
   return DESIGN_INDEX_BANNED_TERMS.some((term) => label.includes(term.toLowerCase()));
 }
 
+/** True when a row is an assumed or administrative parameter (P8, P15, P21). */
+export function isExcludedClientParameterRow(row) {
+  if (!row) return false;
+
+  const key = String(row.key || '').trim().toLowerCase();
+  if (EXCLUDED_CLIENT_PARAMETER_IDS.some((id) => key === `p${id}` || key.startsWith(`p${id}_`))) return true;
+
+  return EXCLUDED_CLIENT_PARAMETER_ROW_PATTERN.test(`${row.area || ''} ${row.label || ''}`);
+}
+
 /** The client-facing rows only: the internal Design Index rows are dropped. */
 export function excludeDesignIndexRows(rows) {
   return (Array.isArray(rows) ? rows : []).filter((row) => !isDesignIndexRow(row));
+}
+
+/**
+ * The rows a client proposal may show: the internal Design Index and the
+ * assumed / administrative parameters (P8, P15, P21) are both dropped.
+ */
+export function excludeClientFacingRows(rows) {
+  return excludeDesignIndexRows(rows).filter((row) => !isExcludedClientParameterRow(row));
 }
 
 export default excludeDesignIndexRows;

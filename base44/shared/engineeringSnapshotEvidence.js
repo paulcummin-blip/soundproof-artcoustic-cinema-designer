@@ -47,6 +47,7 @@ import {
   splitParameterEvidence,
 } from './adiReportEvidenceRules.js';
 import { DESIGN_LED_VOICE_RULES, DESIGN_INDEX_HARD_RULES, isDesignIndexRow } from './reportWritingStyleContract.js';
+import { excludeExcludedClientParameterRows } from './clientFacingParameterAuthority.js';
 import { summariseSubwooferConfiguration } from './subwooferConfigurationSummary.js';
 
 function compose(...parts) {
@@ -288,7 +289,7 @@ export function selectHighlightRows(snapshot) {
 
   // The Design Index is an internal designer diagnostic, so it is never a row
   // here; a row arriving from older data is dropped by the shared guard.
-  const clientFacing = candidates.filter((row) => !isDesignIndexRow(row));
+  const clientFacing = excludeExcludedClientParameterRows(candidates.filter((row) => !isDesignIndexRow(row)));
 
   // Only the most useful results are carried, and the Result column is read
   // from calculated data.

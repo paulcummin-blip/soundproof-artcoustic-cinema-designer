@@ -382,6 +382,9 @@ export default async function(req) {
       invokeLLM: (args) => base44.integrations.Core.InvokeLLM(args),
       sectionRecords, sectionDefs, resolvedType, engineering_snapshot,
       comparisonTable, versionEvidence, projectContext, interpretationBlock,
+      // The Client Brief decides whether the designer explicitly asked for an
+      // assumed parameter (P8, P15, P21), which is the only way one is mentioned.
+      clientBrief: client_brief || '',
     });
 
     // ── Update sections with generated content ──

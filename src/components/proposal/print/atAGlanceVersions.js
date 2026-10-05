@@ -16,6 +16,8 @@
  * Pure: no React, no calculation.
  */
 
+import { excludeClientFacingRows } from '../designIndexRowAuthority';
+
 /** The shared project facts, stated once for the document. */
 const COMPARISON_PROJECT_CARD_LABELS = Object.freeze([
   'Project',
@@ -73,7 +75,10 @@ export function buildComparisonGlance({
   roomCards = [],
 } = {}) {
   const versions = Array.isArray(comparisonVersions) ? comparisonVersions : [];
-  const rows = Array.isArray(comparisonRows) ? comparisonRows : [];
+  // An assumed or administrative parameter (P8, P15, P21) is never a card on
+  // this page, and neither is the internal Design Index, whatever a stored
+  // comparison table carries.
+  const rows = excludeClientFacingRows(Array.isArray(comparisonRows) ? comparisonRows : []);
   const empty = { projectCards: [], roomCards: [], versionGroups: [] };
   // Fewer than two versions with a calculated table is not a comparison, and the
   // page keeps its single-system form.
