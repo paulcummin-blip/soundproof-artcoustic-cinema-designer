@@ -93,6 +93,22 @@ function requireEvidence(row, version, type) {
     );
   }
 
+  // The design the evidence was frozen from is compared with the design this
+  // version holds now, by the one engineering fingerprint. The version record's
+  // modified time is never consulted: opening a project, exporting a PDF or
+  // storing a library asset all touch it without changing the design. When
+  // either side is unreadable, no staleness is manufactured.
+  const evidenceFingerprint = evidence.identity?.source_fingerprint || null;
+  const savedFingerprint = row.source_fingerprints?.engineeringFingerprint || null;
+  const publishedFingerprint = version.published_fingerprint || null;
+  const stated = evidenceFingerprint || savedFingerprint;
+  if (stated && publishedFingerprint && stated !== publishedFingerprint) {
+    throw new Error(
+      `${name}: stale ${type} Report. The design changed after it was generated. `
+      + `Regenerate it before creating a proposal.`,
+    );
+  }
+
   const completeness = validateReportEvidence(evidence, type.toLowerCase(), {
     projectId: version.project_id || row.project_id, versionId: version.id,
     sourceFingerprint: version.published_fingerprint,
@@ -109,22 +125,6 @@ function requireEvidence(row, version, type) {
       `${name}: incomplete ${type} Report evidence${detail}. `
       + `The report's visible values and its evidence snapshot must agree before a proposal can use it. `
       + `Regenerate the ${type} Report for this version, then try again.`,
-    );
-  }
-
-  // The design the evidence was frozen from is compared with the design this
-  // version holds now, by the one engineering fingerprint. The version record's
-  // modified time is never consulted: opening a project, exporting a PDF or
-  // storing a library asset all touch it without changing the design. When
-  // either side is unreadable, no staleness is manufactured.
-  const evidenceFingerprint = evidence.identity?.source_fingerprint || null;
-  const savedFingerprint = row.source_fingerprints?.engineeringFingerprint || null;
-  const publishedFingerprint = version.published_fingerprint || null;
-  const stated = evidenceFingerprint || savedFingerprint;
-  if (stated && publishedFingerprint && stated !== publishedFingerprint) {
-    throw new Error(
-      `${name}: stale ${type} Report. The design changed after it was generated. `
-      + `Regenerate it before creating a proposal.`,
     );
   }
 
