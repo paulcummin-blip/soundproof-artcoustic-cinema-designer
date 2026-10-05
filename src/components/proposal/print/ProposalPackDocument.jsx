@@ -57,6 +57,9 @@ export default function ProposalPackDocument({
   logoUrl,
   sections,
   projectImages = [],
+  // A comparison saved before its comparison metadata was persisted: the table
+  // rebuilt read-only from each version's own frozen engineering evidence.
+  recoveredComparisonTable = null,
 }) {
   const snapshot = proposal?.engineering_snapshot || null;
   const reportType = proposal?.proposal_type;
@@ -86,7 +89,14 @@ export default function ProposalPackDocument({
   // the same calculated comparison rows the Key Differences table prints: one
   // block per selected version, never one version standing in for them all.
   const highlightsSection = byType.get('key_performance_highlights');
-  const comparisonDisplay = resolveComparisonDisplay(highlightsSection?.metadata?.comparison_rows, highlightsSection?.metadata?.comparison_versions, proposal?.metadata?.comparison_table);
+  const storedComparisonTable = proposal?.metadata?.comparison_table?.rows?.length
+    ? proposal.metadata.comparison_table
+    : recoveredComparisonTable;
+  const comparisonDisplay = resolveComparisonDisplay(
+    highlightsSection?.metadata?.comparison_rows,
+    highlightsSection?.metadata?.comparison_versions,
+    storedComparisonTable,
+  );
   const comparisonRows = reportType === 'comparison' ? comparisonDisplay.rows : null;
   const comparisonVersions = reportType === 'comparison' ? comparisonDisplay.versions : null;
   const hasComparisonGlance = Array.isArray(comparisonRows)

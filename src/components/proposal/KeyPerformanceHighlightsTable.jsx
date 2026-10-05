@@ -66,6 +66,18 @@ function optionHeading(column, index) {
   return column?.version_name || column?.label || `Option ${String.fromCharCode(65 + index)}`;
 }
 
+/**
+ * The short derived change a row leads its "What you gain" cell with: the
+ * calculated level or measured difference when it is stated compactly, a plain
+ * statement when the versions share the result, and nothing when the stored
+ * change is too long to hold the column.
+ */
+function changeLead(row) {
+  if (row?.identical) return 'Same / No change. ';
+  const change = String(row?.change || '').trim();
+  return change && change.length <= 24 ? `${change}. ` : '';
+}
+
 export default function KeyPerformanceHighlightsTable({
   rows,
   comparisonRows,
@@ -113,7 +125,7 @@ export default function KeyPerformanceHighlightsTable({
                   {optionHeading(column, index)}
                 </th>
               ))}
-              <th className={HEAD} style={proposalRoleStyle('label')}>What this means</th>
+              <th className={HEAD} style={proposalRoleStyle('label')}>What you gain</th>
             </tr>
           </thead>
           <tbody>
@@ -130,7 +142,7 @@ export default function KeyPerformanceHighlightsTable({
                   </td>
                 ))}
                 <td className={`${cell} text-[#625143]`} style={proposalRoleStyle('body')}>
-                  {row.identical ? 'Same / No change. ' : ''}{comparisonClientMeaning(row)}
+                  {changeLead(row)}{comparisonClientMeaning(row)}
                 </td>
               </tr>
             ))}

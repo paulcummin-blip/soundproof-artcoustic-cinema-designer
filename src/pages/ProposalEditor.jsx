@@ -5,6 +5,7 @@ import { getSectionDef, getSectionLabel, resolveSectionTitle } from '@/component
 import KeyPerformanceHighlightsTable from '@/components/proposal/KeyPerformanceHighlightsTable';
 import { compactViewingResult } from '@/components/proposal/print/snapshotViewingRows';
 import { getProposalTypeLabel } from '@/components/proposal/proposalTypes';
+import useRecoveredComparisonTable from '@/components/proposal/useRecoveredComparisonTable';
 import InlineRichTextEditor from '@/components/proposal/InlineRichTextEditor';
 import SectionToolbar from '@/components/proposal/SectionToolbar';
 import DealerNotesPanel from '@/components/proposal/DealerNotesPanel';
@@ -627,6 +628,18 @@ export default function ProposalEditor() {
   // ── Version names — for the images this document may use ──
   // A version-specific image is only ever composed in with the version it
   // belongs to plainly named, so its name is read alongside the gallery.
+  // A comparison saved before its comparison metadata was persisted recovers its
+  // calculated table from each version's own frozen evidence, read-only.
+  const highlightsSection = sections.find((s) => s.section_type === 'key_performance_highlights');
+  const hasStoredComparison = (highlightsSection?.metadata?.comparison_rows?.length || 0) > 0;
+  const recoveredComparisonTable = useRecoveredComparisonTable({
+    proposal,
+    hasStoredTable: hasStoredComparison || !!proposal?.metadata?.comparison_table?.rows?.length,
+  });
+  const comparisonTableForDisplay = proposal?.metadata?.comparison_table?.rows?.length
+    ? proposal.metadata.comparison_table
+    : recoveredComparisonTable;
+
   const [versionNameById, setVersionNameById] = useState(new Map());
   useEffect(() => {
     const versionIds = proposalVersionIds(proposal);
@@ -989,7 +1002,7 @@ export default function ProposalEditor() {
                     comparisonRows={section.metadata?.comparison_rows}
                     comparisonVersions={section.metadata?.comparison_versions}
                     comparisonExpected={proposal?.proposal_type === 'comparison'}
-                    proposalComparisonTable={proposal?.metadata?.comparison_table}
+                    proposalComparisonTable={comparisonTableForDisplay}
                     viewingResult={compactViewingResult(proposal?.engineering_snapshot)}
                     className="mt-4"
                   />
@@ -1108,6 +1121,7 @@ export default function ProposalEditor() {
         logoUrl={projectContext.logoUrl}
         sections={sections}
         projectImages={packImages}
+        recoveredComparisonTable={comparisonTableForDisplay}
       />
       <ProposalPrintStyles />
     </div>

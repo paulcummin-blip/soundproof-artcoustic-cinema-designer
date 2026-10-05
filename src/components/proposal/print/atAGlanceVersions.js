@@ -1,18 +1,17 @@
 /**
  * atAGlanceVersions.js
  * --------------------
- * The per-version block on the at-a-glance page of a comparison.
+ * The per-version model for the at-a-glance page of a comparison.
  *
  * A comparison covers two or more design versions, so a page that summarises one
  * system would show the client a single design while the document is about
  * several. Everything the versions can differ on is therefore stated once per
- * version, and it is read from the SAME calculated comparison rows the Key
- * Differences table prints, so the page and the table can never state a
- * different value for the same area.
+ * version, read from the SAME calculated comparison rows the comparison table
+ * prints, so the page and the table can never state a different value for the
+ * same area — and never one version's screen, seating or viewing geometry as if
+ * it were the room's.
  *
- * The project identity and the room itself stay shared facts: they belong to the
- * project, not to one design option. The design version card is left out here,
- * because each version block is titled with the exact saved version name.
+ * The project and the room dimensions are shared facts and stay stated once.
  *
  * Pure: no React, no calculation.
  */
@@ -27,14 +26,17 @@ const COMPARISON_PROJECT_CARD_LABELS = Object.freeze([
 
 /**
  * The shared room facts. Only the room itself is shared: the screen, the
- * seating, the viewing geometry and the acoustic treatment are all assessed per
- * design version, so they are stated in that version's own block.
+ * seating, the viewing geometry and the acoustic treatment are assessed per
+ * design version, so they are stated in each version's own block.
  */
-const COMPARISON_ROOM_CARD_LABELS = Object.freeze(['Room size', 'Screen', 'Seating', 'Viewing geometry', 'Acoustic treatment']);
+const COMPARISON_ROOM_CARD_LABELS = Object.freeze(['Room size']);
 
-/** The comparison rows that carry the facts the at-a-glance page states. */
+/** The comparison rows that carry the facts each version block states. */
 export const GLANCE_ROW_LABELS = Object.freeze([
   { key: 'system_layout', label: 'System layout' },
+  { key: 'screen_size', label: 'Screen' },
+  { key: 'seating', label: 'Seating' },
+  { key: 'rp23_viewing', label: 'Viewing geometry' },
   { key: 'lcr', label: 'LCR' },
   { key: 'surrounds', label: 'Surrounds / wides' },
   { key: 'overheads', label: 'Overheads' },
@@ -57,7 +59,7 @@ const cardsFrom = (cards, labels) => (Array.isArray(cards) ? cards : [])
  *
  * @param {Object} input
  * @param {Array<{ key: string, values: string[] }>} input.comparisonRows — the
- *   calculated comparison rows stored on the report's Key Differences section
+ *   calculated comparison rows stored on the report's comparison section
  * @param {Array<{ version_id, label, version_name }>} input.comparisonVersions —
  *   the option columns, in report order
  * @param {Array<{ label: string, value: string }>} input.projectCards
