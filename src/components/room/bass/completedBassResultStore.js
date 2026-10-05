@@ -15,6 +15,7 @@ import {
   resolvePersistedBassAuthority,
 } from "./completedBassResultPersistence";
 import { isValidLimitedP14Contract } from "./p14LimitedTargetAuthority";
+import { diagnoseAuthoritative } from "./publicationTraceStore";
 import { bassCacheKey, bassDbFilter, parseBassCacheKey } from "./bassCacheKey";
 import { assertNotAuthoritativeReadOnly } from "@/components/state/authoritativeReadOnlyMode";
 import { hydrateRecommendation } from "@/components/recommendationEngine/recommendationPersistence";
@@ -197,7 +198,7 @@ export function publishCompletedBassContract(projectId, versionId, contract) {
   const authoritative = isAuthoritativeBassContract(compact);
   const exportable = authoritative;
   const publicationRejectionReason = !authoritative
-    ? (compact?.metricPublication?.publicationRejectionReason || "metric-publication-invalid")
+    ? (diagnoseAuthoritative(compact)?.reason || compact?.metricPublication?.publicationRejectionReason || "metric-publication-invalid")
     : null;
   setMemory(projectId, versionId, {
     projectId: projectKey(projectId, versionId),
