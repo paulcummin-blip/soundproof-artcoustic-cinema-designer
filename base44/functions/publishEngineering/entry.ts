@@ -172,7 +172,7 @@ export default async function(req) {
       published_algorithm_version: publication.algorithm_version,
       publication_reason: publication.publication_reason,
     };
-    const updatedVersion = await service.entities.ProjectVersion.update(version.id, versionPatch);
+    let updatedVersion = await service.entities.ProjectVersion.update(version.id, versionPatch);
 
     // Step 2: Write the publication to the cache map (only if new).
     // If this fails, the pointer already references this fingerprint —
