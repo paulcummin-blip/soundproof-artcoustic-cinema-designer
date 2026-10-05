@@ -53,7 +53,14 @@ function hydrate() {
     if (!stored) return;
     const parsed = JSON.parse(stored);
     Object.entries(parsed || {}).forEach(([key, value]) => {
-      if (value && typeof value === 'object') attempts.set(key, value);
+      if (value && typeof value === 'object') {
+        // A pending request from a previous browser lifetime is not still running.
+        const interrupted = ['queued', 'publishing'].includes(value.status);
+        attempts.set(key, interrupted ? {
+          ...value, status: PUBLICATION_ATTEMPT.CANCELLED,
+          message: 'Publication interrupted by browser refresh. No durable acknowledgement was received. Publish the settled assessment again.',
+        } : value);
+      }
     });
   } catch {
     // Ignore unreadable storage; the store simply starts empty.
