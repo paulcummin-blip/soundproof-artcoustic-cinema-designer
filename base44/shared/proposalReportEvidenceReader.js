@@ -25,6 +25,9 @@
  *     its parity check failed
  */
 
+import { validateReportEvidence } from './reportEvidenceCompleteness.js';
+import { selectCanonicalReportSnapshot } from './reportSnapshotCanonical.js';
+
 /** The parameters a proposal must be able to state from a Technical Report. */
 const REQUIRED_PARAMETERS = [12, 13, 14, 18, 19, 20];
 
@@ -89,6 +92,13 @@ function requireEvidence(row, version, type) {
         : `It carries no stored frozen source, so regenerate the ${type} Report for this version, then try again.`}`,
     );
   }
+
+  const completeness = validateReportEvidence(evidence, type.toLowerCase(), {
+    projectId: version.project_id || row.project_id, versionId: version.id,
+    sourceFingerprint: version.published_fingerprint,
+    snapshotFingerprint: row.source_fingerprints?.engineeringFingerprint,
+  });
+  if (!completeness.complete) throw incompleteFact({ version, type, field: completeness.missing[0] });
 
   if (evidence.proposal_ready !== true || Number(evidence.evidence_version) !== REPORT_EVIDENCE_VERSION) {
     const parity = row.payload?.evidence_parity || null;
@@ -416,8 +426,8 @@ export async function readProposalReportEvidence(entities, projectId, versions) 
       { sort: '-generated_at', limit: 50 },
     );
     const rows = Array.isArray(reports) ? reports : (reports?.items || []);
-    const technicalRow = rows.find((row) => row.report_type === 'technical') || null;
-    const visualRow = rows.find((row) => row.report_type === 'visual') || null;
+    const technicalRow = selectCanonicalReportSnapshot(rows, { reportType: 'technical' });
+    const visualRow = selectCanonicalReportSnapshot(rows, { reportType: 'visual' });
 
     // Evidence only: each report's own machine-readable snapshot, or a block
     // that names this version and this report.
