@@ -108,14 +108,7 @@ export function diagnoseAuthoritative(contract) {
   if (!Number.isInteger(realSeatCount) || realSeatCount < 0) {
     return { pass: false, stage: "hasCanonicalSeatMetricAuthority", reason: "realSeatCount-invalid", detail: `realSeatCount=${realSeatCount}` };
   }
-  const p19Param = contract?.productAnalysis?.parameters?.p19;
-  const p19NotAssessable = p19Param?.notAssessable === true;
-  const p19Seats = contract?.selectedCandidate?.perSeatP19Results;
-  if (!p19NotAssessable && realSeatCount > 0 && (!Array.isArray(p19Seats)
-    || p19Seats.length !== realSeatCount
-    || p19Seats.some((seat) => !seat?.seatId || !Number.isFinite(seat?.variationDbRaw) || !Number.isFinite(seat?.level)))) {
-    return { pass: false, stage: "hasCanonicalSeatMetricAuthority", reason: "p19-per-seat-invalid", detail: `seats=${Array.isArray(p19Seats) ? p19Seats.length : "not-array"}, expected=${realSeatCount}` };
-  }
+  // P19 is RSP-only. This diagnostic must mirror the real gate, not demand per-seat P19.
   const p20Param = contract?.productAnalysis?.parameters?.p20;
   const p20NotAssessable = p20Param?.notAssessable === true;
   const p20Seats = contract?.selectedCandidate?.perSeatP20Results;
