@@ -52,17 +52,25 @@ export function readLevelNumber(level) {
 
 /**
  * The model's −3 dB coverage half-window in degrees, read from the speaker model
- * registry — the same number the engine thresholds against. Null when the model
- * publishes none (the engine's generic fallback is not invented here; callers
- * show "—" rather than a made-up limit).
+ * registry — the same number the engine thresholds the off-axis angle against.
+ * Registry dispersion values are already half-angles (the engine's own
+ * `halfDispersionDeg` does not divide them again). Overheads threshold on the
+ * wider of the horizontal and vertical −3 dB windows, exactly as the engine does.
+ * Null when the model publishes none — the limit is never invented.
  */
-export function readModelCoverageLimitDeg(modelKey) {
+export function readModelCoverageLimitDeg(modelKey, { overhead = false } = {}) {
   if (!modelKey) return null;
   const meta = getSpeakerModelMeta(modelKey);
-  const disp = meta?.dispersion?.horizontal;
-  const value = disp?.minus3dB ?? disp?.minus3;
-  const numeric = Number(value);
-  return Number.isFinite(numeric) && numeric > 0 ? numeric : null;
+  const disp = meta?.dispersion;
+  const read = (window) => {
+    const value = window?.minus3dB ?? window?.minus3;
+    return Number.isFinite(value) ? Math.ceil(value) : null;
+  };
+  const horizontal = read(disp?.horizontal);
+  if (!overhead) return horizontal;
+  const vertical = read(disp?.vertical);
+  if (horizontal != null && vertical != null) return Math.max(horizontal, vertical);
+  return horizontal ?? vertical;
 }
 
 /**
@@ -158,7 +166,7 @@ export function buildP17SeatEvidenceRows({ seats = [], p17BySeatId = {} } = {}) 
     const cause = resolveP17Cause({ rawVarianceDb, level });
     const coverageLimitDeg = num(p17.coverageLimitDeg)
       ?? num(limiting?.coverageLimitDeg)
-      ?? readModelCoverageLimitDeg(limiting?.model);
+      ?? readModelCoverageLimitDeg(limiting?.model, { overhead: isOverheadP17Role(limiting?.role ?? p17.worstRole) });
 
     rows.push({
       seatId,
@@ -225,7 +233,8 @@ export function applySavedSpeakerModels(rows = [], speakersByRole = {}) {
     return {
       ...row,
       limitingModel: model,
-      coverageLimitDeg: row.coverageLimitDeg ?? readModelCoverageLimitDeg(model),
+      coverageLimitDeg: row.coverageLimitDeg
+        ?? readModelCoverageLimitDeg(model, { overhead: isOverheadP17Role(row.limitingRole) }),
     };
   });
 }

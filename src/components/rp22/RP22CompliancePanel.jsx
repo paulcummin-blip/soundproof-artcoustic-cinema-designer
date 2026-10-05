@@ -8,6 +8,7 @@ import { RP22_PRESENTATION_PARAMETERS } from "@/components/utils/rp22ParameterPr
 import BassRp22ParameterTooltip from "@/components/room/bass/BassRp22ParameterTooltip";
 import { resolveParamThresholds, resolveP12P13DualLevels } from "@/components/report/technical/roomParameterLevelAuthority";
 import ComplianceParameterMatrix from "@/components/rp22/ComplianceParameterMatrix";
+import P17SeatEvidencePanel from "@/components/rp22/P17SeatEvidencePanel";
 import { getOfficialRp22Title } from "@/components/utils/rp22OfficialTitles";
 import P15P21AssumptionControl from "@/components/report/P15P21AssumptionControl";
 
@@ -540,6 +541,9 @@ export default function RP22CompliancePanel({
         seatCount={seats.length}
         summary={engineeringSummary?.project?.compliance || null}
       />
+
+      {/* P17 evidence — read-only diagnostic (no calculation, no writes) */}
+      <P17SeatEvidencePanel engineeringSummary={engineeringSummary} seats={seats} />
     </div>
   );
 }
