@@ -262,6 +262,10 @@ export function useReportSnapshot({
         });
         if (!evidence) return;
         const parity = checkReportEvidenceParity({ evidence, captured: stored, reportType });
+        // An incomplete legacy capture must not win the race with the ready
+        // report's refresh. Leave the row legacy so persist() can capture and
+        // save the report's own settled authority when ready becomes true.
+        if (!parity.passed) return;
         const record = {
           ...saved,
           payload: {
