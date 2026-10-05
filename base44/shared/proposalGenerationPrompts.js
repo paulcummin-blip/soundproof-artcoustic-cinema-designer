@@ -41,9 +41,21 @@ export function buildProjectContext(project, narrativeGoal, brandAsset, clientBr
   const screenSize = snapshotRoom.size_inches ?? '';
   const aspectRatio = snapshotRoom.aspect_ratio || project.aspect_ratio || '';
   const dolbyConfig = snapshotSystem.channel_layout?.configuration_text || project.dolby_config || '';
-  const speakerInfo = Object.entries(project.selected_speakers_by_role || {}).map(([role, model]) => `${role}: ${model}`).join(', ');
+  // ── PRODUCT GROUNDING: this version's own frozen system authority wins ──
+  // The prompt must never carry a product the selected version does not have, so
+  // the loudspeaker and subwoofer lines are read from this version's frozen
+  // snapshot first — the same authority the At a Glance package table prints. The
+  // legacy project-level fields are only a fallback for a report saved before the
+  // snapshot carried them.
+  const snapshotRoles = Array.isArray(snapshotSystem.product_roles) ? snapshotSystem.product_roles : [];
+  const speakerInfo = snapshotRoles.length > 0
+    ? snapshotRoles.map((role) => `${role.role_description || role.role}: ${role.model_label || role.model_key}`).join(', ')
+    : Object.entries(project.selected_speakers_by_role || {}).map(([role, model]) => `${role}: ${model}`).join(', ');
+  const snapshotSubModels = [...new Set((Array.isArray(snapshotSystem.subwoofer_strategy?.models) ? snapshotSystem.subwoofer_strategy.models : []).filter(Boolean))];
   const subwoofers = project.subwooferInstances || [];
-  const subInfo = subwoofers.length > 0 ? `${subwoofers.length}x ${subwoofers[0]?.model || 'Subwoofer'}` : '';
+  const subInfo = snapshotSubModels.length > 0
+    ? `${Number(snapshotSystem.subwoofer_strategy?.count) || snapshotSubModels.length}x ${snapshotSubModels.join(' / ')}`
+    : (subwoofers.length > 0 ? `${subwoofers.length}x ${subwoofers[0]?.model || 'Subwoofer'}` : '');
   const companyName = brandAsset?.company_name || '';
   const briefText = (clientBrief || '').trim();
   // Assumed and administrative parameters (P8, P15, P21) are excluded from every

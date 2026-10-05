@@ -15,6 +15,11 @@ import { buildProposalNarrativeEvidenceGuard } from './proposalNarrativeEvidence
 import { sanitizeNarrativeHtml } from './proposalNarrativeSanitizer.js';
 import { resolveP17Tradeoff } from './p17TradeoffAuthority.js';
 import { buildExcludedParameterPolicy } from './clientFacingParameterAuthority.js';
+import {
+  buildProductGrounding,
+  buildProductVocabularyRule,
+  groundProductMentions,
+} from './proposalProductGrounding.js';
 
 export function prepareProposalEvidence(suppliedSnapshots, projectVersions, resolvedType) {
   const versionEvidence = buildSelectedVersionEvidence(suppliedSnapshots.map(entry => {
@@ -50,8 +55,29 @@ export async function generateProposalDraftContent({ invokeLLM, sectionRecords, 
   // client-facing surface: prompt, comparison table, highlights rows and prose.
   // The designer can lift the exclusion for one of them, explicitly.
   const parameterPolicy = buildExcludedParameterPolicy({ clientBrief, dealerNotes });
-  const guard = resolvedType === 'comparison' ? buildProposalNarrativeEvidenceGuard(comparisonTable, versionEvidence, parameterPolicy) : '';
+  // ── PRODUCT GROUNDING (hard rule) ──
+  // A section may name only the products actually selected in the version it is
+  // about, and the allowed vocabulary is built from the SAME frozen
+  // version-specific authority the At a Glance package table reads. The rule is
+  // stated to the writer and then enforced on the returned prose, so a product
+  // from another version, a remembered range or a catalogue product that was
+  // never chosen cannot reach a client.
+  const grounding = buildProductGrounding({
+    snapshot: engineering_snapshot,
+    resolvedType,
+    comparisonTable,
+    versionEvidence,
+  });
+  const productRule = buildProductVocabularyRule(grounding);
+  const guard = [
+    resolvedType === 'comparison' ? buildProposalNarrativeEvidenceGuard(comparisonTable, versionEvidence, parameterPolicy) : '',
+    productRule,
+  ].filter(Boolean).join('\n\n');
   const guardedLLM = args => invokeLLM({ ...args, prompt: [args.prompt, guard].filter(Boolean).join('\n\n') });
+  // The deterministic pass: an unselected product name is replaced with safe
+  // generic wording. A mention that cannot be removed marks the section failed,
+  // so it is rejected rather than saved.
+  const ground = (html) => groundProductMentions(html, grounding);
   const usesSystemStructure = resolvedType !== 'single';
   const isComparisonReport = resolvedType === 'comparison';
   const p17Tradeoff = isComparisonReport ? resolveP17Tradeoff(comparisonTable) : null;
@@ -79,18 +105,18 @@ export async function generateProposalDraftContent({ invokeLLM, sectionRecords, 
     const result = generationResults[index];
     if (isComparisonHighlights(section)) {
       const payload = result.status === 'fulfilled' ? result.value : null;
-      const intro = sanitizeNarrativeHtml(String(payload?.intro_html || '').trim(), { p17Tradeoff, sectionType: section.section_type, parameterPolicy });
-      return { section, html: intro, metadata: comparisonSectionMetadata(comparisonTable), failed: result.status === 'rejected' || intro.length === 0 };
+      const groundedIntro = ground(sanitizeNarrativeHtml(String(payload?.intro_html || '').trim(), { p17Tradeoff, sectionType: section.section_type, parameterPolicy }));
+      return { section, html: groundedIntro.html, metadata: comparisonSectionMetadata(comparisonTable), failed: result.status === 'rejected' || groundedIntro.html.length === 0 || !groundedIntro.grounded };
     }
     if (isHighlightsSection(section)) {
       const payload = result.status === 'fulfilled' ? result.value : null;
-      const intro = sanitizeNarrativeHtml(String(payload?.intro_html || '').trim(), { p17Tradeoff, sectionType: section.section_type, parameterPolicy });
+      const groundedIntro = ground(sanitizeNarrativeHtml(String(payload?.intro_html || '').trim(), { p17Tradeoff, sectionType: section.section_type, parameterPolicy }));
       const rows = mergeHighlightRows(highlightRows,payload?.rows);
-      return { section, html: intro, metadata: {highlight_rows:rows}, failed: result.status === 'rejected' || intro.length === 0 || rows.every(row => !(row.what_the_room_gains || row.what_you_hear)) };
+      return { section, html: groundedIntro.html, metadata: {highlight_rows:rows}, failed: result.status === 'rejected' || groundedIntro.html.length === 0 || !groundedIntro.grounded || rows.every(row => !(row.what_the_room_gains || row.what_you_hear)) };
     }
     const raw = result.status === 'fulfilled' ? (typeof result.value === 'string' ? result.value : result.value?.content || '').trim() : '';
-    const html = sanitizeNarrativeHtml(raw, { p17Tradeoff, sectionType: section.section_type, parameterPolicy });
-    return { section,html,metadata:null,failed:result.status === 'rejected' || html.length === 0 };
+    const grounded = ground(sanitizeNarrativeHtml(raw, { p17Tradeoff, sectionType: section.section_type, parameterPolicy }));
+    return { section, html: grounded.html, metadata: null, failed: result.status === 'rejected' || grounded.html.length === 0 || !grounded.grounded };
   });
   const failedSections = generatedContent.filter(item => item.failed);
   if (failedSections.length > 0) throw new Error(`Proposal generation failed for ${failedSections.length} section(s). No proposal was saved.`);

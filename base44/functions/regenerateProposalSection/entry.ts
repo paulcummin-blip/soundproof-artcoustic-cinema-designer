@@ -12,6 +12,11 @@ import { buildProjectInterpretation, formatInterpretationForPrompt, formatInterp
 import { sanitizeNarrativeHtml } from '../../shared/proposalNarrativeSanitizer.js';
 import { resolveP17Tradeoff } from '../../shared/p17TradeoffAuthority.js';
 import { buildExcludedParameterPolicy, buildClientFacingParameterRule } from '../../shared/clientFacingParameterAuthority.js';
+import {
+  buildProductGrounding,
+  buildProductVocabularyRule,
+  groundProductMentions,
+} from '../../shared/proposalProductGrounding.js';
 
 const SECTION_TITLES: Record<string, string> = {
   executive_summary: 'Executive Summary',
@@ -134,7 +139,7 @@ export default async function(req) {
     }
 
     // ── Build authoritative project context ──
-    const projectContext = buildProjectContext(project, brandAsset);
+    const projectContext = buildProjectContext(project, brandAsset, proposal.engineering_snapshot);
     // The same frozen Engineering Snapshot the report was generated from, so a
     // regenerated section can never drift away from the calculated results.
     const evidence = buildEngineeringEvidence(proposal.engineering_snapshot);
@@ -187,6 +192,18 @@ export default async function(req) {
       SECTION_TITLES[section.section_type] || section.title || 'Section',
       proposal.proposal_type,
     );
+    // ── PRODUCT GROUNDING (hard rule) ──
+    // A regenerated section may name only the products selected in the version
+    // this proposal is about, from the same frozen version authority the At a
+    // Glance package table reads. A comparison is scoped per version.
+    const grounding = buildProductGrounding({
+      snapshot: proposal.engineering_snapshot,
+      resolvedType: proposal.proposal_type,
+      comparisonTable,
+      versionEvidence: comparisonEvidence,
+    });
+    const productRule = buildProductVocabularyRule(grounding);
+
     const currentBody = stripHtml(section.body || '');
     const dealerNotes = section.dealer_notes || '';
     const briefText = effectiveBrief.trim();
@@ -252,6 +269,9 @@ export default async function(req) {
       '',
       buildWritingStyleContract(reportLayout),
       buildProposalSalesVoice(section.section_type, proposal.proposal_type),
+      '',
+      // Appended last, so the version's own product list is the final word.
+      productRule,
     ].join('\n');
 
     // ── Invoke LLM ──
@@ -261,7 +281,20 @@ export default async function(req) {
     // predicted result described as measured, no blanket tonal guarantee where the
     // P17 evidence shows the options differ.
     const p17Tradeoff = proposal.proposal_type === 'comparison' ? resolveP17Tradeoff(comparisonTable) : null;
-    const html = sanitizeNarrativeHtml(rawHtml, { p17Tradeoff, sectionType: section.section_type, parameterPolicy });
+    // The same product grounding as first-draft generation: an unselected product
+    // name is replaced with safe generic wording, and a mention that survives is
+    // rejected rather than saved.
+    const grounded = groundProductMentions(
+      sanitizeNarrativeHtml(rawHtml, { p17Tradeoff, sectionType: section.section_type, parameterPolicy }),
+      grounding,
+    );
+    if (!grounded.grounded) {
+      return Response.json({
+        error: 'The regenerated section named a product that is not selected in this design version, so it was not saved. Please try again.',
+        ungrounded_products: [...new Set(grounded.unresolved.map((violation) => violation.name))],
+      }, { status: 422 });
+    }
+    const html = grounded.html;
 
     // ── Update section ──
     await base44.entities.ProposalSection.update(section_id, {
@@ -281,7 +314,7 @@ export default async function(req) {
   }
 }
 
-function buildProjectContext(project, brandAsset) {
+function buildProjectContext(project, brandAsset, snapshot = null) {
   if (!project) return 'Project data unavailable.';
   const roomWidth = project.room_width || '';
   const roomLength = project.room_length || '';
@@ -289,14 +322,24 @@ function buildProjectContext(project, brandAsset) {
   const screenSize = project.screen_size || '';
   const aspectRatio = project.aspect_ratio || '';
   const dolbyConfig = project.dolby_config || '';
+  // PRODUCT GROUNDING: this version's own frozen system authority wins, so the
+  // prompt can never carry a product the selected version does not have. The
+  // legacy project-level fields are a fallback only.
+  const snapshotSystem = snapshot?.system || {};
+  const snapshotRoles = Array.isArray(snapshotSystem.product_roles) ? snapshotSystem.product_roles : [];
   const speakersByRole = project.selected_speakers_by_role || {};
-  const speakerInfo = Object.entries(speakersByRole)
-    .map(([role, model]) => `${role}: ${model}`)
-    .join(', ');
+  const speakerInfo = snapshotRoles.length > 0
+    ? snapshotRoles.map((role) => `${role.role_description || role.role}: ${role.model_label || role.model_key}`).join(', ')
+    : Object.entries(speakersByRole)
+      .map(([role, model]) => `${role}: ${model}`)
+      .join(', ');
+  const snapshotSubModels = [...new Set((Array.isArray(snapshotSystem.subwoofer_strategy?.models) ? snapshotSystem.subwoofer_strategy.models : []).filter(Boolean))];
   const subwoofers = project.subwooferInstances || [];
-  const subInfo = subwoofers.length > 0
-    ? `${subwoofers.length}x ${subwoofers[0]?.model || 'Subwoofer'}`
-    : '';
+  const subInfo = snapshotSubModels.length > 0
+    ? `${Number(snapshotSystem.subwoofer_strategy?.count) || snapshotSubModels.length}x ${snapshotSubModels.join(' / ')}`
+    : (subwoofers.length > 0
+      ? `${subwoofers.length}x ${subwoofers[0]?.model || 'Subwoofer'}`
+      : '');
   const companyName = brandAsset?.company_name || '';
 
   return [
