@@ -96,9 +96,13 @@ export default async function(req) {
     let comparisonEvidence = proposal.metadata?.selected_versions || [];
     if (proposal.proposal_type === 'comparison') {
       if (!isCompleteComparisonTable(comparisonTable, proposal.selected_version_ids)) {
-        const response = await base44.functions.invoke('readProposalComparisonEvidence', { proposal_id });
-        comparisonTable = response?.data?.table;
-        comparisonEvidence = response?.data?.evidence || [];
+        try {
+          const response = await base44.functions.invoke('readProposalComparisonEvidence', { proposal_id });
+          comparisonTable = response?.data?.table;
+          comparisonEvidence = response?.data?.evidence || [];
+        } catch {
+          // Recovery could not supply both versions: fail closed with the reason.
+        }
       }
       if (!isCompleteComparisonTable(comparisonTable, proposal.selected_version_ids) || comparisonEvidence.length < 2) {
         return Response.json({ error: COMPARISON_REGENERATION_REQUIRED }, { status: 409 });
