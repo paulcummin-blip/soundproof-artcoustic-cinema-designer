@@ -20,6 +20,7 @@
  */
 
 import { buildExcludedParameterPolicy, buildClientFacingParameterRule } from './clientFacingParameterAuthority.js';
+import { resolveP17Tradeoff, p17TradeoffSentences } from './p17TradeoffAuthority.js';
 
 /** The approved evidence vocabulary for calculated (not measured) results. */
 const EVIDENCE_VOCABULARY_RULE = [
@@ -48,8 +49,9 @@ const BASS_SEPARATION_RULE = [
   'KEEP THE BASS CONCEPTS SEPARATE (never merge them):',
   '- P14 = output capability, impact and authority. It is not depth, smoothness or evenness.',
   '- P18 = extension and depth. It is not output or consistency.',
-  '- P19 = tonal balance at the reference listening position against target. It is not every seat.',
-  '- P20 = seat-to-seat consistency. It is the only parameter that speaks about consistency between seats.',
+  '- P19 = tonal balance at the reference listening position against target. That is one position: it is never seat-to-seat variation and never a comparison between seats.',
+  '- P20 = seat-to-seat consistency. It is the only parameter that speaks about consistency between seats, and it is never the reference-position response against target.',
+  'Never describe P19 as seat-to-seat consistency or as variation across seats, and never describe P20 as the response at the reference position.',
   'Never use P14, P18, P19 or a subwoofer count as proof of P20.',
 ].join('\n');
 
@@ -79,10 +81,12 @@ export function buildProposalNarrativeEvidenceGuard(table, versionEvidence = [],
   const p12 = rowFor('p12');
   const p13 = rowFor('p13');
   const p14 = rowFor('p14');
-  const p17 = rowFor('p17');
   const p20Supported = versionEvidence.length === names.length
     && versionEvidence.every(version => version.bass_evidence_if_reliable?.p20);
-  const p17Differs = Boolean(p17) && p17.identical === false && new Set(p17.values || []).size > 1;
+  // One authority resolves the P17 trade-off and its attribution, so this prompt
+  // and the narrative sanitizer can never name different options as stronger.
+  const p17Tradeoff = resolveP17Tradeoff(table);
+  const p17Sentences = p17TradeoffSentences(p17Tradeoff);
   const outputIndex = higherValueIndex(p12?.values || p14?.values || []);
   const outputName = outputIndex >= 0 ? names[outputIndex] : null;
 
@@ -102,11 +106,13 @@ export function buildProposalNarrativeEvidenceGuard(table, versionEvidence = [],
     BASS_SEPARATION_RULE,
     supportedExperiences.length ? `WHAT EACH SUPPORTED DIFFERENCE MEANS:\n- ${supportedExperiences.join('\n- ')}` : '',
     'SHARED DISCRETE CHANNEL CAPABILITY: where every option shares the same layout and the same top P2 level, state it as a strength both options already hold and say plainly that the upgrade is not more channels: it is what those channels can deliver.',
-    p17Differs
+    p17Sentences
       ? [
         'P17 TRADE-OFF (mandatory, state it plainly in Timbre Matching and in Overall Design):',
-        `Say: "${outputName || 'The higher-output option'} wins on output and scale, but the ${names[(p17.values || []).length - 1 - higherValueIndex((p17.values || []).map(v => ({ L1: 1, L2: 2, L3: 3, L4: 4 }[String(v).trim().toUpperCase()] || 0)))] || 'other option'} currently shows the stronger P17 surround and overhead timbre result in the frozen evidence."`,
-        'Then add calmly: "That does not make the higher-output option poor. It means the stronger system should be reviewed for surround and overhead timbre matching before final specification."',
+        `Frozen P17 evidence: ${names.map((name, index) => `${name}: ${p17Tradeoff.values[index]}`).join(' | ')}.`,
+        `Say: "${p17Sentences.evidence}"`,
+        `Then add calmly: "${p17Sentences.balance}"`,
+        `Never reverse this attribution. The stronger P17 result belongs to ${p17Tradeoff.strongerName} in this evidence, and no other option may be named for it.`,
         'Never claim matched voicing, consistent tonal character, or a seamless transition across every channel when this trade-off exists.',
       ].join('\n')
       : '',

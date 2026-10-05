@@ -9,7 +9,8 @@ import { formatVersionEvidenceForPrompt } from '../../shared/comparisonEvidence.
 import { formatComparisonTableForPrompt } from '../../shared/comparisonTable.js';
 import { buildEngineeringEvidence } from '../../shared/engineeringSnapshotEvidence.js';
 import { buildProjectInterpretation, formatInterpretationForPrompt, formatInterpretationForLog } from '../../shared/adiProjectInterpretation.js';
-import { sanitizeNarrativeHtml, p17DiffersAcrossVersions } from '../../shared/proposalNarrativeSanitizer.js';
+import { sanitizeNarrativeHtml } from '../../shared/proposalNarrativeSanitizer.js';
+import { resolveP17Tradeoff } from '../../shared/p17TradeoffAuthority.js';
 import { buildExcludedParameterPolicy, buildClientFacingParameterRule } from '../../shared/clientFacingParameterAuthority.js';
 
 const SECTION_TITLES: Record<string, string> = {
@@ -259,8 +260,8 @@ export default async function(req) {
     // The same narrative rules as first-draft generation: no AI-written table, no
     // predicted result described as measured, no blanket tonal guarantee where the
     // P17 evidence shows the options differ.
-    const p17Differs = proposal.proposal_type === 'comparison' && p17DiffersAcrossVersions(comparisonTable);
-    const html = sanitizeNarrativeHtml(rawHtml, { p17Differs, sectionType: section.section_type, parameterPolicy });
+    const p17Tradeoff = proposal.proposal_type === 'comparison' ? resolveP17Tradeoff(comparisonTable) : null;
+    const html = sanitizeNarrativeHtml(rawHtml, { p17Tradeoff, sectionType: section.section_type, parameterPolicy });
 
     // ── Update section ──
     await base44.entities.ProposalSection.update(section_id, {

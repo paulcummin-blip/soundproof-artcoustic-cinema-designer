@@ -12,7 +12,8 @@ import { buildProposalSalesVoice } from './proposalSalesVoice.js';
 import { resolveReportLayout } from './highChannelDensityRule.js';
 import { buildSectionPrompt } from './proposalGenerationPrompts.js';
 import { buildProposalNarrativeEvidenceGuard } from './proposalNarrativeEvidenceGuard.js';
-import { sanitizeNarrativeHtml, p17DiffersAcrossVersions } from './proposalNarrativeSanitizer.js';
+import { sanitizeNarrativeHtml } from './proposalNarrativeSanitizer.js';
+import { resolveP17Tradeoff } from './p17TradeoffAuthority.js';
 import { buildExcludedParameterPolicy } from './clientFacingParameterAuthority.js';
 
 export function prepareProposalEvidence(suppliedSnapshots, projectVersions, resolvedType) {
@@ -53,7 +54,7 @@ export async function generateProposalDraftContent({ invokeLLM, sectionRecords, 
   const guardedLLM = args => invokeLLM({ ...args, prompt: [args.prompt, guard].filter(Boolean).join('\n\n') });
   const usesSystemStructure = resolvedType !== 'single';
   const isComparisonReport = resolvedType === 'comparison';
-  const p17Differs = isComparisonReport && p17DiffersAcrossVersions(comparisonTable);
+  const p17Tradeoff = isComparisonReport ? resolveP17Tradeoff(comparisonTable) : null;
   const highlightRows = usesSystemStructure && !isComparisonReport ? selectHighlightRows(engineering_snapshot) : [];
   const isComparisonHighlights = section => isComparisonReport && section.section_type === HIGHLIGHTS_SECTION_TYPE && comparisonTable.rows.length > 0;
   const isHighlightsSection = section => isComparisonHighlights(section)
@@ -78,17 +79,17 @@ export async function generateProposalDraftContent({ invokeLLM, sectionRecords, 
     const result = generationResults[index];
     if (isComparisonHighlights(section)) {
       const payload = result.status === 'fulfilled' ? result.value : null;
-      const intro = sanitizeNarrativeHtml(String(payload?.intro_html || '').trim(), { p17Differs, sectionType: section.section_type, parameterPolicy });
+      const intro = sanitizeNarrativeHtml(String(payload?.intro_html || '').trim(), { p17Tradeoff, sectionType: section.section_type, parameterPolicy });
       return { section, html: intro, metadata: comparisonSectionMetadata(comparisonTable), failed: result.status === 'rejected' || intro.length === 0 };
     }
     if (isHighlightsSection(section)) {
       const payload = result.status === 'fulfilled' ? result.value : null;
-      const intro = sanitizeNarrativeHtml(String(payload?.intro_html || '').trim(), { p17Differs, sectionType: section.section_type, parameterPolicy });
+      const intro = sanitizeNarrativeHtml(String(payload?.intro_html || '').trim(), { p17Tradeoff, sectionType: section.section_type, parameterPolicy });
       const rows = mergeHighlightRows(highlightRows,payload?.rows);
       return { section, html: intro, metadata: {highlight_rows:rows}, failed: result.status === 'rejected' || intro.length === 0 || rows.every(row => !(row.what_the_room_gains || row.what_you_hear)) };
     }
     const raw = result.status === 'fulfilled' ? (typeof result.value === 'string' ? result.value : result.value?.content || '').trim() : '';
-    const html = sanitizeNarrativeHtml(raw, { p17Differs, sectionType: section.section_type, parameterPolicy });
+    const html = sanitizeNarrativeHtml(raw, { p17Tradeoff, sectionType: section.section_type, parameterPolicy });
     return { section,html,metadata:null,failed:result.status === 'rejected' || html.length === 0 };
   });
   const failedSections = generatedContent.filter(item => item.failed);

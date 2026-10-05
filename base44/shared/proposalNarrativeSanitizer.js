@@ -19,6 +19,15 @@
  *      P21) is removed, because those are not client decision points; the
  *      designer can lift that exclusion explicitly, per parameter.
  *
+ *   5. the P17 trade-off is attributed to the option the frozen evidence actually
+ *      shows as stronger. A sentence that credits any other option for the
+ *      stronger surround and overhead timbre result is replaced with the
+ *      evidence's own wording, so a reversed attribution can never reach a client.
+ *
+ *   6. a sentence that merges the two bass concepts — calling P19 seat-to-seat
+ *      consistency, or P20 the reference-position response against target — is
+ *      removed, because the two parameters answer different questions.
+ *
  * It only removes or rewrites wording. It never invents, changes or reorders a
  * value, a level, a parameter or a sentence's engineering meaning.
  *
@@ -27,6 +36,7 @@
  */
 
 import { stripExcludedParameterSentences } from './clientFacingParameterAuthority.js';
+import { p17TradeoffSentences } from './p17TradeoffAuthority.js';
 
 const TABLE_BLOCK = /<table\b[\s\S]*?<\/table>/gi;
 const TABLE_TAG = /<\/?(?:table|thead|tbody|tfoot|tr|th|td|caption|colgroup|col)\b[^>]*>/gi;
@@ -136,6 +146,97 @@ export function enforceSectionScope(html, sectionType) {
 }
 
 /**
+ * The option the frozen evidence shows with the stronger P17 result is the only
+ * option that may be named for it. A sentence crediting a different option — or
+ * naming one option and then another around a single claim — is replaced with the
+ * evidence's own wording. A correctly attributed sentence is left exactly as the
+ * writer wrote it, and a sentence that names no option at all cannot invert an
+ * attribution, so it stands.
+ */
+const P17_STRENGTH_CLAIM = /\b(?:stronger|strongest|higher|highest|best|better|leads?|wins?)\b[^.!?<>]{0,80}?(?:P17|surround and overhead timbre|surround\/overhead timbre|timbre result|timbre matching|timbre consistency)/i;
+
+/** Index of the strength claim inside a sentence, or -1. */
+function strengthClaimIndex(sentence) {
+  const match = P17_STRENGTH_CLAIM.exec(sentence);
+  return match ? match.index : -1;
+}
+
+/** The option named as the subject of the claim: the name closest before it. */
+function claimSubject(sentence, claimIndex, names) {
+  const text = sentence.toLowerCase();
+  return names.reduce((subject, name) => {
+    const at = text.lastIndexOf(String(name).toLowerCase(), claimIndex);
+    return at > subject.at ? { at, name } : subject;
+  }, { at: -1, name: null }).name;
+}
+
+/**
+ * Replace a reversed P17 attribution with the frozen evidence's own sentence, and
+ * carry the balanced explanation when the body does not already state it.
+ *
+ * @param {string} html
+ * @param {object} tradeoff - resolved by resolveP17Tradeoff(); nothing happens without it
+ */
+export function enforceP17Attribution(html, tradeoff) {
+  const canonical = p17TradeoffSentences(tradeoff);
+  if (!html || !canonical) return html || '';
+  const names = tradeoff.names || [];
+  const weaker = new Set(tradeoff.weakerNames || []);
+  const balanceAlreadyStated = /(?:does not|doesn['’]t) make[^.!?<>]{0,80}\bpoor\b/i.test(String(html));
+  return String(html)
+    .replace(/[^.!?<>]*[.!?]/g, (sentence) => {
+      const claimIndex = strengthClaimIndex(sentence);
+      if (claimIndex < 0) return sentence;
+      const subject = claimSubject(sentence, claimIndex, names);
+      if (subject === tradeoff.strongerName) return sentence;
+      const mentioned = names.filter(name => sentence.toLowerCase().includes(String(name).toLowerCase()));
+      if (mentioned.length === 0) return sentence;
+      if (!subject && mentioned.includes(tradeoff.strongerName) && !mentioned.some(name => weaker.has(name))) return sentence;
+      const leading = (sentence.match(/^\s*/) || [''])[0];
+      return `${leading}${canonical.evidence}${balanceAlreadyStated ? '' : ` ${canonical.balance}`}`;
+    })
+    .replace(/[ \t]{2,}/g, ' ')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim();
+}
+
+/**
+ * P19 and P20 answer different questions and must never be merged: P19 is the bass
+ * response at the reference listening position against target, P20 is seat-to-seat
+ * consistency. A sentence that assigns one concept to the other parameter is
+ * removed; a sentence that separates them is kept, because that framing is
+ * required.
+ */
+const CONFLATED_BASS_CONCEPTS = Object.freeze([
+  /\bP19\b[^.!?<>]{0,60}?\b(?:is|are|shows?|showing|describes?|describing|measures?|measuring|indicates?|indicating|reports?|reporting|reflects?|gives|delivers?|covers?|relates?)\b[^.!?<>]{0,60}?(?:seat[- ]to[- ]seat|between seats|across (?:all |every )?seats?|every seat|seat consistency|consistency (?:between|across) seats?)/i,
+  /(?:seat[- ]to[- ]seat|between seats|across (?:all |every )?seats?|every seat|seat consistency|consistency (?:between|across) seats?)[^.!?<>]{0,60}?\b(?:is|are|shown|described|measured|assessed|graded|reported|predicted|given|delivered)\b[^.!?<>]{0,40}?\bP19\b/i,
+  /\bP20\b[^.!?<>]{0,60}?\b(?:is|are|shows?|describes?|measures?|indicates?|reports?|covers?|relates?)\b[^.!?<>]{0,60}?(?:reference (?:listening )?position|against the target|response (?:versus|vs\.?) target|tonal balance at the reference)/i,
+]);
+
+/** A negation or separation cue inside the claim means the concepts are being kept apart. */
+const CONCEPT_SEPARATION_CUE = /\bnot\b|n['’]t\b|\bnever\b|\bseparate(?:ly|d)?\b|\bdistinct\b|\bnot the same\b/i;
+
+/** Remove a sentence that merges the P19 and P20 bass concepts. */
+export function enforceBassConceptSeparation(html) {
+  if (!html) return '';
+  const source = String(html);
+  const cleaned = source
+    .replace(/[^.!?<>]*[.!?]/g, (sentence) => {
+      const claim = CONFLATED_BASS_CONCEPTS.map(pattern => sentence.match(pattern)).find(Boolean);
+      if (!claim || CONCEPT_SEPARATION_CUE.test(claim[0])) return sentence;
+      return '';
+    })
+    .replace(/<p>\s*<\/p>/gi, '')
+    .replace(/<h3>\s*<\/h3>/gi, '')
+    .replace(/[ \t]{2,}/g, ' ')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim();
+  // A body that was nothing but a merged sentence is kept rather than emptied:
+  // an empty body would fail the section instead of merely reading badly.
+  return cleaned || source;
+}
+
+/**
  * The section titles the app renders itself. A generated body is prose only, so
  * a heading the model wrote for another section of the report is removed rather
  * than left to duplicate the app's own heading.
@@ -194,14 +295,18 @@ export function p17DiffersAcrossVersions(comparisonTable) {
  * Apply every narrative rule to one section body.
  *
  * @param {string} html - the model's returned section body
- * @param {{ p17Differs?: boolean, sectionType?: string }} [options]
+ * @param {{ p17Tradeoff?: object, p17Differs?: boolean, sectionType?: string, parameterPolicy?: object }} [options]
  * @returns {string} the sanitised body
  */
 export function sanitizeNarrativeHtml(html, options = {}) {
+  const tradeoff = options.p17Tradeoff || null;
+  const p17Differs = Boolean(options.p17Differs) || Boolean(tradeoff?.differs);
   const withoutTables = stripNarrativeTables(html);
   const withEvidenceLanguage = enforcePredictedLanguage(withoutTables);
-  const withTonalRule = options.p17Differs ? removeBlanketTonalClaims(withEvidenceLanguage) : withEvidenceLanguage;
-  const scoped = enforceSectionScope(withTonalRule, options.sectionType);
+  const withAttribution = enforceP17Attribution(withEvidenceLanguage, tradeoff);
+  const withTonalRule = p17Differs ? removeBlanketTonalClaims(withAttribution) : withAttribution;
+  const withSeparatedBass = enforceBassConceptSeparation(withTonalRule);
+  const scoped = enforceSectionScope(withSeparatedBass, options.sectionType);
   const withoutAssumptions = stripExcludedParameterSentences(scoped, options.parameterPolicy);
   return enforceApprovedVocabulary(removeStraySectionHeadings(withoutAssumptions));
 }
