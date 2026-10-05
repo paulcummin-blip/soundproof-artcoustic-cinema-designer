@@ -29,7 +29,16 @@ import {
   buildSnapshotRecord,
   buildSourceFingerprints,
   resolveSnapshotStatus,
+  shouldRefreshEvidence,
 } from './reportSnapshotAuthority';
+
+/** The object's own keys, minus the ones stated as nothing at all. */
+function definedOnly(source) {
+  if (!source || typeof source !== 'object') return {};
+  return Object.fromEntries(
+    Object.entries(source).filter(([, value]) => value !== null && value !== undefined),
+  );
+}
 
 export function useReportSnapshot({
   projectId = null,
@@ -102,6 +111,13 @@ export function useReportSnapshot({
     try {
       const version = await base44.entities.ProjectVersion.get(versionId);
       if (version?.project_id !== projectId) throw new Error('Report version does not belong to this project.');
+      // The report's own live authority is the geometry it renders from — the
+      // loaded app state states the room dimensions and the screen
+      // configuration, which the trimmed project details passed to this hook do
+      // not. Reading them here, at the moment the report freezes its capture, is
+      // what makes the evidence state the same room and screen the report shows
+      // instead of a null room. The version's design state still wins for every
+      // per-version value.
       // Saved with the version's published engineering fingerprint whenever the
       // handoff carried none, so the design this report was generated from is
       // stated in full and a later design change is detected. Saving this at
@@ -112,7 +128,12 @@ export function useReportSnapshot({
         publishedFingerprint: version.published_fingerprint,
       });
       const captured = captureReportProposalSource({ projectId, versionId, ...reportSource,
-        project: { ...reportSource?.project, ...version.design_state, version_name: version.version_name },
+        project: {
+          ...definedOnly(reportSource?.app),
+          ...definedOnly(reportSource?.project),
+          ...definedOnly(version.design_state),
+          version_name: version.version_name,
+        },
         presentation: reportSource?.presentation,
         reportType,
         sourceFingerprint: savedFingerprints,
@@ -139,6 +160,7 @@ export function useReportSnapshot({
         ? { ...reportEvidence, proposal_ready: parity.passed === true }
         : null;
 
+      const refreshing = !!saved?.id && !readStoredEvidence(saved);
       const record = buildSnapshotRecord({
         projectId,
         versionId,
@@ -153,6 +175,16 @@ export function useReportSnapshot({
           evidence_parity: buildParityRecord(parity),
         },
       });
+      // A report that already exists and carries no evidence is REFRESHED, not
+      // regenerated: its evidence is added to the report that is already saved,
+      // so its own generation time, author and status are preserved untouched.
+      if (refreshing) {
+        record.generated_at = saved.generated_at ?? record.generated_at;
+        record.generated_by = saved.generated_by ?? record.generated_by;
+        record.status = saved.status ?? record.status;
+        record.status_reason = saved.status_reason ?? record.status_reason;
+        record.status_updated_at = saved.status_updated_at ?? record.status_updated_at;
+      }
       const written = await saveReportSnapshot({ existing: saved, record });
       if (mountedRef.current) {
         setSaved(written || { ...record, id: saved?.id || null });
@@ -178,14 +210,21 @@ export function useReportSnapshot({
   // and leave the report reading as one that must be opened again.
   useEffect(() => {
     if (loading || !ready || !payload || !projectId || !versionId || !reportType) return;
-    if (resolution.status !== REPORT_SNAPSHOT_STATUS.NONE) return;
+    // A report that has no snapshot is saved; a report that exists, is CURRENT
+    // and carries no evidence gets that evidence written once, in place. A
+    // report the project has moved past is never written automatically.
+    if (!shouldRefreshEvidence({
+      saved,
+      status: resolution.status,
+      hasEvidence: !!readStoredEvidence(saved),
+    })) return;
     if (!reportSource?.project) return;
 
-    const key = `${projectId}::${versionId}::${reportType}::${currentFp.engineeringFingerprint || 'na'}`;
+    const key = `${projectId}::${versionId}::${reportType}::${readStoredEvidence(saved) ? 'evidence' : 'save'}`;
     if (autoSaveKeyRef.current === key) return;
     autoSaveKeyRef.current = key;
     persist();
-  }, [loading, ready, payload, projectId, versionId, reportType, resolution.status, currentFp.engineeringFingerprint, reportSource, persist]);
+  }, [loading, ready, payload, projectId, versionId, reportType, resolution.status, currentFp.engineeringFingerprint, reportSource, persist, saved]);
 
   // ── Legacy path: recover the evidence from the report's OWN frozen source ──
   // A report saved before the evidence capture carries no reportEvidence. Its own
@@ -202,6 +241,11 @@ export function useReportSnapshot({
     if (!saved?.id) return;
     if (resolution.status !== REPORT_SNAPSHOT_STATUS.CURRENT) return;
     if (readStoredEvidence(saved)) return;
+    // When this report is open and ready, the save path above writes the
+    // evidence from the report's own live authority — the same frozen capture —
+    // so the offline recovery below is only reached for a report that cannot be
+    // saved from this page.
+    if (ready && payload) return;
     const stored = saved.payload?.proposalSource;
     if (!stored) return;
 
@@ -237,7 +281,7 @@ export function useReportSnapshot({
         console.warn('[reportEvidence] legacy recovery failed:', error?.message || error);
       }
     })();
-  }, [loading, saved, resolution.status, projectId, versionId, reportType]);
+  }, [loading, saved, resolution.status, projectId, versionId, reportType, ready, payload]);
 
   // The evidence this report carries, and whether a proposal may read it. Read
   // from the SAVED report itself, so a report whose parity check failed shows as

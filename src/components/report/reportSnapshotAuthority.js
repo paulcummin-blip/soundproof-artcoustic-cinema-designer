@@ -159,6 +159,18 @@ export function isSnapshotRestorable(snapshot) {
  * @returns {{restorable: boolean, status: string, changedKeys: string[],
  *            generatedAt: string|null, generatedBy: string|null}}
  */
+/**
+ * Whether opening a report should write the proposal evidence it carries none
+ * of. Only ever true for a snapshot the project has NOT moved past — a report
+ * whose source changed is never re-frozen automatically — and never true for a
+ * report that already carries evidence, which only Regenerate may overwrite.
+ */
+export function shouldRefreshEvidence({ saved = null, status = null, hasEvidence = false } = {}) {
+  if (hasEvidence) return false;
+  if (!saved) return status === REPORT_SNAPSHOT_STATUS.NONE;
+  return status === REPORT_SNAPSHOT_STATUS.CURRENT;
+}
+
 export function resolveSnapshotStatus({ saved = null, currentFingerprints = null } = {}) {
   if (!isSnapshotRestorable(saved)) {
     return {

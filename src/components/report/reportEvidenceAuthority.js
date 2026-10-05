@@ -99,8 +99,12 @@ function buildIdentity({ reportType, captured, sourceFingerprint }) {
     generated_at: asText(identity.generatedAt) || new Date().toISOString(),
     report_type: reportType || null,
     report_label: reportTypeLabel(reportType),
-    // The design this evidence was frozen against, stated in full.
-    source_fingerprint: engineering,
+    // The design this evidence was frozen against, stated in full. A version
+    // with no published engineering authority states its frozen calculation
+    // fingerprint instead — the same frozen authority the report itself was
+    // generated from — so a report that has a fingerprint never yields evidence
+    // that carries none.
+    source_fingerprint: engineering || asText(fingerprints.calculationFingerprint),
     engineering_fingerprint: engineering,
     bass_fingerprint: asText(fingerprints.calculationFingerprint) || asText(identity.engineeringFingerprint),
     seating_fingerprint: asText(fingerprints.seatPriorityFingerprint) || asText(identity.seatPriorityFingerprint),
