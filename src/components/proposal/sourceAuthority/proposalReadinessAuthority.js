@@ -1,31 +1,9 @@
 /**
- * proposalReadinessAuthority.js
- * -----------------------------
- * THE shared per-version proposal readiness authority.
- *
- * A System Design Comparison is built from EVERY selected version, so its
- * readiness must be decided per version — never from the first selected version
- * alone, and never from one report of one version.
- *
- * Per version it states four things:
- *   Visual Report        saved report for project + version + report type
- *   Technical Report     saved report for project + version + report type
- *   Engineering Authority  the version's published engineering result, or its
- *                          completed calculation authority — the SAME calculated
- *                          engineering result a Technical Report is generated
- *                          from, so the two columns can never disagree
- *   the blocking reason, naming the version and the source that blocks
- *
- * The report cells are judged by the SAME fingerprint comparison the report
- * pages use (reportSnapshotAuthority), so this gate and a report's own Current
- * badge can never disagree.
- *
- * States per cell: Current / Stale / Missing / Incomplete / Unavailable /
- * Checking. A read still in flight is Checking — it is never reported as
- * Missing, and the fixed generic sentence is never used to describe it.
- *
- * Derivation only: recalculates nothing, generates no report content, reads no
- * entity. Pure — no React, no side effects, no runtime APIs.
+ * Per-version proposal readiness. Current engineering authority requires a
+ * durable full publication resolved through this version's published pointer.
+ * Completed bass/calibration entries identify bass only; they never substitute
+ * for full engineering authority. Browser handoffs and historical report pages
+ * are not evidence recovery sources. Client/server vocabulary is kept in sync.
  */
 
 /** The readiness state of one cell, one version or the whole gate. */
