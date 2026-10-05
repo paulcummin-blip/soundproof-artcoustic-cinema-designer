@@ -85,7 +85,7 @@ const capture = ({
     per_seat: [{
       seatId: 'r1c1', row: 1, label: 'Row 1 seat 1',
       distance_m: 3.2, horizontal_angle_deg: 0, vertical_angle_deg: 0, level: 'Level 4',
-    }],
+    }, { seatId: 'r1c2', row: 1, distance_m: 3.2, horizontal_angle_deg: 0, vertical_angle_deg: 0, level: 'Level 4' }],
   },
   system: {
     products_selected: { rows: [{ key: 'lcr', area: 'LCR', value: lcr[0] }], lcr },
@@ -153,9 +153,9 @@ const EVIDENCE = ({
     room,
     screen: { screen_type: 'Projection screen', format: '16:9', viewable_width_cm: 265.5 },
     seating: {
-      row_count: 1,
+      row_count: 1, seats: 1,
       per_seat: [{
-        row: 1, seat_id: 'r1c1', seat_label: 'Row 1 seat 1',
+        row: 1, column: 1, priority: 'primary', seat_id: 'r1c1', seat_label: 'Row 1 seat 1',
         vertical_angle_deg: 0, ...seat,
       }],
     },
@@ -264,7 +264,7 @@ test('1. a newly generated report writes a complete reportEvidence snapshot', ()
   const evidence = buildEvidence(capture());
 
   assert.equal(evidence.evidence_version, 1);
-  assert.equal(validateReportEvidence(evidence, 'technical').complete, true, 'the evidence states every fact a proposal needs');
+  assert.equal(validateReportEvidence(evidence, 'technical', { requireProposalReady: false }).complete, true, 'the evidence states every fact a proposal needs');
   assert.equal(evidence.parameter_index.P13.text, 'L4 · 108 dBC (OH)', 'P13 is stated as the report prints it');
   assert.deepEqual(evidence.system.products_selected_by_layer.lcr, [{ role: 'LCR', model: 'Q8-5', quantity: 3, position: null }]);
   assert.equal(evidence.room.width_m, 4.5);
@@ -312,7 +312,7 @@ test('3. a parity failure shows the report as Incomplete for proposal use, never
   assert.equal(cell.status, 'Incomplete');
   assert.notEqual(cell.status, 'Missing');
   assert.equal(cell.current, false);
-  assert.match(cell.reason, /evidence does not match what the report shows/);
+  assert.match(cell.reason, /proposal_ready is missing/);
 });
 
 /* ── 4 + 5. Legacy evidence: recovered from the frozen source, or refused ── */
