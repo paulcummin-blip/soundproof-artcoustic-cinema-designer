@@ -96,6 +96,26 @@ export function resolveP17Cause({ rawVarianceDb, level } = {}) {
   };
 }
 
+/**
+ * Every speaker evaluated at the seat, worst delta first — the evidence behind the
+ * seat's single limiting row. A live result and a saved publication carry the same
+ * per-speaker shape; a field the record does not carry stays null and renders as
+ * unavailable. Nothing is inferred.
+ */
+function readSeatSpeakers(p17) {
+  const list = Array.isArray(p17?.perSpeaker) ? p17.perSpeaker : [];
+  return list
+    .map((entry) => ({
+      role: entry?.role ?? null,
+      model: entry?.model ?? null,
+      angleDeg: num(entry?.angleDeg) ?? num(entry?.rawAngleDeg),
+      rspAngleDeg: num(entry?.rspAngleDeg),
+      lossDb: num(entry?.lossDb),
+      beyondLimit: entry?.isBeyondNonLcrLimit === true,
+    }))
+    .sort((a, b) => (b.lossDb ?? -1) - (a.lossDb ?? -1));
+}
+
 /** The speaker entry that set the seat's variance — live evidence, else the saved worst role. */
 function resolveLimitingEntry(p17) {
   if (p17?.limiting && typeof p17.limiting === "object") return p17.limiting;
@@ -151,6 +171,7 @@ export function buildP17SeatEvidenceRows({ seats = [], p17BySeatId = {} } = {}) 
         coverageLimitDeg: null,
         hasNaAngles: false,
         beyondLimit: [],
+        speakers: [],
         evidenceAvailable: false,
       });
       continue;
@@ -191,6 +212,7 @@ export function buildP17SeatEvidenceRows({ seats = [], p17BySeatId = {} } = {}) 
         angleDeg: num(entry?.angleDeg),
         coverageLimitDeg: num(entry?.coverageLimitDeg),
       })),
+      speakers: readSeatSpeakers(p17),
       evidenceAvailable: true,
     });
   }

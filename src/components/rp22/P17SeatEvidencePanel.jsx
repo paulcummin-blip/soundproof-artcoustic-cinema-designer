@@ -59,9 +59,11 @@ export default function P17SeatEvidencePanel({ engineeringSummary = null, seats 
   return (
     <div style={card}>
       <div style={head}>
-        <div style={title}>P17 diagnostics — read only</div>
+        <div style={title}>ADI Data</div>
         <div style={sub}>
-          Seat-versus-RSP variance and the model coverage cap, exposed without recalculating either.
+          P17 diagnostics, read only: each seat's Result, the Cause that decided it, the limiting
+          speaker and its angles, the raw seat-versus-RSP variance and the model coverage window.
+          Nothing is recalculated and no record is changed.
         </div>
       </div>
 
@@ -82,7 +84,7 @@ export default function P17SeatEvidencePanel({ engineeringSummary = null, seats 
         <div>
           <button type="button" style={toggle(showSeatTable)} onClick={() => setShowSeatTable((open) => !open)}>
             {showSeatTable ? <ChevronDown size={13} /> : <ChevronRight size={13} />}
-            Current design — per-seat P17 evidence
+            Current design — one limiting row per seat (expand for every speaker)
           </button>
           {showSeatTable && <P17SeatEvidenceTable rows={rows} />}
         </div>

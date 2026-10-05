@@ -9,6 +9,7 @@ import BassRp22ParameterTooltip from "@/components/room/bass/BassRp22ParameterTo
 import { resolveParamThresholds, resolveP12P13DualLevels } from "@/components/report/technical/roomParameterLevelAuthority";
 import ComplianceParameterMatrix from "@/components/rp22/ComplianceParameterMatrix";
 import P17SeatEvidencePanel from "@/components/rp22/P17SeatEvidencePanel";
+import P17SpeakerBreakdownTable from "@/components/rp22/P17SpeakerBreakdownTable";
 import { getOfficialRp22Title } from "@/components/utils/rp22OfficialTitles";
 import P15P21AssumptionControl from "@/components/report/P15P21AssumptionControl";
 
@@ -164,43 +165,39 @@ const buildP16DebugText = (metric) => {
   }).join('\n');
 };
 
-const buildP17DebugText = (metric) => {
-  if (!metric?.perSpeaker || metric.perSpeaker.length === 0) return "";
-  const lines = [];
-  // Engine P17 per-speaker quantity = seat-vs-RSP response delta (s.lossDb). Display the
-  // actual numeric delta so the worst value matches the final raw P17 variation before
-  // integer grading. No stepped buckets or placeholder 0.0 dB values.
-  const speakerLine = metric.perSpeaker
-    .slice()
-    .sort((a, b) => a.role.localeCompare(b.role))
-    .map((s) => {
-      const displayAngle = Number.isFinite(s?.rawAngleDeg) ? s.rawAngleDeg : s?.angleDeg;
-      const angle = Number.isFinite(displayAngle) ? String(Math.floor(Math.abs(displayAngle) + 1e-9)) : '—';
-      const rawDelta = Number.isFinite(s?.lossDb) ? Number(s.lossDb) : null;
-      const deltaText = rawDelta == null ? '—' : `${rawDelta.toFixed(1)} dB`;
-      const text = `${s.role} ${angle}° / ${deltaText}`;
-      return metric?.worstRole === s.role ? `[worst] ${text}` : text;
-    })
-    .join(', ');
-  lines.push(speakerLine);
-
-  if (metric?.worstRole && Number.isFinite(metric?.worstAngleDeg) && Number.isFinite(metric?.worstLossDb)) {
-    const worstDelta = Number(metric.worstLossDb);
-    lines.push(`(worst: ${metric.worstRole} ${String(Math.floor(Math.abs(metric.worstAngleDeg) + 1e-9))}° / ${worstDelta.toFixed(1)} dB)`);
-  }
-
-  if (metric.p17HasNaAngles) {
-    lines.push('N/A = >41° off-axis; RP22 Level 2 limit');
-  }
-
-  return lines.join('\n');
+/**
+ * Readable P17 tooltip identity: one line naming how many speakers were evaluated at
+ * the seat and which one limits it. The raw comma-joined debug string is no longer
+ * rendered — the same evidence is shown as a table (P17SpeakerBreakdownTable).
+ */
+const buildP17DebugSummary = (metric) => {
+  const list = Array.isArray(metric?.perSpeaker) ? metric.perSpeaker : [];
+  if (!list.length) return "";
+  const worst = metric?.worstRole
+    ? `${metric.worstRole}${Number.isFinite(metric?.worstLossDb) ? ` ${Number(metric.worstLossDb).toFixed(1)} dB` : ""}`
+    : null;
+  return `${list.length} speaker${list.length === 1 ? "" : "s"} evaluated at this seat${worst ? ` · worst ${worst}` : ""}`;
 };
+
+/** The seat's evaluated speakers, worst delta first, for the readable tooltip table. */
+const buildP17SpeakerRows = (metric) => (Array.isArray(metric?.perSpeaker) ? metric.perSpeaker : [])
+  .map((entry) => ({
+    role: entry?.role ?? null,
+    model: entry?.model ?? null,
+    angleDeg: Number.isFinite(entry?.angleDeg)
+      ? entry.angleDeg
+      : (Number.isFinite(entry?.rawAngleDeg) ? entry.rawAngleDeg : null),
+    rspAngleDeg: Number.isFinite(entry?.rspAngleDeg) ? entry.rspAngleDeg : null,
+    lossDb: Number.isFinite(entry?.lossDb) ? entry.lossDb : null,
+    beyondLimit: entry?.isBeyondNonLcrLimit === true,
+  }))
+  .sort((a, b) => (b.lossDb ?? -1) - (a.lossDb ?? -1));
 
 const getMetricDebugText = (paramId, metric) => {
   if (!metric) return "";
   if (paramId === 9) return metric?.debugText || "";
   if (paramId === 16) return buildP16DebugText(metric);
-  if (paramId === 17) return buildP17DebugText(metric);
+  if (paramId === 17) return buildP17DebugSummary(metric);
   return "";
 };
 
@@ -393,9 +390,19 @@ export default function RP22CompliancePanel({
                     align="start"
                     className="max-w-[420px] whitespace-pre-wrap break-words rounded-md border border-[#C1B6AD] bg-white px-3 py-2 text-[#1B1A1A] shadow-lg"
                   >
-                    <div style={{ fontFamily: "ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', monospace", fontSize: 11, lineHeight: 1.5 }}>
-                      {debugText}
-                    </div>
+                    {p.id === 17 ? (
+                      <div style={{ display: "grid", gap: 6 }}>
+                        <div style={{ fontSize: 11, fontWeight: 700, color: "#213428" }}>{debugText}</div>
+                        <P17SpeakerBreakdownTable
+                          speakers={buildP17SpeakerRows(debugMetric)}
+                          worstRole={debugMetric?.worstRole || null}
+                        />
+                      </div>
+                    ) : (
+                      <div style={{ fontFamily: "ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', monospace", fontSize: 11, lineHeight: 1.5 }}>
+                        {debugText}
+                      </div>
+                    )}
                   </TooltipContent>
                 </Tooltip>
               </TooltipProvider>
