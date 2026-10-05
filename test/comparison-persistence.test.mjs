@@ -56,6 +56,21 @@ try {
 
 test('read-back accepts the full contract and rejects metadata loss', () => assert.equal(rejectedLoss, true));
 
+const reverseKeys = value => Array.isArray(value) ? value.map(reverseKeys)
+  : value && typeof value === 'object' ? Object.fromEntries(Object.keys(value).reverse().map(key => [key, reverseKeys(value[key])])) : value;
+await verifyComparisonPersisted({ entities: {
+  Proposal: { get: async () => reverseKeys(proposal) },
+  ProposalSection: { get: async () => reverseKeys(section) },
+} }, 'fixture', table, evidence, 'fixture-section');
+let rejectedSectionLoss = false;
+try {
+  await verifyComparisonPersisted({ entities: {
+    Proposal: sdkMock.entities.Proposal,
+    ProposalSection: { get: async () => ({ metadata: { comparison_rows: [] } }) },
+  } }, 'fixture', table, evidence, 'fixture-section');
+} catch { rejectedSectionLoss = true; }
+test('read-back ignores object-key ordering but rejects missing section evidence', () => assert.equal(rejectedSectionLoss, true));
+
 test('schema declares frozen rows, client meaning and source identity', () => {
   const p = JSON.parse(fs.readFileSync('base44/entities/Proposal.jsonc', 'utf8'));
   const s = JSON.parse(fs.readFileSync('base44/entities/ProposalSection.jsonc', 'utf8'));
@@ -100,7 +115,8 @@ test('the canonical persisted table wins over stale section metadata and stale r
 test('a legacy record resolves recovery, and invalid rows never mix with recovered columns', () => {
   const legacy = { selected_version_ids: ['low', 'high'], metadata: {} };
   const resolved = resolveProposalComparison(legacy, [], table);
-  assert.equal(resolved.rows.length, table.rows.length, 'recovery supplies the full table');
+  assert.deepEqual(resolved, resolveComparisonDisplay(table.rows, table.versions), 'recovery supplies the complete presentation table');
+  assert.equal(resolved.rows.some(row => row.key === 'speakers'), false, 'split equipment rows suppress the redundant combined speaker row');
   assert.deepEqual(resolveProposalComparison(legacy).rows, [], 'no evidence resolves to nothing, never a mixed table');
   const mixed = resolveComparisonDisplay(
     [{ key: 'wrong', values: ['bad', 'bad'] }],

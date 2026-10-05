@@ -9,7 +9,8 @@
     "lint": "eslint .",
     "typecheck": "tsc -p ./jsconfig.json",
     "preview": "vite preview",
-    "test:p7": "node src/test/_p7-run.mjs src/test/p7-wall-markers.test.mjs src/test/p7-app-geometry-parity.test.mjs"
+    "test:p7": "node src/test/_p7-run.mjs src/test/p7-wall-markers.test.mjs src/test/p7-app-geometry-parity.test.mjs",
+    "test:comparison": "node src/test/_p7-run.mjs test/comparison-persistence.test.mjs"
   },
   "dependencies": {
     "@base44/sdk": "^0.8.52",
