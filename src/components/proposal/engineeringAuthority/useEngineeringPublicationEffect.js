@@ -133,6 +133,9 @@ export function useEngineeringPublicationEffect({
     },
   });
   const preflightKey = JSON.stringify(preflight);
+  // A new summary object on render is not a changed assessment. Debounce only
+  // semantic changes; acknowledgement-store renders must not cancel their own write.
+  const summaryKey = JSON.stringify(engineeringSummary);
   useEffect(() => {
     // Clear any pending debounce on input change
     if (debounceTimerRef.current) {
@@ -214,12 +217,16 @@ export function useEngineeringPublicationEffect({
             status: PUBLICATION_ATTEMPT.ACKNOWLEDGED,
             fingerprint: engineeringFingerprint,
             publishedAt: body?.version?.published_at || null,
+            httpStatus: response?.status || 200,
+            gates: preflight.gates,
           });
         } else {
           recordPublicationAttempt(projectId, versionId, {
             status: PUBLICATION_ATTEMPT.FAILED,
             fingerprint: engineeringFingerprint,
             missing: acknowledgement?.missing || [],
+            httpStatus: response?.status || null,
+            gates: preflight.gates,
             message: body?.message
               || `The saved assessment is incomplete (${(acknowledgement?.missing || []).map((item) => item?.label || item?.key).join(', ') || 'unknown reason'}).`,
           });
@@ -249,7 +256,7 @@ export function useEngineeringPublicationEffect({
         });
       }
     };
-  }, [projectId, versionId, ready, isPublishable, engineeringSummary, engineeringFingerprint, bassFingerprint, preflightKey, retrySequence]);
+  }, [projectId, versionId, ready, isPublishable, summaryKey, engineeringFingerprint, bassFingerprint, preflightKey, retrySequence]);
   return { preflight, attempt, fingerprint: engineeringFingerprint,
     publish: () => { lastPublishedFingerprintRef.current = null; setRetrySequence(value => value + 1); } };
 }
