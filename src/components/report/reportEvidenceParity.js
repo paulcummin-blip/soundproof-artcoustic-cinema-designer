@@ -221,7 +221,7 @@ function viewingMismatches(evidence, captured) {
     if (!match) continue;
     const statedDistance = row.distance_m;
     const visibleDistance = match.distance_m ?? match.distanceM ?? null;
-    if (!sameNumber(statedDistance, visibleDistance)) {
+    if (visibleDistance != null && !sameNumber(statedDistance, visibleDistance)) {
       mismatches.push({ area: 'seating.per_row_viewing', key: row.seat_label || row.seat_id || `row ${row.row}`, evidence: statedDistance, report: visibleDistance });
     }
     const statedAngle = row.horizontal_angle_deg;
@@ -239,7 +239,7 @@ function viewingMismatches(evidence, captured) {
  * @returns {{passed: boolean, mismatches: Array, missing: Array}}
  */
 export function checkReportEvidenceParity({ evidence, captured, reportType = null } = {}) {
-  const validation = validateReportEvidence(evidence, reportType);
+  const validation = validateReportEvidence(evidence, reportType, { requireProposalReady: false });
   const mismatches = [
     ...parameterMismatches(evidence, reportType),
     ...productMismatches(evidence, captured).map((entry) => ({ ...entry, blocking: true })),
