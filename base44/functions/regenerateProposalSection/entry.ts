@@ -3,6 +3,7 @@ import { buildWritingStyleContract, mentionsDesignIndex } from '../../shared/rep
 import { resolveReportLayout, mentionsHighChannelCopyDefect, HIGH_CHANNEL_CLEANUP_NOTE } from '../../shared/highChannelDensityRule.js';
 import { COMPARISON_REPORT_INSTRUCTIONS, resolveSectionTitle } from '../../shared/systemDesignSummarySections.js';
 import { buildComparisonSectionRule } from '../../shared/comparisonStoryRule.js';
+import { buildProposalSalesVoice } from '../../shared/proposalSalesVoice.js';
 import { formatVersionEvidenceForPrompt } from '../../shared/comparisonEvidence.js';
 import { formatComparisonTableForPrompt } from '../../shared/comparisonTable.js';
 import { buildEngineeringEvidence } from '../../shared/engineeringSnapshotEvidence.js';
@@ -179,9 +180,11 @@ export default async function(req) {
       `You are refining the "${sectionTitle}" section of a professional home cinema design proposal.`,
       '',
       '=== AUTHORITATIVE PROJECT DATA (never alter these results) ===',
-      projectContext,
+      proposal.proposal_type === 'comparison'
+        ? `Project: ${project?.name || ''}\nClient: ${project?.client_name || ''}\nCompany: ${brandAsset?.company_name || ''}`
+        : projectContext,
       '',
-      evidence,
+      proposal.proposal_type === 'comparison' ? '' : evidence,
       '',
       comparisonBlock,
       '',
@@ -218,6 +221,7 @@ export default async function(req) {
       'Do not mention prices.',
       '',
       buildWritingStyleContract(reportLayout),
+      buildProposalSalesVoice(section.section_type, proposal.proposal_type),
     ].join('\n');
 
     // ── Invoke LLM ──

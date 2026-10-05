@@ -2,6 +2,7 @@ import { createClientFromRequest } from 'npm:@base44/sdk@0.8.49';
 import { buildWritingStyleContract } from '../../shared/reportWritingStyleContract.js';
 import { SYSTEM_SUMMARY_SECTIONS, HIGHLIGHTS_SECTION_TYPE, getSystemSummarySectionPrompt, COMPARISON_REPORT_INSTRUCTIONS, resolveSectionTitle } from '../../shared/systemDesignSummarySections.js';
 import { buildComparisonSectionRule } from '../../shared/comparisonStoryRule.js';
+import { buildProposalSalesVoice } from '../../shared/proposalSalesVoice.js';
 import { buildSelectedVersionEvidence, formatVersionEvidenceForPrompt } from '../../shared/comparisonEvidence.js';
 import { buildComparisonTable, formatComparisonTableForPrompt, buildComparisonHighlightsPrompt, COMPARISON_HIGHLIGHTS_SCHEMA } from '../../shared/comparisonTable.js';
 import { buildEngineeringEvidence, selectHighlightRows, mergeHighlightRows, buildHighlightsPrompt, HIGHLIGHTS_JSON_SCHEMA } from '../../shared/engineeringSnapshotEvidence.js';
@@ -502,6 +503,7 @@ export default async function(req) {
               projectContext,
               buildComparisonHighlightsPrompt(),
               buildWritingStyleContract(reportLayout),
+              buildProposalSalesVoice(section.section_type, resolvedType),
             ].filter(Boolean).join('\n\n'),
             response_json_schema: COMPARISON_HIGHLIGHTS_SCHEMA,
           });
@@ -512,6 +514,7 @@ export default async function(req) {
               interpretationBlock,
               buildHighlightsPrompt(projectContext, highlightRows),
               buildWritingStyleContract(reportLayout),
+              buildProposalSalesVoice(section.section_type, resolvedType),
             ].filter(Boolean).join('\n\n'),
             response_json_schema: HIGHLIGHTS_JSON_SCHEMA,
           });
@@ -677,13 +680,15 @@ function buildProjectContext(project, narrativeGoal, brandAsset, clientBrief, en
     `Report version: ${sourceIdentity?.version_label || ''}`,
     `Report fingerprint: ${sourceIdentity?.engineering_fingerprint || ''}`,
     `Reports generated: ${sourceIdentity?.published_at || ''}`,
-    `Room Dimensions: ${roomDimensions}`,
-    screenSize
-      ? `Screen: ${screenSize}" ${aspectRatio} (this is the screen for this report: never state, convert or infer another screen size anywhere in the report)`
-      : 'Screen: not stated in this report — never state a screen size',
-    `Speaker Configuration: ${dolbyConfig}`,
-    speakerInfo ? `Speakers: ${speakerInfo}` : '',
-    subInfo ? `Subwoofers: ${subInfo}` : '',
+    ...(!isComparison ? [
+      `Room Dimensions: ${roomDimensions}`,
+      screenSize
+        ? `Screen: ${screenSize}" ${aspectRatio} (this is the screen for this report: never state, convert or infer another screen size anywhere in the report)`
+        : 'Screen: not stated in this report — never state a screen size',
+      `Speaker Configuration: ${dolbyConfig}`,
+      speakerInfo ? `Speakers: ${speakerInfo}` : '',
+      subInfo ? `Subwoofers: ${subInfo}` : '',
+    ] : []),
     '',
     evidence,
     '',
@@ -707,7 +712,7 @@ function buildProjectContext(project, narrativeGoal, brandAsset, clientBrief, en
 
 function buildSectionPrompt(sectionDef, projectContext, proposalType, interpretationBlock = '', layout = null) {
   const sectionInstruction = proposalType !== 'single'
-    ? getSystemSummarySectionPrompt(sectionDef.type, sectionDef.title, layout)
+    ? getSystemSummarySectionPrompt(sectionDef.type, sectionDef.title, layout, proposalType)
     : SECTION_PROMPTS[sectionDef.type] || `Write the ${sectionDef.title} section. 2-3 paragraphs.`;
 
   return [
@@ -737,5 +742,6 @@ function buildSectionPrompt(sectionDef, projectContext, proposalType, interpreta
     'Do not mention prices.',
     '',
     buildWritingStyleContract(layout),
+    buildProposalSalesVoice(sectionDef.type, proposalType),
   ].join('\n');
 }
