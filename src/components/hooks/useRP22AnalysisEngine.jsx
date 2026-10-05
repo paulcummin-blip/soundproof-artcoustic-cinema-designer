@@ -11,7 +11,7 @@ import { getUpperSpeakersForSeat, computeUpperVerticalAnglesForSeat, computeUppe
 import { computeScreenVarianceMetrics, computeWideSurroundUpperVarianceMetrics, computeBassVarianceMetrics } from "../utils/rp22SeatResponseConsistency";
 import { computeP16ForSeat, computeP17ForAllSeats } from "../utils/rp22HfOffAxis";
 import { formatP20Deviation } from "@/components/utils/rp22/levels";
-import { formatP17WindowResult } from "@/components/utils/rp22/p17CoverageWindows";
+import { buildP17SeatMetric } from "@/components/utils/rp22/buildP17SeatMetric";
 import { getSpeakerModelMeta, MODELS, normaliseModelKey } from "@/components/models/speakers/registry";
 import { useAppState } from "@/components/AppStateProvider";
 import { getSeatSplMetrics } from '@/components/utils/spl/centralSplEngine';
@@ -1704,52 +1704,14 @@ export const useRP22AnalysisEngine = ({ placedSpeakers, seatingPositions, dimens
         }
         // ── END TEMP DIAG ──
 
-        if (p17Data && isNum(p17Data.p17Db)) {
-          const valueDb = p17Data.p17Db;
-
-          // P17 DESIGN GUIDE: the grade the engine produced IS the coverage-window
-          // result — L4 inside the 1.5 dB window, L3 inside 3 dB, L2 inside the
-          // usable 4 dB window, L1 outside usable coverage. There is no separate
-          // coverage cap: being outside the −3 dB window is exactly what an L2 or
-          // L1 grade already means. Under 4 dB is not a failure. The seat-versus-RSP
-          // deviation stays read-only diagnostics and never grades.
-          const level17 = /^L[1-4]$/.test(String(p17Data.windowLevel || "")) ? p17Data.windowLevel : null;
-
-          metrics.p17 = {
-            value: valueDb,
-            formatted: formatP17WindowResult(level17),
-            level: level17,
-            windows: p17Data.windows || null,
-            evidenceType: p17Data.evidenceType || null,
-            cause: p17Data.cause || null,
-            worstRole: p17Data.worstRole,
-            worstAngleDeg: p17Data.worstAngleDeg,
-            worstLossDb: p17Data.worstLossDb,
-            perSpeaker: p17Data.perSpeaker || [],
-            p17HasNaAngles: p17Data.p17HasNaAngles || false,
-            // ── Read-only diagnostic evidence (additive; never graded) ──
-            rawVarianceDb: isNum(p17Data.rawVarianceDb) ? p17Data.rawVarianceDb : null,
-            uncappedLevel: level17,
-            capApplied: false,
-            limiting: p17Data.limiting || null,
-            beyondLimit: p17Data.beyondLimit || [],
-            coverageLimitDeg: isNum(p17Data.coverageLimitDeg) ? p17Data.coverageLimitDeg : null,
-          };
-          // ── TEMP DIAG: capture P17 level ──
-          if (!_diag.p17.level) _diag.p17.level = level17;
-          // ── END TEMP DIAG ──
-        } else {
-          metrics.p17 = {
-            value: null,
-            formatted: "—",
-            level: "—",
-            windows: null,
-            evidenceType: "missing",
-            cause: "missing_evidence",
-            perSpeaker: [],
-            p17HasNaAngles: false,
-          };
-        }
+        // P17 DESIGN GUIDE: the seat's grade is the coverage-window result the
+        // engine produced. Built in one place (buildP17SeatMetric.js) so the window
+        // basis stays identical on every surface. No cap, no raw-deviation score.
+        const p17Metric = buildP17SeatMetric(p17Data);
+        // ── TEMP DIAG: capture P17 level ──
+        if (!_diag.p17.level) _diag.p17.level = p17Metric.level;
+        // ── END TEMP DIAG ──
+        metrics.p17 = p17Metric;
       }
 
       // P20 — Seat-to-seat bass consistency below transition frequency

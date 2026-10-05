@@ -418,6 +418,9 @@ export function buildSeatHudSnapshot({
   if (!engineSeatRp22?.[17]) {
     data.rp22.p17 = {
       ...notCalculatedHud(),
+      windows: null,
+      evidenceType: "missing",
+      cause: "missing_evidence",
       perSpeaker: [],
       worstRole: null,
       worstAngleDeg: null,

@@ -36,6 +36,7 @@ const src = (p) => readFileSync(resolve(here, "..", p), "utf8");
 const ENGINE = src("src/components/utils/rp22HfOffAxis.jsx");
 const WINDOWS = src("src/components/utils/rp22/p17CoverageWindows.js");
 const ANALYSIS = src("src/components/hooks/useRP22AnalysisEngine.jsx");
+const P17_METRIC = src("src/components/utils/rp22/buildP17SeatMetric.js");
 const AUTHORITY = src("src/components/utils/rp22/p17SeatEvidenceAuthority.js");
 const ADI = src("src/components/adi/designGuidance/p17DiagnosticExplanation.js");
 const RATING = src("src/components/report/technical/artcousticSystemDesignRating.js");
@@ -112,19 +113,22 @@ test("coverage windows are derived from measured polar data and graded by angle"
   assert.doesNotMatch(WINDOWS, /p17Db/, "the windows module must never produce a seat P17 dB score");
 });
 
-/* TEST 3 — the analysis engine carries the window grade */
-test("analysis engine grades from the coverage window, with no raw-deviation score and no cap", () => {
+/* TEST 3 — the P17 metric is built from the window grade, in one place */
+test("the P17 metric comes from the coverage window, with no raw-deviation score and no cap", () => {
+  assert.match(ANALYSIS, /const p17Metric = buildP17SeatMetric\(p17Data\);/,
+    "the analysis engine must build the P17 metric in one place");
+  assert.match(ANALYSIS, /metrics\.p17 = p17Metric;/, "the engine's P17 result must reach the metric unchanged");
   for (const field of ["windows", "evidenceType", "cause", "limiting", "beyondLimit", "coverageLimitDeg", "rawVarianceDb"]) {
-    assert.ok(ANALYSIS.includes(`${field}:`), `P17 metric must carry ${field}`);
+    assert.ok(P17_METRIC.includes(`${field}:`), `P17 metric must carry ${field}`);
   }
-  assert.match(ANALYSIS, /const level17 = \/\^L\[1-4\]\$\/\.test\(String\(p17Data\.windowLevel \|\| ""\)\) \? p17Data\.windowLevel : null;/,
+  assert.match(P17_METRIC, /const level = \/\^L\[1-4\]\$\/\.test\(String\(p17Data\.windowLevel \|\| ""\)\) \? p17Data\.windowLevel : null;/,
     "the P17 level must be the engine's coverage-window grade, passed through verbatim");
-  assert.match(ANALYSIS, /formatted: formatP17WindowResult\(level17\),/,
+  assert.match(P17_METRIC, /formatted: formatP17WindowResult\(level\),/,
     "the displayed value must be the window, not a raw deviation");
-  assert.match(ANALYSIS, /capApplied: false,/, "the old −3 dB coverage cap must no longer apply");
-  assert.match(ANALYSIS, /windows: null,\s*evidenceType: "missing",\s*cause: "missing_evidence",/,
+  assert.match(P17_METRIC, /capApplied: false,/, "the old −3 dB coverage cap must no longer apply");
+  assert.match(P17_METRIC, /evidenceType: "missing",\s*cause: "missing_evidence",/,
     "a seat with no evidence must be labelled, not graded");
-  assert.doesNotMatch(ANALYSIS, /levelP17_wsFR/,
+  assert.doesNotMatch(ANALYSIS + P17_METRIC, /levelP17_wsFR/,
     "raw measured deviation must no longer derive a P17 grade");
 });
 
@@ -201,8 +205,10 @@ test("the ADI Data surfaces show the effective angle, windows, cause and evidenc
   for (const column of ["Basis", "Effective off-axis angle", "L4 window", "Evidence type"]) {
     assert.ok(VERSION_TABLE.includes(`"${column}"`), `the comparison table must carry the ${column} column`);
   }
-  assert.ok(SEAT_TABLE.includes("measured-derived") === false,
-    "the evidence type is read from evidence, never hard-coded in the table");
+  assert.match(SEAT_TABLE, /const EVIDENCE_TEXT = \(row\) =>/,
+    "the evidence type must be read from the row, never assumed by the table");
+  assert.match(P17_METRIC, /evidenceType: p17Data\.evidenceType \|\| null,/,
+    "the metric must carry the evidence type the engine published");
 });
 
 /* TEST 8 — read-only: no writes anywhere on the diagnostic path */
