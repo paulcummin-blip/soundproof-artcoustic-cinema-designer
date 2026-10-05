@@ -427,24 +427,26 @@ export default function RP22CompliancePanel({
               no duplicate Level pill row here. All other params show it. */}
           {!(p.id === 15 || p.id === 21) && (
           <div style={{ ...row, marginTop: 0 }}>
-            <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
-              <span style={{ fontSize: 12, color: "#625143" }}>
-                {isSeatScope ? "Per-seat levels" : "Level"}
-              </span>
-            </div>
-            {(() => {
-              // ROOM scope: use same pill as HUD + RP22 Report
-              if (!isSeatScope) {
-                return <RP22GradingPill level={lvl} />;
-              }
-
-              // SEAT scope: NO overall pill, only per-seat pill grid
-              return (
-                <div style={{ display: "flex", justifyContent: "flex-end" }}>
+            {isSeatScope ? (
+              /* SEAT scope: no overall pill. One centred row per seating row, so the
+                 rows share a single centre line instead of trailing off to the right. */
+              <div style={{ width: "100%" }}>
+                <div style={{ fontSize: 12, color: "#625143", textAlign: "center" }}>
+                  Per-seat levels
+                </div>
+                <div style={{ marginTop: 6 }}>
                   {renderSeatPillGridForParam(p.id)}
                 </div>
-              );
-            })()}
+              </div>
+            ) : (
+              /* ROOM scope: label and level pill on one line, exactly as before. */
+              <>
+                <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
+                  <span style={{ fontSize: 12, color: "#625143" }}>Level</span>
+                </div>
+                <RP22GradingPill level={lvl} />
+              </>
+            )}
           </div>
           )}
 
