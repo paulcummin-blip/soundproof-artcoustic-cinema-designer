@@ -43,6 +43,9 @@ export function useReportSnapshot({
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const autoSaveKeyRef = useRef(null);
+  // Bumped when a legacy snapshot's proposal evidence has been recovered in
+  // place, so the backfill runs at most once per open report.
+  const evidenceBackfillKeyRef = useRef(null);
   const mountedRef = useRef(true);
 
   useEffect(() => () => { mountedRef.current = false; }, []);
@@ -128,6 +131,28 @@ export function useReportSnapshot({
     autoSaveKeyRef.current = key;
     persist();
   }, [loading, ready, payload, projectId, versionId, reportType, resolution.status, currentFp.engineeringFingerprint, persist]);
+
+  // ── Compatibility path: recover the proposal evidence in place ───────────
+  // A saved report that is CURRENT but predates the proposal evidence capture
+  // carries no payload.proposalSource, so proposal comparison generation cannot
+  // read it. Opening the report augments that SAME record in place — same
+  // report, same fingerprints, plus the proposal evidence built from the same
+  // frozen engineering authority the report renders from. Nothing is
+  // regenerated, and no report content changes.
+  //
+  // A report that is not current is left exactly as it is: Regenerate remains
+  // the only overwrite path for it, so a genuinely stale report is never
+  // silently refreshed.
+  useEffect(() => {
+    if (loading || !ready || !payload || !projectId || !versionId || !reportType) return;
+    if (resolution.status !== REPORT_SNAPSHOT_STATUS.CURRENT) return;
+    if (saved?.payload?.proposalSource) return;
+
+    const key = `${projectId}::${versionId}::${reportType}`;
+    if (evidenceBackfillKeyRef.current === key) return;
+    evidenceBackfillKeyRef.current = key;
+    persist();
+  }, [loading, ready, payload, projectId, versionId, reportType, resolution.status, saved, persist]);
 
   return {
     saved,

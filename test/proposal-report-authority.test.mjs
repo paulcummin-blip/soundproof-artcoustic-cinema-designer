@@ -57,16 +57,32 @@ test('E: missing, stale, legacy payload and missing P13 reject with named errors
   await assert.rejects(readProposalReportEvidence(db([]), 'project', [version('4')]), /Level 4 version: missing Technical/);
   const stale = structuredClone(rows); stale[0].status = 'stale';
   await assert.rejects(readProposalReportEvidence(db(stale), 'project', [version('4')]), /Level 4 version: stale Technical/);
+  // A report that EXISTS and is current, written before the proposal evidence
+  // capture, is a legacy snapshot. It is never reported as a missing report.
   const legacy = structuredClone(rows); legacy[0].payload = {};
-  await assert.rejects(readProposalReportEvidence(db(legacy), 'project', [version('4')]), /no saved parameter payload/);
+  await assert.rejects(
+    readProposalReportEvidence(db(legacy), 'project', [version('4')]),
+    /Level 4 version: Technical Report exists, but needs refreshing for comparison evidence/,
+  );
   const missing = structuredClone(rows);
   missing[0].payload.proposalSource.report_parameters = missing[0].payload.proposalSource.report_parameters.filter((r) => r.parameter_id !== 13);
   await assert.rejects(readProposalReportEvidence(db(missing), 'project', [version('4')]), /Level 4 version: missing Technical Report parameter P13/);
 });
 
+test('a legacy snapshot is never described as a missing report', async () => {
+  const legacy = structuredClone(rows); legacy[0].payload = {};
+  const error = await readProposalReportEvidence(db(legacy), 'project', [version('4')]).catch((e) => e);
+  assert.match(error.message, /Level 4 version/);
+  assert.match(error.message, /Technical Report exists/);
+  assert.doesNotMatch(error.message, /missing (Technical|Visual) Report/);
+});
+
 test('no older report may replace the latest missing evidence', async () => {
   const latest = report('4', 'technical'); latest.payload = {};
-  await assert.rejects(readProposalReportEvidence(db([latest, ...rows]), 'project', [version('4')]), /no saved parameter payload/);
+  await assert.rejects(
+    readProposalReportEvidence(db([latest, ...rows]), 'project', [version('4')]),
+    /Technical Report exists, but needs refreshing for comparison evidence/,
+  );
 });
 
 test('bass alternative values cannot override report parameters', () => {

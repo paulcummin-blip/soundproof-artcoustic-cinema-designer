@@ -32,6 +32,13 @@
 export const READINESS_STATE = Object.freeze({
   CURRENT: 'current',
   STALE: 'stale',
+  /**
+   * The saved report EXISTS and is stored current, but it predates the proposal
+   * evidence capture: it carries no payload.proposalSource, which a comparison
+   * needs. The report is not missing and must never be described as missing —
+   * only its proposal evidence needs refreshing.
+   */
+  LEGACY: 'legacy',
   MISSING: 'missing',
   INCOMPLETE: 'incomplete',
   UNAVAILABLE: 'unavailable',
@@ -42,6 +49,7 @@ export const READINESS_STATE = Object.freeze({
 export const READINESS_STATUS_TEXT = Object.freeze({
   [READINESS_STATE.CURRENT]: 'Current',
   [READINESS_STATE.STALE]: 'Stale',
+  [READINESS_STATE.LEGACY]: 'Needs refresh',
   [READINESS_STATE.MISSING]: 'Missing',
   [READINESS_STATE.INCOMPLETE]: 'Incomplete',
   [READINESS_STATE.UNAVAILABLE]: 'Unavailable',
@@ -70,6 +78,7 @@ export const READINESS_COLUMNS = Object.freeze([
 export const READINESS_VERB = Object.freeze({
   [READINESS_STATE.MISSING]: 'is missing',
   [READINESS_STATE.STALE]: 'has',
+  [READINESS_STATE.LEGACY]: 'has',
   [READINESS_STATE.INCOMPLETE]: 'has',
   [READINESS_STATE.UNAVAILABLE]: 'has',
 });
@@ -246,13 +255,25 @@ export function versionDisplayName({ version_name: name = null, version_number: 
  * @param {boolean} [params.checking]
  * @returns {string} READINESS_STATE
  */
-export function resolveReportCellState({ hasSaved = false, snapshotStatus = null, checking = false } = {}) {
+export function resolveReportCellState({ hasSaved = false, snapshotStatus = null, checking = false, legacy = false } = {}) {
   if (checking) return READINESS_STATE.CHECKING;
   if (!hasSaved) return READINESS_STATE.MISSING;
   if (snapshotStatus === 'stale') return READINESS_STATE.STALE;
+  // The report exists and is current; it simply predates the proposal evidence
+  // capture, so it needs refreshing rather than being called Missing.
+  if (legacy) return READINESS_STATE.LEGACY;
   if (snapshotStatus === 'current') return READINESS_STATE.CURRENT;
   // A saved report that cannot be restored is not a usable source.
   return READINESS_STATE.MISSING;
+}
+
+/**
+ * Whether a saved report carries the proposal evidence payload a comparison is
+ * generated from. A report written before that capture existed has pages and
+ * fingerprints but no proposalSource — it is a legacy snapshot, not a missing one.
+ */
+export function hasProposalEvidence(saved) {
+  return !!saved?.payload?.proposalSource;
 }
 
 /** A cell: its state, its display text and when it was generated. */
@@ -272,6 +293,7 @@ export function statePhrase(state, label) {
   if (label === READINESS_COMBINED_REPORT_LABEL) return label;
   if (state === READINESS_STATE.MISSING) return `the ${label}`;
   if (state === READINESS_STATE.STALE) return `a stale ${label}`;
+  if (state === READINESS_STATE.LEGACY) return `a current ${label}, but it needs refreshing for proposal comparison evidence`;
   if (state === READINESS_STATE.INCOMPLETE) return `incomplete ${label}`;
   return `unreadable ${label}`;
 }
@@ -315,36 +337,55 @@ export function buildVersionBlockers({ versionName, visual, technical, engineeri
  */
 export function buildBlockingSentence({ versionName, visual, technical, engineering }) {
   const isBlocked = (cell) => !!cell && !cell.current && !cell.checking;
-  const items = [];
+  const sentences = [];
 
-  const bothReportsMissing = isBlocked(visual) && isBlocked(technical)
+  // A legacy report EXISTS and is current, so it is never stated as missing:
+  // each one is named in full, on its own, exactly as the designer must read it.
+  for (const { cell, label } of [
+    { cell: visual, label: 'Visual Report' },
+    { cell: technical, label: 'Technical Report' },
+  ]) {
+    if (isBlocked(cell) && cell.state === READINESS_STATE.LEGACY) {
+      sentences.push(`${versionName} has a current ${label}, but it needs refreshing for proposal comparison evidence`);
+    }
+  }
+
+  // Every other blocked source is grouped by state, so several in the same state
+  // still read as one sentence. A legacy report is never in these groups.
+  const items = [];
+  const visualGrouped = isBlocked(visual) && visual.state !== READINESS_STATE.LEGACY;
+  const technicalGrouped = isBlocked(technical) && technical.state !== READINESS_STATE.LEGACY;
+  const bothReportsMissing = visualGrouped && technicalGrouped
     && visual.state === READINESS_STATE.MISSING && technical.state === READINESS_STATE.MISSING;
   if (bothReportsMissing) {
     items.push({ state: READINESS_STATE.MISSING, label: READINESS_COMBINED_REPORT_LABEL });
   } else {
-    if (isBlocked(visual)) items.push({ state: visual.state, label: blockerLabel({ source: READINESS_SOURCE.VISUAL, state: visual.state }) });
-    if (isBlocked(technical)) items.push({ state: technical.state, label: blockerLabel({ source: READINESS_SOURCE.TECHNICAL, state: technical.state }) });
+    if (visualGrouped) items.push({ state: visual.state, label: blockerLabel({ source: READINESS_SOURCE.VISUAL, state: visual.state }) });
+    if (technicalGrouped) items.push({ state: technical.state, label: blockerLabel({ source: READINESS_SOURCE.TECHNICAL, state: technical.state }) });
   }
   if (isBlocked(engineering)) items.push({ state: engineering.state, label: blockerLabel({ source: READINESS_SOURCE.ENGINEERING, state: engineering.state }) });
-  if (items.length === 0) return null;
 
-  // Consecutive items in the same state share one verb, so the sentence never
-  // repeats itself. Items in different states are stated one at a time.
-  const groups = [];
-  for (const item of items) {
-    const last = groups[groups.length - 1];
-    if (last && last.state === item.state) last.items.push(item);
-    else groups.push({ state: item.state, items: [item] });
+  if (items.length > 0) {
+    // Consecutive items in the same state share one verb, so the sentence never
+    // repeats itself. Items in different states are stated one at a time.
+    const groups = [];
+    for (const item of items) {
+      const last = groups[groups.length - 1];
+      if (last && last.state === item.state) last.items.push(item);
+      else groups.push({ state: item.state, items: [item] });
+    }
+
+    const phrases = groups.map((group) => {
+      const [leading, ...rest] = group.items;
+      const head = buildClause(group.state, leading.label);
+      if (rest.length === 0) return head;
+      return `${head} and ${rest.map((item) => statePhrase(group.state, item.label)).join(' and ')}`;
+    });
+
+    sentences.push(`${versionName} ${phrases.join(' and ')}`);
   }
 
-  const phrases = groups.map((group) => {
-    const [leading, ...rest] = group.items;
-    const head = buildClause(group.state, leading.label);
-    if (rest.length === 0) return head;
-    return `${head} and ${rest.map((item) => statePhrase(group.state, item.label)).join(' and ')}`;
-  });
-
-  return `${versionName} ${phrases.join(' and ')}`;
+  return sentences.length > 0 ? sentences.join('. ') : null;
 }
 
 /**
@@ -440,7 +481,7 @@ export function resolveProposalReadinessGate({
       ? PROPOSAL_READINESS_READY_COPY
       : checking
         ? 'Checking each selected version’s reports and engineering results…'
-        : 'Generate the named source for the blocked versions, then return to this step.',
+        : 'Generate or refresh the named source for the blocked versions, then return to this step.',
   };
 }
 

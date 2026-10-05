@@ -195,15 +195,31 @@ test('the action label is identical in every runnable state', () => {
     labels.add(action.label);
   });
 
-  // Only the running state is allowed to read differently.
-  expect([...labels].sort()).toEqual(['Generate Visual Report', 'Generating Visual Report…']);
+  // The running state and the legacy "needs refresh" state are the only two
+  // that read differently; every other runnable state carries the one Generate
+  // label, because the status text already says what condition the report is in.
+  expect([...labels].sort()).toEqual([
+    'Generate Visual Report',
+    'Generating Visual Report…',
+    'Refresh Visual Report evidence',
+  ]);
 
   states
-    .filter((state) => state !== PROPOSAL_REPORT_UI_STATE.GENERATING)
+    .filter((state) => state !== PROPOSAL_REPORT_UI_STATE.GENERATING
+      && state !== PROPOSAL_REPORT_UI_STATE.LEGACY)
     .forEach((state) => {
       expect(resolveReportAction({ label: 'Visual Report', uiState: state }).label)
         .toBe('Generate Visual Report');
     });
+
+  // A report that EXISTS and is current only needs its proposal evidence
+  // refreshed. The action says exactly that, and never implies it is missing.
+  expect(resolveReportAction({
+    label: 'Technical Report',
+    uiState: PROPOSAL_REPORT_UI_STATE.LEGACY,
+  }).label).toBe('Refresh Technical Report evidence');
+  expect(PROPOSAL_REPORT_STATUS_TEXT[PROPOSAL_REPORT_UI_STATE.LEGACY]).toBe('Needs refresh');
+  expect(PROPOSAL_REPORT_STATUS_TEXT[PROPOSAL_REPORT_UI_STATE.LEGACY]).not.toBe('Missing');
 
   expect(resolveReportAction({ label: 'Technical Report', uiState: 'current' }).label)
     .toBe('Generate Technical Report');

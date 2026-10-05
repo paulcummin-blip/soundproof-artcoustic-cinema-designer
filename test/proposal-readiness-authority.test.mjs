@@ -70,6 +70,7 @@ import {
   resolveProposalReadinessGate,
   resolveSavedReportCell,
   resolveVersionReadiness,
+  resolveVersionReadinessRow as sharedVersionReadinessRow,
   versionDisplayName as sharedVersionDisplayName,
 } from '../base44/shared/proposalReadinessAuthority.js';
 
@@ -96,6 +97,22 @@ const SEAT_PRIORITY =
 
 /** A saved report carried under the current payload generation. */
 const savedReport = ({ fingerprints, generatedAt }) => ({
+  report_schema_version: 1,
+  payload: {
+    pages: [{ id: 'cover', category: 'cover' }],
+    proposalSource: { report_source_version: 1, identity: {} },
+  },
+  source_fingerprints: fingerprints,
+  generated_at: generatedAt,
+});
+
+/**
+ * The same report written BEFORE the proposal evidence capture existed: it has
+ * its pages and its fingerprints, and it is stored current, but it carries no
+ * payload.proposalSource. This is the legacy snapshot — the report exists and is
+ * current, and only its proposal evidence needs refreshing.
+ */
+const legacyReport = ({ fingerprints, generatedAt }) => ({
   report_schema_version: 1,
   payload: { pages: [{ id: 'cover', category: 'cover' }] },
   source_fingerprints: fingerprints,
@@ -593,7 +610,6 @@ test('16. a published version is left exactly as it was: every column Current', 
 });
 
 // ── 15. A genuinely uncalculated version still blocks, by name ──────────────
-
 test('15. reports without a calculated result still block, naming that result', () => {
   const row = resolveVersionReadiness(UNBACKED_SOURCES);
   assert.equal(row.visual_report_status, 'Current');
@@ -612,6 +628,98 @@ test('15. reports without a calculated result still block, naming that result', 
   });
   assert.equal(clientRowResult.ready, row.ready);
   assert.equal(clientRowResult.blockingSentence, row.blockingSentence);
+});
+
+// ── 17. A legacy snapshot: the report exists and is current ─────────────────
+
+const LEGACY_VISUAL = legacyReport({
+  generatedAt: '2026-10-02T22:03:28.601Z',
+  fingerprints: { engineeringFingerprint: 'eng:v1:c19ceb2efb6c3d9c', calculationFingerprint: null, seatPriorityFingerprint: SEAT_PRIORITY },
+});
+const LEGACY_TECHNICAL = legacyReport({
+  generatedAt: '2026-10-04T17:11:05.564Z',
+  fingerprints: { engineeringFingerprint: 'eng:v1:c19ceb2efb6c3d9c', calculationFingerprint: null, seatPriorityFingerprint: SEAT_PRIORITY },
+});
+const LEGACY_SOURCES = {
+  ...LEVEL_4_SOURCES,
+  savedReports: { visual: LEGACY_VISUAL, technical: LEGACY_TECHNICAL },
+};
+
+test('17. a current snapshot without proposal evidence is Legacy, never Missing', () => {
+  // Acceptance A: the snapshot exists, is stored current, and has no
+  // payload.proposalSource.
+  for (const report of [LEGACY_VISUAL, LEGACY_TECHNICAL]) {
+    const cell = resolveSavedReportCell({
+      saved: report,
+      currentFingerprints: LEVEL_4_SOURCES.currentFingerprints,
+    });
+    assert.equal(cell.state, READINESS_STATE.LEGACY);
+    assert.equal(cell.status, 'Needs refresh');
+    assert.notEqual(cell.status, 'Missing');
+  }
+
+  const row = resolveVersionReadiness(LEGACY_SOURCES);
+  assert.equal(row.visual_report_status, 'Needs refresh');
+  assert.equal(row.technical_report_status, 'Needs refresh');
+  assert.equal(row.ready, false);
+  // Acceptance E/2: the warning names the exact version and report.
+  assert.equal(
+    row.blockingSentence,
+    'Level 4 version has a current Visual Report, but it needs refreshing for proposal comparison evidence. '
+    + 'Level 4 version has a current Technical Report, but it needs refreshing for proposal comparison evidence',
+  );
+  assert.doesNotMatch(row.blockingSentence, /missing/i, 'a report that exists is never called missing');
+
+  // Acceptance F: Generate stays blocked while any selected version is Legacy.
+  const gate = resolveProposalReadinessGate({ rows: [row] });
+  assert.equal(gate.ready, false);
+  assert.equal(gate.message, `${row.blockingSentence}.`);
+  assert.equal(gate.blockedVersions[0].version_name, 'Level 4 version');
+});
+
+test('18. Missing means no snapshot; Stale means the fingerprints moved on', () => {
+  // Acceptance B: no matching ReportSnapshot for the version and report type.
+  assert.equal(resolveSavedReportCell({ saved: null, currentFingerprints: null }).state, READINESS_STATE.MISSING);
+
+  // Acceptance C: the saved report no longer matches the design it came from,
+  // so it is Stale — not Legacy, and not Missing.
+  const stale = resolveSavedReportCell({
+    saved: legacyReport({
+      generatedAt: '2026-10-04T17:11:05.564Z',
+      fingerprints: { engineeringFingerprint: 'eng:v1:older-design', calculationFingerprint: null, seatPriorityFingerprint: SEAT_PRIORITY },
+    }),
+    currentFingerprints: LEVEL_4_SOURCES.currentFingerprints,
+  });
+  assert.equal(stale.state, READINESS_STATE.STALE);
+  assert.equal(stale.status, 'Stale');
+
+  // Acceptance D: the snapshot carries its proposal evidence.
+  const current = resolveSavedReportCell({
+    saved: LEVEL_4_SOURCES.savedReports.technical,
+    currentFingerprints: LEVEL_4_SOURCES.currentFingerprints,
+  });
+  assert.equal(current.state, READINESS_STATE.CURRENT);
+  assert.equal(current.status, 'Current');
+});
+
+test('19. the client mirror derives the same legacy verdict, word for word', () => {
+  const cells = {
+    visual: resolveSavedReportCell({ saved: LEGACY_VISUAL, currentFingerprints: LEVEL_4_SOURCES.currentFingerprints }),
+    technical: resolveSavedReportCell({ saved: LEGACY_TECHNICAL, currentFingerprints: LEVEL_4_SOURCES.currentFingerprints }),
+    engineering: buildReadinessCell({ state: READINESS_STATE.CURRENT }),
+  };
+  const rowInput = {
+    versionId: LEVEL_4_VERSION.id,
+    versionName: sharedVersionDisplayName(LEVEL_4_VERSION),
+    versionNumber: LEVEL_4_VERSION.version_number,
+    cells,
+  };
+  const clientResult = clientRow(rowInput);
+  const sharedResult = sharedVersionReadinessRow(rowInput);
+  assert.equal(clientResult.blockingSentence, sharedResult.blockingSentence);
+  assert.equal(clientResult.visual_report_status, 'Needs refresh');
+  assert.equal(clientResult.ready, false);
+  assert.equal(sharedResult.ready, false);
 });
 
 // ── Report ─────────────────────────────────────────────────────────────────

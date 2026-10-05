@@ -68,16 +68,32 @@ function publicationStatusOf(durable) {
 }
 
 function reportCell(saved, currentFingerprints, version) {
-  if (!saved?.payload?.proposalSource) return buildReadinessCell({ state: READINESS_STATE.MISSING,
-    reason: 'Regenerate this report to save its authoritative parameter payload.' });
-  if (saved.status !== 'current' || new Date(saved.generated_at) < new Date(version?.updated_date)) {
+  // No saved report for this project version and report type: genuinely Missing.
+  if (!saved) return buildReadinessCell({ state: READINESS_STATE.MISSING });
+
+  // The saved report's own stored status is the first authority: a report the
+  // project has moved past is Stale, not merely in need of a refresh.
+  if (saved.status !== 'current') return buildReadinessCell({ state: READINESS_STATE.STALE });
+
+  // The report exists and is current, but it predates the proposal evidence
+  // capture — it carries no payload.proposalSource. That is a legacy snapshot
+  // that needs refreshing. It is never Missing: the report is not missing.
+  if (!saved.payload?.proposalSource) {
+    return buildReadinessCell({
+      state: READINESS_STATE.LEGACY,
+      generatedAt: saved.generated_at,
+      reason: 'This report is current, but it needs refreshing for proposal comparison evidence.',
+    });
+  }
+
+  // The version has been edited since this report was generated.
+  if (new Date(saved.generated_at) < new Date(version?.updated_date)) {
     return buildReadinessCell({ state: READINESS_STATE.STALE });
   }
   // A report with a captured source is not judged against a lagging publication.
   if (saved.payload.proposalSource.report_source_version === 1) {
     return buildReadinessCell({ state: READINESS_STATE.CURRENT, generatedAt: saved.generated_at });
   }
-  if (!saved) return buildReadinessCell({ state: READINESS_STATE.MISSING });
   const resolution = resolveSnapshotStatus({ saved, currentFingerprints });
   const state = resolveReportCellState({
     hasSaved: resolution.restorable,

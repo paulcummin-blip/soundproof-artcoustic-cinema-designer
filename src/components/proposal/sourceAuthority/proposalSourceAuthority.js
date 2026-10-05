@@ -27,6 +27,12 @@
 
 export const PROPOSAL_SOURCE_STATE = Object.freeze({
   CURRENT: 'current',
+  /**
+   * The report EXISTS and is current, but its proposal evidence was never
+   * captured: it needs refreshing for proposal comparison evidence. Never
+   * stated as Missing — the report is not missing.
+   */
+  LEGACY: 'legacy',
   MISSING: 'missing',
   STALE: 'stale',
   FAILED: 'failed',
@@ -68,6 +74,8 @@ export function describeSourceState(state) {
       return 'Stale';
     case PROPOSAL_SOURCE_STATE.FAILED:
       return 'Unavailable';
+    case PROPOSAL_SOURCE_STATE.LEGACY:
+      return 'Needs refresh';
     case PROPOSAL_SOURCE_STATE.MISSING:
       return 'Missing';
     default:

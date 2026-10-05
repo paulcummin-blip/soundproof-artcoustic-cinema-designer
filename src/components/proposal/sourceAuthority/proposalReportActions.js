@@ -45,6 +45,11 @@ export const PROPOSAL_REPORT_ORDER = Object.freeze([
 export const PROPOSAL_REPORT_UI_STATE = Object.freeze({
   CHECKING: 'checking',
   CURRENT: 'current',
+  /**
+   * The report EXISTS and is current, but it predates the proposal evidence
+   * capture. It needs refreshing — it is never presented as Missing.
+   */
+  LEGACY: 'legacy',
   MISSING: 'missing',
   STALE: 'stale',
   FAILED: 'failed',
@@ -56,6 +61,7 @@ export const PROPOSAL_REPORT_UI_STATE = Object.freeze({
 export const PROPOSAL_REPORT_STATUS_TEXT = Object.freeze({
   [PROPOSAL_REPORT_UI_STATE.CHECKING]: 'Checking…',
   [PROPOSAL_REPORT_UI_STATE.CURRENT]: 'Current',
+  [PROPOSAL_REPORT_UI_STATE.LEGACY]: 'Needs refresh',
   [PROPOSAL_REPORT_UI_STATE.MISSING]: 'Missing',
   [PROPOSAL_REPORT_UI_STATE.STALE]: 'Stale',
   [PROPOSAL_REPORT_UI_STATE.FAILED]: 'Unavailable',
@@ -124,6 +130,8 @@ export function resolveReportUiState({ reportState = null, checking = false, gen
   if (checking) return PROPOSAL_REPORT_UI_STATE.CHECKING;
 
   switch (reportState) {
+    case PROPOSAL_SOURCE_STATE.LEGACY:
+      return PROPOSAL_REPORT_UI_STATE.LEGACY;
     case PROPOSAL_SOURCE_STATE.MISSING:
       return PROPOSAL_REPORT_UI_STATE.MISSING;
     case PROPOSAL_SOURCE_STATE.STALE:
@@ -158,6 +166,13 @@ export function reportActionLabel(label) {
 export function resolveReportAction({ label, uiState }) {
   if (uiState === PROPOSAL_REPORT_UI_STATE.GENERATING) {
     return { label: `Generating ${label}…`, disabled: true, emphasis: 'quiet' };
+  }
+
+  // A report that already exists and is current only needs its proposal
+  // evidence refreshing. The action says exactly that, and never implies the
+  // report is missing.
+  if (uiState === PROPOSAL_REPORT_UI_STATE.LEGACY) {
+    return { label: `Refresh ${label} evidence`, disabled: false, emphasis: 'primary' };
   }
 
   return {

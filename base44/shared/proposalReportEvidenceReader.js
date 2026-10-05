@@ -1,14 +1,46 @@
 const REQUIRED_PARAMETERS = [12, 13, 14, 18, 19, 20];
 
+/**
+ * One version's report evidence, or the exact reason it cannot be used.
+ *
+ * The four blocked conditions are stated separately, because they need four
+ * different actions from the designer:
+ *   no saved report at all        → missing
+ *   the saved report is not current → stale
+ *   the saved report is current but was written before the proposal evidence
+ *     capture, so it carries no proposalSource → LEGACY, needs refreshing.
+ *     It exists: it is never reported as missing.
+ *   the captured evidence is incomplete → incomplete
+ */
 function requireReport(row, version, type) {
   const name = version.version_name || version.id;
+
+  // No matching ReportSnapshot for this project version and report type.
   if (!row) throw new Error(`${name}: missing ${type} Report. Generate it before creating a proposal.`);
-  if (row.status !== 'current' || !row.generated_at || !Number.isFinite(Date.parse(row.generated_at)) || new Date(row.generated_at) < new Date(version.updated_date)) {
+
+  const source = row.payload?.proposalSource;
+
+  // The saved report's own status is the first authority.
+  if (row.status !== 'current') {
     throw new Error(`${name}: stale ${type} Report. Regenerate it before creating a proposal.`);
   }
-  const source = row.payload?.proposalSource;
-  if (source?.report_source_version !== 1 || source.identity?.versionId !== version.id) {
-    throw new Error(`${name}: ${type} Report has no saved parameter payload (P13 and other report evidence). Regenerate it before creating a proposal.`);
+
+  // The report exists and is current, but predates the proposal evidence
+  // capture. It needs refreshing — it is never "missing".
+  if (!source) {
+    throw new Error(
+      `${name}: ${type} Report exists, but needs refreshing for comparison evidence. `
+      + `Open the ${type} Report for this version to save its proposal evidence, then try again.`,
+    );
+  }
+
+  const generatedAt = Date.parse(row.generated_at);
+  if (!Number.isFinite(generatedAt) || new Date(generatedAt) < new Date(version.updated_date)) {
+    throw new Error(`${name}: stale ${type} Report. Regenerate it before creating a proposal.`);
+  }
+
+  if (source.report_source_version !== 1 || source.identity?.versionId !== version.id) {
+    throw new Error(`${name}: incomplete ${type} Report evidence (P13 and other report evidence). Regenerate it before creating a proposal.`);
   }
   return source;
 }
