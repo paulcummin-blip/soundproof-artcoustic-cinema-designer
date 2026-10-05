@@ -248,66 +248,8 @@ export function useReportSnapshot({
     persist();
   }, [loading, ready, payload, projectId, versionId, reportType, resolution.status, currentFp.engineeringFingerprint, reportSource, persist, saved]);
 
-  // ── Legacy path: recover the evidence from the report's OWN frozen source ──
-  // A report saved before the evidence capture carries no reportEvidence. Its own
-  // stored frozen source IS the authority it was generated from, so the evidence
-  // is derived from that stored source ALONE — offline, never from the current
-  // project. Nothing is regenerated and no report content changes: the same
-  // record gains the evidence it should have carried, once.
-  //
-  // A report with NO stored frozen source cannot be recovered. It stays blocked
-  // as a legacy report whose evidence needs a one-time refresh, and only
-  // regenerating it from the current design can produce evidence.
-  useEffect(() => {
-    if (loading || !projectId || !versionId || !reportType) return;
-    if (!saved?.id) return;
-    if (resolution.status !== REPORT_SNAPSHOT_STATUS.CURRENT) return;
-    if (readStoredEvidence(saved)) return;
-    // When this report is open and ready, the save path above writes the
-    // evidence from the report's own live authority — the same frozen capture —
-    // so the offline recovery below is only reached for a report that cannot be
-    // saved from this page.
-    if (ready && payload) return;
-    const stored = saved.payload?.proposalSource;
-    if (!stored) return;
-
-    const key = `${projectId}::${versionId}::${reportType}::evidence`;
-    if (evidenceBackfillKeyRef.current === key) return;
-    evidenceBackfillKeyRef.current = key;
-
-    (async () => {
-      try {
-        const evidence = buildReportEvidence({
-          reportType,
-          captured: stored,
-          sourceFingerprint: saved.source_fingerprints,
-        });
-        if (!evidence) return;
-        const parity = checkReportEvidenceParity({ evidence, captured: stored, reportType });
-        // An incomplete legacy capture must not win the race with the ready
-        // report's refresh. Leave the row legacy so persist() can capture and
-        // save the report's own settled authority when ready becomes true.
-        if (!parity.passed) return;
-        const record = {
-          ...saved,
-          payload: {
-            ...saved.payload,
-            reportEvidence: { ...evidence, proposal_ready: parity.passed === true },
-            evidence_parity: buildParityRecord(parity),
-          },
-        };
-        const written = await saveReportSnapshot({ existing: saved, record });
-        if (!mountedRef.current) return;
-        setSaved(written || record);
-        setEvidenceIncomplete(!parity.passed);
-        setEvidenceMismatches([...parity.mismatches, ...parity.missing.map((field) => ({ area: field }))]);
-      } catch (error) {
-        // Recovery is best effort: a report that cannot be recovered stays
-        // blocked as a legacy report, and is never reported as missing.
-        console.warn('[reportEvidence] legacy recovery failed:', error?.message || error);
-      }
-    })();
-  }, [loading, saved, resolution.status, projectId, versionId, reportType, ready, payload]);
+  // Evidence refresh uses the version's durable publication in persist().
+  // Historical proposalSource is never an authority recovery path.
 
   // The evidence this report carries, and whether a proposal may read it. Read
   // from the SAVED report itself, so a report whose parity check failed shows as
@@ -321,7 +263,8 @@ export function useReportSnapshot({
 
   return {
     saved,
-    status: resolution.status,
+    status: evidenceIncompleteNow && resolution.status === REPORT_SNAPSHOT_STATUS.CURRENT
+      ? 'incomplete' : resolution.status,
     changedKeys: resolution.changedKeys,
     generatedAt: resolution.generatedAt,
     generatedBy: resolution.generatedBy,
