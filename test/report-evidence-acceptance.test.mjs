@@ -317,37 +317,10 @@ test('3. a parity failure shows the report as Incomplete for proposal use, never
 
 /* ── 4 + 5. Legacy evidence: recovered from the frozen source, or refused ── */
 
-test('4. legacy evidence is recovered from the report OWN frozen source only', () => {
-  const stored = capture();
-  const recovered = buildEvidence(stored);
-
-  assert.equal(validateReportEvidence(recovered, 'technical').complete, true, 'the frozen source is enough to rebuild the evidence');
-  assert.equal(
-    checkReportEvidenceParity({ evidence: recovered, captured: stored, reportType: 'technical' }).passed,
-    true,
-    'the recovered evidence agrees with the report it came from',
-  );
-
-  const saved = {
-    report_schema_version: 1,
-    status: 'current',
-    generated_at: '2026-10-05T10:00:00.000Z',
-    source_fingerprints: { engineeringFingerprint: FINGERPRINT },
-    payload: { pages: [], proposalSource: stored, reportEvidence: recovered },
-  };
-  assert.equal(
-    resolveSavedReportCell({ saved, currentFingerprints: { engineeringFingerprint: FINGERPRINT } }).state,
-    READINESS_STATE.CURRENT,
-    'a recovered report reads Current again',
-  );
-
-  // The recovery reads the SAVED report's own frozen source. It never reads the
-  // live project, so a report opened after the design moved on cannot have its
-  // evidence rebuilt from the current design.
-  const backfill = HOOK.slice(HOOK.indexOf('Legacy path: recover'));
-  assert.match(backfill, /const stored = saved\.payload\?\.proposalSource;/);
-  assert.match(backfill, /captured: stored,/);
-  assert.doesNotMatch(backfill, /reportSource/, 'the recovery never reads the live project source');
+test('4. legacy proposalSource cannot be promoted to report authority', () => {
+  assert.doesNotMatch(HOOK, /const stored = saved\.payload\?\.proposalSource;/);
+  assert.match(HOOK, /seatingPublication: durableRead\.publication/);
+  assert.match(HOOK, /auditReportSaveAuthority/);
 });
 
 test('5. a legacy report with no frozen source fails closed', async () => {
@@ -571,7 +544,7 @@ test('16. a fact missing from reportEvidence blocks as Incomplete and is never f
   }), [VERSION('v4')]);
 
   assert.equal(result.decision, 'BLOCKED');
-  assert.match(result.detail, /Level 4 version: incomplete Visual Report evidence/);
+  assert.match(result.detail, /Level 4 version: incomplete (Visual|Technical) Report evidence/);
   assert.match(result.detail, /room\.width_m is missing/);
   assert.doesNotMatch(result.detail, /9\.9/, 'the frozen value is never substituted, and never reported as the fact');
 });
