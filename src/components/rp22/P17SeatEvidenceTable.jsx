@@ -1,14 +1,19 @@
 /**
  * P17SeatEvidenceTable.jsx
  * ------------------------
- * READ-ONLY P17 evidence, one limiting row per seat:
+ * READ-ONLY P17 evidence, one row per seat — the design-guide basis:
  *
- *   Seat | Result | Cause | Limiting speaker | Model | Seat angle | RSP angle |
- *   Raw variance | Coverage limit | Cap applied
+ *   Seat | Result | Limiting speaker | Model | Effective off-axis angle |
+ *   L4 window | L3 window | L2 / usable window | Cause | Evidence type
  *
- * Cause is stated in plain language: "Raw variance", "Coverage cap" or
- * "Missing evidence". Each seat row expands to every speaker evaluated at that
- * seat (P17SpeakerBreakdownTable).
+ * P17 is a design guide based on off-axis suitability: each model's coverage
+ * windows are the angles at which it is approximately 1.5 dB / 3 dB / 4 dB down,
+ * and the seat is graded from the effective off-axis angle of the channel that
+ * covers it. The raw seat-versus-RSP response delta is kept as a read-only
+ * diagnostic inside each expanded row — it never grades the seat.
+ *
+ * Each seat row expands to every speaker evaluated at that seat
+ * (P17SpeakerBreakdownTable).
  *
  * Presentation only: it recomputes nothing, grades nothing and writes nothing;
  * missing evidence renders as "—" and is never inferred.
@@ -41,17 +46,23 @@ const fmt = (value, digits = 1) => (
   typeof value === "number" && Number.isFinite(value) ? value.toFixed(digits) : "—"
 );
 
-/** The three stated causes. Anything unreadable is reported, never guessed. */
-const CAUSE_TEXT = (row) => {
-  if (!row.evidenceAvailable) return "Missing evidence";
-  if (row.capApplied) return "Coverage cap";
-  if (row.cause === "raw_variance") return "Raw variance";
-  return "Missing evidence";
-};
+/** The cause, in the panel's own words. Anything unreadable is reported, never guessed. */
+const CAUSE_TEXT = (row) => row.windowCauseLabel || "Missing evidence";
+
+/** A coverage window as "≤24°". */
+const windowText = (value) => (
+  typeof value === "number" && Number.isFinite(value) ? `≤${Math.round(value)}°` : "—"
+);
+
+/** How the windows were established: measured-derived, estimated or missing. */
+const EVIDENCE_TEXT = (row) => (row.evidenceAvailable ? (row.evidenceType || "—") : "missing");
+
+/** A seat outside every channel's usable window is the actionable case. */
+const isOutsideCoverage = (row) => row.evidenceAvailable && row.windowCause === "outside_usable_window";
 
 const COLUMNS = [
-  "Seat", "Result", "Cause", "Limiting speaker", "Model",
-  "Seat angle", "RSP angle", "Raw variance", "Coverage limit", "Cap applied",
+  "Seat", "Result", "Limiting speaker", "Model", "Effective off-axis angle",
+  "L4 window", "L3 window", "L2 / usable window", "Cause", "Evidence type",
 ];
 
 export default function P17SeatEvidenceTable({ rows = [] }) {
@@ -98,30 +109,35 @@ export default function P17SeatEvidenceTable({ rows = [] }) {
                   <td style={{ ...CELL, ...NUM, fontWeight: 700, color: "#213428" }}>
                     {row.evidenceAvailable ? (row.level || "—") : "—"}
                   </td>
+                  <td style={{ ...CELL, fontWeight: 600 }}>{row.limitingRole || "—"}</td>
+                  <td style={{ ...CELL, ...MUTED }}>{row.limitingModel || "—"}</td>
+                  <td style={{ ...CELL, ...NUM, fontWeight: 700 }}>
+                    {fmt(row.effectiveAngleDeg)}
+                    <span style={{ ...MUTED, fontWeight: 400 }}>{row.effectiveAngleDeg != null ? "°" : ""}</span>
+                  </td>
+                  <td style={{ ...CELL, ...NUM }}>{windowText(row.windows?.l4Deg)}</td>
+                  <td style={{ ...CELL, ...NUM }}>{windowText(row.windows?.l3Deg)}</td>
+                  <td style={{ ...CELL, ...NUM }}>{windowText(row.windows?.l2Deg)}</td>
                   <td style={{
                     ...CELL,
-                    fontWeight: row.capApplied ? 700 : 400,
-                    color: row.capApplied ? "#8B4A2B" : (row.evidenceAvailable ? "#3E4349" : "#9B8E82"),
+                    fontWeight: isOutsideCoverage(row) ? 700 : 400,
+                    color: isOutsideCoverage(row) ? "#8B4A2B" : (row.evidenceAvailable ? "#3E4349" : "#9B8E82"),
                   }}>
                     {CAUSE_TEXT(row)}
                   </td>
-                  <td style={{ ...CELL, fontWeight: 600 }}>{row.limitingRole || "—"}</td>
-                  <td style={{ ...CELL, ...MUTED }}>{row.limitingModel || "—"}</td>
-                  <td style={{ ...CELL, ...NUM }}>{fmt(row.seatAngleDeg)}</td>
-                  <td style={{ ...CELL, ...NUM }}>{fmt(row.rspAngleDeg)}</td>
-                  <td style={{ ...CELL, ...NUM }}>{fmt(row.rawVarianceDb, 2)}</td>
-                  <td style={{ ...CELL, ...NUM }}>{fmt(row.coverageLimitDeg, 0)}</td>
-                  <td style={{
-                    ...CELL,
-                    fontWeight: row.capApplied ? 700 : 400,
-                    color: row.capApplied ? "#8B4A2B" : "#3E4349",
-                  }}>
-                    {row.evidenceAvailable ? (row.capApplied ? "Yes" : "No") : "—"}
-                  </td>
+                  <td style={{ ...CELL, ...MUTED }}>{EVIDENCE_TEXT(row)}</td>
                 </tr>
                 {isOpen && (
                   <tr>
                     <td colSpan={COLUMNS.length} style={{ padding: "5px 8px 9px 8px", background: "#FBFAF7", borderBottom: "1px solid #F0EFEA" }}>
+                      <div style={{ fontSize: 9.5, color: "#9B8E82", marginBottom: 5 }}>
+                        Design-guide windows for the deciding channel
+                        {row.windows?.source ? ` — ${row.windows.source}` : ""}.
+                        <span style={{ marginLeft: 6 }}>
+                          Read-only diagnostics: seat-versus-RSP response delta {fmt(row.rawVarianceDb, 2)} dB
+                          {row.coverageLimitDeg != null ? `; model −3 dB window ${fmt(row.coverageLimitDeg, 0)}°` : ""}.
+                        </span>
+                      </div>
                       <P17SpeakerBreakdownTable speakers={row.speakers || []} worstRole={row.limitingRole} />
                     </td>
                   </tr>

@@ -3,19 +3,27 @@
  * ---------------------------
  * READ-ONLY P17 (surround/wide/overhead timbre) seat evidence.
  *
- * P17 grades the seat's surround/wide/overhead response variance against the
- * RSP. Two different things can decide the final level, and until now the two
- * were indistinguishable on screen:
+ * P17 IS A DESIGN GUIDE BASED ON OFF-AXIS SUITABILITY, NOT A POLAR SIMULATION.
  *
- *   1. RAW VARIANCE — the seat-versus-RSP response difference itself.
- *   2. COVERAGE CAP — when a speaker sits beyond its model's −3 dB coverage
- *      window, the existing engine caps the level at Level 2 regardless of the
- *      variance. The cap is a property of the speaker's angular coverage, not of
- *      the variance.
+ * Each speaker model carries coverage windows — the angle at which it is
+ * approximately 1.5 dB / 3 dB / 4 dB down over the relevant octave band. Those
+ * windows are derived from measured polar data where the model has it, and are
+ * declared/estimated otherwise. A seat is graded from the EFFECTIVE OFF-AXIS
+ * ANGLE of the channel that covers it:
  *
- * This module resolves, from evidence that already exists, which of the two
- * decided each seat's level — and names the exact limiting speaker, the seat and
- * the angles involved.
+ *   L4 = within the 1.5 dB window
+ *   L3 = within the 3 dB window
+ *   L2 = outside 3 dB, still inside the usable (4 dB) window
+ *   L1 = outside the usable coverage window
+ *
+ * Raw measured polar deviation is NEVER the seat's P17 score; it survives here
+ * as read-only diagnostics only, so a product is not punished for having more
+ * detailed data than its neighbour.
+ *
+ * This module resolves, from evidence that already exists, which seat is limiting,
+ * which speaker and angle decided it, which window that angle falls in — and it
+ * never grades anything itself. The level the engine already produced is reported
+ * verbatim.
  *
  * NO CALCULATION IS PERFORMED HERE and nothing is written. The level the engine
  * already produced is reported verbatim; the uncapped level is re-derived from
@@ -28,6 +36,11 @@
 import { levelP17_wsFR, numericRp22Level } from "@/components/utils/rp22/levels";
 import { formatSeatLabel } from "@/components/utils/seatLabel";
 import { getSpeakerModelMeta } from "@/components/models/speakers/registry";
+import {
+  P17_EVIDENCE_TYPE,
+  P17_WINDOW_CAUSE_LABEL,
+  resolveP17Windows,
+} from "@/components/utils/rp22/p17CoverageWindows";
 
 /** The RP22 P17 coverage cap: a speaker beyond its −3 dB window caps the level here. */
 export const P17_COVERAGE_CAP_LEVEL = 2;
@@ -74,7 +87,48 @@ export function readModelCoverageLimitDeg(modelKey, { overhead = false } = {}) {
 }
 
 /**
+ * The coverage windows behind a seat's grade: the record's own evidence when the
+ * publication carries it, else the limiting speaker model's own windows read from
+ * the registry (a product property — measured-derived where the model has polar
+ * data, declared/estimated otherwise). Null when the model is unknown.
+ */
+function resolveRowWindows(p17, limitingModel, limitingRole) {
+  if (p17?.windows && typeof p17.windows === "object") return p17.windows;
+  if (!limitingModel) return null;
+  return resolveP17Windows(limitingModel, null, { overhead: isOverheadP17Role(limitingRole) });
+}
+
+/**
+ * The P17 design-guide basis behind a seat's grade. A record carrying a window
+ * level was graded by the coverage-window method; one that does not predates it
+ * (its stored level came from the earlier variance basis) and is reported as such
+ * rather than silently re-graded.
+ */
+function resolveRowBasis(p17) {
+  const windowLevel = /^L[1-4]$/.test(String(p17?.windowLevel || "")) ? p17.windowLevel : null;
+  if (windowLevel) {
+    return {
+      basis: "coverage_window",
+      windowLevel,
+      windowLevelNumber: readLevelNumber(windowLevel),
+      windowCause: p17.cause || null,
+    };
+  }
+  return { basis: "earlier_variance_basis", windowLevel: null, windowLevelNumber: null, windowCause: null };
+}
+
+/** The cause text shown for a row, in the panel's own plain language. */
+function causeLabelFor({ basis, windowCause, evidenceAvailable }) {
+  if (!evidenceAvailable) return "Missing evidence";
+  if (basis !== "coverage_window") return "Graded on the earlier variance basis";
+  return P17_WINDOW_CAUSE_LABEL[windowCause] || "Missing evidence";
+}
+
+/**
  * Which evidence decided the level: raw variance, or the model coverage cap.
+ *
+ * LEGACY (read-only): this rule graded P17 before the design-guide method. It is
+ * kept so a saved publication from that era is still explained in its own terms.
  *
  * The uncapped level is re-derived from the same authority the engine uses, so
  * the answer matches the produced level exactly.
@@ -110,10 +164,22 @@ function readSeatSpeakers(p17) {
       model: entry?.model ?? null,
       angleDeg: num(entry?.angleDeg) ?? num(entry?.rawAngleDeg),
       rspAngleDeg: num(entry?.rspAngleDeg),
+      // Raw seat-versus-RSP response delta — read-only legacy diagnostic.
       lossDb: num(entry?.lossDb),
       beyondLimit: entry?.isBeyondNonLcrLimit === true,
+      // ── P17 design-guide evidence for this speaker at this seat ──
+      windowDb: num(entry?.windowDb),
+      windowLevel: entry?.windowLevel ?? null,
+      windowLevelNumber: num(entry?.windowLevelNumber),
+      windows: entry?.windows ?? null,
+      evidenceType: entry?.evidenceType ?? null,
+      windowCause: entry?.cause ?? null,
     }))
-    .sort((a, b) => (b.lossDb ?? -1) - (a.lossDb ?? -1));
+    .sort((a, b) => {
+      const levelDiff = (b.windowLevelNumber ?? -1) - (a.windowLevelNumber ?? -1);
+      if (levelDiff !== 0) return levelDiff;
+      return (b.angleDeg ?? -1) - (a.angleDeg ?? -1);
+    });
 }
 
 /** The speaker entry that set the seat's variance — live evidence, else the saved worst role. */
@@ -157,6 +223,16 @@ export function buildP17SeatEvidenceRows({ seats = [], p17BySeatId = {} } = {}) 
         seatId,
         seatLabel: seat?.label || formatSeatLabel(seatId),
         level: null,
+        // ── P17 design-guide basis (the graded result) ──
+        basis: "none",
+        windowLevel: null,
+        windowLevelNumber: null,
+        windows: null,
+        evidenceType: P17_EVIDENCE_TYPE.MISSING,
+        windowCause: null,
+        windowCauseLabel: P17_WINDOW_CAUSE_LABEL.missing_evidence,
+        effectiveAngleDeg: null,
+        // ── read-only legacy diagnostics ──
         rawVarianceDb: null,
         uncappedLevel: null,
         capApplied: false,
@@ -182,25 +258,45 @@ export function buildP17SeatEvidenceRows({ seats = [], p17BySeatId = {} } = {}) 
     const rawVarianceDb = num(p17.rawVarianceDb) ?? num(p17.value);
     const level = p17.level ?? null;
 
-    // The published evidence stores the graded level; the cause is re-derived
-    // from the same authority so a saved version is read with the same rule.
+    // ── P17 design-guide basis: what actually graded this seat ──
+    const grade = resolveRowBasis(p17);
+    const limitingModel = limiting?.model ?? null;
+    const limitingRole = limiting?.role ?? p17.worstRole ?? null;
+    const windows = resolveRowWindows(p17, limitingModel, limitingRole);
+    const evidenceType = p17.evidenceType
+      || windows?.evidenceType
+      || P17_EVIDENCE_TYPE.MISSING;
+    const effectiveAngleDeg = num(limiting?.angleDeg) ?? num(p17.worstAngleDeg);
+
+    // LEGACY (read-only): the variance-versus-cap reading, kept so a saved
+    // publication from before the design-guide method is still explained.
     const cause = resolveP17Cause({ rawVarianceDb, level });
     const coverageLimitDeg = num(p17.coverageLimitDeg)
       ?? num(limiting?.coverageLimitDeg)
-      ?? readModelCoverageLimitDeg(limiting?.model, { overhead: isOverheadP17Role(limiting?.role ?? p17.worstRole) });
+      ?? readModelCoverageLimitDeg(limitingModel, { overhead: isOverheadP17Role(limitingRole) });
 
     rows.push({
       seatId,
       seatLabel: seat?.label || formatSeatLabel(seatId),
       level,
+      // ── P17 design-guide basis (the graded result) ──
+      basis: grade.basis,
+      windowLevel: grade.windowLevel,
+      windowLevelNumber: grade.windowLevelNumber,
+      windows,
+      evidenceType,
+      windowCause: grade.windowCause,
+      windowCauseLabel: causeLabelFor({ basis: grade.basis, windowCause: grade.windowCause, evidenceAvailable: true }),
+      effectiveAngleDeg,
+      // ── read-only legacy diagnostics ──
       rawVarianceDb,
       uncappedLevel: cause.uncappedLevel ?? level,
       capApplied: cause.capApplied,
       cause: cause.cause,
-      limitingRole: limiting?.role ?? p17.worstRole ?? null,
-      limitingModel: limiting?.model ?? null,
+      limitingRole,
+      limitingModel,
       limitingPosition: limiting?.position ?? null,
-      seatAngleDeg: num(limiting?.angleDeg) ?? num(p17.worstAngleDeg),
+      seatAngleDeg: effectiveAngleDeg,
       rspAngleDeg: num(limiting?.rspAngleDeg),
       seatLossDb: num(limiting?.lossAtSeat),
       rspLossDb: num(limiting?.lossAtRsp),
@@ -252,16 +348,28 @@ export function applySavedSpeakerModels(rows = [], speakersByRole = {}) {
     if (!row.evidenceAvailable || row.limitingModel) return row;
     const model = speakersByRole[String(row.limitingRole || "").toUpperCase()] || null;
     if (!model) return row;
+    const overhead = isOverheadP17Role(row.limitingRole);
+    // The windows are a property of the product, so they can be read from the
+    // version's own model selection — never invented for a model we do not know.
+    const windows = row.windows ?? resolveP17Windows(model, null, { overhead });
     return {
       ...row,
       limitingModel: model,
+      windows,
+      evidenceType: row.evidenceType && row.evidenceType !== P17_EVIDENCE_TYPE.MISSING
+        ? row.evidenceType
+        : (windows?.evidenceType ?? P17_EVIDENCE_TYPE.MISSING),
       coverageLimitDeg: row.coverageLimitDeg
-        ?? readModelCoverageLimitDeg(model, { overhead: isOverheadP17Role(row.limitingRole) }),
+        ?? readModelCoverageLimitDeg(model, { overhead }),
     };
   });
 }
 
-/** The seats that decide the room's P17 position: the worst (lowest) level first. */
+/**
+ * The seats that decide the room's P17 position: the worst (lowest) level first,
+ * then — within a level — the seat sitting furthest off axis, i.e. closest to the
+ * edge of the window that decided it.
+ */
 export function selectP17LimitingRows(rows = []) {
   return rows
     .filter((row) => row.evidenceAvailable && readLevelNumber(row.level) != null)
@@ -269,6 +377,8 @@ export function selectP17LimitingRows(rows = []) {
     .sort((a, b) => {
       const levelDiff = readLevelNumber(a.level) - readLevelNumber(b.level);
       if (levelDiff !== 0) return levelDiff;
+      const angleDiff = (num(b.effectiveAngleDeg) ?? -1) - (num(a.effectiveAngleDeg) ?? -1);
+      if (angleDiff !== 0) return angleDiff;
       return (num(b.rawVarianceDb) ?? -1) - (num(a.rawVarianceDb) ?? -1);
     });
 }

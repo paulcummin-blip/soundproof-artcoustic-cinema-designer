@@ -28,7 +28,6 @@ import {
   levelP9_upperSpacing,
   levelP10_upperDelta,
   levelP16_screenFR,
-  levelP17_wsFR,
 } from "@/components/utils/rp22/levels";
 import { rp23LevelForAngleDeg } from "@/components/utils/viewingAngleUtils";
 import gradeP1Distance from "@/components/utils/rp22/p1LevelAuthority";
@@ -328,8 +327,22 @@ function scoreP16(rawValue) {
   return applyMapper(rawValue, levelP16_screenFR, true); // L1=5 bounded → can FAIL
 }
 
+/**
+ * P17 — design-guide coverage windows.
+ *
+ * The P17 value IS the window the seat was graded in: 1.5 dB (the L4 window),
+ * 3 dB (the L3 window), 4 dB (the usable L2 window), or the loss beyond the
+ * usable window when the seat sits outside coverage (L1). The seat's level is
+ * therefore read straight from the value — no re-grading, and no FAIL path:
+ * outside the usable window is L1, the lowest grade, not a failure.
+ */
 function scoreP17(rawValue) {
-  return applyMapper(rawValue, levelP17_wsFR, false); // L1=null open-ended → no FAIL
+  const value = Number(rawValue);
+  if (!Number.isFinite(value)) return { level: null, provisional: true };
+  if (value <= 1.5) return { level: "L4" };
+  if (value <= 3) return { level: "L3" };
+  if (value <= 4) return { level: "L2" };
+  return { level: "L1" };
 }
 
 function scoreP18(rawValue, mode) {

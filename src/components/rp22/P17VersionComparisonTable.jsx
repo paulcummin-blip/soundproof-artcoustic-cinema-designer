@@ -3,11 +3,13 @@
  * -----------------------------
  * READ-ONLY P17 comparison across saved project versions.
  *
- * Version | Seat | P17 level | Raw variance dB | Coverage cap? | Limiting role |
- * Model | Seat angle | Coverage limit | Cause
+ * Version | Seat | P17 level | Basis | Limiting speaker | Model |
+ * Effective off-axis angle | L4 window | L3 window | L2 / usable window |
+ * Cause | Evidence type
  *
  * It renders saved evidence only. A version with no saved engineering evidence is
- * listed as unavailable — never generated, never written.
+ * listed as unavailable — never generated, never written. A version saved before
+ * the design-guide method is labelled with its own basis rather than re-graded.
  */
 
 import React from "react";
@@ -32,18 +34,28 @@ const NUM = { fontFamily: "ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas
 
 const fmt = (value) => (typeof value === "number" && Number.isFinite(value) ? value.toFixed(1) : "—");
 
-const CAP_TEXT = (row) => {
-  const limit = typeof row.coverageLimitDeg === "number" ? ` ≤${row.coverageLimitDeg.toFixed(0)}°` : "";
-  if (row.capApplied) return `Yes${limit}`;
-  if (row.hasNaAngles) return `No (not decisive)${limit}`;
-  return "No";
-};
+/** A coverage window as "≤24°". */
+const windowText = (value) => (
+  typeof value === "number" && Number.isFinite(value) ? `≤${Math.round(value)}°` : "—"
+);
 
-const CAUSE_TEXT = (row) => (row.capApplied ? "Coverage cap" : row.cause === "raw_variance" ? "Raw variance" : "—");
+/** Which method graded the saved row: the coverage windows, or the earlier variance basis. */
+const BASIS_TEXT = (row) => (
+  row.basis === "coverage_window"
+    ? "Coverage window"
+    : row.basis === "earlier_variance_basis"
+      ? "Earlier variance basis"
+      : "—"
+);
+
+const CAUSE_TEXT = (row) => (row.evidenceAvailable ? (row.windowCauseLabel || "—") : "Missing evidence");
+
+const EVIDENCE_TEXT = (row) => (row.evidenceAvailable ? (row.evidenceType || "—") : "missing");
 
 const COLUMNS = [
-  "Version", "Seat", "P17 level", "Raw var dB", "Coverage cap?",
-  "Limiting role", "Model", "Seat angle", "Coverage limit", "Cause",
+  "Version", "Seat", "P17 level", "Basis", "Limiting speaker", "Model",
+  "Effective off-axis angle", "L4 window", "L3 window", "L2 / usable window",
+  "Cause", "Evidence type",
 ];
 
 export default function P17VersionComparisonTable({ versions = [] }) {
@@ -70,13 +82,19 @@ export default function P17VersionComparisonTable({ versions = [] }) {
                       <td style={{ ...CELL, fontWeight: 600, color: "#1B1A1A" }}>{version.label}</td>
                       <td style={{ ...CELL }}>{row.seatLabel}</td>
                       <td style={{ ...CELL, ...NUM, fontWeight: 700, color: "#213428" }}>{row.level || "—"}</td>
-                      <td style={{ ...CELL, ...NUM }}>{fmt(row.rawVarianceDb)}</td>
-                      <td style={{ ...CELL, fontWeight: row.capApplied ? 700 : 400, color: row.capApplied ? "#8B4A2B" : "#3E4349" }}>{CAP_TEXT(row)}</td>
+                      <td style={{ ...CELL, color: row.basis === "earlier_variance_basis" ? "#8B4A2B" : "#3E4349" }}>{BASIS_TEXT(row)}</td>
                       <td style={{ ...CELL, fontWeight: 600 }}>{row.limitingRole || "—"}</td>
                       <td style={{ ...CELL, color: "#9B8E82" }}>{row.limitingModel || "—"}</td>
-                      <td style={{ ...CELL, ...NUM }}>{fmt(row.seatAngleDeg)}</td>
-                      <td style={{ ...CELL, ...NUM }}>{fmt(row.coverageLimitDeg)}</td>
-                      <td style={{ ...CELL, fontWeight: row.capApplied ? 700 : 400, color: row.capApplied ? "#8B4A2B" : "#3E4349" }}>{CAUSE_TEXT(row)}</td>
+                      <td style={{ ...CELL, ...NUM }}>{fmt(row.effectiveAngleDeg)}</td>
+                      <td style={{ ...CELL, ...NUM }}>{windowText(row.windows?.l4Deg)}</td>
+                      <td style={{ ...CELL, ...NUM }}>{windowText(row.windows?.l3Deg)}</td>
+                      <td style={{ ...CELL, ...NUM }}>{windowText(row.windows?.l2Deg)}</td>
+                      <td style={{
+                        ...CELL,
+                        fontWeight: row.windowCause === "outside_usable_window" ? 700 : 400,
+                        color: row.windowCause === "outside_usable_window" ? "#8B4A2B" : "#3E4349",
+                      }}>{CAUSE_TEXT(row)}</td>
+                      <td style={{ ...CELL, color: "#9B8E82" }}>{EVIDENCE_TEXT(row)}</td>
                     </tr>
                   ))}
                 </tbody>

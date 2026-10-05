@@ -61,9 +61,10 @@ export default function P17SeatEvidencePanel({ engineeringSummary = null, seats 
       <div style={head}>
         <div style={title}>ADI Data</div>
         <div style={sub}>
-          P17 diagnostics, read only: each seat's Result, the Cause that decided it, the limiting
-          speaker and its angles, the raw seat-versus-RSP variance and the model coverage window.
-          Nothing is recalculated and no record is changed.
+          P17 design guide, read only: each seat's Result, the limiting speaker and its effective
+          off-axis angle, that model's L4 / L3 / L2 coverage windows, the cause and how the windows
+          were established (measured-derived or estimated). Nothing is recalculated and no record is
+          changed.
         </div>
       </div>
 

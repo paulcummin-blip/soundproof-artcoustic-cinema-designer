@@ -10,7 +10,8 @@ import { computeSeatRoles } from "@/components/utils/seatRoles";
 import { getUpperSpeakersForSeat, computeUpperVerticalAnglesForSeat, computeUpperSplSpreadForSeat } from "../utils/rp22UpperSeatMetrics";
 import { computeScreenVarianceMetrics, computeWideSurroundUpperVarianceMetrics, computeBassVarianceMetrics } from "../utils/rp22SeatResponseConsistency";
 import { computeP16ForSeat, computeP17ForAllSeats } from "../utils/rp22HfOffAxis";
-import { formatP20Deviation, levelP17_wsFR, numericRp22Level } from "@/components/utils/rp22/levels";
+import { formatP20Deviation } from "@/components/utils/rp22/levels";
+import { formatP17WindowResult } from "@/components/utils/rp22/p17CoverageWindows";
 import { getSpeakerModelMeta, MODELS, normaliseModelKey } from "@/components/models/speakers/registry";
 import { useAppState } from "@/components/AppStateProvider";
 import { getSeatSplMetrics } from '@/components/utils/spl/centralSplEngine';
@@ -1706,34 +1707,30 @@ export const useRP22AnalysisEngine = ({ placedSpeakers, seatingPositions, dimens
         if (p17Data && isNum(p17Data.p17Db)) {
           const valueDb = p17Data.p17Db;
 
-          // Grading is unchanged: the level from the seat-vs-RSP variance, then
-          // the existing −3 dB coverage cap at Level 2 when a speaker sits beyond
-          // its model's −3 dB window. The uncapped level and whether the cap was
-          // decisive are recorded as read-only diagnostics only.
-          const uncappedLevel17 = numericRp22Level(levelP17_wsFR(valueDb));
-          let level17 = uncappedLevel17;
-          let p17CapApplied = false;
-
-          // If any speaker is beyond 41°, cap at Level 2.
-          if (p17Data.p17HasNaAngles) {
-            const cappedLevel17 = Math.min(level17, 2);
-            p17CapApplied = cappedLevel17 !== level17;
-            level17 = cappedLevel17;
-          }
+          // P17 DESIGN GUIDE: the grade the engine produced IS the coverage-window
+          // result — L4 inside the 1.5 dB window, L3 inside 3 dB, L2 inside the
+          // usable 4 dB window, L1 outside usable coverage. There is no separate
+          // coverage cap: being outside the −3 dB window is exactly what an L2 or
+          // L1 grade already means. Under 4 dB is not a failure. The seat-versus-RSP
+          // deviation stays read-only diagnostics and never grades.
+          const level17 = /^L[1-4]$/.test(String(p17Data.windowLevel || "")) ? p17Data.windowLevel : null;
 
           metrics.p17 = {
             value: valueDb,
-            formatted: `±${valueDb} dB`,
+            formatted: formatP17WindowResult(level17),
             level: level17,
+            windows: p17Data.windows || null,
+            evidenceType: p17Data.evidenceType || null,
+            cause: p17Data.cause || null,
             worstRole: p17Data.worstRole,
             worstAngleDeg: p17Data.worstAngleDeg,
             worstLossDb: p17Data.worstLossDb,
             perSpeaker: p17Data.perSpeaker || [],
             p17HasNaAngles: p17Data.p17HasNaAngles || false,
             // ── Read-only diagnostic evidence (additive; never graded) ──
-            rawVarianceDb: isNum(p17Data.rawVarianceDb) ? p17Data.rawVarianceDb : valueDb,
-            uncappedLevel: uncappedLevel17,
-            capApplied: p17CapApplied,
+            rawVarianceDb: isNum(p17Data.rawVarianceDb) ? p17Data.rawVarianceDb : null,
+            uncappedLevel: level17,
+            capApplied: false,
             limiting: p17Data.limiting || null,
             beyondLimit: p17Data.beyondLimit || [],
             coverageLimitDeg: isNum(p17Data.coverageLimitDeg) ? p17Data.coverageLimitDeg : null,
@@ -1746,6 +1743,9 @@ export const useRP22AnalysisEngine = ({ placedSpeakers, seatingPositions, dimens
             value: null,
             formatted: "—",
             level: "—",
+            windows: null,
+            evidenceType: "missing",
+            cause: "missing_evidence",
             perSpeaker: [],
             p17HasNaAngles: false,
           };

@@ -1,9 +1,12 @@
 /**
  * P17SpeakerBreakdownTable.jsx
  * ----------------------------
- * READ-ONLY per-speaker P17 evidence for one seat: the speaker role, the seat angle
- * against the aimed acoustic axis, the same angle at the RSP, and the seat-versus-RSP
- * delta that P17 grades.
+ * READ-ONLY per-speaker P17 evidence for one seat: the speaker role, the seat's
+ * effective off-axis angle to that speaker, the coverage window that angle falls
+ * in, the model's L4 / L3 / L2 windows, and the cause.
+ *
+ * The raw seat-versus-RSP response delta is kept as the final diagnostic column.
+ * It never grades the seat — P17 is graded from the off-axis angle.
  *
  * Presentation only. It recomputes nothing, grades nothing and writes nothing;
  * evidence a record does not carry renders as "—" and is never inferred.
@@ -13,6 +16,7 @@
  */
 
 import React from "react";
+import { P17_WINDOW_CAUSE_LABEL } from "@/components/utils/rp22/p17CoverageWindows";
 
 const CELL = {
   padding: "3px 6px",
@@ -38,7 +42,19 @@ const fmt = (value, digits = 1) => {
   return v == null ? "—" : v.toFixed(digits);
 };
 
-const COLUMNS = ["Speaker", "Model", "Seat angle", "RSP angle", "Delta"];
+/** A coverage window as "≤24°". */
+const windowText = (value) => (
+  typeof value === "number" && Number.isFinite(value) ? `≤${Math.round(value)}°` : "—"
+);
+
+const CAUSE_TEXT = (speaker) => (
+  speaker.windowCause ? (P17_WINDOW_CAUSE_LABEL[speaker.windowCause] || "—") : "—"
+);
+
+const COLUMNS = [
+  "Speaker", "Model", "Effective off-axis angle", "Level",
+  "L4 / L3 / L2 windows", "Cause", "Raw Δ (diagnostic)",
+];
 
 export default function P17SpeakerBreakdownTable({ speakers = [], worstRole = null }) {
   if (!speakers.length) {
@@ -64,16 +80,15 @@ export default function P17SpeakerBreakdownTable({ speakers = [], worstRole = nu
                   {speaker.beyondLimit && <span style={{ marginLeft: 4, fontSize: 9, color: "#9B8E82" }}>beyond −3 dB window</span>}
                 </td>
                 <td style={{ ...CELL, color: "#9B8E82" }}>{speaker.model || "—"}</td>
-                <td style={{ ...CELL, ...NUM }}>{fmt(speaker.angleDeg)}</td>
-                <td style={{ ...CELL, ...NUM }}>{fmt(speaker.rspAngleDeg)}</td>
-                <td style={{
-                  ...CELL,
-                  ...NUM,
-                  fontWeight: isWorst ? 700 : 400,
-                  color: isWorst ? "#8B4A2B" : "#3E4349",
-                }}>
-                  {fmt(speaker.lossDb)}
+                <td style={{ ...CELL, ...NUM, fontWeight: isWorst ? 700 : 400 }}>
+                  {fmt(speaker.angleDeg)}{speaker.angleDeg != null ? "°" : ""}
                 </td>
+                <td style={{ ...CELL, ...NUM, fontWeight: 700, color: "#213428" }}>{speaker.windowLevel || "—"}</td>
+                <td style={{ ...CELL, ...NUM }}>
+                  {windowText(speaker.windows?.l4Deg)} · {windowText(speaker.windows?.l3Deg)} · {windowText(speaker.windows?.l2Deg)}
+                </td>
+                <td style={{ ...CELL }}>{CAUSE_TEXT(speaker)}</td>
+                <td style={{ ...CELL, ...NUM, color: "#9B8E82" }}>{fmt(speaker.lossDb)}</td>
               </tr>
             );
           })}
