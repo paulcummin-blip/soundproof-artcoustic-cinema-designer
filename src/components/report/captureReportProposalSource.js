@@ -42,7 +42,7 @@ export default function captureReportProposalSource({
       return { ...row, achieved_level: stated?.level, formatted_value: stated?.value };
     }) },
     report_parameters: parameters,
-    report_seat_results: engineeringSummary.project?.reportCounts?.seatResultsByParameter || {},
+    report_seat_results: (seatingPublication?.engineering_summary || engineeringSummary).project?.reportCounts?.seatResultsByParameter || {},
     viewing: seatingPublication?.engineering_summary?.viewing || snapshot.viewing,
     report_engineering_summary: seatingPublication?.engineering_summary || engineeringSummary,
     report_source_version: 1,
