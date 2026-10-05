@@ -20,7 +20,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useAuth } from '@/lib/AuthContext';
 import { base44 } from '@/api/base44Client';
 import captureReportProposalSource from './captureReportProposalSource';
-import { buildReportEvidence, readStoredEvidence } from './reportEvidenceAuthority';
+import { buildReportEvidence, readStoredEvidence, validateReportEvidence } from './reportEvidenceAuthority';
 import { buildParityRecord, checkReportEvidenceParity } from './reportEvidenceParity';
 import { loadReportSnapshot, saveReportSnapshot } from './reportSnapshotStore';
 import { fetchDurablePublication } from '@/components/engineering/versionedEngineeringAuthority';
@@ -149,6 +149,7 @@ export function useReportSnapshot({
         publishedFingerprint: version.published_fingerprint,
       });
       const captured = captureReportProposalSource({ projectId, versionId, ...reportSource,
+        seatingPublication: durableRead.publication,
         project: {
           ...definedOnly(reportSource?.app),
           ...definedOnly(reportSource?.project),
@@ -312,9 +313,11 @@ export function useReportSnapshot({
   // from the SAVED report itself, so a report whose parity check failed shows as
   // incomplete the moment it is opened — not only after a save in this session.
   const storedEvidence = readStoredEvidence(saved);
-  const evidenceIncompleteNow = storedEvidence
-    ? storedEvidence.proposal_ready !== true
-    : evidenceIncomplete;
+  const storedValidation = validateReportEvidence(storedEvidence, reportType, {
+    projectId, versionId, snapshotFingerprint: saved?.source_fingerprints?.engineeringFingerprint,
+    sourceFingerprint: currentFp.engineeringFingerprint,
+  });
+  const evidenceIncompleteNow = saved ? !storedValidation.complete : evidenceIncomplete;
 
   return {
     saved,
@@ -329,7 +332,7 @@ export function useReportSnapshot({
     // visible here — it is simply never proposal-ready.
     evidence: storedEvidence,
     evidenceIncomplete: evidenceIncompleteNow,
-    evidenceMismatches,
+    evidenceMismatches: [...evidenceMismatches, ...storedValidation.missing.map(field => ({ area: field + ' is missing' }))],
     // Set when the report could not be saved because the engineering assessment
     // has not been durably published for this version.
     publicationBlocked,
