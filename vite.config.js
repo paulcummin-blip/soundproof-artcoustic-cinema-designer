@@ -12,10 +12,10 @@ const pureEvidencePlugin = {
   enforce: 'pre',
   resolveId(id) {
     return pureEvidenceNames.some(name => id === 'virtual:soundproof-' + name)
-      ? '\\0' + id : null;
+      ? '\0' + id : null;
   },
   load(id) {
-    const name = pureEvidenceNames.find(name => id === '\\0virtual:soundproof-' + name);
+    const name = pureEvidenceNames.find(name => id === '\0virtual:soundproof-' + name);
     if (!name) return null;
     const filename = path.resolve('base44/shared', name + '.js');
     this.addWatchFile(filename);
