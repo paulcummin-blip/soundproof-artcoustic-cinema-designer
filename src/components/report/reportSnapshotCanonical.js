@@ -19,6 +19,8 @@
 // Payload and evidence generations, read from the payload itself. The values are
 // the authority's own generations — REPORT_SNAPSHOT_SCHEMA_VERSION and
 // REPORT_EVIDENCE_VERSION in reportSnapshotAuthority / proposalReadinessAuthority.
+import { validateReportEvidence } from '../../../base44/shared/reportEvidenceCompleteness.js';
+
 const SNAPSHOT_SCHEMA_VERSION = 1;
 const EVIDENCE_VERSION = 1;
 
@@ -36,7 +38,7 @@ export function reportRowEvidenceState(row) {
   const evidence = row?.payload?.reportEvidence;
   if (!evidence || typeof evidence !== 'object') return 'none';
   if (Number(evidence.evidence_version) !== EVIDENCE_VERSION) return 'none';
-  return evidence.proposal_ready === true ? 'ready' : 'incomplete';
+  return validateReportEvidence(evidence, row?.report_type || evidence.report_type).complete ? 'ready' : 'incomplete';
 }
 
 /**
