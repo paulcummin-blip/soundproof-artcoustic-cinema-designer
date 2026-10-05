@@ -276,7 +276,8 @@ export function resolveSavedReportCell({ saved = null, currentFingerprints = nul
     return buildReadinessCell({
       state: READINESS_STATE.INCOMPLETE,
       generatedAt: saved.generated_at || null,
-      reason: 'This report’s evidence does not match what the report shows. Regenerate it.',
+      reason: validateReportEvidence(saved.payload?.reportEvidence, saved.report_type).reason
+        || 'This report’s evidence does not match what the report shows. Regenerate it.',
     });
   }
   // The report exists and is current, but its evidence was never captured: it
