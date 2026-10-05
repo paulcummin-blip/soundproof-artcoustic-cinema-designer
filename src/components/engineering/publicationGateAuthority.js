@@ -68,14 +68,16 @@ export function auditDurablePublication({
     );
   }
 
-  if (!durable?.publication) {
+  if (!durable?.publication || !durable?.version?.published_fingerprint) {
     // Not published, or the version pointer references a publication that is not
     // there. Either way there is no authority to report from.
     const attemptReason = attempt?.status === 'failed'
       ? ` The saved assessment could not be written: ${attempt.message || 'the save did not complete.'}`
-      : (attempt?.status === 'publishing'
+      : (attempt?.status === 'not_ready' || attempt?.status === 'cancelled'
+        ? ` ${attempt.message || 'Assessment displayed, not published.'}`
+        : (attempt?.status === 'publishing'
         ? ' The assessment is still being saved — wait for it to finish, then generate the report.'
-        : '');
+        : ''));
     return block(
       durable?.status === 'stale' ? 'stale_pointer' : PUBLICATION_ACKNOWLEDGEMENT.NOT_PUBLISHED,
       [],
@@ -84,7 +86,7 @@ export function auditDurablePublication({
   }
 
   const audited = auditPublicationEntry(durable.publication, {
-    expectedFingerprint: durable?.version?.published_fingerprint || durable?.publication?.engineering_fingerprint || null,
+    expectedFingerprint: durable.version.published_fingerprint,
     project,
     bassAuthorityAvailable: authorityComplete === true,
   });
