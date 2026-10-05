@@ -63,7 +63,9 @@ import {
  */
 function publicationStatusOf(durable) {
   if (durable?.readState === 'failed') return PUBLICATION_STATUS.READ_FAILED;
-  if (durable?.publication) return PUBLICATION_STATUS.PUBLISHED;
+  if (durable?.publication && durable?.version?.published_fingerprint
+    && durable.publication.engineering_fingerprint === durable.version.published_fingerprint
+    && durable?.acknowledgement?.durably_published === true) return PUBLICATION_STATUS.PUBLISHED;
   if (durable?.status === 'stale') return PUBLICATION_STATUS.STALE;
   return PUBLICATION_STATUS.NOT_CALCULATED;
 }
