@@ -143,6 +143,8 @@ const title = { fontSize: 14, fontWeight: 700, color: "#1B1A1A" };
 const sub   = { fontSize: 12, color: "#625143", marginTop: 4 };
 const body  = { padding: "8px 12px 12px 12px" };
 const row   = { display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: 6 };
+/* Compact gap between the seat pills of a row and between the rows themselves. */
+const SEAT_ROW_GAP = 6;
 const keyTx = { fontSize: 12, color: "#3E4349" };
 
 const buildP16DebugText = (metric) => {
@@ -253,20 +255,29 @@ export default function RP22CompliancePanel({
     engineeringSummary?.seatHudById?.[seatId]?.rp22?.[paramKey] || null
   ), [engineeringSummary]);
 
+  /**
+   * Seat-scoped results as one compact centred row per seating row.
+   *
+   * The rows are centred on a shared centre line so the seating pattern reads at
+   * a glance — a four-seat row sits centred above a five-seat row. Seat order and
+   * the level each seat was graded at are presentation inputs only: nothing is
+   * re-ordered, re-graded or dropped, and a seat with no result keeps its
+   * placeholder pill.
+   */
   const renderSeatPillGridForParam = (pId) => {
     const rows = reportCounts.seatResultRowsByParameter?.[`p${Number(pId)}`] || [];
     if (!rows.length) return null;
     return (
-      <div style={{ display: "grid", gap: 6 }}>
+      <div style={{ display: "grid", gap: SEAT_ROW_GAP }}>
         {rows.map((rowObj) => (
           <div
             key={`row-${rowObj.row}`}
             style={{
-              display: "grid",
-              gridAutoFlow: "column",
-              gridAutoColumns: "min-content",
-              justifyContent: "end",
-              gap: 6,
+              display: "flex",
+              flexWrap: "nowrap",
+              justifyContent: "center",
+              alignItems: "center",
+              gap: SEAT_ROW_GAP,
             }}
           >
             {(rowObj.seats || []).map((seat) => (
@@ -277,6 +288,7 @@ export default function RP22CompliancePanel({
                   display: "inline-flex",
                   alignItems: "center",
                   justifyContent: "center",
+                  flex: "0 0 auto",
                   boxShadow: seat.isPrimary ? "0 0 0 2px rgba(33,52,40,0.10)" : "none",
                   borderRadius: 6,
                 }}
