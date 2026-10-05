@@ -572,6 +572,9 @@ function computeVerticalOffAxisDeg(speakerPos, seatPos, rspPos, earHeightM, mode
   // Use model-specific dispersion windows if available
   // For overheads: use MAX(horizontal, vertical) per threshold (forgiving approach)
   let lossDb;
+  // Model-specific −3 dB coverage half-window (degrees). Diagnostic exposure
+  // only: it never changes lossDb, the seat/RSP delta or the RP22 level.
+  let coverageLimitDeg = null;
   if (meta?.dispersion?.horizontal) {
     const dispH = meta.dispersion.horizontal;
     const dispV = meta.dispersion.vertical;
@@ -600,6 +603,7 @@ function computeVerticalOffAxisDeg(speakerPos, seatPos, rspPos, earHeightM, mode
     }
 
     if (minus1p5 != null && minus3 != null && minus5 != null) {
+      coverageLimitDeg = minus3;
       // Use averaged dispersion windows on effective angle
       if (effectiveAngleDeg <= minus1p5) lossDb = 1.5;
       else if (effectiveAngleDeg <= minus3) lossDb = 3.0;
@@ -636,6 +640,7 @@ function computeVerticalOffAxisDeg(speakerPos, seatPos, rspPos, earHeightM, mode
     offAxisDeg: effectiveAngleDeg,  // effective angle for P17 scoring
     rawAngleDeg: rawAngleDeg,       // geometric angle for display
     lossDb,
+    coverageLimitDeg,               // model −3 dB coverage half-window (diagnostic only)
     // Debug data — straight-down axis model
     debug: {
       modelKey,
@@ -884,6 +889,7 @@ function computeSurroundLikeHfLoss({ speaker, seat, mlpPos, earHeightM, modelMet
       offAxisDeg: offAxis,
       lossDb: Number(lossDb.toFixed(1)),
       isBeyondNonLcrLimit,
+      coverageLimitDeg: nonLcrLimit,  // model −3 dB coverage half-window (diagnostic only)
       debug: diagnosticDebug,
     };
   }
@@ -953,6 +959,9 @@ export function computeP17ForAllSeats({ seats, speakers, mlpPos, getSpeakerModel
     let worstRole = null;
     let worstAngleDeg = -Infinity;
     let worstLossDb = null;
+    // Diagnostic-only evidence (never feeds the value, the cap or the level).
+    let limitingEntry = null;
+    const beyondLimit = [];
     const perSpeaker = [];
     let p17HasNaAngles = false;
 
@@ -988,19 +997,27 @@ export function computeP17ForAllSeats({ seats, speakers, mlpPos, getSpeakerModel
         p17HasNaAngles = true;
       }
 
-      // Collect per-speaker data — lossDb is now the weighted delta
-      perSpeaker.push({
+      // Collect per-speaker data — lossDb is now the weighted delta.
+      // model / position / rspAngleDeg / coverageLimitDeg are read-only evidence
+      // exposed for diagnostics; none of them is used in the value or the level.
+      const speakerEntry = {
         role: resultAtSeat.role,
+        model: spk.model ?? null,
+        position: isFinitePos(spk.position) ? { x: spk.position.x, y: spk.position.y } : null,
         angleDeg: resultAtSeat.offAxisDeg,
         rawAngleDeg: resultAtSeat.rawAngleDeg ?? resultAtSeat.offAxisDeg,
+        rspAngleDeg: isNum(resultAtRsp?.offAxisDeg) ? Number(resultAtRsp.offAxisDeg.toFixed(1)) : null,
         lossDb: Number(delta.toFixed(1)),
         isBeyondNonLcrLimit,
+        coverageLimitDeg: isNum(resultAtSeat.coverageLimitDeg) ? Number(resultAtSeat.coverageLimitDeg.toFixed(1)) : null,
         debug: resultAtSeat.debug,
         lossAtSeat: Number(seatLoss.toFixed(1)),
         lossAtRsp: Number(rspLoss.toFixed(1)),
         normalizedDelta: Number(normalizedDelta.toFixed(1)),
         weightedDelta: Number(delta.toFixed(1)),
-      });
+      };
+      perSpeaker.push(speakerEntry);
+      if (isBeyondNonLcrLimit) beyondLimit.push(speakerEntry);
 
       // Track worst delta: highest delta; if tie, largest angle
       if (
@@ -1011,6 +1028,7 @@ export function computeP17ForAllSeats({ seats, speakers, mlpPos, getSpeakerModel
         worstRole = resultAtSeat.role;
         worstAngleDeg = resultAtSeat.offAxisDeg;
         worstLossDb = delta;
+        limitingEntry = speakerEntry;
       }
 
       // Store in debug if provided
@@ -1039,6 +1057,11 @@ export function computeP17ForAllSeats({ seats, speakers, mlpPos, getSpeakerModel
       worstLossDb: isNum(worstLossDb) ? Number(worstLossDb.toFixed(1)) : null,
       perSpeaker,
       p17HasNaAngles,
+      // ── Read-only diagnostic evidence (additive; no value/level effect) ──
+      rawVarianceDb: Number(Math.max(0, maxDelta).toFixed(2)),  // unfloored seat-vs-RSP variance
+      limiting: limitingEntry,                                   // the speaker that set the variance
+      beyondLimit,                                               // speakers beyond the −3 dB window
+      coverageLimitDeg: isNum(limitingEntry?.coverageLimitDeg) ? limitingEntry.coverageLimitDeg : null,
     };
   }
 

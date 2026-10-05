@@ -1706,11 +1706,19 @@ export const useRP22AnalysisEngine = ({ placedSpeakers, seatingPositions, dimens
         if (p17Data && isNum(p17Data.p17Db)) {
           const valueDb = p17Data.p17Db;
 
-          let level17 = numericRp22Level(levelP17_wsFR(valueDb));
+          // Grading is unchanged: the level from the seat-vs-RSP variance, then
+          // the existing −3 dB coverage cap at Level 2 when a speaker sits beyond
+          // its model's −3 dB window. The uncapped level and whether the cap was
+          // decisive are recorded as read-only diagnostics only.
+          const uncappedLevel17 = numericRp22Level(levelP17_wsFR(valueDb));
+          let level17 = uncappedLevel17;
+          let p17CapApplied = false;
 
           // If any speaker is beyond 41°, cap at Level 2.
           if (p17Data.p17HasNaAngles) {
-            level17 = Math.min(level17, 2);
+            const cappedLevel17 = Math.min(level17, 2);
+            p17CapApplied = cappedLevel17 !== level17;
+            level17 = cappedLevel17;
           }
 
           metrics.p17 = {
@@ -1722,6 +1730,13 @@ export const useRP22AnalysisEngine = ({ placedSpeakers, seatingPositions, dimens
             worstLossDb: p17Data.worstLossDb,
             perSpeaker: p17Data.perSpeaker || [],
             p17HasNaAngles: p17Data.p17HasNaAngles || false,
+            // ── Read-only diagnostic evidence (additive; never graded) ──
+            rawVarianceDb: isNum(p17Data.rawVarianceDb) ? p17Data.rawVarianceDb : valueDb,
+            uncappedLevel: uncappedLevel17,
+            capApplied: p17CapApplied,
+            limiting: p17Data.limiting || null,
+            beyondLimit: p17Data.beyondLimit || [],
+            coverageLimitDeg: isNum(p17Data.coverageLimitDeg) ? p17Data.coverageLimitDeg : null,
           };
           // ── TEMP DIAG: capture P17 level ──
           if (!_diag.p17.level) _diag.p17.level = level17;
