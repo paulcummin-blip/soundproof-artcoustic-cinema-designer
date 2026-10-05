@@ -272,11 +272,16 @@ export function resolveSavedReportCell({ saved = null, currentFingerprints = nul
   // The evidence is stored, but it does not agree with what the report shows —
   // or it is missing required facts. It may not be read until the report is
   // regenerated, and the report is never called Missing.
-  if ((evidenceState || resolveEvidenceState(saved)) === 'incomplete') {
+  const completeness = validateReportEvidence(saved.payload?.reportEvidence, saved.report_type, {
+    projectId: saved.project_id, versionId: saved.version_id,
+    snapshotFingerprint: saved.source_fingerprints?.engineeringFingerprint,
+    sourceFingerprint: currentFingerprints?.engineeringFingerprint,
+  });
+  if (saved.payload?.reportEvidence && !completeness.complete) {
     return buildReadinessCell({
       state: READINESS_STATE.INCOMPLETE,
       generatedAt: saved.generated_at || null,
-      reason: validateReportEvidence(saved.payload?.reportEvidence, saved.report_type).reason
+      reason: completeness.reason
         || 'This report’s evidence does not match what the report shows. Regenerate it.',
     });
   }
