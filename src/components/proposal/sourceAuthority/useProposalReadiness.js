@@ -95,11 +95,16 @@ function reportCell(saved, currentFingerprints) {
   // from it. A report whose evidence is stored but does not agree with what the
   // report shows may not be used: it is Incomplete, not Missing.
   const evidenceState = resolveEvidenceState(saved);
-  if (evidenceState === 'incomplete') {
+  const completeness = validateReportEvidence(saved.payload?.reportEvidence, saved.report_type, {
+    projectId: saved.project_id, versionId: saved.version_id,
+    snapshotFingerprint: saved.source_fingerprints?.engineeringFingerprint,
+    sourceFingerprint: currentFingerprints?.engineeringFingerprint,
+  });
+  if (saved.payload?.reportEvidence && !completeness.complete) {
     return buildReadinessCell({
       state: READINESS_STATE.INCOMPLETE,
       generatedAt: saved.generated_at,
-      reason: validateReportEvidence(saved.payload?.reportEvidence, saved.report_type).reason
+      reason: completeness.reason
         || 'This report’s evidence does not match what the report shows. Regenerate it.',
     });
   }
