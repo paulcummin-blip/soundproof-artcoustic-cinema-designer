@@ -19,7 +19,7 @@
 // Payload and evidence generations, read from the payload itself. The values are
 // the authority's own generations — REPORT_SNAPSHOT_SCHEMA_VERSION and
 // REPORT_EVIDENCE_VERSION in reportSnapshotAuthority / proposalReadinessAuthority.
-import { validateReportEvidence } from '../../../base44/shared/reportEvidenceCompleteness.js';
+import { validateReportEvidence } from '../../../shared/reportEvidenceCompleteness.js';
 
 const SNAPSHOT_SCHEMA_VERSION = 1;
 const EVIDENCE_VERSION = 1;
