@@ -164,7 +164,7 @@ export function resolveBassReadiness(completedBassAuthority, bassApplicable = fa
     return { ready: false, pending: false, reason: 'p14-capability-limited', fingerprint: currentFp };
   }
   if (status === BASS_AUTHORITY_STATUS.NOT_VERIFIED) {
-    return { ready: false, pending: true, reason: 'not-verified', fingerprint: currentFp };
+    return { ready: false, pending: true, reason: 'not-verified', detail: completedBassAuthority?.publicationRejectionReason || 'Bass metrics are not verified', fingerprint: currentFp };
   }
   if (status === BASS_AUTHORITY_STATUS.LOADING) {
     return { ready: false, pending: true, reason: 'loading', fingerprint: currentFp };
