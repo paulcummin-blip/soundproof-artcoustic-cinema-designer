@@ -92,6 +92,7 @@ function interpretScreen(project) {
     screen_wall: screenWall,
     mount_mode: mountMode,
     float_depth_m: floatDepthM,
+    front_plane_m: Number(project?.screen_front_plane_m ?? (mountMode === 'floating' ? floatDepthM : 0)),
     interpretation: `${sizeText} screen on ${screenWall} wall, ${mountMode === 'floating' ? 'floating mount' : 'baffle wall'} construction${heightFromFloor != null ? `, screen bottom at ${heightFromFloor.toFixed(2)}m from floor` : ''}.`,
   };
 }
