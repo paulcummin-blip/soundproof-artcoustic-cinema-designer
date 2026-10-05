@@ -28,9 +28,13 @@ const FINGERPRINTS = Object.freeze({
 });
 
 const readyEvidence = (fingerprint = FINGERPRINTS.engineeringFingerprint) => ({
-  evidence_version: 1,
-  proposal_ready: true,
-  identity: { source_fingerprint: fingerprint, engineering_fingerprint: fingerprint },
+  evidence_version: 1, report_type: 'technical', proposal_ready: true,
+  identity: { project_id: 'p1', version_id: 'v1', report_type: 'technical', source_fingerprint: fingerprint, engineering_fingerprint: fingerprint },
+  room: { length_m: 6, width_m: 5, height_m: 3 },
+  screen: { screen_type: 'Projection screen', format: '16:9', viewable_width_cm: 300 },
+  system: { products_selected: [{model:'Q8-5',quantity:3}] },
+  parameter_index: Object.fromEntries([12,13,14,18,19,20].map(id=>['P'+id,{level:'L3',value:'stated value'}])),
+  seating: {seats:1, per_seat:[{seat_id:'s1',row:1,column:1,priority:'primary',distance_m:3,horizontal_angle_deg:50}]},
 });
 
 const incompleteEvidence = () => ({
@@ -60,7 +64,7 @@ function row({
     source_fingerprints: { ...fingerprints },
     payload: {
       pages: [{ id: 'page-1' }],
-      ...(reportEvidence ? { reportEvidence } : {}),
+      ...(reportEvidence ? { reportEvidence: {...reportEvidence, report_type:type, identity:{...reportEvidence.identity, version_id:versionId, report_type:type}} } : {}),
     },
   };
 }
