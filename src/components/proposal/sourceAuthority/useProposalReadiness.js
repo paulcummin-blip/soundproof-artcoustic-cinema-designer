@@ -29,7 +29,7 @@
  */
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { validateReportEvidence } from '../../../../base44/shared/reportEvidenceCompleteness.js';
+import { validateReportEvidence } from '../../../../shared/reportEvidenceCompleteness.js';
 import { base44 } from '@/api/base44Client';
 import {
   buildDurableSnapshot,
