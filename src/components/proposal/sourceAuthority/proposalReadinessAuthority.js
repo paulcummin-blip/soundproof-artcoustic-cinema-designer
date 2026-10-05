@@ -194,18 +194,13 @@ export function resolveEngineeringCell({
   publicationStatus = PUBLICATION_STATUS.NOT_CALCULATED,
   calculationAuthority = null,
 } = {}) {
-  if (publication) {
+  if (publication && publicationStatus === PUBLICATION_STATUS.PUBLISHED) {
     return buildReadinessCell({
       state: READINESS_STATE.CURRENT,
       generatedAt: publication.published_at || null,
     });
   }
-  if (calculationAuthority?.fingerprint) {
-    return buildReadinessCell({
-      state: READINESS_STATE.CURRENT,
-      generatedAt: calculationAuthority.completedAt || null,
-    });
-  }
+  // A completed bass/calibration cache is not a full durable engineering publication.
   if (publicationStatus === PUBLICATION_STATUS.READ_FAILED) {
     return buildReadinessCell({ state: READINESS_STATE.UNAVAILABLE, reason: 'The saved engineering result could not be read.' });
   }
@@ -217,7 +212,7 @@ export function resolveEngineeringCell({
   }
   return buildReadinessCell({
     state: READINESS_STATE.MISSING,
-    reason: 'No saved engineering result was found for this version. Calculate this version in Room Designer.',
+    reason: 'Engineering assessment not saved. Assessment values may be displayed, but are not published. Verify bass and publish this version in Room Designer.',
   });
 }
 
