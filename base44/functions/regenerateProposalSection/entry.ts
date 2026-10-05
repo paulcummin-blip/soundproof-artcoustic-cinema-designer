@@ -4,6 +4,7 @@ import { resolveReportLayout, mentionsHighChannelCopyDefect, HIGH_CHANNEL_CLEANU
 import { COMPARISON_REPORT_INSTRUCTIONS, resolveSectionTitle } from '../../shared/systemDesignSummarySections.js';
 import { buildComparisonSectionRule } from '../../shared/comparisonStoryRule.js';
 import { buildProposalSalesVoice } from '../../shared/proposalSalesVoice.js';
+import { isCompleteComparisonTable, comparisonSectionMetadata, verifyComparisonPersisted, COMPARISON_REGENERATION_REQUIRED } from '../../shared/comparisonPersistence.js';
 import { formatVersionEvidenceForPrompt } from '../../shared/comparisonEvidence.js';
 import { formatComparisonTableForPrompt } from '../../shared/comparisonTable.js';
 import { buildEngineeringEvidence } from '../../shared/engineeringSnapshotEvidence.js';
@@ -87,7 +88,26 @@ export default async function(req) {
     // ── Load section ──
     const sections = await base44.entities.ProposalSection.filter({ id: section_id });
     const section = sections?.[0];
-    if (!section) return Response.json({ error: 'Section not found' }, { status: 404 });
+    if (!section || section.proposal_id !== proposal_id) return Response.json({ error: 'Section not found' }, { status: 404 });
+
+    // An explicit regeneration may restore missing historical metadata. Merely
+    // viewing a proposal never writes it. Fail closed without both versions.
+    let comparisonTable = proposal.metadata?.comparison_table;
+    let comparisonEvidence = proposal.metadata?.selected_versions || [];
+    if (proposal.proposal_type === 'comparison') {
+      if (!isCompleteComparisonTable(comparisonTable, proposal.selected_version_ids)) {
+        const response = await base44.functions.invoke('readProposalComparisonEvidence', { proposal_id });
+        comparisonTable = response?.data?.table;
+        comparisonEvidence = response?.data?.evidence || [];
+      }
+      if (!isCompleteComparisonTable(comparisonTable, proposal.selected_version_ids) || comparisonEvidence.length < 2) {
+        return Response.json({ error: COMPARISON_REGENERATION_REQUIRED }, { status: 409 });
+      }
+      await base44.entities.Proposal.update(proposal_id, { metadata: {
+        ...proposal.metadata, selected_versions: comparisonEvidence, comparison_table: comparisonTable,
+      } });
+      await verifyComparisonPersisted(base44, proposal_id, comparisonTable, comparisonEvidence);
+    }
 
     // ── Persist updated client_brief if provided ──
     if (typeof client_brief === 'string' && client_brief !== (proposal.client_brief || '')) {
@@ -128,13 +148,11 @@ export default async function(req) {
     // A comparison regenerates from the SAME frozen per-version evidence and
     // calculated table the report was generated from, so a refined section can
     // never drift to a single version's results.
-    const storedVersions = Array.isArray(proposal.metadata?.selected_versions)
-      ? proposal.metadata.selected_versions
-      : [];
+    const storedVersions = comparisonEvidence;
     const comparisonBlock = proposal.proposal_type === 'comparison' && storedVersions.length > 0
       ? [
         formatVersionEvidenceForPrompt(storedVersions),
-        formatComparisonTableForPrompt(proposal.metadata?.comparison_table || { rows: [], versions: [] }),
+        formatComparisonTableForPrompt(comparisonTable || { rows: [], versions: [] }),
       ].join('\n\n')
       : '';
 
@@ -231,9 +249,15 @@ export default async function(req) {
     // ── Update section ──
     await base44.entities.ProposalSection.update(section_id, {
       body: html,
+      ...(proposal.proposal_type === 'comparison' && section.section_type === 'key_performance_highlights'
+        ? { metadata: comparisonSectionMetadata(comparisonTable, section.metadata) } : {}),
       last_gpt_generated_at: new Date().toISOString(),
     });
 
+    if (proposal.proposal_type === 'comparison') {
+      await verifyComparisonPersisted(base44, proposal_id, comparisonTable, comparisonEvidence,
+        section.section_type === 'key_performance_highlights' ? section_id : null);
+    }
     return Response.json({ section_id, status: 'regenerated' });
   } catch (error) {
     return Response.json({ error: error.message }, { status: 500 });

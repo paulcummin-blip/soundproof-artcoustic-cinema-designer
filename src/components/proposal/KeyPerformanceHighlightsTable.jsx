@@ -101,7 +101,7 @@ export default function KeyPerformanceHighlightsTable({
     return (
       <div className={className}>
         <p className="text-[#8A8477]" style={proposalRoleStyle('body')}>
-          Comparison evidence could not be built for both selected versions. Regenerate the Visual and Technical Reports for each version, then try again.
+          Comparison evidence requires regeneration. Create a new comparison revision from both versions; the existing report is unchanged.
         </p>
       </div>
     );

@@ -1,20 +1,20 @@
 {
   "name": "Proposal",
   "type": "object",
-  "description": "A client-facing design report for a project, with frozen per-version comparison evidence.",
+  "description": "A client-facing design report with frozen per-version comparison evidence.",
   "properties": {
     "project_id": {
       "type": "string",
-      "description": "ID of the Project this proposal belongs to."
+      "description": "ID of the parent Project."
     },
     "account_id": {
       "type": "string",
-      "description": "Denormalized account_id from the parent Project, used for RLS."
+      "description": "Denormalized parent account for RLS."
     },
     "creation_request_id": {
       "type": "string",
       "nullable": true,
-      "description": "Client-generated idempotency key for creation or duplication. Never copied from a source proposal."
+      "description": "Creation idempotency key; never copied on duplication."
     },
     "proposal_type": {
       "type": "string",
@@ -31,12 +31,11 @@
         "type": "string"
       },
       "default": [],
-      "description": "Exact ProjectVersion IDs covered by this report."
+      "description": "Exact version IDs in comparison column order."
     },
     "version_id": {
       "type": "string",
-      "nullable": true,
-      "description": "Legacy first selected version ID."
+      "nullable": true
     },
     "title": {
       "type": "string",
@@ -85,7 +84,7 @@
     "client_brief": {
       "type": "string",
       "nullable": true,
-      "description": "Narrative emphasis only, never alters engineering results."
+      "description": "Narrative emphasis only, never changes engineering."
     },
     "narrative_brief": {
       "type": "string",
@@ -119,11 +118,11 @@
     "engineering_snapshot": {
       "type": "object",
       "nullable": true,
-      "description": "Frozen engineering evidence for the primary version. Never updated by later design edits."
+      "description": "Frozen primary engineering snapshot."
     },
     "metadata": {
       "type": "object",
-      "description": "Narrative settings and frozen comparison evidence. Comparison rows must survive storage and reload.",
+      "description": "Narrative settings and durable frozen comparison contract.",
       "properties": {
         "audience": {
           "type": "string",
@@ -182,6 +181,11 @@
                   },
                   "label": {
                     "type": "string"
+                  },
+                  "source_identity": {
+                    "type": "object",
+                    "additionalProperties": true,
+                    "description": "Frozen project/version identity and available source fingerprints; never inferred."
                   }
                 }
               }
@@ -209,6 +213,10 @@
                   "change": {
                     "type": "string",
                     "nullable": true
+                  },
+                  "client_meaning": {
+                    "type": "string",
+                    "description": "Evidence-scoped deterministic explanation."
                   }
                 }
               }

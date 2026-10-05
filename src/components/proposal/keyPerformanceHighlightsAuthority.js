@@ -387,7 +387,9 @@ export function changeCellText(row, optionCount) {
 }
 
 export function comparisonClientMeaning(row) {
+  if (row?.client_meaning) return row.client_meaning;
   const key = String(row?.key || '').trim();
+  if (key === 'p17' && row?.identical !== true) return 'A lower achieved level is a real trade-off in surround and overhead tonal consistency, even when output capability is higher.';
   const equipmentMeaning = { lcr: 'The screen-speaker specification sets front-stage capability.', surrounds: 'These speakers carry effects around the listening area.', overheads: 'These speakers carry the height layer.', subwoofers: 'The count and model change the bass system; output is compared in P14.', system_layout: 'The channel format defines the sound positions.' };
   if (equipmentMeaning[key]) return equipmentMeaning[key];
   if (key === 'p20') return 'Measured seat-to-seat variation; lower variation means less difference between seats.';

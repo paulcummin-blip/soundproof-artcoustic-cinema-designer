@@ -34,6 +34,7 @@
  */
 
 import { isDesignIndexRow } from './reportWritingStyleContract.js';
+import comparisonClientMeaning from './comparisonClientMeaning.js';
 
 export const COMPARISON_ROW_ORDER = Object.freeze([
   'screen_size',
@@ -240,6 +241,7 @@ export function buildComparisonTable(versions) {
     version_id: version.version_id || null,
     label: version.label || `Option ${String.fromCharCode(65 + position)}`,
     version_name: version.version_name || null,
+    source_identity: version.source_identity || {},
   }));
 
   // A comparison needs at least two versions with evidence to be a comparison.
@@ -281,7 +283,9 @@ export function buildComparisonTable(versions) {
 
   // The internal Design Index is never a client-facing row, whatever a stored
   // table carries.
-  return { rows: ordered.filter((row) => !isDesignIndexRow(row)), versions: columns };
+  return { rows: ordered.filter((row) => !isDesignIndexRow(row)).map(row => ({
+    ...row, client_meaning: comparisonClientMeaning(row),
+  })), versions: columns };
 }
 
 /**

@@ -3,6 +3,7 @@ import { buildWritingStyleContract } from '../../shared/reportWritingStyleContra
 import { SYSTEM_SUMMARY_SECTIONS, HIGHLIGHTS_SECTION_TYPE, getSystemSummarySectionPrompt, COMPARISON_REPORT_INSTRUCTIONS, resolveSectionTitle } from '../../shared/systemDesignSummarySections.js';
 import { buildComparisonSectionRule } from '../../shared/comparisonStoryRule.js';
 import { buildProposalSalesVoice } from '../../shared/proposalSalesVoice.js';
+import { comparisonSectionMetadata, verifyComparisonPersisted } from '../../shared/comparisonPersistence.js';
 import { buildSelectedVersionEvidence, formatVersionEvidenceForPrompt } from '../../shared/comparisonEvidence.js';
 import { buildComparisonTable, formatComparisonTableForPrompt, buildComparisonHighlightsPrompt, COMPARISON_HIGHLIGHTS_SCHEMA } from '../../shared/comparisonTable.js';
 import { buildEngineeringEvidence, selectHighlightRows, mergeHighlightRows, buildHighlightsPrompt, HIGHLIGHTS_JSON_SCHEMA } from '../../shared/engineeringSnapshotEvidence.js';
@@ -418,6 +419,11 @@ export default async function(req) {
       },
     });
 
+    // Read the persisted record, not the create response, before any writing.
+    if (resolvedType === 'comparison') {
+      await verifyComparisonPersisted(base44, proposal.id, comparisonTable, versionEvidence);
+    }
+
     // ── Create 10 ProposalSection records ──
     const sectionDefs = resolveSections(resolvedType);
     sectionRecords = await base44.entities.ProposalSection.bulkCreate(
@@ -430,6 +436,8 @@ export default async function(req) {
         // compares them, so it is never titled as a single system design.
         title: resolveSectionTitle(s.type, s.title, resolvedType),
         body: '',
+        ...(resolvedType === 'comparison' && s.type === HIGHLIGHTS_SECTION_TYPE
+          ? { metadata: comparisonSectionMetadata(comparisonTable) } : {}),
         dealer_notes: '',
         order_index: i,
         is_enabled: true,
@@ -536,11 +544,7 @@ export default async function(req) {
           html: intro,
           // The calculated table travels with the section: one column per
           // selected version, every value read from that version's evidence.
-          metadata: {
-            comparison: true,
-            comparison_versions: comparisonTable.versions,
-            comparison_rows: comparisonTable.rows,
-          },
+          metadata: comparisonSectionMetadata(comparisonTable),
           failed: result.status === 'rejected' || intro.length === 0,
         };
       }
@@ -577,6 +581,11 @@ export default async function(req) {
         last_gpt_generated_at: generatedAt,
       })
     ));
+
+    if (resolvedType === 'comparison') {
+      const highlights = sectionRecords.find(s => s.section_type === HIGHLIGHTS_SECTION_TYPE);
+      await verifyComparisonPersisted(base44, proposal.id, comparisonTable, versionEvidence, highlights?.id);
+    }
 
     // ── Update Proposal status ──
     await base44.entities.Proposal.update(proposal.id, { status: 'generated' });

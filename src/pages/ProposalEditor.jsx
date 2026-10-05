@@ -6,6 +6,8 @@ import KeyPerformanceHighlightsTable from '@/components/proposal/KeyPerformanceH
 import { compactViewingResult } from '@/components/proposal/print/snapshotViewingRows';
 import { getProposalTypeLabel } from '@/components/proposal/proposalTypes';
 import useRecoveredComparisonTable from '@/components/proposal/useRecoveredComparisonTable';
+import { resolveProposalComparison, isCompleteComparisonTable } from '@/components/proposal/comparisonDisplayAuthority';
+import ComparisonEvidenceState from '@/components/proposal/ComparisonEvidenceState';
 import InlineRichTextEditor from '@/components/proposal/InlineRichTextEditor';
 import SectionToolbar from '@/components/proposal/SectionToolbar';
 import DealerNotesPanel from '@/components/proposal/DealerNotesPanel';
@@ -630,15 +632,16 @@ export default function ProposalEditor() {
   // belongs to plainly named, so its name is read alongside the gallery.
   // A comparison saved before its comparison metadata was persisted recovers its
   // calculated table from each version's own frozen evidence, read-only.
-  const highlightsSection = sections.find((s) => s.section_type === 'key_performance_highlights');
-  const hasStoredComparison = (highlightsSection?.metadata?.comparison_rows?.length || 0) > 0;
-  const recoveredComparisonTable = useRecoveredComparisonTable({
-    proposal,
-    hasStoredTable: hasStoredComparison || !!proposal?.metadata?.comparison_table?.rows?.length,
-  });
-  const comparisonTableForDisplay = proposal?.metadata?.comparison_table?.rows?.length
-    ? proposal.metadata.comparison_table
-    : recoveredComparisonTable;
+  const storedComparison = resolveProposalComparison(proposal, sections);
+  const hasStoredComparison = isCompleteComparisonTable(storedComparison);
+  const recovery = useRecoveredComparisonTable({ proposal, hasStoredTable: hasStoredComparison });
+  const comparisonTableForDisplay = resolveProposalComparison(proposal, sections, recovery.table);
+  const comparisonBlocked = proposal?.proposal_type === 'comparison'
+    && !isCompleteComparisonTable(comparisonTableForDisplay);
+  const comparisonBlockReason = comparisonBlocked
+    ? (recovery.status === 'loading' ? 'Reading frozen comparison evidence for both versions…'
+      : 'Comparison evidence requires regeneration. Create a new comparison revision from both versions; the existing report is unchanged.')
+    : null;
 
   const [versionNameById, setVersionNameById] = useState(new Map());
   useEffect(() => {
@@ -693,6 +696,7 @@ export default function ProposalEditor() {
   } = useProposalExport({
     proposal,
     sections,
+    comparisonBlockReason,
     projectName: projectContext.projectName,
     dealerName: projectContext.filenameDealerName,
     clientName: projectContext.filenameClientName,
@@ -770,7 +774,7 @@ export default function ProposalEditor() {
         onToggleProperties={() => setShowProperties((prev) => !prev)}
         exporting={exporting}
         onExport={handleExport}
-        blockedReason={exportBlockedReason}
+        blockedReason={comparisonBlockReason || exportBlockedReason}
         error={exportError}
       />
 
@@ -996,11 +1000,12 @@ export default function ProposalEditor() {
                   </div>
                 )}
 
-                {section.section_type === 'key_performance_highlights' && (
-                  <KeyPerformanceHighlightsTable
+                {section.section_type === 'key_performance_highlights' && (comparisonBlocked
+                  ? <ComparisonEvidenceState loading={recovery.status === 'loading'} />
+                  : <KeyPerformanceHighlightsTable
                     rows={section.metadata?.highlight_rows}
-                    comparisonRows={section.metadata?.comparison_rows}
-                    comparisonVersions={section.metadata?.comparison_versions}
+                    comparisonRows={comparisonTableForDisplay.rows}
+                    comparisonVersions={comparisonTableForDisplay.versions}
                     comparisonExpected={proposal?.proposal_type === 'comparison'}
                     proposalComparisonTable={comparisonTableForDisplay}
                     viewingResult={compactViewingResult(proposal?.engineering_snapshot)}

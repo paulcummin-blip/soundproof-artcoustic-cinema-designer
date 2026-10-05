@@ -1,7 +1,7 @@
 {
   "name": "ProposalSection",
   "type": "object",
-  "description": "An editable content block within a client-facing design report. Sections retain frozen calculated table metadata independently of narrative edits.",
+  "description": "Editable narrative block with durable frozen calculated table metadata.",
   "properties": {
     "proposal_id": {
       "type": "string"
@@ -107,6 +107,11 @@
               },
               "label": {
                 "type": "string"
+              },
+              "source_identity": {
+                "type": "object",
+                "additionalProperties": true,
+                "description": "Frozen evidence identity and available fingerprints."
               }
             }
           }
@@ -134,6 +139,9 @@
               "change": {
                 "type": "string",
                 "nullable": true
+              },
+              "client_meaning": {
+                "type": "string"
               }
             }
           }

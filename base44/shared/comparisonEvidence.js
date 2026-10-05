@@ -81,6 +81,7 @@ export function buildVersionEvidence({
     version_name: versionName,
     label,
     project_identity: projectIdentity,
+    source_identity: { ...(snapshot?.identity || {}), versionId },
     available: false,
     reason: null,
   };

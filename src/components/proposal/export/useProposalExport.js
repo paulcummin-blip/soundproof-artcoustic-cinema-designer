@@ -48,7 +48,8 @@ function stripHtml(value) {
  * Resolve whether this proposal can be exported.
  * @returns {string|null} a blocking reason, or null when export is allowed
  */
-export function resolveProposalExportReadiness({ proposal, sections }) {
+export function resolveProposalExportReadiness({ proposal, sections, comparisonBlockReason = null }) {
+  if (comparisonBlockReason) return comparisonBlockReason;
   if (!proposal) {
     return 'This proposal could not be loaded. Reopen it from the Proposal Centre and try again.';
   }
@@ -71,6 +72,7 @@ export function resolveProposalExportReadiness({ proposal, sections }) {
 export function useProposalExport({
   proposal,
   sections,
+  comparisonBlockReason = null,
   projectName,
   // Optional filename segments: the shared helper omits them when unavailable.
   dealerName = null,
@@ -127,7 +129,7 @@ export function useProposalExport({
   const handleExport = useCallback(async () => {
     if (printingRef.current) return;
 
-    const reason = resolveProposalExportReadiness({ proposal, sections });
+    const reason = resolveProposalExportReadiness({ proposal, sections, comparisonBlockReason });
     if (reason) {
       setBlockedReason(reason);
       setError(null);
@@ -216,7 +218,7 @@ export function useProposalExport({
       );
       cleanup();
     }
-  }, [proposal, sections, projectName, dealerName, clientName, projectReference, versionNames, issuedDocument, cleanup]);
+  }, [proposal, sections, comparisonBlockReason, projectName, dealerName, clientName, projectReference, versionNames, issuedDocument, cleanup]);
 
   return { exporting, error, blockedReason, handleExport };
 }

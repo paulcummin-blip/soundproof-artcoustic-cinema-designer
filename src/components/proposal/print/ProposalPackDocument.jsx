@@ -19,7 +19,8 @@
  */
 
 import React from 'react';
-import { resolveComparisonDisplay } from '@/components/proposal/comparisonDisplayAuthority';
+import { resolveProposalComparison } from '@/components/proposal/comparisonDisplayAuthority';
+import ComparisonEvidenceState from '@/components/proposal/ComparisonEvidenceState';
 import ProposalCoverPage from '@/components/proposal/cover/ProposalCoverPage';
 import KeyPerformanceHighlightsTable from '@/components/proposal/KeyPerformanceHighlightsTable';
 import ProjectImagesBlock, { projectGalleryImages } from '@/components/proposal/ProjectImagesBlock';
@@ -88,20 +89,14 @@ export default function ProposalPackDocument({
   // A comparison covers several versions, so its at-a-glance page is built from
   // the same calculated comparison rows the Key Differences table prints: one
   // block per selected version, never one version standing in for them all.
-  const highlightsSection = byType.get('key_performance_highlights');
-  const storedComparisonTable = proposal?.metadata?.comparison_table?.rows?.length
-    ? proposal.metadata.comparison_table
-    : recoveredComparisonTable;
-  const comparisonDisplay = resolveComparisonDisplay(
-    highlightsSection?.metadata?.comparison_rows,
-    highlightsSection?.metadata?.comparison_versions,
-    storedComparisonTable,
-  );
+  const comparisonDisplay = resolveProposalComparison(proposal, sections, recoveredComparisonTable);
   const comparisonRows = reportType === 'comparison' ? comparisonDisplay.rows : null;
   const comparisonVersions = reportType === 'comparison' ? comparisonDisplay.versions : null;
   const hasComparisonGlance = Array.isArray(comparisonRows)
     && comparisonRows.length > 0
     && (Array.isArray(comparisonVersions) ? comparisonVersions : []).length >= 2;
+  // Never print a single active-version glance or a blank Key Differences page.
+  if (reportType === 'comparison' && !hasComparisonGlance) return <ComparisonEvidenceState />;
   const glance = isDesignedPack
     ? buildAtAGlance({ snapshot, projectName, projectReference, generatedDate })
     : { projectCards: [], roomCards: [], systemCards: [], packageRows: [] };
@@ -193,9 +188,7 @@ export default function ProposalPackDocument({
         // report generated before the table travelled with the section still
         // says so on the page rather than printing a heading over nothing.
         const isComparisonKind = proposal?.proposal_type === 'comparison';
-        const isComparison = isComparisonKind
-          && Array.isArray(section.metadata?.comparison_rows)
-          && section.metadata.comparison_rows.length > 0;
+        const isComparison = isComparisonKind && hasComparisonGlance;
         // The heading, the table header, every row and the footnote are one
         // indivisible printed block on one page. The section carries no
         // introduction of its own: the table is self-explanatory, and an
