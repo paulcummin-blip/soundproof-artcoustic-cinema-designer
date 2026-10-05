@@ -20,8 +20,8 @@
 
 import { REPORT_SNAPSHOT_TYPE, reportTypeLabel } from './reportSnapshotAuthority';
 import { PRODUCTS_SELECTED_ROWS } from './reportProductsSelected';
-import { validateReportEvidence as validateCompleteness } from '../../../base44/shared/reportEvidenceCompleteness.js';
-import { buildReportSeating } from '../../../base44/shared/reportEvidenceSeating.js';
+import { validateReportEvidence as validateCompleteness } from '../../../shared/reportEvidenceCompleteness.js';
+import { buildReportSeating } from '../../../shared/reportEvidenceSeating.js';
 
 export const REPORT_EVIDENCE_VERSION = 1;
 
