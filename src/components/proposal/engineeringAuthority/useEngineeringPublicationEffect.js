@@ -136,6 +136,7 @@ export function useEngineeringPublicationEffect({
   // A new summary object on render is not a changed assessment. Debounce only
   // semantic changes; acknowledgement-store renders must not cancel their own write.
   const summaryKey = JSON.stringify(engineeringSummary);
+  const publicationKey = `${projectId}::${versionId}::${engineeringFingerprint}`;
   useEffect(() => {
     // Clear any pending debounce on input change
     if (debounceTimerRef.current) {
@@ -168,7 +169,7 @@ export function useEngineeringPublicationEffect({
     // Idempotency: skip if we already published this exact fingerprint
     // in this session (the backend is also idempotent, but this avoids
     // redundant network calls).
-    if (lastPublishedFingerprintRef.current === engineeringFingerprint) {
+    if (lastPublishedFingerprintRef.current === publicationKey) {
       return;
     }
 
@@ -212,7 +213,7 @@ export function useEngineeringPublicationEffect({
         const body = response?.data || response || {};
         const acknowledgement = body.acknowledgement || null;
         if (acknowledgement?.durably_published === true) {
-          lastPublishedFingerprintRef.current = engineeringFingerprint;
+          lastPublishedFingerprintRef.current = publicationKey;
           recordPublicationAttempt(projectId, versionId, {
             status: PUBLICATION_ATTEMPT.ACKNOWLEDGED,
             fingerprint: engineeringFingerprint,
