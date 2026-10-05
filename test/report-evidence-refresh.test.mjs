@@ -90,7 +90,7 @@ const capture = ({
     available: true,
     summary: 'Level 4 viewing',
     primary_floor: 'Level 4',
-    per_seat: [{ seatId: 'r1c1', row: 1, label: 'Row 1 seat 1', distance_m: 3.2, horizontal_angle_deg: 0, vertical_angle_deg: 0, level: 'Level 4' }],
+    per_seat: [{ seatId: 'r1c1', row: 1, label: 'Row 1 seat 1', distance_m: 3.2, horizontal_angle_deg: 0, vertical_angle_deg: 0, level: 'Level 4' }, { seatId: 'r1c2', row: 1, distance_m: 3.2, horizontal_angle_deg: 0, vertical_angle_deg: 0, level: 'Level 4' }],
   },
   system: {
     configuration: { dolby_config: '9.4.6', text: '9.4.6 Dolby Atmos' },
@@ -214,8 +214,8 @@ test('C2. a report whose capture states no room is refused, never filled in', ()
   const parity = checkReportEvidenceParity({ evidence, captured, reportType: REPORT_SNAPSHOT_TYPE.VISUAL });
 
   assert.equal(parity.passed, false);
-  assert.ok(parity.missing.includes('room'), 'the missing room is named');
-  assert.ok(parity.missing.includes('screen'), 'the missing screen is named');
+  assert.ok(parity.missing.includes('room.length_m'), 'the missing room is named');
+  assert.ok(parity.missing.includes('screen.screen_type'), 'the missing screen is named');
 });
 
 /* ── D. One frozen authority fingerprint, stated in all three places ────────── */
