@@ -20,6 +20,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useAuth } from '@/lib/AuthContext';
 import { base44 } from '@/api/base44Client';
 import captureReportProposalSource from './captureReportProposalSource';
+import { buildReportEvidence, readStoredEvidence } from './reportEvidenceAuthority';
+import { buildParityRecord, checkReportEvidenceParity } from './reportEvidenceParity';
 import { loadReportSnapshot, saveReportSnapshot } from './reportSnapshotStore';
 import {
   REPORT_SNAPSHOT_STATUS,
