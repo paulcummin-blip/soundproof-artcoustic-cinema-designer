@@ -13,6 +13,10 @@ import { computeMeasuredP17Response } from "@/components/utils/rp22/measuredP17E
 import { validatePolarModel } from "@/components/utils/rp22/polarModelValidation";
 import { levelP17_wsFR, numericRp22Level } from "@/components/utils/rp22/levels";
 import { resolveRp22DesignValue } from "@/components/utils/rp22/resolveRp22DesignValue";
+// P17 DESIGN-GUIDE COVERAGE WINDOWS — the single source of the 1.5 / 3 / 4 dB
+// windows a seat's effective off-axis angle is graded against. Measured polar
+// data derives the windows only; it is never the seat's P17 dB score.
+import { resolveP17Windows, gradeOffAxisAngle } from "@/components/utils/rp22/p17CoverageWindows";
 
 // P16/P17 RSP-normalisation logic version. Bumped when the seat-vs-RSP delta
 // construction changes (e.g. removal of the absolute-loss offset term). This
@@ -21,7 +25,9 @@ import { resolveRp22DesignValue } from "@/components/utils/rp22/resolveRp22Desig
 // and after a normalisation correction. NOT a bass contract version.
 // v1 = legacy delta = abs(seatLoss - rspLoss) + (seatLoss * 0.5)
 // v2 = corrected delta = abs(seatLoss - rspLoss)  (RSP is true zero reference)
-export const P16_P17_NORMALISATION_VERSION = 2;
+// v3 = P17 grades by off-axis coverage windows (design guide); the seat-versus-RSP
+//      delta survives as a read-only diagnostic and no longer grades the seat.
+export const P16_P17_NORMALISATION_VERSION = 3;
 
 const LCR_ROLES = new Set(["FL", "L", "FC", "C", "FR", "R"]);
 const OVERHEAD_ROLES = new Set(["TFL", "TFR", "TL", "TR", "TML", "TMR", "TBL", "TBR", "TFC", "TBC", "TRL", "TRR"]);
@@ -674,6 +680,20 @@ function computeVerticalOffAxisDeg(speakerPos, seatPos, rspPos, earHeightM, mode
   };
 }
 
+/**
+ * P17 DESIGN GUIDE — grade one speaker's effective off-axis angle at a seat
+ * against that model's coverage windows (measured-derived when its polar dataset
+ * is complete, otherwise its declared/estimated windows).
+ *
+ * Returns the windows, the grade (L4 within 1.5 dB … L1 outside usable coverage)
+ * and the plain-language cause. Nothing else is inferred.
+ */
+function gradeSpeakerCoverage({ role, modelKey, modelMeta, offAxisDeg }) {
+  const overhead = isOverheadRole(role);
+  const windows = resolveP17Windows(modelKey, modelMeta, { overhead });
+  return gradeOffAxisAngle(offAxisDeg, windows);
+}
+
 // CRITICAL: Single source of truth for effective yaw — delegates to resolveSpeakerYaw.
 // Both plan-view (getPlanAimDeg) and P17 (computeSurroundLikeHfLoss) call this path,
 // guaranteeing identical aim for the same speaker object.
@@ -761,6 +781,10 @@ function computeSurroundLikeHfLoss({ speaker, seat, mlpPos, earHeightM, modelMet
     if (!measured.missingMeasuredData) {
       // offAxisDeg/rawAngleDeg for HUD + scoring: total 3D off-axis from the AIMED axis.
       const totalOff = frame ? aimedAxisOffAxisDeg(frame, seatVec3) : 0;
+      // P17 DESIGN GUIDE: the measured polar data supplies this model's coverage
+      // windows only. The seat is graded by its effective angle against them — the
+      // raw polar deviation is kept below as read-only diagnostics and never grades.
+      const coverage = gradeSpeakerCoverage({ role, modelKey: speaker.model, modelMeta, offAxisDeg: totalOff });
       return {
         role,
         offAxisDeg: quantiseAngleDown(totalOff, 0.5),
@@ -768,6 +792,7 @@ function computeSurroundLikeHfLoss({ speaker, seat, mlpPos, earHeightM, modelMet
         lossDb: isNum(measured.maximumDeviationDb) ? Number(measured.maximumDeviationDb.toFixed(1)) : 0,
         measured: true,
         measuredDiagnostics: measured,
+        ...coverage,
       };
     }
     // Missing measured data at this angle: fall through to the estimated path below.
@@ -792,12 +817,22 @@ function computeSurroundLikeHfLoss({ speaker, seat, mlpPos, earHeightM, modelMet
       return null;
     }
 
+    // P17 DESIGN GUIDE: graded by the effective angle against this model's windows
+    // (measured-derived where the model has a complete polar dataset, else declared).
+    const coverage = gradeSpeakerCoverage({
+      role,
+      modelKey: speaker.model,
+      modelMeta,
+      offAxisDeg: vert.offAxisDeg,
+    });
+
     return {
       role,
       offAxisDeg: quantiseAngleDown(vert.offAxisDeg, 0.5), // for scoring
       rawAngleDeg: quantiseAngleDown((vert.rawAngleDeg ?? vert.offAxisDeg), 0.5), // for display
       lossDb: Number(vert.lossDb.toFixed(1)),
       debug: vert.debug, // Pass through debug data
+      ...coverage,
     };
   } 
   // Bed-layer surrounds/wides: use physical wall-normal as the reference axis
@@ -883,6 +918,10 @@ function computeSurroundLikeHfLoss({ speaker, seat, mlpPos, earHeightM, modelMet
       canonRoleUsed: role,
     } : undefined;
 
+    // P17 DESIGN GUIDE: bed-layer channels are graded on the horizontal plane
+    // against this model's horizontal coverage windows.
+    const coverage = gradeSpeakerCoverage({ role, modelKey: speaker.model, modelMeta: meta, offAxisDeg: effectiveAngleDeg });
+
     return {
       role,
       angleDeg: offAxis, // CRITICAL: must be quantised value for HUD display
@@ -891,6 +930,7 @@ function computeSurroundLikeHfLoss({ speaker, seat, mlpPos, earHeightM, modelMet
       isBeyondNonLcrLimit,
       coverageLimitDeg: nonLcrLimit,  // model −3 dB coverage half-window (diagnostic only)
       debug: diagnosticDebug,
+      ...coverage,
     };
   }
 }
@@ -955,12 +995,21 @@ export function computeP17ForAllSeats({ seats, speakers, mlpPos, getSpeakerModel
         ? seat.earHeightM
         : (Number(seatPos.z) && Number.isFinite(seatPos.z) ? seatPos.z : 1.2);
 
+    // Legacy seat-versus-RSP variance — read-only diagnostics, never graded.
     let maxDelta = -Infinity;
+    let limitingEntry = null;
+    // P17 DESIGN GUIDE — the seat's grade is the BEST coverage window any
+    // surround/upper channel achieves at this seat: the channel that serves the
+    // seat decides it. A channel pointing away from the seat is not the seat's
+    // coverage provider, so it may not decide the grade; it is still reported as
+    // per-speaker evidence.
+    let bestLevelNumber = -Infinity;
     let worstRole = null;
     let worstAngleDeg = -Infinity;
     let worstLossDb = null;
-    // Diagnostic-only evidence (never feeds the value, the cap or the level).
-    let limitingEntry = null;
+    let worstWindows = null;
+    let worstEvidenceType = null;
+    let worstCause = null;
     const beyondLimit = [];
     const perSpeaker = [];
     let p17HasNaAngles = false;
@@ -1010,6 +1059,13 @@ export function computeP17ForAllSeats({ seats, speakers, mlpPos, getSpeakerModel
         lossDb: Number(delta.toFixed(1)),
         isBeyondNonLcrLimit,
         coverageLimitDeg: isNum(resultAtSeat.coverageLimitDeg) ? Number(resultAtSeat.coverageLimitDeg.toFixed(1)) : null,
+        // ── P17 design-guide evidence for this speaker at this seat ──
+        windowDb: isNum(resultAtSeat.windowDb) ? Number(resultAtSeat.windowDb.toFixed(1)) : null,
+        windowLevel: resultAtSeat.windowLevel ?? null,
+        windowLevelNumber: isNum(resultAtSeat.windowLevelNumber) ? resultAtSeat.windowLevelNumber : null,
+        windows: resultAtSeat.windows ?? null,
+        evidenceType: resultAtSeat.evidenceType ?? null,
+        cause: resultAtSeat.windowCause ?? null,
         debug: resultAtSeat.debug,
         lossAtSeat: Number(seatLoss.toFixed(1)),
         lossAtRsp: Number(rspLoss.toFixed(1)),
@@ -1019,16 +1075,27 @@ export function computeP17ForAllSeats({ seats, speakers, mlpPos, getSpeakerModel
       perSpeaker.push(speakerEntry);
       if (isBeyondNonLcrLimit) beyondLimit.push(speakerEntry);
 
-      // Track worst delta: highest delta; if tie, largest angle
-      if (
-        delta > maxDelta ||
-        (delta === maxDelta && resultAtSeat.offAxisDeg > worstAngleDeg)
-      ) {
+      // Legacy diagnostics: the speaker with the largest seat-versus-RSP deviation.
+      if (delta > maxDelta) {
         maxDelta = delta;
-        worstRole = resultAtSeat.role;
-        worstAngleDeg = resultAtSeat.offAxisDeg;
-        worstLossDb = delta;
         limitingEntry = speakerEntry;
+      }
+
+      // P17 design guide: keep the best-covered channel. Ties break to the largest
+      // angle — the channel closest to its window edge, which is the actionable one.
+      const levelNumber = isNum(resultAtSeat.windowLevelNumber) ? resultAtSeat.windowLevelNumber : null;
+      if (levelNumber != null) {
+        const isBetterLevel = levelNumber > bestLevelNumber
+          || (levelNumber === bestLevelNumber && resultAtSeat.offAxisDeg > worstAngleDeg);
+        if (isBetterLevel) {
+          bestLevelNumber = levelNumber;
+          worstRole = resultAtSeat.role;
+          worstAngleDeg = resultAtSeat.offAxisDeg;
+          worstLossDb = isNum(resultAtSeat.windowDb) ? Number(resultAtSeat.windowDb.toFixed(1)) : null;
+          worstWindows = resultAtSeat.windows ?? null;
+          worstEvidenceType = resultAtSeat.evidenceType ?? null;
+          worstCause = resultAtSeat.windowCause ?? null;
+        }
       }
 
       // Store in debug if provided
@@ -1044,24 +1111,30 @@ export function computeP17ForAllSeats({ seats, speakers, mlpPos, getSpeakerModel
       }
     }
 
-    // Guard: if no valid speakers processed, return null for this seat
-    if (maxDelta === -Infinity) {
+    // Guard: no surround/upper channel could be graded at this seat
+    if (!worstRole || !isNum(bestLevelNumber) || bestLevelNumber === -Infinity) {
       perSeat[seatId] = null;
       continue;
     }
 
     perSeat[seatId] = {
-      p17Db: resolveRp22DesignValue(17, Math.max(0, maxDelta)),  // 0.5 dB design floor
-      worstRole,
+      // ── P17 DESIGN-GUIDE RESULT (this is what grades the seat) ──
+      p17Db: worstLossDb,                        // dB the decided coverage window represents
+      windowLevel: `L${bestLevelNumber}`,
+      windowLevelNumber: bestLevelNumber,
+      windows: worstWindows,                     // the deciding channel's L4 / L3 / L2 windows
+      evidenceType: worstEvidenceType,           // measured-derived | estimated
+      cause: worstCause,                         // within_l4_window … outside_usable_window
+      worstRole,                                 // the channel that decided this seat's grade
       worstAngleDeg: isNum(worstAngleDeg) ? Number(worstAngleDeg.toFixed(1)) : null,
       worstLossDb: isNum(worstLossDb) ? Number(worstLossDb.toFixed(1)) : null,
       perSpeaker,
       p17HasNaAngles,
-      // ── Read-only diagnostic evidence (additive; no value/level effect) ──
-      rawVarianceDb: Number(Math.max(0, maxDelta).toFixed(2)),  // unfloored seat-vs-RSP variance
-      limiting: limitingEntry,                                   // the speaker that set the variance
-      beyondLimit,                                               // speakers beyond the −3 dB window
-      coverageLimitDeg: isNum(limitingEntry?.coverageLimitDeg) ? limitingEntry.coverageLimitDeg : null,
+      // ── Read-only legacy diagnostics (never graded) ──
+      rawVarianceDb: maxDelta === -Infinity ? null : Number(Math.max(0, maxDelta).toFixed(2)),
+      limiting: limitingEntry,                                   // speaker with the largest seat-vs-RSP deviation
+      beyondLimit,                                               // speakers beyond their −3 dB window
+      coverageLimitDeg: isNum(worstWindows?.l3Deg) ? Number(worstWindows.l3Deg.toFixed(1)) : null,
     };
   }
 
