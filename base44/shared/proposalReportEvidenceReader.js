@@ -186,39 +186,220 @@ export function buildEvidenceCitation({ technicalEvidence, visualEvidence, techn
   };
 }
 
-/**
- * The Visual Report's frozen room, seating and viewing — the same values its
- * report renders. They are checked against the evidence's own statement of the
- * same facts, so a proposal can never be generated from two disagreeing
- * statements of one version's geometry.
- */
-function visualFrozenSource(visualRow) {
-  return visualRow.payload?.proposalSource || {};
+/* ── The snapshot a proposal reads: reportEvidence, and nothing else ───────
+   Every fact below comes from reportEvidence. A fact the evidence does not
+   state is a block that names it — never a value taken from the report's frozen
+   source, from the live project, or from another report. proposalSource is
+   never read for a fact: it is only an input to the one-time legacy backfill
+   that writes reportEvidence, which happens once, when the report is opened. */
+
+function pick(...values) {
+  return values.find((value) => value !== null && value !== undefined && value !== '') ?? null;
 }
 
-function assertEvidenceAgreesWithFrozen({ visualEvidence, visualRow, version }) {
-  const source = visualFrozenSource(visualRow);
-  const statedSeats = Array.isArray(visualEvidence.seating?.per_seat) ? visualEvidence.seating.per_seat : [];
-  const frozenSeats = Array.isArray(source.viewing?.per_seat) ? source.viewing.per_seat : [];
-  if (frozenSeats.length > 0 && statedSeats.length !== frozenSeats.length) {
-    throw new Error(
-      `${version.version_name}: incomplete Visual Report evidence. Its stored evidence and its own `
-      + `viewing values disagree. Regenerate the Visual Report for this version, then try again.`,
-    );
-  }
-  const statedDims = visualEvidence.room || {};
-  const frozenDims = source.room?.dimensions || {};
-  const differs = ['length_m', 'width_m', 'height_m'].some((key) => (
-    frozenDims[key] != null && statedDims[key] != null
-    && Math.abs(Number(frozenDims[key]) - Number(statedDims[key])) > 0.02
-  ));
-  if (differs) {
-    throw new Error(
-      `${version.version_name}: incomplete Visual Report evidence. Its stored evidence and its own `
-      + `room dimensions disagree. Regenerate the Visual Report for this version, then try again.`,
-    );
-  }
+function incompleteFact({ version, type, field }) {
+  const name = version.version_name || version.id;
+  return new Error(
+    `${name}: incomplete ${type} Report evidence — ${field} is missing. `
+    + `Regenerate the ${type} Report for this version, then try again.`,
+  );
 }
+
+function requireFact(value, { version, type, field }) {
+  if (value === null || value === undefined || value === '') throw incompleteFact({ version, type, field });
+  return value;
+}
+
+/** The room, screen and seating the Visual Report states, as a proposal reads them. */
+function geometryFromEvidence(visualEvidence, technicalEvidence, version) {
+  const room = visualEvidence.room || technicalEvidence.room || {};
+  const screen = visualEvidence.screen || technicalEvidence.screen || {};
+  const seating = visualEvidence.seating || technicalEvidence.seating || {};
+
+  for (const key of ['length_m', 'width_m', 'height_m']) {
+    requireFact(room[key], { version, type: 'Visual', field: `room.${key}` });
+  }
+  requireFact(screen.format, { version, type: 'Visual', field: 'screen.format' });
+  requireFact(
+    pick(screen.viewable_diagonal_in, screen.viewable_width_cm),
+    { version, type: 'Visual', field: 'screen.size' },
+  );
+
+  const stated = Array.isArray(seating.per_seat) ? seating.per_seat : [];
+  if (stated.length === 0) throw incompleteFact({ version, type: 'Visual', field: 'seating.per_seat' });
+
+  const perSeat = stated.map((entry, index) => {
+    const row = requireFact(entry?.row, { version, type: 'Visual', field: `seating.per_seat[${index}].row` });
+    return {
+      seatId: pick(entry?.seat_id, `row-${row}-${index + 1}`),
+      label: asText(entry?.seat_label) || null,
+      row,
+      distance_m: requireFact(entry?.distance_m, { version, type: 'Visual', field: `seating.per_seat[${index}].distance_m` }),
+      horizontal_angle_deg: requireFact(entry?.horizontal_angle_deg, { version, type: 'Visual', field: `seating.per_seat[${index}].horizontal_angle_deg` }),
+      vertical_angle_deg: entry?.vertical_angle_deg ?? null,
+      level: asText(entry?.rp23_level) || null,
+    };
+  });
+
+  const seats = [];
+  for (const seat of perSeat) {
+    if (!seats.some((existing) => existing.id === seat.seatId)) seats.push({ id: seat.seatId, row: seat.row });
+  }
+  return { room, screen, seating, perSeat, seats };
+}
+
+/** The system, RP22 and bass facts the Technical Report states. */
+function engineeringFromEvidence(technicalEvidence) {
+  const system = technicalEvidence.system || {};
+  const facts = technicalEvidence.report_facts || {};
+  const bass = technicalEvidence.bass || {};
+  const parameters = parametersFromEvidence(technicalEvidence);
+  return {
+    system,
+    facts,
+    bass,
+    parameters,
+    products: productsFromEvidence(technicalEvidence),
+    // The report's own parameter rows, in the shape the RP22 evidence rules read.
+    headlines: parameters.map((entry) => ({
+      parameter_id: entry.parameter_id,
+      title: entry.title,
+      category: entry.area,
+      level: entry.level,
+      value: entry.value,
+      text: entry.text,
+      achieved_level: entry.level,
+      formatted_value: entry.value,
+    })),
+  };
+}
+
+/**
+ * The whole report-evidence snapshot: assembled from the two saved reports'
+ * evidence alone, in the shape every proposal consumer already reads.
+ */
+function buildSnapshot({ version, projectId, technicalEvidence, visualEvidence, technicalRow, visualRow, citation }) {
+  const geometry = geometryFromEvidence(visualEvidence, technicalEvidence, version);
+  const engineering = engineeringFromEvidence(technicalEvidence);
+  const visualFacts = visualEvidence.report_facts || {};
+  const roomFacts = visualFacts.room || engineering.facts.room || {};
+  const screenFacts = visualFacts.screen || engineering.facts.screen || {};
+  const seatingFacts = visualFacts.seating || engineering.facts.seating || {};
+  const viewFacts = visualFacts.viewing || engineering.facts.viewing || {};
+  const systemFacts = engineering.facts.system || visualFacts.system || {};
+  const rp22Facts = engineering.facts.rp22 || visualFacts.rp22 || {};
+  const bassFacts = engineering.facts.bass || visualFacts.bass || {};
+  const identity = technicalEvidence.identity || visualEvidence.identity || {};
+  const channelLayout = systemFacts.channel_layout || {};
+  const configurationText = systemFacts.configuration?.configuration_text
+    || channelLayout.configuration_text || null;
+  const rowCount = new Set(geometry.seats.map((seat) => seat.row)).size;
+
+  return {
+    available: true,
+    identity: {
+      projectId,
+      versionId: version.id,
+      project_name: identity.project_name || null,
+      client_name: identity.client_name || null,
+      project_reference: identity.project_reference || null,
+      dealer_name: identity.dealer_name || null,
+      engineeringFingerprint: identity.source_fingerprint || null,
+      generatedAt: identity.generated_at || null,
+      technicalReportId: technicalRow?.id || null,
+      visualReportId: visualRow?.id || null,
+      technicalEvidenceFingerprint: technicalEvidence.evidence_fingerprint || null,
+      visualEvidenceFingerprint: visualEvidence.evidence_fingerprint || null,
+    },
+    project: {
+      name: identity.project_name || null,
+      client_name: identity.client_name || null,
+      project_reference: identity.project_reference || null,
+    },
+    dealer: { company_name: identity.dealer_name || null },
+    version: { id: version.id, name: version.version_name },
+    room: {
+      dimensions: {
+        length_m: geometry.room.length_m,
+        width_m: geometry.room.width_m,
+        height_m: geometry.room.height_m,
+      },
+      volume_m3: geometry.room.volume_m3 ?? null,
+      dimensions_text: asText(roomFacts.dimensions_text) || null,
+      classification: roomFacts.classification ?? null,
+      interpretation: asText(roomFacts.interpretation) || null,
+      screen: {
+        size_inches: geometry.screen.viewable_diagonal_in ?? null,
+        aspect_ratio: geometry.screen.format || null,
+        manual_dimensions: screenFacts.manual_dimensions === true,
+        manual_width_m: screenFacts.manual_width_m ?? null,
+        manual_height_m: screenFacts.manual_height_m ?? null,
+        interpretation: asText(screenFacts.interpretation) || null,
+        viewable_width_cm: geometry.screen.viewable_width_cm ?? null,
+        viewable_height_cm: geometry.screen.viewable_height_cm ?? null,
+        screen_type: geometry.screen.screen_type || null,
+      },
+      seating: {
+        interpretation: asText(seatingFacts.interpretation) || null,
+        seat_count: geometry.seats.length,
+        row_count: rowCount,
+      },
+      rsp: geometry.seating.rsp || null,
+      acoustic_treatment: roomFacts.acoustic_treatment ?? null,
+    },
+    seats: geometry.seats,
+    viewing: {
+      available: viewFacts.available !== false && geometry.perSeat.length > 0,
+      summary: asText(viewFacts.summary) || null,
+      primary_floor: asText(viewFacts.primary_floor) || null,
+      per_seat: geometry.perSeat,
+    },
+    system: {
+      configuration: {
+        dolby_config: engineering.system.layout || systemFacts.configuration?.dolby_config || null,
+        text: engineering.system.layout_text || systemFacts.configuration?.text || null,
+        configuration_text: configurationText,
+      },
+      channel_layout: {
+        bed_channels: engineering.system.bed_channels ?? null,
+        overhead_channels: engineering.system.overhead_channels ?? null,
+        dolby_subwoofer_channels: engineering.system.subwoofer_channels ?? null,
+        total_discrete: engineering.system.total_discrete_channels ?? null,
+        subwoofer_count: engineering.system.subwoofer_count ?? null,
+        configuration_text: configurationText,
+      },
+      products_selected: engineering.products,
+      products_selected_by_layer: engineering.system.products_selected_by_layer || {},
+      product_roles: Array.isArray(systemFacts.product_roles) ? systemFacts.product_roles : [],
+      subwoofer_strategy: systemFacts.subwoofer_strategy || null,
+      amplification: systemFacts.amplification || null,
+      acoustic_treatment: engineering.system.acoustic_treatment || [],
+    },
+    rp22: {
+      parameter_headlines: engineering.headlines,
+      categories: rp22Facts.categories || null,
+      strengths: rp22Facts.strengths || [],
+      weaknesses: rp22Facts.weaknesses || [],
+      assumed: rp22Facts.assumed || {},
+      assessment_basis: rp22Facts.assessment_basis || null,
+    },
+    report_parameters: engineering.parameters,
+    bass: {
+      available: engineering.bass.current === true,
+      p14: engineering.bass.p14 ?? null,
+      p18: engineering.bass.p18 ?? null,
+      p19: engineering.bass.p19 ?? null,
+      p20: engineering.bass.p20 ?? null,
+      subwoofer_strategy_summary: asText(bassFacts.subwoofer_strategy_summary) || null,
+    },
+    report_evidence: citation,
+  };
+}
+
+// The evidence-to-frozen cross-check that used to live here is gone with the
+// frozen-source reads it depended on: reportEvidence is now the sole statement
+// of every report fact, so a disagreement between it and the frozen source is
+// resolved in favour of the evidence rather than blocking on the older copy.
 
 /**
  * Every selected version's report evidence.
@@ -257,40 +438,19 @@ export async function readProposalReportEvidence(entities, projectId, versions) 
     }
 
     const citation = buildEvidenceCitation({ technicalEvidence, visualEvidence, technicalRow, visualRow });
-    const products = productsFromEvidence(technicalEvidence);
-    assertEvidenceAgreesWithFrozen({ visualEvidence, visualRow, version });
-    const visualSource = visualFrozenSource(visualRow);
 
-    // The frozen carrier. Every figure the proposal states is taken from the
-    // evidence below; the version's room, seating and viewing come from the
-    // Visual Report's own frozen source, which the evidence above has just been
-    // checked against. No live project value is read anywhere in this module.
-    const frozen = technicalRow.payload?.proposalSource || {};
-
+    // The one snapshot a proposal reads. Every fact in it is taken from the two
+    // reports' own reportEvidence above — no frozen-source field and no live
+    // project field is read anywhere on this path.
     return {
       version_id: version.id,
       version_name: version.version_name,
       source: 'report-evidence',
       engineeringState: 'current',
       evidence: { technical: technicalEvidence, visual: visualEvidence, citation },
-      snapshot: {
-        ...frozen,
-        room: visualSource.room || frozen.room,
-        seats: visualSource.seats || frozen.seats,
-        viewing: visualSource.viewing || frozen.viewing,
-        version: { ...(frozen.version || {}), id: version.id, name: version.version_name },
-        identity: {
-          ...(frozen.identity || {}),
-          projectId,
-          versionId: version.id,
-          technicalReportId: technicalRow.id,
-          visualReportId: visualRow.id,
-        },
-        // Every figure the proposal states comes from the evidence.
-        report_parameters: parametersFromEvidence(technicalEvidence),
-        system: { ...(frozen.system || {}), products_selected: products },
-        report_evidence: citation,
-      },
+      snapshot: buildSnapshot({
+        version, projectId, technicalEvidence, visualEvidence, technicalRow, visualRow, citation,
+      }),
     };
   }));
 }

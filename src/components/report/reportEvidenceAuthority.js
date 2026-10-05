@@ -324,6 +324,115 @@ export function evidenceFingerprint(evidence) {
   return `re1-${hash.toString(16).padStart(8, '0')}-${text.length.toString(16)}`;
 }
 
+/** A deep copy, so stored evidence never shares a reference with the capture. */
+function copy(value) {
+  if (value === null || value === undefined) return null;
+  if (typeof value !== 'object') return value;
+  return JSON.parse(JSON.stringify(value));
+}
+
+/** The ranked parameters, reduced to the facts a proposal states about them. */
+function rankedParameters(rows) {
+  return (Array.isArray(rows) ? rows : [])
+    .map((entry) => ({
+      parameter_id: asNumber(entry?.parameter_id),
+      achieved_level: asText(entry?.achieved_level) || asText(entry?.level) || null,
+    }))
+    .filter((entry) => entry.parameter_id !== null);
+}
+
+/**
+ * The report facts a proposal states beyond the room, screen, seating, product,
+ * parameter and bass blocks above: the screen and seating interpretations, the
+ * product roles, the subwoofer arrangement, the amplification, the design
+ * structure floors and the viewing headline.
+ *
+ * Every one is copied from the SAME frozen capture the human report itself
+ * renders from — never from the live project, never from prose, never inferred.
+ * A fact the capture does not state stays null, and a proposal blocks rather
+ * than reaching for another source.
+ */
+function buildReportFacts(captured = {}) {
+  const room = captured?.room || {};
+  const screen = room.screen || null;
+  const system = captured?.system || {};
+  const configuration = system.configuration || {};
+  const channelLayout = system.channel_layout || {};
+  const subwooferStrategy = system.subwoofer_strategy || null;
+  const amplification = system.amplification || null;
+  const viewing = captured?.viewing || null;
+  const rp22 = captured?.rp22 || {};
+  const categories = rp22?.categories || null;
+  const floors = (source) => (Array.isArray(source) ? source : [])
+    .filter((entry) => entry?.label && entry?.floor)
+    .map((entry) => ({ label: entry.label, floor: entry.floor }));
+
+  return {
+    room: {
+      dimensions_text: asText(room.dimensions_text) || null,
+      classification: copy(room.classification),
+      interpretation: asText(room.interpretation) || null,
+      acoustic_treatment: copy(room.acoustic_treatment),
+    },
+    screen: screen ? {
+      interpretation: asText(screen.interpretation) || null,
+      manual_dimensions: screen.manual_dimensions === true,
+      manual_width_m: asNumber(screen.manual_width_m),
+      manual_height_m: asNumber(screen.manual_height_m),
+    } : null,
+    seating: { interpretation: asText(room.seating?.interpretation) || null },
+    system: {
+      configuration: {
+        dolby_config: asText(configuration.dolby_config) || null,
+        text: asText(configuration.text) || null,
+        configuration_text: asText(configuration.configuration_text)
+          || asText(channelLayout.configuration_text) || null,
+      },
+      channel_layout: copy(channelLayout),
+      product_roles: (Array.isArray(system.product_roles) ? system.product_roles : []).map((role) => ({
+        role: role?.role || null,
+        role_description: role?.role_description || null,
+        model_label: role?.model_label || null,
+        model_key: role?.model_key || null,
+      })),
+      subwoofer_strategy: subwooferStrategy ? {
+        count: asNumber(subwooferStrategy.count),
+        models: (Array.isArray(subwooferStrategy.models) ? subwooferStrategy.models : []).filter(Boolean),
+        strategy_text: asText(subwooferStrategy.strategy_text) || null,
+      } : null,
+      amplification: amplification ? {
+        specified: amplification.specified === true,
+        power_w: asNumber(amplification.power_w),
+        text: asText(amplification.text) || null,
+      } : null,
+    },
+    viewing: viewing ? {
+      available: viewing.available === true,
+      summary: asText(viewing.summary) || null,
+      primary_floor: asText(viewing.primary_floor) || null,
+    } : null,
+    rp22: {
+      categories: categories ? {
+        primary: {
+          available: categories.primary?.available === true,
+          categories: floors(categories.primary?.categories),
+        },
+        all_seat: {
+          available: categories.all_seat?.available === true,
+          categories: floors(categories.all_seat?.categories),
+        },
+      } : null,
+      strengths: rankedParameters(rp22.strengths),
+      weaknesses: rankedParameters(rp22.weaknesses),
+      assumed: copy(rp22.assumed) || {},
+      assessment_basis: copy(rp22.assessment_basis),
+    },
+    bass: {
+      subwoofer_strategy_summary: asText(captured?.bass?.subwoofer_strategy_summary) || null,
+    },
+  };
+}
+
 /**
  * Assemble the evidence snapshot from the same frozen capture the human report
  * is saved with. `captured` is the report's own frozen proposal source.
@@ -343,6 +452,8 @@ export function buildReportEvidence({ reportType, captured, sourceFingerprint = 
     parameters,
     parameter_index: buildParameterIndex(parameters),
     bass: buildBass(captured),
+    // The remaining report facts a proposal states, from the same frozen capture.
+    report_facts: buildReportFacts(captured),
     // Flipped false by the parity check when the report's visible rows and the
     // evidence disagree, so a proposal can never read evidence the report
     // itself does not state.

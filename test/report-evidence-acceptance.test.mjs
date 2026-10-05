@@ -120,6 +120,8 @@ const EVIDENCE = ({
   model = 'Q8-5',
   quantity = 3,
   reportType = 'technical',
+  room = { length_m: 6, width_m: 4.5, height_m: 2.4 },
+  seat = { distance_m: 3.2, horizontal_angle_deg: 0, rp23_level: 'Level 4' },
 } = {}) => {
   const parameters = PARAM_IDS.map((id) => {
     const level = id === 13 ? p13.level : 'L3';
@@ -148,13 +150,13 @@ const EVIDENCE = ({
       source_fingerprint: fingerprint,
       generated_at: '2026-10-05T10:00:00.000Z',
     },
-    room: { length_m: 6, width_m: 4.5, height_m: 2.4 },
+    room,
     screen: { screen_type: 'Projection screen', format: '16:9', viewable_width_cm: 265.5 },
     seating: {
       row_count: 1,
       per_seat: [{
         row: 1, seat_id: 'r1c1', seat_label: 'Row 1 seat 1',
-        distance_m: 3.2, horizontal_angle_deg: 0, vertical_angle_deg: 0, rp23_level: 'Level 4',
+        vertical_angle_deg: 0, ...seat,
       }],
     },
     system: { products_selected: layer, products_selected_by_layer: { lcr: layer } },
@@ -167,12 +169,18 @@ const EVIDENCE = ({
 };
 
 /** A report's own frozen source, which may state DIFFERENT values than the evidence. */
-const FROZEN = ({ versionId = 'v4', p13 = 'L3 · 99 dBC (OH)', lcr = 'DFC-2 × 1' } = {}) => ({
+const FROZEN = ({
+  versionId = 'v4',
+  p13 = 'L3 · 99 dBC (OH)',
+  lcr = 'DFC-2 × 1',
+  room = { length_m: 6, width_m: 4.5, height_m: 2.4 },
+  seat = { distance_m: 3.2, horizontal_angle_deg: 0 },
+} = {}) => ({
   report_source_version: 1,
   identity: { projectId: PROJECT, versionId },
-  room: { dimensions: { length_m: 6, width_m: 4.5, height_m: 2.4 } },
+  room: { dimensions: room },
   seats: [{ id: 'r1c1', row: 1, priority: 'primary' }],
-  viewing: { available: true, per_seat: [{ seatId: 'r1c1', row: 1, distance_m: 3.2, horizontal_angle_deg: 0 }] },
+  viewing: { available: true, per_seat: [{ seatId: 'r1c1', row: 1, ...seat }] },
   system: { products_selected: { rows: [{ key: 'lcr', area: 'LCR', value: lcr }], lcr: [lcr] } },
   rp22: { parameter_headlines: [] },
   report_parameters: PARAM_IDS.map((id) => ({
@@ -511,4 +519,67 @@ test('12. a proposal stores the evidence it was generated from, per version', as
   assert.match(PROPOSAL_FUNCTION, /const reportEvidenceCitations = suppliedSnapshots\.map\(/);
   assert.match(PROPOSAL_FUNCTION, /\.\.\.\(entry\.evidence\?\.citation \|\| \{\}\)/);
   assert.match(PROPOSAL_FUNCTION, /report_evidence: reportEvidenceCitations/);
+});
+
+/* ── 13–17. reportEvidence is the sole source of every report fact ───────── */
+
+/** The evidence and the frozen source deliberately state different facts. */
+const conflicting = ({ room, seat, frozenRoom, frozenSeat } = {}) => pair({
+  technicalEvidence: EVIDENCE({ room, seat }),
+  visualEvidence: EVIDENCE({ reportType: 'visual', room, seat }),
+  technicalFrozen: FROZEN({ room: frozenRoom, seat: frozenSeat }),
+  visualFrozen: FROZEN({ room: frozenRoom, seat: frozenSeat }),
+});
+
+test('13. conflicting room data: the proposal receives the evidence room only', async () => {
+  const result = await gate(conflicting({
+    room: { length_m: 6, width_m: 5.2, height_m: 2.4 },
+    frozenRoom: { length_m: 6, width_m: 9.9, height_m: 2.4 },
+  }), [VERSION('v4')]);
+
+  assert.equal(result.decision, 'ALLOWED');
+  assert.equal(result.entries[0].snapshot.room.dimensions.width_m, 5.2, 'the evidence room is the room the proposal states');
+  assert.equal(result.entries[0].snapshot.room.dimensions.length_m, 6);
+});
+
+test('14. conflicting seating data: the proposal receives the evidence distance only', async () => {
+  const result = await gate(conflicting({
+    seat: { distance_m: 3.4, horizontal_angle_deg: 0, rp23_level: 'Level 4' },
+    frozenSeat: { distance_m: 4.8, horizontal_angle_deg: 0 },
+  }), [VERSION('v4')]);
+
+  assert.equal(result.decision, 'ALLOWED');
+  assert.equal(result.entries[0].snapshot.viewing.per_seat[0].distance_m, 3.4, 'the evidence distance is the distance the proposal states');
+});
+
+test('15. conflicting viewing data: the proposal receives the evidence RP23 angle only', async () => {
+  const result = await gate(conflicting({
+    seat: { distance_m: 3.2, horizontal_angle_deg: 63, rp23_level: 'Level 4' },
+    frozenSeat: { distance_m: 3.2, horizontal_angle_deg: 45 },
+  }), [VERSION('v4')]);
+
+  const seat = result.entries[0].snapshot.viewing.per_seat[0];
+  assert.equal(result.decision, 'ALLOWED');
+  assert.equal(seat.horizontal_angle_deg, 63, 'the evidence angle is the angle the proposal states');
+  assert.equal(seat.level, 'Level 4', 'the RP23 level is the level the evidence states');
+});
+
+test('16. a fact missing from reportEvidence blocks as Incomplete and is never filled from the frozen source', async () => {
+  const result = await gate(conflicting({
+    room: { length_m: 6, width_m: null, height_m: 2.4 },
+    frozenRoom: { length_m: 6, width_m: 9.9, height_m: 2.4 },
+  }), [VERSION('v4')]);
+
+  assert.equal(result.decision, 'BLOCKED');
+  assert.match(result.detail, /Level 4 version: incomplete Visual Report evidence/);
+  assert.match(result.detail, /room\.width_m is missing/);
+  assert.doesNotMatch(result.detail, /9\.9/, 'the frozen value is never substituted, and never reported as the fact');
+});
+
+test('17. the reader reads no report fact from proposalSource', () => {
+  assert.doesNotMatch(READER, /visualFrozenSource/, 'the frozen-source reader is gone');
+  assert.doesNotMatch(READER, /\.\.\.frozen/, 'no frozen block is spread into the snapshot');
+  assert.doesNotMatch(READER, /payload\?\.proposalSource \|\|/, 'no frozen value is ever a fallback');
+  // Its one remaining use: naming the recovery a legacy report needs.
+  assert.match(READER, /const recoverable = !!row\.payload\?\.proposalSource;/);
 });
