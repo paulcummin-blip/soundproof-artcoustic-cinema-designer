@@ -245,9 +245,16 @@ export default async function(req) {
     // publication (read back by fingerprint) plus the version pointer — never
     // from the fact that this request returned. A report is only allowed to be
     // generated when this acknowledgement says durably_published.
-    const storedPublication = findPublication(cacheRecord, fingerprint) || publication;
+    // Audit fresh database reads, never the submitted object or update response.
+    const [storedVersion, storedCache] = await Promise.all([
+      service.entities.ProjectVersion.get(versionId),
+      service.entities.ProjectAnalysisCache.get(cacheRecord.id),
+    ]);
+    updatedVersion = storedVersion;
+    cacheRecord = storedCache;
+    const storedPublication = findPublication(storedCache, fingerprint);
     const audit = auditEngineeringPublication(storedPublication, {
-      expectedFingerprint: updatedVersion.published_fingerprint || fingerprint,
+      expectedFingerprint: fingerprint,
       project,
       bassAuthorityAvailable: Object.keys(cacheRecord?.completed_by_fingerprint || {}).length > 0,
     });
@@ -268,7 +275,7 @@ export default async function(req) {
       cache: cleanCacheRecordForResponse(cacheRecord),
       acknowledgement: {
         status: audit.status,
-        durably_published: audit.durablyPublished === true,
+        durably_published: audit.durablyPublished === true && storedVersion?.published_fingerprint === fingerprint && !!storedVersion?.published_at,
         complete: audit.complete === true,
         fingerprint_matches: audit.fingerprintMatches === true,
         missing: audit.missing,
