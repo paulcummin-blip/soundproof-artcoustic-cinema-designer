@@ -12,6 +12,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { BarChart4 } from 'lucide-react';
 import { rp22Parameters } from '../components/data/rp22Parameters';
 import { getSpeakerModelMeta } from '../components/models/speakers/registry';
+import { buildProductsSelected } from '@/components/report/reportProductsSelected';
 import { computeScreenMetrics } from '../components/utils/screenMetrics';
 import { resolveEffectiveViewableDimsM } from '../components/models/screen/resolveEffectiveScreen';
 import { calculateViewingAngle } from '../components/utils/viewingAngleUtils';
@@ -1103,52 +1104,25 @@ function RP22ReportInner() {
     }, [canRenderSightlinePage, sightlineScreenMetrics, rowCentralSeats, app?.screen?.aspectRatio, reportSeatHudById]);
     // ── end sightline data ───────────────────────────────────────────────────
 
+    // The products selected in THIS version. One derivation, shared with the
+    // frozen Engineering Snapshot, so a System Design Comparison states exactly
+    // the products this report states for each version.
     const systemSummary = React.useMemo(() => {
-        const summary = { lcr: [], surrounds: [], overheads: [], subs: [] };
-        const normalizeModel = (model) => (!model || model === 'off' || model === 'none') ? null : String(model).trim();
-        const activeSpeakers = placedSpeakers.filter(spk => app?.getSpeakerVisibility?.(spk?.role, spk?.model) ?? true);
-        const getDisplayName = (modelKey) => {
-            if (!modelKey) return null;
-            const meta = getSpeakerModelMeta(modelKey);
-            if (meta?.label && !meta.notFound) return meta.label;
-            return String(modelKey).trim().replace(/[_-][sml]$/i, '').split(/[-_]+/).map(w => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()).join(' ');
+        const selected = buildProductsSelected({
+            placedSpeakers,
+            frontSubsCfg,
+            rearSubsCfg,
+            acousticTreatmentEnabled: app?.acousticTreatmentEnabled,
+            selectedAbfuserQty: app?.selectedAbfuserQty,
+            isVisible: app?.getSpeakerVisibility,
+        });
+        return {
+            lcr: selected.lcr,
+            surrounds: selected.surrounds,
+            overheads: selected.overheads,
+            subs: selected.subwoofers,
+            acousticTreatment: selected.acoustic_treatment,
         };
-        const byCategory = { lcr: {}, surrounds: {}, overheads: {} };
-        activeSpeakers.forEach(spk => {
-            const role = String(spk?.role || '').toUpperCase();
-            const modelKey = normalizeModel(spk?.model);
-            if (!modelKey) return;
-            const model = getDisplayName(modelKey) || modelKey;
-            let cat = null;
-            if (['FL', 'FC', 'FR', 'L', 'C', 'R'].includes(role)) cat = 'lcr';
-            else if (
-              ['SL', 'SR', 'SBL', 'SBR', 'LW', 'RW', 'LS', 'RS', 'LR', 'RR', 'FWL', 'FWR'].includes(role) ||
-              /^(SL|SR)\d+$/.test(role)
-            ) cat = 'surrounds';
-            else if (role.startsWith('T') || role.startsWith('U')) cat = 'overheads';
-            if (cat) byCategory[cat][model] = (byCategory[cat][model] || 0) + 1;
-        });
-        Object.keys(byCategory).forEach(cat => {
-            const models = Object.entries(byCategory[cat])
-              .map(([name, count]) => count > 1 ? `${name} × ${count}` : name)
-              .sort();
-            summary[cat] = models.length > 0 ? models : ['None specified'];
-        });
-        const frontSubs = frontSubsCfg?.count || 0;
-        const rearSubs = rearSubsCfg?.count || 0;
-        const frontModel = normalizeModel(frontSubsCfg?.model);
-        const rearModel = normalizeModel(rearSubsCfg?.model);
-        const subList = [];
-        if (frontSubs > 0 && frontModel) { const name = getDisplayName(frontModel) || frontModel; subList.push(frontSubs > 1 ? `${name} × ${frontSubs} (front)` : `${name} (front)`); }
-        if (rearSubs > 0 && rearModel) { const name = getDisplayName(rearModel) || rearModel; subList.push(rearSubs > 1 ? `${name} × ${rearSubs} (rear)` : `${name} (rear)`); }
-        summary.subs = subList.length > 0 ? subList : ['None specified'];
-        // Acoustic treatment (Abfuser product selection)
-        if (app?.acousticTreatmentEnabled && Number(app?.selectedAbfuserQty) > 0) {
-          summary.acousticTreatment = [`Artcoustic Abfuser × ${Math.floor(Number(app.selectedAbfuserQty))}`];
-        } else {
-          summary.acousticTreatment = ['None specified'];
-        }
-        return summary;
     }, [placedSpeakers, frontSubsCfg, rearSubsCfg, app?.getSpeakerVisibility, app?.acousticTreatmentEnabled, app?.selectedAbfuserQty]);
 
     const exportSystemConfiguration = React.useMemo(() => {

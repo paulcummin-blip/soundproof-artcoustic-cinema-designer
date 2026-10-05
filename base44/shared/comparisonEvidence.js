@@ -163,6 +163,11 @@ export function buildVersionEvidence({
         ? new Set(snapshot.seats.map((seat) => seat?.row).filter((row) => row !== null && row !== undefined)).size
         : 0,
     },
+    // The product specification this version's own Technical Report states
+    // ("Products Selected"), carried frozen so the comparison's LCR, Surrounds,
+    // Overheads, Subwoofers and Acoustic treatment rows state exactly what that
+    // report states — model and quantity per layer, for this version only.
+    products_selected: system.products_selected || null,
     speaker_package: Array.isArray(system.product_roles)
       ? system.product_roles.map((role) => ({
         role: role.role || null,

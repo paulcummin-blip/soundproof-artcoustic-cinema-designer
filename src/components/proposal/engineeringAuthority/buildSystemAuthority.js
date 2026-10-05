@@ -9,6 +9,7 @@
 import { CONFIDENCE } from './confidence';
 import { getSpeakerModelMeta } from '@/components/models/speakers/registry';
 import { resolveSpeakerModelsByRole } from './resolveSpeakerModelsByRole';
+import { buildProductsSelected, layoutVisibilityFilter } from '@/components/report/reportProductsSelected';
 
 function parseDolbyConfig(config) {
   if (!config || typeof config !== 'string') return { bed: 0, sub: 0, overhead: 0, text: 'Not configured' };
@@ -112,6 +113,20 @@ export function buildSystemAuthority(project, _version, placedSpeakers) {
     ? { specified: true, power_w: ampPower, text: `${ampPower}W amplifier power specified`, confidence: CONFIDENCE.MEASURED }
     : { specified: false, power_w: null, text: 'Amplification not specified', confidence: CONFIDENCE.NOT_CALCULATED };
 
+  // The products this VERSION is specified with, stating model and quantity per
+  // layer in the exact form the version's own Technical Report prints them. This
+  // is the product specification a System Design Comparison column reads, so a
+  // comparison can never state a different package from that version's report.
+  const productsSelected = buildProductsSelected({
+    placedSpeakers,
+    frontSubsCfg: project?.front_subs_cfg || project?.frontSubsCfg || null,
+    rearSubsCfg: project?.rear_subs_cfg || project?.rearSubsCfg || null,
+    subwooferInstances,
+    acousticTreatmentEnabled: project?.acoustic_treatment_enabled ?? project?.acousticTreatmentEnabled ?? false,
+    selectedAbfuserQty: project?.selected_abfuser_qty ?? project?.selectedAbfuserQty ?? 0,
+    isVisible: layoutVisibilityFilter(project?.dolby_config, project?.seven_bed_layout_type),
+  });
+
   // System topology summary
   const topology = {
     dolby_config: project?.dolby_config || null,
@@ -142,6 +157,9 @@ export function buildSystemAuthority(project, _version, placedSpeakers) {
     },
     channel_layout: channelLayout,
     product_roles: productRoles,
+    // The report-stated product specification of this version (see
+    // reportProductsSelected.js): the comparison's product rows read this.
+    products_selected: productsSelected,
     subwoofer_strategy: subwooferStrategy,
     amplification,
     topology,

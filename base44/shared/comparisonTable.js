@@ -48,6 +48,9 @@ export const COMPARISON_ROW_ORDER = Object.freeze([
   'surrounds',
   'overheads',
   'subwoofers',
+  // The acoustic treatment a version specifies is part of its product
+  // specification, so it is compared alongside the equipment.
+  'acoustic_treatment',
   'amplification',
   'seating',
   'p2',
@@ -75,6 +78,7 @@ const ROW_LABELS = Object.freeze({
   surrounds: 'Surrounds / wides',
   overheads: 'Overheads',
   subwoofers: 'Subwoofers',
+  acoustic_treatment: 'Acoustic treatment',
   amplification: 'Amplification',
   seating: 'Seating',
   p2: 'Discrete channels (P2)',
@@ -141,6 +145,14 @@ function readRowValue(evidence, rowKey) {
     }
     return lines.length > 0 ? lines.join(' · ') : null;
   }
+
+  // The product rows state exactly what THIS version's Technical Report states in
+  // its "Products Selected" list — the model and quantity of each layer, read
+  // from that version's own frozen report source. The per-role package below is
+  // the fallback for a snapshot that predates that authority.
+  const selectedProducts = evidence.products_selected || null;
+  const selectedValue = selectedProducts ? selectedProducts[rowKey] : null;
+  if (Array.isArray(selectedValue) && selectedValue.length > 0) return selectedValue.join(', ');
 
   const packageRoles = { lcr: ['lcr', 'centre_soundbar'], surrounds: ['surround', 'rear_surround', 'front_wide'], overheads: ['overhead'] };
   if (packageRoles[rowKey]) {

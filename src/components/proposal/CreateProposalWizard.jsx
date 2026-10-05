@@ -197,9 +197,12 @@ export default function CreateProposalWizard({ onCreated, onCancel, regenerateFr
 
       const missingSnapshots = versionSnapshots.filter((entry) => !entry.snapshot || entry.snapshot.available !== true);
       if (missingSnapshots.length > 0) {
+        // The version that has no current report source is named, so the
+        // designer knows exactly which report to regenerate.
+        const missingNames = missingSnapshots.map((entry) => entry.version_name || entry.version_id).join(', ');
         setError(proposalType === 'comparison'
-          ? 'Comparison evidence could not be built for both selected versions. Regenerate the Visual and Technical Reports for each version, then try again.'
-          : `No calculated engineering result was found for ${missingSnapshots.map((entry) => entry.version_name || entry.version_id).join(', ')}.`);
+          ? `${missingNames}: no current report source for this comparison. Generate that version's Visual and Technical Reports, then try again.`
+          : `No calculated engineering result was found for ${missingNames}.`);
         return;
       }
 
