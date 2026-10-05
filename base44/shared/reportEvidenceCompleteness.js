@@ -13,7 +13,7 @@ export function validateReportEvidence(evidence, reportType = null, {
 } = {}) {
   const missing = [];
   const add = field => { if (!missing.includes(field)) missing.push(field); };
-  const require = (value, field) => { if (missingValue(value)) add(field); };
+  const requireValue = (value, field) => { if (missingValue(value)) add(field); };
   if (!evidence || typeof evidence !== 'object') return {
     complete: false, missing: ['reportEvidence'], reason: 'reportEvidence is missing',
   };
@@ -21,16 +21,16 @@ export function validateReportEvidence(evidence, reportType = null, {
   if (Number(evidence.evidence_version) !== REPORT_EVIDENCE_VERSION) add('evidence_version');
   const identity = evidence.identity || {};
   for (const key of ['project_id', 'version_id', 'report_type', 'source_fingerprint'])
-    require(identity[key], 'identity.' + key);
+    requireValue(identity[key], 'identity.' + key);
   if (identity.report_type !== type || evidence.report_type !== type) add('identity.report_type');
   if (projectId && identity.project_id !== projectId) add('identity.project_id');
   if (versionId && identity.version_id !== versionId) add('identity.version_id');
   if (sourceFingerprint && identity.source_fingerprint !== sourceFingerprint) add('identity.source_fingerprint');
   if (snapshotFingerprint && identity.source_fingerprint !== snapshotFingerprint) add('identity.source_fingerprint');
-  for (const key of ['length_m', 'width_m', 'height_m']) require(evidence.room?.[key], 'room.' + key);
-  require(evidence.screen?.screen_type, 'screen.screen_type');
-  require(evidence.screen?.format, 'screen.format');
-  require(evidence.screen?.viewable_diagonal_in ?? evidence.screen?.viewable_width_cm, 'screen.size');
+  for (const key of ['length_m', 'width_m', 'height_m']) requireValue(evidence.room?.[key], 'room.' + key);
+  requireValue(evidence.screen?.screen_type, 'screen.screen_type');
+  requireValue(evidence.screen?.format, 'screen.format');
+  requireValue(evidence.screen?.viewable_diagonal_in ?? evidence.screen?.viewable_width_cm, 'screen.size');
   if (!Array.isArray(evidence.system?.products_selected) || !evidence.system.products_selected.length)
     add('system.products_selected');
   const index = evidence.parameter_index;
@@ -47,7 +47,7 @@ export function validateReportEvidence(evidence, reportType = null, {
     const base = 'seating.per_seat[' + i + ']';
     // Row is first so every consumer reports the same original blocker.
     for (const key of ['row', 'seat_id', 'column', 'priority', 'distance_m', 'horizontal_angle_deg'])
-      require(seat?.[key], base + '.' + key);
+      requireValue(seat?.[key], base + '.' + key);
     if (seat?.seat_id && seen.has(seat.seat_id)) add(base + '.seat_id');
     seen.add(seat?.seat_id);
   });
