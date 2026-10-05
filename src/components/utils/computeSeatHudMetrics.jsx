@@ -12,6 +12,13 @@ import {
 } from "@/components/utils/seatMetrics";
 import { getSeatSplMetrics } from "@/components/utils/spl/centralSplEngine";
 import { rp23LevelForAngleDeg, rp23DisplayAngleDeg } from '@/components/utils/viewingAngleUtils';
+// Overhead acoustic-axis geometry — the SAME authority the P17 engine uses, so the seat HUD
+// and the graded result can never disagree on where a ceiling speaker's axis points.
+import {
+  buildOverheadAimedFrame,
+  aimedAxisOffAxisDeg,
+  resolveOverheadTiltDeg,
+} from "@/components/utils/rp22/overheadAcousticAxis";
 
 // Helper: check if point has valid coordinates
 const hasPoint = (p) => {
@@ -387,18 +394,28 @@ export function computeSeatHudMetrics({
       const isOverhead = canon.startsWith('T');
 
       let offAxisDeg = 0;
+      // Geometric angle from ceiling vertical (straight down) — display only, never graded.
+      let rawAngleDeg = null;
 
       if (isOverhead) {
         const sp3 = v3(pos.x, pos.y, roomHeight);
         const mlp3 = v3(mlp.x, mlp.y, 1.2);
         const seat3 = v3(seatX, seatY, seatZ);
-        const aimVec = v3sub(mlp3, sp3);
         const seatVec = v3sub(seat3, sp3);
-        offAxisDeg = angleBetweenDeg(aimVec, seatVec);
 
+        // 0° is the ACOUSTIC AXIS, not the ceiling vertical. The axis is the ceiling normal
+        // rotated by the product's built-in tilt toward the RSP, and the effective off-axis
+        // angle is measured from THAT axis by vector geometry. The tilt is never subtracted
+        // as a scalar: the angle to the RSP direction already contains the tilt's effect, so
+        // subtracting it again double-applies it (and would treat Cloud as a flat ceiling
+        // speaker pointed at every seat inside the tilt cone).
         const meta = getSpeakerModelMeta(sp.model);
-        const builtInTilt = Number(meta?.builtInTiltDeg) || 0;
-        offAxisDeg = Math.max(0, offAxisDeg - builtInTilt);
+        const tiltDeg = resolveOverheadTiltDeg(meta, sp.model);
+        const frame = buildOverheadAimedFrame(sp3, mlp3, tiltDeg);
+        rawAngleDeg = angleBetweenDeg(v3(0, 0, -1), seatVec);
+        offAxisDeg = frame
+          ? aimedAxisOffAxisDeg(frame, seatVec)
+          : (Number.isFinite(rawAngleDeg) ? rawAngleDeg : 0);
       } else {
         const dirDeg = safeYawToMLP(pos, { x: seatX, y: seatY });
         let aimDeg = 0;
@@ -453,7 +470,7 @@ export function computeSeatHudMetrics({
       perSpeaker.push({
         role: canon,
         angleDeg: offAxisDegInt,
-        rawAngleDeg: offAxisDegInt,
+        rawAngleDeg: Number.isFinite(rawAngleDeg) ? Math.floor(rawAngleDeg) : offAxisDegInt,
         lossDb: Math.round(lossDb * 10) / 10,
         lossLabel, // NEW: always one of "≤1.5 dB", "≤3.0 dB", ">3.0 dB"
         isBeyondNonLcrLimit: false,

@@ -174,6 +174,12 @@ function readSeatSpeakers(p17) {
       windows: entry?.windows ?? null,
       evidenceType: entry?.evidenceType ?? null,
       windowCause: entry?.cause ?? null,
+      // ── Acoustic-axis evidence (read-only): the geometric ceiling angle, the product's
+      // built-in tilt, and the axis the effective angle is measured from. ──
+      geometricAngleDeg: num(entry?.geometricAngleDeg),
+      rspGeometricAngleDeg: num(entry?.rspGeometricAngleDeg),
+      builtInTiltDeg: num(entry?.builtInTiltDeg),
+      axisBasis: entry?.axisBasis ?? null,
     }))
     .sort((a, b) => {
       const levelDiff = (b.windowLevelNumber ?? -1) - (a.windowLevelNumber ?? -1);
@@ -232,6 +238,11 @@ export function buildP17SeatEvidenceRows({ seats = [], p17BySeatId = {} } = {}) 
         windowCause: null,
         windowCauseLabel: P17_WINDOW_CAUSE_LABEL.missing_evidence,
         effectiveAngleDeg: null,
+        // ── acoustic-axis evidence (absent until a channel is evaluated here) ──
+        geometricAngleDeg: null,
+        rspGeometricAngleDeg: null,
+        builtInTiltDeg: null,
+        axisBasis: null,
         // ── read-only legacy diagnostics ──
         rawVarianceDb: null,
         uncappedLevel: null,
@@ -288,6 +299,11 @@ export function buildP17SeatEvidenceRows({ seats = [], p17BySeatId = {} } = {}) 
       windowCause: grade.windowCause,
       windowCauseLabel: causeLabelFor({ basis: grade.basis, windowCause: grade.windowCause, evidenceAvailable: true }),
       effectiveAngleDeg,
+      // ── acoustic-axis evidence for the deciding channel (read-only, never graded) ──
+      geometricAngleDeg: num(limiting?.geometricAngleDeg) ?? num(p17.geometricAngleDeg),
+      rspGeometricAngleDeg: num(limiting?.rspGeometricAngleDeg) ?? num(p17.rspGeometricAngleDeg),
+      builtInTiltDeg: num(limiting?.builtInTiltDeg) ?? num(p17.builtInTiltDeg),
+      axisBasis: limiting?.axisBasis ?? p17.axisBasis ?? null,
       // ── read-only legacy diagnostics ──
       rawVarianceDb,
       uncappedLevel: cause.uncappedLevel ?? level,

@@ -148,6 +148,21 @@ export function buildP17DiagnosticExplanation({ rows = [] } = {}) {
     );
   }
 
+  // A tilted ceiling speaker is graded on its ACOUSTIC AXIS: the built-in tilt is applied to
+  // the ceiling normal to form the axis, so the seat's angle is measured from the axis and
+  // not from ceiling vertical. Both angles are stated so the arithmetic is readable.
+  if (worst.axisBasis === "acoustic_axis" && worst.builtInTiltDeg != null) {
+    lines.push(
+      `Axis basis: ${worst.limitingModel || worst.limitingRole} is graded on its acoustic axis — 0° is the axis, not ceiling vertical.`
+      + ` Built-in tilt ${degrees(worst.builtInTiltDeg)}`
+      + `${worst.rspGeometricAngleDeg != null ? `; geometric angle from ceiling vertical to the RSP ${degrees(worst.rspGeometricAngleDeg)}` : ""}`
+      + `${worst.geometricAngleDeg != null ? `; geometric angle to this seat ${degrees(worst.geometricAngleDeg)}` : ""}`
+      + `${worst.effectiveAngleDeg != null ? `; effective off-axis angle ${degrees(worst.effectiveAngleDeg)}` : ""}.`,
+    );
+  } else if (worst.axisBasis === "wall_normal") {
+    lines.push("Axis basis: this is a bed-layer channel, graded on the horizontal plane against its wall-normal axis — no ceiling angle is involved.");
+  }
+
   const phrase = windowPhrase(worst.windows);
   if (phrase) {
     const evidence = evidencePhrase(worst.windows);
@@ -187,6 +202,10 @@ export function buildP17DiagnosticExplanation({ rows = [] } = {}) {
     model: worst.limitingModel,
     seatAngleDeg: worst.effectiveAngleDeg,
     effectiveAngleDeg: worst.effectiveAngleDeg,
+    geometricAngleDeg: worst.geometricAngleDeg ?? null,
+    rspGeometricAngleDeg: worst.rspGeometricAngleDeg ?? null,
+    builtInTiltDeg: worst.builtInTiltDeg ?? null,
+    axisBasis: worst.axisBasis ?? null,
     rspAngleDeg: worst.rspAngleDeg,
     coverageLimitDeg: worst.coverageLimitDeg,
     windows: worst.windows ?? null,
