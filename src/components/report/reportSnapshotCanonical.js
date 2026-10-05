@@ -106,8 +106,7 @@ export function resolveEvidenceWrite({ existing = null, incoming = null } = {}) 
   const incomingEvidence = (incoming && typeof incoming === 'object') ? incoming : null;
   const existingReady = reportRowEvidenceState(existing) === 'ready';
   const incomingReady = !!incomingEvidence
-    && Number(incomingEvidence.evidence_version) === EVIDENCE_VERSION
-    && incomingEvidence.proposal_ready === true;
+    && validateReportEvidence(incomingEvidence, incomingEvidence.report_type).complete;
 
   if (!incomingEvidence) {
     return {
