@@ -6,11 +6,13 @@ import { buildReportEvidence } from '@/components/report/reportEvidenceAuthority
 // Called only by a generated report's save action, never by proposal generation.
 export default function captureReportProposalSource({
   projectId, versionId, project, engineeringSummary, app, presentation,
-  reportType = null, sourceFingerprint = null,
+  reportType = null, sourceFingerprint = null, seatingPublication = null,
 }) {
   if (!engineeringSummary || !projectId || !versionId || !project) return null;
   const speakers = presentation?.placedSpeakers || app?.speakerSystem?.placedSpeakers || [];
-  const seats = presentation?.seatingPositions || app?.seatingPositions || [];
+  const seats = seatingPublication
+    ? seatingPublication.report_snapshot?.seatingPositions || []
+    : presentation?.seatingPositions || app?.seatingPositions || [];
   const design = { ...project, selected_speakers: speakers };
   const snapshot = buildEngineeringSnapshot({
     projectId, versionId, project, mergedProject: design,
@@ -41,7 +43,8 @@ export default function captureReportProposalSource({
     }) },
     report_parameters: parameters,
     report_seat_results: engineeringSummary.project?.reportCounts?.seatResultsByParameter || {},
-    report_engineering_summary: engineeringSummary,
+    viewing: seatingPublication?.engineering_summary?.viewing || snapshot.viewing,
+    report_engineering_summary: seatingPublication?.engineering_summary || engineeringSummary,
     report_source_version: 1,
   };
 
