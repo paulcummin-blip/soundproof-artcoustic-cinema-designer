@@ -10,6 +10,7 @@
 
 import { base44 } from '@/api/base44Client';
 import { notifyReportSourceStored } from '@/components/proposal/sourceAuthority/reportSourceSignal';
+import { resolveEvidenceWrite, selectCanonicalReportSnapshot } from '@/components/report/reportSnapshotCanonical';
 
 // Database object-key order is not evidence content.
 function stableEvidence(value) {
@@ -26,11 +27,15 @@ export async function loadReportSnapshot({ projectId, versionId, reportType }) {
 
   const result = await base44.entities.ReportSnapshot.filter(
     { project_id: projectId, version_id: versionId, report_type: reportType },
-    { sort: '-generated_at', limit: 1 },
+    { sort: '-generated_at', limit: 50 },
   );
   // A filter with options returns a page; tolerate a plain array as well.
   const items = Array.isArray(result) ? result : (result?.items || []);
-  return items[0] || null;
+  // The CANONICAL row for this version and report type: the newest row carrying
+  // complete evidence wins, and a newer duplicate without evidence never
+  // displaces it. Selection never consults the live design, so opening a project
+  // or exporting a PDF cannot change which report is the saved report.
+  return selectCanonicalReportSnapshot(items, { reportType });
 }
 
 /**
@@ -47,9 +52,29 @@ export async function saveReportSnapshot({ existing = null, record }) {
     reportType: record.report_type,
   });
   const target = canonical || existing;
+  // Upgrade-only. Complete evidence already on the row is never replaced by an
+  // incomplete payload, and evidence is never cleared: a save can only improve
+  // what the row carries.
+  const write = resolveEvidenceWrite({
+    existing: target,
+    incoming: record.payload?.reportEvidence ?? null,
+  });
+  if (write.preserved && write.rejectedReason === 'incomplete-incoming-evidence') {
+    console.warn('[reportSnapshot] incomplete report evidence was not written; the saved complete evidence is kept.');
+  }
+  const nextRecord = {
+    ...record,
+    payload: {
+      ...(record.payload || {}),
+      reportEvidence: write.evidence,
+      evidence_parity: write.preserved
+        ? (target?.payload?.evidence_parity ?? record.payload?.evidence_parity ?? null)
+        : (record.payload?.evidence_parity ?? null),
+    },
+  };
   const response = target?.id
-    ? await base44.entities.ReportSnapshot.update(target.id, record)
-    : await base44.entities.ReportSnapshot.create(record);
+    ? await base44.entities.ReportSnapshot.update(target.id, nextRecord)
+    : await base44.entities.ReportSnapshot.create(nextRecord);
   const savedId = response?.id || target?.id;
   if (!savedId) throw new Error('The saved report snapshot ID was not returned.');
   // Announce only a database-confirmed save, never a local success object.
@@ -59,7 +84,7 @@ export async function saveReportSnapshot({ existing = null, record }) {
     || saved.version_id !== record.version_id
     || saved.report_type !== record.report_type
     || JSON.stringify(stableEvidence(saved.payload?.reportEvidence ?? null))
-      !== JSON.stringify(stableEvidence(record.payload?.reportEvidence ?? null))) {
+      !== JSON.stringify(stableEvidence(nextRecord.payload?.reportEvidence ?? null))) {
     throw new Error('Report evidence persistence could not be verified.');
   }
   // One in-session announcement, so the proposal readiness read (which judges

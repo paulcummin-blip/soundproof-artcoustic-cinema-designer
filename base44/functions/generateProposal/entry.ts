@@ -6,6 +6,7 @@ import { HIGHLIGHTS_SECTION_TYPE, resolveSectionTitle } from '../../shared/syste
 import { comparisonSectionMetadata, verifyComparisonPersisted } from '../../shared/comparisonPersistence.js';
 import { formatInterpretationForLog } from '../../shared/adiProjectInterpretation.js';
 import { loadCacheRecord, findPublication } from '../../shared/publishedEngineeringAuthority.js';
+import { selectCanonicalReportSnapshotsByKey } from '../../shared/reportSnapshotCanonical.js';
 
 // ── ONE proposal readiness authority ──
 // The gate below is decided by the SAME per-version rule the Step 5 table shows
@@ -219,12 +220,12 @@ export default async function(req) {
     // the same words as the Step 5 table. The engineering source is the PUBLISHED
     // result alone: a browser-session handoff is not visible here and so is never
     // accepted as readiness.
-    const savedReportByKey = new Map();
+    // The CANONICAL saved report per version and report type — the same rule the
+    // report pages and the Step 5 readiness table apply. A complete, evidence-
+    // carrying row is never displaced by a newer duplicate without evidence, so
+    // the gate judges the report the designer actually generated.
     const savedReportRows = await base44.entities.ReportSnapshot.filter({ project_id }, '-generated_at', 200);
-    (Array.isArray(savedReportRows) ? savedReportRows : []).forEach((row) => {
-      const key = `${row.version_id}::${row.report_type}`;
-      if (!savedReportByKey.has(key)) savedReportByKey.set(key, row);
-    });
+    const savedReportByKey = selectCanonicalReportSnapshotsByKey(Array.isArray(savedReportRows) ? savedReportRows : []);
 
     const versionPublicationById = new Map();
     const cacheRecordByVersionId = new Map();

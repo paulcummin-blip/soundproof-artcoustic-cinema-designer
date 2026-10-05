@@ -42,6 +42,7 @@ import {
 import { readSeatPriorityFingerprint } from '@/components/state/designReviewHandoff';
 import { readProjectAnalysisCacheRecord } from '@/components/state/projectReadCache';
 import { subscribeReportSourceStored } from './reportSourceSignal';
+import { selectCanonicalReportSnapshotsByKey } from '@/components/report/reportSnapshotCanonical';
 import {
   PUBLICATION_STATUS,
   READINESS_STATE,
@@ -175,14 +176,13 @@ export function useProposalReadiness({ projectId = null, versionIds = [] } = {})
           (Array.isArray(versionRecords) ? versionRecords : []).map((version) => [version.id, version]),
         );
 
-        // One saved report per version and report type; the sorted read means
-        // the first row seen per key is the newest.
-        const savedByKey = new Map();
+        // The CANONICAL saved report per version and report type — the same rule
+        // the report pages, Project Library and the server gate use. A complete,
+        // evidence-carrying row is never displaced by a newer duplicate that
+        // carries no evidence, so a report the designer generated cannot stop
+        // being usable because a second row was written later.
         const snapshotRows = Array.isArray(snapshotPage) ? snapshotPage : (snapshotPage?.items || []);
-        snapshotRows.forEach((row) => {
-          const key = `${row.version_id}::${row.report_type}`;
-          if (!savedByKey.has(key)) savedByKey.set(key, row);
-        });
+        const savedByKey = selectCanonicalReportSnapshotsByKey(snapshotRows);
 
         const liveSeatPriorityFingerprint = readSeatPriorityFingerprint(projectId);
         const nextRows = ids.map((versionId, index) => {
