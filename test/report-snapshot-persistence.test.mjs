@@ -15,7 +15,7 @@ async function storeWith(rows, { dropEvidence = false, failUpdate = false } = {}
       calls.push(['update', id]);
       if (failUpdate) throw new Error('save failed');
       const index = rows.findIndex(r => r.id === id);
-      rows[index] = { ...rows[index], ...record };
+      rows[index] = { ...rows[index], ...record, id };
       if (dropEvidence) rows[index].payload = {};
       return { id };
     },
