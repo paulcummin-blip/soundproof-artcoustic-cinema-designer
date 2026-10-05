@@ -2,11 +2,13 @@
  * proposalProductCatalogue.js (shared)
  * ------------------------------------
  * The Artcoustic product vocabulary used to RECOGNISE a product name in prose,
- * and the generic wording that replaces it when it is not selected.
+ * and the role vocabulary used to describe a layer when a specific model must
+ * not be named.
  *
- * Data only: it decides nothing about what is allowed. The version-specific
- * allowed list is built by proposalProductGrounding.js from the frozen system
- * authority, and this catalogue is what that list is compared against.
+ * Data and wording only: it decides nothing about what is allowed. The
+ * version-specific allowed list is built by proposalProductGrounding.js from the
+ * frozen system authority, and this catalogue is what that list is compared
+ * against.
  *
  * Matchers are derived from the app's speaker-registry keys, so a written name
  * is recognised however it is punctuated:
@@ -21,16 +23,56 @@
  * Pure: no React, no SDK, no writes.
  */
 
-/** Generic wording used when an unselected product name has to be removed. */
+/** How a layer is described when no specific model may be named. */
 export const GENERIC_BY_KIND = Object.freeze({
   lcr: 'the selected Artcoustic screen-wall loudspeakers',
   soundbar: 'the selected Artcoustic centre loudspeaker',
   surround: 'the selected Artcoustic surround loudspeakers',
   overhead: 'the selected Artcoustic overhead loudspeakers',
-  subwoofer: 'the selected subwoofers',
+  subwoofer: 'the selected subwoofer system',
   treatment: 'the specified acoustic treatment',
   any: 'the selected Artcoustic loudspeakers',
 });
+
+/** How a layer is described when its one selected model is known. */
+export const NAMED_PHRASES = Object.freeze({
+  lcr: (name) => `the ${name} screen stage`,
+  soundbar: (name) => `the ${name} centre loudspeaker`,
+  surround: (name) => `the ${name} surround loudspeakers`,
+  overhead: (name) => `${name} loudspeakers`,
+  subwoofer: (name) => `the ${name} subwoofer system`,
+  treatment: (name) => `the ${name} acoustic treatment`,
+  any: (name) => `${name} loudspeakers`,
+});
+
+/** The layers a design can have, in the order a sentence lists them. */
+export const ROLE_ORDER = Object.freeze(['lcr', 'soundbar', 'surround', 'overhead', 'subwoofer', 'treatment']);
+
+/** The layers that are loudspeakers, for compound role wording. */
+export const LOUDSPEAKER_ROLES = Object.freeze(['lcr', 'soundbar', 'surround', 'overhead']);
+
+/** The everyday name of each layer, for compound role wording. */
+export const ROLE_NOUNS = Object.freeze({
+  lcr: 'screen',
+  soundbar: 'centre',
+  surround: 'surround',
+  overhead: 'overhead',
+  subwoofer: 'subwoofer',
+  treatment: 'acoustic treatment',
+});
+
+/** A generic description of a layer, whatever model it holds. */
+export const genericPhrase = (role) => GENERIC_BY_KIND[role] || GENERIC_BY_KIND.any;
+
+/** How a sentence's own words reveal which layers it is talking about. */
+export const ROLE_KEYWORDS = Object.freeze([
+  { role: 'lcr', pattern: /(screen|front stage|lcr|left[\s-]?cent|centre channel|soundstage|main channel)/i },
+  { role: 'soundbar', pattern: /(soundbar|sound bar)/i },
+  { role: 'surround', pattern: /(surround|side channel|side wall|rear channel|around the seat|behind the seat)/i },
+  { role: 'overhead', pattern: /(overhead|height|ceiling|atmos|above the seat|upper layer)/i },
+  { role: 'subwoofer', pattern: /(subwoofer|sub[\s-]?bass|low[\s-]frequency|\bbass\b|lfe|extension below)/i },
+  { role: 'treatment', pattern: /(abfuser|acoustic treatment|absorption)/i },
+]);
 
 /** The Artcoustic products the app can specify, keyed as the registry keys them. */
 export const PRODUCT_CATALOGUE = Object.freeze([
@@ -103,11 +145,10 @@ function namePattern(product) {
   return new RegExp(`\\b(?:${forms.join('|')})\\b`, 'i');
 }
 
-/** Every recognised product name, with its matcher and its generic wording. */
+/** Every recognised product name, with its matcher. */
 export const CATALOGUE_ALL = Object.freeze([...PRODUCT_CATALOGUE, ...LEGACY_PRODUCT_NAMES].map((product) => ({
   ...product,
   pattern: namePattern(product),
-  generic: GENERIC_BY_KIND[product.kind] || GENERIC_BY_KIND.any,
 })));
 
 /** A loose matcher for an authority string that is not a catalogue product. */

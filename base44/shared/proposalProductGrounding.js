@@ -1,7 +1,7 @@
 /**
  * proposalProductGrounding.js (shared)
  * ------------------------------------
- * THE product-grounding guard for proposal narrative.
+ * THE product-grounding authority for proposal narrative.
  *
  * HARD RULE: a proposal may name only the products that are actually selected in
  * the specific design version the proposal is about. Anything else — another
@@ -19,28 +19,25 @@
  * version's products can leak into another version's copy.
  *
  * Nothing is inferred: a product is allowed only because the frozen authority for
- * that version states it. The product vocabulary itself lives in
- * proposalProductCatalogue.js.
+ * that version states it. The product and role vocabulary lives in
+ * proposalProductCatalogue.js; the post-generation sentence rewrite lives in
+ * proposalProductSentenceRewriter.js, re-exported here so consumers have one
+ * import for grounding.
  *
  * Provides:
  *   1. buildProductGrounding()       — the allowed vocabulary, per version
  *   2. buildProductVocabularyRule()  — the prompt constraint the writer must obey
- *   3. groundProductMentions()       — the deterministic post-generation pass:
- *      an unselected product name is replaced with safe generic wording, and a
- *      mention that cannot be removed is reported so the section is rejected
- *      instead of stored.
+ *   3. groundProductMentions()       — the deterministic post-generation pass: a
+ *      sentence naming an unselected product is rewritten whole, in clean
+ *      role-based wording, and a mention that cannot be removed is reported so
+ *      the section is rejected instead of stored
  *
  * Pure: no React, no SDK, no writes, no runtime-specific APIs.
  */
 
-import {
-  CATALOGUE_ALL,
-  PRODUCT_FAMILY_WORDS,
-  GENERIC_BY_KIND,
-  catalogueProductsInText,
-  findProductMatches,
-  rawNamePattern,
-} from './proposalProductCatalogue.js';
+import { catalogueProductsInText } from './proposalProductCatalogue.js';
+
+export { groundProductMentions } from './proposalProductSentenceRewriter.js';
 
 /** An allowed product as the report states it. */
 function allowedProduct(name, product = null, roleLabel = null) {
@@ -49,7 +46,6 @@ function allowedProduct(name, product = null, roleLabel = null) {
     roleLabel: roleLabel || null,
     kind: product?.kind || 'any',
     family: product?.family || null,
-    generic: product?.generic || GENERIC_BY_KIND.any,
     catalogueKey: product?.key || null,
   };
 }
@@ -209,188 +205,12 @@ export function buildProductVocabularyRule(grounding) {
   lines.push(
     'Never name a product from another version, another project, an earlier proposal, the product catalogue, a product family you remember, or a report example.',
     'A product not listed above does not exist in this design, however well it would suit it: do not name it, add it, compare against it or explain it.',
-    'For product-family context without naming a product, write "the selected Artcoustic loudspeakers", "the screen-wall loudspeakers", "the surround loudspeakers", "the overhead loudspeakers", "the subwoofers" or "the specified acoustic treatment".',
+    'Write each speaker reference as one complete thought. Never join a selected product with a product that is not on the list, such as "combines X and Y" where only one of them is selected.',
+    'For layer context without naming a model, write "the selected Artcoustic screen-wall loudspeakers", "the selected Artcoustic surround loudspeakers", "the selected Artcoustic overhead loudspeakers", "the selected subwoofer system" or "the specified acoustic treatment".',
     '"Artcoustic" may be used as the brand name. No other product name may appear anywhere in this report.',
-    'Every product name is checked against this list before the report is saved, and anything not on it is removed.',
+    'Every product name is checked against this list before the report is saved, and any sentence that names a product not on it is rewritten.',
   );
   return lines.join('\n');
-}
-
-/**
- * Split HTML into sentence-sized segments without cutting through a tag, so a
- * product mention is always judged in the sentence it appears in.
- */
-function sentenceSegments(html) {
-  const source = String(html || '');
-  const segments = [];
-  let start = 0;
-  let inTag = false;
-  for (let index = 0; index < source.length; index += 1) {
-    const char = source[index];
-    if (char === '<') inTag = true;
-    else if (char === '>') inTag = false;
-    else if (!inTag && (char === '.' || char === '!' || char === '?') && /\s/.test(source[index + 1] || ' ')) {
-      segments.push(source.slice(start, index + 1));
-      start = index + 1;
-    }
-  }
-  if (start < source.length) segments.push(source.slice(start));
-  return segments;
-}
-
-/** The versions a segment is about: by name, by option label, or all of them. */
-function versionsForSegment(segment, grounding) {
-  const text = String(segment).toLowerCase();
-  const matched = grounding.versions.filter((version) => (
-    text.includes(String(version.label).toLowerCase())
-    || (version.optionLabel && text.includes(String(version.optionLabel).toLowerCase()))
-  ));
-  return matched.length > 0 ? matched : grounding.versions;
-}
-
-/** What the versions of one segment are allowed to name. */
-function allowedFor(versions) {
-  const keys = new Set();
-  const families = new Set();
-  const rawPatterns = [];
-  for (const version of versions) {
-    for (const product of version.products) {
-      if (product.catalogueKey) keys.add(product.catalogueKey);
-      if (product.family) families.add(product.family);
-      if (!product.catalogueKey) {
-        const pattern = rawNamePattern(product.name);
-        if (pattern) rawPatterns.push(pattern);
-      }
-    }
-  }
-  return { keys, families, rawPatterns };
-}
-
-/**
- * The generic wording for a removed name: the article is not doubled, the
- * capital is kept only at the start of a sentence, and a possessive is carried
- * onto the generic phrase.
- */
-function genericPhrase(product, { atStart, precededByArticle, possessive }) {
-  let phrase = product.generic;
-  if (precededByArticle) phrase = phrase.replace(/^the\s+/i, '');
-  if (atStart) phrase = phrase.charAt(0).toUpperCase() + phrase.slice(1);
-  return `${phrase}${possessive ? "'" : ''}`;
-}
-
-/**
- * A generic phrase can collide with the noun it replaced ("...overhead
- * loudspeakers overhead array"), so an immediately repeated role word is folded
- * away. Wording only: no value, level or meaning is touched.
- */
-const PHRASE_TIDY = Object.freeze([
-  [/(overhead loudspeakers)(['’]?)\s+overheads?\b/gi, '$1$2'],
-  [/(surround loudspeakers)(['’]?)\s+surrounds?\b/gi, '$1$2'],
-  [/(screen-wall loudspeakers)(['’]?)\s+screens?\b/gi, '$1$2'],
-  [/(centre loudspeaker)(['’]?)\s+centres?\b/gi, '$1$2'],
-  [/(subwoofers)(['’]?)\s+subwoofers?\b/gi, '$1$2'],
-]);
-
-const tidyGenericPhrases = (html) => PHRASE_TIDY.reduce((out, [pattern, replacement]) => out.replace(pattern, replacement), html);
-
-/**
- * The deterministic post-generation pass.
- *
- * An unselected product name is replaced with safe generic wording, in the
- * sentence it appears in, so no ungrounded product reaches the client. A mention
- * that survives the pass is reported as unresolved, and the caller rejects the
- * section rather than storing it.
- *
- * @param {string} html
- * @param {object} grounding — buildProductGrounding() output
- * @returns {{ html: string, grounded: boolean, violations: Array, replacements: number, unresolved: Array }}
- */
-export function groundProductMentions(html, grounding) {
-  const source = String(html || '');
-  if (!isGroundingUsable(grounding) || !source) {
-    return { html: source, grounded: true, violations: [], replacements: 0, unresolved: [] };
-  }
-
-  const violations = [];
-  let replacements = 0;
-
-  const segments = sentenceSegments(source).map((segment) => {
-    if (!segment.trim()) return segment;
-    const versions = versionsForSegment(segment, grounding);
-    const { keys, families, rawPatterns } = allowedFor(versions);
-    const matches = findProductMatches(segment);
-    const plan = [];
-
-    // 1. A product name none of this segment's versions has.
-    for (const match of matches) {
-      const { product } = match;
-      if (keys.has(product.key)) continue;
-      if (rawPatterns.some((pattern) => pattern.test(match.text))) continue;
-      const preceding = segment.slice(0, match.start);
-      violations.push({
-        kind: 'product',
-        name: product.label,
-        version: versions.map((version) => version.label).join(' | '),
-        segment: segment.trim(),
-      });
-      plan.push({
-        start: match.start,
-        end: match.end,
-        replacement: genericPhrase(product, {
-          atStart: preceding.replace(/<[^>]*>/g, '').trim() === '',
-          precededByArticle: /\b(?:the|a|an)\s+$/i.test(preceding),
-          possessive: match.possessive,
-        }),
-      });
-    }
-
-    // 2. A bare family word this version has no product in at all.
-    if (keys.size > 0) {
-      for (const family of PRODUCT_FAMILY_WORDS) {
-        if (families.has(family.family)) continue;
-        family.pattern.lastIndex = 0;
-        const claimed = plan.some((item) => item.start <= (segment.search(family.pattern)));
-        const index = segment.search(family.pattern);
-        if (index < 0 || claimed) continue;
-        const matched = family.pattern.exec(segment)[0];
-        violations.push({
-          kind: 'family',
-          name: family.label,
-          version: versions.map((version) => version.label).join(' | '),
-          segment: segment.trim(),
-        });
-        plan.push({
-          start: index,
-          end: index + matched.length,
-          replacement: /^[A-Z]/.test(matched) ? 'The selected Artcoustic loudspeakers' : 'the selected Artcoustic loudspeakers',
-        });
-      }
-    }
-
-    replacements += plan.length;
-    // Applied from the end, so earlier offsets stay valid.
-    return [...plan]
-      .sort((a, b) => b.start - a.start)
-      .reduce((out, item) => `${out.slice(0, item.start)}${item.replacement}${out.slice(item.end)}`, segment);
-  });
-
-  const cleaned = tidyGenericPhrases(segments.join(''));
-
-  // Anything the pass could not remove is reported, so it can be rejected.
-  const unresolved = violations.filter((violation) => {
-    const product = CATALOGUE_ALL.find((entry) => entry.label === violation.name);
-    const family = PRODUCT_FAMILY_WORDS.find((entry) => entry.label === violation.name);
-    const pattern = violation.kind === 'family' ? family?.pattern : product?.pattern;
-    return pattern ? pattern.test(cleaned) : false;
-  });
-
-  return {
-    html: cleaned,
-    grounded: unresolved.length === 0,
-    violations,
-    replacements,
-    unresolved,
-  };
 }
 
 export default buildProductGrounding;
