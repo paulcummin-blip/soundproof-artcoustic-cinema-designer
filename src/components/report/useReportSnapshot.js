@@ -50,6 +50,11 @@ export function useReportSnapshot({
   // place, so the backfill runs at most once per open report.
   const evidenceBackfillKeyRef = useRef(null);
   const mountedRef = useRef(true);
+  // Whether this report's evidence snapshot passed its parity check. A report
+  // whose evidence disagrees with what the report itself shows is still saved,
+  // but is never proposal-ready.
+  const [evidenceIncomplete, setEvidenceIncomplete] = useState(false);
+  const [evidenceMismatches, setEvidenceMismatches] = useState([]);
 
   useEffect(() => () => { mountedRef.current = false; }, []);
 
