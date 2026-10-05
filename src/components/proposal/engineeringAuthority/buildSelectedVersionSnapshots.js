@@ -150,7 +150,14 @@ export async function buildSelectedVersionSnapshots({
           ? { currentFingerprint: authoritySnapshot.calculationFingerprint }
           : null,
         seats: authoritySnapshot?.seatingPositions || designState.seating_positions || [],
-        placedSpeakers: authoritySnapshot?.placedSpeakers || designState.selected_speakers || [],
+        // The version's SAVED design is the product authority — the same source
+        // its own Technical Report states its products from. The composed
+        // engineering snapshot can lag it (a same-window handoff written before
+        // the design's last save), which would state an older speaker than the
+        // report states. Engineering stays frozen; the products do not.
+        placedSpeakers: (Array.isArray(designState.selected_speakers) && designState.selected_speakers.length > 0)
+          ? designState.selected_speakers
+          : (authoritySnapshot?.placedSpeakers || []),
         priceCalculation: authoritySnapshot?.priceData || null,
       });
 

@@ -45,7 +45,13 @@ function resolveOverheadModel(project) {
 
 export function buildSystemAuthority(project, _version, placedSpeakers) {
   const dolbyConfig = parseDolbyConfig(project?.dolby_config);
-  const speakersByRole = resolveSpeakerModelsByRole(project, placedSpeakers);
+  // The version-merged design state is the product authority: the same
+  // placements the version's own Technical Report states. A placements array
+  // passed in from an older snapshot must never override them.
+  const designSpeakers = Array.isArray(project?.selected_speakers) && project.selected_speakers.length > 0
+    ? project.selected_speakers
+    : (Array.isArray(placedSpeakers) ? placedSpeakers : []);
+  const speakersByRole = resolveSpeakerModelsByRole(project, designSpeakers);
   const subwooferInstances = Array.isArray(project?.subwooferInstances) ? project.subwooferInstances : [];
   const enabledSubs = subwooferInstances.filter((s) => s.enabled !== false);
   const ampPower = Number(project?.amplifier_power) || null;
@@ -118,7 +124,7 @@ export function buildSystemAuthority(project, _version, placedSpeakers) {
   // is the product specification a System Design Comparison column reads, so a
   // comparison can never state a different package from that version's report.
   const productsSelected = buildProductsSelected({
-    placedSpeakers,
+    placedSpeakers: designSpeakers,
     frontSubsCfg: project?.front_subs_cfg || project?.frontSubsCfg || null,
     rearSubsCfg: project?.rear_subs_cfg || project?.rearSubsCfg || null,
     subwooferInstances,
@@ -143,7 +149,7 @@ export function buildSystemAuthority(project, _version, placedSpeakers) {
     },
     subwoofer: subwooferStrategy,
     amplification,
-    placed_speaker_count: Array.isArray(placedSpeakers) ? placedSpeakers.length : 0,
+    placed_speaker_count: designSpeakers.length,
   };
 
   return {

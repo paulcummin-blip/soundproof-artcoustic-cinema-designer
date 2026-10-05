@@ -96,6 +96,18 @@ function authorityStringsFromSnapshot(snapshot) {
 /** The role strings of one version's frozen comparison evidence. */
 function authorityStringsFromVersionEvidence(version) {
   const strings = [];
+  // The version's own product specification — the same strings its Technical
+  // Report prints and the comparison table shows (quantity included). Grounding
+  // therefore allows exactly what the table states, never an older package.
+  const selected = version?.products_selected;
+  if (selected && typeof selected === 'object') {
+    for (const row of Array.isArray(selected.rows) ? selected.rows : []) {
+      if (row?.value) strings.push({ name: row.value, roleLabel: row.area || null });
+    }
+  }
+  if (strings.length > 0) return strings;
+
+  // A comparison saved before the product authority existed: its per-role package.
   for (const role of Array.isArray(version?.speaker_package) ? version.speaker_package : []) {
     if (role?.model) strings.push({ name: role.model, roleLabel: role.role_description || role.role || null });
   }
