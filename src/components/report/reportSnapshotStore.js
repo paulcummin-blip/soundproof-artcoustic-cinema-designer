@@ -11,6 +11,15 @@
 import { base44 } from '@/api/base44Client';
 import { notifyReportSourceStored } from '@/components/proposal/sourceAuthority/reportSourceSignal';
 
+// Database object-key order is not evidence content.
+function stableEvidence(value) {
+  if (Array.isArray(value)) return value.map(stableEvidence);
+  if (value && typeof value === 'object') {
+    return Object.fromEntries(Object.keys(value).sort().map((key) => [key, stableEvidence(value[key])]));
+  }
+  return value;
+}
+
 /** Read the saved report for one project version and report type. */
 export async function loadReportSnapshot({ projectId, versionId, reportType }) {
   if (!projectId || !versionId || !reportType) return null;
@@ -49,8 +58,8 @@ export async function saveReportSnapshot({ existing = null, record }) {
     || saved.project_id !== record.project_id
     || saved.version_id !== record.version_id
     || saved.report_type !== record.report_type
-    || JSON.stringify(saved.payload?.reportEvidence ?? null)
-      !== JSON.stringify(record.payload?.reportEvidence ?? null)) {
+    || JSON.stringify(stableEvidence(saved.payload?.reportEvidence ?? null))
+      !== JSON.stringify(stableEvidence(record.payload?.reportEvidence ?? null))) {
     throw new Error('Report evidence persistence could not be verified.');
   }
   // One in-session announcement, so the proposal readiness read (which judges
