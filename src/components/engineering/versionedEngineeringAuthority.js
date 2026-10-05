@@ -116,6 +116,7 @@ export function fetchDurablePublication(
         publication: data.publication || null,
         status: data.status || 'not_calculated',
         version: data.version || null,
+        acknowledgement: data.acknowledgement || null,
         readState: 'success',
         error: null,
       };
