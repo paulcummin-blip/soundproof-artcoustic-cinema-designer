@@ -1,300 +1,79 @@
-/**
- * Acceptance tests for the System Design Summary / Proposal PDF output.
- *
- * Covers: the proposal filename format for every report type, the numeric
- * display policy (whole angles, whole dB, whole Hz), the four-column Key
- * Performance Highlights rows with a populated "What the room gains" cell, the
- * one-heading rule for a section, the highlights introduction rule, and the
- * canonical screen size a report states.
- *
- * Pure: no React, no database, no browser.
- *
- * Run: npx vitest run test/proposal-report-authority.test.mjs
- */
-
+// System Design Comparison evidence contract: every compared parameter value and
+// the Products Selected block must be read from each version's OWN saved report
+// source, never from a lagging publication or an alternative evidence path.
+import { test } from 'vitest';
 import assert from 'node:assert/strict';
-import { describe, it } from 'vitest';
+import { readProposalReportEvidence } from '../base44/shared/proposalReportEvidenceReader.js';
+import { buildSelectedVersionEvidence } from '../base44/shared/comparisonEvidence.js';
+import { buildComparisonTable } from '../base44/shared/comparisonTable.js';
 
-import {
-  buildProposalReportTitle,
-  buildReportFilename,
-  proposalReportTypeToken,
-  REPORT_PDF_TYPE,
-} from '../src/components/report/reportPdfTitle.js';
-import {
-  DISPLAY_UNIT,
-  formatResultText,
-} from '../src/components/proposal/displayValueFormat.js';
-import {
-  HIGHLIGHT_AREA,
-  buildHighlightDisplayRows,
-  HIGHLIGHT_DISPLAY_LIMIT,
-} from '../src/components/proposal/keyPerformanceHighlightsAuthority.js';
-import {
-  limitSentences,
-  prepareSectionBody,
-  stripDuplicateLeadingHeading,
-} from '../src/components/proposal/sectionBodyAuthority.js';
-import { resolveCanonicalScreen } from '../src/components/models/screen/canonicalScreenSize.js';
+const ids = [12, 13, 14, 18, 19, 20];
+const version = (id) => ({ id, version_name: `Level ${id} version`, updated_date: '2026-10-05T10:00:00Z' });
+const source = (id) => ({
+  available: true,
+  identity: { versionId: id },
+  report_source_version: 1,
+  system: { products_selected: { rows: [{ key: 'lcr', area: 'LCR', value: 'Q8-5 × 3' }], lcr: ['Q8-5 × 3'] } },
+  viewing: { available: true, summary: 'Report RP23 summary', primary_floor: 'Level 4' },
+  rp22: { parameter_headlines: [] },
+  bass: {},
+  report_parameters: ids.map((parameter_id) => {
+    const level = id === '4' ? 'L4' : 'L2';
+    const value = parameter_id === 13
+      ? (id === '4' ? '108 dBC (OH)' : '100 dBC (FW)')
+      : `report P${parameter_id} value`;
+    return { parameter_id, level, value, text: `${level} · ${value}` };
+  }),
+});
+const report = (id, type) => ({
+  id: `${id}-${type}`, version_id: id, report_type: type, status: 'current',
+  generated_at: '2026-10-05T12:00:00Z', payload: { proposalSource: source(id) },
+});
+const db = (rows) => ({ ReportSnapshot: { filter: async (q) => ({ items: rows.filter((r) => r.version_id === q.version_id) }) } });
+const rows = ['4', '1'].flatMap((id) => ['technical', 'visual'].map((type) => report(id, type)));
+const entries = await readProposalReportEvidence(db(rows), 'project', ['4', '1'].map(version));
+const evidence = buildSelectedVersionEvidence(entries);
+const table = buildComparisonTable(evidence);
 
-const SEGMENTS = ['Sound Proof', 'Artcoustic Cinema Designer'];
-
-describe('proposal PDF filename', () => {
-  const details = { dealerName: 'Ribble AV', projectReference: 'LH-001' };
-
-  it('names the report type, dealer, project and reference', () => {
-    assert.equal(
-      buildProposalReportTitle('Lords Hall', 'system_summary', details),
-      'Sound Proof - Artcoustic Cinema Designer - System Design Summary - Ribble AV - Lords Hall - LH-001'
-    );
-    assert.equal(
-      buildProposalReportTitle('Lords Hall', 'comparison', details),
-      'Sound Proof - Artcoustic Cinema Designer - System Design Comparison - Ribble AV - Lords Hall - LH-001'
-    );
-    assert.equal(
-      buildProposalReportTitle('Lords Hall', 'single', details),
-      'Sound Proof - Artcoustic Cinema Designer - Proposal - Ribble AV - Lords Hall - LH-001'
-    );
-  });
-
-  it('always carries Sound Proof, the product and a report type token', () => {
-    const name = buildProposalReportTitle('Lords Hall', 'system_summary', {});
-    SEGMENTS.forEach((segment) => assert.ok(name.includes(segment), segment));
-    assert.ok(name.includes('System Design Summary'));
-    assert.equal(proposalReportTypeToken('system_summary'), REPORT_PDF_TYPE.SYSTEM_DESIGN_SUMMARY);
-    assert.equal(proposalReportTypeToken('comparison'), REPORT_PDF_TYPE.SYSTEM_DESIGN_COMPARISON);
-    assert.equal(proposalReportTypeToken('something_legacy'), REPORT_PDF_TYPE.PROPOSAL);
-  });
-
-  it('never names the platform, whatever the project is called', () => {
-    const name = buildReportFilename('Proposal', 'Base44 demo room', null, {
-      dealerName: 'Base 44 dealer',
-    });
-    assert.ok(!/base\s*44/i.test(name), name);
-  });
-
-  it('omits the dealer and reference segments rather than filling them in', () => {
-    assert.equal(
-      buildProposalReportTitle('Lords Hall', 'system_summary', {}),
-      'Sound Proof - Artcoustic Cinema Designer - System Design Summary - Lords Hall'
-    );
-  });
-
-  // ── Acceptance: Marquee, with and without a project reference ──────────────
-
-  it('A. Marquee with no project reference omits the reference segment', () => {
-    assert.equal(
-      buildProposalReportTitle('Marquee Home', 'system_summary', {
-        dealerName: 'Ribble AV',
-        projectReference: null,
-      }),
-      'Sound Proof - Artcoustic Cinema Designer - System Design Summary - Ribble AV - Marquee Home'
-    );
-    assert.equal(
-      buildProposalReportTitle('Marquee Home', 'system_summary', {
-        dealerName: 'Ribble AV',
-        projectReference: '',
-      }),
-      'Sound Proof - Artcoustic Cinema Designer - System Design Summary - Ribble AV - Marquee Home'
-    );
-  });
-
-  it('B. Marquee with reference "MH-001" states it last', () => {
-    assert.equal(
-      buildProposalReportTitle('Marquee Home', 'system_summary', {
-        dealerName: 'Ribble AV',
-        projectReference: 'MH-001',
-      }),
-      'Sound Proof - Artcoustic Cinema Designer - System Design Summary - Ribble AV - Marquee Home - MH-001'
-    );
-  });
-
-  it('C. a comparison report names System Design Comparison exactly once', () => {
-    const name = buildProposalReportTitle('Marquee Home', 'comparison', {
-      dealerName: 'Ribble AV',
-      projectReference: 'MH-001',
-    });
-    assert.equal(
-      name,
-      'Sound Proof - Artcoustic Cinema Designer - System Design Comparison - Ribble AV - Marquee Home - MH-001'
-    );
-    assert.equal((name.match(/System Design Comparison/g) || []).length, 1);
-  });
-
-  it('D. carries no platform name, no generic word and no browser title', () => {
-    const names = [
-      buildProposalReportTitle('Marquee Home', 'system_summary', {}),
-      buildProposalReportTitle('Marquee Home', 'comparison', { projectReference: 'MH-001' }),
-    ];
-    names.forEach((name) => {
-      assert.ok(!/base\s*44/i.test(name), name);
-      assert.ok(!/\bSoundProof\b/.test(name), name);
-      assert.ok(!/\bdownload\b/i.test(name), name);
-      assert.ok(!/\buntitled proposal\b/i.test(name), name);
-      assert.ok(name.startsWith('Sound Proof - Artcoustic Cinema Designer - '), name);
-      assert.equal(/\s{2,}/.test(name), false, name);
-      assert.equal(/[<>:"/\\|?*]/.test(name), false, name);
-    });
-  });
-
-  it('D. strips a host-tab title that leaked into the dealer or the reference', () => {
-    // The exact string the platform host tab used to contribute.
-    const polluted = 'SoundProof - Artcoustic Cinema Designer _ Base44';
-    const name = buildProposalReportTitle('Marquee Home', 'system_summary', {
-      dealerName: polluted,
-      projectReference: polluted,
-    });
-    assert.ok(!/base\s*44/i.test(name), name);
-    assert.ok(name.includes('System Design Summary'), name);
-    assert.ok(name.includes('Marquee Home'), name);
-  });
+test('A/B: both P13 columns copy their own Technical Report, limiting group included', () => {
+  assert.deepEqual(table.rows.find((r) => r.key === 'p13').values, ['L4 · 108 dBC (OH)', 'L2 · 100 dBC (FW)']);
 });
 
-describe('numeric display policy', () => {
-  it('states angles as whole degrees', () => {
-    assert.equal(formatResultText('L1 · 47.8°', DISPLAY_UNIT.DEGREES), 'L1 · 48°');
-  });
-
-  it('states dB as whole numbers', () => {
-    assert.equal(formatResultText('106.0 dBC', DISPLAY_UNIT.DB), '106 dBC');
-    assert.equal(formatResultText('±0.95 dB', DISPLAY_UNIT.DB), '±1 dB');
-    assert.equal(formatResultText('L4 · 24.4 dB', DISPLAY_UNIT.DB), 'L4 · 25 dB');
-  });
-
-  it('states bass extension as whole Hz using the favourable policy', () => {
-    assert.equal(formatResultText('16.4 Hz', DISPLAY_UNIT.HZ), '16 Hz');
-  });
-
-  it('leaves a level code, a channel count and a distance alone', () => {
-    assert.equal(formatResultText('L1 · 9.1.4', DISPLAY_UNIT.NONE), 'L1 · 9.1.4');
-    assert.equal(formatResultText('L1', DISPLAY_UNIT.NONE), 'L1');
-    assert.equal(formatResultText('0.85 m', DISPLAY_UNIT.NONE), '0.85 m');
-  });
-
-  it('gives a bare angle its degree sign', () => {
-    assert.equal(formatResultText('L1 · 47.8', DISPLAY_UNIT.DEGREES), 'L1 · 48°');
-  });
+test('C: all six key parameter levels and values equal saved report text', () => {
+  for (const id of ids) {
+    assert.deepEqual(
+      table.rows.find((r) => r.key === `p${id}`).values,
+      ['4', '1'].map((v) => source(v).report_parameters.find((r) => r.parameter_id === id).text),
+    );
+  }
 });
 
-describe('Key Performance Highlights rows', () => {
-  const calculated = [
-    { key: 'p5', area: 'Horizontal spacing', result: 'L1 · 47.8', what_the_room_gains: '' },
-    {
-      key: 'p12',
-      area: 'Screen Dynamic Range',
-      result: 'L4 · 106.0 dBC',
-      what_the_room_gains: 'Strong headroom on the screen channels.',
-    },
-    { key: 'p18', area: 'Bass extension', result: 'L4 · 16.4 Hz', what_the_room_gains: '' },
-    { key: 'dpi', area: 'Design Index', result: '4 · Primary', what_the_room_gains: 'Internal' },
-  ];
-
-  const rows = buildHighlightDisplayRows(calculated);
-
-  it('carries the four client-facing columns', () => {
-    assert.deepEqual(Object.keys(rows[0]).filter((key) => key !== 'key'), [
-      'area',
-      'parameter',
-      'result',
-      'gain',
-    ]);
-  });
-
-  it('names the performance area and the parameter source', () => {
-    assert.equal(rows[0].area, HIGHLIGHT_AREA.SPATIAL);
-    assert.equal(rows[0].parameter, 'P5 horizontal spacing');
-    assert.equal(rows[0].result, 'L1 · 48°');
-  });
-
-  it('never leaves "what the room gains" empty', () => {
-    rows.forEach((row) => assert.ok(row.gain.length > 15, `${row.key}: ${row.gain}`));
-  });
-
-  it('keeps each row on its own performance area', () => {
-    const byKey = new Map(rows.map((row) => [row.key, row]));
-    assert.equal(byKey.get('p12').area, HIGHLIGHT_AREA.DYNAMIC);
-    assert.equal(byKey.get('p18').area, HIGHLIGHT_AREA.BASS);
-    assert.equal(byKey.get('p18').result, 'L4 · 16 Hz');
-  });
-
-  it('drops the internal Design Index and caps the table length', () => {
-    assert.ok(!rows.some((row) => /design index/i.test(`${row.area} ${row.parameter}`)));
-    const many = Array.from({ length: 30 }, (unused, index) => ({
-      key: `p${index + 2}`,
-      area: 'Result',
-      result: 'L2 · 3.4 dB',
-      what_the_room_gains: '',
-    }));
-    assert.equal(buildHighlightDisplayRows(many).length, HIGHLIGHT_DISPLAY_LIMIT);
-  });
-
-  it('keeps a generated sentence when it is a usable one', () => {
-    const withProse = buildHighlightDisplayRows([
-      {
-        key: 'p19',
-        area: 'Bass response',
-        result: 'L3 · 4.0 dB',
-        what_the_room_gains: 'Even bass response across every seat in the room.',
-      },
-    ]);
-    assert.equal(withProse[0].gain, 'Even bass response across every seat in the room.');
-  });
+test('D: Products Selected are copied unchanged', () => {
+  assert.deepEqual(entries[0].snapshot.system.products_selected, source('4').system.products_selected);
+  assert.deepEqual(table.rows.find((r) => r.key === 'lcr').values, ['Q8-5 × 3', 'Q8-5 × 3']);
 });
 
-describe('section heading and highlights introduction', () => {
-  it('removes a leading heading that repeats the section title', () => {
-    assert.equal(
-      stripDuplicateLeadingHeading('<h2>Dynamic Range</h2><p>Body text.</p>', 'Dynamic Range'),
-      '<p>Body text.</p>'
-    );
-    assert.equal(
-      stripDuplicateLeadingHeading('<h2>SYSTEM DESIGN SUMMARY</h2><p>Body.</p>', 'System Design Summary'),
-      '<p>Body.</p>'
-    );
-  });
-
-  it('keeps a heading that says something else', () => {
-    const html = '<h2>Screen and seating</h2><p>Body text.</p>';
-    assert.equal(stripDuplicateLeadingHeading(html, 'Dynamic Range'), html);
-  });
-
-  it('applies the one-heading rule to every section', () => {
-    assert.equal(
-      prepareSectionBody('<h2>Timbre Matching</h2><p>Body.</p>', {
-        title: 'Timbre Matching',
-        sectionType: 'timbre_matching',
-      }),
-      '<p>Body.</p>'
-    );
-  });
-
-  it('drops a list from the highlights introduction and keeps it short', () => {
-    const intro = prepareSectionBody(
-      '<h2>Key Performance Highlights</h2><p>Measured summary of this design.</p><ul><li>P5 47.8°</li></ul><p>Every row states what the result gives the room.</p><p>A third sentence.</p><p>A fourth sentence.</p>',
-      { title: 'Key Performance Highlights', sectionType: 'key_performance_highlights' }
-    );
-    assert.ok(!/<ul|<li/.test(intro), intro);
-    assert.ok((intro.match(/[.!?](\s|$)/g) || []).length <= 3, intro);
-  });
-
-  it('limits prose to the requested number of sentences', () => {
-    assert.equal(limitSentences('<p>One. Two. Three.</p>', 2), '<p>One. Two.');
-  });
+test('E: missing, stale, legacy payload and missing P13 reject with named errors', async () => {
+  await assert.rejects(readProposalReportEvidence(db([]), 'project', [version('4')]), /Level 4 version: missing Technical/);
+  const stale = structuredClone(rows); stale[0].status = 'stale';
+  await assert.rejects(readProposalReportEvidence(db(stale), 'project', [version('4')]), /Level 4 version: stale Technical/);
+  const legacy = structuredClone(rows); legacy[0].payload = {};
+  await assert.rejects(readProposalReportEvidence(db(legacy), 'project', [version('4')]), /no saved parameter payload/);
+  const missing = structuredClone(rows);
+  missing[0].payload.proposalSource.report_parameters = missing[0].payload.proposalSource.report_parameters.filter((r) => r.parameter_id !== 13);
+  await assert.rejects(readProposalReportEvidence(db(missing), 'project', [version('4')]), /Level 4 version: missing Technical Report parameter P13/);
 });
 
-describe('canonical screen size', () => {
-  it('derives the stated diagonal from the viewable width', () => {
-    const screen = resolveCanonicalScreen({ screen_size: 147, aspect_ratio: '16:9' });
-    assert.equal(screen.widthInches, 147);
-    assert.equal(screen.diagonalInches, 169);
-  });
+test('no older report may replace the latest missing evidence', async () => {
+  const latest = report('4', 'technical'); latest.payload = {};
+  await assert.rejects(readProposalReportEvidence(db([latest, ...rows]), 'project', [version('4')]), /no saved parameter payload/);
+});
 
-  it('uses a TV preset when the design carries one', () => {
-    const screen = resolveCanonicalScreen({ screen_size: 120, tv_preset_key: 'tv83', aspect_ratio: '16:9' });
-    assert.equal(screen.diagonalInches, 83);
-  });
-
-  it('states nothing when the project declares no screen', () => {
-    assert.equal(resolveCanonicalScreen({ name: 'Room' }), null);
-  });
+test('bass alternative values cannot override report parameters', () => {
+  const conflicting = structuredClone(evidence);
+  conflicting[0].bass_evidence_if_reliable.p18 = { text: 'L1 · 99 Hz' };
+  assert.equal(
+    buildComparisonTable(conflicting).rows.find((r) => r.key === 'p18').values[0],
+    source('4').report_parameters.find((r) => r.parameter_id === 18).text,
+  );
 });
