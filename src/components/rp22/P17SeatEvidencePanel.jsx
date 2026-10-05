@@ -46,7 +46,8 @@ export default function P17SeatEvidencePanel({ engineeringSummary = null, seats 
   }), [seats, engineeringSummary]);
 
   const explanation = useMemo(() => buildP17DiagnosticExplanation({ rows }), [rows]);
-  const { loading, versions } = useP17SavedVersionComparison({ projectId, enabled: true });
+  // Saved-version evidence is read only when the designer opens that section.
+  const { loading, versions } = useP17SavedVersionComparison({ projectId, enabled: showSavedComparison });
 
   const toggle = (open) => ({
     display: "flex", alignItems: "center", gap: 5, width: "100%", textAlign: "left",
@@ -94,7 +95,9 @@ export default function P17SeatEvidencePanel({ engineeringSummary = null, seats 
           {showSavedComparison && (
             loading
               ? <div style={{ fontSize: 10.5, color: "#9B8E82" }}>Reading saved versions…</div>
-              : <P17VersionComparisonTable versions={versions} />
+              : versions.length
+                ? <P17VersionComparisonTable versions={versions} />
+                : <div style={{ fontSize: 10.5, color: "#9B8E82" }}>No saved version evidence available for this project.</div>
           )}
         </div>
       </div>
