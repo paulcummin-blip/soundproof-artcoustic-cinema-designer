@@ -69,13 +69,17 @@ export const GENERATION_RECORD_FIELDS = Object.freeze([
   'record_fingerprint',
 ]);
 
-/** A JSON snapshot: what is stored is JSON, and it is a copy. */
-function jsonClone(value) {
+/**
+ * A JSON snapshot: what is stored is JSON, and it is a copy. Exported so the
+ * Phase 4 edit record is immutable in exactly the same way a generation record
+ * is, rather than the rule being restated somewhere else.
+ */
+export function jsonClone(value) {
   if (value === undefined || value === null) return null;
   return JSON.parse(JSON.stringify(value));
 }
 
-function deepFreeze(value) {
+export function deepFreeze(value) {
   if (value === null || typeof value !== 'object' || Object.isFrozen(value)) return value;
   for (const key of Object.keys(value)) deepFreeze(value[key]);
   return Object.freeze(value);

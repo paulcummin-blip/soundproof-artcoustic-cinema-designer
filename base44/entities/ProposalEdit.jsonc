@@ -1,0 +1,191 @@
+{
+  "name": "ProposalEdit",
+  "type": "object",
+  "description": "One saved edit of a generated proposal, kept forever as an immutable record. The designer's copy of the proposal sections lives here; the ProposalGeneration record it edits is never touched, so the frozen evidence pack, the GPT input, the GPT output, the validation result, the report snapshot IDs, the evidence and engineering fingerprints and the record fingerprint all stay exactly as they were generated. Every saved edit appends a new record linked to the generation by generation_id and base_generation_fingerprint, and nothing is ever overwritten or deleted: the schema refuses both. An edit is validated exactly as the GPT draft was, by the same writer contract against the same frozen GPT input, so an edit may change wording and tone but can never change a figure, a Performance Level, a product, a blocked claim or the copy's shape. The validation status is derived from that validation and is never chosen by a caller: only a copy with status 'valid' may be rendered for issue, export, completion or sending. Reverting appends a new edit whose sections are taken from the copy being restored, never from the caller.",
+  "properties": {
+    "edit_id": {
+      "type": "string",
+      "description": "Stable identifier of this edit, derived from the edit itself (the generation it edits, the copy, how it was made, what it restores, when it was saved and how it validated) so the same edit can never be stored twice."
+    },
+    "edit_number": {
+      "type": "integer",
+      "description": "This edit's place in the generation's edit chain, starting at 1. A further edit, a correction or a revert always appends a higher number; an existing record keeps its own."
+    },
+    "generation_id": {
+      "type": "string",
+      "description": "ID of the ProposalGeneration record this copy edits. The generation itself is never modified by an edit."
+    },
+    "proposal_id": {
+      "type": "string",
+      "nullable": true,
+      "description": "ID of the Proposal this edit belongs to, taken from the generation. Null when the generation was made against a draft proposal, in which case draft_proposal_id carries the identity."
+    },
+    "draft_proposal_id": {
+      "type": "string",
+      "nullable": true,
+      "description": "Identity of the draft proposal before it is saved, taken from the generation. Null once a proposal_id exists."
+    },
+    "project_id": {
+      "type": "string",
+      "description": "ID of the Project every selected version belongs to."
+    },
+    "account_id": {
+      "type": "string",
+      "description": "Denormalized account_id from the parent Project, used for access control. Must be set at creation time from the parent Project's account_id."
+    },
+    "edited_sections": {
+      "type": "array",
+      "items": {
+        "type": "object"
+      },
+      "default": [],
+      "description": "The designer's copy of the proposal: the writer contract's sections, each with its section ID, its text and the claim IDs that ground it. Because the copy carries no contract version and no pack fingerprint of its own, an edit cannot claim to belong to another contract or another evidence pack: both are read from the frozen generation when the copy is validated and rendered."
+    },
+    "edit_source": {
+      "type": "string",
+      "enum": [
+        "manual",
+        "revert"
+      ],
+      "default": "manual",
+      "description": "How the copy came to exist. 'manual' = the designer's own wording, saved through the edit path. 'revert' = a copy restored from the original generated output or from a stored valid edit, whose sections are taken from that copy rather than supplied by the caller."
+    },
+    "base_edit_id": {
+      "type": "string",
+      "nullable": true,
+      "description": "The edit a revert restores, when it restores one. Null for a manual edit, and null for a revert to the original generated copy."
+    },
+    "edited_by": {
+      "type": "string",
+      "description": "Name or email of the user who saved the edit."
+    },
+    "edited_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "When the designer saved the edit."
+    },
+    "created_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "When this edit record was recorded."
+    },
+    "base_generation_fingerprint": {
+      "type": "string",
+      "description": "Content fingerprint of the generation record this copy was made from. Any change to the evidence or the generated output would change it, which is how an edit is recognised as belonging to the generation it started from."
+    },
+    "validation_status": {
+      "type": "string",
+      "enum": [
+        "valid",
+        "needs_human_review",
+        "validation_failed"
+      ],
+      "description": "What became of this copy. valid = it passed every writer rule. needs_human_review = it broke a claim, figure, level or product rule. validation_failed = it was not the contract's shape, or was never validated. Derived from the validation result and never chosen by a caller; an invalid copy is retained for review but blocked from issue, export, completion and sending."
+    },
+    "validation_errors": {
+      "type": "array",
+      "items": {
+        "type": "object"
+      },
+      "default": [],
+      "description": "Every rejection the validation reported for this copy, each with its code, section, detail and claim IDs. Empty for a valid edit."
+    },
+    "edit_fingerprint": {
+      "type": "string",
+      "description": "Content fingerprint of the whole record, taken when it was saved. Evidence that the record has not been rewritten, and the authority for comparing two records of the same edit."
+    }
+  },
+  "required": [
+    "edit_id",
+    "edit_number",
+    "generation_id",
+    "project_id",
+    "edited_sections",
+    "edit_source",
+    "edited_by",
+    "edited_at",
+    "base_generation_fingerprint",
+    "validation_status",
+    "edit_fingerprint"
+  ],
+  "rls": {
+    "read": {
+      "$or": [
+        {
+          "$and": [
+            {
+              "data.account_id": "{{user.data.account_id}}"
+            },
+            {
+              "data.account_id": {
+                "$nin": [
+                  null,
+                  ""
+                ]
+              }
+            },
+            {
+              "$or": [
+                {
+                  "user_condition": {
+                    "data.access_level": "FULL_ACCESS"
+                  }
+                },
+                {
+                  "user_condition": {
+                    "data.access_level": "SOUND_PROOF_ONLY"
+                  }
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        }
+      ]
+    },
+    "create": {
+      "$or": [
+        {
+          "$and": [
+            {
+              "data.account_id": "{{user.data.account_id}}"
+            },
+            {
+              "data.account_id": {
+                "$nin": [
+                  null,
+                  ""
+                ]
+              }
+            },
+            {
+              "$or": [
+                {
+                  "user_condition": {
+                    "data.access_level": "FULL_ACCESS"
+                  }
+                },
+                {
+                  "user_condition": {
+                    "data.access_level": "SOUND_PROOF_ONLY"
+                  }
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        }
+      ]
+    },
+    "update": false,
+    "delete": false
+  }
+}
