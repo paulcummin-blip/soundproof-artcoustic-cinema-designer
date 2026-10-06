@@ -2,9 +2,25 @@ import React, { useEffect, useState } from 'react';
 import { useOptionalSharedBassResults } from '@/components/room/bass/bassResultsStore';
 import { fetchDurablePublication } from './versionedEngineeringAuthority';
 import { auditDurablePublication } from './publicationGateAuthority';
+import EngineeringPublicationDiagnostics from './EngineeringPublicationDiagnostics';
+import { useEngineeringMode } from '@/components/state/useEngineeringMode';
+import { useAuth } from '@/lib/AuthContext';
+import { isMasterAdmin } from '@/lib/accountAccess';
+
+// Dealer-facing status wording. Internal gate labels and field names stay inside
+// the diagnostics disclosure — never in the normal workflow.
+const TONES = {
+  published: { dot: '#2F7D4F', label: 'Published' },
+  publishing: { dot: '#B7791F', label: 'Publishing…' },
+  failed: { dot: '#B3261E', label: 'Failed' },
+  'not-ready': { dot: '#B7791F', label: 'Not ready' },
+  'not-saved': { dot: '#B7791F', label: 'Not saved' },
+};
 
 export default function EngineeringPublicationStatus({ publication, projectId, versionId }) {
   const bass = useOptionalSharedBassResults();
+  const { user } = useAuth();
+  const { engineeringMode } = useEngineeringMode();
   const [durable, setDurable] = useState(null);
   useEffect(() => {
     let cancelled = false;
@@ -18,29 +34,48 @@ export default function EngineeringPublicationStatus({ publication, projectId, v
   const saved = auditDurablePublication({ durable }).allowed
     && durable?.version?.published_fingerprint === fingerprint;
   const matchingAttempt = attempt?.fingerprint === fingerprint ? attempt : null;
-  const status = saved ? 'Published'
-    : matchingAttempt?.status === 'publishing' ? 'Publishing'
-    : matchingAttempt?.status === 'failed' ? 'Failed: ' + matchingAttempt.message
-    : matchingAttempt?.status === 'queued' ? 'Publishing — waiting for assessment to settle'
-    : !preflight.ready ? 'Not ready: ' + preflight.reason
-    : matchingAttempt?.status === 'cancelled' ? matchingAttempt.message
-    : 'Engineering assessment not saved';
-  return <section className="rounded-xl border border-amber-200 bg-white p-3 mb-3" aria-label="Engineering publication">
-    <h2 className="font-semibold">Engineering assessment</h2>
-    <p role="status">{status}</p>
-    {!saved && <p className="text-sm">Assessment displayed, not published. Final reports and proposals remain blocked.</p>}
-    {!saved && (preflight.ready
-      ? <button type="button" className="border rounded px-3 py-1 my-2" disabled={matchingAttempt?.status === 'publishing'} onClick={publish}>Publish Assessment</button>
-      : <button type="button" className="border rounded px-3 py-1 my-2" disabled={!bass?.canCalculate || bass?.calculationInProgress}
-          onClick={() => bass?.onCalculate?.({ collectDiagnostics: true })}>Verify Bass / Complete P19</button>)}
-    {!saved && !preflight.ready && !bass?.canCalculate && <p className="text-sm">Complete the selected P14 target and system inputs in Subwoofer Design first. No publication request has been sent.</p>}
-    <details><summary>Publication preflight</summary>
-      <table className="text-sm"><thead><tr><th>Gate</th><th>Result</th><th>Reason</th></tr></thead>
-      <tbody>{preflight.gates.map(gate => <tr key={gate.key}>
-        <td>{gate.label}</td><td>{gate.ok ? 'PASS' : 'FAIL'}</td><td>{gate.detail || ''}</td>
-      </tr>)}</tbody></table>
-      <p>Publication request: {matchingAttempt?.status || 'not attempted'}. HTTP: {matchingAttempt?.httpStatus || 'not recorded'}.</p>
-      <p>Durable publication: {durable?.acknowledgement?.durably_published === true ? 'acknowledged' : 'not acknowledged'}.</p>
-    </details>
-  </section>;
+
+  const state = saved ? 'published'
+    : matchingAttempt?.status === 'publishing' ? 'publishing'
+    : matchingAttempt?.status === 'failed' ? 'failed'
+    : matchingAttempt?.status === 'queued' ? 'publishing'
+    : !preflight.ready ? 'not-ready'
+    : matchingAttempt?.status === 'cancelled' ? 'not-ready'
+    : 'not-saved';
+
+  const action = state === 'published' ? null
+    : state === 'publishing' ? null
+    : state === 'failed' ? 'Engineering assessment has not been saved.'
+    : state === 'not-saved' ? 'Reports are blocked until the engineering assessment is published.'
+    : preflight.p19Blocks ? 'Complete P19 verification before reports can be generated.'
+    : 'Reports are blocked until the engineering assessment is published.';
+
+  const tone = TONES[state];
+  const showDiagnostics = isMasterAdmin(user) || engineeringMode === true;
+
+  return (
+    <section className="rounded-lg border border-[#DCDBD6] bg-white px-3 py-2 mb-3" aria-label="Engineering publication">
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm">
+        <span className="inline-flex items-center gap-2">
+          <span className="inline-block h-2 w-2 rounded-full" style={{ background: tone.dot }} aria-hidden="true" />
+          <span className="font-semibold" style={{ color: '#213428' }}>Engineering assessment:</span>
+          <span role="status">{tone.label}</span>
+        </span>
+        {action && <span style={{ color: '#625143' }}>{action}</span>}
+        {state !== 'published' && state !== 'publishing' && (preflight.ready
+          ? <button type="button" className="border rounded px-3 py-1" onClick={publish}>Publish Assessment</button>
+          : <button type="button" className="border rounded px-3 py-1" disabled={!bass?.canCalculate || bass?.calculationInProgress}
+              onClick={() => bass?.onCalculate?.({ collectDiagnostics: true })}>Verify Bass / Complete P19</button>)}
+      </div>
+      {state !== 'published' && !preflight.ready && !bass?.canCalculate && (
+        <p className="mt-1 text-xs" style={{ color: '#625143' }}>Complete the selected P14 target and system inputs in Subwoofer Design first.</p>
+      )}
+      {showDiagnostics && (
+        <details className="mt-2">
+          <summary className="cursor-pointer text-xs uppercase tracking-wide" style={{ color: '#625143' }}>Show diagnostics</summary>
+          <EngineeringPublicationDiagnostics preflight={preflight} matchingAttempt={matchingAttempt} durable={durable} />
+        </details>
+      )}
+    </section>
+  );
 }
