@@ -17,33 +17,33 @@ const rowCounts = seats => {
 };
 export function buildFrozenReportProject(state, { projectId, versionId } = {}) {
   const d = state || {}, errors = [];
-  const require = (path, ok) => { if (!ok) errors.push(path + ' is missing or invalid'); };
-  require('project_id', stated(projectId)); require('version_id', stated(versionId));
-  require('name', stated(d.name) && d.name !== 'Untitled Room');
-  require('version_name', stated(d.versionName));
-  for (const key of ['widthM','lengthM','heightM']) require('roomDims.'+key, numeric(d.roomDims?.[key]) && Number(d.roomDims[key]) > 0);
-  require('screen.visibleWidthInches', numeric(d.screen?.visibleWidthInches) && Number(d.screen.visibleWidthInches)>0);
-  require('screen.aspectRatio', stated(d.screen?.aspectRatio));
-  require('screen.manualMode', typeof d.screen?.manualMode === 'boolean');
-  require('screen.heightFromFloorM', numeric(d.screen?.heightFromFloorM));
-  require('screen.mountMode', stated(d.screen?.mountMode));
-  if (d.screen?.manualMode === true) require('screen.manualWidthM', numeric(d.screen?.manualWidthM) && Number(d.screen.manualWidthM)>0);
-  require('screenFrontPlaneM', numeric(d.screenFrontPlaneM));
-  require('dolbyLayout', stated(d.dolbyLayout));
-  require('seatingPositions', Array.isArray(d.seatingPositions) && d.seatingPositions.length>0);
+  const requireField = (path, ok) => { if (!ok) errors.push(path + ' is missing or invalid'); };
+  requireField('project_id', stated(projectId)); requireField('version_id', stated(versionId));
+  requireField('name', stated(d.name) && d.name !== 'Untitled Room');
+  requireField('version_name', stated(d.versionName));
+  for (const key of ['widthM','lengthM','heightM']) requireField('roomDims.'+key, numeric(d.roomDims?.[key]) && Number(d.roomDims[key]) > 0);
+  requireField('screen.visibleWidthInches', numeric(d.screen?.visibleWidthInches) && Number(d.screen.visibleWidthInches)>0);
+  requireField('screen.aspectRatio', stated(d.screen?.aspectRatio));
+  requireField('screen.manualMode', typeof d.screen?.manualMode === 'boolean');
+  requireField('screen.heightFromFloorM', numeric(d.screen?.heightFromFloorM));
+  requireField('screen.mountMode', stated(d.screen?.mountMode));
+  if (d.screen?.manualMode === true) requireField('screen.manualWidthM', numeric(d.screen?.manualWidthM) && Number(d.screen.manualWidthM)>0);
+  requireField('screenFrontPlaneM', numeric(d.screenFrontPlaneM));
+  requireField('dolbyLayout', stated(d.dolbyLayout));
+  requireField('seatingPositions', Array.isArray(d.seatingPositions) && d.seatingPositions.length>0);
   const counts = rowCounts(d.seatingPositions);
-  require('seatingPositions[].row', !!counts);
-  require('seatingRows', Number(d.seatingRows) === counts?.length);
-  require('seatsPerRowByRow', same(d.seatsPerRowByRow, counts));
-  require('placedSpeakers', Array.isArray(d.placedSpeakers) && d.placedSpeakers.length>0);
+  requireField('seatingPositions[].row', !!counts);
+  requireField('seatingRows', Number(d.seatingRows) === counts?.length);
+  requireField('seatsPerRowByRow', same(d.seatsPerRowByRow, counts));
+  requireField('placedSpeakers', Array.isArray(d.placedSpeakers) && d.placedSpeakers.length>0);
   for(const [i, speaker] of (d.placedSpeakers || []).entries()) {
-    require('placedSpeakers['+i+'].model', stated(speaker.model));
-    require('placedSpeakers['+i+'].role', stated(speaker.role));
-    for(const axis of ['x','y','z']) require('placedSpeakers['+i+'].position.'+axis, numeric(speaker.position?.[axis]));
+    requireField('placedSpeakers['+i+'].model', stated(speaker.model));
+    requireField('placedSpeakers['+i+'].role', stated(speaker.role));
+    for(const axis of ['x','y','z']) requireField('placedSpeakers['+i+'].position.'+axis, numeric(speaker.position?.[axis]));
   }
-  require('subwooferInstances', Array.isArray(d.subwooferInstances));
-  require('acousticTreatmentEnabled', typeof d.acousticTreatmentEnabled === 'boolean');
-  require('selectedAbfuserQty', numeric(d.selectedAbfuserQty) && Number(d.selectedAbfuserQty)>=0);
+  requireField('subwooferInstances', Array.isArray(d.subwooferInstances));
+  requireField('acousticTreatmentEnabled', typeof d.acousticTreatmentEnabled === 'boolean');
+  requireField('selectedAbfuserQty', numeric(d.selectedAbfuserQty) && Number(d.selectedAbfuserQty)>=0);
   if (errors.length) return { reportProject:null, missing:errors };
   // Explicit field mapping only. All facts belong to the selected, loaded assessment.
   const reportProject = {
@@ -88,14 +88,17 @@ function atomicRow(row, id, scope, publication) {
     raw_value:row.value ?? row.rawValue ?? null, unit:row.unit ?? ({1:'m',4:'dB',5:'deg',6:'dB',8:'none',9:'deg',10:'dB',15:'NCB',16:'dB',17:'dB',20:'dB',21:'dB'})[id] ?? null, level:level(row.level) ?? '—',
     limiting_group:row.limitingGroup ?? row.seatId ?? null,
     context:row.detail ?? row.note ?? (row.seatId ? 'Limiting seat '+row.seatId : scope),
-    authority_fingerprint:bass ? publication.provenance?.bass_fingerprint : publication.engineering_fingerprint,
-    authority_timestamp:publication.published_at,
+    authority_fingerprint:bass ? publication?.provenance?.bass_fingerprint : publication?.engineering_fingerprint,
+    authority_timestamp:publication?.published_at,
     source_type:bass ? 'durable-current-bass-authority' : 'durable-engineering-publication',
     source_row:copy(row),
   };
 }
 /** Runs BEFORE durable write. Every pair is copied from one complete source row. */
 export function buildAtomicParameterIndex(publication) {
+  // A publication that has not loaded yet (undefined) or does not exist (null)
+  // has no parameter index at all. Auditing it is a blocked state, never a crash.
+  if (!publication || typeof publication !== 'object') return {};
   const summary=publication.engineering_summary, index={};
   for(let id=1;id<=21;id++) {
     const seats=summary?.project?.reportCounts?.seatResultsByParameter?.['p'+id] || [];
@@ -113,7 +116,20 @@ export function buildAtomicParameterIndex(publication) {
   }
   return index;
 }
+/** The structured states a publication audit can report. Never a thrown error. */
+export const PUBLICATION_AUDIT_STATUS = Object.freeze({
+  CHECKING:'checking', MISSING:'missing', INCOMPLETE:'incomplete', BLOCKED:'blocked', COMPLETE:'complete',
+});
+function blockedAudit(status, missing, reason) {
+  return { allowed:false, blocked:true, status, missing, missing_fields:[...missing], reason };
+}
 export function auditPublicationContract(publication) {
+  // Cold load: the durable publication has not resolved yet. Report generation
+  // stays fail-closed and the page shows a checking state instead of crashing.
+  if (publication === undefined) return blockedAudit(PUBLICATION_AUDIT_STATUS.CHECKING, ['engineering_authority'],
+    'Engineering authority is still loading. Reports and proposals stay blocked until it resolves.');
+  if (publication === null) return blockedAudit(PUBLICATION_AUDIT_STATUS.MISSING, ['engineering_authority'],
+    'No saved engineering assessment exists for this version. Run the assessment before generating reports.');
   const missing=[], fail=(path,reason='is missing or invalid')=>missing.push(path+' '+reason);
   if (publication?.publication_contract_version!==PUBLICATION_CONTRACT_VERSION) fail('publication_contract_version');
   const report=publication?.report_snapshot, p=report?.report_project;
@@ -159,5 +175,13 @@ export function auditPublicationContract(publication) {
     // Re-derive ONLY for validation, never as read-time authority.
     if(!same(item,expected[key])) fail('parameter_index.'+key,'conflicts with its source row/provenance');
   }
-  return { allowed:missing.length===0, missing, reason:missing[0] || null };
+  const allowed=missing.length===0;
+  return {
+    allowed,
+    blocked:!allowed,
+    status:allowed ? PUBLICATION_AUDIT_STATUS.COMPLETE : PUBLICATION_AUDIT_STATUS.INCOMPLETE,
+    missing,
+    missing_fields:[...missing],
+    reason:allowed ? null : missing[0],
+  };
 }

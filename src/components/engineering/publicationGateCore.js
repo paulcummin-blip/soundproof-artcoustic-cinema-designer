@@ -15,6 +15,8 @@ export const PUBLICATION_ACKNOWLEDGEMENT = Object.freeze({
   DURABLE: 'durably_published',
   NOT_PUBLISHED: 'not_published',
   INCOMPLETE: 'incomplete',
+  /** The durable read has not resolved yet — fail-closed, never a crash. */
+  CHECKING: 'checking',
 });
 
 export const RP22_PARAMETER_KEYS = Object.freeze(
@@ -128,6 +130,20 @@ export function auditPublicationEntry(
   publication,
   { expectedFingerprint = null, project = null, bassAuthorityAvailable = false } = {},
 ) {
+  if (publication === undefined) {
+    // Cold load: the durable authority has not resolved yet. Blocked and
+    // checking — the page says so instead of crashing on a missing summary.
+    return {
+      status: PUBLICATION_ACKNOWLEDGEMENT.CHECKING,
+      durablyPublished: false,
+      complete: false,
+      fingerprintMatches: false,
+      missing: [section('identity')],
+      missing_fields: ['engineering_authority'],
+      reason: 'Engineering authority is still loading. Reports and proposals stay blocked until it resolves.',
+    };
+  }
+
   if (!publication) {
     return {
       status: PUBLICATION_ACKNOWLEDGEMENT.NOT_PUBLISHED,
@@ -135,6 +151,8 @@ export function auditPublicationEntry(
       complete: false,
       fingerprintMatches: false,
       missing: [section('identity')],
+      missing_fields: ['identity'],
+      reason: publicationBlockMessage({}),
     };
   }
 
@@ -151,6 +169,8 @@ export function auditPublicationEntry(
     complete,
     fingerprintMatches,
     missing,
+    missing_fields: missing.map((item) => item?.key || String(item)),
+    reason: complete ? null : publicationBlockMessage({ published: true, missing }),
   };
 }
 

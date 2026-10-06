@@ -30,6 +30,8 @@ export const PUBLICATION_ACKNOWLEDGEMENT = Object.freeze({
   NOT_PUBLISHED: 'not_published',
   /** Published, but the stored authority is missing required sections. */
   INCOMPLETE: 'incomplete',
+  /** The durable read has not resolved yet — fail-closed, never a crash. */
+  CHECKING: 'checking',
 });
 
 /** The RP22 parameter authority a publication must carry. */
@@ -165,6 +167,20 @@ export function auditEngineeringPublication(
   publication,
   { expectedFingerprint = null, project = null, bassAuthorityAvailable = false, requirePayload = true } = {},
 ) {
+  if (publication === undefined) {
+    // Cold load: the durable publication has not resolved yet. Blocked and
+    // checking — a reader says so instead of crashing on a missing summary.
+    return {
+      status: PUBLICATION_ACKNOWLEDGEMENT.CHECKING,
+      durablyPublished: false,
+      complete: false,
+      fingerprintMatches: false,
+      missing: [{ ...PUBLICATION_SECTION.IDENTITY }],
+      missing_fields: [PUBLICATION_SECTION.IDENTITY.key],
+      reason: 'Engineering authority is still loading. Reports and proposals stay blocked until it resolves.',
+    };
+  }
+
   if (!publication) {
     return {
       status: PUBLICATION_ACKNOWLEDGEMENT.NOT_PUBLISHED,
@@ -172,7 +188,8 @@ export function auditEngineeringPublication(
       complete: false,
       fingerprintMatches: false,
       missing: [{ ...PUBLICATION_SECTION.IDENTITY }],
-      reason: null,
+      missing_fields: [PUBLICATION_SECTION.IDENTITY.key],
+      reason: publicationBlockReason({}),
     };
   }
 
@@ -198,7 +215,8 @@ export function auditEngineeringPublication(
     complete,
     fingerprintMatches,
     missing,
-    reason: null,
+    missing_fields: missing.map((item) => item?.key || String(item)),
+    reason: complete ? null : publicationBlockReason({ published: true, missing }),
   };
 }
 

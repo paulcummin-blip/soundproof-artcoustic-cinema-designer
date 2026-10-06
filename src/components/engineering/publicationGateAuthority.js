@@ -53,10 +53,21 @@ export function auditDurablePublication({
     blocked: true,
     status,
     missing,
+    missing_fields: missing.map((item) => item?.key || String(item)),
     reason,
     publication: durable?.publication || null,
     fingerprintMatches: false,
   });
+
+  if (durable === undefined || durable === null) {
+    // Cold load: the durable read has not resolved yet. Fail closed and say so,
+    // instead of reporting an assessment that has not been saved yet.
+    return block(
+      PUBLICATION_ACKNOWLEDGEMENT.CHECKING,
+      [],
+      `Engineering authority${versionName ? ` for ${versionName}` : ''} is still loading. Report generation is blocked until it resolves.`,
+    );
+  }
 
   if (durable?.readState === 'failed') {
     return block(
