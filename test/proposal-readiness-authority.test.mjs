@@ -45,6 +45,12 @@
  *   TEST 14 Client and server resolve the same engineering result
  *   TEST 15 A version with reports but no calculated result still blocks, and
  *           names the calculated engineering result as what is missing
+ *   TEST 20 The four snapshot fixtures, one verdict each: A legacy (no evidence),
+ *           B incomplete evidence, C current visual, D current technical
+ *   TEST 21 Server authority, client mirror, Proposal Centre gate and Project
+ *           Library banner read every fixture alike
+ *   TEST 22 The fixtures satisfy the shared completeness contract, and the
+ *           incomplete one is refused by it
  *
  * Pure: no React, no database.
  *
@@ -74,6 +80,14 @@ import {
   versionDisplayName as sharedVersionDisplayName,
 } from '../base44/shared/proposalReadinessAuthority.js';
 
+import { validateReportEvidence } from '../base44/shared/reportEvidenceCompleteness.js';
+
+import {
+  LIBRARY_CHECKLIST_STATUS,
+  LIBRARY_READINESS_HEADLINE,
+  buildLibraryProposalReadiness,
+} from '../src/components/library/libraryProposalReadiness.js';
+
 import {
   READINESS_VERB as CLIENT_VERB,
   READINESS_COLUMNS as CLIENT_COLUMNS,
@@ -95,42 +109,176 @@ const SEAT_PRIORITY =
   'seat-r1-c1:secondary|seat-r1-c2:primary|seat-r1-c3:primary|seat-r1-c4:secondary'
   + '|seat-r2-c1:secondary|seat-r2-c2:secondary|seat-r2-c3:primary|seat-r2-c4:secondary|seat-r2-c5:secondary';
 
-/** The proposal evidence a report saved under the current capture carries. */
-const reportEvidence = (versionId = 'v1') => ({
+const PROJECT_ID = 'p1';
+const ENGINEERING_FP = 'eng:v1:c19ceb2efb6c3d9c';
+const EVIDENCE_TIMESTAMP = '2026-10-04T17:11:05.564Z';
+
+/** The parameters whose provenance comes from the durable bass authority. */
+const BASS_PARAMETER_KEYS = ['P14', 'P18', 'P19', 'P20'];
+
+/** The RP22 parameters a Technical Report must state before a proposal may read it. */
+const REQUIRED_TECHNICAL_PARAMETER_IDS = [12, 13, 14, 18, 19, 20];
+
+/** The room, screen, system and seating facts every complete payload states. */
+const EVIDENCE_ROOM = { length_m: 6.2, width_m: 4.6, height_m: 2.5, volume_m3: 71.3 };
+
+const EVIDENCE_SCREEN = {
+  screen_type: 'Projection screen',
+  format: '16:9',
+  viewable_diagonal_in: 120,
+  viewable_width_cm: 265.7,
+  viewable_height_cm: 149.4,
+};
+
+const EVIDENCE_PRODUCTS = [
+  { role: 'Screen LCR', model: 'DF-48', quantity: 3, position: null },
+  { role: 'Surround', model: 'DF-24', quantity: 4, position: 'side and rear' },
+  { role: 'Overhead', model: 'DF-12', quantity: 6, position: null },
+  { role: 'Subwoofer', model: 'SUB3-12', quantity: 4, position: 'front and rear' },
+];
+
+const EVIDENCE_SEATS = [
+  { row: 1, seat_id: 'seat-r1-c1', column: 1, priority: 'secondary', distance_m: 4.12, horizontal_angle_deg: -14.2 },
+  { row: 1, seat_id: 'seat-r1-c2', column: 2, priority: 'primary', distance_m: 4.02, horizontal_angle_deg: -3.1 },
+  { row: 1, seat_id: 'seat-r1-c3', column: 3, priority: 'primary', distance_m: 4.02, horizontal_angle_deg: 3.1 },
+  { row: 2, seat_id: 'seat-r2-c2', column: 2, priority: 'secondary', distance_m: 5.68, horizontal_angle_deg: -4.4 },
+];
+
+/**
+ * One parameter row exactly as the capture writes it: the reading, the scope it
+ * was taken at, and the durable authority it came from. The parameter index and
+ * the parallel `parameters` list share these very objects, which is how the
+ * contract requires the two to agree field for field.
+ */
+function parameterRow({ key, value, level, scope, authorityFingerprint, rawValue = null }) {
+  const bass = BASS_PARAMETER_KEYS.includes(key);
+  return {
+    key,
+    parameter_id: Number(key.slice(1)),
+    scope,
+    value,
+    level,
+    ...(rawValue === null ? {} : { raw_value: rawValue }),
+    authority_value: value,
+    authority_level: level,
+    authority_fingerprint: authorityFingerprint,
+    authority_timestamp: EVIDENCE_TIMESTAMP,
+    source_type: bass ? 'durable-current-bass-authority' : 'durable-engineering-publication',
+  };
+}
+
+/** The viewing geometry a Visual Report states — no bass rows, and none needed. */
+function viewingParameters(sourceFingerprint) {
+  return [
+    { key: 'P4', value: 4.02, level: 'L3', scope: 'room' },
+    { key: 'P5', value: 41.2, level: 'L2', scope: 'room' },
+    { key: 'P7', value: 52.8, level: 'L4', scope: 'per-seat' },
+  ].map((row) => parameterRow({ ...row, authorityFingerprint: sourceFingerprint }));
+}
+
+/** P1–P21, the set a Technical Report states, with the bass rows on their own authority. */
+function technicalParameters({ sourceFingerprint, bassFingerprint }) {
+  const rows = [];
+  for (let id = 1; id <= 21; id += 1) {
+    const key = `P${id}`;
+    const bass = BASS_PARAMETER_KEYS.includes(key);
+    const value = id === 14 ? 4 : 3;
+    rows.push(parameterRow({
+      key,
+      value,
+      level: id === 14 ? 'L4' : 'L3',
+      scope: id === 10 ? 'project' : 'room',
+      authorityFingerprint: bass ? bassFingerprint : sourceFingerprint,
+      rawValue: id === 14 ? value : null,
+    }));
+  }
+  return rows;
+}
+
+/** One complete evidence payload, of one report type, for one version. */
+function completeEvidence({ reportType, versionId, sourceFingerprint, bassFingerprint = null, parameters }) {
+  return {
+    evidence_version: 1,
+    report_type: reportType,
+    identity: {
+      project_id: PROJECT_ID,
+      version_id: versionId,
+      report_type: reportType,
+      source_fingerprint: sourceFingerprint,
+      bass_fingerprint: bassFingerprint,
+    },
+    room: { ...EVIDENCE_ROOM },
+    screen: { ...EVIDENCE_SCREEN },
+    system: { products_selected: EVIDENCE_PRODUCTS.map((product) => ({ ...product })) },
+    seating: { seats: EVIDENCE_SEATS.length, per_seat: EVIDENCE_SEATS.map((seat) => ({ ...seat })) },
+    parameters,
+    parameter_index: Object.fromEntries(parameters.map((row) => [row.key, row])),
+    bass: bassFingerprint
+      ? { current: true, p14: { raw_value: 4, achieved_level: 'L4' } }
+      : { current: false, p14: null },
+    proposal_ready: true,
+    evidence_fingerprint: 're1-8c1f0f2a-2a0',
+  };
+}
+
+/** Fixture C — the Visual Report's own evidence: correct type, viewing facts, no bass rows. */
+const visualEvidence = ({ versionId, sourceFingerprint }) => completeEvidence({
+  reportType: 'visual',
+  versionId,
+  sourceFingerprint,
+  parameters: viewingParameters(sourceFingerprint),
+});
+
+/** Fixture D — the Technical Report's own evidence: P1–P21, with bass provenance. */
+const technicalEvidence = ({ versionId, sourceFingerprint, bassFingerprint }) => completeEvidence({
+  reportType: 'technical',
+  versionId,
+  sourceFingerprint,
+  bassFingerprint,
+  parameters: technicalParameters({ sourceFingerprint, bassFingerprint }),
+});
+
+/**
+ * Fixture B — evidence that is stored but NOT complete: it states its own
+ * identity and claims proposal-ready, and nothing else the contract requires —
+ * no source fingerprint, room, screen, seating, products or parameter index.
+ * This is the shape a proposal must refuse as Incomplete.
+ */
+const incompleteEvidence = ({ reportType, versionId }) => ({
   evidence_version: 1,
-  report_type: null,
-  identity: { project_id: 'p1', version_id: versionId, report_type: 'technical', source_fingerprint: 'eng:v1:c19ceb2efb6c3d9c' },
+  report_type: reportType,
+  identity: { project_id: PROJECT_ID, version_id: versionId, report_type: reportType },
   proposal_ready: true,
   evidence_fingerprint: 're1-8c1f0f2a-2a0',
 });
 
 /**
  * A saved report carried under the current payload generation: its pages, its
- * frozen proposal source AND the machine-readable reportEvidence a proposal
- * reads.
+ * frozen proposal source and — when the fixture states one — the reportEvidence
+ * a proposal reads. Omitting `evidence` is Fixture A, the legacy snapshot: the
+ * report exists and is current, and only its evidence was never captured.
  */
-const savedReport = ({ fingerprints, generatedAt }) => ({
+const savedReport = ({ reportType = null, versionId = null, fingerprints, generatedAt, evidence = null }) => ({
+  report_type: reportType,
+  project_id: PROJECT_ID,
+  version_id: versionId,
   report_schema_version: 1,
   payload: {
     pages: [{ id: 'cover', category: 'cover' }],
     proposalSource: { report_source_version: 1, identity: {} },
-    reportEvidence: reportEvidence(),
+    ...(evidence ? { reportEvidence: evidence } : {}),
   },
   source_fingerprints: fingerprints,
   generated_at: generatedAt,
 });
 
 /**
- * The same report written BEFORE the proposal evidence capture existed: it has
- * its pages and its fingerprints, and it is stored current, but it carries no
- * reportEvidence. This is the legacy snapshot — the report exists and is
- * current, and only its proposal evidence needs a one-time refresh.
+ * Fixture A — the same report written BEFORE the proposal evidence capture
+ * existed: pages and fingerprints, stored current, and no reportEvidence. The
+ * report is not missing; only its proposal evidence needs a one-time refresh.
  */
-const legacyReport = ({ fingerprints, generatedAt }) => ({
-  report_schema_version: 1,
-  payload: { pages: [{ id: 'cover', category: 'cover' }] },
-  source_fingerprints: fingerprints,
-  generated_at: generatedAt,
+const legacyReport = ({ reportType = null, versionId = null, fingerprints, generatedAt }) => savedReport({
+  reportType, versionId, fingerprints, generatedAt,
 });
 
 const LEVEL_4_VERSION = {
@@ -147,30 +295,53 @@ const LEVEL_1_VERSION = {
   published_fingerprint: null,
 };
 
+/**
+ * The bass fingerprint this version's reports were frozen against. A publication
+ * only exists once the bass authority it froze is stated — the publication
+ * contract requires provenance.bass_fingerprint — so the fixture states it, and
+ * the reports state the same design they were generated from.
+ */
+const LEVEL_4_BASS_FINGERPRINT =
+  'cal:v8:2b7f4c91d0a8e63f|mode:canonical-physics-eq|protocol:bass-optimiser-protocol-v1'
+  + '|engine:house-curve-shape-fit-v41-physically-qualified-p18|result-schema:34|metric-schema:21';
+
 const LEVEL_4_PUBLICATION = {
-  engineering_fingerprint: 'eng:v1:c19ceb2efb6c3d9c',
+  engineering_fingerprint: ENGINEERING_FP,
   published_at: '2026-10-01T23:10:14.308Z',
-  provenance: { bass_fingerprint: null },
+  provenance: { bass_fingerprint: LEVEL_4_BASS_FINGERPRINT },
   engineering_summary: { seatPriorityFingerprint: SEAT_PRIORITY },
 };
 
+/** Fixture C — a complete Visual Report: room, screen, viewing and seating, no bass rows. */
+const LEVEL_4_VISUAL = savedReport({
+  reportType: 'visual',
+  versionId: LEVEL_4_VERSION.id,
+  generatedAt: '2026-10-02T22:03:28.601Z',
+  fingerprints: { engineeringFingerprint: ENGINEERING_FP, calculationFingerprint: LEVEL_4_BASS_FINGERPRINT, seatPriorityFingerprint: SEAT_PRIORITY },
+  evidence: visualEvidence({ versionId: LEVEL_4_VERSION.id, sourceFingerprint: ENGINEERING_FP }),
+});
+
+/** Fixture D — a complete Technical Report: P1–P21, with the bass rows on the bass authority. */
+const LEVEL_4_TECHNICAL = savedReport({
+  reportType: 'technical',
+  versionId: LEVEL_4_VERSION.id,
+  generatedAt: EVIDENCE_TIMESTAMP,
+  fingerprints: { engineeringFingerprint: ENGINEERING_FP, calculationFingerprint: LEVEL_4_BASS_FINGERPRINT, seatPriorityFingerprint: SEAT_PRIORITY },
+  evidence: technicalEvidence({
+    versionId: LEVEL_4_VERSION.id,
+    sourceFingerprint: ENGINEERING_FP,
+    bassFingerprint: LEVEL_4_BASS_FINGERPRINT,
+  }),
+});
+
 const LEVEL_4_SOURCES = {
   version: LEVEL_4_VERSION,
-  savedReports: {
-    visual: savedReport({
-      generatedAt: '2026-10-02T22:03:28.601Z',
-      fingerprints: { engineeringFingerprint: 'eng:v1:c19ceb2efb6c3d9c', calculationFingerprint: null, seatPriorityFingerprint: SEAT_PRIORITY },
-    }),
-    technical: savedReport({
-      generatedAt: '2026-10-04T17:11:05.564Z',
-      fingerprints: { engineeringFingerprint: 'eng:v1:c19ceb2efb6c3d9c', calculationFingerprint: null, seatPriorityFingerprint: SEAT_PRIORITY },
-    }),
-  },
+  savedReports: { visual: LEVEL_4_VISUAL, technical: LEVEL_4_TECHNICAL },
   publication: LEVEL_4_PUBLICATION,
   publicationStatus: PUBLICATION_STATUS.PUBLISHED,
   currentFingerprints: {
-    engineeringFingerprint: 'eng:v1:c19ceb2efb6c3d9c',
-    calculationFingerprint: null,
+    engineeringFingerprint: ENGINEERING_FP,
+    calculationFingerprint: LEVEL_4_BASS_FINGERPRINT,
     seatPriorityFingerprint: SEAT_PRIORITY,
   },
 };
@@ -190,13 +361,23 @@ const CALC_FINGERPRINT =
 const CALC_COMPLETED_AT_MS = 1791108297487;
 
 const LEVEL_1_VISUAL = savedReport({
+  reportType: 'visual',
+  versionId: LEVEL_1_VERSION.id,
   generatedAt: '2026-10-04T10:07:51.482Z',
   fingerprints: { engineeringFingerprint: null, calculationFingerprint: CALC_FINGERPRINT, seatPriorityFingerprint: SEAT_PRIORITY },
+  evidence: visualEvidence({ versionId: LEVEL_1_VERSION.id, sourceFingerprint: CALC_FINGERPRINT }),
 });
 
 const LEVEL_1_TECHNICAL = savedReport({
+  reportType: 'technical',
+  versionId: LEVEL_1_VERSION.id,
   generatedAt: '2026-10-04T15:48:40.816Z',
   fingerprints: { engineeringFingerprint: null, calculationFingerprint: CALC_FINGERPRINT, seatPriorityFingerprint: SEAT_PRIORITY },
+  evidence: technicalEvidence({
+    versionId: LEVEL_1_VERSION.id,
+    sourceFingerprint: CALC_FINGERPRINT,
+    bassFingerprint: CALC_FINGERPRINT,
+  }),
 });
 
 const LEVEL_1_CACHE = {
@@ -242,6 +423,33 @@ const UNBACKED_SOURCES = {
     seatPriorityFingerprint: SEAT_PRIORITY,
   },
   calculationAuthority: null,
+};
+
+/**
+ * Fixture B — the same version's reports saved under the current payload
+ * generation, carrying evidence that is stored and incomplete. The version has
+ * moved nowhere: the reports match the design, and only the evidence fails the
+ * contract. Incomplete — never Current, and never Legacy.
+ */
+const INCOMPLETE_VISUAL = savedReport({
+  reportType: 'visual',
+  versionId: LEVEL_4_VERSION.id,
+  generatedAt: '2026-10-02T22:03:28.601Z',
+  fingerprints: { engineeringFingerprint: ENGINEERING_FP, calculationFingerprint: LEVEL_4_BASS_FINGERPRINT, seatPriorityFingerprint: SEAT_PRIORITY },
+  evidence: incompleteEvidence({ reportType: 'visual', versionId: LEVEL_4_VERSION.id }),
+});
+
+const INCOMPLETE_TECHNICAL = savedReport({
+  reportType: 'technical',
+  versionId: LEVEL_4_VERSION.id,
+  generatedAt: EVIDENCE_TIMESTAMP,
+  fingerprints: { engineeringFingerprint: ENGINEERING_FP, calculationFingerprint: LEVEL_4_BASS_FINGERPRINT, seatPriorityFingerprint: SEAT_PRIORITY },
+  evidence: incompleteEvidence({ reportType: 'technical', versionId: LEVEL_4_VERSION.id }),
+});
+
+const INCOMPLETE_SOURCES = {
+  ...LEVEL_4_SOURCES,
+  savedReports: { visual: INCOMPLETE_VISUAL, technical: INCOMPLETE_TECHNICAL },
 };
 
 /** The same row, assembled the way the Step 5 table assembles it. */
@@ -604,9 +812,9 @@ test('16. a published version is left exactly as it was: every column Current', 
   assert.equal(row.engineering.generatedAt, LEVEL_4_PUBLICATION.published_at);
   assert.equal(row.ready, true);
 
-  // With a publication present the bass fingerprint is never taken from the
-  // cache, so a version whose publication states no bass fingerprint keeps the
-  // comparison it had: nothing is compared on that key.
+  // The bass fingerprint the reports were generated from is compared against the
+  // one the publication states for the design as it stands, and the two agree —
+  // so the report stays Current rather than being accused of staleness.
   const visualWithPublication = resolveSavedReportCell({
     saved: LEVEL_4_SOURCES.savedReports.visual,
     currentFingerprints: LEVEL_4_SOURCES.currentFingerprints,
@@ -637,13 +845,18 @@ test('15. reports without a calculated result still block, naming that result', 
 
 // ── 17. A legacy snapshot: the report exists and is current ─────────────────
 
+/** Fixture A — current reports whose proposal evidence was never captured. */
 const LEGACY_VISUAL = legacyReport({
+  reportType: 'visual',
+  versionId: LEVEL_4_VERSION.id,
   generatedAt: '2026-10-02T22:03:28.601Z',
-  fingerprints: { engineeringFingerprint: 'eng:v1:c19ceb2efb6c3d9c', calculationFingerprint: null, seatPriorityFingerprint: SEAT_PRIORITY },
+  fingerprints: { engineeringFingerprint: ENGINEERING_FP, calculationFingerprint: LEVEL_4_BASS_FINGERPRINT, seatPriorityFingerprint: SEAT_PRIORITY },
 });
 const LEGACY_TECHNICAL = legacyReport({
-  generatedAt: '2026-10-04T17:11:05.564Z',
-  fingerprints: { engineeringFingerprint: 'eng:v1:c19ceb2efb6c3d9c', calculationFingerprint: null, seatPriorityFingerprint: SEAT_PRIORITY },
+  reportType: 'technical',
+  versionId: LEVEL_4_VERSION.id,
+  generatedAt: EVIDENCE_TIMESTAMP,
+  fingerprints: { engineeringFingerprint: ENGINEERING_FP, calculationFingerprint: LEVEL_4_BASS_FINGERPRINT, seatPriorityFingerprint: SEAT_PRIORITY },
 });
 const LEGACY_SOURCES = {
   ...LEVEL_4_SOURCES,
@@ -727,6 +940,167 @@ test('19. the client mirror derives the same legacy verdict, word for word', () 
   assert.equal(clientResult.visual_report_status, 'Needs one-time evidence refresh');
   assert.equal(clientResult.ready, false);
   assert.equal(sharedResult.ready, false);
+});
+
+// ── 20. The four snapshot fixtures, each with one verdict ───────────────────
+
+test('20. the fixtures read Legacy, Incomplete, Current and Current', () => {
+  const cellOf = (saved) => resolveSavedReportCell({
+    saved,
+    currentFingerprints: LEVEL_4_SOURCES.currentFingerprints,
+  });
+
+  // A — no evidence stored at all: the report exists, is current, and needs a
+  // single one-time evidence refresh.
+  assert.equal(cellOf(LEGACY_VISUAL).state, READINESS_STATE.LEGACY);
+  assert.equal(cellOf(LEGACY_VISUAL).status, 'Needs one-time evidence refresh');
+  assert.equal(cellOf(LEGACY_TECHNICAL).state, READINESS_STATE.LEGACY);
+
+  // B — evidence stored, and incomplete: Incomplete, not Current, not Legacy.
+  assert.equal(cellOf(INCOMPLETE_VISUAL).state, READINESS_STATE.INCOMPLETE);
+  assert.equal(cellOf(INCOMPLETE_VISUAL).status, 'Incomplete');
+  assert.match(cellOf(INCOMPLETE_VISUAL).reason, /is missing/);
+  assert.equal(cellOf(INCOMPLETE_TECHNICAL).state, READINESS_STATE.INCOMPLETE);
+
+  // C — a complete Visual Report, under its own report type.
+  assert.equal(cellOf(LEVEL_4_VISUAL).state, READINESS_STATE.CURRENT);
+  const visual = LEVEL_4_VISUAL.payload.reportEvidence;
+  assert.equal(visual.report_type, 'visual');
+  assert.equal(visual.identity.report_type, 'visual');
+  assert.equal(visual.identity.source_fingerprint, ENGINEERING_FP);
+
+  // D — a complete Technical Report, under its own report type.
+  assert.equal(cellOf(LEVEL_4_TECHNICAL).state, READINESS_STATE.CURRENT);
+  const technical = LEVEL_4_TECHNICAL.payload.reportEvidence;
+  assert.equal(technical.report_type, 'technical');
+  assert.equal(technical.identity.report_type, 'technical');
+  assert.equal(technical.identity.bass_fingerprint, LEVEL_4_BASS_FINGERPRINT);
+
+  // Every required RP22 parameter is stated with its level, its atomic pair and
+  // its provenance — and the bass rows are on the bass authority, not the
+  // engineering one.
+  for (const id of REQUIRED_TECHNICAL_PARAMETER_IDS) {
+    const row = technical.parameter_index[`P${id}`];
+    assert.ok(row, `P${id} is stated`);
+    assert.match(String(row.level), /^L[1-4]$/, `P${id} level`);
+    assert.equal(row.authority_value, row.value, `P${id} authority value`);
+    assert.equal(row.authority_level, row.level, `P${id} authority level`);
+    assert.ok(
+      row.scope && row.authority_fingerprint && row.authority_timestamp && row.source_type,
+      `P${id} provenance`,
+    );
+  }
+  assert.equal(technical.parameter_index.P14.raw_value, technical.bass.p14.raw_value);
+  assert.equal(technical.parameter_index.P14.level, technical.bass.p14.achieved_level);
+
+  // The Visual Report's evidence is its own: it never borrows the technical payload.
+  assert.notDeepEqual(visual.parameters, technical.parameters);
+  assert.equal(visual.parameter_index.P12, undefined, 'a Visual Report states no P12');
+  assert.ok(technical.parameter_index.P12, 'a Technical Report states P12');
+});
+
+// ── 21. One verdict, four readers ──────────────────────────────────────────
+
+test('21. server, client, Proposal Centre and the Library banner read every fixture alike', () => {
+  const fixtures = [
+    { name: 'A legacy snapshot', sources: LEGACY_SOURCES },
+    { name: 'B incomplete evidence', sources: INCOMPLETE_SOURCES },
+    { name: 'C/D current reports', sources: LEVEL_4_SOURCES },
+    { name: 'current on the calculation authority', sources: LEVEL_1_SOURCES },
+  ];
+
+  for (const { name, sources } of fixtures) {
+    // 1. The server authority, from the version's stored sources.
+    const serverRow = resolveVersionReadiness(sources);
+
+    // 2. The client authority, assembled from the SAME cells.
+    const clientRowResult = clientRow({
+      versionId: serverRow.versionId,
+      versionName: serverRow.versionName,
+      versionNumber: serverRow.versionNumber,
+      cells: { visual: serverRow.visual, technical: serverRow.technical, engineering: serverRow.engineering },
+    });
+    assert.equal(clientRowResult.visual_report_status, serverRow.visual_report_status, `${name}: visual`);
+    assert.equal(clientRowResult.technical_report_status, serverRow.technical_report_status, `${name}: technical`);
+    assert.equal(clientRowResult.engineering_result_status, serverRow.engineering_result_status, `${name}: engineering`);
+    assert.equal(clientRowResult.ready, serverRow.ready, `${name}: verdict`);
+    assert.equal(clientRowResult.blockingSentence, serverRow.blockingSentence, `${name}: sentence`);
+
+    // 3. Proposal Centre readiness — the gate that decides Generate.
+    const serverGate = resolveProposalReadinessGate({ rows: [serverRow] });
+    const centreGate = clientGate({ rows: [clientRowResult] });
+    assert.equal(centreGate.ready, serverGate.ready, `${name}: gate verdict`);
+    assert.equal(centreGate.message, serverGate.message, `${name}: gate message`);
+
+    // 4. The Project Library banner, over that same row.
+    const banner = buildLibraryProposalReadiness({
+      rows: [clientRowResult],
+      versions: [sources.version],
+    });
+    assert.equal(banner.ready, centreGate.ready, `${name}: banner verdict`);
+    assert.equal(
+      banner.headline,
+      centreGate.ready ? LIBRARY_READINESS_HEADLINE.READY : LIBRARY_READINESS_HEADLINE.NOT_READY,
+      `${name}: banner headline`,
+    );
+
+    // The banner's plain words are the row's own states, never a second opinion.
+    const expectedCell = (cell) => (cell.state === READINESS_STATE.CURRENT
+      ? LIBRARY_CHECKLIST_STATUS.READY
+      : LIBRARY_CHECKLIST_STATUS.NEEDS_UPDATE);
+    const checklist = banner.checklist[0];
+    assert.equal(checklist.cells[0].status, expectedCell(serverRow.visual), `${name}: banner visual cell`);
+    assert.equal(checklist.cells[1].status, expectedCell(serverRow.technical), `${name}: banner technical cell`);
+  }
+});
+
+// ── 22. Strictness: the contract, not the fixture, decides ─────────────────
+
+test('22. incomplete evidence is refused, and never reads Current', () => {
+  // The complete fixtures satisfy the shared contract itself.
+  const visual = validateReportEvidence(LEVEL_4_VISUAL.payload.reportEvidence, 'visual', {
+    projectId: PROJECT_ID,
+    versionId: LEVEL_4_VERSION.id,
+    snapshotFingerprint: ENGINEERING_FP,
+    sourceFingerprint: ENGINEERING_FP,
+  });
+  assert.equal(visual.complete, true, `visual evidence complete (${visual.missing.join(', ')})`);
+
+  const technical = validateReportEvidence(LEVEL_4_TECHNICAL.payload.reportEvidence, 'technical', {
+    projectId: PROJECT_ID,
+    versionId: LEVEL_4_VERSION.id,
+    snapshotFingerprint: ENGINEERING_FP,
+    sourceFingerprint: ENGINEERING_FP,
+  });
+  assert.equal(technical.complete, true, `technical evidence complete (${technical.missing.join(', ')})`);
+
+  // The incomplete fixture states none of the facts the contract requires, and
+  // the contract still names every one of them.
+  const refused = validateReportEvidence(INCOMPLETE_TECHNICAL.payload.reportEvidence, 'technical');
+  assert.equal(refused.complete, false);
+  for (const field of [
+    'identity.source_fingerprint', 'room.length_m', 'screen.screen_type',
+    'system.products_selected', 'parameter_index', 'seating.per_seat',
+    'parameter_index.P12', 'parameter_index.P14', 'parameter_index.P18',
+    'parameter_index.P19', 'parameter_index.P20',
+  ]) {
+    assert.ok(refused.missing.includes(field), `the contract still requires ${field}`);
+  }
+
+  // And it blocks, by name, on both sides of the boundary.
+  const row = resolveVersionReadiness(INCOMPLETE_SOURCES);
+  assert.equal(row.visual_report_status, 'Incomplete');
+  assert.equal(row.technical_report_status, 'Incomplete');
+  assert.equal(row.ready, false);
+  assert.equal(resolveProposalReadinessGate({ rows: [row] }).ready, false);
+  const mirrored = clientRow({
+    versionId: row.versionId,
+    versionName: row.versionName,
+    versionNumber: row.versionNumber,
+    cells: { visual: row.visual, technical: row.technical, engineering: row.engineering },
+  });
+  assert.equal(mirrored.ready, false);
+  assert.equal(mirrored.blockingSentence, row.blockingSentence);
 });
 
 // ── Report ─────────────────────────────────────────────────────────────────
