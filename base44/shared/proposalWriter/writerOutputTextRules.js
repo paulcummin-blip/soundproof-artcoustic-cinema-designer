@@ -358,7 +358,9 @@ export function assertedKind(sentence, anchors) {
     return isDenied(sentence, 0) ? null : kind;
   }
   if (!anchors.test(sentence)) return null;
-  const at = sentence.search(new RegExp(`\\b(?:${CLAIM_WORDS})\\b`, 'i'));
+  const at = kind === 'change'
+    ? sentence.search(CHANGE_SIGNAL)
+    : sentence.search(new RegExp(`\\b(?:${CLAIM_WORDS})\\b`, 'i'));
   return isDenied(sentence, at) ? null : kind;
 }
 

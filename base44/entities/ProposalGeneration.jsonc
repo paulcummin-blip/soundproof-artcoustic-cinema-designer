@@ -58,12 +58,12 @@
         "discarded",
         "superseded"
       ],
-      "description": "What became of this attempt. draft_created = the attempt exists but no evidence is assembled yet. evidence_ready = the pack and GPT input are assembled, unread by a provider. provider_failed = the provider returned no output or failed. validation_failed = output arrived but was not the writer contract's shape. needs_human_review = output arrived and broke a claim, figure, level or product rule. valid_generated = output arrived and passed every rule. discarded = the attempt was abandoned. superseded is DERIVED at read time when a newer valid generation exists for the same proposal and is never written to a record."
+      "description": "What became of this attempt. draft_created = the attempt exists but no evidence is assembled yet. evidence_ready = the pack and GPT input are assembled, unread by a provider. provider_failed = the provider returned no output or failed. validation_failed = output arrived but was not the writer contract's shape. needs_human_review = output arrived and broke a claim, figure, level or product rule. valid_generated = output arrived and passed every rule. discarded = the attempt was abandoned. superseded is DERIVED at read time from a newer valid generation and never written."
     },
     "provider": {
       "type": "string",
       "nullable": true,
-      "description": "The provider the attempt was made with (for example the platform AI gateway). Recorded for audit; null when no provider call was reached."
+      "description": "The provider the attempt was made with. Recorded for audit; null when no provider call was reached."
     },
     "model": {
       "type": "string",
@@ -84,6 +84,30 @@
       "type": "integer",
       "nullable": true,
       "description": "The writer contract generation the attempt was made and validated under."
+    },
+    "validator_version": {
+      "type": "string",
+      "nullable": true,
+      "description": "Immutable validator release identity for new attempts. Historical records are not backfilled."
+    },
+    "validator_rules_fingerprint": {
+      "type": "string",
+      "nullable": true,
+      "description": "Deterministic identity of the bundled validator source manifest used by this validation. Historical records are not backfilled."
+    },
+    "validator_source_manifest": {
+      "type": "object",
+      "description": "Internal audit-only per-module SHA-256 validator source hashes. Never rendered in client-facing copy."
+    },
+    "writer_rules_fingerprint": {
+      "type": "string",
+      "nullable": true,
+      "description": "Deterministic fingerprint of the writing rules in this attempt's exact frozen writer input."
+    },
+    "deployed_function_revision": {
+      "type": "string",
+      "nullable": true,
+      "description": "Deployed function revision if supplied by the runtime. Null when unavailable; never inferred from the prompt version."
     },
     "retry_of_generation_id": {
       "type": "string",
@@ -121,11 +145,11 @@
     },
     "evidence_fingerprints": {
       "type": "object",
-      "description": "The evidence this attempt was filed against: { pack, reports: [{ version_id, visual_report_snapshot_id, technical_report_snapshot_id, visual_evidence, technical_evidence }] }. Report evidence fingerprints are recorded per version, so a report regenerated later never changes what this historical attempt read."
+      "description": "Report evidence fingerprints recorded per version, so regenerated reports never change what a historical attempt read."
     },
     "engineering_fingerprints": {
       "type": "object",
-      "description": "The engineering publication each selected version's evidence was generated against: { versions: [{ version_id, engineering }] }."
+      "description": "The engineering publication each selected version's evidence was generated against."
     },
     "gpt_input": {
       "type": "object",
@@ -144,12 +168,12 @@
     "gpt_output_fingerprint": {
       "type": "string",
       "nullable": true,
-      "description": "Content fingerprint of the received output, so an edited or substituted output is detectable against the record. Null when no output was received."
+      "description": "Content fingerprint of the received output. Null when no output was received."
     },
     "validation_result": {
       "type": "object",
       "nullable": true,
-      "description": "The writer-contract validation result: whether the output was valid, the contract and pack it was validated against, the per-section word counts and cited claim IDs, and the rejection list. Null when no output was validated."
+      "description": "The writer-contract validation result and internal validator provenance. Null when no output was validated."
     },
     "validation_errors": {
       "type": "array",
@@ -157,7 +181,7 @@
         "type": "object"
       },
       "default": [],
-      "description": "Every rejection the validation reported, each with its code, section, detail and claim IDs. Empty for a valid generation."
+      "description": "Every rejection with section, detail, exact sentence/clause where applicable, match spans where practical, rule ID, block and cited claim IDs, and validator version/fingerprint. Internal audit metadata only. Empty for a valid generation."
     },
     "provider_error": {
       "type": "string",
@@ -175,7 +199,7 @@
     },
     "record_fingerprint": {
       "type": "string",
-      "description": "Content fingerprint of the whole record, taken when it was created. Evidence that the record has not been rewritten, and the authority for comparing two records of the same attempt."
+      "description": "Content fingerprint of the whole record, taken when it was created. Evidence that the record has not been rewritten."
     }
   },
   "required": [

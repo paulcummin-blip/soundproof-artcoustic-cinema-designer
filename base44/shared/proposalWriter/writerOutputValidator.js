@@ -30,6 +30,8 @@ import {
   writerSection,
 } from './writerContractSchema.js';
 import { scanProse } from './writerOutputTextRules.js';
+import { validatorProvenance } from './validatorProvenance.js';
+import { attributeViolation } from './writerViolationAudit.js';
 import {
   blockIdSet,
   claimIndex,
@@ -41,7 +43,7 @@ import {
 function dedupe(violations) {
   const seen = new Set();
   return violations.filter((entry) => {
-    const key = `${entry.code}|${entry.section}|${entry.detail}`;
+    const key = `${entry.code}|${entry.section}|${entry.detail}|${entry.clause_span?.start ?? ''}`;
     if (seen.has(key)) return false;
     seen.add(key);
     return true;
@@ -49,9 +51,17 @@ function dedupe(violations) {
 }
 
 /** The one shape a validation returns. */
-function summarise({ contractVersion, packFingerprint, violations, sections }) {
-  const reported = dedupe(violations);
+function summarise({ contractVersion, packFingerprint, violations, sections, input, draft }) {
+  const provenance = validatorProvenance(input);
+  const reported = dedupe(violations).map(entry => {
+    const target = draft?.sections?.find(s => s.section === entry.section);
+    const attributed = entry.rule_id ? entry : attributeViolation(entry, { text: target?.text || '' });
+    return { ...attributed, validator_version: provenance.validator_version,
+      validator_rules_fingerprint: provenance.validator_rules_fingerprint,
+      cited_claim_ids: target?.claim_ids || attributed.cited_claim_ids || [] };
+  });
   return {
+    ...provenance,
     valid: reported.length === 0,
     contract_version: contractVersion ?? null,
     pack_fingerprint: packFingerprint ?? null,
@@ -198,7 +208,7 @@ export function validateWriterOutput({ input, output } = {}) {
     if (violations.length === 0) {
       violations.push(violation(WRITER_REJECTION.SCHEMA_VIOLATION, { detail: 'output_is_not_a_json_object' }));
     }
-    return summarise({ contractVersion, packFingerprint, violations, sections: [] });
+    return summarise({ contractVersion, packFingerprint, violations, sections: [], input, draft });
   }
 
   violations.push(...schemaViolations({ input, draft }));
@@ -281,7 +291,7 @@ export function validateWriterOutput({ input, output } = {}) {
     });
   }
 
-  return summarise({ contractVersion, packFingerprint, violations, sections });
+  return summarise({ contractVersion, packFingerprint, violations, sections, input, draft });
 }
 
 export default validateWriterOutput;

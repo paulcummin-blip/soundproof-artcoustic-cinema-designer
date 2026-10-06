@@ -27,6 +27,7 @@ import {
   WRITER_PROMPT_VERSION,
 } from '../proposalWriter/writerContractSchema.js';
 import { generationEvidenceIdentity } from './generationEvidenceIdentity.js';
+import { validatorProvenance } from '../proposalWriter/validatorProvenance.js';
 import {
   GENERATION_OUTCOMES,
   GENERATION_STATUS,
@@ -63,6 +64,11 @@ export const GENERATION_RECORD_FIELDS = Object.freeze([
   'gpt_output_fingerprint',
   'validation_result',
   'validation_errors',
+  'validator_version',
+  'validator_rules_fingerprint',
+  'validator_source_manifest',
+  'writer_rules_fingerprint',
+  'deployed_function_revision',
   'provider_error',
   'created_at',
   'created_by',
@@ -231,6 +237,14 @@ export function buildGenerationRecord(attempt = {}) {
     gpt_output_fingerprint: outputFingerprint,
     validation_result: jsonClone(validation),
     validation_errors: jsonClone(validation?.violations) || [],
+    // The validation's identity wins, never the current module's identity for an older result.
+    ...jsonClone(validation?.validator_version ? {
+      validator_version: validation.validator_version,
+      validator_rules_fingerprint: validation.validator_rules_fingerprint,
+      validator_source_manifest: validation.validator_source_manifest,
+      writer_rules_fingerprint: validation.writer_rules_fingerprint,
+      deployed_function_revision: validation.deployed_function_revision ?? null,
+    } : validatorProvenance(writerInput)),
     provider_error: providerError ?? null,
     created_at: createdAt,
     created_by: createdBy,
