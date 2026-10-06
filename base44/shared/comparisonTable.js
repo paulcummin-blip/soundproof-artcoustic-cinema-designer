@@ -69,7 +69,9 @@ export const COMPARISON_ROW_ORDER = Object.freeze([
   'p20',
 ]);
 
-const ROW_LABELS = Object.freeze({
+/** The printed area name for each comparison key. Exported so the frozen
+ *  proposal evidence pack labels an area with the same words this table does. */
+export const ROW_LABELS = Object.freeze({
   screen_size: 'Screen size',
   rp23_viewing: 'Viewing angle / RP23',
   system_layout: 'System layout',
@@ -183,7 +185,7 @@ function readRowValue(evidence, rowKey) {
   return row?.text || null;
 }
 
-function parseLevel(value) {
+export function parseLevel(value) {
   // Accepts both the parameter form ("L4") and the RP23 floor form ("Level 4").
   const match = /^\s*(?:L([1-4])|Level\s*([1-4]))\b/i.exec(String(value || ''));
   if (!match) return null;
