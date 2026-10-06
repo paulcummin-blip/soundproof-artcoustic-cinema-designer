@@ -10,8 +10,10 @@
  * Proposal Centre can never disagree. This module only translates that verdict
  * into the Library's plain words and names the single action that unblocks it.
  *
- * The words avoid every internal term: no fingerprints, no report payloads, no
- * engine state names and no publication vocabulary reach the screen from here.
+ * The words are the dealer's words, and they are the same three states a report
+ * row carries: Current, Update needed, Not generated. No internal term reaches
+ * the screen from here — no fingerprints, no report payloads, no engine state
+ * names, no evidence or publication vocabulary.
  *
  * Derivation only: pure functions, no reads, no writes.
  */
@@ -23,40 +25,55 @@ import {
 } from '@/components/proposal/sourceAuthority/proposalReadinessAuthority';
 import { PROPOSAL_SOURCE_REPORT } from '@/components/proposal/sourceAuthority/proposalSourceAuthority';
 
-/** The banner's two verdicts. */
+/** The banner's three verdicts. */
+export const LIBRARY_VERDICT = Object.freeze({
+  READY: 'ready',
+  UPDATES_NEEDED: 'updates-needed',
+  NOT_ASSESSED: 'not-assessed',
+  CHECKING: 'checking',
+});
+
+/** The banner's title, per verdict. */
 export const LIBRARY_READINESS_HEADLINE = Object.freeze({
   READY: 'Ready for Proposal',
-  NOT_READY: 'Not ready for Proposal',
+  UPDATES_NEEDED: 'Update reports before creating a proposal',
+  NOT_ASSESSED: 'Reports are not ready yet',
 });
 
 /** Shown under Ready for Proposal. */
-export const LIBRARY_READY_DETAIL = 'All selected versions have current Visual and Technical Reports.';
+export const LIBRARY_READY_DETAIL =
+  'The current Visual and Technical Reports are ready for proposal creation.';
+
+/** Shown when the design has moved past one or more reports. */
+export const LIBRARY_UPDATES_NEEDED_DETAIL =
+  'The design has changed since one or more reports were created. '
+  + 'Create updated reports before preparing the proposal.';
+
+/** Shown when a version has not been assessed, so its reports cannot be created. */
+export const LIBRARY_NOT_ASSESSED_DETAIL =
+  'One or more versions have not been fully assessed yet. '
+  + 'Complete the assessment in the Room Designer, then create the reports.';
 
 /** Shown while the versions are still being read. */
 export const LIBRARY_CHECKING_DETAIL = 'Checking each version’s reports…';
 
-/** The checklist's simple status words. */
+/** The compact list's three status words. */
 export const LIBRARY_CHECKLIST_STATUS = Object.freeze({
   READY: 'Ready',
-  NEEDS_UPDATE: 'Needs updated report',
+  UPDATE_NEEDED: 'Update needed',
   NOT_GENERATED: 'Not generated',
-  NEEDS_ENGINEERING: 'Needs engineering results',
 });
 
 /** Every action the banner offers. */
 export const LIBRARY_READINESS_ACTION = Object.freeze({
   CREATE_PROPOSAL: 'Create Proposal',
   VIEW_PROPOSAL_CENTRE: 'View Proposal Centre',
-  CREATE_UPDATED: 'Create updated report',
-  GENERATE: 'Generate report',
-  OPEN_REPORT: 'Open report',
+  UPDATE_REQUIRED: 'Update required reports',
+  VIEW_REPORTS: 'View reports',
   OPEN_ROOM_DESIGNER: 'Open Room Designer',
 });
 
-/** The one report the banner names in its blocking sentence. */
-export const LIBRARY_COMBINED_REPORTS_LABEL = 'Visual and Technical Reports';
-
-/** The checklist's report rows, in reading order. */
+/** The compact list's report rows, in reading order. */
 export const LIBRARY_READINESS_CELLS = Object.freeze([
   { source: READINESS_SOURCE.VISUAL, label: 'Visual Report' },
   { source: READINESS_SOURCE.TECHNICAL, label: 'Technical Report' },
@@ -67,80 +84,76 @@ function readinessAction(label, kind, extra = {}) {
   return { label, kind, reportType: null, versionId: null, ...extra };
 }
 
-/** The report type a readiness source names, or null for the engineering row. */
+/** The report type a readiness source names. */
 function reportTypeOf(source) {
-  if (source === READINESS_SOURCE.VISUAL) return PROPOSAL_SOURCE_REPORT.VISUAL;
-  if (source === READINESS_SOURCE.TECHNICAL) return PROPOSAL_SOURCE_REPORT.TECHNICAL;
+  return source === READINESS_SOURCE.VISUAL
+    ? PROPOSAL_SOURCE_REPORT.VISUAL
+    : PROPOSAL_SOURCE_REPORT.TECHNICAL;
+}
+
+/** A report cell that stands between this version and a proposal. */
+function blockedReportCell(row) {
+  for (const { source, label } of LIBRARY_READINESS_CELLS) {
+    const cell = row?.cells?.[source];
+    if (cell && !cell.current && !cell.checking) return { source, label, cell };
+  }
   return null;
 }
 
 /**
- * One cell's plain status word — Ready, Needs updated report or Not generated.
- * A cell that is still being read states nothing.
+ * One compact-list cell's status word — Ready, Update needed or Not generated.
+ * A cell that is still being read states nothing, and no internal state name
+ * ever reaches the list: every report state other than Current reads as Update
+ * needed.
  */
-export function libraryCellStatus({ source, cell } = {}) {
+export function libraryCellStatus({ cell } = {}) {
   const state = cell?.state;
   if (!state || state === READINESS_STATE.CHECKING) return null;
   if (state === READINESS_STATE.CURRENT) return LIBRARY_CHECKLIST_STATUS.READY;
-  if (source === READINESS_SOURCE.ENGINEERING) return LIBRARY_CHECKLIST_STATUS.NEEDS_ENGINEERING;
   if (state === READINESS_STATE.MISSING) return LIBRARY_CHECKLIST_STATUS.NOT_GENERATED;
-  return LIBRARY_CHECKLIST_STATUS.NEEDS_UPDATE;
-}
-
-/** What one blocked version needs, as a clause. */
-function blockerClause(blocker) {
-  const label = blocker?.label || 'report';
-  if (blocker?.source === READINESS_SOURCE.ENGINEERING) {
-    return 'needs its engineering results calculated and saved';
-  }
-  if (blocker?.state === READINESS_STATE.MISSING) return `needs its ${label} generated`;
-  if (blocker?.state === READINESS_STATE.LEGACY) return `needs its ${label} refreshed once`;
-  return `needs an updated ${label}`;
-}
-
-/** The one sentence naming what stands between this project and a proposal. */
-export function libraryBlockerSentence(row) {
-  if (!row || row.ready || row.checking) return null;
-  const blocker = (row.blockers || [])[0] || null;
-  if (!blocker) return null;
-  return `${row.versionName} ${blockerClause(blocker)} before a proposal can be created.`;
+  return LIBRARY_CHECKLIST_STATUS.UPDATE_NEEDED;
 }
 
 /**
- * One version's own readiness line: "Ready for Proposal", or exactly what it
- * still needs — "Needs updated Technical Report".
+ * One version's own line: "Ready for Proposal" when it can go to Proposal, the
+ * same words the report rows use when it cannot.
  */
 export function libraryVersionReadinessLine(row) {
   if (!row || row.checking) return null;
   if (row.ready) return LIBRARY_READINESS_HEADLINE.READY;
-
-  const blockers = Array.isArray(row.blockers) ? row.blockers : [];
-  const reportBlockers = blockers.filter((blocker) => blocker.source !== READINESS_SOURCE.ENGINEERING);
-  if (reportBlockers.length >= 2) return `Needs updated ${LIBRARY_COMBINED_REPORTS_LABEL}`;
-  if (reportBlockers.length === 1) {
-    const blocker = reportBlockers[0];
-    return blocker.state === READINESS_STATE.MISSING
-      ? `Needs ${blocker.label} generated`
-      : `Needs updated ${blocker.label}`;
-  }
-  if (blockers.length > 0) return LIBRARY_CHECKLIST_STATUS.NEEDS_ENGINEERING;
-  return null;
+  if (blockedReportCell(row)) return LIBRARY_CHECKLIST_STATUS.UPDATE_NEEDED;
+  return 'Not assessed yet';
 }
 
-/** The single action that unblocks the first blocked version. */
+/** The one action that unblocks the first blocked version. */
 function fixActionFor(row) {
-  const blocker = (row?.blockers || [])[0] || null;
-  const reportType = reportTypeOf(blocker?.source);
-  if (!reportType) {
+  const blocked = blockedReportCell(row);
+  if (!blocked) {
     return readinessAction(LIBRARY_READINESS_ACTION.OPEN_ROOM_DESIGNER, 'room-designer', {
       versionId: row?.versionId || null,
     });
   }
-  const target = { reportType, versionId: row?.versionId || null };
-  if (blocker.state === READINESS_STATE.MISSING) return readinessAction(LIBRARY_READINESS_ACTION.GENERATE, 'generate', target);
-  if (blocker.state === READINESS_STATE.LEGACY) return readinessAction(LIBRARY_READINESS_ACTION.OPEN_REPORT, 'open', target);
-  return readinessAction(LIBRARY_READINESS_ACTION.CREATE_UPDATED, 'update', target);
+  return readinessAction(LIBRARY_READINESS_ACTION.UPDATE_REQUIRED, 'update', {
+    reportType: reportTypeOf(blocked.source),
+    versionId: row?.versionId || null,
+  });
 }
+
+/** The verdict the gate's own rows read as, in the Library's words. */
+function verdictFor({ checking, ready, rows }) {
+  if (checking) return LIBRARY_VERDICT.CHECKING;
+  if (ready) return LIBRARY_VERDICT.READY;
+  return rows.some((row) => blockedReportCell(row))
+    ? LIBRARY_VERDICT.UPDATES_NEEDED
+    : LIBRARY_VERDICT.NOT_ASSESSED;
+}
+
+const VERDICT_DETAIL = {
+  [LIBRARY_VERDICT.READY]: LIBRARY_READY_DETAIL,
+  [LIBRARY_VERDICT.UPDATES_NEEDED]: LIBRARY_UPDATES_NEEDED_DETAIL,
+  [LIBRARY_VERDICT.NOT_ASSESSED]: LIBRARY_NOT_ASSESSED_DETAIL,
+  [LIBRARY_VERDICT.CHECKING]: LIBRARY_CHECKING_DETAIL,
+};
 
 /**
  * The Library's readiness verdict, in the designer's words.
@@ -149,13 +162,13 @@ function fixActionFor(row) {
  * @param {Array} params.rows        the readiness rows, one per design version
  * @param {boolean} [params.loading] the read is in flight
  * @param {Array} [params.versions]  the design versions, in Library order
- * @returns {Object} — headline, detail, checklist, showChecklist and the actions
+ * @returns {Object} — verdict, headline, detail, checklist, showChecklist and the actions
  */
 export function buildLibraryProposalReadiness({ rows = [], loading = false, versions = [] } = {}) {
   const list = Array.isArray(rows) ? rows : [];
   const gate = resolveProposalReadinessGate({ rows: list, loading, minVersions: 1 });
 
-  // The checklist reads in the order the version sections are shown, so the
+  // The compact list reads in the order the version sections are shown, so the
   // banner and the sections below it name the versions in the same order.
   const orderedRows = (Array.isArray(versions) ? versions : [])
     .map((version) => list.find((row) => row.versionId === version.id))
@@ -170,7 +183,7 @@ export function buildLibraryProposalReadiness({ rows = [], loading = false, vers
     cells: LIBRARY_READINESS_CELLS.map(({ source, label }) => ({
       source,
       label,
-      status: libraryCellStatus({ source, cell: row.cells?.[source] }),
+      status: libraryCellStatus({ cell: row.cells?.[source] }),
     })),
   }));
 
@@ -180,32 +193,37 @@ export function buildLibraryProposalReadiness({ rows = [], loading = false, vers
     0,
   );
   const firstBlockedRow = rowsInOrder.find((row) => !row.ready) || null;
+  const verdict = verdictFor({ checking: gate.checking, ready: gate.ready, rows: rowsInOrder });
+  const ready = verdict === LIBRARY_VERDICT.READY;
 
   return {
     checking: gate.checking,
     ready: gate.ready,
-    headline: gate.checking
+    verdict,
+    headline: verdict === LIBRARY_VERDICT.CHECKING
       ? null
-      : gate.ready
-        ? LIBRARY_READINESS_HEADLINE.READY
-        : LIBRARY_READINESS_HEADLINE.NOT_READY,
-    detail: gate.checking
-      ? LIBRARY_CHECKING_DETAIL
-      : gate.ready
-        ? LIBRARY_READY_DETAIL
-        : libraryBlockerSentence(firstBlockedRow),
+      : LIBRARY_READINESS_HEADLINE[
+        verdict === LIBRARY_VERDICT.READY
+          ? 'READY'
+          : verdict === LIBRARY_VERDICT.UPDATES_NEEDED
+            ? 'UPDATES_NEEDED'
+            : 'NOT_ASSESSED'
+      ],
+    detail: VERDICT_DETAIL[verdict],
     checklist,
-    // One blocked report reads as a sentence; several read as the short
-    // checklist, so the designer sees every version at once.
-    showChecklist: !gate.checking && blockedCells >= 2,
+    // The short per-version list is shown whenever a report stands in the way,
+    // so the designer sees which report and which version at a glance.
+    showChecklist: !gate.checking && blockedCells >= 1,
     primaryAction: gate.checking
       ? null
-      : gate.ready
+      : ready
         ? readinessAction(LIBRARY_READINESS_ACTION.CREATE_PROPOSAL, 'create-proposal')
         : fixActionFor(firstBlockedRow),
-    secondaryAction: !gate.checking && gate.ready
-      ? readinessAction(LIBRARY_READINESS_ACTION.VIEW_PROPOSAL_CENTRE, 'proposal-centre')
-      : null,
+    secondaryAction: gate.checking
+      ? null
+      : ready
+        ? readinessAction(LIBRARY_READINESS_ACTION.VIEW_PROPOSAL_CENTRE, 'proposal-centre')
+        : readinessAction(LIBRARY_READINESS_ACTION.VIEW_REPORTS, 'view-reports'),
   };
 }
 
