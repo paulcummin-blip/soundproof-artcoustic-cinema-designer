@@ -11,6 +11,6 @@ export function auditFinalReportAuthority(publication) {
   if (!Array.isArray(report?.placedSpeakers) || !report.placedSpeakers.length) missing.push('report_snapshot.placedSpeakers');
   return {
     allowed: !missing.length, missing,
-    reason: missing.length ? 'Final report blocked: ' + missing[0] + ' is missing from the durable publication.' : null,
+    reason: missing.length ? 'Final report blocked: ' + missing.join('; ') : null,
   };
 }
