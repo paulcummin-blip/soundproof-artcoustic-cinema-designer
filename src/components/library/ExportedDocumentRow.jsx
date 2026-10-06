@@ -6,8 +6,10 @@
  * overwritten and is never deleted from here.
  *
  * The row's state is stated by the caller — the same library vocabulary every
- * other row uses — so an exported report can read "Same as current", "Older
- * export", "Source changed since export" or "Superseded by newer export".
+ * other row uses — so an issued PDF reads "Issued PDF", "Issued PDF — older than
+ * current design" or "Superseded by newer export". An older-than-design PDF also
+ * carries the caller's one-line note, so it reads as history rather than as
+ * something that blocks a proposal.
  *
  * The row owns its own open/download state, so it can be dropped into any
  * section without prop plumbing.
@@ -28,6 +30,7 @@ export default function ExportedDocumentRow({
   statusState,
   statusLabel,
   superseded = false,
+  note = null,
 }) {
   const [busy, setBusy] = useState(null);
   const [failure, setFailure] = useState(null);
@@ -70,6 +73,11 @@ export default function ExportedDocumentRow({
             <span>{record.page_count ? `${record.page_count} pages` : 'PDF'}</span>
           </div>
           {failure && <p className="mt-1 text-xs text-[#7A2E10]">{failure}</p>}
+          {note && !failure && (
+            <p className="mt-1 text-xs text-[#8A8477]" style={{ fontFamily: REPORT_FONT_BODY }}>
+              {note}
+            </p>
+          )}
         </div>
       </div>
 

@@ -33,8 +33,12 @@ import { REPORT_FONT_HEADING, REPORT_FONT_BODY } from '@/components/report/typog
 export default function ProposalCentre() {
   const { user } = useAuth();
   const navigate = useNavigate();
+  // The wizard can also be opened from another page — the Project Library's
+  // readiness banner links to ?create=1 — so the flag is read from the URL as
+  // well as from the Create Proposal button below.
+  const [searchParams] = useSearchParams();
   const [activeTab, setActiveTab] = useState('brand');
-  const [showWizard, setShowWizard] = useState(false);
+  const [showWizard, setShowWizard] = useState(searchParams.get('create') === '1');
   const [regenerateFrom, setRegenerateFrom] = useState(null);
   const accountId = user?.access_context?.account?.id || user?.account_id || null;
 

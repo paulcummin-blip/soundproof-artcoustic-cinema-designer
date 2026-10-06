@@ -46,12 +46,24 @@ export const ISSUED_PDF_LABEL = 'Issued PDF';
 /**
  * The wording an issued PDF carries when the design moved on after it was issued
  * — the same source-changed state, stated from the PDF's side. It never implies
- * the PDF itself needs regenerating: it is a historical issued document.
+ * the PDF itself needs regenerating: the PDF is history, and it is simply older
+ * than the design the project now holds.
  */
-export const EXPORT_SOURCE_CHANGED_LABEL = 'Issued PDF — design changed since export';
+export const EXPORT_SOURCE_CHANGED_LABEL = 'Issued PDF — older than current design';
 
-/** The plain-English sentence beside that label. */
-export const EXPORT_DESIGN_CHANGED_NOTE = 'Design changed since this PDF was issued';
+/**
+ * The one line that older-than-design PDF carries, so the designer reads it as
+ * history rather than as something that stands in the way of a proposal.
+ */
+export const EXPORT_DESIGN_CHANGED_NOTE =
+  'This PDF is still available, but it was issued before the latest report update.';
+
+/**
+ * The one sentence that separates the Issued PDFs section from the reports above
+ * it: proposals read the reports, never these fixed exports.
+ */
+export const ISSUED_PDFS_HELPER =
+  'Issued PDFs are fixed exports from the date shown. They remain available for records, but proposals use the Current Reports above.';
 
 export const LIVE_REPORT_LABEL = 'Current report';
 export const EXPORTED_PDF_LABEL = 'Issued PDF';

@@ -196,11 +196,11 @@ test('TEST 3 — regenerating after exporting updates the live row and marks the
   assert.deepEqual(
     kept.map((record) => resolveExportLiveState({ record, version: VERSION_4, liveReport }).label),
     [EXPORT_SOURCE_CHANGED_LABEL],
-    'the design moved on: "Issued PDF — design changed since export"',
+    'the design moved on: "Issued PDF — older than current design"',
   );
   assert.equal(
     EXPORT_SOURCE_CHANGED_LABEL,
-    'Issued PDF — design changed since export',
+    'Issued PDF — older than current design',
     'the exact wording',
   );
 

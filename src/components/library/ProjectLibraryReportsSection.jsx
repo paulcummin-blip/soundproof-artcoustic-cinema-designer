@@ -3,6 +3,11 @@
  * ---------------------------
  * The active project's Generated Reports, per design version.
  *
+ * The tab opens with the readiness banner — the one line answer to "can I go to
+ * Proposal now?" — read from the same authority the Proposal Centre gates
+ * generation with. Each version below it then states its own readiness line, so
+ * a project that is not ready names the version and the report that holds it up.
+ *
  * Each design version lists, in two groups:
  *
  *   Current reports    ONE row per report type, always shown — so the Library
@@ -14,12 +19,15 @@
  *                      section it stands in, so a Level 4 row acts on Level 4
  *                      and never on another version.
  *
- *   Issued PDFs        the LATEST issued PDF per report type. An earlier export
- *                      of the same version and report type stays in storage but
- *                      is not listed. An issued PDF is a fixed historical
- *                      document: it is only ever opened or downloaded, and it
- *                      reads "Issued PDF — design changed since export" once the
- *                      design has moved on.
+ *   Issued PDFs        the LATEST issued PDF per report type, separated from the
+ *                      reports by the line that says what they are: fixed
+ *                      exports, kept for records, never what a proposal reads.
+ *                      An earlier export of the same version and report type
+ *                      stays in storage but is not listed. An issued PDF is a
+ *                      fixed historical document: it is only ever opened or
+ *                      downloaded, and once the design has moved on it reads
+ *                      "Issued PDF — older than current design" with the line
+ *                      that says it is simply older than the latest report.
  *
  * Nothing here changes a report's status: exporting, opening or listing a report
  * leaves it exactly as it was.
@@ -41,12 +49,18 @@ import {
 } from '@/components/report/reportActionIntent';
 import LiveReportRow from './LiveReportRow';
 import ExportedDocumentRow from './ExportedDocumentRow';
+import LibraryProposalReadinessBanner from './LibraryProposalReadinessBanner';
+import VersionReadinessLine from './VersionReadinessLine';
+import useLibraryProposalReadiness from './useLibraryProposalReadiness';
 import {
+  EXPORT_DESIGN_CHANGED_NOTE,
+  ISSUED_PDFS_HELPER,
+  LIVE_REPORT_STATE,
+  LIBRARY_SOURCE_STATE,
   liveReportStateLabel,
   resolveExportLiveState,
   resolveLiveReportState,
   selectLatestExports,
-  LIVE_REPORT_STATE,
 } from './librarySourceStatus';
 
 /** The two report types every version states a row for, in reading order. */
@@ -81,6 +95,13 @@ export default function ProjectLibraryReportsSection({
 }) {
   const navigate = useNavigate();
 
+  // The Library's readiness verdict: read from the SAME authority the Proposal
+  // Centre gates generation with, never a second opinion derived here.
+  const readiness = useLibraryProposalReadiness({ projectId, versions });
+  const readinessByVersion = new Map(
+    (readiness.checklist || []).map((entry) => [entry.versionId, entry]),
+  );
+
   /**
    * Open, generate or regenerate one report — always for the exact version of
    * the row it was clicked in. The version is passed explicitly and is the only
@@ -111,6 +132,26 @@ export default function ProjectLibraryReportsSection({
     [REPORT_UPDATE_PARAM]: '1',
   });
 
+  /** The two places the readiness banner sends the designer. */
+  const openProposalCentre = () => navigate('/ProposalCentre');
+  const createProposal = () => navigate('/ProposalCentre?create=1');
+
+  /**
+   * The banner's one unblocking action, aimed at the exact version and report it
+   * named — the same route a row's own action takes, so the two can never point
+   * at different places. An engineering action opens the version's design.
+   */
+  const runReadinessAction = (action) => {
+    if (!action) return;
+    if (action.kind === 'room-designer') {
+      navigate('/RoomDesigner');
+      return;
+    }
+    openVersionReport(action.reportType, action.versionId, action.kind === 'update'
+      ? { [REPORT_UPDATE_PARAM]: '1' }
+      : null);
+  };
+
   if (versions.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center py-20">
@@ -124,6 +165,13 @@ export default function ProjectLibraryReportsSection({
 
   return (
     <div className="space-y-12">
+      <LibraryProposalReadinessBanner
+        readiness={readiness}
+        onCreateProposal={createProposal}
+        onViewProposalCentre={openProposalCentre}
+        onPrimaryAction={runReadinessAction}
+      />
+
       {versions.map((version) => {
         // This version's own rows only. The live report of a type is judged
         // against the export of the SAME type, and both belong to THIS version.
@@ -145,6 +193,10 @@ export default function ProjectLibraryReportsSection({
               <h2 className="text-xl text-[#1B1A1A]" style={{ fontFamily: REPORT_FONT_BODY }}>
                 {version.version_name || `Version ${version.version_number}`}
               </h2>
+              <VersionReadinessLine
+                line={readinessByVersion.get(version.id)?.line}
+                ready={readinessByVersion.get(version.id)?.ready === true}
+              />
             </div>
 
             <SectionHeading>Current reports</SectionHeading>
@@ -174,6 +226,11 @@ export default function ProjectLibraryReportsSection({
 
             <div className="mt-6">
               <SectionHeading>Issued PDFs</SectionHeading>
+              {issued.length > 0 && (
+                <p className="text-xs text-[#8A8477] mb-3 max-w-3xl leading-relaxed" style={{ fontFamily: REPORT_FONT_BODY }}>
+                  {ISSUED_PDFS_HELPER}
+                </p>
+              )}
               {issued.length === 0 ? (
                 <EmptyNote>No PDF has been issued for this version yet.</EmptyNote>
               ) : (
@@ -193,6 +250,9 @@ export default function ProjectLibraryReportsSection({
                       statusState={state.state}
                       statusLabel={state.label}
                       superseded={superseded}
+                      note={state.state === LIBRARY_SOURCE_STATE.SOURCE_CHANGED
+                        ? EXPORT_DESIGN_CHANGED_NOTE
+                        : null}
                     />
                   );
                 })

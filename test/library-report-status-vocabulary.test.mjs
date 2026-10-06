@@ -6,7 +6,7 @@
 //   A  Current report      Current · Open · Export PDF, and no refresh action
 //   B  Design changed      Previous report · Open previous · Create updated report
 //   C  Issued PDF current  Issued PDF · Open · Download
-//   D  Issued PDF changed  Issued PDF — design changed since export · Open · Download
+//   D  Issued PDF changed  Issued PDF — older than current design · Open · Download
 //   E  Exporting a PDF never stales the report
 //   F  Opening a report never stales it
 //   G  Generating a proposal never stales it
@@ -205,8 +205,11 @@ test('D — an issued PDF after a design change says so, and is never regenerate
     liveReport: { generatedAt: live.generated_at, sourceFingerprints: live.source_fingerprints },
   });
   assert.equal(changed.label, EXPORT_SOURCE_CHANGED_LABEL);
-  assert.equal(changed.label, 'Issued PDF — design changed since export');
-  assert.equal(EXPORT_DESIGN_CHANGED_NOTE, 'Design changed since this PDF was issued');
+  assert.equal(changed.label, 'Issued PDF — older than current design');
+  assert.equal(
+    EXPORT_DESIGN_CHANGED_NOTE,
+    'This PDF is still available, but it was issued before the latest report update.',
+  );
 
   // The version's published pointer moved on with no live report to compare to.
   const movedPointer = resolveExportLiveState({
