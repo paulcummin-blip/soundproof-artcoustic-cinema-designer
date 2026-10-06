@@ -29,8 +29,9 @@
 import { isBassConsistencyClaim } from '../proposalEvidence/proposalEvidenceWording.js';
 import { WRITER_REJECTION, violation } from './writerContractSchema.js';
 import {
+  areaAnchorTerms,
   assertionKind,
-  blockKeywords,
+  blockPatterns,
   blockedChangeBlocks,
   hasRecommendationClaim,
   isPackProse,
@@ -47,20 +48,95 @@ import {
   stripOptionNames,
 } from './writerVocabulary.js';
 
-/** The words that turn a keyword into a claimed improvement about it. */
-const BENEFIT_WORDS = 'improve\\w*|improvements?|gains?|better|greater|more|increas\\w*|enhanc\\w*|exceeds?|superior|boosts?|advantages?|benefits?';
+/** A comparative in front of an area claims more of it: "a larger screen". */
+const COMPARATIVES = 'more|larger|bigger|wider|greater|better|higher|superior|increased|additional|extra|further|stronger|deeper';
 
-/** The words that add or change something outright. */
-const STRONG_CHANGE_WORDS = 'adds?|added|changes?|changed|upgrad\\w*|exchanges?';
+/** Words that are themselves an improvement or a change in the area. */
+const CLAIM_VERBS = 'improve[sd]?|improvements?|gains?|increases?|increased|boosts?|enhances?|exceeds?|solves?|fixes?|resolves?|adds?|added|changes?|changed|upgrades?|upgraded|replaces?|exchanges?|introduces?';
+
+/** Verbs that carry a benefit to the area without asserting one themselves. */
+const LINK_VERBS = 'is|are|was|were|has|have|had|offers?|provides?|gives?|giving|delivers?|records?|shows?|reaches?|achieves?|supports?|remains?|scores?|performs?|states?|holds?|keeps?';
+
+/** The words that turn a keyword into a claimed improvement about it. */
+const BENEFIT_WORDS = 'improve[sd]?|improvements?|gains?|better|greater|more|increas\\w*|enhanc\\w*|exceeds?|superior|boosts?|advantages?|benefits?|stronger|higher|larger|bigger|wider|deeper';
+
+/** Any word that carries a claim: an improvement, a change or a comparative. */
+const CLAIM_WORDS = `${CLAIM_VERBS}|${COMPARATIVES}|${BENEFIT_WORDS}`;
 
 /** A phrase that compares two options rather than importing from one into the other. */
 const CONTRAST = /\b(?:rather than|instead of|compared (?:with|to)|against)\b/i;
 
-/** Whether a sentence claims an improvement or a change in the area a keyword names. */
-function claimsChangeOf(sentence, keyword) {
-  const subjectFirst = new RegExp(`\\b${keyword}\\w*\\b[^.]{0,40}?\\b(?:${BENEFIT_WORDS})\\b`, 'i');
-  const changeFirst = new RegExp(`\\b(?:${STRONG_CHANGE_WORDS})\\b[^.]{0,25}?\\b${keyword}\\w*\\b`, 'i');
-  return subjectFirst.test(sentence) || changeFirst.test(sentence);
+/** The words that deny a claim, however they are written. */
+const DENIAL = /\b(?:not|never|no|none|nor|neither|cannot|can't|doesn't|don't|isn't|aren't|without|lacks?)\b|\b(?:do|does|did|is|are|was|were|can|could|will|would|has|have|had)\s+not\b/i;
+
+/** Whether the clause carrying a match denies it: "the bass results do not indicate improved...". */
+function isDenied(sentence, at) {
+  if (!Number.isFinite(at) || at < 0) return false;
+  const clause = sentence.slice(0, at)
+    .split(/[,;:]|\b(?:but|however|although|whereas|yet)\b/i)
+    .pop() || '';
+  return DENIAL.test(clause);
+}
+
+/** One pattern for every term the pack's areas are named by. */
+function anchorPatternFor(input) {
+  const terms = areaAnchorTerms(input?.evidence_pack);
+  return terms.length > 0 ? new RegExp(`\\b(?:${terms.join('|')})\\w*\\b`, 'i') : /$^/;
+}
+
+/**
+ * Whether a sentence claims a change or an improvement in ONE area, read from
+ * the area itself: the area's own phrase, or one of its distinctive terms
+ * carrying the claim as its subject. A term that merely occurs in the sentence —
+ * inside another area's phrase, inside an option's name, or as a compound
+ * modifier of something else — is not a claim about this area.
+ *
+ * @returns {{ at: number, keyword: string, phrase: boolean }|null}
+ */
+function claimsArea(sentence, { heads = [], phrases = [] } = {}) {
+  for (const phrase of phrases) {
+    const at = sentence.toLowerCase().indexOf(phrase);
+    if (at < 0) continue;
+    const before = sentence.slice(Math.max(0, at - 40), at);
+    const after = sentence.slice(at + phrase.length, at + phrase.length + 40);
+    const claimed = new RegExp(`\\b(?:${CLAIM_WORDS})\\b`, 'i').test(before)
+      || new RegExp(`\\b(?:${BENEFIT_WORDS})\\b`, 'i').test(after);
+    if (claimed) return { at, keyword: phrase, phrase: true };
+  }
+
+  for (const head of heads) {
+    const term = `\\b${head}\\w*\\b`;
+    const patterns = [
+      // the area carries the comparative itself: "a larger screen"
+      new RegExp(`\\b(?:${COMPARATIVES})\\b\\s+(?:\\w+\\s+){0,1}?${term}`, 'i'),
+      // the area is the subject of the claim: "the screen improves"
+      new RegExp(`${term}(?:\\s+\\w+){0,2}\\s+(?:${CLAIM_VERBS})\\b`, 'i'),
+      // the claim is predicated of the area: "adds more channels"
+      new RegExp(`\\b(?:${CLAIM_VERBS})\\b(?:\\s+\\w+){0,3}\\s+${term}`, 'i'),
+      // the area is the subject of a benefit: "the screen gives more headroom"
+      new RegExp(`${term}(?:\\s+\\w+){0,2}\\s+(?:${LINK_VERBS})\\b(?:\\s+\\w+){0,3}\\s+(?:${BENEFIT_WORDS})\\b`, 'i'),
+    ];
+    for (const pattern of patterns) {
+      const match = pattern.exec(sentence);
+      if (match) return { at: match.index, keyword: head, phrase: false };
+    }
+  }
+
+  return null;
+}
+
+/**
+ * What a sentence asserts, once the areas and the denials are read. A sentence
+ * that names no area of the evidence asserts nothing about it, and a sentence
+ * that denies its own claim is not making it — so neither is a grounded claim
+ * that a section has to have cited a claim for.
+ */
+function assertedKind(sentence, anchors) {
+  const kind = assertionKind(sentence);
+  if (!kind || kind === 'result' || kind === 'same') return kind;
+  if (!anchors.test(sentence)) return null;
+  const at = sentence.search(new RegExp(`\\b(?:${CLAIM_WORDS})\\b`, 'i'));
+  return isDenied(sentence, at) ? null : kind;
 }
 
 /** The option a version ID belongs to, as the draft would name it. */
@@ -84,9 +160,21 @@ export function scanProse({ input, vocabulary, section, text, claims = [], claim
   const citedClaims = Array.isArray(claims) ? claims : [];
   const sentences = sentenceParts(text);
   const packProse = packProseSentences(input);
+  const anchors = anchorPatternFor(input);
+  const blocks = blockedChangeBlocks(input)
+    .map((block) => ({ block, patterns: blockPatterns(block, input.evidence_pack) }));
 
   for (const sentence of sentences) {
-    const kind = assertionKind(sentence);
+    // An option's own name is an option's name: it is not a claim about an area
+    // and it is not a Performance Level, so it is taken out before the sentence
+    // is read for either.
+    const claimed = stripOptionNames(sentence, vocabulary.optionNames)
+      .replace(/\bLevel\s?[1-4]\b(?:\s+versions?)?/gi, ' ');
+
+    // What the sentence asserts, once a sentence that names no area of the
+    // evidence, and a sentence that denies its own claim, are read as asserting
+    // nothing at all.
+    const kind = assertedKind(claimed, anchors);
 
     // Grounding: a claim the section cites nothing for, or cites the wrong kind
     // of claim for, is not a claim this pack supports.
@@ -106,10 +194,11 @@ export function scanProse({ input, vocabulary, section, text, claims = [], claim
     // Prose the pack itself states is exempt — the pack's own claim wording is
     // permitted by definition, and quoting it is exactly what a draft should do.
     const fromPack = isPackProse(sentence, packProse);
-    for (const block of fromPack ? [] : blockedChangeBlocks(input)) {
-      const matched = blockKeywords(block, input.evidence_pack)
-        .some((keyword) => claimsChangeOf(sentence, keyword));
-      if (!matched) continue;
+    for (const { block, patterns } of fromPack ? [] : blocks) {
+      const match = claimsArea(claimed, patterns);
+      if (!match) continue;
+      // A sentence that denies the claim is not making it.
+      if (isDenied(claimed, match.at)) continue;
       found.push(violation(WRITER_REJECTION.UNSUPPORTED_IMPROVEMENT, {
         section,
         detail: `${block.reason}:${block.block_id}`,

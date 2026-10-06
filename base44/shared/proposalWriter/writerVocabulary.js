@@ -287,14 +287,103 @@ export function blockedChangeBlocks(input) {
     .filter((block) => CHANGE_BLOCK_REASONS.includes(block?.reason));
 }
 
-/** The words an improvement claim would have to name for one blocked area. */
-export function blockKeywords(block, pack) {
+/** Words that name no area on their own, so they never stand as an area's head. */
+const STOPWORDS = Object.freeze([
+  'and', 'or', 'the', 'of', 'to', 'for', 'with', 'a', 'an', 'in', 'on', 'at', 'by', 'as', 'its', 'from',
+]);
+
+/**
+ * Terms too broad to stand for one area on their own. "System" names a
+ * subwoofer as often as a layout, "level" is an option's name and a Performance
+ * Level before it is an overhead result, and "bass" is the family the whole bass
+ * section belongs to. None of them identifies ONE area, so a sentence is never
+ * read as claiming a change in an area from that word by itself — but the area's
+ * own phrase ("system layout", "bass consistency") still names it.
+ */
+const GENERIC_AREA_TERMS = Object.freeze(['system', 'level', 'bass']);
+
+/** The distinctive terms a label is named by. */
+function areaHeads(label) {
+  const words = String(label || '')
+    .replace(/\([^)]*\)/g, ' ')
+    .toLowerCase()
+    .split(/[^a-z]+/)
+    .filter((word) => word.length > 2
+      && !STOPWORDS.includes(word)
+      && !GENERIC_AREA_TERMS.includes(word));
+
+  const heads = new Set();
+  for (const word of words) {
+    heads.add(word);
+    // A plural label names its singular too: "Subwoofers" is claimed by "subwoofer".
+    if (word.endsWith('s') && word.length > 4) heads.add(word.slice(0, -1));
+  }
+  return [...heads];
+}
+
+/** The area's own phrase, as a sentence would write it. */
+function areaPhrases(label) {
+  const text = String(label || '')
+    .replace(/\([^)]*\)/g, ' ')
+    .split('/')[0]
+    .toLowerCase()
+    .replace(/[^a-z]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+  return text.split(' ').filter((word) => word.length > 1).length > 1 ? [text] : [];
+}
+
+/**
+ * What one blocked claim is named by: the area's own phrase, and the distinctive
+ * terms a claim about that area would use as its subject. A block whose wording
+ * is a fixed phrase rather than an area keeps its own terms.
+ *
+ * @param {Object} block — one blocked claim
+ * @param {Object} pack — the frozen evidence pack
+ * @returns {{ reason: string|null, heads: Array<string>, phrases: Array<string> }}
+ */
+export function blockPatterns(block, pack) {
   const explicit = REASON_KEYWORDS[block?.reason];
-  if (explicit) return explicit;
   const area = (Array.isArray(pack?.areas) ? pack.areas : [])
     .find((entry) => entry.area === (block?.area || block?.scope)) || null;
-  const source = area?.label || block?.area || block?.scope || '';
-  return String(source).toLowerCase().split(/[^a-z]+/).filter((word) => word.length > 2);
+  const label = area?.label || '';
+
+  return {
+    reason: block?.reason || null,
+    heads: explicit ? [...explicit] : areaHeads(label || block?.area || block?.scope),
+    phrases: explicit ? [] : areaPhrases(label),
+  };
+}
+
+/** The words an improvement claim would have to name for one blocked area. */
+export function blockKeywords(block, pack) {
+  return blockPatterns(block, pack).heads;
+}
+
+/**
+ * Every term the pack's areas are named by — the vocabulary a sentence has to
+ * reach into before it can be asserting anything about the evidence at all.
+ * Used to tell a claim about the design from a sentence that asserts nothing.
+ */
+export function areaAnchorTerms(pack) {
+  const terms = new Set();
+
+  const add = (label) => {
+    const words = String(label || '')
+      .toLowerCase()
+      .split(/[^a-z]+/)
+      .filter((word) => word.length > 2 && !STOPWORDS.includes(word));
+    for (const word of words) {
+      terms.add(word);
+      if (word.endsWith('s') && word.length > 4) terms.add(word.slice(0, -1));
+    }
+  };
+
+  for (const area of Array.isArray(pack?.areas) ? pack.areas : []) add(area?.label);
+  for (const keywords of Object.values(REASON_KEYWORDS)) {
+    for (const word of keywords) terms.add(word);
+  }
+  return [...terms];
 }
 
 /* ── Reading a draft's prose ───────────────────────────────────────────────── */

@@ -1,0 +1,3964 @@
+{
+  "generation_id": "gen_7bf15603",
+  "created_at": "2026-10-06T18:38:38.967Z",
+  "provider": "base44-ai-gateway",
+  "model": "gpt_5_mini",
+  "prompt_version": "proposal-writer-prompt-1",
+  "contract_version": 1,
+  "schema_version": 1,
+  "status_at_review": "needs_human_review",
+  "input": {
+    "contract_version": 1,
+    "prompt_version": "proposal-writer-prompt-1",
+    "output": {
+      "mode": "json_only",
+      "schema_version": 1,
+      "top_level_keys": [
+        "contract_version",
+        "pack_fingerprint",
+        "sections"
+      ],
+      "section_keys": [
+        "section",
+        "text",
+        "claim_ids"
+      ],
+      "claim_id_prefixes": [
+        "claim_",
+        "block_"
+      ],
+      "grounding_rule": "every client-facing claim must cite one or more allowed claim IDs in that section's claim_ids",
+      "sections": [
+        {
+          "section": "decision_summary",
+          "title": "Decision Summary",
+          "word_limit": 140,
+          "requirement": "State the decision between the options in the pack's own framing, and only where the pack allows a framing."
+        },
+        {
+          "section": "what_stays_same",
+          "title": "What Stays the Same",
+          "word_limit": 130,
+          "requirement": "State only what every option shares, from the shared-result claims the pack allows."
+        },
+        {
+          "section": "what_changes",
+          "title": "What Changes",
+          "word_limit": 180,
+          "requirement": "State only the differences the pack records, and call one a gain only where the pack allows a gain."
+        },
+        {
+          "section": "key_performance_highlights",
+          "title": "Key Performance Highlights",
+          "word_limit": 170,
+          "requirement": "State the pack's recorded results, in the pack's own words, for the areas that carry a claim."
+        },
+        {
+          "section": "spatial_resolution",
+          "title": "Spatial Resolution",
+          "word_limit": 170,
+          "requirement": "Explain what the spatial results mean for the seating, within the claims the pack allows."
+        },
+        {
+          "section": "dynamic_range",
+          "title": "Dynamic Range",
+          "word_limit": 170,
+          "requirement": "Explain the dynamic-range results the pack records, and present no other."
+        },
+        {
+          "section": "timbre_matching",
+          "title": "Timbre Matching",
+          "word_limit": 150,
+          "requirement": "Explain the loudspeaker and coverage evidence the pack records, and claim nothing beyond it."
+        },
+        {
+          "section": "overall_design",
+          "title": "Overall Design",
+          "word_limit": 190,
+          "requirement": "Close on the design as a whole, using only the credibility and recommendation claims the pack allows."
+        },
+        {
+          "section": "appendix_notes",
+          "title": "Appendix Notes",
+          "word_limit": 200,
+          "requirement": "Note the report evidence the pack was built from, with no performance claim."
+        }
+      ]
+    },
+    "evidence": {
+      "pack_schema_version": 2,
+      "pack_fingerprint": "93ffc5f8",
+      "mode": "comparison",
+      "options": [
+        {
+          "version_id": "6abbca6e199f13dc4d74ec4a",
+          "version_name": "Level 4 version",
+          "label": "Option A"
+        },
+        {
+          "version_id": "6ac22230d40d8bb0a925ecab",
+          "version_name": "Level 1 version",
+          "label": "Option B"
+        }
+      ],
+      "areas": [
+        {
+          "area": "room",
+          "label": "Room",
+          "kind": "room",
+          "structure": null
+        },
+        {
+          "area": "screen_size",
+          "label": "Screen size",
+          "kind": "structural",
+          "structure": null
+        },
+        {
+          "area": "rp23_viewing",
+          "label": "Viewing angle / RP23",
+          "kind": "graded",
+          "structure": "Viewing"
+        },
+        {
+          "area": "system_layout",
+          "label": "System layout",
+          "kind": "structural",
+          "structure": null
+        },
+        {
+          "area": "speakers",
+          "label": "Speaker package",
+          "kind": "equipment",
+          "structure": null
+        },
+        {
+          "area": "lcr",
+          "label": "LCR",
+          "kind": "equipment",
+          "structure": null
+        },
+        {
+          "area": "surrounds",
+          "label": "Surrounds / wides",
+          "kind": "equipment",
+          "structure": null
+        },
+        {
+          "area": "overheads",
+          "label": "Overheads",
+          "kind": "equipment",
+          "structure": null
+        },
+        {
+          "area": "subwoofers",
+          "label": "Subwoofers",
+          "kind": "equipment",
+          "structure": null
+        },
+        {
+          "area": "acoustic_treatment",
+          "label": "Acoustic treatment",
+          "kind": "equipment",
+          "structure": null
+        },
+        {
+          "area": "amplification",
+          "label": "Amplification",
+          "kind": "equipment",
+          "structure": null
+        },
+        {
+          "area": "seating",
+          "label": "Seating",
+          "kind": "structural",
+          "structure": null
+        },
+        {
+          "area": "p2",
+          "label": "Discrete channels (P2)",
+          "kind": "graded",
+          "structure": "Spatial Resolution"
+        },
+        {
+          "area": "p4",
+          "label": "Screen consistency (P4)",
+          "kind": "graded",
+          "structure": "Spatial Resolution"
+        },
+        {
+          "area": "p5",
+          "label": "Horizontal spacing (P5)",
+          "kind": "graded",
+          "structure": "Spatial Resolution"
+        },
+        {
+          "area": "p7",
+          "label": "Front wide position (P7)",
+          "kind": "graded",
+          "structure": "Spatial Resolution"
+        },
+        {
+          "area": "p9",
+          "label": "Overhead spacing (P9)",
+          "kind": "graded",
+          "structure": "Spatial Resolution"
+        },
+        {
+          "area": "p10",
+          "label": "Overhead level consistency (P10)",
+          "kind": "graded",
+          "structure": "Spatial Resolution"
+        },
+        {
+          "area": "p12",
+          "label": "Screen Dynamic Range (P12)",
+          "kind": "graded",
+          "structure": "Dynamic Range"
+        },
+        {
+          "area": "p13",
+          "label": "Non-screen Dynamic Range (P13)",
+          "kind": "graded",
+          "structure": "Dynamic Range"
+        },
+        {
+          "area": "p14",
+          "label": "LFE and subwoofer Dynamic Range (P14)",
+          "kind": "graded",
+          "structure": "Dynamic Range"
+        },
+        {
+          "area": "p16",
+          "label": "Screen timbre (P16)",
+          "kind": "graded",
+          "structure": "Timbre Matching"
+        },
+        {
+          "area": "p17",
+          "label": "Surround and overhead timbre (P17)",
+          "kind": "graded",
+          "structure": "Timbre Matching"
+        },
+        {
+          "area": "p18",
+          "label": "Bass extension (P18)",
+          "kind": "graded",
+          "structure": "Timbre Matching"
+        },
+        {
+          "area": "p19",
+          "label": "Bass response (P19)",
+          "kind": "graded",
+          "structure": "Timbre Matching"
+        },
+        {
+          "area": "p20",
+          "label": "Bass consistency (P20)",
+          "kind": "graded",
+          "structure": "Timbre Matching"
+        }
+      ]
+    },
+    "evidence_pack": {
+      "schema_version": 2,
+      "generated_at": "2026-10-06T18:38:38.967Z",
+      "mode": "comparison",
+      "areas": [
+        {
+          "area": "room",
+          "label": "Room",
+          "kind": "room",
+          "structure": null
+        },
+        {
+          "area": "screen_size",
+          "label": "Screen size",
+          "kind": "structural",
+          "structure": null
+        },
+        {
+          "area": "rp23_viewing",
+          "label": "Viewing angle / RP23",
+          "kind": "graded",
+          "structure": "Viewing"
+        },
+        {
+          "area": "system_layout",
+          "label": "System layout",
+          "kind": "structural",
+          "structure": null
+        },
+        {
+          "area": "speakers",
+          "label": "Speaker package",
+          "kind": "equipment",
+          "structure": null
+        },
+        {
+          "area": "lcr",
+          "label": "LCR",
+          "kind": "equipment",
+          "structure": null
+        },
+        {
+          "area": "surrounds",
+          "label": "Surrounds / wides",
+          "kind": "equipment",
+          "structure": null
+        },
+        {
+          "area": "overheads",
+          "label": "Overheads",
+          "kind": "equipment",
+          "structure": null
+        },
+        {
+          "area": "subwoofers",
+          "label": "Subwoofers",
+          "kind": "equipment",
+          "structure": null
+        },
+        {
+          "area": "acoustic_treatment",
+          "label": "Acoustic treatment",
+          "kind": "equipment",
+          "structure": null
+        },
+        {
+          "area": "amplification",
+          "label": "Amplification",
+          "kind": "equipment",
+          "structure": null
+        },
+        {
+          "area": "seating",
+          "label": "Seating",
+          "kind": "structural",
+          "structure": null
+        },
+        {
+          "area": "p2",
+          "label": "Discrete channels (P2)",
+          "kind": "graded",
+          "structure": "Spatial Resolution"
+        },
+        {
+          "area": "p4",
+          "label": "Screen consistency (P4)",
+          "kind": "graded",
+          "structure": "Spatial Resolution"
+        },
+        {
+          "area": "p5",
+          "label": "Horizontal spacing (P5)",
+          "kind": "graded",
+          "structure": "Spatial Resolution"
+        },
+        {
+          "area": "p7",
+          "label": "Front wide position (P7)",
+          "kind": "graded",
+          "structure": "Spatial Resolution"
+        },
+        {
+          "area": "p9",
+          "label": "Overhead spacing (P9)",
+          "kind": "graded",
+          "structure": "Spatial Resolution"
+        },
+        {
+          "area": "p10",
+          "label": "Overhead level consistency (P10)",
+          "kind": "graded",
+          "structure": "Spatial Resolution"
+        },
+        {
+          "area": "p12",
+          "label": "Screen Dynamic Range (P12)",
+          "kind": "graded",
+          "structure": "Dynamic Range"
+        },
+        {
+          "area": "p13",
+          "label": "Non-screen Dynamic Range (P13)",
+          "kind": "graded",
+          "structure": "Dynamic Range"
+        },
+        {
+          "area": "p14",
+          "label": "LFE and subwoofer Dynamic Range (P14)",
+          "kind": "graded",
+          "structure": "Dynamic Range"
+        },
+        {
+          "area": "p16",
+          "label": "Screen timbre (P16)",
+          "kind": "graded",
+          "structure": "Timbre Matching"
+        },
+        {
+          "area": "p17",
+          "label": "Surround and overhead timbre (P17)",
+          "kind": "graded",
+          "structure": "Timbre Matching"
+        },
+        {
+          "area": "p18",
+          "label": "Bass extension (P18)",
+          "kind": "graded",
+          "structure": "Timbre Matching"
+        },
+        {
+          "area": "p19",
+          "label": "Bass response (P19)",
+          "kind": "graded",
+          "structure": "Timbre Matching"
+        },
+        {
+          "area": "p20",
+          "label": "Bass consistency (P20)",
+          "kind": "graded",
+          "structure": "Timbre Matching"
+        }
+      ],
+      "options": [
+        {
+          "version_id": "6abbca6e199f13dc4d74ec4a",
+          "version_name": "Level 4 version",
+          "label": "Option A",
+          "version_name_source": {
+            "source": "saved-report-evidence",
+            "from": "technical_report",
+            "stated_by": [
+              "technical_report",
+              "visual_report"
+            ],
+            "reports_agree": true
+          },
+          "facts": {
+            "version_id": "6abbca6e199f13dc4d74ec4a",
+            "version_name": "Level 4 version",
+            "label": "Option A",
+            "report_identity": {
+              "project_name": "Marquee Home",
+              "client_name": null,
+              "project_reference": null,
+              "dealer_name": null
+            },
+            "report_snapshot_ids": {
+              "visual": "6ac20c15df233b979449bcc3",
+              "technical": "6ac391ef796c4899260e0c5a"
+            },
+            "fingerprints": {
+              "engineering": "eng:v1:0cf530d793062741",
+              "visual_evidence": "re1-f82c164e-1fb91",
+              "technical_evidence": "re1-f23d9723-1fb94",
+              "evidence_generated_at": "2026-10-06T11:01:45.131Z"
+            },
+            "room": {
+              "length_m": 7.29,
+              "width_m": 5.18,
+              "height_m": 2.8,
+              "volume_m3": 105.7,
+              "dimensions_text": "7.3m × 5.2m × 2.8m (L × W × H)",
+              "interpretation": null,
+              "acoustic_treatment": {
+                "enabled": true,
+                "product": "Artcoustic Abfuser",
+                "quantity": 8,
+                "source": "User Input",
+                "interpretation": "8 Artcoustic Abfuser panels (auto-calculated recommended quantity). The Abfuser provides broad-band absorption and diffusion to control early reflections and room reverberation.",
+                "confidence": 0.99
+              }
+            },
+            "screen": {
+              "size_inches": 185,
+              "aspect_ratio": "2.35:1",
+              "screen_type": "Projection screen",
+              "viewable_width_cm": 431.8,
+              "viewable_height_cm": 183.7,
+              "manual_dimensions": false,
+              "manual_width_m": null,
+              "manual_height_m": null,
+              "interpretation": "170\" 2.35:1 screen on front wall, baffle wall construction, screen bottom at 0.64m from floor."
+            },
+            "seating": {
+              "interpretation": "2 rows: 4 seats in row 1, 5 seats in row 2. 1.8m centre-to-centre row spacing. MLP positioned at the middle row centre.",
+              "seat_count": 9,
+              "row_count": 2,
+              "per_seat": [
+                {
+                  "seat_id": "seat-r1-c1",
+                  "label": "seat-r1-c1",
+                  "row": 1,
+                  "distance_m": 3.42,
+                  "horizontal_angle_deg": 64.6,
+                  "vertical_angle_deg": null,
+                  "rp23_level": "L4"
+                },
+                {
+                  "seat_id": "seat-r1-c2",
+                  "label": "seat-r1-c2",
+                  "row": 1,
+                  "distance_m": 3.42,
+                  "horizontal_angle_deg": 64.6,
+                  "vertical_angle_deg": null,
+                  "rp23_level": "L4"
+                },
+                {
+                  "seat_id": "seat-r1-c3",
+                  "label": "seat-r1-c3",
+                  "row": 1,
+                  "distance_m": 3.42,
+                  "horizontal_angle_deg": 64.6,
+                  "vertical_angle_deg": null,
+                  "rp23_level": "L4"
+                },
+                {
+                  "seat_id": "seat-r1-c4",
+                  "label": "seat-r1-c4",
+                  "row": 1,
+                  "distance_m": 3.42,
+                  "horizontal_angle_deg": 64.6,
+                  "vertical_angle_deg": null,
+                  "rp23_level": "L4"
+                },
+                {
+                  "seat_id": "seat-r2-c1",
+                  "label": "seat-r2-c1",
+                  "row": 2,
+                  "distance_m": 5.22,
+                  "horizontal_angle_deg": 45,
+                  "vertical_angle_deg": null,
+                  "rp23_level": "L3"
+                },
+                {
+                  "seat_id": "seat-r2-c2",
+                  "label": "seat-r2-c2",
+                  "row": 2,
+                  "distance_m": 5.22,
+                  "horizontal_angle_deg": 45,
+                  "vertical_angle_deg": null,
+                  "rp23_level": "L3"
+                },
+                {
+                  "seat_id": "seat-r2-c3",
+                  "label": "seat-r2-c3",
+                  "row": 2,
+                  "distance_m": 5.22,
+                  "horizontal_angle_deg": 45,
+                  "vertical_angle_deg": null,
+                  "rp23_level": "L3"
+                },
+                {
+                  "seat_id": "seat-r2-c4",
+                  "label": "seat-r2-c4",
+                  "row": 2,
+                  "distance_m": 5.22,
+                  "horizontal_angle_deg": 45,
+                  "vertical_angle_deg": null,
+                  "rp23_level": "L3"
+                },
+                {
+                  "seat_id": "seat-r2-c5",
+                  "label": "seat-r2-c5",
+                  "row": 2,
+                  "distance_m": 5.22,
+                  "horizontal_angle_deg": 45,
+                  "vertical_angle_deg": null,
+                  "rp23_level": "L3"
+                }
+              ]
+            },
+            "viewing": {
+              "available": true,
+              "summary": "Viewing angles calculated for 9 seats. Horizontal viewing angle ranges from 45° to 65°.",
+              "primary_floor": "L3"
+            },
+            "system": {
+              "layout": "9.1.6 (15 discrete channels)",
+              "format": "9.1.6",
+              "channel_layout": {
+                "bed_channels": 9,
+                "overhead_channels": 6,
+                "dolby_subwoofer_channels": 1,
+                "total_discrete": 15,
+                "subwoofer_count": 4
+              },
+              "products": [
+                {
+                  "key": "lcr",
+                  "area": "LCR",
+                  "value": "Q8-5 × 3"
+                },
+                {
+                  "key": "surrounds",
+                  "area": "Surrounds / wides",
+                  "value": "Q6-3 × 6"
+                },
+                {
+                  "key": "overheads",
+                  "area": "Overheads",
+                  "value": "SPITFIRE CLOUD × 6"
+                },
+                {
+                  "key": "subwoofers",
+                  "area": "Subwoofers",
+                  "value": "SUB4-12 × 2 (front), SUB4-12 × 2 (rear)"
+                },
+                {
+                  "key": "acoustic_treatment",
+                  "area": "Acoustic treatment",
+                  "value": "Artcoustic Abfuser × 8"
+                }
+              ],
+              "products_by_layer": {
+                "lcr": [
+                  {
+                    "role": "LCR",
+                    "model": "Q8-5",
+                    "quantity": 3,
+                    "position": null
+                  }
+                ],
+                "surrounds": [
+                  {
+                    "role": "Surrounds / wides",
+                    "model": "Q6-3",
+                    "quantity": 6,
+                    "position": null
+                  }
+                ],
+                "overheads": [
+                  {
+                    "role": "Overheads",
+                    "model": "SPITFIRE CLOUD",
+                    "quantity": 6,
+                    "position": null
+                  }
+                ],
+                "subwoofers": [
+                  {
+                    "role": "Subwoofers",
+                    "model": "SUB4-12",
+                    "quantity": 2,
+                    "position": "front"
+                  },
+                  {
+                    "role": "Subwoofers",
+                    "model": "SUB4-12",
+                    "quantity": 2,
+                    "position": "rear"
+                  }
+                ],
+                "acoustic_treatment": [
+                  {
+                    "role": "Acoustic treatment",
+                    "model": "Artcoustic Abfuser",
+                    "quantity": 8,
+                    "position": null
+                  }
+                ]
+              },
+              "product_roles": "Left/Centre/Right (screen wall): Q8-5 · Side surround: Q6-3 · Rear surround: Q6-3 · Front wide: Q6-3 · Overhead/height: SPITFIRE CLOUD",
+              "subwoofer_strategy": {
+                "count": 4,
+                "models": [
+                  "sub4-12"
+                ],
+                "strategy_text": "Four subwoofers (sub4-12)."
+              },
+              "amplification": null,
+              "acoustic_treatment": [
+                {
+                  "model": "Artcoustic Abfuser",
+                  "quantity": 8
+                }
+              ]
+            },
+            "parameters": [
+              {
+                "parameter_id": 1,
+                "key": "P1",
+                "label": "Seat-to-wall distance",
+                "structure": "Spatial Resolution",
+                "level": "L3",
+                "value": "1.39m",
+                "text": "L3 · 1.39m"
+              },
+              {
+                "parameter_id": 2,
+                "key": "P2",
+                "label": "Discrete channels",
+                "structure": "Spatial Resolution",
+                "level": "L4",
+                "value": "15 speakers",
+                "text": "L4 · 15 speakers"
+              },
+              {
+                "parameter_id": 3,
+                "key": "P3",
+                "label": "Screen speaker placement",
+                "structure": "Spatial Resolution",
+                "level": "L4",
+                "value": "0 speakers",
+                "text": "L4 · 0 speakers"
+              },
+              {
+                "parameter_id": 4,
+                "key": "P4",
+                "label": "Screen consistency",
+                "structure": "Spatial Resolution",
+                "level": "L4",
+                "value": "1 dB",
+                "text": "L4 · 1 dB"
+              },
+              {
+                "parameter_id": 5,
+                "key": "P5",
+                "label": "Horizontal spacing",
+                "structure": "Spatial Resolution",
+                "level": "L4",
+                "value": "45.9",
+                "text": "L4 · 45.9"
+              },
+              {
+                "parameter_id": 6,
+                "key": "P6",
+                "label": "Surround level consistency",
+                "structure": "Spatial Resolution",
+                "level": "L1",
+                "value": "7 dB",
+                "text": "L1 · 7 dB"
+              },
+              {
+                "parameter_id": 7,
+                "key": "P7",
+                "label": "Front wide position",
+                "structure": "Spatial Resolution",
+                "level": "L2",
+                "value": "6",
+                "text": "L2 · 6"
+              },
+              {
+                "parameter_id": 9,
+                "key": "P9",
+                "label": "Overhead spacing",
+                "structure": "Spatial Resolution",
+                "level": "L3",
+                "value": "53.1°",
+                "text": "L3 · 53.1°"
+              },
+              {
+                "parameter_id": 10,
+                "key": "P10",
+                "label": "Overhead level consistency",
+                "structure": "Spatial Resolution",
+                "level": "L1",
+                "value": "9 dB",
+                "text": "L1 · 9 dB"
+              },
+              {
+                "parameter_id": 11,
+                "key": "P11",
+                "label": "Surround speaker placement",
+                "structure": "Spatial Resolution",
+                "level": "L4",
+                "value": "0",
+                "text": "L4 · 0"
+              },
+              {
+                "parameter_id": 12,
+                "key": "P12",
+                "label": "Screen Dynamic Range",
+                "structure": "Dynamic Range",
+                "level": "L4",
+                "value": "116 dBC",
+                "text": "L4 · 116 dBC"
+              },
+              {
+                "parameter_id": 13,
+                "key": "P13",
+                "label": "Non-screen Dynamic Range",
+                "structure": "Dynamic Range",
+                "level": "L4",
+                "value": "108 dBC (OH)",
+                "text": "L4 · 108 dBC (OH)"
+              },
+              {
+                "parameter_id": 14,
+                "key": "P14",
+                "label": "LFE and subwoofer Dynamic Range",
+                "structure": "Dynamic Range",
+                "level": "L4",
+                "value": "118 dBC",
+                "text": "L4 · 118 dBC"
+              },
+              {
+                "parameter_id": 16,
+                "key": "P16",
+                "label": "Screen timbre",
+                "structure": "Timbre Matching",
+                "level": "L4",
+                "value": "±0.5 dB",
+                "text": "L4 · ±0.5 dB"
+              },
+              {
+                "parameter_id": 17,
+                "key": "P17",
+                "label": "Surround timbre",
+                "structure": "Timbre Matching",
+                "level": "L4",
+                "value": "≤1.5 dB window",
+                "text": "L4 · ≤1.5 dB window"
+              },
+              {
+                "parameter_id": 18,
+                "key": "P18",
+                "label": "Bass extension",
+                "structure": "Timbre Matching",
+                "level": "L3",
+                "value": "16 Hz",
+                "text": "L3 · 16 Hz"
+              },
+              {
+                "parameter_id": 19,
+                "key": "P19",
+                "label": "Bass response",
+                "structure": "Timbre Matching",
+                "level": "L4",
+                "value": "±0 dB",
+                "text": "L4 · ±0 dB"
+              },
+              {
+                "parameter_id": 20,
+                "key": "P20",
+                "label": "Bass consistency",
+                "structure": "Timbre Matching",
+                "level": "L1",
+                "value": "±13.2 dB",
+                "text": "L1 · ±13.2 dB"
+              }
+            ],
+            "bass": {
+              "available": false,
+              "subwoofer_strategy_summary": "Authoritative published bass result."
+            }
+          }
+        },
+        {
+          "version_id": "6ac22230d40d8bb0a925ecab",
+          "version_name": "Level 1 version",
+          "label": "Option B",
+          "version_name_source": {
+            "source": "saved-report-evidence",
+            "from": "technical_report",
+            "stated_by": [
+              "technical_report",
+              "visual_report"
+            ],
+            "reports_agree": true
+          },
+          "facts": {
+            "version_id": "6ac22230d40d8bb0a925ecab",
+            "version_name": "Level 1 version",
+            "label": "Option B",
+            "report_identity": {
+              "project_name": "Marquee Home",
+              "client_name": null,
+              "project_reference": null,
+              "dealer_name": null
+            },
+            "report_snapshot_ids": {
+              "visual": "6ac2257837dd624e74adf140",
+              "technical": "6ac275599f85fb8449ec3fd2"
+            },
+            "fingerprints": {
+              "engineering": "eng:v1:fcf0cd1b446857c9",
+              "visual_evidence": "re1-43db56f1-1fbba",
+              "technical_evidence": "re1-fb58c560-1fbbd",
+              "evidence_generated_at": "2026-10-06T11:23:00.793Z"
+            },
+            "room": {
+              "length_m": 7.29,
+              "width_m": 5.18,
+              "height_m": 2.8,
+              "volume_m3": 105.7,
+              "dimensions_text": "7.3m × 5.2m × 2.8m (L × W × H)",
+              "interpretation": null,
+              "acoustic_treatment": {
+                "enabled": true,
+                "product": "Artcoustic Abfuser",
+                "quantity": 8,
+                "source": "User Input",
+                "interpretation": "8 Artcoustic Abfuser panels (auto-calculated recommended quantity). The Abfuser provides broad-band absorption and diffusion to control early reflections and room reverberation.",
+                "confidence": 0.99
+              }
+            },
+            "screen": {
+              "size_inches": 185,
+              "aspect_ratio": "2.35:1",
+              "screen_type": "Projection screen",
+              "viewable_width_cm": 431.8,
+              "viewable_height_cm": 183.7,
+              "manual_dimensions": false,
+              "manual_width_m": null,
+              "manual_height_m": null,
+              "interpretation": "170\" 2.35:1 screen on front wall, baffle wall construction, screen bottom at 0.64m from floor."
+            },
+            "seating": {
+              "interpretation": "2 rows: 4 seats in row 1, 5 seats in row 2. 1.8m centre-to-centre row spacing. MLP positioned at the middle row centre.",
+              "seat_count": 9,
+              "row_count": 2,
+              "per_seat": [
+                {
+                  "seat_id": "seat-r1-c1",
+                  "label": "seat-r1-c1",
+                  "row": 1,
+                  "distance_m": 3.49,
+                  "horizontal_angle_deg": 63.5,
+                  "vertical_angle_deg": null,
+                  "rp23_level": "L4"
+                },
+                {
+                  "seat_id": "seat-r1-c2",
+                  "label": "seat-r1-c2",
+                  "row": 1,
+                  "distance_m": 3.49,
+                  "horizontal_angle_deg": 63.5,
+                  "vertical_angle_deg": null,
+                  "rp23_level": "L4"
+                },
+                {
+                  "seat_id": "seat-r1-c3",
+                  "label": "seat-r1-c3",
+                  "row": 1,
+                  "distance_m": 3.49,
+                  "horizontal_angle_deg": 63.5,
+                  "vertical_angle_deg": null,
+                  "rp23_level": "L4"
+                },
+                {
+                  "seat_id": "seat-r1-c4",
+                  "label": "seat-r1-c4",
+                  "row": 1,
+                  "distance_m": 3.49,
+                  "horizontal_angle_deg": 63.5,
+                  "vertical_angle_deg": null,
+                  "rp23_level": "L4"
+                },
+                {
+                  "seat_id": "seat-r2-c1",
+                  "label": "seat-r2-c1",
+                  "row": 2,
+                  "distance_m": 5.29,
+                  "horizontal_angle_deg": 44.4,
+                  "vertical_angle_deg": null,
+                  "rp23_level": "L3"
+                },
+                {
+                  "seat_id": "seat-r2-c2",
+                  "label": "seat-r2-c2",
+                  "row": 2,
+                  "distance_m": 5.29,
+                  "horizontal_angle_deg": 44.4,
+                  "vertical_angle_deg": null,
+                  "rp23_level": "L3"
+                },
+                {
+                  "seat_id": "seat-r2-c3",
+                  "label": "seat-r2-c3",
+                  "row": 2,
+                  "distance_m": 5.29,
+                  "horizontal_angle_deg": 44.4,
+                  "vertical_angle_deg": null,
+                  "rp23_level": "L3"
+                },
+                {
+                  "seat_id": "seat-r2-c4",
+                  "label": "seat-r2-c4",
+                  "row": 2,
+                  "distance_m": 5.29,
+                  "horizontal_angle_deg": 44.4,
+                  "vertical_angle_deg": null,
+                  "rp23_level": "L3"
+                },
+                {
+                  "seat_id": "seat-r2-c5",
+                  "label": "seat-r2-c5",
+                  "row": 2,
+                  "distance_m": 5.29,
+                  "horizontal_angle_deg": 44.4,
+                  "vertical_angle_deg": null,
+                  "rp23_level": "L3"
+                }
+              ]
+            },
+            "viewing": {
+              "available": true,
+              "summary": "Viewing angles calculated for 9 seats. Horizontal viewing angle ranges from 44° to 63°.",
+              "primary_floor": "L3"
+            },
+            "system": {
+              "layout": "9.1.6 (15 discrete channels)",
+              "format": "9.1.6",
+              "channel_layout": {
+                "bed_channels": 9,
+                "overhead_channels": 6,
+                "dolby_subwoofer_channels": 1,
+                "total_discrete": 15,
+                "subwoofer_count": 2
+              },
+              "products": [
+                {
+                  "key": "lcr",
+                  "area": "LCR",
+                  "value": "Q6-3 × 3"
+                },
+                {
+                  "key": "surrounds",
+                  "area": "Surrounds / wides",
+                  "value": "EVOLVE 2-1 × 6"
+                },
+                {
+                  "key": "overheads",
+                  "area": "Overheads",
+                  "value": "ARCHITECT 2-1 × 6"
+                },
+                {
+                  "key": "subwoofers",
+                  "area": "Subwoofers",
+                  "value": "SUB4-12 (front), SUB4-12 (rear)"
+                },
+                {
+                  "key": "acoustic_treatment",
+                  "area": "Acoustic treatment",
+                  "value": "Artcoustic Abfuser × 8"
+                }
+              ],
+              "products_by_layer": {
+                "lcr": [
+                  {
+                    "role": "LCR",
+                    "model": "Q6-3",
+                    "quantity": 3,
+                    "position": null
+                  }
+                ],
+                "surrounds": [
+                  {
+                    "role": "Surrounds / wides",
+                    "model": "EVOLVE 2-1",
+                    "quantity": 6,
+                    "position": null
+                  }
+                ],
+                "overheads": [
+                  {
+                    "role": "Overheads",
+                    "model": "ARCHITECT 2-1",
+                    "quantity": 6,
+                    "position": null
+                  }
+                ],
+                "subwoofers": [
+                  {
+                    "role": "Subwoofers",
+                    "model": "SUB4-12 (front)",
+                    "quantity": 1,
+                    "position": null
+                  },
+                  {
+                    "role": "Subwoofers",
+                    "model": "SUB4-12 (rear)",
+                    "quantity": 1,
+                    "position": null
+                  }
+                ],
+                "acoustic_treatment": [
+                  {
+                    "role": "Acoustic treatment",
+                    "model": "Artcoustic Abfuser",
+                    "quantity": 8,
+                    "position": null
+                  }
+                ]
+              },
+              "product_roles": "Left/Centre/Right (screen wall): Q6-3 · Side surround: EVOLVE 2-1 · Rear surround: EVOLVE 2-1 · Front wide: EVOLVE 2-1 · Overhead/height: ARCHITECT 2-1",
+              "subwoofer_strategy": {
+                "count": 2,
+                "models": [
+                  "sub4-12"
+                ],
+                "strategy_text": "Two subwoofers (sub4-12, sub4-12). Dual-subwoofer configuration improves modal smoothing compared to a single subwoofer."
+              },
+              "amplification": null,
+              "acoustic_treatment": [
+                {
+                  "model": "Artcoustic Abfuser",
+                  "quantity": 8
+                }
+              ]
+            },
+            "parameters": [
+              {
+                "parameter_id": 1,
+                "key": "P1",
+                "label": "Seat-to-wall distance",
+                "structure": "Spatial Resolution",
+                "level": "L3",
+                "value": "1.39m",
+                "text": "L3 · 1.39m"
+              },
+              {
+                "parameter_id": 2,
+                "key": "P2",
+                "label": "Discrete channels",
+                "structure": "Spatial Resolution",
+                "level": "L4",
+                "value": "15 speakers",
+                "text": "L4 · 15 speakers"
+              },
+              {
+                "parameter_id": 3,
+                "key": "P3",
+                "label": "Screen speaker placement",
+                "structure": "Spatial Resolution",
+                "level": "L4",
+                "value": "0 speakers",
+                "text": "L4 · 0 speakers"
+              },
+              {
+                "parameter_id": 4,
+                "key": "P4",
+                "label": "Screen consistency",
+                "structure": "Spatial Resolution",
+                "level": "L4",
+                "value": "2 dB",
+                "text": "L4 · 2 dB"
+              },
+              {
+                "parameter_id": 5,
+                "key": "P5",
+                "label": "Horizontal spacing",
+                "structure": "Spatial Resolution",
+                "level": "L4",
+                "value": "47.9",
+                "text": "L4 · 47.9"
+              },
+              {
+                "parameter_id": 6,
+                "key": "P6",
+                "label": "Surround level consistency",
+                "structure": "Spatial Resolution",
+                "level": "L1",
+                "value": "7 dB",
+                "text": "L1 · 7 dB"
+              },
+              {
+                "parameter_id": 7,
+                "key": "P7",
+                "label": "Front wide position",
+                "structure": "Spatial Resolution",
+                "level": "L3",
+                "value": "5",
+                "text": "L3 · 5"
+              },
+              {
+                "parameter_id": 9,
+                "key": "P9",
+                "label": "Overhead spacing",
+                "structure": "Spatial Resolution",
+                "level": "L3",
+                "value": "55.6°",
+                "text": "L3 · 55.6°"
+              },
+              {
+                "parameter_id": 10,
+                "key": "P10",
+                "label": "Overhead level consistency",
+                "structure": "Spatial Resolution",
+                "level": "L1",
+                "value": "9 dB",
+                "text": "L1 · 9 dB"
+              },
+              {
+                "parameter_id": 11,
+                "key": "P11",
+                "label": "Surround speaker placement",
+                "structure": "Spatial Resolution",
+                "level": "L4",
+                "value": "0",
+                "text": "L4 · 0"
+              },
+              {
+                "parameter_id": 12,
+                "key": "P12",
+                "label": "Screen Dynamic Range",
+                "structure": "Dynamic Range",
+                "level": "L3",
+                "value": "106 dBC",
+                "text": "L3 · 106 dBC"
+              },
+              {
+                "parameter_id": 13,
+                "key": "P13",
+                "label": "Non-screen Dynamic Range",
+                "structure": "Dynamic Range",
+                "level": "L2",
+                "value": "100 dBC (FW)",
+                "text": "L2 · 100 dBC (FW)"
+              },
+              {
+                "parameter_id": 14,
+                "key": "P14",
+                "label": "LFE and subwoofer Dynamic Range",
+                "structure": "Dynamic Range",
+                "level": "L3",
+                "value": "115 dBC",
+                "text": "L3 · 115 dBC"
+              },
+              {
+                "parameter_id": 16,
+                "key": "P16",
+                "label": "Screen timbre",
+                "structure": "Timbre Matching",
+                "level": "L4",
+                "value": "±0.5 dB",
+                "text": "L4 · ±0.5 dB"
+              },
+              {
+                "parameter_id": 17,
+                "key": "P17",
+                "label": "Surround timbre",
+                "structure": "Timbre Matching",
+                "level": "L4",
+                "value": "≤1.5 dB window",
+                "text": "L4 · ≤1.5 dB window"
+              },
+              {
+                "parameter_id": 18,
+                "key": "P18",
+                "label": "Bass extension",
+                "structure": "Timbre Matching",
+                "level": "L4",
+                "value": "16 Hz",
+                "text": "L4 · 16 Hz"
+              },
+              {
+                "parameter_id": 19,
+                "key": "P19",
+                "label": "Bass response",
+                "structure": "Timbre Matching",
+                "level": "L4",
+                "value": "±1 dB",
+                "text": "L4 · ±1 dB"
+              },
+              {
+                "parameter_id": 20,
+                "key": "P20",
+                "label": "Bass consistency",
+                "structure": "Timbre Matching",
+                "level": "L1",
+                "value": "±15.6 dB",
+                "text": "L1 · ±15.6 dB"
+              }
+            ],
+            "bass": {
+              "available": false,
+              "subwoofer_strategy_summary": "Authoritative published bass result."
+            }
+          }
+        }
+      ],
+      "classification": [
+        {
+          "area": "room",
+          "label": "Room",
+          "kind": "room",
+          "structure": null,
+          "classification": "same",
+          "reason": "identical_room_dimensions",
+          "values": [
+            "7.3m × 5.2m × 2.8m (L × W × H)",
+            "7.3m × 5.2m × 2.8m (L × W × H)"
+          ],
+          "levels": []
+        },
+        {
+          "area": "screen_size",
+          "label": "Screen size",
+          "kind": "structural",
+          "structure": null,
+          "classification": "same",
+          "reason": "identical_in_every_report",
+          "values": [
+            "185\" (2.35:1)",
+            "185\" (2.35:1)"
+          ],
+          "levels": []
+        },
+        {
+          "area": "rp23_viewing",
+          "label": "Viewing angle / RP23",
+          "kind": "graded",
+          "structure": "Viewing",
+          "classification": "not_materially_different",
+          "reason": "same_level_different_value",
+          "values": [
+            "Viewing angles calculated for 9 seats. Horizontal viewing angle ranges from 45° to 65°.",
+            "Viewing angles calculated for 9 seats. Horizontal viewing angle ranges from 44° to 63°."
+          ],
+          "levels": [
+            "L3",
+            "L3"
+          ]
+        },
+        {
+          "area": "system_layout",
+          "label": "System layout",
+          "kind": "structural",
+          "structure": null,
+          "classification": "same",
+          "reason": "identical_in_every_report",
+          "values": [
+            "9.1.6 (15 discrete channels)",
+            "9.1.6 (15 discrete channels)"
+          ],
+          "levels": []
+        },
+        {
+          "area": "speakers",
+          "label": "Speaker package",
+          "kind": "equipment",
+          "structure": null,
+          "classification": "different",
+          "reason": "different_equipment",
+          "values": [
+            "Left/Centre/Right (screen wall): Q8-5 · Side surround: Q6-3 · Rear surround: Q6-3 · Front wide: Q6-3 · Overhead/height: SPITFIRE CLOUD",
+            "Left/Centre/Right (screen wall): Q6-3 · Side surround: EVOLVE 2-1 · Rear surround: EVOLVE 2-1 · Front wide: EVOLVE 2-1 · Overhead/height: ARCHITECT 2-1"
+          ],
+          "levels": []
+        },
+        {
+          "area": "lcr",
+          "label": "LCR",
+          "kind": "equipment",
+          "structure": null,
+          "classification": "different",
+          "reason": "different_equipment",
+          "values": [
+            "Q8-5 × 3",
+            "Q6-3 × 3"
+          ],
+          "levels": []
+        },
+        {
+          "area": "surrounds",
+          "label": "Surrounds / wides",
+          "kind": "equipment",
+          "structure": null,
+          "classification": "different",
+          "reason": "different_equipment",
+          "values": [
+            "Q6-3 × 6",
+            "EVOLVE 2-1 × 6"
+          ],
+          "levels": []
+        },
+        {
+          "area": "overheads",
+          "label": "Overheads",
+          "kind": "equipment",
+          "structure": null,
+          "classification": "different",
+          "reason": "different_equipment",
+          "values": [
+            "SPITFIRE CLOUD × 6",
+            "ARCHITECT 2-1 × 6"
+          ],
+          "levels": []
+        },
+        {
+          "area": "subwoofers",
+          "label": "Subwoofers",
+          "kind": "equipment",
+          "structure": null,
+          "classification": "different",
+          "reason": "different_equipment",
+          "values": [
+            "SUB4-12 × 2 (front), SUB4-12 × 2 (rear)",
+            "SUB4-12 (front), SUB4-12 (rear)"
+          ],
+          "levels": []
+        },
+        {
+          "area": "acoustic_treatment",
+          "label": "Acoustic treatment",
+          "kind": "equipment",
+          "structure": null,
+          "classification": "same",
+          "reason": "identical_in_every_report",
+          "values": [
+            "Artcoustic Abfuser × 8",
+            "Artcoustic Abfuser × 8"
+          ],
+          "levels": []
+        },
+        {
+          "area": "amplification",
+          "label": "Amplification",
+          "kind": "equipment",
+          "structure": null,
+          "classification": "not_comparable",
+          "reason": "not_stated_by_every_report",
+          "values": [
+            null,
+            null
+          ],
+          "levels": []
+        },
+        {
+          "area": "seating",
+          "label": "Seating",
+          "kind": "structural",
+          "structure": null,
+          "classification": "same",
+          "reason": "identical_in_every_report",
+          "values": [
+            "2 rows: 4 seats in row 1, 5 seats in row 2. 1.8m centre-to-centre row spacing. MLP positioned at the middle row centre.",
+            "2 rows: 4 seats in row 1, 5 seats in row 2. 1.8m centre-to-centre row spacing. MLP positioned at the middle row centre."
+          ],
+          "levels": []
+        },
+        {
+          "area": "p2",
+          "label": "Discrete channels (P2)",
+          "kind": "graded",
+          "structure": "Spatial Resolution",
+          "classification": "same",
+          "reason": "identical_in_every_report",
+          "values": [
+            "L4 · 15 speakers",
+            "L4 · 15 speakers"
+          ],
+          "levels": []
+        },
+        {
+          "area": "p4",
+          "label": "Screen consistency (P4)",
+          "kind": "graded",
+          "structure": "Spatial Resolution",
+          "classification": "not_materially_different",
+          "reason": "same_level_different_value",
+          "values": [
+            "L4 · 1 dB",
+            "L4 · 2 dB"
+          ],
+          "levels": [
+            "L4",
+            "L4"
+          ]
+        },
+        {
+          "area": "p5",
+          "label": "Horizontal spacing (P5)",
+          "kind": "graded",
+          "structure": "Spatial Resolution",
+          "classification": "not_materially_different",
+          "reason": "same_level_different_value",
+          "values": [
+            "L4 · 45.9",
+            "L4 · 47.9"
+          ],
+          "levels": [
+            "L4",
+            "L4"
+          ]
+        },
+        {
+          "area": "p7",
+          "label": "Front wide position (P7)",
+          "kind": "graded",
+          "structure": "Spatial Resolution",
+          "classification": "materially_different",
+          "reason": "higher_level_achieved",
+          "values": [
+            "L2 · 6",
+            "L3 · 5"
+          ],
+          "levels": [
+            "L2",
+            "L3"
+          ]
+        },
+        {
+          "area": "p9",
+          "label": "Overhead spacing (P9)",
+          "kind": "graded",
+          "structure": "Spatial Resolution",
+          "classification": "not_materially_different",
+          "reason": "same_level_different_value",
+          "values": [
+            "L3 · 53.1°",
+            "L3 · 55.6°"
+          ],
+          "levels": [
+            "L3",
+            "L3"
+          ]
+        },
+        {
+          "area": "p10",
+          "label": "Overhead level consistency (P10)",
+          "kind": "graded",
+          "structure": "Spatial Resolution",
+          "classification": "same",
+          "reason": "identical_in_every_report",
+          "values": [
+            "L1 · 9 dB",
+            "L1 · 9 dB"
+          ],
+          "levels": []
+        },
+        {
+          "area": "p12",
+          "label": "Screen Dynamic Range (P12)",
+          "kind": "graded",
+          "structure": "Dynamic Range",
+          "classification": "materially_different",
+          "reason": "higher_level_achieved",
+          "values": [
+            "L4 · 116 dBC",
+            "L3 · 106 dBC"
+          ],
+          "levels": [
+            "L4",
+            "L3"
+          ]
+        },
+        {
+          "area": "p13",
+          "label": "Non-screen Dynamic Range (P13)",
+          "kind": "graded",
+          "structure": "Dynamic Range",
+          "classification": "materially_different",
+          "reason": "higher_level_achieved",
+          "values": [
+            "L4 · 108 dBC (OH)",
+            "L2 · 100 dBC (FW)"
+          ],
+          "levels": [
+            "L4",
+            "L2"
+          ]
+        },
+        {
+          "area": "p14",
+          "label": "LFE and subwoofer Dynamic Range (P14)",
+          "kind": "graded",
+          "structure": "Dynamic Range",
+          "classification": "materially_different",
+          "reason": "higher_level_achieved",
+          "values": [
+            "L4 · 118 dBC",
+            "L3 · 115 dBC"
+          ],
+          "levels": [
+            "L4",
+            "L3"
+          ]
+        },
+        {
+          "area": "p16",
+          "label": "Screen timbre (P16)",
+          "kind": "graded",
+          "structure": "Timbre Matching",
+          "classification": "same",
+          "reason": "identical_in_every_report",
+          "values": [
+            "L4 · ±0.5 dB",
+            "L4 · ±0.5 dB"
+          ],
+          "levels": []
+        },
+        {
+          "area": "p17",
+          "label": "Surround and overhead timbre (P17)",
+          "kind": "graded",
+          "structure": "Timbre Matching",
+          "classification": "same",
+          "reason": "identical_in_every_report",
+          "values": [
+            "L4 · ≤1.5 dB window",
+            "L4 · ≤1.5 dB window"
+          ],
+          "levels": []
+        },
+        {
+          "area": "p18",
+          "label": "Bass extension (P18)",
+          "kind": "graded",
+          "structure": "Timbre Matching",
+          "classification": "materially_different",
+          "reason": "higher_level_achieved",
+          "values": [
+            "L3 · 16 Hz",
+            "L4 · 16 Hz"
+          ],
+          "levels": [
+            "L3",
+            "L4"
+          ]
+        },
+        {
+          "area": "p19",
+          "label": "Bass response (P19)",
+          "kind": "graded",
+          "structure": "Timbre Matching",
+          "classification": "not_materially_different",
+          "reason": "same_level_different_value",
+          "values": [
+            "L4 · ±0 dB",
+            "L4 · ±1 dB"
+          ],
+          "levels": [
+            "L4",
+            "L4"
+          ]
+        },
+        {
+          "area": "p20",
+          "label": "Bass consistency (P20)",
+          "kind": "graded",
+          "structure": "Timbre Matching",
+          "classification": "not_materially_different",
+          "reason": "same_level_different_value",
+          "values": [
+            "L1 · ±13.2 dB",
+            "L1 · ±15.6 dB"
+          ],
+          "levels": [
+            "L1",
+            "L1"
+          ]
+        }
+      ],
+      "materiality_notes": [
+        {
+          "area": "rp23_viewing",
+          "label": "Viewing angle / RP23",
+          "classification": "not_materially_different",
+          "kind": "modest_result",
+          "note": "How comfortably the screen scale reads from each seating row.",
+          "option": null
+        },
+        {
+          "area": "speakers",
+          "label": "Speaker package",
+          "classification": "different",
+          "kind": "factual_change",
+          "note": "The loudspeakers each position is delivered with.",
+          "option": null
+        },
+        {
+          "area": "lcr",
+          "label": "LCR",
+          "classification": "different",
+          "kind": "factual_change",
+          "note": "The screen speakers that carry dialogue, music and screen effects.",
+          "option": null
+        },
+        {
+          "area": "surrounds",
+          "label": "Surrounds / wides",
+          "classification": "different",
+          "kind": "factual_change",
+          "note": "The speakers that carry effects around the seating area.",
+          "option": null
+        },
+        {
+          "area": "overheads",
+          "label": "Overheads",
+          "classification": "different",
+          "kind": "factual_change",
+          "note": "The speakers that carry the height layer above the seats.",
+          "option": null
+        },
+        {
+          "area": "subwoofers",
+          "label": "Subwoofers",
+          "classification": "different",
+          "kind": "factual_change",
+          "note": "The subwoofers that carry the low-frequency content.",
+          "option": null
+        },
+        {
+          "area": "p4",
+          "label": "Screen consistency (P4)",
+          "classification": "not_materially_different",
+          "kind": "modest_result",
+          "note": "How evenly the screen channels hold their level across the seating area.",
+          "option": null
+        },
+        {
+          "area": "p5",
+          "label": "Horizontal spacing (P5)",
+          "classification": "not_materially_different",
+          "kind": "modest_result",
+          "note": "How evenly the listener-level speakers are spaced, which is what lets movement travel through the room.",
+          "option": null
+        },
+        {
+          "area": "p7",
+          "label": "Front wide position (P7)",
+          "classification": "materially_different",
+          "kind": "material_gain",
+          "note": "How well the front wide positions bridge the screen and the side speakers.",
+          "option": {
+            "version_id": "6ac22230d40d8bb0a925ecab",
+            "version_name": "Level 1 version",
+            "label": "Option B"
+          }
+        },
+        {
+          "area": "p7",
+          "label": "Front wide position (P7)",
+          "classification": "materially_different",
+          "kind": "modest_result",
+          "note": "How well the front wide positions bridge the screen and the side speakers.",
+          "option": {
+            "version_id": "6abbca6e199f13dc4d74ec4a",
+            "version_name": "Level 4 version",
+            "label": "Option A"
+          }
+        },
+        {
+          "area": "p9",
+          "label": "Overhead spacing (P9)",
+          "classification": "not_materially_different",
+          "kind": "modest_result",
+          "note": "How evenly the overhead speakers are spaced above the seats.",
+          "option": null
+        },
+        {
+          "area": "p12",
+          "label": "Screen Dynamic Range (P12)",
+          "classification": "materially_different",
+          "kind": "material_gain",
+          "note": "More front-stage headroom. Dialogue, score and screen effects have more room to expand before the system sounds strained.",
+          "option": {
+            "version_id": "6abbca6e199f13dc4d74ec4a",
+            "version_name": "Level 4 version",
+            "label": "Option A"
+          }
+        },
+        {
+          "area": "p13",
+          "label": "Non-screen Dynamic Range (P13)",
+          "classification": "materially_different",
+          "kind": "material_gain",
+          "note": "More capability around and above the seating: effects in the surround and height layers keep their presence during demanding scenes.",
+          "option": {
+            "version_id": "6abbca6e199f13dc4d74ec4a",
+            "version_name": "Level 4 version",
+            "label": "Option A"
+          }
+        },
+        {
+          "area": "p13",
+          "label": "Non-screen Dynamic Range (P13)",
+          "classification": "materially_different",
+          "kind": "modest_result",
+          "note": "The surround and height layers have usable headroom, with less reserve than the screen stage.",
+          "option": {
+            "version_id": "6ac22230d40d8bb0a925ecab",
+            "version_name": "Level 1 version",
+            "label": "Option B"
+          }
+        },
+        {
+          "area": "p14",
+          "label": "LFE and subwoofer Dynamic Range (P14)",
+          "classification": "materially_different",
+          "kind": "material_gain",
+          "note": "More bass authority and physical impact, supporting the scale of film soundtracks.",
+          "option": {
+            "version_id": "6abbca6e199f13dc4d74ec4a",
+            "version_name": "Level 4 version",
+            "label": "Option A"
+          }
+        },
+        {
+          "area": "p18",
+          "label": "Bass extension (P18)",
+          "classification": "materially_different",
+          "kind": "material_gain",
+          "note": "Bass depth: how far down the system reaches for the lowest film effects.",
+          "option": {
+            "version_id": "6ac22230d40d8bb0a925ecab",
+            "version_name": "Level 1 version",
+            "label": "Option B"
+          }
+        },
+        {
+          "area": "p19",
+          "label": "Bass response (P19)",
+          "classification": "not_materially_different",
+          "kind": "modest_result",
+          "note": "Bass balance at the reference seat, which is the response the calibration is measured against.",
+          "option": null
+        },
+        {
+          "area": "p20",
+          "label": "Bass consistency (P20)",
+          "classification": "not_materially_different",
+          "kind": "modest_result",
+          "note": "Both designs remain Level 1 for seat-to-seat bass consistency. Level 4 version improves bass output authority, not full-seat uniformity.",
+          "option": null
+        }
+      ],
+      "allowed_claims": [
+        {
+          "claim_id": "claim_room_shared_result_01",
+          "area": "room",
+          "label": "Room",
+          "kind": "shared_result",
+          "statement": "Both options are the same room, on the same stated dimensions.",
+          "option": null,
+          "favours": false,
+          "basis": {
+            "classification": "same",
+            "reason": "identical_room_dimensions",
+            "values": [
+              "7.3m × 5.2m × 2.8m (L × W × H)",
+              "7.3m × 5.2m × 2.8m (L × W × H)"
+            ],
+            "levels": [],
+            "report_snapshot_ids": [
+              {
+                "version_id": "6abbca6e199f13dc4d74ec4a",
+                "visual_report_snapshot_id": "6ac20c15df233b979449bcc3",
+                "technical_report_snapshot_id": "6ac391ef796c4899260e0c5a"
+              },
+              {
+                "version_id": "6ac22230d40d8bb0a925ecab",
+                "visual_report_snapshot_id": "6ac2257837dd624e74adf140",
+                "technical_report_snapshot_id": "6ac275599f85fb8449ec3fd2"
+              }
+            ]
+          }
+        },
+        {
+          "claim_id": "claim_screen_size_shared_result_01",
+          "area": "screen_size",
+          "label": "Screen size",
+          "kind": "shared_result",
+          "statement": "Same screen scale in both options.",
+          "option": null,
+          "favours": false,
+          "basis": {
+            "classification": "same",
+            "reason": "identical_in_every_report",
+            "values": [
+              "185\" (2.35:1)",
+              "185\" (2.35:1)"
+            ],
+            "levels": [],
+            "report_snapshot_ids": [
+              {
+                "version_id": "6abbca6e199f13dc4d74ec4a",
+                "visual_report_snapshot_id": "6ac20c15df233b979449bcc3",
+                "technical_report_snapshot_id": "6ac391ef796c4899260e0c5a"
+              },
+              {
+                "version_id": "6ac22230d40d8bb0a925ecab",
+                "visual_report_snapshot_id": "6ac2257837dd624e74adf140",
+                "technical_report_snapshot_id": "6ac275599f85fb8449ec3fd2"
+              }
+            ]
+          }
+        },
+        {
+          "claim_id": "claim_rp23_viewing_modest_result_01",
+          "area": "rp23_viewing",
+          "label": "Viewing angle / RP23",
+          "kind": "modest_result",
+          "statement": "How comfortably the screen scale reads from each seating row.",
+          "option": null,
+          "favours": false,
+          "basis": {
+            "classification": "not_materially_different",
+            "reason": "same_level_different_value",
+            "values": [
+              "Viewing angles calculated for 9 seats. Horizontal viewing angle ranges from 45° to 65°.",
+              "Viewing angles calculated for 9 seats. Horizontal viewing angle ranges from 44° to 63°."
+            ],
+            "levels": [
+              "L3",
+              "L3"
+            ],
+            "report_snapshot_ids": [
+              {
+                "version_id": "6abbca6e199f13dc4d74ec4a",
+                "visual_report_snapshot_id": "6ac20c15df233b979449bcc3",
+                "technical_report_snapshot_id": "6ac391ef796c4899260e0c5a"
+              },
+              {
+                "version_id": "6ac22230d40d8bb0a925ecab",
+                "visual_report_snapshot_id": "6ac2257837dd624e74adf140",
+                "technical_report_snapshot_id": "6ac275599f85fb8449ec3fd2"
+              }
+            ]
+          }
+        },
+        {
+          "claim_id": "claim_system_layout_shared_result_01",
+          "area": "system_layout",
+          "label": "System layout",
+          "kind": "shared_result",
+          "statement": "Same layout in both options.",
+          "option": null,
+          "favours": false,
+          "basis": {
+            "classification": "same",
+            "reason": "identical_in_every_report",
+            "values": [
+              "9.1.6 (15 discrete channels)",
+              "9.1.6 (15 discrete channels)"
+            ],
+            "levels": [],
+            "report_snapshot_ids": [
+              {
+                "version_id": "6abbca6e199f13dc4d74ec4a",
+                "visual_report_snapshot_id": "6ac20c15df233b979449bcc3",
+                "technical_report_snapshot_id": "6ac391ef796c4899260e0c5a"
+              },
+              {
+                "version_id": "6ac22230d40d8bb0a925ecab",
+                "visual_report_snapshot_id": "6ac2257837dd624e74adf140",
+                "technical_report_snapshot_id": "6ac275599f85fb8449ec3fd2"
+              }
+            ]
+          }
+        },
+        {
+          "claim_id": "claim_speakers_factual_change_01",
+          "area": "speakers",
+          "label": "Speaker package",
+          "kind": "factual_change",
+          "statement": "The loudspeakers each position is delivered with.",
+          "option": null,
+          "favours": false,
+          "basis": {
+            "classification": "different",
+            "reason": "different_equipment",
+            "values": [
+              "Left/Centre/Right (screen wall): Q8-5 · Side surround: Q6-3 · Rear surround: Q6-3 · Front wide: Q6-3 · Overhead/height: SPITFIRE CLOUD",
+              "Left/Centre/Right (screen wall): Q6-3 · Side surround: EVOLVE 2-1 · Rear surround: EVOLVE 2-1 · Front wide: EVOLVE 2-1 · Overhead/height: ARCHITECT 2-1"
+            ],
+            "levels": [],
+            "report_snapshot_ids": [
+              {
+                "version_id": "6abbca6e199f13dc4d74ec4a",
+                "visual_report_snapshot_id": "6ac20c15df233b979449bcc3",
+                "technical_report_snapshot_id": "6ac391ef796c4899260e0c5a"
+              },
+              {
+                "version_id": "6ac22230d40d8bb0a925ecab",
+                "visual_report_snapshot_id": "6ac2257837dd624e74adf140",
+                "technical_report_snapshot_id": "6ac275599f85fb8449ec3fd2"
+              }
+            ]
+          }
+        },
+        {
+          "claim_id": "claim_lcr_factual_change_01",
+          "area": "lcr",
+          "label": "LCR",
+          "kind": "factual_change",
+          "statement": "The screen speakers that carry dialogue, music and screen effects.",
+          "option": null,
+          "favours": false,
+          "basis": {
+            "classification": "different",
+            "reason": "different_equipment",
+            "values": [
+              "Q8-5 × 3",
+              "Q6-3 × 3"
+            ],
+            "levels": [],
+            "report_snapshot_ids": [
+              {
+                "version_id": "6abbca6e199f13dc4d74ec4a",
+                "visual_report_snapshot_id": "6ac20c15df233b979449bcc3",
+                "technical_report_snapshot_id": "6ac391ef796c4899260e0c5a"
+              },
+              {
+                "version_id": "6ac22230d40d8bb0a925ecab",
+                "visual_report_snapshot_id": "6ac2257837dd624e74adf140",
+                "technical_report_snapshot_id": "6ac275599f85fb8449ec3fd2"
+              }
+            ]
+          }
+        },
+        {
+          "claim_id": "claim_surrounds_factual_change_01",
+          "area": "surrounds",
+          "label": "Surrounds / wides",
+          "kind": "factual_change",
+          "statement": "The speakers that carry effects around the seating area.",
+          "option": null,
+          "favours": false,
+          "basis": {
+            "classification": "different",
+            "reason": "different_equipment",
+            "values": [
+              "Q6-3 × 6",
+              "EVOLVE 2-1 × 6"
+            ],
+            "levels": [],
+            "report_snapshot_ids": [
+              {
+                "version_id": "6abbca6e199f13dc4d74ec4a",
+                "visual_report_snapshot_id": "6ac20c15df233b979449bcc3",
+                "technical_report_snapshot_id": "6ac391ef796c4899260e0c5a"
+              },
+              {
+                "version_id": "6ac22230d40d8bb0a925ecab",
+                "visual_report_snapshot_id": "6ac2257837dd624e74adf140",
+                "technical_report_snapshot_id": "6ac275599f85fb8449ec3fd2"
+              }
+            ]
+          }
+        },
+        {
+          "claim_id": "claim_overheads_factual_change_01",
+          "area": "overheads",
+          "label": "Overheads",
+          "kind": "factual_change",
+          "statement": "The speakers that carry the height layer above the seats.",
+          "option": null,
+          "favours": false,
+          "basis": {
+            "classification": "different",
+            "reason": "different_equipment",
+            "values": [
+              "SPITFIRE CLOUD × 6",
+              "ARCHITECT 2-1 × 6"
+            ],
+            "levels": [],
+            "report_snapshot_ids": [
+              {
+                "version_id": "6abbca6e199f13dc4d74ec4a",
+                "visual_report_snapshot_id": "6ac20c15df233b979449bcc3",
+                "technical_report_snapshot_id": "6ac391ef796c4899260e0c5a"
+              },
+              {
+                "version_id": "6ac22230d40d8bb0a925ecab",
+                "visual_report_snapshot_id": "6ac2257837dd624e74adf140",
+                "technical_report_snapshot_id": "6ac275599f85fb8449ec3fd2"
+              }
+            ]
+          }
+        },
+        {
+          "claim_id": "claim_subwoofers_factual_change_01",
+          "area": "subwoofers",
+          "label": "Subwoofers",
+          "kind": "factual_change",
+          "statement": "The subwoofers that carry the low-frequency content.",
+          "option": null,
+          "favours": false,
+          "basis": {
+            "classification": "different",
+            "reason": "different_equipment",
+            "values": [
+              "SUB4-12 × 2 (front), SUB4-12 × 2 (rear)",
+              "SUB4-12 (front), SUB4-12 (rear)"
+            ],
+            "levels": [],
+            "report_snapshot_ids": [
+              {
+                "version_id": "6abbca6e199f13dc4d74ec4a",
+                "visual_report_snapshot_id": "6ac20c15df233b979449bcc3",
+                "technical_report_snapshot_id": "6ac391ef796c4899260e0c5a"
+              },
+              {
+                "version_id": "6ac22230d40d8bb0a925ecab",
+                "visual_report_snapshot_id": "6ac2257837dd624e74adf140",
+                "technical_report_snapshot_id": "6ac275599f85fb8449ec3fd2"
+              }
+            ]
+          }
+        },
+        {
+          "claim_id": "claim_acoustic_treatment_shared_result_01",
+          "area": "acoustic_treatment",
+          "label": "Acoustic treatment",
+          "kind": "shared_result",
+          "statement": "Same acoustic treatment in both options.",
+          "option": null,
+          "favours": false,
+          "basis": {
+            "classification": "same",
+            "reason": "identical_in_every_report",
+            "values": [
+              "Artcoustic Abfuser × 8",
+              "Artcoustic Abfuser × 8"
+            ],
+            "levels": [],
+            "report_snapshot_ids": [
+              {
+                "version_id": "6abbca6e199f13dc4d74ec4a",
+                "visual_report_snapshot_id": "6ac20c15df233b979449bcc3",
+                "technical_report_snapshot_id": "6ac391ef796c4899260e0c5a"
+              },
+              {
+                "version_id": "6ac22230d40d8bb0a925ecab",
+                "visual_report_snapshot_id": "6ac2257837dd624e74adf140",
+                "technical_report_snapshot_id": "6ac275599f85fb8449ec3fd2"
+              }
+            ]
+          }
+        },
+        {
+          "claim_id": "claim_seating_shared_result_01",
+          "area": "seating",
+          "label": "Seating",
+          "kind": "shared_result",
+          "statement": "Same seating in both options.",
+          "option": null,
+          "favours": false,
+          "basis": {
+            "classification": "same",
+            "reason": "identical_in_every_report",
+            "values": [
+              "2 rows: 4 seats in row 1, 5 seats in row 2. 1.8m centre-to-centre row spacing. MLP positioned at the middle row centre.",
+              "2 rows: 4 seats in row 1, 5 seats in row 2. 1.8m centre-to-centre row spacing. MLP positioned at the middle row centre."
+            ],
+            "levels": [],
+            "report_snapshot_ids": [
+              {
+                "version_id": "6abbca6e199f13dc4d74ec4a",
+                "visual_report_snapshot_id": "6ac20c15df233b979449bcc3",
+                "technical_report_snapshot_id": "6ac391ef796c4899260e0c5a"
+              },
+              {
+                "version_id": "6ac22230d40d8bb0a925ecab",
+                "visual_report_snapshot_id": "6ac2257837dd624e74adf140",
+                "technical_report_snapshot_id": "6ac275599f85fb8449ec3fd2"
+              }
+            ]
+          }
+        },
+        {
+          "claim_id": "claim_p2_shared_result_01",
+          "area": "p2",
+          "label": "Discrete channels (P2)",
+          "kind": "shared_result",
+          "statement": "Both options place the same sound positions around and above the seats.",
+          "option": null,
+          "favours": false,
+          "basis": {
+            "classification": "same",
+            "reason": "identical_in_every_report",
+            "values": [
+              "L4 · 15 speakers",
+              "L4 · 15 speakers"
+            ],
+            "levels": [],
+            "report_snapshot_ids": [
+              {
+                "version_id": "6abbca6e199f13dc4d74ec4a",
+                "visual_report_snapshot_id": "6ac20c15df233b979449bcc3",
+                "technical_report_snapshot_id": "6ac391ef796c4899260e0c5a"
+              },
+              {
+                "version_id": "6ac22230d40d8bb0a925ecab",
+                "visual_report_snapshot_id": "6ac2257837dd624e74adf140",
+                "technical_report_snapshot_id": "6ac275599f85fb8449ec3fd2"
+              }
+            ]
+          }
+        },
+        {
+          "claim_id": "claim_p4_modest_result_01",
+          "area": "p4",
+          "label": "Screen consistency (P4)",
+          "kind": "modest_result",
+          "statement": "How evenly the screen channels hold their level across the seating area.",
+          "option": null,
+          "favours": false,
+          "basis": {
+            "classification": "not_materially_different",
+            "reason": "same_level_different_value",
+            "values": [
+              "L4 · 1 dB",
+              "L4 · 2 dB"
+            ],
+            "levels": [
+              "L4",
+              "L4"
+            ],
+            "report_snapshot_ids": [
+              {
+                "version_id": "6abbca6e199f13dc4d74ec4a",
+                "visual_report_snapshot_id": "6ac20c15df233b979449bcc3",
+                "technical_report_snapshot_id": "6ac391ef796c4899260e0c5a"
+              },
+              {
+                "version_id": "6ac22230d40d8bb0a925ecab",
+                "visual_report_snapshot_id": "6ac2257837dd624e74adf140",
+                "technical_report_snapshot_id": "6ac275599f85fb8449ec3fd2"
+              }
+            ]
+          }
+        },
+        {
+          "claim_id": "claim_p5_modest_result_01",
+          "area": "p5",
+          "label": "Horizontal spacing (P5)",
+          "kind": "modest_result",
+          "statement": "How evenly the listener-level speakers are spaced, which is what lets movement travel through the room.",
+          "option": null,
+          "favours": false,
+          "basis": {
+            "classification": "not_materially_different",
+            "reason": "same_level_different_value",
+            "values": [
+              "L4 · 45.9",
+              "L4 · 47.9"
+            ],
+            "levels": [
+              "L4",
+              "L4"
+            ],
+            "report_snapshot_ids": [
+              {
+                "version_id": "6abbca6e199f13dc4d74ec4a",
+                "visual_report_snapshot_id": "6ac20c15df233b979449bcc3",
+                "technical_report_snapshot_id": "6ac391ef796c4899260e0c5a"
+              },
+              {
+                "version_id": "6ac22230d40d8bb0a925ecab",
+                "visual_report_snapshot_id": "6ac2257837dd624e74adf140",
+                "technical_report_snapshot_id": "6ac275599f85fb8449ec3fd2"
+              }
+            ]
+          }
+        },
+        {
+          "claim_id": "claim_p7_material_gain_01",
+          "area": "p7",
+          "label": "Front wide position (P7)",
+          "kind": "material_gain",
+          "statement": "How well the front wide positions bridge the screen and the side speakers.",
+          "option": {
+            "version_id": "6ac22230d40d8bb0a925ecab",
+            "version_name": "Level 1 version",
+            "label": "Option B"
+          },
+          "favours": true,
+          "basis": {
+            "classification": "materially_different",
+            "reason": "higher_level_achieved",
+            "values": [
+              "L2 · 6",
+              "L3 · 5"
+            ],
+            "levels": [
+              "L2",
+              "L3"
+            ],
+            "report_snapshot_ids": [
+              {
+                "version_id": "6abbca6e199f13dc4d74ec4a",
+                "visual_report_snapshot_id": "6ac20c15df233b979449bcc3",
+                "technical_report_snapshot_id": "6ac391ef796c4899260e0c5a"
+              },
+              {
+                "version_id": "6ac22230d40d8bb0a925ecab",
+                "visual_report_snapshot_id": "6ac2257837dd624e74adf140",
+                "technical_report_snapshot_id": "6ac275599f85fb8449ec3fd2"
+              }
+            ]
+          }
+        },
+        {
+          "claim_id": "claim_p7_modest_result_01",
+          "area": "p7",
+          "label": "Front wide position (P7)",
+          "kind": "modest_result",
+          "statement": "How well the front wide positions bridge the screen and the side speakers.",
+          "option": {
+            "version_id": "6abbca6e199f13dc4d74ec4a",
+            "version_name": "Level 4 version",
+            "label": "Option A"
+          },
+          "favours": false,
+          "basis": {
+            "classification": "materially_different",
+            "reason": "higher_level_achieved",
+            "values": [
+              "L2 · 6",
+              "L3 · 5"
+            ],
+            "levels": [
+              "L2",
+              "L3"
+            ],
+            "report_snapshot_ids": [
+              {
+                "version_id": "6abbca6e199f13dc4d74ec4a",
+                "visual_report_snapshot_id": "6ac20c15df233b979449bcc3",
+                "technical_report_snapshot_id": "6ac391ef796c4899260e0c5a"
+              },
+              {
+                "version_id": "6ac22230d40d8bb0a925ecab",
+                "visual_report_snapshot_id": "6ac2257837dd624e74adf140",
+                "technical_report_snapshot_id": "6ac275599f85fb8449ec3fd2"
+              }
+            ]
+          }
+        },
+        {
+          "claim_id": "claim_p9_modest_result_01",
+          "area": "p9",
+          "label": "Overhead spacing (P9)",
+          "kind": "modest_result",
+          "statement": "How evenly the overhead speakers are spaced above the seats.",
+          "option": null,
+          "favours": false,
+          "basis": {
+            "classification": "not_materially_different",
+            "reason": "same_level_different_value",
+            "values": [
+              "L3 · 53.1°",
+              "L3 · 55.6°"
+            ],
+            "levels": [
+              "L3",
+              "L3"
+            ],
+            "report_snapshot_ids": [
+              {
+                "version_id": "6abbca6e199f13dc4d74ec4a",
+                "visual_report_snapshot_id": "6ac20c15df233b979449bcc3",
+                "technical_report_snapshot_id": "6ac391ef796c4899260e0c5a"
+              },
+              {
+                "version_id": "6ac22230d40d8bb0a925ecab",
+                "visual_report_snapshot_id": "6ac2257837dd624e74adf140",
+                "technical_report_snapshot_id": "6ac275599f85fb8449ec3fd2"
+              }
+            ]
+          }
+        },
+        {
+          "claim_id": "claim_p10_shared_result_01",
+          "area": "p10",
+          "label": "Overhead level consistency (P10)",
+          "kind": "shared_result",
+          "statement": "How closely the overhead channels are matched in level.",
+          "option": null,
+          "favours": false,
+          "basis": {
+            "classification": "same",
+            "reason": "identical_in_every_report",
+            "values": [
+              "L1 · 9 dB",
+              "L1 · 9 dB"
+            ],
+            "levels": [],
+            "report_snapshot_ids": [
+              {
+                "version_id": "6abbca6e199f13dc4d74ec4a",
+                "visual_report_snapshot_id": "6ac20c15df233b979449bcc3",
+                "technical_report_snapshot_id": "6ac391ef796c4899260e0c5a"
+              },
+              {
+                "version_id": "6ac22230d40d8bb0a925ecab",
+                "visual_report_snapshot_id": "6ac2257837dd624e74adf140",
+                "technical_report_snapshot_id": "6ac275599f85fb8449ec3fd2"
+              }
+            ]
+          }
+        },
+        {
+          "claim_id": "claim_p12_material_gain_01",
+          "area": "p12",
+          "label": "Screen Dynamic Range (P12)",
+          "kind": "material_gain",
+          "statement": "More front-stage headroom. Dialogue, score and screen effects have more room to expand before the system sounds strained.",
+          "option": {
+            "version_id": "6abbca6e199f13dc4d74ec4a",
+            "version_name": "Level 4 version",
+            "label": "Option A"
+          },
+          "favours": true,
+          "basis": {
+            "classification": "materially_different",
+            "reason": "higher_level_achieved",
+            "values": [
+              "L4 · 116 dBC",
+              "L3 · 106 dBC"
+            ],
+            "levels": [
+              "L4",
+              "L3"
+            ],
+            "report_snapshot_ids": [
+              {
+                "version_id": "6abbca6e199f13dc4d74ec4a",
+                "visual_report_snapshot_id": "6ac20c15df233b979449bcc3",
+                "technical_report_snapshot_id": "6ac391ef796c4899260e0c5a"
+              },
+              {
+                "version_id": "6ac22230d40d8bb0a925ecab",
+                "visual_report_snapshot_id": "6ac2257837dd624e74adf140",
+                "technical_report_snapshot_id": "6ac275599f85fb8449ec3fd2"
+              }
+            ]
+          }
+        },
+        {
+          "claim_id": "claim_p13_material_gain_01",
+          "area": "p13",
+          "label": "Non-screen Dynamic Range (P13)",
+          "kind": "material_gain",
+          "statement": "More capability around and above the seating: effects in the surround and height layers keep their presence during demanding scenes.",
+          "option": {
+            "version_id": "6abbca6e199f13dc4d74ec4a",
+            "version_name": "Level 4 version",
+            "label": "Option A"
+          },
+          "favours": true,
+          "basis": {
+            "classification": "materially_different",
+            "reason": "higher_level_achieved",
+            "values": [
+              "L4 · 108 dBC (OH)",
+              "L2 · 100 dBC (FW)"
+            ],
+            "levels": [
+              "L4",
+              "L2"
+            ],
+            "report_snapshot_ids": [
+              {
+                "version_id": "6abbca6e199f13dc4d74ec4a",
+                "visual_report_snapshot_id": "6ac20c15df233b979449bcc3",
+                "technical_report_snapshot_id": "6ac391ef796c4899260e0c5a"
+              },
+              {
+                "version_id": "6ac22230d40d8bb0a925ecab",
+                "visual_report_snapshot_id": "6ac2257837dd624e74adf140",
+                "technical_report_snapshot_id": "6ac275599f85fb8449ec3fd2"
+              }
+            ]
+          }
+        },
+        {
+          "claim_id": "claim_p13_modest_result_01",
+          "area": "p13",
+          "label": "Non-screen Dynamic Range (P13)",
+          "kind": "modest_result",
+          "statement": "The surround and height layers have usable headroom, with less reserve than the screen stage.",
+          "option": {
+            "version_id": "6ac22230d40d8bb0a925ecab",
+            "version_name": "Level 1 version",
+            "label": "Option B"
+          },
+          "favours": false,
+          "basis": {
+            "classification": "materially_different",
+            "reason": "higher_level_achieved",
+            "values": [
+              "L4 · 108 dBC (OH)",
+              "L2 · 100 dBC (FW)"
+            ],
+            "levels": [
+              "L4",
+              "L2"
+            ],
+            "report_snapshot_ids": [
+              {
+                "version_id": "6abbca6e199f13dc4d74ec4a",
+                "visual_report_snapshot_id": "6ac20c15df233b979449bcc3",
+                "technical_report_snapshot_id": "6ac391ef796c4899260e0c5a"
+              },
+              {
+                "version_id": "6ac22230d40d8bb0a925ecab",
+                "visual_report_snapshot_id": "6ac2257837dd624e74adf140",
+                "technical_report_snapshot_id": "6ac275599f85fb8449ec3fd2"
+              }
+            ]
+          }
+        },
+        {
+          "claim_id": "claim_p14_material_gain_01",
+          "area": "p14",
+          "label": "LFE and subwoofer Dynamic Range (P14)",
+          "kind": "material_gain",
+          "statement": "More bass authority and physical impact, supporting the scale of film soundtracks.",
+          "option": {
+            "version_id": "6abbca6e199f13dc4d74ec4a",
+            "version_name": "Level 4 version",
+            "label": "Option A"
+          },
+          "favours": true,
+          "basis": {
+            "classification": "materially_different",
+            "reason": "higher_level_achieved",
+            "values": [
+              "L4 · 118 dBC",
+              "L3 · 115 dBC"
+            ],
+            "levels": [
+              "L4",
+              "L3"
+            ],
+            "report_snapshot_ids": [
+              {
+                "version_id": "6abbca6e199f13dc4d74ec4a",
+                "visual_report_snapshot_id": "6ac20c15df233b979449bcc3",
+                "technical_report_snapshot_id": "6ac391ef796c4899260e0c5a"
+              },
+              {
+                "version_id": "6ac22230d40d8bb0a925ecab",
+                "visual_report_snapshot_id": "6ac2257837dd624e74adf140",
+                "technical_report_snapshot_id": "6ac275599f85fb8449ec3fd2"
+              }
+            ]
+          }
+        },
+        {
+          "claim_id": "claim_p16_shared_result_01",
+          "area": "p16",
+          "label": "Screen timbre (P16)",
+          "kind": "shared_result",
+          "statement": "Tonal consistency across the screen channels, so voices and effects stay consistent from left to right.",
+          "option": null,
+          "favours": false,
+          "basis": {
+            "classification": "same",
+            "reason": "identical_in_every_report",
+            "values": [
+              "L4 · ±0.5 dB",
+              "L4 · ±0.5 dB"
+            ],
+            "levels": [],
+            "report_snapshot_ids": [
+              {
+                "version_id": "6abbca6e199f13dc4d74ec4a",
+                "visual_report_snapshot_id": "6ac20c15df233b979449bcc3",
+                "technical_report_snapshot_id": "6ac391ef796c4899260e0c5a"
+              },
+              {
+                "version_id": "6ac22230d40d8bb0a925ecab",
+                "visual_report_snapshot_id": "6ac2257837dd624e74adf140",
+                "technical_report_snapshot_id": "6ac275599f85fb8449ec3fd2"
+              }
+            ]
+          }
+        },
+        {
+          "claim_id": "claim_p17_shared_result_01",
+          "area": "p17",
+          "label": "Surround and overhead timbre (P17)",
+          "kind": "shared_result",
+          "statement": "Tonal consistency around and above the seats as effects move through the room.",
+          "option": null,
+          "favours": false,
+          "basis": {
+            "classification": "same",
+            "reason": "identical_in_every_report",
+            "values": [
+              "L4 · ≤1.5 dB window",
+              "L4 · ≤1.5 dB window"
+            ],
+            "levels": [],
+            "report_snapshot_ids": [
+              {
+                "version_id": "6abbca6e199f13dc4d74ec4a",
+                "visual_report_snapshot_id": "6ac20c15df233b979449bcc3",
+                "technical_report_snapshot_id": "6ac391ef796c4899260e0c5a"
+              },
+              {
+                "version_id": "6ac22230d40d8bb0a925ecab",
+                "visual_report_snapshot_id": "6ac2257837dd624e74adf140",
+                "technical_report_snapshot_id": "6ac275599f85fb8449ec3fd2"
+              }
+            ]
+          }
+        },
+        {
+          "claim_id": "claim_p18_material_gain_01",
+          "area": "p18",
+          "label": "Bass extension (P18)",
+          "kind": "material_gain",
+          "statement": "Bass depth: how far down the system reaches for the lowest film effects.",
+          "option": {
+            "version_id": "6ac22230d40d8bb0a925ecab",
+            "version_name": "Level 1 version",
+            "label": "Option B"
+          },
+          "favours": true,
+          "basis": {
+            "classification": "materially_different",
+            "reason": "higher_level_achieved",
+            "values": [
+              "L3 · 16 Hz",
+              "L4 · 16 Hz"
+            ],
+            "levels": [
+              "L3",
+              "L4"
+            ],
+            "report_snapshot_ids": [
+              {
+                "version_id": "6abbca6e199f13dc4d74ec4a",
+                "visual_report_snapshot_id": "6ac20c15df233b979449bcc3",
+                "technical_report_snapshot_id": "6ac391ef796c4899260e0c5a"
+              },
+              {
+                "version_id": "6ac22230d40d8bb0a925ecab",
+                "visual_report_snapshot_id": "6ac2257837dd624e74adf140",
+                "technical_report_snapshot_id": "6ac275599f85fb8449ec3fd2"
+              }
+            ]
+          }
+        },
+        {
+          "claim_id": "claim_p19_modest_result_01",
+          "area": "p19",
+          "label": "Bass response (P19)",
+          "kind": "modest_result",
+          "statement": "Bass balance at the reference seat, which is the response the calibration is measured against.",
+          "option": null,
+          "favours": false,
+          "basis": {
+            "classification": "not_materially_different",
+            "reason": "same_level_different_value",
+            "values": [
+              "L4 · ±0 dB",
+              "L4 · ±1 dB"
+            ],
+            "levels": [
+              "L4",
+              "L4"
+            ],
+            "report_snapshot_ids": [
+              {
+                "version_id": "6abbca6e199f13dc4d74ec4a",
+                "visual_report_snapshot_id": "6ac20c15df233b979449bcc3",
+                "technical_report_snapshot_id": "6ac391ef796c4899260e0c5a"
+              },
+              {
+                "version_id": "6ac22230d40d8bb0a925ecab",
+                "visual_report_snapshot_id": "6ac2257837dd624e74adf140",
+                "technical_report_snapshot_id": "6ac275599f85fb8449ec3fd2"
+              }
+            ]
+          }
+        },
+        {
+          "claim_id": "claim_p20_modest_result_01",
+          "area": "p20",
+          "label": "Bass consistency (P20)",
+          "kind": "modest_result",
+          "statement": "Bass level varies between seats as the room and the subwoofer positions allow, so calibration attention is required.",
+          "option": null,
+          "favours": false,
+          "basis": {
+            "classification": "not_materially_different",
+            "reason": "same_level_different_value",
+            "values": [
+              "L1 · ±13.2 dB",
+              "L1 · ±15.6 dB"
+            ],
+            "levels": [
+              "L1",
+              "L1"
+            ],
+            "report_snapshot_ids": [
+              {
+                "version_id": "6abbca6e199f13dc4d74ec4a",
+                "visual_report_snapshot_id": "6ac20c15df233b979449bcc3",
+                "technical_report_snapshot_id": "6ac391ef796c4899260e0c5a"
+              },
+              {
+                "version_id": "6ac22230d40d8bb0a925ecab",
+                "visual_report_snapshot_id": "6ac2257837dd624e74adf140",
+                "technical_report_snapshot_id": "6ac275599f85fb8449ec3fd2"
+              }
+            ]
+          }
+        },
+        {
+          "claim_id": "claim_design_credibility_01",
+          "area": "design",
+          "label": "Design",
+          "kind": "credibility",
+          "statement": "Level 1 version remains a credible 9.1.6 design.",
+          "option": {
+            "version_id": "6ac22230d40d8bb0a925ecab",
+            "version_name": "Level 1 version",
+            "label": "Option B"
+          },
+          "favours": false,
+          "basis": {
+            "classification": "same",
+            "reason": "identical_in_every_report",
+            "values": [
+              "9.1.6 (15 discrete channels)",
+              "9.1.6 (15 discrete channels)"
+            ],
+            "levels": [],
+            "report_snapshot_ids": [
+              {
+                "version_id": "6abbca6e199f13dc4d74ec4a",
+                "visual_report_snapshot_id": "6ac20c15df233b979449bcc3",
+                "technical_report_snapshot_id": "6ac391ef796c4899260e0c5a"
+              },
+              {
+                "version_id": "6ac22230d40d8bb0a925ecab",
+                "visual_report_snapshot_id": "6ac2257837dd624e74adf140",
+                "technical_report_snapshot_id": "6ac275599f85fb8449ec3fd2"
+              }
+            ],
+            "supports": [
+              "shared_design"
+            ]
+          }
+        },
+        {
+          "claim_id": "claim_design_recommendation_01",
+          "area": "design",
+          "label": "Design",
+          "kind": "recommendation",
+          "statement": "Level 4 version is the stronger recommendation where maximum performance and headroom are the priority.",
+          "option": {
+            "version_id": "6abbca6e199f13dc4d74ec4a",
+            "version_name": "Level 4 version",
+            "label": "Option A"
+          },
+          "favours": true,
+          "basis": {
+            "classification": "materially_different",
+            "reason": "shared_design_with_material_dynamic_range_and_products",
+            "values": [
+              "p12",
+              "p13",
+              "p14"
+            ],
+            "levels": [],
+            "material_areas": [
+              "p12",
+              "p13",
+              "p14"
+            ],
+            "product_differences": [
+              "speakers",
+              "lcr",
+              "surrounds",
+              "overheads",
+              "subwoofers"
+            ],
+            "bass_consistency_claims": "blocked",
+            "report_snapshot_ids": [
+              {
+                "version_id": "6abbca6e199f13dc4d74ec4a",
+                "visual_report_snapshot_id": "6ac20c15df233b979449bcc3",
+                "technical_report_snapshot_id": "6ac391ef796c4899260e0c5a"
+              },
+              {
+                "version_id": "6ac22230d40d8bb0a925ecab",
+                "visual_report_snapshot_id": "6ac2257837dd624e74adf140",
+                "technical_report_snapshot_id": "6ac275599f85fb8449ec3fd2"
+              }
+            ]
+          }
+        }
+      ],
+      "blocked_claims": [
+        {
+          "block_id": "block_global_no_invented_benefits_01",
+          "scope": "global",
+          "area": null,
+          "reason": "no_invented_benefits",
+          "prohibited": "Do not invent a benefit: every client-facing claim must be one of the allowed claims in this pack.",
+          "detail": null
+        },
+        {
+          "block_id": "block_global_no_changed_values_02",
+          "scope": "global",
+          "area": null,
+          "reason": "no_changed_values",
+          "prohibited": "Never change, round or restate a value: every figure is copied exactly as this pack states it.",
+          "detail": null
+        },
+        {
+          "block_id": "block_global_no_unselected_products_03",
+          "scope": "global",
+          "area": null,
+          "reason": "no_unselected_products",
+          "prohibited": "Never name a product that is not listed for the option it belongs to in this pack.",
+          "detail": null
+        },
+        {
+          "block_id": "block_global_no_recalculation_04",
+          "scope": "global",
+          "area": null,
+          "reason": "no_recalculation",
+          "prohibited": "Never calculate, estimate or infer a result: this pack is the only source of performance figures.",
+          "detail": null
+        },
+        {
+          "block_id": "block_global_no_redesign_recommendation_05",
+          "scope": "global",
+          "area": null,
+          "reason": "no_redesign_recommendation",
+          "prohibited": "Do not recommend changing the design: the proposal states the final design, it is not a set of next steps.",
+          "detail": null
+        },
+        {
+          "block_id": "block_global_no_universal_improvement_06",
+          "scope": "global",
+          "area": null,
+          "reason": "no_universal_improvement",
+          "prohibited": "Do not claim every parameter improves: claim only what this pack records as a material gain.",
+          "detail": null
+        },
+        {
+          "block_id": "block_room_no_claimed_change_07",
+          "scope": "room",
+          "area": "room",
+          "reason": "no_claimed_change",
+          "prohibited": "Do not state or imply a change in room: every report states it identically.",
+          "detail": "7.3m × 5.2m × 2.8m (L × W × H) | 7.3m × 5.2m × 2.8m (L × W × H)"
+        },
+        {
+          "block_id": "block_screen_size_no_claimed_change_08",
+          "scope": "screen_size",
+          "area": "screen_size",
+          "reason": "no_claimed_change",
+          "prohibited": "Do not state or imply a change in screen size: every report states it identically.",
+          "detail": "185\" (2.35:1) | 185\" (2.35:1)"
+        },
+        {
+          "block_id": "block_rp23_viewing_no_claimed_improvement_09",
+          "scope": "rp23_viewing",
+          "area": "rp23_viewing",
+          "reason": "no_claimed_improvement",
+          "prohibited": "Do not claim an improvement in viewing angle / rp23: the reports show no material difference.",
+          "detail": "same_level_different_value"
+        },
+        {
+          "block_id": "block_system_layout_no_claimed_change_10",
+          "scope": "system_layout",
+          "area": "system_layout",
+          "reason": "no_claimed_change",
+          "prohibited": "Do not state or imply a change in system layout: every report states it identically.",
+          "detail": "9.1.6 (15 discrete channels) | 9.1.6 (15 discrete channels)"
+        },
+        {
+          "block_id": "block_acoustic_treatment_no_claimed_change_11",
+          "scope": "acoustic_treatment",
+          "area": "acoustic_treatment",
+          "reason": "no_claimed_change",
+          "prohibited": "Do not state or imply a change in acoustic treatment: every report states it identically.",
+          "detail": "Artcoustic Abfuser × 8 | Artcoustic Abfuser × 8"
+        },
+        {
+          "block_id": "block_amplification_not_comparable_12",
+          "scope": "amplification",
+          "area": "amplification",
+          "reason": "not_comparable",
+          "prohibited": "Do not compare or describe amplification: the reports do not both state it.",
+          "detail": "not_stated_by_every_report"
+        },
+        {
+          "block_id": "block_seating_no_claimed_change_13",
+          "scope": "seating",
+          "area": "seating",
+          "reason": "no_claimed_change",
+          "prohibited": "Do not state or imply a change in seating: every report states it identically.",
+          "detail": "2 rows: 4 seats in row 1, 5 seats in row 2. 1.8m centre-to-centre row spacing. MLP positioned at the middle row centre. | 2 rows: 4 seats in row 1, 5 seats in row 2. 1.8m centre-to-centre row spacing. MLP positioned at the middle row centre."
+        },
+        {
+          "block_id": "block_p2_no_claimed_change_14",
+          "scope": "p2",
+          "area": "p2",
+          "reason": "no_claimed_change",
+          "prohibited": "Do not state or imply a change in discrete channels (p2): every report states it identically.",
+          "detail": "L4 · 15 speakers | L4 · 15 speakers"
+        },
+        {
+          "block_id": "block_p4_no_claimed_improvement_15",
+          "scope": "p4",
+          "area": "p4",
+          "reason": "no_claimed_improvement",
+          "prohibited": "Do not claim an improvement in screen consistency (p4): the reports show no material difference.",
+          "detail": "same_level_different_value"
+        },
+        {
+          "block_id": "block_p5_no_claimed_improvement_16",
+          "scope": "p5",
+          "area": "p5",
+          "reason": "no_claimed_improvement",
+          "prohibited": "Do not claim an improvement in horizontal spacing (p5): the reports show no material difference.",
+          "detail": "same_level_different_value"
+        },
+        {
+          "block_id": "block_p9_no_claimed_improvement_17",
+          "scope": "p9",
+          "area": "p9",
+          "reason": "no_claimed_improvement",
+          "prohibited": "Do not claim an improvement in overhead spacing (p9): the reports show no material difference.",
+          "detail": "same_level_different_value"
+        },
+        {
+          "block_id": "block_p10_no_claimed_change_18",
+          "scope": "p10",
+          "area": "p10",
+          "reason": "no_claimed_change",
+          "prohibited": "Do not state or imply a change in overhead level consistency (p10): every report states it identically.",
+          "detail": "L1 · 9 dB | L1 · 9 dB"
+        },
+        {
+          "block_id": "block_p16_no_claimed_change_19",
+          "scope": "p16",
+          "area": "p16",
+          "reason": "no_claimed_change",
+          "prohibited": "Do not state or imply a change in screen timbre (p16): every report states it identically.",
+          "detail": "L4 · ±0.5 dB | L4 · ±0.5 dB"
+        },
+        {
+          "block_id": "block_p17_no_claimed_change_20",
+          "scope": "p17",
+          "area": "p17",
+          "reason": "no_claimed_change",
+          "prohibited": "Do not state or imply a change in surround and overhead timbre (p17): every report states it identically.",
+          "detail": "L4 · ≤1.5 dB window | L4 · ≤1.5 dB window"
+        },
+        {
+          "block_id": "block_p19_no_claimed_improvement_21",
+          "scope": "p19",
+          "area": "p19",
+          "reason": "no_claimed_improvement",
+          "prohibited": "Do not claim an improvement in bass response (p19): the reports show no material difference.",
+          "detail": "same_level_different_value"
+        },
+        {
+          "block_id": "block_p20_no_claimed_improvement_22",
+          "scope": "p20",
+          "area": "p20",
+          "reason": "no_claimed_improvement",
+          "prohibited": "Do not claim an improvement in bass consistency (p20): the reports show no material difference.",
+          "detail": "same_level_different_value"
+        },
+        {
+          "block_id": "block_system_layout_no_added_channels_23",
+          "scope": "system_layout",
+          "area": null,
+          "reason": "no_added_channels",
+          "prohibited": "Do not claim any option adds channels or a larger format: every option uses the same system layout.",
+          "detail": null
+        },
+        {
+          "block_id": "block_screen_size_no_screen_change_24",
+          "scope": "screen_size",
+          "area": null,
+          "reason": "no_screen_change",
+          "prohibited": "Do not claim any option changes the screen: both options are designed around the same screen.",
+          "detail": null
+        },
+        {
+          "block_id": "block_seating_no_seating_change_25",
+          "scope": "seating",
+          "area": null,
+          "reason": "no_seating_change",
+          "prohibited": "Do not claim any option changes the seating: both options are assessed across the same seats.",
+          "detail": null
+        },
+        {
+          "block_id": "block_p20_no_solved_bass_consistency_26",
+          "scope": "p20",
+          "area": "p20",
+          "reason": "no_solved_bass_consistency",
+          "prohibited": "Do not claim that seat-to-seat bass consistency has been solved or improved, and do not describe the bass as uniform, identical or materially even across the seats: the reports show no material difference here. Bass may be described only as output authority, physical capability and the subwoofer specification.",
+          "detail": "same_level_different_value"
+        }
+      ],
+      "bass_claims": {
+        "p20": {
+          "classification": "not_materially_different",
+          "reason": "same_level_different_value",
+          "levels": [
+            "L1",
+            "L1"
+          ],
+          "values": [
+            "L1 · ±13.2 dB",
+            "L1 · ±15.6 dB"
+          ],
+          "supports_consistency": false
+        },
+        "p14": {
+          "classification": "materially_different",
+          "reason": "higher_level_achieved",
+          "levels": [
+            "L4",
+            "L3"
+          ],
+          "values": [
+            "L4 · 118 dBC",
+            "L3 · 115 dBC"
+          ]
+        },
+        "allowed": [
+          {
+            "claim_id": "claim_p14_material_gain_01",
+            "scope": "bass_output_authority",
+            "text": "More bass authority and physical impact, supporting the scale of film soundtracks."
+          },
+          {
+            "claim_id": "claim_subwoofers_factual_change_01",
+            "scope": "subwoofer_specification",
+            "text": "Level 4 version is specified with SUB4-12 × 2 (front), SUB4-12 × 2 (rear) rather than SUB4-12 (front), SUB4-12 (rear)."
+          }
+        ],
+        "blocked": [
+          {
+            "reason": "no_solved_bass_consistency",
+            "prohibited": "Do not claim that seat-to-seat bass consistency has been solved or improved, and do not describe the bass as uniform, identical or materially even across the seats: the reports show no material difference here. Bass may be described only as output authority, physical capability and the subwoofer specification.",
+            "scope": "seat_to_seat_consistency",
+            "block_id": "block_p20_no_solved_bass_consistency_26"
+          }
+        ],
+        "scope": [
+          "bass_output_authority",
+          "physical_capability",
+          "subwoofer_specification"
+        ],
+        "note": "Both designs remain Level 1 for seat-to-seat bass consistency. Level 4 version improves bass output authority, not full-seat uniformity.",
+        "removed_wording": [
+          {
+            "version_id": "6abbca6e199f13dc4d74ec4a",
+            "path": "facts.system.subwoofer_strategy.strategy_text",
+            "rule": "maximum_consistency"
+          }
+        ]
+      },
+      "decision_framing": {
+        "allowed": true,
+        "reason": "shared_design_with_material_dynamic_range_and_products",
+        "text": "Level 1 version gives the room the format. Level 4 version gives that format the authority to feel like a serious dedicated cinema.",
+        "evidence": {
+          "shared_areas": [
+            "room",
+            "screen_size",
+            "seating",
+            "system_layout"
+          ],
+          "acoustic_treatment": "identical_in_every_report",
+          "material_areas": [
+            "p12",
+            "p13",
+            "p14"
+          ],
+          "equipment_areas": [
+            "speakers",
+            "lcr",
+            "surrounds",
+            "overheads",
+            "subwoofers"
+          ],
+          "option": {
+            "version_id": "6abbca6e199f13dc4d74ec4a",
+            "version_name": "Level 4 version",
+            "label": "Option A"
+          },
+          "option_index": 0,
+          "p20": {
+            "classification": "not_materially_different",
+            "levels": [
+              "L1",
+              "L1"
+            ],
+            "values": [
+              "L1 · ±13.2 dB",
+              "L1 · ±15.6 dB"
+            ],
+            "supports_framing": true,
+            "consistency_claims": "blocked"
+          },
+          "rests_on": [
+            "shared_design",
+            "material_dynamic_range",
+            "product_differences"
+          ],
+          "excludes": [
+            "seat_to_seat_bass_consistency"
+          ]
+        }
+      },
+      "evidence_basis": {
+        "sources": [
+          "saved-report-evidence"
+        ],
+        "version_names": [
+          {
+            "version_id": "6abbca6e199f13dc4d74ec4a",
+            "source": "saved-report-evidence",
+            "from": "technical_report",
+            "stated_by": [
+              "technical_report",
+              "visual_report"
+            ],
+            "reports_agree": true
+          },
+          {
+            "version_id": "6ac22230d40d8bb0a925ecab",
+            "source": "saved-report-evidence",
+            "from": "technical_report",
+            "stated_by": [
+              "technical_report",
+              "visual_report"
+            ],
+            "reports_agree": true
+          }
+        ],
+        "report_snapshot_ids": [
+          {
+            "version_id": "6abbca6e199f13dc4d74ec4a",
+            "visual_report_snapshot_id": "6ac20c15df233b979449bcc3",
+            "technical_report_snapshot_id": "6ac391ef796c4899260e0c5a"
+          },
+          {
+            "version_id": "6ac22230d40d8bb0a925ecab",
+            "visual_report_snapshot_id": "6ac2257837dd624e74adf140",
+            "technical_report_snapshot_id": "6ac275599f85fb8449ec3fd2"
+          }
+        ],
+        "fingerprints": [
+          {
+            "version_id": "6abbca6e199f13dc4d74ec4a",
+            "engineering": "eng:v1:0cf530d793062741",
+            "visual_evidence": "re1-f82c164e-1fb91",
+            "technical_evidence": "re1-f23d9723-1fb94"
+          },
+          {
+            "version_id": "6ac22230d40d8bb0a925ecab",
+            "engineering": "eng:v1:fcf0cd1b446857c9",
+            "visual_evidence": "re1-43db56f1-1fbba",
+            "technical_evidence": "re1-fb58c560-1fbbd"
+          }
+        ]
+      },
+      "pack_fingerprint": "93ffc5f8"
+    },
+    "writing_rules": [
+      "Write only from the evidence pack. It is the sole source of every fact, figure, level and claim.",
+      "Every client-facing claim must cite one or more allowed claim IDs in that section's claim_ids.",
+      "Copy every figure, Performance Level and product name exactly as the pack states it. Never round, convert, restate or estimate.",
+      "Never name a product the pack does not list for the option it belongs to.",
+      "Never present a claim the pack blocks, and never describe a shared result as a change or a gain.",
+      "Never recommend changing the design, and never describe the proposal as an upgrade path.",
+      "Where P20 does not support seat-to-seat bass consistency, describe bass only as output authority, physical capability and the subwoofer specification.",
+      "Write to the client: benefit-led, dealer-safe language, with no internal parameter codes and no engineering jargon.",
+      "Keep every paragraph to one to three sentences, and keep every section inside its word limit.",
+      "Explain what each recorded result means for the room, rather than naming the number and moving on.",
+      "Return structured JSON only, in the nine sections of this contract, with no extra fields and no commentary."
+    ],
+    "word_limits": {
+      "decision_summary": 140,
+      "what_stays_same": 130,
+      "what_changes": 180,
+      "key_performance_highlights": 170,
+      "spatial_resolution": 170,
+      "dynamic_range": 170,
+      "timbre_matching": 150,
+      "overall_design": 190,
+      "appendix_notes": 200
+    },
+    "section_requirements": [
+      {
+        "section": "decision_summary",
+        "title": "Decision Summary",
+        "word_limit": 140,
+        "requirement": "State the decision between the options in the pack's own framing, and only where the pack allows a framing.",
+        "requires_grounding": true
+      },
+      {
+        "section": "what_stays_same",
+        "title": "What Stays the Same",
+        "word_limit": 130,
+        "requirement": "State only what every option shares, from the shared-result claims the pack allows.",
+        "requires_grounding": true
+      },
+      {
+        "section": "what_changes",
+        "title": "What Changes",
+        "word_limit": 180,
+        "requirement": "State only the differences the pack records, and call one a gain only where the pack allows a gain.",
+        "requires_grounding": true
+      },
+      {
+        "section": "key_performance_highlights",
+        "title": "Key Performance Highlights",
+        "word_limit": 170,
+        "requirement": "State the pack's recorded results, in the pack's own words, for the areas that carry a claim.",
+        "requires_grounding": true
+      },
+      {
+        "section": "spatial_resolution",
+        "title": "Spatial Resolution",
+        "word_limit": 170,
+        "requirement": "Explain what the spatial results mean for the seating, within the claims the pack allows.",
+        "requires_grounding": true
+      },
+      {
+        "section": "dynamic_range",
+        "title": "Dynamic Range",
+        "word_limit": 170,
+        "requirement": "Explain the dynamic-range results the pack records, and present no other.",
+        "requires_grounding": true
+      },
+      {
+        "section": "timbre_matching",
+        "title": "Timbre Matching",
+        "word_limit": 150,
+        "requirement": "Explain the loudspeaker and coverage evidence the pack records, and claim nothing beyond it.",
+        "requires_grounding": true
+      },
+      {
+        "section": "overall_design",
+        "title": "Overall Design",
+        "word_limit": 190,
+        "requirement": "Close on the design as a whole, using only the credibility and recommendation claims the pack allows.",
+        "requires_grounding": true
+      },
+      {
+        "section": "appendix_notes",
+        "title": "Appendix Notes",
+        "word_limit": 200,
+        "requirement": "Note the report evidence the pack was built from, with no performance claim.",
+        "requires_grounding": true
+      }
+    ],
+    "allowed_claims": [
+      {
+        "claim_id": "claim_room_shared_result_01",
+        "area": "room",
+        "label": "Room",
+        "kind": "shared_result",
+        "statement": "Both options are the same room, on the same stated dimensions.",
+        "option": null,
+        "favours": false
+      },
+      {
+        "claim_id": "claim_screen_size_shared_result_01",
+        "area": "screen_size",
+        "label": "Screen size",
+        "kind": "shared_result",
+        "statement": "Same screen scale in both options.",
+        "option": null,
+        "favours": false
+      },
+      {
+        "claim_id": "claim_rp23_viewing_modest_result_01",
+        "area": "rp23_viewing",
+        "label": "Viewing angle / RP23",
+        "kind": "modest_result",
+        "statement": "How comfortably the screen scale reads from each seating row.",
+        "option": null,
+        "favours": false
+      },
+      {
+        "claim_id": "claim_system_layout_shared_result_01",
+        "area": "system_layout",
+        "label": "System layout",
+        "kind": "shared_result",
+        "statement": "Same layout in both options.",
+        "option": null,
+        "favours": false
+      },
+      {
+        "claim_id": "claim_speakers_factual_change_01",
+        "area": "speakers",
+        "label": "Speaker package",
+        "kind": "factual_change",
+        "statement": "The loudspeakers each position is delivered with.",
+        "option": null,
+        "favours": false
+      },
+      {
+        "claim_id": "claim_lcr_factual_change_01",
+        "area": "lcr",
+        "label": "LCR",
+        "kind": "factual_change",
+        "statement": "The screen speakers that carry dialogue, music and screen effects.",
+        "option": null,
+        "favours": false
+      },
+      {
+        "claim_id": "claim_surrounds_factual_change_01",
+        "area": "surrounds",
+        "label": "Surrounds / wides",
+        "kind": "factual_change",
+        "statement": "The speakers that carry effects around the seating area.",
+        "option": null,
+        "favours": false
+      },
+      {
+        "claim_id": "claim_overheads_factual_change_01",
+        "area": "overheads",
+        "label": "Overheads",
+        "kind": "factual_change",
+        "statement": "The speakers that carry the height layer above the seats.",
+        "option": null,
+        "favours": false
+      },
+      {
+        "claim_id": "claim_subwoofers_factual_change_01",
+        "area": "subwoofers",
+        "label": "Subwoofers",
+        "kind": "factual_change",
+        "statement": "The subwoofers that carry the low-frequency content.",
+        "option": null,
+        "favours": false
+      },
+      {
+        "claim_id": "claim_acoustic_treatment_shared_result_01",
+        "area": "acoustic_treatment",
+        "label": "Acoustic treatment",
+        "kind": "shared_result",
+        "statement": "Same acoustic treatment in both options.",
+        "option": null,
+        "favours": false
+      },
+      {
+        "claim_id": "claim_seating_shared_result_01",
+        "area": "seating",
+        "label": "Seating",
+        "kind": "shared_result",
+        "statement": "Same seating in both options.",
+        "option": null,
+        "favours": false
+      },
+      {
+        "claim_id": "claim_p2_shared_result_01",
+        "area": "p2",
+        "label": "Discrete channels (P2)",
+        "kind": "shared_result",
+        "statement": "Both options place the same sound positions around and above the seats.",
+        "option": null,
+        "favours": false
+      },
+      {
+        "claim_id": "claim_p4_modest_result_01",
+        "area": "p4",
+        "label": "Screen consistency (P4)",
+        "kind": "modest_result",
+        "statement": "How evenly the screen channels hold their level across the seating area.",
+        "option": null,
+        "favours": false
+      },
+      {
+        "claim_id": "claim_p5_modest_result_01",
+        "area": "p5",
+        "label": "Horizontal spacing (P5)",
+        "kind": "modest_result",
+        "statement": "How evenly the listener-level speakers are spaced, which is what lets movement travel through the room.",
+        "option": null,
+        "favours": false
+      },
+      {
+        "claim_id": "claim_p7_material_gain_01",
+        "area": "p7",
+        "label": "Front wide position (P7)",
+        "kind": "material_gain",
+        "statement": "How well the front wide positions bridge the screen and the side speakers.",
+        "option": {
+          "version_id": "6ac22230d40d8bb0a925ecab",
+          "version_name": "Level 1 version",
+          "label": "Option B"
+        },
+        "favours": true
+      },
+      {
+        "claim_id": "claim_p7_modest_result_01",
+        "area": "p7",
+        "label": "Front wide position (P7)",
+        "kind": "modest_result",
+        "statement": "How well the front wide positions bridge the screen and the side speakers.",
+        "option": {
+          "version_id": "6abbca6e199f13dc4d74ec4a",
+          "version_name": "Level 4 version",
+          "label": "Option A"
+        },
+        "favours": false
+      },
+      {
+        "claim_id": "claim_p9_modest_result_01",
+        "area": "p9",
+        "label": "Overhead spacing (P9)",
+        "kind": "modest_result",
+        "statement": "How evenly the overhead speakers are spaced above the seats.",
+        "option": null,
+        "favours": false
+      },
+      {
+        "claim_id": "claim_p10_shared_result_01",
+        "area": "p10",
+        "label": "Overhead level consistency (P10)",
+        "kind": "shared_result",
+        "statement": "How closely the overhead channels are matched in level.",
+        "option": null,
+        "favours": false
+      },
+      {
+        "claim_id": "claim_p12_material_gain_01",
+        "area": "p12",
+        "label": "Screen Dynamic Range (P12)",
+        "kind": "material_gain",
+        "statement": "More front-stage headroom. Dialogue, score and screen effects have more room to expand before the system sounds strained.",
+        "option": {
+          "version_id": "6abbca6e199f13dc4d74ec4a",
+          "version_name": "Level 4 version",
+          "label": "Option A"
+        },
+        "favours": true
+      },
+      {
+        "claim_id": "claim_p13_material_gain_01",
+        "area": "p13",
+        "label": "Non-screen Dynamic Range (P13)",
+        "kind": "material_gain",
+        "statement": "More capability around and above the seating: effects in the surround and height layers keep their presence during demanding scenes.",
+        "option": {
+          "version_id": "6abbca6e199f13dc4d74ec4a",
+          "version_name": "Level 4 version",
+          "label": "Option A"
+        },
+        "favours": true
+      },
+      {
+        "claim_id": "claim_p13_modest_result_01",
+        "area": "p13",
+        "label": "Non-screen Dynamic Range (P13)",
+        "kind": "modest_result",
+        "statement": "The surround and height layers have usable headroom, with less reserve than the screen stage.",
+        "option": {
+          "version_id": "6ac22230d40d8bb0a925ecab",
+          "version_name": "Level 1 version",
+          "label": "Option B"
+        },
+        "favours": false
+      },
+      {
+        "claim_id": "claim_p14_material_gain_01",
+        "area": "p14",
+        "label": "LFE and subwoofer Dynamic Range (P14)",
+        "kind": "material_gain",
+        "statement": "More bass authority and physical impact, supporting the scale of film soundtracks.",
+        "option": {
+          "version_id": "6abbca6e199f13dc4d74ec4a",
+          "version_name": "Level 4 version",
+          "label": "Option A"
+        },
+        "favours": true
+      },
+      {
+        "claim_id": "claim_p16_shared_result_01",
+        "area": "p16",
+        "label": "Screen timbre (P16)",
+        "kind": "shared_result",
+        "statement": "Tonal consistency across the screen channels, so voices and effects stay consistent from left to right.",
+        "option": null,
+        "favours": false
+      },
+      {
+        "claim_id": "claim_p17_shared_result_01",
+        "area": "p17",
+        "label": "Surround and overhead timbre (P17)",
+        "kind": "shared_result",
+        "statement": "Tonal consistency around and above the seats as effects move through the room.",
+        "option": null,
+        "favours": false
+      },
+      {
+        "claim_id": "claim_p18_material_gain_01",
+        "area": "p18",
+        "label": "Bass extension (P18)",
+        "kind": "material_gain",
+        "statement": "Bass depth: how far down the system reaches for the lowest film effects.",
+        "option": {
+          "version_id": "6ac22230d40d8bb0a925ecab",
+          "version_name": "Level 1 version",
+          "label": "Option B"
+        },
+        "favours": true
+      },
+      {
+        "claim_id": "claim_p19_modest_result_01",
+        "area": "p19",
+        "label": "Bass response (P19)",
+        "kind": "modest_result",
+        "statement": "Bass balance at the reference seat, which is the response the calibration is measured against.",
+        "option": null,
+        "favours": false
+      },
+      {
+        "claim_id": "claim_p20_modest_result_01",
+        "area": "p20",
+        "label": "Bass consistency (P20)",
+        "kind": "modest_result",
+        "statement": "Bass level varies between seats as the room and the subwoofer positions allow, so calibration attention is required.",
+        "option": null,
+        "favours": false
+      },
+      {
+        "claim_id": "claim_design_credibility_01",
+        "area": "design",
+        "label": "Design",
+        "kind": "credibility",
+        "statement": "Level 1 version remains a credible 9.1.6 design.",
+        "option": {
+          "version_id": "6ac22230d40d8bb0a925ecab",
+          "version_name": "Level 1 version",
+          "label": "Option B"
+        },
+        "favours": false
+      },
+      {
+        "claim_id": "claim_design_recommendation_01",
+        "area": "design",
+        "label": "Design",
+        "kind": "recommendation",
+        "statement": "Level 4 version is the stronger recommendation where maximum performance and headroom are the priority.",
+        "option": {
+          "version_id": "6abbca6e199f13dc4d74ec4a",
+          "version_name": "Level 4 version",
+          "label": "Option A"
+        },
+        "favours": true
+      }
+    ],
+    "blocked_claims": [
+      {
+        "block_id": "block_global_no_invented_benefits_01",
+        "scope": "global",
+        "area": null,
+        "reason": "no_invented_benefits",
+        "prohibited": "Do not invent a benefit: every client-facing claim must be one of the allowed claims in this pack."
+      },
+      {
+        "block_id": "block_global_no_changed_values_02",
+        "scope": "global",
+        "area": null,
+        "reason": "no_changed_values",
+        "prohibited": "Never change, round or restate a value: every figure is copied exactly as this pack states it."
+      },
+      {
+        "block_id": "block_global_no_unselected_products_03",
+        "scope": "global",
+        "area": null,
+        "reason": "no_unselected_products",
+        "prohibited": "Never name a product that is not listed for the option it belongs to in this pack."
+      },
+      {
+        "block_id": "block_global_no_recalculation_04",
+        "scope": "global",
+        "area": null,
+        "reason": "no_recalculation",
+        "prohibited": "Never calculate, estimate or infer a result: this pack is the only source of performance figures."
+      },
+      {
+        "block_id": "block_global_no_redesign_recommendation_05",
+        "scope": "global",
+        "area": null,
+        "reason": "no_redesign_recommendation",
+        "prohibited": "Do not recommend changing the design: the proposal states the final design, it is not a set of next steps."
+      },
+      {
+        "block_id": "block_global_no_universal_improvement_06",
+        "scope": "global",
+        "area": null,
+        "reason": "no_universal_improvement",
+        "prohibited": "Do not claim every parameter improves: claim only what this pack records as a material gain."
+      },
+      {
+        "block_id": "block_room_no_claimed_change_07",
+        "scope": "room",
+        "area": "room",
+        "reason": "no_claimed_change",
+        "prohibited": "Do not state or imply a change in room: every report states it identically."
+      },
+      {
+        "block_id": "block_screen_size_no_claimed_change_08",
+        "scope": "screen_size",
+        "area": "screen_size",
+        "reason": "no_claimed_change",
+        "prohibited": "Do not state or imply a change in screen size: every report states it identically."
+      },
+      {
+        "block_id": "block_rp23_viewing_no_claimed_improvement_09",
+        "scope": "rp23_viewing",
+        "area": "rp23_viewing",
+        "reason": "no_claimed_improvement",
+        "prohibited": "Do not claim an improvement in viewing angle / rp23: the reports show no material difference."
+      },
+      {
+        "block_id": "block_system_layout_no_claimed_change_10",
+        "scope": "system_layout",
+        "area": "system_layout",
+        "reason": "no_claimed_change",
+        "prohibited": "Do not state or imply a change in system layout: every report states it identically."
+      },
+      {
+        "block_id": "block_acoustic_treatment_no_claimed_change_11",
+        "scope": "acoustic_treatment",
+        "area": "acoustic_treatment",
+        "reason": "no_claimed_change",
+        "prohibited": "Do not state or imply a change in acoustic treatment: every report states it identically."
+      },
+      {
+        "block_id": "block_amplification_not_comparable_12",
+        "scope": "amplification",
+        "area": "amplification",
+        "reason": "not_comparable",
+        "prohibited": "Do not compare or describe amplification: the reports do not both state it."
+      },
+      {
+        "block_id": "block_seating_no_claimed_change_13",
+        "scope": "seating",
+        "area": "seating",
+        "reason": "no_claimed_change",
+        "prohibited": "Do not state or imply a change in seating: every report states it identically."
+      },
+      {
+        "block_id": "block_p2_no_claimed_change_14",
+        "scope": "p2",
+        "area": "p2",
+        "reason": "no_claimed_change",
+        "prohibited": "Do not state or imply a change in discrete channels (p2): every report states it identically."
+      },
+      {
+        "block_id": "block_p4_no_claimed_improvement_15",
+        "scope": "p4",
+        "area": "p4",
+        "reason": "no_claimed_improvement",
+        "prohibited": "Do not claim an improvement in screen consistency (p4): the reports show no material difference."
+      },
+      {
+        "block_id": "block_p5_no_claimed_improvement_16",
+        "scope": "p5",
+        "area": "p5",
+        "reason": "no_claimed_improvement",
+        "prohibited": "Do not claim an improvement in horizontal spacing (p5): the reports show no material difference."
+      },
+      {
+        "block_id": "block_p9_no_claimed_improvement_17",
+        "scope": "p9",
+        "area": "p9",
+        "reason": "no_claimed_improvement",
+        "prohibited": "Do not claim an improvement in overhead spacing (p9): the reports show no material difference."
+      },
+      {
+        "block_id": "block_p10_no_claimed_change_18",
+        "scope": "p10",
+        "area": "p10",
+        "reason": "no_claimed_change",
+        "prohibited": "Do not state or imply a change in overhead level consistency (p10): every report states it identically."
+      },
+      {
+        "block_id": "block_p16_no_claimed_change_19",
+        "scope": "p16",
+        "area": "p16",
+        "reason": "no_claimed_change",
+        "prohibited": "Do not state or imply a change in screen timbre (p16): every report states it identically."
+      },
+      {
+        "block_id": "block_p17_no_claimed_change_20",
+        "scope": "p17",
+        "area": "p17",
+        "reason": "no_claimed_change",
+        "prohibited": "Do not state or imply a change in surround and overhead timbre (p17): every report states it identically."
+      },
+      {
+        "block_id": "block_p19_no_claimed_improvement_21",
+        "scope": "p19",
+        "area": "p19",
+        "reason": "no_claimed_improvement",
+        "prohibited": "Do not claim an improvement in bass response (p19): the reports show no material difference."
+      },
+      {
+        "block_id": "block_p20_no_claimed_improvement_22",
+        "scope": "p20",
+        "area": "p20",
+        "reason": "no_claimed_improvement",
+        "prohibited": "Do not claim an improvement in bass consistency (p20): the reports show no material difference."
+      },
+      {
+        "block_id": "block_system_layout_no_added_channels_23",
+        "scope": "system_layout",
+        "area": null,
+        "reason": "no_added_channels",
+        "prohibited": "Do not claim any option adds channels or a larger format: every option uses the same system layout."
+      },
+      {
+        "block_id": "block_screen_size_no_screen_change_24",
+        "scope": "screen_size",
+        "area": null,
+        "reason": "no_screen_change",
+        "prohibited": "Do not claim any option changes the screen: both options are designed around the same screen."
+      },
+      {
+        "block_id": "block_seating_no_seating_change_25",
+        "scope": "seating",
+        "area": null,
+        "reason": "no_seating_change",
+        "prohibited": "Do not claim any option changes the seating: both options are assessed across the same seats."
+      },
+      {
+        "block_id": "block_p20_no_solved_bass_consistency_26",
+        "scope": "p20",
+        "area": "p20",
+        "reason": "no_solved_bass_consistency",
+        "prohibited": "Do not claim that seat-to-seat bass consistency has been solved or improved, and do not describe the bass as uniform, identical or materially even across the seats: the reports show no material difference here. Bass may be described only as output authority, physical capability and the subwoofer specification."
+      }
+    ],
+    "bass": {
+      "scope": [
+        "bass_output_authority",
+        "physical_capability",
+        "subwoofer_specification"
+      ],
+      "note": "Both designs remain Level 1 for seat-to-seat bass consistency. Level 4 version improves bass output authority, not full-seat uniformity.",
+      "allowed": [
+        {
+          "claim_id": "claim_p14_material_gain_01",
+          "scope": "bass_output_authority",
+          "text": "More bass authority and physical impact, supporting the scale of film soundtracks."
+        },
+        {
+          "claim_id": "claim_subwoofers_factual_change_01",
+          "scope": "subwoofer_specification",
+          "text": "Level 4 version is specified with SUB4-12 × 2 (front), SUB4-12 × 2 (rear) rather than SUB4-12 (front), SUB4-12 (rear)."
+        }
+      ],
+      "blocked": [
+        {
+          "reason": "no_solved_bass_consistency",
+          "prohibited": "Do not claim that seat-to-seat bass consistency has been solved or improved, and do not describe the bass as uniform, identical or materially even across the seats: the reports show no material difference here. Bass may be described only as output authority, physical capability and the subwoofer specification.",
+          "scope": "seat_to_seat_consistency",
+          "block_id": "block_p20_no_solved_bass_consistency_26"
+        }
+      ]
+    },
+    "claim_grounding": {
+      "rule": "every_client_facing_claim_cites_one_or_more_allowed_claim_ids",
+      "section_field": "claim_ids",
+      "allowed_prefix": "claim_",
+      "blocked_prefix": "block_"
+    },
+    "input_fingerprint": "a7b6c8ef"
+  },
+  "output": {
+    "contract_version": 1,
+    "pack_fingerprint": "93ffc5f8",
+    "sections": [
+      {
+        "section": "decision_summary",
+        "text": "Level 1 version gives the room the format. Level 4 version gives that format the authority to feel like a serious dedicated cinema. Where maximum performance and headroom are the priority, Level 4 version is the stronger recommendation.",
+        "claim_ids": [
+          "claim_design_recommendation_01"
+        ]
+      },
+      {
+        "section": "what_stays_same",
+        "text": "Both options use the same room dimensions, the same 185\" (2.35:1) screen and the same 9.1.6 (15 discrete channels) layout. The seating and Artcoustic Abfuser × 8 treatment are also shared, so the comparison is about the equipment and the performance each option delivers within this common design.",
+        "claim_ids": [
+          "claim_room_shared_result_01",
+          "claim_screen_size_shared_result_01",
+          "claim_system_layout_shared_result_01",
+          "claim_seating_shared_result_01",
+          "claim_acoustic_treatment_shared_result_01"
+        ]
+      },
+      {
+        "section": "what_changes",
+        "text": "The loudspeaker package changes between options. Level 4 version uses Q8-5 × 3 for the screen, Q6-3 × 6 for surrounds and wides, and SPITFIRE CLOUD × 6 overhead; Level 1 version uses Q6-3 × 3, EVOLVE 2-1 × 6 and ARCHITECT 2-1 × 6 in those roles. The subwoofer specification also changes: SUB4-12 × 2 (front), SUB4-12 × 2 (rear) in Level 4 version, compared with SUB4-12 (front), SUB4-12 (rear) in Level 1 version. The recorded performance gains and trade-offs are set out below.",
+        "claim_ids": [
+          "claim_lcr_factual_change_01",
+          "claim_surrounds_factual_change_01",
+          "claim_overheads_factual_change_01",
+          "claim_subwoofers_factual_change_01"
+        ]
+      },
+      {
+        "section": "key_performance_highlights",
+        "text": "The principal gains for Level 4 version are in dynamic range: the screen stage, the surround and height layers, and the subwoofer system each have a material gain recorded. Level 1 version has the higher recorded result for bass extension. Both options record the same result for screen and surround/overhead tonal consistency; bass consistency remains Level 1 in both.",
+        "claim_ids": [
+          "claim_p12_material_gain_01",
+          "claim_p13_material_gain_01",
+          "claim_p14_material_gain_01",
+          "claim_p18_material_gain_01",
+          "claim_p16_shared_result_01",
+          "claim_p17_shared_result_01",
+          "claim_p20_modest_result_01"
+        ]
+      },
+      {
+        "section": "spatial_resolution",
+        "text": "Both options place the same sound positions around and above the seats. The front wide positions bridge the screen and side speakers more effectively in Level 1 version; the recorded levels are L3 for Level 1 version and L2 for Level 4 version. Screen-channel level across the seats, listener-level speaker spacing and overhead spacing are all recorded at the same level in both options, with no material difference. Viewing angles are calculated for 9 seats, and both options have a primary floor of L3.",
+        "claim_ids": [
+          "claim_p2_shared_result_01",
+          "claim_p7_material_gain_01",
+          "claim_p7_modest_result_01",
+          "claim_p4_modest_result_01",
+          "claim_p5_modest_result_01",
+          "claim_p9_modest_result_01",
+          "claim_rp23_viewing_modest_result_01"
+        ]
+      },
+      {
+        "section": "dynamic_range",
+        "text": "Level 4 version has more front-stage headroom, giving dialogue, score and screen effects more room to expand before the system sounds strained. It also has more capability around and above the seating, helping surround and height effects keep their presence during demanding scenes. Its subwoofer result supports more bass authority and physical impact for film soundtracks. Level 1 version has usable headroom in the surround and height layers, with less reserve than the screen stage.",
+        "claim_ids": [
+          "claim_p12_material_gain_01",
+          "claim_p13_material_gain_01",
+          "claim_p14_material_gain_01",
+          "claim_p13_modest_result_01"
+        ]
+      },
+      {
+        "section": "timbre_matching",
+        "text": "Both options record tonal consistency across the screen channels, so voices and effects stay consistent from left to right. Tonal consistency around and above the seats is also recorded in both, supporting consistency as effects move through the room. Level 1 version records the higher level for bass extension, describing how far down the system reaches for the lowest film effects. Bass consistency remains Level 1 in both options; bass output authority is the area where Level 4 version gains.",
+        "claim_ids": [
+          "claim_p16_shared_result_01",
+          "claim_p17_shared_result_01",
+          "claim_p18_material_gain_01",
+          "claim_p20_modest_result_01",
+          "claim_p14_material_gain_01"
+        ]
+      },
+      {
+        "section": "overall_design",
+        "text": "Level 1 version remains a credible 9.1.6 design. The distinction is not the format, but the greater headroom and authority recorded for Level 4 version, alongside changes to the loudspeaker and subwoofer package. Level 4 version is the stronger recommendation where maximum performance and headroom are the priority; the bass results do not indicate improved seat-to-seat consistency.",
+        "claim_ids": [
+          "claim_design_credibility_01",
+          "claim_design_recommendation_01",
+          "claim_p12_material_gain_01",
+          "claim_p13_material_gain_01",
+          "claim_p14_material_gain_01",
+          "claim_speakers_factual_change_01",
+          "claim_subwoofers_factual_change_01",
+          "claim_p20_modest_result_01"
+        ]
+      },
+      {
+        "section": "appendix_notes",
+        "text": "This comparison is based on the saved visual and technical report evidence for Level 4 version and Level 1 version. The report snapshots are visual 6ac20c15df233b979449bcc3 and technical 6ac391ef796c4899260e0c5a for Level 4 version, and visual 6ac2257837dd624e74adf140 and technical 6ac275599f85fb8449ec3fd2 for Level 1 version.",
+        "claim_ids": []
+      }
+    ]
+  },
+  "recorded_validation_errors": [
+    {
+      "code": "invented_benefit",
+      "section": "what_changes",
+      "detail": "gain_claim_not_supported_by_the_cited_claims"
+    },
+    {
+      "code": "unsupported_improvement",
+      "section": "key_performance_highlights",
+      "detail": "no_claimed_change:block_system_layout_no_claimed_change_10"
+    },
+    {
+      "code": "unsupported_improvement",
+      "section": "spatial_resolution",
+      "detail": "no_claimed_change:block_screen_size_no_claimed_change_08"
+    },
+    {
+      "code": "unsupported_improvement",
+      "section": "spatial_resolution",
+      "detail": "no_claimed_improvement:block_p4_no_claimed_improvement_15"
+    },
+    {
+      "code": "unsupported_improvement",
+      "section": "spatial_resolution",
+      "detail": "no_claimed_change:block_p16_no_claimed_change_19"
+    },
+    {
+      "code": "unsupported_improvement",
+      "section": "spatial_resolution",
+      "detail": "no_claimed_change:block_p17_no_claimed_change_20"
+    },
+    {
+      "code": "unsupported_improvement",
+      "section": "spatial_resolution",
+      "detail": "no_screen_change:block_screen_size_no_screen_change_24"
+    },
+    {
+      "code": "unsupported_improvement",
+      "section": "dynamic_range",
+      "detail": "no_claimed_change:block_screen_size_no_claimed_change_08"
+    },
+    {
+      "code": "unsupported_improvement",
+      "section": "dynamic_range",
+      "detail": "no_claimed_improvement:block_p4_no_claimed_improvement_15"
+    },
+    {
+      "code": "unsupported_improvement",
+      "section": "dynamic_range",
+      "detail": "no_claimed_change:block_p10_no_claimed_change_18"
+    },
+    {
+      "code": "unsupported_improvement",
+      "section": "dynamic_range",
+      "detail": "no_claimed_change:block_p16_no_claimed_change_19"
+    },
+    {
+      "code": "unsupported_improvement",
+      "section": "dynamic_range",
+      "detail": "no_claimed_change:block_p17_no_claimed_change_20"
+    },
+    {
+      "code": "unsupported_improvement",
+      "section": "dynamic_range",
+      "detail": "no_screen_change:block_screen_size_no_screen_change_24"
+    },
+    {
+      "code": "unsupported_improvement",
+      "section": "timbre_matching",
+      "detail": "no_claimed_change:block_p10_no_claimed_change_18"
+    },
+    {
+      "code": "unsupported_improvement",
+      "section": "overall_design",
+      "detail": "no_claimed_change:block_p17_no_claimed_change_20"
+    },
+    {
+      "code": "unsupported_improvement",
+      "section": "overall_design",
+      "detail": "no_added_channels:block_system_layout_no_added_channels_23"
+    },
+    {
+      "code": "unsupported_improvement",
+      "section": "overall_design",
+      "detail": "no_claimed_improvement:block_p19_no_claimed_improvement_21"
+    },
+    {
+      "code": "unsupported_improvement",
+      "section": "overall_design",
+      "detail": "no_claimed_improvement:block_p20_no_claimed_improvement_22"
+    }
+  ]
+}
