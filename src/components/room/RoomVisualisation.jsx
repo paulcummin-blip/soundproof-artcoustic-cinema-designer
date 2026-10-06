@@ -56,12 +56,14 @@ import { usePanZoomHandlers } from "@/components/room/rv/hooks/usePanZoomHandler
 import { useZoneComponents } from "@/components/room/rv/hooks/useZoneComponents";
 import { useRenderFrontWideZones } from "@/components/room/rv/hooks/useRenderFrontWideZones";
 import { getDolbyZoneSpecs } from "@/components/room/rv/utils/getDolbyZoneSpecs";
+import { buildSeatDimensionInfo } from "@/components/room/rv/utils/seatDimensionInfo";
 import { useVisiblePlanSpeakers } from "@/components/room/rv/hooks/useVisiblePlanSpeakers";
 import { useOverheadIconElements } from "@/components/room/rv/hooks/useOverheadIconElements";
 import { useSideSurroundVisualSpanM } from "@/components/room/rv/hooks/useSideSurroundVisualSpanM";
 import { useSeatMetricsCacheEffect } from "@/components/room/rv/hooks/useSeatMetricsCacheEffect";
 import { useMouseUpHandler } from "@/components/room/rv/hooks/useMouseUpHandler";
 import { useMouseDownHandler } from "@/components/room/rv/hooks/useMouseDownHandler";
+import { useSeatGesture } from "@/components/room/rv/hooks/useSeatGesture";
 import { useSpeakerDragUpdate } from "@/components/room/rv/hooks/useSpeakerDragUpdate";
 import { useRoomCanvasMouseMove } from "@/components/room/rv/hooks/useRoomCanvasMouseMove";
 import { useSubDragHandler } from "@/components/room/rv/hooks/useSubDragHandler";
@@ -1177,7 +1179,9 @@ const byId = useEntitiesById({
       setSelectedOverheadRow(null);
     }
     justSelectedOverheadRef.current = false;
-  }, []);
+    // A click on the empty plan dismisses a held dimensional mode.
+    clearSeatDimensionMode();
+  }, [clearSeatDimensionMode]);
 
   // Reset just-selected ref after drag ends (handles case where onClick doesn't fire)
   useEffect(() => {
@@ -1341,27 +1345,17 @@ const byId = useEntitiesById({
 
   // Seat drag guides — computed from draftSeatsRef on every seatDragTick.
   // Shows nearest side wall + nearest front/back wall for the dragged seat.
+  // The measurements come from the shared seat-dimension authority, so the drag
+  // guide and the held dimensional guide can never disagree.
   useEffect(() => {
     if (dragType !== 'seat') { setSeatDragInfo(null); return; }
     const seats = draftSeatsRef?.current;
     if (!Array.isArray(seats)) return;
     const draggedSeat = seats.find(s => String(s.id) === String(draggedItemId));
     if (!draggedSeat) return;
-    const sx = Number(draggedSeat.x ?? draggedSeat.position?.x ?? 0);
-    const sy = Number(draggedSeat.y ?? draggedSeat.position?.y ?? 0);
-    if (!Number.isFinite(sx) || !Number.isFinite(sy)) return;
-    const distLeft = sx;
-    const distRight = Math.max(0, widthM - sx);
-    const distFront = sy;
-    const distRear = Math.max(0, lengthM - sy);
-    setSeatDragInfo({
-      visible: true,
-      x: sx, y: sy, widthM, lengthM,
-      side: distLeft < distRight ? 'left' : 'right',
-      sideDist: Math.min(distLeft, distRight),
-      vert: distFront < distRear ? 'front' : 'rear',
-      vertDist: Math.min(distFront, distRear),
-    });
+    const info = buildSeatDimensionInfo(draggedSeat, widthM, lengthM);
+    if (!info) return;
+    setSeatDragInfo(info);
   }, [seatDragTick, dragType, draggedItemId, widthM, lengthM, draftSeatsRef]);
 
   // Room Element drag — wall-constrained movement, updates pos_m + drag info live
@@ -1747,6 +1741,25 @@ const byId = useEntitiesById({
     perSeatP19Results: [], // P19 is RSP-only — no per-seat P19 results.
     perSeatP20Results: currentP20Results,
   });
+
+  // ── Seat plan gesture ─────────────────────────────────────────────────────
+  // Single click selects only; double click opens / moves the pinned HUD; a
+  // deliberate 1.5 s hold holds the measurement guides on the selected seat;
+  // movement past the drag threshold keeps the drag immediate and cancels the
+  // hold. Priority: drag → double-click HUD → long-press dimensions → select.
+  const { selectedSeatId, dimensionSeatId, clearSeatDimensionMode, seatGesture } = useSeatGesture({
+    handleMouseDown,
+    handleSeatClick,
+  });
+
+  // Measurements for the held dimensional guide, taken from the seat's stored
+  // centre through the same authority the drag guide uses.
+  const dimensionDragInfo = useMemo(() => {
+    if (!dimensionSeatId) return null;
+    const seats = Array.isArray(seatingPositions) ? seatingPositions : [];
+    const seat = seats.find(s => String(s?.id) === String(dimensionSeatId));
+    return buildSeatDimensionInfo(seat, widthM, lengthM);
+  }, [dimensionSeatId, seatingPositions, widthM, lengthM]);
 
   // AUTOMATIC SEAT METRICS CACHE — extracted to hook
   // ---- Stable primitive revision inputs (avoid update loops) ----
@@ -2407,6 +2420,10 @@ const idsClip = (ids && ids.clip) ? ids.clip : 'b44_clip_fallback';
           lensY: projectorPosition?.lensY ?? null,
         }}
         seatDragInfo={seatDragInfo}
+        dimensionDragInfo={dimensionDragInfo}
+        dimensionSeatId={dimensionSeatId}
+        selectedSeatId={selectedSeatId}
+        seatGesture={seatGesture}
         mlpDragInfo={mlpDragInfo}
         dragType={dragType}
         isSeatSnapping={isSeatSnapping}

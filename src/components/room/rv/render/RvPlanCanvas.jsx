@@ -120,6 +120,11 @@ export default function RvPlanCanvas({
   handleSeatMouseEnter,
   handleSeatMouseLeave,
   handleSeatClick,
+  // Seat press-and-hold gesture surface (interactive plan only)
+  seatGesture,
+  selectedSeatId,
+  dimensionSeatId,
+  dimensionDragInfo,
   clampMlpY,
   MLPMarker,
   overheadIconElements,
@@ -309,6 +314,13 @@ export default function RvPlanCanvas({
           onMouseUp={handleMouseUp}
           onMouseLeave={handleMouseUp}
           onMouseDown={handleSvgMouseDown}
+          // Touch drag: forward the active finger to the same drag handler the
+          // mouse path uses. No-ops unless a drag is actually in progress.
+          onTouchMove={(e) => {
+            if (e.touches.length !== 1) return;
+            handleMouseMove({ clientX: e.touches[0].clientX, clientY: e.touches[0].clientY });
+          }}
+          onTouchEnd={handleMouseUp}
         >
 
           {!roomRect || !Number.isFinite(scale) ? (
@@ -613,7 +625,7 @@ export default function RvPlanCanvas({
             />
 
             {/* Layer 9: Draggable Seating Positions */}
-            <RvSeatLayer seatingPositions={seatsLive} toPx={toPx} scale={scale} exportMode={exportMode} speakerPositionsView={speakerPositionsView} rowFrontWallLabelSeatIds={rowFrontWallLabelSeatIds} rowDistanceLabelSeatIds={rowDistanceLabelSeatIds} _overlays={_overlays} hudPinnedSeatId={hudPinnedSeatId} handleMouseDown={handleMouseDown} handleSeatClick={handleSeatClick} clampMlpY={clampMlpY} MLPMarker={MLPMarker} />
+            <RvSeatLayer seatingPositions={seatsLive} toPx={toPx} scale={scale} exportMode={exportMode} speakerPositionsView={speakerPositionsView} rowFrontWallLabelSeatIds={rowFrontWallLabelSeatIds} rowDistanceLabelSeatIds={rowDistanceLabelSeatIds} _overlays={_overlays} hudPinnedSeatId={hudPinnedSeatId} handleMouseDown={handleMouseDown} handleSeatClick={handleSeatClick} seatGesture={seatGesture} selectedSeatId={selectedSeatId} dimensionSeatId={dimensionSeatId} clampMlpY={clampMlpY} MLPMarker={MLPMarker} />
 
             {/* Seat snap-to-zero indicator */}
             {isSeatSnapping && mlpPoint && (() => {
@@ -741,6 +753,19 @@ export default function RvPlanCanvas({
               svgW={svgWSafe}
               svgH={svgHSafe}
             />
+
+            {/* Seat dimensional mode — the same wall measurements, held on screen
+                after a long press on the selected seat (no drag in progress). */}
+            {dragType !== 'seat' && dimensionDragInfo?.visible && (
+              <RvMlpDragDims
+                dragInfo={dimensionDragInfo}
+                scale={scale}
+                meterToCanvasX={meterToCanvasX}
+                meterToCanvasY={meterToCanvasY}
+                svgW={svgWSafe}
+                svgH={svgHSafe}
+              />
+            )}
 
             {/* Seat drag dimensions — nearest side wall + nearest front/back wall */}
             {dragType === 'seat' && seatDragInfo?.visible && (
