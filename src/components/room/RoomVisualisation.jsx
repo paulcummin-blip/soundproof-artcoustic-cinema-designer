@@ -1173,16 +1173,6 @@ const byId = useEntitiesById({
     setViewOffsetPx,
   });
 
-  // Clear overhead selection when clicking on canvas background
-  const handlePlanClickWithSelection = useCallback((e) => {
-    if (!justSelectedOverheadRef.current) {
-      setSelectedOverheadRow(null);
-    }
-    justSelectedOverheadRef.current = false;
-    // A click on the empty plan dismisses a held dimensional mode.
-    clearSeatDimensionMode();
-  }, [clearSeatDimensionMode]);
-
   // Reset just-selected ref after drag ends (handles case where onClick doesn't fire)
   useEffect(() => {
     if (!dragging) {
@@ -1751,6 +1741,20 @@ const byId = useEntitiesById({
     handleMouseDown,
     handleSeatClick,
   });
+
+  // Clear overhead selection when clicking on canvas background. Declared after
+  // the gesture hook on purpose: a useCallback dependency array is evaluated
+  // during render, so consuming clearSeatDimensionMode above the hook that
+  // declares it crashed the Room Designer in its temporal dead zone. Hook
+  // results are only consumed below the hook that produces them.
+  const handlePlanClickWithSelection = useCallback((e) => {
+    if (!justSelectedOverheadRef.current) {
+      setSelectedOverheadRow(null);
+    }
+    justSelectedOverheadRef.current = false;
+    // A click on the empty plan dismisses a held dimensional mode.
+    clearSeatDimensionMode();
+  }, [clearSeatDimensionMode]);
 
   // Measurements for the held dimensional guide, taken from the seat's stored
   // centre through the same authority the drag guide uses.
