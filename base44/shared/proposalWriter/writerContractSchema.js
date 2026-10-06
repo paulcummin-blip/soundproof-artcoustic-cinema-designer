@@ -25,17 +25,22 @@ export const WRITER_CONTRACT_VERSION = 1;
  * The writer prompt generation this contract is issued with.
  *
  * Bumped to 2 when the writing authority gained the proposal sales authority and
- * the authority began to be carried as one block, and to 3 when the pack began
- * to carry scoped seat-group claims and the writer gained the rule that governs
- * them. A generation before and after either change must stay distinguishable in
- * the append-only audit history, so every new record stores this version. A
- * historical record keeps the version it was filed under and is never rewritten.
+ * the authority began to be carried as one block, to 3 when the pack began to
+ * carry scoped seat-group claims and the writer gained the rule that governs
+ * them, and to 4 when the proposal stage became strength-led: the copy now states
+ * the strongest supported results positively, keeps every claim inside its own
+ * scope, and carries no design-stage corrective commentary. A generation before
+ * and after any of those changes must stay distinguishable in the append-only
+ * audit history, so every new record stores this version. A historical record
+ * keeps the version it was filed under and is never rewritten.
  *
- * The contract version is deliberately NOT bumped: the sections, the word
- * limits, the claim grounding rule and every rejection category are unchanged,
- * so a draft filed under generation 1 is still read against the same agreement.
+ * The contract version is deliberately NOT bumped: the sections, the word limits
+ * and the claim grounding rule are unchanged, and every existing rejection keeps
+ * its meaning, so a draft filed under generation 1 is still read against the same
+ * agreement. One rejection was added, for the design-stage commentary a proposal
+ * no longer carries.
  */
-export const WRITER_PROMPT_VERSION = 'proposal-writer-prompt-3';
+export const WRITER_PROMPT_VERSION = 'proposal-writer-prompt-4';
 
 /** The only pack generation a draft may be written from. */
 export const WRITER_ACCEPTED_PACK_SCHEMA_VERSION = 2;
@@ -86,6 +91,14 @@ export const WRITER_REJECTION = Object.freeze({
   P20_BASS_CONTRADICTION: 'p20_bass_contradiction',
   /** A seat-group claim at a scope, or at a level, the pack does not state. */
   SCOPE_MISMATCH: 'scope_mismatch',
+  /**
+   * Design-stage commentary: the copy tells the client what still needs
+   * attention, improvement, calibration, optimisation or further design work, or
+   * suggests a future correction. The proposal states the finished design, so
+   * this is never written. A refusal is also how a genuine material issue is
+   * held for human review instead of becoming advice in the copy.
+   */
+  DESIGN_STAGE_COMMENTARY: 'design_stage_commentary',
   /** A section over its word limit. */
   SECTION_TOO_LONG: 'section_too_long',
 });
@@ -204,6 +217,8 @@ export const WRITER_WRITING_RULES = Object.freeze([
   'Never recommend changing the design, and never describe the proposal as an upgrade path.',
   'Where P20 does not support seat-to-seat bass consistency, describe bass only as output authority, physical capability and the subwoofer specification.',
   'State a primary-seat or a secondary-seat result only where the pack states that scope\'s own claim, word it for that scope alone, and never present it as a result for the seating area or the room.',
+  'Sell what is strong: state a supported strength positively and stop there, and where one scope is the stronger, keep the claim to that scope rather than reporting the weaker one beside it.',
+  'The proposal is not a design review: never write that something needs attention, improvement, calibration, optimisation or further design work, and never suggest a future correction, a recalibration or an upgrade path.',
   'Write to the client: benefit-led, dealer-safe language, with no internal parameter codes and no engineering jargon.',
   'Keep every paragraph to one to three sentences, and keep every section inside its word limit.',
   'Explain what each recorded result means for the room, rather than naming the number and moving on.',
