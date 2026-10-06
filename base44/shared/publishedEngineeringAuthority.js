@@ -19,7 +19,7 @@
  *   - Browser handoff (frontend concern)
  */
 
-export const PUBLICATION_SCHEMA_VERSION = 1;
+export const PUBLICATION_SCHEMA_VERSION = 2;
 
 /**
  * Load a Project and verify the caller's account owns it.
@@ -175,6 +175,8 @@ export function reconcileOrphanedPublications(cacheRecord, currentPointerFingerp
 export function cleanPublicationForResponse(publication) {
   if (!publication) return null;
   return {
+    publication_contract_version: publication.publication_contract_version ?? null,
+    parameter_index: publication.parameter_index ?? null,
     engineering_summary: publication.engineering_summary ?? null,
     // Optional presentation payload (rating envelope, seats, speakers,
     // analysisResult, priceData). Written by the Room Designer alongside the
