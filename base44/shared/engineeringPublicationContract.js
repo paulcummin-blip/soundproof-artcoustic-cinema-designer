@@ -27,6 +27,7 @@ export function buildFrozenReportProject(state, { projectId, versionId } = {}) {
   require('screen.manualMode', typeof d.screen?.manualMode === 'boolean');
   require('screen.heightFromFloorM', numeric(d.screen?.heightFromFloorM));
   require('screen.mountMode', stated(d.screen?.mountMode));
+  if (d.screen?.manualMode === true) require('screen.manualWidthM', numeric(d.screen?.manualWidthM) && Number(d.screen.manualWidthM)>0);
   require('screenFrontPlaneM', numeric(d.screenFrontPlaneM));
   require('dolbyLayout', stated(d.dolbyLayout));
   require('seatingPositions', Array.isArray(d.seatingPositions) && d.seatingPositions.length>0);
@@ -120,6 +121,9 @@ export function auditPublicationContract(publication) {
   else {
     for(const key of ['project_id','version_id','version_name','name','roomDims','screen_size','aspect_ratio','dolby_config']) if(!stated(p[key])) fail('report_project.'+key);
     if(p.name==='Untitled Room') fail('report_project.name','is a placeholder');
+    let dims=null; try { dims=typeof p.roomDims==='string'?JSON.parse(p.roomDims):p.roomDims; } catch {}
+    for(const [axis,field] of [['widthM','room_width'],['lengthM','room_length'],['heightM','room_height']]) if(!numeric(dims?.[axis]) || Number(dims[axis])!==Number(p[field])) fail('report_project.'+field,'conflicts with roomDims');
+    if(p.manual_dimensions!==true && Math.abs(Number(p.screen_width_m)-Number(p.screen_size)*0.0254)>1e-8) fail('report_project.screen_width_m','conflicts with screen_size');
     for(const key of ['room_width','room_length','room_height','screen_width_m']) if(!numeric(p[key]) || Number(p[key])<=0) fail('report_project.'+key);
     const counts=rowCounts(report?.seatingPositions);
     if(!counts || Number(p.seating_rows)!==counts.length || !same(p.seats_per_row_by_row,counts)) fail('report_project.seating_rows / seats_per_row_by_row','conflicts with seatingPositions');
@@ -130,6 +134,13 @@ export function auditPublicationContract(publication) {
     // The middle channel-format digit describes LFE channels, not physical sub count.
     if(parts.length<2 || parts[0]!==speakers.length-overheads || (parts[2] || 0)!==overheads) fail('report_project.dolby_config','conflicts with speaker roles');
     if(!Array.isArray(p.subwooferInstances)) fail('report_project.subwooferInstances');
+    for(const [i,sub] of (p.subwooferInstances || []).entries()) {
+      if(!stated(sub.id) || !stated(sub.model) || !numeric(sub.position?.x) || !numeric(sub.position?.y) || typeof sub.enabled!=='boolean') fail('report_project.subwooferInstances['+i+']');
+    }
+    for(const [key,rows] of Object.entries(publication?.engineering_summary?.project?.reportCounts?.seatResultsByParameter || {})) for(const row of rows) {
+      const seat=(report.seatingPositions || []).find(item=>item.id===row.seatId);
+      if(!seat || String(seat.rowNumber ?? seat.row)!==String(row.row)) fail('engineering_summary.'+key+'.'+row.seatId,'conflicts with frozen seat/row identity');
+    }
     if(typeof p.acoustic_treatment_enabled!=='boolean' || !numeric(p.selected_abfuser_qty)) fail('report_project.acoustic_treatment');
   }
   const expected=buildAtomicParameterIndex(publication);
