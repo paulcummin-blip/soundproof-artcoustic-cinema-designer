@@ -2,6 +2,7 @@
 // 3-column grid of exact Compliance Report tiles for the RP22 Report page.
 // Stage C: Computation logic extracted to shared useParameterGridAuthority hook.
 import React from "react";
+import { readReportParameter } from "@/components/report/reportParameterEvidence";
 import RP22ComplianceParameterTile from "@/components/rp22/RP22ComplianceParameterTile";
 import { RP22_PRESENTATION_PARAMETERS } from "@/components/utils/rp22ParameterPresentation";
 import TechnicalParameterCard from "@/components/report/technical/TechnicalParameterCard";
@@ -70,6 +71,7 @@ export default function RP22ReportParameterGrid({
   /* ----- Render a single compliance tile (screen variant) ----- */
   const renderCard = (param) => {
     const resolvedThresholds = resolveThresholds(param);
+    const atomic = readReportParameter(engineeringSummary, param.id);
     const resolvedParam = (param.id === 12 || param.id === 13 || param.id === 14 || param.id === 18)
       ? { ...param, thresholds: resolvedThresholds }
       : param;
@@ -82,8 +84,8 @@ export default function RP22ReportParameterGrid({
       <div key={param.id} className="rp22-card-wrap print-avoid-break" style={{ breakInside: "avoid", pageBreakInside: "avoid" }}>
         <RP22ComplianceParameterTile
           param={resolvedParam}
-          achievedValue={getHudValueForParam(param, { isPrintVariant })}
-          lvl={getHudLevelForParam(param)}
+          achievedValue={engineeringSummary?.reportAuthority ? atomic.value : getHudValueForParam(param, { isPrintVariant })}
+          lvl={engineeringSummary?.reportAuthority ? atomic.level : getHudLevelForParam(param)}
           seatGridData={seatMapFor(param)}
           targetBasisNote={targetBasisNote}
         />
@@ -100,6 +102,7 @@ export default function RP22ReportParameterGrid({
   /* ----- Render a single redesigned Technical Report parameter card (print variant) ----- */
   const renderPrintCard = (param) => {
     const resolvedThresholds = resolveThresholds(param);
+    const atomic = readReportParameter(engineeringSummary, param.id);
     const resolvedParam = (param.id === 12 || param.id === 13 || param.id === 14 || param.id === 18)
       ? { ...param, thresholds: resolvedThresholds }
       : param;
@@ -108,12 +111,12 @@ export default function RP22ReportParameterGrid({
       ?? engineeringSummary?.roomResultsByParameter?.[param.id]?.detail
       ?? null;
     const seatGridData = seatMapFor(param);
-    const humanTitle = getHumanTitleForParam(param.id);
+    const humanTitle = getHumanTitleForParam(param.id) + (param.id === 10 ? ' — Project/all-seat floor' : '');
     const category = getCategoryForParam(param.id);
     const asdrFooter = buildAsdrFooter(param.id);
 
-    const achievedValue = getHudValueForParam(param, { isPrintVariant });
-    const lvl = getHudLevelForParam(param);
+    const achievedValue = engineeringSummary?.reportAuthority ? atomic.value : getHudValueForParam(param, { isPrintVariant });
+    const lvl = engineeringSummary?.reportAuthority ? atomic.level : getHudLevelForParam(param);
 
     const isP15P21 = param.id === 15 || param.id === 21;
     return (
