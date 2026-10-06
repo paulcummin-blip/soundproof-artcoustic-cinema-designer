@@ -9,6 +9,10 @@
  * server from the shared Phase 3 and Phase 4 modules. This hook fetches that model
  * and re-reads it after every save, so a new edit appears alongside every earlier
  * one instead of replacing it.
+ *
+ * The server also resolves the Phase 6 GPT writer flag for this login and returns
+ * it as `writer`. It defaults to off, and the browser never asks for it any other
+ * way: while it is off, no writer action is rendered at all.
  */
 
 import { useCallback, useEffect, useState } from 'react';
@@ -16,6 +20,7 @@ import { base44 } from '@/api/base44Client';
 
 export default function useProposalEditLayer({ proposalId = null, draftProposalId = null } = {}) {
   const [layer, setLayer] = useState(null);
+  const [writer, setWriter] = useState(null);
   const [loading, setLoading] = useState(Boolean(proposalId || draftProposalId));
   const [error, setError] = useState(null);
   const [saving, setSaving] = useState(false);
@@ -26,6 +31,7 @@ export default function useProposalEditLayer({ proposalId = null, draftProposalI
   const load = useCallback(async () => {
     if (!proposalId && !draftProposalId) {
       setLayer(null);
+      setWriter(null);
       setLoading(false);
       return;
     }
@@ -39,13 +45,16 @@ export default function useProposalEditLayer({ proposalId = null, draftProposalI
       if (data.error) {
         setError(data.error);
         setLayer(null);
+        setWriter(null);
       } else {
         setLayer(data.layer || null);
+        setWriter(data.writer || null);
         setError(null);
       }
     } catch (readError) {
       setError(readError?.response?.data?.error || readError?.message || 'The proposal copy history could not be read.');
       setLayer(null);
+      setWriter(null);
     } finally {
       setLoading(false);
     }
@@ -54,6 +63,7 @@ export default function useProposalEditLayer({ proposalId = null, draftProposalI
   useEffect(() => {
     if (!hasTarget) {
       setLayer(null);
+      setWriter(null);
       setLoading(false);
       return;
     }
@@ -111,10 +121,12 @@ export default function useProposalEditLayer({ proposalId = null, draftProposalI
 
   return {
     layer,
+    writer,
     loading,
     error,
     saving,
     lastSave,
+    refresh: load,
     saveDrafts,
     revertToCopy,
     clearLastSave: () => setLastSave(null),

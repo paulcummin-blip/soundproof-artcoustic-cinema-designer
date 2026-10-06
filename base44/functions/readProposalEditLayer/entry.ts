@@ -1,6 +1,7 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.52';
 import { resolveAccountAccess } from '../../shared/accountAccessAuthority.js';
 import { resolveEditorLayer } from '../../shared/proposalEdit/proposalEditEditorModel.js';
+import { GPT_WRITER_FLAG_FIELD, gptWriterClientState, resolveGptWriterFlag } from '../../shared/proposalWriter/proposalWriterFlag.js';
 
 /**
  * Read the Proposal Editor's copy layer for one proposal.
@@ -19,6 +20,11 @@ import { resolveEditorLayer } from '../../shared/proposalEdit/proposalEditEditor
  * returned only to an authorised editor (a master admin, or an account with Sound
  * Proof access). A client login receives the model without any audit detail, and
  * no client-facing page ever asks for it.
+ *
+ * The Phase 6 GPT writer flag is resolved here too, from SystemConfig and for
+ * this login only, and returned as a resolved state: whether the action may be
+ * shown, and its label. The browser is never given the scope lists, and it cannot
+ * switch the writer on for itself.
  */
 export default async function(req) {
   try {
@@ -53,7 +59,24 @@ export default async function(req) {
       canViewAudit,
     });
 
-    return Response.json({ ok: true, layer, can_view_audit: canViewAudit });
+    // The writer flag, resolved server-side for this login only. It defaults OFF:
+    // while it is off the editor simply shows no writer action.
+    let writer = gptWriterClientState(null);
+    try {
+      const configResult = await base44.asServiceRole.entities.SystemConfig.filter({}, { limit: 1 });
+      const configRecord = (Array.isArray(configResult) ? configResult : (configResult?.items || []))[0] || null;
+      writer = gptWriterClientState(resolveGptWriterFlag({
+        config: configRecord?.[GPT_WRITER_FLAG_FIELD] || null,
+        accountId: accessContext.user?.account_id || accessContext.account?.id || null,
+        email: user.email || null,
+        isMasterAdmin: accessContext.isMasterAdmin === true,
+      }));
+    } catch (flagError) {
+      // A flag that cannot be read is a flag that is off.
+      writer = gptWriterClientState(null);
+    }
+
+    return Response.json({ ok: true, layer, can_view_audit: canViewAudit, writer });
   } catch (error) {
     return Response.json({ error: error?.message || 'The proposal copy history could not be read.' }, { status: 500 });
   }

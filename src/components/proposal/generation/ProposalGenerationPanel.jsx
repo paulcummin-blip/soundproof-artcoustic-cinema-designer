@@ -14,6 +14,11 @@
  * as such, it is never blocked, and the editor carries on working exactly as it
  * did before.
  *
+ * The Phase 6 GPT writer action is offered here only while the feature flag is on
+ * for this login. Everything the action needs — whether to exist at all — is
+ * resolved by the server with the copy layer, so nothing in this panel can switch
+ * it on.
+ *
  * Props:
  * - proposal: the saved proposal record
  * - readOnly: the proposal is archived
@@ -32,6 +37,7 @@ import ProposalEditStatusBanner from './ProposalEditStatusBanner';
 import ProposalEditFields from './ProposalEditFields';
 import ProposalEditCopyPreview from './ProposalEditCopyPreview';
 import ProposalEditAuditPanel from './ProposalEditAuditPanel';
+import ProposalWriteAction from './ProposalWriteAction';
 
 const STRIP = {
   padding: '10px 24px',
@@ -61,10 +67,12 @@ const TOGGLE = {
 export default function ProposalGenerationPanel({ proposal, readOnly = false, onBlockedReasonChange }) {
   const {
     layer,
+    writer,
     loading,
     error,
     saving,
     lastSave,
+    refresh,
     saveDrafts,
     revertToCopy,
   } = useProposalEditLayer({ proposalId: proposal?.id ?? null });
@@ -120,6 +128,17 @@ export default function ProposalGenerationPanel({ proposal, readOnly = false, on
           </div>
         )}
       </ProposalEditStatusBanner>
+
+      {/* Phase 6: the controlled GPT writer action, present only while the flag
+          is on for this login. It writes a generation record; this panel then
+          re-reads the layer, so the copy shown is always the stored one. */}
+      <ProposalWriteAction
+        proposalId={proposal.id}
+        writer={writer}
+        layer={layer}
+        readOnly={readOnly}
+        onGenerated={refresh}
+      />
 
       {showCopy && layer.mode === 'edit_layer' && (
         <>

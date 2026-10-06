@@ -2,6 +2,7 @@ import React, { useEffect, useState } from "react";
 import { useAuth } from "@/lib/AuthContext";
 import { base44 } from "@/api/base44Client";
 import AdminSectionCard from "@/components/admin/AdminSectionCard";
+import GptWriterFlagCard from "@/components/admin/GptWriterFlagCard";
 
 const BRAND = {
   text: "#1B1A1A",
@@ -217,6 +218,20 @@ export default function AdminDashboard() {
           Advanced / Setup
         </h2>
         {renderGrid(advancedCards)}
+      </div>
+
+      <div style={{ marginTop: 30 }}>
+        <h2 style={{
+          margin: "0 0 12px",
+          fontSize: 11,
+          fontWeight: 700,
+          letterSpacing: "0.08em",
+          textTransform: "uppercase",
+          color: BRAND.accent,
+        }}>
+          Controlled tools
+        </h2>
+        <GptWriterFlagCard />
       </div>
     </div>
   );
