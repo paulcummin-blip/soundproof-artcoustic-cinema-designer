@@ -9,7 +9,9 @@ export default function captureReportProposalSource({
   reportType = null, sourceFingerprint = null, seatingPublication = null,
 }) {
   if (!engineeringSummary || !projectId || !versionId || !project) return null;
-  const speakers = presentation?.placedSpeakers || app?.speakerSystem?.placedSpeakers || [];
+  if (engineeringSummary.reportAuthority?.source_type !== 'durable-engineering-publication'
+    || !seatingPublication?.report_snapshot?.report_project) return null;
+  const speakers = seatingPublication.report_snapshot.placedSpeakers || [];
   const seats = seatingPublication
     ? seatingPublication.report_snapshot?.seatingPositions || []
     : presentation?.seatingPositions || app?.seatingPositions || [];
@@ -22,18 +24,20 @@ export default function captureReportProposalSource({
   });
   const products = buildProductsSelected({
     placedSpeakers: speakers,
-    frontSubsCfg: app?.frontSubsCfg || project.front_subs_cfg,
-    rearSubsCfg: app?.rearSubsCfg || project.rear_subs_cfg,
-    acousticTreatmentEnabled: app?.acousticTreatmentEnabled ?? project.acoustic_treatment_enabled,
-    selectedAbfuserQty: app?.selectedAbfuserQty ?? project.selected_abfuser_qty,
-    isVisible: app?.getSpeakerVisibility,
+    frontSubsCfg: project.front_subs_cfg,
+    rearSubsCfg: project.rear_subs_cfg,
+    acousticTreatmentEnabled: project.acoustic_treatment_enabled,
+    selectedAbfuserQty: project.selected_abfuser_qty,
   });
   const ids = Object.keys(engineeringSummary.parameterSummaries?.project || {})
     .filter((key) => /^p\d+$/.test(key)).map((key) => Number(key.slice(1)));
   const parameters = ids.map((id) => readReportParameter(engineeringSummary, id));
   // The RP22 authority's own statement of each parameter, kept BEFORE the
   // visible rows overwrite the headlines. The parity check compares the two.
-  const authorityHeadlines = snapshot.rp22.parameter_headlines;
+  const authorityHeadlines = snapshot.rp22.parameter_headlines.map(row => {
+    const atomic = parameters.find(entry => entry.parameter_id === row.parameter_id);
+    return { ...row, achieved_level: atomic?.level, formatted_value: atomic?.value };
+  });
   const captured = {
     ...snapshot,
     system: { ...snapshot.system, products_selected: products },
