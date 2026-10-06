@@ -1,7 +1,7 @@
 import { firstStatedPrimitive } from '@/components/utils/renderSafe';
 import { formatP7Degrees, isP7Number } from '@/components/utils/rp22/p7DisplayAuthority';
 
-const normaliseLevel = value => /^[1-4]$/.test(String(value)) ? 'L' + value : value;
+const normaliseLevel = value => String(value) === '0' ? 'FAIL' : /^[1-4]$/.test(String(value)) ? 'L' + value : value;
 const rank = value => value === 'FAIL' ? 0 : /^L[1-4]$/.test(String(value)) ? Number(String(value).slice(1)) : -1;
 
 // Select a complete source row. Never borrow its grade from an aggregate.
