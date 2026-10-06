@@ -34,7 +34,7 @@ import { useBassReconciliationStatus } from '@/components/room/bass/bassReconcil
 import { auditDurablePublication } from './publicationGateAuthority';
 import { usePublicationAttempt } from './publicationAcknowledgementStore';
 
-export function useVersionedEngineeringAuthority(projectId, versionId) {
+export function useVersionedEngineeringAuthority(projectId, versionId, { finalReport = false } = {}) {
   const [localSnapshot, setLocalSnapshot] = useState(
     () => (projectId && versionId ? readLocalHandoff(projectId, versionId) : null),
   );
@@ -115,7 +115,7 @@ export function useVersionedEngineeringAuthority(projectId, versionId) {
   useSharedBassAuthorityReconciliation(projectId, versionId);
   // No-match and eligibility outcomes also refresh the gate, not just promotions.
   useBassReconciliationStatus(projectId, versionId);
-  const composedSnapshot = composeAuthoritySnapshot({ localSnapshot, durableSnapshot });
+  const composedSnapshot = composeAuthoritySnapshot({ localSnapshot, durableSnapshot, finalReport });
   const composedSummary = extractEngineeringSummary(composedSnapshot);
   const restoredSummary = applyRestoredBassAuthority(
     composedSummary,
