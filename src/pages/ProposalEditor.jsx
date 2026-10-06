@@ -40,6 +40,7 @@ import { proposalReportTypeToken } from '@/components/report/reportPdfTitle';
 import { Loader2, ChevronLeft, Archive, RotateCcw } from 'lucide-react';
 import ProposalEditorState from '@/components/proposal/editor/ProposalEditorState';
 import ProposalRenderBoundary from '@/components/proposal/editor/ProposalRenderBoundary';
+import ProposalGenerationPanel from '@/components/proposal/generation/ProposalGenerationPanel';
 import {
   PROPOSAL_EDITOR_STATE,
   GENERATION_POLL_LIMIT,
@@ -68,6 +69,9 @@ export default function ProposalEditor() {
   // Why the proposal could not be read, stated plainly rather than left blank.
   const [loadError, setLoadError] = useState(null);
   const [loadErrorDetail, setLoadErrorDetail] = useState(null);
+  // Whether the generated copy layer blocks issue and export. Null when it does
+  // not, and null for a proposal with no generated copy at all.
+  const [editLayerBlockReason, setEditLayerBlockReason] = useState(null);
   // How long the editor has waited for a generating proposal's sections.
   const [pollCount, setPollCount] = useState(0);
   const [showNotes, setShowNotes] = useState(false);
@@ -774,7 +778,7 @@ export default function ProposalEditor() {
         onToggleProperties={() => setShowProperties((prev) => !prev)}
         exporting={exporting}
         onExport={handleExport}
-        blockedReason={comparisonBlockReason || exportBlockedReason}
+        blockedReason={comparisonBlockReason || editLayerBlockReason || exportBlockedReason}
         error={exportError}
       />
 
@@ -817,6 +821,14 @@ export default function ProposalEditor() {
 
       {/* ── Centre: The document ── */}
       <div className="flex-1 overflow-y-auto">
+        {/* The generated copy: its status, the wording an editor may change, the
+            copy as the client reads it and the audit behind it. A proposal with
+            no generation history is stated as legacy and is never blocked. */}
+        <ProposalGenerationPanel
+          proposal={proposal}
+          readOnly={archived}
+          onBlockedReasonChange={setEditLayerBlockReason}
+        />
         {/* Proposal typography scope — cover, section headings and body copy
             follow the Artcoustic rule: Futura PT Light headings, Didact Gothic
             body, Century Gothic fallback. */}
