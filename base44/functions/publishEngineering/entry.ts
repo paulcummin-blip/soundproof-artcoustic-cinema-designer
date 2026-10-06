@@ -8,6 +8,8 @@ import {
   createCacheRecord,
   findPublication,
   upsertPublication,
+  retainPublications,
+  PUBLICATION_RETENTION_RECENT,
   cleanPublicationForResponse,
   cleanCacheRecordForResponse,
   completeMissingBassResults,
@@ -196,12 +198,35 @@ export default async function(req) {
       created = true;
     }
 
+    // ── BOUNDED RETENTION ──────────────────────────────────────────────
+    // This map is rewritten, read back and returned on every publish. Left
+    // unbounded it grew by a full publication (~0.5 MB) on every publish, so once
+    // a version had published many times the request moved tens of megabytes and
+    // the platform refused it — which the designer saw as a failed, unsaved
+    // assessment. The map is therefore kept bounded: the publication this pointer
+    // references is ALWAYS retained (it is the authority every report reads) plus
+    // the most recent few. Anything removed is reported in the response as
+    // `retention.pruned` and logged — never dropped silently.
+    let retentionPruned: string[] = [];
+
     if (existing) {
       // Immutable valid new-contract idempotency hit. Never enrich old authority.
+      // The map is still bounded here, so a record bloated by earlier publishes
+      // heals on the next publish instead of staying too large to write.
+      const { publications: retained, pruned } = retainPublications(cacheRecord, fingerprint);
+      if (pruned.length) {
+        cacheRecord = await service.entities.ProjectAnalysisCache.update(
+          cacheRecord.id, { engineering_publications: retained },
+        );
+        retentionPruned = pruned;
+      }
     } else {
       const { publications } = upsertPublication(cacheRecord, fingerprint, publication);
+      const { publications: retained, pruned } = retainPublications(
+        { engineering_publications: publications }, fingerprint,
+      );
       const updatePayload = {
-        engineering_publications: publications,
+        engineering_publications: retained,
       };
       // Stamp account_id if missing (legacy records)
       if (!cacheRecord.account_id && projectAccountId) {
@@ -209,6 +234,12 @@ export default async function(req) {
       }
       cacheRecord = await service.entities.ProjectAnalysisCache.update(
         cacheRecord.id, updatePayload,
+      );
+      retentionPruned = pruned;
+    }
+    if (retentionPruned.length) {
+      console.warn(
+        `[publishEngineering] pruned ${retentionPruned.length} superseded publication(s) to keep the stored publication map bounded.`,
       );
     }
 
@@ -245,6 +276,14 @@ export default async function(req) {
         publication_reason: updatedVersion.publication_reason,
       },
       cache: cleanCacheRecordForResponse(cacheRecord),
+      // Superseded publications removed to keep the stored map bounded. Reported
+      // rather than silent: a version holds its current publication plus the most
+      // recent few.
+      retention: {
+        recent_kept: PUBLICATION_RETENTION_RECENT,
+        pruned: retentionPruned,
+        pruned_count: retentionPruned.length,
+      },
       acknowledgement: {
         status: audit.status,
         durably_published: audit.durablyPublished === true && storedVersion?.published_fingerprint === fingerprint && !!storedVersion?.published_at,

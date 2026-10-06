@@ -128,6 +128,58 @@ export function upsertPublication(cacheRecord, fingerprint, publication) {
   return { publications, created: true, existing: null };
 }
 
+/** How many superseded publications are kept alongside the current pointer's. */
+export const PUBLICATION_RETENTION_RECENT = 3;
+
+/** Published-at ordering key for a publication entry. */
+function publicationTime(entry) {
+  const parsed = Date.parse(entry?.published_at || '');
+  return Number.isFinite(parsed) ? parsed : 0;
+}
+
+/**
+ * Bound the publication map so a publish never has to move an ever-growing
+ * payload.
+ *
+ * Every publish rewrites this whole map through a single entity write, reads it
+ * back, and returns it. Left unbounded it grew by a full publication (~0.5 MB)
+ * on every publish, so once a version had published many times the request moved
+ * tens of megabytes and the platform refused it — which the designer saw as a
+ * failed, unsaved assessment.
+ *
+ * The publication the version pointer references is ALWAYS retained: it is the
+ * durable authority every report reads. Beyond it the most recent `keepRecent`
+ * publications are retained, because a design restore repoints the pointer at a
+ * recent publication. Anything removed is returned in `pruned` so the caller can
+ * report it — nothing is ever dropped silently.
+ *
+ * @returns {{ publications: Object, pruned: string[] }}
+ */
+export function retainPublications(cacheRecord, keepFingerprint, keepRecent = PUBLICATION_RETENTION_RECENT) {
+  const pubs = (cacheRecord?.engineering_publications && typeof cacheRecord.engineering_publications === 'object')
+    ? cacheRecord.engineering_publications
+    : {};
+  const keys = Object.keys(pubs);
+  // Nothing to bound: the pointer's publication plus the retained recent few.
+  if (keys.length <= keepRecent + 1) return { publications: pubs, pruned: [] };
+
+  const keep = new Set();
+  if (keepFingerprint) keep.add(keepFingerprint);
+  keys
+    .filter((key) => key !== keepFingerprint)
+    .sort((a, b) => publicationTime(pubs[b]) - publicationTime(pubs[a]))
+    .slice(0, keepRecent)
+    .forEach((key) => keep.add(key));
+
+  const publications = {};
+  const pruned = [];
+  for (const [key, entry] of Object.entries(pubs)) {
+    if (keep.has(key)) publications[key] = entry;
+    else pruned.push(key);
+  }
+  return { publications, pruned };
+}
+
 /**
  * Reconcile orphaned publications — Phase 1A.5 recovery mechanism.
  *
@@ -250,10 +302,20 @@ export function completeMissingBassResults(existingPublication, incomingSummary)
 }
 
 /**
- * Clean the cache record for API response (includes engineering_publications).
+ * Clean the cache record for API response.
+ *
+ * The publication map itself is deliberately NOT echoed. It was the payload that
+ * made a publish move tens of megabytes, and no consumer reads it from here: a
+ * caller receives the publication it just wrote in the response's own
+ * `publication` field. The keys are returned instead, which is all a caller
+ * needs to see what the version now holds.
  */
 export function cleanCacheRecordForResponse(record) {
   if (!record) return null;
+  const pubs = (record.engineering_publications && typeof record.engineering_publications === 'object')
+    ? record.engineering_publications
+    : {};
+  const publicationKeys = Object.keys(pubs);
   return {
     id: record.id,
     project_id: record.project_id,
@@ -261,9 +323,7 @@ export function cleanCacheRecordForResponse(record) {
     account_id: record.account_id || null,
     current_fingerprint: record.current_fingerprint || null,
     status: record.status || 'uncalculated',
-    engineering_publications:
-      record.engineering_publications && typeof record.engineering_publications === 'object'
-        ? record.engineering_publications
-        : {},
+    publication_keys: publicationKeys,
+    publication_count: publicationKeys.length,
   };
 }

@@ -5,7 +5,6 @@ import { auditDurablePublication } from './publicationGateAuthority';
 import EngineeringPublicationDiagnostics from './EngineeringPublicationDiagnostics';
 import { useEngineeringMode } from '@/components/state/useEngineeringMode';
 import { useAuth } from '@/lib/AuthContext';
-import { isMasterAdmin } from '@/lib/accountAccess';
 
 // Dealer-facing status wording. Internal gate labels and field names stay inside
 // the diagnostics disclosure — never in the normal workflow.
@@ -22,6 +21,9 @@ export default function EngineeringPublicationStatus({ publication, projectId, v
   const { user } = useAuth();
   const { engineeringMode } = useEngineeringMode();
   const [durable, setDurable] = useState(null);
+  // The diagnostics disclosure is mounted only once the designer opens it, so no
+  // gate row, fingerprint or HTTP code exists in the DOM by default.
+  const [diagnosticsOpen, setDiagnosticsOpen] = useState(false);
   useEffect(() => {
     let cancelled = false;
     setDurable(null);
@@ -45,13 +47,18 @@ export default function EngineeringPublicationStatus({ publication, projectId, v
 
   const action = state === 'published' ? null
     : state === 'publishing' ? null
-    : state === 'failed' ? 'Engineering assessment has not been saved.'
+    : state === 'failed' ? 'Engineering assessment has not been saved. Publish the assessment before generating reports.'
     : state === 'not-saved' ? 'Reports are blocked until the engineering assessment is published.'
     : preflight.p19Blocks ? 'Complete P19 verification before reports can be generated.'
     : 'Reports are blocked until the engineering assessment is published.';
 
   const tone = TONES[state];
-  const showDiagnostics = isMasterAdmin(user) || engineeringMode === true;
+  // Internal diagnostics only. `isMasterAdmin` also treats any app role 'admin'
+  // as master admin, which includes a dealer's own account administrator — the
+  // strict master-admin capability is read here instead. Engineering mode remains
+  // the developer switch. Neither is on for a normal dealer or client login.
+  const showDiagnostics = user?.access_context?.capabilities?.masterAdmin === true
+    || engineeringMode === true;
 
   return (
     <section className="rounded-lg border border-[#DCDBD6] bg-white px-3 py-2 mb-3" aria-label="Engineering publication">
@@ -71,9 +78,14 @@ export default function EngineeringPublicationStatus({ publication, projectId, v
         <p className="mt-1 text-xs" style={{ color: '#625143' }}>Complete the selected P14 target and system inputs in Subwoofer Design first.</p>
       )}
       {showDiagnostics && (
-        <details className="mt-2">
+        <details
+          className="mt-2"
+          onToggle={(event) => setDiagnosticsOpen(event.currentTarget.open)}
+        >
           <summary className="cursor-pointer text-xs uppercase tracking-wide" style={{ color: '#625143' }}>Show diagnostics</summary>
-          <EngineeringPublicationDiagnostics preflight={preflight} matchingAttempt={matchingAttempt} durable={durable} />
+          {diagnosticsOpen && (
+            <EngineeringPublicationDiagnostics preflight={preflight} matchingAttempt={matchingAttempt} durable={durable} />
+          )}
         </details>
       )}
     </section>
