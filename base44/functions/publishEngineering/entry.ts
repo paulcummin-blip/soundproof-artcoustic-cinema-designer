@@ -1,3 +1,4 @@
+import { PUBLICATION_CONTRACT_VERSION, buildAtomicParameterIndex, auditPublicationContract } from '../../shared/engineeringPublicationContract.js';
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.40';
 import { assertCapability, resolveAccountAccess } from '../../shared/accountAccessAuthority.js';
 import {
@@ -131,11 +132,9 @@ export default async function(req) {
       return Response.json({ error: code }, { status });
     }
 
-    // Load or create the cache record
+    // Read only until the strict producer contract passes. No defaults/backfill.
     let cacheRecord = await loadCacheRecord(service, projectId, versionId);
-    if (!cacheRecord) {
-      cacheRecord = await createCacheRecord(service, projectId, versionId, projectAccountId);
-    }
+
 
     // Idempotency check — if the fingerprint already exists, no duplicate.
     const existing = findPublication(cacheRecord, fingerprint);
@@ -152,8 +151,19 @@ export default async function(req) {
       publication_reason: String(body?.publication_reason ?? 'auto-settled'),
       provenance: (body?.provenance && typeof body.provenance === 'object') ? body.provenance : null,
       schema_version: PUBLICATION_SCHEMA_VERSION,
+      publication_contract_version: body?.publication_contract_version,
     };
 
+    incomingPublication.parameter_index = buildAtomicParameterIndex(incomingPublication);
+    const contract = auditPublicationContract(incomingPublication);
+    if (reportSnapshot?.report_project?.project_id !== projectId || reportSnapshot?.report_project?.version_id !== versionId || reportSnapshot?.report_project?.version_name !== version.version_name) contract.missing.push('report_project version identity conflicts with selected version');
+    if (cacheRecord?.current_fingerprint && incomingPublication.provenance?.bass_fingerprint !== cacheRecord.current_fingerprint) contract.missing.push('bass fingerprint conflicts with current selected-version authority');
+    const existingAudit = existing ? auditPublicationContract(existing) : null;
+    if (contract.missing.length || (existingAudit && !existingAudit.allowed)) {
+      const missing = contract.missing.length ? contract.missing : existingAudit.missing;
+      return Response.json({ error:'PUBLICATION_CONTRACT_FAILED', missing, message:missing.join('; ') }, { status:422 });
+    }
+    if (!cacheRecord) cacheRecord = await createCacheRecord(service, projectId, versionId, projectAccountId);
     let publication = existing || incomingPublication;
     let created = false;
 
@@ -187,45 +197,7 @@ export default async function(req) {
     }
 
     if (existing) {
-      // Idempotent hit — publication already exists, pointer already updated.
-      //
-      // Additive enrichment only: a publication written before report_snapshot
-      // existed may gain that optional presentation payload ONCE, so cold
-      // report/proposal loads never depend on a browser-only store. The
-      // publication's identity, engineering_summary, version stamps and
-      // provenance are never modified.
-      if (reportSnapshot && !existing.report_snapshot) {
-        const enriched = { ...existing, report_snapshot: reportSnapshot };
-        const basePublications = (cacheRecord.engineering_publications
-          && typeof cacheRecord.engineering_publications === 'object')
-          ? cacheRecord.engineering_publications
-          : {};
-        cacheRecord = await service.entities.ProjectAnalysisCache.update(
-          cacheRecord.id,
-          { engineering_publications: { ...basePublications, [fingerprint]: enriched } },
-        );
-        publication = enriched;
-      }
-
-      // ── Add-only bass completion ──────────────────────────────────────
-      // A publication written before P19 was a published room result leaves that
-      // result blank, so a restored Technical Report rendered an empty P19 box.
-      // The stored publication may gain that value ONCE: identity, fingerprint,
-      // provenance and every already-stated value are never modified, and a
-      // stated value is never replaced. This is the only amendment a publication
-      // can ever receive.
-      const completedPublication = completeMissingBassResults(publication, engineeringSummary);
-      if (completedPublication) {
-        const latestPublications = (cacheRecord.engineering_publications
-          && typeof cacheRecord.engineering_publications === 'object')
-          ? cacheRecord.engineering_publications
-          : {};
-        cacheRecord = await service.entities.ProjectAnalysisCache.update(
-          cacheRecord.id,
-          { engineering_publications: { ...latestPublications, [fingerprint]: completedPublication } },
-        );
-        publication = completedPublication;
-      }
+      // Immutable valid new-contract idempotency hit. Never enrich old authority.
     } else {
       const { publications } = upsertPublication(cacheRecord, fingerprint, publication);
       const updatePayload = {
