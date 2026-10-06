@@ -113,7 +113,8 @@ export function publicationSectionReport(publication, { project = null, bassAuth
   );
   add('source_fingerprints', !!asObject(publication?.provenance));
 
-  if (project) {
+  if (payload.report_project) {
+    const project = payload.report_project; // Frozen selected-version authority only.
     add('room', parsesRoomDims(project.roomDims));
     add('screen', stated(project.screen_size) || stated(project.manual_width_m) || stated(project.tv_width_mm));
   }
