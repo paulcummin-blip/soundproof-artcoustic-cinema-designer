@@ -1961,6 +1961,19 @@ function RoomDesignerWithState() {
   const engineeringPublicationDesignState = React.useMemo(() => {
     if (!appState) return null;
     return {
+      // Verified loaded assessment metadata and explicit report facts.
+      name: projectName,
+      dolbyLayout: dolbyPreset,
+      seatingRows: appState.seatingRows,
+      seatsPerRow: appState.seatsPerRow,
+      rowEarHeights: appState.rowEarHeights,
+      seatSpacing: appState.seatSpacing,
+      viewingPriority: appState.viewingPriority,
+      roomElements: appState.roomElements,
+      manualExtras: appState.manualExtras,
+      priceMode: appState.priceMode,
+      showPrices: appState.showPrices,
+      difficultyMultiplier: appState.difficultyMultiplier,
       // Room geometry
       roomDims: appState.roomDims,
       roomOrientation: appState.roomOrientation,
@@ -2016,7 +2029,7 @@ function RoomDesignerWithState() {
       aimRearSurroundsAtMLP: appState.aimRearSurroundsAtMLP,
       aimSideSurroundsAtMLP: appState.aimSideSurroundsAtMLP,
     };
-  }, [appState, placedSpeakers]);
+  }, [appState, placedSpeakers, projectName, dolbyPreset]);
 
   const engineeringPublication = useEngineeringPublicationEffect({
     projectId: resolvedProjectId || projectIdState || null,
