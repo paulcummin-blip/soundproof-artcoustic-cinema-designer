@@ -103,10 +103,23 @@ export function useEngineeringPublicationEffect({
   engineeringSummary,
   bassFingerprint,
   ready,
-  designState,
+  designState: assessmentDesignState,
   bassReadiness,
   retainedFromRefresh,
 }) {
+  // Read selected-version identity only; never substitute its design or project facts.
+  const [selectedVersion, setSelectedVersion] = useState(null);
+  useEffect(() => {
+    let active = true;
+    setSelectedVersion(null);
+    if (projectId && versionId) base44.entities.ProjectVersion.get(versionId).then(version => {
+      if (active && version?.project_id === projectId) setSelectedVersion(version);
+    }).catch(() => {});
+    return () => { active = false; };
+  }, [projectId, versionId]);
+  const designState = useMemo(() => ({ ...assessmentDesignState,
+    versionName: selectedVersion?.id === versionId ? selectedVersion.version_name : null,
+  }), [assessmentDesignState, selectedVersion, versionId]);
   const [retrySequence, setRetrySequence] = useState(0);
   const attempt = usePublicationAttempt(projectId, versionId);
   const lastPublishedFingerprintRef = useRef(null);
