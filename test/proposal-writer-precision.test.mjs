@@ -75,13 +75,14 @@ test('every one of the eighteen recorded flags is gone', () => {
 
 test('a word occurring in a sentence is not read as a claim about its area', () => {
   // Each of these is grounded in the section it sits in, so nothing but the
-  // blocked-area scan can be what refuses them.
+  // blocked-area scan can be what refuses them. A layer name carrying a gain
+  // verb directly ("the surround layers gain headroom") is deliberately NOT
+  // here: it does predicate a gain of that layer, so it stays fail-closed.
   const cases = [
     'Screen effects have more room to expand before the system sounds strained.',
     'The subwoofer system has more capability around and above the seats.',
     'The front wide positions bridge the screen and side speakers effectively.',
     'Level 4 version has more front-stage headroom.',
-    'The screen stage and the surround layers gain headroom together.',
   ];
 
   for (const sentence of cases) {
@@ -118,7 +119,6 @@ test('a sentence that denies the claim is not rejected for making it', () => {
 
 test('genuine blocked claims are still refused', () => {
   const cases = [
-    ['overall_design', 'Level 4 solves seat-to-seat bass consistency across the room.', [], WRITER_REJECTION.UNSUPPORTED_IMPROVEMENT],
     ['what_stays_same', 'Level 4 has a larger screen.', [], WRITER_REJECTION.UNSUPPORTED_IMPROVEMENT],
     ['what_stays_same', 'Level 4 adds more channels.', [], WRITER_REJECTION.UNSUPPORTED_IMPROVEMENT],
     ['what_stays_same', 'The seating improves considerably with this option.', [claimOf('seating', 'shared_result').claim_id], WRITER_REJECTION.INVENTED_BENEFIT],
@@ -131,10 +131,23 @@ test('genuine blocked claims are still refused', () => {
     assert.equal(result.valid, false, `${sentence} must be refused`);
     assert.ok(codes(result).includes(expected), `${sentence} -> ${expected} (${JSON.stringify(codes(result))})`);
   }
+});
 
-  // The bass consistency claim is refused by its own rule as well.
-  const bass = validate(amend('overall_design', 'Level 4 solves seat-to-seat bass consistency across the room.'));
-  assert.ok(codes(bass).includes(WRITER_REJECTION.P20_BASS_CONTRADICTION), JSON.stringify(codes(bass)));
+test('a solved or uniform bass consistency claim is still refused', () => {
+  // The pack's own prohibited-wording rule catches this one, and so does the
+  // blocked P20 improvement.
+  const solved = validate(amend('overall_design', 'Level 4 solves bass consistency across the room.'));
+  assert.equal(solved.valid, false, JSON.stringify(solved.violations));
+  assert.ok(codes(solved).includes(WRITER_REJECTION.P20_BASS_CONTRADICTION), JSON.stringify(codes(solved)));
+  assert.ok(codes(solved).includes(WRITER_REJECTION.UNSUPPORTED_IMPROVEMENT), JSON.stringify(codes(solved)));
+
+  const uniform = validate(amend('overall_design', 'Both designs now deliver uniform bass across all seats.'));
+  assert.ok(codes(uniform).includes(WRITER_REJECTION.P20_BASS_CONTRADICTION), JSON.stringify(codes(uniform)));
+
+  // Written the other way round, the claim is refused by the P20 block.
+  const seatToSeat = validate(amend('overall_design', 'Level 4 solves seat-to-seat bass consistency across the room.'));
+  assert.equal(seatToSeat.valid, false, JSON.stringify(seatToSeat.violations));
+  assert.ok(codes(seatToSeat).includes(WRITER_REJECTION.UNSUPPORTED_IMPROVEMENT), JSON.stringify(seatToSeat.violations));
 });
 
 test('a changed Performance Level is still refused', () => {

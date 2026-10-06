@@ -83,13 +83,21 @@ const CONTRAST = /\b(?:rather than|instead of|compared (?:with|to)|against)\b/i;
 /** The words that deny a claim, however they are written. */
 const DENIAL = /\b(?:not|never|no|none|nor|neither|cannot|can't|doesn't|don't|isn't|aren't|without|lacks?)\b|\b(?:do|does|did|is|are|was|were|can|could|will|would|has|have|had)\s+not\b/i;
 
-/** Whether the clause carrying a match denies it: "the bass results do not indicate improved...". */
+/** Where one clause ends and the next begins. */
+const CLAUSE_BREAKS = /[.!?,;:]|\b(?:but|however|although|whereas|yet)\b/i;
+
+/**
+ * Whether the clause the match sits in denies it: "the bass results do not
+ * indicate improved...", "the distinction is not the format...", "the screen is
+ * not larger...". The whole clause is read, so a denial written either side of
+ * the matched words counts — and a denial in the NEXT clause does not.
+ */
 function isDenied(sentence, at) {
   if (!Number.isFinite(at) || at < 0) return false;
-  const clause = sentence.slice(0, at)
-    .split(/[,;:]|\b(?:but|however|although|whereas|yet)\b/i)
-    .pop() || '';
-  return DENIAL.test(clause);
+  const text = String(sentence);
+  const before = text.slice(0, at).split(CLAUSE_BREAKS).pop() || '';
+  const after = text.slice(at).split(CLAUSE_BREAKS)[0] || '';
+  return DENIAL.test(`${before} ${after}`);
 }
 
 /** One pattern for every term the pack's areas are named by. */
