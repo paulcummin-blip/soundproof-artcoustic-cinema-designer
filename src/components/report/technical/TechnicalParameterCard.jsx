@@ -115,6 +115,7 @@ export default function TechnicalParameterCard({
   asdrFooter = null,
   variant = "print",
   assumed = false,
+  categoryColour = null,
 }) {
   const isSeatScope = String(param?.scope || "").toLowerCase() === "seat";
   const isScreen = variant === "screen";
@@ -177,7 +178,8 @@ export default function TechnicalParameterCard({
           <span
             style={{
               fontSize: u.fsCategory,
-              color: "#9B8E82",
+              color: categoryColour || "#9B8E82",
+              fontWeight: categoryColour ? 600 : 400,
               letterSpacing: "0.06em",
               textTransform: "uppercase",
               fontFamily: BODY_FONT,

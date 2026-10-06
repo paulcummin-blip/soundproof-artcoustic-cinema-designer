@@ -805,12 +805,39 @@ export function getCategoryModalSummaries(roomDesignRating) {
 //   - Seat-scoped: the worst (lowest) seat level in the scope governs.
 // The category floor is the minimum across all included parameter levels.
 
+// Ranges follow the report's own category grouping (technicalParameterMeta):
+// Spatial Resolution P1–P11, Dynamic Range P12–P16, Timbre Matching P17–P21.
 const FLOOR_CATEGORY_RANGES = [
   { label: "Spatial Resolution", range: [1, 11] },
-  { label: "Dynamic Range", range: [12, 15] },
-  { label: "Timbre Matching", range: [16, 21] },
+  { label: "Dynamic Range", range: [12, 16] },
+  { label: "Timbre Matching", range: [17, 21] },
   { label: "Screen / Viewing Geometry", range: null },
 ];
+
+/**
+ * The parameters the Technical Report presents as ASSUMED rather than
+ * calculated or measured: P8 (fixed Sound Proof product rule), P15
+ * (background noise floor) and P21 (early reflections).
+ *
+ * They stay visible on the parameter pages as ASSUMED, but they never lower a
+ * group: an assumed L2 must not drag the "Primary/Secondary Seats — no lower
+ * than" result below what the room actually achieves.
+ *
+ * This mirrors the assumed marking in
+ * src/components/engineering/engineeringSummaryAuthority.js — the frontend
+ * cannot import base44/, so the two lists live in both places and
+ * test/technical-report-category-grouping.test.mjs asserts they agree.
+ */
+export const ASSUMED_FLOOR_EXCLUDED_KEYS = Object.freeze(["p8", "p15", "p21"]);
+
+/** Whether this contribution must be left out of the seat floor. */
+function isAssumedFloorContribution(contrib) {
+  if (!contrib) return false;
+  // A genuine measured result marks itself assumed:false and is a real result.
+  if (contrib.assumed === false) return false;
+  return contrib.assumed === true
+    || ASSUMED_FLOOR_EXCLUDED_KEYS.includes(String(contrib.key || ""));
+}
 
 function getFloorGroupForContrib(contrib) {
   if (contrib.key === "screen") return "Screen / Viewing Geometry";
@@ -834,11 +861,12 @@ function getFloorGroupForContrib(contrib) {
  * Screen / Viewing Geometry is separately governed by RP23 and returns the
  * authoritative RP23 level (worst achieved) without flooring.
  *
- * P15 and P21 are included in their respective category ranges (Dynamic Range
- * P12–P15, Timbre Matching P16–P21). They contribute ONLY when genuinely
- * assumed (non-null) — the rating authority returns provisional for null
- * assumed levels, excluding them from contributions. P8 is V1-excluded by the
- * rating authority and never appears in contributions.
+ * P8, P15 and P21 — the parameters the report presents as ASSUMED — are
+ * excluded from the floor (see ASSUMED_FLOOR_EXCLUDED_KEYS), so an assumed
+ * level never lowers a group. They remain on the parameter pages as ASSUMED;
+ * they are simply never treated as a measured result for "Primary/Secondary
+ * Seats — no lower than". P8 is additionally V1-excluded by the rating
+ * authority and never appears in contributions at all.
  *
  * @param {Object} roomDesignRating — a scoped rating (e.g. scopedRatings.primary)
  * @returns {Array<{ label, hasContribs, isScreen?, screenLevel?, floorLevel?, hasFail?, paramDetails? }>}
@@ -874,6 +902,9 @@ export function getCategoryFloorSummaries(roomDesignRating) {
     let hasFail = false;
     const paramDetails = [];
     for (const c of contribs) {
+      // The report's assumed parameters never lower the group — and never
+      // appear as a limiting parameter either.
+      if (isAssumedFloorContribution(c)) continue;
       const worst = worstLevelFromResultLevel(c.resultLevel);
       if (!worst) continue;
       paramDetails.push({ key: c.key, level: worst });

@@ -4,10 +4,18 @@
  * Category and human-readable title mappings for the Technical Report
  * RP22 parameter redesign.
  *
- * Categories follow the three RP22 pillars:
- *   Spatial Resolution — speaker placement, angles, zones
- *   Dynamic Range      — SPL capability, speaker count, noise, extension
- *   Timbre Matching    — SPL consistency, frequency response variance
+ * Categories follow the three RP22 pillars, in the grouping the report prints:
+ *   Spatial Resolution — P1–P11  (speaker placement, angles, zones)
+ *   Dynamic Range      — P12–P16 (SPL capability, speaker count, noise floor,
+ *                                 screen frequency-response variance)
+ *   Timbre Matching    — P17–P21 (surround timbre, bass extension, bass
+ *                                 response, seat-to-seat consistency, early
+ *                                 reflections)
+ *
+ * P12, P13, P14, P15 and P16 are ALWAYS Dynamic Range parameters: the page
+ * heading, the category divider and the card's own category label all read
+ * from this one map, so the parameter pages and the group headings can never
+ * disagree.
  */
 
 export const PARAM_CATEGORIES = {
@@ -26,13 +34,32 @@ export const PARAM_CATEGORIES = {
   13: "Dynamic Range",
   14: "Dynamic Range",
   15: "Dynamic Range",
-  16: "Timbre Matching",
+  16: "Dynamic Range",
   17: "Timbre Matching",
   18: "Timbre Matching",
   19: "Timbre Matching",
   20: "Timbre Matching",
   21: "Timbre Matching",
 };
+
+/**
+ * Category colours — existing Sound Proof brand tones only.
+ *   Spatial Resolution  deep green  #213428  (brand green)
+ *   Dynamic Range       warm bronze #625143  (brand accent)
+ *   Timbre Matching     cool slate  #3E4349  (brand slate)
+ * Applied to the category heading strip, its colour bar and the small category
+ * label on the parameter card. Deliberately three tones, so the report reads
+ * as clearly grouped rather than busy.
+ */
+export const PARAM_CATEGORY_COLOURS = Object.freeze({
+  "Spatial Resolution": "#213428",
+  "Dynamic Range": "#625143",
+  "Timbre Matching": "#3E4349",
+  // Screen / Viewing Geometry is governed by RP23 and shares the neutral slate.
+  "Screen / Viewing Geometry": "#3E4349",
+});
+
+const DEFAULT_CATEGORY_COLOUR = "#213428";
 
 export const PARAM_HUMAN_TITLES = {
   1: "Distance to Nearest Wall",
@@ -60,6 +87,10 @@ export const PARAM_HUMAN_TITLES = {
 
 export function getCategoryForParam(paramId) {
   return PARAM_CATEGORIES[paramId] || "General";
+}
+
+export function getCategoryColour(category) {
+  return PARAM_CATEGORY_COLOURS[category] || DEFAULT_CATEGORY_COLOUR;
 }
 
 export function getHumanTitleForParam(paramId) {

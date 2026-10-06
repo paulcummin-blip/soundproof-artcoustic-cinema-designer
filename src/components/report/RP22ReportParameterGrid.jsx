@@ -7,7 +7,7 @@ import RP22ComplianceParameterTile from "@/components/rp22/RP22ComplianceParamet
 import { RP22_PRESENTATION_PARAMETERS } from "@/components/utils/rp22ParameterPresentation";
 import TechnicalParameterCard from "@/components/report/technical/TechnicalParameterCard";
 import TechnicalParameterPage from "@/components/report/technical/TechnicalParameterPage";
-import { getCategoryForParam, getHumanTitleForParam } from "@/components/report/technical/technicalParameterMeta";
+import { getCategoryForParam, getCategoryColour, getHumanTitleForParam } from "@/components/report/technical/technicalParameterMeta";
 import { useParameterGridAuthority } from "@/components/report/technical/useParameterGridAuthority.jsx";
 import P15P21AssumptionControl from "@/components/report/P15P21AssumptionControl";
 
@@ -126,6 +126,7 @@ export default function RP22ReportParameterGrid({
           achievedValue={achievedValue}
           lvl={lvl}
           category={category}
+          categoryColour={getCategoryColour(category)}
           humanTitle={humanTitle}
           seatGridData={seatGridData}
           targetBasisNote={targetBasisNote}
@@ -143,16 +144,53 @@ export default function RP22ReportParameterGrid({
   };
 
   if (isPrintVariant) {
-    const groups = [];
+    // Where each category's FIRST parameter sits in canonical order. A group
+    // that starts after that point is a continuation of a category already
+    // begun on an earlier page, and says so in its heading.
+    const categoryFirstIndex = new Map();
+    RP22_PARAMS.forEach((param, index) => {
+      const category = getCategoryForParam(param.id);
+      if (!categoryFirstIndex.has(category)) categoryFirstIndex.set(category, index);
+    });
+
+    // Each page still carries three cards. Within the page, consecutive cards
+    // are grouped into category runs, so a page crossing from Spatial
+    // Resolution into Dynamic Range prints a Dynamic Range heading before its
+    // first Dynamic Range parameter instead of one mixed heading.
+    const pages = [];
     for (let i = 0; i < RP22_PARAMS.length; i += TECHNICAL_PARAMETER_CARDS_PER_PAGE) {
-      groups.push(RP22_PARAMS.slice(i, i + TECHNICAL_PARAMETER_CARDS_PER_PAGE));
+      const pageParams = RP22_PARAMS.slice(i, i + TECHNICAL_PARAMETER_CARDS_PER_PAGE);
+      const segments = [];
+      pageParams.forEach((param, offset) => {
+        const category = getCategoryForParam(param.id);
+        const previous = segments[segments.length - 1];
+        if (previous && previous.category === category) {
+          previous.params.push(param);
+          return;
+        }
+        const globalIndex = i + offset;
+        segments.push({
+          category,
+          params: [param],
+          continued: globalIndex > (categoryFirstIndex.get(category) ?? globalIndex),
+        });
+      });
+      pages.push({ pageParams, segments });
     }
+
     return (
       <div className="rp22-params-grid rp22-params-print-groups tech-params-print-groups">
-        {groups.map((group, groupIdx) => (
-          <TechnicalParameterPage key={groupIdx} params={group} isFirst={groupIdx === 0}>
-            {group.map((param) => renderPrintCard(param))}
-          </TechnicalParameterPage>
+        {pages.map((page, pageIdx) => (
+          <TechnicalParameterPage
+            key={pageIdx}
+            params={page.pageParams}
+            isFirst={pageIdx === 0}
+            segments={page.segments.map((segment) => ({
+              category: segment.category,
+              continued: segment.continued,
+              cards: segment.params.map((param) => renderPrintCard(param)),
+            }))}
+          />
         ))}
       </div>
     );

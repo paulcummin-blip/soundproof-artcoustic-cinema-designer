@@ -354,6 +354,30 @@ export default function ReportPrintStyles() {
                     page-break-after: always;
                 }
 
+                /* ── Category heading and continuation ──
+                   A page that crosses from one RP22 category into the next
+                   prints a second, compact category divider. The heading
+                   travels with its own cards, so it can never be stranded at
+                   the foot of a page, and the divider's height is reclaimed
+                   from the cards' own gap and padding so all three cards stay
+                   inside the fixed A4 frame. */
+                .rp22-report .tech-param-segment {
+                    break-inside: avoid !important;
+                    page-break-inside: avoid !important;
+                }
+
+                .rp22-report .tech-param-page--multi .tech-param-page__cards {
+                    gap: 1.5mm !important;
+                }
+
+                .rp22-report .tech-param-page--multi .tech-param-card {
+                    padding: 1.4mm 3mm !important;
+                }
+
+                .rp22-report .tech-param-segment-heading--divider {
+                    padding-bottom: 0.5mm !important;
+                }
+
                 .rp22-report .tech-param-card {
                     break-inside: avoid !important;
                     page-break-inside: avoid !important;
