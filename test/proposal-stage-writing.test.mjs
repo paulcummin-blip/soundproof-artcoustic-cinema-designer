@@ -279,5 +279,49 @@ test('the proposal prompt sells scoped strengths and asks for no design-stage ca
   assert.ok(WRITER_WRITING_RULES.some((rule) => /not a design review/i.test(rule)), JSON.stringify(WRITER_WRITING_RULES));
   assert.ok(WRITER_WRITING_RULES.some((rule) => /Sell what is strong/i.test(rule)));
   assert.equal(WRITER_SECTIONS.length, 9, 'the nine sections are untouched');
-  assert.ok(prompt.includes('proposal-writer-prompt-4'), 'the generation is filed under the current prompt version');
+  assert.ok(prompt.includes('proposal-writer-prompt-5'), 'the generation is filed under the current prompt version');
+});
+
+/* ── G: the scoped claim is the sentence the copy writes ───────────────────── */
+
+test('G. each scoped claim states its own parameter as a client sentence', () => {
+  const pack = packFor({
+    primary: { p5: 'L2', p10: 'L3', p19: 'L4' },
+    secondary: { p5: 'L1', p10: 'L1', p19: 'L1' },
+  });
+
+  const expected = {
+    p5: 'Speaker spacing is good across the primary seats, supporting clear movement between the screen and side channels.',
+    p10: 'Overhead level consistency is great across the primary seats, helping the height layer remain balanced across the main listening positions.',
+    p19: 'Bass response is excellent across the primary seats.',
+  };
+
+  for (const [area, sentence] of Object.entries(expected)) {
+    const claim = scopedOf(pack, area).find((entry) => entry.scope === 'primary');
+    assert.ok(claim, `${area} states a primary-seat result`);
+    assert.equal(claim.statement, sentence, `${area} states its own scoped sentence`);
+    // The sentence the pack states for that scope is the sentence the copy
+    // writes, and it is clean at its own level.
+    assertClean(pack, 'key_performance_highlights', claim.statement, [claim.claim_id]);
+  }
+});
+
+test('G. the writer is told to reach for the scoped claim before anything wider', () => {
+  const pack = packFor({ primary: { p20: 'L4' }, secondary: { p20: 'L1' } });
+  const authority = buildProposalWritingAuthority();
+  const prompt = buildWriterPrompt({ input: buildWriterInput({ pack }) });
+
+  for (const line of [
+    'SCOPED CLAIM PRIORITY',
+    'WRITER PRIORITY, IN EVERY SECTION',
+    'Bass response is excellent across the primary seats.',
+    'Overhead level consistency is great across the primary seats, helping the height layer remain balanced across the main listening positions.',
+    'Speaker spacing is good across the primary seats, supporting clear movement between the screen and side channels.',
+  ]) {
+    assert.ok(authority.includes(line), `the proposal authority must carry: ${line}`);
+  }
+
+  assert.match(authority, /Prefer a scoped claim to any generic whole-area sentence/);
+  assert.match(authority, /Level 1 carries no positive claim at all/);
+  assert.match(prompt, /scoped claim in the pack is the sentence to prefer/i);
 });

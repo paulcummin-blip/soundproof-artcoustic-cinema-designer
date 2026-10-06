@@ -98,6 +98,22 @@ const HEAD_NOT_RENAMED = '(?!\\s+(?:stage|stages|channel|channels|speaker|speake
 /** Words that are themselves an improvement or a change in the area. */
 const CLAIM_VERBS = 'improve[sd]?|improvements?|gains?|increases?|increased|boosts?|enhances?|exceeds?|solves?|fixes?|resolves?|adds?|added|changes?|changed|upgrades?|upgraded|replaces?|exchanges?|introduces?';
 
+/**
+ * The wording that actually claims a CHANGE to a channel set or a layout: an
+ * addition, a replacement, a difference or a comparative. A capability benefit
+ * predicated of the area's own channels or layers — "the surround channels gain
+ * headroom" — is a performance claim about those channels, judged by the gain
+ * and figure rules, and not a claim that the channel set itself changed.
+ */
+const CHANGE_SIGNAL = /\b(?:adds?|added|adding|extra|additional|more|increases?|increased|upgrades?|upgraded|replaces?|replacement|changed|changes?|differs?|different|instead\s+of|rather\s+than|larger|bigger|wider|greater|higher|superior|deeper|stronger)\b/i;
+
+/**
+ * A word that names the channel set, a layer of it or a loudspeaker position
+ * rather than a capability of its own. A change block is raised by one of these
+ * only where the sentence claims the set itself changed.
+ */
+const CHANNEL_FAMILY = /^(?:channels?|formats?|layers?|speakers?|positions?)$/i;
+
 /** Verbs that carry a benefit to the area without asserting one themselves. */
 const LINK_VERBS = 'is|are|was|were|has|have|had|offers?|provides?|gives?|giving|delivers?|records?|shows?|reaches?|achieves?|supports?|remains?|scores?|performs?|states?|holds?|keeps?';
 
@@ -123,6 +139,15 @@ const CLAUSE_BREAKS = /[.!?,;:]|\b(?:but|however|although|whereas|yet)\b/i;
  * is never read as a claim that the bass is consistent.
  */
 const CONSISTENCY_CAVEAT = /\b(?:needs?\s+(?:calibration\s+)?attention|calibration\s+attention|requires?\s+attention|not\s+solved|unsolved|remains?\s+an?\s+(?:area|item|point)|remains?\s+open|to\s+be\s+addressed)\b/i;
+
+/**
+ * Where a sentence states consistency, so the clause it sits in can be read: the
+ * position the denial and the open-item checks are anchored on.
+ */
+const CONSISTENCY_ANCHOR = /\b(?:consisten\w+|uniform|identical|even|same|similar|equal)\b/i;
+
+/** The claim written as its own negation: "there are no bad seats in this design". */
+const NEGATION_SHAPED_CLAIM = /\bno\s+(?:bad|poor|weak|cheap|second[- ]class|compromised)\s+seats?\b/i;
 
 /** The clause a position sits in: from the break before it to the break after it. */
 function clauseAt(sentence, at) {
@@ -258,7 +283,14 @@ function claimsArea(sentence, { heads = [], phrases = [] } = {}) {
  */
 function assertedKind(sentence, anchors) {
   const kind = assertionKind(sentence);
-  if (!kind || kind === 'result' || kind === 'same') return kind;
+  if (!kind) return null;
+  if (kind === 'result' || kind === 'same') {
+    // A stated result or a shared statement that denies itself in its own clause
+    // is not making the claim: "No claim is made for identical bass in every
+    // seat." The sentence is read from its opening clause, so a denial stated
+    // later never excuses the claim it follows.
+    return isDenied(sentence, 0) ? null : kind;
+  }
   if (!anchors.test(sentence)) return null;
   const at = sentence.search(new RegExp(`\\b(?:${CLAIM_WORDS})\\b`, 'i'));
   return isDenied(sentence, at) ? null : kind;
@@ -364,6 +396,10 @@ export function scanProse({ input, vocabulary, section, text, claims = [], claim
       if (!match) continue;
       // A sentence that denies the claim is not making it.
       if (isDenied(claimed, match.at)) continue;
+      // A channel-set word is a change claim about the layout only where the
+      // sentence actually claims the layout changed: the channels gaining
+      // headroom is a performance claim about those channels, not a new channel.
+      if (CHANNEL_FAMILY.test(match.keyword) && !CHANGE_SIGNAL.test(claimed)) continue;
       found.push(violation(WRITER_REJECTION.UNSUPPORTED_IMPROVEMENT, {
         section,
         detail: `${block.reason}:${block.block_id}`,
@@ -485,12 +521,22 @@ export function scanProse({ input, vocabulary, section, text, claims = [], claim
   }
 
   // The bass rule: where P20 does not support seat-to-seat consistency, no
-  // sentence may claim it, however it is worded.
-  if (p20BlocksConsistency(input) && isBassConsistencyClaim(text)) {
-    found.push(violation(WRITER_REJECTION.P20_BASS_CONTRADICTION, {
-      section,
-      detail: 'p20_does_not_support_a_bass_consistency_claim',
-    }));
+  // sentence may claim it, however it is worded. Read sentence by sentence, so a
+  // sentence that denies the claim or names consistency as an open item is not
+  // refused for making it — while a claim written as its own negation ("there are
+  // no bad seats") is not a denial and is still refused.
+  if (p20BlocksConsistency(input)) {
+    for (const sentence of sentences) {
+      const denied = stripOptionNames(sentence, vocabulary.optionNames);
+      if (!isBassConsistencyClaim(denied)) continue;
+      const at = Math.max(0, denied.search(CONSISTENCY_ANCHOR));
+      if (!NEGATION_SHAPED_CLAIM.test(denied) && (isDenied(denied, at) || isConsistencyCaveat(denied, at))) continue;
+      found.push(violation(WRITER_REJECTION.P20_BASS_CONTRADICTION, {
+        section,
+        detail: 'p20_does_not_support_a_bass_consistency_claim',
+      }));
+      break;
+    }
   }
 
   return found;

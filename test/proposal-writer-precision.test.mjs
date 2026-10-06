@@ -309,3 +309,57 @@ test('the bass wording the pack does allow still passes', () => {
     );
   }
 });
+
+/* ── A denial of the consistency claim is not the claim ───────────────────── */
+
+test('a sentence that denies the bass consistency claim is not refused for making it', () => {
+  for (const sentence of [
+    'The bass is not consistent across every seat.',
+    'The proposal does not claim consistent bass across every seat.',
+    'No claim is made for identical bass in every seat.',
+    'Neither option claims the same bass at every seat.',
+  ]) {
+    const result = validate(amend('overall_design', sentence));
+    assert.equal(
+      codes(result).includes(WRITER_REJECTION.P20_BASS_CONTRADICTION),
+      false,
+      `${sentence} -> ${JSON.stringify(result.violations)}`,
+    );
+  }
+
+  // The claim written as its own negation is a claim, not a denial, and is still
+  // refused: "there are no bad seats" is what a client reads as "no weak seats".
+  const shaped = validate(amend('overall_design', 'There are no bad seats in this design.'));
+  assert.ok(
+    codes(shaped).includes(WRITER_REJECTION.P20_BASS_CONTRADICTION),
+    JSON.stringify(codes(shaped)),
+  );
+});
+
+/* ── A capability benefit is not a change to the area that carries it ─────── */
+
+test('a capability benefit is not read as a change to the area that carries it', () => {
+  const p13 = claimOf('p13', 'material_gain');
+  const sentence = 'The screen stage and the surround channels gain headroom in this option.';
+
+  const result = validate(amend('dynamic_range', sentence, [p13?.claim_id].filter(Boolean)));
+  assert.equal(
+    codes(result).includes(WRITER_REJECTION.UNSUPPORTED_IMPROVEMENT),
+    false,
+    `${sentence} -> ${JSON.stringify(result.violations)}`,
+  );
+
+  // An actual addition to the same area is still refused.
+  const added = validate(amend('what_changes', 'The system adds more channels in this option.'));
+  assert.ok(
+    codes(added).includes(WRITER_REJECTION.UNSUPPORTED_IMPROVEMENT),
+    `an added channel must still be refused: ${JSON.stringify(codes(added))}`,
+  );
+
+  // And a comparative predicated of the area itself is still refused.
+  const larger = validate(amend('what_stays_same', 'Level 4 has a larger screen.'));
+  assert.ok(
+    codes(larger).includes(WRITER_REJECTION.UNSUPPORTED_IMPROVEMENT),
+    JSON.stringify(codes(larger)),
+  );
+});

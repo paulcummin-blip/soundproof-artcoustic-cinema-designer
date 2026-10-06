@@ -207,6 +207,7 @@ export function buildWriterPrompt({ input } = {}) {
     'Never present something the pack blocks, and never describe a shared result as a change or a gain.',
     'Never recommend changing the design, and never describe the proposal as an upgrade path.',
     'Sell what is strong. Where a result is strong for the primary seats, state it positively for the primary seats and stop there: do not add a caveat about the secondary seats, and do not report a weaker scope beside a stronger one.',
+    'A scoped claim in the pack is the sentence to prefer: where one states a strong result for the primary seats, write that claim\'s own wording, cite its claim ID, and let it stand alone rather than replacing it with a whole-area sentence.',
     'This proposal is not a design review. Never write that anything needs attention, improvement, calibration, optimisation or further design work, and never suggest a future correction, a recalibration or an optimisation to come.',
     'If the evidence shows something that genuinely undermines the proposed system, describe the design as it stands and claim nothing beyond it. Do not write advice about it, and do not write it up as an improvement plan: the attempt is held for human review instead.',
     'Keep every paragraph to one to three sentences and every section inside its word limit.',

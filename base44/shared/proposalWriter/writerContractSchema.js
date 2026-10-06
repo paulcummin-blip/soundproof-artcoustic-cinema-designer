@@ -40,7 +40,7 @@ export const WRITER_CONTRACT_VERSION = 1;
  * agreement. One rejection was added, for the design-stage commentary a proposal
  * no longer carries.
  */
-export const WRITER_PROMPT_VERSION = 'proposal-writer-prompt-4';
+export const WRITER_PROMPT_VERSION = 'proposal-writer-prompt-5';
 
 /** The only pack generation a draft may be written from. */
 export const WRITER_ACCEPTED_PACK_SCHEMA_VERSION = 2;

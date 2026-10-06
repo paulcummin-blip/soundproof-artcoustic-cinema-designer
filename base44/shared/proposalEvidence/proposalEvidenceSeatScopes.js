@@ -47,16 +47,28 @@ export const SCOPE_PHRASE = Object.freeze({
 export const SCOPE_ADJECTIVE = Object.freeze({ L4: 'Excellent', L3: 'Great', L2: 'Good' });
 
 /**
- * The wording class and the noun each scoped parameter is described with, where
- * the parameter's own subject has a client-safe name. A parameter not named here
- * is eligible only when its own RP22 scope is the seats, and is described with
- * its own plain-language area name from the pack.
+ * The wording class, the client subject and the experience each scoped parameter
+ * is written with. The subject leads the sentence and the benefit says what the
+ * client experiences, so a scoped claim reads as a client sentence rather than a
+ * grade — "Speaker spacing is good across the primary seats, supporting clear
+ * movement between the screen and side channels."
+ *
+ * A parameter not named here is eligible only when its own RP22 scope is the
+ * seats, and is described with its own plain-language area name from the pack.
  */
 const WORDING_BY_PARAMETER = Object.freeze({
-  p5: { className: 'spacing', noun: 'spacing' },
-  p10: { className: 'consistency', noun: 'overhead consistency' },
-  p19: { className: 'consistency', noun: 'bass consistency' },
-  p20: { className: 'consistency', noun: 'bass consistency' },
+  p5: {
+    className: 'spacing',
+    subject: 'Speaker spacing',
+    benefit: 'supporting clear movement between the screen and side channels',
+  },
+  p10: {
+    className: 'consistency',
+    subject: 'Overhead level consistency',
+    benefit: 'helping the height layer remain balanced across the main listening positions',
+  },
+  p19: { className: 'consistency', subject: 'Bass response', benefit: null },
+  p20: { className: 'consistency', subject: 'Bass consistency', benefit: null },
 });
 
 /** The fewest seats a scope holds before it can carry a group claim. */
@@ -65,9 +77,14 @@ export const MIN_SCOPE_SEATS = 2;
 /** The levels that carry a positive adjective. */
 const POSITIVE_LEVELS = Object.freeze(Object.keys(SCOPE_ADJECTIVE));
 
-/** One scoped claim's sentence: "Excellent bass consistency across the primary seats." */
-export function scopedStatement(adjective, noun, scope) {
-  return `${adjective} ${noun} ${SCOPE_PHRASE[scope]}.`;
+/**
+ * One scoped claim's sentence: "Bass response is excellent across the primary
+ * seats." The benefit, where the parameter has one, is the client-experience
+ * clause the sentence ends on.
+ */
+export function scopedStatement(adjective, subject, scope, benefit = null) {
+  const tail = benefit ? `, ${benefit}` : '';
+  return `${subject} is ${adjective.toLowerCase()} ${SCOPE_PHRASE[scope]}${tail}.`;
 }
 
 /**
@@ -105,7 +122,8 @@ export function buildScopedSeatClaims(option, optionIndex = 0) {
       // state, whichever way the summary reports it.
       if (!named && parameter?.parameter_scope !== 'seat') continue;
 
-      const noun = named?.noun || (areaByKey(key)?.label || key).toLowerCase();
+      const subject = named?.subject || (areaByKey(key)?.label || key).toLowerCase();
+      const benefit = named?.benefit || null;
       const wordingClass = named?.className || 'performance';
       const adjective = SCOPE_ADJECTIVE[level];
       const value = parameter?.value ?? null;
@@ -115,7 +133,7 @@ export function buildScopedSeatClaims(option, optionIndex = 0) {
         area: key,
         label: areaByKey(key)?.label || key,
         kind: CLAIM_KIND.SCOPED_RESULT,
-        statement: scopedStatement(adjective, noun, scope),
+        statement: scopedStatement(adjective, subject, scope, benefit),
         option: optionRef(option),
         favours: false,
         // The scope a sentence has to name before this claim can support it.

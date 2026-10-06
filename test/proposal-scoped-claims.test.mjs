@@ -96,7 +96,7 @@ test('a scoped claim carries its scope, seat count, level and authority', () => 
   const claim = claims[0];
 
   assert.equal(claim.claim_id, 'claim_p20_primary_consistency_01');
-  assert.equal(claim.statement, 'Excellent bass consistency across the primary seats.');
+  assert.equal(claim.statement, 'Bass consistency is excellent across the primary seats.');
   assert.equal(claim.scope, 'primary');
   assert.equal(claim.seat_count, 3);
   assert.equal(claim.level, 'L4');
@@ -126,7 +126,7 @@ test('the adjective is the level\'s own, and an L1 result mints no claim', () =>
     if (!minted) continue;
     assert.ok(claims.every((entry) => entry.wording === adjective), JSON.stringify(claims));
     assert.ok(
-      claims.every((entry) => entry.statement === `${adjective} bass consistency across the primary seats.`),
+      claims.every((entry) => entry.statement === `Bass consistency is ${adjective.toLowerCase()} across the primary seats.`),
       JSON.stringify(claims.map((entry) => entry.statement)),
     );
   }
