@@ -8,8 +8,8 @@
 //   TEST 3  A page that was asked for a version never reuses another version's
 //           hydrated design (the in-session shortcut is refused)
 //   TEST 4  Only the latest export per version and report type is listed
-//   TEST 5  A missing report is stated as Missing; an existing one is Current
-//           or Stale — never Missing
+//   TEST 5  A version with no report of a type reads Not generated; an existing
+//           one is Current or Update needed — never Missing, never invented
 //
 // The Level 4 case under test, exactly as reported:
 //   Room Designer open on Level 1 version, Project Library open, Level 4 row

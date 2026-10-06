@@ -93,13 +93,6 @@ function asIssuedPdfState({ state, label }) {
   return { state, label: ISSUED_PDF_STATE_LABEL[state] || label };
 }
 
-/** A saved report's own status word, in Library vocabulary. */
-export function liveReportStatusLabel(snapshotStatus) {
-  return snapshotStatus === 'stale'
-    ? LIVE_REPORT_STATE_LABEL[LIVE_REPORT_STATE.STALE]
-    : LIVE_REPORT_STATE_LABEL[LIVE_REPORT_STATE.CURRENT];
-}
-
 /**
  * The three states a version's report row can be in, in the dealer's words:
  *   current        ready to use in a proposal

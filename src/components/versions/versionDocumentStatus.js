@@ -15,7 +15,6 @@
 
 import {
   collapseLiveReports,
-  liveReportStatusLabel,
 } from '@/components/library/librarySourceStatus';
 import { isSnapshotRestorable } from '@/components/report/reportSnapshotAuthority';
 import { proposalVersionIds } from '@/components/proposal/library/proposalSourceState';
@@ -24,6 +23,8 @@ import { getStatusLabel } from '@/components/proposal/proposalLifecycle';
 const REPORT_TYPES = ['visual', 'technical'];
 
 export const NO_REPORTS_LABEL = 'No reports yet';
+export const CURRENT_REPORTS_LABEL = 'Current reports';
+export const REPORTS_NEED_UPDATING_LABEL = 'Reports need updating';
 export const REPORT_STATE = Object.freeze({
   CURRENT: 'current',
   STALE: 'stale',
@@ -86,9 +87,11 @@ export function deriveVersionDocumentStatus({ snapshots = [], proposals = [] } =
     statusByVersionId.set(versionId, {
       reportsState,
       reportsGenerated: generated,
+      // The dealer's words: a version's reports are either current, or the design
+      // has moved on and they need updating. No internal state name is rendered.
       reportsLabel: generated.length === 0
         ? NO_REPORTS_LABEL
-        : `${liveReportStatusLabel(stale ? 'stale' : 'current')} reports`,
+        : (stale ? REPORTS_NEED_UPDATING_LABEL : CURRENT_REPORTS_LABEL),
       proposal: entry.proposal,
       proposalStatus: entry.proposal?.status || null,
       proposalLabel: entry.proposal ? getStatusLabel(entry.proposal.status) : null,

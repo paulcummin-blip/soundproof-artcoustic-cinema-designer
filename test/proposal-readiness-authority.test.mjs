@@ -1054,7 +1054,9 @@ test('21. server, client, Proposal Centre and the Library banner read every fixt
     // The banner's plain words are the row's own states, never a second opinion.
     const expectedCell = (cell) => (cell.state === READINESS_STATE.CURRENT
       ? LIBRARY_CHECKLIST_STATUS.READY
-      : LIBRARY_CHECKLIST_STATUS.NEEDS_UPDATE);
+      : cell.state === READINESS_STATE.MISSING
+        ? LIBRARY_CHECKLIST_STATUS.NOT_GENERATED
+        : LIBRARY_CHECKLIST_STATUS.UPDATE_NEEDED);
     const checklist = banner.checklist[0];
     assert.equal(checklist.cells[0].status, expectedCell(serverRow.visual), `${name}: banner visual cell`);
     assert.equal(checklist.cells[1].status, expectedCell(serverRow.technical), `${name}: banner technical cell`);

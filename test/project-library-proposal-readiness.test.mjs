@@ -290,7 +290,9 @@ test('D — the banner uses the Proposal Centre readiness contract, never a seco
   assert.equal(libraryChecking.secondaryAction, null);
   // Nothing is claimed per version while the read is still in flight.
   assert.equal(libraryChecking.checklist[0].line, null);
-  assert.deepEqual(libraryChecking.checklist[0].cells.map((item) => item.status), [null, null]);
+  // A report whose own cell is already known still states it: only the version's
+  // verdict is unknown while the read is in flight.
+  assert.deepEqual(libraryChecking.checklist[0].cells.map((item) => item.status), ['Ready', 'Ready']);
 
   // ONE authority: the read is imported, and the verdict is the gate's.
   assert.match(READINESS_HOOK, /useProposalReadiness/);

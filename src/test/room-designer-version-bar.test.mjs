@@ -88,7 +88,8 @@ describe('per-version document status', () => {
     expect(status.get(V1).reportsState).toBe(REPORT_STATE.CURRENT);
     expect(status.get(V1).reportsLabel).toBe('Current reports');
     expect(status.get(V4).reportsState).toBe(REPORT_STATE.STALE);
-    expect(status.get(V4).reportsLabel).toBe('Source changed reports');
+    // The dealer's words for a version whose reports the design moved past.
+    expect(status.get(V4).reportsLabel).toBe('Reports need updating');
     expect(status.get(V4).reportsGenerated).toEqual(['visual']);
   });
 
