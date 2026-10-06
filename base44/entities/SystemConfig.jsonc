@@ -7,6 +7,49 @@
       "type": "boolean",
       "default": false,
       "description": "Global feature flag for commercial project licensing. Default OFF. Not connected to any enforcement logic yet \u2014 infrastructure only."
+    },
+    "gpt_proposal_writer": {
+      "type": "object",
+      "description": "Phase 6 feature flag for the controlled GPT proposal writer. Default OFF: no GPT writer action is shown and no provider call can be reached. When the master switch is on, only the accounts or emails listed here may use it; when both lists are empty only master admins may. Written only by a master admin through manageProposalWriterFlag \u2014 never by a dealer or client login.",
+      "properties": {
+        "enabled": {
+          "type": "boolean",
+          "default": false,
+          "description": "The master switch. False = the GPT proposal writer is unavailable to everyone and the current proposal flow is unchanged."
+        },
+        "accounts": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "default": [],
+          "description": "Account IDs permitted to use the writer while the master switch is on. Empty together with emails = master admins only."
+        },
+        "emails": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "default": [],
+          "description": "User emails permitted to use the writer while the master switch is on, for a single test login that is not an admin."
+        },
+        "model": {
+          "type": "string",
+          "nullable": true,
+          "description": "Optional provider model override for the controlled test. Null = the writer's own default model. Recorded on every generation attempt."
+        },
+        "updated_at": {
+          "type": "string",
+          "format": "date-time",
+          "nullable": true,
+          "description": "When the flag was last changed."
+        },
+        "updated_by": {
+          "type": "string",
+          "nullable": true,
+          "description": "Name or email of the master admin who last changed the flag."
+        }
+      }
     }
   }
 }
