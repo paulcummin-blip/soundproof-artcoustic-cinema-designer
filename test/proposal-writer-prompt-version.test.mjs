@@ -6,7 +6,9 @@
 // ONE block rather than spread character by character, and it later gained the
 // proposal-stage rule that sells what is strong and refuses design-stage
 // commentary. Both are material changes to what the writer reads, so the version
-// moved to 2 and then to 4, and every new record must store it. The live
+// moved to 2, to 4, and to 6 when the sales authority gained the experience rule,
+// the lower-priced-option rule, the repetition ban and the scoped-claim
+// instruction, and every new record must store it. The live
 // generation the review was run on is the fixture: it keeps the version it was
 // filed under, its stored input is never rewritten, and the pack and contract it
 // cites are unchanged — only the prompt version moved.
@@ -27,9 +29,9 @@ const pack = historical.input.evidence_pack;
 
 const VERSION_1 = 'proposal-writer-prompt-1';
 const VERSION_3 = 'proposal-writer-prompt-3';
-const CURRENT = 'proposal-writer-prompt-5';
+const CURRENT = 'proposal-writer-prompt-6';
 
-test('the writer prompt version is 4', () => {
+test('the writer prompt version is the current one', () => {
   assert.equal(WRITER_PROMPT_VERSION, CURRENT);
   assert.notEqual(CURRENT, VERSION_3, 'the proposal-stage change is a new generation');
 });

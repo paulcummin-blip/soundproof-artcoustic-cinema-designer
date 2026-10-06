@@ -9,7 +9,12 @@
  *   FIGURES     is this figure, level or product one the pack states?
  *   BLOCKED     does this sentence claim a change or an improvement in an area
  *               the pack blocks as unchanged, or recommend where no
- *               recommendation is allowed?
+ *               recommendation is allowed? A head that is modifying a capability
+ *               noun — "screen headroom", "screen, surround and height headroom"
+ *               — is Dynamic Range language (P12/P13), not a claim that the area
+ *               itself changed, so it is not read as one. A head that names its
+ *               area itself — "a larger screen", "the screen is wider" — is read
+ *               exactly as before.
  *   BASS        does this sentence claim the seat-to-seat bass consistency the
  *               P20 result does not support? Read in two passes: the pack's own
  *               prohibited phrasings, over the whole text, and the seat-to-seat
@@ -120,6 +125,41 @@ const LINK_VERBS = 'is|are|was|were|has|have|had|offers?|provides?|gives?|giving
 /** The words that turn a keyword into a claimed improvement about it. */
 const BENEFIT_WORDS = 'improve[sd]?|improvements?|gains?|better|greater|more|increas\\w*|enhanc\\w*|exceeds?|superior|boosts?|advantages?|benefits?|stronger|higher|larger|bigger|wider|deeper';
 
+/**
+ * The layer and family words a capability can belong to. In "greater screen,
+ * surround and height headroom" the words in front of "headroom" name the layers
+ * that headroom belongs to, so "screen" there is not claiming a change to the
+ * screen itself.
+ */
+const ATTRIBUTED_LAYERS = 'screen|screens|surround|surrounds|height|heights|overhead|overheads|front|rear|wide|wides|bed|beds|lcr|centre|center|subwoofer|subwoofers|subs|bass';
+
+/**
+ * The nouns that name what the system DELIVERS — headroom, output capability,
+ * dynamic range, authority, impact — rather than an area of it. A head that is
+ * modifying one of these is Dynamic Range language: "screen headroom" is a
+ * capability claim about the screen stage, judged by the grounding and figure
+ * rules, and not a claim that the screen, its size or its timbre changed. None of
+ * these nouns names a size, a dimension or a tone, so "a larger screen", "the
+ * screen is wider" and "improves the screen size" are read exactly as before.
+ */
+const ATTRIBUTED_CAPABILITY = 'headroom|output|outputs|capability|capabilities|authority|reserve|dynamics|dynamic\\s+range|impact|weight|scale|punch|effects?|levels?|spl|pressure';
+
+/**
+ * The words between a head and the capability noun it modifies: a list of layers,
+ * one claim or link verb, or both. The head is only read as capability language
+ * when a capability noun actually follows it, so ordinary size wording — where
+ * nothing but the end of the claim follows the head — is untouched.
+ */
+const ATTRIBUTED_CAPABILITY_FOLLOW = new RegExp(
+  `^(?:[\\s,]+(?:and|plus|or)?[\\s,]*(?:${ATTRIBUTED_LAYERS})\\b)*(?:[\\s,]+(?:and|plus|or)?[\\s,]*(?:${LINK_VERBS}|gains?|adds?)\\b)?[\\s,]+(?:and|plus|or)?[\\s,]*(?:${ATTRIBUTED_CAPABILITY})\\b`,
+  'i',
+);
+
+/** Whether the head at `at` is modifying a capability noun rather than naming an area. */
+function modifiesCapabilityNoun(sentence, at, term) {
+  return ATTRIBUTED_CAPABILITY_FOLLOW.test(String(sentence).slice(at + String(term).length));
+}
+
 /** Any word that carries a claim: an improvement, a change or a comparative. */
 const CLAIM_WORDS = `${CLAIM_VERBS}|${COMPARATIVES}|${BENEFIT_WORDS}`;
 
@@ -131,6 +171,20 @@ const DENIAL = /\b(?:not|never|no|none|nor|neither|cannot|can't|doesn't|don't|is
 
 /** Where one clause ends and the next begins. */
 const CLAUSE_BREAKS = /[.!?,;:]|\b(?:but|however|although|whereas|yet)\b/i;
+
+/**
+ * A rejected alternative: what follows "rather than" or "instead of" is what the
+ * sentence says is NOT the case. A change word inside it — "everything is shared
+ * rather than a different room" — is not the sentence claiming a change, so the
+ * alternative is taken out before the sentence is classified. Only the
+ * alternative goes: a change asserted before it is read exactly as before.
+ */
+const REJECTED_ALTERNATIVE = /\b(?:rather than|instead of)\b[^.;:!?]*/gi;
+
+/** The sentence with every rejected alternative removed. */
+function withoutRejectedAlternatives(sentence) {
+  return String(sentence || '').replace(REJECTED_ALTERNATIVE, ' ');
+}
 
 /**
  * Bass wording that names seat-to-seat consistency as an open item rather than a
@@ -268,7 +322,14 @@ function claimsArea(sentence, { heads = [], phrases = [] } = {}) {
     ];
     for (const pattern of patterns) {
       const match = pattern.exec(sentence);
-      if (match) return { at: match.index, keyword: head, phrase: false };
+      if (!match) continue;
+      // Where the head itself sits inside the match, so the words that follow the
+      // head decide whether it names the area or modifies a capability of it.
+      const within = new RegExp(term, 'i').exec(match[0]);
+      const headAt = match.index + (within ? within.index : 0);
+      const headText = within ? within[0] : head;
+      if (modifiesCapabilityNoun(sentence, headAt, headText)) continue;
+      return { at: match.index, keyword: head, phrase: false };
     }
   }
 
@@ -282,7 +343,9 @@ function claimsArea(sentence, { heads = [], phrases = [] } = {}) {
  * that a section has to have cited a claim for.
  */
 function assertedKind(sentence, anchors) {
-  const kind = assertionKind(sentence);
+  // Classified with the rejected alternatives taken out: "shared, rather than a
+  // different room" is a statement of sameness, not a claim that a room changed.
+  const kind = assertionKind(withoutRejectedAlternatives(sentence));
   if (!kind) return null;
   if (kind === 'result' || kind === 'same') {
     // A stated result or a shared statement that denies itself in its own clause

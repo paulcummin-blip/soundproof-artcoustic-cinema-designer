@@ -34,13 +34,21 @@ export const WRITER_CONTRACT_VERSION = 1;
  * audit history, so every new record stores this version. A historical record
  * keeps the version it was filed under and is never rewritten.
  *
+ * Bumped to 6 when the sales authority gained the rule that a capability is
+ * always finished by the experience it creates, the rule for the one result where
+ * the lower-priced option leads, the ban on repeating a phrase between sections,
+ * and the instruction to use the pack's scoped claims rather than leave them
+ * unused; and when the blocked-area reading stopped treating the layer words a
+ * capability belongs to ("screen headroom", "front stage headroom") as a claim
+ * that the area itself changed.
+ *
  * The contract version is deliberately NOT bumped: the sections, the word limits
  * and the claim grounding rule are unchanged, and every existing rejection keeps
  * its meaning, so a draft filed under generation 1 is still read against the same
  * agreement. One rejection was added, for the design-stage commentary a proposal
  * no longer carries.
  */
-export const WRITER_PROMPT_VERSION = 'proposal-writer-prompt-5';
+export const WRITER_PROMPT_VERSION = 'proposal-writer-prompt-6';
 
 /** The only pack generation a draft may be written from. */
 export const WRITER_ACCEPTED_PACK_SCHEMA_VERSION = 2;
