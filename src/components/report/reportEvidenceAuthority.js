@@ -218,45 +218,15 @@ function buildSystem(captured) {
   };
 }
 
-function buildParameters(captured, reportType, authorityHeadlines = null) {
-  const visible = Array.isArray(captured?.report_parameters) ? captured.report_parameters : [];
-  const stated = Array.isArray(captured?.rp22?.parameter_headlines) ? captured.rp22.parameter_headlines : [];
-  const authority = Array.isArray(authorityHeadlines) ? authorityHeadlines : stated;
-  const headlineById = new Map(authority.map((row) => [Number(row?.parameter_id), row]));
-  const statedById = new Map(stated.map((row) => [Number(row?.parameter_id), row]));
-  const source = reportType === REPORT_SNAPSHOT_TYPE.VISUAL ? 'visual_report' : 'technical_report';
-
-  return visible
-    .filter((row) => Number.isFinite(Number(row?.parameter_id)))
-    .sort((a, b) => Number(a.parameter_id) - Number(b.parameter_id))
-    .map((row) => {
-      const id = Number(row.parameter_id);
-      const headline = headlineById.get(id) || null;
-      const statedRow = statedById.get(id) || null;
-      const value = row.value ?? null;
-      const level = asText(row.level) || null;
-      return {
-        key: `P${id}`,
-        parameter_id: id,
-        title: asText(headline?.title) || asText(statedRow?.title) || `P${id}`,
-        area: asText(headline?.category) || asText(statedRow?.category) || null,
-        level,
-        value,
-        // The report's own statement of this parameter, exactly as it prints it.
-        // A proposal reads this sentence, so its P13 can never be assembled from
-        // a different value than the Technical Report shows.
-        text: [level, asText(value)].filter(Boolean).join(' · ') || null,
-        unit: inferUnit(value) || inferUnit(headline?.formatted_value),
-        context: parameterContext(id),
-        limiting_group: null,
-        source,
-        // What the RP22 authority itself stated for this parameter. Parity
-        // compares these against the values above, so a report can never state
-        // a figure its own authority did not state.
-        authority_level: asText(headline?.achieved_level) || null,
-        authority_value: asText(headline?.formatted_value) || null,
-      };
-    });
+function buildParameters(captured) {
+  // Presentation may add title/area, but all engineering fields are copied
+  // together from the selected authority row. No headline/context inference.
+  return (captured?.report_parameters || []).map(row => ({
+    ...row,
+    authority_level: row.level,
+    authority_value: row.value,
+    source: row.source_type,
+  }));
 }
 
 function buildParameterIndex(parameters) {
