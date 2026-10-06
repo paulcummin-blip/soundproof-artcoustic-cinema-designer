@@ -21,6 +21,13 @@
  *               result for, at the level the sentence's own adjective claims? A
  *               result the evidence states for one group is never written as a
  *               result for every seat.
+ *   STAGE       is this sentence design-stage commentary — what still needs
+ *               attention, improvement, calibration, optimisation or further
+ *               design work, or a correction to come? The proposal states the
+ *               finished design, so that wording is refused rather than written:
+ *               where an issue genuinely undermines the design, the refusal is
+ *               what holds the copy for human review instead of the writer
+ *               proposing a correction.
  *
  * Two boundaries are deliberate and worth stating plainly:
  *
@@ -61,6 +68,7 @@ import {
   sentenceParts,
   stripOptionNames,
 } from './writerVocabulary.js';
+import { designStageCommentary } from './writerDesignStageRules.js';
 
 /** A comparative in front of an area claims more of it: "a larger screen". */
 const COMPARATIVES = 'more|larger|bigger|wider|greater|better|higher|superior|increased|additional|extra|further|stronger|deeper';
@@ -368,6 +376,18 @@ export function scanProse({ input, vocabulary, section, text, claims = [], claim
       found.push(violation(WRITER_REJECTION.UNSUPPORTED_RECOMMENDATION, {
         section,
         detail: 'the_pack_allows_no_recommendation',
+      }));
+    }
+
+    // Design-stage commentary: the proposal states the finished design, so a
+    // sentence that tells the client what still needs attention, calibration,
+    // optimisation or further work is refused. The refusal is also how a genuine
+    // material issue reaches a human: it is never written up as advice.
+    const designStage = designStageCommentary(claimed);
+    if (designStage) {
+      found.push(violation(WRITER_REJECTION.DESIGN_STAGE_COMMENTARY, {
+        section,
+        detail: `design_stage_commentary:${designStage.rule}`,
       }));
     }
 

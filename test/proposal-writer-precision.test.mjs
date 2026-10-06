@@ -60,6 +60,9 @@ test('the saved live Marquee draft now validates cleanly', () => {
   assert.equal(saved.recorded_validation_errors.length, 18, 'the generation recorded eighteen flags');
   assert.equal(result.valid, true, JSON.stringify(result.violations));
   assert.deepEqual(result.violations, []);
+  // The copy states bass as output authority and never reviews the design, so
+  // the proposal-stage rule finds nothing to refuse in it either.
+  assert.equal(codes(result).includes(WRITER_REJECTION.DESIGN_STAGE_COMMENTARY), false);
   assert.equal(result.sections.length, 9);
   assert.equal(result.pack_fingerprint, input.evidence_pack.pack_fingerprint);
   assert.ok(result.sections.every((entry) => entry.words > 0 && entry.words <= entry.word_limit));
@@ -268,7 +271,7 @@ test('the same claims pass where P20 supports the consistency', () => {
   }
 });
 
-test('naming consistency as an open item passes, worded either way', () => {
+test('naming consistency as an open item is refused as design-stage commentary', () => {
   const p20 = claimOf('p20', 'modest_result') || claimOf('p20', 'shared_result');
   const grounded = [p20?.claim_id].filter(Boolean);
 
@@ -276,10 +279,18 @@ test('naming consistency as an open item passes, worded either way', () => {
     'Bass consistency remains an area for calibration attention.',
     'Seat-to-seat consistency still needs calibration attention.',
   ]) {
-    // The section holds this sentence alone, so its word count is not what is
-    // being read here: the copy has to be valid outright.
+    // The sentence is not a consistency claim, so it is not refused as one: a
+    // proposal does not review the design, and that is what it is refused for.
     const result = validate(replaceSection('overall_design', sentence, grounded));
-    assert.equal(result.valid, true, `${sentence} -> ${JSON.stringify(result.violations)}`);
+    assert.ok(
+      codes(result).includes(WRITER_REJECTION.DESIGN_STAGE_COMMENTARY),
+      `${sentence} -> ${JSON.stringify(result.violations)}`,
+    );
+    assert.equal(
+      codes(result).includes(WRITER_REJECTION.P20_BASS_CONTRADICTION),
+      false,
+      `${sentence} is not a consistency claim`,
+    );
   }
 });
 

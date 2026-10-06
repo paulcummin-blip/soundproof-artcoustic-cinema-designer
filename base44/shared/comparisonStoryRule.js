@@ -118,7 +118,7 @@ const SECTION_FOCUS = Object.freeze({
 
   timbre_matching: [
     'FOR THIS SECTION (ceiling: 150 words): the tonal story, and nothing else. State the screen timbre (P16) and surround and overhead timbre (P17) position in one or two sentences — where both options are strong, say so plainly and move on — and give the bass its one honest sentence where the evidence states one: bass extension (P18), bass response at the listening position (P19) or bass consistency between seats (P20).',
-    'Say what tonal consistency gives the room as a sound travels from the screen into the surround and height layers. Do not repeat every P16 and P17 result, do not re-tell the headroom story, and where bass consistency is the same in both options, say that it still needs calibration attention rather than claiming an improvement.',
+    'Say what tonal consistency gives the room as a sound travels from the screen into the surround and height layers. Do not repeat every P16 and P17 result, do not re-tell the headroom story, and where bass consistency is the same in both options, state that plainly rather than claiming an improvement, and never add design-stage advice about it.',
   ].join('\n'),
 
   key_performance_highlights: [

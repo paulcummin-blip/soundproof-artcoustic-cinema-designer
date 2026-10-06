@@ -137,8 +137,8 @@ export default function DecisionSummaryPage({
 
         {p20 && p20.identical === true ? (
           <p>
-            What does not change: both designs still need calibration attention for seat-to-seat bass
-            consistency. The stronger specification improves output authority, not full-seat uniformity.
+            What does not change: seat-to-seat bass consistency is the same in both designs. The
+            stronger specification improves output authority rather than seat-to-seat consistency.
           </p>
         ) : null}
 

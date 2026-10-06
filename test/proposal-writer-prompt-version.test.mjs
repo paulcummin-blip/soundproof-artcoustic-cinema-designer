@@ -3,11 +3,13 @@
 // generation made before the writing authority changed, and one made after it.
 //
 // The authority gained the proposal sales authority and began to be carried as
-// ONE block rather than spread character by character. Both are material changes
-// to what the writer reads, so the version moved to 2 and every new record must
-// store it. The live generation the review was run on is the fixture: it keeps
-// the version it was filed under, its stored input is never rewritten, and the
-// pack and contract it cites are unchanged — only the prompt version moved.
+// ONE block rather than spread character by character, and it later gained the
+// proposal-stage rule that sells what is strong and refuses design-stage
+// commentary. Both are material changes to what the writer reads, so the version
+// moved to 2 and then to 4, and every new record must store it. The live
+// generation the review was run on is the fixture: it keeps the version it was
+// filed under, its stored input is never rewritten, and the pack and contract it
+// cites are unchanged — only the prompt version moved.
 //
 // No GPT call is made here.
 import { test } from 'vitest';
@@ -24,15 +26,17 @@ const historical = JSON.parse(readFileSync(new URL('./fixtures/marqueeLiveGenera
 const pack = historical.input.evidence_pack;
 
 const VERSION_1 = 'proposal-writer-prompt-1';
-const VERSION_2 = 'proposal-writer-prompt-3';
+const VERSION_3 = 'proposal-writer-prompt-3';
+const CURRENT = 'proposal-writer-prompt-4';
 
-test('the writer prompt version is 3', () => {
-  assert.equal(WRITER_PROMPT_VERSION, VERSION_2);
+test('the writer prompt version is 4', () => {
+  assert.equal(WRITER_PROMPT_VERSION, CURRENT);
+  assert.notEqual(CURRENT, VERSION_3, 'the proposal-stage change is a new generation');
 });
 
 test('a new writer input carries the current prompt version', () => {
   const input = buildWriterInput({ pack });
-  assert.equal(input.prompt_version, VERSION_2);
+  assert.equal(input.prompt_version, CURRENT);
 });
 
 test('a new generation records the current prompt version', () => {
@@ -48,8 +52,8 @@ test('a new generation records the current prompt version', () => {
     generationNumber: 1,
   });
 
-  assert.equal(record.prompt_version, VERSION_2);
-  assert.equal(record.gpt_input.prompt_version, VERSION_2);
+  assert.equal(record.prompt_version, CURRENT);
+  assert.equal(record.gpt_input.prompt_version, CURRENT);
   assert.equal(record.contract_version, historical.contract_version, 'the contract generation it was written under is unchanged');
 });
 
@@ -77,5 +81,5 @@ test('the full writing authority is carried as one intact block', () => {
     [],
     'no line of the prompt is a single character: the authority is not spread',
   );
-  assert.ok(prompt.includes(VERSION_2), 'the prompt carries the input, which states the version it was written under');
+  assert.ok(prompt.includes(CURRENT), 'the prompt carries the input, which states the version it was written under');
 });
