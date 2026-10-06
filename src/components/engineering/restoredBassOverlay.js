@@ -153,17 +153,19 @@ export function applyRestoredBassAuthority(summary, { projectId, versionId, comp
     const existing = roomResults[id] || roomResults[String(id)] || {};
     // Preserve each already-published result independently. A complete P14
     // must not prevent a missing P19 or placeholder P20 from being restored.
-    if (statesBassResultEntry(existing)) continue;
+    // The current durable contract replaces the entire old value/grade pair.
     if (!statesBassResultEntry({ value: parameter?.rawValue, formatted: parameter?.valueText })) continue;
     roomResults[id] = {
-      ...existing,
       ...parameter,
       status: parameter.status,
       value: parameter.rawValue ?? null,
       formatted: parameter.valueText,
       level: parameter.level ?? null,
-      detail: parameter.detail ?? existing.detail ?? null,
-      targetBasis: parameter.targetBasis ?? existing.targetBasis ?? null,
+      detail: parameter.detail ?? null,
+      targetBasis: parameter.targetBasis ?? null,
+      authority_fingerprint: authority.currentFingerprint,
+      authority_timestamp: authority.contract?.job?.completedAt ?? authority.contract?.completedAt ?? null,
+      source_type: 'durable-current-bass-authority',
       restoredFromSavedBassAuthority: true,
     };
     overlaid = true;
@@ -202,7 +204,7 @@ export function applyRestoredBassAuthority(summary, { projectId, versionId, comp
       multiplier: scored ? (LEVEL_MULTIPLIERS[level] ?? existing.multiplier ?? 0) : existing.multiplier,
       effectiveWeight: Number.isFinite(effectiveWeight) ? effectiveWeight : existing.effectiveWeight,
       mode,
-      rawValue: parameter.rawValue ?? existing.rawValue ?? null,
+      rawValue: parameter.rawValue ?? null,
       restoredFromSavedBassAuthority: overlaidIds.has(id) || existing.restoredFromSavedBassAuthority === true,
     };
     if (next.state !== existing.state
@@ -234,8 +236,7 @@ export function applyRestoredBassAuthority(summary, { projectId, versionId, comp
         const previous = seats[seatId] || {};
         const seatLevel = normaliseLevel(seat.level) || previous.level || null;
         const seatMultiplier = LEVEL_MULTIPLIERS[seatLevel] ?? previous.multiplier ?? 0;
-        if (previous.state === "scored"
-          && statesBassResultEntry({ value: previous.rawValue, formatted: previous.formatted })) {
+        if (false) { // Current bass authority replaces each seat value and grade together.
           if (previous.level !== seatLevel || previous.multiplier !== seatMultiplier) {
             seats[seatId] = {
               ...previous,
@@ -253,6 +254,9 @@ export function applyRestoredBassAuthority(summary, { projectId, versionId, comp
           level: seatLevel,
           multiplier: seatMultiplier,
           rawValue: raw,
+          authority_fingerprint: authority.currentFingerprint,
+          authority_timestamp: authority.contract?.job?.completedAt ?? authority.contract?.completedAt ?? null,
+          source_type: 'durable-current-bass-authority',
           reason: null,
           restoredFromSavedBassAuthority: true,
         };
@@ -326,6 +330,9 @@ export function applyRestoredBassAuthority(summary, { projectId, versionId, comp
               valueFormatted: `±${raw.toFixed(1)} dB`,
               level: Number.isFinite(Number(seat.level)) ? `L${Math.max(1, Number(seat.level))}` : row.level,
               value: raw,
+              authority_fingerprint: authority.currentFingerprint,
+              authority_timestamp: authority.contract?.job?.completedAt ?? authority.contract?.completedAt ?? null,
+              source_type: 'durable-current-bass-authority',
               status: "scored",
               worstFrequencyHz: seat.worstFrequencyHz ?? row.worstFrequencyHz ?? null,
               restoredFromSavedBassAuthority: true,
@@ -339,6 +346,7 @@ export function applyRestoredBassAuthority(summary, { projectId, versionId, comp
   return {
     ...summary,
     roomResultsByParameter: roomResults,
+    bassAuthorityFingerprint: authority.currentFingerprint,
     parameterAuthority,
     parameterSummaries: rebuilt?.parameterSummaries || summary.parameterSummaries,
     primary: rebuilt?.primary ? { ...summary.primary, ...rebuilt.primary } : summary.primary,
