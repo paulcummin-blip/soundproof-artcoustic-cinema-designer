@@ -9,6 +9,8 @@
  * Pure. Identical vocabulary to the shared module.
  */
 
+import { auditPublicationContract } from '../../../shared/engineeringPublicationContract.js';
+
 export const PUBLICATION_ACKNOWLEDGEMENT = Object.freeze({
   DURABLE: 'durably_published',
   NOT_PUBLISHED: 'not_published',
@@ -138,7 +140,7 @@ export function auditPublicationEntry(
   const fingerprintMatches = !expectedFingerprint
     || publication.engineering_fingerprint === expectedFingerprint;
   const report = publicationSectionReport(publication, { project, bassAuthorityAvailable });
-  const missing = [...report.missing];
+  const missing = [...report.missing, ...auditPublicationContract(publication).missing.map(reason => ({key:reason,label:reason}))];
   if (!fingerprintMatches) missing.unshift(section('pointer_match'));
 
   const complete = missing.length === 0;
