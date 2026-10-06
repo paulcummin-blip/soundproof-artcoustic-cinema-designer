@@ -13,6 +13,7 @@ import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { WRITER_REJECTION } from '../base44/shared/proposalWriter/writerContractSchema.js';
+import { BLOCK_REASON } from '../base44/shared/proposalEvidence/evidencePackSchema.js';
 import { validateWriterOutput } from '../base44/shared/proposalWriter/writerOutputValidator.js';
 
 const saved = JSON.parse(readFileSync(new URL('./fixtures/marqueeLiveGeneration.json', import.meta.url), 'utf8'));
@@ -204,4 +205,96 @@ test('a recommendation is still refused where the pack allows none', () => {
     codes(validate(draft)).includes(WRITER_REJECTION.UNSUPPORTED_RECOMMENDATION),
     false,
   );
+});
+
+/* ── Seat-to-seat consistency, where P20 supports none ─────────────────────── */
+
+/** The claims a client reads as "there are no weak seats in this room". */
+const SEAT_CONSISTENCY = [
+  'The bass remains consistent across the seating area.',
+  'Bass response is consistent across all seats.',
+  'The system delivers even bass across the seats.',
+  'The result is uniform bass across the room.',
+  'Every seat gets the same bass.',
+  'You hear similar bass in every seat.',
+  'There are no bad seats in this design.',
+  'There are no cheap seats in this room.',
+];
+
+/** The saved draft with one section's text replaced, so its word count stays inside its limit. */
+const replaceSection = (section, text, claimIds = []) => {
+  const copy = JSON.parse(JSON.stringify(draft));
+  const target = copy.sections.find((entry) => entry.section === section);
+  target.text = text;
+  target.claim_ids = claimIds;
+  return copy;
+};
+
+/** The same input, with P20 no longer blocking a seat-to-seat consistency claim. */
+const p20Supported = () => ({
+  ...input,
+  bass: {
+    ...input.bass,
+    blocked: (input.bass.blocked || []).filter((entry) => entry.reason !== BLOCK_REASON.NO_SOLVED_BASS_CONSISTENCY),
+  },
+});
+
+test('a seat-to-seat consistency claim is refused where P20 does not support it', () => {
+  assert.equal(
+    input.bass.blocked.some((entry) => entry.reason === BLOCK_REASON.NO_SOLVED_BASS_CONSISTENCY),
+    true,
+    'the live pack records that P20 supports no seat-to-seat consistency',
+  );
+
+  for (const sentence of SEAT_CONSISTENCY) {
+    const result = validate(amend('overall_design', sentence));
+    assert.ok(
+      codes(result).includes(WRITER_REJECTION.P20_BASS_CONTRADICTION),
+      `${sentence} -> ${JSON.stringify(result.violations)}`,
+    );
+  }
+});
+
+test('the same claims pass where P20 supports the consistency', () => {
+  const supported = p20Supported();
+
+  for (const sentence of SEAT_CONSISTENCY) {
+    const result = validate(amend('overall_design', sentence), supported);
+    assert.equal(
+      codes(result).includes(WRITER_REJECTION.P20_BASS_CONTRADICTION),
+      false,
+      `${sentence} -> ${JSON.stringify(result.violations)}`,
+    );
+  }
+});
+
+test('naming consistency as an open item passes, worded either way', () => {
+  const p20 = claimOf('p20', 'modest_result') || claimOf('p20', 'shared_result');
+  const grounded = [p20?.claim_id].filter(Boolean);
+
+  for (const sentence of [
+    'Bass consistency remains an area for calibration attention.',
+    'Seat-to-seat consistency still needs calibration attention.',
+  ]) {
+    // The section holds this sentence alone, so its word count is not what is
+    // being read here: the copy has to be valid outright.
+    const result = validate(replaceSection('overall_design', sentence, grounded));
+    assert.equal(result.valid, true, `${sentence} -> ${JSON.stringify(result.violations)}`);
+  }
+});
+
+test('the bass wording the pack does allow still passes', () => {
+  for (const sentence of [
+    'The additional subwoofer package adds bass output authority.',
+    'The design brings more bass impact.',
+    'Bass extension reaches further down.',
+    'The response is controlled at the RSP.',
+  ]) {
+    const result = validate(amend('overall_design', sentence));
+    assert.equal(
+      codes(result).includes(WRITER_REJECTION.P20_BASS_CONTRADICTION),
+      false,
+      `${sentence} -> ${JSON.stringify(result.violations)}`,
+    );
+  }
 });
