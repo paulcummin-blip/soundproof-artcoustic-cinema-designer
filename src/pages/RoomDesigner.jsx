@@ -1986,6 +1986,10 @@ function RoomDesignerWithState() {
       useFrontGlobal: appState.useFrontGlobal,
       useMidGlobal: appState.useMidGlobal,
       useRearGlobal: appState.useRearGlobal,
+      // Freeze report facts at the assessment producer, never at report read time.
+      placedSpeakers,
+      frontSubsCfg: appState.frontSubsCfg,
+      rearSubsCfg: appState.rearSubsCfg,
       // Subwoofers
       subwooferInstances: appState.subwooferInstances,
       // Screen
@@ -2012,7 +2016,7 @@ function RoomDesignerWithState() {
       aimRearSurroundsAtMLP: appState.aimRearSurroundsAtMLP,
       aimSideSurroundsAtMLP: appState.aimSideSurroundsAtMLP,
     };
-  }, [appState]);
+  }, [appState, placedSpeakers]);
 
   const engineeringPublication = useEngineeringPublicationEffect({
     projectId: resolvedProjectId || projectIdState || null,
