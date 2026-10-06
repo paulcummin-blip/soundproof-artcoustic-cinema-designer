@@ -586,7 +586,7 @@ export function resolvePersistedBassAuthority(projectId, persisted, { bankTarget
   // current_fingerprint the bank still holds is a real saved contract: the
   // parent row's stale/updating flag is metadata written when the identity was
   // produced, not evidence that the design moved on.
-  const bankCandidate = !snapshotCurrent && currentFingerprint
+  const bankCandidate = currentFingerprint
     ? findSavedContractForFingerprint({ bankTargets, fingerprint: currentFingerprint }).contract
     : null;
   const bankCurrent = bankCandidate
@@ -595,7 +595,12 @@ export function resolvePersistedBassAuthority(projectId, persisted, { bankTarget
     && bankCandidate.metricSchemaVersion === RP22_BASS_METRIC_SCHEMA_VERSION
     ? bankCandidate
     : null;
-  const matchingCurrent = snapshotCurrent || bankCurrent || null;
+  // A compact map entry may omit its completion timestamp. The verified bank
+  // contract for this exact pointer is the intact authority, not a timestamp
+  // borrowed from a different result.
+  const matchingCurrent = snapshotCurrent && !snapshotCurrent.job?.completedAtMs
+    && bankCurrent?.job?.completedAtMs && isAuthoritativeBassContract(bankCurrent)
+    ? bankCurrent : (snapshotCurrent || bankCurrent || null);
   // Reconcile contradictory parent metadata on hydration. A matching child
   // that independently satisfies the full authoritative contract must win
   // over a stale/updating parent flag; otherwise an already-complete result
@@ -653,7 +658,7 @@ export function resolvePersistedBassAuthority(projectId, persisted, { bankTarget
     authorityStatus,
     currentFingerprint,
     // Which saved store the current authority came from — proof for diagnostics.
-    authoritySource: snapshotCurrent ? "completed_by_fingerprint" : (bankCurrent ? "target_cache" : null),
+    authoritySource: contract === bankCurrent ? "target_cache" : (snapshotCurrent ? "completed_by_fingerprint" : null),
     contract: structurallyComplete ? contract : null,
     structurallyComplete,
     authoritative,
