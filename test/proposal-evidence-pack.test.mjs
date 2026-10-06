@@ -257,6 +257,7 @@ test('the pack modules can reach no live project, entity client or session store
     './proposalEvidenceClaims.js',
     './proposalEvidenceDesignClaims.js',
     './proposalEvidenceIdentity.js',
+    './proposalEvidenceSeatScopes.js',
     './proposalEvidenceWording.js',
     '../comparisonTable.js',
     '../comparisonClientMeaning.js',

@@ -16,6 +16,11 @@
  *               claims a client reads as "there are no weak seats", sentence by
  *               sentence. Consistency named as an open item, and a claim that is
  *               denied, are not claims.
+ *   SCOPE       is the seating scope this sentence names — the primary seats, the
+ *               secondary seats, or the seating area — one the pack states a
+ *               result for, at the level the sentence's own adjective claims? A
+ *               result the evidence states for one group is never written as a
+ *               result for every seat.
  *
  * Two boundaries are deliberate and worth stating plainly:
  *
@@ -37,7 +42,9 @@ import {
   assertionKind,
   blockPatterns,
   blockedChangeBlocks,
+  claimLevels,
   hasRecommendationClaim,
+  isNarrowScopeClaim,
   isPackProse,
   isProductToken,
   isRecommendation,
@@ -48,6 +55,9 @@ import {
   p20BlocksConsistency,
   packProseSentences,
   parameterIds,
+  SCOPE_ADJECTIVE_LEVEL,
+  scopeAdjectiveInText,
+  seatScopeInText,
   sentenceParts,
   stripOptionNames,
 } from './writerVocabulary.js';
@@ -246,6 +256,46 @@ function assertedKind(sentence, anchors) {
   return isDenied(sentence, at) ? null : kind;
 }
 
+/**
+ * Whether a sentence makes a seat-group claim at a scope the pack does not state.
+ *
+ * A sentence naming the primary seats has to cite a claim the pack states for the
+ * primary seats; one naming the secondary seats, a claim for the secondary seats;
+ * and a sentence about the seating area or the room has to cite support that is
+ * not scoped to one group at all — so a strong result for one group can never be
+ * presented as a result for every seat. Where the sentence carries one of the
+ * scoped adjectives, a cited claim for that scope has to state the level the
+ * adjective reads as, so a result cannot be written one grade higher than the
+ * evidence states it.
+ *
+ * @returns {string|null} the reason, or null when the sentence is sound
+ */
+function scopedClaimIssue({ sentence, scope, claims }) {
+  if (!scope) return null;
+
+  const adjective = scopeAdjectiveInText(sentence);
+  // Only a sentence that states a seat-group result is held to this rule.
+  if (!adjective && !seatConsistencyClaim(sentence)) return null;
+
+  const cited = Array.isArray(claims) ? claims : [];
+  const supporting = scope === 'all'
+    ? cited.filter((claim) => !isNarrowScopeClaim(claim))
+    : cited.filter((claim) => isNarrowScopeClaim(claim) && claim.scope === scope);
+
+  if (supporting.length === 0) {
+    return scope === 'all'
+      ? 'the_seating_area_needs_evidence_that_is_not_scoped_to_one_group'
+      : `no_${scope}_seat_result_is_stated_for_this_pack`;
+  }
+
+  if (!adjective) return null;
+  const required = SCOPE_ADJECTIVE_LEVEL[adjective];
+  const stated = supporting.some((claim) => claimLevels(claim).has(required));
+  return stated
+    ? null
+    : `${adjective.toLowerCase()}_is_not_stated_for_${scope === 'all' ? 'every_seat' : `the_${scope}_seats`}`;
+}
+
 /** The option a version ID belongs to, as the draft would name it. */
 function optionNameById(input, versionId) {
   const option = (Array.isArray(input?.evidence_pack?.options) ? input.evidence_pack.options : [])
@@ -321,11 +371,16 @@ export function scanProse({ input, vocabulary, section, text, claims = [], claim
       }));
     }
 
+    const seatScope = seatScopeInText(claimed);
+
     // Seat-to-seat consistency, where P20 does not support it: no sentence may
-    // claim it, however the claim is worded. The pack's own prohibited phrasings
-    // are caught below, over the whole text; this is the reading that also
-    // catches "consistent across the seating area", which carries none of them.
-    if (p20BlocksConsistency(input)) {
+    // claim it for the seating area as a whole, or without naming a scope at all.
+    // The pack's own prohibited phrasings are caught below, over the whole text;
+    // this is the reading that also catches "consistent across the seating area",
+    // which carries none of them. A sentence that names the primary or the
+    // secondary seats is judged by the scoped rule beneath: that is the one place
+    // a narrower scope may be positive while the room is not.
+    if (p20BlocksConsistency(input) && seatScope !== 'primary' && seatScope !== 'secondary') {
       const claim = seatConsistencyClaim(claimed);
       if (claim) {
         // A denial of the claim, or consistency named as an open item, is not
@@ -338,6 +393,14 @@ export function scanProse({ input, vocabulary, section, text, claims = [], claim
           }));
         }
       }
+    }
+
+    // Scoped seat-group claims: the scope a sentence names has to be the scope
+    // the pack states that result at, at the level its own adjective claims, and
+    // a narrower result may never be written as a wider one.
+    const scopedIssue = scopedClaimIssue({ sentence: claimed, scope: seatScope, claims: citedClaims });
+    if (scopedIssue) {
+      found.push(violation(WRITER_REJECTION.SCOPE_MISMATCH, { section, detail: scopedIssue }));
     }
   }
 

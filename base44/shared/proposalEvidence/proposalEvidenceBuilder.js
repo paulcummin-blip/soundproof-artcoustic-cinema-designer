@@ -53,6 +53,7 @@ import {
   buildDesignClaims,
   emptyBassClaims,
 } from './proposalEvidenceDesignClaims.js';
+import { buildScopedSeatClaims } from './proposalEvidenceSeatScopes.js';
 import { assertBassWordingSafe } from './proposalEvidenceWording.js';
 
 /** Deterministic key order, so the same content always serialises identically. */
@@ -112,6 +113,11 @@ export function buildProposalEvidence({ versions = [], generatedAt = null } = {}
   const allowedClaims = compared
     ? [
       ...buildAllowedClaims(classification, options),
+      // The scoped seat-group claims: a result the saved evidence states for the
+      // primary or the secondary seats, at a level that carries a positive
+      // adjective. Minted per option, and only where that option's evidence
+      // states the scope's own level and the scope holds at least two seats.
+      ...options.flatMap((option, index) => buildScopedSeatClaims(option, index)),
       ...buildDesignClaims(classification, options, decisionFraming),
     ]
     : [];

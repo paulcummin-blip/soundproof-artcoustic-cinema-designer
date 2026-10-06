@@ -307,6 +307,20 @@ export function buildBassClaims(classification = [], options = [], allowedClaims
     }
   }
 
+  // A scoped seat-group result is allowed whatever the whole-seat result says:
+  // the saved reports state it for that scope, so it may be described for that
+  // scope alone. It never widens the rule above.
+  for (const scoped of claims.filter(
+    (claim) => claim.kind === CLAIM_KIND.SCOPED_RESULT && claim.area === 'p20',
+  )) {
+    allowed.push({
+      claim_id: scoped.claim_id,
+      scope: 'seat_to_seat_consistency',
+      seat_scope: scoped.scope,
+      text: scoped.statement,
+    });
+  }
+
   const blocked = supported
     ? []
     : [{

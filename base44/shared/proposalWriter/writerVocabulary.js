@@ -409,6 +409,48 @@ export function isRecommendation(text) {
   return RECOMMEND_WORDS.test(String(text || ''));
 }
 
+/* ── Scoped seat-group claims ──────────────────────────────────────────────── */
+
+/**
+ * The client adjectives a scoped claim is worded with, and the Performance Level
+ * each one has to be supported by. The same mapping the pack mints its scoped
+ * claims with, read here so a draft's own wording can be held to it.
+ */
+export const SCOPE_ADJECTIVE_LEVEL = Object.freeze({ Excellent: 'L4', Great: 'L3', Good: 'L2' });
+
+/** The seating scope a sentence names, or null when it names none. */
+export function seatScopeInText(text) {
+  const sentence = String(text || '');
+  if (sentence.length === 0) return null;
+  if (/\b(?:primary|principal|main)\s+(?:seats?|listening\s+positions?|positions?)\b/i.test(sentence)) return 'primary';
+  if (/\bsecondary\s+(?:seats?|listening\s+positions?|positions?)\b/i.test(sentence)) return 'secondary';
+  if (/\b(?:all|every|each)\s+(?:of\s+the\s+)?seats?\b/i.test(sentence)) return 'all';
+  if (/\bthe\s+seating\b|\bthe\s+seats\b|\bthe\s+room\b|\bthe\s+whole\s+room\b/i.test(sentence)) return 'all';
+  return null;
+}
+
+/** The client adjective a sentence uses, or null. */
+export function scopeAdjectiveInText(text) {
+  const match = /\b(Excellent|Great|Good)\b/i.exec(String(text || ''));
+  if (!match) return null;
+  return match[1][0].toUpperCase() + match[1].slice(1).toLowerCase();
+}
+
+/** Every Performance Level a claim states: its own scoped level, or the levels behind it. */
+export function claimLevels(claim) {
+  const levels = new Set();
+  if (/^L[1-4]$/.test(String(claim?.level ?? ''))) levels.add(String(claim.level));
+  for (const level of Array.isArray(claim?.levels) ? claim.levels : []) {
+    if (/^L[1-4]$/.test(String(level))) levels.add(String(level));
+  }
+  return levels;
+}
+
+/** Whether a claim states a result for one seating group rather than for every seat. */
+export function isNarrowScopeClaim(claim) {
+  return claim?.scope === 'primary' || claim?.scope === 'secondary';
+}
+
 /**
  * Whether the claim kinds a section cites can support what the sentence asserts.
  * A gain needs a claim that allows a gain; a change needs a claim that records a

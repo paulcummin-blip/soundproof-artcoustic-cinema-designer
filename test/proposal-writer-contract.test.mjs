@@ -38,7 +38,12 @@ import {
 } from './fixtures/proposalWriterFixtures.mjs';
 
 /** The recorded Marquee pack fingerprint, from the Phase 1 audit. */
-const MARQUEE_PACK_FINGERPRINT = '4fe44d7e';
+// The Marquee pack's own content fingerprint. It moved from 4fe44d7e when the
+// pack's P20 block gained the sentence that says which scope it governs — the
+// block is part of the pack, so its wording is part of what the fingerprint
+// identifies. Nothing else in the pack changed, and the draft's values are
+// untouched by it: this is the pack the audit's draft is still read against.
+const MARQUEE_PACK_FINGERPRINT = '77d48356';
 
 const pack = (versions = twoOptions()) => buildProposalEvidence({ versions, generatedAt: AT });
 const writerInput = (versions) => buildWriterInput({ pack: pack(versions) });

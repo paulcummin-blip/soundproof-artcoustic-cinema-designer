@@ -315,6 +315,9 @@ function buildSnapshot({ version, projectId, technicalEvidence, visualEvidence, 
       project_reference: identity.project_reference || null,
       dealer_name: identity.dealer_name || null,
       engineeringFingerprint: identity.source_fingerprint || null,
+      // The seat-priority set the report's scoped results were computed from, so
+      // a scoped claim can name the scope authority it rests on.
+      seatingFingerprint: identity.seating_fingerprint || null,
       generatedAt: identity.generated_at || null,
       technicalReportId: technicalRow?.id || null,
       visualReportId: visualRow?.id || null,
@@ -394,6 +397,10 @@ function buildSnapshot({ version, projectId, technicalEvidence, visualEvidence, 
       assessment_basis: rp22Facts.assessment_basis || null,
     },
     report_parameters: engineering.parameters,
+    // The scoped seat-group results the Technical Report states, or the Visual
+    // Report's copy of them, exactly as that report's evidence states them. Null
+    // where that evidence carries none, in which case no scoped claim exists.
+    seat_scopes: technicalEvidence.seat_scopes || visualEvidence.seat_scopes || null,
     bass: {
       available: engineering.bass.current === true,
       p14: engineering.bass.p14 ?? null,

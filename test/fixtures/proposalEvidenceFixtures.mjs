@@ -46,6 +46,7 @@ export function snapshot({
   roomDims = { length_m: 6, width_m: 4.5, height_m: 2.4 },
   roomText = '6.0 x 4.5 x 2.4 m',
   reports = {},
+  seatScopes = null,
 } = {}) {
   const parameters = Object.entries(levels).map(([parameter_id, level]) => {
     const value = values[parameter_id] ?? null;
@@ -112,6 +113,10 @@ export function snapshot({
     },
     rp22: { parameter_headlines: parameters, weaknesses: [], strengths: [] },
     report_parameters: parameters,
+    // The scoped seat-group results this version's saved reports state, or null
+    // for a version whose evidence states none — which is what every fixture but
+    // the scoped ones carries.
+    seat_scopes: seatScopes,
     bass: {
       available: true, p14: null, p18: null, p19: null, p20: null,
       subwoofer_strategy_summary: subwooferSummary,
@@ -197,4 +202,38 @@ export function marqueeOptions() {
       subwooferSummary: MARQUEE_SUBWOOFER_SUMMARY,
     }),
   ];
+}
+
+/* ── The scoped seat-group results a saved report states ─────────────────────
+   The levels come from the published engineering summary's own per-scope
+   parameter summaries; the seat count is the number of seats that scope holds.
+   Nothing here is aggregated: a parameter with no stated level carries null, and
+   a scope with no stated level is not available. */
+
+/** One scope's stated result: the level per parameter, and how many seats it holds. */
+export function scopeBlock(levels = {}, seatCount = 3) {
+  const parameters = {};
+  for (const [key, level] of Object.entries(levels)) {
+    parameters[key] = {
+      level: /^L[1-4]$/.test(String(level ?? '')) ? String(level) : null,
+      parameter_scope: 'seat',
+    };
+  }
+  return {
+    available: Object.values(parameters).some((entry) => entry.level !== null),
+    seat_count: seatCount,
+    parameters,
+  };
+}
+
+/** The three scopes a version's saved reports state, as its evidence carries them. */
+export function seatScopes({
+  primary = {}, secondary = {}, all = {},
+  primarySeats = 3, secondarySeats = 3, allSeats = 6,
+} = {}) {
+  return {
+    primary: scopeBlock(primary, primarySeats),
+    secondary: scopeBlock(secondary, secondarySeats),
+    all: scopeBlock(all, allSeats),
+  };
 }

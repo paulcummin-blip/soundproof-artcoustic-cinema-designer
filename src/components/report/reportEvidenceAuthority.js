@@ -262,7 +262,7 @@ function canonicalise(value) {
 /** A stable content fingerprint: the same facts always give the same value. */
 export function evidenceFingerprint(evidence) {
   if (!evidence || typeof evidence !== 'object') return null;
-  const { identity = {}, room, screen, seating, system, parameters, bass } = evidence;
+  const { identity = {}, room, screen, seating, system, parameters, seat_scopes: seatScopes, bass } = evidence;
   const frozen = {
     identity: {
       project_id: identity.project_id,
@@ -272,7 +272,7 @@ export function evidenceFingerprint(evidence) {
       bass_fingerprint: identity.bass_fingerprint,
       seating_fingerprint: identity.seating_fingerprint,
     },
-    room, screen, seating, system, parameters, bass,
+    room, screen, seating, system, parameters, seat_scopes: seatScopes, bass,
   };
   const text = canonicalise(frozen);
   // FNV-1a, 32-bit, hex — small, dependency-free and stable across runtimes.
@@ -394,6 +394,48 @@ function buildReportFacts(captured = {}) {
 }
 
 /**
+ * The scoped seat-group results the saved reports state for this version: the
+ * level each scope reached for each parameter — the primary seats, the secondary
+ * seats, and every seat — with the number of seats that scope holds.
+ *
+ * Both are read, never derived. The levels come from the published engineering
+ * summary's own per-scope parameter summaries (its rating authority computed
+ * them, not this module), and the seat counts come from the seats' own recorded
+ * priorities. A scope the capture does not state level data for reports
+ * `available: false` and carries no level, so no scoped claim can be minted for
+ * it; a seat with no recorded priority is not counted as a primary seat, so a
+ * legacy project never gains a scope result it did not state.
+ */
+function buildSeatScopes(captured) {
+  const scoped = captured?.report_engineering_summary?.parameterSummaries || null;
+  const seats = Array.isArray(captured?.seats) ? captured.seats : [];
+  const priorityCount = (priority) => seats
+    .filter((seat) => String(seat?.priority || '').toLowerCase() === priority).length;
+
+  const scopeBlock = (source, seatCount) => {
+    const parameters = {};
+    for (const [key, parameter] of Object.entries(source || {})) {
+      if (!/^p\d+$/.test(key)) continue;
+      parameters[key] = {
+        level: /^L[1-4]$/.test(String(parameter?.level ?? '')) ? String(parameter.level) : null,
+        parameter_scope: asText(parameter?.scope) || null,
+      };
+    }
+    return {
+      available: Object.values(parameters).some((entry) => entry.level !== null),
+      seat_count: seatCount,
+      parameters,
+    };
+  };
+
+  return {
+    primary: scopeBlock(scoped?.primary, priorityCount('primary')),
+    secondary: scopeBlock(scoped?.secondary, priorityCount('secondary')),
+    all: scopeBlock(scoped?.project, seats.length),
+  };
+}
+
+/**
  * Assemble the evidence snapshot from the same frozen capture the human report
  * is saved with. `captured` is the report's own frozen proposal source.
  */
@@ -411,6 +453,10 @@ export function buildReportEvidence({ reportType, captured, sourceFingerprint = 
     system: buildSystem(captured),
     parameters,
     parameter_index: buildParameterIndex(parameters),
+    // The scoped seat-group results, per parameter and per scope, as the saved
+    // reports state them. Nothing is aggregated: a scope the capture does not
+    // state a level for carries none.
+    seat_scopes: buildSeatScopes(captured),
     bass: buildBass(captured),
     // The remaining report facts a proposal states, from the same frozen capture.
     report_facts: buildReportFacts(captured),

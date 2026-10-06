@@ -24,18 +24,18 @@ const historical = JSON.parse(readFileSync(new URL('./fixtures/marqueeLiveGenera
 const pack = historical.input.evidence_pack;
 
 const VERSION_1 = 'proposal-writer-prompt-1';
-const VERSION_2 = 'proposal-writer-prompt-2';
+const VERSION_2 = 'proposal-writer-prompt-3';
 
-test('the writer prompt version is 2', () => {
+test('the writer prompt version is 3', () => {
   assert.equal(WRITER_PROMPT_VERSION, VERSION_2);
 });
 
-test('a new writer input carries prompt 2', () => {
+test('a new writer input carries the current prompt version', () => {
   const input = buildWriterInput({ pack });
   assert.equal(input.prompt_version, VERSION_2);
 });
 
-test('a new generation records prompt 2', () => {
+test('a new generation records the current prompt version', () => {
   const input = buildWriterInput({ pack });
 
   const record = buildGenerationRecord({

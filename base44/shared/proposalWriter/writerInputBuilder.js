@@ -48,6 +48,22 @@ function allowedClaim(claim) {
     statement: claim?.statement ?? null,
     option: claim?.option ? { ...claim.option } : null,
     favours: claim?.favours === true,
+    // The seating scope this claim holds at, where it is a scoped result. A
+    // draft may make a primary- or secondary-seat claim only where the pack
+    // states that scope's own result, and a whole-seat claim may never rest on a
+    // narrower one.
+    scope: claim?.scope ?? null,
+    seat_count: claim?.seat_count ?? null,
+    level: claim?.level ?? null,
+    wording_class: claim?.wording_class ?? null,
+    wording: claim?.wording ?? null,
+    authority_fingerprint: claim?.authority_fingerprint ?? null,
+    scope_fingerprint: claim?.scope_fingerprint ?? null,
+    // The Performance Levels the reports state behind this claim, so a client
+    // adjective can be held to the level it is claimed at.
+    levels: Array.isArray(claim?.basis?.levels)
+      ? claim.basis.levels.map((level) => String(level))
+      : [],
   };
 }
 

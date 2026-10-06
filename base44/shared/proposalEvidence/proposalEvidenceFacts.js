@@ -312,6 +312,20 @@ export function buildOptionFacts(entry, label) {
     },
   };
 
+  // The scoped seat-group results, added only where the saved evidence states
+  // them: per parameter and per scope, with the number of seats each scope holds,
+  // copied exactly and never aggregated. A version whose evidence states no
+  // scoped summary carries no such fact at all — so a pack built from unscoped
+  // evidence is unchanged, and no scoped claim can be minted from it.
+  if (snapshot.seat_scopes) {
+    frozen.facts.seat_scopes = snapshot.seat_scopes;
+  }
+  // The seat-priority set the report's scoped results were computed from, so a
+  // scoped claim can state the scope authority it rests on.
+  if (identity.seatingFingerprint) {
+    frozen.facts.fingerprints.seating_scope = identity.seatingFingerprint;
+  }
+
   // No prohibited bass claim may reach the pack, wherever a report wrote it: one
   // pass over the facts and the readings removes the phrase, keeps the rest of
   // the line it appeared in, and records the path and the rule that removed it —

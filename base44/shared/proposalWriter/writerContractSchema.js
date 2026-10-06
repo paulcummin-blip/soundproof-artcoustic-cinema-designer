@@ -25,16 +25,17 @@ export const WRITER_CONTRACT_VERSION = 1;
  * The writer prompt generation this contract is issued with.
  *
  * Bumped to 2 when the writing authority gained the proposal sales authority and
- * the authority began to be carried as one block: a generation before and after
- * that change must stay distinguishable in the append-only audit history, so
- * every new record stores this version. A historical record keeps the version it
- * was filed under and is never rewritten.
+ * the authority began to be carried as one block, and to 3 when the pack began
+ * to carry scoped seat-group claims and the writer gained the rule that governs
+ * them. A generation before and after either change must stay distinguishable in
+ * the append-only audit history, so every new record stores this version. A
+ * historical record keeps the version it was filed under and is never rewritten.
  *
  * The contract version is deliberately NOT bumped: the sections, the word
  * limits, the claim grounding rule and every rejection category are unchanged,
  * so a draft filed under generation 1 is still read against the same agreement.
  */
-export const WRITER_PROMPT_VERSION = 'proposal-writer-prompt-2';
+export const WRITER_PROMPT_VERSION = 'proposal-writer-prompt-3';
 
 /** The only pack generation a draft may be written from. */
 export const WRITER_ACCEPTED_PACK_SCHEMA_VERSION = 2;
@@ -83,6 +84,8 @@ export const WRITER_REJECTION = Object.freeze({
   UNSUPPORTED_IMPROVEMENT: 'unsupported_improvement',
   /** A seat-to-seat bass consistency claim the P20 result does not support. */
   P20_BASS_CONTRADICTION: 'p20_bass_contradiction',
+  /** A seat-group claim at a scope, or at a level, the pack does not state. */
+  SCOPE_MISMATCH: 'scope_mismatch',
   /** A section over its word limit. */
   SECTION_TOO_LONG: 'section_too_long',
 });
@@ -200,6 +203,7 @@ export const WRITER_WRITING_RULES = Object.freeze([
   'Never present a claim the pack blocks, and never describe a shared result as a change or a gain.',
   'Never recommend changing the design, and never describe the proposal as an upgrade path.',
   'Where P20 does not support seat-to-seat bass consistency, describe bass only as output authority, physical capability and the subwoofer specification.',
+  'State a primary-seat or a secondary-seat result only where the pack states that scope\'s own claim, word it for that scope alone, and never present it as a result for the seating area or the room.',
   'Write to the client: benefit-led, dealer-safe language, with no internal parameter codes and no engineering jargon.',
   'Keep every paragraph to one to three sentences, and keep every section inside its word limit.',
   'Explain what each recorded result means for the room, rather than naming the number and moving on.',

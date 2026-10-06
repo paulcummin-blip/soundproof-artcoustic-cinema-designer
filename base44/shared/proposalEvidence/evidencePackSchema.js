@@ -18,6 +18,16 @@
  * ------------------
  *   allowed claim   claim_<area>_<kind>_<nn>     e.g. claim_p12_material_gain_01
  *   blocked claim   block_<scope>_<reason>_<nn>  e.g. block_global_no_changed_values_01
+ *   scoped claim    claim_<area>_<scope>_<wording_class>_<nn>
+ *                   e.g. claim_p20_primary_consistency_01
+ *                        claim_p5_primary_spacing_01
+ *                        claim_p10_secondary_consistency_01
+ *
+ * A scoped claim is a result the saved evidence states for ONE seating scope
+ * (the primary seats or the secondary seats) rather than for every seat. It is
+ * minted only where that scope's own summary exists in the saved reports, so a
+ * draft can be positive about one group while the whole-seat result stays lower,
+ * and it can never be promoted to a wider scope.
  *
  * <area>  is a canonical area key (p12, system_layout, subwoofers, ...), or
  *         'design' for a claim about the design as a whole (credibility,
@@ -80,6 +90,8 @@ export const CLAIM_KIND = Object.freeze({
   CREDIBILITY: 'credibility',
   /** The stronger option where maximum performance and headroom are the priority. */
   RECOMMENDATION: 'recommendation',
+  /** A result the saved evidence states for one seating scope, not for every seat. */
+  SCOPED_RESULT: 'scoped_result',
 });
 
 /** Why a claim is blocked. Each reason carries its own client-safe sentence. */
@@ -185,4 +197,14 @@ export function buildClaimId(areaKey, kind, index = 1) {
 /** The stable ID of a blocked claim. */
 export function buildBlockId(scope, reason, index = 1) {
   return `block_${scope}_${reason}_${String(index).padStart(2, '0')}`;
+}
+
+/**
+ * The stable ID of a scoped claim: a result the evidence states for one seating
+ * scope ("claim_p20_primary_consistency_01"). The scope and the wording class are
+ * part of the ID, so a generated sentence can be traced to the scope it was
+ * allowed at.
+ */
+export function buildScopedClaimId(areaKey, scope, wordingClass, index = 1) {
+  return `claim_${areaKey}_${scope}_${wordingClass}_${String(index).padStart(2, '0')}`;
 }

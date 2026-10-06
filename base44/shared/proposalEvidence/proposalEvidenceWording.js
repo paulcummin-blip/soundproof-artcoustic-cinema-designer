@@ -201,6 +201,9 @@ export function buildBassConsistencyBlock() {
     prohibited: 'Do not claim that seat-to-seat bass consistency has been solved or improved, '
       + 'and do not describe the bass as uniform, identical or materially even across the seats: '
       + 'the reports show no material difference here. '
+      + 'This applies to the seating area as a whole. '
+      + 'Where the reports state a result for one scope — the primary seats or the secondary seats — '
+      + 'it may be described for that scope alone, and never as a result for every seat. '
       + 'Bass may be described only as output authority, physical capability and the subwoofer specification.',
     scope: 'seat_to_seat_consistency',
   };
