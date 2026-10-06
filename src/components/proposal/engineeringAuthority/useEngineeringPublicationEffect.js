@@ -39,6 +39,7 @@
  */
 
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { serializeProject } from '@/components/utils/serializeProject';
 import { engineeringPublicationPreflight } from '@/components/engineering/engineeringPublicationPreflight';
 import { base44 } from '@/api/base44Client';
 import { ENGINEERING_AUTHORITY_VERSION } from '@/components/proposal/engineeringAuthority';
@@ -69,15 +70,16 @@ const PUBLISH_DEBOUNCE_MS = 2000;
  * state. The rating envelope is deliberately not copied — it is derived from
  * the published engineering summary on read, so it is never duplicated.
  */
-function buildReportSnapshot(projectId, versionId) {
+function buildReportSnapshot(projectId, versionId, designState) {
   if (!projectId || !versionId) return null;
   const snapshot = readDesignReviewHandoff(projectId, versionId, { preferStored: false });
-  if (!snapshot) return null;
+  if (!snapshot || !designState?.roomDims || !designState?.screen) return null;
   return {
+    report_project: serializeProject(designState),
     analysisResult: snapshot.analysisResult || null,
     priceData: snapshot.priceData || null,
-    seatingPositions: Array.isArray(snapshot.seatingPositions) ? snapshot.seatingPositions : null,
-    placedSpeakers: Array.isArray(snapshot.placedSpeakers) ? snapshot.placedSpeakers : null,
+    seatingPositions: designState.seatingPositions || null,
+    placedSpeakers: designState.placedSpeakers || null,
     showAsdr: snapshot.showAsdr === true,
   };
 }
@@ -125,7 +127,7 @@ export function useEngineeringPublicationEffect({
   const preflight = engineeringPublicationPreflight({
     projectId, versionId, ready, isPublishable, engineeringSummary,
     engineeringFingerprint, bassReadiness, retainedFromRefresh, designState,
-    reportSnapshot: buildReportSnapshot(projectId, versionId),
+    reportSnapshot: buildReportSnapshot(projectId, versionId, designState),
     versions: {
       engine_version: ENGINEERING_AUTHORITY_VERSION,
       rp22_version: String(RP22_BASS_METRIC_SCHEMA_VERSION),
@@ -184,7 +186,7 @@ export function useEngineeringPublicationEffect({
       try {
         // Read the presentation payload at fire time so it reflects the most
         // recent settled handoff publication.
-        const reportSnapshot = buildReportSnapshot(projectId, versionId);
+        const reportSnapshot = buildReportSnapshot(projectId, versionId, designState);
         recordPublicationAttempt(projectId, versionId, {
           status: PUBLICATION_ATTEMPT.PUBLISHING,
           fingerprint: engineeringFingerprint,
