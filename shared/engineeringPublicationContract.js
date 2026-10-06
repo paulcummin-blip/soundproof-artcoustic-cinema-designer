@@ -153,6 +153,9 @@ export function auditPublicationContract(publication) {
     const key='P'+id, item=publication?.parameter_index?.[key];
     if(!item) { fail('parameter_index.'+key); continue; }
     for(const field of ['key','title','scope','value','level','authority_fingerprint','authority_timestamp','source_type']) if(!stated(item[field])) fail('parameter_index.'+key+'.'+field);
+    const explicitNA = item.source_row?.applicable === false && item.level === 'N/A';
+    if (!/^L[1-4]$/.test(String(item.level)) && item.level !== 'FAIL' && !explicitNA) fail('parameter_index.'+key+'.level','is not a terminal published result');
+    if (item.value === '—' || item.value === '' || ['provisional','pending','calculating','no_data'].includes(item.source_row?.status)) fail('parameter_index.'+key+'.value','is not a terminal published result');
     // Re-derive ONLY for validation, never as read-time authority.
     if(!same(item,expected[key])) fail('parameter_index.'+key,'conflicts with its source row/provenance');
   }
