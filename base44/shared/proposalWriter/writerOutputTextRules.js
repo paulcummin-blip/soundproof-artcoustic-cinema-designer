@@ -11,7 +11,11 @@
  *               the pack blocks as unchanged, or recommend where no
  *               recommendation is allowed?
  *   BASS        does this sentence claim the seat-to-seat bass consistency the
- *               P20 result does not support?
+ *               P20 result does not support? Read in two passes: the pack's own
+ *               prohibited phrasings, over the whole text, and the seat-to-seat
+ *               claims a client reads as "there are no weak seats", sentence by
+ *               sentence. Consistency named as an open item, and a claim that is
+ *               denied, are not claims.
  *
  * Two boundaries are deliberate and worth stating plainly:
  *
@@ -95,17 +99,87 @@ const DENIAL = /\b(?:not|never|no|none|nor|neither|cannot|can't|doesn't|don't|is
 const CLAUSE_BREAKS = /[.!?,;:]|\b(?:but|however|although|whereas|yet)\b/i;
 
 /**
+ * Bass wording that names seat-to-seat consistency as an open item rather than a
+ * delivered result: what still needs attention, what is not yet solved. This is
+ * the honest way to write about a P20 result that supports no consistency, so it
+ * is never read as a claim that the bass is consistent.
+ */
+const CONSISTENCY_CAVEAT = /\b(?:needs?\s+(?:calibration\s+)?attention|calibration\s+attention|requires?\s+attention|not\s+solved|unsolved|remains?\s+an?\s+(?:area|item|point)|remains?\s+open|to\s+be\s+addressed)\b/i;
+
+/** The clause a position sits in: from the break before it to the break after it. */
+function clauseAt(sentence, at) {
+  if (!Number.isFinite(at) || at < 0) return '';
+  const text = String(sentence);
+  const before = text.slice(0, at).split(CLAUSE_BREAKS).pop() || '';
+  const after = text.slice(at).split(CLAUSE_BREAKS)[0] || '';
+  return `${before} ${after}`;
+}
+
+/**
  * Whether the clause the match sits in denies it: "the bass results do not
  * indicate improved...", "the distinction is not the format...", "the screen is
  * not larger...". The whole clause is read, so a denial written either side of
  * the matched words counts — and a denial in the NEXT clause does not.
  */
 function isDenied(sentence, at) {
-  if (!Number.isFinite(at) || at < 0) return false;
-  const text = String(sentence);
-  const before = text.slice(0, at).split(CLAUSE_BREAKS).pop() || '';
-  const after = text.slice(at).split(CLAUSE_BREAKS)[0] || '';
-  return DENIAL.test(`${before} ${after}`);
+  return DENIAL.test(clauseAt(sentence, at));
+}
+
+/** Whether the clause the match sits in names consistency as an open item. */
+function isConsistencyCaveat(sentence, at) {
+  return CONSISTENCY_CAVEAT.test(clauseAt(sentence, at));
+}
+
+/**
+ * The seat-to-seat bass consistency claims P20 has to support before a draft may
+ * make one. Each is an affirmative statement that the bass is the same at every
+ * seat — the phrasings a client reads as "there are no weak seats in this room",
+ * which is exactly what the pack's own prohibited-wording patterns do not catch.
+ *
+ * The rules are deliberately narrow: a claim about bass output authority, impact,
+ * extension or the response at the reference seating position names no
+ * consistency and matches nothing here.
+ */
+const SEAT_CONSISTENCY_CLAIMS = Object.freeze([
+  {
+    rule: 'the_same_bass_at_every_seat',
+    pattern: /\b(?:even|uniform|identical|the\s+same|consistent|similar|equal)\s+bass\b(?:\s+\w+){0,2}\s+(?:across|throughout|in|at|between)\s+(?:all\s+|every\s+|each\s+|the\s+)?(?:seat\w*|seating|rows?|listeners?|audience|room)\b/i,
+  },
+  {
+    rule: 'consistent_across_the_seats',
+    pattern: /\b(?:consisten\w+|even|uniform|identical)\b(?:\s+\w+){0,3}\s+(?:across|throughout|between|in|at|from)\s+(?:all\s+|every\s+|each\s+|the\s+)?(?:seat\w*|seating|rows?|listeners?|audience)\b/i,
+  },
+  {
+    rule: 'every_seat_gets_the_same_bass',
+    pattern: /\b(?:every|each|all)\s+seats?\b[^.;:]{0,30}\b(?:same|identical|equal|even)\b[^.;:]{0,12}\bbass\b/i,
+  },
+  {
+    rule: 'no_bad_seats',
+    pattern: /\bno\s+(?:bad|poor|weak|cheap|second[- ]class|compromised)\s+seats?\b/i,
+    // The claim is itself written as a negation ("there are no bad seats"), so a
+    // denial in the same clause cannot mean the sentence is not making it.
+    negationShaped: true,
+  },
+]);
+
+/** The rule ids behind the seat-consistency claims, for an audit to assert against. */
+export const SEAT_CONSISTENCY_RULES = Object.freeze(SEAT_CONSISTENCY_CLAIMS.map((entry) => entry.rule));
+
+/**
+ * The seat-to-seat consistency claim a sentence makes, or null. The first rule
+ * that matches is the one reported, so one sentence raises one claim.
+ *
+ * @param {string} text
+ * @returns {{ rule: string, at: number, negationShaped: boolean }|null}
+ */
+export function seatConsistencyClaim(text) {
+  const sentence = String(text || '');
+  if (sentence.length === 0) return null;
+  for (const entry of SEAT_CONSISTENCY_CLAIMS) {
+    const match = entry.pattern.exec(sentence);
+    if (match) return { rule: entry.rule, at: match.index, negationShaped: entry.negationShaped === true };
+  }
+  return null;
 }
 
 /** One pattern for every term the pack's areas are named by. */
@@ -245,6 +319,25 @@ export function scanProse({ input, vocabulary, section, text, claims = [], claim
         section,
         detail: 'the_pack_allows_no_recommendation',
       }));
+    }
+
+    // Seat-to-seat consistency, where P20 does not support it: no sentence may
+    // claim it, however the claim is worded. The pack's own prohibited phrasings
+    // are caught below, over the whole text; this is the reading that also
+    // catches "consistent across the seating area", which carries none of them.
+    if (p20BlocksConsistency(input)) {
+      const claim = seatConsistencyClaim(claimed);
+      if (claim) {
+        // A denial of the claim, or consistency named as an open item, is not
+        // the claim being made.
+        const denied = !claim.negationShaped && isDenied(claimed, claim.at);
+        if (!denied && !isConsistencyCaveat(claimed, claim.at)) {
+          found.push(violation(WRITER_REJECTION.P20_BASS_CONTRADICTION, {
+            section,
+            detail: `p20_does_not_support_a_seat_consistency_claim:${claim.rule}`,
+          }));
+        }
+      }
     }
   }
 

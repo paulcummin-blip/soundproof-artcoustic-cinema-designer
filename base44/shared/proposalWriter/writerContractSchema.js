@@ -21,8 +21,20 @@
 /** The contract generation. A draft is only read against the revision it cites. */
 export const WRITER_CONTRACT_VERSION = 1;
 
-/** The writer prompt generation this contract is issued with. */
-export const WRITER_PROMPT_VERSION = 'proposal-writer-prompt-1';
+/**
+ * The writer prompt generation this contract is issued with.
+ *
+ * Bumped to 2 when the writing authority gained the proposal sales authority and
+ * the authority began to be carried as one block: a generation before and after
+ * that change must stay distinguishable in the append-only audit history, so
+ * every new record stores this version. A historical record keeps the version it
+ * was filed under and is never rewritten.
+ *
+ * The contract version is deliberately NOT bumped: the sections, the word
+ * limits, the claim grounding rule and every rejection category are unchanged,
+ * so a draft filed under generation 1 is still read against the same agreement.
+ */
+export const WRITER_PROMPT_VERSION = 'proposal-writer-prompt-2';
 
 /** The only pack generation a draft may be written from. */
 export const WRITER_ACCEPTED_PACK_SCHEMA_VERSION = 2;
