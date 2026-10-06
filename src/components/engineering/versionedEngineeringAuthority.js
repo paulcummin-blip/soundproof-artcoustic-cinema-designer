@@ -180,6 +180,8 @@ export function buildDurableSnapshot({ projectId, versionId, publication, design
   const publishedSummary = publication?.engineering_summary || null;
   const engineeringSummary = publishedSummary ? {
     ...publishedSummary,
+    publication_contract_version: publication.publication_contract_version,
+    parameter_index: publication.parameter_index,
     reportAuthority: {
       authority_fingerprint: publication.engineering_fingerprint,
       authority_timestamp: publication.published_at,
