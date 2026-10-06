@@ -1,0 +1,272 @@
+{
+  "name": "ProposalGeneration",
+  "type": "object",
+  "description": "One GPT proposal generation attempt, kept forever as an immutable audit record \u2014 whether it passed, failed validation, or never reached the provider. The record carries the frozen proposal evidence pack it was generated from, the exact GPT input, the output if one arrived, the validation result and every rejection, the report snapshot IDs, evidence fingerprints and engineering fingerprints, and who created it and when. Append-only: a regeneration, a retry, or an attempt against changed evidence is a new record linked to the previous one by retry_of_generation_id, and nothing is ever overwritten or deleted \u2014 the schema refuses both. The 'superseded' status is derived at read time from a newer valid generation for the same proposal and is never written. Only a record with status 'valid_generated' may be used to issue, export, complete or send a proposal in later phases.",
+  "properties": {
+    "generation_id": {
+      "type": "string",
+      "description": "Stable identifier of this generation attempt, derived from the attempt itself (proposal, place in the chain, evidence pack fingerprint, input and output fingerprints, status and time) so the same attempt can never be stored twice."
+    },
+    "generation_number": {
+      "type": "integer",
+      "description": "This attempt's place in the proposal's generation chain, starting at 1. Regeneration and retry always append a higher number; an existing record keeps its own."
+    },
+    "proposal_id": {
+      "type": "string",
+      "nullable": true,
+      "description": "ID of the Proposal this attempt was generated for. Null when the attempt was made against a draft proposal that has not been saved yet, in which case draft_proposal_id carries the identity."
+    },
+    "draft_proposal_id": {
+      "type": "string",
+      "nullable": true,
+      "description": "Identity of the draft proposal before it is saved. Null once a proposal_id exists."
+    },
+    "project_id": {
+      "type": "string",
+      "description": "ID of the Project every selected version belongs to."
+    },
+    "account_id": {
+      "type": "string",
+      "description": "Denormalized account_id from the parent Project, used for access control. Must be set at creation time from the parent Project's account_id."
+    },
+    "proposal_type": {
+      "type": "string",
+      "enum": [
+        "single",
+        "comparison",
+        "system_summary"
+      ],
+      "description": "The proposal type this attempt was generated for, defaulted from the evidence pack's own mode."
+    },
+    "selected_version_ids": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "default": [],
+      "description": "The exact ProjectVersion IDs this attempt was generated for, in the order the pack presents them."
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "draft_created",
+        "evidence_ready",
+        "provider_failed",
+        "validation_failed",
+        "needs_human_review",
+        "valid_generated",
+        "discarded",
+        "superseded"
+      ],
+      "description": "What became of this attempt. draft_created = the attempt exists but no evidence is assembled yet. evidence_ready = the pack and GPT input are assembled, unread by a provider. provider_failed = the provider returned no output or failed. validation_failed = output arrived but was not the writer contract's shape. needs_human_review = output arrived and broke a claim, figure, level or product rule. valid_generated = output arrived and passed every rule. discarded = the attempt was abandoned. superseded is DERIVED at read time when a newer valid generation exists for the same proposal and is never written to a record."
+    },
+    "provider": {
+      "type": "string",
+      "nullable": true,
+      "description": "The provider the attempt was made with (for example the platform AI gateway). Recorded for audit; null when no provider call was reached."
+    },
+    "model": {
+      "type": "string",
+      "nullable": true,
+      "description": "The model the attempt was made with. Recorded for audit."
+    },
+    "prompt_version": {
+      "type": "string",
+      "nullable": true,
+      "description": "The writer prompt version the attempt was made with, so a draft can always be traced to the agreement it was written against."
+    },
+    "schema_version": {
+      "type": "integer",
+      "nullable": true,
+      "description": "The writer output schema version the attempt was validated against."
+    },
+    "contract_version": {
+      "type": "integer",
+      "nullable": true,
+      "description": "The writer contract generation the attempt was made and validated under."
+    },
+    "retry_of_generation_id": {
+      "type": "string",
+      "nullable": true,
+      "description": "The generation this attempt retries, when it is a retry. Null for a first attempt or a new generation against changed evidence. A retry always reuses the same evidence pack and always creates a new record: the attempt it points at is never modified."
+    },
+    "evidence_pack": {
+      "type": "object",
+      "description": "The frozen proposal evidence pack this attempt was generated from, stored verbatim so the attempt can always be read back against exactly the evidence it used."
+    },
+    "evidence_pack_fingerprint": {
+      "type": "string",
+      "description": "Content fingerprint of that evidence pack. Any change to the design or the saved report evidence changes it, which is how a new generation is recognised as needing a new pack and a new record."
+    },
+    "evidence_pack_schema_version": {
+      "type": "integer",
+      "nullable": true,
+      "description": "The evidence pack generation this attempt read."
+    },
+    "visual_report_snapshot_ids": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "default": [],
+      "description": "The saved Visual Report snapshot IDs this attempt was generated from."
+    },
+    "technical_report_snapshot_ids": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "default": [],
+      "description": "The saved Technical Report snapshot IDs this attempt was generated from."
+    },
+    "evidence_fingerprints": {
+      "type": "object",
+      "description": "The evidence this attempt was filed against: { pack, reports: [{ version_id, visual_report_snapshot_id, technical_report_snapshot_id, visual_evidence, technical_evidence }] }. Report evidence fingerprints are recorded per version, so a report regenerated later never changes what this historical attempt read."
+    },
+    "engineering_fingerprints": {
+      "type": "object",
+      "description": "The engineering publication each selected version's evidence was generated against: { versions: [{ version_id, engineering }] }."
+    },
+    "gpt_input": {
+      "type": "object",
+      "description": "The exact GPT input JSON the attempt was made with: the frozen evidence pack, the writer contract, the section requirements and word limits, the allowed and blocked claims, and the input fingerprint."
+    },
+    "gpt_input_fingerprint": {
+      "type": "string",
+      "nullable": true,
+      "description": "The GPT input's own content fingerprint, so the attempt is traceable to exactly what the writer read."
+    },
+    "gpt_output": {
+      "type": "object",
+      "nullable": true,
+      "description": "The GPT output if one was received, stored verbatim \u2014 including output that failed validation. Null when the provider returned nothing."
+    },
+    "gpt_output_fingerprint": {
+      "type": "string",
+      "nullable": true,
+      "description": "Content fingerprint of the received output, so an edited or substituted output is detectable against the record. Null when no output was received."
+    },
+    "validation_result": {
+      "type": "object",
+      "nullable": true,
+      "description": "The writer-contract validation result: whether the output was valid, the contract and pack it was validated against, the per-section word counts and cited claim IDs, and the rejection list. Null when no output was validated."
+    },
+    "validation_errors": {
+      "type": "array",
+      "items": {
+        "type": "object"
+      },
+      "default": [],
+      "description": "Every rejection the validation reported, each with its code, section, detail and claim IDs. Empty for a valid generation."
+    },
+    "provider_error": {
+      "type": "string",
+      "nullable": true,
+      "description": "The provider failure this attempt ended in, recorded verbatim. Null when the provider returned output or was never called."
+    },
+    "created_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "When this attempt was recorded."
+    },
+    "created_by": {
+      "type": "string",
+      "description": "Name or email of the user who made the attempt."
+    },
+    "record_fingerprint": {
+      "type": "string",
+      "description": "Content fingerprint of the whole record, taken when it was created. Evidence that the record has not been rewritten, and the authority for comparing two records of the same attempt."
+    }
+  },
+  "required": [
+    "generation_id",
+    "generation_number",
+    "project_id",
+    "proposal_type",
+    "status",
+    "evidence_pack",
+    "evidence_pack_fingerprint",
+    "created_at",
+    "created_by"
+  ],
+  "rls": {
+    "read": {
+      "$or": [
+        {
+          "$and": [
+            {
+              "data.account_id": "{{user.data.account_id}}"
+            },
+            {
+              "data.account_id": {
+                "$nin": [
+                  null,
+                  ""
+                ]
+              }
+            },
+            {
+              "$or": [
+                {
+                  "user_condition": {
+                    "data.access_level": "FULL_ACCESS"
+                  }
+                },
+                {
+                  "user_condition": {
+                    "data.access_level": "SOUND_PROOF_ONLY"
+                  }
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        }
+      ]
+    },
+    "create": {
+      "$or": [
+        {
+          "$and": [
+            {
+              "data.account_id": "{{user.data.account_id}}"
+            },
+            {
+              "data.account_id": {
+                "$nin": [
+                  null,
+                  ""
+                ]
+              }
+            },
+            {
+              "$or": [
+                {
+                  "user_condition": {
+                    "data.access_level": "FULL_ACCESS"
+                  }
+                },
+                {
+                  "user_condition": {
+                    "data.access_level": "SOUND_PROOF_ONLY"
+                  }
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        }
+      ]
+    },
+    "update": false,
+    "delete": false
+  }
+}

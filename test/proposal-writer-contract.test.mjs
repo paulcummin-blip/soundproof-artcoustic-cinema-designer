@@ -316,7 +316,6 @@ test('I. the Marquee draft passes against its own pack and preserves every value
   });
 
   // The pack this draft is written from is the one the Phase 1 audit recorded.
-  console.log(`MARQUEE_PACK_FINGERPRINT=${input.evidence_pack.pack_fingerprint}`);
   assert.equal(input.evidence_pack.pack_fingerprint, MARQUEE_PACK_FINGERPRINT, 'the Marquee pack fingerprint');
 
   const draft = marqueeDraft(input);
