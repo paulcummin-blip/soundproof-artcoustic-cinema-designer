@@ -52,6 +52,31 @@ export function validateReportEvidence(evidence, reportType = null, {
     seen.add(seat?.seat_id);
   });
   if (Array.isArray(seats) && evidence.seating?.seats !== seats.length) add('seating.seats');
+
+  // Current is a provenance verdict, not merely a populated-fields verdict.
+  for (const [key, row] of Object.entries(index || {})) {
+    const base = 'parameter_index.' + key;
+    for (const field of ['key', 'scope', 'authority_fingerprint', 'authority_timestamp', 'source_type'])
+      requireValue(row?.[field], base + '.' + field);
+    const bass = ['P14', 'P18', 'P19', 'P20'].includes(key);
+    const expectedFingerprint = bass ? identity.bass_fingerprint : identity.source_fingerprint;
+    const expectedSource = bass ? 'durable-current-bass-authority' : 'durable-engineering-publication';
+    if (!expectedFingerprint || row?.authority_fingerprint !== expectedFingerprint) add(base + '.authority_fingerprint');
+    if (row?.source_type !== expectedSource) add(base + '.source_type');
+    if (row?.authority_value !== row?.value || row?.authority_level !== row?.level) add(base + '.atomic_pair');
+    const parallel = (evidence.parameters || []).find(entry => entry.key === key);
+    if (!parallel || ['scope', 'value', 'level', 'authority_fingerprint', 'authority_timestamp', 'source_type']
+      .some(field => parallel[field] !== row?.[field])) add(base + '.atomic_pair');
+  }
+  const p10 = index?.P10;
+  if (p10 && p10.scope !== 'project') add('parameter_index.P10.scope');
+  if (p10 && Number(p10.raw_value) === 3 && ['L1', 'L2'].includes(p10.level))
+    add('parameter_index.P10.atomic_pair');
+  const p14 = index?.P14;
+  if (p14 && (p14.raw_value !== evidence.bass?.p14?.raw_value
+    || p14.level !== evidence.bass?.p14?.achieved_level))
+    add('parameter_index.P14.atomic_pair');
+
   if (requireProposalReady && evidence.proposal_ready !== true) add('proposal_ready');
   return { complete: missing.length === 0, missing,
     reason: missing.length ? missing[0] + ' is missing' : null };
