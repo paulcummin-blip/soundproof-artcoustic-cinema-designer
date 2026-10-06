@@ -85,7 +85,7 @@ function atomicRow(row, id, scope, publication) {
   return {
     key:'P'+id, parameter_id:id, title:row.title || 'RP22 P'+id, scope,
     value:row.formatted ?? row.valueFormatted ?? row.hudLabel ?? row.value ?? '—',
-    raw_value:row.value ?? row.rawValue ?? null, unit:row.unit ?? null, level:level(row.level) ?? '—',
+    raw_value:row.value ?? row.rawValue ?? null, unit:row.unit ?? ({1:'m',4:'dB',5:'deg',6:'dB',8:'none',9:'deg',10:'dB',15:'NCB',16:'dB',17:'dB',20:'dB',21:'dB'})[id] ?? null, level:level(row.level) ?? '—',
     limiting_group:row.limitingGroup ?? row.seatId ?? null,
     context:row.detail ?? row.note ?? (row.seatId ? 'Limiting seat '+row.seatId : scope),
     authority_fingerprint:bass ? publication.provenance?.bass_fingerprint : publication.engineering_fingerprint,
@@ -117,6 +117,11 @@ export function auditPublicationContract(publication) {
   const missing=[], fail=(path,reason='is missing or invalid')=>missing.push(path+' '+reason);
   if (publication?.publication_contract_version!==PUBLICATION_CONTRACT_VERSION) fail('publication_contract_version');
   const report=publication?.report_snapshot, p=report?.report_project;
+  for(const field of ['engineering_fingerprint','published_at','engine_version','rp22_version','algorithm_version']) if(!stated(publication?.[field]) || publication[field]==='unknown') fail(field);
+  if(!publication?.engineering_summary?.viewing) fail('engineering_summary.viewing');
+  if(!report?.priceData) fail('report_snapshot.priceData');
+  if(!report?.analysisResult || !Object.keys(report.analysisResult).length) fail('report_snapshot.analysisResult');
+  if(!stated(publication?.provenance?.bass_fingerprint)) fail('provenance.bass_fingerprint');
   if(!p) fail('report_snapshot.report_project');
   else {
     for(const key of ['project_id','version_id','version_name','name','roomDims','screen_size','aspect_ratio','dolby_config']) if(!stated(p[key])) fail('report_project.'+key);
