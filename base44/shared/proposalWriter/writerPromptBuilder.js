@@ -18,6 +18,14 @@
  * subwoofer model name, a printed dimension in a sentence — is evidence and is
  * left alone; the check is on key names, not on prose.
  *
+ * The frozen pack itself is the one sanctioned carrier of those names. It holds
+ * report evidence — including a screen's `manual_width_m` and `manual_height_m`
+ * when the designer sized the screen by hand — and every fact in it is frozen
+ * evidence, proved pack-side by the Phase 1 guard and its own tests. So the scan
+ * skips the pack subtree and checks everything the writer input and the request
+ * carry around it: a live Project, a live ProjectVersion, or any other live
+ * design state riding alongside the pack still refuses the prompt.
+ *
  * Pure: no React, no SDK, no runtime-specific APIs. No provider call is made
  * here.
  */
@@ -81,13 +89,22 @@ export const LIVE_STATE_KEYS = Object.freeze([
 ]);
 
 /**
+ * The one root key whose subtree is the frozen evidence pack itself. Its facts
+ * are evidence — a saved report's own screen, seating and system values — so the
+ * live-state scan does not descend into it. Nothing else is exempt.
+ */
+export const LIVE_STATE_SCAN_SKIP_ROOTS = Object.freeze(['evidence_pack']);
+
+/**
  * Every path in a value whose key carries live design state.
  *
  * @param {*} value
  * @param {Array<string>} [forbidden]
- * @returns {Array<string>} offending key paths, e.g. 'evidence_pack.options[0].roomDims'
+ * @param {Object} [options]
+ * @param {Array<string>} [options.skipRootKeys] — root subtrees left unscanned
+ * @returns {Array<string>} offending key paths, e.g. 'project.roomDims'
  */
-export function findLiveStateKeyPaths(value, forbidden = LIVE_STATE_KEYS) {
+export function findLiveStateKeyPaths(value, forbidden = LIVE_STATE_KEYS, { skipRootKeys = [] } = {}) {
   const found = [];
 
   const walk = (node, path) => {
@@ -98,6 +115,7 @@ export function findLiveStateKeyPaths(value, forbidden = LIVE_STATE_KEYS) {
     }
     for (const key of Object.keys(node)) {
       const next = path ? `${path}.${key}` : key;
+      if (!path && skipRootKeys.includes(key)) continue;
       if (forbidden.includes(String(key).toLowerCase())) found.push(next);
       walk(node[key], next);
     }
@@ -110,10 +128,10 @@ export function findLiveStateKeyPaths(value, forbidden = LIVE_STATE_KEYS) {
 /**
  * Prove a writer input carries the evidence and the contract only.
  *
- * @throws when any live design-state key is present
+ * @throws when any live design-state key is present outside the frozen pack
  */
 export function assertWriterInputCarriesNoLiveState(input) {
-  const offending = findLiveStateKeyPaths(input);
+  const offending = findLiveStateKeyPaths(input, LIVE_STATE_KEYS, { skipRootKeys: LIVE_STATE_SCAN_SKIP_ROOTS });
   if (offending.length > 0) {
     throw new Error(
       `The writer input carries live design state and was not sent: ${offending.slice(0, 5).join(', ')}. `
