@@ -68,12 +68,13 @@ function optionHeading(column, index) {
 
 /**
  * The short derived change a row leads its "What you gain" cell with: the
- * calculated level or measured difference when it is stated compactly, a plain
- * statement when the versions share the result, and nothing when the stored
- * change is too long to hold the column.
+ * calculated level or measured difference when it is stated compactly, and
+ * nothing when the stored change is too long to hold the column. A shared row
+ * leads with nothing: its meaning line already states what both options keep,
+ * and a bare "same / no change" repeated down the table says nothing.
  */
 function changeLead(row) {
-  if (row?.identical) return 'Same / No change. ';
+  if (row?.identical) return '';
   const change = String(row?.change || '').trim();
   return change && change.length <= 24 ? `${change}. ` : '';
 }
@@ -150,7 +151,7 @@ export default function KeyPerformanceHighlightsTable({
           </tbody>
         </table>
         <p className="mt-2 text-[#8A8477]" style={proposalRoleStyle('caption')}>
-          Values are read from each version’s frozen Sound Proof evidence. Matching results are retained as Same / No change.
+          Values are read from each version’s frozen Sound Proof evidence.
         </p>
       </div>
     );

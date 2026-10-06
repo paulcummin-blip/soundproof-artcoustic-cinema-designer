@@ -142,6 +142,28 @@ export default function ProposalPackStyles() {
          rather than wrapping mid-phrase. */
       .proposal-print-portal .pp-card--span2 { grid-column: span 2; }
 
+      /* Reading flow: nothing that introduces content is left alone at the foot
+         of a page, a table header never prints without its rows, and a paragraph
+         never splits into a stranded line. A section too long for its page is
+         shortened in its copy, not allowed to overflow. */
+      .proposal-print-portal .pp-header,
+      .proposal-print-portal .pp-block__title,
+      .proposal-print-portal .pp-facts-group__title,
+      .proposal-print-portal .pp-decision__title,
+      .proposal-print-portal .pp-body > h1,
+      .proposal-print-portal .pp-body > h2,
+      .proposal-print-portal .pp-body > h3 { break-after: avoid; page-break-after: avoid; }
+      .proposal-print-portal .pp-body { orphans: 3; widows: 3; }
+      .proposal-print-portal .kph-table { break-inside: avoid; page-break-inside: avoid; }
+      .proposal-print-portal .kph-table thead { break-after: avoid; page-break-after: avoid; }
+      .proposal-print-portal .kph-table tr { break-inside: avoid; page-break-inside: avoid; }
+      .proposal-print-portal .pp-decision { break-inside: avoid; page-break-inside: avoid; }
+      .proposal-print-portal .pp-decision__title { font-family: var(--pp-heading); font-size: 9pt; letter-spacing: .08em; text-transform: uppercase; color: var(--pp-warm); margin: 0 0 2mm; }
+      .proposal-print-portal .pp-decision__choice { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6mm; margin-top: 6mm; break-inside: avoid; }
+      .proposal-print-portal .pp-decision__choice-item { border-top: 2px solid var(--pp-green); padding-top: 3mm; break-inside: avoid; }
+      .proposal-print-portal .pp-decision__choice-item dt { font-family: var(--pp-heading); font-size: 8pt; letter-spacing: .08em; text-transform: uppercase; color: var(--pp-warm); margin: 0; }
+      .proposal-print-portal .pp-decision__choice-item dd { margin: 1.5mm 0 0; font-family: var(--pp-body); font-size: 10pt; line-height: 1.35; color: var(--pp-ink); }
+      .proposal-print-portal .pp-decision__same { margin-top: 6mm; }
       .proposal-print-portal .pp-comparison-options { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6mm; margin-top: 6mm; break-inside: avoid; }
       .proposal-print-portal .pp-comparison-option { border-top: 2px solid var(--pp-green); padding-top: 4mm; }
       .proposal-print-portal .pp-comparison-option__row { padding: 1.8mm 0; border-bottom: 1px solid var(--pp-rule); }

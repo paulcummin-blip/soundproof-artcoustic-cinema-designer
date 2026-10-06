@@ -28,6 +28,7 @@ import ProjectImagesPage from '@/components/proposal/print/ProjectImagesPage';
 import { imagePagesFor } from '@/components/proposal/print/imagePageLayout';
 import AtAGlancePage from '@/components/proposal/print/AtAGlancePage';
 import MethodPage from '@/components/proposal/print/MethodPage';
+import DecisionSummaryPage from '@/components/proposal/print/DecisionSummaryPage';
 import AppendixPage from '@/components/proposal/print/AppendixPage';
 import ProposalPageHeader from '@/components/proposal/print/ProposalPageHeader';
 import ProposalMetricCards from '@/components/proposal/print/ProposalMetricCards';
@@ -134,6 +135,21 @@ export default function ProposalPackDocument({
 
   if (isDesignedPack) {
     pages.push(<MethodPage key="method" number={takeNumber()} />);
+  }
+
+  // A comparison opens with the decision: one page that says which option to
+  // choose and why, read from the same calculated rows the Key Differences table
+  // prints. A single-version pack has no choice to present, so it never prints
+  // this page.
+  if (reportType === 'comparison' && hasComparisonGlance) {
+    pages.push(
+      <DecisionSummaryPage
+        key="decision"
+        number={takeNumber()}
+        comparisonRows={comparisonRows}
+        comparisonVersions={comparisonVersions}
+      />
+    );
   }
 
   canonical
