@@ -23,7 +23,10 @@ import captureReportProposalSource from './captureReportProposalSource';
 import { readStoredEvidence, validateReportEvidence } from './reportEvidenceAuthority';
 import { buildParityRecord, checkReportEvidenceParity } from './reportEvidenceParity';
 import { loadReportSnapshot, saveReportSnapshot } from './reportSnapshotStore';
-import { fetchDurablePublication } from '@/components/engineering/versionedEngineeringAuthority';
+import { auditFinalReportAuthority } from './finalReportAuthorityGate';
+import { getCompletedBassAuthority } from '@/components/room/bass/completedBassResultStore';
+import { applyRestoredBassAuthority, assessRestoredBassAuthorityCurrentness } from '@/components/engineering/restoredBassOverlay';
+import { buildDurableSnapshot, fetchDurablePublication } from '@/components/engineering/versionedEngineeringAuthority';
 import { auditReportSaveAuthority } from '@/components/engineering/publicationGateAuthority';
 import {
   REPORT_SNAPSHOT_STATUS,
@@ -128,32 +131,35 @@ export function useReportSnapshot({
         console.warn('[reportSnapshot] generation blocked:', saveGate.reason);
         return null;
       }
-      if (mountedRef.current) setPublicationBlocked(null);
-      // The report's own live authority is the geometry it renders from — the
-      // loaded app state states the room dimensions and the screen
-      // configuration, which the trimmed project details passed to this hook do
-      // not. Reading them here, at the moment the report freezes its capture, is
-      // what makes the evidence state the same room and screen the report shows
-      // instead of a null room. The version's design state still wins for every
-      // per-version value.
-      // Saved with the version's published engineering fingerprint whenever the
-      // handoff carried none, so the design this report was generated from is
-      // stated in full and a later design change is detected. Saving this at
-      // generation time is what keeps a new report Current for proposal
-      // generation without it ever being opened again.
-      const savedFingerprints = buildSavedSourceFingerprints({
-        currentFingerprints: currentFp,
-        publishedFingerprint: version.published_fingerprint,
+      const finalGate = auditFinalReportAuthority(durableRead.publication);
+      if (!finalGate.allowed) {
+        if (mountedRef.current) setPublicationBlocked(finalGate.reason);
+        return null;
+      }
+      const publication = durableRead.publication;
+      const bass = getCompletedBassAuthority(projectId, versionId);
+      const caches = await base44.entities.ProjectAnalysisCache.filter({ project_id: projectId, version_id: versionId });
+      const pointers = [...new Set(caches.map(row => row.current_fingerprint).filter(Boolean))];
+      if (pointers.length !== 1 || bass?.currentFingerprint !== pointers[0]
+        || !assessRestoredBassAuthorityCurrentness(bass).current) {
+        if (mountedRef.current) setPublicationBlocked('Final report blocked: durable current bass pointer does not match the restored authority.');
+        return null;
+      }
+      const frozen = buildDurableSnapshot({ projectId, versionId, publication });
+      const summary = applyRestoredBassAuthority(frozen.engineeringSummary, {
+        projectId, versionId, completedBassAuthority: bass,
       });
-      const captured = captureReportProposalSource({ projectId, versionId, ...reportSource,
-        seatingPublication: durableRead.publication,
-        project: {
-          ...definedOnly(reportSource?.app),
-          ...definedOnly(reportSource?.project),
-          ...definedOnly(version.design_state),
-          version_name: version.version_name,
-        },
-        presentation: reportSource?.presentation,
+      if (mountedRef.current) setPublicationBlocked(null);
+      const savedFingerprints = {
+        engineeringFingerprint: publication.engineering_fingerprint,
+        calculationFingerprint: bass.currentFingerprint,
+      };
+      const captured = captureReportProposalSource({
+        projectId, versionId,
+        engineeringSummary: summary,
+        seatingPublication: publication,
+        project: publication.report_snapshot.report_project,
+        presentation: frozen,
         reportType,
         sourceFingerprint: savedFingerprints,
       });
