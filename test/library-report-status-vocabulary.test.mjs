@@ -104,7 +104,10 @@ test('A — a Current report offers Open and Export PDF, and no refresh action',
 
   // The Current branch is the one that ends before the previous-report branch,
   // so neither refresh action can ever sit on a Current report.
-  const currentBranch = LIVE_ROW.slice(0, LIVE_ROW.indexOf('{hasReport && previous && ('));
+  const currentBranch = LIVE_ROW.slice(
+    LIVE_ROW.indexOf('{!hasReport && ('),
+    LIVE_ROW.indexOf('{hasReport && previous && ('),
+  );
   assert.doesNotMatch(currentBranch, /CREATE_UPDATED|OPEN_PREVIOUS|Regenerate/i);
 
   // No surface in the vocabulary carries the old wording.
