@@ -381,7 +381,7 @@ export function useClientReportAuthority(projectId, requestedVersionId = null) {
   // Engineering Authority for this version; the same-window handoff overlays it
   // as an optimisation, so a cold/direct load with empty site storage still
   // restores the published report.
-  const engineeringAuthority = useVersionedEngineeringAuthority(projectId, versionId);
+  const engineeringAuthority = useVersionedEngineeringAuthority(projectId, versionId, { finalReport: true });
   const publishedEngineering = engineeringAuthority.snapshot;
   const engineeringSummary = publishedEngineering?.engineeringSummary
     ?? publishedEngineering?.rating?.engineeringSummary
