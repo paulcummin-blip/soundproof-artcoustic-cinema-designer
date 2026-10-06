@@ -106,6 +106,7 @@ import { useCompletedBassAuthority } from '@/components/room/bass/completedBassR
 import { setAuthoritativeReadOnlyMode } from '@/components/state/authoritativeReadOnlyMode';
 import { useAutoPrintReadinessInstrumentation, logAutoPrintBlock } from '@/components/report/useAutoPrintReadinessInstrumentation';
 import useReportBlockPagination from '@/components/report/useReportBlockPagination';
+import { REPORT_UPDATE_PARAM, useReportActionIntent } from '@/components/report/reportActionIntent';
 
 // --- Main component ---
 function RP22ReportInner() {
@@ -288,6 +289,19 @@ function RP22ReportInner() {
         payload: snapshotPayload,
         reportSource: { project: projectDetails, engineeringSummary, app },
         ready: !!engineeringSummary && !authorityResolving && !reportHydrating && !bassReportPending && !bassRestoreFailed && !reportDataIncomplete,
+    });
+
+    // updateReport: when the Project Library's row asks for an updated report,
+    // create it from the design as it stands — through the same action the saved
+    // report banner offers. It runs only on a report the design has moved past,
+    // and never changes a Current report's status.
+    useReportActionIntent({
+        requested: searchParams.get(REPORT_UPDATE_PARAM) === "1",
+        ready: reportSnapshot.status === REPORT_SNAPSHOT_STATUS.STALE
+            && !reportSnapshot.saving
+            && !!explicitProjectId
+            && !isPrinting,
+        onRun: reportSnapshot.regenerate,
     });
 
     // The gate's own account of this report: which authority exists, whether it

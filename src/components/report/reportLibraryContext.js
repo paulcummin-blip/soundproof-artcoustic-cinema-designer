@@ -176,11 +176,14 @@ export function buildReportPairingUrl({
  * @param {string} params.versionId — the row's version (never the active version)
  * @returns {string}
  */
-export function buildLibraryReportActionUrl({ route, projectId, versionId }) {
+export function buildLibraryReportActionUrl({ route, projectId, versionId, extraParams = null }) {
   return buildReportPairingUrl({
     route,
     projectId,
     versionId,
+    // The row's action travels with the link: the report page runs it through its
+    // own export or update handler once it is ready (see reportActionIntent).
+    extraParams,
     libraryContext: { active: true },
   });
 }

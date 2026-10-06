@@ -23,6 +23,10 @@ import ClientReportPage from "@/components/report/client/ClientReportPage";
 import ClientReportPrintStyles from "@/components/report/client/ClientReportPrintStyles";
 import ReportTypographyStyles from "@/components/report/typography/ReportTypographyStyles";
 import { useClientReportPdfExport } from "@/components/report/client/useClientReportPdfExport";
+import {
+  readReportActionIntent,
+  useReportActionIntent,
+} from "@/components/report/reportActionIntent";
 import useReportFilenameIdentity from '@/components/report/useReportFilenameIdentity';
 import { selectClientDesignHighlights } from "@/components/report/client/selectClientDesignHighlights";
 import ClientDesignHighlights from "@/components/report/client/ClientDesignHighlights";
@@ -1001,6 +1005,25 @@ export default function RP22ClientReport() {
     reportSource: { project: projectDetails, engineeringSummary, app: appState,
       presentation: { seatingPositions, placedSpeakers, priceData: authority.authoritySnapshot?.priceData } },
     ready: reportReady && orderedPages.length > 0,
+  });
+
+  // ── Report actions requested by the link that opened this report ──────────
+  // The Project Library's rows ask for one of these: ?autoPrint=1 exports this
+  // report's PDF, ?updateReport=1 creates an updated report from the design as it
+  // stands. Both run through THIS report's own handlers — the same ones its own
+  // buttons call — and neither changes the saved report's status.
+  const reportIntent = readReportActionIntent(searchParams);
+  useReportActionIntent({
+    requested: reportIntent.exportPdf,
+    ready: reportReady && filenameIdentity.ready && activePages.length > 0 && !exporting,
+    onRun: handleExport,
+  });
+  useReportActionIntent({
+    requested: reportIntent.updateReport,
+    ready: reportReady
+      && reportSnapshot.status === REPORT_SNAPSHOT_STATUS.STALE
+      && !reportSnapshot.saving,
+    onRun: reportSnapshot.regenerate,
   });
 
   // The gate's own account of this report: which authority exists, whether it is

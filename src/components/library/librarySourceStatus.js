@@ -3,10 +3,13 @@
  * ----------------------
  * The Project Library's source vocabulary, and how each row's state is derived.
  *
- * The labels are fixed:
- *   Live reports     Current · Source changed · Missing source
- *   Exported PDFs    Same as current · Older export · Source changed since export ·
- *                    Superseded by newer export
+ * The labels are the product's own words:
+ *   Reports      Current · Previous report (the design changed) · Not generated
+ *   Issued PDFs  Issued PDF · Issued PDF — design changed since export
+ *
+ * A generated report is permanent: it stays Current until the design fingerprint
+ * changes, and exporting it, opening it or using it in a proposal never changes
+ * it.
  *
  * Nothing here rewrites an issued document. A document that has been superseded
  * or whose source has moved on stays exactly as it was stored; only its label
@@ -33,24 +36,48 @@ export const LIBRARY_SOURCE_LABEL = Object.freeze({
   [LIBRARY_SOURCE_STATE.SOURCE_CHANGED]: 'Source changed',
   [LIBRARY_SOURCE_STATE.MISSING_SOURCE]: 'Missing source',
   [LIBRARY_SOURCE_STATE.SUPERSEDED]: 'Superseded by newer export',
-  [LIBRARY_SOURCE_STATE.SAME_AS_CURRENT]: 'Same as current',
-  [LIBRARY_SOURCE_STATE.OLDER_EXPORT]: 'Older export',
+  [LIBRARY_SOURCE_STATE.SAME_AS_CURRENT]: 'Issued PDF',
+  [LIBRARY_SOURCE_STATE.OLDER_EXPORT]: 'Issued PDF',
 });
 
-/**
- * The wording an exported report carries when the design moved on after it was
- * exported — the same source-changed state, stated from the export's side.
- */
-export const EXPORT_SOURCE_CHANGED_LABEL = 'Source changed since export';
+/** One issued PDF, whether or not it still matches the design. */
+export const ISSUED_PDF_LABEL = 'Issued PDF';
 
-export const LIVE_REPORT_LABEL = 'Current live report';
-export const EXPORTED_PDF_LABEL = 'Exported PDF';
+/**
+ * The wording an issued PDF carries when the design moved on after it was issued
+ * — the same source-changed state, stated from the PDF's side. It never implies
+ * the PDF itself needs regenerating: it is a historical issued document.
+ */
+export const EXPORT_SOURCE_CHANGED_LABEL = 'Issued PDF — design changed since export';
+
+/** The plain-English sentence beside that label. */
+export const EXPORT_DESIGN_CHANGED_NOTE = 'Design changed since this PDF was issued';
+
+export const LIVE_REPORT_LABEL = 'Current report';
+export const EXPORTED_PDF_LABEL = 'Issued PDF';
+
+/**
+ * An issued PDF judged inside the Library's Generated Reports states what it IS.
+ * It never borrows the report vocabulary, so no export row can ever read
+ * "Current" or "Older export" again.
+ */
+const ISSUED_PDF_STATE_LABEL = Object.freeze({
+  [LIBRARY_SOURCE_STATE.CURRENT]: ISSUED_PDF_LABEL,
+  [LIBRARY_SOURCE_STATE.SAME_AS_CURRENT]: ISSUED_PDF_LABEL,
+  [LIBRARY_SOURCE_STATE.OLDER_EXPORT]: ISSUED_PDF_LABEL,
+  [LIBRARY_SOURCE_STATE.SOURCE_CHANGED]: EXPORT_SOURCE_CHANGED_LABEL,
+});
+
+/** Re-state an exported document's own source state as an Issued PDF label. */
+function asIssuedPdfState({ state, label }) {
+  return { state, label: ISSUED_PDF_STATE_LABEL[state] || label };
+}
 
 /** A saved report's own status word, in Library vocabulary. */
 export function liveReportStatusLabel(snapshotStatus) {
   return snapshotStatus === 'stale'
-    ? LIBRARY_SOURCE_LABEL[LIBRARY_SOURCE_STATE.SOURCE_CHANGED]
-    : LIBRARY_SOURCE_LABEL[LIBRARY_SOURCE_STATE.CURRENT];
+    ? LIVE_REPORT_STATE_LABEL[LIVE_REPORT_STATE.STALE]
+    : LIVE_REPORT_STATE_LABEL[LIVE_REPORT_STATE.CURRENT];
 }
 
 /**
@@ -66,8 +93,27 @@ export const LIVE_REPORT_STATE = Object.freeze({
 
 export const LIVE_REPORT_STATE_LABEL = Object.freeze({
   [LIVE_REPORT_STATE.CURRENT]: 'Current',
-  [LIVE_REPORT_STATE.STALE]: 'Stale',
-  [LIVE_REPORT_STATE.MISSING]: 'Missing',
+  [LIVE_REPORT_STATE.STALE]: 'Previous report',
+  [LIVE_REPORT_STATE.MISSING]: 'Not generated',
+});
+
+/** The history mark a report carries once the design has moved past it. */
+export const PREVIOUS_REPORT_HISTORY_LABEL = 'Previous report — design has changed';
+
+/** The same thing said in a full sentence. */
+export const LIVE_REPORT_DESIGN_CHANGED_NOTE = 'Design changed since this report was created.';
+
+/**
+ * The only actions a report row offers. "Create updated report" is the ONE
+ * refresh word, and a Current report never carries it: a report stays Current
+ * until the design fingerprint changes.
+ */
+export const REPORT_ROW_ACTION = Object.freeze({
+  OPEN: 'Open',
+  OPEN_PREVIOUS: 'Open previous',
+  CREATE_UPDATED: 'Create updated report',
+  EXPORT_PDF: 'Export PDF',
+  GENERATE: 'Generate report',
 });
 
 /** The state of one report row: no saved report is "Missing", never "Current". */
@@ -249,10 +295,10 @@ export function collapseLiveReports(snapshots = []) {
  * export is never judged against a Visual Report live report, and a Level 4
  * version export is never judged against a Level 1 version live report.
  *
- *   newer live report, design moved on   → "Source changed since export"
- *   newer live report, same source       → "Older export"
- *   matches the live report              → "Same as current"
- *   no live report to compare against    → the export's own source state
+ *   design moved on since it was issued  → "Issued PDF — design changed since export"
+ *   newer live report, same source       → "Issued PDF"
+ *   matches the live report              → "Issued PDF"
+ *   no live report to compare against    → "Issued PDF" (or its own source state)
  *
  * @returns {{state: string, label: string}}
  */
@@ -264,7 +310,7 @@ export function resolveExportLiveState({ record, version = null, liveReport = nu
     };
   }
 
-  if (!liveReport) return resolveExportedSourceState({ record, version });
+  if (!liveReport) return asIssuedPdfState(resolveExportedSourceState({ record, version }));
 
   const liveIsNewer = timestampOf(liveReport) > String(record?.exported_at || '');
   const { changed, compared } = compareSourceFingerprints(
@@ -287,5 +333,5 @@ export function resolveExportLiveState({ record, version = null, liveReport = nu
       label: LIBRARY_SOURCE_LABEL[LIBRARY_SOURCE_STATE.SAME_AS_CURRENT],
     };
   }
-  return resolveExportedSourceState({ record, version });
+  return asIssuedPdfState(resolveExportedSourceState({ record, version }));
 }

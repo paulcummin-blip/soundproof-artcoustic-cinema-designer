@@ -75,7 +75,7 @@ export default function ReportSnapshotBanner({
             </strong>{' '}
             {buildStaleSentence(changedKeys)}
             {stamp ? ` ${stamp}.` : ''}{' '}
-            The saved report is shown unchanged. Regenerate it to bring it up to date.
+            The saved report is shown unchanged. Create an updated report to bring it up to date.
           </>
         ) : (
           <>
@@ -112,7 +112,7 @@ export default function ReportSnapshotBanner({
           }}
         >
           <RefreshCw className="w-3.5 h-3.5" style={{ color: regenerating ? '#7A6640' : '#FFFFFF' }} />
-          {regenerating ? 'Regenerating…' : 'Regenerate'}
+          {regenerating ? 'Creating updated report…' : 'Create updated report'}
         </button>
       )}
     </div>

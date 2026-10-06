@@ -5,17 +5,24 @@
  *
  * Each design version lists, in two groups:
  *
- *   Current live reports   ONE row per report type, always shown — so the
- *                         Library states whether each report EXISTS for this
- *                         version. Current or Stale opens or regenerates it;
- *                         Missing generates it. Every row's action carries the
- *                         version of the section it stands in, so a Level 4 row
- *                         acts on Level 4 and never on another version.
+ *   Current reports    ONE row per report type, always shown — so the Library
+ *                      states whether each report EXISTS for this version. A
+ *                      Current report offers Open and Export PDF and nothing
+ *                      else; a report whose design has moved on is kept as
+ *                      history and offers Open previous and Create updated
+ *                      report. Every row's action carries the version of the
+ *                      section it stands in, so a Level 4 row acts on Level 4
+ *                      and never on another version.
  *
- *   Exported PDFs         the LATEST exported PDF per report type. An earlier
- *                         export of the same version and report type stays in
- *                         storage but is not listed, and the row says "Same as
- *                         current" when it still matches the live report.
+ *   Issued PDFs        the LATEST issued PDF per report type. An earlier export
+ *                      of the same version and report type stays in storage but
+ *                      is not listed. An issued PDF is a fixed historical
+ *                      document: it is only ever opened or downloaded, and it
+ *                      reads "Issued PDF — design changed since export" once the
+ *                      design has moved on.
+ *
+ * Nothing here changes a report's status: exporting, opening or listing a report
+ * leaves it exactly as it was.
  */
 
 import React from 'react';
@@ -28,6 +35,10 @@ import {
   PROPOSAL_SOURCE_REPORT_ROUTE,
 } from '@/components/proposal/sourceAuthority/proposalSourceAuthority';
 import { buildLibraryReportActionUrl } from '@/components/report/reportLibraryContext';
+import {
+  REPORT_AUTOPRINT_PARAM,
+  REPORT_UPDATE_PARAM,
+} from '@/components/report/reportActionIntent';
 import LiveReportRow from './LiveReportRow';
 import ExportedDocumentRow from './ExportedDocumentRow';
 import {
@@ -80,11 +91,25 @@ export default function ProjectLibraryReportsSection({
    * place: it can return to this version's section, and the two report types stay
    * paired on this version rather than the version loaded in the Room Designer.
    */
-  const openVersionReport = (reportType, versionId) => {
+  const openVersionReport = (reportType, versionId, extraParams = null) => {
     const route = PROPOSAL_SOURCE_REPORT_ROUTE[reportType];
     if (!route || !versionId) return;
-    navigate(buildLibraryReportActionUrl({ route, projectId, versionId }));
+    navigate(buildLibraryReportActionUrl({ route, projectId, versionId, extraParams }));
   };
+
+  /**
+   * Export the report's PDF. The report page runs its own export once it is
+   * ready — the same export its own button calls — so the Library never grows a
+   * second export implementation and the report's status never changes.
+   */
+  const exportVersionReport = (reportType, versionId) => openVersionReport(reportType, versionId, {
+    [REPORT_AUTOPRINT_PARAM]: '1',
+  });
+
+  /** Create an updated report: the report page updates it from the current design. */
+  const updateVersionReport = (reportType, versionId) => openVersionReport(reportType, versionId, {
+    [REPORT_UPDATE_PARAM]: '1',
+  });
 
   if (versions.length === 0) {
     return (
@@ -122,7 +147,7 @@ export default function ProjectLibraryReportsSection({
               </h2>
             </div>
 
-            <SectionHeading>Current live reports</SectionHeading>
+            <SectionHeading>Current reports</SectionHeading>
             <div className="border-t border-[#E5E1D8]">
               {REPORT_TYPES.map((reportType) => {
                 const report = liveByType.get(reportType) || null;
@@ -138,17 +163,19 @@ export default function ProjectLibraryReportsSection({
                     statusLabel={liveReportStateLabel(state)}
                     hasReport={state !== LIVE_REPORT_STATE.MISSING}
                     onOpen={() => openVersionReport(reportType, version.id)}
+                    onOpenPrevious={() => openVersionReport(reportType, version.id)}
+                    onCreateUpdated={() => updateVersionReport(reportType, version.id)}
+                    onExportPdf={() => exportVersionReport(reportType, version.id)}
                     onGenerate={() => openVersionReport(reportType, version.id)}
-                    onRegenerate={() => openVersionReport(reportType, version.id)}
                   />
                 );
               })}
             </div>
 
             <div className="mt-6">
-              <SectionHeading>Exported PDFs</SectionHeading>
+              <SectionHeading>Issued PDFs</SectionHeading>
               {issued.length === 0 ? (
-                <EmptyNote>No PDF has been exported for this version yet.</EmptyNote>
+                <EmptyNote>No PDF has been issued for this version yet.</EmptyNote>
               ) : (
                 issued.map(({ record, superseded }) => {
                   const state = resolveExportLiveState({
