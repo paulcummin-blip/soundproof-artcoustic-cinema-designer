@@ -177,7 +177,15 @@ export function buildDurableSnapshot({ projectId, versionId, publication, design
   // RP22 P8 is a fixed Sound Proof product rule. Stamping it here means a
   // publication made before the rule was wired still reports Level 4 / "No",
   // never a dash. A publication that already carries it is returned untouched.
-  const engineeringSummary = stampFixedParameterAuthority(publication?.engineering_summary || null);
+  const publishedSummary = publication?.engineering_summary || null;
+  const engineeringSummary = publishedSummary ? {
+    ...publishedSummary,
+    reportAuthority: {
+      authority_fingerprint: publication.engineering_fingerprint,
+      authority_timestamp: publication.published_at,
+      source_type: 'durable-engineering-publication',
+    },
+  } : null;
   if (!engineeringSummary) return null;
 
   const ds = asObject(designState) || {};
@@ -278,7 +286,9 @@ export function statesBassAuthority(summary) {
   return roomResultsComplete && p20Complete;
 }
 
-export function composeAuthoritySnapshot({ localSnapshot, durableSnapshot }) {
+export function composeAuthoritySnapshot({ localSnapshot, durableSnapshot, finalReport = false }) {
+  // A browser handoff is preview-only, even when its fingerprints happen to match.
+  if (finalReport) return durableSnapshot || null;
   const localSummary = extractEngineeringSummary(localSnapshot);
   const durableSummary = extractEngineeringSummary(durableSnapshot);
 
