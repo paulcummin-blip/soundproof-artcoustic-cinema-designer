@@ -23,7 +23,7 @@ import {
 import BassResponsePlot from "./BassResponsePlot";
 import {
   REPORT_FONT_BODY,
-  REPORT_FONT_HEADING,
+  reportSectionHeadingStyle,
 } from "@/components/report/typography/reportTypography";
 
 const LEGEND_ROW = { display: "flex", flexWrap: "wrap", gap: "10px 22px", paddingTop: "3mm" };
@@ -77,7 +77,7 @@ function GraphPage({ id, blockName, title, explanation, graph, note, first = fal
         data-report-section-heading="true"
         style={{ borderBottom: "1px solid #DCDBD6", paddingBottom: "3mm", marginBottom: "4mm" }}
       >
-        <div style={{ fontFamily: REPORT_FONT_HEADING, fontSize: "15pt", fontWeight: 700, color: "#1B1A1A", letterSpacing: "0.06em" }}>
+        <div style={reportSectionHeadingStyle("15pt", { color: "#1B1A1A" })}>
           {title}
         </div>
       </header>
@@ -164,7 +164,7 @@ export default function BassResponseGraphSection({
   if (variant !== "print") {
     return (
       <div style={{ background: "#FFFFFF", border: "1px solid #DCDBD6", borderRadius: 8, padding: "20px 24px" }}>
-        <div style={{ fontFamily: REPORT_FONT_HEADING, fontSize: "16pt", color: "#213428", marginBottom: "4mm" }}>
+        <div style={reportSectionHeadingStyle("16pt", { color: "#213428", marginBottom: "4mm" })}>
           BASS RESPONSE GRAPHS
         </div>
         {pages}

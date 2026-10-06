@@ -40,7 +40,9 @@ import ReportPrintStyles from '../components/report/ReportPrintStyles';
 import ReportTypographyStyles from '@/components/report/typography/ReportTypographyStyles';
 import {
     REPORT_FONT_BODY,
+    REPORT_FONT_HEADING,
     REPORT_SECTION_HEADING_GAP_PX,
+    reportSectionHeadingStyle,
 } from '@/components/report/typography/reportTypography';
 import RP22ReportParameterGrid from '../components/report/RP22ReportParameterGrid';
 import BassResponseGraphSection from '../components/report/technical/BassResponseGraphSection';
@@ -1305,7 +1307,7 @@ function RP22ReportInner() {
             <div className="min-h-screen bg-white flex items-center justify-center">
                 <div className="flex flex-col items-center gap-6">
                     <div className="w-10 h-10 border-[3px] border-[#E6E4DD] border-t-[#213428] rounded-full animate-spin" />
-                    <div style={{ fontSize: 18, fontWeight: 400, color: '#213428', fontFamily: "'Futura PT Light', 'Century Gothic', sans-serif", letterSpacing: '0.01em' }}>
+                    <div style={{ fontSize: 18, fontWeight: 400, color: '#213428', fontFamily: REPORT_FONT_HEADING, letterSpacing: '0.01em' }}>
                         Preparing Technical Report…
                     </div>
                 </div>
@@ -1379,7 +1381,7 @@ function RP22ReportInner() {
                 {isAutoPrintPreparing ? (
                     <div className="flex flex-col items-center justify-center" style={{ minHeight: 'calc(100vh - 200px)', gap: 24 }}>
                         <div className="w-10 h-10 border-[3px] border-[#E6E4DD] border-t-[#213428] rounded-full animate-spin" />
-                        <div style={{ fontSize: 18, fontWeight: 400, color: '#213428', fontFamily: "'Futura PT Light', 'Century Gothic', sans-serif", letterSpacing: '0.01em' }}>
+                        <div style={{ fontSize: 18, fontWeight: 400, color: '#213428', fontFamily: REPORT_FONT_HEADING, letterSpacing: '0.01em' }}>
                             Preparing Technical Report…
                         </div>
                     </div>
@@ -1496,11 +1498,11 @@ function RP22ReportInner() {
                             borderRadius: 8,
                             padding: '20px 24px',
                         }}>
-                            <div style={{ fontFamily: "'Futura PT Light', 'Century Gothic', sans-serif", fontSize: 16, fontWeight: 400, color: '#213428', marginBottom: 12, letterSpacing: '0.01em' }}>
+                            <div style={{ fontFamily: REPORT_FONT_HEADING, fontSize: 16, fontWeight: 400, color: '#213428', marginBottom: 12, letterSpacing: '0.01em' }}>
                                 ARTCOUSTIC SYSTEM DESIGN RATING
                             </div>
                             <ScopedAsdrSummary engineeringSummary={engineeringSummary} />
-                            <div style={{ marginTop: 12, fontSize: 10, color: '#9B8E82', fontStyle: 'italic', fontFamily: "'Didact Gothic', 'Century Gothic', sans-serif" }}>
+                            <div style={{ marginTop: 12, fontSize: 10, color: '#9B8E82', fontStyle: 'italic', fontFamily: REPORT_FONT_BODY }}>
                                 Sound Proof proprietary design metric. Not part of CEDIA RP22 or RP23.
                             </div>
                         </div>
@@ -1545,7 +1547,7 @@ function RP22ReportInner() {
                                 <ReportCover variant="print" project={projectDetails} meta={technicalFirstPageMeta} />
                                 {/* RP22 explanation */}
                                 <div style={{ maxWidth: '185mm', margin: '0 auto', paddingTop: '5mm', fontFamily: REPORT_FONT_BODY, fontSize: '10pt', color: '#3E4349', lineHeight: 1.55, textAlign: 'left' }}>
-                                    <div data-report-section-heading="true" style={{ fontWeight: 700, color: '#1B1A1A', fontSize: '11pt', marginBottom: `${REPORT_SECTION_HEADING_GAP_PX}px` }}>CEDIA RP22 - Immersive Audio Performance Levels</div>
+                                    <div data-report-section-heading="true" style={reportSectionHeadingStyle('11pt', { color: '#1B1A1A', marginBottom: `${REPORT_SECTION_HEADING_GAP_PX}px` })}>CEDIA RP22 - Immersive Audio Performance Levels</div>
                                     <div><strong>Level 1</strong> – The minimum level of performance necessary to convey basic artistic intent.</div>
                                     <div><strong>Level 2</strong> – A higher level of performance that more accurately conveys artistic intent.</div>
                                     <div><strong>Level 3</strong> – Meets or exceeds reference commercial cinema exhibition standards.</div>
@@ -1554,7 +1556,7 @@ function RP22ReportInner() {
                                 </div>
                                 {/* RP23 explanation */}
                                 <div style={{ maxWidth: '185mm', margin: '0 auto', marginTop: '5mm', paddingTop: '5mm', borderTop: '1px solid #D9D5CE', fontFamily: REPORT_FONT_BODY, fontSize: '10pt', color: '#3E4349', lineHeight: 1.55, textAlign: 'left' }}>
-                                    <div data-report-section-heading="true" style={{ fontWeight: 700, color: '#1B1A1A', fontSize: '11pt', marginBottom: `${REPORT_SECTION_HEADING_GAP_PX}px` }}>RP23 - Image Performance</div>
+                                    <div data-report-section-heading="true" style={reportSectionHeadingStyle('11pt', { color: '#1B1A1A', marginBottom: `${REPORT_SECTION_HEADING_GAP_PX}px` })}>RP23 - Image Performance</div>
                                     <div>CEDIA's forthcoming RP23 document will address best practice for image. Currently, we only have the size of the images based on the horizontal viewing angle, and the brightness which is known.</div>
                                     {coverageSentence && (
                                         <Rp22SeatCoverageSentence sentence={coverageSentence} variant="cover" />

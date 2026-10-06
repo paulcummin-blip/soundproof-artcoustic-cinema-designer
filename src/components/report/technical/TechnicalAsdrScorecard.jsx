@@ -23,6 +23,7 @@ import AsdrSeatingSummary from "./AsdrSeatingSummary";
 import {
   REPORT_FONT_HEADING as FONT_HEADING,
   REPORT_FONT_BODY as FONT_BODY,
+  reportSectionHeadingStyle,
 } from '@/components/report/typography/reportTypography';
 
 const COLORS = {
@@ -79,16 +80,7 @@ export default function TechnicalAsdrScorecard({
         data-report-section-heading="true"
         style={{ marginBottom: "5mm" }}
       >
-        <div
-          style={{
-            fontFamily: FONT_HEADING,
-            fontSize: "18pt",
-            fontWeight: 400,
-            color: COLORS.primary,
-            letterSpacing: "0.01em",
-            lineHeight: 1.1,
-          }}
-        >
+        <div style={reportSectionHeadingStyle("18pt", { color: COLORS.primary })}>
           ARTCOUSTIC SYSTEM DESIGN RATING
         </div>
         <div

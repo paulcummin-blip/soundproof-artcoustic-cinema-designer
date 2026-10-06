@@ -16,6 +16,7 @@ import { getCategoryForParam } from "./technicalParameterMeta";
 import {
   REPORT_FONT_HEADING as HEADING_FONT,
   REPORT_FONT_BODY as BODY_FONT,
+  reportSectionHeadingStyle,
 } from '@/components/report/typography/reportTypography';
 
 export default function TechnicalParameterPage({ params, children, isFirst = false }) {
@@ -65,16 +66,7 @@ export default function TechnicalParameterPage({ params, children, isFirst = fal
           borderBottom: "1px solid #D9D5CE",
         }}
       >
-        <span
-          style={{
-            fontSize: "8pt",
-            fontWeight: 600,
-            color: "#213428",
-            letterSpacing: "0.12em",
-            textTransform: "uppercase",
-            fontFamily: HEADING_FONT,
-          }}
-        >
+        <span style={reportSectionHeadingStyle("8pt", { fontWeight: 600, color: "#213428" })}>
           {categoryLabel}
         </span>
         <span

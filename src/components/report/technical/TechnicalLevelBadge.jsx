@@ -14,6 +14,7 @@
 
 import React from "react";
 import { resolveGradeToken } from "@/components/utils/rp22Colors";
+import { REPORT_FONT_HEADING } from "@/components/report/typography/reportTypography";
 
 const normalizeLevel = (lvl) => {
   if (typeof lvl === "number" && lvl >= 1 && lvl <= 4) return lvl;
@@ -47,9 +48,15 @@ export default function TechnicalLevelBadge({ level, size = "normal" }) {
         display: "inline-flex",
         alignItems: "center",
         justifyContent: "center",
+        // box-sizing keeps the border inside the fixed box, so every badge in a
+        // row is the same size; line-height 1 plus the centred flex alignment
+        // places the label centrally in the browser and in the exported PDF.
+        boxSizing: "border-box",
+        textAlign: "center",
         fontSize: dims.fs,
-        fontWeight: token.solid ? 700 : 700,
-        fontFamily: "'Futura PT Light', 'Century Gothic', sans-serif",
+        fontWeight: 700,
+        // The shared brand heading face — never a one-off stack.
+        fontFamily: REPORT_FONT_HEADING,
         flexShrink: 0,
         lineHeight: 1,
         letterSpacing: "0.02em",

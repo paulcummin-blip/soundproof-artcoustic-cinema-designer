@@ -5,6 +5,7 @@
 // notice says, so a report never invents a reason for itself.
 
 import React from "react";
+import { REPORT_FONT_BODY } from "@/components/report/typography/reportTypography";
 
 const NOTICE = {
     background: "#F7F1E6",
@@ -14,7 +15,7 @@ const NOTICE = {
     color: "#7A6640",
     fontSize: 13,
     lineHeight: 1.55,
-    fontFamily: "'Didact Gothic', 'Century Gothic', sans-serif",
+    fontFamily: REPORT_FONT_BODY,
 };
 
 export default function TechnicalReportNotice({ title, children }) {

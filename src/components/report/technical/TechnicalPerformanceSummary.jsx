@@ -26,6 +26,7 @@ import {
 import {
   REPORT_FONT_HEADING as FONT_HEADING,
   REPORT_FONT_BODY as FONT_BODY,
+  reportSectionHeadingStyle,
 } from '@/components/report/typography/reportTypography';
 
 const COLORS = {
@@ -206,16 +207,7 @@ export default function TechnicalPerformanceSummary({
           Marked so the Technical Report's one section-heading rule sets the
           gap below it in the exported PDF as well as on screen. */}
       <div data-report-section-heading="true" style={{ marginBottom: "6mm" }}>
-        <div
-          style={{
-            fontFamily: FONT_HEADING,
-            fontSize: "18pt",
-            fontWeight: 400,
-            color: COLORS.primary,
-            letterSpacing: "0.01em",
-            lineHeight: 1.1,
-          }}
-        >
+        <div style={reportSectionHeadingStyle("18pt", { color: COLORS.primary })}>
           RP22 PERFORMANCE SUMMARY
         </div>
       </div>
@@ -241,15 +233,7 @@ export default function TechnicalPerformanceSummary({
             marginBottom: "5mm",
           }}
         >
-          <span
-            style={{
-              fontFamily: FONT_HEADING,
-              fontSize: "12pt",
-              fontWeight: 600,
-              color: COLORS.primary,
-              letterSpacing: "0.04em",
-            }}
-          >
+          <span style={reportSectionHeadingStyle("12pt", { fontWeight: 600, color: COLORS.primary })}>
             ROOM PARAMETERS
           </span>
           <span
@@ -273,7 +257,9 @@ export default function TechnicalPerformanceSummary({
           <LevelCountBlock level="L3" count={roomLevelCounts?.L3 ?? 0} />
           <LevelCountBlock level="L2" count={roomLevelCounts?.L2 ?? 0} />
           <LevelCountBlock level="L1" count={roomLevelCounts?.L1 ?? 0} />
-          <LevelCountBlock level="—" count={roomLevelCounts?.unassessed ?? 0} />
+          {/* The fifth bucket is the FAILURE count, labelled FAIL — never a dash.
+              Same bucket and same colour token the RP22 Compliance Report uses. */}
+          <LevelCountBlock level="FAIL" count={roomLevelCounts?.fail ?? 0} />
         </div>
 
         {/* Artcoustic System Design Rating — three scoped results */}
@@ -323,15 +309,7 @@ export default function TechnicalPerformanceSummary({
             marginBottom: "5mm",
           }}
         >
-          <span
-            style={{
-              fontFamily: FONT_HEADING,
-              fontSize: "12pt",
-              fontWeight: 600,
-              color: COLORS.primary,
-              letterSpacing: "0.04em",
-            }}
-          >
+          <span style={reportSectionHeadingStyle("12pt", { fontWeight: 600, color: COLORS.primary })}>
             SEAT PARAMETERS
           </span>
           <span style={{ fontSize: "9pt", color: COLORS.secondary, fontFamily: FONT_BODY }}>

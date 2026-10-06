@@ -24,8 +24,8 @@ const BRAND_GREEN = "#213428";
 const TEXT_DARK = "#1B1A1A";
 
 import {
-  REPORT_FONT_HEADING as FONT_HEADING,
   REPORT_FONT_BODY as FONT_BODY,
+  reportSectionHeadingStyle,
 } from '@/components/report/typography/reportTypography';
 
 export default function AboutSoundProofReportPage({ variant = "full", html: providedHtml }) {
@@ -107,15 +107,11 @@ function AboutSoundProofView({ variant = "full", html }) {
           sets the gap below it in the printed PDF as well as on screen. */}
       <h1
         data-report-section-heading="true"
-        style={{
-          fontFamily: FONT_HEADING,
-          fontSize: compact ? "13pt" : "15pt",
-          fontWeight: 400,
+        style={reportSectionHeadingStyle(compact ? "13pt" : "15pt", {
           color: TEXT_DARK,
-          letterSpacing: "0.02em",
           margin: compact ? "0 0 3mm 0" : "0 0 3.5mm 0",
           textAlign: compact ? "left" : "center",
-        }}
+        })}
       >
         About Sound Proof
       </h1>

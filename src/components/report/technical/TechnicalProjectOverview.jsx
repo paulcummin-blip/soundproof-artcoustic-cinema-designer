@@ -20,6 +20,8 @@ import { rp23DisplayAngleDeg, rp23LevelForAngleDeg } from "@/components/utils/vi
 import {
   REPORT_FONT_HEADING as FONT_HEADING,
   REPORT_FONT_BODY as FONT_BODY,
+  reportSectionHeadingStyle,
+  reportBodyStyle,
 } from '@/components/report/typography/reportTypography';
 
 const COLORS = {
@@ -90,15 +92,11 @@ export default function TechnicalProjectOverview({
     pageBreakInside: "avoid",
   };
 
-  const sectionLabelStyle = {
-    fontFamily: FONT_HEADING,
-    fontSize: "9pt",
+  const sectionLabelStyle = reportSectionHeadingStyle("9pt", {
     fontWeight: 600,
     color: COLORS.secondary,
-    letterSpacing: "0.1em",
-    textTransform: "uppercase",
     marginBottom: "4mm",
-  };
+  });
 
   return (
     <div
@@ -118,27 +116,10 @@ export default function TechnicalProjectOverview({
           Marked so the Technical Report's one section-heading rule sets the
           gap below it in the exported PDF as well as on screen. */}
       <div data-report-section-heading="true" style={{ marginBottom: "6mm" }}>
-        <div
-          style={{
-            fontFamily: FONT_HEADING,
-            fontSize: "18pt",
-            fontWeight: 400,
-            color: COLORS.primary,
-            letterSpacing: "0.01em",
-            lineHeight: 1.1,
-          }}
-        >
+        <div style={reportSectionHeadingStyle("18pt", { color: COLORS.primary })}>
           PROJECT &amp; SYSTEM OVERVIEW
         </div>
-        <div
-          style={{
-            fontFamily: FONT_BODY,
-            fontSize: "10pt",
-            color: COLORS.secondary,
-            marginTop: "2mm",
-            letterSpacing: "0.04em",
-          }}
-        >
+        <div style={reportBodyStyle("10pt", { color: COLORS.secondary, marginTop: "2mm" })}>
           System Configuration · {exportSystemConfiguration || "—"}
         </div>
       </div>

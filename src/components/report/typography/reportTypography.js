@@ -166,6 +166,55 @@ export function reportRoleStyle(role, profile = DEFAULT_REPORT_PROFILE) {
   };
 }
 
+/* ── Section-heading and body roles ────────────────────────────────────── */
+
+/**
+ * The brand recipe for a report SECTION heading — a page title, a section
+ * heading or a card heading — at the size the caller's frame can carry.
+ *
+ * Family (Futura PT Light), weight, tracking (+100), line height (1.2) and case
+ * all come from the tokens above, so no report surface can set its own: the
+ * Technical Report, the Visual Report and the proposal pack read this one
+ * function. Only the size is the caller's, because the Technical Report's A4
+ * frames are fixed-height and carry a smaller size where the frame cannot hold
+ * the profile's 22pt.
+ *
+ * @param {string|number} fontSize - the frame's size, e.g. '18pt'
+ * @param {Object} [overrides]     - colour, margins and the like (never type)
+ * @returns {React.CSSProperties}
+ */
+export function reportSectionHeadingStyle(fontSize, overrides = {}) {
+  return {
+    fontFamily: REPORT_FONT_HEADING,
+    fontWeight: 300,
+    letterSpacing: REPORT_TRACKING_HEADING,
+    lineHeight: REPORT_LEADING_HEADING,
+    textTransform: 'uppercase',
+    fontSize,
+    ...overrides,
+  };
+}
+
+/**
+ * The body-copy counterpart: Didact Gothic, sentence case, tracking +50 and the
+ * 1.4 leading. A4 report copy is 9pt; a caller passes the size its frame can
+ * carry, as the fixed Technical Report frames do.
+ *
+ * @param {string|number} [fontSize]
+ * @param {Object} [overrides]
+ * @returns {React.CSSProperties}
+ */
+export function reportBodyStyle(fontSize = '9pt', overrides = {}) {
+  return {
+    fontFamily: REPORT_FONT_BODY,
+    letterSpacing: REPORT_TRACKING_BODY,
+    lineHeight: REPORT_LEADING_BODY,
+    textTransform: 'none',
+    fontSize,
+    ...overrides,
+  };
+}
+
 /* ── CSS builder ───────────────────────────────────────────────────────── */
 
 /**
