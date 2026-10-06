@@ -73,7 +73,7 @@ import {
   sentenceParts,
   stripOptionNames,
 } from './writerVocabulary.js';
-import { designStageCommentary } from './writerDesignStageRules.js';
+import { directAreaDifference, screenLocationQualifier } from './writerClausePrecision.js';
 
 /** A comparative in front of an area claims more of it: "a larger screen". */
 const COMPARATIVES = 'more|larger|bigger|wider|greater|better|higher|superior|increased|additional|extra|further|stronger|deeper';
@@ -110,14 +110,14 @@ const CLAIM_VERBS = 'improve[sd]?|improvements?|gains?|increases?|increased|boos
  * headroom" — is a performance claim about those channels, judged by the gain
  * and figure rules, and not a claim that the channel set itself changed.
  */
-const CHANGE_SIGNAL = /\b(?:adds?|added|adding|extra|additional|more|increases?|increased|upgrades?|upgraded|replaces?|replacement|changed|changes?|differs?|different|instead\s+of|rather\s+than|larger|bigger|wider|greater|higher|superior|deeper|stronger)\b/i;
+export const CHANGE_SIGNAL = /\b(?:adds?|added|adding|extra|additional|more|increases?|increased|upgrades?|upgraded|replaces?|replacement|changed|changes?|differs?|different|instead\s+of|rather\s+than|larger|bigger|wider|greater|higher|superior|deeper|stronger)\b/i;
 
 /**
  * A word that names the channel set, a layer of it or a loudspeaker position
  * rather than a capability of its own. A change block is raised by one of these
  * only where the sentence claims the set itself changed.
  */
-const CHANNEL_FAMILY = /^(?:channels?|formats?|layers?|speakers?|positions?)$/i;
+export const CHANNEL_FAMILY = /^(?:channels?|formats?|layers?|speakers?|positions?)$/i;
 
 /** Verbs that carry a benefit to the area without asserting one themselves. */
 const LINK_VERBS = 'is|are|was|were|has|have|had|offers?|provides?|gives?|giving|delivers?|records?|shows?|reaches?|achieves?|supports?|remains?|scores?|performs?|states?|holds?|keeps?';
@@ -164,7 +164,7 @@ function modifiesCapabilityNoun(sentence, at, term) {
 const CLAIM_WORDS = `${CLAIM_VERBS}|${COMPARATIVES}|${BENEFIT_WORDS}`;
 
 /** A phrase that compares two options rather than importing from one into the other. */
-const CONTRAST = /\b(?:rather than|instead of|compared (?:with|to)|against)\b/i;
+export const CONTRAST = /\b(?:rather than|instead of|compared (?:with|to)|against)\b/i;
 
 /** The words that deny a claim, however they are written. */
 const DENIAL = /\b(?:not|never|no|none|nor|neither|cannot|can't|doesn't|don't|isn't|aren't|without|lacks?)\b|\b(?:do|does|did|is|are|was|were|can|could|will|would|has|have|had)\s+not\b/i;
@@ -198,10 +198,10 @@ const CONSISTENCY_CAVEAT = /\b(?:needs?\s+(?:calibration\s+)?attention|calibrati
  * Where a sentence states consistency, so the clause it sits in can be read: the
  * position the denial and the open-item checks are anchored on.
  */
-const CONSISTENCY_ANCHOR = /\b(?:consisten\w+|uniform|identical|even|same|similar|equal)\b/i;
+export const CONSISTENCY_ANCHOR = /\b(?:consisten\w+|uniform|identical|even|same|similar|equal)\b/i;
 
 /** The claim written as its own negation: "there are no bad seats in this design". */
-const NEGATION_SHAPED_CLAIM = /\bno\s+(?:bad|poor|weak|cheap|second[- ]class|compromised)\s+seats?\b/i;
+export const NEGATION_SHAPED_CLAIM = /\bno\s+(?:bad|poor|weak|cheap|second[- ]class|compromised)\s+seats?\b/i;
 
 /** The clause a position sits in: from the break before it to the break after it. */
 function clauseAt(sentence, at) {
@@ -218,12 +218,12 @@ function clauseAt(sentence, at) {
  * not larger...". The whole clause is read, so a denial written either side of
  * the matched words counts — and a denial in the NEXT clause does not.
  */
-function isDenied(sentence, at) {
+export function isDenied(sentence, at) {
   return DENIAL.test(clauseAt(sentence, at));
 }
 
 /** Whether the clause the match sits in names consistency as an open item. */
-function isConsistencyCaveat(sentence, at) {
+export function isConsistencyCaveat(sentence, at) {
   return CONSISTENCY_CAVEAT.test(clauseAt(sentence, at));
 }
 
@@ -280,7 +280,7 @@ export function seatConsistencyClaim(text) {
 }
 
 /** One pattern for every term the pack's areas are named by. */
-function anchorPatternFor(input) {
+export function anchorPatternFor(input) {
   const terms = areaAnchorTerms(input?.evidence_pack);
   return terms.length > 0 ? new RegExp(`\\b(?:${terms.join('|')})\\w*\\b`, 'i') : /$^/;
 }
@@ -294,7 +294,7 @@ function anchorPatternFor(input) {
  *
  * @returns {{ at: number, keyword: string, phrase: boolean }|null}
  */
-function claimsArea(sentence, { heads = [], phrases = [] } = {}) {
+export function claimsArea(sentence, { heads = [], phrases = [] } = {}) {
   for (const phrase of phrases) {
     const at = sentence.toLowerCase().indexOf(phrase);
     if (at < 0) continue;
@@ -302,10 +302,12 @@ function claimsArea(sentence, { heads = [], phrases = [] } = {}) {
     const after = sentence.slice(at + phrase.length, at + phrase.length + 40);
     const claimed = new RegExp(`\\b(?:${CLAIM_WORDS})\\b`, 'i').test(before)
       || new RegExp(`\\b(?:${BENEFIT_WORDS})\\b`, 'i').test(after);
-    if (claimed) return { at, keyword: phrase, phrase: true };
+    if (claimed) return { at, keyword: phrase, phrase: true, matched: phrase };
   }
 
   for (const head of heads) {
+    const difference = directAreaDifference(sentence, head);
+    if (difference) return difference;
     const term = `\\b${head}\\w*\\b`;
     const head2 = `${term}${HEAD_NOT_RENAMED}`;
     const patterns = [
@@ -328,8 +330,9 @@ function claimsArea(sentence, { heads = [], phrases = [] } = {}) {
       const within = new RegExp(term, 'i').exec(match[0]);
       const headAt = match.index + (within ? within.index : 0);
       const headText = within ? within[0] : head;
-      if (modifiesCapabilityNoun(sentence, headAt, headText)) continue;
-      return { at: match.index, keyword: head, phrase: false };
+      if (modifiesCapabilityNoun(sentence, headAt, headText)
+        || screenLocationQualifier(sentence, headAt, headText)) continue;
+      return { at: match.index, keyword: head, phrase: false, matched: match[0] };
     }
   }
 
@@ -342,7 +345,7 @@ function claimsArea(sentence, { heads = [], phrases = [] } = {}) {
  * that denies its own claim is not making it — so neither is a grounded claim
  * that a section has to have cited a claim for.
  */
-function assertedKind(sentence, anchors) {
+export function assertedKind(sentence, anchors) {
   // Classified with the rejected alternatives taken out: "shared, rather than a
   // different room" is a statement of sameness, not a claim that a room changed.
   const kind = assertionKind(withoutRejectedAlternatives(sentence));
@@ -373,7 +376,7 @@ function assertedKind(sentence, anchors) {
  *
  * @returns {string|null} the reason, or null when the sentence is sound
  */
-function scopedClaimIssue({ sentence, scope, claims }) {
+export function scopedClaimIssue({ sentence, scope, claims }) {
   if (!scope) return null;
 
   const adjective = scopeAdjectiveInText(sentence);
@@ -400,209 +403,11 @@ function scopedClaimIssue({ sentence, scope, claims }) {
 }
 
 /** The option a version ID belongs to, as the draft would name it. */
-function optionNameById(input, versionId) {
+export function optionNameById(input, versionId) {
   const option = (Array.isArray(input?.evidence_pack?.options) ? input.evidence_pack.options : [])
     .find((entry) => entry?.version_id === versionId) || null;
   return option?.version_name || null;
 }
 
-/**
- * Read one section's prose against the pack.
- *
- * @param {Object} input — the writer input (carries the pack)
- * @param {Object} vocabulary — the pack's vocabulary (writerVocabulary)
- * @param {Object} section — { section, text, claims, claim_kinds }
- * @returns {Array<Object>} the rejections this section raises
- */
-export function scanProse({ input, vocabulary, section, text, claims = [], claimKinds = [] }) {
-  const found = [];
-  const citedKinds = Array.isArray(claimKinds) ? claimKinds : [];
-  const citedClaims = Array.isArray(claims) ? claims : [];
-  const sentences = sentenceParts(text);
-  const packProse = packProseSentences(input);
-  const anchors = anchorPatternFor(input);
-  const blocks = blockedChangeBlocks(input)
-    .map((block) => ({ block, patterns: blockPatterns(block, input.evidence_pack) }));
-
-  for (const sentence of sentences) {
-    // An option's own name is an option's name: it is not a claim about an area
-    // and it is not a Performance Level, so it is taken out before the sentence
-    // is read for either.
-    const claimed = stripOptionNames(sentence, vocabulary.optionNames)
-      .replace(/\bLevel\s?[1-4]\b(?:\s+versions?)?/gi, ' ');
-
-    // What the sentence asserts, once a sentence that names no area of the
-    // evidence, and a sentence that denies its own claim, are read as asserting
-    // nothing at all.
-    const kind = assertedKind(claimed, anchors);
-
-    // Grounding: a claim the section cites nothing for, or cites the wrong kind
-    // of claim for, is not a claim this pack supports.
-    if (kind && citedKinds.length === 0) {
-      found.push(violation(WRITER_REJECTION.MISSING_CLAIM_ID, {
-        section,
-        detail: `${kind}_claim_without_a_claim_id`,
-      }));
-    } else if (kind && !kindSatisfiesAssertion(kind, citedKinds)) {
-      found.push(violation(WRITER_REJECTION.INVENTED_BENEFIT, {
-        section,
-        detail: `${kind}_claim_not_supported_by_the_cited_claims`,
-      }));
-    }
-
-    // Blocked areas: a change or an improvement the pack records as unchanged.
-    // Prose the pack itself states is exempt — the pack's own claim wording is
-    // permitted by definition, and quoting it is exactly what a draft should do.
-    const fromPack = isPackProse(sentence, packProse);
-    for (const { block, patterns } of fromPack ? [] : blocks) {
-      const match = claimsArea(claimed, patterns);
-      if (!match) continue;
-      // A sentence that denies the claim is not making it.
-      if (isDenied(claimed, match.at)) continue;
-      // A channel-set word is a change claim about the layout only where the
-      // sentence actually claims the layout changed: the channels gaining
-      // headroom is a performance claim about those channels, not a new channel.
-      if (CHANNEL_FAMILY.test(match.keyword) && !CHANGE_SIGNAL.test(claimed)) continue;
-      found.push(violation(WRITER_REJECTION.UNSUPPORTED_IMPROVEMENT, {
-        section,
-        detail: `${block.reason}:${block.block_id}`,
-        claim_ids: [block.block_id],
-      }));
-    }
-
-    // A recommendation where the pack allows none.
-    if (isRecommendation(sentence) && !hasRecommendationClaim(input)) {
-      found.push(violation(WRITER_REJECTION.UNSUPPORTED_RECOMMENDATION, {
-        section,
-        detail: 'the_pack_allows_no_recommendation',
-      }));
-    }
-
-    // Design-stage commentary: the proposal states the finished design, so a
-    // sentence that tells the client what still needs attention, calibration,
-    // optimisation or further work is refused. The refusal is also how a genuine
-    // material issue reaches a human: it is never written up as advice.
-    const designStage = designStageCommentary(claimed);
-    if (designStage) {
-      found.push(violation(WRITER_REJECTION.DESIGN_STAGE_COMMENTARY, {
-        section,
-        detail: `design_stage_commentary:${designStage.rule}`,
-      }));
-    }
-
-    const seatScope = seatScopeInText(claimed);
-
-    // Seat-to-seat consistency, where P20 does not support it: no sentence may
-    // claim it for the seating area as a whole, or without naming a scope at all.
-    // The pack's own prohibited phrasings are caught below, over the whole text;
-    // this is the reading that also catches "consistent across the seating area",
-    // which carries none of them. A sentence that names the primary or the
-    // secondary seats is judged by the scoped rule beneath: that is the one place
-    // a narrower scope may be positive while the room is not.
-    if (p20BlocksConsistency(input) && seatScope !== 'primary' && seatScope !== 'secondary') {
-      const claim = seatConsistencyClaim(claimed);
-      if (claim) {
-        // A denial of the claim, or consistency named as an open item, is not
-        // the claim being made.
-        const denied = !claim.negationShaped && isDenied(claimed, claim.at);
-        if (!denied && !isConsistencyCaveat(claimed, claim.at)) {
-          found.push(violation(WRITER_REJECTION.P20_BASS_CONTRADICTION, {
-            section,
-            detail: `p20_does_not_support_a_seat_consistency_claim:${claim.rule}`,
-          }));
-        }
-      }
-    }
-
-    // Scoped seat-group claims: the scope a sentence names has to be the scope
-    // the pack states that result at, at the level its own adjective claims, and
-    // a narrower result may never be written as a wider one.
-    const scopedIssue = scopedClaimIssue({ sentence: claimed, scope: seatScope, claims: citedClaims });
-    if (scopedIssue) {
-      found.push(violation(WRITER_REJECTION.SCOPE_MISMATCH, { section, detail: scopedIssue }));
-    }
-  }
-
-  // Figures: every measurement a draft states is a measurement the pack states.
-  for (const token of measurementTokens(text)) {
-    if (vocabulary.measurements.has(token)) continue;
-    found.push(violation(WRITER_REJECTION.CHANGED_PARAMETER_VALUE, {
-      section,
-      detail: `figure_not_stated_by_the_reports:${token}`,
-    }));
-  }
-
-  // Levels: read with the option names removed, so an option's name is never
-  // mistaken for a result. Where the sentence names a parameter, the level must
-  // be one that parameter's own reports state.
-  for (const sentence of sentenceParts(stripOptionNames(text, vocabulary.optionNames))) {
-    const ids = parameterIds(sentence);
-    for (const level of levelTokens(sentence)) {
-      const supported = ids.length > 0
-        ? ids.every((id) => (vocabulary.parameters.get(id) || new Set()).has(level))
-        : vocabulary.levels.has(level);
-      if (supported) continue;
-      found.push(violation(WRITER_REJECTION.CHANGED_LEVEL, {
-        section,
-        detail: `${ids.length > 0 ? ids.map((id) => `P${id}`).join(',') : 'no_parameter_named'}:${level}`,
-      }));
-    }
-  }
-
-  // Products: only those the pack lists, and only for the option they belong to.
-  const citedOptionIds = new Set(
-    citedClaims.filter((claim) => claim?.option?.version_id).map((claim) => claim.option.version_id),
-  );
-  const oneOptionOnly = citedOptionIds.size === 1
-    && citedClaims.some((claim) => claim?.option?.version_id)
-    && citedClaims.every((claim) => !claim?.option?.version_id || citedOptionIds.has(claim.option.version_id));
-
-  for (const token of modelTokens(text)) {
-    if (!isProductToken(token)) continue;
-    if (!vocabulary.products.has(token)) {
-      found.push(violation(WRITER_REJECTION.UNSELECTED_PRODUCT, { section, detail: token }));
-      continue;
-    }
-    if (!oneOptionOnly) continue;
-    const owners = vocabulary.owners.get(token) || new Set();
-    const foreign = [...owners].filter((versionId) => !citedOptionIds.has(versionId));
-    if (foreign.length === 0) continue;
-    // The sentence the product is named in decides it: a sentence that compares
-    // the two options, or names the other option, is a contrast rather than an
-    // import of one option's product into the other's claim.
-    const sentence = sentences.find((entry) => entry.includes(token)) || String(text);
-    if (CONTRAST.test(sentence)) continue;
-    const named = foreign.some((versionId) => {
-      const name = optionNameById(input, versionId);
-      return name && sentence.includes(name);
-    });
-    if (named) continue;
-    found.push(violation(WRITER_REJECTION.EXTRA_PRODUCT, {
-      section,
-      detail: `product_belongs_to_another_option:${token}`,
-    }));
-  }
-
-  // The bass rule: where P20 does not support seat-to-seat consistency, no
-  // sentence may claim it, however it is worded. Read sentence by sentence, so a
-  // sentence that denies the claim or names consistency as an open item is not
-  // refused for making it — while a claim written as its own negation ("there are
-  // no bad seats") is not a denial and is still refused.
-  if (p20BlocksConsistency(input)) {
-    for (const sentence of sentences) {
-      const denied = stripOptionNames(sentence, vocabulary.optionNames);
-      if (!isBassConsistencyClaim(denied)) continue;
-      const at = Math.max(0, denied.search(CONSISTENCY_ANCHOR));
-      if (!NEGATION_SHAPED_CLAIM.test(denied) && (isDenied(denied, at) || isConsistencyCaveat(denied, at))) continue;
-      found.push(violation(WRITER_REJECTION.P20_BASS_CONTRADICTION, {
-        section,
-        detail: 'p20_does_not_support_a_bass_consistency_claim',
-      }));
-      break;
-    }
-  }
-
-  return found;
-}
-
-export default scanProse;
+// Preserve the public scanner import while keeping rules and scanner modular.
+export { scanProse, scanProse as default } from './writerProseScanner.js';
