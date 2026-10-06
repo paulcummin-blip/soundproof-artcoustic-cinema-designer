@@ -32,13 +32,13 @@
  * recommendation, and stops reading.
  */
 export const COMPARISON_STORY_STRUCTURE = [
-  '=== HOW A DIFFERENCE IS EXPLAINED — ONCE, IN THE SECTION THAT OWNS IT ===',
-  'Each section owns ONE story, set out in the section note at the end of this rule. Where a difference belongs to that story, explain it in four SHORT steps:',
-  '1. WHAT CHANGED: the loudspeaker, the subwoofer, the count or the position that differs, named exactly as supplied.',
-  '2. WHICH PARAMETER IT AFFECTS: named in client-friendly words with its code once, for example "Screen Dynamic Range (P12)".',
-  '3. WHAT EACH OPTION\'S VALUE IS, stated once: "106 dBC at Level 3 in the Level 1 version, 116 dBC at Level 4 in the Level 4 version".',
-  '4. WHAT THE CLIENT GETS: one or two sentences on what that gives the room.',
-  'No other section repeats this story. It may refer back in a clause at most ("the headroom difference covered in Dynamic Range"), and then writes about its own subject.',
+  '=== EXPLAIN EVERY MAJOR DIFFERENCE IN FOUR STEPS ===',
+  'For each difference that matters, in this order:',
+  '1. WHAT CHANGED: the loudspeaker, the subwoofer, the count or the layout that differs, named exactly as supplied.',
+  '2. WHICH PARAMETER IT AFFECTS: the RP22 or RP23 parameter that carries the result, named in client-friendly words with its number once, for example "RP22 Parameter 12, Screen Dynamic Range".',
+  '3. WHAT THE VALUE IS: each option\'s own value and level exactly as supplied, for example "106 dBC at Level 3 in the Level 1 version, 116 dBC at Level 4 in the Level 4 version", together with the size of the change.',
+  '4. WHY THE CLIENT SHOULD CARE: what that value gives the room. Connect the product change to the parameter, the parameter to the value, and the value to the experience in the room. Never state a value without saying what it gives the room, and never describe an experience without the value that supports it.',
+  'Use these four steps ONCE for a difference, in the one section that owns its story — the section note at the end of this rule says which. No other section repeats that story: it may refer back in a clause at most ("the headroom difference covered in Dynamic Range"), and then writes about its own subject. A client who reads the same P12, P13 and P14 story in four consecutive sections is reading a report, not a recommendation.',
 ].join('\n');
 
 /** The parameters a comparison may name, where the evidence supplies them. */
@@ -104,20 +104,20 @@ const SECTION_FOCUS = Object.freeze({
   ].join('\n'),
 
   spatial_resolution: [
-    'FOR THIS SECTION (ceiling: 150 words): the honest framing. Where every option already uses the same layout and reaches the same top level for discrete channel capability (P2), say so plainly and say that this is not where the choice lies. State what the options genuinely share: the channel count, the layout, the screen and the seating positions.',
-    'Then give what actually differs at the positions, in one short paragraph: the loudspeaker models specified (P5, P7 and P9 where the evidence supplies them), and what a position or spacing difference gives the room where there is one.',
+    'FOR THIS SECTION (ceiling: 150 words): the honest framing, and the only place the spatial position is discussed. Name the shared channel capability (Parameter 2) as a strength both options already hold where the evidence says so, say that this is not where the choice lies, and state what the options genuinely share: the channel count, the layout, the screen and the seating positions.',
+    'Give what actually differs at the positions in one short paragraph — the loudspeaker models specified, horizontal spacing (P5), front wide position (P7) and overhead spacing (P9) where the evidence supplies them — and say what a position or spacing difference gives the room where there is one.',
     'Do not oversell spatial difference when the layout is the same, and do not explain P12, P13 or P14 here: Dynamic Range owns the headroom story.',
   ].join('\n'),
 
   dynamic_range: [
     'FOR THIS SECTION (ceiling: 250 words): the main upgrade story, and the ONE place the headroom parameters are explained. Give each option its own Screen Dynamic Range (P12), Non-screen Dynamic Range (P13) and LFE and subwoofer Dynamic Range (P14) values and levels exactly as supplied, once each, and state the size of each difference.',
-    'Then explain headroom in the client\'s terms: the margin between normal listening and the point where the system starts to sound strained. Say what more of it gives the room — dialogue that stays clear when music and effects build, large effects with more scale, the surround and height layers keeping their presence in busy scenes, bass that feels more effortless, and peaks that stay composed instead of the system sounding pushed at cinema playback levels.',
+    'Then explain what that headroom buys at the listening level the design assumes, in the client\'s own terms: dialogue that stays clean when the soundtrack becomes demanding, music that opens up, large effects that keep their impact and scale, the surround and height layers keeping their presence in a busy scene, and peaks that stay composed instead of the system sounding pushed.',
     'Do not restate what the options share, do not explain the products again, and do not repeat any part of this story in another section.',
   ].join('\n'),
 
   timbre_matching: [
-    'FOR THIS SECTION (ceiling: 150 words): the tonal story, and nothing else. State the screen timbre (P16) and surround and overhead timbre (P17) position in one or two sentences — where both options are strong, say so plainly and move on — then say what tonal consistency gives the room as a sound travels from the screen into the surround and height layers.',
-    'Do not repeat every P16 and P17 result, do not re-tell the headroom story, and give the bass its one honest sentence only where the evidence states a bass difference (P18, P19 or P20). Where bass consistency is the same in both options, say that it still needs calibration attention rather than claiming an improvement.',
+    'FOR THIS SECTION (ceiling: 150 words): the tonal story, and nothing else. State the screen timbre (P16) and surround and overhead timbre (P17) position in one or two sentences — where both options are strong, say so plainly and move on — and give the bass its one honest sentence where the evidence states one: bass extension (P18), bass response at the listening position (P19) or bass consistency between seats (P20).',
+    'Say what tonal consistency gives the room as a sound travels from the screen into the surround and height layers. Do not repeat every P16 and P17 result, do not re-tell the headroom story, and where bass consistency is the same in both options, say that it still needs calibration attention rather than claiming an improvement.',
   ].join('\n'),
 
   key_performance_highlights: [
@@ -125,7 +125,7 @@ const SECTION_FOCUS = Object.freeze({
   ].join('\n'),
 
   overall_design: [
-    'FOR THIS SECTION (ceiling: 180 words): the conclusion, not another report. Say what the smaller option still keeps, say what the larger option adds, and say plainly which client each option suits. Use no value that has not already been given, and introduce no new parameter.',
+    'FOR THIS SECTION (ceiling: 180 words): the conclusion, not another report. Bring the differences together for the decision: say what the smaller option still keeps, say what the larger option adds, and say plainly which client each option suits — without ranking one as best. Use no value that has not already been given, and introduce no new parameter.',
     'Do not restate the differences section by section, do not repeat a parameter story, and do not name a product that appears nowhere else in this comparison.',
   ].join('\n'),
 });
