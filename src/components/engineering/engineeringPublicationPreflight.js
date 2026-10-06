@@ -1,3 +1,4 @@
+import { PUBLICATION_CONTRACT_VERSION, buildAtomicParameterIndex, auditPublicationContract } from '../../../shared/engineeringPublicationContract.js';
 import { publicationSectionReport, RP22_PARAMETER_KEYS } from './publicationGateCore';
 import { statesBassAuthority } from './versionedEngineeringAuthority';
 
@@ -10,8 +11,11 @@ export function engineeringPublicationPreflight({
   const candidate = {
     engineering_fingerprint: engineeringFingerprint, published_at: 'preflight',
     engineering_summary: engineeringSummary, report_snapshot: reportSnapshot,
+    publication_contract_version: PUBLICATION_CONTRACT_VERSION,
     ...versions, provenance: { bass_fingerprint: bassReadiness.fingerprint },
   };
+  candidate.parameter_index = buildAtomicParameterIndex(candidate);
+  const contract = auditPublicationContract(candidate);
   const sectionReport = publicationSectionReport(candidate, {
     project: { roomDims: designState?.roomDims,
       screen_size: designState?.screen?.visibleWidthInches,
@@ -28,6 +32,8 @@ export function engineeringPublicationPreflight({
   });
   const bassReason = bassReadiness.detail || bassReadiness.reason || 'bass authority unavailable';
   const gates = [
+    ...(reportSnapshot?.capture_missing || []).map(reason => ({ key:reason, label:reason, ok:false })),
+    ...contract.missing.map(reason => ({ key:reason, label:reason, ok:false })),
     { key: 'version', label: 'Project and selected version', ok: !!projectId && !!versionId },
     { key: 'hydration', label: 'Version loaded and minimum system selected', ok: ready === true },
     { key: 'rp22_terminal', label: 'RP22 P1–P21 terminal (verified bass or explicit N/A)', ok: provisional.length === 0, detail: provisional.join(', ') },
