@@ -132,6 +132,7 @@ export function useVersionedEngineeringAuthority(projectId, versionId, { finalRe
   const snapshot = composedSnapshot && restoredSummary !== composedSummary
     ? {
         ...composedSnapshot,
+        calculationFingerprint: restoredSummary?.bassAuthorityFingerprint ?? composedSnapshot.calculationFingerprint,
         engineeringSummary: restoredSummary,
         rating: composedSnapshot.rating
           ? { ...composedSnapshot.rating, ...(restoredRating || {}), engineeringSummary: restoredSummary }
