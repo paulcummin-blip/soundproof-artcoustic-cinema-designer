@@ -104,10 +104,16 @@ test('the article fits one A4 report page', () => {
 });
 
 test('brand typography is used', () => {
-  assert.ok(SRC.includes('REPORT_FONT_HEADING as FONT_HEADING'), 'the heading family comes from the report authority');
+  // The family authority is the shared report typography module: this page asks
+  // it for the body family and for the section-heading style (family, weight,
+  // tracking, leading), instead of restating any family of its own.
+  const typographySrc = fs.readFileSync('src/components/report/typography/reportTypography.js', 'utf8');
+  assert.ok(SRC.includes('reportSectionHeadingStyle'), 'the page title uses the shared report heading style');
+  assert.ok(typographySrc.includes('fontFamily: REPORT_FONT_HEADING'),
+    'the shared heading style carries the authority heading family');
   assert.ok(SRC.includes('REPORT_FONT_BODY as FONT_BODY'), 'the body family comes from the report authority');
   assert.ok(SRC.includes('fontFamily: FONT_BODY'), 'the page is set in the brand body family');
-  assert.ok(SRC.includes('fontFamily: FONT_HEADING'), 'the page title is set in the brand heading family');
+  assert.ok(!SRC.includes('fontFamily: "Futura'), 'the page never restates the heading family itself');
   // The copy renderer never sets a family of its own, so the brand font inherits.
   const rendererSrc = fs.readFileSync('src/components/publicationContent/PublicationContentHtml.jsx', 'utf8');
   assert.ok(!rendererSrc.includes('fontFamily'), 'the copy renderer does not override the brand family');
