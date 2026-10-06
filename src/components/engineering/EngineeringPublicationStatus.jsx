@@ -6,8 +6,10 @@ import EngineeringPublicationDiagnostics from './EngineeringPublicationDiagnosti
 import { useEngineeringMode } from '@/components/state/useEngineeringMode';
 import { useAuth } from '@/lib/AuthContext';
 
-// Dealer-facing status wording. Internal gate labels and field names stay inside
-// the diagnostics disclosure — never in the normal workflow.
+// Internal exposure only: the row is mounted for a true master admin or an
+// explicit Engineering Mode session, and renders nothing at all for a dealer or
+// a client. Internal gate labels and field names stay inside the diagnostics
+// disclosure — never in the normal workflow.
 const TONES = {
   published: { dot: '#2F7D4F', label: 'Saved' },
   publishing: { dot: '#B7791F', label: 'Saving…' },
@@ -33,14 +35,34 @@ export default function EngineeringPublicationStatus({ publication, projectId, v
   // The diagnostics disclosure is mounted only once the designer opens it, so no
   // gate row, fingerprint or HTTP code exists in the DOM by default.
   const [diagnosticsOpen, setDiagnosticsOpen] = useState(false);
+
+  // WHO SEES THIS AT ALL. The engineering status row is an internal surface, so it
+  // exists for exactly two audiences and never for a dealer or a client:
+  //   · an explicit Engineering Mode / developer session, or
+  //   · a true internal master admin, which is never account-scoped — a dealer's
+  //     own account administrator is account scoped, so it does not qualify.
+  // Every other login renders nothing: no status row, no action button and no
+  // publication or assessment wording anywhere in the Room Designer.
+  const accountScoped = Boolean(
+    user?.access_context?.account?.id || user?.access_context?.user?.account_id
+  );
+  const internalAudience = engineeringMode === true
+    || (user?.access_context?.capabilities?.masterAdmin === true && !accountScoped);
+
   useEffect(() => {
+    // A dealer never sees this row, so the durable publication is not even read
+    // for them: the visibility rule also decides whether the read happens.
+    if (!internalAudience) {
+      setDurable(null);
+      return undefined;
+    }
     let cancelled = false;
     setDurable(null);
     fetchDurablePublication(projectId, versionId, { force: true }).then(value => {
       if (!cancelled) setDurable(value);
     });
     return () => { cancelled = true; };
-  }, [projectId, versionId, publication.attempt?.status, publication.attempt?.fingerprint]);
+  }, [internalAudience, projectId, versionId, publication.attempt?.status, publication.attempt?.fingerprint]);
   const { preflight, attempt, fingerprint, publish } = publication;
   const saved = auditDurablePublication({ durable }).allowed
     && durable?.version?.published_fingerprint === fingerprint;
@@ -71,11 +93,14 @@ export default function EngineeringPublicationStatus({ publication, projectId, v
   // developer Engineering Mode session, or a true internal master admin, which
   // is never account-scoped. A dealer's own account administrator is account
   // scoped, so it never reaches this disclosure even though it manages users.
-  const accountScoped = Boolean(
-    user?.access_context?.account?.id || user?.access_context?.user?.account_id
-  );
-  const showDiagnostics = engineeringMode === true
-    || (user?.access_context?.capabilities?.masterAdmin === true && !accountScoped);
+  // Diagnostics belong to the same internal audience as the row itself, and stay
+  // collapsed behind their own disclosure until explicitly opened.
+  const showDiagnostics = internalAudience;
+
+  // Not an internal audience: nothing is rendered at all. The Room Designer stays
+  // simply the design workspace, and readiness is enforced where a report or a
+  // proposal is actually created, never as a permanent banner here.
+  if (!internalAudience) return null;
 
   return (
     <section className="rounded-lg border border-[#DCDBD6] bg-white px-3 py-2 mb-3" aria-label="Engineering assessment status">
