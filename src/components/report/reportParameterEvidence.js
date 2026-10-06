@@ -6,6 +6,11 @@ const rank = value => value === 'FAIL' ? 0 : /^L[1-4]$/.test(String(value)) ? Nu
 
 // Select a complete source row. Never borrow its grade from an aggregate.
 export function readReportParameter(summary, id, { scope = 'project', seatId = null } = {}) {
+  if (summary?.parameter_index) {
+    const saved = summary.parameter_index['P' + id];
+    const row = scope === 'per-seat' ? saved?.supporting_per_seat?.find(item => String(item.seat_id) === String(seatId)) : scope === 'primary' || scope === 'secondary' ? saved?.scopes?.[scope] : saved;
+    return row ? { ...row, text: (scope === 'primary' ? 'Primary ' : scope === 'secondary' ? 'Secondary ' : '') + row.level + ' · ' + row.value } : { key:'P'+id, scope, value:'—', level:'—', source_type:'unavailable' };
+  }
   const key = 'p' + id;
   const room = summary?.roomResultsByParameter?.[id];
   let row = room || null;
