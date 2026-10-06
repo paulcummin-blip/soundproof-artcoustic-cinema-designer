@@ -1,14 +1,23 @@
 // ReportSnapshotBanner.jsx
 // ------------------------
-// The saved-report banner shown above a report that was generated before the
-// latest changes to the project. The report itself stays fully visible and is
-// never blanked; the banner states what moved on, when the report was generated
-// and by whom, and offers Regenerate.
+// The saved-report banner shown above a report that was created before the
+// latest design update. The report itself stays fully visible and is never
+// blanked; the banner states plainly that the design moved on, and offers the
+// one action that brings the report up to date.
+//
+// The dealer-facing wording is deliberately plain: no bass, gate, stale,
+// evidence or publication vocabulary reaches the screen. Which inputs moved on,
+// when the report was generated and by whom, and any evidence mismatch are
+// diagnostics: they are shown only to a master admin or with Engineering Mode on
+// (the development preview flag).
 //
 // Presentation only: the caller supplies the status and the regenerate action.
 
 import React from 'react';
 import { AlertTriangle, RefreshCw } from 'lucide-react';
+import { useAuth } from '@/lib/AuthContext';
+import { isMasterAdmin } from '@/lib/accountAccess';
+import { useEngineeringMode } from '@/components/state/useEngineeringMode';
 import {
   REPORT_SNAPSHOT_STATUS,
   buildStaleSentence,
@@ -28,6 +37,22 @@ const BANNER = {
   fontSize: 13,
   lineHeight: 1.55,
   fontFamily: "'Didact Gothic', 'Century Gothic', sans-serif",
+};
+
+/** What the designer reads when the design has moved past the saved report. */
+export const STALE_BANNER_TEXT = 'This report was created before the latest design update.';
+
+/** What the designer reads when the saved report must be recreated to be usable. */
+export const UPDATE_NEEDED_BANNER_TEXT = 'This report needs updating before it can be used in a proposal.';
+
+/** The line both states end on. */
+export const BANNER_UNCHANGED_TEXT = 'The saved report is shown unchanged.';
+
+const DIAGNOSTIC = {
+  marginTop: 6,
+  fontSize: 11,
+  color: '#8A8580',
+  fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Consolas, monospace',
 };
 
 function formatGeneratedAt(value) {
@@ -51,8 +76,14 @@ export default function ReportSnapshotBanner({
   evidenceMismatches = [],
   className = '',
 }) {
+  const { user } = useAuth();
+  const { engineeringMode } = useEngineeringMode();
+
   const stale = status === REPORT_SNAPSHOT_STATUS.STALE;
   if (!stale && !evidenceIncomplete) return null;
+
+  // Diagnostics only: master admin, or the development preview flag.
+  const showDiagnostics = isMasterAdmin(user) || engineeringMode === true;
 
   const when = formatGeneratedAt(generatedAt);
   const author = (typeof generatedBy === 'string' && generatedBy.trim()) ? generatedBy.trim() : null;
@@ -63,31 +94,25 @@ export default function ReportSnapshotBanner({
     .map((entry) => entry?.key || entry?.area)
     .filter(Boolean)
     .slice(0, 6);
+  const diagnosticLine = stale
+    ? [buildStaleSentence(changedKeys), stamp ? `${stamp}.` : null].filter(Boolean).join(' ')
+    : [
+      `This ${reportTypeLabel(reportType)} is incomplete for proposal use.`,
+      mismatchList.length > 0 ? `Mismatched values: ${mismatchList.join(', ')}.` : null,
+      stamp ? `${stamp}.` : null,
+    ].filter(Boolean).join(' ');
 
   return (
-    <div className={className} style={BANNER}>
+    <div className={className} style={BANNER} data-report-snapshot-banner={stale ? 'stale' : 'update-needed'}>
       <AlertTriangle className="w-4 h-4 mt-[2px] flex-shrink-0" style={{ color: '#B08A3E' }} />
       <div style={{ flex: 1, minWidth: 0 }}>
-        {stale ? (
-          <>
-            <strong style={{ color: '#213428' }}>
-              This {reportTypeLabel(reportType)} was generated before the latest changes.
-            </strong>{' '}
-            {buildStaleSentence(changedKeys)}
-            {stamp ? ` ${stamp}.` : ''}{' '}
-            The saved report is shown unchanged. Create an updated report to bring it up to date.
-          </>
-        ) : (
-          <>
-            <strong style={{ color: '#213428' }}>
-              This {reportTypeLabel(reportType)} is incomplete for proposal use.
-            </strong>{' '}
-            The evidence saved with this report does not match the values the report shows
-            {mismatchList.length > 0 ? ` (${mismatchList.join(', ')})` : ''}.
-            A proposal cannot use this report until it is regenerated.
-            {stamp ? ` ${stamp}.` : ''}
-          </>
-        )}
+        <strong style={{ color: '#213428' }}>
+          {stale ? STALE_BANNER_TEXT : UPDATE_NEEDED_BANNER_TEXT}
+        </strong>{' '}
+        {BANNER_UNCHANGED_TEXT}
+        {showDiagnostics && diagnosticLine ? (
+          <div style={DIAGNOSTIC} data-report-snapshot-diagnostics="true">{diagnosticLine}</div>
+        ) : null}
       </div>
       {onRegenerate && (
         <button

@@ -1,10 +1,10 @@
 // library-report-status-vocabulary.test.mjs
 // ---------------------------------------------------------------------------
-// ACCEPTANCE — the Project Library's three user-facing states and the actions
-// each one offers.
+// ACCEPTANCE — the Project Library's three user-facing report states and the
+// actions each one offers.
 //
 //   A  Current report      Current · Open · Export PDF, and no refresh action
-//   B  Design changed      Previous report · Open previous · Create updated report
+//   B  Design changed      Update needed · Open saved report · Create updated report
 //   C  Issued PDF current  Issued PDF · Open · Download
 //   D  Issued PDF changed  Issued PDF — older than current design · Open · Download
 //   E  Exporting a PDF never stales the report
@@ -12,9 +12,11 @@
 //   G  Generating a proposal never stales it
 //   H  Duplicate saved reports list ONE live report: the canonical current one
 //
-// The status vocabulary is derived, never stored: a report is Current until the
-// design fingerprint changes, and nothing the designer does to the document —
-// export, open, propose — is allowed to move it.
+// A row's state is the version's proposal-readiness cell — the same authority
+// the banner and the Proposal Centre read — so the Library can never show
+// Current on a report a proposal may not use. The state is derived, never
+// stored: nothing the designer does to the document — export, open, propose — is
+// allowed to move it.
 // ---------------------------------------------------------------------------
 
 import { test } from 'vitest';
@@ -25,17 +27,23 @@ import {
   EXPORT_DESIGN_CHANGED_NOTE,
   EXPORT_SOURCE_CHANGED_LABEL,
   ISSUED_PDF_LABEL,
+  ISSUED_PDFS_HELPER,
   LIVE_REPORT_DESIGN_CHANGED_NOTE,
   LIVE_REPORT_STATE,
   LIVE_REPORT_STATE_LABEL,
-  PREVIOUS_REPORT_HISTORY_LABEL,
+  LIVE_REPORT_UPDATE_NEEDED_NOTE,
   REPORT_ROW_ACTION,
   collapseLiveReports,
+  liveReportNote,
   liveReportStateLabel,
   resolveExportLiveState,
   resolveLiveReportState,
   selectLatestExports,
 } from '../src/components/library/librarySourceStatus.js';
+import {
+  READINESS_STATE,
+  buildReadinessCell,
+} from '../src/components/proposal/sourceAuthority/proposalReadinessAuthority.js';
 
 const read = (path) => readFileSync(new URL(`../${path}`, import.meta.url), 'utf8');
 
@@ -49,6 +57,9 @@ const VERSION = {
   id: 'version-4',
   published_fingerprint: 'ENG-1',
 };
+
+/** One readiness cell, as the Proposal Centre builds it. */
+const cell = (state) => buildReadinessCell({ state });
 
 const issuedPdf = ({ engineering = 'ENG-1', exportedAt = '2026-10-03T10:00:00.000Z' } = {}) => ({
   id: 'export-1',
@@ -84,17 +95,19 @@ const savedReport = ({ status = 'current', generatedAt = '2026-10-02T09:00:00.00
 const actionOrder = () => [
   ['OPEN', LIVE_ROW.indexOf('REPORT_ROW_ACTION.OPEN')],
   ['EXPORT_PDF', LIVE_ROW.indexOf('REPORT_ROW_ACTION.EXPORT_PDF')],
-  ['OPEN_PREVIOUS', LIVE_ROW.indexOf('REPORT_ROW_ACTION.OPEN_PREVIOUS')],
+  ['OPEN_SAVED', LIVE_ROW.indexOf('REPORT_ROW_ACTION.OPEN_SAVED')],
   ['CREATE_UPDATED', LIVE_ROW.indexOf('REPORT_ROW_ACTION.CREATE_UPDATED')],
 ];
 
 /* ── A — a Current report ─────────────────────────────────────────────────── */
 
 test('A — a Current report offers Open and Export PDF, and no refresh action', () => {
-  const state = resolveLiveReportState(savedReport({ status: 'current' }));
+  const ready = { cell: cell(READINESS_STATE.CURRENT), hasReport: true };
+  const state = resolveLiveReportState(ready);
   assert.equal(state, LIVE_REPORT_STATE.CURRENT);
   assert.equal(liveReportStateLabel(state), 'Current');
   assert.equal(liveReportStateLabel(state), LIVE_REPORT_STATE_LABEL[LIVE_REPORT_STATE.CURRENT]);
+  assert.equal(liveReportNote(ready), null, 'a Current report carries no note');
 
   const actions = Object.fromEntries(actionOrder());
   assert.ok(actions.OPEN > -1, 'the row offers Open');
@@ -102,38 +115,34 @@ test('A — a Current report offers Open and Export PDF, and no refresh action',
   assert.equal(REPORT_ROW_ACTION.OPEN, 'Open');
   assert.equal(REPORT_ROW_ACTION.EXPORT_PDF, 'Export PDF');
 
-  // The Current branch is the one that ends before the previous-report branch,
-  // so neither refresh action can ever sit on a Current report.
-  const currentBranch = LIVE_ROW.slice(
-    LIVE_ROW.indexOf('{!hasReport && ('),
-    LIVE_ROW.indexOf('{hasReport && previous && ('),
-  );
-  assert.doesNotMatch(currentBranch, /CREATE_UPDATED|OPEN_PREVIOUS|Regenerate/i);
+  // The Current branch is the one that ends before the update-needed branch, so
+  // neither refresh action can ever sit on a Current report.
+  const currentBranch = LIVE_ROW.slice(LIVE_ROW.indexOf('{hasReport && !updateNeeded && ('));
+  assert.doesNotMatch(currentBranch, /CREATE_UPDATED|OPEN_SAVED|Regenerate/i);
 
-  // No surface in the vocabulary carries the old wording. The check is on the
-  // words the Library actually renders — the exported labels and whatever the row
-  // resolvers return — never on this module's own comments, which quote the
-  // retired wording precisely in order to forbid it.
+  // No surface in the vocabulary carries internal wording. The check is on the
+  // words the Library actually renders.
   const rowLabels = [
     liveReportStateLabel(LIVE_REPORT_STATE.CURRENT),
-    liveReportStateLabel(LIVE_REPORT_STATE.STALE),
+    liveReportStateLabel(LIVE_REPORT_STATE.UPDATE_NEEDED),
     liveReportStateLabel(LIVE_REPORT_STATE.MISSING),
     ISSUED_PDF_LABEL,
     EXPORT_SOURCE_CHANGED_LABEL,
     EXPORT_DESIGN_CHANGED_NOTE,
-    PREVIOUS_REPORT_HISTORY_LABEL,
+    ISSUED_PDFS_HELPER,
     LIVE_REPORT_DESIGN_CHANGED_NOTE,
+    LIVE_REPORT_UPDATE_NEEDED_NOTE,
     ...Object.values(REPORT_ROW_ACTION),
     resolveExportLiveState({ record: issuedPdf(), version: VERSION }).label,
     resolveExportLiveState({ record: issuedPdf({ engineering: 'ENG-0' }), version: VERSION }).label,
     resolveExportLiveState({ record: issuedPdf(), version: null }).label,
     resolveExportLiveState({ record: issuedPdf(), version: VERSION, superseded: true }).label,
-  ];
+  ].filter(Boolean);
   const vocabularySurface = rowLabels.join(' | ');
 
   assert.doesNotMatch(vocabularySurface, /Regenerate/);
-  assert.doesNotMatch(vocabularySurface, /Older export/);
-  assert.doesNotMatch(vocabularySurface, /Source changed since export/);
+  assert.doesNotMatch(vocabularySurface, /Previous report|Older export|Source changed since export/);
+  assert.doesNotMatch(vocabularySurface, /stale|legacy|incomplete|evidence|fingerprint|publication/i);
 
   // An issued PDF states what it IS, whatever state its source is in: it never
   // borrows the report vocabulary.
@@ -153,28 +162,43 @@ test('A — a Current report offers Open and Export PDF, and no refresh action',
 
 /* ── B — the design changed ───────────────────────────────────────────────── */
 
-test('B — a report the design moved past is history, and offers an updated report', () => {
-  const state = resolveLiveReportState(savedReport({ status: 'stale' }));
-  assert.equal(state, LIVE_REPORT_STATE.STALE);
-  assert.equal(liveReportStateLabel(state), 'Previous report');
-  assert.equal(LIVE_REPORT_STATE_LABEL[LIVE_REPORT_STATE.STALE], 'Previous report');
-  assert.equal(PREVIOUS_REPORT_HISTORY_LABEL, 'Previous report — design has changed');
+test('B — a report the design moved past reads Update needed, and offers an updated report', () => {
+  const moved = { cell: cell(READINESS_STATE.STALE), hasReport: true };
+  const state = resolveLiveReportState(moved);
+  assert.equal(state, LIVE_REPORT_STATE.UPDATE_NEEDED);
+  assert.equal(liveReportStateLabel(state), 'Update needed');
+  assert.equal(LIVE_REPORT_STATE_LABEL[LIVE_REPORT_STATE.UPDATE_NEEDED], 'Update needed');
   assert.equal(LIVE_REPORT_DESIGN_CHANGED_NOTE, 'Design changed since this report was created.');
+  assert.equal(liveReportNote(moved), LIVE_REPORT_DESIGN_CHANGED_NOTE);
+
+  // A report that must be recreated before a proposal may read it reads the same
+  // state, with its own plain line — never an internal name.
+  const refresh = { cell: cell(READINESS_STATE.LEGACY), hasReport: true };
+  assert.equal(resolveLiveReportState(refresh), LIVE_REPORT_STATE.UPDATE_NEEDED);
+  assert.equal(liveReportNote(refresh), LIVE_REPORT_UPDATE_NEEDED_NOTE);
+  assert.equal(LIVE_REPORT_UPDATE_NEEDED_NOTE, 'This report needs updating before a proposal can use it.');
+  assert.equal(
+    resolveLiveReportState({ cell: cell(READINESS_STATE.INCOMPLETE), hasReport: true }),
+    LIVE_REPORT_STATE.UPDATE_NEEDED,
+  );
 
   const actions = Object.fromEntries(actionOrder());
-  assert.ok(actions.OPEN_PREVIOUS > -1, 'the row offers Open previous');
+  assert.ok(actions.OPEN_SAVED > -1, 'the row offers Open saved report');
   assert.ok(actions.CREATE_UPDATED > -1, 'the row offers Create updated report');
-  assert.equal(REPORT_ROW_ACTION.OPEN_PREVIOUS, 'Open previous');
+  assert.equal(REPORT_ROW_ACTION.OPEN_SAVED, 'Open saved report');
   assert.equal(REPORT_ROW_ACTION.CREATE_UPDATED, 'Create updated report');
 
-  const previousBranch = LIVE_ROW.slice(LIVE_ROW.indexOf('{hasReport && previous && ('));
-  assert.match(previousBranch, /REPORT_ROW_ACTION\.OPEN_PREVIOUS/);
-  assert.match(previousBranch, /REPORT_ROW_ACTION\.CREATE_UPDATED/);
+  const updateBranch = LIVE_ROW.slice(
+    LIVE_ROW.indexOf('{hasReport && updateNeeded && ('),
+    LIVE_ROW.indexOf('{hasReport && !updateNeeded && ('),
+  );
+  assert.match(updateBranch, /REPORT_ROW_ACTION\.OPEN_SAVED/);
+  assert.match(updateBranch, /REPORT_ROW_ACTION\.CREATE_UPDATED/);
   assert.doesNotMatch(LIVE_ROW, /Regenerate/i);
 
-  // The Library names the two history lines it shows for such a report.
-  assert.match(LIVE_ROW, /PREVIOUS_REPORT_HISTORY_LABEL/);
-  assert.match(LIVE_ROW, /LIVE_REPORT_DESIGN_CHANGED_NOTE/);
+  // The Library renders the plain line such a row carries, supplied by the
+  // vocabulary and never written inline in the row.
+  assert.match(LIVE_ROW, /\{note &&/);
 });
 
 /* ── C — an issued PDF that matches ───────────────────────────────────────── */
@@ -221,8 +245,8 @@ test('D — an issued PDF after a design change says so, and is never regenerate
 
   // An issued PDF is only ever opened or downloaded.
   assert.deepEqual(
-    [REPORT_ROW_ACTION.OPEN, REPORT_ROW_ACTION.EXPORT_PDF, REPORT_ROW_ACTION.OPEN_PREVIOUS],
-    ['Open', 'Export PDF', 'Open previous'],
+    [REPORT_ROW_ACTION.OPEN, REPORT_ROW_ACTION.EXPORT_PDF, REPORT_ROW_ACTION.OPEN_SAVED],
+    ['Open', 'Export PDF', 'Open saved report'],
   );
   assert.doesNotMatch(EXPORT_SOURCE_CHANGED_LABEL, /regenerate/i);
 });

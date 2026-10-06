@@ -85,6 +85,7 @@ import { validateReportEvidence } from '../base44/shared/reportEvidenceCompleten
 import {
   LIBRARY_CHECKLIST_STATUS,
   LIBRARY_READINESS_HEADLINE,
+  LIBRARY_VERDICT,
   buildLibraryProposalReadiness,
 } from '../src/components/library/libraryProposalReadiness.js';
 
@@ -1038,9 +1039,15 @@ test('21. server, client, Proposal Centre and the Library banner read every fixt
       versions: [sources.version],
     });
     assert.equal(banner.ready, centreGate.ready, `${name}: banner verdict`);
+    // The banner's own verdict decides its words — and the Library words never
+    // name an internal state.
     assert.equal(
       banner.headline,
-      centreGate.ready ? LIBRARY_READINESS_HEADLINE.READY : LIBRARY_READINESS_HEADLINE.NOT_READY,
+      {
+        [LIBRARY_VERDICT.READY]: LIBRARY_READINESS_HEADLINE.READY,
+        [LIBRARY_VERDICT.UPDATES_NEEDED]: LIBRARY_READINESS_HEADLINE.UPDATES_NEEDED,
+        [LIBRARY_VERDICT.NOT_ASSESSED]: LIBRARY_READINESS_HEADLINE.NOT_ASSESSED,
+      }[banner.verdict],
       `${name}: banner headline`,
     );
 

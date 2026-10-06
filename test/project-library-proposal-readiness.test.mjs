@@ -2,15 +2,17 @@
 // ---------------------------------------------------------------------------
 // ACCEPTANCE — the Project Library's proposal readiness banner.
 //
-//   A  all reports current        Ready for Proposal · Create Proposal · no refresh action
-//   B  one report not current     Not ready, naming the exact version and report
+//   A  all reports current        Ready for Proposal · Create Proposal · no update action
+//   B  the design has changed     Update reports before creating a proposal, naming the
+//                                 version and the report · Update required reports
 //   C  current reports + old PDFs the PDFs are history, and block nothing
 //   D  readiness source           the banner's verdict IS the Proposal Centre contract
 //   E  user wording               no internal diagnostic word reaches the Library
 //
 // The banner answers one question — can I go to Proposal now? — and it does so
 // from the readiness authority the Proposal Centre already gates generation with,
-// never from a second opinion derived in the Library.
+// never from a second opinion derived in the Library. Its words are the dealer's
+// words: ready, reports to update, or assessment still to complete.
 // ---------------------------------------------------------------------------
 
 import { test } from 'vitest';
@@ -19,9 +21,12 @@ import { readFileSync } from 'node:fs';
 
 import {
   LIBRARY_CHECKLIST_STATUS,
+  LIBRARY_NOT_ASSESSED_DETAIL,
   LIBRARY_READINESS_ACTION,
   LIBRARY_READINESS_HEADLINE,
   LIBRARY_READY_DETAIL,
+  LIBRARY_UPDATES_NEEDED_DETAIL,
+  LIBRARY_VERDICT,
   buildLibraryProposalReadiness,
 } from '../src/components/library/libraryProposalReadiness.js';
 import {
@@ -35,6 +40,7 @@ import {
   EXPORT_SOURCE_CHANGED_LABEL,
   ISSUED_PDFS_HELPER,
   ISSUED_PDF_LABEL,
+  liveReportNote,
   liveReportStateLabel,
   resolveExportLiveState,
   resolveLiveReportState,
@@ -79,19 +85,20 @@ const readinessFor = (rows, versions = versionsWith()) => buildLibraryProposalRe
   versions,
 });
 
-/** The words one checklist cell reads as, e.g. "Technical Report: Not generated". */
+/** The words one compact-list cell reads as, e.g. "Technical Report: Not generated". */
 const cellWords = (entry) => entry.cells.filter((item) => item.status)
   .map((item) => `${item.label}: ${item.status}`);
 
 // ── A ───────────────────────────────────────────────────────────────────────
 
-test('A — every report current: Ready for Proposal, and no refresh action', () => {
+test('A — every report current: Ready for Proposal, and no update action', () => {
   const readiness = readinessFor(allCurrentRows());
 
   assert.equal(readiness.ready, true);
+  assert.equal(readiness.verdict, LIBRARY_VERDICT.READY);
   assert.equal(readiness.headline, 'Ready for Proposal');
   assert.equal(readiness.headline, LIBRARY_READINESS_HEADLINE.READY);
-  assert.equal(readiness.detail, 'All selected versions have current Visual and Technical Reports.');
+  assert.equal(readiness.detail, 'The current Visual and Technical Reports are ready for proposal creation.');
   assert.equal(readiness.detail, LIBRARY_READY_DETAIL);
 
   assert.equal(readiness.primaryAction.label, 'Create Proposal');
@@ -99,10 +106,10 @@ test('A — every report current: Ready for Proposal, and no refresh action', ()
   assert.equal(readiness.secondaryAction.label, 'View Proposal Centre');
   assert.equal(readiness.secondaryAction.kind, 'proposal-centre');
 
-  // No refresh action exists on a project whose reports are all current.
+  // No update action exists on a project whose reports are all current.
   const offered = [readiness.primaryAction.label, readiness.secondaryAction.label];
-  assert.ok(!offered.includes(LIBRARY_READINESS_ACTION.CREATE_UPDATED));
-  assert.ok(!offered.includes(LIBRARY_READINESS_ACTION.GENERATE));
+  assert.ok(!offered.includes(LIBRARY_READINESS_ACTION.UPDATE_REQUIRED));
+  assert.ok(!offered.includes(LIBRARY_READINESS_ACTION.OPEN_ROOM_DESIGNER));
   assert.equal(readiness.showChecklist, false);
 
   // Every version states its own line, and every report reads Ready.
@@ -118,49 +125,75 @@ test('A — every report current: Ready for Proposal, and no refresh action', ()
 
 // ── B ───────────────────────────────────────────────────────────────────────
 
-test('B — one report not current: Not ready, naming the version and the report', () => {
+test('B — the design changed: update the reports, naming the version and the report', () => {
   const readiness = readinessFor([
     versionRow({ id: 'v4', name: 'Level 4 version' }),
     versionRow({ id: 'v1', name: 'Level 1 version', technical: READINESS_STATE.STALE }),
   ]);
 
   assert.equal(readiness.ready, false);
-  assert.equal(readiness.headline, 'Not ready for Proposal');
+  assert.equal(readiness.verdict, LIBRARY_VERDICT.UPDATES_NEEDED);
+  assert.equal(readiness.headline, 'Update reports before creating a proposal');
   assert.equal(
     readiness.detail,
-    'Level 1 version needs an updated Technical Report before a proposal can be created.',
+    'The design has changed since one or more reports were created. Create updated reports before preparing the proposal.',
   );
+  assert.equal(readiness.detail, LIBRARY_UPDATES_NEEDED_DETAIL);
 
-  // The one action unblocks exactly what was named.
-  assert.equal(readiness.primaryAction.label, 'Create updated report');
+  // ONE action unblocks exactly what was named, aimed at the first report in the way.
+  assert.equal(readiness.primaryAction.label, 'Update required reports');
   assert.equal(readiness.primaryAction.kind, 'update');
   assert.equal(readiness.primaryAction.reportType, 'technical');
   assert.equal(readiness.primaryAction.versionId, 'v1');
   assert.notEqual(readiness.primaryAction.label, 'Create Proposal');
-  assert.equal(readiness.secondaryAction, null);
+  assert.equal(readiness.secondaryAction.label, 'View reports');
+  assert.equal(readiness.secondaryAction.kind, 'view-reports');
 
-  // The version's own line says the same thing, and the other version stays ready.
+  // The compact list states each version and each report in the same three words.
+  assert.equal(readiness.showChecklist, true);
   const lines = Object.fromEntries(readiness.checklist.map((entry) => [entry.versionId, entry]));
-  assert.equal(lines.v1.line, 'Needs updated Technical Report');
+  assert.deepEqual(lines.v1, {
+    versionId: 'v1',
+    versionName: 'Level 1 version',
+    ready: false,
+    line: 'Update needed',
+    cells: [
+      { source: 'visual', label: 'Visual Report', status: 'Ready' },
+      { source: 'technical', label: 'Technical Report', status: 'Update needed' },
+    ],
+  });
+  assert.deepEqual(cellWords(lines.v4), ['Visual Report: Ready', 'Technical Report: Ready']);
   assert.equal(lines.v4.line, 'Ready for Proposal');
   assert.equal(lines.v4.ready, true);
-  assert.equal(readiness.showChecklist, false);
 
-  // Several reports at once read as the short version-by-version checklist.
+  // Every report state other than Current reads Update needed; only a report that
+  // does not exist reads Not generated.
   const many = readinessFor([
-    versionRow({ id: 'v4', name: 'Level 4 version', visual: READINESS_STATE.STALE }),
-    versionRow({ id: 'v1', name: 'Level 1 version', technical: READINESS_STATE.MISSING }),
+    versionRow({ id: 'v4', name: 'Level 4 version', visual: READINESS_STATE.STALE, technical: READINESS_STATE.LEGACY }),
+    versionRow({ id: 'v1', name: 'Level 1 version', visual: READINESS_STATE.INCOMPLETE, technical: READINESS_STATE.MISSING }),
   ]);
-  assert.equal(many.ready, false);
-  assert.equal(many.showChecklist, true);
-  assert.deepEqual(many.checklist.map((entry) => entry.versionName), ['Level 4 version', 'Level 1 version']);
-  assert.deepEqual(cellWords(many.checklist[0]), ['Visual Report: Needs updated report', 'Technical Report: Ready']);
-  assert.deepEqual(cellWords(many.checklist[1]), ['Visual Report: Ready', 'Technical Report: Not generated']);
+  assert.equal(many.verdict, LIBRARY_VERDICT.UPDATES_NEEDED);
+  assert.deepEqual(cellWords(many.checklist[0]), ['Visual Report: Update needed', 'Technical Report: Update needed']);
+  assert.deepEqual(cellWords(many.checklist[1]), ['Visual Report: Update needed', 'Technical Report: Not generated']);
+  assert.equal(LIBRARY_CHECKLIST_STATUS.READY, 'Ready');
+  assert.equal(LIBRARY_CHECKLIST_STATUS.UPDATE_NEEDED, 'Update needed');
   assert.equal(LIBRARY_CHECKLIST_STATUS.NOT_GENERATED, 'Not generated');
-  assert.equal(many.checklist[1].line, 'Needs Technical Report generated');
-  assert.equal(many.primaryAction.label, 'Create updated report');
-  assert.equal(many.primaryAction.reportType, 'visual');
-  assert.equal(many.primaryAction.versionId, 'v4');
+
+  // A version that is not assessed at all says so, and sends the designer to the
+  // design rather than to a report.
+  const unassessed = readinessFor(
+    [versionRow({ id: 'v1', name: 'Level 1 version', engineering: READINESS_STATE.MISSING })],
+    [VERSIONS[1]],
+  );
+  assert.equal(unassessed.ready, false);
+  assert.equal(unassessed.verdict, LIBRARY_VERDICT.NOT_ASSESSED);
+  assert.equal(unassessed.headline, 'Reports are not ready yet');
+  assert.equal(unassessed.detail, LIBRARY_NOT_ASSESSED_DETAIL);
+  assert.equal(unassessed.primaryAction.label, 'Open Room Designer');
+  assert.equal(unassessed.primaryAction.kind, 'room-designer');
+  assert.equal(unassessed.secondaryAction.kind, 'view-reports');
+  assert.equal(unassessed.checklist[0].line, 'Not assessed yet');
+  assert.deepEqual(cellWords(unassessed.checklist[0]), ['Visual Report: Ready', 'Technical Report: Ready']);
 });
 
 // ── C ───────────────────────────────────────────────────────────────────────
@@ -184,9 +217,11 @@ test('C — current reports and old PDFs: the PDFs are history and block nothing
     source_fingerprints: { engineeringFingerprint: 'ENG-1', calculationFingerprint: 'CALC-1' },
   };
 
-  // The report the project holds now is Current…
-  assert.equal(resolveLiveReportState(liveReport), 'current');
+  // The report the project holds now is Current, read from its readiness cell…
+  const ready = { cell: cell(READINESS_STATE.CURRENT), hasReport: true };
+  assert.equal(resolveLiveReportState(ready), 'current');
   assert.equal(liveReportStateLabel('current'), 'Current');
+  assert.equal(liveReportNote(ready), null);
 
   // …while the PDF issued before the latest report says so, in the Library's words.
   const issued = resolveExportLiveState({ record: issuedPdf, version, liveReport });
@@ -200,7 +235,7 @@ test('C — current reports and old PDFs: the PDFs are history and block nothing
   );
   assert.equal(
     ISSUED_PDFS_HELPER,
-    'Issued PDFs are fixed exports from the date shown. They remain available for records, but proposals use the Current Reports above.',
+    'Issued PDFs are fixed exports from the date shown. They remain available for records; proposals use the current reports above.',
   );
 
   // A PDF is never a blocker: readiness reads the reports, not the exports.
@@ -209,7 +244,7 @@ test('C — current reports and old PDFs: the PDFs are history and block nothing
   assert.equal(readiness.headline, 'Ready for Proposal');
   assert.deepEqual(
     Object.keys(readiness).sort(),
-    ['checking', 'checklist', 'detail', 'headline', 'primaryAction', 'ready', 'secondaryAction', 'showChecklist'],
+    ['checking', 'checklist', 'detail', 'headline', 'primaryAction', 'ready', 'secondaryAction', 'showChecklist', 'verdict'],
   );
   assert.doesNotMatch(READINESS, /exported|ProjectAssetExport/, 'the readiness verdict never reads the exported PDFs');
   assert.doesNotMatch(issued.label, /needs updated report/i);
@@ -236,7 +271,7 @@ test('D — the banner uses the Proposal Centre readiness contract, never a seco
   const centreBlocked = resolveProposalReadinessGate({ rows: blockedRows, loading: false, minVersions: 1 });
   assert.equal(libraryBlocked.ready, false);
   assert.equal(libraryBlocked.ready, centreBlocked.ready);
-  assert.equal(libraryBlocked.headline, 'Not ready for Proposal');
+  assert.equal(libraryBlocked.headline, 'Update reports before creating a proposal');
 
   // While the read is in flight neither side says Ready, and the banner offers
   // no action it cannot stand behind.
@@ -249,11 +284,13 @@ test('D — the banner uses the Proposal Centre readiness contract, never a seco
   const centreChecking = resolveProposalReadinessGate({ rows: checkingRows, loading: true, minVersions: 1 });
   assert.equal(libraryChecking.ready, false);
   assert.equal(libraryChecking.ready, centreChecking.ready);
+  assert.equal(libraryChecking.verdict, LIBRARY_VERDICT.CHECKING);
   assert.equal(libraryChecking.headline, null);
   assert.equal(libraryChecking.primaryAction, null);
+  assert.equal(libraryChecking.secondaryAction, null);
   // Nothing is claimed per version while the read is still in flight.
   assert.equal(libraryChecking.checklist[0].line, null);
-  assert.deepEqual(libraryChecking.checklist[0].cells.map((item) => item.status), ['Ready', 'Ready']);
+  assert.deepEqual(libraryChecking.checklist[0].cells.map((item) => item.status), [null, null]);
 
   // ONE authority: the read is imported, and the verdict is the gate's.
   assert.match(READINESS_HOOK, /useProposalReadiness/);
@@ -302,13 +339,12 @@ test('E — no internal diagnostic word reaches the Library', () => {
   const pdfSurface = [EXPORT_SOURCE_CHANGED_LABEL, EXPORT_DESIGN_CHANGED_NOTE, ISSUED_PDFS_HELPER, ISSUED_PDF_LABEL].join(' | ');
   assert.doesNotMatch(pdfSurface, /proposal_ready|reportEvidence|fingerprint|snapshot|evidence|publication|stale|legacy|incomplete/i);
 
-  // The words the designer does read, including every simple status word.
+  // The words the designer does read.
   assert.match(shown, /Ready for Proposal/);
-  assert.match(shown, /Not ready for Proposal/);
-  assert.match(shown, /Needs updated Technical Report/);
-  assert.match(shown, /Needs updated Visual and Technical Reports/);
+  assert.match(shown, /Update reports before creating a proposal/);
+  assert.match(shown, /Reports are not ready yet/);
+  assert.match(shown, /Update needed/);
   assert.match(shown, /Not generated/);
-  assert.match(shown, /Needs engineering results/);
-  assert.equal(LIBRARY_CHECKLIST_STATUS.READY, 'Ready');
-  assert.equal(LIBRARY_CHECKLIST_STATUS.NEEDS_UPDATE, 'Needs updated report');
+  assert.match(shown, /View reports/);
+  assert.match(shown, /Open Room Designer/);
 });

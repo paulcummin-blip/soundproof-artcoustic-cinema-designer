@@ -1,15 +1,21 @@
 /**
  * ReportGateDiagnosticsPanel
  * --------------------------
- * The report gate's own account of why a report did or did not open, shown with
- * the blocked state so a designer (or support) can see exactly which authority
- * is missing instead of guessing. Collapsed by default — the block message stays
- * the headline.
+ * The report gate's own account of why a report did or did not open, so support
+ * can see exactly which authority is missing instead of guessing.
+ *
+ * It is a DIAGNOSTIC surface and never reaches a dealer or a client: it renders
+ * nothing at all unless the viewer is a master admin or has Engineering Mode on
+ * (the development preview flag), and even then it is collapsed behind "Show
+ * diagnostics" — the block message stays the headline.
  *
  * Presentation only: it renders the diagnostics object it is given.
  */
 
 import React from "react";
+import { useAuth } from "@/lib/AuthContext";
+import { isMasterAdmin } from "@/lib/accountAccess";
+import { useEngineeringMode } from "@/components/state/useEngineeringMode";
 import { buildReportGateDiagnosticRows } from "./reportGateDiagnostics";
 import BassReconciliationDiagnosticRows from "@/components/report/BassReconciliationDiagnosticRows";
 
@@ -44,12 +50,17 @@ const ROW = {
 const LABEL = { color: "#8A8580" };
 
 export default function ReportGateDiagnosticsPanel({ diagnostics = null }) {
+  const { user } = useAuth();
+  const { engineeringMode } = useEngineeringMode();
+
+  // Admin or development preview only: a dealer never sees this panel.
+  const allowed = isMasterAdmin(user) || engineeringMode === true;
   const rows = buildReportGateDiagnosticRows(diagnostics);
-  if (!rows.length) return null;
+  if (!allowed || !rows.length) return null;
 
   return (
-    <details style={PANEL}>
-      <summary style={SUMMARY}>Report gate diagnostics</summary>
+    <details style={PANEL} data-report-gate-diagnostics="true">
+      <summary style={SUMMARY}>Show diagnostics</summary>
       <div style={{ marginTop: 10 }}>
         <BassReconciliationDiagnosticRows projectId={diagnostics.project_id} versionId={diagnostics.version_id} gateResult={diagnostics.gate_result} />
         {rows.map(([label, value]) => (

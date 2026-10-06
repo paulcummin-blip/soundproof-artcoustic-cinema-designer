@@ -10,14 +10,17 @@
  *
  * Each design version lists, in two groups:
  *
- *   Current reports    ONE row per report type, always shown — so the Library
- *                      states whether each report EXISTS for this version. A
- *                      Current report offers Open and Export PDF and nothing
- *                      else; a report whose design has moved on is kept as
- *                      history and offers Open previous and Create updated
- *                      report. Every row's action carries the version of the
- *                      section it stands in, so a Level 4 row acts on Level 4
- *                      and never on another version.
+ *   Current reports    ONE row per report type, always shown in one of the
+ *                      three dealer-facing states — Current, Update needed or
+ *                      Not generated. The state comes from the same readiness
+ *                      authority the banner reads, so a row can never say
+ *                      Current while the banner says that report needs
+ *                      updating. A Current report offers Open and Export PDF and
+ *                      nothing else; a report that needs updating offers Open
+ *                      saved report and Create updated report. Every row's
+ *                      action carries the version of the section it stands in,
+ *                      so a Level 4 row acts on Level 4 and never on another
+ *                      version.
  *
  *   Issued PDFs        the LATEST issued PDF per report type, separated from the
  *                      reports by the line that says what they are: fixed
@@ -55,9 +58,9 @@ import useLibraryProposalReadiness from './useLibraryProposalReadiness';
 import {
   EXPORT_DESIGN_CHANGED_NOTE,
   ISSUED_PDFS_HELPER,
-  LIVE_REPORT_STATE,
+  LIVE_REPORT_STATE_LABEL,
   LIBRARY_SOURCE_STATE,
-  liveReportStateLabel,
+  liveReportNote,
   resolveExportLiveState,
   resolveLiveReportState,
   selectLatestExports,
@@ -101,6 +104,11 @@ export default function ProjectLibraryReportsSection({
   const readinessByVersion = new Map(
     (readiness.checklist || []).map((entry) => [entry.versionId, entry]),
   );
+  // The raw readiness rows behind that verdict: every report row reads its own
+  // state from the same cells the banner summarises.
+  const readinessRowByVersion = new Map(
+    (readiness.rows || []).map((row) => [row.versionId, row]),
+  );
 
   /**
    * Open, generate or regenerate one report — always for the exact version of
@@ -132,9 +140,15 @@ export default function ProjectLibraryReportsSection({
     [REPORT_UPDATE_PARAM]: '1',
   });
 
-  /** The two places the readiness banner sends the designer. */
+  /** The places the readiness banner sends the designer. */
   const openProposalCentre = () => navigate('/ProposalCentre');
   const createProposal = () => navigate('/ProposalCentre?create=1');
+
+  /** "View reports": the version sections below the banner, from the top. */
+  const viewReports = () => {
+    const first = document.querySelector('[data-library-version]');
+    if (first) first.scrollIntoView({ block: 'start' });
+  };
 
   /**
    * The banner's one unblocking action, aimed at the exact version and report it
@@ -169,6 +183,7 @@ export default function ProjectLibraryReportsSection({
         readiness={readiness}
         onCreateProposal={createProposal}
         onViewProposalCentre={openProposalCentre}
+        onViewReports={viewReports}
         onPrimaryAction={runReadinessAction}
       />
 
@@ -203,7 +218,11 @@ export default function ProjectLibraryReportsSection({
             <div className="border-t border-[#E5E1D8]">
               {REPORT_TYPES.map((reportType) => {
                 const report = liveByType.get(reportType) || null;
-                const state = resolveLiveReportState(report);
+                // The row's state IS the version's readiness cell for this
+                // report type — the same evidence the banner reads.
+                const cell = readinessRowByVersion.get(version.id)?.cells?.[reportType] || null;
+                const hasReport = !!report;
+                const state = resolveLiveReportState({ cell, hasReport });
                 return (
                   <LiveReportRow
                     key={reportType}
@@ -212,10 +231,11 @@ export default function ProjectLibraryReportsSection({
                     generatedAt={report?.generatedAt}
                     generatedBy={report?.generatedBy}
                     statusState={state}
-                    statusLabel={liveReportStateLabel(state)}
-                    hasReport={state !== LIVE_REPORT_STATE.MISSING}
+                    statusLabel={LIVE_REPORT_STATE_LABEL[state] || null}
+                    note={liveReportNote({ cell, hasReport })}
+                    hasReport={hasReport}
                     onOpen={() => openVersionReport(reportType, version.id)}
-                    onOpenPrevious={() => openVersionReport(reportType, version.id)}
+                    onOpenSaved={() => openVersionReport(reportType, version.id)}
                     onCreateUpdated={() => updateVersionReport(reportType, version.id)}
                     onExportPdf={() => exportVersionReport(reportType, version.id)}
                     onGenerate={() => openVersionReport(reportType, version.id)}

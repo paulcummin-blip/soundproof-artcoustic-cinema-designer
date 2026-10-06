@@ -4,12 +4,16 @@
  * The Project Library's source vocabulary, and how each row's state is derived.
  *
  * The labels are the product's own words:
- *   Reports      Current · Previous report (the design changed) · Not generated
- *   Issued PDFs  Issued PDF · Issued PDF — design changed since export
+ *   Reports      Current · Update needed · Not generated
+ *   Issued PDFs  Issued PDF · Issued PDF — older than current design
  *
- * A generated report is permanent: it stays Current until the design fingerprint
- * changes, and exporting it, opening it or using it in a proposal never changes
- * it.
+ * A report row's state is read from the version's proposal-readiness cell — the
+ * SAME authority the Library banner and the Proposal Centre use — so a row can
+ * never read Current while the banner says that report needs updating.
+ *
+ * A generated report is permanent: it stays Current while the readiness
+ * authority accepts it as a proposal source, and exporting it, opening it or
+ * using it in a proposal never changes it.
  *
  * Nothing here rewrites an issued document. A document that has been superseded
  * or whose source has moved on stays exactly as it was stored; only its label
@@ -19,6 +23,7 @@
  */
 
 import { compareSourceFingerprints } from '@/components/report/reportSnapshotAuthority';
+import { READINESS_STATE } from '@/components/proposal/sourceAuthority/proposalReadinessAuthority';
 
 export const LIBRARY_SOURCE_STATE = Object.freeze({
   CURRENT: 'current',
@@ -63,7 +68,7 @@ export const EXPORT_DESIGN_CHANGED_NOTE =
  * it: proposals read the reports, never these fixed exports.
  */
 export const ISSUED_PDFS_HELPER =
-  'Issued PDFs are fixed exports from the date shown. They remain available for records, but proposals use the Current Reports above.';
+  'Issued PDFs are fixed exports from the date shown. They remain available for records; proposals use the current reports above.';
 
 export const LIVE_REPORT_LABEL = 'Current report';
 export const EXPORTED_PDF_LABEL = 'Issued PDF';
@@ -96,49 +101,74 @@ export function liveReportStatusLabel(snapshotStatus) {
 }
 
 /**
- * The three states a version's report row can be in, as the Library states them:
- * the report exists and matches the version, it exists but the design has moved
- * on, or it has not been generated for this version at all.
+ * The three states a version's report row can be in, in the dealer's words:
+ *   current        ready to use in a proposal
+ *   update_needed  a report exists, and the design moved past it or the report
+ *                  must be recreated before a proposal may read it
+ *   missing        no report has been generated for this version
+ *   checking       the readiness read is in flight, so nothing is claimed yet
  */
 export const LIVE_REPORT_STATE = Object.freeze({
   CURRENT: 'current',
-  STALE: 'stale',
+  UPDATE_NEEDED: 'update_needed',
   MISSING: 'missing',
+  CHECKING: 'checking',
 });
 
 export const LIVE_REPORT_STATE_LABEL = Object.freeze({
   [LIVE_REPORT_STATE.CURRENT]: 'Current',
-  [LIVE_REPORT_STATE.STALE]: 'Previous report',
+  [LIVE_REPORT_STATE.UPDATE_NEEDED]: 'Update needed',
   [LIVE_REPORT_STATE.MISSING]: 'Not generated',
+  [LIVE_REPORT_STATE.CHECKING]: null,
 });
 
-/** The history mark a report carries once the design has moved past it. */
-export const PREVIOUS_REPORT_HISTORY_LABEL = 'Previous report — design has changed';
-
-/** The same thing said in a full sentence. */
+/** The line a report carries once the design has moved past it. */
 export const LIVE_REPORT_DESIGN_CHANGED_NOTE = 'Design changed since this report was created.';
 
+/** The same, for a report that must be recreated before a proposal may read it. */
+export const LIVE_REPORT_UPDATE_NEEDED_NOTE = 'This report needs updating before a proposal can use it.';
+
 /**
- * The only actions a report row offers. "Create updated report" is the ONE
- * refresh word, and a Current report never carries it: a report stays Current
- * until the design fingerprint changes.
+ * The actions a report row offers. "Create updated report" is the ONE refresh
+ * word, and a Current report never carries it.
  */
 export const REPORT_ROW_ACTION = Object.freeze({
   OPEN: 'Open',
-  OPEN_PREVIOUS: 'Open previous',
+  OPEN_SAVED: 'Open saved report',
   CREATE_UPDATED: 'Create updated report',
   EXPORT_PDF: 'Export PDF',
   GENERATE: 'Generate report',
 });
 
-/** The state of one report row: no saved report is "Missing", never "Current". */
-export function resolveLiveReportState(snapshot) {
-  if (!snapshot) return LIVE_REPORT_STATE.MISSING;
-  return snapshot.status === 'stale' ? LIVE_REPORT_STATE.STALE : LIVE_REPORT_STATE.CURRENT;
+/**
+ * One report row's state, read from the version's proposal-readiness cell — the
+ * same authority the Library banner and the Proposal Centre gate generation
+ * with. A saved report the readiness authority will not accept as a proposal
+ * source never reads Current: it reads Update needed.
+ *
+ * @param {Object} params
+ * @param {Object|null} params.cell   the version's readiness cell for this report type
+ * @param {boolean} params.hasReport  a saved report exists for this version and type
+ * @returns {string} LIVE_REPORT_STATE
+ */
+export function resolveLiveReportState({ cell = null, hasReport = false } = {}) {
+  if (!cell || cell.checking || cell.state === READINESS_STATE.CHECKING) return LIVE_REPORT_STATE.CHECKING;
+  if (!hasReport) return LIVE_REPORT_STATE.MISSING;
+  return cell.state === READINESS_STATE.CURRENT
+    ? LIVE_REPORT_STATE.CURRENT
+    : LIVE_REPORT_STATE.UPDATE_NEEDED;
+}
+
+/** The small line a row carries while its report is not ready to use. */
+export function liveReportNote({ cell = null, hasReport = false } = {}) {
+  if (!hasReport || !cell || cell.checking || cell.state === READINESS_STATE.CURRENT) return null;
+  return cell.state === READINESS_STATE.STALE
+    ? LIVE_REPORT_DESIGN_CHANGED_NOTE
+    : LIVE_REPORT_UPDATE_NEEDED_NOTE;
 }
 
 export function liveReportStateLabel(state) {
-  return LIVE_REPORT_STATE_LABEL[state] || LIVE_REPORT_STATE_LABEL[LIVE_REPORT_STATE.CURRENT];
+  return LIVE_REPORT_STATE_LABEL[state] ?? null;
 }
 
 /** The version ids a document covers, oldest field first. */

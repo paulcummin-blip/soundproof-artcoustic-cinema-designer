@@ -33,6 +33,10 @@ import {
   resolveLiveReportState,
   selectLatestExports,
 } from '../components/library/librarySourceStatus.js';
+import {
+  READINESS_STATE,
+  buildReadinessCell,
+} from '../components/proposal/sourceAuthority/proposalReadinessAuthority.js';
 
 const VERSION_4 = 'version-level-4';
 const VERSION_1 = 'version-level-1';
@@ -162,29 +166,43 @@ test('TEST 4 — four exports of one version and type list ONE row; versions and
   assert.equal(exports.length, 6, 'every export record stays in storage');
 });
 
-/* ── TEST 5 — Missing is stated, never invented ─────────────────────────── */
+/* ── TEST 5 — the row state is the readiness cell, stated never invented ── */
 
-test('TEST 5 — a version with no report of a type reads Missing; an existing one Current or Stale', () => {
-  assert.equal(resolveLiveReportState(null), LIVE_REPORT_STATE.MISSING);
-  assert.equal(resolveLiveReportState({ status: 'current' }), LIVE_REPORT_STATE.CURRENT);
-  assert.equal(resolveLiveReportState({ status: 'stale' }), LIVE_REPORT_STATE.STALE);
+test('TEST 5 — no report of a type reads Not generated; an existing one Current or Update needed', () => {
+  const ready = buildReadinessCell({ state: READINESS_STATE.CURRENT });
+  const movedOn = buildReadinessCell({ state: READINESS_STATE.STALE });
+  const absent = buildReadinessCell({ state: READINESS_STATE.MISSING });
+
+  // The row state IS the readiness cell: a report the readiness authority will
+  // not accept as a proposal source never reads Current.
+  assert.equal(resolveLiveReportState({ cell: ready, hasReport: true }), LIVE_REPORT_STATE.CURRENT);
+  assert.equal(resolveLiveReportState({ cell: movedOn, hasReport: true }), LIVE_REPORT_STATE.UPDATE_NEEDED);
+  assert.equal(resolveLiveReportState({ cell: absent, hasReport: false }), LIVE_REPORT_STATE.MISSING);
+
+  // While the readiness read is in flight nothing is claimed — not even Missing.
+  assert.equal(resolveLiveReportState({ cell: null, hasReport: true }), LIVE_REPORT_STATE.CHECKING);
+  assert.equal(
+    resolveLiveReportState({ cell: buildReadinessCell({ state: READINESS_STATE.CHECKING }), hasReport: false }),
+    LIVE_REPORT_STATE.CHECKING,
+  );
 
   // The Level 4 section: a Technical Report exists, the Visual Report does not.
-  const level4 = [
-    { version_id: VERSION_4, report_type: 'technical', status: 'current' },
-  ];
-  const byType = new Map(level4.map((snapshot) => [snapshot.report_type, snapshot]));
-  assert.equal(resolveLiveReportState(byType.get('visual')), LIVE_REPORT_STATE.MISSING, 'Level 4 Visual');
-  assert.equal(resolveLiveReportState(byType.get('technical')), LIVE_REPORT_STATE.CURRENT, 'Level 4 Technical');
+  const level4Cells = new Map([['technical', ready]]);
+  assert.equal(
+    resolveLiveReportState({ cell: level4Cells.get('visual') || absent, hasReport: false }),
+    LIVE_REPORT_STATE.MISSING,
+    'Level 4 Visual',
+  );
+  assert.equal(
+    resolveLiveReportState({ cell: level4Cells.get('technical'), hasReport: true }),
+    LIVE_REPORT_STATE.CURRENT,
+    'Level 4 Technical',
+  );
 
   // A report belonging to another version is never this version's report: the
   // section filters by version first, so Level 1's Technical Report cannot
   // answer for Level 4.
-  const level1 = [{ version_id: VERSION_1, report_type: 'technical', status: 'current' }];
+  const level1 = [{ version_id: VERSION_1, report_type: 'technical' }];
   const level4Only = level1.filter((snapshot) => snapshot.version_id === VERSION_4);
   assert.equal(level4Only.length, 0, 'no Level 1 row leaks into the Level 4 section');
-  assert.equal(
-    resolveLiveReportState(new Map(level4Only.map((s) => [s.report_type, s])).get('technical')),
-    LIVE_REPORT_STATE.MISSING,
-  );
 });

@@ -34,7 +34,9 @@ export function useLibraryProposalReadiness({ projectId = null, versions = [] } 
     [rows, loading, versions],
   );
 
-  return { ...readiness, error, retry };
+  // The raw per-version rows travel with the verdict, so a report row reads its
+  // state from the same cell the banner does — never a second opinion.
+  return { ...readiness, rows, error, retry };
 }
 
 export default useLibraryProposalReadiness;

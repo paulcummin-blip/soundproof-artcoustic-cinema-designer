@@ -19,8 +19,8 @@ import {
 
 const STATE_STYLE = {
   [LIBRARY_SOURCE_STATE.CURRENT]: { colour: '#213428', Icon: Check },
-  // A version's own report row: exists and matches, moved on, or not generated.
-  [LIVE_REPORT_STATE.STALE]: { colour: '#7A5A10', Icon: AlertTriangle },
+  // A version's own report row: exists and matches, needs updating, or not generated.
+  [LIVE_REPORT_STATE.UPDATE_NEEDED]: { colour: '#7A5A10', Icon: AlertTriangle },
   [LIVE_REPORT_STATE.MISSING]: { colour: '#7A2E10', Icon: CircleSlash },
   [LIBRARY_SOURCE_STATE.SOURCE_CHANGED]: { colour: '#7A5A10', Icon: AlertTriangle },
   [LIBRARY_SOURCE_STATE.MISSING_SOURCE]: { colour: '#7A2E10', Icon: CircleSlash },
