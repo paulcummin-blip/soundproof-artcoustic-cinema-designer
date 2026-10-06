@@ -222,7 +222,7 @@ function RP22ReportInner() {
     // handoff overlaid as an optimisation. A cold load with empty site storage
     // therefore still restores the published report instead of reporting that
     // no analysis exists. Still read-only: no engine, no recalculation.
-    const reportAuthority = useVersionedEngineeringAuthority(explicitProjectId, reportVersionId);
+    const reportAuthority = useVersionedEngineeringAuthority(explicitProjectId, reportVersionId, { finalReport: true });
     const completedBassAuthority = useCompletedBassAuthority(
         explicitProjectId || "free",
         reportVersionId || "free",
