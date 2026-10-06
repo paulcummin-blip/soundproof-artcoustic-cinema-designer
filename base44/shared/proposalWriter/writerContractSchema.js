@@ -126,7 +126,7 @@ export const WRITER_SECTIONS = Object.freeze([
     section: 'what_stays_same',
     title: 'What Stays the Same',
     word_limit: 130,
-    requirement: 'State only what every option shares, from the shared-result claims the pack allows.',
+    requirement: 'State only what every option shares, from the shared-result claims the pack allows. Where the copy also contrasts the options, cite the shared-result claims for what is unchanged and the pack\'s factual-change or material-gain claims for what differs.',
   },
   {
     section: 'what_changes',
@@ -219,6 +219,7 @@ export function writerOutputSchema() {
 export const WRITER_WRITING_RULES = Object.freeze([
   'Write only from the evidence pack. It is the sole source of every fact, figure, level and claim.',
   'Every client-facing claim must cite one or more allowed claim IDs in that section\'s claim_ids.',
+  'Where a section states what is shared and also contrasts the options, cite both: the shared-result claims for the unchanged facts and the factual-change or material-gain claims for the facts that differ.',
   'Copy every figure, Performance Level and product name exactly as the pack states it. Never round, convert, restate or estimate.',
   'Never name a product the pack does not list for the option it belongs to.',
   'Never present a claim the pack blocks, and never describe a shared result as a change or a gain.',

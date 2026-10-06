@@ -4,7 +4,7 @@ import { WRITER_REJECTION, violation } from './writerContractSchema.js';
 import { claimLevels, hasRecommendationClaim, isPackProse, isProductToken, isRecommendation, kindSatisfiesAssertion, levelTokens, measurementTokens, modelTokens, p20BlocksConsistency, packProseSentences, parameterIds, seatScopeInText, sentenceParts, stripOptionNames, blockedChangeBlocks, blockPatterns } from './writerVocabulary.js';
 import { anchorPatternFor, assertedKind, claimsArea, isDenied, isConsistencyCaveat, seatConsistencyClaim, scopedClaimIssue, optionNameById, CHANNEL_FAMILY, CHANGE_SIGNAL, CONTRAST, CONSISTENCY_ANCHOR, NEGATION_SHAPED_CLAIM } from './writerOutputTextRules.js';
 import { designStageCommentary } from './writerDesignStageRules.js';
-import { independentClauses, supportedChangeClause } from './writerClausePrecision.js';
+import { framingContrastGrounded, independentClauses, supportedChangeClause } from './writerClausePrecision.js';
 import { attributeViolation } from './writerViolationAudit.js';
 
 export function scanProse({ input, vocabulary, section, text, claims = [], claimKinds = [] }) {
@@ -24,9 +24,14 @@ export function scanProse({ input, vocabulary, section, text, claims = [], claim
       const claimed = stripOptionNames(clause, vocabulary.optionNames)
         .replace(/\bLevel\s?[1-4]\b(?:\s+versions?)?/gi, ' ');
       const kind = assertedKind(claimed, anchors);
+      // A contrast sentence that places the difference between the options is
+      // grounded by the input's own change evidence for the families it names.
+      // Never an exemption: with no such evidence the clause stays unsupported,
+      // and a clause that asserts a named area changed is never framing.
+      const framingGrounded = kind === 'change' && framingContrastGrounded(claimed, input, citedKinds);
       if (kind && citedKinds.length === 0) {
         report(WRITER_REJECTION.MISSING_CLAIM_ID, { section, detail: `${kind}_claim_without_a_claim_id` });
-      } else if (kind && (!kindSatisfiesAssertion(kind, citedKinds)
+      } else if (kind && !framingGrounded && (!kindSatisfiesAssertion(kind, citedKinds)
         || (kind === 'change' && !supportedChangeClause(claimed, citedClaims)))) {
         report(WRITER_REJECTION.INVENTED_BENEFIT, { section, detail: `${kind}_claim_not_supported_by_the_cited_claims` });
       }
