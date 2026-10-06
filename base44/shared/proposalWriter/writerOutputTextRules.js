@@ -51,6 +51,20 @@ import {
 /** A comparative in front of an area claims more of it: "a larger screen". */
 const COMPARATIVES = 'more|larger|bigger|wider|greater|better|higher|superior|increased|additional|extra|further|stronger|deeper';
 
+/**
+ * The comparatives that stand as the area's own comparative as they are: "a
+ * larger screen", "greater bass extension".
+ */
+const OWN_COMPARATIVES = 'larger|bigger|wider|greater|better|higher|superior|increased|additional|extra|further|stronger|deeper';
+
+/**
+ * A bare "more" is only a claim about an area when it opens a noun phrase —
+ * "more channels" alongside "adds" is a change, while "more room to expand"
+ * is room to work in, not a larger room. So "more" needs one of these in front
+ * of it before it is read as claiming the area that follows.
+ */
+const NP_LEADS = 'a|an|the|this|that|these|those|its|their|our|your|his|her|any|every|each|such';
+
 /** Words that are themselves an improvement or a change in the area. */
 const CLAIM_VERBS = 'improve[sd]?|improvements?|gains?|increases?|increased|boosts?|enhances?|exceeds?|solves?|fixes?|resolves?|adds?|added|changes?|changed|upgrades?|upgraded|replaces?|exchanges?|introduces?';
 
@@ -108,7 +122,9 @@ function claimsArea(sentence, { heads = [], phrases = [] } = {}) {
     const term = `\\b${head}\\w*\\b`;
     const patterns = [
       // the area carries the comparative itself: "a larger screen"
-      new RegExp(`\\b(?:${COMPARATIVES})\\b\\s+(?:\\w+\\s+){0,1}?${term}`, 'i'),
+      new RegExp(`\\b(?:${OWN_COMPARATIVES})\\b\\s+(?:\\w+\\s+){0,1}?${term}`, 'i'),
+      // a determiner-led "more": "the more capable screen"
+      new RegExp(`\\b(?:${NP_LEADS})\\s+more\\b\\s+(?:\\w+\\s+){0,1}?${term}`, 'i'),
       // the area is the subject of the claim: "the screen improves"
       new RegExp(`${term}(?:\\s+\\w+){0,2}\\s+(?:${CLAIM_VERBS})\\b`, 'i'),
       // the claim is predicated of the area: "adds more channels"
