@@ -136,8 +136,9 @@ export function useEngineeringPublicationEffect({
       instanceAuthorityVersion: INSTANCE_AUTHORITY_VERSION,
       summarySchemaVersion: ENGINEERING_SUMMARY_SCHEMA_VERSION,
       publicationContractVersion: PUBLICATION_CONTRACT_VERSION,
+      bassFingerprint,
     });
-  }, [designState]);
+  }, [designState, bassFingerprint]);
 
   const preflight = engineeringPublicationPreflight({
     projectId, versionId, ready, isPublishable, engineeringSummary,
