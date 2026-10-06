@@ -39,7 +39,7 @@
  */
 
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { serializeProject } from '@/components/utils/serializeProject';
+import { PUBLICATION_CONTRACT_VERSION, buildFrozenReportProject } from '../../../../shared/engineeringPublicationContract.js';
 import { engineeringPublicationPreflight } from '@/components/engineering/engineeringPublicationPreflight';
 import { base44 } from '@/api/base44Client';
 import { ENGINEERING_AUTHORITY_VERSION } from '@/components/proposal/engineeringAuthority';
@@ -75,7 +75,8 @@ function buildReportSnapshot(projectId, versionId, designState) {
   const snapshot = readDesignReviewHandoff(projectId, versionId, { preferStored: false });
   if (!snapshot || !designState?.roomDims || !designState?.screen) return null;
   return {
-    report_project: serializeProject(designState),
+    report_project: buildFrozenReportProject(designState, { projectId, versionId }).reportProject,
+    capture_missing: buildFrozenReportProject(designState, { projectId, versionId }).missing,
     analysisResult: snapshot.analysisResult || null,
     priceData: snapshot.priceData || null,
     seatingPositions: designState.seatingPositions || null,
@@ -121,6 +122,7 @@ export function useEngineeringPublicationEffect({
       algorithmVersion: String(BASS_ANALYSIS_CONTRACT_VERSION),
       instanceAuthorityVersion: INSTANCE_AUTHORITY_VERSION,
       summarySchemaVersion: ENGINEERING_SUMMARY_SCHEMA_VERSION,
+      publicationContractVersion: PUBLICATION_CONTRACT_VERSION,
     });
   }, [designState]);
 
@@ -196,6 +198,7 @@ export function useEngineeringPublicationEffect({
           version_id: versionId,
           engineering_summary: engineeringSummary,
           engineering_fingerprint: engineeringFingerprint,
+          publication_contract_version: PUBLICATION_CONTRACT_VERSION,
           ...(reportSnapshot ? { report_snapshot: reportSnapshot } : {}),
           engine_version: ENGINEERING_AUTHORITY_VERSION,
           rp22_version: String(RP22_BASS_METRIC_SCHEMA_VERSION),
