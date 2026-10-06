@@ -151,7 +151,7 @@ const ATTRIBUTED_CAPABILITY = 'headroom|output|outputs|capability|capabilities|a
  * nothing but the end of the claim follows the head — is untouched.
  */
 const ATTRIBUTED_CAPABILITY_FOLLOW = new RegExp(
-  `^(?:[\\s,]+(?:and|plus|or)?[\\s,]*(?:${ATTRIBUTED_LAYERS})\\b)*(?:[\\s,]+(?:and|plus|or)?[\\s,]*(?:${LINK_VERBS}|gains?|adds?)\\b)?[\\s,]+(?:and|plus|or)?[\\s,]*(?:${ATTRIBUTED_CAPABILITY})\\b`,
+  `^(?:[\\s,]+(?:and|plus|or)?[\\s,]*(?:${ATTRIBUTED_LAYERS})\\b)*(?:[\\s,]+(?:and|plus|or)?[\\s,]*(?:${LINK_VERBS}|gains?|adds?)\\b)?[\\s,]+(?:and|plus|or)?[\\s,]*(?:(?:${COMPARATIVES})\\s+)?(?:${ATTRIBUTED_CAPABILITY})\\b`,
   'i',
 );
 
@@ -282,7 +282,7 @@ export function seatConsistencyClaim(text) {
 /** One pattern for every term the pack's areas are named by. */
 export function anchorPatternFor(input) {
   const terms = areaAnchorTerms(input?.evidence_pack);
-  return terms.length > 0 ? new RegExp(`\\b(?:${terms.join('|')})\\w*\\b`, 'i') : /$^/;
+  return terms.length > 0 ? new RegExp(`\\b(?:${terms.join('|')}|equipment|loudspeaker)\\w*\\b`, 'i') : /$^/;
 }
 
 /**

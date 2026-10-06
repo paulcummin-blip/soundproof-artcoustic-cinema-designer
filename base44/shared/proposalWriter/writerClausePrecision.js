@@ -41,10 +41,12 @@ export function supportedChangeClause(clause, claims) {
   const subjects = [];
   if (/\b(?:speaker|loudspeaker)\s+package\b|\bdifferent\s+(?:speakers|loudspeakers)\b/i.test(clause)) subjects.push('speakers');
   if (/\bdifferent\s+equipment\b/i.test(clause)) subjects.push('equipment');
-  if (/\b(?:cinema\s+)?formats?\b/i.test(clause)) subjects.push('system_layout');
+  if (/\bdifferent\s+(?:cinema\s+)?formats?\b|\b(?:cinema\s+)?formats?\s+(?:is|are)\s+different\b/i.test(clause)) subjects.push('system_layout');
   if (/\bdifferent\s+room\b|\broom\s+is\s+different\b/i.test(clause)) subjects.push('room');
   if (/\bscreen\s+(?:size\s+)?(?:is\s+different|changes?)\b|\bdifferent\s+screen\b/i.test(clause)) subjects.push('screen_size');
   const equipment = ['speakers', 'lcr', 'surrounds', 'overheads', 'subwoofers', 'amplification'];
   return subjects.length === 0 || subjects.every(subject => changes.some(c =>
-    subject === 'equipment' ? equipment.includes(c.area) : c.area === subject));
+    subject === 'equipment' ? equipment.includes(c.area)
+      : subject === 'speakers' ? ['speakers', 'lcr', 'surrounds', 'overheads'].includes(c.area)
+      : c.area === subject));
 }
