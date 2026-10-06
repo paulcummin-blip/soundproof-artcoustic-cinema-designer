@@ -83,38 +83,44 @@ export function isBassConsistencyClaim(text) {
 }
 
 /**
- * Tidy what a removal left behind. Applied ONLY to a string a phrase was
- * removed from: text with no prohibited claim is never touched.
+ * The boundaries a report line is read in: a separator between the parts of a
+ * line ("X · Y"), or the end of a sentence. A line is therefore measured in
+ * clauses, and a clause is kept or dropped whole — a claim is never cut out of
+ * the middle of a sentence, which would leave maimed prose behind.
  */
+const CLAUSE_BOUNDARY = /(\s*[·•|;]\s*|(?<=[.!?])\s+)/;
+
+/** Tidy what a drop left behind. Only ever applied to text a clause left. */
 function tidy(remaining) {
   return String(remaining)
     .replace(/\s+/g, ' ')
-    .replace(/([·•|])\s*(and|plus|with|for)\b/gi, '$2')
-    .replace(/[\s·•|,;:\-\u2013\u2014]+$/, '')
-    .replace(/^[\s·•|,;:\-\u2013\u2014]+/, '')
-    .replace(/\s+([.,;:])/g, '$1')
+    .replace(/^[\s·•|,;:\-–—]+/, '')
+    .replace(/[\s·•|,;:\-–—]+$/, '')
     .trim();
 }
 
 /**
- * Remove every prohibited bass claim from one string.
+ * Remove the clauses that make a prohibited bass claim from one string. The rest
+ * of the line is kept exactly as the report wrote it: the count and the models in
+ * "4 × SUB4-12 · maximum seat-to-seat bass consistency" survive, and only the
+ * claim goes.
  *
  * @param {string} text
  * @returns {{ text: string|null, rules: string[] }} the cleaned text (null when
- *   nothing but the claim was left) and the rule ids that matched
+ *   nothing but claims was left) and the rule ids that matched
  */
 export function stripBassConsistencyWording(text) {
   if (typeof text !== 'string' || text.length === 0) return { text, rules: [] };
-  let remaining = text;
   const rules = [];
-  for (const rule of PROHIBITED_BASS_CLAIMS) {
-    if (!rule.pattern.test(remaining)) continue;
-    remaining = remaining.replace(new RegExp(rule.pattern.source, `${rule.pattern.flags}g`), ' ');
-    rules.push(rule.rule);
-  }
+  const kept = String(text).split(CLAUSE_BOUNDARY).filter((clause, index) => {
+    if (index % 2 === 1) return false; // a boundary between clauses
+    if (!isBassConsistencyClaim(clause)) return true;
+    for (const rule of PROHIBITED_BASS_CLAIMS) if (rule.pattern.test(clause)) rules.push(rule.rule);
+    return false;
+  });
   if (rules.length === 0) return { text, rules: [] };
-  const cleaned = tidy(remaining);
-  return { text: cleaned.length > 0 ? cleaned : null, rules };
+  const cleaned = tidy(kept.join(' '));
+  return { text: cleaned.length > 0 ? cleaned : null, rules: [...new Set(rules)] };
 }
 
 /**

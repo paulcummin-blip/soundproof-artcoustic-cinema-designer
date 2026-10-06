@@ -6,7 +6,7 @@
  * Sound Proof is the engineering authority. The pack is the only thing a writer
  * is given, and this module names what the pack may say: the five
  * classifications (same, different, materially different, not materially
- * different, not comparable), the four allowed claim kinds, and the reasons a
+ * different, not comparable), the six allowed claim kinds, and the reasons a
  * claim is blocked.
  *
  * The area list is deliberately NOT a second opinion. It is the canonical
@@ -19,7 +19,9 @@
  *   allowed claim   claim_<area>_<kind>_<nn>     e.g. claim_p12_material_gain_01
  *   blocked claim   block_<scope>_<reason>_<nn>  e.g. block_global_no_changed_values_01
  *
- * <area>  is a canonical area key (p12, system_layout, subwoofers, ...);
+ * <area>  is a canonical area key (p12, system_layout, subwoofers, ...), or
+ *         'design' for a claim about the design as a whole (credibility,
+ *         recommendation);
  * <kind>  is a CLAIM_KIND value;
  * <scope> is 'global' for a rule that applies to the whole proposal, or an area
  *         key for a rule about that area;
@@ -36,8 +38,12 @@
 import { COMPARISON_ROW_ORDER, ROW_LABELS } from '../comparisonTable.js';
 import { structureForParameter } from '../adiReportEvidenceRules.js';
 
-/** The pack payload generation. A pack of another generation is never read. */
-export const PROPOSAL_EVIDENCE_SCHEMA_VERSION = 1;
+/**
+ * The pack payload generation. A pack of another generation is never read.
+ * v2 adds the room classification, the saved-evidence version-name rule, the
+ * strengthened framing guard, the bass wording rule and the whole-design claims.
+ */
+export const PROPOSAL_EVIDENCE_SCHEMA_VERSION = 2;
 
 /** Every classification a design area may carry. A writer reasons only in these. */
 export const CLASSIFICATION = Object.freeze({
@@ -56,6 +62,8 @@ export const AREA_KIND = Object.freeze({
   EQUIPMENT: 'equipment',
   /** The room, screen, seating or system format: a stated design choice. */
   STRUCTURAL: 'structural',
+  /** The room itself: the dimensions the reports state, compared directly. */
+  ROOM: 'room',
 });
 
 /** The claims a writer may make from this pack. */
@@ -68,6 +76,10 @@ export const CLAIM_KIND = Object.freeze({
   SHARED_RESULT: 'shared_result',
   /** A stated difference that is a change of equipment or geometry, not a gain. */
   FACTUAL_CHANGE: 'factual_change',
+  /** A design that takes no material gain is still a credible design in itself. */
+  CREDIBILITY: 'credibility',
+  /** The stronger option where maximum performance and headroom are the priority. */
+  RECOMMENDATION: 'recommendation',
 });
 
 /** Why a claim is blocked. Each reason carries its own client-safe sentence. */
@@ -138,12 +150,27 @@ function structureOf(key) {
  * Excluded parameters (P8, P15, P21) are absent by construction: they are not in
  * the canonical order and never reach a client-facing surface.
  */
-export const PROPOSAL_EVIDENCE_AREAS = Object.freeze(COMPARISON_ROW_ORDER.map((key) => Object.freeze({
-  key,
-  label: ROW_LABELS[key] || key,
-  kind: NON_PARAMETER_KINDS[key] || AREA_KIND.GRADED,
-  structure: structureOf(key),
-})));
+/**
+ * The room itself. It is not a comparison row: it is classified from the room
+ * facts both reports state, so no framing can describe two different rooms as
+ * one shared design.
+ */
+const ROOM_AREA = Object.freeze({
+  key: 'room',
+  label: 'Room',
+  kind: AREA_KIND.ROOM,
+  structure: null,
+});
+
+export const PROPOSAL_EVIDENCE_AREAS = Object.freeze([
+  ROOM_AREA,
+  ...COMPARISON_ROW_ORDER.map((key) => Object.freeze({
+    key,
+    label: ROW_LABELS[key] || key,
+    kind: NON_PARAMETER_KINDS[key] || AREA_KIND.GRADED,
+    structure: structureOf(key),
+  })),
+]);
 
 /** The area definition for a key, or null. */
 export function areaByKey(key) {

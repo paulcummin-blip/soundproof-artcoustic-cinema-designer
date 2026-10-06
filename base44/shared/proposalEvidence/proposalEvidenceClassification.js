@@ -15,6 +15,10 @@
  *  1. A single option is not a comparison: not comparable.
  *  2. An area any report does not state is not comparable. Missing evidence is
  *     never filled in from anywhere.
+ *  2b. The room is compared on its own stated dimensions (to a millimetre of
+ *     rounding), falling back to the stated dimensions text: same, different, or
+ *     not comparable when a report does not state it. Wording is never what
+ *     makes a room the same room.
  *  3. Identical statements in every report: same.
  *  4. Equipment: a change of model is a change of equipment, never a claimed
  *     gain. What the equipment achieves is decided by the graded results below.
@@ -67,6 +71,35 @@ function highestLevel(levels) {
   }, null);
 }
 
+/** The two rooms are the same room within a millimetre of rounding. */
+const ROOM_DIMENSION_TOLERANCE_M = 0.005;
+
+/** The dimensions a room reading states, or null when it states none. */
+function dimsOf(reading) {
+  const dimensions = reading && typeof reading === 'object' ? reading.dimensions : null;
+  if (!dimensions) return null;
+  const values = [dimensions.length_m, dimensions.width_m, dimensions.height_m].map(Number);
+  return values.every(Number.isFinite) ? values : null;
+}
+
+/**
+ * The room: the same, different, or not comparable. The stated dimensions decide
+ * it when both reports state them; the stated dimensions text decides it
+ * otherwise. A room fact either report omits is never filled in.
+ */
+function classifyRoom(area, values, readings) {
+  const dims = readings.map(dimsOf);
+  const same = dims.every(Boolean)
+    ? dims.every((entry) => entry.every((value, index) => Math.abs(value - dims[0][index]) <= ROOM_DIMENSION_TOLERANCE_M))
+    : new Set(values.map((value) => String(value).toLowerCase().replace(/\s+/g, ' ').trim())).size === 1;
+  return verdict(
+    area,
+    same ? CLASSIFICATION.SAME : CLASSIFICATION.DIFFERENT,
+    same ? 'identical_room_dimensions' : 'different_room_dimensions',
+    values,
+  );
+}
+
 function verdict(area, classification, reason, values, levels = []) {
   return {
     area: area.key,
@@ -95,6 +128,10 @@ export function classifyArea(area, readings = []) {
   if (values.some((value) => !value)) {
     return verdict(area, CLASSIFICATION.NOT_COMPARABLE, 'not_stated_by_every_report', values);
   }
+
+  // The room is classified from its own dimensions before any wording is read.
+  if (area.kind === AREA_KIND.ROOM) return classifyRoom(area, values, list);
+
   if (new Set(values).size === 1) return verdict(area, CLASSIFICATION.SAME, 'identical_in_every_report', values);
 
   if (area.kind === AREA_KIND.EQUIPMENT) {

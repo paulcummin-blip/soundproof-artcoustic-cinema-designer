@@ -19,6 +19,19 @@
  * every claim it allows was classified from that evidence first. A writer's job
  * is to turn this pack into prose, and to claim nothing else.
  *
+ * Four safety rules are enforced here and nowhere else:
+ *
+ *   1. every client-facing version name comes from the saved report evidence
+ *      (proposalEvidenceIdentity), and a version whose evidence states no name
+ *      blocks the pack rather than being named from live state;
+ *   2. the room is classified explicitly — same, different or not comparable —
+ *      from the room facts the reports state (proposalEvidenceClassification);
+ *   3. the decision framing is allowed only where the whole shared design is
+ *      confirmed and P20 does not contradict it (proposalEvidenceDesignClaims);
+ *   4. no prohibited seat-to-seat bass consistency wording survives anywhere in
+ *      the pack, and the pack is not returned until that is proven
+ *      (proposalEvidenceWording).
+ *
  * Pure: no React, no SDK, no runtime-specific APIs.
  */
 
@@ -32,9 +45,15 @@ import { classifyAreas } from './proposalEvidenceClassification.js';
 import {
   buildAllowedClaims,
   buildBlockedClaims,
-  buildDecisionFraming,
   buildMaterialityNotes,
 } from './proposalEvidenceClaims.js';
+import {
+  buildBassClaims,
+  buildDecisionFraming,
+  buildDesignClaims,
+  emptyBassClaims,
+} from './proposalEvidenceDesignClaims.js';
+import { assertBassWordingSafe } from './proposalEvidenceWording.js';
 
 /** Deterministic key order, so the same content always serialises identically. */
 function canonicalise(value) {
@@ -84,11 +103,36 @@ export function buildProposalEvidence({ versions = [], generatedAt = null } = {}
   const compared = options.length >= 2;
 
   const classification = compared ? classifyAreas(options.map((option) => option.areas)) : [];
-  const allowedClaims = compared ? buildAllowedClaims(classification, options) : [];
   const decisionFraming = compared
     ? buildDecisionFraming(classification, options)
     : { allowed: false, reason: 'single_option', text: null, evidence: {} };
-  const blockedClaims = buildBlockedClaims(classification, options, decisionFraming);
+
+  // The area claims first, then the whole-design claims, which rest on them: a
+  // credibility claim on the shared format, a recommendation on the framing.
+  const allowedClaims = compared
+    ? [
+      ...buildAllowedClaims(classification, options),
+      ...buildDesignClaims(classification, options, decisionFraming),
+    ]
+    : [];
+
+  const bassClaims = compared
+    ? buildBassClaims(classification, options, allowedClaims)
+    : emptyBassClaims();
+  const blockedClaims = buildBlockedClaims(classification, options, decisionFraming, bassClaims);
+
+  // The bass consistency rule is minted once, in the packed rule list; the bass
+  // contract points at that same block instead of minting a second id for it.
+  const bass = {
+    ...bassClaims,
+    blocked: (bassClaims.blocked || []).map((entry) => ({
+      ...entry,
+      block_id: blockedClaims.find((block) => block.area === 'p20' && block.reason === entry.reason)?.block_id
+        || entry.block_id,
+    })),
+    removed_wording: options.flatMap((option) => (option.wording_removed || [])
+      .map((entry) => ({ version_id: option.version_id, ...entry }))),
+  };
 
   const pack = {
     schema_version: PROPOSAL_EVIDENCE_SCHEMA_VERSION,
@@ -104,17 +148,24 @@ export function buildProposalEvidence({ versions = [], generatedAt = null } = {}
       version_id: option.version_id,
       version_name: option.version_name,
       label: option.label,
+      version_name_source: option.version_name_source,
       facts: option.facts,
     })),
     classification,
-    materiality_notes: buildMaterialityNotes(allowedClaims),
+    materiality_notes: buildMaterialityNotes(allowedClaims, { p20Note: bass.note }),
     allowed_claims: allowedClaims,
     blocked_claims: blockedClaims,
+    bass_claims: bass,
     decision_framing: decisionFraming,
-    // The audit spine of the pack: which saved reports it was built from, and
-    // the fingerprints they were generated against.
+    // The audit spine of the pack: which saved reports it was built from, where
+    // each client-facing version name came from, and the fingerprints those
+    // reports were generated against. Every name is the saved evidence's own.
     evidence_basis: {
       sources: ['saved-report-evidence'],
+      version_names: options.map((option) => ({
+        version_id: option.version_id,
+        ...(option.version_name_source || {}),
+      })),
       report_snapshot_ids: options.map((option) => ({
         version_id: option.version_id,
         visual_report_snapshot_id: option.facts?.report_snapshot_ids?.visual ?? null,
@@ -129,7 +180,10 @@ export function buildProposalEvidence({ versions = [], generatedAt = null } = {}
     },
   };
 
-  return { ...pack, pack_fingerprint: proposalEvidenceFingerprint(pack) };
+  // The pack's final gate. Every report-sourced string has already been cleaned,
+  // and this proves the pack as a whole carries no prohibited bass claim — its
+  // own rule text included — before it can reach a writer.
+  return assertBassWordingSafe({ ...pack, pack_fingerprint: proposalEvidenceFingerprint(pack) });
 }
 
 export default buildProposalEvidence;

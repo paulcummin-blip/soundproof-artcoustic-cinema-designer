@@ -20,8 +20,6 @@ import {
   BLOCK_REASON,
   CLASSIFICATION,
   CLAIM_KIND,
-  DECISION_FRAMING_EQUIPMENT_KEYS,
-  DECISION_FRAMING_PARAMETER_KEYS,
   MATERIAL_RESULT_LEVELS,
   buildBlockId,
   buildClaimId,
@@ -32,11 +30,16 @@ function meaning(areaKey, values) {
   return comparisonClientMeaning({ key: areaKey, values, identical: false });
 }
 
-function optionName(option, index) {
+/**
+ * The name an option is described by. It is the version name the saved report
+ * evidence states (never a live project read), and the option label otherwise.
+ */
+export function optionName(option, index) {
   return option?.version_name || option?.label || `Option ${String.fromCharCode(65 + index)}`;
 }
 
-function optionRef(option) {
+/** The option reference a claim names, carrying internal identifiers only. */
+export function optionRef(option) {
   return {
     version_id: option?.version_id ?? null,
     version_name: option?.version_name ?? null,
@@ -44,23 +47,28 @@ function optionRef(option) {
   };
 }
 
+/** The saved report each option's evidence came from, so a claim is traceable. */
+export function reportSnapshotIds(options = []) {
+  return (Array.isArray(options) ? options : []).map((option) => ({
+    version_id: option?.version_id ?? null,
+    visual_report_snapshot_id: option?.facts?.report_snapshot_ids?.visual ?? null,
+    technical_report_snapshot_id: option?.facts?.report_snapshot_ids?.technical ?? null,
+  }));
+}
+
 /** The report evidence each claim rests on, so a claim is always traceable. */
-function basisOf(row, options) {
+export function basisOf(row, options) {
   return {
     classification: row.classification,
     reason: row.reason,
     values: row.values,
     levels: row.levels || [],
-    report_snapshot_ids: options.map((option) => ({
-      version_id: option.version_id,
-      visual_report_snapshot_id: option.facts?.report_snapshot_ids?.visual ?? null,
-      technical_report_snapshot_id: option.facts?.report_snapshot_ids?.technical ?? null,
-    })),
+    report_snapshot_ids: reportSnapshotIds(options),
   };
 }
 
 /** The strongest option in a graded row, by its level. */
-function bestIndex(row) {
+export function bestIndex(row) {
   let best = -1;
   let bestLevel = 0;
   row.levels.forEach((level, index) => {
@@ -185,8 +193,15 @@ export function buildAllowedClaims(classification = [], options = []) {
   return claims;
 }
 
-/** The materiality note behind each important difference, in the claim's own words. */
-export function buildMaterialityNotes(claims = []) {
+/**
+ * The materiality note behind each important difference, in the claim's own words.
+ *
+ * @param {Array<Object>} claims
+ * @param {{ p20Note?: string|null }} [options] — the seat-to-seat bass consistency
+ *   note, authored by the one bass wording authority, so the rule that governs
+ *   bass wording governs the note the writer reads
+ */
+export function buildMaterialityNotes(claims = [], { p20Note = null } = {}) {
   const notable = [CLAIM_KIND.MATERIAL_GAIN, CLAIM_KIND.FACTUAL_CHANGE, CLAIM_KIND.MODEST_RESULT];
   return (Array.isArray(claims) ? claims : [])
     .filter((claim) => notable.includes(claim.kind))
@@ -195,13 +210,21 @@ export function buildMaterialityNotes(claims = []) {
       label: claim.label,
       classification: claim.basis.classification,
       kind: claim.kind,
-      note: claim.statement,
+      note: claim.area === 'p20' && p20Note ? p20Note : claim.statement,
       option: claim.option,
     }));
 }
 
-/** The claims the writer must not make, each with the reason it is blocked. */
-export function buildBlockedClaims(classification = [], options = [], framing = null) {
+/**
+ * The claims the writer must not make, each with the reason it is blocked.
+ *
+ * @param {Array<Object>} classification
+ * @param {Array<Object>} options
+ * @param {Object|null} framing — the decision framing, when one is allowed
+ * @param {Object|null} bassClaims — the bass claim contract, whose blocked rules
+ *   are minted here so the packed rule list and the bass contract name one block
+ */
+export function buildBlockedClaims(classification = [], options = [], framing = null, bassClaims = null) {
   const list = Array.isArray(classification) ? classification : [];
   const blocked = [];
   const add = (scope, reason, prohibited, detail = null, area = null) => {
@@ -263,11 +286,12 @@ export function buildBlockedClaims(classification = [], options = [], framing = 
     add('seating', BLOCK_REASON.NO_SEATING_CHANGE,
       'Do not claim any option changes the seating: both options are assessed across the same seats.');
   }
+  // The bass wording rule is authored in one place (proposalEvidenceWording) and
+  // reaches this list through the bass contract, so the rule the writer reads and
+  // the rule the pack points at are the same rule.
   const p20 = list.find((row) => row.area === 'p20');
-  if (p20 && p20.classification !== CLASSIFICATION.MATERIALLY_DIFFERENT) {
-    add('p20', BLOCK_REASON.NO_SOLVED_BASS_CONSISTENCY,
-      'Do not claim seat-to-seat bass consistency is solved, and do not present it as an improvement: the reports show no material difference here.',
-      p20.reason, 'p20');
+  for (const entry of Array.isArray(bassClaims?.blocked) ? bassClaims.blocked : []) {
+    add('p20', entry.reason, entry.prohibited, p20?.reason ?? null, 'p20');
   }
 
   if (framing && framing.allowed !== true) {
@@ -279,48 +303,6 @@ export function buildBlockedClaims(classification = [], options = [], framing = 
   return blocked;
 }
 
-/**
- * The decision framing a Marquee-style comparison may use, and only where the
- * evidence supports it: a shared format, a material dynamic-range gain for one
- * option, and a product difference behind it.
- *
- * @returns {{ allowed: boolean, reason: string, text: string|null, evidence: Object }}
- */
-export function buildDecisionFraming(classification = [], options = []) {
-  const list = Array.isArray(classification) ? classification : [];
-  const rowFor = (key) => list.find((row) => row.area === key) || null;
-
-  const refuse = (reason, evidence = {}) => ({ allowed: false, reason, text: null, evidence });
-  if (options.length !== 2) return refuse('not_a_two_option_comparison');
-
-  const layout = rowFor('system_layout');
-  if (layout?.classification !== CLASSIFICATION.SAME) return refuse('format_is_not_shared');
-
-  const material = DECISION_FRAMING_PARAMETER_KEYS
-    .map((key) => rowFor(key))
-    .filter((row) => row?.classification === CLASSIFICATION.MATERIALLY_DIFFERENT);
-  if (material.length === 0) return refuse('no_material_dynamic_range_evidence');
-
-  const equipment = DECISION_FRAMING_EQUIPMENT_KEYS
-    .filter((key) => rowFor(key)?.classification === CLASSIFICATION.DIFFERENT);
-  if (equipment.length === 0) return refuse('no_product_difference');
-
-  const winners = new Set(material.map((row) => bestIndex(row)));
-  if (winners.size !== 1 || winners.has(-1)) return refuse('no_single_option_supported');
-
-  const winner = [...winners][0];
-  const base = winner === 0 ? 1 : 0;
-  const evidence = {
-    shared_areas: ['system_layout'],
-    material_areas: material.map((row) => row.area),
-    equipment_areas: equipment,
-    option: optionRef(options[winner]),
-  };
-  return {
-    allowed: true,
-    reason: 'shared_format_with_material_dynamic_range_and_products',
-    text: `${optionName(options[base], base)} gives the room the format. `
-      + `${optionName(options[winner], winner)} gives that format the authority to feel like a serious dedicated cinema.`,
-    evidence,
-  };
-}
+/* The decision framing, the whole-design claims and the bass claim contract live
+   in proposalEvidenceDesignClaims.js: their guard reads the shared design (the
+   room, screen, seating and layout), which this module does not classify. */

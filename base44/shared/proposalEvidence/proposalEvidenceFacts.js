@@ -13,10 +13,19 @@
  * Excluded parameters (P8, P15, P21) are filtered out here, by the existing
  * report rule, so they cannot enter the pack at all.
  *
+ * Two further rules apply before a fact is frozen:
+ *
+ *   - the version name comes from the saved report evidence, never from live
+ *     project state (see proposalEvidenceIdentity);
+ *   - no prohibited seat-to-seat bass consistency wording survives anywhere in a
+ *     fact, wherever a report wrote it (see proposalEvidenceWording).
+ *
  * Pure: no React, no SDK, no runtime-specific APIs.
  */
 
 import { isReportParameter, structureForParameter, plainLanguageName } from '../adiReportEvidenceRules.js';
+import { savedVersionIdentity } from './proposalEvidenceIdentity.js';
+import { stripBassWordingDeep } from './proposalEvidenceWording.js';
 
 const NONE = 'None specified';
 
@@ -33,6 +42,25 @@ function valueText(value) {
     return asText(value.statement) || asText(value.display_value) || asText(value.formatted_value);
   }
   return String(value);
+}
+
+/** The room as the Visual Report states it: its dimensions, and the text for them. */
+function roomReading(room) {
+  const dimensions = room?.dimensions || {};
+  const values = [dimensions.length_m, dimensions.width_m, dimensions.height_m]
+    .map((value) => (Number.isFinite(Number(value)) ? Number(value) : null));
+  const stated = asText(room?.dimensions_text);
+  const text = stated || (values.every((value) => value !== null) ? `${values.join(' x ')} m` : null);
+  if (!text) return null;
+  return {
+    text,
+    dimensions: { length_m: values[0], width_m: values[1], height_m: values[2] },
+  };
+}
+
+/** The short system format ("9.1.6") as the reports state it. */
+function formatText(system) {
+  return asText(system?.configuration?.dolby_config) || asText(system?.configuration?.text);
 }
 
 /** The screen as the Visual Report states it, in the comparison table's words. */
@@ -125,11 +153,12 @@ function parameterRows(snapshot) {
  * The reading each major design area carries for this one version, or null where
  * the reports do not state it. This is what the classification compares.
  */
-function areaReadings({ screen, seating, viewing, system, parameters, products }) {
+function areaReadings({ room, screen, seating, viewing, system, parameters, products }) {
   const byLayer = new Map(products.map((row) => [row.key, row.value]));
   const byParameter = new Map(parameters.map((row) => [`p${row.parameter_id}`, row]));
 
   const readings = {
+    room: roomReading(room),
     screen_size: screenText(screen),
     system_layout: layoutText(system),
     seating: seatingText(seating),
@@ -157,13 +186,19 @@ function areaReadings({ screen, seating, viewing, system, parameters, products }
  *
  * @param {Object} entry — one readProposalReportEvidence result
  * @param {string} label — the option label this version is given ("Option A")
- * @returns {{ version_id, version_name, label, facts, areas }}
+ * @returns {{ version_id, version_name, version_name_source, label, facts, areas, wording_removed }}
  */
 export function buildOptionFacts(entry, label) {
   const snapshot = entry?.snapshot;
   const versionId = entry?.version_id || snapshot?.identity?.versionId || null;
   if (!versionId) throw new Error('A selected version could not be identified from its report evidence.');
   if (!snapshot) throw new Error(`No saved report evidence was supplied for version ${versionId}.`);
+
+  // The name this version is described by is the name its saved reports were
+  // generated under. It is never read from the live ProjectVersion record, and a
+  // version whose saved evidence states no name is not put in a pack at all.
+  const versionIdentity = savedVersionIdentity(entry, versionId);
+  const versionName = versionIdentity.version_name;
 
   const identity = snapshot.identity || {};
   const room = snapshot.room || {};
@@ -175,16 +210,18 @@ export function buildOptionFacts(entry, label) {
   const products = productRows(snapshot);
   const perSeat = Array.isArray(viewing.per_seat) ? viewing.per_seat : [];
 
-  return {
+  // Internal only: the raw readings the classification compares. The frozen pack
+  // carries the classification and the facts, never this working copy.
+  const readings = areaReadings({ room, screen, seating, viewing, system, parameters, products });
+
+  const frozen = {
     version_id: versionId,
-    version_name: entry?.version_name || snapshot.version?.name || null,
+    version_name: versionName,
     label: label || null,
-    // Internal only: the raw readings the classification compares. The frozen
-    // pack carries the classification and the facts, never this working copy.
-    areas: areaReadings({ screen, seating, viewing, system, parameters, products }),
+    areas: readings,
     facts: {
       version_id: versionId,
-      version_name: entry?.version_name || snapshot.version?.name || null,
+      version_name: versionName,
       label: label || null,
       // The report's own identity statement. It is never the live project record.
       report_identity: {
@@ -244,6 +281,9 @@ export function buildOptionFacts(entry, label) {
       },
       system: {
         layout: layoutText(system),
+        // The short format ("9.1.6") as the reports state it, so a claim can
+        // name the format the design is built to without recomposing it.
+        format: formatText(system),
         channel_layout: {
           bed_channels: system.channel_layout?.bed_channels ?? null,
           overhead_channels: system.channel_layout?.overhead_channels ?? null,
@@ -264,5 +304,26 @@ export function buildOptionFacts(entry, label) {
         subwoofer_strategy_summary: asText(snapshot.bass?.subwoofer_strategy_summary),
       },
     },
+  };
+
+  // No prohibited bass claim may reach the pack, wherever a report wrote it: one
+  // pass over the facts and the readings removes the phrase, keeps the rest of
+  // the line it appeared in, and records the path and the rule that removed it —
+  // never the sentence itself, which the pack must not carry either.
+  const stripped = stripBassWordingDeep(frozen);
+
+  return {
+    version_id: versionId,
+    version_name: versionName,
+    label: label || null,
+    version_name_source: {
+      source: 'saved-report-evidence',
+      from: versionIdentity.from,
+      stated_by: versionIdentity.stated_by,
+      reports_agree: versionIdentity.reports_agree,
+    },
+    areas: stripped.value.areas,
+    facts: stripped.value.facts,
+    wording_removed: stripped.removed,
   };
 }
