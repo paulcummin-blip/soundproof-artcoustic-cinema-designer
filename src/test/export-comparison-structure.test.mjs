@@ -147,11 +147,14 @@ test('TEST 7 — the highlights page says so when no comparison table could be b
   const table = read('src/components/proposal/KeyPerformanceHighlightsTable.jsx');
   assert.ok(table.includes('comparisonUnavailable'), 'the empty-comparison state exists');
   assert.ok(
-    table.includes('No calculated comparison values are available for the selected versions'),
+    table.includes('Comparison evidence requires regeneration'),
     'and states the reason on the page instead of printing nothing under the heading',
   );
-  assert.ok(table.includes('Client meaning'), 'the comparison table carries the client-meaning column');
-  assert.ok(table.includes('changeCellText(row, options.length)'), 'an unchanged area is stated as unchanged');
+  assert.ok(table.includes('What you gain'), 'the comparison table carries the client-meaning column');
+  assert.ok(
+    table.includes('comparisonClientMeaning(row)') && table.includes('changeLead(row)'),
+    'an unchanged area is stated as unchanged',
+  );
 
   const pack = read('src/components/proposal/print/ProposalPackDocument.jsx');
   assert.ok(pack.includes('comparisonExpected={isComparisonKind}'), 'the printed pack knows when a comparison was asked for');
@@ -166,7 +169,10 @@ test('TEST 7 — the highlights page says so when no comparison table could be b
 test('TEST 8 — the backend fails visibly rather than writing an empty table', () => {
   const source = read('base44/functions/generateProposal/entry.ts');
   assert.ok(source.includes('comparisonTable.rows.length === 0'), 'an empty comparison table is detected');
-  assert.ok(source.includes('so the comparison table cannot be built'), 'and the generation fails with that reason');
+  assert.ok(
+    source.includes('Comparison evidence could not be built for both selected versions'),
+    'and the generation fails with that reason',
+  );
   const refusal = source.indexOf('comparisonTable.rows.length === 0');
   const firstWrite = source.indexOf('ProposalSection.create');
   assert.ok(firstWrite === -1 || refusal < firstWrite, 'the refusal happens before any section is written');

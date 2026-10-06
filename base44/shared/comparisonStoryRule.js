@@ -54,6 +54,7 @@ export const COMPARISON_REFERENCE_STYLE = [
   'Ground the story in the reports the client also holds, naturally and sparingly, for example:',
   '- "RP22 Parameter 12 in the Technical Report shows ..."',
   '- "The Visual Report shows ..."',
+  '- "The Visual Report confirms the seating and screen geometry for both options."',
   '- "The P20 seat map shows ..."',
   '- "RP23 viewing geometry remains strong in both versions ..."',
   'Never cite a file name, a page number or a link, and use two or three references in a section at most rather than one in every paragraph.',
@@ -66,7 +67,7 @@ export const COMPARISON_LANGUAGE_RULES = [
   'Never write a table, a grid of values or a performance summary: the report renders its one calculated table itself. Never write "measured", "proven" or "confirmed" for a calculated result; use "predicted", "calculated" or "shown in the Technical Report".',
   'Never write "not just X, but Y". Never define an RP22 parameter at length, never list parameters dryly, and never make a claim without the value that supports it.',
   'Say "far higher", "much more" or "significantly" only together with the values that show it, and never at all where the difference is small.',
-  'Prefer: "The main upgrade is ...", "This matters because ...", "For the listener, that means ...", "The calculated difference is ...", "Parameter 12 shows ...", "The Level 4 version gives the room ...", "The Level 1 version still keeps ...".',
+  'Prefer: "The main upgrade is ...", "The measured difference is ...", "This matters because ...", "For the listener, that means ...", "The calculated difference is ...", "Parameter 12 shows ...", "The Level 4 version gives the room ...", "The Level 1 version still keeps ...".',
   'Write short paragraphs of one to three sentences. Never write a paragraph longer than four sentences, and never a block of dense text.',
   'Respect the section\'s word ceiling stated in its section note. If the material does not fit, cut the weaker sentence: never let a section run on to a second page.',
   'Never repeat a point another section has already made. Each section makes its own point once, and a shared result is stated in the section that owns it rather than in every section.',
@@ -125,7 +126,7 @@ const SECTION_FOCUS = Object.freeze({
   ].join('\n'),
 
   overall_design: [
-    'FOR THIS SECTION (ceiling: 180 words): the conclusion, not another report. Bring the differences together for the decision: say what the smaller option still keeps, say what the larger option adds, and say plainly which client each option suits — without ranking one as best. Use no value that has not already been given, and introduce no new parameter.',
+    'FOR THIS SECTION (ceiling: 180 words): the conclusion, not another report. Its job is to bring the differences together for the decision: say what the smaller option still keeps, say what the larger option adds, and say plainly which client each option suits, without ranking one as best. Use no value that has not already been given, and introduce no new parameter.',
     'Do not restate the differences section by section, do not repeat a parameter story, and do not name a product that appears nowhere else in this comparison.',
   ].join('\n'),
 });

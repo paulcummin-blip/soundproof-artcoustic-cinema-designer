@@ -29,7 +29,7 @@ const GAIN = Object.freeze({
   p17: 'Tonal consistency around and above the seats as effects move through the room.',
   p18: 'Bass depth: how far down the system reaches for the lowest film effects.',
   p19: 'Bass balance at the reference seat, which is the response the calibration is measured against.',
-  p20: 'Seat-to-seat bass consistency. Both designs need calibration attention here; the upgrade adds output authority, not full-seat uniformity.',
+  p20: 'Consistent bass from seat to seat, so every listening position gets the same low-frequency balance.',
   p2: 'The physical sound positions the system is built with, around and above the seats.',
   p4: 'How evenly the screen channels hold their level across the seating area.',
   p5: 'How evenly the listener-level speakers are spaced, which is what lets movement travel through the room.',
