@@ -23,7 +23,7 @@ test('the authority governs the System Design reports', () => {
   assert.match(contract, /Sound Proof does not write software reports\. It writes professional design advice\./);
   assert.match(contract, /a homeowner, an architect, an interior designer or an installer/);
   assert.match(contract, /They are intelligent\. Do not patronise them/);
-  assert.match(contract, /The client is buying confidence, not specifications\./);
+  assert.match(contract, /The client is buying the experience\. The specifications and engineering give them confidence that the experience can actually be delivered\./);
   assert.match(contract, /I understand why this has been designed this way, and I trust the reasoning behind it\./);
 });
 
@@ -102,7 +102,7 @@ test('the authority governs the client summaries as well as the reports', () => 
       `the ${name} prompt must carry the authority`,
     );
     assert.ok(
-      prompt.includes('The client is buying confidence, not specifications.'),
+      prompt.includes('The client is buying the experience. The specifications and engineering give them confidence that the experience can actually be delivered.'),
       `the ${name} prompt must carry the guiding principle`,
     );
     // The neutral voice still governs how the summary addresses the reader.

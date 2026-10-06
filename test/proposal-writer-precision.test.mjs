@@ -115,6 +115,32 @@ test('a sentence that denies the claim is not rejected for making it', () => {
   }
 });
 
+/* ── The style the sales authority asks for passes ─────────────────────────── */
+
+test('the intended sales style passes where the pack records the result', () => {
+  // The prompt's own exemplars, written about results this pack supports: the
+  // screen-stage headroom is the pack's P12 gain, and the surround and height
+  // layer headroom is its P13 gain. None of them may be refused as a claim about
+  // a blocked area — "the screen stage" is the front stage, not the screen.
+  const p12 = claimOf('p12', 'material_gain');
+  const p13 = claimOf('p13', 'material_gain');
+
+  const cases = [
+    ['dynamic_range', 'The screen stage has substantially more headroom. Dialogue, music and effects can build in scale without the front speakers sounding compressed or strained when the film becomes demanding.', [p12?.claim_id]],
+    ['dynamic_range', 'The surround and overhead channels have enough reserve to keep their presence when the front stage becomes busy. Effects around and above the audience do not disappear behind the main soundtrack.', [p13?.claim_id]],
+    ['overall_design', 'The additional headroom means the front stage, surrounds and overhead channels can all maintain their scale during the busiest parts of a soundtrack.', [p12?.claim_id, p13?.claim_id]],
+  ];
+
+  for (const [section, sentence, claimIds] of cases) {
+    const result = validate(amend(section, sentence, claimIds.filter(Boolean)));
+    assert.equal(
+      codes(result).includes(WRITER_REJECTION.UNSUPPORTED_IMPROVEMENT),
+      false,
+      `${sentence} -> ${JSON.stringify(result.violations)}`,
+    );
+  }
+});
+
 /* ── Rule 6: genuine blocked claims still fail ─────────────────────────────── */
 
 test('genuine blocked claims are still refused', () => {

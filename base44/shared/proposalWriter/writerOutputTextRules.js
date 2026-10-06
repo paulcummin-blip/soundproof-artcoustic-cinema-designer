@@ -65,6 +65,14 @@ const OWN_COMPARATIVES = 'larger|bigger|wider|greater|better|higher|superior|inc
  */
 const NP_LEADS = 'a|an|the|this|that|these|those|its|their|our|your|his|her|any|every|each|such';
 
+/**
+ * A head that is only MODIFYING the word after it is naming something else:
+ * "screen stage" is the front stage, not the screen, and "surround channels" are
+ * the surround layer. A term in that position is not the area claiming anything
+ * itself, so it is not read as a claim about the area.
+ */
+const HEAD_NOT_RENAMED = '(?!\\s+(?:stage|stages|channel|channels|speaker|speakers|wall|walls|plane|planes|array|arrays|layer|layers|format|formats|position|positions|field)\\b)';
+
 /** Words that are themselves an improvement or a change in the area. */
 const CLAIM_VERBS = 'improve[sd]?|improvements?|gains?|increases?|increased|boosts?|enhances?|exceeds?|solves?|fixes?|resolves?|adds?|added|changes?|changed|upgrades?|upgraded|replaces?|exchanges?|introduces?';
 
@@ -128,17 +136,18 @@ function claimsArea(sentence, { heads = [], phrases = [] } = {}) {
 
   for (const head of heads) {
     const term = `\\b${head}\\w*\\b`;
+    const head2 = `${term}${HEAD_NOT_RENAMED}`;
     const patterns = [
       // the area carries the comparative itself: "a larger screen"
-      new RegExp(`\\b(?:${OWN_COMPARATIVES})\\b\\s+(?:\\w+\\s+){0,1}?${term}`, 'i'),
+      new RegExp(`\\b(?:${OWN_COMPARATIVES})\\b\\s+(?:\\w+\\s+){0,1}?${head2}`, 'i'),
       // a determiner-led "more": "the more capable screen"
-      new RegExp(`\\b(?:${NP_LEADS})\\s+more\\b\\s+(?:\\w+\\s+){0,1}?${term}`, 'i'),
+      new RegExp(`\\b(?:${NP_LEADS})\\s+more\\b\\s+(?:\\w+\\s+){0,1}?${head2}`, 'i'),
       // the area is the subject of the claim: "the screen improves"
-      new RegExp(`${term}(?:\\s+\\w+){0,2}\\s+(?:${CLAIM_VERBS})\\b`, 'i'),
+      new RegExp(`${head2}(?:\\s+\\w+){0,2}\\s+(?:${CLAIM_VERBS})\\b`, 'i'),
       // the claim is predicated of the area: "adds more channels"
-      new RegExp(`\\b(?:${CLAIM_VERBS})\\b(?:\\s+\\w+){0,3}\\s+${term}`, 'i'),
+      new RegExp(`\\b(?:${CLAIM_VERBS})\\b(?:\\s+\\w+){0,3}\\s+${head2}`, 'i'),
       // the area is the subject of a benefit: "the screen gives more headroom"
-      new RegExp(`${term}(?:\\s+\\w+){0,2}\\s+(?:${LINK_VERBS})\\b(?:\\s+\\w+){0,3}\\s+(?:${BENEFIT_WORDS})\\b`, 'i'),
+      new RegExp(`${head2}(?:\\s+\\w+){0,2}\\s+(?:${LINK_VERBS})\\b(?:\\s+\\w+){0,3}\\s+(?:${BENEFIT_WORDS})\\b`, 'i'),
     ];
     for (const pattern of patterns) {
       const match = pattern.exec(sentence);

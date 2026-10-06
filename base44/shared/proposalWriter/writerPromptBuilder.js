@@ -30,7 +30,7 @@
  * here.
  */
 
-import { SOUND_PROOF_WRITING_AUTHORITY } from '../soundProofWritingAuthority.js';
+import { buildProposalWritingAuthority } from '../soundProofWritingAuthority.js';
 import {
   WRITER_CONTRACT_VERSION,
   WRITER_OUTPUT_MODE,
@@ -189,7 +189,11 @@ export function buildWriterPrompt({ input } = {}) {
     'You are the Sound Proof proposal writer.',
     'You do not calculate, measure, estimate or infer anything. You turn the frozen evidence you are given into client-facing narrative copy, and you claim nothing it does not support.',
     '',
-    ...SOUND_PROOF_WRITING_AUTHORITY,
+    // The authority this writer is held to: the shared Sound Proof writing
+    // authority with the proposal sales authority inserted after CORE PRINCIPLE.
+    // It is ONE string and is carried as one entry — spreading it here would
+    // spread its characters, one per line.
+    buildProposalWritingAuthority(),
     '',
     '=== THE WRITER INPUT (your only source) ===',
     'This JSON carries the frozen evidence pack, the nine sections you must write with their word limits, the writing rules, the claims you may make, the claims that are blocked, the bass contract, the grounding rule and the exact output schema. It is the only source of every fact, figure, Performance Level and product name.',
