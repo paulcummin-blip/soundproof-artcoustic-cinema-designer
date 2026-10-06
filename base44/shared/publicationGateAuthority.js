@@ -21,6 +21,8 @@
  *   - base44/functions/readPublishedEngineering (read-time acknowledgement)
  */
 
+import { auditPublicationContract } from './engineeringPublicationContract.js';
+
 export const PUBLICATION_ACKNOWLEDGEMENT = Object.freeze({
   /** A complete publication is stored and the version pointer references it. */
   DURABLE: 'durably_published',
@@ -182,7 +184,7 @@ export function auditEngineeringPublication(
     requirePayload,
   });
 
-  const missing = [...report.missing];
+  const missing = [...report.missing, ...auditPublicationContract(publication).missing.map(reason => ({key:reason,label:reason}))];
   if (!fingerprintMatches) missing.unshift({ ...PUBLICATION_SECTION.POINTER_MATCH });
 
   const complete = missing.length === 0;
