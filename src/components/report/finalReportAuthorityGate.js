@@ -1,6 +1,7 @@
+import { auditPublicationContract } from '../../../shared/engineeringPublicationContract.js';
 /** Final report authority must include frozen facts, not only metric existence. */
 export function auditFinalReportAuthority(publication) {
-  const missing = [];
+  const missing = [...auditPublicationContract(publication).missing];
   const report = publication?.report_snapshot;
   if (!publication?.engineering_fingerprint) missing.push('engineering_fingerprint');
   if (!publication?.published_at) missing.push('published_at');
