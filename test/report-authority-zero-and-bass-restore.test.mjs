@@ -64,9 +64,9 @@ test("published summary and report gates restore bass without opening the Bass U
   const compliancePrint = fs.readFileSync("src/pages/ComplianceReportPrint.jsx", "utf8");
 
   assert.match(rating, /for \(const parameterNumber of \[14, 18, 19\]\)/);
-  assert.match(overlay, /statesBassResultEntry\(existing\)/);
+  assert.doesNotMatch(overlay, /if \(statesBassResultEntry\(existing\)\) continue/);
   assert.doesNotMatch(overlay, /if \(statesBassAuthority\(summary\)\) return summary/);
-  assert.match(overlay, /previous\.state === "scored"/);
+  assert.match(overlay, /authority_fingerprint: authority.currentFingerprint/);
   assert.match(overlay, /summariseEngineeringResults/);
   assert.match(authorityHook, /completedBassAuthority\?\.hydrationSettled !== true/);
   assert.match(authorityHook, /bassRestoreFailed/);
