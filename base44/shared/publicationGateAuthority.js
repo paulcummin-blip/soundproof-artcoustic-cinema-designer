@@ -140,7 +140,8 @@ export function publicationSectionReport(
   );
   add(PUBLICATION_SECTION.SOURCE_FINGERPRINTS, !!asObject(publication?.provenance));
 
-  if (project) {
+  if (payload.report_project) {
+    const project = payload.report_project; // Frozen selected-version authority only.
     // Room and screen are stated by the project the version belongs to: they are
     // shared by every version and are not per-version authority.
     add(PUBLICATION_SECTION.ROOM, parsesRoomDims(project.roomDims));
