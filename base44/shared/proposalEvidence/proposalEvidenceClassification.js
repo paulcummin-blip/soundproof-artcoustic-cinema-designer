@@ -74,12 +74,19 @@ function highestLevel(levels) {
 /** The two rooms are the same room within a millimetre of rounding. */
 const ROOM_DIMENSION_TOLERANCE_M = 0.005;
 
+/** A stated number, or null. An unstated dimension is never read as zero. */
+function numericOrNull(value) {
+  if (value === null || value === undefined || value === '') return null;
+  const number = Number(value);
+  return Number.isFinite(number) ? number : null;
+}
+
 /** The dimensions a room reading states, or null when it states none. */
 function dimsOf(reading) {
   const dimensions = reading && typeof reading === 'object' ? reading.dimensions : null;
   if (!dimensions) return null;
-  const values = [dimensions.length_m, dimensions.width_m, dimensions.height_m].map(Number);
-  return values.every(Number.isFinite) ? values : null;
+  const values = [dimensions.length_m, dimensions.width_m, dimensions.height_m].map(numericOrNull);
+  return values.every((value) => value !== null) ? values : null;
 }
 
 /**

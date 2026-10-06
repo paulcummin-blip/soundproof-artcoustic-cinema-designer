@@ -44,11 +44,17 @@ function valueText(value) {
   return String(value);
 }
 
+/** A stated number, or null. An unstated dimension is never read as zero. */
+function numericOrNull(value) {
+  if (value === null || value === undefined || value === '') return null;
+  const number = Number(value);
+  return Number.isFinite(number) ? number : null;
+}
+
 /** The room as the Visual Report states it: its dimensions, and the text for them. */
 function roomReading(room) {
   const dimensions = room?.dimensions || {};
-  const values = [dimensions.length_m, dimensions.width_m, dimensions.height_m]
-    .map((value) => (Number.isFinite(Number(value)) ? Number(value) : null));
+  const values = [dimensions.length_m, dimensions.width_m, dimensions.height_m].map(numericOrNull);
   const stated = asText(room?.dimensions_text);
   const text = stated || (values.every((value) => value !== null) ? `${values.join(' x ')} m` : null);
   if (!text) return null;
