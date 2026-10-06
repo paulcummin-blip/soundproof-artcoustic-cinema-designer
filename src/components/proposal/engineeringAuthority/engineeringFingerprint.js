@@ -223,7 +223,7 @@ export function computeEngineeringFingerprint(designState, versions = {}) {
     algorithmVersion: v.algorithmVersion || null,
     instanceAuthorityVersion: v.instanceAuthorityVersion || null,
     summarySchemaVersion: v.summarySchemaVersion || null,
-    ...(v.publicationContractVersion ? { publicationContractVersion: v.publicationContractVersion, frozenReportFacts: ds } : {}),
+    ...(v.publicationContractVersion ? { publicationContractVersion: v.publicationContractVersion, publicationBassFingerprint: v.bassFingerprint, frozenReportFacts: ds } : {}),
 
     // Room geometry
     room: {
