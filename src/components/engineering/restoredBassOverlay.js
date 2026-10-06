@@ -141,6 +141,9 @@ export function applyRestoredBassAuthority(summary, { projectId, versionId, comp
   } catch (error) {
     return summary;
   }
+  const completedMs = Number(authority.contract?.job?.completedAtMs);
+  const authorityTimestamp = completedMs > 0 && Number.isFinite(completedMs)
+    ? new Date(completedMs).toISOString() : null;
   const parameters = presentation?.parameters || null;
   if (!parameters) return summary;
 
@@ -157,6 +160,7 @@ export function applyRestoredBassAuthority(summary, { projectId, versionId, comp
     if (!statesBassResultEntry({ value: parameter?.rawValue, formatted: parameter?.valueText })) continue;
     roomResults[id] = {
       ...parameter,
+      unit: ({ 14: 'dBC', 18: 'Hz', 19: 'dB', 20: 'dB' })[id],
       status: parameter.status,
       value: parameter.rawValue ?? null,
       formatted: parameter.valueText,
@@ -164,7 +168,7 @@ export function applyRestoredBassAuthority(summary, { projectId, versionId, comp
       detail: parameter.detail ?? null,
       targetBasis: parameter.targetBasis ?? null,
       authority_fingerprint: authority.currentFingerprint,
-      authority_timestamp: authority.contract?.job?.completedAt ?? authority.contract?.completedAt ?? null,
+      authority_timestamp: authorityTimestamp,
       source_type: 'durable-current-bass-authority',
       restoredFromSavedBassAuthority: true,
     };
@@ -245,7 +249,7 @@ export function applyRestoredBassAuthority(summary, { projectId, versionId, comp
           multiplier: seatMultiplier,
           rawValue: raw,
           authority_fingerprint: authority.currentFingerprint,
-          authority_timestamp: authority.contract?.job?.completedAt ?? authority.contract?.completedAt ?? null,
+          authority_timestamp: authorityTimestamp,
           source_type: 'durable-current-bass-authority',
           reason: null,
           restoredFromSavedBassAuthority: true,
@@ -321,7 +325,7 @@ export function applyRestoredBassAuthority(summary, { projectId, versionId, comp
               level: Number.isFinite(Number(seat.level)) ? `L${Math.max(1, Number(seat.level))}` : row.level,
               value: raw,
               authority_fingerprint: authority.currentFingerprint,
-              authority_timestamp: authority.contract?.job?.completedAt ?? authority.contract?.completedAt ?? null,
+              authority_timestamp: authorityTimestamp,
               source_type: 'durable-current-bass-authority',
               status: "scored",
               worstFrequencyHz: seat.worstFrequencyHz ?? row.worstFrequencyHz ?? null,
