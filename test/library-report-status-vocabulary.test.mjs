@@ -110,10 +110,45 @@ test('A — a Current report offers Open and Export PDF, and no refresh action',
   );
   assert.doesNotMatch(currentBranch, /CREATE_UPDATED|OPEN_PREVIOUS|Regenerate/i);
 
-  // No surface in the vocabulary carries the old wording.
-  assert.doesNotMatch(VOCABULARY, /Regenerate/);
-  assert.doesNotMatch(VOCABULARY, /Older export/);
-  assert.doesNotMatch(VOCABULARY, /Source changed since export/);
+  // No surface in the vocabulary carries the old wording. The check is on the
+  // words the Library actually renders — the exported labels and whatever the row
+  // resolvers return — never on this module's own comments, which quote the
+  // retired wording precisely in order to forbid it.
+  const rowLabels = [
+    liveReportStateLabel(LIVE_REPORT_STATE.CURRENT),
+    liveReportStateLabel(LIVE_REPORT_STATE.STALE),
+    liveReportStateLabel(LIVE_REPORT_STATE.MISSING),
+    ISSUED_PDF_LABEL,
+    EXPORT_SOURCE_CHANGED_LABEL,
+    EXPORT_DESIGN_CHANGED_NOTE,
+    PREVIOUS_REPORT_HISTORY_LABEL,
+    LIVE_REPORT_DESIGN_CHANGED_NOTE,
+    ...Object.values(REPORT_ROW_ACTION),
+    resolveExportLiveState({ record: issuedPdf(), version: VERSION }).label,
+    resolveExportLiveState({ record: issuedPdf({ engineering: 'ENG-0' }), version: VERSION }).label,
+    resolveExportLiveState({ record: issuedPdf(), version: null }).label,
+    resolveExportLiveState({ record: issuedPdf(), version: VERSION, superseded: true }).label,
+  ];
+  const vocabularySurface = rowLabels.join(' | ');
+
+  assert.doesNotMatch(vocabularySurface, /Regenerate/);
+  assert.doesNotMatch(vocabularySurface, /Older export/);
+  assert.doesNotMatch(vocabularySurface, /Source changed since export/);
+
+  // An issued PDF states what it IS, whatever state its source is in: it never
+  // borrows the report vocabulary.
+  assert.equal(
+    resolveExportLiveState({ record: issuedPdf(), version: VERSION }).label,
+    ISSUED_PDF_LABEL,
+  );
+  assert.equal(
+    resolveExportLiveState({ record: issuedPdf({ engineering: 'ENG-0' }), version: VERSION }).label,
+    EXPORT_SOURCE_CHANGED_LABEL,
+  );
+  assert.equal(
+    resolveExportLiveState({ record: issuedPdf(), version: null }).label,
+    ISSUED_PDF_LABEL,
+  );
 });
 
 /* ── B — the design changed ───────────────────────────────────────────────── */

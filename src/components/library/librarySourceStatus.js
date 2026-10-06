@@ -66,6 +66,9 @@ const ISSUED_PDF_STATE_LABEL = Object.freeze({
   [LIBRARY_SOURCE_STATE.SAME_AS_CURRENT]: ISSUED_PDF_LABEL,
   [LIBRARY_SOURCE_STATE.OLDER_EXPORT]: ISSUED_PDF_LABEL,
   [LIBRARY_SOURCE_STATE.SOURCE_CHANGED]: EXPORT_SOURCE_CHANGED_LABEL,
+  // A version that no longer resolves says nothing about the issued document:
+  // the document exists, so that is what it reads.
+  [LIBRARY_SOURCE_STATE.MISSING_SOURCE]: ISSUED_PDF_LABEL,
 });
 
 /** Re-state an exported document's own source state as an Issued PDF label. */

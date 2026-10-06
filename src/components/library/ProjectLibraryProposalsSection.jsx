@@ -16,8 +16,8 @@ import { REPORT_FONT_BODY } from '@/components/report/typography/reportTypograph
 import ExportedDocumentRow from './ExportedDocumentRow';
 import { describeDocumentVersions } from './libraryVersionLabels';
 import {
-  exportedDocumentStatus,
   LIBRARY_SOURCE_STATE,
+  resolveExportLiveState,
 } from './librarySourceStatus';
 
 export default function ProjectLibraryProposalsSection({
@@ -74,9 +74,12 @@ export default function ProjectLibraryProposalsSection({
             {group.rows.map(({ record, superseded }) => {
               const versions = record.selected_version_ids || [];
               const version = versions.length >= 1 ? versionById.get(versions[0]) : null;
+              // An issued proposal is an issued document: it states what it IS in
+              // the same words the report exports use, and never borrows the
+              // report vocabulary.
               const current = superseded
                 ? { state: LIBRARY_SOURCE_STATE.SUPERSEDED, label: undefined }
-                : exportedDocumentStatus({ record, version });
+                : resolveExportLiveState({ record, version });
 
               return (
                 <ExportedDocumentRow
