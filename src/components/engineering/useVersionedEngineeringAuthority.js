@@ -31,6 +31,7 @@ import { applyRestoredBassAuthority } from './restoredBassOverlay';
 import { assessEngineeringReportCompleteness } from './engineeringReportCompleteness';
 import { useSharedBassAuthorityReconciliation } from '@/components/room/bass/useSharedBassAuthorityReconciliation';
 import { useBassReconciliationStatus } from '@/components/room/bass/bassReconciliationStatus';
+import { auditFinalReportAuthority } from '@/components/report/finalReportAuthorityGate';
 import { auditDurablePublication } from './publicationGateAuthority';
 import { usePublicationAttempt } from './publicationAcknowledgementStore';
 
@@ -145,9 +146,10 @@ export function useVersionedEngineeringAuthority(projectId, versionId, { finalRe
   const readError = readFailed
     ? (durable?.error || 'Saved engineering authority could not be read.')
     : null;
-  const reportCompleteness = assessEngineeringReportCompleteness(
-    extractEngineeringSummary(snapshot),
-  );
+  const summaryCompleteness = assessEngineeringReportCompleteness(extractEngineeringSummary(snapshot));
+  const finalAuthorityGate = finalReport ? auditFinalReportAuthority(durable?.publication) : { allowed: true };
+  const reportCompleteness = finalAuthorityGate.allowed ? summaryCompleteness
+    : { ...summaryCompleteness, complete: false, reason: finalAuthorityGate.reason };
 
   // ── DURABLE PUBLICATION GATE ─────────────────────────────────────────────
   // A report or proposal may only be generated from a DURABLY PUBLISHED
