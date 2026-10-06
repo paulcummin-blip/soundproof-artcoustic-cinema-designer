@@ -72,7 +72,8 @@ test('No durable authority means no final snapshot even with browser values', ()
 });
 test('Historical publication missing frozen room/screen facts blocks regeneration', () => {
   const result = auditFinalReportAuthority(publication);
-  assert.equal(result.allowed, false); assert.match(result.reason, /report_snapshot.report_project/);
+  assert.equal(result.allowed, false); assert.ok(result.missing.some(field => field.includes('report_snapshot.report_project')));
+  assert.ok(result.missing.some(field => field.includes('publication_contract_version')));
 });
 function completeEvidence() {
   const parameters = Array.from({ length: 21 }, (_, n) => {
