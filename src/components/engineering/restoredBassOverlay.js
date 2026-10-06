@@ -199,6 +199,8 @@ export function applyRestoredBassAuthority(summary, { projectId, versionId, comp
       : baseWeight;
     const next = {
       ...existing,
+      authority_fingerprint: authority.currentFingerprint,
+      source_type: 'durable-current-bass-authority',
       state: scored ? "scored" : existing.state,
       level: scored ? level : existing.level,
       multiplier: scored ? (LEVEL_MULTIPLIERS[level] ?? existing.multiplier ?? 0) : existing.multiplier,
@@ -234,20 +236,8 @@ export function applyRestoredBassAuthority(summary, { projectId, versionId, comp
         const raw = Number(seat?.variationDbRaw);
         if (!seatId || !Number.isFinite(raw)) continue;
         const previous = seats[seatId] || {};
-        const seatLevel = normaliseLevel(seat.level) || previous.level || null;
+        const seatLevel = normaliseLevel(seat.level);
         const seatMultiplier = LEVEL_MULTIPLIERS[seatLevel] ?? previous.multiplier ?? 0;
-        if (false) { // Current bass authority replaces each seat value and grade together.
-          if (previous.level !== seatLevel || previous.multiplier !== seatMultiplier) {
-            seats[seatId] = {
-              ...previous,
-              level: seatLevel,
-              multiplier: seatMultiplier,
-              restoredFromSavedBassAuthority: true,
-            };
-            authorityRepaired = true;
-          }
-          continue;
-        }
         seats[seatId] = {
           ...previous,
           state: "scored",
