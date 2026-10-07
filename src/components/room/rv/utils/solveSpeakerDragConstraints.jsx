@@ -51,8 +51,7 @@ export function solveSpeakerDragConstraints({
   speakerId,
   spk,
   canonicalRole,
-  newCanvasPos,
-  canvasToRoom,
+  newRoomPos,
   // room
   widthM,
   lengthM,
@@ -100,6 +99,9 @@ export function solveSpeakerDragConstraints({
 }) {
   const finalPositions = [];
   const additionalUpdates = {};
+  if (!Number.isFinite(newRoomPos?.x) || !Number.isFinite(newRoomPos?.y)) {
+    return { finalPositions, additionalUpdates };
+  }
 
   // ── 1. LCR ────────────────────────────────────────────────────────────────
   if (['FL', 'FC', 'FR'].includes(canonicalRole)) {
@@ -120,7 +122,7 @@ export function solveSpeakerDragConstraints({
     }
 
     // FL or FR
-    const rawRoomPos = canvasToRoom(newCanvasPos);
+    const rawRoomPos = newRoomPos;
     const desiredX = rawRoomPos.x;
     const isLeft = canonicalRole === 'FL';
 
@@ -128,6 +130,7 @@ export function solveSpeakerDragConstraints({
     function normClamp(z) {
       if (!z) return null;
       if (Number.isFinite(z.min) && Number.isFinite(z.max)) return z;
+      if (Number.isFinite(z.minX) && Number.isFinite(z.maxX)) return { min: z.minX, max: z.maxX };
       if (Number.isFinite(z.xMin) && Number.isFinite(z.xMax)) return { min: z.xMin, max: z.xMax };
       return null;
     }
@@ -203,7 +206,7 @@ export function solveSpeakerDragConstraints({
     const yMax_visual = Number(sideSurroundVisualSpanM?.maxY) || 0;
     const yMax_clamp  = Math.max(yMin_side, Math.min(yMax_visual, L - WALL_BUFFER_M));
 
-    const { y: proposedRoomY_m } = canvasToRoom(newCanvasPos);
+    const { y: proposedRoomY_m } = newRoomPos;
     const yPtr = Number(proposedRoomY_m);
     const yMin = yMin_side;
     const yMax = yMax_clamp;
@@ -265,7 +268,7 @@ export function solveSpeakerDragConstraints({
     }
 
     // back-wall mode
-    const { x: proposedRoomX_m_slsr } = canvasToRoom(newCanvasPos);
+    const { x: proposedRoomX_m_slsr } = newRoomPos;
     const rawXL = (baseSide === 'SL')
       ? proposedRoomX_m_slsr
       : (W - proposedRoomX_m_slsr);
@@ -296,7 +299,7 @@ export function solveSpeakerDragConstraints({
 
   // ── 3. Rear surrounds SBL/SBR ────────────────────────────────────────────
   if (canonicalRole === 'SBL' || canonicalRole === 'SBR') {
-    const { x: rawX } = canvasToRoom(newCanvasPos);
+    const { x: rawX } = newRoomPos;
     const W = widthM || 4.5;
     const L = lengthM || 6.0;
 
@@ -340,7 +343,7 @@ export function solveSpeakerDragConstraints({
     const partnerRoleFw = canonicalRole === 'LW' ? 'RW' : 'LW';
 
     const xAtWall = sideWallX(W, dims, canonicalRole === 'LW' ? 'L' : 'R');
-    const { y: rawY } = canvasToRoom(newCanvasPos);
+    const { y: rawY } = newRoomPos;
 
     const fallbackYMin    = SURROUND_WALL_GAP_M + halfWidth;
     const fallbackYMax    = L - SURROUND_WALL_GAP_M - halfWidth;
@@ -417,7 +420,7 @@ export function solveSpeakerDragConstraints({
   }
 
   // ── 5. Overhead T* ───────────────────────────────────────────────────────
-  const { x: rawX, y: rawY } = canvasToRoom(newCanvasPos);
+  const { x: rawX, y: rawY } = newRoomPos;
 
   if (canonicalRole && canonicalRole.startsWith('T')) {
     additionalUpdates.setHasManualOverheadEdit = true;
