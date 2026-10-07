@@ -79,6 +79,7 @@ export function buildFrontStageSeed({
   rsp = null,
   screenFrontPlaneM = null,
   lcrAimMode = 'flat',
+  getModelDimsM,
 }) {
   setSpeakers(prev => {
     const list = Array.isArray(prev) ? prev : [];
@@ -146,6 +147,7 @@ export function buildFrontStageSeed({
         lcrHeightM: heightForRole(role),
         lcrAimMode,
         fallbackSpreadM: spread,
+        getModelDimsM,
       });
 
       if (!resolved) return hasExisting ? existingPos : null;

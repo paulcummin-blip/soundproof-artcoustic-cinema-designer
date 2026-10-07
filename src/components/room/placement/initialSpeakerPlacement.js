@@ -212,13 +212,16 @@ export function resolveInitialWallPosition({
   const canon = canonFn(role);
   const isLeft = canon === "LW" || canon.startsWith("SL");
 
+  // A dims resolver is always supplied to the shared span rule.
+  const dimsFn = typeof getModelDimsM === "function" ? getModelDimsM : (m) => resolveSpeakerDims(m);
+
   // Side-surround centre-line Y: the plan view's own band, from the same hook
   // the wall-hug effect uses.
   const span = resolveSideSurroundVisualSpan({
     mlpY_m: rsp?.y ?? null,
     seatingPositions,
     placedSpeakers: Array.isArray(placedSpeakers) ? placedSpeakers : [],
-    getModelDimsM,
+    getModelDimsM: dimsFn,
     lengthM: L,
     getCanonicalRole: canonFn,
   });
