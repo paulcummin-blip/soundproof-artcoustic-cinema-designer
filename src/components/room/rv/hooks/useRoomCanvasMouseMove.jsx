@@ -1,87 +1,56 @@
 import { useCallback } from "react";
 import { clientToRoom, computeDragTargetRoom } from "@/components/room/rv/utils/rvPointerToRoom";
+import { isDragPointer, primaryButtonHeld } from "@/components/room/rv/utils/rvDragGesture";
 
-/**
- * useRoomCanvasMouseMove
- *
- * Handles the SVG onMouseMove event during drag operations.
- * Extracted from RoomVisualisation.jsx – behaviour is identical.
- *
- * Returns: { handleMouseMove }
- */
+/** One screen → room conversion. All constraint handlers receive room metres. */
 export function useRoomCanvasMouseMove({
-  dragging,
-  draggedItemId,
-  dragType,
-  dragState,
+  activeDragRef,
   setDragState,
   setDragWarning,
   svgRef,
-  canvasToRoom,
-  roomToCanvas,
-  // Canonical pointer conversion inputs — the same pan/view-offset/zoom the
-  // draggable zoom group renders with.
   scale,
   viewOffsetPx,
   dragOffsetRoomRef,
   roomRect,
-  placedSpeakers,
   handleSpeakerDrag,
   handleSeatDrag,
   handleSubDrag,
   handleProjectorDrag,
   handleRoomElementDrag,
-  // RSP marker drag
   handleMlpDrag,
-  // Ref-based RSP drag guard — set synchronously in mousedown, never stale
   mlpDragActiveRef,
 }) {
   const handleMouseMove = useCallback((e) => {
-    if (globalThis.__B44_LOGS) console.log("[DRAG] MOVE", { dragging: dragState.dragging, draggedItemId: dragState.draggedItemId, dragType: dragState.dragType });
+    const gesture = activeDragRef.current;
     const isMlpDragging = mlpDragActiveRef?.current === true;
-    if ((!dragging || !draggedItemId) && !isMlpDragging) return;
+    if (!gesture && !isMlpDragging) return;
+    // A stale release can never produce a movement frame. RSP placement is a
+    // separate explicit mode, not an object or seating drag.
+    if (gesture && (!isDragPointer(gesture, e) || !primaryButtonHeld(e))) return;
+    const dragType = gesture?.type;
+    const draggedItemId = gesture?.id;
     setDragWarning({ show: false });
 
-    if (!svgRef.current) return;
-    const svgElement = svgRef.current;
-
-    // ONE canonical conversion: screen pixels -> zoom-group-local -> room metres.
     const pointerRoom = clientToRoom({
-      svgElement,
-      clientX: e.clientX,
-      clientY: e.clientY,
-      roomRect,
-      scale,
-      viewOffsetPx,
+      svgElement: svgRef.current, clientX: e.clientX, clientY: e.clientY,
+      roomRect, scale, viewOffsetPx,
     });
     if (!pointerRoom) return;
-
-    // The pointer-to-object offset is applied exactly ONCE, here, so a 1 px
-    // pointer move produces a 1 px object move at any zoom.
     const targetRoomPos = computeDragTargetRoom({
-      pointerRoom,
-      dragOffsetRoom: dragOffsetRoomRef.current,
+      pointerRoom, dragOffsetRoom: dragOffsetRoomRef.current,
     });
+    const boundedRoomPos = {
+      x: Math.max(0, Math.min(roomRect.width / scale, targetRoomPos.x)),
+      y: Math.max(0, Math.min(roomRect.height / scale, targetRoomPos.y)),
+    };
 
-    // Canvas round-trip for the handlers that still work in canvas space.
-    const targetCanvasPos = roomToCanvas(targetRoomPos);
-
-    if (globalThis.__B44_LOGS) console.log("[DRAG] MOVE_LOOKUP", { draggedItemId, found: !!placedSpeakers.find(s => s.id === draggedItemId) });
-
-    const clampedCanvasX = Math.max(roomRect?.x ?? 0, Math.min((roomRect?.x ?? 0) + (roomRect?.width ?? 0), targetCanvasPos.x));
-    const clampedCanvasY = Math.max(roomRect?.y ?? 0, Math.min((roomRect?.y ?? 0) + (roomRect?.height ?? 0), targetCanvasPos.y));
-
-    // mlpMarker: also check ref so the branch fires on the very first mousemove
-    // frame before React state has flushed from the synchronous mousedown.
     if (dragType === 'mlpMarker' || isMlpDragging) {
       handleMlpDrag?.(draggedItemId || 'mlp-marker-dot', targetRoomPos);
     } else if (dragType === 'speaker') {
-      handleSpeakerDrag(draggedItemId, { x: clampedCanvasX, y: clampedCanvasY });
+      handleSpeakerDrag(draggedItemId, boundedRoomPos);
     } else if (dragType === 'seat') {
-      handleSeatDrag(draggedItemId, { x: clampedCanvasX, y: clampedCanvasY });
+      handleSeatDrag(draggedItemId, targetRoomPos);
     } else if (dragType === 'sub') {
-      // Room metres, offset already applied. Never converted back and never
-      // offset again inside the handler.
       handleSubDrag(draggedItemId, targetRoomPos);
       setDragState(s => (s && s.dragging ? { ...s } : s));
     } else if (dragType === 'projector') {
@@ -90,13 +59,9 @@ export function useRoomCanvasMouseMove({
       handleRoomElementDrag?.(draggedItemId, targetRoomPos);
     }
   }, [
-    dragging, draggedItemId, dragType, dragState,
-    setDragWarning, svgRef, canvasToRoom, roomToCanvas,
-    scale, viewOffsetPx,
-    dragOffsetRoomRef, roomRect, placedSpeakers,
-    handleSpeakerDrag, handleSeatDrag, handleSubDrag, handleProjectorDrag,
+    activeDragRef, setDragWarning, svgRef, scale, viewOffsetPx, dragOffsetRoomRef,
+    roomRect, handleSpeakerDrag, handleSeatDrag, handleSubDrag, handleProjectorDrag,
     handleRoomElementDrag, handleMlpDrag, setDragState, mlpDragActiveRef,
   ]);
-
   return { handleMouseMove };
 }
