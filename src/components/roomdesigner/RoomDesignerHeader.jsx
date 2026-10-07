@@ -5,6 +5,7 @@ import { RotateCcw, FileText, Eye, ExternalLink } from "lucide-react";
 import { useProjectVersions } from "@/components/versions/useProjectVersions";
 import { useCanonicalProject } from "@/components/state/projectHydrationStore";
 import RoomDesignerVersionBar from "@/components/versions/RoomDesignerVersionBar";
+import ProjectCadExportButton from "@/components/roomdesigner/ProjectCadExportButton";
 
 // External resource — Artcoustic product CAD files (Dropbox folder).
 // Opens in a new tab; not a primary project action.
@@ -33,6 +34,28 @@ export default function RoomDesignerHeader({
   // same instance, so a version is never fetched twice or reported twice.
   const versionApi = useProjectVersions(effectiveProjectId);
   const activeVersionId = versionApi.activeVersionId;
+
+  // The version the designer is editing. The loaded version record is preferred
+  // so the Project CAD filename names the version actually on screen; the
+  // project's active version is the fallback, then its slot number.
+  const activeVersionRecord = React.useMemo(() => {
+    const versions = Array.isArray(versionApi?.versions) ? versionApi.versions : [];
+    return (
+      versions.find((v) => v.id === loadedVersionId) ||
+      (activeVersionId ? versions.find((v) => v.id === activeVersionId) : null) ||
+      versionApi?.activeVersion ||
+      null
+    );
+  }, [versionApi?.versions, versionApi?.activeVersion, activeVersionId, loadedVersionId]);
+
+  const projectCadVersionName = React.useMemo(() => {
+    const name = String(activeVersionRecord?.version_name || "").trim();
+    if (name) return name;
+    const number = Number(activeVersionRecord?.version_number);
+    return Number.isFinite(number) ? `V${number}` : null;
+  }, [activeVersionRecord]);
+
+  const projectCadProjectName = identity?.name || loadState?.name || null;
 
   // Base44 preview mirrors the iframe path into its outer route. A client-side
   // path-only transition could update that outer route while leaving the Room
@@ -76,6 +99,14 @@ export default function RoomDesignerHeader({
             <ExternalLink className="w-4 h-4 mr-2" style={{ flexShrink: 0 }} />
             Product CAD Files
           </Button>
+
+          {/* Project CAD drawing — the active design version, exported with the
+              existing shared cadExport utilities. */}
+          <ProjectCadExportButton
+            projectName={projectCadProjectName}
+            versionName={projectCadVersionName}
+            disabled={!effectiveProjectId || loadState?.phase !== "loaded"}
+          />
 
           <Button
             size="sm"
