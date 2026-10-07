@@ -16,10 +16,10 @@ export default function RvSeatLayer({
   handleMouseDown,
   handleSeatClick,
   MLPMarker,
-  // Seat press-and-hold gesture: single click selects, double click opens the
-  // HUD, a 1.5 s hold holds the measurement guides, and movement past the drag
-  // threshold drags. Supplied only by the interactive plan; the static and
-  // export canvases keep the legacy direct wiring.
+  // Seat gesture: a single click opens that seat's HUD, a 1.5 s hold holds the
+  // measurement guides, and movement past the drag threshold drags the seat.
+  // Supplied only by the interactive plan; the static and export canvases keep
+  // the legacy direct wiring.
   seatGesture,
   selectedSeatId,
   dimensionSeatId,
@@ -32,6 +32,27 @@ export default function RvSeatLayer({
   const RX_M = 0.10;
   const RY_M = 0.125;
   const hasSeatGesture = typeof seatGesture?.onSeatPointerDown === 'function';
+
+  // Is the visible RSP sitting on a seat? If so the seat owns the pointer: the
+  // marker is status only and must not become a second layer the designer has to
+  // click around. Read from the marker element itself so the coordinates are the
+  // ones actually drawn, grow the seat target by the marker's own grab radius
+  // (its r=14 hit circle), and use the same SVG radii as the seat hit targets
+  // below, so the test stays correct when the canvas is zoomed.
+  const RSP_GRAB_RADIUS_PX = 14;
+  const rspX = Number(MLPMarker?.props?.mlpDotX_m);
+  const rspY = Number(MLPMarker?.props?.mlpDotY_m);
+  const rspSeatOwnsPointer = Number.isFinite(rspX) && Number.isFinite(rspY) && scale > 0
+    && seatingPositions.some((seat) => {
+      const [seatX, seatY] = toPx(
+        Number(seat.x ?? seat.position?.x ?? 0),
+        Number(seat.y ?? seat.position?.y ?? 0)
+      );
+      const [dotX, dotY] = toPx(rspX, rspY);
+      const dx = (dotX - seatX) / (RX_M * scale * 2 + RSP_GRAB_RADIUS_PX);
+      const dy = (dotY - seatY) / (RY_M * scale * 2 + RSP_GRAB_RADIUS_PX);
+      return dx * dx + dy * dy <= 1;
+    });
 
   if (globalThis.__B44_LOGS) console.log('RvSeatLayer: rendering seats =', seatingPositions.length);
 
@@ -58,6 +79,9 @@ export default function RvSeatLayer({
         const hitTargetProps = hasSeatGesture
           ? {
               onPointerDown: (e) => seatGesture.onSeatPointerDown(e, seat),
+              // The seat's own click must never reach the plan background
+              // handler, which dismisses the pinned HUD.
+              onClick: (e) => e.stopPropagation(),
               onDoubleClick: (e) => e.stopPropagation(),
             }
           : {
@@ -80,8 +104,8 @@ export default function RvSeatLayer({
               pointerEvents="all"
               style={{
                 cursor: 'grab',
-                // Hold, double tap and drag must work without the page scrolling
-                // under the finger. Only set while the gesture layer is active.
+                // Hold and drag must work without the page scrolling under the
+                // finger. Only set while the gesture layer is active.
                 touchAction: hasSeatGesture ? 'none' : undefined,
               }}
               {...hitTargetProps}
@@ -121,31 +145,11 @@ export default function RvSeatLayer({
         );
       })}
 
-      {/* Keep the RSP grab target above seats, but route its double-click to
-          the exact seat hit ellipse beneath the pointer (not the nearest seat).
-          Use the same SVG coordinates/radii as the visible seat layer so this
-          remains correct when the canvas is zoomed or resized. */}
+      {/* The RSP marker is status, never a second interactive layer: where the
+          dot sits on a seat the seat keeps the pointer, so one click opens that
+          seat's HUD and the seat can still be dragged out from under it. */}
       {React.isValidElement(MLPMarker) ? React.cloneElement(MLPMarker, {
-        onSeatDoubleClick: (e) => {
-          const svg = e.currentTarget.ownerSVGElement;
-          const ctm = svg?.getScreenCTM();
-          if (!ctm || !(scale > 0)) return;
-          const point = svg.createSVGPoint();
-          point.x = e.clientX;
-          point.y = e.clientY;
-          const pointer = point.matrixTransform(ctm.inverse());
-          // Last rendered seat wins, matching normal SVG hit-target stacking.
-          const seat = [...seatingPositions].reverse().find((candidate) => {
-            const [cx, cy] = toPx(
-              Number(candidate.x ?? candidate.position?.x ?? 0),
-              Number(candidate.y ?? candidate.position?.y ?? 0)
-            );
-            const dx = (pointer.x - cx) / (RX_M * scale * 2);
-            const dy = (pointer.y - cy) / (RY_M * scale * 2);
-            return dx * dx + dy * dy <= 1;
-          });
-          if (seat) handleSeatClick(seat);
-        },
+        seatOwnsPointer: rspSeatOwnsPointer,
       }) : MLPMarker}
 
       {/* Seat row labels extracted to component */}

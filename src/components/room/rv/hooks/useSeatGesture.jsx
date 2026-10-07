@@ -3,21 +3,19 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 /**
  * useSeatGesture — the seat plan interaction model.
  *
- *   single click   → select the seat only (no guides, no HUD)
- *   double click   → open / move the pinned Seat HUD
- *   press & hold   → enter dimensional mode: the existing wall-measurement
- *                    guides are held on screen, seat stays selected
- *   drag           → unchanged and immediate: movement past the drag threshold
- *                    starts the existing seat drag and cancels the hold
+ *   single click   → open (or move) that seat's HUD immediately
+ *   press & hold   → the seat's wall-measurement guides are held on screen;
+ *                    releasing still opens that seat's HUD
+ *   drag           → movement past the drag threshold drags the seat, and a
+ *                    release after a drag never also opens the HUD
  *
- * Priority (highest first): drag → double-click HUD → long-press dimensions →
- * single-click selection. Selection is applied on the first release, never
- * delayed, so a single click never feels sluggish.
+ * The seat is the interactive object and its HUD is the single click action:
+ * there is no separate select step, no double-click requirement, and no hold
+ * needed to read a seat. Nothing is delayed waiting for a second click.
  */
 
 export const SEAT_LONG_PRESS_MS = 1500;
 export const SEAT_DRAG_THRESHOLD_PX = 4;
-const DOUBLE_CLICK_MS = 350;
 
 export function useSeatGesture({ handleMouseDown, handleSeatClick }) {
   const [selectedSeatId, setSelectedSeatId] = useState(null);
@@ -25,7 +23,6 @@ export function useSeatGesture({ handleMouseDown, handleSeatClick }) {
   const pendingRef = useRef(null);
   const timerRef = useRef(null);
   const listenersRef = useRef(null);
-  const lastClickRef = useRef({ seatId: null, time: 0 });
 
   const clearLongPressTimer = useCallback(() => {
     if (timerRef.current) {
@@ -81,14 +78,14 @@ export function useSeatGesture({ handleMouseDown, handleSeatClick }) {
       startY: e.clientY,
       pointerId: e.pointerId,
       dragStarted: false,
-      activated: false,
     };
     pendingRef.current = pending;
 
+    // A deliberate hold shows this seat's measurement guides. It never withholds
+    // the HUD: the release below opens it either way.
     timerRef.current = setTimeout(() => {
       timerRef.current = null;
       if (pendingRef.current !== pending || pending.dragStarted) return;
-      pending.activated = true;
       setSelectedSeatId(seat.id);
       setDimensionSeatId(seat.id);
     }, SEAT_LONG_PRESS_MS);
@@ -106,23 +103,16 @@ export function useSeatGesture({ handleMouseDown, handleSeatClick }) {
       const active = pendingRef.current;
       endGesture();
       if (!active) return;
-      // A drag commits on the drag path; a completed hold has already selected.
-      if (active.dragStarted || active.activated) return;
-
-      const now = Date.now();
-      const last = lastClickRef.current;
+      // A drag commits on the drag path and never also opens the HUD. Every
+      // other release — quick click or the end of a hold — is the seat's click.
+      if (active.dragStarted) return;
 
       setSelectedSeatId(active.seatId);
       setDimensionSeatId((current) => (
         current && String(current) !== String(active.seatId) ? null : current
       ));
 
-      if (last.seatId === active.seatId && now - last.time <= DOUBLE_CLICK_MS) {
-        lastClickRef.current = { seatId: null, time: 0 };
-        if (typeof handleSeatClick === "function") handleSeatClick(active.seat);
-      } else {
-        lastClickRef.current = { seatId: active.seatId, time: now };
-      }
+      if (typeof handleSeatClick === "function") handleSeatClick(active.seat);
     };
 
     const onCancel = () => { endGesture(); };

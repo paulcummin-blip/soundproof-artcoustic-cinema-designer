@@ -41,21 +41,22 @@ export function useSeatHoverLogic({
   const [speakerTooltip, setSpeakerTooltip] = useState({ visible: false, text: '', x: 0, y: 0 });
 
   // Seat hover handlers
+  // The seat's one click action: open (or move) that seat's HUD. Clicking the
+  // seat that is already showing does not close it — the plan background is
+  // where the HUD is dismissed — so a double click is simply two openings and
+  // never a different behaviour.
   const handleSeatClick = useCallback((seat) => {
     if (!seat?.id) return;
-    const currentPinnedId = appState?.hudPinnedSeatId || hudPinnedSeatId || null;
-    const isAlreadyPinned = !!currentPinnedId && String(currentPinnedId) === String(seat.id);
+    if (typeof setHudPinnedSeatId === 'function') setHudPinnedSeatId(seat.id);
+    setHoveredSeat(seat);
+  }, [setHudPinnedSeatId]);
 
-    if (isAlreadyPinned) {
-      // Unpin
-      if (typeof setHudPinnedSeatId === 'function') setHudPinnedSeatId(null);
-      setHoveredSeat(null);
-    } else {
-      // Pin this seat
-      if (typeof setHudPinnedSeatId === 'function') setHudPinnedSeatId(seat.id);
-      setHoveredSeat(seat);
-    }
-  }, [appState?.hudPinnedSeatId, hudPinnedSeatId, setHudPinnedSeatId]);
+  // A click on the empty plan dismisses the seat HUD completely: the pin and the
+  // clicked seat both go, so the plan returns to showing no seat at all.
+  const dismissSeatHud = useCallback(() => {
+    if (typeof setHudPinnedSeatId === 'function') setHudPinnedSeatId(null);
+    setHoveredSeat(null);
+  }, [setHudPinnedSeatId]);
 
   const handleSeatMouseEnter = useCallback((seat) => {
     if (!hudPinnedSeatId) setHoveredSeat(seat);
@@ -249,6 +250,7 @@ export function useSeatHoverLogic({
     tooltipData,
     speakerTooltip,
     handleSeatClick,
+    dismissSeatHud,
     handleSeatMouseEnter,
     handleSeatMouseLeave,
     handleIconEnter,

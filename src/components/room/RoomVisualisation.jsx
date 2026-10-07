@@ -1696,6 +1696,7 @@ const byId = useEntitiesById({
     tooltipData,
     speakerTooltip,
     handleSeatClick,
+    dismissSeatHud,
     handleSeatMouseEnter,
     handleSeatMouseLeave,
     handleIconEnter,
@@ -1733,10 +1734,10 @@ const byId = useEntitiesById({
   });
 
   // ── Seat plan gesture ─────────────────────────────────────────────────────
-  // Single click selects only; double click opens / moves the pinned HUD; a
-  // deliberate 1.5 s hold holds the measurement guides on the selected seat;
-  // movement past the drag threshold keeps the drag immediate and cancels the
-  // hold. Priority: drag → double-click HUD → long-press dimensions → select.
+  // The seat is the interactive object: a single click opens that seat's HUD
+  // immediately, a drag moves the seat, and a release after a drag never opens
+  // the HUD. There is no select step and no double-click requirement; the RSP
+  // marker is status only and never intercepts the seat (see RvSeatLayer).
   const { selectedSeatId, dimensionSeatId, clearSeatDimensionMode, seatGesture } = useSeatGesture({
     handleMouseDown,
     handleSeatClick,
@@ -1752,9 +1753,11 @@ const byId = useEntitiesById({
       setSelectedOverheadRow(null);
     }
     justSelectedOverheadRef.current = false;
-    // A click on the empty plan dismisses a held dimensional mode.
+    // A click on the empty plan dismisses a held dimensional mode and the pinned
+    // seat HUD: clicking a seat opens it, clicking the plan itself closes it.
     clearSeatDimensionMode();
-  }, [clearSeatDimensionMode]);
+    dismissSeatHud();
+  }, [clearSeatDimensionMode, dismissSeatHud]);
 
   // Measurements for the held dimensional guide, taken from the seat's stored
   // centre through the same authority the drag guide uses.
