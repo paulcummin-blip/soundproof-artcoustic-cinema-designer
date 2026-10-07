@@ -88,6 +88,7 @@ export function resolveInitialLcrPosition({
   lcrHeightM,
   lcrAimMode,
   getModelDimsM,
+  fallbackSpreadM,
 }) {
   const canon = getCanonicalRole(role);
   if (canon !== "FL" && canon !== "FC" && canon !== "FR") return null;
@@ -101,14 +102,18 @@ export function resolveInitialLcrPosition({
 
   // ── X: centre of the role's LCR zone ────────────────────────────────────
   let x = W / 2;
-  if (canon !== "FC" && rsp) {
-    const planeM = resolveRspScreenFrontPlaneM(screenFrontPlaneM, screen);
-    const zoneDepthM = clampLcrZoneDepth(planeM);
-    const zones = zoneDepthM === null ? null : computeLcrZones({ mlpX: rsp.x, mlpY: rsp.y, zoneDepthM });
-    if (zones) {
-      const span = canon === "FL" ? zones.left : zones.right;
-      x = (span.xMin + span.xMax) / 2;
+  if (canon !== "FC") {
+    let span = null;
+    if (rsp) {
+      const planeM = resolveRspScreenFrontPlaneM(screenFrontPlaneM, screen);
+      const zoneDepthM = clampLcrZoneDepth(planeM);
+      const zones = zoneDepthM === null ? null : computeLcrZones({ mlpX: rsp.x, mlpY: rsp.y, zoneDepthM });
+      if (zones) span = canon === "FL" ? zones.left : zones.right;
     }
+    // With no RSP the zone cannot be constructed, so the nominal lateral spread
+    // is kept as the fallback (unchanged behaviour).
+    const spread = num(fallbackSpreadM) ?? Math.min(1.2, W * 0.22);
+    x = span ? (span.xMin + span.xMax) / 2 : (canon === "FL" ? W / 2 - spread : W / 2 + spread);
   }
 
   // ── Y: front-wall clearance for this model, at its final aim ────────────
@@ -127,31 +132,52 @@ export function resolveInitialLcrPosition({
 }
 
 /**
- * Y for a front wide from the RP22 median-angle zones (the same value the
- * front-wide overlay and its placement effect use), or null when the zones are
- * unavailable.
+ * Y for a front wide (LW/RW).
+ *
+ * PRIMARY — the RP22 median-angle zone, i.e. the exact value the front-wide
+ * overlay and its placement effect use, including the same overhang clamp.
+ *
+ * FALLBACK — when the zones are unavailable (overlay off, or the side surrounds
+ * are not on their walls) the median between the front and side surround Y is
+ * used, which is the value the plan view's fallback pass would apply.
+ *
+ * @returns {number|null}
  */
-export function resolveFrontWideZoneY({ role, placedSpeakers, roomDims, rsp, enableFrontWides, getModelDimsM }) {
-  if (!enableFrontWides || !rsp) return null;
-
-  const zones = computeFrontWideZonesStrict({
-    mlpPoint: rsp,
-    dimensions: { width: roomW(roomDims), length: roomL(roomDims) },
-    placedSpeakers,
-    getModelDimsM: (m) => resolveSpeakerDims(m, getModelDimsM),
-  });
-  if (zones?.status !== "ok") return null;
-
+export function resolveFrontWideY({ role, model, placedSpeakers, roomDims, rsp, enableFrontWides, getModelDimsM }) {
   const canon = getCanonicalRole(role);
-  const zone = canon === "LW" ? zones.left : zones.right;
-  const medianY = num(zone?.medianY);
-  if (medianY === null) return null;
 
-  const dims = resolveSpeakerDims(role.model, getModelDimsM);
-  const halfWidth = dims.widthM / 2;
-  const lo = num(zone?.yMin) ?? 0;
-  const hi = num(zone?.yMax) ?? roomL(roomDims);
-  return Math.max(lo + halfWidth * SIDE_ALLOW_OVERHANG, Math.min(hi - halfWidth * SIDE_ALLOW_OVERHANG, medianY));
+  if (enableFrontWides && rsp) {
+    const zones = computeFrontWideZonesStrict({
+      mlpPoint: rsp,
+      dimensions: { width: roomW(roomDims), length: roomL(roomDims) },
+      placedSpeakers,
+      getModelDimsM: (m) => resolveSpeakerDims(m, getModelDimsM),
+    });
+
+    if (zones?.status === "ok") {
+      const zone = canon === "LW" ? zones.left : zones.right;
+      const medianY = num(zone?.medianY);
+      if (medianY !== null) {
+        const dims = resolveSpeakerDims(model, getModelDimsM);
+        const halfWidth = dims.widthM / 2;
+        const lo = num(zone?.yMin) ?? 0;
+        const hi = num(zone?.yMax) ?? roomL(roomDims);
+        return Math.max(
+          lo + halfWidth * SIDE_ALLOW_OVERHANG,
+          Math.min(hi - halfWidth * SIDE_ALLOW_OVERHANG, medianY)
+        );
+      }
+    }
+  }
+
+  const list = Array.isArray(placedSpeakers) ? placedSpeakers : [];
+  const yOf = (r) => num(list.find((s) => getCanonicalRole(s?.role) === r)?.position?.y);
+  const flY = yOf("FL");
+  const frY = yOf("FR");
+  const slY = yOf("SL");
+  const srY = yOf("SR");
+  if (flY === null || frY === null || slY === null || srY === null) return null;
+  return ((flY + slY) / 2 + (frY + srY) / 2) / 2;
 }
 
 /**
@@ -207,17 +233,18 @@ export function resolveInitialWallPosition({
     else y = L * 0.5;
   }
 
-  // Front wides: the RP22 median-angle zone decides Y when it is available.
+  // Front wides: the RP22 median-angle authority decides Y.
   if (kind === "wide") {
-    const zoneY = resolveFrontWideZoneY({
+    const wideY = resolveFrontWideY({
       role,
+      model,
       placedSpeakers,
       roomDims,
       rsp,
       enableFrontWides,
       getModelDimsM,
     });
-    if (zoneY !== null) y = zoneY;
+    if (wideY !== null) y = wideY;
   }
 
   let x = num(existingPosition?.x);

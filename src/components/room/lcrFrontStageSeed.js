@@ -5,6 +5,7 @@
 import { getSpeakerModelMeta } from '@/components/models/speakers/registry';
 import { getCanonicalRole } from '@/components/utils/surroundRoleMap';
 import { computeTvVerticalCentreM } from '@/components/roomdesigner/utils/lcrHeightAuthority';
+import { resolveInitialLcrPosition } from '@/components/room/placement/initialSpeakerPlacement';
 
 export const CENTER_ONLY_SOUNDBAR_LABELS = ['C-1', 'C4-1', 'Multi (Mono)', 'HSPL (Mono)'];
 export const INTEGRATED_LCR_SOUNDBAR_LABELS = ['Multi (LCR)', 'HSPL (LCR)'];
@@ -67,7 +68,18 @@ export function resolveSoundbarMeta(modelLabel, screen) {
   return getSpeakerModelMeta(modelLabel, tvPresetKey);
 }
 
-export function buildFrontStageSeed({ baseModelLabel, frontStageMode, soundbarModelLabel, dimensions, screen, splConfig, setSpeakers }) {
+export function buildFrontStageSeed({
+  baseModelLabel,
+  frontStageMode,
+  soundbarModelLabel,
+  dimensions,
+  screen,
+  splConfig,
+  setSpeakers,
+  rsp = null,
+  screenFrontPlaneM = null,
+  lcrAimMode = 'flat',
+}) {
   setSpeakers(prev => {
     const list = Array.isArray(prev) ? prev : [];
     const by = buildRoleMap(list);
@@ -84,39 +96,79 @@ export function buildFrontStageSeed({ baseModelLabel, frontStageMode, soundbarMo
 
     const roomW = Number(dimensions?.width ?? dimensions?.widthM) || 4.5;
     const roomH = Number(dimensions?.height ?? dimensions?.heightM) || 2.8;
-    const screenHeightFromFloorM = Number(screen?.heightFromFloorM) || 0.5;
-    const visibleWidthInches = Number(screen?.visibleWidthInches) || 100;
-    const aspectRatio = String(screen?.aspectRatio || '16:9');
-    const [arW, arH] = aspectRatio.split(':').map(Number);
-    const ratio = (arW && arH) ? arW / arH : 16 / 9;
-    const viewableWidthM = visibleWidthInches * 0.0254;
-    const viewableHeightM = viewableWidthM / ratio;
-    const screenBottomM = screenHeightFromFloorM;
 
     const defaultY = 0.20;
-    const lcrHeightM = Number(splConfig?.lcrHeightM);
-    const lcrLRHeightM = Number(splConfig?.lcrLRHeightM);
     // TV vertical centre — the canonical FL/FR auto-height target.
     const tvCentreM = computeTvVerticalCentreM(screen, dimensions);
-    const defaultZ = Number.isFinite(lcrHeightM) ? lcrHeightM : roomH * 0.5;
-    // In center_only mode, L/R use their own stored height if available,
-    // otherwise fall back to the TV vertical centre (NOT the centre height).
-    const defaultLRZ = (frontStageMode === 'center_only' && Number.isFinite(lcrLRHeightM))
-      ? lcrLRHeightM
-      : (frontStageMode === 'center_only' ? tvCentreM : defaultZ);
+    const defaultZ = Number.isFinite(Number(splConfig?.lcrHeightM))
+      ? Number(splConfig.lcrHeightM)
+      : roomH * 0.5;
     const spread = Math.min(1.2, roomW * 0.22);
     const midX = roomW / 2;
+
+    // Height authority per role. In center_only mode FL/FR follow the TV
+    // centreline (lcrLRHeightM, then the TV centre); everything else follows the
+    // centre/soundbar authority (lcrHeightM).
+    const heightForRole = (role) => {
+      const isLr = role === 'FL' || role === 'FR';
+      if (frontStageMode === 'center_only' && isLr) {
+        return Number.isFinite(Number(splConfig?.lcrLRHeightM))
+          ? Number(splConfig.lcrLRHeightM)
+          : tvCentreM;
+      }
+      return defaultZ;
+    };
+
+    // ONE initial placement authority for the front stage.
+    //
+    // A speaker that is already installed — or that the designer has placed by
+    // hand — keeps the position it has, and is only pushed clear of the front
+    // wall when the newly assigned model's depth requires it. A role that has
+    // no equipment yet is resolved to its FINAL position in this same state
+    // update, so the first frame it is visible is already correct and no later
+    // effect has to move it.
+    const placeRole = (role, model, existing) => {
+      const existingPos = existing?.position;
+      const existingModel = String(existing?.model ?? '').trim().toLowerCase();
+      const alreadyInstalled = !!existingModel && existingModel !== 'off' && existingModel !== 'none';
+      const userPlaced = existing?.positionSource === 'user';
+      const x0 = Number(existingPos?.x);
+      const y0 = Number(existingPos?.y);
+      const hasExisting = Number.isFinite(x0) && Number.isFinite(y0);
+
+      const resolved = resolveInitialLcrPosition({
+        role,
+        model,
+        roomDims: dimensions,
+        rsp,
+        screenFrontPlaneM,
+        screen,
+        lcrHeightM: heightForRole(role),
+        lcrAimMode,
+        fallbackSpreadM: spread,
+      });
+
+      if (!resolved) return hasExisting ? existingPos : null;
+      if (!hasExisting || (!alreadyInstalled && !userPlaced)) {
+        return { x: resolved.x, y: resolved.y, z: resolved.z };
+      }
+
+      // Preserve the existing installation position; keep the cabinet clear of
+      // the front wall for the new model's projected depth.
+      return { x: x0, y: Math.max(y0, resolved.y), z: resolved.z };
+    };
 
     const FL = by.get('FL') || { role: 'FL', id: 'FL-1', draggable: true };
     const FC = by.get('FC') || { role: 'FC', id: 'FC-1', draggable: true };
     const FR = by.get('FR') || { role: 'FR', id: 'FR-1', draggable: true };
 
     const soundbarLabel = soundbarModelLabel || null;
-    const soundbarMeta = soundbarLabel ? resolveSoundbarMeta(soundbarLabel, screen) : null;
-    const soundbarHeightM = Number(soundbarMeta?.heightM) || 0;
-    const soundbarCenterZ = soundbarMeta
-      ? Math.max(soundbarHeightM / 2, screenBottomM - 0.02 - (soundbarHeightM / 2))
-      : defaultZ;
+
+    const fallbackPosition = (role) => ({
+      x: role === 'FL' ? midX - spread : role === 'FR' ? midX + spread : midX,
+      y: defaultY,
+      z: heightForRole(role),
+    });
 
     if (frontStageMode === 'integrated_lcr' && soundbarLabel) {
       return [
@@ -126,7 +178,7 @@ export function buildFrontStageSeed({ baseModelLabel, frontStageMode, soundbarMo
           role: 'FC',
           id: FC.id || 'FC-1',
           model: soundbarLabel,
-          position: { x: midX, y: defaultY, z: defaultZ },
+          position: placeRole('FC', soundbarLabel, FC) || fallbackPosition('FC'),
           rotation: FC.rotation || { x: 0, y: 0, z: 0 },
         },
       ];
@@ -140,7 +192,7 @@ export function buildFrontStageSeed({ baseModelLabel, frontStageMode, soundbarMo
           role: 'FL',
           id: FL.id || 'FL-1',
           model: baseModelLabel,
-          position: { ...(FL.position || { x: midX - spread, y: defaultY, z: defaultLRZ }), z: defaultLRZ },
+          position: placeRole('FL', baseModelLabel, FL) || fallbackPosition('FL'),
           rotation: FL.rotation || { x: 0, y: 0, z: 0 },
         },
         {
@@ -148,7 +200,7 @@ export function buildFrontStageSeed({ baseModelLabel, frontStageMode, soundbarMo
           role: 'FC',
           id: FC.id || 'FC-1',
           model: soundbarLabel,
-          position: { x: midX, y: defaultY, z: defaultZ },
+          position: placeRole('FC', soundbarLabel, FC) || fallbackPosition('FC'),
           rotation: FC.rotation || { x: 0, y: 0, z: 0 },
         },
         {
@@ -156,7 +208,7 @@ export function buildFrontStageSeed({ baseModelLabel, frontStageMode, soundbarMo
           role: 'FR',
           id: FR.id || 'FR-1',
           model: baseModelLabel,
-          position: { ...(FR.position || { x: midX + spread, y: defaultY, z: defaultLRZ }), z: defaultLRZ },
+          position: placeRole('FR', baseModelLabel, FR) || fallbackPosition('FR'),
           rotation: FR.rotation || { x: 0, y: 0, z: 0 },
         },
       ];
@@ -169,7 +221,7 @@ export function buildFrontStageSeed({ baseModelLabel, frontStageMode, soundbarMo
         role: 'FL',
         id: FL.id || 'FL-1',
         model: baseModelLabel,
-        position: { x: midX - spread, y: defaultY, z: defaultZ },
+        position: placeRole('FL', baseModelLabel, FL) || fallbackPosition('FL'),
         rotation: FL.rotation || { x: 0, y: 0, z: 0 },
       },
       {
@@ -177,7 +229,7 @@ export function buildFrontStageSeed({ baseModelLabel, frontStageMode, soundbarMo
         role: 'FC',
         id: FC.id || 'FC-1',
         model: baseModelLabel,
-        position: { x: midX, y: defaultY, z: defaultZ },
+        position: placeRole('FC', baseModelLabel, FC) || fallbackPosition('FC'),
         rotation: FC.rotation || { x: 0, y: 0, z: 0 },
       },
       {
@@ -185,7 +237,7 @@ export function buildFrontStageSeed({ baseModelLabel, frontStageMode, soundbarMo
         role: 'FR',
         id: FR.id || 'FR-1',
         model: baseModelLabel,
-        position: { x: midX + spread, y: defaultY, z: defaultZ },
+        position: placeRole('FR', baseModelLabel, FR) || fallbackPosition('FR'),
         rotation: FR.rotation || { x: 0, y: 0, z: 0 },
       },
     ];

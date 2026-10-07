@@ -1,6 +1,5 @@
 import { useEffect } from "react";
-import { sideWallX, rearWallY } from "@/components/room/rv/utils/rvGeometry";
-import { getPlanAimDeg } from "@/components/room/rv/utils/rvAiming";
+import { resolveWallHugTarget } from "@/components/room/placement/wallHugAuthority";
 
 /**
  * useAutoHugSurroundsToWalls
@@ -8,9 +7,10 @@ import { getPlanAimDeg } from "@/components/room/rv/utils/rvAiming";
  * respective walls whenever room dimensions or speaker list changes.
  * Respects the drag guard and user-positioned lock.
  *
- * Uses the same live yaw as the renderer (getPlanAimDeg) to compute the
- * rotated half-extent toward the wall, preventing any aimed speaker from
- * visually crossing the wall boundary.
+ * The target itself comes from resolveWallHugTarget — the ONE wall authority,
+ * shared with initial placement — so a newly installed speaker is already at
+ * this position and this effect finds nothing to change. It remains the safety
+ * net for room resizes, format changes and aim toggles.
  */
 export function useAutoHugSurroundsToWalls({
   placedSpeakers,
@@ -50,48 +50,30 @@ export function useAutoHugSurroundsToWalls({
 
       let changed = false;
       const next = prev.map(spk => {
-        const canon = getCanonicalRole(spk.role);
-
-        const extraSurroundPattern = /^(SL|SR)\d*$/;
-        const isSideSurround = extraSurroundPattern.test(canon);
-        const isRearSurround = (canon === 'SBL' || canon === 'SBR');
-
-        // Front Wides (LW/RW) are handled in their own separate effect below
-        if (!isSideSurround && !isRearSurround) return spk;
         if (!spk.position || !spk.model) return spk;
         if (spk.positionSource === 'user') return spk;
 
-        const dims = getModelDimsM(spk.model);
-        const liveYaw = getPlanAimDeg(
-          { x: spk.position?.x, y: spk.position?.y, role: spk.role },
-          mlp || null,
-          W, L,
-          false,
-          false,                          // aimFrontWidesAtMLP — not relevant here
-          aimSideSurroundsAtMLP || false,
-          aimRearSurroundsAtMLP || false,
-          lcrAngleInfo || null,
-        );
-
-        let targetX = spk.position.x;
-        let targetY = spk.position.y;
-
-        if (isSideSurround) {
-          const isLeft = canon.startsWith('SL');
-          targetX = sideWallX(W, dims, isLeft ? 'L' : 'R', liveYaw);
-          targetY = sideSurroundDefaultY;
-        }
-
-        if (isRearSurround) {
-          targetY = rearWallY(L, dims, liveYaw);
-        }
+        // Front Wides (LW/RW) are handled in their own separate effect below.
+        const target = resolveWallHugTarget({
+          role: spk.role,
+          model: spk.model,
+          roomDims: { widthM: W, lengthM: L },
+          mlp,
+          aimState: { aimSideSurroundsAtMLP, aimRearSurroundsAtMLP },
+          lcrAngleInfo,
+          sideSurroundDefaultY,
+          position: spk.position,
+          getModelDimsM,
+          kinds: ['side', 'rear'],
+        });
+        if (!target) return spk;
 
         const currentX = Number(spk.position.x) || 0;
         const currentY = Number(spk.position.y) || 0;
 
-        if (Math.abs(currentX - targetX) > 0.001 || Math.abs(currentY - targetY) > 0.001) {
+        if (Math.abs(currentX - target.x) > 0.001 || Math.abs(currentY - target.y) > 0.001) {
           changed = true;
-          return { ...spk, position: { ...spk.position, x: targetX, y: targetY } };
+          return { ...spk, position: { ...spk.position, x: target.x, y: target.y } };
         }
 
         return spk;
@@ -120,34 +102,29 @@ export function useAutoHugSurroundsToWalls({
 
       let changed = false;
       const next = prev.map(spk => {
-        const canon = getCanonicalRole(spk.role);
-
-        const isFrontWide = (canon === 'LW' || canon === 'RW');
-        if (!isFrontWide) return spk;
         if (!spk.position || !spk.model) return spk;
         if (spk.positionSource === 'user') return spk;
 
-        const dims = getModelDimsM(spk.model);
-        const liveYaw = getPlanAimDeg(
-          { x: spk.position?.x, y: spk.position?.y, role: spk.role },
-          mlp || null,
-          W, L,
-          false,
-          aimFrontWidesAtMLP || false,
-          false,                          // aimSideSurroundsAtMLP — not relevant here
-          false,                          // aimRearSurroundsAtMLP — not relevant here
-          lcrAngleInfo || null,
-        );
-
-        const isLeft = (canon === 'LW');
-        const targetX = sideWallX(W, dims, isLeft ? 'L' : 'R', liveYaw);
-        const targetY = spk.position.y; // Front Wides keep their Y (user-draggable along wall)
+        // Front Wides keep their Y (user-draggable along the wall); only X is
+        // wall-pinned, by the same authority the initial placement uses.
+        const target = resolveWallHugTarget({
+          role: spk.role,
+          model: spk.model,
+          roomDims: { widthM: W, lengthM: L },
+          mlp,
+          aimState: { aimFrontWidesAtMLP },
+          lcrAngleInfo,
+          position: spk.position,
+          getModelDimsM,
+          kinds: ['wide'],
+        });
+        if (!target) return spk;
 
         const currentX = Number(spk.position.x) || 0;
 
-        if (Math.abs(currentX - targetX) > 0.001) {
+        if (Math.abs(currentX - target.x) > 0.001) {
           changed = true;
-          return { ...spk, position: { ...spk.position, x: targetX } };
+          return { ...spk, position: { ...spk.position, x: target.x } };
         }
 
         return spk;

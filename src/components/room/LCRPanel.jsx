@@ -26,6 +26,7 @@ import {
   resolveSoundbarMeta,
   buildFrontStageSeed,
 } from '@/components/room/lcrFrontStageSeed';
+import { resolveCanonicalRsp } from '@/components/room/placement/initialSpeakerPlacement';
 
 const P12_THRESHOLDS_REC = { L1: 102, L2: 105, L3: 108, L4: 111 };
 const P12_THRESHOLDS_MIN = { L1: 99, L2: 102, L3: 105, L4: 108 };
@@ -456,8 +457,29 @@ export default function LCRPanel({ setSpeakers, dimensions, lcrAimMode, onChange
       screen,
       splConfig,
       setSpeakers,
+      // Initial placement context. The canonical RSP is the published green-dot
+      // position — the same authority the LCR zones and the plan view use — so
+      // the speaker is placed where it will stay.
+      rsp: resolveCanonicalRsp({
+        roomDims: dimensions,
+        mlpX_m: appState?.mlpX_m,
+        mlpY_m: appState?.mlpY_m,
+        fallbackMlp: mlpPoint,
+      }),
+      screenFrontPlaneM: appState?.screenFrontPlaneM,
+      lcrAimMode,
     });
-  }, [dimensions, screen, splConfig, setSpeakers]);
+  }, [
+    dimensions,
+    screen,
+    splConfig,
+    setSpeakers,
+    appState?.mlpX_m,
+    appState?.mlpY_m,
+    appState?.screenFrontPlaneM,
+    mlpPoint,
+    lcrAimMode,
+  ]);
 
   const onChooseModel = useCallback((modelLabel) => {
     if (!standardLcrOptions.some(opt => opt.label === modelLabel)) return;

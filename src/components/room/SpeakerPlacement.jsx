@@ -6,6 +6,11 @@ import UnifiedSurroundsConfigExtracted from './UnifiedSurroundsConfig';
 import SubwooferPanel from './SubwooferPanel';
 import OverheadChannelsPanel from './OverheadChannelsPanel';
 import { useFinalSafetyPass } from './hooks/useFinalSafetyPass';
+import {
+  resolveInitialWallPosition,
+  resolveAutoSurroundHeight,
+  resolveCanonicalRsp,
+} from '@/components/room/placement/initialSpeakerPlacement';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
@@ -527,17 +532,13 @@ function SpeakerPlacementImpl(props) {
     )?.mlp || null;
   }, [seatingPositions, effectiveDims?.width, effectiveDims?.widthM, effectiveDims?.length, effectiveDims?.lengthM]);
 
-  const computeAutoSurroundHeight = useCallback((seatingPos, roomH) => {
-    const seats = Array.isArray(seatingPos) ? seatingPos : [];
-    const earHeights = seats.map(s =>
-      Number.isFinite(s.rowEarHeight) ? s.rowEarHeight :
-      Number.isFinite(s.z) ? s.z : 1.1
-    );
-    const maxEarH = earHeights.length > 0 ? Math.max(...earHeights) : 1.1;
-    const raw = maxEarH + 0.05;
-    const maxH = (Number.isFinite(roomH) ? roomH : 2.8) - 0.30;
-    return Math.max(1.10, Math.min(maxH, raw));
-  }, []);
+  // ONE authority for the automatic surround height — the shared resolver is
+  // also used by initial placement, so a newly installed surround is already at
+  // its final height and the height effect finds nothing to change.
+  const computeAutoSurroundHeight = useCallback(
+    (seatingPos, roomH) => resolveAutoSurroundHeight(seatingPos, roomH),
+    []
+  );
 
   const setSpeakers = useCallback((updater) => {
     setSpeakerSystem(prev => {
@@ -701,6 +702,24 @@ function SpeakerPlacementImpl(props) {
         return true;
       };
 
+      // ── ONE initial placement authority ─────────────────────────────────
+      // The position written by ensure() below is already the FINAL wall-hugged
+      // position, resolved in the same update that assigns the model. Assigning
+      // a model therefore never moves a speaker, and the plan view's wall-hug
+      // effect finds nothing to correct afterwards.
+      const placementRsp = resolveCanonicalRsp({
+        roomDims: { widthM: W, lengthM: L },
+        mlpX_m: appState?.mlpX_m,
+        mlpY_m: appState?.mlpY_m,
+        fallbackMlp: mlpPoint,
+      });
+
+      const placementAimState = {
+        aimFrontWidesAtMLP: appState?.aimFrontWidesAtMLP,
+        aimSideSurroundsAtMLP: appState?.aimSideSurroundsAtMLP,
+        aimRearSurroundsAtMLP: appState?.aimRearSurroundsAtMLP,
+      };
+
       const ensure = (canonRole, xFrac, yVal) => {
         const existing = byCanon.get(canonRole);
         if (!existing) return;
@@ -708,22 +727,42 @@ function SpeakerPlacementImpl(props) {
         // Placement never installs a speaker: the role's own model is preserved
         // exactly as it is, so an unassigned role is positioned for the format
         // but stays out of the design until the user selects a model for it.
-        const sm = String(existing?.model || '').trim();
-        const smLower = sm.toLowerCase();
-        const speakerModelOn = !!smLower && smLower !== 'off' && smLower !== 'none';
+        const sm = String(existing?.model || '').trim().toLowerCase();
+        const speakerModelOn = !!sm && sm !== 'off' && sm !== 'none';
 
-        const finalModel = existing?.model;
+        // An installed speaker keeps its installation position, and a position
+        // the designer established by hand is never overwritten. For SBL/SBR the
+        // existing position must also be genuinely rear-valid.
+        const isUserPlaced = existing?.positionSource === 'user';
+        if (hasXY(existing) && (speakerModelOn || isUserPlaced) && isValidRearPos(canonRole, existing.position)) return;
 
-        // For SBL/SBR, also require that the existing position is genuinely rear-valid
-        if (hasXY(existing) && speakerModelOn && isValidRearPos(canonRole, existing.position)) return;
+        // Roles placed earlier in this same pass (sides before wides) already
+        // hold their FINAL coordinates, so front wides resolve from the true
+        // front and side surround geometry in one consistent result — never from
+        // a nominal seed, and never from a value another effect has yet to set.
+        const resolved = resolveInitialWallPosition({
+          role: canonRole,
+          model: existing?.model,
+          roomDims: { widthM: W, lengthM: L, heightM: Number(dims?.height) || null },
+          rsp: placementRsp,
+          aimState: placementAimState,
+          lcrAngleInfo: null,
+          seatingPositions,
+          enableFrontWides: appState?.enableFrontWides,
+          placedSpeakers: Array.from(byCanon.values()),
+          existingPosition: existing?.position,
+          getModelDimsM,
+          getCanonicalRoleFn: getCanonicalRole,
+        });
 
-        const x = clamp(W * xFrac, INSET, W - INSET);
-        const y = clamp(yVal, INSET, L - INSET);
+        const x = Number.isFinite(resolved?.x) ? resolved.x : clamp(W * xFrac, INSET, W - INSET);
+        const y = Number.isFinite(resolved?.y) ? resolved.y : clamp(yVal, INSET, L - INSET);
+        const z = Number.isFinite(resolved?.z) ? resolved.z : earZ;
 
         byCanon.set(canonRole, {
           ...existing,
-          model: finalModel,
-          position: { ...(existing.position || {}), x, y, z: earZ },
+          model: existing?.model,
+          position: { ...(existing.position || {}), x, y, z },
         });
       };
 
@@ -789,7 +828,20 @@ function SpeakerPlacementImpl(props) {
 
       return out;
     },
-    [sevenBedLayoutType]
+    [
+      sevenBedLayoutType,
+      // Initial placement context: the same published authorities the plan view
+      // reads, so a placed speaker lands where it will stay.
+      appState?.mlpX_m,
+      appState?.mlpY_m,
+      appState?.aimFrontWidesAtMLP,
+      appState?.aimSideSurroundsAtMLP,
+      appState?.aimRearSurroundsAtMLP,
+      appState?.enableFrontWides,
+      seatingPositions,
+      getModelDimsM,
+      mlpPoint,
+    ]
   );
 
   // [B44] Central surround hydration (the ONLY place resetSurroundPositions is called)
@@ -976,6 +1028,11 @@ function SpeakerPlacementImpl(props) {
   useEffect(() => {
     if (!canWides || !effectiveDims) return;
 
+    // The RP22 front-wide zone authority is the single writer for LW/RW whenever
+    // its zones are available. This legacy median pass is the fallback for when
+    // they are not, and must never run in succession with it.
+    if (props?.frontWideOverlay?.status === 'ok') return;
+
     const __sig = __b44SigFor({
       w: effectiveDims?.width ?? null,
       l: effectiveDims?.length ?? null,
@@ -1118,6 +1175,9 @@ function SpeakerPlacementImpl(props) {
       // wall-pinned by the hugging logic.
       // [B44 POSITION LOCK] Only adjusts auto-positioned speakers
       useEffect(() => {
+      // Fallback only — see the front-wide median pass above.
+      if (props?.frontWideOverlay?.status === 'ok') return;
+
       const __sig = __b44SigFor({
       w: effectiveDims?.width ?? null,
       l: effectiveDims?.length ?? null,
@@ -1211,6 +1271,9 @@ function SpeakerPlacementImpl(props) {
         // This runs after all other positioning and clamping, correcting any asymmetries.
         useEffect(() => {
         if (!canWides || !effectiveDims) return;
+
+        // Fallback only — see the front-wide median pass above.
+        if (props?.frontWideOverlay?.status === 'ok') return;
 
         const W = Number(effectiveDims?.width ?? effectiveDims?.widthM);
         if (!Number.isFinite(W) || W <= 0) return;
