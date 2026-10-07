@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback } from "react";
+import { beginPointerDrag, isPrimaryDragStart } from "@/components/room/rv/utils/rvDragGesture";
 import { clientToRoom } from "@/components/room/rv/utils/rvPointerToRoom";
 
 export function useMouseDownHandler({
@@ -19,6 +20,7 @@ export function useMouseDownHandler({
   viewOffsetPx,
   svgRef,
   isAnyDraggingRef,
+  activeDragRef,
   isDraggingSpeakerRef,
   isDraggingRearRef,
   isDraggingFW,
@@ -62,12 +64,18 @@ export function useMouseDownHandler({
   // grab offset must come from what the designer actually grabbed.
   const handleMouseDown = useCallback(
     (e, id, type, displayCentre) => {
+      if (!isPrimaryDragStart(e) || activeDragRef.current) return;
       e.preventDefault();
       e.stopPropagation();
 
       // Shared cursor calculation — must come first so all branches can use cursorRoom
       if (!svgRef.current) return;
       const svgElement = svgRef.current;
+      const beginDrag = () => {
+        if (!beginPointerDrag(activeDragRef, e, { id, type, captureTarget: svgElement })) return;
+        isAnyDraggingRef.current = true;
+        setDragState({ dragging: true, draggedItemId: id, dragType: type });
+      };
 
       // ONE canonical conversion, shared by every drag: screen pixels -> the
       // draggable zoom group's local coordinates -> room metres, in the same
@@ -133,8 +141,7 @@ export function useMouseDownHandler({
           y: Number.isFinite(markerY) ? markerY - cursorRoom.y : 0,
           coordinateSpace: 'canvas',
         };
-        isAnyDraggingRef.current = true;
-        setDragState({ dragging: true, draggedItemId: id, dragType: 'mlpMarker' });
+        beginDrag();
         setDragWarning({ show: false });
         rsDragLockRef.current = null;
         return;
@@ -147,15 +154,14 @@ export function useMouseDownHandler({
           : null;
         const lensY = Number(projEl?.y_lens_m) || lengthM * 0.8;
         dragOffsetRoomRef.current = { x: (Number(projEl?.x_lens_m) || widthM / 2) - cursorRoom.x, y: lensY - cursorRoom.y };
-        isAnyDraggingRef.current = true;
-        setDragState({ dragging: true, draggedItemId: id, dragType: 'projector' });
+        beginDrag();
         setDragWarning({ show: false });
         rsDragLockRef.current = null;
         // Pointer capture, equivalent to speaker and sub drags: leaving the
         // visible projector body must not cancel the drag.
         try {
           if (e.target && typeof e.target.setPointerCapture === 'function') {
-            e.target.setPointerCapture(e.pointerId);
+            svgElement.setPointerCapture(e.pointerId);
           }
         } catch (err) {
           // Ignore capture errors
@@ -181,8 +187,7 @@ export function useMouseDownHandler({
           x: isFrontRear ? (centerPosM - cursorRoom.x) : 0,
           y: isFrontRear ? 0 : (centerPosM - cursorRoom.y),
         };
-        isAnyDraggingRef.current = true;
-        setDragState({ dragging: true, draggedItemId: String(id), dragType: 'roomElement' });
+        beginDrag();
         setDragWarning({ show: false });
         rsDragLockRef.current = null;
         return;
@@ -397,13 +402,7 @@ export function useMouseDownHandler({
         }
       }
 
-      isAnyDraggingRef.current = true;
-
-      setDragState({
-        dragging: true,
-        draggedItemId: id,
-        dragType: type,
-      });
+      beginDrag();
       setDragWarning({ show: false });
       rsDragLockRef.current = null;
 
@@ -427,13 +426,10 @@ export function useMouseDownHandler({
         }
         if (isDraggingSpeakerDraftRef) isDraggingSpeakerDraftRef.current = true;
 
-        // Capture the pointer on the icon. The icon is a pointer-down target, so
-        // pointerId is present and the capture actually takes effect; compat
-        // mouse events then keep reaching the plan canvas through bubbling, so
-        // the drag survives the pointer leaving the icon.
+        // Keep capture on the stable SVG for the entire pointer gesture.
         try {
           if (e.target && typeof e.target.setPointerCapture === 'function' && e.pointerId != null) {
-            e.target.setPointerCapture(e.pointerId);
+            svgElement.setPointerCapture(e.pointerId);
           }
         } catch (err) {
           // Ignore capture errors
@@ -446,14 +442,14 @@ export function useMouseDownHandler({
         // Capture pointer on the target element
         try {
           if (e.target && typeof e.target.setPointerCapture === 'function') {
-            e.target.setPointerCapture(e.pointerId);
+            svgElement.setPointerCapture(e.pointerId);
           }
         } catch (err) {
           // Ignore capture errors
         }
       }
     },
-    [byId, setDragState, setDragWarning, setTooltip, rsDragLockRef, getCanonicalRole, widthM, lengthM, canvasToRoom, svgRef, roomRect, scale, viewOffsetPx, roomElements, seatDragStartRef, seatingPositions, placedSpeakers, mlpDotX_m, mlpDotY_m, captureBeforeSubDrag]
+    [activeDragRef, byId, setDragState, setDragWarning, setTooltip, rsDragLockRef, getCanonicalRole, widthM, lengthM, canvasToRoom, svgRef, roomRect, scale, viewOffsetPx, roomElements, seatDragStartRef, seatingPositions, placedSpeakers, mlpDotX_m, mlpDotY_m, captureBeforeSubDrag]
   );
 
   return { handleMouseDown };
