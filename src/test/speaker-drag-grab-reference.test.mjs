@@ -192,8 +192,9 @@ test('pointer capture is effective and guarded', () => {
   );
   // The plan canvas owns move and release, and the icon is inside it, so the
   // captured compatibility events still reach it by bubbling.
-  assert.ok(/onMouseMove=\{handleMouseMove\}/.test(PLAN_SRC));
-  assert.ok(/onMouseUp=\{handleMouseUp\}/.test(PLAN_SRC));
+  assert.ok(/addEventListener\('pointermove', onMove, true\)/.test(ROOM_VIS_SRC));
+  assert.ok(/addEventListener\('pointerup', onEnd, true\)/.test(ROOM_VIS_SRC));
+  assert.ok(!/onMouseMove=\{handleMouseMove\}|onMouseUp=\{handleMouseUp\}/.test(PLAN_SRC));
 });
 
 // TEST 8 — The working canvas panning is untouched.
