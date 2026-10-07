@@ -310,18 +310,11 @@ export default function RvPlanCanvas({
             overflow: 'hidden',
             position: 'relative',
             zIndex: 1,
+            touchAction: 'none',
           }}
-          onMouseMove={handleMouseMove}
-          onMouseUp={handleMouseUp}
-          onMouseLeave={handleMouseUp}
+          // Shared window pointer listeners own object movement and termination.
+          // Background click-to-place remains separate from object dragging.
           onMouseDown={handleSvgMouseDown}
-          // Touch drag: forward the active finger to the same drag handler the
-          // mouse path uses. No-ops unless a drag is actually in progress.
-          onTouchMove={(e) => {
-            if (e.touches.length !== 1) return;
-            handleMouseMove({ clientX: e.touches[0].clientX, clientY: e.touches[0].clientY });
-          }}
-          onTouchEnd={handleMouseUp}
         >
 
           {!roomRect || !Number.isFinite(scale) ? (
@@ -520,22 +513,7 @@ export default function RvPlanCanvas({
                       const handlePointerDown = (e) => {
                         e.preventDefault();
                         e.stopPropagation();
-                        try { e.currentTarget.setPointerCapture(e.pointerId); } catch (_) { /* pointer capture is optional */ }
                         handleMouseDown(e, subId, "sub");
-                      };
-
-                      const handlePointerMove = (e) => {
-                        if (!dragging || draggedItemId !== subId) return;
-                        e.preventDefault();
-                        e.stopPropagation();
-                        handleMouseMove(e);
-                      };
-
-                      const handlePointerUp = (e) => {
-                        e.preventDefault();
-                        e.stopPropagation();
-                        try { e.currentTarget.releasePointerCapture(e.pointerId); } catch (_) { /* pointer capture is optional */ }
-                        handleMouseUp(e);
                       };
 
                       const isSelected = appState?.selectedSubId != null && subId === appState.selectedSubId;
@@ -547,9 +525,6 @@ export default function RvPlanCanvas({
                             pointerEvents: "all"
                           }}
                           onPointerDown={handlePointerDown}
-                          onPointerMove={handlePointerMove}
-                          onPointerUp={handlePointerUp}
-                          onPointerCancel={handlePointerUp}
                         >
                           <rect
                             x={cx - hitW / 2}
