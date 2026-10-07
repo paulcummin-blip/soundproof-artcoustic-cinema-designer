@@ -58,7 +58,7 @@ import { useRvPlanPan } from "@/components/room/rv/hooks/useRvPlanPan";
 import { useZoneComponents } from "@/components/room/rv/hooks/useZoneComponents";
 import { useRenderFrontWideZones } from "@/components/room/rv/hooks/useRenderFrontWideZones";
 import { getDolbyZoneSpecs } from "@/components/room/rv/utils/getDolbyZoneSpecs";
-import { buildSeatDimensionInfo, buildSeatWallMeasurements } from "@/components/room/rv/utils/seatDimensionInfo";
+import { buildSeatWallMeasurements } from "@/components/room/rv/utils/seatDimensionInfo";
 import { useVisiblePlanSpeakers } from "@/components/room/rv/hooks/useVisiblePlanSpeakers";
 import { useOverheadIconElements } from "@/components/room/rv/hooks/useOverheadIconElements";
 import { useSideSurroundVisualSpanM } from "@/components/room/rv/hooks/useSideSurroundVisualSpanM";
@@ -1264,7 +1264,6 @@ const byId = useEntitiesById({
   // Room element drag info (structured, only visible during roomElement drag)
   const [roomElementDragInfo, setRoomElementDragInfo] = useState(null);
   const [projectorDragInfo, setProjectorDragInfo] = useState(null);
-  const [seatDragInfo, setSeatDragInfo] = useState(null);
 
   useEffect(() => {
     if (dragType !== 'roomElement') setRoomElementDragInfo(null);
@@ -1274,20 +1273,9 @@ const byId = useEntitiesById({
     if (dragType !== 'projector') setProjectorDragInfo(null);
   }, [dragType]);
 
-  // Seat drag guides — computed from draftSeatsRef on every seatDragTick.
-  // Shows nearest side wall + nearest front/back wall for the dragged seat.
-  // The measurements come from the shared seat-dimension authority, so the drag
-  // guide and the held dimensional guide can never disagree.
-  useEffect(() => {
-    if (dragType !== 'seat') { setSeatDragInfo(null); return; }
-    const seats = draftSeatsRef?.current;
-    if (!Array.isArray(seats)) return;
-    const draggedSeat = seats.find(s => String(s.id) === String(draggedItemId));
-    if (!draggedSeat) return;
-    const info = buildSeatDimensionInfo(draggedSeat, widthM, lengthM);
-    if (!info) return;
-    setSeatDragInfo(info);
-  }, [seatDragTick, dragType, draggedItemId, widthM, lengthM, draftSeatsRef]);
+  // A seating-block drag draws no measurement overlay. The drag guide that used
+  // to be computed here is what made a drag look like an activation of
+  // Dimensions: dimensions are a completed-click result in Dimensions mode only.
 
   // Room Element drag — wall-constrained movement, updates pos_m + drag info live
   // Receives the canonical room-space target from the shared move handler: the
@@ -2410,7 +2398,6 @@ const idsClip = (ids && ids.clip) ? ids.clip : 'b44_clip_fallback';
           lensX: projectorPosition?.lensX ?? null,
           lensY: projectorPosition?.lensY ?? null,
         }}
-        seatDragInfo={seatDragInfo}
         seatDimensions={seatDimensions}
         dimensionSeatId={dimensionSeatId}
         selectedSeatId={selectedSeatId}

@@ -16,8 +16,11 @@ export default function RvSeatLayer({
   handleMouseDown,
   handleSeatClick,
   MLPMarker,
-  // Seat gesture: a single click opens that seat's HUD, a 1.5 s hold holds the
-  // measurement guides, and movement past the drag threshold drags the seat.
+  // Seat gesture: a completed single click shows that seat's information in the
+  // active mode — its HUD in HUD mode, its dimensions in Dimensions mode — and
+  // movement past the drag threshold drags the seating block instead, showing no
+  // overlay at all. There is no hold timer and no long press: holding a seat
+  // activates nothing, and a drag never activates the HUD or the dimensions.
   // Supplied only by the interactive plan; the static and export canvases keep
   // the legacy direct wiring.
   seatGesture,

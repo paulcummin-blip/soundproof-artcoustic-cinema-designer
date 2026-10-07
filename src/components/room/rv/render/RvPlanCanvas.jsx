@@ -177,7 +177,6 @@ export default function RvPlanCanvas({
   roomElementDragInfo,
   projectorDragInfo,
   projectorThrowWarning,
-  seatDragInfo,
   mlpDragInfo,
   dragType,
   mlpGrabbed,
@@ -769,17 +768,11 @@ export default function RvPlanCanvas({
               />
             )}
 
-            {/* Seat drag dimensions — nearest side wall + nearest front/back wall */}
-            {dragType === 'seat' && seatDragInfo?.visible && (
-              <RvMlpDragDims
-                dragInfo={seatDragInfo}
-                scale={scale}
-                meterToCanvasX={meterToCanvasX}
-                meterToCanvasY={meterToCanvasY}
-                svgW={svgWSafe}
-                svgH={svgHSafe}
-              />
-            )}
+            {/* A seating-block drag draws no measurement overlay. The drag guide
+                that used to appear here is what made dragging look like an
+                activation of Dimensions, in every mode. Dimensions belong to a
+                completed click in Dimensions mode only, so nothing at all is
+                drawn while the block is being moved. */}
 
             {/* RSP / MLP drag dimensions — visible while GRABBED (free-move) */}
             {mlpGrabbed && mlpDragInfo?.visible && (
