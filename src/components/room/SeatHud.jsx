@@ -23,8 +23,11 @@ export default function SeatHud({
   // Track which parameter is being hovered for tooltip
   const [hoveredParam, setHoveredParam] = useState(null);
 
-  // Guard: render nothing if no hovered seat or tooltip data
-  if (!effectiveHoveredSeat || !tooltipData) return null;
+  // Guard: render nothing if there is no hovered seat, no tooltip data, or no
+  // resolved position. The position is supplied for the frame the seat becomes
+  // active, so there is no placeholder coordinate to render and then correct.
+  const hasHudPosition = Number.isFinite(hudPosition?.x) && Number.isFinite(hudPosition?.y);
+  if (!effectiveHoveredSeat || !tooltipData || !hasHudPosition) return null;
 
   // RP22 Tooltip Component - positioned as a sibling to the HUD
   const RP22Tooltip = ({ paramKey, level, hudElRef }) => {
@@ -113,8 +116,8 @@ export default function SeatHud({
         className="seat-hud"
         style={{
           position: 'absolute',
-          left: hudPosition?.x || 20,
-          top: hudPosition?.y || 20,
+          left: hudPosition.x,
+          top: hudPosition.y,
           background: 'white',
           border: '1px solid #DCDBD6',
           borderRadius: 8,

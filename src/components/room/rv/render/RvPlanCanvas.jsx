@@ -145,7 +145,7 @@ export default function RvPlanCanvas({
   hudHiddenWhenPinned,
   isHudPinned,
   speakerTooltip,
-  hudPosition,  // canvas-pixel position of the HUD card (hudBasePosPx from parent)
+  hudPosition,  // resolved canvas-pixel position of the HUD card (dragged or seat-relative)
   subDragTick,  // incremented on every sub draft update — forces re-read of draft refs
   subSnapState,  // drag-time symmetry snap guide state (null when inactive)
   lastValidDraftFrontSubs,

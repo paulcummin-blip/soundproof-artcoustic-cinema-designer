@@ -3,6 +3,7 @@
 import React, { useMemo, useCallback, useState, useRef, useImperativeHandle, useEffect, useLayoutEffect, useSyncExternalStore, forwardRef } from "react";
 
 import SeatHud from "@/components/room/SeatHud";
+import { computeAutomaticHudPosition, HUD_PINNED_INITIAL_OFFSET_PX } from "@/components/room/hud/hudPositionAuthority";
 import { getSeatInfoMode, subscribeSeatInfoMode } from "@/components/state/seatInfoModeStore";
 import RP22GradingPill from "@/components/ui/RP22GradingPill";
 import { getSpeakerModelMeta, normaliseModelKey as registryNormaliseModelKey } from "@/components/models/speakers/registry";
@@ -526,7 +527,7 @@ const [hudBasePosPx, setHudBasePosPx] = useState(null);
 
   useEffect(() => {
     if (isHudPinned && hudPinnedOffsetPx == null) {
-      setHudPinnedOffsetPx({ x: 24, y: 24 });
+      setHudPinnedOffsetPx(HUD_PINNED_INITIAL_OFFSET_PX);
     }
   }, [isHudPinned, hudPinnedOffsetPx]);
 
@@ -585,38 +586,8 @@ const clampHudOffset = useCallback((x, y) => {
   };
 }, []);
 
-  // Drag handlers (defined BEFORE they're used in JSX)
-const onHudHeaderMouseDown = useCallback((event) => {
-  if (!planBoundsRef.current) return;
-  if (!hudBasePosPx) return;
-
-  event.preventDefault();
-
-  const startBase = hudBasePosPx || { x: 20, y: 20 };
-  const startMouseX = event.clientX;
-  const startMouseY = event.clientY;
-
-  const handleMove = (moveEvent) => {
-    const dx = moveEvent.clientX - startMouseX;
-    const dy = moveEvent.clientY - startMouseY;
-
-    const unclamped = {
-      x: startBase.x + dx,
-      y: startBase.y + dy,
-    };
-
-    const clamped = clampHudOffset(unclamped.x, unclamped.y);
-    setHudBasePosPx(clamped);
-  };
-
-  const handleUp = () => {
-    window.removeEventListener("mousemove", handleMove);
-    window.removeEventListener("mouseup", handleUp);
-  };
-
-  window.addEventListener("mousemove", handleMove);
-  window.addEventListener("mouseup", handleUp);
-}, [clampHudOffset, hudBasePosPx]);
+  // The manual HUD drag handler is declared with the HUD position it starts
+  // from — see "Seat HUD position" further down.
 
 
   // Helper to clamp HUD within canvas, pick side dynamically
@@ -1804,38 +1775,59 @@ const byId = useEntitiesById({
     getCanonicalRole,
   });
 
-// 1) Auto-position HUD near the currently hovered/pinned seat
-//    BUT only when there is no manual position yet.
-useEffect(() => {
-  if (!effectiveHoveredSeat || !toPx) return;
-  if (hudBasePosPx) return; // already manually placed, don't move it
+  // ── Seat HUD position — one authoritative calculation ─────────────────────
+  // The seat-relative position is computed during render, before the HUD's first
+  // visible frame, so the card is never drawn at a placeholder coordinate and
+  // then corrected. A position the designer dragged wins over it; both are in
+  // the same canvas-pixel space, so they can never disagree.
+  const automaticHudPosPx = useMemo(() => {
+    if (!effectiveHoveredSeat || typeof toPx !== 'function') return null;
+    if (!roomRect || !Number.isFinite(scale)) return null;
 
-  const [seatX_px, seatY_px] = toPx(
-    Number(effectiveHoveredSeat.x ?? effectiveHoveredSeat.position?.x ?? 0),
-    Number(effectiveHoveredSeat.y ?? effectiveHoveredSeat.position?.y ?? 0)
-  );
+    const [seatX_px, seatY_px] = toPx(
+      Number(effectiveHoveredSeat.x ?? effectiveHoveredSeat.position?.x ?? 0),
+      Number(effectiveHoveredSeat.y ?? effectiveHoveredSeat.position?.y ?? 0)
+    );
 
-  const HUD_EST_W = 320;
-  const HUD_EST_H = 520;
-  const pad = 8;
+    return computeAutomaticHudPosition({
+      seatX_px,
+      seatY_px,
+      canvasW: containerW,
+      canvasH: containerH,
+    });
+  }, [effectiveHoveredSeat, toPx, roomRect, scale, containerW, containerH]);
 
-  const canvasW = containerW || 1200;
-  const canvasH = containerH || 800;
+  const hudPositionPx = hudBasePosPx || automaticHudPosPx;
 
-  let preferredX = seatX_px + 16;
-  let preferredY = seatY_px - HUD_EST_H / 2;
+  // Manual drag: the card moves from the position it is actually showing — the
+  // dragged position once one exists, otherwise the seat-relative position — and
+  // that position is kept until it is cleared (unpin), exactly as before.
+  const onHudHeaderMouseDown = useCallback((event) => {
+    if (!planBoundsRef.current) return;
 
-  if (preferredX + HUD_EST_W + pad > canvasW) {
-    preferredX = seatX_px - HUD_EST_W - 16;
-  }
+    const startBase = hudBasePosPx || automaticHudPosPx;
+    if (!startBase) return;
 
-  const clamped = {
-    x: Math.min(canvasW - HUD_EST_W - pad, Math.max(pad, preferredX)),
-    y: Math.min(canvasH - HUD_EST_H - pad, Math.max(pad, preferredY)),
-  };
+    event.preventDefault();
 
-  setHudBasePosPx(clamped);
-}, [effectiveHoveredSeat, toPx, containerW, containerH, hudBasePosPx]);
+    const startMouseX = event.clientX;
+    const startMouseY = event.clientY;
+
+    const handleMove = (moveEvent) => {
+      const dx = moveEvent.clientX - startMouseX;
+      const dy = moveEvent.clientY - startMouseY;
+
+      setHudBasePosPx(clampHudOffset(startBase.x + dx, startBase.y + dy));
+    };
+
+    const handleUp = () => {
+      window.removeEventListener("mousemove", handleMove);
+      window.removeEventListener("mouseup", handleUp);
+    };
+
+    window.addEventListener("mousemove", handleMove);
+    window.addEventListener("mouseup", handleUp);
+  }, [clampHudOffset, hudBasePosPx, automaticHudPosPx]);
 
 
   // Phase 1: Calculate and log LCR constraints, and store them in state
@@ -2278,7 +2270,13 @@ useEffect(() => {
   const svgH = containerH;
 
 
-  const { hudDynamicStyle } = useHudComputation({ isHudPinned, hudPinnedOffsetPx, hudHiddenWhenPinned });
+  // The pinned offset is carried on the pin's own first frame: the pin state
+  // stores that same offset, so it cannot shift the card again when it lands.
+  const { hudDynamicStyle } = useHudComputation({
+    isHudPinned,
+    hudPinnedOffsetPx: hudPinnedOffsetPx || HUD_PINNED_INITIAL_OFFSET_PX,
+    hudHiddenWhenPinned,
+  });
 
   // RP22 overhead corridors: shown whenever overheads are present in the layout  
   const overheadCorridorsOn = overheadCount > 0;
@@ -2418,7 +2416,7 @@ const idsClip = (ids && ids.clip) ? ids.clip : 'b44_clip_fallback';
         hudHiddenWhenPinned={hudHiddenWhenPinned}
         isHudPinned={isHudPinned}
         speakerTooltip={speakerTooltip}
-        hudPosition={hudBasePosPx}
+        hudPosition={hudPositionPx}
         subDragTick={subDragTick}
         subSnapState={subSnapState}
         lastValidDraftFrontSubs={_lastValidDraftFrontSubsRef.current}
