@@ -66,6 +66,7 @@ import { useSeatMetricsCacheEffect } from "@/components/room/rv/hooks/useSeatMet
 import { useMouseUpHandler } from "@/components/room/rv/hooks/useMouseUpHandler";
 import { useMouseDownHandler } from "@/components/room/rv/hooks/useMouseDownHandler";
 import { useSeatGesture } from "@/components/room/rv/hooks/useSeatGesture";
+import { finishPointerDrag, isDragPointer, primaryButtonHeld, releaseDragCapture } from "@/components/room/rv/utils/rvDragGesture";
 import { useSpeakerDragUpdate } from "@/components/room/rv/hooks/useSpeakerDragUpdate";
 import { useRoomCanvasMouseMove } from "@/components/room/rv/hooks/useRoomCanvasMouseMove";
 import { useSubDragHandler } from "@/components/room/rv/hooks/useSubDragHandler";
@@ -474,6 +475,7 @@ const [hudBasePosPx, setHudBasePosPx] = useState(null);
   const isDraggingRearRef = React.useRef(0);
   const isDraggingSpeakerRef = useRef(false);
   const isAnyDraggingRef = React.useRef(false);
+  const activeDragRef = useRef(null);
   const dragOffsetRoomRef = useRef({ x: 0, y: 0 });
 
   // Fix 5: when Restore Previous Design commits new canonical positions from
@@ -1060,7 +1062,7 @@ const byId = useEntitiesById({
     byId, setDragState, setDragWarning, setTooltip, rsDragLockRef, getCanonicalRole,
     widthM, lengthM, canvasToRoom, svgRef,
     roomRect, scale, viewOffsetPx,
-    isAnyDraggingRef, isDraggingSpeakerRef, isDraggingRearRef, isDraggingFW,
+    isAnyDraggingRef, activeDragRef, isDraggingSpeakerRef, isDraggingRearRef, isDraggingFW,
     isDraggingSubRef, dragOffsetRoomRef, draggedSubWallRef, draggedSubTypeRef,
     draftFrontSubsRef, draftRearSubsRef, idleCommitTimerRef,
     frontSubs, rearSubs, frontSubsCfg, rearSubsCfg,
@@ -1527,10 +1529,7 @@ const byId = useEntitiesById({
 
   // Mouse handling — delegated to extracted hook
   const { handleMouseMove } = useRoomCanvasMouseMove({
-    dragging,
-    draggedItemId,
-    dragType,
-    dragState,
+    activeDragRef,
     setDragState,
     setDragWarning,
     svgRef,
@@ -1578,42 +1577,63 @@ const byId = useEntitiesById({
     setSubSnapState,
   });
 
-  // Wrap mouseup so mlpDragActiveRef is always cleared, regardless of drag type.
-  // EXCEPTION: when the RSP is GRABBED (pick-up / free-move mode), releasing the
-  // mouse button must NOT end the grabbed state — the user releases after the
-  // 3 s long-press and then free-moves without a button held. The grabbed state
-  // ends only on click-to-place or Escape cancel.
+  // One synchronous end path. Capture loss, cancellation, outside release and
+  // a move without the primary button all commit at most once and clear ownership.
   const handleMouseUp = useCallback((e) => {
-    if (!getMlpGrab()) {
-      mlpDragActiveRef.current = false;
+    const gesture = finishPointerDrag(activeDragRef, e);
+    if (!gesture) return;
+    isAnyDraggingRef.current = false;
+    if (!getMlpGrab()) mlpDragActiveRef.current = false;
+    try {
+      _handleMouseUpRaw(e, gesture);
+    } finally {
+      clearSeatSnap();
+      clearSeatDragBaseline();
+      clearSeatDragLive();
+      isDraggingSeatRef.current = false;
+      isDraggingSpeakerRef.current = false;
+      isDraggingSpeakerDraftRef.current = false;
+      draftSeatsRef.current = null;
+      draftSpeakersRef.current = null;
+      setDragState({ dragging: false, draggedItemId: null, dragType: null });
+      releaseDragCapture(gesture);
     }
-    _handleMouseUpRaw(e);
-  }, [_handleMouseUpRaw]);
+  }, [_handleMouseUpRaw, clearSeatSnap, clearSeatDragBaseline]);
 
-  // Clear drag-time sub symmetry snap guide when no sub is being dragged
   useEffect(() => {
     if (!dragging || dragType !== "sub") setSubSnapState(null);
   }, [dragging, dragType]);
 
-  // Window-level drag cleanup — fires for ALL drag types when mouse is released outside the SVG
+  // Listeners stay installed across renders. Ref callbacks see the latest
+  // geometry/commit handlers; an immediate pointerup cannot hit stale React state.
+  const pointerHandlersRef = useRef(null);
+  pointerHandlersRef.current = { move: handleMouseMove, end: handleMouseUp };
   useEffect(() => {
-    const onWindowMouseUp = (e) => {
-      if (isAnyDraggingRef.current) { handleMouseUp(e); clearSeatSnap(); clearSeatDragBaseline(); clearSeatDragLive(); }
+    const onMove = (e) => {
+      const gesture = activeDragRef.current;
+      if (gesture && !isDragPointer(gesture, e)) return;
+      if (gesture && !primaryButtonHeld(e)) {
+        pointerHandlersRef.current.end(e);
+        return;
+      }
+      pointerHandlersRef.current.move(e);
     };
-    const onWindowBlur = () => {
-      if (isAnyDraggingRef.current) { handleMouseUp({}); clearSeatSnap(); clearSeatDragBaseline(); clearSeatDragLive(); }
-    };
-    window.addEventListener('mouseup', onWindowMouseUp);
-    window.addEventListener('blur', onWindowBlur);
-    // Pointer-cancel parity for every drag type: a cancelled pointer ends the
-    // drag exactly like a release, so no object is left in a half-dragged state.
-    window.addEventListener('pointercancel', onWindowMouseUp);
+    const onEnd = (e) => pointerHandlersRef.current.end(e);
+    const onBlur = () => pointerHandlersRef.current.end({});
+    window.addEventListener('pointermove', onMove, true);
+    window.addEventListener('pointerup', onEnd, true);
+    window.addEventListener('pointercancel', onEnd, true);
+    window.addEventListener('lostpointercapture', onEnd, true);
+    window.addEventListener('blur', onBlur);
     return () => {
-      window.removeEventListener('mouseup', onWindowMouseUp);
-      window.removeEventListener('blur', onWindowBlur);
-      window.removeEventListener('pointercancel', onWindowMouseUp);
+      window.removeEventListener('pointermove', onMove, true);
+      window.removeEventListener('pointerup', onEnd, true);
+      window.removeEventListener('pointercancel', onEnd, true);
+      window.removeEventListener('lostpointercapture', onEnd, true);
+      window.removeEventListener('blur', onBlur);
+      pointerHandlersRef.current.end({});
     };
-  }, [handleMouseUp, clearSeatSnap, clearSeatDragBaseline]);
+  }, []);
 
   const handleSpeakerDragEnd = useCallback((role, newPosition) => {
     onSetSpeakers(prev => prev.map(s => (s.role === role ? { ...s, position: newPosition } : s)));
@@ -1675,6 +1695,8 @@ const byId = useEntitiesById({
   // marker is status only and never intercepts the seat (see RvSeatLayer).
   const { selectedSeatId, dimensionSeatId, clearSeatSelection, seatGesture } = useSeatGesture({
     handleMouseDown,
+    handleMouseMove,
+    handleMouseUp,
     handleSeatClick,
     mode: seatInfoMode,
   });
