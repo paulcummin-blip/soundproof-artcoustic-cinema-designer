@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -8,6 +8,8 @@ import OverheadChannelSelector from '@/components/speakers/OverheadChannelSelect
 import OverheadSplStrip from '@/components/speakers/OverheadSplStrip';
 import { getLevelColors } from '@/components/utils/rp22Colors';
 import { getMlpSeat } from "@/components/utils/spl/centralSplEngine";
+import { getTargetOverheadIds } from '@/components/room/utils/dolbyHelpers';
+import { assignModelsForRoles, resolveOverheadModelForRole } from '@/components/room/utils/speakerAssignmentAuthority';
 
 const P13_THRESHOLDS_REC = { L1: 99, L2: 102, L3: 105, L4: 108 };
 const P13_THRESHOLDS_MIN = { L1: 96, L2: 99, L3: 102, L4: 105 };
@@ -58,6 +60,69 @@ export default function OverheadChannelsPanel({
     setOverheadsPowerInputValue(String(splConfig?.overheadsW || 100));
   }, [splConfig?.overheadsW]);
 
+  // The overhead control is the user action that installs overhead equipment:
+  // selecting a model gives it to the roles the current format requires, and
+  // clearing it removes them again. Format changes, reloads and placement never
+  // assign a model on their own.
+  const selection = {
+    globalModel: overheadGlobalModel,
+    frontOverride: overheadFrontOverride,
+    midOverride: overheadMidOverride,
+    rearOverride: overheadRearOverride,
+    useFrontGlobal,
+    useMidGlobal,
+    useRearGlobal,
+  };
+
+  const applyOverheadSelection = useCallback((next) => {
+    if (typeof setSpeakers !== 'function') return;
+    const roles = getTargetOverheadIds(effectivePreset);
+    if (!roles.length) return;
+    setSpeakers((prev) => assignModelsForRoles(
+      Array.isArray(prev) ? prev : [],
+      roles,
+      (role) => resolveOverheadModelForRole(role, next),
+    ));
+  }, [setSpeakers, effectivePreset]);
+
+  const handleGlobalModelChange = (model) => {
+    setOverheadGlobalModel(model);
+    applyOverheadSelection({ ...selection, globalModel: model });
+  };
+
+  const handleFrontOverrideChange = (model) => {
+    setOverheadFrontOverride(model);
+    setUseFrontGlobal(false);
+    applyOverheadSelection({ ...selection, frontOverride: model, useFrontGlobal: false });
+  };
+
+  const handleMidOverrideChange = (model) => {
+    setOverheadMidOverride(model);
+    setUseMidGlobal(false);
+    applyOverheadSelection({ ...selection, midOverride: model, useMidGlobal: false });
+  };
+
+  const handleRearOverrideChange = (model) => {
+    setOverheadRearOverride(model);
+    setUseRearGlobal(false);
+    applyOverheadSelection({ ...selection, rearOverride: model, useRearGlobal: false });
+  };
+
+  const handleUseFrontGlobalChange = (next) => {
+    setUseFrontGlobal(next);
+    applyOverheadSelection({ ...selection, useFrontGlobal: next });
+  };
+
+  const handleUseMidGlobalChange = (next) => {
+    setUseMidGlobal(next);
+    applyOverheadSelection({ ...selection, useMidGlobal: next });
+  };
+
+  const handleUseRearGlobalChange = (next) => {
+    setUseRearGlobal(next);
+    applyOverheadSelection({ ...selection, useRearGlobal: next });
+  };
+
   if (overheadCount === 0) return null;
 
   const p13Pill = (() => {
@@ -83,19 +148,19 @@ export default function OverheadChannelsPanel({
           <OverheadChannelSelector
             overheadCount={overheadCount}
             globalModel={overheadGlobalModel}
-            onGlobalModelChange={setOverheadGlobalModel}
+            onGlobalModelChange={handleGlobalModelChange}
             frontOverride={overheadFrontOverride}
             midOverride={overheadMidOverride}
             rearOverride={overheadRearOverride}
-            onFrontOverrideChange={setOverheadFrontOverride}
-            onMidOverrideChange={setOverheadMidOverride}
-            onRearOverrideChange={setOverheadRearOverride}
+            onFrontOverrideChange={handleFrontOverrideChange}
+            onMidOverrideChange={handleMidOverrideChange}
+            onRearOverrideChange={handleRearOverrideChange}
             useFrontGlobal={useFrontGlobal}
             useMidGlobal={useMidGlobal}
             useRearGlobal={useRearGlobal}
-            onUseFrontGlobalChange={setUseFrontGlobal}
-            onUseMidGlobalChange={setUseMidGlobal}
-            onUseRearGlobalChange={setUseRearGlobal}
+            onUseFrontGlobalChange={handleUseFrontGlobalChange}
+            onUseMidGlobalChange={handleUseMidGlobalChange}
+            onUseRearGlobalChange={handleUseRearGlobalChange}
             disabled={disabled}
           />
         </div>

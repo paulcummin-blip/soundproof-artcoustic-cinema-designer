@@ -232,8 +232,8 @@
     },
     "overhead_global_model": {
       "type": "string",
-      "default": "architect-2-1",
-      "description": "Global overhead speaker model"
+      "description": "Global overhead speaker model. No default: a new project starts with overheads Not Selected, and a model is assigned only by the designer's own selection in the overhead control.",
+      "nullable": true
     },
     "overhead_front_override": {
       "type": "string",

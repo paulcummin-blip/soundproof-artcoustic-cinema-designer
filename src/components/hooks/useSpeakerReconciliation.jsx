@@ -250,8 +250,6 @@ export function useSpeakerReconciliation({
       }
 
       setSpeakers((prev) => {
-        const hint = typeof window !== 'undefined' && window.__SURROUND_MODEL_HINT_ || null;
-
         // targetOverheadIds already computed above, reuse it
         const targetSet = new Set(targetOverheadIds.map((id) => id.toUpperCase()));
 
@@ -290,18 +288,11 @@ export function useSpeakerReconciliation({
           return !!s && s !== 'off' && s !== 'none';
         };
 
-        // Hoist these early so pushIfMissing can use them
+        // Required surround roles for this layout. A newly created role is added
+        // WITHOUT a model: format selection establishes roles and locations
+        // only, and the selected surround model is installed by the surround
+        // control's own user action — never here.
         const surroundRolesSet = new Set(['SL', 'SR', 'SBL', 'SBR', 'LW', 'RW']);
-        const globalSurroundModelEarly = appState?.globalSurroundModel;
-        const anySurroundModelEarly = prevBedSpeakers
-          .filter((s) => surroundRolesSet.has(safeCanon(s.role)))
-          .find((s) => isValidSurroundModel(s.model))?.model;
-
-        // Pick best available surround model for a newly created role
-        const pickSurroundModel = () =>
-          isValidSurroundModel(globalSurroundModelEarly) ? globalSurroundModelEarly
-          : isValidSurroundModel(anySurroundModelEarly)  ? anySurroundModelEarly
-          : undefined;
 
         // [B44 FIX] Ensure required surround roles exist even if seededSpeakers is missing them
         const have = new Set(bedSpeakers.map((s) => safeCanon(s.role)));
@@ -313,7 +304,7 @@ export function useSpeakerReconciliation({
             id: role,
             role,
             label: role,
-            model: surroundRolesSet.has(safeCanon(role)) ? pickSurroundModel() : undefined,
+            model: undefined,
             position: null // SpeakerPlacement / resetSurroundPositions will hydrate
           });
 
@@ -354,13 +345,9 @@ export function useSpeakerReconciliation({
 
         if (globalThis.__B44_LOGS) debug(`[Speakers] Seeded: ${seededBed.length} bed + ${seededOverheads.length} overhead (${seededOverheads.map((s) => s.role).join(', ')})`);
 
-        // Process bed-layer speakers (preserve models from previous)
-        // For surround roles without models, try to inherit from any existing surround speaker OR globalSurroundModel
-        // NOTE: surroundRoles / globalSurroundModel / anySurroundModel / isValidSurroundModel
-        //       are already declared above in the pushIfMissing block — reuse them.
+        // Process bed-layer speakers. A role keeps the model it already carries
+        // and is never given one by this pass.
         const surroundRoles = surroundRolesSet;
-        const globalSurroundModel = globalSurroundModelEarly;
-        const anySurroundModel = anySurroundModelEarly;
 
         // [B44 FIX: SYMMETRIC PAIR MODEL] Resolve one shared model per mirrored surround pair
         // BEFORE nextBed.map so that SL/SR, SBL/SBR, and LW/RW always leave reconciliation
@@ -371,13 +358,12 @@ export function useSpeakerReconciliation({
         for (const [roleA, roleB] of SURROUND_MIRROR_PAIRS) {
           const prevA = byCanonPrev.get(roleA);
           const prevB = byCanonPrev.get(roleB);
-          // Priority: valid prev model from either side → global → any → hint
+          // Only a model the pair already carries is preserved. The selected
+          // surround model is installed by the surround control's user action,
+          // so a format change never puts a model on a newly introduced role.
           const pairModel =
-            isValidSurroundModel(prevA?.model)     ? prevA.model :
-            isValidSurroundModel(prevB?.model)     ? prevB.model :
-            isValidSurroundModel(globalSurroundModel) ? globalSurroundModel :
-            isValidSurroundModel(anySurroundModel) ? anySurroundModel :
-            isValidSurroundModel(hint)             ? hint :
+            isValidSurroundModel(prevA?.model) ? prevA.model :
+            isValidSurroundModel(prevB?.model) ? prevB.model :
             undefined;
           pairModelMap.set(roleA, pairModel);
           pairModelMap.set(roleB, pairModel);
@@ -393,23 +379,12 @@ export function useSpeakerReconciliation({
           // For surround roles: use symmetric pair-resolved model to prevent left/right divergence
           if (surroundRoles.has(canonRole)) {
             const pairModel = pairModelMap.get(canonRole);
-            if (isValidSurroundModel(pairModel)) {
-              finalModel = pairModel;
-            } else if (isValidSurroundModel(globalSurroundModel)) {
-              finalModel = globalSurroundModel;
-            } else if (isValidSurroundModel(anySurroundModel)) {
-              finalModel = anySurroundModel;
-            } else if (isValidSurroundModel(hint)) {
-              finalModel = hint;
-            }
+            finalModel = isValidSurroundModel(pairModel) ? pairModel : undefined;
 
             if (globalThis.__B44_LOGS) {
               console.log(`[RD RECON] Surround model for ${canonRole}:`, {
                 prevModel: prevMatch?.model,
                 pairModel,
-                globalSurroundModel,
-                anySurroundModel,
-                hint,
                 finalModel,
                 willRender: !!(finalModel && String(finalModel).trim().toLowerCase() !== 'off' && String(finalModel).trim().toLowerCase() !== 'none')
               });
@@ -448,19 +423,11 @@ export function useSpeakerReconciliation({
           } else {
             const seeded = seededOverheads.find((s) => safeCanon(s.role) === canonId);
             if (seeded) {
-              let modelFromOverrides = undefined;
-
-              if (['TFL', 'TFR', 'TFC'].includes(canonId)) {
-                modelFromOverrides = _useFrontGlobal ? _overheadGlobalModel : _overheadFrontOverride || _overheadGlobalModel;
-              } else if (['TML', 'TMR'].includes(canonId)) {
-                modelFromOverrides = _useMidGlobal ? _overheadGlobalModel : _overheadMidOverride || _overheadGlobalModel;
-              } else if (['TRL', 'TRR', 'TRC'].includes(canonId)) {
-                modelFromOverrides = _useRearGlobal ? _overheadGlobalModel : _overheadRearOverride || _overheadGlobalModel;
-              }
-
-              const finalModel = modelFromOverrides || _overheadGlobalModel || seeded.model;
-              if (globalThis.__B44_LOGS) debug(`[Speakers] Creating new overhead: ${canonId} with model ${finalModel}`);
-              nextOverheads.push({ ...seeded, model: finalModel, draggable: true });
+              // A newly introduced overhead role carries no model: the format
+              // establishes the role and its location only. The overhead
+              // control's model is installed only by the user's own selection.
+              if (globalThis.__B44_LOGS) debug(`[Speakers] Creating new overhead: ${canonId} (Not Selected)`);
+              nextOverheads.push({ ...seeded, model: undefined, draggable: true });
             } else {
               if (globalThis.__B44_LOGS) debug(`[Speakers] WARNING: Target overhead ${canonId} not found in seeded speakers!`);
             }
@@ -480,9 +447,9 @@ export function useSpeakerReconciliation({
           if (globalThis.__B44_LOGS) safeTable(nextList.map((s) => ({ role: s.role, model: s.model ?? '(none)', hasPosition: !!s.position })));
         });
 
-        // NEW: guarantee Atmos overheads exist & have models,
-        // independent of surround model selection.
-        let withOverheads = ensureAtmosOverheads({
+        // Guarantee the Atmos overhead ROLES exist for this format. No model is
+        // assigned here: an overhead is installed only by the user's selection.
+        const withOverheads = ensureAtmosOverheads({
           placedSpeakers: nextList,
           dolbyPreset,
           roomDimensions: stableDimensions,
@@ -495,20 +462,10 @@ export function useSpeakerReconciliation({
           useRearGlobal: _useRearGlobal
         });
 
-        // CRITICAL: Final safety pass - ensure surround roles NEVER lose their model
+        // Surround roles keep exactly the model they already carry. The selected
+        // surround model is installed by the surround control's own user action,
+        // so reconciliation never turns an unselected role into an installed one.
         const surroundRolesToProtect = surroundRolesSet;
-        const globalSurroundModelFinal = appState?.globalSurroundModel;
-
-        if (isValidSurroundModel(globalSurroundModelFinal)) {
-          withOverheads = withOverheads.map((spk) => {
-            const canonRole = safeCanon(spk.role);
-            if (!surroundRolesToProtect.has(canonRole)) return spk;
-            if (!isValidSurroundModel(spk.model)) {
-              return { ...spk, model: globalSurroundModelFinal };
-            }
-            return spk;
-          });
-        }
 
         // DEBUG: Log final state before commit
         if (globalThis.__B44_LOGS) {
@@ -531,8 +488,7 @@ export function useSpeakerReconciliation({
 
         const ensureFinal = (role) => {
           if (haveFinal.has(role)) return;
-          const fallbackModel = surroundRolesSet.has(safeCanon(role)) ? pickSurroundModel() : undefined;
-          final.push({ id: role, role, label: role, model: fallbackModel, position: null });
+          final.push({ id: role, role, label: role, model: undefined, position: null });
           haveFinal.add(role);
         };
 

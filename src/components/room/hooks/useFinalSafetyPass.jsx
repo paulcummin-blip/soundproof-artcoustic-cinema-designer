@@ -41,7 +41,9 @@ export function useFinalSafetyPass({
         if (!SBL) {
           const fixedX = Math.max(0.01, Math.min(W - 0.01, W * 0.25));
           const fixedY = Math.max(0.01, L - 0.10);
-          SBL = { id: `sbl-${timeNowMs()}`, role: 'SBL', model: masterModelValid ? masterModel : null, position: { x: fixedX, y: fixedY, z: earZ }, rotation: { x: 0, y: 0, z: 0 }, draggable: true };
+          // A newly introduced rear role carries no model: it is positioned for
+          // the layout but stays Not Selected until the user selects a model.
+          SBL = { id: `sbl-${timeNowMs()}`, role: 'SBL', model: null, position: { x: fixedX, y: fixedY, z: earZ }, rotation: { x: 0, y: 0, z: 0 }, draggable: true };
           speakers.push(SBL);
           changed = true;
         }
@@ -49,7 +51,7 @@ export function useFinalSafetyPass({
         if (!SBR) {
           const fixedX = Math.max(0.01, Math.min(W - 0.01, W * 0.75));
           const fixedY = Math.max(0.01, L - 0.10);
-          SBR = { id: `sbr-${timeNowMs()}`, role: 'SBR', model: masterModelValid ? masterModel : null, position: { x: fixedX, y: fixedY, z: earZ }, rotation: { x: 0, y: 0, z: 0 }, draggable: true };
+          SBR = { id: `sbr-${timeNowMs()}`, role: 'SBR', model: null, position: { x: fixedX, y: fixedY, z: earZ }, rotation: { x: 0, y: 0, z: 0 }, draggable: true };
           speakers.push(SBR);
           changed = true;
         }
