@@ -56,7 +56,7 @@ export default function RvPlanCanvas({
   onPanPointerDown,
   onPanPointerMove,
   onPanPointerUp,
-  isPanningRef,
+  isPanning,
   zoom,
   panX,
   panY,
@@ -366,7 +366,7 @@ export default function RvPlanCanvas({
             viewOffsetPx={viewOffsetPx}
             zoom={zoom}
             roomRect={roomRect}
-            isPanning={isPanningRef.current}
+            isPanning={isPanning}
             onPanPointerDown={onPanPointerDown}
             onPanPointerMove={onPanPointerMove}
             onPanPointerUp={onPanPointerUp}

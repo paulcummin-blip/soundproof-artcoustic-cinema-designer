@@ -202,11 +202,12 @@ export default function RvRoomBaseLayers(props) {
             fill="none"
             stroke="#DCDBD6"
             strokeWidth={2}
+            pointerEvents="none"
           />
 
           {/* Room Dimensions Overlay */}
           {exportMode !== 'clean' && overlaysForRendering?.ROOM_DIMS && (
-            <g data-layer="room-dimensions">
+            <g data-layer="room-dimensions" pointerEvents="none">
               {/* Arrow markers */}
               <defs>
                 <marker

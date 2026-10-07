@@ -54,7 +54,7 @@ import { useFrontWideZonesComputed } from "@/components/room/rv/hooks/useFrontWi
 import { useOverheadZonesComputed } from "@/components/room/rv/hooks/useOverheadZonesComputed";
 import { useP9CorridorsComputed } from "@/components/room/rv/hooks/useP9CorridorsComputed";
 import { useP9StaticGuides } from "@/components/room/rv/hooks/useP9StaticGuides";
-import { usePanZoomHandlers } from "@/components/room/rv/hooks/usePanZoomHandlers";
+import { useRvPlanPan } from "@/components/room/rv/hooks/useRvPlanPan";
 import { useZoneComponents } from "@/components/room/rv/hooks/useZoneComponents";
 import { useRenderFrontWideZones } from "@/components/room/rv/hooks/useRenderFrontWideZones";
 import { getDolbyZoneSpecs } from "@/components/room/rv/utils/getDolbyZoneSpecs";
@@ -414,8 +414,6 @@ export default forwardRef(function RoomVisualisation(props, ref) {
   const [panX, setPanX] = React.useState(0);
   const [panY, setPanY] = React.useState(0);
   const [viewOffsetPx, setViewOffsetPx] = React.useState({ x: 0, y: 0 });
-  const isPanningRef = useRef(false);
-  const panStartRef = useRef({ x: 0, y: 0, ox: 0, oy: 0 });
   const lastPointerRef = useRef({ x: 0, y: 0 });
   const [containerW, setContainerW] = useState(null);
   const [containerH, setContainerH] = useState(null);
@@ -1153,45 +1151,16 @@ const byId = useEntitiesById({
     }
   }, [dragging]);
 
-  // Pan handlers - extracted to hook
-  const { onPanPointerDown: hookOnPanDown, onPanPointerMove: hookOnPanMove, onPanPointerUp: hookOnPanUp } = usePanZoomHandlers({
-    zoom,
-    panStartRef,
-    isPanningRef,
+  // Pan gesture — the plan's canvas panning, one authority. Dragging empty plan
+  // space repositions the whole drawing at every zoom level, including the
+  // fitted default view; seats, speakers, subwoofers and room elements keep
+  // their own drag because they sit above the pan surface.
+  const { onPanPointerDown, onPanPointerMove, onPanPointerUp, isPanning, consumePanClick } = useRvPlanPan({
+    viewOffsetPx,
     setViewOffsetPx,
+    isDraggingSpeakerRef,
+    dragging,
   });
-
-  // Wrap hook handlers with additional context guards (speaker drag, etc.)
-  const onPanPointerDown = useCallback((e) => {
-    // Never pan if event was already handled (sub/speaker drag)
-    if (e.defaultPrevented) return;
-    
-    // Never pan if dragging anything
-    if (isDraggingSpeakerRef.current) return;
-    if (dragging) return;
-    
-    // Only pan when zoomed
-    if (zoom <= 1) return;
-    
-    // Left click only
-    if (e.button !== 0) return;
-    
-    // Avoid modifier conflicts
-    if (e.shiftKey || e.altKey || e.metaKey || e.ctrlKey) return;
-    
-    // Only proceed if clicking the rect itself (not a child element)
-    if (e.currentTarget !== e.target) return;
-    
-    hookOnPanDown(e);
-  }, [zoom, hookOnPanDown, isDraggingSpeakerRef, dragging]);
-
-  const onPanPointerMove = useCallback((e) => {
-    hookOnPanMove(e);
-  }, [hookOnPanMove]);
-
-  const onPanPointerUp = useCallback((e) => {
-    hookOnPanUp(e);
-  }, [hookOnPanUp]);
 
   // Derived screen values still needed in RoomVisualisation (for LCR constraints, drag logic)
   const screenCenterX_m = (widthM || 4.5) / 2;
@@ -1726,6 +1695,9 @@ const byId = useEntitiesById({
   // declares it crashed the Room Designer in its temporal dead zone. Hook
   // results are only consumed below the hook that produces them.
   const handlePlanClickWithSelection = useCallback((e) => {
+    // A drag across the plan panned the drawing: it is not a click, so it must
+    // not dismiss the pinned HUD or clear the active seat.
+    if (consumePanClick()) return;
     if (!justSelectedOverheadRef.current) {
       setSelectedOverheadRow(null);
     }
@@ -2327,7 +2299,7 @@ const idsClip = (ids && ids.clip) ? ids.clip : 'b44_clip_fallback';
         onPanPointerDown={onPanPointerDown}
         onPanPointerMove={onPanPointerMove}
         onPanPointerUp={onPanPointerUp}
-        isPanningRef={isPanningRef}
+        isPanning={isPanning}
         zoom={zoom}
         panX={panX}
         panY={panY}

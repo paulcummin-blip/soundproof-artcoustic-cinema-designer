@@ -11,8 +11,9 @@ const MAX_ZOOM = 4.0;
  * scrolling the page. Normal page scrolling continues outside the plan
  * because the listener is scoped to the plan element only.
  *
- * Zoom range: 0.6×–4.0×. Drag-pan (via usePanZoomHandlers) remains active once
- * zoomed in (zoom > 1).
+ * Zoom range: 0.6×–4.0×. Drag-pan (via usePanZoomHandlers) is independent of
+ * zoom: the drawing can be repositioned by dragging empty plan space at any
+ * zoom level, and a pan offsets the one zoom transform on top of the zoom pan.
  *
  * Returns:
  *   resetView  — restores zoom=1, pan=0, viewOffset=0

@@ -12,7 +12,9 @@ export default function RvGridLayer(props) {
   } = props;
 
   return (
-    <g data-layer="grid">
+    // The grid is decorative chrome: it must never intercept the pointer, so an
+    // empty plan area stays pannable right across the grid lines.
+    <g data-layer="grid" pointerEvents="none">
       {/* Draw vertical grid lines (centre-anchored) */}
       {(() => {
         const GRID_STEP_M = 0.5;
