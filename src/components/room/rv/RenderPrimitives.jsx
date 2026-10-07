@@ -175,7 +175,7 @@ export const SpeakerIcon = React.memo(function SpeakerIcon({
     return (
       <g
         pointerEvents="all"
-        onMouseDown={handleMouseDown}
+        onPointerDown={handleMouseDown}
         className={speakerMouseDownHandler ? "cursor-grab active:cursor-grabbing" : ""}
       >
         <circle
@@ -205,7 +205,7 @@ export const SpeakerIcon = React.memo(function SpeakerIcon({
     <g
       transform={transform}
       pointerEvents="all"
-      onMouseDown={handleMouseDown}
+      onPointerDown={handleMouseDown}
       className={speakerMouseDownHandler ? "cursor-grab active:cursor-grabbing" : ""}
     >
       <path

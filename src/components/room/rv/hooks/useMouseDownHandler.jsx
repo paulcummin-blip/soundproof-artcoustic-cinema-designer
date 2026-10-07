@@ -57,8 +57,11 @@ export function useMouseDownHandler({
   // useCheckpointedCommits via RoomVisualisation.
   captureBeforeSubDrag,
 }) {
+  // `displayCentre` (room metres) is the speaker's DRAWN centre, supplied by the
+  // layer that rendered it. Wall-mounted roles draw at a derived position, so the
+  // grab offset must come from what the designer actually grabbed.
   const handleMouseDown = useCallback(
-    (e, id, type) => {
+    (e, id, type, displayCentre) => {
       e.preventDefault();
       e.stopPropagation();
 
@@ -210,11 +213,18 @@ export function useMouseDownHandler({
 
       if (globalThis.__B44_LOGS) console.log("[DRAG] START", { id, type, role: target?.role, hasTarget: !!target });
 
-      // Store offset between speaker center and cursor
+      // Offset between the speaker's DRAWN centre and the cursor. The drawn
+      // centre is supplied by the renderer; the stored position is used only
+      // where the two are the same (overheads, subwoofers).
       if (type === "speaker" && target.position) {
+        const grabReference = (displayCentre
+          && Number.isFinite(displayCentre.x)
+          && Number.isFinite(displayCentre.y))
+          ? displayCentre
+          : target.position;
         dragOffsetRoomRef.current = {
-          x: target.position.x - cursorRoom.x,
-          y: target.position.y - cursorRoom.y
+          x: grabReference.x - cursorRoom.x,
+          y: grabReference.y - cursorRoom.y
         };
       } else if (type === "seat") {
         // Capture stable baseline: starting cursor Y and every seat's starting Y.
@@ -417,9 +427,12 @@ export function useMouseDownHandler({
         }
         if (isDraggingSpeakerDraftRef) isDraggingSpeakerDraftRef.current = true;
 
-        // Capture pointer on the target element
+        // Capture the pointer on the icon. The icon is a pointer-down target, so
+        // pointerId is present and the capture actually takes effect; compat
+        // mouse events then keep reaching the plan canvas through bubbling, so
+        // the drag survives the pointer leaving the icon.
         try {
-          if (e.target && typeof e.target.setPointerCapture === 'function') {
+          if (e.target && typeof e.target.setPointerCapture === 'function' && e.pointerId != null) {
             e.target.setPointerCapture(e.pointerId);
           }
         } catch (err) {

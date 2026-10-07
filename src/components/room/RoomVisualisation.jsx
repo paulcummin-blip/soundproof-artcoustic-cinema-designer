@@ -1080,15 +1080,17 @@ const byId = useEntitiesById({
     captureBeforeSubDrag,
   });
 
-  // Shared drag handler wrapper for all speakers (bed-layer and overhead)
+  // Shared drag handler wrapper for all speakers (bed-layer and overhead).
+  // `displayCentre` is the icon's rendered centre in room metres, supplied by the
+  // layer that drew it — the grab offset is taken from what was actually grabbed.
   const bedLayerSpeakerMouseDownHandler = useCallback(
-    (e, id) => handleMouseDown(e, id, "speaker"),
+    (e, id, displayCentre) => handleMouseDown(e, id, "speaker", displayCentre),
     [handleMouseDown]
   );
 
   // Wrapped handler that also tracks selected overhead row for P9 corridors
   const bedLayerSpeakerMouseDownHandlerWithSelection = useCallback(
-    (e, id) => {
+    (e, id, displayCentre) => {
       const speaker = placedSpeakers.find((s) => getSpeakerSelectionKey(s) === id);
       let isOverhead = false;
       if (speaker) {
@@ -1101,7 +1103,7 @@ const byId = useEntitiesById({
         setSelectedOverheadRow(null);
       }
       justSelectedOverheadRef.current = isOverhead;
-      bedLayerSpeakerMouseDownHandler(e, id);
+      bedLayerSpeakerMouseDownHandler(e, id, displayCentre);
     },
     [bedLayerSpeakerMouseDownHandler, placedSpeakers]
   );

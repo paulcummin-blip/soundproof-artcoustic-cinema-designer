@@ -140,8 +140,12 @@ export default function RvSpeakerLayer({
 
         const [canvasX, canvasY] = toPx(renderX, renderY);
 
+        // The grab reference is the icon the designer actually grabbed. For
+        // wall-mounted roles the drawn centre is derived from the stored anchor,
+        // so it is handed to the drag start: one coordinate reference for the
+        // rendering and for the initial pointer-to-speaker offset.
         const onMouseDown = bedLayerSpeakerMouseDownHandler
-          ? (e) => bedLayerSpeakerMouseDownHandler(e, speaker.id)
+          ? (e) => bedLayerSpeakerMouseDownHandler(e, speaker.id, { x: renderX, y: renderY })
           : undefined;
 
         return (
