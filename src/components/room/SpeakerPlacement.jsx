@@ -705,12 +705,14 @@ function SpeakerPlacementImpl(props) {
         const existing = byCanon.get(canonRole);
         if (!existing) return;
 
-        // If model missing on the speaker, apply the global model key
+        // Placement never installs a speaker: the role's own model is preserved
+        // exactly as it is, so an unassigned role is positioned for the format
+        // but stays out of the design until the user selects a model for it.
         const sm = String(existing?.model || '').trim();
         const smLower = sm.toLowerCase();
         const speakerModelOn = !!smLower && smLower !== 'off' && smLower !== 'none';
 
-        const finalModel = speakerModelOn ? existing.model : normKey;
+        const finalModel = existing?.model;
 
         // For SBL/SBR, also require that the existing position is genuinely rear-valid
         if (hasXY(existing) && speakerModelOn && isValidRearPos(canonRole, existing.position)) return;

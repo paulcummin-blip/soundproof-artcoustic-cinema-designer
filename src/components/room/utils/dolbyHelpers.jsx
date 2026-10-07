@@ -217,36 +217,8 @@ export function ensureAtmosOverheads({
     }
   }
 
-  let merged = [...bedSpeakers, ...nextOverheads];
-
-  if (overheadGlobalModel) {
-    const OVERHEAD_CANON_ROLES = new Set([
-      "TFL", "TFR", "TML", "TMR", "TRL", "TRR",
-      "TL", "TR", "TBL", "TBR", "TFC", "TRC", "TBC"
-    ]);
-
-    merged = merged.map((spk) => {
-      const canonRole = String(spk.role || "").toUpperCase();
-      if (!OVERHEAD_CANON_ROLES.has(canonRole)) return spk;
-
-      const currentModel = (spk.model || "").toString().trim().toLowerCase();
-      if (!currentModel || currentModel === "off" || currentModel === "none") {
-        let modelFromOverrides = overheadGlobalModel;
-
-        if (['TFL', 'TFR', 'TFC'].includes(canonRole)) {
-          modelFromOverrides = useFrontGlobal ? overheadGlobalModel : overheadFrontOverride || overheadGlobalModel;
-        } else if (['TML', 'TMR', 'TL', 'TR'].includes(canonRole)) {
-          modelFromOverrides = useMidGlobal ? overheadGlobalModel : overheadMidOverride || overheadGlobalModel;
-        } else if (['TRL', 'TRR', 'TRC', 'TBL', 'TBR'].includes(canonRole)) {
-          modelFromOverrides = useRearGlobal ? overheadGlobalModel : overheadRearOverride || overheadGlobalModel;
-        }
-
-        return { ...spk, model: modelFromOverrides };
-      }
-
-      return spk;
-    });
-  }
-
-  return merged;
+  // Format selection establishes overhead ROLES and their LOCATIONS only. No
+  // model is assigned here: an unassigned overhead stays out of the design and
+  // is hidden by isRenderableSpeaker() until the user selects a model for it.
+  return [...bedSpeakers, ...nextOverheads];
 }

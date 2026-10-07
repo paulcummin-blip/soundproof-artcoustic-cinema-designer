@@ -1,5 +1,6 @@
 import React, { useMemo, useRef, useEffect, useCallback, useState } from "react";
 import { getSpeakerModelMeta, normaliseModelKey } from "@/components/models/speakers/registry";
+import { isRenderableSpeaker } from "@/components/room/rv/RenderPrimitives";
 import { Q43FaceIcon, Q45FaceIcon, Q85FaceIcon, Q63FaceIcon, Evolve11FaceIcon, Evolve21FaceIcon, Evolve31FaceIcon, Evolve42FaceIcon, Evolve63FaceIcon, Evolve84FaceIcon, C41FaceIcon, MultiSoundbarArtworkFaceIcon, MultiSoundbar77ArtworkFaceIcon, MultiSoundbar65ArtworkFaceIcon, MultiSoundbar100ArtworkFaceIcon } from "@/components/report/SpeakerFaceIcons";
 import { computeSpeakerAnnotation, speakerBBox } from "@/components/room/frontElevationAnnotationLayout";
 import { resolveEffectiveViewableDimsM, isManualOverrideActive } from "@/components/models/screen/resolveEffectiveScreen";
@@ -282,7 +283,9 @@ export default function FrontElevation({ dimensions, screen, placedSpeakers = []
   const lcrSpeakers = useMemo(() => {
     if (!Array.isArray(placedSpeakers)) return [];
     return placedSpeakers
-      .filter(s => canonFront(s?.role))
+      // Only installed speakers are drawn: a role with no assigned model is not
+      // in the design yet, whatever the selected format requires of it.
+      .filter(s => canonFront(s?.role) && isRenderableSpeaker(s))
       .map(s => {
         const meta = getSpeakerModelMeta(s?.model, tvPresetKey);
         const wM = (meta && !meta.notFound && meta.widthM) ? meta.widthM : 0.20;

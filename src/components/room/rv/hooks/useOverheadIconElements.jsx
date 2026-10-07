@@ -3,6 +3,7 @@
 import { useMemo } from "react";
 import { SpeakerIcon } from "@/components/room/rv/RenderPrimitives";
 import { hasPos } from "@/components/room/rv/RenderPrimitives";
+import { isAssignedModel } from "@/components/room/utils/speakerAssignmentAuthority";
 
 function rvIsOverheadRole(role) {
   const r = String(role || '').toUpperCase();
@@ -76,8 +77,12 @@ export function useOverheadIconElements({
 
     const overheadSpeakers = (placedSpeakers || [])
       .filter((spk) => rvIsOverheadRole(spk.role) && hasPos(spk))
+      // Only an overhead that carries its own assigned model is drawn: the
+      // overhead control's model is never an assignment for a role the user has
+      // not selected it for.
+      .filter((spk) => isAssignedModel(spk.model))
       .map((spk) => {
-        const modelId = resolveModelForSpeaker(spk);
+        const modelId = isAssignedModel(spk.model) ? spk.model : resolveModelForSpeaker(spk);
 
         if (globalThis.__B44_LOGS) console.log(
           "[RV overhead-icons]",

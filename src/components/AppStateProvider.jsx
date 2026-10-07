@@ -8,6 +8,7 @@ import { useCommercialSelections } from "@/components/state/useCommercialSelecti
 import { computeMLPAndPrimary } from "@/components/utils/computeMLPAndPrimary";
 import { getSpeakerModelMeta } from "@/components/models/speakers/registry";
 import { resolveSurroundModel } from "@/components/utils/speakerModelResolver";
+import { resolveOverheadModelForRole, refreshAssignedModels } from "@/components/room/utils/speakerAssignmentAuthority";
 import { useRspState } from "@/components/state/useRspState";
 import { MIGRATION_STATE, INSTANCE_STATUS } from "@/components/utils/subwooferInstanceCompatibility";
 import { bassInputAdapter } from "@/components/utils/subwooferInstanceMigration";
@@ -822,32 +823,25 @@ function useDesignerState() {
     const global = overheadGlobalModel;
     if (!global) return; // No global model selected — nothing to sync
 
-    const resolveForRole = (role) => {
-      const r = String(role || '').toUpperCase();
-      if (!r.startsWith('T')) return null;
-      let zone = null;
-      if (['TFL', 'TFR', 'TFC'].includes(r)) zone = 'front';
-      else if (['TL', 'TR', 'TML', 'TMR'].includes(r)) zone = 'mid';
-      else if (['TBL', 'TBR', 'TBC', 'TRL', 'TRR', 'TRC'].includes(r)) zone = 'rear';
-      if (!zone) return global || null;
-      if (zone === 'front') return useFrontGlobal ? global : (overheadFrontOverride || global);
-      if (zone === 'mid') return useMidGlobal ? global : (overheadMidOverride || global);
-      if (zone === 'rear') return useRearGlobal ? global : (overheadRearOverride || global);
-      return global || null;
-    };
-
     setSpeakerSystem(prev => {
       const current = Array.isArray(prev?.placedSpeakers) ? prev.placedSpeakers : [];
-      let changed = false;
-      const next = current.map(spk => {
-        const role = String(spk?.role || '').toUpperCase();
-        if (!role.startsWith('T')) return spk;
-        const resolved = resolveForRole(role);
-        if (!resolved || spk.model === resolved) return spk;
-        changed = true;
-        return { ...spk, model: resolved };
-      });
-      if (!changed) return prev;
+      // Refresh only the overhead roles that are already assigned. This sync must
+      // never turn an unassigned role into an installed speaker: assignment is a
+      // user action on the overhead control (see OverheadChannelsPanel).
+      const next = refreshAssignedModels(
+        current,
+        (spk) => String(spk?.role || '').toUpperCase().startsWith('T'),
+        (spk) => resolveOverheadModelForRole(spk.role, {
+          globalModel: global,
+          frontOverride: overheadFrontOverride,
+          midOverride: overheadMidOverride,
+          rearOverride: overheadRearOverride,
+          useFrontGlobal,
+          useMidGlobal,
+          useRearGlobal,
+        }),
+      );
+      if (next === current) return prev;
       return { ...prev, placedSpeakers: next };
     });
   }, [isHydrated, overheadGlobalModel, overheadFrontOverride, overheadMidOverride, overheadRearOverride, useFrontGlobal, useMidGlobal, useRearGlobal, setSpeakerSystem]);
