@@ -186,12 +186,20 @@ export function useProposalReadiness({ projectId = null, versionIds = [] } = {})
         );
 
         // The CANONICAL saved report per version and report type — the same rule
-        // the report pages, Project Library and the server gate use. A complete,
-        // evidence-carrying row is never displaced by a newer duplicate that
-        // carries no evidence, so a report the designer generated cannot stop
-        // being usable because a second row was written later.
+        // the report pages, Project Library and the server gate use. Complete
+        // evidence comes first, then the row frozen against the version's CURRENT
+        // published authority, and only then the newest: a complete, evidence-
+        // carrying report is never displaced by a newer duplicate that is stale or
+        // carries no evidence, so a report the designer generated cannot stop being
+        // usable because a second row was written later.
         const snapshotRows = Array.isArray(snapshotPage) ? snapshotPage : (snapshotPage?.items || []);
-        const savedByKey = selectCanonicalReportSnapshotsByKey(snapshotRows);
+        const publishedFingerprintByVersionId = new Map(ids.map((versionId) => [
+          versionId,
+          versionsById.get(versionId)?.published_fingerprint || null,
+        ]));
+        const savedByKey = selectCanonicalReportSnapshotsByKey(snapshotRows, {
+          currentFingerprintByVersion: publishedFingerprintByVersionId,
+        });
 
         const liveSeatPriorityFingerprint = readSeatPriorityFingerprint(projectId);
         const nextRows = ids.map((versionId, index) => {

@@ -129,14 +129,25 @@ export function useProjectLibraryAssets({ projectId }) {
     [versions],
   );
   const versionNameById = useMemo(() => buildVersionNameMap(versions), [versions]);
+  // Each version's CURRENT durable authority — the published engineering result
+  // the version pointer holds. The canonical report row is resolved against it,
+  // so a newer stale or incomplete duplicate cannot hide the valid Current
+  // report the rest of the app shows for that version.
+  const publishedFingerprintByVersionId = useMemo(
+    () => new Map(versions.map((version) => [version.id, version.published_fingerprint || null])),
+    [versions],
+  );
 
   /**
-   * ONE row per project version and report type: the newest saved report for
-   * that version and type. A report regenerated five times still produces one
-   * row — the earlier generations are never listed — and the rows read in the
-   * order the report types are declared.
+   * ONE row per project version and report type: the CANONICAL saved report for
+   * that version and type — complete evidence, proposal-ready, frozen against the
+   * current authority, and only then the newest. A report regenerated five times
+   * still produces one row — the earlier generations are never listed — and the
+   * rows read in the order the report types are declared.
    */
-  const liveReports = useMemo(() => collapseLiveReports(savedReports)
+  const liveReports = useMemo(() => collapseLiveReports(savedReports, {
+    currentFingerprintByVersion: publishedFingerprintByVersionId,
+  })
     .filter((snapshot) => LIVE_REPORT_TYPES.includes(snapshot.report_type))
     .filter(isSnapshotRestorable)
     .map((snapshot) => ({
@@ -150,7 +161,7 @@ export function useProjectLibraryAssets({ projectId }) {
       sourceFingerprints: snapshot.source_fingerprints || {},
     }))
     .sort((a, b) => LIVE_REPORT_TYPES.indexOf(a.reportType) - LIVE_REPORT_TYPES.indexOf(b.reportType)),
-  [savedReports]);
+  [savedReports, publishedFingerprintByVersionId]);
 
   const markedExports = useMemo(() => markSuperseded(issuedExports), [issuedExports]);
 

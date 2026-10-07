@@ -221,11 +221,20 @@ export default async function(req) {
     // result alone: a browser-session handoff is not visible here and so is never
     // accepted as readiness.
     // The CANONICAL saved report per version and report type — the same rule the
-    // report pages and the Step 5 readiness table apply. A complete, evidence-
-    // carrying row is never displaced by a newer duplicate without evidence, so
-    // the gate judges the report the designer actually generated.
+    // report pages and the Step 5 readiness table apply. Complete evidence comes
+    // first, then the row frozen against the version's CURRENT published
+    // authority, and only then the newest: a stale or incomplete duplicate never
+    // displaces the valid Current report, so the gate judges the report the
+    // designer actually generated.
     const savedReportRows = await base44.entities.ReportSnapshot.filter({ project_id }, '-generated_at', 200);
-    const savedReportByKey = selectCanonicalReportSnapshotsByKey(Array.isArray(savedReportRows) ? savedReportRows : []);
+    const savedReportByKey = selectCanonicalReportSnapshotsByKey(
+      Array.isArray(savedReportRows) ? savedReportRows : [],
+      {
+        currentFingerprintByVersion: new Map(
+          (projectVersions || []).map((version) => [version.id, version.published_fingerprint || null]),
+        ),
+      },
+    );
 
     const versionPublicationById = new Map();
     const cacheRecordByVersionId = new Map();

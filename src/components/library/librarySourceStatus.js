@@ -23,6 +23,7 @@
  */
 
 import { compareSourceFingerprints } from '@/components/report/reportSnapshotAuthority';
+import { selectCanonicalReportSnapshot } from '@/components/report/reportSnapshotCanonical';
 import { READINESS_STATE } from '@/components/proposal/sourceAuthority/proposalReadinessAuthority';
 
 export const LIBRARY_SOURCE_STATE = Object.freeze({
@@ -299,28 +300,45 @@ function timestampOf(row) {
   return String(row?.generated_at || row?.generatedAt || row?.updated_date || row?.created_date || '');
 }
 
+/** The current fingerprint held for one version id, from a Map or a plain object. */
+function fingerprintFor(byVersion, versionId) {
+  if (!byVersion || !versionId) return null;
+  if (typeof byVersion.get === 'function') return byVersion.get(versionId) ?? null;
+  return byVersion[versionId] ?? null;
+}
+
 /**
- * ONE live report per project version and report type: the newest generated.
+ * ONE live report per project version and report type — the CANONICAL one.
  *
  * A report is saved against a version and type and overwritten in place when it
  * is regenerated, but an earlier generation that stayed behind as its own record
  * must never produce a second row. Nothing is deleted or modified here — the
- * duplicate records are left exactly as they are and only the newest one is
- * listed.
+ * duplicate records are left exactly as they are.
+ *
+ * Which row is listed is not the newest generation: it is the row the ONE
+ * canonical rule resolves (complete evidence, proposal-ready, frozen against the
+ * CURRENT authority, parity, and only then newest), so a stale or incomplete
+ * duplicate can never hide the valid Current report here while every other
+ * surface shows it.
  *
  * @param {Array<Object>} snapshots saved reports, any order
- * @returns {Array<Object>} the newest saved report per version and report type
+ * @param {Object} [options]
+ * @param {Map|Object|null} [options.currentFingerprintByVersion] each version's
+ *   current authority fingerprint, keyed by version id.
+ * @returns {Array<Object>} the canonical saved report per version and report type
  */
-export function collapseLiveReports(snapshots = []) {
-  const newestByKey = new Map();
+export function collapseLiveReports(snapshots = [], { currentFingerprintByVersion = null } = {}) {
+  const order = [];
+  const canonicalByKey = new Map();
   (Array.isArray(snapshots) ? snapshots : []).forEach((snapshot) => {
     const key = liveReportKey(snapshot?.version_id, snapshot?.report_type);
-    const current = newestByKey.get(key);
-    if (!current || timestampOf(snapshot) > timestampOf(current)) {
-      newestByKey.set(key, snapshot);
-    }
+    if (!canonicalByKey.has(key)) order.push(key);
+    const candidates = [canonicalByKey.get(key), snapshot].filter(Boolean);
+    canonicalByKey.set(key, selectCanonicalReportSnapshot(candidates, {
+      currentFingerprint: fingerprintFor(currentFingerprintByVersion, snapshot?.version_id),
+    }));
   });
-  return Array.from(newestByKey.values());
+  return order.map((key) => canonicalByKey.get(key));
 }
 
 /* ── Exported report PDF rows ─────────────────────────────────────────────── */

@@ -38,6 +38,9 @@ export const REPORT_STATE = Object.freeze({
  * @param {Object} input
  * @param {Array<Object>} input.snapshots   saved reports (ReportSnapshot), any order
  * @param {Array<Object>} input.proposals   saved proposals, newest first
+ * @param {Map|Object|null} [input.currentFingerprintByVersion] each version's
+ *   current authority fingerprint, so the canonical report is resolved against
+ *   the design the version holds now.
  * @returns {Map<string, {
  *   reportsState: string,
  *   reportsLabel: string,
@@ -47,7 +50,11 @@ export const REPORT_STATE = Object.freeze({
  *   proposalLabel: string|null,
  * }>}
  */
-export function deriveVersionDocumentStatus({ snapshots = [], proposals = [] } = {}) {
+export function deriveVersionDocumentStatus({
+  snapshots = [],
+  proposals = [],
+  currentFingerprintByVersion = null,
+} = {}) {
   const entries = new Map();
   const entryFor = (versionId) => {
     if (!versionId) return null;
@@ -57,8 +64,11 @@ export function deriveVersionDocumentStatus({ snapshots = [], proposals = [] } =
     return entries.get(versionId);
   };
 
-  // ONE saved report per version and report type — the newest generation.
-  collapseLiveReports(snapshots)
+  // ONE saved report per version and report type — the CANONICAL one, resolved
+  // by the same rule every other surface uses, so a newer stale or incomplete
+  // duplicate cannot make this version read "Reports need updating" while the
+  // Library and the report pages show a Current report.
+  collapseLiveReports(snapshots, { currentFingerprintByVersion })
     .filter(isSnapshotRestorable)
     .forEach((snapshot) => {
       if (!REPORT_TYPES.includes(snapshot.report_type)) return;

@@ -12,6 +12,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { base44 } from '@/api/base44Client';
+import { selectCanonicalReportSnapshot } from '@/components/report/reportSnapshotCanonical';
 import {
   groupProposalsByProject,
   proposalVersionIds,
@@ -69,6 +70,10 @@ export function useProposalLibrary({ projectFilter = null } = {}) {
       const nextVersionsById = new Map(asItems(versionRecords).map((version) => [version.id, version]));
 
       // The saved reports behind each selected version decide the source state.
+      // The CANONICAL report of each type is resolved by the one shared rule —
+      // complete evidence first, then the row frozen against the version's current
+      // published authority, and only then the newest — so this page can never
+      // disagree with the report pages, the Library or the proposal gate.
       const versionIds = [...new Set(proposalList.flatMap((proposal) => proposalVersionIds(proposal)))];
       const snapshotPage = versionIds.length > 0
         ? await base44.entities.ReportSnapshot.filter(
@@ -81,7 +86,12 @@ export function useProposalLibrary({ projectFilter = null } = {}) {
       asItems(snapshotPage).forEach((row) => {
         if (!REPORT_TYPES.includes(row.report_type)) return;
         const entry = savedReportsByVersionId.get(row.version_id) || {};
-        if (!entry[row.report_type]) entry[row.report_type] = row;
+        entry[row.report_type] = selectCanonicalReportSnapshot(
+          [entry[row.report_type], row].filter(Boolean),
+          {
+            currentFingerprint: nextVersionsById.get(row.version_id)?.published_fingerprint || null,
+          },
+        );
         savedReportsByVersionId.set(row.version_id, entry);
       });
 

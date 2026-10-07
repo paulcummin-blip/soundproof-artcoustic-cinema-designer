@@ -90,7 +90,13 @@ export function useReportSnapshot({
     }
 
     setLoading(true);
-    loadReportSnapshot({ projectId, versionId, reportType })
+    // The selection is authority-aware: the row frozen against the authority this
+    // version holds NOW outranks any newer duplicate that is stale or incomplete,
+    // so the report on screen is the canonical report everywhere.
+    loadReportSnapshot({
+      projectId, versionId, reportType,
+      currentFingerprint: currentFp.engineeringFingerprint,
+    })
       .then((row) => { if (!cancelled) setSaved(row || null); })
       .catch((error) => {
         if (!cancelled) {
@@ -102,7 +108,9 @@ export function useReportSnapshot({
       .finally(() => { if (!cancelled) setLoading(false); });
 
     return () => { cancelled = true; };
-  }, [projectId, versionId, reportType]);
+    // The durable authority is read with the selection: when it arrives, the
+    // canonical row for this version and report type is resolved again.
+  }, [projectId, versionId, reportType, currentFp.engineeringFingerprint]);
 
   const resolution = useMemo(
     () => resolveSnapshotStatus({ saved, currentFingerprints: currentFp }),
@@ -210,7 +218,13 @@ export function useReportSnapshot({
         record.status_reason = saved.status_reason ?? record.status_reason;
         record.status_updated_at = saved.status_updated_at ?? record.status_updated_at;
       }
-      const written = await saveReportSnapshot({ existing: saved, record });
+      const written = await saveReportSnapshot({
+        existing: saved,
+        record,
+        // The authority the report is being generated from: the write boundary
+        // resolves the same canonical row this page is showing.
+        currentFingerprint: savedFingerprints.engineeringFingerprint,
+      });
       if (mountedRef.current) {
         setSaved(written || { ...record, id: saved?.id || null });
         setEvidenceIncomplete(!parity.passed);

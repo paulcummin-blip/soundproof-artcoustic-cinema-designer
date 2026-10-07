@@ -433,8 +433,13 @@ export async function readProposalReportEvidence(entities, projectId, versions) 
       { sort: '-generated_at', limit: 50 },
     );
     const rows = Array.isArray(reports) ? reports : (reports?.items || []);
-    const technicalRow = selectCanonicalReportSnapshot(rows, { reportType: 'technical' });
-    const visualRow = selectCanonicalReportSnapshot(rows, { reportType: 'visual' });
+    // The CANONICAL saved report per type, resolved against the authority this
+    // version holds now — the same one rule the report pages and the readiness
+    // table apply. A newer duplicate that is stale or incomplete never displaces
+    // the valid Current report a proposal must read.
+    const currentFingerprint = version.published_fingerprint || null;
+    const technicalRow = selectCanonicalReportSnapshot(rows, { reportType: 'technical', currentFingerprint });
+    const visualRow = selectCanonicalReportSnapshot(rows, { reportType: 'visual', currentFingerprint });
 
     // Evidence only: each report's own machine-readable snapshot, or a block
     // that names this version and this report.

@@ -18,7 +18,7 @@ const PROPOSAL_LIMIT = 100;
 
 const asItems = (result) => (Array.isArray(result) ? result : (result?.items || []));
 
-export function useVersionDocumentStatus({ projectId, enabled = false } = {}) {
+export function useVersionDocumentStatus({ projectId, enabled = false, versions = [] } = {}) {
   const [snapshots, setSnapshots] = useState([]);
   const [proposals, setProposals] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -56,8 +56,19 @@ export function useVersionDocumentStatus({ projectId, enabled = false } = {}) {
   }, [projectId, enabled]);
 
   const statusByVersionId = useMemo(
-    () => deriveVersionDocumentStatus({ snapshots, proposals }),
-    [snapshots, proposals],
+    () => deriveVersionDocumentStatus({
+      snapshots,
+      proposals,
+      // Each version's CURRENT durable authority, so the canonical report row is
+      // resolved against the design the version holds now.
+      currentFingerprintByVersion: new Map(
+        (Array.isArray(versions) ? versions : []).map((version) => [
+          version.id,
+          version.published_fingerprint || null,
+        ]),
+      ),
+    }),
+    [snapshots, proposals, versions],
   );
 
   return { loading, statusByVersionId };

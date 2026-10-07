@@ -13,6 +13,7 @@
  */
 
 import { base44 } from '@/api/base44Client';
+import { selectCanonicalReportSnapshot } from '@/components/report/reportSnapshotCanonical';
 import {
   proposalVersionIds,
   resolveProposalSourceState,
@@ -44,7 +45,15 @@ export async function resolveProposalExportSource(proposal) {
     base44.entities.ProjectVersion.filter({ id: { $in: versionIds } }),
     base44.entities.ReportSnapshot.filter(
       { version_id: { $in: versionIds }, report_type: { $in: LAYER_ONE_REPORT_TYPES } },
-      { fields: ['version_id', 'report_type', 'source_fingerprints'], limit: 50 },
+      // The canonical rule judges a row's evidence before its date, so the fields
+      // it judges are read with the fingerprints it compares.
+      {
+        fields: [
+          'version_id', 'report_type', 'source_fingerprints', 'payload',
+          'report_schema_version', 'generated_at', 'updated_date', 'created_date',
+        ],
+        limit: 50,
+      },
     ),
   ]);
 
@@ -52,7 +61,15 @@ export async function resolveProposalExportSource(proposal) {
   const savedReportsByVersionId = new Map();
   asItems(snapshotRecords).forEach((snapshot) => {
     const entry = savedReportsByVersionId.get(snapshot.version_id) || {};
-    if (!entry[snapshot.report_type]) entry[snapshot.report_type] = snapshot;
+    // The CANONICAL report of each type — the same rule the report pages, the
+    // Library and the proposal gate apply, so an issued document is judged against
+    // the report the app actually shows for that version.
+    entry[snapshot.report_type] = selectCanonicalReportSnapshot(
+      [entry[snapshot.report_type], snapshot].filter(Boolean),
+      {
+        currentFingerprint: versionsById.get(snapshot.version_id)?.published_fingerprint || null,
+      },
+    );
     savedReportsByVersionId.set(snapshot.version_id, entry);
   });
 

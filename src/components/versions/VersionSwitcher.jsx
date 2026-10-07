@@ -98,6 +98,9 @@ export default function VersionSwitcher({
   const { loading: statusLoading, statusByVersionId } = useVersionDocumentStatus({
     projectId,
     enabled: open,
+    // The switcher already holds the versions; they carry the published pointer
+    // each version's canonical report is resolved against.
+    versions,
   });
 
   const openVersion = async (version, { saveFirst }) => {
