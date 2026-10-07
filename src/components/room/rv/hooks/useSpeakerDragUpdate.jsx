@@ -2,12 +2,12 @@
  * useSpeakerDragUpdate.js  (Layer 2)
  *
  * Owns:
- *   - canvas → room coordinate conversion
+ *   - room-coordinate targets (already converted by the pointer handler)
  *   - calling solveSpeakerDragConstraints (Layer 1)
  *   - applying ref side-effects (slsrModeRef, fwOffsetRef, isDraggingFW, lastInteractionEpoch)
  *   - calling onSetSpeakers with the solved positions
  *
- * Returns:  handleSpeakerDragUpdate(speakerId, newCanvasPos)
+ * Returns:  handleSpeakerDragUpdate(speakerId, newRoomPos)
  */
 
 import { useCallback } from "react";
@@ -21,8 +21,6 @@ export function useSpeakerDragUpdate({
   // draft ref — transient positions during drag (no state writes)
   draftSpeakersRef,
   setSpeakerDragTick,
-  // coordinate helpers
-  canvasToRoom,
   // refs
   lastInteractionEpoch,
   fwOffsetRef,
@@ -78,7 +76,7 @@ export function useSpeakerDragUpdate({
   timeNowMs,
 }) {
   const handleSpeakerDragUpdate = useCallback(
-    (speakerId, newCanvasPos) => {
+    (speakerId, newRoomPos) => {
       if (globalThis.__B44_LOGS)
         console.log("[DRAG] handleSpeakerDragUpdate ENTER", { speakerId });
 
@@ -102,9 +100,8 @@ export function useSpeakerDragUpdate({
         speakerId,
         spk,
         canonicalRole,
-        newCanvasPos,
-        canvasToRoom,
-        widthM,
+        newRoomPos,
+          widthM,
         lengthM,
         aimFrontWidesAtMLP,
         aimSideSurroundsAtMLP,
@@ -148,7 +145,7 @@ export function useSpeakerDragUpdate({
       // Instead of leaving the speaker frozen or broken, provide a safe room-geometry
       // clamp so FL/FC/FR stay visible and draggable at all times.
       if (finalPositions.length === 0 && ['FL', 'FC', 'FR'].includes(canonicalRole)) {
-        const raw = canvasToRoom(newCanvasPos);
+        const raw = newRoomPos;
         if (raw && Number.isFinite(raw.x)) {
           const W = widthM || 4.5;
           const halfW = W / 2;
@@ -225,7 +222,7 @@ export function useSpeakerDragUpdate({
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [
-      byId, onSetSpeakers, draftSpeakersRef, setSpeakerDragTick, canvasToRoom, widthM, lengthM, screenCenterX_m, centerX_m,
+      byId, onSetSpeakers, draftSpeakersRef, setSpeakerDragTick, widthM, lengthM, screenCenterX_m, centerX_m,
       constraintZones, frontWideZones, overheadZones, sideSurroundVisualSpanM,
       rearSurroundVisualLanes, mlp, mlpDotY_m, freeMoveLcr,
       getModelDimsM, getCanonicalRole, getSpeakerDims, rsRearCorridor,
