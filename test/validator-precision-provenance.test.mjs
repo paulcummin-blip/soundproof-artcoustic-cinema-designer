@@ -47,7 +47,7 @@ test('generation record stores provenance from its own validation', () => {
   const record = buildGenerationRecord({proposalId:'audit',projectId:'audit',pack:input.evidence_pack,writerInput:input,output:saved.output,validation,createdBy:'audit',createdAt:'2026-10-06T20:00:00Z',generationNumber:1});
   expect(record.validator_rules_fingerprint).toBe(validation.validator_rules_fingerprint);
   expect(record.writer_rules_fingerprint).toBe(validation.writer_rules_fingerprint);
-  expect(record.validator_version).toBe('proposal-validator-2');
+  expect(record.validator_version).toBe('proposal-validator-3');
   expect(Object.isFrozen(record.validator_source_manifest)).toBe(true);
   expect(generationEntityPayload({record}).validator_rules_fingerprint).toBe(record.validator_rules_fingerprint);
 });
