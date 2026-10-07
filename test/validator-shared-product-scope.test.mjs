@@ -45,6 +45,8 @@ const PASSING = [
   ['shared product, correct role and count in each option', 'Level 4 version uses Q6-3 × 6 for surrounds and wides; Level 1 version uses Q6-3 × 3 at LCR.'],
   ['shared subwoofer, correct count in each option', 'Level 4 version uses four SUB4-12; Level 1 version uses two SUB4-12.'],
   ['shared product, each option in its own role', 'Level 4 version uses Q8-5 × 3 at the screen; Level 1 version uses Q6-3 × 3 at the screen.'],
+  ['a rejected alternative naming the other option\'s product', 'Level 4 version uses Q8-5 × 3 at the screen rather than the EVOLVE 2-1 package.'],
+  ['a rejected alternative naming the other option\'s quantity', 'Level 4 version uses four SUB4-12 rather than two SUB4-12.'],
 ];
 for (const [label, text] of PASSING) {
   test(`passes: ${label}`, () => expect(scopeIssues(run(text)).length).toBe(0));
@@ -56,6 +58,7 @@ const BLOCKED = [
   ['shared subwoofer with the wrong quantity', 'Level 4 version uses six SUB4-12.', 'changed_parameter_value'],
   ['a screen product the option does not have', 'Level 1 version uses Q8-5 × 3 at the screen.', 'extra_product'],
   ['a height product the option does not have', 'Level 1 version uses SPITFIRE CLOUD × 6 overhead.', 'extra_product'],
+  ['another option\'s product named before the contrast, not in its alternative', 'Level 1 version uses Q8-5 × 3 at the screen rather than the SPITFIRE CLOUD package.', 'extra_product'],
 ];
 for (const [label, text, code] of BLOCKED) {
   test(`blocks: ${label}`, () => {

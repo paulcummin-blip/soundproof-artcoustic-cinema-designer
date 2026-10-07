@@ -3,7 +3,7 @@ export const VALIDATOR_SOURCE_MANIFEST = Object.freeze({
   'base44/shared/proposalWriter/writerOutputValidator.js': '1eaa80e2ebe88beb56978e0dd9124cafa9c8e5a0c891d4bcd5ca1f3b948650d5',
   'base44/shared/proposalWriter/writerOutputTextRules.js': '7e5623b4e64b61583009b79e7c8d1a5ffe1d3c60dd3a1459f3cadf91ef5ff868',
   'base44/shared/proposalWriter/writerProseScanner.js': '03586bd655646050f561450ecd6027c96d502aae6dd3c41e323b107277c6af5b',
-  'base44/shared/proposalWriter/writerProductScope.js': 'f8aa8508b8a1b0eea8e1e90d9b043fc571a3ee8d625e8a8a0c5c9de2e9214e3b',
+  'base44/shared/proposalWriter/writerProductScope.js': '7b15e264a35b8f7c1694c3e5c70c3d43e2d06c4a77e195a01cb9e0ec47e11749',
   'base44/shared/proposalWriter/writerVocabulary.js': 'f4d2c362cab58c2bd600b9eacab0c2d4c0fa0e5e43399bb5168deef7d62d2030',
   'base44/shared/proposalWriter/writerClausePrecision.js': '5139fdd22c8f7f72ebc440defae7c87421efb9504d58aaf8cb15dc17bb6d07f3',
   'base44/shared/proposalWriter/writerViolationAudit.js': '4cc361d1c96a101fc29330d740cef2184ae5650fd3cc64e253892d004efdb0b9',

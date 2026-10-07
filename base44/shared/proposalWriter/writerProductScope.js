@@ -27,6 +27,10 @@
  * either option, and an unattributed mention is judged against the cited claims'
  * own option, exactly as before.
  *
+ * A mention the sentence itself frames as the rejected alternative — the product
+ * named after "rather than" or "instead of" — is read as the design being
+ * replaced, never as a product the option the sentence names is specified with.
+ *
  * Pure: no React, no SDK, no writes, no runtime-specific APIs.
  */
 
@@ -208,6 +212,29 @@ function mentionWindow(text, end) {
   return stop === -1 ? rest : rest.slice(0, stop);
 }
 
+/**
+ * Whether a mention is the rejected alternative of its own sentence — the product
+ * a sentence names after "rather than" or "instead of". "Level 4 is specified with
+ * SUB4-12 x 4 rather than SUB3-12 x 2" names SUB3-12 as the design being replaced,
+ * not as one the option it names is specified with, so it is not an import into
+ * that option. The alternative is read within the mention's own clause: a mark
+ * that ends the alternative before the mention leaves the mention outside it.
+ */
+function isRejectedAlternative({ span, start }) {
+  const local = start - span.start;
+  if (local <= 0) return false;
+  const before = span.text.slice(0, local);
+  const pattern = new RegExp(CONTRAST.source, 'gi');
+  let opened = -1;
+  let match = pattern.exec(before);
+  while (match) {
+    opened = match.index + match[0].length;
+    match = pattern.exec(before);
+  }
+  if (opened === -1) return false;
+  return !/[.!?;]|\b(?:but|however|although|whereas|yet)\b/i.test(before.slice(opened));
+}
+
 /** The quantity a mention states: attached to it, or written as the word before it. */
 function statedQuantity(text, start, end) {
   const after = text.slice(end, end + 12);
@@ -328,6 +355,15 @@ export function productScopeViolations({ input = null, vocabulary = null, text =
 
     const entry = authority.get(mention.key) || null;
     const owners = entry ? new Set([...entry.owners]) : new Set(vocabulary?.owners?.get(mention.token) || []);
+
+    // The sentence's own rejected alternative is the design being replaced, not a
+    // product the option the sentence names is specified with. The contrast rule
+    // already exempts a mention in a contrast sentence; reading the mention's own
+    // position means a sentence that names an option can no longer turn its own
+    // alternative into an import. A product the pack lists nowhere is unselected
+    // and was refused above, before this point.
+    if (owners.size > 0 && CONTRAST.test(sentence) && isRejectedAlternative({ span, start: mention.start })) continue;
+
     const owned = [...scoped].filter((id) => owners.has(id));
     if (owned.length === 0) {
       if (attribution || !CONTRAST.test(sentence)) {
