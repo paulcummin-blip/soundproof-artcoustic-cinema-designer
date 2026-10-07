@@ -14,13 +14,15 @@
 //   TEST 7  No measurement overlay is drawn by a drag
 //   TEST 8  The block still moves as one; panning and other objects untouched
 // ---------------------------------------------------------------------------
-import { test, afterEach } from 'vitest';
+import { test, afterEach } from 'node:test';
+import { register } from 'node:module';
+register('../../test/_alias-loader.mjs', import.meta.url);
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import React from 'react';
 import TestRenderer, { act } from 'react-test-renderer';
 
-import { useSeatGesture, SEAT_DRAG_THRESHOLD_PX } from '../components/room/rv/hooks/useSeatGesture.jsx';
+const { useSeatGesture, SEAT_DRAG_THRESHOLD_PX } = await import('../components/room/rv/hooks/useSeatGesture.jsx');
 
 const GESTURE_SRC = fs.readFileSync('src/components/room/rv/hooks/useSeatGesture.jsx', 'utf8');
 const RV_SRC = fs.readFileSync('src/components/room/RoomVisualisation.jsx', 'utf8');
@@ -63,7 +65,7 @@ function mountGesture(mode) {
     preventDefault() {},
     stopPropagation() {},
   }, seat));
-  const move = (dx) => act(() => fire('pointermove', { clientX: 100 + dx, clientY: 100 }));
+  const move = (dx) => act(() => fire('pointermove', { buttons: 1, pointerId: 1, clientX: 100 + dx, clientY: 100 }));
   const release = () => act(() => fire('pointerup'));
 
   return {
@@ -172,7 +174,7 @@ test('TEST 6 — a release that follows a drag performs no click action', () => 
 
   assert.deepEqual(h.calls.opened, [], 'no part of a drag opened the HUD');
   assert.equal(h.gesture().dimensionSeatId, null, 'and no part of a drag activated dimensions');
-  assert.match(GESTURE_SRC, /if \(active\.dragStarted\) return;/, 'the drag suppresses the click on release');
+  assert.match(GESTURE_SRC, /if \(active\.dragStarted\) \{/, 'the drag suppresses the click on release');
   h.unmount();
 });
 
