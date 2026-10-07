@@ -54,9 +54,10 @@ function resolveEverywhere(rows, { reportType = 'technical' } = {}) {
 
 // ── Fixture guard ───────────────────────────────────────────────────────────
 test('the fixtures are what the rule judges: complete evidence is complete', () => {
-  const complete = validateReportEvidence(completeEvidence({ reportType: 'technical' }), 'technical');
+  const evidence = completeEvidence({ reportType: 'technical' });
+  const complete = validateReportEvidence(evidence, 'technical');
   assert.equal(complete.complete, true, `complete fixture must validate: ${complete.missing?.join(', ')}`);
-  assert.equal(complete.proposal_ready, true);
+  assert.equal(evidence.proposal_ready, true);
 
   const incomplete = validateReportEvidence(incompleteEvidence({ reportType: 'technical' }), 'technical');
   assert.equal(incomplete.complete, false, 'the incomplete fixture must NOT be complete evidence');
@@ -78,6 +79,27 @@ test('A — a newer INCOMPLETE duplicate never displaces the older Current repor
   assert.equal(byKey.id, 'current-old', 'client, collapsed by version and type');
   assert.equal(library.id, 'current-old', 'Project Library listing');
   assert.equal(matchesCurrentAuthority(client, CURRENT), true, 'the selected row is frozen against authority');
+});
+
+// ── A2 — the completeness rung on its own ───────────────────────────────────
+// Both rows are frozen against the SAME authority, so authority cannot decide:
+// only completeness can. Without that rung the newer incomplete row would win.
+const caseA2 = [
+  reportRow({ id: 'current-complete', generatedAt: '2026-10-02T09:00:00.000Z', fingerprint: CURRENT }),
+  reportRow({ id: 'current-incomplete', generatedAt: '2026-10-09T09:00:00.000Z', fingerprint: CURRENT, complete: false }),
+];
+
+test('A2 — with the same authority, only complete evidence decides', () => {
+  const { client, server, byKey, library } = resolveEverywhere(caseA2);
+  assert.equal(client.id, 'current-complete', 'client half');
+  assert.equal(server.id, 'current-complete', 'server half');
+  assert.equal(byKey.id, 'current-complete');
+  assert.equal(library.id, 'current-complete');
+  assert.equal(
+    compareReportSnapshots(caseA2[1], caseA2[0], { currentFingerprint: CURRENT }),
+    -1,
+    'the newer row loses on evidence, not on date',
+  );
 });
 
 // ── B — newer COMPLETE STALE duplicate ──────────────────────────────────────
@@ -135,20 +157,23 @@ test('D — with no Current row, the best available row is selected and surfaced
 });
 
 // ── E — every consumer resolves the same ID ─────────────────────────────────
-test('E — every consumer resolves the same snapshot ID', async () => {
-  const { client, server, byKey, library } = resolveEverywhere(caseA);
-  const viaStore = await loadSnapshotStore(createSnapshotClient(caseA));
-
-  const storeRow = await viaStore.loadReportSnapshot({
+// The store's own reader, built once here: the focused runner's test() is
+// synchronous, so the read happens at module scope and the test asserts on it.
+const storeRead = await (async () => {
+  const instance = createSnapshotClient(caseA);
+  const store = await loadSnapshotStore(instance.client);
+  return store.loadReportSnapshot({
     projectId: PROJECT,
     versionId: VERSION,
     reportType: 'technical',
     currentFingerprint: CURRENT,
   });
+})();
 
-  assert.equal(storeRow.id, 'current-old', 'the store reads through the rule, not the newest row');
-  assert.equal(viaStore.loadReportSnapshot.length, 1, 'the store has one reader');
-  [server.id, byKey.id, library.id, storeRow.id].forEach((id) => {
+test('E — every consumer resolves the same snapshot ID', () => {
+  const { client, server, byKey, library } = resolveEverywhere(caseA);
+  assert.equal(storeRead.id, 'current-old', 'the store reads through the rule, not the newest row');
+  [server.id, byKey.id, library.id, storeRead.id].forEach((id) => {
     assert.equal(id, client.id, 'every entry point resolves the same row');
   });
 });

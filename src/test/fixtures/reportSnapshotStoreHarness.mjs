@@ -68,6 +68,11 @@ export function createSnapshotClient(rows = [], { failUpdate = false } = {}) {
   };
 }
 
+// Every call must yield its OWN module instance, so an instance is never shared
+// between two harnesses: a data: URL is cached by its source text, and a shared
+// instance would keep the first client it captured.
+let instances = 0;
+
 /** Import the store with a given client. Each call yields its own module instance. */
 export async function loadSnapshotStore(client, notify = () => {}) {
   const source = fs.readFileSync(STORE_PATH, 'utf8');
@@ -90,8 +95,10 @@ export async function loadSnapshotStore(client, notify = () => {}) {
     patched = patched.replace(find, replace);
   });
 
+  instances += 1;
   globalThis.__snapshotStoreClient = client;
   globalThis.__snapshotStoreNotify = notify;
-  const module = await import(`data:text/javascript;base64,${Buffer.from(patched).toString('base64')}`);
+  const variant = `${patched}\n// harness instance ${instances}\n`;
+  const module = await import(`data:text/javascript;base64,${Buffer.from(variant).toString('base64')}`);
   return module;
 }

@@ -296,7 +296,7 @@ test('H — several saved reports for one version and type list ONE live report'
 
   // The hook lists exactly what collapseLiveReports returns — collapsed by the ONE
   // canonical rule, told which authority each version holds now.
-  assert.match(LIBRARY_HOOK, /collapseLiveReports\(savedReports, \{ currentFingerprintByVersion/);
+  assert.match(LIBRARY_HOOK, /collapseLiveReports\(savedReports, \{[\s\S]{0,80}currentFingerprintByVersion: publishedFingerprintByVersionId/);
 
   // And one issued PDF per version and report type, however often it was exported.
   const kept = selectLatestExports([
