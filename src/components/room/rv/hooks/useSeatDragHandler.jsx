@@ -18,7 +18,6 @@ const SEAT_MARGIN_M = 0.3;
  * mlpOverride, or trigger any row rebuild during drag.
  */
 export function useSeatDragHandler({
-  canvasToRoom,
   lengthM,
   seatDragStartRef,
   draftSeatsRef,
@@ -30,10 +29,11 @@ export function useSeatDragHandler({
   // Cleanup on unmount
   useEffect(() => () => { if (snapTimerRef.current) clearTimeout(snapTimerRef.current); }, []);
 
-  const handleSeatDrag = useCallback((seatId, newCanvasPos) => {
+  const handleSeatDrag = useCallback((seatId, newRoomPos) => {
     if (!draftSeatsRef?.current) return;
 
-    const { y: currentCursorY } = canvasToRoom(newCanvasPos);
+    const currentCursorY = newRoomPos?.y;
+    if (!Number.isFinite(currentCursorY)) return;
     const roomLen = Number(lengthM) || 6.0;
 
     // Use stable baseline if available — this is the correct path during drag
@@ -92,7 +92,7 @@ export function useSeatDragHandler({
     }));
     publishSeatDragLive(draftSeatsRef.current);
     setSeatDragTick(n => n + 1);
-  }, [canvasToRoom, lengthM, seatDragStartRef, draftSeatsRef, setSeatDragTick]);
+  }, [lengthM, seatDragStartRef, draftSeatsRef, setSeatDragTick]);
 
   const clearSnap = useCallback(() => {
     if (snapTimerRef.current) { clearTimeout(snapTimerRef.current); snapTimerRef.current = null; }
