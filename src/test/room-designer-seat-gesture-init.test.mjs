@@ -1,8 +1,8 @@
 //
 // Room Designer seat gesture — initialisation-order regression.
 //
-// The crash: "Cannot access 'clearSeatDimensionMode' before initialization".
-// RoomVisualisation consumed the gesture hook's clearSeatDimensionMode in a
+// The crash: "Cannot access 'clearSeatSelection' before initialization".
+// RoomVisualisation consumed the gesture hook's clearSeatSelection in a
 // useCallback dependency array declared ~570 lines ABOVE the useSeatGesture call
 // that produces it. A dependency array is evaluated while the component renders,
 // so the binding was still in its temporal dead zone and the whole Room Designer
@@ -29,11 +29,11 @@ const lines = source.split('\n');
 const GESTURE_OUTPUTS = [
   'selectedSeatId',
   'dimensionSeatId',
-  'clearSeatDimensionMode',
+  'clearSeatSelection',
   'seatGesture',
 ];
 
-const hookLineIndex = lines.findIndex(line => /const \{ selectedSeatId, dimensionSeatId, clearSeatDimensionMode, seatGesture \} = useSeatGesture\(\{/.test(line));
+const hookLineIndex = lines.findIndex(line => /const \{ selectedSeatId, dimensionSeatId, clearSeatSelection, seatGesture \} = useSeatGesture\(\{/.test(line));
 
 const firstLineWith = (name) => lines.findIndex(line => new RegExp(`\\b${name}\\b`).test(line));
 
@@ -64,8 +64,8 @@ test('a consumer may hold the gesture callback in a dependency array below the h
   let captured = null;
 
   function Harness() {
-    const { clearSeatDimensionMode } = useSeatGesture({});
-    const onPlanClick = React.useCallback(() => { clearSeatDimensionMode(); }, [clearSeatDimensionMode]);
+    const { clearSeatSelection } = useSeatGesture({});
+    const onPlanClick = React.useCallback(() => { clearSeatSelection(); }, [clearSeatSelection]);
     captured = onPlanClick;
     return null;
   }
@@ -78,14 +78,14 @@ test('the inverted order is what the guard protects against', () => {
   function InvertedOrder() {
     // Consuming the hook result above the hook: the dependency array is
     // evaluated during render, before the const exists.
-    const onPlanClick = React.useCallback(() => { clearSeatDimensionMode(); }, [clearSeatDimensionMode]);
-    const { clearSeatDimensionMode } = useSeatGesture({});
+    const onPlanClick = React.useCallback(() => { clearSeatSelection(); }, [clearSeatSelection]);
+    const { clearSeatSelection } = useSeatGesture({});
     return onPlanClick && null;
   }
 
   assert.throws(
     () => renderToStaticMarkup(React.createElement(InvertedOrder)),
-    /Cannot access 'clearSeatDimensionMode' before initialization/,
+    /Cannot access 'clearSeatSelection' before initialization/,
     'the inverted order must still fail, so the source-order guard is meaningful'
   );
 });

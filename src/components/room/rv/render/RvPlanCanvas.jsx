@@ -21,6 +21,7 @@ import RvSpeakerTooltip from "@/components/room/rv/render/RvSpeakerTooltip";
 import SeatingDragImpactCard from "@/components/room/SeatingDragImpactCard";
 import RvRoomElementDragDims from "@/components/room/rv/render/RvRoomElementDragDims";
 import RvMlpDragDims from "@/components/room/rv/render/RvMlpDragDims";
+import RvSeatDimensions from "@/components/room/rv/render/RvSeatDimensions";
 import RvProjectorDragDims from "@/components/room/rv/render/RvProjectorDragDims";
 import RvProjectorThrowWarning from "@/components/room/rv/render/RvProjectorThrowWarning";
 import RvSubSymmetryGuide from "@/components/room/rv/render/RvSubSymmetryGuide";
@@ -124,7 +125,8 @@ export default function RvPlanCanvas({
   seatGesture,
   selectedSeatId,
   dimensionSeatId,
-  dimensionDragInfo,
+  // Dimensions mode: the active seat's three measurements (null when inactive).
+  seatDimensions,
   clampMlpY,
   MLPMarker,
   overheadIconElements,
@@ -754,12 +756,12 @@ export default function RvPlanCanvas({
               svgH={svgHSafe}
             />
 
-            {/* Seat dimensional mode — the same wall measurements, held on screen
-                after a long press on the selected seat (no drag in progress). */}
-            {dragType !== 'seat' && dimensionDragInfo?.visible && (
-              <RvMlpDragDims
-                dragInfo={dimensionDragInfo}
-                scale={scale}
+            {/* Seat dimensions mode — the active seat's three measurements (nearest
+                side wall, rear wall, screen plane), held on screen while no drag is
+                in progress. Only one seat's dimensions are ever shown. */}
+            {dragType !== 'seat' && seatDimensions?.visible && (
+              <RvSeatDimensions
+                dimensions={seatDimensions}
                 meterToCanvasX={meterToCanvasX}
                 meterToCanvasY={meterToCanvasY}
                 svgW={svgWSafe}

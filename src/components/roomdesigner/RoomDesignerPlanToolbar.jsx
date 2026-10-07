@@ -1,8 +1,10 @@
-import React, { useMemo, useState } from "react";
+import React, { useMemo, useState, useSyncExternalStore } from "react";
 import { Switch } from "@/components/ui/switch";
 import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
 import { ChevronDown, Crosshair } from "lucide-react";
 import { setMlpGrab } from "@/components/state/mlpGrabStore";
+import { getSeatInfoMode, setSeatInfoMode as persistSeatInfoMode, subscribeSeatInfoMode } from "@/components/state/seatInfoModeStore";
+import SeatInfoModeToggle from "@/components/roomdesigner/SeatInfoModeToggle";
 
 export default function RoomDesignerPlanToolbar({
   allowExtraSurrounds,
@@ -20,6 +22,7 @@ export default function RoomDesignerPlanToolbar({
   seatingPositions = [],
   onMoveRsp,
 }) {
+  const seatInfoMode = useSyncExternalStore(subscribeSeatInfoMode, getSeatInfoMode, getSeatInfoMode);
   const [rspMenuOpen, setRspMenuOpen] = useState(false);
   const rspOptions = useMemo(() => {
     // Use the seats actually drawn, including any committed row moves.
@@ -140,6 +143,20 @@ export default function RoomDesignerPlanToolbar({
       </div>
       
       <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginLeft: 'auto' }}>
+        {/* Seat click mode — what clicking a seat on the plan does */}
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: 6,
+            borderRight: '1px solid #DCDBD6',
+            paddingRight: 12,
+          }}
+        >
+          <span style={{ fontSize: 12, color: '#3E4349', fontWeight: 500 }}>Seat click</span>
+          <SeatInfoModeToggle value={seatInfoMode} onChange={persistSeatInfoMode} />
+        </div>
+
         <Popover open={rspMenuOpen} onOpenChange={setRspMenuOpen}>
           <PopoverTrigger asChild>
             <button

@@ -3,6 +3,7 @@
 import React, { useMemo, useCallback, useState, useRef, useImperativeHandle, useEffect, useLayoutEffect, useSyncExternalStore, forwardRef } from "react";
 
 import SeatHud from "@/components/room/SeatHud";
+import { getSeatInfoMode, subscribeSeatInfoMode } from "@/components/state/seatInfoModeStore";
 import RP22GradingPill from "@/components/ui/RP22GradingPill";
 import { getSpeakerModelMeta, normaliseModelKey as registryNormaliseModelKey } from "@/components/models/speakers/registry";
 import { rp23HorizontalAngleForSeat, verticalViewingAngleDeg } from "@/components/utils/seatHover";
@@ -56,7 +57,7 @@ import { usePanZoomHandlers } from "@/components/room/rv/hooks/usePanZoomHandler
 import { useZoneComponents } from "@/components/room/rv/hooks/useZoneComponents";
 import { useRenderFrontWideZones } from "@/components/room/rv/hooks/useRenderFrontWideZones";
 import { getDolbyZoneSpecs } from "@/components/room/rv/utils/getDolbyZoneSpecs";
-import { buildSeatDimensionInfo } from "@/components/room/rv/utils/seatDimensionInfo";
+import { buildSeatDimensionInfo, buildSeatWallMeasurements } from "@/components/room/rv/utils/seatDimensionInfo";
 import { useVisiblePlanSpeakers } from "@/components/room/rv/hooks/useVisiblePlanSpeakers";
 import { useOverheadIconElements } from "@/components/room/rv/hooks/useOverheadIconElements";
 import { useSideSurroundVisualSpanM } from "@/components/room/rv/hooks/useSideSurroundVisualSpanM";
@@ -1733,19 +1734,24 @@ const byId = useEntitiesById({
     perSeatP20Results: currentP20Results,
   });
 
+  // Seat click mode — one authority, shared with the Plan View toolbar control.
+  const seatInfoMode = useSyncExternalStore(subscribeSeatInfoMode, getSeatInfoMode, getSeatInfoMode);
+
   // ── Seat plan gesture ─────────────────────────────────────────────────────
-  // The seat is the interactive object: a single click opens that seat's HUD
-  // immediately, a drag moves the seat, and a release after a drag never opens
-  // the HUD. There is no select step and no double-click requirement; the RSP
+  // The seat is the interactive object: one click shows the active mode's
+  // information for that seat — its HUD in HUD mode, its dimensions in
+  // Dimensions mode — and a drag moves the seating block without activating the
+  // seat. There is no select step and no double-click requirement; the RSP
   // marker is status only and never intercepts the seat (see RvSeatLayer).
-  const { selectedSeatId, dimensionSeatId, clearSeatDimensionMode, seatGesture } = useSeatGesture({
+  const { selectedSeatId, dimensionSeatId, clearSeatSelection, seatGesture } = useSeatGesture({
     handleMouseDown,
     handleSeatClick,
+    mode: seatInfoMode,
   });
 
   // Clear overhead selection when clicking on canvas background. Declared after
   // the gesture hook on purpose: a useCallback dependency array is evaluated
-  // during render, so consuming clearSeatDimensionMode above the hook that
+  // during render, so consuming clearSeatSelection above the hook that
   // declares it crashed the Room Designer in its temporal dead zone. Hook
   // results are only consumed below the hook that produces them.
   const handlePlanClickWithSelection = useCallback((e) => {
@@ -1753,20 +1759,28 @@ const byId = useEntitiesById({
       setSelectedOverheadRow(null);
     }
     justSelectedOverheadRef.current = false;
-    // A click on the empty plan dismisses a held dimensional mode and the pinned
-    // seat HUD: clicking a seat opens it, clicking the plan itself closes it.
-    clearSeatDimensionMode();
+    // A click on the empty plan clears everything a seat click produced: the
+    // pinned HUD and the active seat's dimensions both go.
     dismissSeatHud();
-  }, [clearSeatDimensionMode, dismissSeatHud]);
+    clearSeatSelection();
+  }, [dismissSeatHud, clearSeatSelection]);
 
-  // Measurements for the held dimensional guide, taken from the seat's stored
-  // centre through the same authority the drag guide uses.
-  const dimensionDragInfo = useMemo(() => {
-    if (!dimensionSeatId) return null;
+  // Dimensions mode: the three measurements for the active seat only, taken from
+  // that seat's own listening position through the same authorities the seat drag
+  // guide and the seat HUD use. Only one seat can be on screen at a time.
+  const seatDimensions = useMemo(() => {
+    if (seatInfoMode !== 'dimensions' || !dimensionSeatId) return null;
     const seats = Array.isArray(seatingPositions) ? seatingPositions : [];
     const seat = seats.find(s => String(s?.id) === String(dimensionSeatId));
-    return buildSeatDimensionInfo(seat, widthM, lengthM);
-  }, [dimensionSeatId, seatingPositions, widthM, lengthM]);
+    return buildSeatWallMeasurements(seat, { widthM, lengthM, screenFrontPlaneM });
+  }, [seatInfoMode, dimensionSeatId, seatingPositions, widthM, lengthM, screenFrontPlaneM]);
+
+  // Dimensions mode owns the plan: the HUD closes as the dimensions appear. Going
+  // back to HUD mode re-opens the same seat's HUD, which the gesture hook does
+  // when it sees the mode change.
+  React.useEffect(() => {
+    if (seatInfoMode === 'dimensions') dismissSeatHud();
+  }, [seatInfoMode, dismissSeatHud]);
 
   // AUTOMATIC SEAT METRICS CACHE — extracted to hook
   // ---- Stable primitive revision inputs (avoid update loops) ----
@@ -2427,7 +2441,7 @@ const idsClip = (ids && ids.clip) ? ids.clip : 'b44_clip_fallback';
           lensY: projectorPosition?.lensY ?? null,
         }}
         seatDragInfo={seatDragInfo}
-        dimensionDragInfo={dimensionDragInfo}
+        seatDimensions={seatDimensions}
         dimensionSeatId={dimensionSeatId}
         selectedSeatId={selectedSeatId}
         seatGesture={seatGesture}

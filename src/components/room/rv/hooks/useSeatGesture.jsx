@@ -3,33 +3,26 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 /**
  * useSeatGesture — the seat plan interaction model.
  *
- *   single click   → open (or move) that seat's HUD immediately
- *   press & hold   → the seat's wall-measurement guides are held on screen;
- *                    releasing still opens that seat's HUD
- *   drag           → movement past the drag threshold drags the seat, and a
- *                    release after a drag never also opens the HUD
+ *   single click   → the active mode's information for that seat: its HUD in
+ *                    HUD mode, its dimensions in Dimensions mode
+ *   drag           → movement past the drag threshold moves the seating block,
+ *                    and a release after a drag never activates the seat
  *
- * The seat is the interactive object and its HUD is the single click action:
- * there is no separate select step, no double-click requirement, and no hold
- * needed to read a seat. Nothing is delayed waiting for a second click.
+ * The seat is the interactive object and its click has exactly one action:
+ * there is no separate select step, no double-click requirement and no hold
+ * timer. Nothing is delayed waiting for a second click.
  */
 
-export const SEAT_LONG_PRESS_MS = 1500;
 export const SEAT_DRAG_THRESHOLD_PX = 4;
 
-export function useSeatGesture({ handleMouseDown, handleSeatClick }) {
+export function useSeatGesture({ handleMouseDown, handleSeatClick, mode = "hud" }) {
   const [selectedSeatId, setSelectedSeatId] = useState(null);
   const [dimensionSeatId, setDimensionSeatId] = useState(null);
   const pendingRef = useRef(null);
-  const timerRef = useRef(null);
   const listenersRef = useRef(null);
-
-  const clearLongPressTimer = useCallback(() => {
-    if (timerRef.current) {
-      clearTimeout(timerRef.current);
-      timerRef.current = null;
-    }
-  }, []);
+  // The last seat activated by a click, so a mode switch can show the same seat.
+  const activeSeatRef = useRef(null);
+  const previousModeRef = useRef(mode);
 
   const detachPointerListeners = useCallback(() => {
     const listeners = listenersRef.current;
@@ -41,14 +34,12 @@ export function useSeatGesture({ handleMouseDown, handleSeatClick }) {
   }, []);
 
   const endGesture = useCallback(() => {
-    clearLongPressTimer();
     detachPointerListeners();
     pendingRef.current = null;
-  }, [clearLongPressTimer, detachPointerListeners]);
+  }, [detachPointerListeners]);
 
   // Movement past the drag threshold hands the gesture over to the existing
-  // seat drag. The drag guide carries the same measurements, so the held
-  // dimensional guide is dropped to avoid drawing the values twice.
+  // seating-block drag: the whole block moves, and the click never fires.
   const startSeatDrag = useCallback((pending, clientX, clientY) => {
     pending.dragStarted = true;
     setDimensionSeatId((current) => (String(current) === String(pending.seatId) ? null : current));
@@ -81,21 +72,11 @@ export function useSeatGesture({ handleMouseDown, handleSeatClick }) {
     };
     pendingRef.current = pending;
 
-    // A deliberate hold shows this seat's measurement guides. It never withholds
-    // the HUD: the release below opens it either way.
-    timerRef.current = setTimeout(() => {
-      timerRef.current = null;
-      if (pendingRef.current !== pending || pending.dragStarted) return;
-      setSelectedSeatId(seat.id);
-      setDimensionSeatId(seat.id);
-    }, SEAT_LONG_PRESS_MS);
-
     const onMove = (moveEvent) => {
       if (pendingRef.current !== pending || pending.dragStarted) return;
       const dx = moveEvent.clientX - pending.startX;
       const dy = moveEvent.clientY - pending.startY;
       if (dx * dx + dy * dy <= SEAT_DRAG_THRESHOLD_PX * SEAT_DRAG_THRESHOLD_PX) return;
-      clearLongPressTimer();
       startSeatDrag(pending, moveEvent.clientX, moveEvent.clientY);
     };
 
@@ -103,15 +84,21 @@ export function useSeatGesture({ handleMouseDown, handleSeatClick }) {
       const active = pendingRef.current;
       endGesture();
       if (!active) return;
-      // A drag commits on the drag path and never also opens the HUD. Every
-      // other release — quick click or the end of a hold — is the seat's click.
+      // A drag commits on the drag path and never also activates the seat. Every
+      // other release is that seat's click, in whichever mode is active.
       if (active.dragStarted) return;
 
       setSelectedSeatId(active.seatId);
-      setDimensionSeatId((current) => (
-        current && String(current) !== String(active.seatId) ? null : current
-      ));
+      activeSeatRef.current = active.seat;
 
+      if (mode === "dimensions") {
+        // Dimensions mode shows one seat's measurements at a time, so this
+        // replaces whatever was shown before.
+        setDimensionSeatId(active.seatId);
+        return;
+      }
+
+      setDimensionSeatId(null);
       if (typeof handleSeatClick === "function") handleSeatClick(active.seat);
     };
 
@@ -121,14 +108,32 @@ export function useSeatGesture({ handleMouseDown, handleSeatClick }) {
     window.addEventListener("pointerup", onUp);
     window.addEventListener("pointercancel", onCancel);
     listenersRef.current = { onMove, onUp, onCancel };
-  }, [endGesture, clearLongPressTimer, startSeatDrag, handleSeatClick]);
+  }, [endGesture, startSeatDrag, handleSeatClick, mode]);
 
-  const clearSeatDimensionMode = useCallback(() => setDimensionSeatId(null), []);
+  const clearSeatSelection = useCallback(() => {
+    setSelectedSeatId(null);
+    setDimensionSeatId(null);
+    activeSeatRef.current = null;
+  }, []);
+
+  // Switching modes keeps the active seat and immediately shows the matching
+  // information for it: the HUD in HUD mode, that seat's dimensions in
+  // Dimensions mode. No second click is required.
+  useEffect(() => {
+    if (previousModeRef.current === mode) return;
+    previousModeRef.current = mode;
+    if (mode === "dimensions") {
+      setDimensionSeatId(selectedSeatId);
+      return;
+    }
+    setDimensionSeatId(null);
+    const seat = activeSeatRef.current;
+    if (seat && typeof handleSeatClick === "function") handleSeatClick(seat);
+  }, [mode, selectedSeatId, handleSeatClick]);
 
   useEffect(() => () => {
-    clearLongPressTimer();
     detachPointerListeners();
-  }, [clearLongPressTimer, detachPointerListeners]);
+  }, [detachPointerListeners]);
 
   const seatGesture = useMemo(() => ({
     onSeatPointerDown: handleSeatPointerDown,
@@ -137,7 +142,7 @@ export function useSeatGesture({ handleMouseDown, handleSeatClick }) {
   return {
     selectedSeatId,
     dimensionSeatId,
-    clearSeatDimensionMode,
+    clearSeatSelection,
     seatGesture,
   };
 }

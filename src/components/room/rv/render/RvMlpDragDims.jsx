@@ -1,5 +1,17 @@
 "use client";
 
+import {
+  DIM_DASH as DASH,
+  DIM_STROKE as STROKE,
+  DIM_STROKE_W as STROKE_W,
+  DIM_TEXT_FILL as TEXT_FILL,
+  DIM_TEXT_SIZE as TEXT_SIZE,
+  DIM_TEXT_WEIGHT as TEXT_WEIGHT,
+  DIM_TICK as TICK,
+  clampDimTextX as clampTextX,
+  clampDimTextY as clampTextY,
+} from "@/components/room/rv/render/rvDimensionStyle";
+
 /**
  * RvMlpDragDims
  *
@@ -13,25 +25,6 @@
  * Stage 1 scope: RSP / MLP only. Visible only while dragging; unmounts
  * immediately on drag end (parent clears dragInfo to null/invisible).
  */
-
-const TEXT_SIZE = 10;
-const TEXT_HALF_W = 50;
-const TEXT_H = TEXT_SIZE;
-const SAFE_PAD = 4;
-
-const STROKE = '#3E6B4F';
-const STROKE_W = 1;
-const DASH = '3,3';
-const TEXT_FILL = '#213428';
-const TEXT_WEIGHT = 600;
-const TICK = 5;
-
-function clampTextX(x, svgW) {
-  return Math.max(TEXT_HALF_W + SAFE_PAD, Math.min(x, svgW - TEXT_HALF_W - SAFE_PAD));
-}
-function clampTextY(y, svgH) {
-  return Math.max(TEXT_H + SAFE_PAD, Math.min(y, svgH - TEXT_H - SAFE_PAD));
-}
 
 export default function RvMlpDragDims({
   dragInfo,
