@@ -1,8 +1,9 @@
 /** Existing prose checks, with clause-independent grounding and internal attribution. */
 import { isBassConsistencyClaim } from '../proposalEvidence/proposalEvidenceWording.js';
 import { WRITER_REJECTION, violation } from './writerContractSchema.js';
-import { claimLevels, hasRecommendationClaim, isPackProse, isProductToken, isRecommendation, kindSatisfiesAssertion, levelTokens, measurementTokens, modelTokens, p20BlocksConsistency, packProseSentences, parameterIds, seatScopeInText, sentenceParts, stripOptionNames, blockedChangeBlocks, blockPatterns } from './writerVocabulary.js';
-import { anchorPatternFor, assertedKind, claimsArea, isDenied, isConsistencyCaveat, seatConsistencyClaim, scopedClaimIssue, optionNameById, CHANNEL_FAMILY, CHANGE_SIGNAL, CONTRAST, CONSISTENCY_ANCHOR, NEGATION_SHAPED_CLAIM } from './writerOutputTextRules.js';
+import { claimLevels, hasRecommendationClaim, isPackProse, isRecommendation, kindSatisfiesAssertion, levelTokens, measurementTokens, p20BlocksConsistency, packProseSentences, parameterIds, seatScopeInText, sentenceParts, stripOptionNames, blockedChangeBlocks, blockPatterns } from './writerVocabulary.js';
+import { anchorPatternFor, assertedKind, claimsArea, isDenied, isConsistencyCaveat, seatConsistencyClaim, scopedClaimIssue, CHANNEL_FAMILY, CHANGE_SIGNAL, CONSISTENCY_ANCHOR, NEGATION_SHAPED_CLAIM } from './writerOutputTextRules.js';
+import { productScopeViolations } from './writerProductScope.js';
 import { designStageCommentary } from './writerDesignStageRules.js';
 import { framingContrastGrounded, independentClauses, supportedChangeClause } from './writerClausePrecision.js';
 import { attributeViolation } from './writerViolationAudit.js';
@@ -92,21 +93,12 @@ export function scanProse({ input, vocabulary, section, text, claims = [], claim
   const citedOptionIds = new Set(citedClaims.filter(c => c?.option?.version_id).map(c => c.option.version_id));
   const oneOptionOnly = citedOptionIds.size === 1 && citedClaims.some(c => c?.option?.version_id)
     && citedClaims.every(c => !c?.option?.version_id || citedOptionIds.has(c.option.version_id));
-  for (const token of modelTokens(text)) {
-    if (!isProductToken(token)) continue;
-    context = { text, sentence: sentences.find(s => s.includes(token)), match: token };
-    if (!vocabulary.products.has(token)) {
-      report(WRITER_REJECTION.UNSELECTED_PRODUCT, { section, detail: token });
-      continue;
-    }
-    if (!oneOptionOnly) continue;
-    const owners = vocabulary.owners.get(token) || new Set();
-    const foreign = [...owners].filter(id => !citedOptionIds.has(id));
-    if (foreign.length === 0) continue;
-    const sentence = sentences.find(s => s.includes(token)) || String(text);
-    if (CONTRAST.test(sentence)) continue;
-    if (foreign.some(id => { const name = optionNameById(input, id); return name && sentence.includes(name); })) continue;
-    report(WRITER_REJECTION.EXTRA_PRODUCT, { section, detail: `product_belongs_to_another_option:${token}` });
+  // A product is scoped by option, role and quantity, never by its name alone —
+  // the same product may legitimately appear in more than one option. See
+  // writerProductScope.js for the rule and the evidence it reads.
+  for (const issue of productScopeViolations({ input, vocabulary, text, citedOptionIds, oneOptionOnly })) {
+    context = { text, sentence: issue.sentence, match: issue.token };
+    report(issue.code, { section, detail: issue.detail });
   }
   if (p20BlocksConsistency(input)) {
     for (const sentence of sentences) {
