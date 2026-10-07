@@ -7,8 +7,8 @@ import { recordTemporaryP18P19DragEnd } from "@/components/hooks/useRP22Analysis
 let temporaryRSPDragEndCount = 0;
 
 export function useMouseUpHandler({
-  dragType,
-  draggedItemId,
+  dragType: renderedDragType,
+  draggedItemId: renderedDraggedItemId,
   byId,
   getCanonicalRole,
   overheadZones,
@@ -51,7 +51,9 @@ export function useMouseUpHandler({
   // Sub snap guide cleanup
   setSubSnapState,
 }) {
-  const handleMouseUp = useCallback((e) => {
+  const handleMouseUp = useCallback((e, gesture) => {
+    const dragType = gesture?.type ?? renderedDragType;
+    const draggedItemId = gesture?.id ?? renderedDraggedItemId;
     // RSP marker drag: commit the final draft Y once on release.
     // RSP drag is Y-AXIS ONLY — X is never persisted; it always derives from
     // the room centreline via useEffectiveRsp. On first committed drag from
@@ -138,16 +140,7 @@ export function useMouseUpHandler({
        isDraggingSeatRef.current = false;
        }
 
-     // Release pointer capture
-     if ((dragType === 'speaker' || dragType === 'projector') && e?.target) {
-       try {
-         if (typeof e.target.releasePointerCapture === 'function' && e.pointerId) {
-           e.target.releasePointerCapture(e.pointerId);
-         }
-       } catch (err) {
-         // Ignore release errors
-       }
-     }
+     // Stable SVG pointer capture is released by the shared end path.
 
      // Commit draft speaker positions if speakers were being dragged.
      // Apply final release constraints (overhead zones, front-wide side walls) and
@@ -217,7 +210,7 @@ export function useMouseUpHandler({
     draggedSubWallRef.current = null;
     draggedSubTypeRef.current = null;
 
-  }, [dragType, draggedItemId, byId, getCanonicalRole, overheadZones, onSetSpeakers, setDragState, setDragWarning, setTooltip, rsDragLockRef, isDraggingRearRef, isDraggingFW, isDraggingRef, widthM, getModelDimsM, commitDraftSubPositions, isDraggingSeatRef, draftSeatsRef, commitDraftSeatPositions, isDraggingSpeakerDraftRef, draftSpeakersRef, commitDraftSpeakerPositions,     mlpDragInfo, onSetManualRspY_m, onSetManualRspX_m, onSetRspMode, onClearDesignatedRspSeatId, setSubSnapState]);
+  }, [renderedDragType, renderedDraggedItemId, byId, getCanonicalRole, overheadZones, onSetSpeakers, setDragState, setDragWarning, setTooltip, rsDragLockRef, isDraggingRearRef, isDraggingFW, isDraggingRef, widthM, getModelDimsM, commitDraftSubPositions, isDraggingSeatRef, draftSeatsRef, commitDraftSeatPositions, isDraggingSpeakerDraftRef, draftSpeakersRef, commitDraftSpeakerPositions,     mlpDragInfo, onSetManualRspY_m, onSetManualRspX_m, onSetRspMode, onClearDesignatedRspSeatId, setSubSnapState]);
 
   return { handleMouseUp };
 }
