@@ -294,8 +294,9 @@ test('H — several saved reports for one version and type list ONE live report'
   assert.equal(rows.filter((row) => row.report_type === 'visual').length, 1, 'one visual row');
   assert.equal(rows.find((row) => row.report_type === 'technical').id, 'snap-2', 'the newest generation');
 
-  // The hook lists exactly what collapseLiveReports returns.
-  assert.match(LIBRARY_HOOK, /collapseLiveReports\(savedReports\)/);
+  // The hook lists exactly what collapseLiveReports returns — collapsed by the ONE
+  // canonical rule, told which authority each version holds now.
+  assert.match(LIBRARY_HOOK, /collapseLiveReports\(savedReports, \{ currentFingerprintByVersion/);
 
   // And one issued PDF per version and report type, however often it was exported.
   const kept = selectLatestExports([
