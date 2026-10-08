@@ -900,36 +900,48 @@ export default function RP22ClientReport() {
     pricingStatus,
     elapsedSeconds: stateSeconds,
   });
-  const staleBassParameterKeys = authority.reportCompleteness?.bassAuthorityOutOfDate
-    ? [...new Set([
-        ...(authority.reportCompleteness?.missingParameterKeys || []),
-        ...(authority.reportCompleteness?.incompleteSeatParameterKeys || []),
-      ])].filter((key) => ["p14", "p18", "p19", "p20"].includes(key))
-    : [];
-  // The saved publication is stale: the published bass fingerprint no longer
-  // matches this version's authority, so no report may be generated from it yet.
-  // The outstanding work is saving the CURRENT assessment, which happens in the
-  // Room Designer — so this report offers that route as its primary action rather
-  // than only a way back. Nothing is published from here: the one publication
-  // flow stays where it is.
-  const publicationStale = authority.publicationGate?.status === "stale_pointer";
+  // ── THE TWO NOT-READY STATES ARE DISTINCT ────────────────────────────────
+  // An incomplete assessment and a stale publication are different problems and
+  // must never be labelled as each other. Staleness is the authority's own
+  // determination — the saved publication exists but its bass fingerprint no
+  // longer matches the current version. Incompleteness is the real absence of
+  // assessment items. Each state states its own body, label and action, so the
+  // card can never describe two different problems at once.
   const incompleteAssessmentKeys = [...new Set([
     ...(authority.reportCompleteness?.missingParameterKeys || []),
     ...(authority.reportCompleteness?.incompleteSeatParameterKeys || []),
   ])];
-  const assessmentCanBePublished = publicationStale && incompleteAssessmentKeys.length === 0;
+  const gateStatus = authority.publicationGate?.status || null;
+  // The assessment itself is genuinely incomplete: items are missing, or the
+  // authority says the assessment is not there at all.
+  const assessmentIncomplete = incompleteAssessmentKeys.length > 0
+    || gateStatus === "assessment_incomplete"
+    || gateStatus === "assessment_missing";
+  // A stale publication: stated by the gate pointer, or by the authority's own
+  // stale-publication reason.
+  const publicationStale = gateStatus === "stale_pointer"
+    || authority.reportCompleteness?.bassAuthorityOutOfDate === true
+    || /publication is stale/i.test(authority.reportCompleteness?.reason || "");
 
-  const readinessBase = staleBassParameterKeys.length
+  const STALE_PUBLICATION_BODY = "The saved engineering publication is stale. The bass fingerprint no longer matches the current version.";
+  const INCOMPLETE_ASSESSMENT_BODY = "The current assessment is incomplete. Complete the missing items before creating the Project Report.";
+  const PUBLISH_CURRENT_ASSESSMENT_ACTION = "Update the Project Report to publish the current assessment and refresh the report evidence.";
+  const COMPLETE_ASSESSMENT_ACTION = "Complete the missing assessment items in Room Designer, then create the Project Report.";
+
+  const readinessBase = assessmentIncomplete
     ? {
         ...derivedReadiness,
         state: REPORT_STATE.NOT_READY,
-        missing: staleBassParameterKeys.map((key) => ({
-          key,
-          label: key.toUpperCase(),
-          action: "Update Bass Performance in Room Designer.",
-        })),
-        nextAction: "Update Bass Performance before generating reports.",
-        reason: authority.reportCompleteness?.reason,
+        missing: [
+          { key: "engineering_assessment", label: "Saved assessment incomplete" },
+          ...incompleteAssessmentKeys.map((key) => ({
+            key,
+            label: key.toUpperCase(),
+            action: "Complete this parameter in Room Designer.",
+          })),
+        ],
+        nextAction: COMPLETE_ASSESSMENT_ACTION,
+        reason: INCOMPLETE_ASSESSMENT_BODY,
         canExport: false,
       }
     : publicationStale
@@ -938,17 +950,9 @@ export default function RP22ClientReport() {
           state: REPORT_STATE.NOT_READY,
           // A complete assessment needs saving, not repairing: the missing item is
           // the stale publication itself, and the body already says why.
-          missing: assessmentCanBePublished
-            ? [{ key: "engineering_publication", label: "Saved publication stale" }]
-            : incompleteAssessmentKeys.map((key) => ({
-                key,
-                label: key.toUpperCase(),
-                action: "Complete this parameter in Room Designer.",
-              })),
-          nextAction: assessmentCanBePublished
-            ? "Update the Project Report to publish the current assessment and refresh the report evidence."
-            : "Complete the outstanding assessment items in Room Designer, then open the Project Report again.",
-          reason: authority.reportCompleteness?.reason,
+          missing: [{ key: "engineering_publication", label: "Saved publication stale" }],
+          nextAction: PUBLISH_CURRENT_ASSESSMENT_ACTION,
+          reason: STALE_PUBLICATION_BODY,
           canExport: false,
         }
       : derivedReadiness;
@@ -1112,10 +1116,11 @@ export default function RP22ClientReport() {
     navigate(`/RoomDesigner?projectId=${projectId}`);
   };
 
-  // The one update flow for a stale publication: the Room Designer, for THIS
-  // version, is where the current assessment is saved and published. Opening it
-  // refreshes the publication; the Project Report can then be generated, or
-  // refreshed by its own Update action. No second publication path is created.
+  // The one action flow for both not-ready states: the Room Designer, for THIS
+  // version, is where a stale publication is refreshed and where an incomplete
+  // assessment is completed. Opening it refreshes the publication; the Project
+  // Report can then be generated, or refreshed by its own Update action. No
+  // second publication path is created here.
   const handleUpdateProjectReport = () => {
     if (!projectId) return;
     const targetVersion = authority.versionId || requestedVersionId || null;
@@ -1304,12 +1309,10 @@ export default function RP22ClientReport() {
               onRetry={
                 authorityReadFailed ? authority.retry
                   : exportError ? handleExport
-                  : publicationStale ? handleUpdateProjectReport
+                  : (assessmentIncomplete || publicationStale) ? handleUpdateProjectReport
                   : undefined
               }
-              retryLabel={publicationStale
-                ? (assessmentCanBePublished ? "Update Project Report" : "Complete Assessment")
-                : "Retry"}
+              retryLabel={assessmentIncomplete ? "Complete Assessment" : "Update Project Report"}
               diagnostics={gateDiagnostics}
             />
           </div>
