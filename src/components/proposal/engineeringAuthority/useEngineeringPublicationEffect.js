@@ -54,6 +54,7 @@ import {
   computeEngineeringFingerprint,
 } from '@/components/proposal/engineeringAuthority/engineeringFingerprint';
 import { readDesignReviewHandoff } from '@/components/state/designReviewHandoff';
+import { refreshEngineeringPublicationReaders } from '@/components/engineering/versionedEngineeringAuthority';
 import { statesBassAuthority } from '@/components/engineering/versionedEngineeringAuthority';
 import {
   PUBLICATION_ATTEMPT,
@@ -166,6 +167,7 @@ export function useEngineeringPublicationEffect({
       recordPublicationAttempt(projectId, versionId, {
         status: PUBLICATION_ATTEMPT.NOT_READY, fingerprint: engineeringFingerprint,
         message: 'Not ready: ' + preflight.reason, missing: preflight.missing, gates: preflight.gates,
+        assessmentComplete: preflight.assessmentComplete,
       });
       return;
     }
@@ -232,6 +234,7 @@ export function useEngineeringPublicationEffect({
         const body = response?.data || response || {};
         const acknowledgement = body.acknowledgement || null;
         if (acknowledgement?.durably_published === true) {
+          refreshEngineeringPublicationReaders(projectId, versionId);
           lastPublishedFingerprintRef.current = publicationKey;
           recordPublicationAttempt(projectId, versionId, {
             status: PUBLICATION_ATTEMPT.ACKNOWLEDGED,
@@ -239,6 +242,7 @@ export function useEngineeringPublicationEffect({
             publishedAt: body?.version?.published_at || null,
             httpStatus: response?.status || 200,
             gates: preflight.gates,
+            assessmentComplete: preflight.assessmentComplete,
           });
         } else {
           recordPublicationAttempt(projectId, versionId, {
@@ -261,6 +265,8 @@ export function useEngineeringPublicationEffect({
           message: err?.response?.data?.message || err?.message || 'The engineering assessment could not be saved.',
           missing: err?.response?.data?.acknowledgement?.missing || [],
           httpStatus: err?.response?.status || null,
+          assessmentComplete: preflight.assessmentComplete,
+          gates: preflight.gates,
         });
         console.error('[publishEngineering] DB publish failed:', err?.message || err);
       }
