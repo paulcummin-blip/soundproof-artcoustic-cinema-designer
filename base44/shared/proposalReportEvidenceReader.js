@@ -290,7 +290,7 @@ function engineeringFromEvidence(technicalEvidence) {
  * only the RSP result is kept here and the per-seat rows are dropped — no
  * per-seat P19 evidence can reach a proposal pack or a comparison.
  */
-function rspOnlyP19(p19) {
+export function rspOnlyP19(p19) {
   if (!p19 || typeof p19 !== 'object') return p19 ?? null;
   return { rsp: p19.rsp ?? null };
 }
