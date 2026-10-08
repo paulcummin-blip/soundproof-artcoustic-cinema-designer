@@ -46,6 +46,8 @@ import { buildClientAcousticTreatmentPage } from "@/components/report/client/aco
 import ClientBassCapability from "@/components/report/client/ClientBassCapability";
 import ClientBassResponse from "@/components/report/client/ClientBassResponse";
 import ClientP19RspPresentation from "@/components/report/client/ClientP19RspPresentation";
+import { buildP19RspGraph } from "@/components/report/technical/bassResponseGraphAuthority";
+import { useCompletedBassAuthority } from "@/components/room/bass/completedBassResultStore";
 import ClientAdiDesignSummary from "@/components/report/client/ClientAdiDesignSummary";
 import { selectClientBassPerformance } from "@/components/report/client/selectClientBassPerformance";
 import ClientP2SystemArchitecture from "@/components/report/client/ClientP2SystemArchitecture";
@@ -106,6 +108,11 @@ export default function RP22ClientReport() {
   const requestedVersionId = useMemo(() => readRequestedVersionId(searchParams), [searchParams]);
 
   const authority = useClientReportAuthority(projectId, requestedVersionId);
+  // The P19 evidence graph reads the same saved completed bass contract the
+  // Room Designer and the Technical Report read. Nothing is recalculated, and
+  // when the saved post-EQ RSP curve and target are unavailable the P19 page
+  // states that plainly instead of drawing an unrelated curve.
+  const completedBassAuthority = useCompletedBassAuthority(projectId || "free", authority.versionId || "free");
   const engineeringSummary = authority.engineeringSummary || null;
   const p19SeatAuthority = engineeringSummary?.p19SeatAuthority || null;
   const appState = authority.reportApp;
@@ -133,6 +140,16 @@ export default function RP22ClientReport() {
 
   // The report's canonical readiness state is derived below, once the
   // published bass authority has resolved. One state governs the whole report.
+
+  // ── P19 evidence graph ──
+  // The corrected (post-EQ) response at the RSP against the target, built from
+  // the saved completed bass contract through the shared P19 graph authority —
+  // the same evidence the Technical Report's P19 page draws.
+  const p19Graph = useMemo(() => buildP19RspGraph({
+    contract: completedBassAuthority?.contract || null,
+    authoritative: completedBassAuthority?.authoritative === true,
+    roomDims,
+  }), [completedBassAuthority?.contract, completedBassAuthority?.authoritative, roomDims]);
 
   // ── Design Summary (static intro) ──
   // Design assumptions (P15/P21) are deliberately absent from the Visual Report:
@@ -678,6 +695,7 @@ export default function RP22ClientReport() {
         visual: (
           <ClientP19RspPresentation
             bassPerformance={bassPerformance}
+            p19Graph={p19Graph}
             roomDims={roomDims}
             seatingPositions={seatingPositions}
             rsp={rsp}
@@ -689,6 +707,7 @@ export default function RP22ClientReport() {
         printData: {
           type: "p19-rsp",
           bassPerformance,
+          p19Graph,
           roomDims,
           seatingPositions,
           rsp,

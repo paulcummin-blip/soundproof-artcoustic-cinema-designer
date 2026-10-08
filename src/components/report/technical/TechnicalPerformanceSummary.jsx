@@ -357,7 +357,7 @@ export default function TechnicalPerformanceSummary({
       {/* ── Seat comparison summary line ── */}
       {reportCounts.compromisedSeatCount === 0 ? (
         <div style={{ marginTop: "3mm", fontSize: "8.5pt", color: COLORS.secondary, fontFamily: FONT_BODY, fontStyle: "italic" }}>
-          Calculated seat performance is broadly consistent across the listening area.
+          No listening position shows material compromise across the calculated seat-scope RP22 parameters.
         </div>
       ) : (
         <div style={{ marginTop: "3mm", fontSize: "8.5pt", color: COLORS.secondary, fontFamily: FONT_BODY, fontStyle: "italic" }}>

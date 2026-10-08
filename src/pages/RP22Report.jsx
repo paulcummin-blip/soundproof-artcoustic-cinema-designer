@@ -254,6 +254,18 @@ function RP22ReportInner() {
     const engineeringSummary = designReviewHandoff?.engineeringSummary
         ?? designReviewHandoff?.rating?.engineeringSummary
         ?? null;
+
+    // The published P19 result — the single RSP assessment the P19 graph page
+    // states beside its graph. Read from the same canonical room result every
+    // other P19 surface reads; never re-graded or re-derived here.
+    const p19ReportResult = useMemo(() => {
+        const row = engineeringSummary?.roomResultsByParameter?.[19] || null;
+        if (!row) return null;
+        return {
+            level: row.level ?? null,
+            valueText: row.formatted ?? row.valueText ?? null,
+        };
+    }, [engineeringSummary]);
     const authorityReportPending = !engineeringSummary;
     const reportDataIncomplete = !authorityResolving
         && !authorityReadFailed
@@ -1533,6 +1545,7 @@ function RP22ReportInner() {
                             lengthM: stableDimensions.length,
                             heightM: stableDimensions.height,
                         }}
+                        p19Result={p19ReportResult}
                         variant="screen"
                     />
 
@@ -1804,6 +1817,7 @@ function RP22ReportInner() {
                                 lengthM: stableDimensions.length,
                                 heightM: stableDimensions.height,
                             }}
+                            p19Result={p19ReportResult}
                             variant="print"
                         />
 

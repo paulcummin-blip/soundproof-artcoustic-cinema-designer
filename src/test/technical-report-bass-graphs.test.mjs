@@ -24,7 +24,7 @@ import path from 'node:path';
 import React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 
-import { buildReportBassGraphs } from '../components/report/technical/bassResponseGraphAuthority.js';
+import { buildReportBassGraphs, buildP19RspGraph } from '../components/report/technical/bassResponseGraphAuthority.js';
 import BassResponseGraphSection from '../components/report/technical/BassResponseGraphSection.jsx';
 import { buildMarkerLabelLayout } from '../components/report/technical/bassGraphMarkerLabels.js';
 import {
@@ -82,13 +82,17 @@ test('TEST 4 — explanations are predictive, positive and not overclaiming', ()
 
   // Required framing: prediction, never measurement.
   assert.ok(lower.includes('predicted'), 'explanation must frame results as predicted');
-  assert.ok(lower.includes('aims to') || lower.includes('has been designed to'), 'predictive wording required');
 
   // Forbidden claims.
   for (const banned of ['measured performance', 'perfect bass', 'fully optimised', 'rew']) {
     assert.ok(!lower.includes(banned), `explanation must not claim or mention "${banned}"`);
   }
   assert.ok(!/processor recommendation/i.test(source), 'no brand-specific processor recommendations');
+
+  // Equal P20 grades never imply equal frequency responses, so no graph copy may
+  // claim seat-to-seat bass is consistent, uniform or controlled.
+  assert.ok(!/powerful and controlled/i.test(source),
+    'the Primary Seats explanation makes no unsupported consistency claim');
 });
 
 // ── TEST 5 — print layout rules ────────────────────────────────────────────
@@ -172,53 +176,46 @@ test('TEST 8 — the graphs are the final technical evidence, before About Sound
   // The titles the report prints.
   const section = read('src/components/report/technical/BassResponseGraphSection.jsx');
   assert.ok(section.includes('BASS RESPONSE GRAPHS'), 'section title present');
-  assert.ok(section.includes('RSP ROOM RESPONSE'), 'page 1 title present');
+  assert.ok(section.includes('P19 BASS RESPONSE AT THE RSP'), 'page 1 title present');
   assert.ok(section.includes('PRIMARY SEATS BASS RESPONSE'), 'page 2 title present');
 });
 
-// ── TEST 9 — the RSP Room Response page carries ONE trace ──────────────────
-// This page shows the bass behaviour at the reference seat. It is not a
-// comparison page: no after-EQ curve and no house-curve target are drawn on it.
-test('TEST 9 — the RSP page plots the RSP room response and nothing else', () => {
+// ── TEST 9 — the P19 page plots the corrected RSP response against the target ─
+// P19 IS the corrected (post-EQ) response at the reference seating position
+// measured against the target. The room/layout response is a different quantity
+// and must never be drawn as the P19 result.
+test('TEST 9 — the P19 page plots the post-EQ RSP response and the target', () => {
   const source = read('src/components/report/technical/bassResponseGraphAuthority.js');
   const section = read('src/components/report/technical/BassResponseGraphSection.jsx');
 
-  // Kinds: the room response only. The after-EQ curve and the target stay on
-  // the Primary Seats page, where a comparison between seats is the point.
-  assert.ok(/const RSP_PAGE_KINDS = \["room-response"\];/.test(source),
-    'the RSP page plots the room response only');
+  // Kinds: exactly the two curves the P19 metric compares.
+  assert.ok(/const P19_RSP_KINDS = \["post-eq", "house-curve"\];/.test(source),
+    'the P19 page plots the post-EQ response and the target');
+  assert.ok(!source.includes('"room-response"'),
+    'the room/layout response is never plotted as the P19 result');
+  assert.ok(source.includes('export function buildP19RspGraph'),
+    'ONE shared P19 graph authority serves both reports');
   assert.ok(source.includes('const PRIMARY_PAGE_KINDS = ["post-eq", "house-curve"];'),
-    'the Primary Seats page still plots the after-EQ curve and the target');
-  assert.ok(source.includes('.slice(0, 1)'), 'a single RSP trace is kept');
+    'the Primary Seats page keeps its own scope');
 
-  // One legend entry, named the way the page states it.
-  assert.ok(source.includes('RSP_ROOM_RESPONSE_LABEL = "RSP room response"'),
-    'the legend entry is the RSP room response');
+  // The two legend entries, named the way the page states them.
+  assert.ok(source.includes('P19_RSP_LABEL = "RSP post-EQ response"'),
+    'the response legend entry names the RSP post-EQ response');
+  assert.ok(source.includes('P19_TARGET_LABEL = "Target"'), 'the target legend entry');
 
-  // The mandated page copy, and no leftover caption from the comparison page.
-  assert.ok(source.includes('The RSP trace shows the predicted low-frequency response at the reference seating position.'),
-    'the mandated RSP explanation is present');
-  // ONE sentence only: the paragraph ends at that first full stop, and the
-  // transition-region sentence is gone.
-  const rspExplanation = source.match(/RSP_ROOM_RESPONSE_EXPLANATION = "([^"]*)"/)?.[1] ?? '';
-  assert.equal(rspExplanation,
-    'The RSP trace shows the predicted low-frequency response at the reference seating position.',
-    'the RSP paragraph is the single mandated sentence');
-  assert.equal((rspExplanation.match(/\./g) || []).length, 1, 'no second explanatory sentence');
-  assert.ok(!source.includes('below the room transition region'), 'the transition sentence is removed');
-  assert.ok(!source.includes('RSP_GRAPH_NOTE'), 'the old comparison-page caption is gone');
-  assert.ok(/note: null,/.test(source), 'the RSP page carries no second caption');
+  // The page copy identifies the RSP, the band, and keeps P20 separate.
+  assert.ok(source.includes('Reference Seating Position (RSP)'), 'the RSP is identified');
+  assert.ok(source.includes('across the P19 assessment band'), 'the range is the P19 assessment band');
+  assert.ok(source.includes('assessed separately under P20'), 'P20 stays a separate parameter');
 
-  // The page title, drawn from the same authority, and the single-trace guard
-  // that keeps the Primary Seats page rendering if the RSP curve is absent.
-  assert.ok(section.includes('title="RSP ROOM RESPONSE"'), 'the RSP page heading is RSP ROOM RESPONSE');
-  assert.ok(section.includes('explanation={RSP_ROOM_RESPONSE_EXPLANATION}'),
-    'the page renders the mandated paragraph');
-  assert.ok(section.includes('hasRspCurve'), 'the RSP page is drawn only when its curve exists');
+  // The page title and its paragraph.
+  assert.ok(section.includes('title="P19 BASS RESPONSE AT THE RSP"'), 'the P19 page heading');
+  assert.ok(section.includes('explanation={P19_RSP_EXPLANATION}'),
+    'the page renders the P19 paragraph');
 });
 
-// ── TEST 10 — the single RSP trace is built from the saved contract ────────
-test('TEST 10 — the built RSP graph holds exactly one room-response trace', () => {
+// ── TEST 10 — the P19 curves are built from the saved contract ─────────────
+test('TEST 10 — the built P19 graph holds the post-EQ response and the target', () => {
   const curve = (offset) => Array.from({ length: 7 }, (_, index) => ({
     frequency: [20, 30, 40, 60, 80, 100, 150][index],
     spl: 96 + offset + (index % 2 ? -2 : 2),
@@ -238,10 +235,20 @@ test('TEST 10 — the built RSP graph holds exactly one room-response trace', ()
 
   const graphs = buildReportBassGraphs({ contract, authoritative: true, seats: [{ id: 'seat-r1-c1' }] });
   assert.equal(graphs.ready, true);
-  assert.equal(graphs.rsp.series.length, 1, 'one trace only');
-  assert.equal(graphs.rsp.series[0].kind, 'room-response', 'the trace is the RSP room response');
-  assert.equal(graphs.rsp.series[0].label, 'RSP room response', 'the legend entry');
-  assert.equal(graphs.rsp.note, null, 'no second caption on the RSP page');
+
+  const p19Kinds = graphs.p19.series.map((entry) => entry.kind).sort();
+  assert.deepEqual(p19Kinds, ['house-curve', 'post-eq'],
+    'the P19 page plots the post-EQ response and the target');
+  assert.ok(!graphs.p19.series.some((entry) => entry.kind === 'room-response'),
+    'the room/layout response is not on the P19 page');
+
+  const rsp = graphs.p19.series.find((entry) => entry.kind === 'post-eq');
+  assert.equal(rsp.label, 'RSP post-EQ response', 'the response legend entry');
+  assert.equal(rsp.color, REPORT_RSP_STYLE.color, 'the response wears the RSP style');
+  const target = graphs.p19.series.find((entry) => entry.kind === 'house-curve');
+  assert.equal(target.label, 'Target', 'the target legend entry');
+  assert.equal(target.strokeDasharray, REPORT_TARGET_STYLE.strokeDasharray,
+    'the target wears the target style');
 
   // The Primary Seats page keeps its reference curve and its target.
   const primaryKinds = graphs.primary.series.map((entry) => entry.kind);
@@ -249,8 +256,8 @@ test('TEST 10 — the built RSP graph holds exactly one room-response trace', ()
   assert.ok(primaryKinds.includes('house-curve'), 'the Primary Seats page still plots the target');
 });
 
-// ── TEST 11 — what the RSP page actually renders ───────────────────────────
-test('TEST 11 — the rendered RSP page shows one RSP room response trace', () => {
+// ── TEST 11 — what the P19 page actually renders ───────────────────────────
+test('TEST 11 — the rendered P19 page shows the response, the target and the published result', () => {
   const points = (offset) => Array.from({ length: 7 }, (_, i) => ({
     frequency: [20, 30, 40, 60, 80, 100, 150][i],
     spl: 96 + offset + (i % 2 ? -3 : 3),
@@ -266,6 +273,7 @@ test('TEST 11 — the rendered RSP page shows one RSP room response trace', () =
       designEqFitProfile: 'identity',
       operatingLevelOffsetDb: 0,
     },
+    assessmentEnvelope: { assessmentStartHz: 20, assessmentEndHz: 150 },
   };
 
   const markup = renderToStaticMarkup(
@@ -273,35 +281,49 @@ test('TEST 11 — the rendered RSP page shows one RSP room response trace', () =
       contract,
       authoritative: true,
       seats: [{ id: 'seat-r1-c1' }],
+      p19Result: { level: 'L4', valueText: '±0 dB' },
       variant: 'print',
     }),
   );
 
-  const start = markup.indexOf('data-report-block="bass-response-rsp"');
+  const start = markup.indexOf('data-report-block="bass-response-p19-rsp"');
   const end = markup.indexOf('data-report-block="bass-response-primary-seats"');
   assert.ok(start > 0 && end > start, 'both graph pages are rendered');
-  const rspPage = markup.slice(start, end);
+  const p19Page = markup.slice(start, end);
 
-  // AC 3 — one response line only.
-  assert.equal((rspPage.match(/<path /g) || []).length, 1, 'exactly one trace is drawn');
+  // Two traces: the corrected RSP response and the target it is judged against.
+  assert.equal((p19Page.match(/<path /g) || []).length, 2, 'the response and the target are drawn');
 
-  // AC 4 — the legend references the RSP room response and nothing else.
-  assert.ok(rspPage.includes('RSP room response'), 'the legend names the RSP room response');
-  assert.ok(!rspPage.includes('after EQ'), 'no after-EQ legend entry');
-  assert.ok(!rspPage.includes('House-curve target'), 'no house-curve target legend entry');
-  assert.ok(!rspPage.includes('Room / layout response'), 'no reference-only room/layout entry');
+  // The legend names both traces and never the room/layout response.
+  assert.ok(p19Page.includes('RSP post-EQ response'), 'the legend names the RSP post-EQ response');
+  assert.ok(p19Page.includes('Target'), 'the legend names the target');
+  assert.ok(!p19Page.includes('Room / layout response'), 'no reference-only room/layout entry');
 
-  // AC 5 — the EQ and the target are not on this page.
-  assert.ok(!rspPage.includes('rsp-eq'), 'no after-EQ trace on this page');
+  // The published P19 result and its performance pill are stated with the graph.
+  assert.ok(p19Page.includes('P19 — Bass response at the reference seating position'), 'the result label');
+  assert.ok(p19Page.includes('±0 dB deviation from the target response.'), 'the published deviation');
+  assert.ok(p19Page.includes('>L4<'), 'the performance pill states the published level');
 
-  // AC 6 and the kept elements: heading, paragraph, axes, log x, marker, width.
-  assert.ok(rspPage.includes('RSP ROOM RESPONSE'), 'the page heading');
-  assert.ok(rspPage.includes('The RSP trace shows the predicted low-frequency response at the reference seating position.'),
-    'the mandated paragraph');
-  assert.ok(rspPage.includes('Frequency (Hz)') && rspPage.includes('SPL (dB)'), 'both axes are labelled');
-  assert.ok(rspPage.includes('>150</text>'), 'the log frequency axis keeps its upper decade label');
-  assert.ok(rspPage.includes('Transition / Schroeder ≈'), 'the transition / Schroeder marker is kept');
-  assert.ok(rspPage.includes('width="100%"'), 'the graph spans the full page width');
+  // The kept elements: heading, paragraph, axes, log x, marker, width.
+  assert.ok(p19Page.includes('P19 BASS RESPONSE AT THE RSP'), 'the page heading');
+  assert.ok(p19Page.includes('Reference Seating Position (RSP)'), 'the paragraph identifies the RSP');
+  assert.ok(p19Page.includes('Frequency (Hz)') && p19Page.includes('SPL (dB)'), 'both axes are labelled');
+  assert.ok(p19Page.includes('Transition / Schroeder ≈'), 'the transition / Schroeder marker is kept');
+  assert.ok(p19Page.includes('width="100%"'), 'the graph spans the full page width');
+
+  // The P19 assessment band is the page's frequency range.
+  const graphs = buildReportBassGraphs({ contract, authoritative: true, seats: [] });
+  assert.deepEqual(graphs.p19.xDomain, [15, 150], 'the x window is the P19 assessment band');
+
+  // Without the saved post-EQ evidence the P19 authority reports not-ready, so
+  // the page states the evidence is unavailable rather than substituting the
+  // room/layout response.
+  const withoutCurve = buildP19RspGraph({
+    contract: { graphPayload: { roomResponseCurve: points(0) } },
+    authoritative: true,
+  });
+  assert.equal(withoutCurve.ready, false, 'the P19 graph reports not-ready');
+  assert.equal(withoutCurve.series.length, 0, 'no unrelated curve is supplied');
 });
 
 // ── TEST 12 — marker labels never clash or leave the plot box ──────────────

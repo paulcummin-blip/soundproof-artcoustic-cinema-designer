@@ -437,6 +437,7 @@ export default function ClientReportPage({ children, isFirst, projectDetails, lo
             <div className="client-report-print-drawing">
               <ClientP19RspPresentation
                 bassPerformance={printData.bassPerformance}
+                p19Graph={printData.p19Graph}
                 roomDims={printData.roomDims}
                 seatingPositions={printData.seatingPositions}
                 rsp={printData.rsp}
@@ -450,6 +451,7 @@ export default function ClientReportPage({ children, isFirst, projectDetails, lo
             <div className="client-report-print-support">
               <ClientP19RspPresentation
                 bassPerformance={printData.bassPerformance}
+                p19Graph={printData.p19Graph}
                 roomDims={printData.roomDims}
                 seatingPositions={printData.seatingPositions}
                 rsp={printData.rsp}

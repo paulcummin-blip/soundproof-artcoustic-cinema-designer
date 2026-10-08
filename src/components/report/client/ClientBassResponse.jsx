@@ -107,35 +107,42 @@ function buildBassSeats(seatingPositions, p19PerSeat, p20PerSeat) {
 
 // ── Summary sentence ──
 
+/** The canonical floored P20 deviation text for one raw value. */
+function formatP20Deviation(value) {
+  const display = resolveP20SeatDisplay({ variationDbRaw: value });
+  return display ? display.displayVariationText : null;
+}
+
+/**
+ * A factual statement of the published P20 seat results.
+ *
+ * Equal P20 grades do NOT establish equal frequency responses, so no sentence
+ * here may claim seat-to-seat bass is consistent, uniform or controlled. The
+ * sentence states only what the published per-seat results state: the measured
+ * difference from the reference response, seat by seat.
+ */
 function buildSummarySentence(seats) {
   const assessed = seats.filter((s) => s.p20Level);
   if (assessed.length === 0) return null;
-
-  const primarySeats = assessed.filter((s) => s.isPrimary);
-  const secondarySeats = assessed.filter((s) => !s.isPrimary);
 
   if (assessed.length <= 1) {
     return "Bass response is assessed at the reference seating position.";
   }
 
-  // P20 is the seat-to-seat parameter: compare primary and secondary seats.
-  const primaryLevels = primarySeats.map((s) => s.p20Level).filter(Boolean);
-  const secondaryLevels = secondarySeats.map((s) => s.p20Level).filter(Boolean);
+  const deviations = assessed
+    .map((s) => s.p20VariationDb)
+    .filter((value) => value != null && Number.isFinite(Number(value)));
 
-  if (primaryLevels.length > 0 && secondaryLevels.length > 0) {
-    const primaryBest = primaryLevels.every((l) => l === "L4" || l === "L3");
-    const secondaryWorse = secondaryLevels.some((l) => l === "L1" || l === "L2" || l === "FAIL");
-    if (primaryBest && secondaryWorse) {
-      return "Seat-to-seat bass consistency is strongest around the reference seating area, with greater variation toward the outer seats.";
-    }
+  if (deviations.length === 0) {
+    return "Seat-to-seat bass variation is assessed at every listening position under P20.";
   }
 
-  const allP20 = assessed.map((s) => s.p20Level).filter(Boolean);
-  if (allP20.length > 0 && new Set(allP20).size <= 1) {
-    return "Bass consistency remains uniform across the seating area.";
-  }
+  const bestText = formatP20Deviation(Math.min(...deviations));
+  const worstText = formatP20Deviation(Math.max(...deviations));
 
-  return "Seat-to-seat bass consistency varies across the seating area as shown above.";
+  return bestText && worstText
+    ? `Seat-to-seat bass variation is assessed at every listening position under P20. Across the ${assessed.length} assessed seats the measured difference from the reference response ranges from ${bestText} to ${worstText}.`
+    : "Seat-to-seat bass variation is assessed at every listening position under P20.";
 }
 
 // ── Per-seat level badge ──

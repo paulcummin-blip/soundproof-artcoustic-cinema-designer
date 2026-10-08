@@ -9,11 +9,18 @@
  * (P20). It never presents an all-seat P19 grid: P19 has no per-seat result,
  * so showing one would only produce a grid of dashes.
  *
+ * The page also carries the P19 evidence graph — the corrected (post-EQ) RSP
+ * response against the target across the P19 assessment band — built from the
+ * saved completed bass contract by the shared P19 graph authority. When that
+ * evidence is unavailable the page states so plainly instead of rendering
+ * blank or substituting another curve.
+ *
  * All values are read from the published bass authority. Nothing is
  * recalculated here.
  */
 
 import React from "react";
+import P19RspGraphContent from "@/components/report/P19RspGraphContent";
 import { formatP19P20DeviationText } from "@/components/utils/rp22/resolveRp22DesignValue";
 import { resolveRspLabelPlacement } from "./ClientSpeakerBalance";
 import { resolveCoordinate } from "./selectClientSpeakerBalance";
@@ -66,8 +73,21 @@ function finiteOrNull(value) {
   return Number.isFinite(number) ? number : null;
 }
 
-// The single RSP result: the published row for the reference seating position.
+// The single RSP result: the published RSP P19 authority. P19 has no per-seat
+// result, so the legacy per-seat rows are only consulted when the published RSP
+// row is absent.
 function resolveRspResult(bassPerformance) {
+  const published = bassPerformance?.p19?.rspResult || null;
+  if (published) {
+    const publishedLevel = levelToLabel(published.level);
+    if (!publishedLevel) return null;
+    return {
+      level: publishedLevel,
+      deviationDb: finiteOrNull(published.deviationDb),
+      displayedValue: published.displayedValue || null,
+      worstFrequencyHz: finiteOrNull(published.worstFrequencyHz),
+    };
+  }
   const rows = bassPerformance?.p19?.perSeatResults;
   if (!Array.isArray(rows) || rows.length === 0) return null;
   const primary = rows.find((row) => row?.priority === "primary") || rows[0];
@@ -83,6 +103,7 @@ function resolveRspResult(bassPerformance) {
 
 export default function ClientP19RspPresentation({
   bassPerformance,
+  p19Graph = null,
   roomDims,
   seatingPositions,
   rsp,
@@ -356,6 +377,14 @@ export default function ClientP19RspPresentation({
                 </div>
               )}
             </div>
+          </div>
+
+          {/* ── The P19 evidence: the corrected (post-EQ) RSP response plotted
+              against the target across the P19 assessment band. When that saved
+              evidence is unavailable the graph states so plainly — it is never
+              replaced by the room/layout response or left blank. ── */}
+          <div style={{ width: "100%", maxWidth: print ? "100%" : 620 }}>
+            <P19RspGraphContent graph={p19Graph} chartId="client-p19-rsp-graph" />
           </div>
 
           {/* ── Target ── */}

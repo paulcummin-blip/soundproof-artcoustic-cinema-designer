@@ -42,14 +42,16 @@ export const REPORT_BASS_GRAPH_Y_DOMAIN = [70, 140];
 export const REPORT_BASS_GRAPH_X_DOMAIN = [15, 200];
 export const REPORT_BASS_GRAPH_X_DOMAIN_WIDE = [15, 300];
 
-/** The RSP Room Response page's single legend entry — its only trace. */
-export const RSP_ROOM_RESPONSE_LABEL = "RSP room response";
+/** The P19 page's two traces — the corrected RSP response and the target. */
+export const P19_RSP_LABEL = "RSP post-EQ response";
+export const P19_TARGET_LABEL = "Target";
 
-/** The mandated explanatory paragraph on the RSP Room Response page. */
-// One sentence, and only one sentence: the page states what the trace is and
-// stops there. The graph's own markers carry the transition-region detail, so
-// the paragraph never repeats it.
-export const RSP_ROOM_RESPONSE_EXPLANATION = "The RSP trace shows the predicted low-frequency response at the reference seating position.";
+/**
+ * The P19 page's explanatory paragraph. P19 is the corrected (post-EQ) response
+ * at the Reference Seating Position measured against the target across the P19
+ * assessment band. It is that comparison — never the room/layout response.
+ */
+export const P19_RSP_EXPLANATION = "This graph plots the predicted corrected (post-EQ) low-frequency response at the Reference Seating Position (RSP) against the target curve, across the P19 assessment band. P19 is assessed at the reference seating position only; seat-to-seat consistency is assessed separately under P20.";
 
 /** Colour-independent caps so the page stays readable. */
 export const REPORT_PRIMARY_SEAT_LIMIT = 8;
@@ -60,10 +62,11 @@ export const REPORT_GRAPH_SMOOTHING = "third";
 const finite = (value) => value !== null && value !== "" && Number.isFinite(Number(value));
 
 /** The series the report plots, chosen by kind from the app's own builder output.
- *  The RSP page is NOT a comparison page: it plots the room response at the
- *  reference seat and nothing else. The corrected (after-EQ) curve and the
- *  house-curve target belong to the Primary Seats page. */
-const RSP_PAGE_KINDS = ["room-response"];
+ *  The P19 page plots exactly the two curves the P19 metric compares: the
+ *  corrected (post-EQ) response at the reference seat and the house-curve
+ *  target. The room/layout response is a different quantity and is never drawn
+ *  as the P19 result. */
+const P19_RSP_KINDS = ["post-eq", "house-curve"];
 const PRIMARY_PAGE_KINDS = ["post-eq", "house-curve"];
 
 function pickSeries(series, kinds) {
@@ -90,6 +93,96 @@ function resolveXDomain(series) {
 }
 
 /**
+ * The P19 page's frequency range: the P19 assessment band, never the whole
+ * axis. P19 is assessed below the room transition frequency, so the page shows
+ * that band. The window still starts at the report's own floor so no curve is
+ * clipped flat onto the left border, and falls back to the standard axis when
+ * the saved contract states no band.
+ */
+function resolveP19XDomain(assessmentBand) {
+  const start = REPORT_BASS_GRAPH_X_DOMAIN[0];
+  const end = finite(assessmentBand?.endHz) ? Math.ceil(Number(assessmentBand.endHz)) : null;
+  return end && end > start ? [start, end] : REPORT_BASS_GRAPH_X_DOMAIN;
+}
+
+/**
+ * The P19 bass response graph — the ONE P19 evidence presentation, shared by the
+ * Technical Report's P19 page and the Visual Report's P19 page.
+ *
+ * It plots exactly the two curves the P19 metric compares: the corrected
+ * (post-EQ) response at the Reference Seating Position and the house-curve
+ * target, across the P19 assessment band. Nothing is recalculated, and the
+ * room/layout response is never substituted for the post-EQ result. When the
+ * saved post-EQ curve and target are not available it reports not-ready, so a
+ * consumer states that plainly instead of drawing an unrelated curve.
+ *
+ * @param {object} params
+ * @param {object|null} params.contract - the saved completed bass contract
+ * @param {boolean} [params.authoritative] - the store's own authority flag
+ * @param {object|null} [params.roomDims] - { widthM, lengthM, heightM }, for the marker
+ * @returns {object} { ready, reason, series, xDomain, yDomain, markers, assessmentBand }
+ */
+export function buildP19RspGraph({ contract = null, authoritative = false, roomDims = null } = {}) {
+  const empty = (reason) => ({
+    ready: false,
+    reason,
+    series: [],
+    xDomain: REPORT_BASS_GRAPH_X_DOMAIN,
+    yDomain: REPORT_BASS_GRAPH_Y_DOMAIN,
+    markers: {},
+    assessmentBand: { startHz: null, endHz: null },
+  });
+  if (authoritative !== true) return empty("no-current-bass-authority");
+  if (!hasGraphPayload(contract)) return empty("no-graph-payload");
+
+  const optimisationResult = buildFinishedGraphOptimisationResult(contract);
+  const finalResponse = optimisationResult?.finalOptimisedBassResponse;
+  if (!optimisationResult || !finalResponse?.postEqRspCurve?.length) return empty("no-finished-graph");
+
+  const graphPayload = contract.graphPayload || {};
+  const operatingLevelOffsetDb = finite(graphPayload.operatingLevelOffsetDb)
+    ? Number(graphPayload.operatingLevelOffsetDb)
+    : 0;
+  const roomResponseCurve = Array.isArray(graphPayload.roomResponseCurve) ? graphPayload.roomResponseCurve : [];
+  const built = buildBassGraphSeries({
+    designEqEnabled: true,
+    showHouseCurve: true,
+    normalizedSeries: roomResponseCurve.length ? { data: roomResponseCurve } : null,
+    rspRawCurve: [],
+    optimisationResult,
+    hasMatchingDetailedResult: true,
+    multiSeries: [],
+    selectedSeatIds: [],
+    showRealSeatOverlays: false,
+    smoothingMode: REPORT_GRAPH_SMOOTHING,
+    operatingLevelOffsetDb,
+  });
+
+  const markers = buildRp22GraphMarkers(finalResponse, null);
+  const assessmentBand = {
+    startHz: finite(markers.p19StartHz) ? Number(markers.p19StartHz) : null,
+    endHz: finite(markers.p19EndHz) ? Number(markers.p19EndHz) : null,
+  };
+  const series = pickSeries(built, P19_RSP_KINDS).map((entry) => (entry.kind === "house-curve"
+    ? { ...entry, label: P19_TARGET_LABEL, ...REPORT_TARGET_STYLE }
+    : { ...entry, label: P19_RSP_LABEL, ...REPORT_RSP_STYLE }));
+
+  return {
+    ready: series.length > 0,
+    reason: series.length ? null : "no-curves",
+    series,
+    xDomain: resolveP19XDomain(assessmentBand),
+    yDomain: REPORT_BASS_GRAPH_Y_DOMAIN,
+    markers: {
+      transitionHz: resolveOptimisationTransitionHz(roomDims),
+      assessmentBand,
+      limitingFrequencyHz: finite(markers.p19WorstFrequencyHz) ? Number(markers.p19WorstFrequencyHz) : null,
+    },
+    assessmentBand,
+  };
+}
+
+/**
  * Build the Technical Report's bass response graphs.
  *
  * @param {object} params
@@ -97,7 +190,7 @@ function resolveXDomain(series) {
  * @param {boolean} [params.authoritative] - the store's own authority flag
  * @param {Array} [params.seats] - project seating positions (priority lives here)
  * @param {object|null} [params.roomDims] - { widthM, lengthM, heightM }, for the marker
- * @returns {object} { ready, reason, rsp, primary } — series, markers and domains
+ * @returns {object} { ready, reason, p19, primary } — series, markers and domains
  */
 export function buildReportBassGraphs({
   contract = null,
@@ -126,28 +219,10 @@ export function buildReportBassGraphs({
     : 0;
   const roomResponseCurve = Array.isArray(graphPayload.roomResponseCurve) ? graphPayload.roomResponseCurve : [];
 
-  // ── RSP scope: the reference response, its corrected form and the target ──
-  const rspBuilt = buildBassGraphSeries({
-    designEqEnabled: true,
-    showHouseCurve: true,
-    normalizedSeries: roomResponseCurve.length ? { data: roomResponseCurve } : null,
-    rspRawCurve: [],
-    optimisationResult,
-    hasMatchingDetailedResult: true,
-    multiSeries: [],
-    selectedSeatIds: [],
-    showRealSeatOverlays: false,
-    smoothingMode: REPORT_GRAPH_SMOOTHING,
-    operatingLevelOffsetDb,
-  });
-  // One trace only. The label is the page's own wording for that curve, and it
-  // wears the report's RSP style — the same Sound Proof green the reference line
-  // uses on the Primary Seats page.
-  const rspSeries = pickSeries(rspBuilt, RSP_PAGE_KINDS)
-    .slice(0, 1)
-    .map((entry) => ({ ...entry, label: RSP_ROOM_RESPONSE_LABEL, ...REPORT_RSP_STYLE }));
-  const rspCorrected = rspBuilt.find((entry) => entry?.kind === "post-eq") || null;
-  const targetSeries = rspBuilt.find((entry) => entry?.kind === "house-curve") || null;
+  // ── P19 scope: the corrected RSP response against the target, built by the
+  // shared P19 authority so the Visual and Technical Reports cannot diverge. ──
+  const p19 = buildP19RspGraph({ contract, authoritative, roomDims });
+  const rspCorrected = p19.series.find((entry) => entry?.kind === "post-eq") || null;
 
   // ── Primary seats: only Primary seats, never Secondary ones ──
   const primarySeats = getPrimarySeats(seats);
@@ -198,13 +273,14 @@ export function buildReportBassGraphs({
   // The canonical seat label the bass graph itself uses (seat-r1-c1 → R1S1).
   const primarySeatLabel = (seatId) => formatSeatPillLabel(seatId);
 
-  // A page is drawn from whatever curve it actually has: an older saved contract
-  // without the room-response curve must not hide the Primary Seats page.
-  const hasAnyCurve = rspSeries.length > 0 || primarySeries.length > 0;
+  // A page is drawn from whatever curve it actually has: a saved contract
+  // without the post-EQ RSP curve must not hide the Primary Seats page.
+  const hasAnyCurve = p19.series.length > 0 || primarySeries.length > 0;
 
   return {
     ready: hasAnyCurve,
     reason: hasAnyCurve ? null : "no-curves",
+    p19,
     transitionHz,
     limitingFrequencyHz: finite(markers.p19WorstFrequencyHz) ? Number(markers.p19WorstFrequencyHz) : null,
     p18FrequencyHz: finite(markers.p18FrequencyHz) ? Number(markers.p18FrequencyHz) : null,
@@ -213,16 +289,8 @@ export function buildReportBassGraphs({
       endHz: finite(markers.p19EndHz) ? Number(markers.p19EndHz) : null,
     },
     yDomain: REPORT_BASS_GRAPH_Y_DOMAIN,
-    rsp: {
-      xDomain: resolveXDomain(rspSeries),
-      yDomain: REPORT_BASS_GRAPH_Y_DOMAIN,
-      series: rspSeries,
-      // No second line of copy: the page's explanation already states what the
-      // trace is, and this page carries no target or EQ to caption.
-      note: null,
-    },
     primary: {
-      xDomain: resolveXDomain(primarySeries.length ? primarySeries : rspSeries),
+      xDomain: resolveXDomain(primarySeries.length ? primarySeries : p19.series),
       yDomain: REPORT_BASS_GRAPH_Y_DOMAIN,
       series: primarySeries.map((entry) => ({
         ...entry,

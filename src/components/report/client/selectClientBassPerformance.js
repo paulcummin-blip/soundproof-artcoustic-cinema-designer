@@ -45,14 +45,28 @@ export function selectClientBassPerformance(engineeringSummary, seatingPositions
     publicationVerified: p18Result.isAuthoritative === true,
   } : null;
 
+  // P19 is RSP-only: the published RSP room result IS the assessment, and the
+  // authority states no per-seat P19 rows. Requiring those rows was what made
+  // the Visual Report's P19 page render blank. Legacy per-seat rows are still
+  // carried when a publication states them, but they are never required.
+  const p19Room = roomResults[19] || null;
   const p19BySeat = new Map(
     (p19Authority?.seats || []).map((seat) => [String(seat?.seatId), seat]),
   );
-  const p19 = p19Rows.length ? {
-    achievedLevel: summaries.project?.p19?.level ?? null,
-    achievedVariationDb: null,
+  const p19 = (p19Room || p19Rows.length) ? {
+    achievedLevel: p19Room?.level ?? summaries.project?.p19?.level ?? null,
+    achievedVariationDb: finite(p19Room?.value ?? p19Room?.rawValue),
+    displayedValue: p19Room?.formatted ?? p19Room?.valueText ?? null,
     targetBasis: null,
-    publicationVerified: true,
+    scope: "rsp",
+    publicationVerified: p19Room ? p19Room.isAuthoritative === true : true,
+    // The single published RSP result, in the shape the P19 page reads.
+    rspResult: p19Room ? {
+      level: p19Room.level ?? null,
+      deviationDb: finite(p19Room.value ?? p19Room.rawValue),
+      displayedValue: p19Room.formatted ?? p19Room.valueText ?? null,
+      worstFrequencyHz: finite(p19Room.worstFrequencyHz),
+    } : null,
     primary: p19Authority?.primary || null,
     secondary: p19Authority?.secondary || null,
     project: p19Authority?.project || null,

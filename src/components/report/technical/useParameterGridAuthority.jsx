@@ -134,7 +134,13 @@ export function useParameterGridAuthority({
     // calculated. P14 and P18 are room results and are unchanged.
     const scopedFallback = (id === 19 || id === 20) ? getHudValueForParam({ id }) : null;
     return {
-      level: parameterSummaries[`p${id}`]?.level || result?.level || "—",
+      // P14 and P18 are room results: the published room result is the single
+      // authority for the grade, so no summary row may override it. P19 and P20
+      // have no room result of their own and still read the published summary.
+      level: (id === 18 && result?.level)
+        || parameterSummaries[`p${id}`]?.level
+        || result?.level
+        || "—",
       valueText: firstStatedPrimitive([result?.formatted, result?.value, scopedFallback], "—"),
       detail: result?.detail || null,
       targetBasis: result?.targetBasis || null,
