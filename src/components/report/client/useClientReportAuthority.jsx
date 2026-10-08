@@ -13,6 +13,7 @@
  */
 
 import { useEffect, useMemo, useState } from "react";
+import { frozenReportAppState } from '@/components/report/frozenReportAppState';
 import { useAppState } from "@/components/AppStateProvider";
 import {
   readProjectRecord,
@@ -70,7 +71,7 @@ function resolveScreenVisibleWidthInches(screen) {
 }
 
 export function useClientReportAuthority(projectId, requestedVersionId = null) {
-  const app = useAppState();
+  const liveApp = useAppState();
   const activeProjectId = useActiveProjectId();
   // The version the shared app state currently holds. The in-session shortcut
   // (below) may only be used when it is the version this report was asked for.
@@ -85,6 +86,9 @@ export function useClientReportAuthority(projectId, requestedVersionId = null) {
   const [versionId, setVersionId] = useState(null);
   const [versionNumber, setVersionNumber] = useState(null);
   const [versionName, setVersionName] = useState(null);
+
+  const engineeringAuthority = useVersionedEngineeringAuthority(projectId, versionId, { finalReport:true });
+  const app = useMemo(() => frozenReportAppState(liveApp, engineeringAuthority.publication), [liveApp, engineeringAuthority.publication]);
 
   // ── 1) Fetch + hydrate ──────────────────────────────────────────────────
   useEffect(() => {
@@ -381,7 +385,6 @@ export function useClientReportAuthority(projectId, requestedVersionId = null) {
   // Engineering Authority for this version; the same-window handoff overlays it
   // as an optimisation, so a cold/direct load with empty site storage still
   // restores the published report.
-  const engineeringAuthority = useVersionedEngineeringAuthority(projectId, versionId, { finalReport: true });
   const publishedEngineering = engineeringAuthority.snapshot;
   const engineeringSummary = publishedEngineering?.engineeringSummary
     ?? publishedEngineering?.rating?.engineeringSummary
@@ -684,7 +687,11 @@ export function useClientReportAuthority(projectId, requestedVersionId = null) {
     versionId,
     versionNumber,
     versionName,
-    projectDetails,
+    projectDetails:engineeringAuthority.publication?.report_snapshot?.report_project
+      ? { ...projectDetails, ...engineeringAuthority.publication.report_snapshot.report_project } : projectDetails,
+    reportApp:app,
+    publicationGate:engineeringAuthority.publicationGate,
+    publicationAttempt:engineeringAuthority.publicationAttempt,
     hydrating: hydrating || engineeringAuthority.loading,
     hydrated: hydratedProjectId === projectId && !hydrating && !engineeringAuthority.loading,
     roomDims,
