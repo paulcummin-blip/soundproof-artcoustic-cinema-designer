@@ -148,7 +148,8 @@ export function useReportSnapshot({
       const bass = getCompletedBassAuthority(projectId, versionId);
       const caches = await base44.entities.ProjectAnalysisCache.filter({ project_id: projectId, version_id: versionId });
       const pointers = [...new Set(caches.map(row => row.current_fingerprint).filter(Boolean))];
-      if (pointers.length !== 1 || bass?.currentFingerprint !== pointers[0]
+      if (publication.provenance?.bass_fingerprint !== bass?.currentFingerprint
+        || pointers.length !== 1 || bass?.currentFingerprint !== pointers[0]
         || !assessRestoredBassAuthorityCurrentness(bass).current) {
         if (mountedRef.current) setPublicationBlocked('Final report blocked: durable current bass pointer does not match the restored authority.');
         return null;
