@@ -13,7 +13,6 @@
 
 import React, { useMemo } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import { useActiveProjectId } from "@/components/state/project-session";
 import { useClientReportAuthority } from "@/components/report/client/useClientReportAuthority";
 import ClientSoundAroundListener from "@/components/report/client/ClientSoundAroundListener";
 import ClientP9Overhead from "@/components/report/client/ClientP9Overhead";
@@ -91,15 +90,13 @@ import { readSeatPriorityFingerprint } from "@/components/state/designReviewHand
 export default function RP22ClientReport() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-  const sessionProjectId = useActiveProjectId();
 
   const projectId = useMemo(
     () =>
       searchParams.get("projectId") ||
       searchParams.get("id") ||
-      sessionProjectId ||
       null,
-    [searchParams, sessionProjectId]
+    [searchParams]
   );
 
   // The version this report was opened FOR. The Project Library's report row
@@ -111,7 +108,7 @@ export default function RP22ClientReport() {
   const authority = useClientReportAuthority(projectId, requestedVersionId);
   const engineeringSummary = authority.engineeringSummary || null;
   const p19SeatAuthority = engineeringSummary?.p19SeatAuthority || null;
-  const appState = useAppState();
+  const appState = authority.reportApp;
   const p12Mode = engineeringSummary?.roomResultsByParameter?.[12]?.targetBasis || "minimum";
   const p13Mode = engineeringSummary?.roomResultsByParameter?.[13]?.targetBasis || "minimum";
   const {
@@ -877,8 +874,10 @@ export default function RP22ClientReport() {
     hydrating,
     roomDims,
     placedSpeakers,
-    engineeringSummary: authority.reportComplete ? engineeringSummary : null,
-    bassPerformance: authority.reportComplete ? bassPerformance : null,
+    engineeringSummary,
+    bassPerformance,
+    assessment: { reportComplete:authority.reportComplete, status:authority.publicationGate?.status,
+      reason:authority.reportCompleteness?.reason, missing:authority.publicationGate?.missing },
     pricingStatus,
     elapsedSeconds: stateSeconds,
   });
