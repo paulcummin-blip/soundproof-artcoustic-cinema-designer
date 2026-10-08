@@ -31,6 +31,7 @@
 
 import { countFailingSeats } from "./zeroFailOptimiser.js";
 import { floorP19P20Deviation } from "@/components/utils/rp22/resolveRp22DesignValue";
+import { hasPerSeatP19, compareRspP19 } from "./p19Authority.js";
 
 const MATERIAL_RAW_THRESHOLD_DB = 1.0;  // material raw improvement or worsening
 const PRIMARY_RAW_WORSENING_THRESHOLD_DB = 1.0;  // same as materialityGate
@@ -87,6 +88,25 @@ export function hasPrimarySeatLevelRegression(candidateResult, currentResult) {
 export function findBestP19Improvement(candidateResult, currentResult) {
   const candidateP19 = Array.isArray(candidateResult?.perSeatP19) ? candidateResult.perSeatP19 : [];
   const currentP19Map = new Map((Array.isArray(currentResult?.perSeatP19) ? currentResult.perSeatP19 : []).map(s => [String(s.seatId), s]));
+
+  // P19 is RSP-only in this model. When neither side carries per-seat P19 rows
+  // the aggregate RSP authority is the only P19 evidence there is.
+  if (!hasPerSeatP19(candidateResult) || !hasPerSeatP19(currentResult)) {
+    const aggregate = compareRspP19(currentResult, candidateResult, MATERIAL_RAW_THRESHOLD_DB);
+    if (!aggregate) return { improved: false, delta: 0 };
+    if (aggregate.levelImproved) {
+      return { improved: true, parameter: "P19", scope: "rsp",
+        beforeLevel: aggregate.before.level, afterLevel: aggregate.after.level,
+        isLevelChange: true, delta: aggregate.after.level - aggregate.before.level };
+    }
+    if (aggregate.improved) {
+      return { improved: true, parameter: "P19", scope: "rsp",
+        beforeLevel: aggregate.before.level, afterLevel: aggregate.after.level,
+        beforeRaw: aggregate.before.deviationDb, afterRaw: aggregate.after.deviationDb,
+        delta: aggregate.deviationDeltaDb, isLevelChange: false };
+    }
+    return { improved: false, delta: 0 };
+  }
 
   let best = { improved: false, delta: 0 };
 
@@ -171,6 +191,21 @@ function findBestImprovement(candidateResult, currentResult) {
 export function findP19Worsening(candidateResult, currentResult) {
   const candidateP19 = Array.isArray(candidateResult?.perSeatP19) ? candidateResult.perSeatP19 : [];
   const currentP19Map = new Map((Array.isArray(currentResult?.perSeatP19) ? currentResult.perSeatP19 : []).map(s => [String(s.seatId), s]));
+
+  // RSP-only P19: the aggregate deviation is the worsening signal. Only a
+  // same-level raw worsening counts — a level drop is a safety matter, not a
+  // trade-off.
+  if (!hasPerSeatP19(candidateResult) || !hasPerSeatP19(currentResult)) {
+    const aggregate = compareRspP19(currentResult, candidateResult, MATERIAL_RAW_THRESHOLD_DB);
+    if (!aggregate) return { worsened: false, delta: 0 };
+    const sameLevel = aggregate.before.level != null && aggregate.after.level === aggregate.before.level;
+    const delta = -aggregate.deviationDeltaDb; // positive = worse
+    if (sameLevel && delta > 0) {
+      return { worsened: delta > PRIMARY_RAW_WORSENING_THRESHOLD_DB, seatId: "rsp", parameter: "P19",
+        scope: "rsp", beforeRaw: aggregate.before.deviationDb, afterRaw: aggregate.after.deviationDb, delta };
+    }
+    return { worsened: false, delta: 0 };
+  }
 
   let worst = { worsened: false, delta: 0 };
 

@@ -58,6 +58,9 @@ import {
 import { buildOptimisationDiagnosticsReport, logOptimisationDiagnosticsReport } from "./optimisationDiagnosticsReport.js";
 import { runCombinedOptimisation, identifyBestPositionCandidate } from "./combinedOptimisationSearch.js";
 import { setCombinedResult } from "./improveBassV2Store.js";
+import { computeProxyCandidateMetrics, promoteProxyChallengers } from "./proxyCandidateMetrics.js";
+import { selectCanonicalObjectives, explainFinalSelection, dedupeCandidates } from "./canonicalObjectiveSelection.js";
+import { buildCandidateLedger, buildProxyIndex } from "./candidateLedger.js";
 
 const MAX_CHALLENGERS = 3;
 
@@ -67,10 +70,7 @@ const MAX_CHALLENGERS = 3;
 const V2_WHOLE_RUN_TIMEOUT_MS_PROVISIONAL = 300000;
 const YIELD_DELAY_MS = 0;
 
-// Scoring band for proxy P19 (worst-seat peak-to-peak). Matches the tuning
-// search band (20–120 Hz) so proxy metrics are consistent with the search.
-const PROXY_SCORE_MIN_HZ = 20;
-const PROXY_SCORE_MAX_HZ = 120;
+// Proxy scoring band and metric names live in ./proxyCandidateMetrics.js.
 
 // ---------------------------------------------------------------------------
 // Snapshot (BLOCKER 6: ALL instances + ACTIVE optimisation subset)
@@ -366,138 +366,29 @@ function runProxySearch(candidate) {
   if (!best?.tuning) return null;
 
   const tuning = best.tuning;
-  const proxyMetrics = computeProxyMetrics(rawTransfer, tuning);
+  const proxyMetrics = computeProxyCandidateMetrics(rawTransfer, tuning);
 
   return {
     tuning, delays: best.delays, gains: best.gains, polarities: best.polarities,
     score: best.score ?? Infinity,
     alternatives: searchResult.finalists.slice(1),
-    proxyP19: proxyMetrics.proxyP19,
-    proxyP20: proxyMetrics.proxyP20,
-    proxyBalanced: proxyMetrics.proxyBalanced,
+    proxyRspRange: proxyMetrics.proxyRspRange,
+    proxyWorstSeatRange: proxyMetrics.proxyWorstSeatRange,
+    proxyAllSeatRange: proxyMetrics.proxyAllSeatRange,
+    proxyBalancedRange: proxyMetrics.proxyBalancedRange,
   };
 }
 
-// ---------------------------------------------------------------------------
-// Proxy metrics (P19/P20 cheap diagnostics for promotion only)
-// ---------------------------------------------------------------------------
-
-function computeProxyMetrics(rawTransfer, tuning) {
-  const defaultResult = { proxyP19: Infinity, proxyP20: Infinity, proxyBalanced: Infinity };
-  if (!rawTransfer?.perSourcePerSeatComplexTransfers?.length) return defaultResult;
-  if (!Array.isArray(tuning) || !tuning.length) return defaultResult;
-
-  const seatIds = rawTransfer.seatIds || [];
-  if (!seatIds.length) return defaultResult;
-
-  const seatResponses = resumWithTuning(
-    rawTransfer.perSourcePerSeatComplexTransfers,
-    tuning,
-    seatIds,
-  );
-
-  let worstSeatPeakToPeak = 0;
-  let rspPeakToPeak = Infinity;
-
-  for (const seatId of seatIds) {
-    const response = seatResponses[seatId];
-    if (!response?.freqsHz?.length) continue;
-
-    const spls = [];
-    for (let i = 0; i < response.freqsHz.length; i++) {
-      const freq = response.freqsHz[i];
-      if (freq >= PROXY_SCORE_MIN_HZ && freq <= PROXY_SCORE_MAX_HZ) {
-        spls.push(response.splDb[i]);
-      }
-    }
-    if (!spls.length) continue;
-
-    const peakToPeak = Math.max(...spls) - Math.min(...spls);
-    if (seatId === "rsp") {
-      rspPeakToPeak = peakToPeak;
-    } else {
-      if (peakToPeak > worstSeatPeakToPeak) worstSeatPeakToPeak = peakToPeak;
-    }
-  }
-
-  if (worstSeatPeakToPeak === 0 && Number.isFinite(rspPeakToPeak)) {
-    worstSeatPeakToPeak = rspPeakToPeak;
-  }
-
-  const proxyP19 = worstSeatPeakToPeak;
-  const proxyP20 = rspPeakToPeak;
-  const proxyBalanced = Math.max(proxyP19, proxyP20);
-
-  return { proxyP19, proxyP20, proxyBalanced };
-}
+// Proxy metrics live in ./proxyCandidateMetrics.js under names that state what
+// each one measures: RSP range, worst-seat range, all-seat range and balanced
+// range. None of them is a P19/P20 grade.
 
 // ---------------------------------------------------------------------------
 // Promotion (CHALLENGERS ONLY — Current is never promoted/searched)
 // ---------------------------------------------------------------------------
 
-function promoteChallengers(candidates, maxChallengers) {
-  const challengers = candidates
-    .filter((c) => !c.isCurrent && c.proxyResult)
-    .map((c) => ({
-      ...c,
-      proxyP19: c.proxyResult.proxyP19 ?? Infinity,
-      proxyP20: c.proxyResult.proxyP20 ?? Infinity,
-      proxyBalanced: c.proxyResult.proxyBalanced ?? Infinity,
-    }));
-
-  if (!challengers.length) return [];
-
-  const promoted = [];
-  const promotedIds = new Set();
-
-  function tryAdd(candidate) {
-    if (!candidate || promotedIds.has(candidate.id)) return false;
-    if (promoted.length >= maxChallengers) return false;
-    promoted.push(candidate);
-    promotedIds.add(candidate.id);
-    return true;
-  }
-
-  const bestP19 = challengers.reduce((best, c) =>
-    c.proxyP19 < best.proxyP19 ? c : best
-  );
-  tryAdd(bestP19);
-
-  const bestP20 = challengers.reduce((best, c) =>
-    c.proxyP20 < best.proxyP20 ? c : best
-  );
-  tryAdd(bestP20);
-
-  const bestBalanced = challengers.reduce((best, c) =>
-    c.proxyBalanced < best.proxyBalanced ? c : best
-  );
-  tryAdd(bestBalanced);
-
-  const seenFamilies = new Set(promoted.map((p) => p.finalist?.familyId));
-  const byFamilyDiversity = [...challengers]
-    .filter((c) => !promotedIds.has(c.id))
-    .sort((a, b) => a.proxyBalanced - b.proxyBalanced);
-  for (const ch of byFamilyDiversity) {
-    if (promoted.length >= maxChallengers) break;
-    const family = ch.finalist?.familyId || "unknown";
-    if (!seenFamilies.has(family)) {
-      tryAdd(ch);
-      seenFamilies.add(family);
-    }
-  }
-
-  if (promoted.length < maxChallengers) {
-    const remaining = challengers
-      .filter((c) => !promotedIds.has(c.id))
-      .sort((a, b) => a.proxyBalanced - b.proxyBalanced);
-    for (const ch of remaining) {
-      if (promoted.length >= maxChallengers) break;
-      tryAdd(ch);
-    }
-  }
-
-  return promoted;
-}
+// Promotion lives in ./proxyCandidateMetrics.js — each objective is promoted by
+// its OWN proxy metric (RSP range for P19, worst-seat range for P20).
 
 // ---------------------------------------------------------------------------
 // Winner selection with primary-seat protection
@@ -741,6 +632,9 @@ export async function runImproveBassV2(projectId, versionId, params, callbacks) 
     let gainDiagnostics = {status:"incomplete",retained:0,confirmed:0,valid:0,invalid:0,options:[]};
     let savedCurrentRawTransfer = null;
     let savedEffectiveBaseline = null;
+    // Every canonically confirmed candidate of this run, in confirmation order.
+    // Feeds the objective winners and the diagnostic ledger — read-only.
+    const funnelCandidates = [];
     /** The best evaluated gain attempt: lowest P20 variation, then lowest P19. */
     function pickBestGainAttempt(pairs) {
       const ranked = (pairs || [])
@@ -869,6 +763,7 @@ export async function runImproveBassV2(projectId, versionId, params, callbacks) 
             phaseDiagnostics.options[index].validated = check.result;
             if (check.valid) {
               phaseCandidates.push(check.result);
+              funnelCandidates.push(check.result);
               phaseDiagnostics.valid++;
             } else {
               phaseDiagnostics.invalid++;
@@ -929,7 +824,7 @@ export async function runImproveBassV2(projectId, versionId, params, callbacks) 
           calibrationDiagnostics.options[index].canonical=result;
           calibrationDiagnostics.options[index].validated=check.result;
           calibrationDiagnostics.options[index].canonicalMs=performance.now()-_confirmT0;
-          if(check.valid){calibrationCandidates.push(check.result);calibrationDiagnostics.valid++;}
+          if(check.valid){calibrationCandidates.push(check.result);funnelCandidates.push(check.result);calibrationDiagnostics.valid++;}
           else {calibrationDiagnostics.invalid++;evaluationIssues.push({stage:"calibration",index,issues:check.issues});}
         }
         calibrationDiagnostics.status=calibrationSearch?.status==="skipped"?"skipped":calibrationDiagnostics.valid?"completed-shortlist":"incomplete";
@@ -1017,6 +912,7 @@ export async function runImproveBassV2(projectId, versionId, params, callbacks) 
             gainDiagnostics.options[gi].validated = gCheck.result;
             if (gCheck.valid) {
               gainCandidates.push(gCheck.result);
+              funnelCandidates.push(gCheck.result);
               gainConfirmedPairs.push({candidate: gainRetained[gi], result: gCheck.result});
               gainDiagnostics.valid++;
             } else {
@@ -1339,7 +1235,7 @@ export async function runImproveBassV2(projectId, versionId, params, callbacks) 
       allCandidates = [...allCandidates, ...phaseResult.promoted];
 
       // ── Promote from merged pool (global + all local so far)
-      const promoted = promoteChallengers(allCandidates, MAX_CHALLENGERS);
+      const promoted = promoteProxyChallengers(allCandidates, MAX_CHALLENGERS);
 
       // ── Confirm only NEW promoted candidates (skip already-confirmed)
       const confirmedIds = new Set(confirmedResults.map((r) => r.candidateId));
@@ -1355,7 +1251,11 @@ export async function runImproveBassV2(projectId, versionId, params, callbacks) 
           const _t0 = typeof performance !== "undefined" ? performance.now() : Date.now();
           attemptedConfirmationIds.add(newPromoted[i].id);
           const options=[newPromoted[i].proxyResult,...(newPromoted[i].proxyResult?.alternatives || [])];
-          for (const option of options) {
+          // EVERY retained tuning alternative is canonically confirmed. Stopping
+          // at the first valid option could discard the better P19 / P20 /
+          // balanced candidate before it was ever measured.
+          for (let optionIndex = 0; optionIndex < options.length; optionIndex++) {
+          const option = options[optionIndex];
           funnel[funnelKey].confirmationAttempts++;
           const result = await runInWorker(worker, "confirmation", {
             rawTransfer: newPromoted[i].rawTransfer,
@@ -1372,8 +1272,11 @@ export async function runImproveBassV2(projectId, versionId, params, callbacks) 
             Object.assign(bound,{isPositionCandidate:true,positionPhase:candidate.phase,
               movementDescription:candidate.movement,positionCoordinates:candidate.coordinates || result.coordinates,
               candidateOrigin:candidate.candidateOrigin || "global-placement"});
+            // A second tuning alternative of the same placement carries its own
+            // id so both stay comparable confirmed candidates.
+            if (optionIndex > 0) bound.candidateId = String(candidate.id || "position") + "::alt" + optionIndex;
             const check=validateConfirmedCandidate(bound,validationContext);
-            if(check.valid){confirmedResults.push(check.result);phaseConfirmedCount++;metrics.recordChallengerConfirmed();onBestSoFar({result:check.result,candidate});break;}
+            if(check.valid){confirmedResults.push(check.result);funnelCandidates.push(check.result);phaseConfirmedCount++;metrics.recordChallengerConfirmed();onBestSoFar({result:check.result,candidate});}
             else evaluationIssues.push({stage:escPhase.name,candidateId:candidate.id,issues:check.issues});
           } else evaluationIssues.push({stage:escPhase.name,candidateId:newPromoted[i].id,issues:["Missing confirmation"]});
           }
@@ -1478,7 +1381,7 @@ export async function runImproveBassV2(projectId, versionId, params, callbacks) 
               if (seatingTransfer?.perSourcePerSeatComplexTransfers?.length) {
                 const _proxyEvalT0 = typeof performance !== "undefined" ? performance.now() : Date.now();
                 const effectiveTuning = existingAuthority?.appliedTuning || savedEffectiveBaseline || [];
-                const proxyMetrics = computeProxyMetrics(seatingTransfer, effectiveTuning);
+                const proxyMetrics = computeProxyCandidateMetrics(seatingTransfer, effectiveTuning);
                 const _proxyEvalMs = (typeof performance !== "undefined" ? performance.now() : Date.now()) - _proxyEvalT0;
 
                 seatingProfiler.recordCandidate(offsetMm, {
@@ -1486,12 +1389,13 @@ export async function runImproveBassV2(projectId, versionId, params, callbacks) 
                   receiverEvalMs,
                 });
 
-                if (proxyMetrics && Number.isFinite(proxyMetrics.proxyP19)) {
+                if (proxyMetrics && Number.isFinite(proxyMetrics.proxyWorstSeatRange)) {
                   proxyResults.push({
                     offsetMm,
-                    proxyP19: proxyMetrics.proxyP19,
-                    proxyP20: proxyMetrics.proxyP20,
-                    proxyBalanced: proxyMetrics.proxyBalanced,
+                    proxyRspRange: proxyMetrics.proxyRspRange,
+                    proxyWorstSeatRange: proxyMetrics.proxyWorstSeatRange,
+                    proxyAllSeatRange: proxyMetrics.proxyAllSeatRange,
+                    proxyBalancedRange: proxyMetrics.proxyBalancedRange,
                     seatingTransfer,
                     seatingPositions: validCandidates[i].seatingPositions,
                   });
@@ -1548,6 +1452,7 @@ export async function runImproveBassV2(projectId, versionId, params, callbacks) 
               sBound.seatingPositions = sc.seatingPositions;
               const sCheck = validateConfirmedCandidate(sBound, validationContext);
               if (sCheck.valid) {
+                funnelCandidates.push(sCheck.result);
                 confirmedSeatingCandidates.push({
                   result: sCheck.result,
                   seatingOffsetMm: sc.offsetMm,
@@ -1605,7 +1510,9 @@ export async function runImproveBassV2(projectId, versionId, params, callbacks) 
         }
 
         seatingDiagnostics.best = shortlist.length > 0
-          ? { offsetMm: shortlist[0].offsetMm, proxyP19: shortlist[0].proxyP19 }
+          ? { offsetMm: shortlist[0].offsetMm,
+              proxyRspRange: shortlist[0].proxyRspRange,
+              proxyWorstSeatRange: shortlist[0].proxyWorstSeatRange }
           : null;
         seatingDiagnostics.status = seatingDiagnostics.tested > 0 ? "completed" : "incomplete";
       }
@@ -1680,6 +1587,7 @@ export async function runImproveBassV2(projectId, versionId, params, callbacks) 
         // Add confirmed combined candidates to the pool
         for (const cc of combinedCandidates) {
           confirmedResults.push(cc);
+          funnelCandidates.push(cc);
           metrics.recordChallengerConfirmed();
         }
 
@@ -1731,6 +1639,29 @@ export async function runImproveBassV2(projectId, versionId, params, callbacks) 
     selection.combinedResult=combinedResult;
     selection.combinedMaterial=combinedMaterial;
     selection.combinedDiagnostics=combinedDiagnostics;
+    // ── Canonical objective winners + diagnostic ledger ─────────────────
+    // Built from canonically CONFIRMED results only. This never changes the
+    // final winner rule — it exposes which candidate best serves each
+    // objective and why the final recommendation was chosen.
+    const objectivePool = dedupeCandidates([
+      ...funnelCandidates, ...confirmedResults, ...calibrationCandidates, ...phaseCandidates,
+    ]);
+    selection.objectives = selectCanonicalObjectives({
+      candidates: objectivePool, baseline: existingAuthority,
+    });
+    selection.objectiveExplanation = explainFinalSelection({
+      finalCandidate: selection.winner, objectives: selection.objectives,
+    });
+    selection.candidateLedger = buildCandidateLedger({
+      candidates: objectivePool,
+      proxyIndex: buildProxyIndex({
+        challengers: allCandidates,
+        diagnostics: { phaseDiagnostics, calibrationDiagnostics, gainDiagnostics },
+      }),
+      evaluations: selection.evaluations,
+      objectives: selection.objectives,
+      finalCandidate: selection.winner,
+    });
     setStageVerdict(projectId, versionId, "preparing", "done");
     await yieldToUI();
 

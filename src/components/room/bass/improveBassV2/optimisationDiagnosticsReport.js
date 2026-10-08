@@ -509,6 +509,12 @@ export function buildOptimisationDiagnosticsReport(selection, context = {}) {
     stageContributions: stageContributionBreakdown,
     winningCandidate: winner ? buildWinningCandidateDetail(winner, instanceIds) : null,
     runtimeMetrics: context.runtimeMetrics || null,
+    // Canonical objective winners and the reason the final candidate was chosen.
+    objectives: selection.objectives || null,
+    objectiveExplanation: selection.objectiveExplanation || null,
+    // Read-only per-candidate ledger: proxy values, canonical P19/P20, rank and
+    // the objective each candidate was selected as.
+    candidateLedger: selection.candidateLedger || null,
   };
 }
 
@@ -587,6 +593,40 @@ export function logOptimisationDiagnosticsReport(report) {
       console.table(report.stageContributions.map((c) => ({
         Stage: c.name,
         "Contribution %": c.contributionPercent,
+      })));
+      console.groupEnd();
+    }
+
+    // Canonical objective winners: which candidate best serves each objective.
+    if (report.objectives) {
+      console.groupCollapsed("%cCanonical objective winners", "color:#213428;font-weight:600");
+      console.log("bestCanonicalP19:", report.objectives.bestCanonicalP19?.candidateId ?? "—");
+      console.log("bestCanonicalP20:", report.objectives.bestCanonicalP20?.candidateId ?? "—");
+      console.log("bestCanonicalBalanced:", report.objectives.bestCanonicalBalanced?.candidateId ?? "—");
+      if (report.objectiveExplanation) {
+        console.log("final objective:", report.objectiveExplanation.objectiveLabel);
+        console.log("reason:", report.objectiveExplanation.reason);
+        console.log("trade-off:", report.objectiveExplanation.tradeOff);
+      }
+      console.groupEnd();
+    }
+
+    // Candidate ledger — proxy values, canonical P19/P20, rank and objective.
+    if (report.candidateLedger?.length) {
+      console.groupCollapsed(`%cCandidate ledger (${report.candidateLedger.length})`, "color:#3E4349;font-weight:600");
+      console.table(report.candidateLedger.map((row) => ({
+        Rank: row.rank ?? "—",
+        Id: row.candidateId,
+        Source: row.source,
+        Status: row.status,
+        "Proxy RSP": row.proxyRspRange?.toFixed?.(3) ?? row.proxyRspRange ?? "—",
+        "Proxy Seat": row.proxyWorstSeatRange?.toFixed?.(3) ?? row.proxyWorstSeatRange ?? "—",
+        "Proxy Bal": row.proxyBalancedRange?.toFixed?.(3) ?? row.proxyBalancedRange ?? "—",
+        "P19 dB": row.canonicalP19 ?? "—",
+        "P19 Lvl": row.canonicalP19Level ?? "—",
+        "P20 dB": row.canonicalP20 ?? "—",
+        "P18 Hz": row.canonicalP18Hz ?? "—",
+        Selected: row.selectedAs.join(", "),
       })));
       console.groupEnd();
     }

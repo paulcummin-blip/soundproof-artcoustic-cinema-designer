@@ -1,6 +1,7 @@
 import { validateSeatResults, canonicalLevel, applicableSeatsFromResult } from "./confirmedCandidateValidity.js";
 import { countFailingSeats, hasNewFailingSeats } from "./zeroFailOptimiser.js";
 import { floorP19P20Deviation } from "@/components/utils/rp22/resolveRp22DesignValue";
+import { compareRspP19 } from "./p19Authority.js";
 // materialityGate.js
 // Canonical user-facing materiality assessment for calibration-only improvements.
 //
@@ -162,6 +163,23 @@ export function isMaterialImprovement(currentResult, candidateResult) {
   // do not treat as material improvement on the fail objective.
   if (hasNewFailingSeats(currentResult, candidateResult)) {
     return { material: false, reason: "Failing seat moved \u2014 no net improvement" };
+  }
+
+  // ── P19 is RSP-only: materiality reads the aggregate RSP authority ──────
+  // Per-seat P19 rows are legitimately empty in this model, so a per-seat
+  // comparison sees no P19 change at all. An aggregate RSP improvement — a
+  // level gain, or >= 1.0 dB less deviation — is a material improvement.
+  // A regression is deliberately NOT rejected here: the trade-off classifier
+  // and the P14/P18 safety gate own that decision.
+  const rspP19 = compareRspP19(currentResult, candidateResult, WITHIN_LEVEL_THRESHOLD_DB);
+  if (rspP19?.improved) {
+    return {
+      material: true,
+      reason: rspP19.levelImproved
+        ? `P19 aggregate RSP level improved: L${rspP19.before.level} -> L${rspP19.after.level}`
+        : `P19 aggregate RSP deviation improved by ${floorP19P20Deviation(rspP19.deviationDeltaDb)} dB`,
+      details: { rspP19 },
+    };
   }
 
   // Same fail count, no moved fails -- check for level / deviation / null

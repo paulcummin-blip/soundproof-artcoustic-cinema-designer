@@ -33,15 +33,18 @@ export const SEATING_SHORTLIST_SIZE = 8;
  * If fewer than N valid candidates exist, return all available.
  * The offset=0 candidate is excluded by the caller (validCandidates filter).
  *
- * @param {Array} proxyResults - [{ offsetMm, proxyP19, proxyP20, ... }]
+ * @param {Array} proxyResults - [{ offsetMm, proxyWorstSeatRange, proxyRspRange, ... }]
  * @param {number} n - shortlist size (default 8)
  * @returns {Array} top N candidates sorted by proxy P19 ascending
  */
 export function selectSeatingShortlist(proxyResults, n = SEATING_SHORTLIST_SIZE) {
+  // The seat-consistency proxy is the worst-seat range, under its corrected
+  // name; the legacy field is still read so previously captured results work.
+  const worstSeatRange = (candidate) => candidate?.proxyWorstSeatRange ?? candidate?.proxyP19;
   const valid = (proxyResults || []).filter(
-    (c) => c && Number.isFinite(c.proxyP19),
+    (c) => c && Number.isFinite(worstSeatRange(c)),
   );
-  const sorted = [...valid].sort((a, b) => a.proxyP19 - b.proxyP19);
+  const sorted = [...valid].sort((a, b) => worstSeatRange(a) - worstSeatRange(b));
   return sorted.slice(0, Math.max(0, n));
 }
 

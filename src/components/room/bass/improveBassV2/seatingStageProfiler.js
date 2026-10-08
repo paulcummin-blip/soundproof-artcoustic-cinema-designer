@@ -93,7 +93,7 @@ export function formatSeatingProfileReport(report) {
     `  Prepared source/room field: ${report.preparedSourceRoomMs.toFixed(1)} ms`,
     `  Batch worker (round-trip): ${report.batchWorkerMs.toFixed(1)} ms`,
     `  Receiver evaluation (per-offset total): ${report.totalReceiverEvalMs.toFixed(1)} ms`,
-    `  Proxy eval (computeProxyMetrics): ${report.totalProxyEvalMs.toFixed(1)} ms`,
+    `  Proxy eval (proxy candidate metrics): ${report.totalProxyEvalMs.toFixed(1)} ms`,
     `  Canonical confirmation: ${report.confirmationMs.toFixed(1)} ms (offset ${report.confirmationOffsetMm} mm)`,
     `  Per-candidate:`,
   ];

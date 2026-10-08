@@ -82,6 +82,23 @@ function computeLevelChanges(currentResult, candidateResult) {
     return {...lead,jump,seats,fromLabel:levelText(lead.from),toLabel:levelText(lead.to)};
   });
   const [p19,p20]=changes;
+  // P19 is RSP-only: when the candidate carries no per-seat P19 rows, state the
+  // aggregate RSP level change rather than silently reporting no P19 change.
+  if ((candidateResult?.perSeatP19 || []).length === 0) {
+    const beforeRaw = currentResult?.achievedP19Level;
+    const afterRaw = candidateResult?.achievedP19Level;
+    if (beforeRaw != null && afterRaw != null) {
+      const before = numericLevel(beforeRaw);
+      const after = numericLevel(afterRaw);
+      if (after > before) {
+        p19.from = before;
+        p19.to = after;
+        p19.jump = after - before;
+        p19.fromLabel = levelText(before);
+        p19.toLabel = levelText(after);
+      }
+    }
+  }
   const p19Jump=p19.jump,p20Jump=p20.jump;
 
   return {
