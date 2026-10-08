@@ -1,6 +1,7 @@
 import { gradeP19FromRaw, gradeP20FromRaw } from "../completedBassResultPersistence.js";
 import { STAGE2_CANONICAL_VERSION } from "../stage2/stage2Constants.js";
 import { normalisePhaseControlDeg } from "../../../../bass/core/subwooferPhaseControl.js";
+import { hasPerSeatP19 } from "./p19Authority.js";
 
 export const RECOMMENDATION_CONTRACT_VERSION = "improve-bass-confirmed-v1";
 const finite = value => typeof value === "number" && Number.isFinite(value);
@@ -84,11 +85,15 @@ export function applicableSeatsFromResult(result) {
   return rows.map(row => ({ id: String(row?.seatId ?? ""), isPrimary: row?.isPrimary !== false }));
 }
 export function validateConfirmedCandidate(result, context = {}) {
-  // Per-seat P20 (required), the aggregate RSP P19 headline (required), and any
-  // genuine per-seat P19 rows the result happens to carry.
+  // Per-seat P20 (required), plus the P19 evidence the result actually carries:
+  // the aggregate RSP headline when it holds no per-seat P19 rows (the model
+  // that has none), or its own per-seat P19 rows when it holds them (legacy
+  // authority). Requiring the aggregate unconditionally would reject a result
+  // that carries genuine P19 evidence, so it is required only when there are
+  // no per-seat rows to validate.
   const issues = [
     ...validateSeatResults(result, context.seats).issues,
-    ...validateAggregateP19(result).issues,
+    ...(hasPerSeatP19(result) ? [] : validateAggregateP19(result).issues),
   ];
   if (!finite(result?.assessmentStartHz) || !finite(result?.assessmentEndHz) ||
       result.assessmentStartHz <= 0 || result.assessmentEndHz <= result.assessmentStartHz) issues.push("Invalid assessment band");
