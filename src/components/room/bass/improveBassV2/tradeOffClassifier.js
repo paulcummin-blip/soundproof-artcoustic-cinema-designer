@@ -6,12 +6,14 @@
 // A VERIFIED TRADE-OFF requires ALL of:
 //   - P14 preserved (output pass, meets target — checked by caller)
 //   - P18 preserved (no level regression — checked by caller)
-//   - No primary seat LEVEL regression (P19 or P20) — hard safety
+//   - No primary seat LEVEL regression (P20) — hard safety
 //   - No muted subs — hard safety (checked by caller)
 //   - Material improvement in one objective (P19 or P20: level OR raw >= 1.0 dB)
 //   - Material worsening in another objective (P19 or P20: same-level raw >= 1.0 dB)
 //
-// P19 = frequency response at the PRIMARY seat(s) — assessed on primary seats only.
+// P19 = the AGGREGATE RSP response against target — one authority, never a
+//       per-seat collection. Legacy per-seat P19 rows are ignored diagnostic
+//       evidence: they can neither supply nor mask a P19 result here.
 // P20 = seat-to-seat consistency — assessed on the WORST seat across ALL seats,
 //       not just primary, because P20 is a project-level consistency metric.
 //
@@ -31,7 +33,7 @@
 
 import { countFailingSeats } from "./zeroFailOptimiser.js";
 import { floorP19P20Deviation } from "@/components/utils/rp22/resolveRp22DesignValue";
-import { hasPerSeatP19, compareRspP19 } from "./p19Authority.js";
+import { compareRspP19 } from "./p19Authority.js";
 
 const MATERIAL_RAW_THRESHOLD_DB = 1.0;  // material raw improvement or worsening
 const PRIMARY_RAW_WORSENING_THRESHOLD_DB = 1.0;  // same as materialityGate
@@ -51,23 +53,15 @@ function levelText(level) {
 /**
  * Check for primary seat LEVEL regression only (hard safety).
  * Does NOT check same-level raw worsening — that is a trade-off signal.
+ *
+ * Read from the per-seat metric (P20) only. P19 is the aggregate RSP authority,
+ * so its legacy per-seat rows are never inspected here; the aggregate P19 level
+ * is guarded by hasHardSafetyRegression at the confirmed-recommendation gate.
  */
 export function hasPrimarySeatLevelRegression(candidateResult, currentResult) {
-  const candidateP19 = Array.isArray(candidateResult?.perSeatP19) ? candidateResult.perSeatP19 : [];
   const candidateP20 = Array.isArray(candidateResult?.perSeatP20) ? candidateResult.perSeatP20 : [];
-  const currentP19Map = new Map((Array.isArray(currentResult?.perSeatP19) ? currentResult.perSeatP19 : []).map(s => [String(s.seatId), s]));
   const currentP20Map = new Map((Array.isArray(currentResult?.perSeatP20) ? currentResult.perSeatP20 : []).map(s => [String(s.seatId), s]));
 
-  for (const seat of candidateP19) {
-    if (!seat.isPrimary) continue;
-    const currentSeat = currentP19Map.get(String(seat.seatId));
-    if (!currentSeat) continue;
-    const candidateLevel = numericLevel(seat.level);
-    const currentLevel = numericLevel(currentSeat.level);
-    if (candidateLevel < currentLevel) {
-      return { regressed: true, seatId: seat.seatId, parameter: "P19", currentLevel, candidateLevel };
-    }
-  }
   for (const seat of candidateP20) {
     if (!seat.isPrimary) continue;
     const currentSeat = currentP20Map.get(String(seat.seatId));
@@ -82,55 +76,28 @@ export function hasPrimarySeatLevelRegression(candidateResult, currentResult) {
 }
 
 /**
- * Find the best P19 primary-seat material improvement (level or raw).
- * P19 is a primary-seat metric — only primary seats are assessed.
+ * Find the material P19 improvement (level or raw).
+ *
+ * P19 is the AGGREGATE RSP response against target and has no per-seat form.
+ * The aggregate authority is the only P19 evidence read here: legacy per-seat
+ * P19 rows can never supply, mask or substitute for it, so a per-seat
+ * "improvement" cannot make a P19 regression look like an improvement.
  */
 export function findBestP19Improvement(candidateResult, currentResult) {
-  const candidateP19 = Array.isArray(candidateResult?.perSeatP19) ? candidateResult.perSeatP19 : [];
-  const currentP19Map = new Map((Array.isArray(currentResult?.perSeatP19) ? currentResult.perSeatP19 : []).map(s => [String(s.seatId), s]));
-
-  // P19 is RSP-only in this model. When neither side carries per-seat P19 rows
-  // the aggregate RSP authority is the only P19 evidence there is.
-  if (!hasPerSeatP19(candidateResult) || !hasPerSeatP19(currentResult)) {
-    const aggregate = compareRspP19(currentResult, candidateResult, MATERIAL_RAW_THRESHOLD_DB);
-    if (!aggregate) return { improved: false, delta: 0 };
-    if (aggregate.levelImproved) {
-      return { improved: true, parameter: "P19", scope: "rsp",
-        beforeLevel: aggregate.before.level, afterLevel: aggregate.after.level,
-        isLevelChange: true, delta: aggregate.after.level - aggregate.before.level };
-    }
-    if (aggregate.improved) {
-      return { improved: true, parameter: "P19", scope: "rsp",
-        beforeLevel: aggregate.before.level, afterLevel: aggregate.after.level,
-        beforeRaw: aggregate.before.deviationDb, afterRaw: aggregate.after.deviationDb,
-        delta: aggregate.deviationDeltaDb, isLevelChange: false };
-    }
-    return { improved: false, delta: 0 };
+  const aggregate = compareRspP19(currentResult, candidateResult, MATERIAL_RAW_THRESHOLD_DB);
+  if (!aggregate) return { improved: false, delta: 0 };
+  if (aggregate.levelImproved) {
+    return { improved: true, parameter: "P19", scope: "rsp",
+      beforeLevel: aggregate.before.level, afterLevel: aggregate.after.level,
+      isLevelChange: true, delta: aggregate.after.level - aggregate.before.level };
   }
-
-  let best = { improved: false, delta: 0 };
-
-  for (const seat of candidateP19) {
-    if (!seat.isPrimary) continue;
-    const currentSeat = currentP19Map.get(String(seat.seatId));
-    if (!currentSeat) continue;
-    const candidateLevel = numericLevel(seat.level);
-    const currentLevel = numericLevel(currentSeat.level);
-    if (candidateLevel > currentLevel) {
-      const delta = candidateLevel - currentLevel;
-      if (delta > best.delta) {
-        best = { improved: true, parameter: "P19", seatId: seat.seatId, beforeLevel: currentLevel, afterLevel: candidateLevel, isLevelChange: true, delta };
-      }
-    } else if (candidateLevel === currentLevel) {
-      const candRaw = Math.abs(Number(seat.variationDbRaw) || 0);
-      const curRaw = Math.abs(Number(currentSeat.variationDbRaw) || 0);
-      const rawDelta = curRaw - candRaw; // positive = improvement
-      if (rawDelta >= MATERIAL_RAW_THRESHOLD_DB && rawDelta > best.delta) {
-        best = { improved: true, parameter: "P19", seatId: seat.seatId, beforeLevel: currentLevel, afterLevel: candidateLevel, beforeRaw: curRaw, afterRaw: candRaw, delta: rawDelta, isLevelChange: false };
-      }
-    }
+  if (aggregate.improved) {
+    return { improved: true, parameter: "P19", scope: "rsp",
+      beforeLevel: aggregate.before.level, afterLevel: aggregate.after.level,
+      beforeRaw: aggregate.before.deviationDb, afterRaw: aggregate.after.deviationDb,
+      delta: aggregate.deviationDeltaDb, isLevelChange: false };
   }
-  return best;
+  return { improved: false, delta: 0 };
 }
 
 /**
@@ -185,45 +152,22 @@ function findBestImprovement(candidateResult, currentResult) {
 }
 
 /**
- * Find P19 primary-seat same-level raw worsening (trade-off signal).
- * Only checks seats where the displayed level is preserved but raw deviation worsens.
+ * Find the aggregate RSP P19 same-level raw worsening (trade-off signal).
+ *
+ * The aggregate RSP deviation is the only P19 worsening signal — legacy
+ * per-seat P19 rows are never inspected. Only a same-level raw worsening counts:
+ * a level drop is a safety matter, not a trade-off.
  */
 export function findP19Worsening(candidateResult, currentResult) {
-  const candidateP19 = Array.isArray(candidateResult?.perSeatP19) ? candidateResult.perSeatP19 : [];
-  const currentP19Map = new Map((Array.isArray(currentResult?.perSeatP19) ? currentResult.perSeatP19 : []).map(s => [String(s.seatId), s]));
-
-  // RSP-only P19: the aggregate deviation is the worsening signal. Only a
-  // same-level raw worsening counts — a level drop is a safety matter, not a
-  // trade-off.
-  if (!hasPerSeatP19(candidateResult) || !hasPerSeatP19(currentResult)) {
-    const aggregate = compareRspP19(currentResult, candidateResult, MATERIAL_RAW_THRESHOLD_DB);
-    if (!aggregate) return { worsened: false, delta: 0 };
-    const sameLevel = aggregate.before.level != null && aggregate.after.level === aggregate.before.level;
-    const delta = -aggregate.deviationDeltaDb; // positive = worse
-    if (sameLevel && delta > 0) {
-      return { worsened: delta > PRIMARY_RAW_WORSENING_THRESHOLD_DB, seatId: "rsp", parameter: "P19",
-        scope: "rsp", beforeRaw: aggregate.before.deviationDb, afterRaw: aggregate.after.deviationDb, delta };
-    }
-    return { worsened: false, delta: 0 };
+  const aggregate = compareRspP19(currentResult, candidateResult, MATERIAL_RAW_THRESHOLD_DB);
+  if (!aggregate) return { worsened: false, delta: 0 };
+  const sameLevel = aggregate.before.level != null && aggregate.after.level === aggregate.before.level;
+  const delta = -aggregate.deviationDeltaDb; // positive = worse
+  if (sameLevel && delta > 0) {
+    return { worsened: delta > PRIMARY_RAW_WORSENING_THRESHOLD_DB, seatId: "rsp", parameter: "P19",
+      scope: "rsp", beforeRaw: aggregate.before.deviationDb, afterRaw: aggregate.after.deviationDb, delta };
   }
-
-  let worst = { worsened: false, delta: 0 };
-
-  for (const seat of candidateP19) {
-    if (!seat.isPrimary) continue;
-    const currentSeat = currentP19Map.get(String(seat.seatId));
-    if (!currentSeat) continue;
-    const candidateLevel = numericLevel(seat.level);
-    const currentLevel = numericLevel(currentSeat.level);
-    if (candidateLevel !== currentLevel) continue; // only same-level
-    const candRaw = Math.abs(Number(seat.variationDbRaw) || 0);
-    const curRaw = Math.abs(Number(currentSeat.variationDbRaw) || 0);
-    const delta = candRaw - curRaw;
-    if (delta > worst.delta) {
-      worst = { worsened: delta > PRIMARY_RAW_WORSENING_THRESHOLD_DB, seatId: seat.seatId, parameter: "P19", beforeRaw: curRaw, afterRaw: candRaw, delta };
-    }
-  }
-  return worst;
+  return { worsened: false, delta: 0 };
 }
 
 /**

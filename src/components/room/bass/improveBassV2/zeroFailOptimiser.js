@@ -163,10 +163,26 @@ export function compareZeroFailFirst(a, b) {
 }
 
 /**
- * Hard safety regression: P14 or P18 level drop only.
- * Does NOT check P19 L3+ protection — that blanket veto was removed
- * by the zero-fail-first policy. A candidate may trade a strong primary
- * P19 seat to eliminate FAILs elsewhere.
+ * Drop of a full performance level in the CANONICAL AGGREGATE RSP P19 that
+ * counts as a hard safety regression. L4 → L2 (the reported case) is a drop of
+ * two and is rejected; any drop of one or more leaves the RSP response below
+ * the level the design already achieved and is rejected too.
+ */
+const P19_AGGREGATE_LEVEL_DROP = 1;
+
+/**
+ * Hard safety regression: P14 or P18 level drop, plus the canonical aggregate
+ * RSP P19 level.
+ *
+ * P19 is an AGGREGATE RSP result in this model. Its level is read from the
+ * aggregate authority ONLY — per-seat P19 rows are legacy diagnostic evidence
+ * and can never reach this check. The rule is inert when the caller supplies no
+ * aggregate P19 metrics (the optimisation stage classifier passes P14/P18), so
+ * it fires exactly where the confirmed-recommendation safety gate evaluates two
+ * canonical results against each other.
+ *
+ * A same-level raw worsening is NOT a hard rejection: that is a trade-off
+ * signal, classified by the trade-off classifier.
  */
 export function hasHardSafetyRegression(candidateMetrics, currentMetrics) {
   if (!currentMetrics) return { regressed: false };
@@ -175,6 +191,16 @@ export function hasHardSafetyRegression(candidateMetrics, currentMetrics) {
   }
   if (candidateMetrics.p18Level < currentMetrics.p18Level) {
     return { regressed: true, parameter: "P18", current: currentMetrics.p18Level, candidate: candidateMetrics.p18Level };
+  }
+  // Canonical aggregate RSP P19 level (never per-seat P19 rows). Guarded against
+  // the "no authority" sentinel: a result with no aggregate P19 reports a
+  // non-finite variation and must never be read as a regression.
+  const currentP19Level = Number.isFinite(currentMetrics.p19Level) ? currentMetrics.p19Level : null;
+  const candidateP19Level = Number.isFinite(candidateMetrics.p19Level) ? candidateMetrics.p19Level : null;
+  if (currentP19Level != null && candidateP19Level != null &&
+      currentP19Level - candidateP19Level >= P19_AGGREGATE_LEVEL_DROP) {
+    return { regressed: true, parameter: "P19", scope: "rsp",
+      current: currentP19Level, candidate: candidateP19Level };
   }
   return { regressed: false };
 }

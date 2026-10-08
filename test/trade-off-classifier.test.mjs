@@ -40,13 +40,19 @@ function makeSeatP19(seatId, isPrimary, raw) {
   return { seatId, isPrimary, variationDbRaw: raw, level };
 }
 
+// The same RP22 mapping, applied to the AGGREGATE RSP P19 authority.
+function gradeP19(raw) {
+  const wholeDb = Math.floor(Math.abs(raw));
+  return wholeDb <= 2 ? 4 : wholeDb <= 3 ? 3 : wholeDb <= 4 ? 2 : wholeDb <= 5 ? 1 : 0;
+}
+
 function makeSeatP20(seatId, isPrimary, raw) {
   const wholeDb = Math.floor(Math.abs(raw));
   const level = wholeDb <= 2 ? 4 : wholeDb <= 3 ? 3 : wholeDb <= 4 ? 2 : 1;
   return { seatId, isPrimary, variationDbRaw: raw, level };
 }
 
-function makeResult({ candidateId, candidateKind = "calibration", primaryP19Raw, primaryP20Raw, worstP19Raw, worstP20Raw, appliedTuning, inputIdentity = "fp-test" }) {
+function makeResult({ candidateId, candidateKind = "calibration", primaryP19Raw, primaryP20Raw, worstP19Raw, worstP20Raw, aggregateP19Raw, appliedTuning, inputIdentity = "fp-test" }) {
   const seats = [
     { id: "seat-r1-c1", isPrimary: true },
     { id: "seat-r2-c1", isPrimary: false },
@@ -71,6 +77,11 @@ function makeResult({ candidateId, candidateKind = "calibration", primaryP19Raw,
       { sourceId: "sub-1", delayMs: 0, gainDb: 0, polarity: 1 },
       { sourceId: "sub-2", delayMs: 0, gainDb: 0, polarity: 1 },
     ],
+    // Canonical P19 authority: the AGGREGATE RSP response against target. The
+    // per-seat P19 rows below are legacy diagnostic evidence — no decision reads
+    // them, so an aggregate regression can never be masked by a per-seat gain.
+    achievedP19VariationDb: aggregateP19Raw ?? primaryP19Raw,
+    achievedP19Level: gradeP19(aggregateP19Raw ?? primaryP19Raw),
     perSeatP19: [
       makeSeatP19("seat-r1-c1", true, primaryP19Raw),
       makeSeatP19("seat-r2-c1", false, worstP19Raw ?? primaryP19Raw),

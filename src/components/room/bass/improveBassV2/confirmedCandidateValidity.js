@@ -1,7 +1,6 @@
 import { gradeP19FromRaw, gradeP20FromRaw } from "../completedBassResultPersistence.js";
 import { STAGE2_CANONICAL_VERSION } from "../stage2/stage2Constants.js";
 import { normalisePhaseControlDeg } from "../../../../bass/core/subwooferPhaseControl.js";
-import { hasPerSeatP19 } from "./p19Authority.js";
 
 export const RECOMMENDATION_CONTRACT_VERSION = "improve-bass-confirmed-v1";
 const finite = value => typeof value === "number" && Number.isFinite(value);
@@ -68,9 +67,9 @@ export function validateSeatResults(result, seats) {
 }
 
 /**
- * The aggregate RSP P19 headline — validated on its own, exactly once, because
- * this model holds no per-seat P19. A missing or ungradeable aggregate P19 is a
- * genuine validation failure.
+ * The aggregate RSP P19 headline — the ONE P19 authority, validated on its own,
+ * exactly once, for every result. A missing or ungradeable aggregate RSP P19 is
+ * a genuine validation failure, and no legacy per-seat P19 row can rescue it.
  */
 export function validateAggregateP19(result) {
   const issues = [];
@@ -85,15 +84,15 @@ export function applicableSeatsFromResult(result) {
   return rows.map(row => ({ id: String(row?.seatId ?? ""), isPrimary: row?.isPrimary !== false }));
 }
 export function validateConfirmedCandidate(result, context = {}) {
-  // Per-seat P20 (required), plus the P19 evidence the result actually carries:
-  // the aggregate RSP headline when it holds no per-seat P19 rows (the model
-  // that has none), or its own per-seat P19 rows when it holds them (legacy
-  // authority). Requiring the aggregate unconditionally would reject a result
-  // that carries genuine P19 evidence, so it is required only when there are
-  // no per-seat rows to validate.
+  // Per-seat P20 (required), plus the canonical P19 authority — ALWAYS.
+  // P19 is an aggregate RSP result in this model, so the aggregate deviation and
+  // the aggregate level are required of every confirmed candidate. A legacy
+  // per-seat P19 row is ignored diagnostic evidence: it is never validated in
+  // place of the aggregate, so a result that carries per-seat P19 rows but no
+  // aggregate RSP P19 is INVALID/INCOMPLETE — it is never rescued by them.
   const issues = [
     ...validateSeatResults(result, context.seats).issues,
-    ...(hasPerSeatP19(result) ? [] : validateAggregateP19(result).issues),
+    ...validateAggregateP19(result).issues,
   ];
   if (!finite(result?.assessmentStartHz) || !finite(result?.assessmentEndHz) ||
       result.assessmentStartHz <= 0 || result.assessmentEndHz <= result.assessmentStartHz) issues.push("Invalid assessment band");

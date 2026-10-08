@@ -28,11 +28,13 @@ function numericLevel(value) {
   return match ? Number(match[1]) : 0;
 }
 
+// Seat-level deviation is read from the PER-SEAT METRIC (P20) only. P19 is the
+// aggregate RSP authority in this model, so its legacy per-seat P19 rows are
+// ignored diagnostic evidence and are never inspected for materiality.
 function worstSeatDeviation(result) {
-  const p19 = Array.isArray(result?.perSeatP19) ? result.perSeatP19 : [];
   const p20 = Array.isArray(result?.perSeatP20) ? result.perSeatP20 : [];
   let worst = 0;
-  for (const seat of [...p19, ...p20]) {
+  for (const seat of p20) {
     const v = Math.abs(Number(seat?.variationDbRaw) || 0);
     if (v > worst) worst = v;
   }
@@ -40,10 +42,9 @@ function worstSeatDeviation(result) {
 }
 
 function worstPrimarySeatDeviation(result) {
-  const p19 = (Array.isArray(result?.perSeatP19) ? result.perSeatP19 : []).filter(s => s.isPrimary);
   const p20 = (Array.isArray(result?.perSeatP20) ? result.perSeatP20 : []).filter(s => s.isPrimary);
   let worst = 0;
-  for (const seat of [...p19, ...p20]) {
+  for (const seat of p20) {
     const v = Math.abs(Number(seat?.variationDbRaw) || 0);
     if (v > worst) worst = v;
   }
@@ -103,16 +104,12 @@ export function hasPrimarySeatRegression(currentResult, candidateResult) {
   return { regressed: false };
 }
 
+// A new significant problem is a PER-SEAT (P20) worsening. The aggregate RSP
+// P19 has its own authority and is not a per-seat signal, so legacy per-seat P19
+// rows are not inspected here.
 function hasNewSignificantProblem(currentResult, candidateResult) {
-  const currentP19 = new Map((currentResult?.perSeatP19 || []).map(s => [String(s.seatId), s]));
   const currentP20 = new Map((currentResult?.perSeatP20 || []).map(s => [String(s.seatId), s]));
 
-  for (const seat of (candidateResult?.perSeatP19 || [])) {
-    const cur = currentP19.get(String(seat.seatId));
-    const curVar = Math.abs(Number(cur?.variationDbRaw) || 0);
-    const candVar = Math.abs(Number(seat?.variationDbRaw) || 0);
-    if (candVar > curVar + NEW_PROBLEM_THRESHOLD_DB) return true;
-  }
   for (const seat of (candidateResult?.perSeatP20 || [])) {
     const cur = currentP20.get(String(seat.seatId));
     const curVar = Math.abs(Number(cur?.variationDbRaw) || 0);
@@ -183,11 +180,12 @@ export function isMaterialImprovement(currentResult, candidateResult) {
   }
 
   // Same fail count, no moved fails -- check for level / deviation / null
-  // improvements. Use the actual matched seats. The P19/P20 headline remains SEAT.
-  const pairs = ["perSeatP19","perSeatP20"].flatMap(field=>(candidateResult[field]||[]).map(seat=>({
-    parameter:field==="perSeatP19"?"P19":"P20",seatId:seat.seatId,
-    before:(currentResult[field]||[]).find(s=>String(s.seatId)===String(seat.seatId)),after:seat,
-  })));
+  // improvements. Use the actual matched seats, from the PER-SEAT metric (P20).
+  // P19 has no per-seat form: its aggregate authority was assessed above.
+  const pairs = (candidateResult.perSeatP20||[]).map(seat=>({
+    parameter:"P20",seatId:seat.seatId,
+    before:(currentResult.perSeatP20||[]).find(s=>String(s.seatId)===String(seat.seatId)),after:seat,
+  }));
   const improvements=pairs.filter(p=>canonicalLevel(p.after.level)>canonicalLevel(p.before.level));
   if(improvements.length) return {material:true,reason:"Level improvement: "+improvements.map(p=>p.seatId+" "+p.parameter+" L"+canonicalLevel(p.before.level)+" -> L"+canonicalLevel(p.after.level)).join(", "),details:{seats:improvements}};
   const sameLevels = pairs.every(p=>canonicalLevel(p.after.level)===canonicalLevel(p.before.level));

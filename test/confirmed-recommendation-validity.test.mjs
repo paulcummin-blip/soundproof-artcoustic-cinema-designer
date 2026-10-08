@@ -16,7 +16,7 @@ test("B: material position alone",()=>assert.equal(select([position]).winner.can
 test("C: both use one recommendation authority",()=>{const s=select([calibration,position]);assert.equal(s.recommendations.length,2);assert.equal(s.winner.candidateId,s.recommendations[0].result.candidateId);assert.strictEqual(rankRecommendations(s),s.recommendations);});
 test("D: complete valid immaterial evaluation",()=>{const s=select([{...current,candidateKind:"calibration",candidateId:"no-benefit",configurationKey:"different"}]);assert.equal(s.winner,null);assert.equal(s.terminalOutcome,"below-materiality");});
 test("Same positions and inherited isCurrent do not erase calibration",()=>assert.equal(select([{...calibration,isCurrent:true}]).winner.candidateId,calibration.candidateId));
-test("Reference follows the existing 1 dB same-level primary path",()=>{const m=isMaterialImprovement(current,calibration);assert.equal(m.material,true);assert.ok(Math.abs(m.details.improvement-1.1745106187541694)<1e-9);});
+test("Reference follows the canonical aggregate RSP P19 materiality path",()=>{const m=isMaterialImprovement(current,calibration);assert.equal(m.material,true);assert.ok(Math.abs(m.details.rspP19.deviationDeltaDb-1.2222134359931829)<1e-9);});
 for(const [name,edit] of [
  ["empty",r=>{r.perSeatP19=[];r.perSeatP20=[]}], ["missing",r=>r.perSeatP19.pop()],
  ["duplicate",r=>r.perSeatP20[1].seatId=r.perSeatP20[0].seatId], ["wrong seat",r=>r.perSeatP19[0].seatId="wrong"],
@@ -26,9 +26,13 @@ for(const [name,edit] of [
  ["physical",r=>r.physicalValidation={passed:false}], ["stale",r=>r.inputIdentity="old"],
  ["timing version",r=>r.timingVersion="old"], ["source identity",r=>r.appliedTuning[1].sourceId=r.appliedTuning[0].sourceId],
 ])test("E: fail closed on "+name,()=>{const r=structuredClone(calibration);edit(r);const s=select([r]);assert.equal(s.winner,null);assert.equal(s.terminalOutcome,"incomplete");assert.equal(s.evaluations[0].status,"invalid");});
-test("Invalid Current cannot authorise a recommendation",()=>assert.equal(selectWinnerWithProtection([calibration],snapshot,{...current,perSeatP19:[]}).terminalOutcome,"incomplete"));
-test("Invalid alternative cannot conceal a valid material calibration",()=>{const s=select([{...position,perSeatP19:[]},calibration]);assert.equal(s.winner.candidateId,calibration.candidateId);assert.ok(s.evaluations.some(e=>e.status==="invalid"));});
+// Legacy per-seat P19 rows are retained here on purpose: they must NOT rescue a
+// baseline whose canonical aggregate RSP P19 authority is missing.
+test("Invalid Current cannot authorise a recommendation",()=>assert.equal(selectWinnerWithProtection([calibration],snapshot,{...current,achievedP19VariationDb:null,achievedP19Level:null}).terminalOutcome,"incomplete"));
+test("Invalid alternative cannot conceal a valid material calibration",()=>{const s=select([{...position,achievedP19VariationDb:null,achievedP19Level:null},calibration]);assert.equal(s.winner.candidateId,calibration.candidateId);assert.ok(s.evaluations.some(e=>e.status==="invalid"));});
 test("Empty seats never pass standalone materiality",()=>assert.equal(isMaterialImprovement(current,{...calibration,perSeatP19:[],perSeatP20:[]}).material,false));
-test("Primary safety still rejects a canonical level regression",()=>{const r=structuredClone(calibration);r.perSeatP19[1].variationDbRaw=3.5;r.perSeatP19[1].level=3;const s=select([r]);assert.equal(s.winner,null);assert.equal(s.evaluations[0].status,"safety-rejected");});
+// The regression is applied to the CANONICAL AGGREGATE RSP P19 (L4 -> L2), not
+// to a legacy per-seat row: per-seat P19 rows carry no safety authority.
+test("Canonical aggregate RSP P19 level regression is rejected",()=>{const r=structuredClone(calibration);r.achievedP19VariationDb=4.28;r.achievedP19Level=2;const s=select([r]);assert.equal(s.winner,null);assert.equal(s.evaluations[0].status,"safety-rejected");});
 test("Insufficient operating output remains rejected",()=>{const r={...calibration,operatingOutputDb:114,requestedP14Pass:false};assert.equal(select([r]).evaluations[0].status,"safety-rejected");});
 test("A-C: card, comparison and top Apply IDs agree; lower cards cannot Apply",()=>{for(const rows of [[calibration],[position],[calibration,position]]){const s=select(rows);const html=renderToStaticMarkup(React.createElement(Results,{selection:s,snapshot,currentInstances:snapshot.allInstances,roomDims:{widthM:5.5,lengthM:5.29,heightM:2.4},seatingPositions:snapshot.validationContext.seats,onApply:()=>{},onApplyCalibration:()=>{}}));for(const r of s.recommendations){assert.ok(html.includes('data-candidate-id="'+r.result.candidateId+'"'));assert.ok(html.includes('data-comparison-candidate-id="'+r.result.candidateId+'"'));assert.equal(html.includes('data-apply-candidate-id="'+r.result.candidateId+'"'),r.isWinner);}assert.ok(html.includes("SEAT"));}});
