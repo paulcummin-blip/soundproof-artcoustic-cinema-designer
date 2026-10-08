@@ -5,7 +5,8 @@
 // Layout: 4-column grid of titled cards, each with a standard RP22GradingPill
 // and supporting value underneath. All four parameters split
 // "L2 · 112 dBC" into pill label "L2" and supporting text "112 dBC".
-// When stale, an "Out of date" badge appears beneath the pill.
+// When the shown value is not the current authority, the shared state badge
+// (Preview only, Calculated — not published, …) appears beneath the pill.
 //
 // Publication-gated: only a canonically published completed result may be
 // presented as an official RP22 result. During calculation with a published
@@ -17,7 +18,8 @@ import React, { useEffect, useState } from "react";
 import RP22GradingPill from "@/components/ui/RP22GradingPill";
 import BassResultDetailTooltip from "@/components/room/bass/BassResultDetailTooltip";
 import { formatOfficialBassResults } from "@/components/room/bass/bassResultsPresentation";
-import { useSharedBassResults } from "@/components/room/bass/bassResultsStore";
+import useSharedBassAuthorityState from "@/components/room/bass/useSharedBassAuthorityState";
+import BassStateBadge from "@/components/room/bass/BassStateBadge";
 import { resolveP14TargetSelectionState } from "@/components/room/bass/p14TargetSelectionState";
 import { useGraphInteraction, setGraphInteraction } from "@/components/room/bass/bda/graphInteractionStore";
 import { useEffectiveBassLifecycleState } from "@/components/room/bass/bda/useEffectiveBassLifecycle";
@@ -48,7 +50,7 @@ function splitPillContent(resultText) {
  * @param {number} [opts.nowMs] — optional clock for elapsed-time text
  */
 export default function BassHeadlinePills({ nowMs }) {
-  const shared = useSharedBassResults();
+  const { shared, authorityState } = useSharedBassAuthorityState();
   const interaction = useGraphInteraction();
   const activeMetric = interaction?.selectedMetric || null;
   const [clock, setClock] = useState(Date.now());
@@ -107,9 +109,7 @@ export default function BassHeadlinePills({ nowMs }) {
             {supportingText
               ? <div className="text-center text-[10px] text-[#625143]">{supportingText}</div>
               : null}
-            {pill.stale && (
-              <div className="text-[9px] font-semibold uppercase tracking-wide text-amber-700 bg-amber-50 border border-amber-200 rounded px-1.5 py-0.5">Out of date</div>
-            )}
+            {pill.stale && <BassStateBadge state={authorityState} />}
           </div>
         );
       })}

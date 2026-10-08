@@ -1,0 +1,31 @@
+// useSharedBassAuthorityState — the ONE way any P14 / P18 / P19 / P20 surface
+// reads the state of the bass result it sits beside.
+//
+// PRESENTATION ONLY. It assembles exactly the inputs the authority band uses
+// and hands them to the single resolver, so every visible badge names the same
+// state as the band: Preview only, Needs calculation, Calculated — not
+// published, Current (or Calculating). It computes no engineering value and
+// holds no state of its own.
+import { useSharedBassResults } from "@/components/room/bass/bassResultsStore";
+import { usePublicationAttempt } from "@/components/engineering/publicationAcknowledgementStore";
+import { resolveBassAuthorityState } from "@/components/room/bass/bassAuthorityState";
+
+export default function useSharedBassAuthorityState() {
+  const shared = useSharedBassResults();
+  const publicationAttempt = usePublicationAttempt(
+    shared?.scopeId || null,
+    shared?.versionId || null,
+  );
+
+  return {
+    shared,
+    publicationAttempt,
+    authorityState: resolveBassAuthorityState({
+      completedBassAuthority: shared?.completedBassAuthority,
+      publicationAttempt,
+      lifecycleState: shared?.bassLifecycleState,
+      calculationInProgress: shared?.calculationInProgress,
+      placementPreviewActive: shared?.placementPreviewActive,
+    }),
+  };
+}

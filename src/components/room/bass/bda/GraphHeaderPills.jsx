@@ -17,7 +17,8 @@ import React, { useEffect, useState } from "react";
 import RP22GradingPill from "@/components/ui/RP22GradingPill";
 import BassResultDetailTooltip from "@/components/room/bass/BassResultDetailTooltip";
 import { formatOfficialBassResults } from "@/components/room/bass/bassResultsPresentation";
-import { useSharedBassResults } from "@/components/room/bass/bassResultsStore";
+import useSharedBassAuthorityState from "@/components/room/bass/useSharedBassAuthorityState";
+import BassStateBadge from "@/components/room/bass/BassStateBadge";
 import { resolveP14TargetSelectionState } from "@/components/room/bass/p14TargetSelectionState";
 import { useGraphInteraction, setGraphInteraction, clearGraphInteraction } from "@/components/room/bass/bda/graphInteractionStore";
 
@@ -35,7 +36,7 @@ function splitPillContent(resultText) {
 }
 
 export default function GraphHeaderPills() {
-  const shared = useSharedBassResults();
+  const { shared, authorityState } = useSharedBassAuthorityState();
   const interaction = useGraphInteraction();
   const [clock, setClock] = useState(Date.now());
 
@@ -97,9 +98,7 @@ export default function GraphHeaderPills() {
               {supportingText && (
                 <span className="text-[10px] text-[#625143]">{supportingText}</span>
               )}
-              {pill.stale && (
-                <span className="text-[9px] font-semibold uppercase tracking-wide text-amber-700 bg-amber-50 border border-amber-200 rounded px-1">Out of date</span>
-              )}
+              {pill.stale && <BassStateBadge state={authorityState} compact />}
             </button>
           </BassResultDetailTooltip>
         );
