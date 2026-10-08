@@ -32,6 +32,7 @@ import {
   resolveCentreCabinetFootprintM,
   resolveCentreCabinetX,
 } from '@/components/utils/frontStageModeAuthority';
+import { getSpeakerModelMeta } from '@/components/models/speakers/registry';
 import { buildFrontStageSeed } from '@/components/room/lcrFrontStageSeed';
 import { computeTvVerticalCentreM } from '@/components/roomdesigner/utils/lcrHeightAuthority';
 import { discreteChannelCounts } from '../shared/channelArchitecture.js';
@@ -202,6 +203,45 @@ test('the seed places one cabinet at each TV edge at the TV midpoint height', ()
   const rotatedOffset = TV83_WIDTH_MM / 2000 + rotated.widthM / 2;
   assert.ok(Math.abs(verticalLeft.position.x - (ROOM.widthM / 2 - rotatedOffset)) < 1e-6);
 
+});
+
+test('a C-1 pair flanks the TV at the TV midpoint, drawn horizontally by default', () => {
+  const placed = seed({ centreModelLabel: 'C-1' });
+  const left = placed.find((s) => s.role === 'FCL');
+  const right = placed.find((s) => s.role === 'FCR');
+  assert.ok(left && right, 'both C-1 cabinets are placed');
+  assert.equal(left.orientation, 'horizontal');
+
+  const footprint = resolveCentreCabinetFootprintM('c-1', 'horizontal', 'tv83');
+  const offset = TV83_WIDTH_MM / 2000 + footprint.widthM / 2;
+  assert.ok(Math.abs(left.position.x - (ROOM.widthM / 2 - offset)) < 1e-6, 'left cabinet at the TV left edge');
+  assert.ok(Math.abs(right.position.x - (ROOM.widthM / 2 + offset)) < 1e-6, 'right cabinet at the TV right edge');
+  const tvMid = computeTvVerticalCentreM(SCREEN, ROOM);
+  assert.ok(Math.abs(left.position.z - tvMid) < 1e-6);
+
+  // Turning it on end rotates the box: the cabinet stays, at the same height.
+  const vertical = seed({ centreModelLabel: 'C-1', centreOrientation: 'vertical' });
+  const verticalLeft = vertical.find((s) => s.role === 'FCL');
+  assert.equal(verticalLeft.orientation, 'vertical');
+  assert.ok(Math.abs(verticalLeft.position.z - tvMid) < 1e-6, 'acoustic centre stays on the TV midpoint');
+});
+
+test('vertical mode never excludes a valid on-wall model', () => {
+  // C-1 is an on-wall centre drawn horizontally; C4-1 / Multi (Mono) / HSPL (Mono)
+  // are drawn across the TV. The normal drawing never decides eligibility, and
+  // vertical is offered for every one of them.
+  const horizontalDrawn = 'c-1';
+  const tvWidthBars = ['c4-1', 'multi-mono', 'hspl-mono'];
+
+  for (const key of [horizontalDrawn, ...tvWidthBars]) {
+    assert.equal(isEligibleDualCentreCentreModel(key), true, `${key} stays eligible`);
+    const meta = getSpeakerModelMeta(key);
+    assert.equal(meta.category, 'LCR', `${key} is in the front-wall LCR range`);
+    assert.equal(meta.round === true, false, `${key} is not an in-ceiling product`);
+
+    const footprint = resolveCentreCabinetFootprintM(key, 'vertical', 'tv83');
+    assert.equal(footprint.orientation, 'vertical', `${key} can be installed vertically`);
+  }
 });
 
 test('the cabinets are the mode record and share one orientation', () => {
