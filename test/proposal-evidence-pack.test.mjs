@@ -24,7 +24,11 @@ import {
   CLAIM_KIND,
   BLOCK_REASON,
 } from '../base44/shared/proposalEvidence/evidencePackSchema.js';
-import { isBassConsistencyClaim } from '../base44/shared/proposalEvidence/proposalEvidenceWording.js';
+import {
+  assertBassWordingSafe,
+  isBassConsistencyClaim,
+  stripBassWordingDeep,
+} from '../base44/shared/proposalEvidence/proposalEvidenceWording.js';
 import {
   EVIDENCE_AT as AT,
   LIVE_VERSION_NAME_DECOY,
@@ -546,4 +550,54 @@ test('G. no client-facing fact is sourced from live project or version state', (
   assert.ok(built.evidence_basis.version_names.every((entry) => entry.source === 'saved-report-evidence'));
   assert.deepEqual(built.evidence_basis.sources, ['saved-report-evidence']);
   assert.match(built.decision_framing.text, /Level 1 gives the room the format\. Level 4 /);
+});
+
+/* ── H. The prohibited P20 phrases, phrase by phrase ───────────────────────── */
+
+test('H. every prohibited P20 phrase is refused by the bass-wording authority', () => {
+  // Each sentence is what a version's own report prose could state about P20
+  // while the result is Level 1. None of them may enter a pack.
+  const refused = [
+    'The bass is uniform across all seats.',
+    'The design brings improved seat-to-seat consistency.',
+    'The bass is controlled across the room.',
+    'The bass is controlled across the seating area.',
+    'The bass is powerful and controlled across the seating area.',
+    'Bass stays smooth across all seats.',
+    'The design gives a more uniform bass response across all seating positions.',
+    'The bass is perfectly even across all seats.',
+    'The same bass at every seat is the goal.',
+    'The bass solves the bass consistency problem across the room.',
+  ];
+
+  for (const sentence of refused) {
+    assert.equal(isBassConsistencyClaim(sentence), true, sentence);
+    assert.throws(
+      () => assertBassWordingSafe({ facts: [{ line: sentence }] }),
+      /prohibited bass claim/,
+      sentence,
+    );
+  }
+});
+
+test('H. the allowed bass wording is not refused', () => {
+  const allowed = [
+    'Bass consistency remains limited.',
+    'The response varies between seats.',
+    'P20 is the limiting bass parameter.',
+    'Further subwoofer placement, delay, gain or polarity optimisation may be useful.',
+    'Strong output does not automatically mean even seat-to-seat bass.',
+  ];
+  for (const sentence of allowed) {
+    assert.equal(isBassConsistencyClaim(sentence), false, sentence);
+    assert.doesNotThrow(() => assertBassWordingSafe({ facts: [{ line: sentence }] }), sentence);
+  }
+});
+
+test('H. a prohibited claim is removed and the rest of the line survives', () => {
+  const { value, removed } = stripBassWordingDeep({
+    facts: [{ line: '4 × SUB4-12 · more uniform bass response across all seating positions' }],
+  });
+  assert.equal(value.facts[0].line, '4 × SUB4-12');
+  assert.deepEqual(removed.map((entry) => entry.rule), ['uniform_response_across_seats']);
 });

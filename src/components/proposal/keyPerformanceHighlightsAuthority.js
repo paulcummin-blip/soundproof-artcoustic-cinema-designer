@@ -358,7 +358,9 @@ const MODEST_GAIN = Object.freeze({
   p16: 'The screen channels keep a broadly consistent tonal character, with some variation across the screen.',
   p17: 'Surround and overhead tone stays reasonably consistent, with some variation as effects move around the room.',
   p18: 'Bass extension is useful for film effects without reaching the deepest low-frequency content.',
-  p19: 'Bass response is even across the main seats rather than identical at every position.',
+  // P19 is the response AT the reference seating position: its line never
+  // claims evenness across the seats, which is P20's result to state.
+  p19: 'Bass response is set at the reference seating position, with the variation the response shows there.',
   p20: 'Bass level varies between seats as the room and the subwoofer positions allow.',
 });
 

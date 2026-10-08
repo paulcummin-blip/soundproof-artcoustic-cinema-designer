@@ -119,8 +119,8 @@ export function deriveUpgradeOpportunities({ engineeringAuthority, productIntell
       const subCount = engineeringAuthority?.system?.subwoofer_strategy?.count || 0;
       if (subCount < 4) {
         opportunities.push({
-          opportunity: `Add subwoofers to improve seat-to-seat bass consistency`,
-          engineering_benefit: `Current P20 at L2 with ${subCount} subwoofer${subCount !== 1 ? 's' : ''}; a four-subwoofer arrangement would smooth room modes across all seats.`,
+          opportunity: `Add subwoofers to reduce seat-to-seat bass variation`,
+          engineering_benefit: `Current P20 at L2 with ${subCount} subwoofer${subCount !== 1 ? 's' : ''}; an additional subwoofer position would add modal smoothing.`,
           ...withDecisionConfidence(p20.confidence || 0.80),
         });
       }

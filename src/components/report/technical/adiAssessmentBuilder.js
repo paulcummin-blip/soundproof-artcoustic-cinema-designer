@@ -277,9 +277,9 @@ export function buildAdiAssessment(
 
   if (p20Primary && LEVEL_RANK[p20Primary] < 3) {
     improvements.push({
-      action: "Consider additional rear subwoofers to improve seat-to-seat consistency.",
-      why: "Seat consistency is below the reference threshold.",
-      benefit: "More uniform bass response across all seating positions.",
+      action: "Consider further subwoofer placement, delay, gain or polarity optimisation, or an additional subwoofer position to reduce seat-to-seat bass variation.",
+      why: "Seat-to-seat bass consistency remains the limiting bass parameter.",
+      benefit: "Less difference in low-frequency response between the seating positions.",
     });
   }
 

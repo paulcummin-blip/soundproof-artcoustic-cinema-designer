@@ -81,6 +81,23 @@ const PROHIBITED_BASS_CLAIMS = Object.freeze([
     rule: 'smooth_across_the_seats',
     pattern: /smooth(?:ly)?\s+(?:across|throughout)\s+(?:the\s+|all\s+|every\s+|each\s+)?(?:seats?|seating(?:\s+area)?|room|listening\s+(?:area|position(?:s)?))/i,
   },
+  {
+    // "more uniform bass response across all seating positions" states evenness
+    // without putting the word "seats" straight after "bass".
+    rule: 'uniform_response_across_seats',
+    pattern: /uniform\s+(?:bass\s+)?(?:low[- ]frequency\s+)?(?:response|balance|level|output)\s+(?:across|throughout|between)\s+(?:all\s+|every\s+|each\s+|the\s+)?(?:seats?|seating(?:\s+area)?|listening\s+positions?|room)/i,
+  },
+  {
+    // "the bass is uniform across all seats" leads with the adjective instead.
+    rule: 'uniform_across_seats_phrase',
+    pattern: /uniform(?:ly)?\s+(?:across|throughout|between)\s+(?:all\s+|every\s+|each\s+|the\s+)?(?:seats?|seating(?:\s+area)?|listening\s+positions?|room)/i,
+  },
+  {
+    // "the bass is even across all seats" — the adjective leads the phrase, with
+    // or without an intensifier, and the word "bass" may not appear at all.
+    rule: 'even_across_seats_phrase',
+    pattern: /\b(?:(?:perfectly|materially|completely|totally)\s+)?even\s+(?:across|throughout|between)\s+(?:all|every|each)\s+(?:seats?|seating(?:\s+area)?|listening\s+positions?)/i,
+  },
 ]);
 
 /** The rule ids behind the prohibited claims, for an audit to assert against. */
