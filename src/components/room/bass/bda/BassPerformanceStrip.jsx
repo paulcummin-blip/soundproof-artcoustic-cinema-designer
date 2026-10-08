@@ -27,6 +27,10 @@ import { useSharedBassResults } from "@/components/room/bass/bassResultsStore";
 import { resolveP14TargetSelectionState } from "@/components/room/bass/p14TargetSelectionState";
 import { useGraphInteraction, setGraphInteraction, clearGraphInteraction } from "@/components/room/bass/bda/graphInteractionStore";
 import { useEffectiveBassLifecycleState } from "@/components/room/bass/bda/useEffectiveBassLifecycle";
+import { usePublicationAttempt } from "@/components/engineering/publicationAcknowledgementStore";
+import { resolveBassAuthorityState, BASS_AUTHORITY_STATE } from "@/components/room/bass/bassAuthorityState";
+import BassAuthorityStateBar from "@/components/room/bass/bda/BassAuthorityStateBar";
+import { readEngineeringPublishTrigger } from "@/components/engineering/engineeringPublishTrigger";
 
 const PARAM_KEYS = ["p14", "p18", "p19", "p20"];
 const PARAM_LABELS = { p14: "P14", p18: "P18", p19: "P19", p20: "P20" };
@@ -45,6 +49,26 @@ export default function BassPerformanceStrip() {
   const shared = useSharedBassResults();
   const interaction = useGraphInteraction();
   const [clock, setClock] = useState(Date.now());
+
+  // The state of the band, from the shared authority: preview only, needs
+  // calculation, calculated but not published, or current. The label replaces
+  // the old vague "Out of date", and carries the one action that resolves it.
+  const publicationAttempt = usePublicationAttempt(shared?.scopeId || null, shared?.versionId || null);
+  const authorityState = resolveBassAuthorityState({
+    completedBassAuthority: shared?.completedBassAuthority,
+    publicationAttempt,
+    lifecycleState: shared?.bassLifecycleState,
+    calculationInProgress: shared?.calculationInProgress,
+    placementPreviewActive: shared?.placementPreviewActive,
+  });
+  const stateAction = authorityState.code === BASS_AUTHORITY_STATE.CALCULATED_NOT_PUBLISHED
+    // The publish action is the one the publication effect already owns, read
+    // from its registration seam — never a second publication path.
+    ? () => {
+        const publish = readEngineeringPublishTrigger(shared?.scopeId, shared?.versionId);
+        if (publish) publish();
+      }
+    : (typeof shared?.onCalculate === "function" ? shared.onCalculate : null);
 
   const active = shared.calculationInProgress || shared.bassLifecycleState === "stale_needs_recalculation";
   useEffect(() => {
@@ -137,7 +161,7 @@ export default function BassPerformanceStrip() {
                 </span>
               )}
 
-              {/* Stale marker — retains prominence */}
+              {/* Stale marker — retains prominence, names the actual state */}
               {pill.stale && (
                 <span
                   className="font-semibold uppercase tracking-wide rounded px-1.5 py-0.5 shrink-0"
@@ -148,13 +172,19 @@ export default function BassPerformanceStrip() {
                     border: "1px solid #FCD34D",
                   }}
                 >
-                  Out of date
+                  {authorityState.label}
                 </span>
               )}
             </button>
           </BassResultDetailTooltip>
         );
       })}
+
+      <BassAuthorityStateBar
+        state={authorityState}
+        onPrimaryAction={stateAction}
+        primaryDisabled={shared?.calculationInProgress === true}
+      />
     </div>
   );
 }

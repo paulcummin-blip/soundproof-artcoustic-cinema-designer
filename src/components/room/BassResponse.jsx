@@ -809,7 +809,10 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, h
           {placementPreviewActive && (
             <div style={{ border: "1px solid #F59E0B", borderRadius: 10, background: "#FFFBEB", padding: "10px 14px", marginBottom: 8 }}>
               <div style={{ fontSize: 13, fontWeight: 700, color: "#92400E" }}>
-                Subwoofer positions changed. Previewing room response only.
+                Preview only — calculate bass performance to update RP22 results.
+              </div>
+              <div style={{ fontSize: 12, color: "#92400E", marginTop: 2 }}>
+                Subwoofer positions changed. The P14 / P18 / P19 / P20 values below are the previous result, not the current design.
               </div>
             </div>
           )}

@@ -38,7 +38,7 @@
  * Failures are logged but do not block the UI or the browser handoff.
  */
 
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState, useCallback } from 'react';
 import { PUBLICATION_CONTRACT_VERSION, buildFrozenReportProject } from '../../../../shared/engineeringPublicationContract.js';
 import { engineeringPublicationPreflight } from '@/components/engineering/engineeringPublicationPreflight';
 import { base44 } from '@/api/base44Client';
@@ -55,6 +55,7 @@ import {
 } from '@/components/proposal/engineeringAuthority/engineeringFingerprint';
 import { readDesignReviewHandoff } from '@/components/state/designReviewHandoff';
 import { refreshEngineeringPublicationReaders } from '@/components/engineering/versionedEngineeringAuthority';
+import { registerEngineeringPublishTrigger } from '@/components/engineering/engineeringPublishTrigger';
 import { statesBassAuthority } from '@/components/engineering/versionedEngineeringAuthority';
 import {
   PUBLICATION_ATTEMPT,
@@ -283,6 +284,21 @@ export function useEngineeringPublicationEffect({
       }
     };
   }, [projectId, versionId, ready, isPublishable, summaryKey, engineeringFingerprint, bassFingerprint, preflightKey, retrySequence]);
-  return { preflight, attempt, fingerprint: engineeringFingerprint,
-    publish: () => { lastPublishedFingerprintRef.current = null; setRetrySequence(value => value + 1); } };
+
+  // The manual publish action, and the SAME action other surfaces ask for when a
+  // completed result is not yet published (the bass result band's "Publish
+  // Current Assessment"). It only clears the session idempotency guard and asks
+  // this effect to run again — it publishes nothing itself, and adds no second
+  // path to publishEngineering.
+  const publish = useCallback(() => {
+    lastPublishedFingerprintRef.current = null;
+    setRetrySequence((value) => value + 1);
+  }, []);
+
+  useEffect(() => {
+    if (!projectId || !versionId) return undefined;
+    return registerEngineeringPublishTrigger(projectId, versionId, publish);
+  }, [projectId, versionId, publish]);
+
+  return { preflight, attempt, fingerprint: engineeringFingerprint, publish };
 }
