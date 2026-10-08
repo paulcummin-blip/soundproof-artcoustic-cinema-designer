@@ -124,15 +124,31 @@ export function isAssumedParameterDifferentiator(text) {
 const TREATMENT_CONTEXT = /\b(?:treatment|treatments|absor\w*|diffus\w*|abfuser|panel|panels|reverberation|reverb)\b/i;
 
 /**
+ * Whether a policy admits a parameter code. A resolved policy answers by its
+ * own function; a serialized one — the frozen pack's admission record, which
+ * cannot carry a function — answers by the request list it stores.
+ */
+export function assumedParameterAdmitted(policy, code) {
+  if (!policy) return false;
+  if (typeof policy.allows === 'function') return policy.allows(code) === true;
+  if (Array.isArray(policy.requested)) return policy.requested.includes(String(code).toUpperCase());
+  return false;
+}
+
+/**
  * Whether the designer explicitly asked for one assumed parameter. Accepts a
- * resolved policy (buildExcludedParameterPolicy output) or the raw request
- * context ({ clientBrief, narrativeBrief, dealerNotes }).
+ * resolved policy (buildExcludedParameterPolicy output), the frozen pack's
+ * serialized admission record, or the raw request context
+ * ({ clientBrief, narrativeBrief, dealerNotes }).
  */
 export function isExplicitlyRequestedAssumedParameter(parameterId, requestContext) {
   if (!isAssumedAdministrativeParameter(parameterId)) return false;
   if (!requestContext) return false;
   const code = `P${Number(parameterId)}`;
-  if (typeof requestContext.allows === 'function') return requestContext.allows(code) === true;
+  if (assumedParameterAdmitted(requestContext, code)) return true;
+  // A policy-shaped input has already stated its decision; only plain wording
+  // ({ clientBrief, dealerNotes }) is read for a request.
+  if (typeof requestContext.allows === 'function' || Array.isArray(requestContext.requested)) return false;
   const { clientBrief = '', narrativeBrief = '', dealerNotes = '' } = requestContext;
   const policy = buildExcludedParameterPolicy({
     clientBrief: [clientBrief, narrativeBrief].filter(Boolean).join('\n'),
@@ -156,7 +172,7 @@ export function assumedParameterUseIssue(text, policy, { broad = false } = {}) {
   const codes = (broad ? assumedParameterRowMentions(value) : assumedParameterMentions(value))
     .filter((code) => !(code === 'P21' && TREATMENT_CONTEXT.test(value)));
   if (codes.length === 0) return null;
-  const unrequested = codes.filter((code) => policy?.allows?.(code) !== true);
+  const unrequested = codes.filter((code) => !assumedParameterAdmitted(policy, code));
   if (unrequested.length > 0) {
     return { rule: 'assumed_parameter_not_requested', code: unrequested[0] };
   }
