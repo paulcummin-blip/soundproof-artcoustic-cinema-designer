@@ -118,6 +118,14 @@ export default function ReportStatePanel({
   retryLabel = "Retry",
   diagnostics = null,
 }) {
+  // The same sentence never appears twice on one screen: the diagnosis is stated
+  // once in the body, and the required action is stated once in the action line.
+  // A missing item keeps only its label when its own action repeats either — the
+  // stale-publication screen used to say the same thing three times over.
+  const actionLine = nextAction && nextAction !== reason ? nextAction : null;
+  const itemAction = (item) =>
+    (item?.action && item.action !== reason && item.action !== actionLine ? item.action : null);
+
   // ── Preparing ──────────────────────────────────────────────────────────
   if (state === REPORT_STATE.PREPARING) {
     return (
@@ -216,7 +224,7 @@ export default function ReportStatePanel({
   // ── Not ready ──────────────────────────────────────────────────────────
   return (
     <div style={cardStyle}>
-      <h2 style={headingStyle}>{reportLabel} not ready</h2>
+      <h2 style={headingStyle}>{reportLabel} Not Ready</h2>
       <p style={{ ...textStyle, marginTop: 12 }}>
         {reason || "This project has not been fully assessed yet."}
       </p>
@@ -232,9 +240,9 @@ export default function ReportStatePanel({
               <div style={{ fontSize: 14, fontWeight: 600, color: COLORS.primary }}>
                 {item.label}
               </div>
-              {item.action && (
+              {itemAction(item) && (
                 <div style={{ fontSize: 12, color: COLORS.muted, marginTop: 2, lineHeight: 1.5 }}>
-                  Next action: {item.action}
+                  Next action: {itemAction(item)}
                 </div>
               )}
             </div>
@@ -242,7 +250,7 @@ export default function ReportStatePanel({
         ))}
       </div>
 
-      {nextAction && (
+      {actionLine && (
         <div style={{
           marginTop: 20,
           paddingTop: 16,
@@ -254,7 +262,7 @@ export default function ReportStatePanel({
           <span style={{ fontWeight: 700, letterSpacing: "0.06em", textTransform: "uppercase", fontSize: 10, color: COLORS.muted }}>
             Next action
           </span>
-          <div style={{ marginTop: 4 }}>{nextAction}</div>
+          <div style={{ marginTop: 4 }}>{actionLine}</div>
         </div>
       )}
 

@@ -906,6 +906,19 @@ export default function RP22ClientReport() {
         ...(authority.reportCompleteness?.incompleteSeatParameterKeys || []),
       ])].filter((key) => ["p14", "p18", "p19", "p20"].includes(key))
     : [];
+  // The saved publication is stale: the published bass fingerprint no longer
+  // matches this version's authority, so no report may be generated from it yet.
+  // The outstanding work is saving the CURRENT assessment, which happens in the
+  // Room Designer — so this report offers that route as its primary action rather
+  // than only a way back. Nothing is published from here: the one publication
+  // flow stays where it is.
+  const publicationStale = authority.publicationGate?.status === "stale_pointer";
+  const incompleteAssessmentKeys = [...new Set([
+    ...(authority.reportCompleteness?.missingParameterKeys || []),
+    ...(authority.reportCompleteness?.incompleteSeatParameterKeys || []),
+  ])];
+  const assessmentCanBePublished = publicationStale && incompleteAssessmentKeys.length === 0;
+
   const readinessBase = staleBassParameterKeys.length
     ? {
         ...derivedReadiness,
@@ -919,7 +932,26 @@ export default function RP22ClientReport() {
         reason: authority.reportCompleteness?.reason,
         canExport: false,
       }
-    : derivedReadiness;
+    : publicationStale
+      ? {
+          ...derivedReadiness,
+          state: REPORT_STATE.NOT_READY,
+          // A complete assessment needs saving, not repairing: the missing item is
+          // the stale publication itself, and the body already says why.
+          missing: assessmentCanBePublished
+            ? [{ key: "engineering_publication", label: "Saved publication stale" }]
+            : incompleteAssessmentKeys.map((key) => ({
+                key,
+                label: key.toUpperCase(),
+                action: "Complete this parameter in Room Designer.",
+              })),
+          nextAction: assessmentCanBePublished
+            ? "Update the Project Report to publish the current assessment and refresh the report evidence."
+            : "Complete the outstanding assessment items in Room Designer, then open the Project Report again.",
+          reason: authority.reportCompleteness?.reason,
+          canExport: false,
+        }
+      : derivedReadiness;
 
   // The design version this report belongs to. One object states it on the
   // first page and in the exported filename, so the two can never disagree.
@@ -1078,6 +1110,16 @@ export default function RP22ClientReport() {
   const handleBackToProject = () => {
     if (!projectId) return;
     navigate(`/RoomDesigner?projectId=${projectId}`);
+  };
+
+  // The one update flow for a stale publication: the Room Designer, for THIS
+  // version, is where the current assessment is saved and published. Opening it
+  // refreshes the publication; the Project Report can then be generated, or
+  // refreshed by its own Update action. No second publication path is created.
+  const handleUpdateProjectReport = () => {
+    if (!projectId) return;
+    const targetVersion = authority.versionId || requestedVersionId || null;
+    navigate(`/RoomDesigner?projectId=${projectId}${targetVersion ? `&versionId=${targetVersion}` : ""}`);
   };
 
   // The Visual and Technical Reports are one pairing: moving between them must
@@ -1259,7 +1301,15 @@ export default function RP22ClientReport() {
               progressItems={progressItems}
               elapsedSeconds={stateSeconds}
               onReturn={handleBackToProject}
-              onRetry={authorityReadFailed ? authority.retry : (exportError ? handleExport : undefined)}
+              onRetry={
+                authorityReadFailed ? authority.retry
+                  : exportError ? handleExport
+                  : publicationStale ? handleUpdateProjectReport
+                  : undefined
+              }
+              retryLabel={publicationStale
+                ? (assessmentCanBePublished ? "Update Project Report" : "Complete Assessment")
+                : "Retry"}
               diagnostics={gateDiagnostics}
             />
           </div>

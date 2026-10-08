@@ -157,7 +157,7 @@ export function useVersionedEngineeringAuthority(projectId, versionId, { finalRe
   const summaryCompleteness = assessEngineeringReportCompleteness(extractEngineeringSummary(snapshot));
   const finalAuthorityGate = finalReport ? auditFinalReportAuthority(durable?.publication) : { allowed: true };
   const reportCompleteness = !publishedBassMatches
-    ? { ...summaryCompleteness, complete:false, reason:'Saved publication stale: its bass fingerprint differs from the current version authority. Publish the completed current assessment before generating reports.' }
+    ? { ...summaryCompleteness, complete:false, reason:'The saved engineering publication is stale. The bass fingerprint no longer matches the current version.' }
     : finalAuthorityGate.allowed ? summaryCompleteness
       : { ...summaryCompleteness, complete:false, reason:finalAuthorityGate.reason };
 
