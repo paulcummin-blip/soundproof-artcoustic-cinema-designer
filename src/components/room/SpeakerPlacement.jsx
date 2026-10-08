@@ -10,6 +10,7 @@ import {
   resolveInitialWallPosition,
   resolveAutoSurroundHeight,
   resolveCanonicalRsp,
+  hasInvalidAutomaticRearPair,
 } from '@/components/room/placement/initialSpeakerPlacement';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -623,7 +624,14 @@ function SpeakerPlacementImpl(props) {
         mlpY: Math.round((mlp?.y || 0) * 1000) / 1000,
       });
 
-      if (lastSurroundResetSigRef.current === sig) {
+      // A demonstrably invalid AUTOMATIC rear pair is never preserved by the
+      // signature alone: if SBL and SBR overlap, or either is on the wrong side,
+      // the pass must run so the pair is corrected. Manual positions are
+      // excluded from that test, so deliberate adjustments stay protected and
+      // the guard still suppresses redundant work in the ordinary case.
+      const invalidAutoRearPair = hasInvalidAutomaticRearPair(list, { widthM: W, lengthM: L });
+
+      if (lastSurroundResetSigRef.current === sig && !invalidAutoRearPair) {
         console.log('[SP resetSurroundPositions CALLBACK] NO-OP (same inputs)');
         return list;
       }
@@ -709,6 +717,13 @@ function SpeakerPlacementImpl(props) {
         const isUserPlaced = existing?.positionSource === 'user';
         if (hasXY(existing) && (speakerModelOn || isUserPlaced) && isValidRearPos(canonRole, existing.position)) return;
 
+        // A position this validator has just rejected is never fed back in as
+        // the seed. Without this, an overlapping automatic rear pair would be
+        // "corrected" straight back onto the coordinate it already holds,
+        // because the authority respects a seeded X. Non-rear roles always pass
+        // isValidRearPos, so their existing position is seeded exactly as before.
+        const seedPosition = isValidRearPos(canonRole, existing?.position) ? existing?.position : null;
+
         // Roles placed earlier in this same pass (sides before wides) already
         // hold their FINAL coordinates, so front wides resolve from the true
         // front and side surround geometry in one consistent result — never from
@@ -723,7 +738,7 @@ function SpeakerPlacementImpl(props) {
           seatingPositions,
           enableFrontWides: appState?.enableFrontWides,
           placedSpeakers: Array.from(byCanon.values()),
-          existingPosition: existing?.position,
+          existingPosition: seedPosition,
           getModelDimsM,
           getCanonicalRoleFn: getCanonicalRole,
         });

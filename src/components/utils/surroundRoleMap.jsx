@@ -55,6 +55,31 @@ export function getCanonicalRole(role) {
   return CANONICAL_ROLE_MAP[String(role || "").toUpperCase()] || String(role || "").toUpperCase();
 }
 
+// --- Canonical side classification ---
+// The ONE authority for which side of the room a role belongs to. A role is
+// classified from its CANONICAL form, so every alias ("RL", "RSL", "BL", "FWL")
+// is judged by the canonical role it maps to instead of by another list of raw
+// role names. Numbered variants (SL1, SR2) classify with their base role.
+const LEFT_ROLE_RE = /^(FL|SL|SBL|LW|TFL|TML|TRL|TBL|UFL|UBL)\d*$/;
+const RIGHT_ROLE_RE = /^(FR|SR|SBR|RW|TFR|TMR|TRR|TBR|UFR|UBR)\d*$/;
+
+/**
+ * The side of the room a speaker role belongs to.
+ * @param {string} role - raw or already-canonical role
+ * @returns {"L"|"R"|null} null for centre and unknown roles.
+ */
+export function canonicalSide(role) {
+  const canon = getCanonicalRole(role);
+  if (LEFT_ROLE_RE.test(canon)) return "L";
+  if (RIGHT_ROLE_RE.test(canon)) return "R";
+  return null;
+}
+
+/** Whether a role belongs on the room's left side. */
+export function isLeftRole(role) {
+  return canonicalSide(role) === "L";
+}
+
 /**
  * Get required speaker roles for a given layout and config.
  * This is the SINGLE SOURCE OF TRUTH for bed-layer surround existence.

@@ -17,7 +17,7 @@
 // Pure: no React, no side effects, no state writes.
 // ---------------------------------------------------------------------------
 
-import { getCanonicalRole } from "@/components/utils/surroundRoleMap";
+import { getCanonicalRole, canonicalSide } from "@/components/utils/surroundRoleMap";
 import { computeLcrZones, clampLcrZoneDepth } from "@/components/utils/rp22/lcrZoneAuthority";
 import { computeFrontWideZonesStrict } from "@/components/utils/frontWideZones";
 import { yHalfExtentM_physical } from "@/components/room/rv/RenderPrimitives";
@@ -67,6 +67,44 @@ export function resolveAutoSurroundHeight(seatingPositions, roomHeightM) {
   const raw = maxEarH + 0.05;
   const maxH = (num(roomHeightM) ?? 2.8) - 0.30;
   return Math.max(1.10, Math.min(maxH, raw));
+}
+
+/**
+ * Whether an AUTOMATIC rear pair is demonstrably invalid: both speakers are
+ * installed, neither was positioned by hand, and either they share a coordinate
+ * or they are not each on their own side of the room.
+ *
+ * Used only to decide whether the placement pass must run — never as a
+ * placement authority. A pair the designer positioned by hand is never
+ * reported invalid, so deliberate adjustments stay protected.
+ */
+export function hasInvalidAutomaticRearPair(speakers, roomDims) {
+  const W = roomW(roomDims);
+  if (!(W > 0)) return false;
+
+  const byCanon = new Map();
+  (Array.isArray(speakers) ? speakers : []).forEach((speaker) => {
+    byCanon.set(getCanonicalRole(speaker?.role), speaker);
+  });
+
+  const left = byCanon.get("SBL");
+  const right = byCanon.get("SBR");
+  if (!left || !right) return false;
+
+  const isAutomatic = (speaker) => {
+    const model = String(speaker?.model || "").trim().toLowerCase();
+    const installed = !!model && model !== "off" && model !== "none";
+    return installed && speaker?.positionSource !== "user";
+  };
+  if (!isAutomatic(left) || !isAutomatic(right)) return false;
+
+  const xL = num(left?.position?.x);
+  const xR = num(right?.position?.x);
+  if (xL === null || xR === null) return true;
+
+  const overlapping = Math.abs(xL - xR) < 0.001;
+  const wronglySided = !(xL < W / 2 && xR > W / 2);
+  return overlapping || wronglySided;
 }
 
 /**
@@ -210,7 +248,10 @@ export function resolveInitialWallPosition({
 
   const canonFn = getCanonicalRoleFn || getCanonicalRole;
   const canon = canonFn(role);
-  const isLeft = canon === "LW" || canon.startsWith("SL");
+  // The canonical side authority. A literal list here is what classified SBL as
+  // a RIGHT-hand speaker, so the rear pair was seeded onto one coordinate and
+  // SBR's X was reused for SBL.
+  const isLeft = canonicalSide(canon) === "L";
 
   // A dims resolver is always supplied to the shared span rule.
   const dimsFn = typeof getModelDimsM === "function" ? getModelDimsM : (m) => resolveSpeakerDims(m);
