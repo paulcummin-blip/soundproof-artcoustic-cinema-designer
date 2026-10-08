@@ -16,6 +16,8 @@
  *   - SCREEN_THICKNESS_M (5 mm) → physical screen body rect
  *   - Baffle zone: dashed rect from front wall (y=0) to screenFrontPlaneM,
  *     matching visible screen width → SCREEN_WALL_BUILDUP layer
+ *   - Screen wall (when enabled): dashed line across the full room width at the
+ *     rear face of the screen → SCREEN_WALL layer (visual overlay only)
  *
  * SPEAKER FOOTPRINTS (via getSpeakerModelMeta):
  *   - Front/rear wall: widthM → X, depthM → Y (into room)
@@ -723,6 +725,15 @@ export function generateSVG({
             svg.push(`  </g>`);
         }
 
+        // SCREEN_WALL — proposed fabric false wall spanning the full room width at
+        // the rear face of the screen. Visual overlay only; the front wall remains
+        // the acoustic boundary. Emitted before the screen so the screen reads on top.
+        if (showScreenWall && baffleDepthMm > 0) {
+            svg.push(`  <g id="SCREEN_WALL">`);
+            svg.push(`    <line x1="0" y1="${baffleDepthMm}" x2="${W}" y2="${baffleDepthMm}" stroke="#3E4349" stroke-width="2" stroke-dasharray="12 8"/>`);
+            svg.push(`  </g>`);
+        }
+
         // SCREEN_FRAME — overall frame width as a solid rectangle (front face + depth)
         svg.push(`  <g id="SCREEN_FRAME">`);
         svg.push(`    ${svgRect(overallXLeftMm, screenFaceYcad, overallWidthMm, screenThickMm, 'rgba(30,30,30,0.85)', '#333', 2)}`);
@@ -993,6 +1004,12 @@ export function generateDXF({
             // In DXF: front wall = Y=L, screen face = Y=screenFaceYcad
             // Baffle rect goes from screenFaceYcad (bottom) to L (top)
             dxf.push(dxfRect('SCREEN_WALL_BUILDUP', visibleXLeftMm, screenFaceYcad, visibleWidthMm, baffleDepthMm));
+        }
+
+        // SCREEN_WALL — proposed fabric false wall across the full room width at the
+        // rear face of the screen. Visual overlay only; never a room boundary.
+        if (showScreenWall) {
+            dxf.push(dxfLine('SCREEN_WALL', 0, screenFaceYcad, W, screenFaceYcad));
         }
 
         // SCREEN_FRAME — full frame width as rectangle (depth = CAD_SCREEN_DEPTH_MM)
