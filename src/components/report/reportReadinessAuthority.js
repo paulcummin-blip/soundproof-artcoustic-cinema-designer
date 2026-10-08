@@ -101,6 +101,7 @@ export function deriveReportReadiness({
   roomDims = null,
   placedSpeakers = null,
   engineeringSummary = null,
+  assessment = null,
   bassPerformance = null,
   pricingStatus = "unknown",
   requiresImages = false,
@@ -130,6 +131,21 @@ export function deriveReportReadiness({
       nextAction: "Regenerate the report before exporting.",
       reason: staleReason || "The project has changed since this report was generated.",
       canExport: false,
+    };
+  }
+
+  if (assessment && assessment.reportComplete !== true) {
+    const labels = {
+      assessment_missing:'Assessment missing', assessment_incomplete:'Assessment incomplete',
+      publication_rejected:'Assessment complete — publication rejected', stale_pointer:'Saved publication stale',
+      publishing:'Publishing assessment', queued:'Publication queued', checking:'Checking saved assessment',
+      incomplete:'Saved assessment incomplete', not_published:'Assessment not published',
+    };
+    const reason = assessment.reason || 'This version has no complete durable engineering publication.';
+    return {
+      state: hydrating && elapsedSeconds < PREPARING_BOUND_SECONDS ? REPORT_STATE.PREPARING : REPORT_STATE.NOT_READY,
+      missing:[{ key:'engineering_publication', label:/Saved publication stale/i.test(reason) ? 'Saved publication stale' : (labels[assessment.status] || 'Assessment not published'), action:reason }],
+      nextAction:reason, reason, canExport:false,
     };
   }
 
