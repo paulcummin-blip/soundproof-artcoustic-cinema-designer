@@ -96,8 +96,8 @@ function atomicRow(row, id, scope, publication) {
   const bass = [14,18,19,20].includes(id);
   return {
     key:'P'+id, parameter_id:id, title:row.title || 'RP22 P'+id, scope,
-    value:row.formatted ?? row.valueFormatted ?? row.hudLabel ?? row.value ?? '—',
-    raw_value:row.value ?? row.rawValue ?? null, unit:row.unit ?? ({1:'m',4:'dB',5:'deg',6:'dB',8:'none',9:'deg',10:'dB',15:'NCB',16:'dB',17:'dB',20:'dB',21:'dB'})[id] ?? null, level:level(row.level) ?? '—',
+    value:isExplicitNotApplicable(row) ? 'N/A' : row.formatted ?? row.valueFormatted ?? row.hudLabel ?? row.value ?? '—',
+    raw_value:row.value ?? row.rawValue ?? null, unit:row.unit ?? ({1:'m',4:'dB',5:'deg',6:'dB',8:'none',9:'deg',10:'dB',15:'NCB',16:'dB',17:'dB',20:'dB',21:'dB'})[id] ?? null, level:isExplicitNotApplicable(row) ? 'N/A' : level(row.level) ?? '—',
     limiting_group:row.limitingGroup ?? row.seatId ?? null,
     context:row.detail ?? row.note ?? (row.seatId ? 'Limiting seat '+row.seatId : scope),
     authority_fingerprint:bass ? publication?.provenance?.bass_fingerprint : publication?.engineering_fingerprint,
