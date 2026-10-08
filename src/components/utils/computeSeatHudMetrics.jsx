@@ -11,6 +11,7 @@ import {
   rp22LevelForP5_NoWrap 
 } from "@/components/utils/seatMetrics";
 import { getSeatSplMetrics } from "@/components/utils/spl/centralSplEngine";
+import { computeP6Authority } from "@/components/utils/rp22/canonicalP6Authority";
 import { rp23LevelForAngleDeg, rp23DisplayAngleDeg } from '@/components/utils/viewingAngleUtils';
 // Overhead acoustic-axis geometry — the SAME authority the P17 engine uses, so the seat HUD
 // and the graded result can never disagree on where a ceiling speaker's axis points.
@@ -225,27 +226,21 @@ export function computeSeatHudMetrics({
   }
 
   // --- P6 ---
-  const surroundRoles = new Set(['SL', 'SR', 'SBL', 'SBR', 'LW', 'RW']);
-  const placedSur = (placedSpeakers || []).filter(sp => {
-    const canon = getCanonicalRole(sp.role);
-    return surroundRoles.has(canon) && sp.position;
-  });
-
-  if (placedSur.length >= 2 && seatSplData?.surrounds) {
-    const surSplValues = Object.values(seatSplData.surrounds)
-      .map(s => s.value)
-      .filter(Number.isFinite);
-    const p6ValueDb = maxPairwiseDelta(surSplValues);
-    if (Number.isFinite(p6ValueDb)) {
-      let level = '—';
-      if (p6ValueDb <= 2) level = 'L4';
-      else if (p6ValueDb <= 4) level = 'L3';
-      else if (p6ValueDb <= 6) level = 'L2';
-      else if (p6ValueDb <= 10) level = 'L1';
+  // The ONE P6 authority: the RSP-normalised relative level spread across the
+  // installed listener-level surrounds, from uncapped design levels. The HUD no
+  // longer computes an absolute seat-only spread here — that was a second P6
+  // semantic, and it disagreed with the published engine result.
+  {
+    const rspSeatSpl = getSeatSplMetrics(allSeatSplMetrics, 'mlp');
+    const p6 = computeP6Authority({
+      seatListeners: seatSplData?.listenerLevelSurrounds || seatSplData?.surrounds || null,
+      rspListeners: rspSeatSpl?.listenerLevelSurrounds || rspSeatSpl?.surrounds || null,
+    });
+    if (p6) {
       metrics.rp22.p6 = {
-        valueDb: p6ValueDb,
-        level,
-        formatted: `${Math.floor(p6ValueDb)} dB`
+        valueDb: p6.valueDb,
+        level: p6.levelLabel,
+        formatted: p6.formatted,
       };
     }
   }

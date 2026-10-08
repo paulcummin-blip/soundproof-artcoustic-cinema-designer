@@ -6,7 +6,7 @@ import { pickMLP } from '../utils/seatingUtils';
 import { RP22_CATALOG } from "@/components/data/rp22Catalog";
 import { computeBackSweepGaps, levelFromGap } from "@/components/utils/RP22Geometry";
 import { computeSurroundRingGaps, rp22LevelForP5, isEligibleP5Surround } from "@/components/utils/p5SurroundGaps";
-import { resolveP6Listeners } from "@/components/utils/rp22/listenerLevelSurroundRoles";
+import { computeP6Authority } from "@/components/utils/rp22/canonicalP6Authority";
 import { computeSeatRoles } from "@/components/utils/seatRoles";
 import { getUpperSpeakersForSeat, computeUpperVerticalAnglesForSeat, computeUpperSplSpreadForSeat } from "../utils/rp22UpperSeatMetrics";
 import { computeScreenVarianceMetrics, computeWideSurroundUpperVarianceMetrics, computeBassVarianceMetrics } from "../utils/rp22SeatResponseConsistency";
@@ -1478,60 +1478,36 @@ export const useRP22AnalysisEngine = ({ placedSpeakers, seatingPositions, dimens
         const rspListeners  = rspSpl?.listenerLevelSurrounds  || rspSpl?.surrounds;
 
         if (seatListeners && rspListeners) {
-          const {
-            normalizedByRole,
-            seatByRole,
-            rspByRole,
-            rolesUsed,
-          } = resolveP6Listeners({ seatListeners, rspListeners });
+          // ONE P6 authority (canonicalP6Authority): the RSP-normalised relative
+          // level spread across the installed listener-level surrounds, computed
+          // from the engine's UNCAPPED design levels so no speaker capability
+          // limit (P12/P13) can bias this geometry result. The role set, the
+          // same-speaker RSP normalisation, the whole-dB design value and the
+          // RP22 thresholds are unchanged.
+          const p6 = computeP6Authority({ seatListeners, rspListeners });
 
-          const normValues     = Object.values(normalizedByRole);
-
-          if (normValues.length >= 2) {
-            let maxDeltaRaw = 0;
-            for (let i = 0; i < normValues.length; i++) {
-              for (let j = i + 1; j < normValues.length; j++) {
-                const delta = Math.abs(normValues[i] - normValues[j]);
-                if (delta > maxDeltaRaw) maxDeltaRaw = delta;
-              }
-            }
-
-            // ── Sound Proof P6 design-grading policy ──
-            // Full-precision geometry is preserved in maxDeltaRaw (diagnostics only).
-            // The DESIGN VALUE is Math.floor(maxDeltaRaw) — a Sound Proof convention so
-            // fractions of a predicted dB do not cause a Performance Level loss.
-            // This flooring is a Sound Proof design-grading policy, NOT a claim that
-            // RP22 mandates rounding. RP22 thresholds themselves are unchanged.
-            const p6DesignDb = resolveRp22DesignValue(6, maxDeltaRaw);
-
-            let level6;
-            if      (p6DesignDb <= 2)  level6 = 4;
-            else if (p6DesignDb <= 4)  level6 = 3;
-            else if (p6DesignDb <= 6)  level6 = 2;
-            else if (p6DesignDb <= 10) level6 = 1;
-            else                       level6 = 0; // FAIL — > 10 dB
-
+          if (p6) {
             if (globalThis.__B44_LOGS) {
               console.log('[RP22 P6 normalized]', {
                 seatId,
-                rolesUsed,
-                normalizedByRole,
-                maxDeltaRaw,
-                p6DesignDb,
-                level: level6,
+                rolesUsed:        p6.rolesUsed,
+                normalizedByRole: p6.normalizedByRole,
+                maxDeltaRaw:      p6.maxDeltaRaw,
+                p6DesignDb:       p6.valueDb,
+                level:            p6.level,
               });
             }
 
             metrics.p6 = {
-              valueDb:         p6DesignDb,
-              level:           level6,
-              formatted:       `${p6DesignDb} dB`,
+              valueDb:          p6.valueDb,
+              level:            p6.level,
+              formatted:        p6.formatted,
               // Debug payload — raw full-precision preserved for diagnostics
-              rolesUsed,
-              normalizedByRole,
-              rspByRole,
-              seatByRole,
-              maxDeltaRaw,
+              rolesUsed:        p6.rolesUsed,
+              normalizedByRole: p6.normalizedByRole,
+              rspByRole:        p6.rspByRole,
+              seatByRole:       p6.seatByRole,
+              maxDeltaRaw:      p6.maxDeltaRaw,
             };
           }
         }

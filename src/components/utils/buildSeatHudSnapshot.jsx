@@ -5,6 +5,7 @@
 // Any changes to the HUD must be reflected here to keep both in sync
 
 import { getSeatSplMetrics } from '@/components/utils/spl/centralSplEngine';
+import { computeP6Authority } from '@/components/utils/rp22/canonicalP6Authority';
 import { getSpeakerModelMeta } from '@/components/models/speakers/registry';
 import { 
   metricP1_nearestWallM, 
@@ -545,28 +546,24 @@ export function buildSeatHudSnapshot({
     // Use engine result only if it contains a real numeric value
     data.rp22.p6 = engineP6;
   } else {
-    // Fallback to local calculation from live SPL data
-    const surSplValues = Object.values(seatSplData?.surrounds || {})
-      .map(s => s?.value)
-      .filter(Number.isFinite);
+    // Fallback when the engine has not published P6 for this seat: the SAME
+    // canonical P6 authority the engine uses — the RSP-normalised relative level
+    // spread across the installed listener-level surrounds, from uncapped design
+    // levels. This was previously an absolute seat-only spread over the six-role
+    // `surrounds` category, which was a second P6 semantic that disagreed with
+    // the published result (and omitted numbered additional pairs such as SL2).
+    const rspSeatSpl = getSeatSplMetrics(allSeatSplMetrics, 'mlp');
+    const canonicalP6 = computeP6Authority({
+      seatListeners: seatSplData?.listenerLevelSurrounds || seatSplData?.surrounds || null,
+      rspListeners: rspSeatSpl?.listenerLevelSurrounds || rspSeatSpl?.surrounds || null,
+    });
 
-    const p6ValueDb = maxPairwiseDelta(surSplValues);
-
-    if (Number.isFinite(p6ValueDb)) {
-      const p6FloorDb = Math.floor(p6ValueDb);
-
-      let level = '—';
-      if (p6FloorDb <= 2) level = 'L4';
-      else if (p6FloorDb <= 4) level = 'L3';
-      else if (p6FloorDb <= 6) level = 'L2';
-      else if (p6FloorDb <= 10) level = 'L1';
-      else level = 'FAIL';
-
+    if (canonicalP6) {
       data.rp22.p6 = {
-        valueDb: p6ValueDb,
-        valueDbFloor: p6FloorDb,
-        level,
-        formatted: `${p6FloorDb} dB`
+        valueDb: canonicalP6.valueDb,
+        valueDbFloor: canonicalP6.valueDb,
+        level: canonicalP6.levelLabel,
+        formatted: canonicalP6.formatted,
       };
     } else {
       data.rp22.p6 = {

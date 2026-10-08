@@ -40,7 +40,7 @@ export const RP22_DEFINITIONS = {
   
   P6: {
     title: "6. Maximum measured in-situ SPL difference between surround speakers",
-    description: "This parameter ensures uniform surround presentation. It measures the maximum SPL difference between any two surround speakers at each listening position.",
+    description: "This parameter ensures an even surround presentation at every listening position. It measures the maximum spread of the surround speakers' levels relative to the reference seat (RSP): each surround speaker's level at the listening position is normalised to that same speaker's level at the RSP, and the widest difference between those normalised levels is the result. Because each speaker is normalised against itself, the result describes the relative level spread of the listener-level layout (sides, rears and front wides) and not the system's SPL capability, which P12 and P13 assess.",
     thresholds: [
       { level: 1, criteria: "≤10 dB" },
       { level: 2, criteria: "≤6 dB" },
