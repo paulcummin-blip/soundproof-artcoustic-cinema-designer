@@ -9,6 +9,7 @@
 import { useMemo } from "react";
 import { rolesForLayout, getCanonicalRole } from "@/components/utils/surroundRoleMap";
 import { isRenderableSpeaker } from "@/components/room/rv/RenderPrimitives";
+import { isCentreCabinetRole } from "@/components/utils/frontStageModeAuthority";
 
 /**
  * Pure function: resolve the active speaker layout from raw placed speakers
@@ -94,6 +95,12 @@ export function resolveActiveSpeakerLayout({
     if (/^(SL|SR)\d+$/.test(canon)) {
       return allowedRoles.has("SL");
     }
+
+    // Dual-centre physical cabinets (FCL/FCR): always part of the front stage
+    // when they are installed. They exist ONLY in the dual-centre mode, they add
+    // no channel to the layout (rolesForLayout is untouched) and the centre
+    // channel remains FC.
+    if (isCentreCabinetRole(canon)) return true;
 
     // Everything else keeps existing behaviour
     return visFn(s.role, s.model);

@@ -28,11 +28,13 @@ export default function LcrAcousticCentreGuidanceCard({ guidance }) {
   const { status, minHeightM, maxHeightM, idealHeightM, currentAcousticCentreM, placementOffsetM, mode } = guidance;
   const meta = STATUS_META[status] || STATUS_META.unknown;
 
-  const title = mode === 'tv_soundbar'
-    ? 'TV SOUNDBAR HEIGHT GUIDANCE'
-    : mode === 'tv_separate_lcr'
-      ? 'TV L/R HEIGHT GUIDANCE'
-      : 'ACOUSTIC CENTRE GUIDANCE';
+  const title = mode === 'tv_dual_centre'
+    ? 'TV DUAL CENTRE HEIGHT GUIDANCE'
+    : mode === 'tv_soundbar'
+      ? 'TV SOUNDBAR HEIGHT GUIDANCE'
+      : mode === 'tv_separate_lcr'
+        ? 'TV L/R HEIGHT GUIDANCE'
+        : 'ACOUSTIC CENTRE GUIDANCE';
 
   return (
     <div style={{ marginTop: 10, padding: '10px 12px', borderRadius: 8, background: '#F8F8F7', border: '1px solid #E6E4DD' }}>
@@ -46,7 +48,12 @@ export default function LcrAcousticCentreGuidanceCard({ guidance }) {
           <span style={{ fontSize: 15, fontWeight: 700, color: '#213428' }}>{formatHeightM(idealHeightM)}</span>
         </div>
 
-        {mode === 'tv_soundbar' ? (
+        {mode === 'tv_dual_centre' ? (
+          <>
+            <Row label="Centre speaker acoustic centre" value="TV midpoint" />
+            <Row label="Current" value={currentAcousticCentreM !== null ? formatHeightM(currentAcousticCentreM) : '—'} />
+          </>
+        ) : mode === 'tv_soundbar' ? (
           <>
             <Row label="Offset below TV" value={formatHeightM(placementOffsetM)} />
             <Row label="Current" value={currentAcousticCentreM !== null ? formatHeightM(currentAcousticCentreM) : '—'} />

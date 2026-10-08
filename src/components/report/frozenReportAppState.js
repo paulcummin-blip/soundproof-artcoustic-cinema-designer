@@ -38,7 +38,7 @@ export function frozenReportAppState(live, publication) {
     aimRearSurroundsAtMLP:p.aim_rear_surrounds_at_mlp,
     acousticTreatmentEnabled:p.acoustic_treatment_enabled, selectedAbfuserQty:p.selected_abfuser_qty,
     abfuserQtySource:'frozen-publication', legacyAbfuserAutoQty:0,
-    getSpeakerVisibility:role => visibility.has(String(role || '').toUpperCase()),
+    getSpeakerVisibility:role => (/^FC[LR]$/.test(String(role || '').toUpperCase()) || visibility.has(String(role || '').toUpperCase())),
     projectName:p.name,
     reportEngineeringFingerprint:publication.engineering_fingerprint, reportVersionId:p.version_id,
   };

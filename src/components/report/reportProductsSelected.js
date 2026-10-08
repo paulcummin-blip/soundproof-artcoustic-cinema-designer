@@ -24,6 +24,7 @@
 
 import { getSpeakerModelMeta } from '@/components/models/speakers/registry';
 import { getSpeakerVisibilityFor } from '@/components/AppStateProvider';
+import { isCentreCabinetRole, isCentreChannelRole } from '@/components/utils/frontStageModeAuthority';
 
 /**
  * The design's own visibility rule for a layout: which channel roles the layout
@@ -37,6 +38,10 @@ export function layoutVisibilityFilter(dolbyConfig, sevenBedLayoutType) {
     const code = String(role || '').toUpperCase().trim();
     if (!code) return false;
     if (code.startsWith('LFE')) return false;
+    // The dual-centre physical cabinets are part of the front stage whenever they
+    // are installed: they are the centre channel's own cabinets, not a channel
+    // the layout has to contain.
+    if (isCentreCabinetRole(code)) return true;
     if (/^(SL|SR)\d+$/.test(code)) return visible.has(code.slice(0, 2));
     return visible.has(code);
   };
@@ -54,7 +59,7 @@ export const PRODUCTS_SELECTED_ROWS = Object.freeze([
 ]);
 
 /** The speaker role codes that belong to each loudspeaker layer. */
-const LCR_ROLES = Object.freeze(['FL', 'FC', 'FR', 'L', 'C', 'R']);
+const LCR_ROLES = Object.freeze(['FL', 'FC', 'FR', 'L', 'C', 'R', 'FCL', 'FCR']);
 const SURROUND_ROLES = Object.freeze(['SL', 'SR', 'SBL', 'SBR', 'LW', 'RW', 'LS', 'RS', 'LR', 'RR', 'FWL', 'FWR']);
 
 const normaliseModel = (model) => ((!model || model === 'off' || model === 'none') ? null : String(model).trim());
@@ -160,6 +165,12 @@ export function buildProductsSelected({
   const activeSpeakers = speakers.filter((speaker) => visible(speaker?.role, speaker?.model) !== false);
 
   const byLayer = { lcr: new Map(), surrounds: new Map(), overheads: new Map() };
+  // The centre channel's own cabinets, counted apart from the left/right so the
+  // dual-centre stage can state its two physical cabinets explicitly.
+  const lcrLeftRight = new Map();
+  const lcrCentre = new Map();
+  const isCentreSpeakerRole = (role) => isCentreChannelRole(role) || isCentreCabinetRole(role);
+
   for (const speaker of activeSpeakers) {
     const modelKey = normaliseModel(speaker?.model);
     if (!modelKey) continue;
@@ -167,11 +178,38 @@ export function buildProductsSelected({
     if (!layer) continue;
     const name = productDisplayName(modelKey) || modelKey;
     byLayer[layer].set(name, (byLayer[layer].get(name) || 0) + 1);
+    if (layer === 'lcr') {
+      const bucket = isCentreSpeakerRole(speaker?.role) ? lcrCentre : lcrLeftRight;
+      bucket.set(name, (bucket.get(name) || 0) + 1);
+    }
   }
 
   const layerList = (layer) => {
     const models = [...byLayer[layer].entries()].map(([name, count]) => countLabel(name, count)).sort();
     return models.length > 0 ? models : [NONE];
+  };
+
+  /**
+   * The LCR row.
+   *
+   * A single centre cabinet (or none) states the front stage exactly as before —
+   * one grouped list ("Q8-5 × 3").
+   *
+   * Two physical centre cabinets (the dual-centre front stage) are stated as
+   * CABINETS fed from the one centre channel: the left/right cabinets and the
+   * centre cabinets are named separately, and the centre count is the number of
+   * physical cabinets. The row never claims two centre channels.
+   */
+  const lcrList = () => {
+    const centreTotal = [...lcrCentre.values()].reduce((sum, n) => sum + n, 0);
+    if (centreTotal <= 1) return layerList('lcr');
+    const rows = [
+      ...[...lcrLeftRight.entries()].map(([name, count]) => countLabel(name, count)).sort(),
+      ...[...lcrCentre.entries()]
+        .map(([name, count]) => `${countLabel(name, count)} centre cabinets`)
+        .sort(),
+    ];
+    return rows.length > 0 ? rows : [NONE];
   };
 
   const treatmentQty = Math.floor(Number(selectedAbfuserQty) || 0);
@@ -180,7 +218,7 @@ export function buildProductsSelected({
     : [NONE];
 
   const products = {
-    lcr: layerList('lcr'),
+    lcr: lcrList(),
     surrounds: layerList('surrounds'),
     overheads: layerList('overheads'),
     subwoofers: subwooferRows({ frontSubsCfg, rearSubsCfg, subwooferInstances }),

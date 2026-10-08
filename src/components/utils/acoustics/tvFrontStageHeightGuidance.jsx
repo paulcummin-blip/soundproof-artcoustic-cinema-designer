@@ -75,7 +75,34 @@ export function calculateTvFrontStageHeightGuidance({
     };
   }
 
-  // ── 4. Soundbar modes: center_only or integrated_lcr ─────────────────────
+  // ── 4. Dual centre (TV) mode ─────────────────────────────────────────────
+  // The two physical centre cabinets carry ONE centre channel. Their acoustic
+  // centre is the TV midpoint height — the same geometry that drives the L/R
+  // height in the TV front-stage modes. The single-centre LCR guidance does not
+  // apply here and is never shown.
+  if (frontStageMode === 'dual_centre') {
+    const TOLERANCE_M = 0.05;
+
+    let status = 'unknown';
+    if (current !== null) {
+      const diff = current - screenCentreHeightM;
+      if (Math.abs(diff) <= TOLERANCE_M) status = 'ideal';
+      else if (diff < 0)                  status = 'below';
+      else                                status = 'above';
+    }
+
+    return {
+      isValid: true,
+      mode: 'tv_dual_centre',
+      idealHeightM: screenCentreHeightM,
+      currentAcousticCentreM: current,
+      status,
+      explanationText:
+        'Dual physical centre speakers flank the TV and are fed from the centre channel. Centre speaker acoustic centre: TV midpoint height.',
+    };
+  }
+
+  // ── 5. Soundbar modes: center_only or integrated_lcr ─────────────────────
   if (frontStageMode === 'center_only' || frontStageMode === 'integrated_lcr') {
     const soundbarH = Number(soundbarHeightM);
     if (!Number.isFinite(soundbarH) || soundbarH <= 0) {

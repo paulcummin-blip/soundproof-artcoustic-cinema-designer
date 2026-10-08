@@ -14,6 +14,7 @@
 
 import { getSpeakerModelMeta } from "@/components/models/speakers/registry";
 import { resolveEffectiveViewableDimsM } from "@/components/models/screen/resolveEffectiveScreen";
+import { isCentreCabinetRole, hasInstalledModel } from "@/components/utils/frontStageModeAuthority";
 
 function canonRole(role) {
   const r = String(role || "").toUpperCase();
@@ -22,11 +23,18 @@ function canonRole(role) {
 }
 
 /**
- * Detect the front-stage mode from the FC speaker model's frontStageType.
- * Returns 'center_only', 'integrated_lcr', or 'standard'.
+ * Detect the front-stage mode.
+ *
+ * 'dual_centre' is detected from the design itself — the installed centre
+ * cabinets (FCL/FCR) ARE the mode's record, because in this mode there is no
+ * single FC speaker. Everything else is unchanged: the FC model's frontStageType
+ * still resolves the soundbar modes, and no FC means 'standard'.
+ *
+ * Returns 'dual_centre', 'center_only', 'integrated_lcr', or 'standard'.
  */
 export function detectFrontStageMode(placedSpeakers) {
   const list = Array.isArray(placedSpeakers) ? placedSpeakers : [];
+  if (list.some((s) => isCentreCabinetRole(s?.role) && hasInstalledModel(s?.model))) return "dual_centre";
   const fcSpk = list.find((s) => canonRole(s?.role) === "FC");
   const fcMeta = fcSpk?.model ? getSpeakerModelMeta(fcSpk.model) : null;
   if (fcMeta?.frontStageType === "integrated_lcr") return "integrated_lcr";

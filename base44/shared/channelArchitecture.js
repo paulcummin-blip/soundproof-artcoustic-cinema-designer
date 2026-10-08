@@ -14,5 +14,14 @@ export function usesIntegratedLcrStage(speakers, getModelMeta = () => null) {
 export function discreteChannelCounts(speakers) {
   const list = (speakers || []).filter(s => !/^LFE/.test(String(s?.role || '').toUpperCase()));
   const overhead = list.filter(s => /^(T|OH|U)/.test(String(s?.role || '').toUpperCase())).length;
-  return { bed: list.length - overhead + (usesIntegratedLcrStage(list) ? 2 : 0), overhead };
+  // TWO PHYSICAL CENTRE CABINETS ARE ONE CHANNEL. In the dual-centre front stage
+  // the centre channel is carried by centre-left (FCL) and centre-right (FCR)
+  // physically; the second cabinet is never a second channel, so the bed count
+  // is corrected by one and no layout ever becomes "10.x.x".
+  const centreCabinets = list.filter(s => /^FC[LR]$/.test(String(s?.role || '').toUpperCase())).length;
+  const secondCabinetCorrection = Math.max(0, centreCabinets - 1);
+  return {
+    bed: list.length - overhead + (usesIntegratedLcrStage(list) ? 2 : 0) - secondCabinetCorrection,
+    overhead,
+  };
 }

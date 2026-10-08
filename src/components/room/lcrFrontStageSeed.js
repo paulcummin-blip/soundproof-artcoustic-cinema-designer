@@ -6,6 +6,10 @@ import { getSpeakerModelMeta } from '@/components/models/speakers/registry';
 import { getCanonicalRole } from '@/components/utils/surroundRoleMap';
 import { computeTvVerticalCentreM } from '@/components/roomdesigner/utils/lcrHeightAuthority';
 import { resolveInitialLcrPosition } from '@/components/room/placement/initialSpeakerPlacement';
+import {
+  CENTRE_CABINET_ROLES,
+  isCentreCabinetRole,
+} from '@/components/utils/frontStageModeAuthority';
 
 export const CENTER_ONLY_SOUNDBAR_LABELS = ['C-1', 'C4-1', 'Multi (Mono)', 'HSPL (Mono)'];
 export const INTEGRATED_LCR_SOUNDBAR_LABELS = ['Multi (LCR)', 'HSPL (LCR)'];
@@ -72,6 +76,7 @@ export function buildFrontStageSeed({
   baseModelLabel,
   frontStageMode,
   soundbarModelLabel,
+  centreModelLabel = null,
   dimensions,
   screen,
   splConfig,
@@ -92,6 +97,10 @@ export function buildFrontStageSeed({
     const LCR_ROLES_SET = new Set(['FL', 'FR']);
     const filtered = list.filter(s => {
       const canon = getCanonicalRole(s.role);
+      // The dual-centre cabinets are owned by this seed in EVERY mode: they are
+      // re-created only in dual-centre mode and removed otherwise, so switching
+      // front stage never leaves a stale cabinet behind.
+      if (isCentreCabinetRole(canon)) return false;
       return !LCR_ROLES_SET.has(canon) && !isCentreLike(String(s.role || '').trim().toUpperCase());
     });
 
@@ -115,6 +124,14 @@ export function buildFrontStageSeed({
       if (frontStageMode === 'center_only' && isLr) {
         return Number.isFinite(Number(splConfig?.lcrLRHeightM))
           ? Number(splConfig.lcrLRHeightM)
+          : tvCentreM;
+      }
+      if (frontStageMode === 'dual_centre' && isCentreCabinetRole(role)) {
+        // The cabinets' acoustic centre is the TV midpoint height — the same TV
+        // geometry authority that drives the L/R height. A designer's manual
+        // override (saved as lcrHeightM) always wins.
+        return Number.isFinite(Number(splConfig?.lcrHeightM))
+          ? Number(splConfig.lcrHeightM)
           : tvCentreM;
       }
       return defaultZ;
@@ -165,12 +182,21 @@ export function buildFrontStageSeed({
     const FR = by.get('FR') || { role: 'FR', id: 'FR-1', draggable: true };
 
     const soundbarLabel = soundbarModelLabel || null;
+    // The centre label carries the dual-centre cabinet model — ONE model for both
+    // physical centre cabinets. The soundbar slot is untouched for the other modes.
+    const centreLabel = centreModelLabel || null;
 
-    const fallbackPosition = (role) => ({
-      x: role === 'FL' ? midX - spread : role === 'FR' ? midX + spread : midX,
-      y: defaultY,
-      z: heightForRole(role),
-    });
+    const fallbackPosition = (role) => {
+      if (isCentreCabinetRole(role)) {
+        const left = getCanonicalRole(role) === CENTRE_CABINET_ROLES.left;
+        return { x: left ? midX - spread : midX + spread, y: defaultY, z: heightForRole(role) };
+      }
+      return {
+        x: role === 'FL' ? midX - spread : role === 'FR' ? midX + spread : midX,
+        y: defaultY,
+        z: heightForRole(role),
+      };
+    };
 
     if (frontStageMode === 'integrated_lcr' && soundbarLabel) {
       return [
@@ -204,6 +230,52 @@ export function buildFrontStageSeed({
           model: soundbarLabel,
           position: placeRole('FC', soundbarLabel, FC) || fallbackPosition('FC'),
           rotation: FC.rotation || { x: 0, y: 0, z: 0 },
+        },
+        {
+          ...FR,
+          role: 'FR',
+          id: FR.id || 'FR-1',
+          model: baseModelLabel,
+          position: placeRole('FR', baseModelLabel, FR) || fallbackPosition('FR'),
+          rotation: FR.rotation || { x: 0, y: 0, z: 0 },
+        },
+      ];
+    }
+
+    // ── Dual centre (TV) ────────────────────────────────────────────────────
+    // FL/FR are placed by the SAME standard authority as the 'standard' mode
+    // (this mode never moves them), plus the two physical centre cabinets
+    // flanking the TV. Both cabinets carry the SAME centre model and are fed
+    // from the ONE centre channel: no extra channel, no Dolby layout change.
+    if (frontStageMode === 'dual_centre' && centreLabel) {
+      const FCL = by.get('FCL') || { role: 'FCL', id: 'FCL-1', draggable: true };
+      const FCR = by.get('FCR') || { role: 'FCR', id: 'FCR-1', draggable: true };
+
+      return [
+        ...filtered,
+        {
+          ...FL,
+          role: 'FL',
+          id: FL.id || 'FL-1',
+          model: baseModelLabel,
+          position: placeRole('FL', baseModelLabel, FL) || fallbackPosition('FL'),
+          rotation: FL.rotation || { x: 0, y: 0, z: 0 },
+        },
+        {
+          ...FCL,
+          role: 'FCL',
+          id: FCL.id || 'FCL-1',
+          model: centreLabel,
+          position: placeRole('FCL', centreLabel, FCL) || fallbackPosition('FCL'),
+          rotation: FCL.rotation || { x: 0, y: 0, z: 0 },
+        },
+        {
+          ...FCR,
+          role: 'FCR',
+          id: FCR.id || 'FCR-1',
+          model: centreLabel,
+          position: placeRole('FCR', centreLabel, FCR) || fallbackPosition('FCR'),
+          rotation: FCR.rotation || { x: 0, y: 0, z: 0 },
         },
         {
           ...FR,

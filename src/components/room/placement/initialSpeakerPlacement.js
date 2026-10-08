@@ -18,6 +18,11 @@
 // ---------------------------------------------------------------------------
 
 import { getCanonicalRole, canonicalSide } from "@/components/utils/surroundRoleMap";
+import {
+  CENTRE_CABINET_ROLES,
+  isCentreCabinetRole,
+  resolveCentreCabinetX,
+} from "@/components/utils/frontStageModeAuthority";
 import { computeLcrZones, clampLcrZoneDepth } from "@/components/utils/rp22/lcrZoneAuthority";
 import { computeFrontWideZonesStrict } from "@/components/utils/frontWideZones";
 import { yHalfExtentM_physical } from "@/components/room/rv/RenderPrimitives";
@@ -129,7 +134,8 @@ export function resolveInitialLcrPosition({
   fallbackSpreadM,
 }) {
   const canon = getCanonicalRole(role);
-  if (canon !== "FL" && canon !== "FC" && canon !== "FR") return null;
+  const isCentreCabinet = isCentreCabinetRole(canon);
+  if (canon !== "FL" && canon !== "FC" && canon !== "FR" && !isCentreCabinet) return null;
 
   const W = roomW(roomDims);
   const L = roomL(roomDims);
@@ -138,9 +144,9 @@ export function resolveInitialLcrPosition({
   const dims = resolveSpeakerDims(model, getModelDimsM);
   const z = num(lcrHeightM) ?? roomH(roomDims) * 0.5;
 
-  // ── X: centre of the role's LCR zone ────────────────────────────────────
+  // ── X: the role's canonical position ────────────────────────────────────
   let x = W / 2;
-  if (canon !== "FC") {
+  if (canon === "FL" || canon === "FR") {
     let span = null;
     if (rsp) {
       const planeM = resolveRspScreenFrontPlaneM(screenFrontPlaneM, screen);
@@ -152,6 +158,15 @@ export function resolveInitialLcrPosition({
     // is kept as the fallback (unchanged behaviour).
     const spread = num(fallbackSpreadM) ?? Math.min(1.2, W * 0.22);
     x = span ? (span.xMin + span.xMax) / 2 : (canon === "FL" ? W / 2 - spread : W / 2 + spread);
+  } else if (isCentreCabinet) {
+    // Dual centre: each cabinet flanks one edge of the TV (symmetric about the
+    // room centreline), placed from the TV geometry when it is available. With
+    // no TV geometry the nominal lateral spread keeps the pair usable.
+    const spread = num(fallbackSpreadM) ?? Math.min(1.2, W * 0.22);
+    const tvX = resolveCentreCabinetX({ screen, role: canon, cabinetWidthM: dims.widthM, roomWidthM: W });
+    x = Number.isFinite(tvX)
+      ? tvX
+      : (canon === CENTRE_CABINET_ROLES.left ? W / 2 - spread : W / 2 + spread);
   }
 
   // ── Y: front-wall clearance for this model, at its final aim ────────────

@@ -1,4 +1,5 @@
 import { usesIntegratedLcrStage } from '../../../../shared/channelArchitecture.js';
+import { detectDualCentreStage, isCentreCabinetRole, centreCabinetPowerW } from '@/components/utils/frontStageModeAuthority';
 import { isListenerLevelSurroundRole } from '@/components/utils/rp22/listenerLevelSurroundRoles';
 // components/utils/spl/centralSplEngine.js
 // ─────────────────────────────────────────────────────────────────────────────
@@ -465,6 +466,16 @@ export function computeAllSeatSplMetrics({
   // For SPL/RP22 reporting only, expose virtual FL/FC/FR screen-channel entries.
   const isIntegratedLcr = usesIntegratedLcrStage(placedLCR, getModelDimsM);
 
+  // Dual centre (TV): the two physical centre cabinets (FCL/FCR) carry the ONE
+  // centre channel. For SPL they resolve to a SINGLE FC screen channel — the
+  // cabinet's own capability at HALF the centre-channel amplifier power. No
+  // +3 dB / +6 dB combining gain is ever added, and the cabinets never appear as
+  // screen channels of their own, so the centre is neither overstated nor
+  // double-counted.
+  const centreCabinet = detectDualCentreStage(placedSpeakers)
+    ? placedSpeakers.find((s) => hasPos(s) && hasRealModel(s) && isCentreCabinetRole(s.role))
+    : null;
+
   const screenSpeakersForSpl = isIntegratedLcr
     ? (() => {
         const fc = placedLCR[0];
@@ -475,7 +486,18 @@ export function computeAllSeatSplMetrics({
           { ...fc, role: 'FR', id: `${baseId}__virtual_FR`, virtualFromIntegratedLcr: true },
         ];
       })()
-    : placedLCR;
+    : centreCabinet
+      ? [
+          ...placedLCR.filter((s) => getCanonicalRole(s.role) !== 'FC'),
+          {
+            ...centreCabinet,
+            role: 'FC',
+            id: `${centreCabinet.id || 'FC'}__dual_centre_FC`,
+            virtualFromDualCentre: true,
+            dualCentreHalfPower: true,
+          },
+        ]
+      : placedLCR;
 
   // Process each seat (including synthetic MLP)
   for (const seat of seatsToProcess) {
@@ -511,6 +533,11 @@ export function computeAllSeatSplMetrics({
         
         // Get effective SPL inputs (power, sensitivity overrides)
         const effectiveSplInputs = getEffectiveSplInputs(spk.role);
+        // The dual-centre cabinet carries ONE centre channel split between the two
+        // cabinets: it is driven at half the centre-channel amplifier power, with
+        // no combining gain of any kind.
+        const channelPowerW = effectiveSplInputs?.powerW || 100;
+        const powerW = spk.dualCentreHalfPower ? centreCabinetPowerW(channelPowerW) : channelPowerW;
 
         // --- Overhead SPL must always assume ceiling mount height ---
         // Do NOT trust spk.position.z for overheads (often missing/0/legacy).
@@ -535,8 +562,9 @@ export function computeAllSeatSplMetrics({
                                speakerMeta?.sensitivity_dB_1w1m || 
                                speakerMeta?.sensitivity || 
                                87,
-          // Power from effective inputs
-          powerW: effectiveSplInputs?.powerW || 100,
+          // Power from effective inputs (dual centre: the per-cabinet share —
+          // X/2, with no combining gain applied)
+          powerW,
           // Screen loss and EQ headroom
           screenLoss_dB: screenLoss_dB || 0,
           eqHeadroom_dB: eqHeadroom_dB || 0,
