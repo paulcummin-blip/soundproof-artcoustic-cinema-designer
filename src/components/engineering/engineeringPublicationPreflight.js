@@ -1,5 +1,6 @@
 import { PUBLICATION_CONTRACT_VERSION, buildAtomicParameterIndex, auditPublicationContract } from '../../../shared/engineeringPublicationContract.js';
 import { publicationSectionReport, RP22_PARAMETER_KEYS } from './publicationGateCore';
+import { assessEngineeringReportCompleteness, isExplicitNotApplicable } from '../../../shared/assessmentTerminal.js';
 import { statesBassAuthority } from './versionedEngineeringAuthority';
 
 export function engineeringPublicationPreflight({
@@ -24,12 +25,9 @@ export function engineeringPublicationPreflight({
     bassAuthorityAvailable: bassReady,
   });
   const parameters = engineeringSummary?.parameterAuthority || {};
-  const provisional = RP22_PARAMETER_KEYS.filter(key => {
-    const item = parameters[key];
-    // Bass is composed from the matching verified contract, not its provisional shell.
-    if (['p14', 'p18', 'p19', 'p20'].includes(key) && bassReady) return false;
-    return !item || ['provisional', 'pending', 'calculating'].includes(item.state);
-  });
+  const terminal = assessEngineeringReportCompleteness(engineeringSummary);
+  const provisional = [...new Set([...terminal.missingParameterKeys, ...terminal.incompleteSeatParameterKeys])];
+
   const bassReason = bassReadiness.detail || bassReadiness.reason || 'bass authority unavailable';
   const gates = [
     ...(reportSnapshot?.capture_missing || []).map(reason => ({ key:reason, label:reason, ok:false })),
@@ -38,7 +36,7 @@ export function engineeringPublicationPreflight({
     { key: 'hydration', label: 'Version loaded and minimum system selected', ok: ready === true },
     { key: 'rp22_terminal', label: 'RP22 P1–P21 terminal (verified bass or explicit N/A)', ok: provisional.length === 0, detail: provisional.join(', ') },
     { key: 'bass_current', label: 'Current verified bass / P19', ok: bassReady, detail: bassReady ? null : bassReason },
-    { key: 'p20_available', label: 'P20 seat results available', ok: engineeringSummary?.project?.reportCounts?.seatResultsByParameter?.p20?.some(row => row?.status === 'scored') === true },
+    { key: 'p20_available', label: 'P20 seat results available', ok: isExplicitNotApplicable(parameters.p20) || engineeringSummary?.project?.reportCounts?.seatResultsByParameter?.p20?.some(row => row?.status === 'scored') === true },
     { key: 'design_rating', label: 'Publishable settled design rating', ok: isPublishable === true },
     { key: 'bass_summary', label: 'Bass results in engineering summary', ok: statesBassAuthority(engineeringSummary) },
     ...sectionReport.items.filter(item => item.key !== 'published_at'),
@@ -46,6 +44,7 @@ export function engineeringPublicationPreflight({
   const missing = gates.filter(item => !item.ok);
   return {
     ready: missing.length === 0, gates, missing,
+    assessmentComplete: terminal.complete && bassReady,
     reason: missing.map(item => item.label + (item.detail ? ': ' + item.detail : '')).join('; '),
     action: bassReady ? 'Publish Assessment' : 'Verify Bass / Complete P19',
     p19Blocks: !bassReady && bassReadiness.reason === 'not-verified',
