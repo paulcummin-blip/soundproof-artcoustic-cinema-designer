@@ -168,19 +168,28 @@ export function useVersionedEngineeringAuthority(projectId, versionId, { finalRe
   // authority, so no report, reportEvidence or "Current" state is allowed
   // without the publication the version pointer references.
   const publicationAttempt = usePublicationAttempt(projectId, versionId);
+  // Browser assessment is diagnostics only, never final report authority.
+  const localSummary = extractEngineeringSummary(localSnapshot);
+  const localCompleteness = assessEngineeringReportCompleteness(localSummary);
   const publicationGate = auditDurablePublication({
     durable,
     versionName: durable?.version?.version_name || null,
     authorityComplete: reportCompleteness.complete,
     authorityReason: reportCompleteness.reason,
     attempt: publicationAttempt,
-    assessmentExists: !!extractEngineeringSummary(localSnapshot) || !!durable?.publication,
-    assessmentComplete: assessEngineeringReportCompleteness(extractEngineeringSummary(localSnapshot)).complete,
+    assessmentExists: !!localSummary || !!durable?.publication,
+    assessmentComplete: localCompleteness.complete,
   });
   const gatedCompleteness = publicationGate.allowed
     ? reportCompleteness
     : {
         ...reportCompleteness,
+        // Do not translate an absent saved publication into an assertion that
+        // the displayed assessment never ran. This cannot make the gate pass.
+        ...(!durable?.publication && localSummary ? {
+          missingParameterKeys:localCompleteness.missingParameterKeys,
+          incompleteSeatParameterKeys:localCompleteness.incompleteSeatParameterKeys,
+        } : {}),
         complete: false,
         publicationBlocked: true,
         publicationStatus: publicationGate.status,
