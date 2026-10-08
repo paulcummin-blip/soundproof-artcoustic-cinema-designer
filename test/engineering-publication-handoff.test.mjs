@@ -81,3 +81,23 @@ test('client/server shared contracts are identical',()=>{
   for(const file of ['channelArchitecture.js','assessmentTerminal.js','engineeringPublicationContract.js','reportEvidenceCompleteness.js'])
     assert.equal(fs.readFileSync(new URL('../shared/'+file,import.meta.url),'utf8'),fs.readFileSync(new URL('../base44/shared/'+file,import.meta.url),'utf8'));
 });
+test('missing publication preserves actual assessment state and rejection reasons',()=>{
+  const source=fs.readFileSync(new URL('../src/components/engineering/publicationGateAuthority.js',import.meta.url),'utf8')
+    .replace(/^import[\s\S]*?;\n/gm,'').replace(/^export\s*\{[\s\S]*?\};\n/gm,'').replace(/export /g,'');
+  const audit=new Function('PUBLICATION_ACKNOWLEDGEMENT',source+';return auditDurablePublication;')({CHECKING:'checking'});
+  const durable={status:'not_calculated',version:{published_fingerprint:null},publication:null};
+  assert.equal(audit({durable}).status,'assessment_missing');
+  const incomplete=audit({durable,assessmentExists:true,attempt:{status:'not_ready',message:'P3, P9, P11 not terminal',assessmentComplete:false}});
+  assert.equal(incomplete.status,'assessment_incomplete');assert.match(incomplete.reason,/P3, P9, P11/);
+  const rejected=audit({durable,assessmentComplete:true,attempt:{status:'failed',message:'HTTP 422: channel architecture rejected'}});
+  assert.equal(rejected.status,'publication_rejected');assert.match(rejected.reason,/422/);
+  assert.equal(audit({durable:{...durable,status:'stale'}}).status,'stale_pointer');
+});
+test('final report source identity never includes newer live seating priorities',()=>{
+  for(const file of ['../src/pages/RP22Report.jsx','../src/pages/RP22ClientReport.jsx'])
+    assert.doesNotMatch(fs.readFileSync(new URL(file,import.meta.url),'utf8'),/liveSeatPriorityFingerprint:\s*readSeatPriorityFingerprint/);
+  const hook=fs.readFileSync(new URL('../src/components/engineering/useVersionedEngineeringAuthority.js',import.meta.url),'utf8');
+  assert.match(hook,/missingParameterKeys:localCompleteness.missingParameterKeys/);
+  assert.match(hook,/complete: false,\s*publicationBlocked: true/);
+});
+
