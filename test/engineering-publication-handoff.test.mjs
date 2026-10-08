@@ -97,7 +97,8 @@ test('final report source identity never includes newer live seating priorities'
   for(const file of ['../src/pages/RP22Report.jsx','../src/pages/RP22ClientReport.jsx'])
     assert.doesNotMatch(fs.readFileSync(new URL(file,import.meta.url),'utf8'),/liveSeatPriorityFingerprint:\s*readSeatPriorityFingerprint/);
   const hook=fs.readFileSync(new URL('../src/components/engineering/useVersionedEngineeringAuthority.js',import.meta.url),'utf8');
-  assert.match(hook,/missingParameterKeys:localCompleteness.missingParameterKeys/);
+  assert.match(hook,/missingParameterKeys:diagnosticCompleteness.missingParameterKeys/);
+  assert.match(hook,/terminalGate\?\.detail\?\.split/);
   assert.match(hook,/complete: false,\s*publicationBlocked: true/);
 });
 
