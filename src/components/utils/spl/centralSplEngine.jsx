@@ -1,3 +1,4 @@
+import { usesIntegratedLcrStage } from '../../../../shared/channelArchitecture.js';
 // components/utils/spl/centralSplEngine.js
 // ─────────────────────────────────────────────────────────────────────────────
 // UNIFIED SPL ENGINE — Single source of truth for SPL calculations.
@@ -438,13 +439,7 @@ export function computeAllSeatSplMetrics({
 
   // Integrated LCR soundbars are stored as one physical FC speaker.
   // For SPL/RP22 reporting only, expose virtual FL/FC/FR screen-channel entries.
-  const isIntegratedLcr = (() => {
-    if (placedLCR.length !== 1) return false;
-    const fc = placedLCR[0];
-    if (getCanonicalRole(fc.role) !== 'FC') return false;
-    const meta = getModelDimsM(fc.model);
-    return meta?.frontStageType === 'integrated_lcr';
-  })();
+  const isIntegratedLcr = usesIntegratedLcrStage(placedLCR, getModelDimsM);
 
   const screenSpeakersForSpl = isIntegratedLcr
     ? (() => {
