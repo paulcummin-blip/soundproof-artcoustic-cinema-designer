@@ -10,8 +10,9 @@ export function hasTerminalLevel(entry) {
 }
 export function isTerminalAssessment(entry, { requireLevel = true, requireState = true } = {}) {
   if (!entry || entry.isStale === true || entry.reliable === false || entry.verified === false) return false;
-  const state = normalizedAssessmentState(entry.state ?? entry.status);
-  if (state && !['scored', 'complete', 'ok', 'na', 'not_applicable'].includes(state)) return false;
+  const states = [entry.state, entry.status].map(normalizedAssessmentState).filter(Boolean);
+  if (states.some(value => !['scored', 'complete', 'ok', 'na', 'not_applicable'].includes(value))) return false;
+  const state = states[0] || '';
   if (!state && requireState) return false;
   if (isExplicitNotApplicable(entry)) return true;
   return (!requireLevel || hasTerminalLevel(entry)) && (!state || !['na', 'not_applicable'].includes(state));
