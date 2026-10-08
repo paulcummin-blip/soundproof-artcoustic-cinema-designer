@@ -188,6 +188,9 @@ export function serializeProject(input = {}) {
     Number(screen?.speakerClearanceM ?? 0.02) || 0.02;
   const showScreenPlane = !!screen?.showScreenPlane;
   const showCavity = !!screen?.showCavity;
+  // Visual-only fabric false wall behind the screen. Not a Project shared field,
+  // so it lands in design_state and is therefore saved per design version.
+  const showScreenWall = !!screen?.showScreenWall;
 
   // Helper to JSON-stringify safely
   const j = (value, fallback) => {
@@ -229,6 +232,7 @@ export function serializeProject(input = {}) {
     float_depth_m: floatDepthM,
     show_screen_plane: showScreenPlane,
     show_cavity: showCavity,
+    show_screen_wall: showScreenWall,
     speaker_clearance_m: speakerClearanceM,
     // A missing derived value must not overwrite the existing entity value.
     ...(persistedScreenPlaneM !== null ? { screen_front_plane_m: persistedScreenPlaneM } : {}),

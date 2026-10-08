@@ -626,6 +626,26 @@ export default function ScreenConfiguration(props) {
           )}
         </div>
 
+        {/* SCREEN WALL — visual fabric false wall behind the screen */}
+        <div>
+          <div style={groupTitleStyle}>Screen Wall</div>
+          <div className="flex items-start justify-between gap-4">
+            <div>
+              <span className="text-sm font-medium text-[#3E4349]">Screen Wall</span>
+              <div className="text-[11px] text-[#9CA3AF] mt-0.5 leading-snug">
+                Shows a fabric-covered false wall across the room at the rear of the screen,
+                leaving the equipment cavity behind it. Visual only — the structural front wall
+                remains the acoustic boundary.
+              </div>
+            </div>
+            <Switch
+              checked={!!screenData.showScreenWall}
+              onCheckedChange={(showScreenWall) => handleUpdate({ showScreenWall })}
+              disabled={disabled}
+            />
+          </div>
+        </div>
+
         {/* LIVE METRICS — soft report-style card */}
         <div className="p-4 border border-[#E5E5E5] rounded-lg bg-[#FAF9F6]">
           <div style={groupTitleStyle}>Live Metrics</div>

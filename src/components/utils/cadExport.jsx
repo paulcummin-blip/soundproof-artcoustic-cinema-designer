@@ -640,6 +640,7 @@ const ALL_LAYERS = [
     'SCREEN_VIEWABLE',
     'SCREEN_FRAME',
     'SCREEN_WALL_BUILDUP',
+    'SCREEN_WALL',
     'SCREEN_LABELS',
     'SPEAKERS',
     'SPEAKER_AIMING',
@@ -677,6 +678,7 @@ export function generateSVG({
     projector = null,
     lcrAngleInfo = null,
     aimToggles = {},
+    showScreenWall = false,
 }) {
     const roomW = Number(roomDims?.widthM || roomDims?.width || 4.5);
     const roomL = Number(roomDims?.lengthM || roomDims?.length || 6.0);
@@ -925,6 +927,7 @@ export function generateDXF({
     projector = null,
     lcrAngleInfo = null,
     aimToggles = {},
+    showScreenWall = false,
 }) {
     const roomW = Number(roomDims?.widthM || roomDims?.width || 4.5);
     const roomL = Number(roomDims?.lengthM || roomDims?.length || 6.0);

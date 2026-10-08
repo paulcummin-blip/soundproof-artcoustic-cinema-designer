@@ -123,6 +123,7 @@ export default function ProjectCadExportButton({
         aimSideSurroundsAtMLP,
         aimRearSurroundsAtMLP,
       },
+      showScreenWall: !!screen?.showScreenWall,
     });
   }, [
     projectName,

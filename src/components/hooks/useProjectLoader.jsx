@@ -440,6 +440,7 @@ appState, // Pass appState directly for setters
           floatDepthM: Number(mergedP?.float_depth_m) || 0.2,
           showScreenPlane: !!mergedP?.show_screen_plane,
           showCavity: !!mergedP?.show_cavity,
+          showScreenWall: !!mergedP?.show_screen_wall,
           speakerClearanceM: Number(mergedP?.speaker_clearance_m) || 0.02,
           heightFromFloorM: typeof mergedP?.screen_height_from_floor === "number" ? mergedP.screen_height_from_floor : 0.5,
 

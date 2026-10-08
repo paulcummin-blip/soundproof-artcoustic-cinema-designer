@@ -207,6 +207,7 @@ export function buildProjectCadPayload({
   projector,
   lcrAngleInfo,
   aimToggles,
+  showScreenWall = false,
 }) {
   const notReady = (reason) => ({ ready: false, reason, filename: null, data: null });
 
@@ -265,6 +266,8 @@ export function buildProjectCadPayload({
     roomElements: adaptRoomElementsForCad(roomElements, roomDims),
     projector: projector || null,
     lcrAngleInfo: lcrAngleInfo || null,
+    // Visual-only screen wall overlay — included in the drawing when enabled.
+    showScreenWall: !!showScreenWall,
     aimToggles: {
       aimFrontWidesAtMLP: !!aimToggles?.aimFrontWidesAtMLP,
       aimSideSurroundsAtMLP: !!aimToggles?.aimSideSurroundsAtMLP,

@@ -37,6 +37,13 @@ export default function RvBaffleAndScreen({
       ? exportPlaneM
       : actualScreenFrontY;
 
+  // Visual-only proposed fabric false wall. Drawn across the full room width at
+  // the rear face of the screen (the screen's mounting plane). Purely a drawing
+  // overlay: it never feeds room dimensions, speaker geometry or acoustics.
+  const showScreenWall = !!screen?.showScreenWall;
+  const xScreenWallL = roomRect?.x ?? meterToCanvasX(0);
+  const xScreenWallR = (roomRect?.x ?? 0) + (roomRect?.width ?? widthM * scale);
+
   const xCentre = widthM / 2;
   const yFront = (roomRect?.y ?? 0);
 
@@ -55,6 +62,21 @@ export default function RvBaffleAndScreen({
 
   return (
     <>
+      {showScreenWall && (
+        // Screen wall — dashed line spanning the full room width at the rear face
+        // of the screen. Drawn first so the screen, speakers and subwoofers always
+        // remain visible on top of it.
+        <line
+          x1={xScreenWallL}
+          y1={screenPlaneY}
+          x2={xScreenWallR}
+          y2={screenPlaneY}
+          stroke="#3E4349"
+          strokeWidth="1.5"
+          strokeDasharray="10 7"
+          pointerEvents="none"
+        />
+      )}
       {showBaffle && (
         <>
           <rect
