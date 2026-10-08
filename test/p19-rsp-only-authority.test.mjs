@@ -49,8 +49,14 @@ const EVIDENCE_READER = read('base44/shared/proposalReportEvidenceReader.js');
 /* ── 1. The Visual bass adapter ─────────────────────────────────────────── */
 
 test('the Visual bass adapter builds P19 from the RSP result only', () => {
+  // The P19 object literal itself: from its opening line to the P20 block.
+  const p19Block = VISUAL_ADAPTER.slice(
+    VISUAL_ADAPTER.indexOf('const p19 = p19Room ? {'),
+    VISUAL_ADAPTER.indexOf('const p20 ='),
+  );
+  assert.ok(p19Block.length > 0, 'the P19 adapter block was located');
   assert.ok(
-    !/perSeatResults/.test(VISUAL_ADAPTER),
+    !/perSeatResults/.test(p19Block),
     'the Visual bass adapter carries no per-seat P19 rows',
   );
   assert.ok(
@@ -58,7 +64,7 @@ test('the Visual bass adapter builds P19 from the RSP result only', () => {
     'the Visual bass adapter never reads the stored per-seat P19 rows',
   );
   assert.match(
-    VISUAL_ADAPTER,
+    p19Block,
     /rspResult:/,
     'the P19 result is the published RSP result',
   );
@@ -66,6 +72,11 @@ test('the Visual bass adapter builds P19 from the RSP result only', () => {
     VISUAL_ADAPTER,
     /seatResultsByParameter\?\.p20/,
     'P20 seat results are still carried',
+  );
+  assert.match(
+    VISUAL_ADAPTER.slice(VISUAL_ADAPTER.indexOf('const p20 =')),
+    /perSeatResults:/,
+    'the P20 per-seat rows are unchanged',
   );
 });
 

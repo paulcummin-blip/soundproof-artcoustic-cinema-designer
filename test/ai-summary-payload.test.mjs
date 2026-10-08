@@ -1,8 +1,8 @@
 // test/ai-summary-payload.test.mjs
 //
 // Tests for buildAiSummaryPayload — the canonical AI input schema builder.
-// Verifies: N/A exclusion, FAIL retention, P19/P20 seat preservation,
-// Primary/Secondary category floors, DPI scores passed.
+// Verifies: N/A exclusion, FAIL retention, P19 stated at the RSP, P20 per-seat
+// preservation, Primary/Secondary category floors, DPI scores passed.
 //
 // Run: node test/ai-summary-payload.test.mjs
 
@@ -112,11 +112,13 @@ test("G: FAIL level retained", () => {
   assert.equal(payload.parameters.all.p4.level, "FAIL");
 });
 
-// H. P19/P20 seat results preserved
-test("H: P19 per-seat results preserved", () => {
+// H. P19 stated at the RSP (never per seat) and P20 seat results preserved
+test("H: P19 is stated at the RSP and P20 per-seat results are preserved", () => {
   const parameters = {
+    // P19 is RSP-only. The legacy per-seat block is retained here to prove the
+    // payload never reads it: only the reference-position result is carried.
     p19: {
-      scope: "seat", state: "scored",
+      scope: "room", state: "scored", level: "L2", rawValue: 4.5,
       seats: {
         "seat-1": { state: "scored", level: "L3", rawValue: 2.5 },
         "seat-2": { state: "scored", level: "L2", rawValue: 4.0 },
@@ -134,8 +136,9 @@ test("H: P19 per-seat results preserved", () => {
   const payload = buildAiSummaryPayload({ publishedSnapshot: snap, projectDetails: makeProject(), projectId: "proj-1", versionId: "ver-1" });
   assert.ok(payload.bass, "bass should be present");
   assert.ok(payload.bass.p19, "P19 should be present");
-  assert.equal(payload.bass.p19.perSeat["seat-1"].level, "L3");
-  assert.equal(payload.bass.p19.perSeat["seat-2"].level, "L2");
+  assert.equal(payload.bass.p19.level, "L2", "P19 states the published reference-position level");
+  assert.equal(payload.bass.p19.scope, "rsp", "P19 is scoped to the reference seating position");
+  assert.equal(payload.bass.p19.perSeat, undefined, "no per-seat P19 is ever collected");
   assert.ok(payload.bass.p20, "P20 should be present");
   assert.equal(payload.bass.p20.perSeat["seat-1"].level, "L4");
 });

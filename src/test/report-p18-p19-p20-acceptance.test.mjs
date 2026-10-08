@@ -208,13 +208,14 @@ test('P19 DOES NOT REQUIRE PER-SEAT RECORDS — zero P19 seat rows still produce
   assert.equal(BASELINE.p19SeatAuthority.seats.length, 0, 'no P19 seat authority');
 
   const performance = selectClientBassPerformance(BASELINE, BASELINE_SEATS);
-  assert.deepEqual(performance.p19.perSeatResults, [], 'P19 carries no per-seat rows');
+  assert.equal(performance.p19.perSeatResults, undefined, 'P19 carries no per-seat rows at all');
   assert.equal(performance.p19.achievedLevel, 'L4', 'P19 is still assessed from the RSP result');
 
   const adapter = read('src/components/report/client/selectClientBassPerformance.js');
-  assert.ok(adapter.includes('const p19 = (p19Room || p19Rows.length)'),
-    'the RSP room result alone is enough for P19');
-  assert.ok(adapter.includes('they are never required'), 'the per-seat rows are explicitly optional');
+  assert.ok(adapter.includes('const p19 = p19Room ? {'),
+    'the RSP room result alone produces the P19 authority');
+  assert.ok(!adapter.includes('seatResultsByParameter?.p19'),
+    'the stored per-seat P19 rows are never read, required or carried');
 });
 
 test('P19 PAGE NOT BLANK WITH RSP EVIDENCE — the Visual Report renders its page', () => {

@@ -54,6 +54,15 @@ const publishedP19Rows = seatingPositions.map((seat, i) => ({
 const bassPerformance = {
   p19: {
     achievedLevel: P19_LEVEL,
+    // The single reference-position result: the only P19 evidence this page
+    // reads. P19 is RSP-only, so the legacy per-seat rows below are retained
+    // here to prove they are never read, required or drawn.
+    rspResult: {
+      level: P19_LEVEL,
+      deviationDb: 4,
+      displayedValue: '4 dB',
+      worstFrequencyHz: 90,
+    },
     perSeatResults: publishedP19Rows.map((row) => ({
       seatId: row.seatId,
       isPrimary: row.priority === 'primary',
