@@ -24,12 +24,6 @@ const RoomElements = React.lazy(() =>
 const BassDesignAssistant = React.lazy(() =>
   import("@/components/room/bass/BassDesignAssistant").then((m) => ({ default: m.default }))
 );
-// Subwoofer hardware configuration (model, quantity, height, orientation,
-// screen lock). Owned by the Speakers section. Rendered with noWrapper
-// inside the Speakers CollapsiblePanel.
-const SubwooferPanel = React.lazy(() =>
-  import("@/components/room/SubwooferPanel").then((m) => ({ default: m.default ?? m.SubwooferPanel }))
-);
 
 export default function RoomDesignerControlsPanel({
   appState,
@@ -326,20 +320,6 @@ export default function RoomDesignerControlsPanel({
               roomLength={stableDimensions.length}
               screenFrontPlaneM={appState?.screenFrontPlaneM}
               view={speakerPositionsView} />
-
-            <div className="mt-4 pt-3 border-t border-[#DCDBD6]">
-              <h4 className="text-[13px] font-semibold text-[#1B1A1A] mb-2">Subwoofers</h4>
-              <Suspense fallback={<div>Loading...</div>}>
-                <SubwooferPanel
-                  appState={appState}
-                  disabled={isFrozen('bass')}
-                  frontSubsCfg={frontSubsCfg}
-                  rearSubsCfg={rearSubsCfg}
-                  subWarnings={subWarnings}
-                  noWrapper
-                />
-              </Suspense>
-            </div>
           </CollapsiblePanel>
         </div>
 
