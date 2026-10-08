@@ -678,12 +678,12 @@ export default function ScreenConfiguration(props) {
                         </div>
                         <div>
                           <div className="text-[#9CA3AF] text-[11px]">RP23</div>
-                          {/* Canonical RP23 performance pill: the graded level as L4–L1,
-                              or FAIL where the row's angle falls outside every RP23
-                              window. Recomputed with the row, so it updates as screen
-                              dimensions and seating positions change. */}
+                          {/* Canonical RP23 performance pill at the app-wide standard size
+                              (the same box as the Speakers-panel P12 pill): the graded
+                              level as L4–L1, or FAIL where the row's angle falls outside
+                              every RP23 window. Recomputed with the row, so it updates as
+                              screen dimensions and seating positions change. */}
                           <RP22GradingPill
-                            variant="compact"
                             level={row.level || (Number.isFinite(row.displayHorizontal) ? "FAIL" : "N/A")}
                           />
                         </div>

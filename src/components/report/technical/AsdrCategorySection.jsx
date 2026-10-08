@@ -91,7 +91,7 @@ function ScopeLine({ scope, isPrimary, isScreen }) {
             </div>
           )}
         </div>
-        <RP22GradingPill level={lvl} compact>{pillLabel}</RP22GradingPill>
+        <RP22GradingPill level={lvl} variant="printCompact">{pillLabel}</RP22GradingPill>
       </div>
     );
   }
@@ -105,14 +105,14 @@ function ScopeLine({ scope, isPrimary, isScreen }) {
         <span style={{ fontSize: "8pt", fontWeight: 600, color: COLORS.secondary, letterSpacing: "0.06em", textTransform: "uppercase", fontFamily: FONT_BODY }}>
           {lead}
         </span>
-        <RP22GradingPill level="FAIL" compact />
+        <RP22GradingPill level="FAIL" variant="printCompact" />
       </div>
     );
   }
 
   const lead = isPrimary ? "Primary Seats — no lower than" : "Secondary Seats — no lower than";
   const pill = floor ? (
-    <RP22GradingPill level={floor} compact />
+    <RP22GradingPill level={floor} variant="printCompact" />
   ) : (
     <span style={{ fontSize: "9pt", color: COLORS.muted, fontFamily: FONT_BODY }}>—</span>
   );

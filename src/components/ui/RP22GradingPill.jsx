@@ -2,17 +2,28 @@
  * RP22GradingPill.jsx — CANONICAL RP22 GRADING PILL
  * --------------------------------------------------
  * The single semantic grading-pill component for the entire Sound Proof app
- * and all report surfaces.  One component, multiple size/context variants.
+ * and all report surfaces.  One component, one on-screen size standard and two
+ * print-only sizes.
  *
  * Colours come exclusively from RP22_GRADE_TOKENS (rp22Colors.jsx).
  * Variants change ONLY dimensions, font size and padding — never colours or
  * semantic treatment.  L3 in the app looks like the same L3 in the report.
  *
+ * THE ON-SCREEN STANDARD — every RP22 / RP23 level shown anywhere in Cinema
+ * Designer (the Speakers-panel P12 pill, the RP23 Live Metrics pills in Screen
+ * Configuration, seat HUD rows, parameter tiles and seat results) is the "app"
+ * size.  It is the default: a caller that passes no variant, or the legacy
+ * "compact" spelling, gets this standard, so an on-screen pill cannot drift to
+ * a smaller size again.
+ *
+ * "printCompact" and "report" are PRINT-ONLY sizes, for dense report tables and
+ * PDF output that must not grow.  A print surface must opt into one explicitly.
+ *
  * Props:
  *   level    — 1-4 | "L1"-"L4" | 0 | "FAIL" | "SEAT" | "N/A" |
  *              "NOT CALCULATED" | "—" | "-" | undefined
- *   variant  — "app" (default) | "compact" | "report"
- *   compact  — (legacy boolean) maps to variant="compact" for backward compat
+ *   variant  — "printCompact" | "report"   (omit for the on-screen standard)
+ *   compact  — legacy boolean; now resolves to the on-screen standard
  *   count    — optional number appended as ": N" (legacy)
  *   children — optional override label
  *   style    — optional inline style merge
@@ -28,14 +39,29 @@ import { REPORT_FONT_HEADING } from "@/components/report/typography/reportTypogr
  * label, and box-sizing keeps the border inside the box.
  */
 const VARIANT_SIZES = {
-  app:     { height: 28, padding: "0 12px", fontSize: "13px", radius: "6px", minWidth: "44px", fontWeight: 600 },
-  compact: { height: 20, padding: "0 7px",  fontSize: "10px", radius: "5px", minWidth: "36px", fontWeight: 700 },
-  report:  { height: 22, padding: "0 9px",  fontSize: "11px", radius: "4px", minWidth: "38px", fontWeight: 600 },
+  // THE on-screen standard — the Speakers-panel P12 pill. Every RP22 / RP23
+  // level rendered in Cinema Designer uses this exact box.
+  app:          { height: 28, padding: "0 12px", fontSize: "13px", radius: "6px", minWidth: "44px", fontWeight: 600 },
+  // Print-only sizes. No on-screen surface may select these.
+  printCompact: { height: 20, padding: "0 7px",  fontSize: "10px", radius: "5px", minWidth: "36px", fontWeight: 700 },
+  report:       { height: 22, padding: "0 9px",  fontSize: "11px", radius: "4px", minWidth: "38px", fontWeight: 600 },
 };
 
+/**
+ * Only the two PRINT sizes can be chosen explicitly. Everything else — no
+ * variant, "app", the legacy "compact" spelling, or the legacy compact boolean
+ * — resolves to the on-screen standard, so an app surface can never end up
+ * with the smaller print box.
+ */
+function resolveVariant(variant) {
+  if (variant === "printCompact" || variant === "report") return variant;
+  return "app";
+}
+
 export default function RP22GradingPill({ level, variant, compact = false, count, children, style }) {
-  // Legacy: compact boolean maps to variant="compact" unless an explicit variant is passed.
-  const resolvedVariant = variant || (compact ? "compact" : "app");
+  // On-screen surfaces always resolve to the standard; only print surfaces opt
+  // into one of the two print sizes.
+  const resolvedVariant = resolveVariant(variant);
   const { token, label: baseLabel } = resolveGradeToken(level);
   const label = children ?? (count !== undefined ? `${baseLabel}: ${count}` : baseLabel);
 

@@ -136,7 +136,7 @@ export default function PerSeatPerformanceCard({ seat, layout, print }) {
             }}>
               {row.label}
             </span>
-            <RP22GradingPill level={row.level} variant="compact" />
+            <RP22GradingPill level={row.level} variant="printCompact" />
             {tier.showValues && (
               <span style={{
                 marginLeft: "auto",

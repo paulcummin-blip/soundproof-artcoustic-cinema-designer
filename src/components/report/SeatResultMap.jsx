@@ -22,7 +22,8 @@
  *   rows           — [{ row, seats: [{ id, level, value, isPrimary, priority }] }]
  *   print          — print (PDF) sizing
  *   showRowLabels  — show the "Row N" label beside each band (default true)
- *   levelVariant   — grading-pill variant ("compact" default)
+ *   levelVariant   — grading-pill variant ("printCompact" default: this is a
+ *                    print surface, so it opts into the print box)
  */
 
 import React from "react";
@@ -36,7 +37,7 @@ export default function SeatResultMap({
   rows,
   print = false,
   showRowLabels = true,
-  levelVariant = "compact",
+  levelVariant = "printCompact",
 }) {
   const list = Array.isArray(rows) ? rows.filter((row) => row?.seats?.length) : [];
   if (!list.length) return null;

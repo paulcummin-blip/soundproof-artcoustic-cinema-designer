@@ -98,7 +98,7 @@ export default function SeatScopedParameterCard({ param, perSeatResults, seatCou
             </div>
             <div className="flex items-center gap-2 text-xs">
               <span className="text-[#625143]">Level:</span>
-              <RP22GradingPill level={normalizeLevelForDisplay(selected.level)} compact />
+              <RP22GradingPill level={normalizeLevelForDisplay(selected.level)} variant="printCompact" />
             </div>
           </div>
         )}
@@ -124,7 +124,7 @@ export default function SeatScopedParameterCard({ param, perSeatResults, seatCou
                   </td>
                   <td className="py-1 text-right text-[#3E4349]">{result?.valueFormatted ?? '—'}</td>
                   <td className="py-1 text-right">
-                    <RP22GradingPill level={normalizeLevelForDisplay(result?.level)} compact />
+                    <RP22GradingPill level={normalizeLevelForDisplay(result?.level)} variant="printCompact" />
                   </td>
                 </tr>
               ))}

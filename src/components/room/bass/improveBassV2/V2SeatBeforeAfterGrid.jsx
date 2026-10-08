@@ -123,11 +123,11 @@ function SeatBeforeAfterCell({ seat, parameter, formatDb, levelTextFn }) {
       }}
     >
       <div className="flex items-center gap-1">
-        <RP22GradingPill level={beforeLevel} compact style={{ flex: 1, whiteSpace: "normal", minWidth: 0, fontSize: 9 }}>
+        <RP22GradingPill level={beforeLevel} style={{ flex: 1, whiteSpace: "normal", minWidth: 0 }}>
           {formatDb(beforeRaw)}
         </RP22GradingPill>
         <span className="text-[8px] text-[#8A7B6A] flex-shrink-0">→</span>
-        <RP22GradingPill level={afterLevel} compact style={{ flex: 1, whiteSpace: "normal", minWidth: 0, fontSize: 9 }}>
+        <RP22GradingPill level={afterLevel} style={{ flex: 1, whiteSpace: "normal", minWidth: 0 }}>
           {formatDb(afterRaw)}
         </RP22GradingPill>
       </div>

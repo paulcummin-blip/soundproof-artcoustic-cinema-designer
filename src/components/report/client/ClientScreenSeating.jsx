@@ -416,7 +416,7 @@ export default function ClientScreenSeating({
         }}
       >
         {LEGEND_LEVELS.map((lvl) => (
-          <RP22GradingPill key={lvl} level={lvl} variant="compact" />
+          <RP22GradingPill key={lvl} level={lvl} variant="printCompact" />
         ))}
         {/* Below L1 — custom swatch matching the diluted zone fill + dark border */}
         <div style={{ display: "flex", alignItems: "center", gap: 5 }}>
