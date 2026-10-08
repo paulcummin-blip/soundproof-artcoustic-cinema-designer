@@ -175,10 +175,13 @@ export function resolveCentreCabinetX({ screen, role, cabinetWidthM, roomWidthM 
 export const DUAL_CENTRE_MIN_IMPEDANCE_OHM = 4;
 
 /**
- * Whether a model may be used as a physical centre cabinet in this mode:
- * an Artcoustic LCR-range product, above 4 Ω, excluding the Architect (in-ceiling
- * / overhead) range and the dedicated soundbar products (which are their own
- * front-stage modes, not a dual-centre cabinet).
+ * Whether a model may be used as a physical centre cabinet in this mode.
+ *
+ * An Artcoustic LCR-range cabinet, above 4 Ω, whatever orientation it is normally
+ * drawn in — a suitable on-wall model is never excluded because it is normally
+ * drawn horizontally. Excluded: the Architect (in-ceiling / overhead) range, and
+ * the integrated LCR soundbars (ONE cabinet carrying three channels is a front
+ * stage of its own, not a single centre cabinet).
  */
 export function isEligibleDualCentreCentreModel(modelKey) {
   const key = String(modelKey ?? '').trim();
@@ -187,8 +190,8 @@ export function isEligibleDualCentreCentreModel(modelKey) {
   if (!meta || meta.notFound) return false;
 
   if (meta.category !== 'LCR') return false;      // Artcoustic LCR range only
-  if (meta.frontStageType) return false;          // soundbars stay in their own modes
   if (meta.round === true) return false;          // in-ceiling / overhead form factor
+  if (meta.frontStageType === FRONT_STAGE_INTEGRATED_LCR) return false;
 
   const ohms = Number(meta.nominalOhms);
   return Number.isFinite(ohms) && ohms > DUAL_CENTRE_MIN_IMPEDANCE_OHM;
@@ -198,6 +201,88 @@ export function isEligibleDualCentreCentreModel(modelKey) {
 export function eligibleDualCentreCentreOptions(options) {
   const list = Array.isArray(options) ? options : [];
   return list.filter((option) => isEligibleDualCentreCentreModel(
-    option?.key ?? option?.engineering_key ?? option?.label,
+    option?.key ?? option?.value ?? option?.engineering_key ?? option?.label,
   ));
+}
+
+// ── Cabinet orientation ────────────────────────────────────────────────────
+//
+// Each physical centre cabinet may be installed horizontally or vertically.
+// Vertical is the SAME cabinet rotated a quarter turn: its drawn width and
+// height swap, its depth is unchanged and its acoustic centre is still the
+// cabinet centre. The logical centre channel is never rotated and the two
+// cabinets are still ONE channel.
+
+export const CABINET_ORIENTATION_HORIZONTAL = 'horizontal';
+export const CABINET_ORIENTATION_VERTICAL = 'vertical';
+
+/** Orientation choices, in selector order. */
+export const CABINET_ORIENTATION_OPTIONS = Object.freeze([
+  { value: CABINET_ORIENTATION_HORIZONTAL, label: 'Horizontal' },
+  { value: CABINET_ORIENTATION_VERTICAL, label: 'Vertical' },
+]);
+
+/** A stored orientation, validated: anything unrecognised is horizontal. */
+export function normaliseCabinetOrientation(value) {
+  return String(value || '').trim().toLowerCase() === CABINET_ORIENTATION_VERTICAL
+    ? CABINET_ORIENTATION_VERTICAL
+    : CABINET_ORIENTATION_HORIZONTAL;
+}
+
+/**
+ * The orientation a NEW centre cabinet starts in — the product's own form.
+ *
+ * A TV-width bar (C4-1, Multi (Mono), HSPL (Mono)) spans the TV horizontally:
+ * as a centre cabinet it can only flank the TV standing VERTICALLY, so that is
+ * its default here. Every other cabinet keeps its normal drawn orientation.
+ * The designer's own selection always overrides this.
+ */
+export function defaultCentreCabinetOrientation(modelKey, tvPresetKey = null) {
+  const meta = getSpeakerModelMeta(String(modelKey || '').trim(), tvPresetKey || null);
+  if (!meta || meta.notFound) return CABINET_ORIENTATION_HORIZONTAL;
+  return meta.widthType === 'tv_linked'
+    ? CABINET_ORIENTATION_VERTICAL
+    : CABINET_ORIENTATION_HORIZONTAL;
+}
+
+/** The model's normal (as-drawn) footprint in metres, or null when unknown. */
+export function centreCabinetNormalFootprintM(modelKey, tvPresetKey = null) {
+  const meta = getSpeakerModelMeta(String(modelKey || '').trim(), tvPresetKey || null);
+  const widthM = Number(meta?.widthM);
+  const heightM = Number(meta?.heightM);
+  const depthM = Number(meta?.depthM);
+  if (!Number.isFinite(widthM) || !Number.isFinite(heightM) || widthM <= 0 || heightM <= 0) return null;
+  return { widthM, heightM, depthM: Number.isFinite(depthM) && depthM > 0 ? depthM : 0.08 };
+}
+
+/**
+ * The cabinet's INSTALLED footprint in metres.
+ *
+ * horizontal → the product's normal footprint.
+ * vertical   → the same cabinet rotated a quarter turn: width and height swap,
+ *              the depth is unchanged and the acoustic centre stays the centre.
+ *
+ * @returns {{widthM:number, heightM:number, depthM:number, orientation:string}|null}
+ */
+export function resolveCentreCabinetFootprintM(modelKey, orientation, tvPresetKey = null) {
+  const normal = centreCabinetNormalFootprintM(modelKey, tvPresetKey);
+  if (!normal) return null;
+  const value = normaliseCabinetOrientation(orientation);
+  if (value === CABINET_ORIENTATION_HORIZONTAL) return { ...normal, orientation: value };
+  return {
+    widthM: normal.heightM,
+    heightM: normal.widthM,
+    depthM: normal.depthM,
+    orientation: value,
+  };
+}
+
+/**
+ * The orientation the INSTALLED centre cabinets carry.
+ * They are installed as a pair and always share one orientation; horizontal is
+ * returned when nothing is installed or nothing is recorded.
+ */
+export function centreCabinetOrientation(placedSpeakers) {
+  const recorded = centreCabinets(placedSpeakers).find((c) => String(c?.orientation || '').trim());
+  return normaliseCabinetOrientation(recorded?.orientation);
 }

@@ -21,6 +21,7 @@ import { getCanonicalRole, canonicalSide } from "@/components/utils/surroundRole
 import {
   CENTRE_CABINET_ROLES,
   isCentreCabinetRole,
+  resolveCentreCabinetFootprintM,
   resolveCentreCabinetX,
 } from "@/components/utils/frontStageModeAuthority";
 import { computeLcrZones, clampLcrZoneDepth } from "@/components/utils/rp22/lcrZoneAuthority";
@@ -124,6 +125,7 @@ export function hasInvalidAutomaticRearPair(speakers, roomDims) {
 export function resolveInitialLcrPosition({
   role,
   model,
+  orientation = null,
   roomDims,
   rsp,
   screenFrontPlaneM,
@@ -141,7 +143,15 @@ export function resolveInitialLcrPosition({
   const L = roomL(roomDims);
   if (!(W > 0 && L > 0)) return null;
 
-  const dims = resolveSpeakerDims(model, getModelDimsM);
+  // A dual-centre cabinet is placed from its INSTALLED footprint: when it is
+  // mounted vertically the cabinet is rotated, so both the TV-edge offset and the
+  // front-wall clearance follow the rotated width and the unchanged depth.
+  const cabinetFootprint = isCentreCabinet
+    ? resolveCentreCabinetFootprintM(model, orientation, screen?.tvPresetKey || null)
+    : null;
+  const dims = cabinetFootprint
+    ? { widthM: cabinetFootprint.widthM, depthM: cabinetFootprint.depthM }
+    : resolveSpeakerDims(model, getModelDimsM);
   const z = num(lcrHeightM) ?? roomH(roomDims) * 0.5;
 
   // ── X: the role's canonical position ────────────────────────────────────

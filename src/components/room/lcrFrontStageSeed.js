@@ -8,7 +8,9 @@ import { computeTvVerticalCentreM } from '@/components/roomdesigner/utils/lcrHei
 import { resolveInitialLcrPosition } from '@/components/room/placement/initialSpeakerPlacement';
 import {
   CENTRE_CABINET_ROLES,
+  defaultCentreCabinetOrientation,
   isCentreCabinetRole,
+  normaliseCabinetOrientation,
 } from '@/components/utils/frontStageModeAuthority';
 
 export const CENTER_ONLY_SOUNDBAR_LABELS = ['C-1', 'C4-1', 'Multi (Mono)', 'HSPL (Mono)'];
@@ -77,6 +79,7 @@ export function buildFrontStageSeed({
   frontStageMode,
   soundbarModelLabel,
   centreModelLabel = null,
+  centreOrientation = null,
   dimensions,
   screen,
   splConfig,
@@ -145,7 +148,7 @@ export function buildFrontStageSeed({
     // no equipment yet is resolved to its FINAL position in this same state
     // update, so the first frame it is visible is already correct and no later
     // effect has to move it.
-    const placeRole = (role, model, existing) => {
+    const placeRole = (role, model, existing, orientation = null) => {
       const existingPos = existing?.position;
       const existingModel = String(existing?.model ?? '').trim().toLowerCase();
       const alreadyInstalled = !!existingModel && existingModel !== 'off' && existingModel !== 'none';
@@ -157,6 +160,9 @@ export function buildFrontStageSeed({
       const resolved = resolveInitialLcrPosition({
         role,
         model,
+        // A centre cabinet is placed from its INSTALLED footprint, so a vertical
+        // cabinet hugs the TV edge with its rotated width.
+        orientation,
         roomDims: dimensions,
         rsp,
         screenFrontPlaneM,
@@ -185,6 +191,15 @@ export function buildFrontStageSeed({
     // The centre label carries the dual-centre cabinet model — ONE model for both
     // physical centre cabinets. The soundbar slot is untouched for the other modes.
     const centreLabel = centreModelLabel || null;
+
+    // The orientation the cabinets are INSTALLED in: the designer's own choice is
+    // always preserved, a newly created cabinet starts in the product's own form.
+    const cabinetOrientation = (existing) => {
+      const recorded = String(existing?.orientation || '').trim();
+      if (recorded) return normaliseCabinetOrientation(recorded);
+      if (centreOrientation) return normaliseCabinetOrientation(centreOrientation);
+      return defaultCentreCabinetOrientation(centreLabel, screen?.tvPresetKey || null);
+    };
 
     const fallbackPosition = (role) => {
       if (isCentreCabinetRole(role)) {
@@ -266,7 +281,8 @@ export function buildFrontStageSeed({
           role: 'FCL',
           id: FCL.id || 'FCL-1',
           model: centreLabel,
-          position: placeRole('FCL', centreLabel, FCL) || fallbackPosition('FCL'),
+          orientation: cabinetOrientation(FCL),
+          position: placeRole('FCL', centreLabel, FCL, cabinetOrientation(FCL)) || fallbackPosition('FCL'),
           rotation: FCL.rotation || { x: 0, y: 0, z: 0 },
         },
         {
@@ -274,7 +290,8 @@ export function buildFrontStageSeed({
           role: 'FCR',
           id: FCR.id || 'FCR-1',
           model: centreLabel,
-          position: placeRole('FCR', centreLabel, FCR) || fallbackPosition('FCR'),
+          orientation: cabinetOrientation(FCR),
+          position: placeRole('FCR', centreLabel, FCR, cabinetOrientation(FCR)) || fallbackPosition('FCR'),
           rotation: FCR.rotation || { x: 0, y: 0, z: 0 },
         },
         {

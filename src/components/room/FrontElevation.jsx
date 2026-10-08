@@ -5,6 +5,10 @@ import { Q43FaceIcon, Q45FaceIcon, Q85FaceIcon, Q63FaceIcon, Evolve11FaceIcon, E
 import { computeSpeakerAnnotation, speakerBBox } from "@/components/room/frontElevationAnnotationLayout";
 import { resolveEffectiveViewableDimsM, isManualOverrideActive } from "@/components/models/screen/resolveEffectiveScreen";
 import { detectFrontStageMode } from "@/components/roomdesigner/utils/lcrHeightAuthority";
+import {
+  isCentreCabinetRole,
+  resolveCentreCabinetFootprintM,
+} from "@/components/utils/frontStageModeAuthority";
 
 // Roles displayed in front elevation
 const FRONT_ROLES = new Set(["FL", "FC", "FR", "L", "C", "R"]);
@@ -285,19 +289,35 @@ export default function FrontElevation({ dimensions, screen, placedSpeakers = []
     return placedSpeakers
       // Only installed speakers are drawn: a role with no assigned model is not
       // in the design yet, whatever the selected format requires of it.
-      .filter(s => canonFront(s?.role) && isRenderableSpeaker(s))
+      .filter(s => (canonFront(s?.role) || isCentreCabinetRole(s?.role)) && isRenderableSpeaker(s))
       .map(s => {
+        const cabinet = isCentreCabinetRole(s?.role);
+        // A dual-centre cabinet is drawn from its INSTALLED footprint: mounted
+        // vertically it is the same cabinet rotated a quarter turn, so its drawn
+        // width and height swap while its acoustic centre stays the centre.
+        const footprint = cabinet
+          ? resolveCentreCabinetFootprintM(s?.model, s?.orientation, tvPresetKey)
+          : null;
         const meta = getSpeakerModelMeta(s?.model, tvPresetKey);
-        const wM = (meta && !meta.notFound && meta.widthM) ? meta.widthM : 0.20;
-        const hM = (meta && !meta.notFound && meta.heightM) ? meta.heightM : 0.20;
+        const wM = footprint ? footprint.widthM : ((meta && !meta.notFound && meta.widthM) ? meta.widthM : 0.20);
+        const hM = footprint ? footprint.heightM : ((meta && !meta.notFound && meta.heightM) ? meta.heightM : 0.20);
         const baseX = Number.isFinite(s?.position?.x) ? s.position.x : roomW / 2;
         const baseZ = Number.isFinite(s?.position?.z) ? s.position.z : 1.2;
-        const role = canonFront(s.role);
+        const role = cabinet ? String(s.role || '').toUpperCase() : canonFront(s.role);
         const liveOverride = liveDragLcr?.[role];
         const x = liveOverride ? liveOverride.x : baseX;
         const z = liveOverride ? liveOverride.z : baseZ;
         const modelKey = normaliseModelKey(s?.model);
-        return { role, x, z, wM, hM, label: role, modelKey };
+        return {
+          role,
+          x,
+          z,
+          wM,
+          hM,
+          label: role,
+          modelKey,
+          vertical: !!footprint && footprint.orientation === 'vertical',
+        };
       });
   }, [placedSpeakers, roomW, tvPresetKey, liveDragLcr]);
 
@@ -430,7 +450,7 @@ export default function FrontElevation({ dimensions, screen, placedSpeakers = []
    * @param {number}  zM     - acoustic centre height in metres (for z= annotation)
    * @param {boolean} labelInsideBox - if true, centre label inside the shape; if false, above
    */
-  const drawSpeakerFront = ({ key, cx, cy, sw, sh, isRound, fill, stroke, label, zM, modelKey, tvPresetKey: speakerTvPreset, labelInsideBox = false, labelY, onMouseDown }) => {
+  const drawSpeakerFront = ({ key, cx, cy, sw, sh, isRound, fill, stroke, label, zM, modelKey, tvPresetKey: speakerTvPreset, labelInsideBox = false, labelY, onMouseDown, vertical = false }) => {
     const sx = cx - sw / 2;
     const sy = cy - sh / 2;
 
@@ -489,10 +509,16 @@ export default function FrontElevation({ dimensions, screen, placedSpeakers = []
     // All other Artcoustic PNG assets have internal transparent padding; enlarge them so
     // the visible cabinet drawing fills the speaker boundary box with ~2–4px clearance.
     const FACE_ICON_VISIBLE_RATIO = isC41 ? 1.0 : 0.72;
-    const adjustedW = hasFaceIcon ? sw / FACE_ICON_VISIBLE_RATIO : sw;
-    const adjustedH = hasFaceIcon ? sh / FACE_ICON_VISIBLE_RATIO : sh;
-    const adjustedX = hasFaceIcon ? sx - (adjustedW - sw) / 2 : sx;
-    const adjustedY = hasFaceIcon ? sy - (adjustedH - sh) / 2 : sy;
+    // A vertically mounted cabinet draws the SAME face rotated a quarter turn:
+    // the face icon's own long axis is the box's height, and the whole icon is
+    // turned 90° about the cabinet centre, so the drawn footprint is the cabinet's
+    // rotated width × height (the dimension labels read from the same box).
+    const iconBoxW = vertical ? sh : sw;
+    const iconBoxH = vertical ? sw : sh;
+    const adjustedW = hasFaceIcon ? iconBoxW / FACE_ICON_VISIBLE_RATIO : iconBoxW;
+    const adjustedH = hasFaceIcon ? iconBoxH / FACE_ICON_VISIBLE_RATIO : iconBoxH;
+    const adjustedX = hasFaceIcon ? cx - adjustedW / 2 : sx;
+    const adjustedY = hasFaceIcon ? cy - adjustedH / 2 : sy;
 
     const renderFaceIcon = () => {
       if (isC41) return <C41FaceIcon x={adjustedX} y={adjustedY} width={adjustedW} height={adjustedH} />;
@@ -512,7 +538,9 @@ export default function FrontElevation({ dimensions, screen, placedSpeakers = []
     return (
       <g key={key} onMouseDown={onMouseDown} style={onMouseDown ? { cursor: 'grab', userSelect: 'none' } : undefined}>
         {/* Body */}
-        {hasFaceIcon ? renderFaceIcon() : isRound ? (
+        {hasFaceIcon ? (
+          <g transform={vertical ? `rotate(90 ${cx} ${cy})` : undefined}>{renderFaceIcon()}</g>
+        ) : isRound ? (
           <circle cx={cx} cy={cy} r={Math.max(6, sw / 2)} fill={fill} stroke={stroke} strokeWidth={1.2} opacity={0.90} />
         ) : (
           <rect x={sx} y={sy} width={sw} height={sh} fill={fill} stroke={stroke} strokeWidth={1.2} rx={2} opacity={0.90} />
@@ -752,8 +780,12 @@ export default function FrontElevation({ dimensions, screen, placedSpeakers = []
                 zM: spk.z,
                 modelKey: spk.modelKey ?? "",
                 tvPresetKey: tvPresetKey,
+                // A vertically mounted centre cabinet draws its face rotated.
+                vertical: spk.vertical === true,
                 labelY: annotation.label.y,
-                onMouseDown: onLcrSpeakerMoved ? (e) => handleLcrMouseDown(e, spk.role, spk.x, spk.z) : undefined,
+                // The cabinets are not dragged in the elevation: FL/FC/FR keep
+                // their existing drag behaviour untouched.
+                onMouseDown: (onLcrSpeakerMoved && canonFront(spk.role)) ? (e) => handleLcrMouseDown(e, spk.role, spk.x, spk.z) : undefined,
               })}
               {/* Dimension labels — placed outside speaker artwork via annotation layout */}
               {heightCm !== null && (

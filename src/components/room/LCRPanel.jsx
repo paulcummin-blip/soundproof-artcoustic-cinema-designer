@@ -27,6 +27,19 @@ import {
   resolveSoundbarMeta,
   buildFrontStageSeed,
 } from '@/components/room/lcrFrontStageSeed';
+import {
+  CABINET_ORIENTATION_OPTIONS,
+  CENTRE_CABINET_ROLES,
+  FRONT_STAGE_DUAL_CENTRE,
+  FRONT_STAGE_MODE_LABELS,
+  FRONT_STAGE_MODE_OPTIONS,
+  FRONT_STAGE_STANDARD,
+  centreCabinetOrientation,
+  centreCabinets,
+  detectDualCentreStage,
+  eligibleDualCentreCentreOptions,
+  normaliseCabinetOrientation,
+} from '@/components/utils/frontStageModeAuthority';
 import { resolveCanonicalRsp } from '@/components/room/placement/initialSpeakerPlacement';
 
 const P12_THRESHOLDS_REC = { L1: 102, L2: 105, L3: 108, L4: 111 };
@@ -134,7 +147,16 @@ export default function LCRPanel({ setSpeakers, dimensions, lcrAimMode, onChange
 
   const fcModel = getByRole('FC')?.model;
   const fcMeta = fcModel ? getSpeakerModelMeta(fcModel) : null;
-  const derivedFrontStageMode = fcMeta?.frontStageType === 'integrated_lcr' ? 'integrated_lcr' : fcMeta?.frontStageType === 'center_only' ? 'center_only' : 'standard';
+  // The dual-centre stage is detected from its own two physical cabinets: the mode's
+  // record IS the cabinets, since in this mode there is no single FC speaker. The
+  // three existing modes resolve exactly as before.
+  const dualCentreStage = useMemo(
+    () => detectDualCentreStage(speakerSystem?.placedSpeakers),
+    [speakerSystem?.placedSpeakers],
+  );
+  const derivedFrontStageMode = dualCentreStage
+    ? FRONT_STAGE_DUAL_CENTRE
+    : fcMeta?.frontStageType === 'integrated_lcr' ? 'integrated_lcr' : fcMeta?.frontStageType === 'center_only' ? 'center_only' : FRONT_STAGE_STANDARD;
   // A soundbar is installed the same way as an LCR: the stored key is resolved to
   // its catalogue option's label so the binding matches a SelectItem exactly, with
   // the registry label as the loading fallback.
@@ -146,6 +168,26 @@ export default function LCRPanel({ setSpeakers, dimensions, lcrAimMode, onChange
     const meta = getSpeakerModelMeta(fcModel);
     return meta && !meta.notFound ? (meta.label || fcModel) : fcModel;
   }, [fcModel, fcMeta?.frontStageType, soundbarOptions]);
+
+  // Dual-centre centre cabinets: Artcoustic LCR-range models above 4 Ω. The
+  // Architect (in-ceiling) range and the integrated LCR soundbars are never
+  // offered; a suitable on-wall model is never excluded for being normally drawn
+  // horizontally (the orientation selector covers that).
+  const centreOptions = useMemo(
+    () => eligibleDualCentreCentreOptions(standardLcrOptions),
+    [standardLcrOptions],
+  );
+
+  // The installed cabinets are the authority for the two selectors, so a reopened
+  // project shows the model and the orientation it was designed with.
+  const derivedCentreModel = useMemo(() => {
+    if (!dualCentreStage) return '';
+    const cabinet = centreCabinets(speakerSystem?.placedSpeakers)[0];
+    const model = cabinet?.model;
+    if (!model) return '';
+    return resolveModelOption(centreOptions, model)?.label
+      || (getSpeakerModelMeta(model)?.label || model);
+  }, [dualCentreStage, speakerSystem?.placedSpeakers, centreOptions]);
 
   const roomH = Number(dimensions?.height ?? dimensions?.heightM) || 2.8;
   const screenBottomM = Number(screen?.heightFromFloorM);
@@ -193,6 +235,10 @@ export default function LCRPanel({ setSpeakers, dimensions, lcrAimMode, onChange
   const [lcrModel, setLcrModel] = useState(initialModel);
   const [frontStageMode, setFrontStageMode] = useState(derivedFrontStageMode);
   const [soundbarModel, setSoundbarModel] = useState(derivedSoundbarModel);
+  const [centreModel, setCentreModel] = useState(derivedCentreModel);
+  const [centreOrientation, setCentreOrientation] = useState(
+    () => centreCabinetOrientation(speakerSystem?.placedSpeakers),
+  );
   const [lcrPowerInputValue, setLcrPowerInputValue] = useState(String(splConfig?.lcrW || 100));
   const [lcrHeightInputValue, setLcrHeightInputValue] = useState(String(clampLcrHeight(Number.isFinite(Number(splConfig?.lcrHeightM)) ? Number(splConfig.lcrHeightM) : defaultLcrHeightM).toFixed(2)));
   // Separate L/R height for center_only mode (FC uses lcrHeightInputValue)
@@ -206,6 +252,21 @@ export default function LCRPanel({ setSpeakers, dimensions, lcrAimMode, onChange
     if (derivedFrontStageMode !== frontStageMode) setFrontStageMode(derivedFrontStageMode);
     if (derivedSoundbarModel !== soundbarModel) setSoundbarModel(derivedSoundbarModel);
   }, [derivedFrontStageMode, derivedSoundbarModel, frontStageMode, soundbarModel]);
+
+  // While the dual-centre cabinets are installed they are the authority for the
+  // centre model and the orientation; nothing is overwritten when they are not.
+  useEffect(() => {
+    if (!dualCentreStage) return;
+    if (derivedCentreModel && derivedCentreModel !== centreModel) setCentreModel(derivedCentreModel);
+    const installed = centreCabinetOrientation(speakerSystem?.placedSpeakers);
+    if (installed !== centreOrientation) setCentreOrientation(installed);
+  }, [
+    dualCentreStage,
+    derivedCentreModel,
+    speakerSystem?.placedSpeakers,
+    centreModel,
+    centreOrientation,
+  ]);
 
   useEffect(() => {
     setLcrPowerInputValue(String(splConfig?.lcrW || 100));
@@ -249,7 +310,9 @@ export default function LCRPanel({ setSpeakers, dimensions, lcrAimMode, onChange
   }, [splConfig?.lcrW, updateGlobalSpl]);
 
   const updatePlacedLcrHeight = useCallback((heightM) => {
-    const rolesToUpdate = new Set(['FL', 'FC', 'FR', 'L', 'C', 'R']);
+    // FL/FR plus the dual-centre physical cabinets: the cabinets carry the ONE
+    // centre channel, so they follow the same LCR acoustic-centre height.
+    const rolesToUpdate = new Set(['FL', 'FC', 'FR', 'L', 'C', 'R', CENTRE_CABINET_ROLES.left, CENTRE_CABINET_ROLES.right]);
     setSpeakers?.((prev) => (Array.isArray(prev) ? prev.map((speaker) => {
       const role = getCanonicalRole(speaker?.role);
       if (!rolesToUpdate.has(role) || !speaker?.position) return speaker;
@@ -453,11 +516,16 @@ export default function LCRPanel({ setSpeakers, dimensions, lcrAimMode, onChange
     }
   }, [lcrHeightInputValue, recommendedLcrHeightM, clampLcrHeight, updateGlobalSpl, updatePlacedLcrHeight, updatePlacedFCHeight, frontStageMode]);
 
-  const applyFrontStage = useCallback((nextBaseModel, nextMode, nextSoundbarModel) => {
+  const applyFrontStage = useCallback((nextBaseModel, nextMode, nextSoundbarModel, nextCentreModel = null, nextCentreOrientation = null) => {
     buildFrontStageSeed({
       baseModelLabel: nextBaseModel,
       frontStageMode: nextMode,
       soundbarModelLabel: nextSoundbarModel,
+      // Dual centre only: the ONE model both physical centre cabinets are built
+      // from, and the orientation they are installed in (null = the product's own
+      // form, an installed cabinet's own orientation always wins).
+      centreModelLabel: nextMode === FRONT_STAGE_DUAL_CENTRE ? nextCentreModel : null,
+      centreOrientation: nextMode === FRONT_STAGE_DUAL_CENTRE ? nextCentreOrientation : null,
       dimensions,
       screen,
       splConfig,
@@ -489,8 +557,25 @@ export default function LCRPanel({ setSpeakers, dimensions, lcrAimMode, onChange
   const onChooseModel = useCallback((modelLabel) => {
     if (!standardLcrOptions.some(opt => opt.label === modelLabel)) return;
     setLcrModel(modelLabel);
-    applyFrontStage(modelLabel, frontStageMode, soundbarModel);
-  }, [standardLcrOptions, applyFrontStage, frontStageMode, soundbarModel]);
+    applyFrontStage(modelLabel, frontStageMode, soundbarModel, centreModel, centreOrientation);
+  }, [standardLcrOptions, applyFrontStage, frontStageMode, soundbarModel, centreModel, centreOrientation]);
+
+  // Dual centre — the pair's model. Both cabinets carry it; the centre channel
+  // remains ONE channel.
+  const onChooseCentreModel = useCallback((modelLabel) => {
+    if (!centreOptions.some(opt => opt.label === modelLabel)) return;
+    setCentreModel(modelLabel);
+    applyFrontStage(lcrModel, FRONT_STAGE_DUAL_CENTRE, soundbarModel, modelLabel, centreOrientation);
+  }, [centreOptions, applyFrontStage, lcrModel, soundbarModel, centreOrientation]);
+
+  // Dual centre — horizontal or vertical. The logical centre channel is never
+  // rotated: only the two cabinets' own drawn footprint.
+  const onChooseCentreOrientation = useCallback((value) => {
+    const next = normaliseCabinetOrientation(value);
+    setCentreOrientation(next);
+    if (!centreModel) return;
+    applyFrontStage(lcrModel, FRONT_STAGE_DUAL_CENTRE, soundbarModel, centreModel, next);
+  }, [applyFrontStage, lcrModel, soundbarModel, centreModel]);
 
   // Clear the LCR model — remove the model from all LCR speakers and return
   // the selector to its placeholder state. No hidden fallback remains.
@@ -507,12 +592,20 @@ export default function LCRPanel({ setSpeakers, dimensions, lcrAimMode, onChange
   }, [setSpeakers]);
 
   const onChooseFrontStageMode = useCallback((mode) => {
-    const nextMode = mode || 'standard';
-    const nextSoundbarModel = nextMode === 'standard'
+    const nextMode = mode || FRONT_STAGE_STANDARD;
+    const nextSoundbarModel = (nextMode === FRONT_STAGE_STANDARD || nextMode === FRONT_STAGE_DUAL_CENTRE)
       ? ''
       : nextMode === 'center_only'
         ? (CENTER_ONLY_SOUNDBAR_LABELS.includes(soundbarModel) ? soundbarModel : CENTER_ONLY_SOUNDBAR_LABELS[0])
         : (INTEGRATED_LCR_SOUNDBAR_LABELS.includes(soundbarModel) ? soundbarModel : INTEGRATED_LCR_SOUNDBAR_LABELS[0]);
+
+    // Dual centre: the two physical cabinets are the mode's record, so the mode
+    // needs its centre model. The orientation starts from the product's own form
+    // (the seed resolves it) and the designer's selector overrides it.
+    const nextCentreModel = nextMode === FRONT_STAGE_DUAL_CENTRE
+      ? (centreOptions.some(opt => opt.label === centreModel) ? centreModel : (centreOptions[0]?.label || ''))
+      : '';
+    if (nextMode === FRONT_STAGE_DUAL_CENTRE) setCentreModel(nextCentreModel);
 
     // When entering center_only mode, seed L/R height from the TV vertical
     // centre (NOT the centre/soundbar height) if not yet set.
@@ -524,8 +617,8 @@ export default function LCRPanel({ setSpeakers, dimensions, lcrAimMode, onChange
 
     setFrontStageMode(nextMode);
     setSoundbarModel(nextSoundbarModel);
-    applyFrontStage(lcrModel, nextMode, nextSoundbarModel);
-  }, [applyFrontStage, lcrModel, soundbarModel, splConfig?.lcrLRHeightM, splConfig?.lcrHeightM, defaultLcrHeightM, clampLcrHeight, updateGlobalSpl, tvVerticalCentreM]);
+    applyFrontStage(lcrModel, nextMode, nextSoundbarModel, nextCentreModel, null);
+  }, [applyFrontStage, lcrModel, soundbarModel, centreModel, centreOptions, splConfig?.lcrLRHeightM, splConfig?.lcrHeightM, defaultLcrHeightM, clampLcrHeight, updateGlobalSpl, tvVerticalCentreM]);
 
   const onChooseSoundbarModel = useCallback((modelLabel) => {
     if (!soundbarOptions.some(opt => opt.label === modelLabel)) return;
@@ -565,19 +658,19 @@ export default function LCRPanel({ setSpeakers, dimensions, lcrAimMode, onChange
               <Select value={frontStageMode} onValueChange={onChooseFrontStageMode} disabled={disabled}>
                 <SelectTrigger id="front-stage-mode" className="w-full h-10 px-3 py-2 bg-white border border-[#DCDBD6] rounded-md hover:border-[#213428] focus:border-[#213428] focus:ring-1 focus:ring-[#213428] focus:outline-none">
                   <span className="text-base font-semibold" style={{ color: '#213428' }}>
-                    {frontStageMode === 'integrated_lcr' ? 'Integrated LCR soundbar' : frontStageMode === 'center_only' ? 'Center-only soundbar override' : 'Separate LCR speakers'}
+                    {FRONT_STAGE_MODE_LABELS[frontStageMode] || FRONT_STAGE_MODE_LABELS[FRONT_STAGE_STANDARD]}
                   </span>
                 </SelectTrigger>
                 <SelectContent className="bg-white border-[#DCDBD6]">
-                  <SelectItem value="standard" className="hover:bg-[#F8F8F7] focus:bg-[#F1F0EE]" style={{ color: '#213428' }}>Separate LCR speakers</SelectItem>
-                  <SelectItem value="center_only" className="hover:bg-[#F8F8F7] focus:bg-[#F1F0EE]" style={{ color: '#213428' }}>Center-only soundbar override</SelectItem>
-                  <SelectItem value="integrated_lcr" className="hover:bg-[#F8F8F7] focus:bg-[#F1F0EE]" style={{ color: '#213428' }}>Integrated LCR soundbar</SelectItem>
+                  {FRONT_STAGE_MODE_OPTIONS.map((option) => (
+                    <SelectItem key={option.value} value={option.value} className="hover:bg-[#F8F8F7] focus:bg-[#F1F0EE]" style={{ color: '#213428' }}>{option.label}</SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </div>
           </div>
 
-          {frontStageMode !== 'standard' && (
+          {frontStageMode !== 'standard' && frontStageMode !== FRONT_STAGE_DUAL_CENTRE && (
             <div className="space-y-1">
               <Label htmlFor="front-stage-soundbar" className="text-[#3E4349] font-medium">Soundbar Model</Label>
               <Select value={soundbarModel || undefined} onValueChange={onChooseSoundbarModel} disabled={disabled}>
@@ -597,6 +690,47 @@ export default function LCRPanel({ setSpeakers, dimensions, lcrAimMode, onChange
                     ))}
                 </SelectContent>
               </Select>
+            </div>
+          )}
+
+          {frontStageMode === FRONT_STAGE_DUAL_CENTRE && (
+            <div className="space-y-2">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <Label htmlFor="dual-centre-model" className="text-[#3E4349] font-medium">Centre Model (two cabinets)</Label>
+                  <Select value={centreModel || undefined} onValueChange={onChooseCentreModel} disabled={disabled}>
+                    <SelectTrigger id="dual-centre-model" className="w-full h-10 px-3 py-2 bg-white border border-[#DCDBD6] rounded-md hover:border-[#213428] focus:border-[#213428] focus:ring-1 focus:ring-[#213428] focus:outline-none">
+                      <span className="text-base font-semibold" style={{ color: '#213428' }}>
+                        {centreModel || 'Select centre model'}
+                      </span>
+                    </SelectTrigger>
+                    <SelectContent className="bg-white border-[#DCDBD6]">
+                      {centreOptions.map(model => (
+                        <SelectItem key={model.key} value={model.label} className="hover:bg-[#F8F8F7] focus:bg-[#F1F0EE]" style={{ color: '#213428' }}>{model.label}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-1">
+                  <Label htmlFor="dual-centre-orientation" className="text-[#3E4349] font-medium">Centre Cabinet Orientation</Label>
+                  <Select value={centreOrientation} onValueChange={onChooseCentreOrientation} disabled={disabled}>
+                    <SelectTrigger id="dual-centre-orientation" className="w-full h-10 px-3 py-2 bg-white border border-[#DCDBD6] rounded-md hover:border-[#213428] focus:border-[#213428] focus:ring-1 focus:ring-[#213428] focus:outline-none">
+                      <span className="text-base font-semibold" style={{ color: '#213428' }}>
+                        {CABINET_ORIENTATION_OPTIONS.find(opt => opt.value === centreOrientation)?.label || 'Horizontal'}
+                      </span>
+                    </SelectTrigger>
+                    <SelectContent className="bg-white border-[#DCDBD6]">
+                      {CABINET_ORIENTATION_OPTIONS.map(option => (
+                        <SelectItem key={option.value} value={option.value} className="hover:bg-[#F8F8F7] focus:bg-[#F1F0EE]" style={{ color: '#213428' }}>{option.label}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+              <p className="text-[11px] text-[#8B7F76]">
+                One cabinet at each edge of the TV, acoustic centre at the TV midpoint. The two cabinets are the one centre channel: the centre amplifier power is split between them, and no combining gain is added.
+              </p>
             </div>
           )}
 
@@ -702,7 +836,11 @@ export default function LCRPanel({ setSpeakers, dimensions, lcrAimMode, onChange
             <div className="px-4 pb-3 space-y-2">
               <div className="flex items-center justify-between">
                 <Label className="text-xs text-[#625143]">
-                  {frontStageMode === 'center_only' ? 'Centre soundbar height (to middle of speaker)' : 'LCR height from floor (to middle of speaker)'}
+                  {frontStageMode === 'center_only'
+                    ? 'Centre soundbar height (to middle of speaker)'
+                    : frontStageMode === FRONT_STAGE_DUAL_CENTRE
+                      ? 'Centre speakers height from floor (to middle of speaker)'
+                      : 'LCR height from floor (to middle of speaker)'}
                 </Label>
                 <span className="text-[11px] text-[#625143]">
                   {lcrHeightManual ? 'Manual' : `Auto: ${formatHeightM(recommendedLcrHeightM)}`}

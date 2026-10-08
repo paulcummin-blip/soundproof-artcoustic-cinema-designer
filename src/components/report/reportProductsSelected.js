@@ -24,7 +24,7 @@
 
 import { getSpeakerModelMeta } from '@/components/models/speakers/registry';
 import { getSpeakerVisibilityFor } from '@/components/AppStateProvider';
-import { isCentreCabinetRole, isCentreChannelRole } from '@/components/utils/frontStageModeAuthority';
+import { centreCabinetOrientation, isCentreCabinetRole, isCentreChannelRole } from '@/components/utils/frontStageModeAuthority';
 
 /**
  * The design's own visibility rule for a layout: which channel roles the layout
@@ -203,10 +203,12 @@ export function buildProductsSelected({
   const lcrList = () => {
     const centreTotal = [...lcrCentre.values()].reduce((sum, n) => sum + n, 0);
     if (centreTotal <= 1) return layerList('lcr');
+    // The equipment schedule states the installed orientation of the cabinets.
+    const orientationLabel = centreCabinetOrientation(activeSpeakers) === 'vertical' ? ' (vertical)' : '';
     const rows = [
       ...[...lcrLeftRight.entries()].map(([name, count]) => countLabel(name, count)).sort(),
       ...[...lcrCentre.entries()]
-        .map(([name, count]) => `${countLabel(name, count)} centre cabinets`)
+        .map(([name, count]) => `${countLabel(name, count)} centre cabinets${orientationLabel}`)
         .sort(),
     ];
     return rows.length > 0 ? rows : [NONE];

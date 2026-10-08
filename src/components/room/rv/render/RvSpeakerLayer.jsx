@@ -4,6 +4,10 @@ import { getCanonicalRole as defaultGetCanonicalRole } from "@/components/utils/
 import { getPlanAimDeg } from "@/components/room/rv/utils/rvAiming";
 import { sideWallX, rearWallY } from "@/components/room/rv/utils/rvGeometry";
 import { getSpeakerModelMeta } from "@/components/models/speakers/registry";
+import {
+  isCentreCabinetRole,
+  resolveCentreCabinetFootprintM,
+} from "@/components/utils/frontStageModeAuthority";
 import { useAppState } from "@/components/AppStateProvider";
 
 /**
@@ -54,7 +58,13 @@ export default function RvSpeakerLayer({
           ? getSpeakerDims(speaker.model, tvPresetKey || null)
           : speakerMeta;
 
-        const speakerWidthM = metaWidthM;
+        // A dual-centre cabinet is drawn from its INSTALLED footprint: mounted
+        // vertically it is the same cabinet rotated, so its plan width is the
+        // cabinet's own height while its depth is unchanged.
+        const cabinetFootprint = isCentreCabinetRole(role)
+          ? resolveCentreCabinetFootprintM(speaker.model, speaker.orientation, tvPresetKey || null)
+          : null;
+        const speakerWidthM = cabinetFootprint ? cabinetFootprint.widthM : metaWidthM;
 
         // Compute yaw first — wall-mounted position derivation depends on it
         const speakerForAim = { ...speaker, x: speaker.position.x, y: speaker.position.y };
