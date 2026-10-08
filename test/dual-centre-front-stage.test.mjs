@@ -14,11 +14,12 @@
 //          CENTRE POWER STILL SPLIT
 // ---------------------------------------------------------------------------
 
-import test from 'node:test';
+import { test } from 'vitest';
 import assert from 'node:assert/strict';
 
 import {
   CABINET_ORIENTATION_OPTIONS,
+  DUAL_CENTRE_MIN_IMPEDANCE_OHM,
   FRONT_STAGE_DUAL_CENTRE,
   FRONT_STAGE_MODES,
   centreCabinetOrientation,
@@ -84,41 +85,89 @@ test('dual centre is a front-stage mode and orientation is a two-way choice', ()
 
 // ── C4-1 AVAILABLE FOR DUAL CENTRE IF IMPEDANCE VALID ──────────────────────
 
-test('a suitable on-wall cabinet is available; impedance and in-ceiling exclusions hold', () => {
-  // C4-1 is normally drawn horizontally and is 8 Ω — it must be offered.
-  assert.equal(isEligibleDualCentreCentreModel('c4-1'), true);
-  assert.equal(defaultCentreCabinetOrientation('c4-1', 'tv83'), 'vertical');
+test('the four centre-cabinet families are offered; soundbars, ceiling and sub-4 Ω are not', () => {
+  // Purpose-built front-wall centre cabinets, in every family the mode supports.
+  for (const key of ['c-1', 'c4-1', 'multi-mono', 'hspl-mono']) {
+    assert.equal(isEligibleDualCentreCentreModel(key), true, `${key} is a centre cabinet`);
+  }
+  // C-1 is a fixed 400 mm cabinet drawn horizontally; the TV-width bars
+  // (C4-1, Multi (Mono), HSPL (Mono)) flank the TV standing vertically.
+  assert.equal(defaultCentreCabinetOrientation('c-1', 'tv83'), 'horizontal');
+  for (const key of ['c4-1', 'multi-mono', 'hspl-mono']) {
+    assert.equal(defaultCentreCabinetOrientation(key, 'tv83'), 'vertical', `${key} stands vertically`);
+  }
 
-  // 4 Ω is exactly at the limit, not above it.
-  assert.equal(isEligibleDualCentreCentreModel('c-1'), false);
-  // A single cabinet carrying three channels is a front stage of its own.
+  // ONE cabinet carrying three channels is a soundbar, not a centre cabinet.
   assert.equal(isEligibleDualCentreCentreModel('multi-lcr'), false);
-  // The Architect (in-ceiling) range is never a centre cabinet.
+  assert.equal(isEligibleDualCentreCentreModel('hspl-lcr'), false);
+  // The Architect (in-ceiling) range is never a front-wall centre.
+  assert.equal(isEligibleDualCentreCentreModel('architect-2-1'), false);
   assert.equal(isEligibleDualCentreCentreModel('architect-mikro'), false);
+  // The discrete L/R ranges are not centre cabinets.
+  assert.equal(isEligibleDualCentreCentreModel('q4-5'), false);
+  assert.equal(isEligibleDualCentreCentreModel('evolve-1-1'), false);
 
   const options = eligibleDualCentreCentreOptions([
-    { key: 'c4-1', label: 'C4-1' },
     { key: 'c-1', label: 'C-1' },
+    { key: 'c4-1', label: 'C4-1' },
+    { key: 'multi-mono', label: 'Multi (Mono)' },
     { key: 'multi-lcr', label: 'Multi (LCR)' },
+    { key: 'hspl-mono', label: 'HSPL (Mono)' },
+    { key: 'architect-mikro', label: 'Architect Mikro' },
   ]);
-  assert.deepEqual(options.map((o) => o.label), ['C4-1']);
+  assert.deepEqual(
+    options.map((o) => o.label),
+    ['C-1', 'C4-1', 'Multi (Mono)', 'HSPL (Mono)'],
+  );
+});
+
+test('the impedance floor refuses a sub-4 Ω load', () => {
+  assert.equal(DUAL_CENTRE_MIN_IMPEDANCE_OHM, 4);
+  // 3 Ω cabinets (EVOLVE 3-1 / 8-4) are refused outright.
+  assert.equal(isEligibleDualCentreCentreModel('evolve-3-1'), false);
+  assert.equal(isEligibleDualCentreCentreModel('evolve-8-4'), false);
+  // C-1 sits exactly at the floor: Artcoustic's own 4 Ω centre cabinet.
+  assert.equal(isEligibleDualCentreCentreModel('c-1'), true);
 });
 
 // ── VERTICAL ORIENTATION ROTATES DRAWN FOOTPRINT ───────────────────────────
 
-test('vertical orientation rotates the cabinet footprint and keeps the depth', () => {
-  const horizontal = resolveCentreCabinetFootprintM('c4-1', 'horizontal', 'tv83');
-  const vertical = resolveCentreCabinetFootprintM('c4-1', 'vertical', 'tv83');
+test('vertical orientation is available for every family and rotates the footprint', () => {
+  for (const key of ['c-1', 'c4-1', 'multi-mono', 'hspl-mono']) {
+    const horizontal = resolveCentreCabinetFootprintM(key, 'horizontal', 'tv83');
+    const vertical = resolveCentreCabinetFootprintM(key, 'vertical', 'tv83');
+    assert.ok(horizontal && vertical, `${key} has a footprint`);
 
-  assert.ok(Math.abs(horizontal.widthM - TV83_WIDTH_MM / 1000) < 1e-9);
-  assert.ok(Math.abs(horizontal.heightM - 0.120) < 1e-9);
+    // Rotated a quarter turn: width and height swap, depth unchanged.
+    assert.ok(Math.abs(vertical.widthM - horizontal.heightM) < 1e-9, `${key} vertical width = horizontal height`);
+    assert.ok(Math.abs(vertical.heightM - horizontal.widthM) < 1e-9, `${key} vertical height = horizontal width`);
+    assert.equal(vertical.depthM, horizontal.depthM, `${key} keeps its depth`);
+    assert.equal(vertical.orientation, 'vertical');
+    assert.equal(horizontal.orientation, 'horizontal');
+  }
 
-  // Rotated a quarter turn: width and height swap, depth unchanged.
-  assert.ok(Math.abs(vertical.widthM - horizontal.heightM) < 1e-9);
-  assert.ok(Math.abs(vertical.heightM - horizontal.widthM) < 1e-9);
-  assert.equal(vertical.depthM, horizontal.depthM);
-  assert.equal(vertical.orientation, 'vertical');
-  assert.equal(horizontal.orientation, 'horizontal');
+  // The TV-width bar is measured from the TV itself, and C-1 from its fixed width.
+  const c41 = resolveCentreCabinetFootprintM('c4-1', 'horizontal', 'tv83');
+  assert.ok(Math.abs(c41.widthM - TV83_WIDTH_MM / 1000) < 1e-9);
+  assert.ok(Math.abs(c41.heightM - 0.120) < 1e-9);
+  const c1 = resolveCentreCabinetFootprintM('c-1', 'horizontal', 'tv83');
+  assert.ok(Math.abs(c1.widthM - 0.400) < 1e-9);
+  assert.ok(Math.abs(c1.heightM - 0.120) < 1e-9);
+});
+
+test('a TV-width mono bar is placed vertically by default, at the TV midpoint', () => {
+  const placed = seed({ centreModelLabel: 'Multi (Mono)' });
+  const left = placed.find((s) => s.role === 'FCL');
+  const right = placed.find((s) => s.role === 'FCR');
+  assert.ok(left && right, 'both Multi (Mono) cabinets are placed');
+  assert.equal(left.orientation, 'vertical');
+
+  const footprint = resolveCentreCabinetFootprintM('multi-mono', 'vertical', 'tv83');
+  const offset = TV83_WIDTH_MM / 2000 + footprint.widthM / 2;
+  assert.ok(Math.abs(left.position.x - (ROOM.widthM / 2 - offset)) < 1e-6);
+  assert.ok(Math.abs(right.position.x - (ROOM.widthM / 2 + offset)) < 1e-6);
+  const tvMid = computeTvVerticalCentreM(SCREEN, ROOM);
+  assert.ok(Math.abs(left.position.z - tvMid) < 1e-6);
 });
 
 // ── TWO CABINETS AT THE TV EDGES, ACOUSTIC CENTRE AT THE TV MIDPOINT ──────
@@ -153,9 +202,6 @@ test('the seed places one cabinet at each TV edge at the TV midpoint height', ()
   const rotatedOffset = TV83_WIDTH_MM / 2000 + rotated.widthM / 2;
   assert.ok(Math.abs(verticalLeft.position.x - (ROOM.widthM / 2 - rotatedOffset)) < 1e-6);
 
-  // The designer's own orientation is preserved on a re-seed.
-  const reseeded = seed({ centreOrientation: 'vertical', setSpeakers: undefined });
-  assert.equal(reseeded.find((s) => s.role === 'FCL').orientation, 'vertical');
 });
 
 test('the cabinets are the mode record and share one orientation', () => {

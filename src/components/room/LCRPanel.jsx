@@ -39,6 +39,7 @@ import {
   detectDualCentreStage,
   eligibleDualCentreCentreOptions,
   normaliseCabinetOrientation,
+  normaliseFrontStageMode,
 } from '@/components/utils/frontStageModeAuthority';
 import { resolveCanonicalRsp } from '@/components/room/placement/initialSpeakerPlacement';
 
@@ -592,7 +593,9 @@ export default function LCRPanel({ setSpeakers, dimensions, lcrAimMode, onChange
   }, [setSpeakers]);
 
   const onChooseFrontStageMode = useCallback((mode) => {
-    const nextMode = mode || FRONT_STAGE_STANDARD;
+    // Anything unrecognised — an old, corrupt or future value — falls back to the
+    // existing default, so a project can never open into an undefined front stage.
+    const nextMode = normaliseFrontStageMode(mode);
     const nextSoundbarModel = (nextMode === FRONT_STAGE_STANDARD || nextMode === FRONT_STAGE_DUAL_CENTRE)
       ? ''
       : nextMode === 'center_only'

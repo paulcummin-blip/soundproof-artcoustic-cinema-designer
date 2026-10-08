@@ -171,17 +171,21 @@ export function resolveCentreCabinetX({ screen, role, cabinetWidthM, roomWidthM 
 
 // ── Centre model eligibility ───────────────────────────────────────────────
 
-/** A centre cabinet must be above this impedance to be offered. */
+/** A centre cabinet is never offered below this impedance: a 3 Ω load is refused. */
 export const DUAL_CENTRE_MIN_IMPEDANCE_OHM = 4;
 
 /**
  * Whether a model may be used as a physical centre cabinet in this mode.
  *
- * An Artcoustic LCR-range cabinet, above 4 Ω, whatever orientation it is normally
- * drawn in — a suitable on-wall model is never excluded because it is normally
- * drawn horizontally. Excluded: the Architect (in-ceiling / overhead) range, and
- * the integrated LCR soundbars (ONE cabinet carrying three channels is a front
- * stage of its own, not a single centre cabinet).
+ * The Artcoustic purpose-built front-wall centre cabinets, and nothing else:
+ * C-1, C4-1, Multi (Mono) and HSPL (Mono) — each ONE cabinet carrying the centre
+ * channel, whatever orientation it is normally drawn in (a TV-width bar is never
+ * excluded for being drawn horizontally).
+ *
+ * Excluded: the Architect (in-ceiling / round) range; the discrete L/R ranges,
+ * which are not centre cabinets; the integrated LCR bars — Multi (LCR) and
+ * HSPL (LCR) are soundbars, ONE cabinet carrying three channels, a front stage
+ * of their own; and any cabinet below the minimum impedance.
  */
 export function isEligibleDualCentreCentreModel(modelKey) {
   const key = String(modelKey ?? '').trim();
@@ -189,12 +193,12 @@ export function isEligibleDualCentreCentreModel(modelKey) {
   const meta = getSpeakerModelMeta(key);
   if (!meta || meta.notFound) return false;
 
-  if (meta.category !== 'LCR') return false;      // Artcoustic LCR range only
-  if (meta.round === true) return false;          // in-ceiling / overhead form factor
-  if (meta.frontStageType === FRONT_STAGE_INTEGRATED_LCR) return false;
+  if (meta.category !== 'LCR') return false;                          // Artcoustic LCR range only
+  if (meta.round === true) return false;                              // in-ceiling / overhead form factor
+  if (meta.frontStageType !== FRONT_STAGE_CENTER_ONLY) return false;  // centre cabinets only — never a soundbar
 
   const ohms = Number(meta.nominalOhms);
-  return Number.isFinite(ohms) && ohms > DUAL_CENTRE_MIN_IMPEDANCE_OHM;
+  return Number.isFinite(ohms) && ohms >= DUAL_CENTRE_MIN_IMPEDANCE_OHM;
 }
 
 /** Filter a product-option list to the eligible centre cabinets. */
