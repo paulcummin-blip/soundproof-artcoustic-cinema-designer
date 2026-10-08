@@ -22,6 +22,8 @@
  * Pure logic + one network read. No React, no recalculation, no re-grading.
  */
 
+import { invalidateProjectVersionRead, invalidateProjectAnalysisCacheRead } from '@/components/state/projectReadCache';
+import { isExplicitNotApplicable } from '../../../shared/assessmentTerminal.js';
 import { base44 } from '@/api/base44Client';
 import { readDesignReviewHandoff } from '@/components/state/designReviewHandoff';
 import {
@@ -57,6 +59,7 @@ export function isAuthorityAvailable(state) {
 }
 
 const durablePublicationReads = new Map();
+const publicationReaders = new Map();
 let durablePublicationReadCount = 0;
 
 const publicationReadKey = (projectId, versionId, engineeringFingerprint = null) =>
@@ -139,6 +142,19 @@ export function fetchDurablePublication(
 
 export function invalidateDurablePublicationRead(projectId, versionId) {
   durablePublicationReads.delete(publicationReadKey(projectId, versionId));
+}
+export function subscribeDurablePublication(projectId, versionId, listener) {
+  const key = publicationReadKey(projectId, versionId);
+  const set = publicationReaders.get(key) || new Set();
+  set.add(listener); publicationReaders.set(key, set);
+  return () => { set.delete(listener); if (!set.size) publicationReaders.delete(key); };
+}
+/** Only called after server acknowledgement of the stored version publication. */
+export function refreshEngineeringPublicationReaders(projectId, versionId) {
+  invalidateDurablePublicationRead(projectId, versionId);
+  invalidateProjectVersionRead(versionId);
+  invalidateProjectAnalysisCacheRead(projectId, versionId);
+  for (const listener of publicationReaders.get(publicationReadKey(projectId, versionId)) || []) listener();
 }
 
 /**
@@ -280,7 +296,7 @@ export function statesBassAuthority(summary) {
   // P20 is seat-scoped. A real zero is valid only when the row is explicitly
   // scored; placeholder ±0.0 rows published before bass restore are not.
   const p20Rows = summary?.project?.reportCounts?.seatResultsByParameter?.p20;
-  const p20Complete = Array.isArray(p20Rows) && p20Rows.some((row) => (
+  const p20Complete = isExplicitNotApplicable(summary?.parameterAuthority?.p20) || Array.isArray(p20Rows) && p20Rows.some((row) => (
     row?.status === 'scored'
     && statesBassResultEntry({ value: row?.value, formatted: row?.valueFormatted })
   ));
