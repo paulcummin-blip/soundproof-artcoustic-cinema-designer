@@ -197,6 +197,21 @@ function calculateSplAtPoint({
   if (!resolvedMeta && speakerModel) {
     resolvedMeta = findSpeakerData(speakerModel);
   }
+
+  // NO SILENT SUBSTITUTION. When a model was supplied but no product data
+  // resolves for it, this speaker has no known capability: report no result at
+  // all rather than a credible-looking number built from the generic
+  // sensitivity/power fallbacks below, which would be read as this product's own
+  // capability. The propagation and headroom maths are untouched — only the
+  // fabricated result is removed.
+  if (speakerModel && (!resolvedMeta || resolvedMeta.notFound)) {
+    const warnKey = `__splUnresolved_${speakerModel}`;
+    if (!globalThis[warnKey]) {
+      globalThis[warnKey] = true;
+      console.warn(`[SPL] No engineering data resolves for model "${speakerModel}" — no SPL is reported for it (no generic substitution).`);
+    }
+    return null;
+  }
   
   // Build effective speaker data — source basis is published half-space values.
   // Propagation remains current direct-sound seat-loss method.

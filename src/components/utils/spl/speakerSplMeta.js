@@ -23,5 +23,11 @@ export function resolveSpeakerSplMeta(model, resolvedGetMeta = getSpeakerModelMe
       max_spl_peak_db_cf6_1m_anechoic: meta.max_spl_peak_db_cf6_1m_anechoic ?? capSource.max_spl_peak_db_cf6_1m_anechoic ?? null,
     };
   }
-  return { widthM: 0.27, depthM: 0.082, sensitivity_db_1w_1m: 87 };
+  // NO PRODUCT DATA. The model does not resolve to an Artcoustic catalogue
+  // product, so there is no honest sensitivity, power handling or SPL ceiling to
+  // report. `notFound` states that plainly: consumers must expose the missing
+  // model rather than fall back to a generic figure that would read as this
+  // product's capability. Geometry placeholders are kept for the placement
+  // callers that only need a footprint.
+  return { widthM: 0.27, depthM: 0.082, notFound: true, model: String(model ?? "") };
 }

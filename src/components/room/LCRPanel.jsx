@@ -8,6 +8,7 @@ import StepperInput from '@/components/ui/StepperInput';
 import { getSpeakerModelMeta, normaliseModelKey } from '@/components/models/speakers/registry';
 import { useProductRoleOptions } from '@/components/products/useProductMaster';
 import { PRODUCT_ROLES } from '@/components/products/productMaster';
+import { resolveModelOption } from '@/components/products/modelOptionResolver';
 import RP22LabelledLevelPill from '@/components/ui/RP22LabelledLevelPill';
 import { getCanonicalRole } from '@/components/utils/surroundRoleMap';
 import { getMlpSeat } from '@/components/utils/spl/centralSplEngine';
@@ -54,21 +55,36 @@ export default function LCRPanel({ setSpeakers, dimensions, lcrAimMode, onChange
 
   const getByRole = useCallback(r => byRole.get(getCanonicalRole(r)), [byRole]);
 
+  // The installed speaker records are the equipment authority. Their stored value
+  // is the canonical product KEY (e.g. "q4-3") while the options are keyed by
+  // product LABEL (e.g. "Q4-3"), so the match goes through the shared key-first
+  // resolver and returns the OPTION's own label — the value every SelectItem
+  // carries. Nothing here assigns a model: a role with no equipment stays unset.
   const initialModel = useMemo(() => {
     const fcModel = getByRole('FC')?.model;
     const fcMeta = fcModel ? getSpeakerModelMeta(fcModel) : null;
 
+    // Shown while the catalogue is still loading, or when a product is not
+    // published in it, so an installed model is displayed immediately rather
+    // than reading as "Select LCR model".
+    const installedLabel = (model) => {
+      if (!model) return null;
+      const meta = getSpeakerModelMeta(model);
+      return meta && !meta.notFound ? (meta.label || model) : model;
+    };
+    const labelFor = (model) => resolveModelOption(standardLcrOptions, model)?.label || installedLabel(model);
+
     if (fcMeta?.frontStageType === 'center_only' || fcMeta?.frontStageType === 'integrated_lcr') {
       for (const role of ['FL', 'FR']) {
-        const m = getByRole(role)?.model;
-        if (m && standardLcrOptions.some(opt => opt.label === m)) return m;
+        const label = labelFor(getByRole(role)?.model);
+        if (label) return label;
       }
       return '';
     }
 
     for (const r of LCR_CANONICAL_ROLES) {
-      const m = getByRole(r)?.model;
-      if (m && standardLcrOptions.some(opt => opt.label === m)) return m;
+      const label = labelFor(getByRole(r)?.model);
+      if (label) return label;
     }
     return '';
   }, [getByRole, LCR_CANONICAL_ROLES, standardLcrOptions]);
@@ -119,7 +135,17 @@ export default function LCRPanel({ setSpeakers, dimensions, lcrAimMode, onChange
   const fcModel = getByRole('FC')?.model;
   const fcMeta = fcModel ? getSpeakerModelMeta(fcModel) : null;
   const derivedFrontStageMode = fcMeta?.frontStageType === 'integrated_lcr' ? 'integrated_lcr' : fcMeta?.frontStageType === 'center_only' ? 'center_only' : 'standard';
-  const derivedSoundbarModel = (fcMeta?.frontStageType === 'center_only' || fcMeta?.frontStageType === 'integrated_lcr') ? fcModel : '';
+  // A soundbar is installed the same way as an LCR: the stored key is resolved to
+  // its catalogue option's label so the binding matches a SelectItem exactly, with
+  // the registry label as the loading fallback.
+  const derivedSoundbarModel = useMemo(() => {
+    const isSoundbarStage = fcMeta?.frontStageType === 'center_only' || fcMeta?.frontStageType === 'integrated_lcr';
+    if (!isSoundbarStage || !fcModel) return '';
+    const fromCatalogue = resolveModelOption(soundbarOptions, fcModel)?.label;
+    if (fromCatalogue) return fromCatalogue;
+    const meta = getSpeakerModelMeta(fcModel);
+    return meta && !meta.notFound ? (meta.label || fcModel) : fcModel;
+  }, [fcModel, fcMeta?.frontStageType, soundbarOptions]);
 
   const roomH = Number(dimensions?.height ?? dimensions?.heightM) || 2.8;
   const screenBottomM = Number(screen?.heightFromFloorM);
