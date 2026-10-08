@@ -17,14 +17,6 @@ import React from 'react';
 import RP22GradingPill from '@/components/ui/RP22GradingPill';
 import { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider } from '@/components/ui/tooltip';
 
-const SCREEN_DESCRIPTOR = {
-  L4: 'Exceptional Performance',
-  L3: 'Reference Performance',
-  L2: 'Good Performance',
-  L1: 'Acceptable Performance',
-  FAIL: 'Design Improvement Recommended',
-};
-
 function levelNum(key) {
   return Number(String(key).replace('L', ''));
 }
@@ -104,16 +96,10 @@ function CategoryBlock({ label, primary, secondary, isScreen }) {
         ? (isFail ? 'Primary Seats FAIL' : 'Primary Seats — no lower than')
         : (isFail ? 'Secondary Seats FAIL' : 'Secondary Seats — no lower than');
       const pillLabel = isFail ? 'RP23 FAIL' : `RP23 L${levelNum(lvl)}`;
-      const descriptor = isFail ? null : (SCREEN_DESCRIPTOR[lvl] ?? null);
       return (
-        <div>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr auto', alignItems: 'center', gap: '2px 8px' }}>
-            <span style={{ fontSize: 10, fontWeight: 600, color: '#625143' }}>{lead}</span>
-            <RP22GradingPill level={lvl} compact>{pillLabel}</RP22GradingPill>
-          </div>
-          {descriptor && (
-            <div style={{ fontSize: 9, color: '#9B9890', marginTop: 1 }}>{descriptor}</div>
-          )}
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr auto', alignItems: 'center', gap: '2px 8px' }}>
+          <span style={{ fontSize: 10, fontWeight: 600, color: '#625143' }}>{lead}</span>
+          <RP22GradingPill level={lvl} compact>{pillLabel}</RP22GradingPill>
         </div>
       );
     }
@@ -195,14 +181,14 @@ export default function DesignRatingSummary({
     </div>
   );
 
-  if (asdrUnavailable) return unavailableCard('Add LCR, surrounds and subwoofer to calculate rating');
-  if (p14TargetUnselected && !engineeringSummary) return unavailableCard('Select Bass Target to complete design rating');
+  if (asdrUnavailable) return unavailableCard('Incomplete Design');
+  if (p14TargetUnselected && !engineeringSummary) return unavailableCard('Incomplete Design');
   if (bassPending && !engineeringSummary) return unavailableCard('Calculating bass analysis…');
 
   // Stale-scope guard: the published summary was calculated from a different
   // seat-priority set than the current live one. Do not display its
   // Primary/Secondary floors as current until a matching publication arrives.
-  if (staleScope && engineeringSummary) return unavailableCard('Updating seat priorities…');
+  if (staleScope && engineeringSummary) return unavailableCard('Incomplete Design');
 
   // Direct read only: floors, scoped ratings and DPIs are already present in
   // summariseEngineeringResults(). The sidebar never rebuilds them.
