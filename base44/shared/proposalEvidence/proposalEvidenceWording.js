@@ -57,12 +57,29 @@ const PROHIBITED_BASS_CLAIMS = Object.freeze([
     pattern: /uniform\s+bass\s+across\s+(all\s+)?seats?/i,
   },
   {
+    // "improved bass consistency" and "improved seat-to-seat consistency" are the
+    // same claim written with and without the word "bass".
     rule: 'improved_consistency',
-    pattern: /(improved?|greater|better)\s+bass\s+consisten\w*/i,
+    pattern: /(improved?|greater|better)\s+(?:seat[- ]to[- ]seat\s+|full[- ]seat\s+)?(?:bass\s+)?consisten\w*/i,
   },
   {
+    // "the same bass at every seat" is also written as "the same low-frequency
+    // balance at every listening position".
     rule: 'identical_at_every_seat',
-    pattern: /(identical|the\s+same)\s+bass\s+(at|in|across)\s+(every|all)\s+seats?/i,
+    pattern: /(?:identical|the\s+same)\s+(?:bass|low[- ]frequency(?:\s+(?:balance|response|level|output))?)\s+(?:at|in|across|for)\s+(?:every|all|each)\s+(?:seats?|listening\s+positions?|positions?)/i,
+  },
+  {
+    // P20 describes the low-frequency response; "controlled" is only ever true of
+    // the response AT one reference position, never across the seating area.
+    rule: 'controlled_across_the_seating',
+    pattern: /(?:powerful\s+and\s+)?controlled\s+(?:across|throughout)\s+(?:the\s+|all\s+|every\s+|each\s+)?(?:seating(?:\s+area)?|room|seats?|listening\s+(?:area|position(?:s)?))/i,
+  },
+  {
+    // "smooth across the seats" is a consistency claim about the bass. A smooth
+    // PAN across the seats (P5/P7 wording) names the pan, not the bass, and does
+    // not match here.
+    rule: 'smooth_across_the_seats',
+    pattern: /smooth(?:ly)?\s+(?:across|throughout)\s+(?:the\s+|all\s+|every\s+|each\s+)?(?:seats?|seating(?:\s+area)?|room|listening\s+(?:area|position(?:s)?))/i,
   },
 ]);
 
