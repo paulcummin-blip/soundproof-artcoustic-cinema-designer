@@ -1,3 +1,4 @@
+import { isExplicitNotApplicable, isTerminalAssessment } from './assessmentTerminal.js';
 /**
  * One pure completeness contract, imported by the browser and the server.
  * No source fallback, storage, calculation, or proposal narrative.
@@ -5,7 +6,7 @@
 export const REPORT_EVIDENCE_VERSION = 1;
 export const REQUIRED_TECHNICAL_PARAMETERS = Object.freeze([12, 13, 14, 18, 19, 20]);
 const missingValue = value => value == null || value === '' || (typeof value === 'string' && !value.trim());
-const unstated = /NOT CALCULATED|Seat results|^—$|N\/A/i;
+const unstated = /NOT CALCULATED|Seat results|^—$/i;
 
 export function validateReportEvidence(evidence, reportType = null, {
   requireProposalReady = true, projectId = null, versionId = null,
@@ -37,7 +38,10 @@ export function validateReportEvidence(evidence, reportType = null, {
   if (!index || typeof index !== 'object' || !Object.keys(index).length) add('parameter_index');
   for (const id of type === 'technical' ? REQUIRED_TECHNICAL_PARAMETERS : []) {
     const entry = index?.['P' + id];
-    if (!entry || !/^L[1-4]$/.test(String(entry.level)) || missingValue(entry.value) || unstated.test(String(entry.value)))
+    const source = entry?.source_row || entry;
+    const explicitNA = isExplicitNotApplicable(source) && entry?.level === 'N/A';
+    if (!entry || !isTerminalAssessment({ ...source, level:entry.level }, { requireState:false })
+      || (!explicitNA && (missingValue(entry.value) || unstated.test(String(entry.value)) || /^N\/A$/i.test(String(entry.value)))))
       add('parameter_index.P' + id);
   }
   const seats = evidence.seating?.per_seat;
