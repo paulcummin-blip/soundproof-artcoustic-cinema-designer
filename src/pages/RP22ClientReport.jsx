@@ -972,7 +972,7 @@ export default function RP22ClientReport() {
       currentSourceFingerprints({
         authoritySnapshot: authority.authoritySnapshot,
         engineeringSummary,
-        liveSeatPriorityFingerprint: readSeatPriorityFingerprint(projectId),
+        // Final report identity follows the publication's frozen seating priorities.
       }),
     [authority.authoritySnapshot, engineeringSummary, projectId]
   );
