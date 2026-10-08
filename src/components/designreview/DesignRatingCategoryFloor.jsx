@@ -30,14 +30,6 @@ const COLORS = {
   fail: "#8B2E2E",
 };
 
-const SCREEN_DESCRIPTOR = {
-  L4: 'Exceptional Performance',
-  L3: 'Reference Performance',
-  L2: 'Good Performance',
-  L1: 'Acceptable Performance',
-  FAIL: 'Design Improvement Recommended',
-};
-
 const CATEGORY_LABELS = [
   'Spatial Resolution',
   'Dynamic Range',
@@ -112,7 +104,7 @@ function ScopeLine({ scope, label, isPrimary }) {
     );
   }
 
-  // Screen / Viewing Geometry — RP23 pill + descriptor.
+  // Screen / Viewing Geometry — RP23 pill only, no commentary.
   if (scope.isScreen) {
     const lvl = scope.screenLevel;
     if (!lvl) {
@@ -126,18 +118,12 @@ function ScopeLine({ scope, label, isPrimary }) {
     }
     const isFail = lvl === 'FAIL';
     const lead = isPrimary
-      ? (isFail ? 'Primary Seats FAIL' : 'Primary Seats achieve')
+      ? (isFail ? 'Primary Seats FAIL' : 'Primary Seats — no lower than')
       : (isFail ? 'Secondary Seats FAIL' : 'Secondary Seats — no lower than');
     const pillLabel = isFail ? 'RP23 FAIL' : `RP23 L${levelNum(lvl)}`;
-    const descriptor = isFail ? null : (SCREEN_DESCRIPTOR[lvl] ?? null);
     return (
       <div style={rowStyle}>
-        <div>
-          <span style={{ fontSize: 11, fontWeight: 600, color: COLORS.secondary, fontFamily: FONT_BODY }}>{lead}</span>
-          {descriptor && (
-            <div style={{ fontSize: 10, color: COLORS.muted, fontFamily: FONT_BODY, marginTop: 1 }}>{descriptor}</div>
-          )}
-        </div>
+        <span style={{ fontSize: 11, fontWeight: 600, color: COLORS.secondary, fontFamily: FONT_BODY }}>{lead}</span>
         <RP22GradingPill level={lvl} compact>{pillLabel}</RP22GradingPill>
       </div>
     );

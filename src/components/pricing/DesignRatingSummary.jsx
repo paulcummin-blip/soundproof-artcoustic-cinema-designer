@@ -80,7 +80,7 @@ function CategoryBlock({ label, primary, secondary, isScreen }) {
       );
     }
 
-    // Screen / Viewing Geometry — standard RP23 pill + descriptor underneath.
+    // Screen / Viewing Geometry — standard RP23 pill only, no commentary.
     // Separately governed by RP23 authority; not affected by floor method.
     if (isScreen) {
       const lvl = scope.screenLevel;
