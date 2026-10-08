@@ -47,6 +47,8 @@ export function auditDurablePublication({
   authorityComplete = null,
   authorityReason = null,
   attempt = null,
+  assessmentExists = false,
+  assessmentComplete = false,
 } = {}) {
   const block = (status, missing, reason) => ({
     allowed: false,
@@ -82,18 +84,18 @@ export function auditDurablePublication({
   if (!durable?.publication || !durable?.version?.published_fingerprint) {
     // Not published, or the version pointer references a publication that is not
     // there. Either way there is no authority to report from.
-    const attemptReason = attempt?.status === 'failed'
-      ? ` The saved assessment could not be written: ${attempt.message || 'the save did not complete.'}`
-      : (attempt?.status === 'not_ready' || attempt?.status === 'cancelled'
-        ? ` ${attempt.message || 'Assessment displayed, not published.'}`
-        : (attempt?.status === 'publishing'
-        ? ' The assessment is still being saved — wait for it to finish, then generate the report.'
-        : ''));
-    return block(
-      durable?.status === 'stale' ? 'stale_pointer' : PUBLICATION_ACKNOWLEDGEMENT.NOT_PUBLISHED,
-      [],
-      publicationBlockMessage({ versionName }) + attemptReason,
-    );
+    const missing = attempt?.missing || [];
+    const details = attempt?.message || missing.map(item => item.label || item.key || String(item)).join('; ');
+    if (durable?.status === 'stale') return block('stale_pointer', missing,
+      'Saved publication stale: the version pointer has no matching stored publication. ' + (details || 'Publish this version again.'));
+    if (attempt?.status === 'publishing' || attempt?.status === 'queued') return block(attempt.status, [],
+      details || 'Assessment publication is in progress. Reports remain blocked until acknowledgement.');
+    const complete = assessmentComplete || attempt?.assessmentComplete === true;
+    if (complete) return block('publication_rejected', missing,
+      'Assessment complete but not durably published. ' + (details || 'Publish Assessment in Room Designer.'));
+    if (assessmentExists || attempt) return block('assessment_incomplete', missing,
+      'Assessment incomplete or publication preflight blocked. ' + (details || authorityReason || 'Complete the identified assessment gates.'));
+    return block('assessment_missing', [], 'Engineering assessment missing: no complete saved assessment exists for this version. Run assessment in Room Designer.');
   }
 
   const audited = auditPublicationEntry(durable.publication, {
