@@ -1,11 +1,13 @@
 import React from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
-import { RotateCcw, FileText, Eye, ExternalLink } from "lucide-react";
+import { RotateCcw, ExternalLink } from "lucide-react";
 import { useProjectVersions } from "@/components/versions/useProjectVersions";
 import { useCanonicalProject } from "@/components/state/projectHydrationStore";
 import RoomDesignerVersionBar from "@/components/versions/RoomDesignerVersionBar";
 import ProjectCadExportButton from "@/components/roomdesigner/ProjectCadExportButton";
+import ProjectReportMenu from "@/components/roomdesigner/ProjectReportMenu";
+import { projectReportRoute } from "@/components/roomdesigner/projectReportEntries";
 
 // External resource — Artcoustic product CAD files (Dropbox folder).
 // Opens in a new tab; not a primary project action.
@@ -57,6 +59,10 @@ export default function RoomDesignerHeader({
 
   const projectCadProjectName = identity?.name || loadState?.name || null;
 
+  // The version the report area opens for: the version being edited — the same
+  // version the Project CAD export names — never another version's saved report.
+  const reportVersionId = activeVersionRecord?.id || activeVersionId || null;
+
   // Base44 preview mirrors the iframe path into its outer route. A client-side
   // path-only transition could update that outer route while leaving the Room
   // Designer tree mounted. Load the same explicit project/version URL used by a
@@ -65,7 +71,7 @@ export default function RoomDesignerHeader({
     if (!effectiveProjectId) return;
     const params = new URLSearchParams();
     params.set("projectId", effectiveProjectId);
-    if (activeVersionId) params.set("versionId", activeVersionId);
+    if (reportVersionId) params.set("versionId", reportVersionId);
     const url = `${pathname}?${params.toString()}`;
     if (typeof window !== "undefined") {
       window.location.assign(url);
@@ -74,9 +80,12 @@ export default function RoomDesignerHeader({
     }
   };
 
-  const handleDesignReviewClick = () => openReport("/DesignReview");
-
-  const handleClientReportClick = () => openReport("/RP22ClientReport");
+  // ONE report entry point. The chosen entry resolves to its shared report route,
+  // and the active project and the version on screen travel with it.
+  const handleProjectReportSelect = (key) => {
+    const route = projectReportRoute(key);
+    if (route) openReport(route);
+  };
 
   const handleProductCadFilesClick = () => {
     window.open(PRODUCT_CAD_FILES_URL, "_blank", "noopener,noreferrer");
@@ -108,29 +117,13 @@ export default function RoomDesignerHeader({
             disabled={!effectiveProjectId || loadState?.phase !== "loaded"}
           />
 
-          <Button
-            size="sm"
-            variant="secondary"
-            className="font-semibold border-[#213428] text-[#213428] whitespace-nowrap"
-            onClick={handleClientReportClick}
+          {/* ONE report action for the project — every report and the Design
+              Review sit behind it, for the version on screen. The two separate
+              report buttons are gone. */}
+          <ProjectReportMenu
             disabled={!effectiveProjectId}
-            style={{ whiteSpace: 'nowrap', flexShrink: 0 }}
-          >
-            <Eye className="w-4 h-4 mr-2" style={{ flexShrink: 0 }} />
-            Visual Report
-          </Button>
-
-          <Button
-            size="sm"
-            variant="secondary"
-            className="font-semibold border-[#625143] text-[#625143] whitespace-nowrap"
-            onClick={handleDesignReviewClick}
-            disabled={!effectiveProjectId}
-            style={{ whiteSpace: 'nowrap', flexShrink: 0 }}
-          >
-            <FileText className="w-4 h-4 mr-2" style={{ flexShrink: 0 }} />
-            Technical Report
-          </Button>
+            onSelect={handleProjectReportSelect}
+          />
         </div>
       </div>
       {/* The prominent version identity block: project, client and reference,
