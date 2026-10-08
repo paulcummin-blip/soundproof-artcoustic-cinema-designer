@@ -8,7 +8,7 @@ import StepperInput from '@/components/ui/StepperInput';
 import { getSpeakerModelMeta, normaliseModelKey } from '@/components/models/speakers/registry';
 import { useProductRoleOptions } from '@/components/products/useProductMaster';
 import { PRODUCT_ROLES } from '@/components/products/productMaster';
-import { getLevelColors } from '@/components/utils/rp22Colors';
+import RP22LabelledLevelPill from '@/components/ui/RP22LabelledLevelPill';
 import { getCanonicalRole } from '@/components/utils/surroundRoleMap';
 import { getMlpSeat } from '@/components/utils/spl/centralSplEngine';
 import LcrSplCard from '@/components/speakers/LcrSplCard';
@@ -38,27 +38,6 @@ function computeRP22Level(splDb, thresholds) {
   if (splDb >= thresholds.L2) return 2;
   if (splDb >= thresholds.L1) return 1;
   return 'FAIL';
-}
-
-function RP22LevelPill({ parameter, level, label }) {
-  const colors = getLevelColors(level);
-  return (
-    <div
-      style={{
-        marginTop: 12,
-        padding: '8px 16px',
-        borderRadius: 8,
-        border: `1px solid ${colors.border || '#E6E4DD'}`,
-        background: colors.bg,
-        display: 'inline-block',
-        width: '100%',
-      }}
-    >
-      <div style={{ fontSize: 13, fontWeight: 600, color: colors.text }}>
-        {label}: {typeof level === 'number' && level >= 1 ? `Level ${level}` : 'FAIL'}
-      </div>
-    </div>
-  );
 }
 
 export default function LCRPanel({ setSpeakers, dimensions, lcrAimMode, onChangeLcrAimMode, lcrAngleDeg, mlpPoint, disabled, allSeatSplMetrics, onP12Update }) {
@@ -669,8 +648,7 @@ export default function LCRPanel({ setSpeakers, dimensions, lcrAimMode, onChange
               </Button>
             </div>
             {p12Computed && (
-              <RP22LevelPill
-                parameter="P12"
+              <RP22LabelledLevelPill
                 level={p12Computed.level}
                 label="RP22 P12"
               />

@@ -14,6 +14,7 @@ import { rp23DisplayAngleDeg, rp23LevelForAngleDeg } from "@/components/utils/vi
 
 import { getSpeakerModelMeta } from "@/components/models/speakers/registry";
 import ManualSizeInput from "./ManualSizeInput";
+import RP22GradingPill from "@/components/ui/RP22GradingPill";
 
 export default function ScreenConfiguration(props) {
   const {
@@ -677,7 +678,14 @@ export default function ScreenConfiguration(props) {
                         </div>
                         <div>
                           <div className="text-[#9CA3AF] text-[11px]">RP23</div>
-                          <div className="text-[#1B1A1A] text-sm font-medium">{row.level ? `Level ${row.level.replace('L', '')}` : '—'}</div>
+                          {/* Canonical RP23 performance pill: the graded level as L4–L1,
+                              or FAIL where the row's angle falls outside every RP23
+                              window. Recomputed with the row, so it updates as screen
+                              dimensions and seating positions change. */}
+                          <RP22GradingPill
+                            variant="compact"
+                            level={row.level || (Number.isFinite(row.displayHorizontal) ? "FAIL" : "N/A")}
+                          />
                         </div>
                       </div>
                     ) : (

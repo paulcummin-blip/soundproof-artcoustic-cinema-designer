@@ -4,7 +4,6 @@ import { useAppState } from '@/components/AppStateProvider';
 import { calculateViewingAngle, assignRP23Level, buildPerRowViewingData } from '@/components/utils/viewingAngleUtils';
 import { resolveEffectiveVisibleWidthInches } from '@/components/models/screen/resolveEffectiveScreen';
 import RP22GradingPill from '../ui/RP22GradingPill';
-import { getLevelColors } from '@/components/utils/rp22Colors';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
 import { subscribeSeatDragLive, getSeatDragLive } from '@/components/state/seatDragLiveStore';
@@ -125,9 +124,6 @@ export default function ViewingAnglePanel({
           </div>
           {/* Rows */}
           {perRowData.map((row, idx) => {
-            const levelNum = row.rp23Level ? parseInt(row.rp23Level.replace('L', ''), 10) : 0;
-            const colors = getLevelColors(levelNum);
-            const levelLabel = row.rp23Level ?? 'Fail';
             const isEven = idx % 2 === 1;
             return (
               <div
@@ -149,23 +145,10 @@ export default function ViewingAnglePanel({
                 <div style={{ fontSize: 20, fontWeight: 700, color: '#1B1A1A', letterSpacing: '-0.5px' }}>
                   {`${row.viewingDistanceM.toFixed(2)} m`}
                 </div>
-                <div style={{
-                  fontSize: '13px',
-                  fontWeight: 600,
-                  color: colors.text,
-                  backgroundColor: colors.bg,
-                  border: `1px solid ${colors.border || colors.bg}`,
-                  borderRadius: '6px',
-                  padding: '6px 12px',
-                  textAlign: 'center',
-                  whiteSpace: 'nowrap',
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  lineHeight: '1.2',
-                  minWidth: '40px'
-                }}>
-                  {levelLabel}
+                {/* RP23 result — the canonical performance pill, so a level reads
+                    the same here as on every other Sound Proof surface. */}
+                <div style={{ display: 'flex', justifyContent: 'center' }}>
+                  <RP22GradingPill level={row.rp23Level || 'FAIL'} />
                 </div>
               </div>
             );

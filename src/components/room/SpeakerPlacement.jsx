@@ -22,7 +22,7 @@ import SevenLayoutSwitcher from './SevenLayoutSwitcher';
 import { CollapsiblePanel } from '@/components/ui/CollapsiblePanel';
 import { computeMLPAndPrimary } from '@/components/utils/computeMLPAndPrimary';
 import { getSpeakerModelMeta, getModelsByCategoryOrdered, normaliseModelKey } from "@/components/models/speakers/registry";
-import { getLevelColors } from '@/components/utils/rp22Colors';
+import RP22LabelledLevelPill from '@/components/ui/RP22LabelledLevelPill';
 import { timeNowMs } from "@/components/utils/timeNow";
 import { getCanonicalRole } from "@/components/utils/surroundRoleMap";
 import { getMlpSeat } from "@/components/utils/spl/centralSplEngine";
@@ -41,33 +41,6 @@ function computeRP22Level(splDb, thresholds) {
   if (splDb >= thresholds.L2) return 2;
   if (splDb >= thresholds.L1) return 1;
   return 'FAIL';
-}
-
-// RP22 Level Pill Component (P13 only - P12 version lives in LCRPanel.jsx)
-function RP22LevelPill({ parameter, level, label }) {
-  const colors = getLevelColors(level);
-  
-  return (
-    <div 
-      style={{
-        marginTop: 12,
-        padding: '8px 16px',
-        borderRadius: 8,
-        border: `1px solid ${colors.border || '#E6E4DD'}`,
-        background: colors.bg,
-        display: 'inline-block',
-        width: '100%',
-      }}
-    >
-      <div style={{ 
-        fontSize: 13, 
-        fontWeight: 600, 
-        color: colors.text
-      }}>
-        {label}: {typeof level === 'number' && level >= 1 ? `Level ${level}` : 'FAIL'}
-      </div>
-    </div>
-  );
 }
 
 function buildRoleMap(list) {
@@ -1687,9 +1660,8 @@ function SpeakerPlacementImpl(props) {
             const level = computeRP22Level(pillBasisDb, thresholds);
 
             return (
-              <RP22LevelPill 
-                parameter="P13" 
-                level={level} 
+              <RP22LabelledLevelPill
+                level={level}
                 label="RP22 P13 (Surrounds)"
               />
             );

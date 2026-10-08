@@ -6,7 +6,7 @@ import { CollapsiblePanel } from '@/components/ui/CollapsiblePanel';
 import { useAppState } from '@/components/AppStateProvider';
 import OverheadChannelSelector from '@/components/speakers/OverheadChannelSelector';
 import OverheadSplStrip from '@/components/speakers/OverheadSplStrip';
-import { getLevelColors } from '@/components/utils/rp22Colors';
+import RP22LabelledLevelPill from '@/components/ui/RP22LabelledLevelPill';
 import { getMlpSeat } from "@/components/utils/spl/centralSplEngine";
 import { getTargetOverheadIds } from '@/components/room/utils/dolbyHelpers';
 import { assignModelsForRoles, resolveOverheadModelForRole } from '@/components/room/utils/speakerAssignmentAuthority';
@@ -21,17 +21,6 @@ function computeRP22Level(splDb, thresholds) {
   if (splDb >= thresholds.L2) return 2;
   if (splDb >= thresholds.L1) return 1;
   return 'FAIL';
-}
-
-function RP22LevelPill({ level, label }) {
-  const colors = getLevelColors(level);
-  return (
-    <div style={{ marginTop: 12, padding: '8px 16px', borderRadius: 8, border: `1px solid ${colors.border || '#E6E4DD'}`, background: colors.bg, display: 'inline-block', width: '100%' }}>
-      <div style={{ fontSize: 13, fontWeight: 600, color: colors.text }}>
-        {label}: {typeof level === 'number' && level >= 1 ? `Level ${level}` : 'FAIL'}
-      </div>
-    </div>
-  );
 }
 
 export default function OverheadChannelsPanel({
@@ -137,7 +126,7 @@ export default function OverheadChannelsPanel({
     const isMinimumMode = splConfig?.p13Mode === 'minimum' || !splConfig?.p13Mode;
     const thresholds = isMinimumMode ? P13_THRESHOLDS_MIN : P13_THRESHOLDS_REC;
     const level = computeRP22Level(pillBasisDb, thresholds);
-    return <RP22LevelPill level={level} label="RP22 P13 (Overheads)" />;
+    return <RP22LabelledLevelPill level={level} label="RP22 P13 (Overheads)" />;
   })();
 
   return (
