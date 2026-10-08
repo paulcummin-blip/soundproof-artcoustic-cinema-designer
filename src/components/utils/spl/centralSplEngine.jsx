@@ -1,4 +1,5 @@
 import { usesIntegratedLcrStage } from '../../../../shared/channelArchitecture.js';
+import { isListenerLevelSurroundRole } from '@/components/utils/rp22/listenerLevelSurroundRoles';
 // components/utils/spl/centralSplEngine.js
 // ─────────────────────────────────────────────────────────────────────────────
 // UNIFIED SPL ENGINE — Single source of truth for SPL calculations.
@@ -448,6 +449,14 @@ export function computeAllSeatSplMetrics({
   const placedSur = placedSpeakers.filter(
     (s) => hasPos(s) && hasRealModel(s) && surroundRoles.has(getCanonicalRole(s.role))
   );
+  // Listener-level surround set for the RP22 surround-consistency assessment (P6).
+  // ADDITIVE ONLY: the shared `surrounds` category above is untouched, so no
+  // existing consumer (surround SPL tiles, P13 presentation) changes. This
+  // category carries EVERY explicitly installed listener-level surround —
+  // numbered additional side pairs (SL2/SR2…) and aliased labels included.
+  const placedListenerLevelSur = placedSpeakers.filter(
+    (s) => hasPos(s) && hasRealModel(s) && isListenerLevelSurroundRole(s.role)
+  );
   const placedOH = placedSpeakers.filter(
     (s) => hasPos(s) && hasRealModel(s) && isOverheadRole(s.role)
   );
@@ -485,6 +494,8 @@ export function computeAllSeatSplMetrics({
       screen: {},
       surrounds: {},
       uppers: {},
+      // Additive P6 category — see placedListenerLevelSur above.
+      listenerLevelSurrounds: {},
     };
 
     // ─────────────────────────────────────────────────────────────────────────
@@ -557,6 +568,7 @@ export function computeAllSeatSplMetrics({
     processSpeakers(screenSpeakersForSpl, 'screen');
     processSpeakers(placedSur, 'surrounds');
     processSpeakers(placedOH, 'uppers');
+    processSpeakers(placedListenerLevelSur, 'listenerLevelSurrounds');
 
     metricsMap.set(seatId, { spl });
   }

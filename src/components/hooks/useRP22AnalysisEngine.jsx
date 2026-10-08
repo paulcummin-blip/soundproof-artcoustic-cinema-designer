@@ -6,6 +6,7 @@ import { pickMLP } from '../utils/seatingUtils';
 import { RP22_CATALOG } from "@/components/data/rp22Catalog";
 import { computeBackSweepGaps, levelFromGap } from "@/components/utils/RP22Geometry";
 import { computeSurroundRingGaps, rp22LevelForP5, isEligibleP5Surround } from "@/components/utils/p5SurroundGaps";
+import { resolveP6Listeners } from "@/components/utils/rp22/listenerLevelSurroundRoles";
 import { computeSeatRoles } from "@/components/utils/seatRoles";
 import { getUpperSpeakersForSeat, computeUpperVerticalAnglesForSeat, computeUpperSplSpreadForSeat } from "../utils/rp22UpperSeatMetrics";
 import { computeScreenVarianceMetrics, computeWideSurroundUpperVarianceMetrics, computeBassVarianceMetrics } from "../utils/rp22SeatResponseConsistency";
@@ -1464,25 +1465,26 @@ export const useRP22AnalysisEngine = ({ placedSpeakers, seatingPositions, dimens
             : null
         );
 
-        if (seatSpl?.surrounds && rspSpl?.surrounds) {
-          const P6_ROLES = ['SL', 'SR', 'SBL', 'SBR', 'LW', 'RW'];
+        // P6 assesses EVERY explicitly installed listener-level surround speaker —
+        // the bed-layer sides (including numbered additional pairs SL2/SR2…), the
+        // rear pair and the front wides — never a fixed six-role list. Stored role
+        // labels resolve through the established canonical role map, so aliases
+        // (LS/RS, LR/RR, LRS/RRS, FWL/FWR) match, and two labels for ONE physical
+        // position are counted once while genuinely distinct speakers (SL and SL2)
+        // stay separate. A speaker contributes only with a finite SPL at BOTH the
+        // seat and the RSP — the existing same-speaker RSP normalisation.
+        // The P6 mathematics, quantisation and thresholds below are unchanged.
+        const seatListeners = seatSpl?.listenerLevelSurrounds || seatSpl?.surrounds;
+        const rspListeners  = rspSpl?.listenerLevelSurrounds  || rspSpl?.surrounds;
 
-          // Build normalised values for roles present in BOTH seat and RSP
-          const normalizedByRole = {};
-          const seatByRole       = {};
-          const rspByRole        = {};
+        if (seatListeners && rspListeners) {
+          const {
+            normalizedByRole,
+            seatByRole,
+            rspByRole,
+            rolesUsed,
+          } = resolveP6Listeners({ seatListeners, rspListeners });
 
-          for (const role of P6_ROLES) {
-            const seatVal = seatSpl.surrounds[role]?.value;
-            const rspVal  = rspSpl.surrounds[role]?.value;
-            if (isNum(seatVal) && isNum(rspVal)) {
-              normalizedByRole[role] = seatVal - rspVal;
-              seatByRole[role]       = seatVal;
-              rspByRole[role]        = rspVal;
-            }
-          }
-
-          const rolesUsed      = Object.keys(normalizedByRole);
           const normValues     = Object.values(normalizedByRole);
 
           if (normValues.length >= 2) {
