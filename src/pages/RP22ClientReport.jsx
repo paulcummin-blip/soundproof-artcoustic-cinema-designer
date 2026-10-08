@@ -1132,7 +1132,7 @@ export default function RP22ClientReport() {
             color: "#213428",
             fontFamily: "Futura PT Light, Century Gothic, sans-serif",
           }}>
-            Visual Report
+            Project Report
           </h1>
           {projectDetails && (
             <p style={{
@@ -1205,7 +1205,7 @@ export default function RP22ClientReport() {
             }}
           >
             <Download className="w-4 h-4 mr-2" style={{ color: "#FFFFFF", flexShrink: 0 }} />
-            {exporting ? "Preparing Visual Report…" : "Download Visual Report (PDF)"}
+            {exporting ? "Preparing Project Report…" : "Download Project Report (PDF)"}
           </Button>
         </div>
       </div>
@@ -1246,13 +1246,13 @@ export default function RP22ClientReport() {
             boxShadow: "0 2px 12px rgba(0, 0, 0, 0.06)",
             border: "1px solid #DCDBD6",
           }}>
-            Open a project from the Room Designer to view its Visual Report.
+            Open a project from the Room Designer to view its Project Report.
           </div>
         ) : !reportReady ? (
           <div className="client-report-screen-only">
             <ReportStatePanel
               state={readiness.state}
-              reportLabel="Visual Report"
+              reportLabel="Project Report"
               missing={readiness.missing}
               nextAction={readiness.nextAction}
               reason={readiness.reason}

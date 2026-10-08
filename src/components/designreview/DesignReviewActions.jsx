@@ -153,7 +153,7 @@ export default function DesignReviewActions({ projectId, versionId = null }) {
         }}
       >
         <Eye style={{ width: 16, height: 16, color: "#625143" }} />
-        Visual Report
+        Project Report
       </button>
 
       <button

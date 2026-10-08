@@ -98,7 +98,7 @@ export default function TechnicalReportNavBar({
         style={BTN_STYLE}
       >
         <Eye style={{ width: 16, height: 16, color: '#625143', flexShrink: 0 }} />
-        Visual Report
+        Project Report
       </button>
     </div>
   );

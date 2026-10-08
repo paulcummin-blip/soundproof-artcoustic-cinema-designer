@@ -1,13 +1,12 @@
 import React from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
-import { RotateCcw, ExternalLink } from "lucide-react";
+import { RotateCcw, ExternalLink, FileText } from "lucide-react";
 import { useProjectVersions } from "@/components/versions/useProjectVersions";
 import { useCanonicalProject } from "@/components/state/projectHydrationStore";
 import RoomDesignerVersionBar from "@/components/versions/RoomDesignerVersionBar";
 import ProjectCadExportButton from "@/components/roomdesigner/ProjectCadExportButton";
-import ProjectReportMenu from "@/components/roomdesigner/ProjectReportMenu";
-import { projectReportRoute } from "@/components/roomdesigner/projectReportEntries";
+import { REPORT_ROUTE } from "@/components/report/reportLibraryContext";
 
 // External resource — Artcoustic product CAD files (Dropbox folder).
 // Opens in a new tab; not a primary project action.
@@ -80,12 +79,10 @@ export default function RoomDesignerHeader({
     }
   };
 
-  // ONE report entry point. The chosen entry resolves to its shared report route,
-  // and the active project and the version on screen travel with it.
-  const handleProjectReportSelect = (key) => {
-    const route = projectReportRoute(key);
-    if (route) openReport(route);
-  };
+  // ONE direct report action: the consolidated Project Report for the active
+  // project and the version on screen. The report page owns its readiness, so a
+  // report that is missing or out of date is handled there — no new flow.
+  const handleProjectReportClick = () => openReport(REPORT_ROUTE.VISUAL);
 
   const handleProductCadFilesClick = () => {
     window.open(PRODUCT_CAD_FILES_URL, "_blank", "noopener,noreferrer");
@@ -117,13 +114,19 @@ export default function RoomDesignerHeader({
             disabled={!effectiveProjectId || loadState?.phase !== "loaded"}
           />
 
-          {/* ONE report action for the project — every report and the Design
-              Review sit behind it, for the version on screen. The two separate
-              report buttons are gone. */}
-          <ProjectReportMenu
+          {/* ONE report action: the consolidated Project Report. No dropdown,
+              no separate report choices. */}
+          <Button
+            size="sm"
+            variant="secondary"
+            className="font-semibold border-[#213428] text-[#213428] whitespace-nowrap"
+            onClick={handleProjectReportClick}
             disabled={!effectiveProjectId}
-            onSelect={handleProjectReportSelect}
-          />
+            style={{ whiteSpace: 'nowrap', flexShrink: 0 }}
+          >
+            <FileText className="w-4 h-4 mr-2" style={{ flexShrink: 0 }} />
+            Project Report
+          </Button>
         </div>
       </div>
       {/* The prominent version identity block: project, client and reference,

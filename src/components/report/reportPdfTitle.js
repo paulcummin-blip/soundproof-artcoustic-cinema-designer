@@ -29,8 +29,9 @@
  * available the segment is omitted entirely rather than filled with a
  * placeholder. Client name and project reference are independent — a blank one
  * never borrows the other's value — and an identical value repeated in the two
- * adjacent fields is written once only. "Visual" or "Technical" is ALWAYS
- * present, and the project name is always present (falling back to "Untitled
+ * adjacent fields is written once only. A document token ("Project Report",
+ * "Visual", "Technical") is ALWAYS present, and the project name is always
+ * present (falling back to "Untitled
  * Project").
  *
  * The browser's "Save as PDF" dialog uses document.title as the default
@@ -51,8 +52,12 @@ const PRODUCT = "Artcoustic Cinema Designer";
 const SEPARATOR = " - ";
 const FALLBACK_PROJECT = "Untitled Project";
 
-/** The fixed report-type token. "Visual" / "Technical" must always be present. */
+/**
+ * The fixed report-type token. Every exported report states which document it
+ * is: the consolidated Project Report, or the internal Technical Report.
+ */
 export const REPORT_PDF_TYPE = Object.freeze({
+  PROJECT_REPORT: "Project Report",
   VISUAL: "Visual",
   TECHNICAL: "Technical",
   PROPOSAL: "Proposal",
@@ -182,6 +187,15 @@ export function buildReportPdfFilename(reportType, projectName, version, details
  */
 export function buildVisualReportTitle(projectName, version, details = {}) {
   return buildReportFilename(REPORT_PDF_TYPE.VISUAL, projectName, version, details);
+}
+
+/**
+ * The consolidated Project Report filename. Delegates to buildReportFilename
+ * with the Project Report token, so the exported file is named after the
+ * document the designer opened rather than an internal report name.
+ */
+export function buildProjectReportTitle(projectName, version, details = {}) {
+  return buildReportFilename(REPORT_PDF_TYPE.PROJECT_REPORT, projectName, version, details);
 }
 
 /**

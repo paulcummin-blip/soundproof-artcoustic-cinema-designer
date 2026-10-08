@@ -16,7 +16,7 @@
  */
 
 import { useState, useCallback, useRef, useEffect } from "react";
-import { buildVisualReportTitle } from "@/components/report/reportPdfTitle";
+import { buildProjectReportTitle } from "@/components/report/reportPdfTitle";
 import {
   applyPrintDocumentTitle,
   restorePrintDocumentTitle,
@@ -120,7 +120,7 @@ export function useClientReportPdfExport({
     if (exporting || printingRef.current) return;
     if (activePageCount === 0) return;
 
-    const title = buildVisualReportTitle(
+    const title = buildProjectReportTitle(
       projectName,
       { number: versionNumber, name: versionName },
       { dealerName, clientName, projectReference }
