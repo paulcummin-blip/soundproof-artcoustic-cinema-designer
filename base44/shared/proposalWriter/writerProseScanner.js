@@ -2,7 +2,7 @@
 import { isBassConsistencyClaim } from '../proposalEvidence/proposalEvidenceWording.js';
 import { WRITER_REJECTION, violation } from './writerContractSchema.js';
 import { claimLevels, hasRecommendationClaim, isPackProse, isRecommendation, kindSatisfiesAssertion, levelTokens, measurementTokens, p20BlocksConsistency, packProseSentences, parameterIds, seatScopeInText, sentenceParts, stripOptionNames, blockedChangeBlocks, blockPatterns } from './writerVocabulary.js';
-import { anchorPatternFor, assertedKind, claimsArea, isDenied, isConsistencyCaveat, seatConsistencyClaim, scopedClaimIssue, CHANNEL_FAMILY, CHANGE_SIGNAL, CONSISTENCY_ANCHOR, NEGATION_SHAPED_CLAIM } from './writerOutputTextRules.js';
+import { anchorPatternFor, assertedKind, claimsArea, isDenied, isConsistencyCaveat, seatConsistencyClaim, scopedClaimIssue, referencePositionScopeIssue, CHANNEL_FAMILY, CHANGE_SIGNAL, CONSISTENCY_ANCHOR, NEGATION_SHAPED_CLAIM } from './writerOutputTextRules.js';
 import { productScopeViolations } from './writerProductScope.js';
 import { designStageCommentary } from './writerDesignStageRules.js';
 import { framingContrastGrounded, independentClauses, supportedChangeClause } from './writerClausePrecision.js';
@@ -70,6 +70,14 @@ export function scanProse({ input, vocabulary, section, text, claims = [], claim
       context = { text, sentence, clause };
       const scopedIssue = scopedClaimIssue({ sentence: claimed, scope: seatScope, claims: citedClaims });
       if (scopedIssue) report(WRITER_REJECTION.SCOPE_MISMATCH, { section, detail: scopedIssue });
+      // An area the evidence states at one reference position only — P19 — has
+      // no seat-group result, so a sentence that scopes it to the seats claims a
+      // result the pack does not state.
+      const referenceOnlyIssue = referencePositionScopeIssue({ sentence: claimed, scope: seatScope, packProse });
+      if (referenceOnlyIssue) {
+        context.ruleId = `reference_position_scope:${referenceOnlyIssue}`;
+        report(WRITER_REJECTION.SCOPE_MISMATCH, { section, detail: referenceOnlyIssue });
+      }
     }
   }
 

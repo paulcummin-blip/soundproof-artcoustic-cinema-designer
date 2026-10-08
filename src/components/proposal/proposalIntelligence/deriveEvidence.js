@@ -112,13 +112,15 @@ export function deriveHonestLimitations({ engineeringAuthority, productIntellige
     });
   }
 
-  // Bass limitations
+  // Bass limitations. P19 is the reference-position response against the target:
+  // it is never written as a seat-to-seat result, and seat-to-seat consistency
+  // is stated only from P20.
   if (bass.available) {
     const p19 = bass.p19 || {};
     if (p19.achieved_level && LEVEL_NUMERIC[p19.achieved_level] <= 2) {
       limitations.push({
-        limitation: `Bass smoothness at ${p19.achieved_level} (P19)`,
-        professional_framing: 'Acknowledge that bass smoothness at the reference position is moderate; multi-subwoofer calibration has improved consistency but residual room modes remain below the transition frequency.',
+        limitation: `Reference-position bass response at ${p19.achieved_level} (P19)`,
+        professional_framing: 'Acknowledge that the reference-position bass response departs from the target; the specified subwoofers and calibration manage the low-frequency response below the transition frequency, where residual room modes remain.',
         ...withDecisionConfidence(p19.confidence || 0.80),
       });
     }

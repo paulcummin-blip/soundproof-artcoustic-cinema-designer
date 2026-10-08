@@ -81,9 +81,7 @@ function formatBass(bass) {
   if (bass.p14) parts.push(`P14 LFE capability (Dynamic Range): ${bass.p14.level}`);
   if (bass.p18) parts.push(`P18 bass extension (Timbre Matching): ${bass.p18.level}`);
   if (bass.p19) {
-    parts.push(`P19 response vs target (Timbre Matching) — Primary floor: ${bass.p19.primaryFloor || "—"}; Secondary floor: ${bass.p19.secondaryFloor || "—"}`);
-    const seats = formatBassSeatResults(bass.p19.perSeat);
-    if (seats) parts.push(`P19 canonical per-seat results: ${seats}`);
+    parts.push(`P19 response vs target at the reference seating position (Timbre Matching): ${bass.p19.level}`);
   }
   if (bass.p20) {
     parts.push(`P20 seat-to-seat consistency (Timbre Matching) — Primary floor: ${bass.p20.primaryFloor || "—"}; Secondary floor: ${bass.p20.secondaryFloor || "—"}`);

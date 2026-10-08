@@ -278,6 +278,53 @@ export function seatConsistencyClaim(text) {
   return null;
 }
 
+/**
+ * The areas the evidence states at ONE reference position rather than at the
+ * seats, and the terms a sentence names them by. P19 is the reference-position
+ * bass response against the house target: it has no seat-group result at all, so
+ * a sentence that scopes it to a seat group describes a result the evidence does
+ * not state — including where the pack does state a result for another bass area
+ * at that scope, which the general scope rule cannot see.
+ */
+const REFERENCE_POSITION_AREA_PATTERNS = Object.freeze([
+  { area: 'p19', pattern: /\bP19\b/i },
+  { area: 'p19', pattern: /\bbass\s+response\b/i },
+  { area: 'p19', pattern: /\bresponse\s+quality\b/i },
+]);
+
+/** The area keys assessed at one reference position, for an audit to assert against. */
+export const REFERENCE_POSITION_AREA_KEYS = Object.freeze(['p19']);
+
+/**
+ * Whether a sentence claims a seat-group result for an area the evidence states
+ * at one reference position only.
+ *
+ * A claim that is denied in its own clause is not a claim, so "the bass response
+ * is not even across every seat" is not reported; the pack's own prose is
+ * exempt, exactly as it is for the other prose rules.
+ *
+ * @param {Object} params
+ * @param {string} params.sentence
+ * @param {string|null} params.scope — the seat group the sentence names, or null
+ * @param {Array<string>} [params.packProse] — the pack's own sentences
+ * @returns {string|null} the reason, or null when the sentence is sound
+ */
+export function referencePositionScopeIssue({ sentence, scope, packProse = [] } = {}) {
+  if (!scope) return null;
+  const text = String(sentence || '');
+  if (text.length === 0) return null;
+  if (isPackProse(text, packProse)) return null;
+
+  const match = REFERENCE_POSITION_AREA_PATTERNS
+    .map((entry) => ({ ...entry, at: text.search(entry.pattern) }))
+    .filter((entry) => entry.at >= 0)
+    .sort((left, right) => left.at - right.at)[0];
+  if (!match) return null;
+  if (isDenied(text, match.at)) return null;
+
+  return `${match.area}_is_assessed_at_the_reference_seating_position_not_across_the_seats`;
+}
+
 /** One pattern for every term the pack's areas are named by. */
 export function anchorPatternFor(input) {
   const terms = areaAnchorTerms(input?.evidence_pack);

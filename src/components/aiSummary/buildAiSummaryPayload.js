@@ -82,24 +82,19 @@ function extractBassSummary(engineeringSummary, parameterAuthority) {
     bass.p18 = { level: p18.level || null, value: roomValue(18, p18) };
   }
 
-  // P19 — seat-scoped, copied from the canonical engineering summary.
+  // P19 — RSP-only. The reference-position result against the target is the whole
+  // of P19: it has no per-seat result, so none is ever collected here.
   const p19 = parameterAuthority?.p19;
-  if (p19 && p19.state === "scored" && p19.scope === "seat") {
-    const perSeat = {};
-    const values = seatValueMap("p19");
-    for (const [seatId, seat] of Object.entries(p19.seats || {})) {
-      if (seat?.state === "scored" && GENUINE_LEVELS.has(seat.level)) {
-        perSeat[seatId] = {
-          level: seat.level,
-          value: seat.rawValue ?? values[String(seatId)] ?? null,
-        };
-      }
-    }
-    if (Object.keys(perSeat).length) {
+  if (p19 && p19.state === "scored") {
+    const level = engineeringSummary?.parameterSummaries?.project?.p19?.level
+      ?? roomResults?.[19]?.level
+      ?? p19.level
+      ?? null;
+    if (GENUINE_LEVELS.has(level)) {
       bass.p19 = {
-        primaryFloor: engineeringSummary?.parameterSummaries?.primary?.p19?.level || null,
-        secondaryFloor: engineeringSummary?.parameterSummaries?.secondary?.p19?.level || null,
-        perSeat,
+        level,
+        value: roomValue(19, p19),
+        scope: "rsp",
       };
     }
   }
