@@ -63,6 +63,13 @@ const PROHIBITED_BASS_CLAIMS = Object.freeze([
     pattern: /(improved?|greater|better)\s+(?:seat[- ]to[- ]seat\s+|full[- ]seat\s+)?(?:bass\s+)?consisten\w*/i,
   },
   {
+    // "the bass is consistent across all seats" leads with the adjective and may
+    // not name the bass at all. Only the whole seating area is a prohibited scope:
+    // scoped wording ("the primary seats") stays allowed by the pack's own block.
+    rule: 'consistent_across_seats_phrase',
+    pattern: /consisten(?:t|tly|cy)\s+(?:across|throughout|between)\s+(?:all|every|each)\s+(?:seats?|seating(?:\s+area)?|listening\s+positions?)/i,
+  },
+  {
     // "the same bass at every seat" is also written as "the same low-frequency
     // balance at every listening position".
     rule: 'identical_at_every_seat',
