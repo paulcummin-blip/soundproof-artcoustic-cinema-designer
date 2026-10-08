@@ -135,16 +135,52 @@ test("E: SeatScopeBadge uses canonical SEAT token", () => {
 test("F: variants change size only, not semantic colour", () => {
   for (const n of [1, 2, 3, 4]) {
     const app = styleOf(RP22GradingPill({ level: n, variant: "app" }));
-    const compact = styleOf(RP22GradingPill({ level: n, variant: "compact" }));
+    const printCompact = styleOf(RP22GradingPill({ level: n, variant: "printCompact" }));
     const report = styleOf(RP22GradingPill({ level: n, variant: "report" }));
-    assert.equal(app.background, compact.background, `L${n} app/compact bg must match`);
+    assert.equal(app.background, printCompact.background, `L${n} app/printCompact bg must match`);
     assert.equal(app.background, report.background, `L${n} app/report bg must match`);
-    assert.equal(app.color, compact.color, `L${n} app/compact text must match`);
+    assert.equal(app.color, printCompact.color, `L${n} app/printCompact text must match`);
     assert.equal(app.color, report.color, `L${n} app/report text must match`);
-    assert.notEqual(app.padding, compact.padding, "app and compact padding must differ");
-    assert.notEqual(app.fontSize, compact.fontSize, "app and compact font size must differ");
+    assert.notEqual(app.padding, printCompact.padding, "app and printCompact padding must differ");
+    assert.notEqual(app.fontSize, printCompact.fontSize, "app and printCompact font size must differ");
     assert.notEqual(app.padding, report.padding, "app and report padding must differ");
   }
+});
+
+// ---------------------------------------------------------------------------
+// F2. ONE on-screen standard — every non-print call renders the app pill
+// ---------------------------------------------------------------------------
+test("F2: every on-screen pill resolves to the one app standard", () => {
+  const standard = styleOf(RP22GradingPill({ level: "L3" }));
+  const onScreenCalls = [
+    { level: "L3" },                    // no variant — the default
+    { level: "L3", variant: "app" },    // explicit standard
+    { level: "L3", variant: "compact" },// legacy string spelling
+    { level: "L3", compact: true },     // legacy boolean spelling
+    { level: "L3", variant: "unknown" },// anything unrecognised
+  ];
+  for (const props of onScreenCalls) {
+    const s = styleOf(RP22GradingPill(props));
+    assert.equal(s.height, standard.height, "on-screen pill height must be the standard");
+    assert.equal(s.padding, standard.padding, "on-screen pill padding must be the standard");
+    assert.equal(s.fontSize, standard.fontSize, "on-screen pill font size must be the standard");
+    assert.equal(s.borderRadius, standard.borderRadius, "on-screen pill radius must be the standard");
+    assert.ok(String(s.border).includes("1px solid"), "on-screen pill border must be 1px");
+  }
+  // Print sizes are opt-in only, and stay smaller than the on-screen standard.
+  assert.notEqual(styleOf(RP22GradingPill({ level: "L3", variant: "printCompact" })).height, standard.height);
+  assert.notEqual(styleOf(RP22GradingPill({ level: "L3", variant: "report" })).height, standard.height);
+});
+
+// ---------------------------------------------------------------------------
+// F3. One pill box, whichever level is displayed
+// ---------------------------------------------------------------------------
+test("F3: pill dimensions do not depend on the level displayed", () => {
+  const boxes = ["L4", "L3", "L2", "L1", "FAIL", "N/A", "—"].map((level) => {
+    const s = styleOf(RP22GradingPill({ level }));
+    return `${s.height}|${s.padding}|${s.fontSize}|${s.borderRadius}|${s.minWidth}`;
+  });
+  assert.equal(new Set(boxes).size, 1, "every level must render one identical pill box");
 });
 
 // ---------------------------------------------------------------------------
