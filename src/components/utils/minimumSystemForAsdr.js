@@ -9,6 +9,7 @@
 //
 // Pure function — no React. Safe to call from hooks, effects, or tests.
 
+import { isIntegratedLcrSpeaker } from '../../../shared/channelArchitecture.js';
 import { getCanonicalRole } from '@/components/utils/surroundRoleMap';
 import { getSpeakerModelMeta } from '@/components/models/speakers/registry';
 
@@ -35,7 +36,7 @@ export function hasMinimumSystemForAsdr(placedSpeakers, appState) {
       // discrete LCR stage for publication eligibility.
       if (role === 'FC' && s?.model) {
         const meta = getSpeakerModelMeta(s.model);
-        if (meta?.frontStageType === 'integrated_lcr') {
+        if (isIntegratedLcrSpeaker(s, meta)) {
           integratedLcr = true;
         }
       }
