@@ -151,7 +151,9 @@ function buildAchievementSentence({ meetsObjective, primaryHasFail }) {
     return "The design meets the foundational RP22 objectives with specific parameters requiring attention.";
   }
   if (meetsObjective) {
-    return "The design comfortably achieves the selected RP22 objectives while maintaining good bass uniformity across the room.";
+    // No bass claim is made here: seat-to-seat bass consistency is stated only
+    // where the published P20 result supports it (see the highlights below).
+    return "The design comfortably achieves the selected RP22 objectives.";
   }
   return "The design meets the selected design objectives with consistent performance across the listening area.";
 }
@@ -240,7 +242,12 @@ export function buildAdiAssessment(
   if (bassStrong) {
     highlights.push("The primary listening area delivers a consistent and balanced bass response that meets the selected design objectives.");
   } else if (bassModerate) {
-    highlights.push("The primary listening area delivers a well-controlled bass response across the selected listening positions.");
+    // A response cannot be described as controlled ACROSS the listening
+    // positions unless P20 states that the seats hold together. With a weaker
+    // P20 the honest statement is that the response is set at the reference seat.
+    highlights.push(p20Primary && LEVEL_RANK[p20Primary] >= 3
+      ? "The primary listening area delivers a well-controlled bass response across the selected listening positions."
+      : "The primary listening area delivers strong bass output, with the response set at the reference seating position.");
   }
   if (!primaryHasFail && !secondaryHasFail) {
     highlights.push("The listening experience remains well balanced across the seating area.");
@@ -262,9 +269,9 @@ export function buildAdiAssessment(
 
   if (compromisedSeatCount > 0) {
     improvements.push({
-      action: "Consider moving the primary seating row approximately 250 mm forward to improve bass consistency.",
+      action: "Consider moving the primary seating row approximately 250 mm forward to reduce seat-to-seat bass variation.",
       why: "Seat-to-seat bass variation is the primary remaining limitation.",
-      benefit: "Improved response consistency across the primary listening area.",
+      benefit: "Less variation in low-frequency response across the primary listening area.",
     });
   }
 

@@ -178,13 +178,15 @@ const ROW_PRESENTATION = Object.freeze({
     area: HIGHLIGHT_AREA.BASS,
     parameter: 'P19 bass response',
     unit: DISPLAY_UNIT.DB,
-    gain: 'Even bass response across the seating area, so the low end holds together between seats.',
+    // P19 is the response AT the reference seating position, so its gain line
+    // never claims evenness across the seats: seat-to-seat balance is P20.
+    gain: 'Bass balance at the reference seating position, where the response is set against the target.',
   },
   p20: {
     area: HIGHLIGHT_AREA.BASS,
     parameter: 'P20 bass consistency',
     unit: DISPLAY_UNIT.DB,
-    gain: 'Consistent bass from seat to seat, so every listening position gets the same low-frequency balance.',
+    gain: 'Consistent bass from seat to seat, so the low-frequency balance holds more evenly across the listening positions.',
   },
 });
 
