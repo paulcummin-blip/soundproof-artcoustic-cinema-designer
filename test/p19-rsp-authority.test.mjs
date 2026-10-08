@@ -41,8 +41,7 @@ import { compareRspP19, readRspP19 } from '@/components/room/bass/improveBassV2/
 import { selectCanonicalObjectives } from '@/components/room/bass/improveBassV2/canonicalObjectiveSelection';
 import { extractAuthoritativeMetrics } from '@/components/room/bass/best-layout/authoritativeFinalistSelection';
 import { gradeP19FromRaw, gradeP20FromRaw } from '@/components/room/bass/completedBassResultPersistence';
-
-const STAGE2_CANONICAL_VERSION = 'stage2-canonical-v6-delay-lag';
+import { STAGE2_CANONICAL_VERSION } from '@/components/room/bass/stage2/stage2Constants';
 
 const SEATS = [
   { id: 'seat-r1-c1', isPrimary: true },
@@ -85,6 +84,9 @@ function makeResult({
   p20SecondaryRaw = P20_SECONDARY_RAW,
   omitP20Seat = false,
 }) {
+  // The canonical worst-seat P20 (the aggregate P20 headline read by the
+  // objective selector). P20 itself stays a per-seat metric.
+  const worstP20Raw = Math.max(Math.abs(p20PrimaryRaw), Math.abs(p20SecondaryRaw));
   const result = {
     candidateId,
     candidateKind,
@@ -109,6 +111,8 @@ function makeResult({
       p20Row('seat-r1-c1', true, p20PrimaryRaw),
       ...(omitP20Seat ? [] : [p20Row('seat-r2-c1', false, p20SecondaryRaw)]),
     ],
+    achievedP20VariationDb: worstP20Raw,
+    achievedP20Level: gradeP20FromRaw(worstP20Raw),
     perSeatP19: legacyP19Rows,
   };
   if (!omitAggregateP19) {
@@ -326,7 +330,9 @@ function testMaterialityUsesAggregateP19() {
   const regressed = makeResult({
     candidateId: 'cand-aggregate-regression',
     aggregateP19Raw: 6.5, // L1 -> FAIL
-    legacyP19Rows: [legacyRow('seat-r1-c1', true, 0.4)],
+    // Two legacy rows (the full seat set) so the candidate is otherwise valid:
+    // the rejection must come from the AGGREGATE regression alone.
+    legacyP19Rows: [legacyRow('seat-r1-c1', true, 0.4), legacyRow('seat-r2-c1', false, 0.4)],
     p20PrimaryRaw: 3.5,
     p20SecondaryRaw: 5.23,
   });
