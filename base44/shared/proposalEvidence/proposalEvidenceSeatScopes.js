@@ -67,9 +67,16 @@ const WORDING_BY_PARAMETER = Object.freeze({
     subject: 'Overhead level consistency',
     benefit: 'helping the height layer remain balanced across the main listening positions',
   },
-  p19: { className: 'consistency', subject: 'Bass response', benefit: null },
   p20: { className: 'consistency', subject: 'Bass consistency', benefit: null },
 });
+
+/**
+ * The parameters assessed at ONE reference position rather than at the seats.
+ * P19 is the reference-position bass response: no seat-group result exists for
+ * it, so no scoped seat claim is ever minted for it, whatever a legacy summary
+ * states about its scope.
+ */
+export const REFERENCE_POSITION_PARAMETERS = Object.freeze(['p19']);
 
 /** The fewest seats a scope holds before it can carry a group claim. */
 export const MIN_SCOPE_SEATS = 2;
@@ -114,6 +121,10 @@ export function buildScopedSeatClaims(option, optionIndex = 0) {
     if (!Number.isFinite(seatCount) || seatCount < MIN_SCOPE_SEATS) continue;
 
     for (const [key, parameter] of Object.entries(block.parameters || {})) {
+      // P19 is RSP-only: it has no seat-group result, so it never mints a
+      // scoped seat claim.
+      if (REFERENCE_POSITION_PARAMETERS.includes(key)) continue;
+
       const level = /^L[1-4]$/.test(String(parameter?.level ?? '')) ? String(parameter.level) : null;
       if (!level || !POSITIVE_LEVELS.includes(level)) continue;
 

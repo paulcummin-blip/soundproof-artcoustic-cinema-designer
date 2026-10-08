@@ -63,9 +63,14 @@ export default function RP22ReportParameterGrid({
    * built for it — the scope authority decides, not this grid.
    */
   const seatMapFor = (param) => (
-    String(param?.scope || "").toLowerCase() === "seat"
-      ? buildSeatGridData(param.id)
-      : null
+    // P19 is RSP-scoped and assessed at the reference seating position alone, so
+    // no P19 seat map is ever built — not even where a legacy catalogue entry or
+    // a legacy stored publication states a seat scope for it.
+    Number(param?.id) === 19
+      ? null
+      : String(param?.scope || "").toLowerCase() === "seat"
+        ? buildSeatGridData(param.id)
+        : null
   );
 
   /* ----- Render a single compliance tile (screen variant) ----- */

@@ -89,6 +89,9 @@ export function useParameterGridAuthority({
   ), [engineeringSummary]);
 
   const buildSeatGridData = React.useCallback((paramId) => {
+    // P19 is RSP-only: it has no per-seat result, so no seat grid is ever built
+    // for it, whatever a legacy publication stores against it.
+    if (Number(paramId) === 19) return [];
     return adaptSeatRows(seatRowsFor(engineeringSummary, paramId), positionsById);
   }, [engineeringSummary, positionsById]);
 

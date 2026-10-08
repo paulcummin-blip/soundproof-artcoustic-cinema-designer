@@ -1,9 +1,10 @@
 /**
  * Passive Visual Report bass adapter.
  *
- * P14/P18 room results, P19/P20 seat results, scoped floors and grades are
- * copied exclusively from the published engineering summary. In particular,
- * P20 can never be reintroduced as FAIL by reading the raw bass contract.
+ * P14/P18 room results, the RSP-only P19 result, P20 seat results and the
+ * published grades are copied exclusively from the published engineering
+ * summary. In particular, P20 can never be reintroduced as FAIL by reading the
+ * raw bass contract, and P19 is never built from per-seat rows: P19 is RSP-only.
  */
 
 function finite(value) {
@@ -17,10 +18,8 @@ export function selectClientBassPerformance(engineeringSummary, seatingPositions
   const roomResults = engineeringSummary.roomResultsByParameter || {};
   const summaries = engineeringSummary.parameterSummaries || {};
   const reportCounts = engineeringSummary.project?.reportCounts || {};
-  const p19Authority = engineeringSummary.p19SeatAuthority || null;
   const p14Result = roomResults[14] || null;
   const p18Result = roomResults[18] || null;
-  const p19Rows = reportCounts.seatResultsByParameter?.p19 || [];
   const p20Rows = reportCounts.seatResultsByParameter?.p20 || [];
 
   const p14 = p14Result ? {
@@ -45,44 +44,24 @@ export function selectClientBassPerformance(engineeringSummary, seatingPositions
     publicationVerified: p18Result.isAuthoritative === true,
   } : null;
 
-  // P19 is RSP-only: the published RSP room result IS the assessment, and the
-  // authority states no per-seat P19 rows. Requiring those rows was what made
-  // the Visual Report's P19 page render blank. Legacy per-seat rows are still
-  // carried when a publication states them, but they are never required.
+  // P19 is RSP-only: the published RSP room result IS the whole assessment. P19
+  // has no per-seat result, so no per-seat P19 row is carried here — a legacy
+  // per-seat P19 row in older data is never read, required or presented.
   const p19Room = roomResults[19] || null;
-  const p19BySeat = new Map(
-    (p19Authority?.seats || []).map((seat) => [String(seat?.seatId), seat]),
-  );
-  const p19 = (p19Room || p19Rows.length) ? {
+  const p19 = p19Room ? {
     achievedLevel: p19Room?.level ?? summaries.project?.p19?.level ?? null,
     achievedVariationDb: finite(p19Room?.value ?? p19Room?.rawValue),
     displayedValue: p19Room?.formatted ?? p19Room?.valueText ?? null,
     targetBasis: null,
     scope: "rsp",
-    publicationVerified: p19Room ? p19Room.isAuthoritative === true : true,
+    publicationVerified: p19Room.isAuthoritative === true,
     // The single published RSP result, in the shape the P19 page reads.
-    rspResult: p19Room ? {
+    rspResult: {
       level: p19Room.level ?? null,
       deviationDb: finite(p19Room.value ?? p19Room.rawValue),
       displayedValue: p19Room.formatted ?? p19Room.valueText ?? null,
       worstFrequencyHz: finite(p19Room.worstFrequencyHz),
-    } : null,
-    primary: p19Authority?.primary || null,
-    secondary: p19Authority?.secondary || null,
-    project: p19Authority?.project || null,
-    perSeatResults: p19Rows.map((row) => {
-      const detail = p19BySeat.get(String(row.seatId));
-      return {
-        seatId: row.seatId,
-        isPrimary: row.priority === "primary",
-        priority: row.priority,
-        level: row.level,
-        grade: row.level,
-        variationDbRaw: row.value,
-        displayedValue: row.valueFormatted,
-        worstFrequencyHz: detail?.worstFrequencyHz ?? row.worstFrequencyHz ?? null,
-      };
-    }),
+    },
   } : null;
 
   const p20 = p20Rows.length ? {

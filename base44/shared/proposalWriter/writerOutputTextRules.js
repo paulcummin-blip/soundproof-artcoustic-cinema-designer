@@ -236,8 +236,7 @@ export function isConsistencyCaveat(sentence, at) {
  * The rules are deliberately narrow: a claim about bass output authority, impact,
  * extension or the response at the reference seating position names no
  * consistency and matches nothing here.
- */
-const SEAT_CONSISTENCY_CLAIMS = Object.freeze([
+ */const SEAT_CONSISTENCY_CLAIMS = Object.freeze([
   {
     rule: 'the_same_bass_at_every_seat',
     pattern: /\b(?:even|uniform|identical|the\s+same|consistent|similar|equal)\s+bass\b(?:\s+\w+){0,2}\s+(?:across|throughout|in|at|between)\s+(?:all\s+|every\s+|each\s+|the\s+)?(?:seat\w*|seating|rows?|listeners?|audience|room)\b/i,

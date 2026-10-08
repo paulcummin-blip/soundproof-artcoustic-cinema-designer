@@ -285,6 +285,17 @@ function engineeringFromEvidence(technicalEvidence) {
 }
 
 /**
+ * P19 is RSP-only: the reference-position result is the whole of it. An older
+ * saved report may carry a legacy per-seat P19 block in its stored evidence, so
+ * only the RSP result is kept here and the per-seat rows are dropped — no
+ * per-seat P19 evidence can reach a proposal pack or a comparison.
+ */
+function rspOnlyP19(p19) {
+  if (!p19 || typeof p19 !== 'object') return p19 ?? null;
+  return { rsp: p19.rsp ?? null };
+}
+
+/**
  * The whole report-evidence snapshot: assembled from the two saved reports'
  * evidence alone, in the shape every proposal consumer already reads.
  */
@@ -405,7 +416,7 @@ function buildSnapshot({ version, projectId, technicalEvidence, visualEvidence, 
       available: engineering.bass.current === true,
       p14: engineering.bass.p14 ?? null,
       p18: engineering.bass.p18 ?? null,
-      p19: engineering.bass.p19 ?? null,
+      p19: rspOnlyP19(engineering.bass.p19),
       p20: engineering.bass.p20 ?? null,
       subwoofer_strategy_summary: asText(bassFacts.subwoofer_strategy_summary) || null,
     },

@@ -55,15 +55,12 @@ function levelToLabel(level) {
 
 // ── Build seat data from bass per-seat results + seating positions ──
 
-function buildBassSeats(seatingPositions, p19PerSeat, p20PerSeat) {
+function buildBassSeats(seatingPositions, p20PerSeat) {
   if (!Array.isArray(seatingPositions)) return [];
 
-  const p19Map = new Map();
-  if (Array.isArray(p19PerSeat)) {
-    p19PerSeat.forEach((s) => {
-      if (s?.seatId != null) p19Map.set(s.seatId, s);
-    });
-  }
+  // P20 is the seat-to-seat parameter, so this page carries P20 per seat and
+  // only P20. P19 is assessed at the reference seating position alone, so no
+  // per-seat P19 field is read or carried here.
   const p20Map = new Map();
   if (Array.isArray(p20PerSeat)) {
     p20PerSeat.forEach((s) => {
@@ -81,13 +78,12 @@ function buildBassSeats(seatingPositions, p19PerSeat, p20PerSeat) {
     .map((s, i) => {
       const x = resolveCoordinate(s.x, s.position?.x);
       const y = resolveCoordinate(s.y, s.position?.y);
-      const p19Result = p19Map.get(s.id);
       const p20Result = p20Map.get(s.id);
       // Priority group. The published seat row is the authority when present;
       // otherwise the seat's own stamped priority resolves it (legacy projects
       // default to Primary). The seat's internal isPrimary flag is the RSP/MLP
       // marker and must never be read as the priority classification.
-      const priority = p20Result?.priority ?? p19Result?.priority ?? resolveSeatPriority(s);
+      const priority = p20Result?.priority ?? resolveSeatPriority(s);
       return {
         id: s.id,
         label: s.label || `Seat ${i + 1}`,
@@ -95,10 +91,7 @@ function buildBassSeats(seatingPositions, p19PerSeat, p20PerSeat) {
         y,
         priority,
         isPrimary: priority === PRIMARY,
-        p19Level: p19Result ? levelToLabel(p19Result.level) : null,
         p20Level: p20Result ? levelToLabel(p20Result.level) : null,
-        p19VariationDb: p19Result?.variationDbRaw != null && Number.isFinite(Number(p19Result.variationDbRaw))
-          ? Number(p19Result.variationDbRaw) : null,
         p20VariationDb: p20Result?.variationDbRaw != null && Number.isFinite(Number(p20Result.variationDbRaw))
           ? Number(p20Result.variationDbRaw) : null,
       };
@@ -187,15 +180,14 @@ export default function ClientBassResponse({
 }) {
   if (!bassPerformance) return null;
 
-  const { p19, p20, seatLabelMap } = bassPerformance;
+  const { p20 } = bassPerformance;
 
   // NOT CALCULATED guard — screen only. In print mode, the print content
   // component (PrintBassResponseContent) handles the NOT CALCULATED state
   // at the page level to avoid duplicate headings.
-  // P20 (seat-to-seat consistency) is the parameter this page presents. P19 is
-  // assessed at the reference seating position alone and has its own page, so
-  // this page never renders a per-seat P19 row or a grid of dashes.
-  const hasP19 = p19 && isAssessedLevel(p19.achievedLevel);
+  // P20 (seat-to-seat consistency) is the parameter this page presents, and the
+  // page reads only P20: P19 is assessed at the reference seating position alone
+  // and has its own page, so it is never read here.
   const hasP20 = p20 && isAssessedLevel(p20.achievedLevel);
   if (!hasP20 && !print) {
     return (
@@ -246,7 +238,6 @@ export default function ClientBassResponse({
 
   const seats = buildBassSeats(
     seatingPositions,
-    p19?.perSeatResults,
     p20?.perSeatResults
   );
 

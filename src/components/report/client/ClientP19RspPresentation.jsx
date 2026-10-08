@@ -73,31 +73,25 @@ function finiteOrNull(value) {
   return Number.isFinite(number) ? number : null;
 }
 
-// The single RSP result: the published RSP P19 authority. P19 has no per-seat
-// result, so the legacy per-seat rows are only consulted when the published RSP
-// row is absent.
+/** Shown when the RSP result itself is absent: P19 has no other authority. */
+const MISSING_EVIDENCE_TITLE = "P19 Bass Response at RSP";
+const MISSING_EVIDENCE_MESSAGE =
+  "Not available. The reference-position bass response has not been assessed for this design, so this page has no P19 result to show.";
+
+// The single RSP result: the published RSP P19 authority, and nothing else.
+// P19 is assessed at the Reference Seating Position only, so it has no per-seat
+// result at all: a legacy per-seat P19 row is never read as P19 authority, and
+// its presence does not make this page render a result.
 function resolveRspResult(bassPerformance) {
   const published = bassPerformance?.p19?.rspResult || null;
-  if (published) {
-    const publishedLevel = levelToLabel(published.level);
-    if (!publishedLevel) return null;
-    return {
-      level: publishedLevel,
-      deviationDb: finiteOrNull(published.deviationDb),
-      displayedValue: published.displayedValue || null,
-      worstFrequencyHz: finiteOrNull(published.worstFrequencyHz),
-    };
-  }
-  const rows = bassPerformance?.p19?.perSeatResults;
-  if (!Array.isArray(rows) || rows.length === 0) return null;
-  const primary = rows.find((row) => row?.priority === "primary") || rows[0];
-  const level = levelToLabel(primary?.level) || levelToLabel(bassPerformance?.p19?.achievedLevel);
-  if (!level) return null;
+  if (!published) return null;
+  const publishedLevel = levelToLabel(published.level);
+  if (!publishedLevel) return null;
   return {
-    level,
-    deviationDb: finiteOrNull(primary?.variationDbRaw),
-    displayedValue: primary?.displayedValue || null,
-    worstFrequencyHz: finiteOrNull(primary?.worstFrequencyHz),
+    level: publishedLevel,
+    deviationDb: finiteOrNull(published.deviationDb),
+    displayedValue: published.displayedValue || null,
+    worstFrequencyHz: finiteOrNull(published.worstFrequencyHz),
   };
 }
 
@@ -114,7 +108,73 @@ export default function ClientP19RspPresentation({
   printPart,
 }) {
   const result = resolveRspResult(bassPerformance);
-  if (!result) return null;
+  // P19 is RSP-only: when the reference-position result is absent the page says
+  // so plainly. It never substitutes a legacy per-seat P19 row, and it never
+  // infers a result from P20.
+  if (!result) {
+    return (
+      <div
+        style={{
+          display: "flex",
+          flexDirection: "column",
+          alignItems: "center",
+          gap: 16,
+          padding: print ? "0 16px" : "32px 36px",
+          background: COLORS.cardBg,
+          borderRadius: print ? 0 : 16,
+          border: print ? "none" : `1px solid ${COLORS.border}`,
+          boxShadow: print ? "none" : "0 2px 12px rgba(0,0,0,0.06)",
+          fontFamily: FONT_BODY,
+        }}
+      >
+        {!print && (
+          <>
+            <h2 style={{
+              margin: 0,
+              fontSize: 26,
+              fontWeight: 300,
+              color: COLORS.primary,
+              letterSpacing: "0.01em",
+              fontFamily: FONT_HEADING,
+              textAlign: "center",
+            }}>
+              {MISSING_EVIDENCE_TITLE}
+            </h2>
+            <p style={{
+              margin: 0,
+              fontSize: 13,
+              color: COLORS.body,
+              textAlign: "center",
+              fontFamily: FONT_BODY,
+              maxWidth: 620,
+              lineHeight: 1.55,
+            }}>
+              {SCOPE_STATEMENT}
+            </p>
+          </>
+        )}
+        <div
+          style={{
+            width: "100%",
+            maxWidth: print ? "100%" : 620,
+            padding: "16px 20px",
+            background: "#F1F0EE",
+            border: `1px solid ${COLORS.border}`,
+            borderLeft: `4px solid ${COLORS.primary}`,
+            borderRadius: 8,
+            fontFamily: FONT_BODY,
+          }}
+        >
+          <div style={{ fontSize: 13, fontWeight: 600, color: COLORS.primary, lineHeight: 1.4 }}>
+            P19 bass response at the reference seating position
+          </div>
+          <div style={{ fontSize: 12, color: COLORS.body, lineHeight: 1.5, marginTop: 4 }}>
+            {MISSING_EVIDENCE_MESSAGE}
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   const W = Number(roomDims?.widthM) || 4.5;
   const L = Number(roomDims?.lengthM) || 6.0;
@@ -275,9 +335,9 @@ export default function ClientP19RspPresentation({
             />
           ))}
 
-          {/* Seats — position and priority. P19 has no per-seat result, so no
-              grade is shown on any seat here; seat-to-seat results live on the
-              P20 page. Every primary seat carries the bold keyline, so the
+          {/* Seats — position and priority only. P19 has no per-seat result, so
+              no grade is shown on any seat here; seat-to-seat results live on
+              the P20 page. Every primary seat carries the bold keyline, so the
               reference marker can never be read as the only primary seat. */}
           {seatPoints.map((seat) => (
             <PositionMarker

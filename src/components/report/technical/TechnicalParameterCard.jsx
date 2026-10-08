@@ -117,7 +117,10 @@ export default function TechnicalParameterCard({
   assumed = false,
   categoryColour = null,
 }) {
-  const isSeatScope = String(param?.scope || "").toLowerCase() === "seat";
+  // P19 is RSP-only: it is never drawn as a seat-scoped card, so it can never
+  // render a P19 seat table — whatever scope legacy data states for it.
+  const isSeatScope = String(param?.scope || "").toLowerCase() === "seat"
+    && Number(param?.id) !== 19;
   const isScreen = variant === "screen";
 
   // Screen variant: px/rem units, no print-only styles, responsive width.
