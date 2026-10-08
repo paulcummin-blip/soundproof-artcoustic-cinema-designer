@@ -57,6 +57,13 @@ export default function ReportHeader({
     // stalled-export fallback below — goes through it, so no path can fall back
     // to naming the file after the browser tab.
     onPrintFallback = null,
+    // The on-screen cover states the same identity line as the printed first
+    // page — project, client, design version and project reference — composed by
+    // the caller from the one shared metadata builder. The screen can therefore
+    // never name a different version from the report it prints, and the version
+    // is stated on the page itself rather than only in the Library context.
+    screenTitle = 'RP22 Compliance Report',
+    screenMeta = null,
 }) {
     const navigate = useNavigate();
 
@@ -203,7 +210,7 @@ export default function ReportHeader({
 
     return (
         <div>
-        <ReportCover variant="screen" />
+        <ReportCover variant="screen" title={screenTitle} meta={screenMeta} />
         <div className="flex items-start justify-end gap-4 mb-6">
             <div className="flex gap-3 items-center">
                 {/* Proposal context only — absent when the report was opened from the project flow */}

@@ -49,6 +49,17 @@ export const LIBRARY_UPDATES_NEEDED_DETAIL =
   'The design has changed since one or more reports were created. '
   + 'Create updated reports before preparing the proposal.';
 
+/**
+ * Shown when a version's reports were never created. The designer is told to
+ * create them — not to "update" something that does not exist.
+ */
+export const LIBRARY_MISSING_REPORTS_HEADLINE = 'Create the reports before creating a proposal';
+
+/** Shown under the missing-reports headline: exactly which report is absent. */
+export const LIBRARY_MISSING_REPORTS_DETAIL =
+  'One or more versions have no Visual or Technical Report yet. '
+  + 'Create the reports named below, then prepare the proposal.';
+
 /** Shown when a version has not been assessed, so its reports cannot be created. */
 export const LIBRARY_NOT_ASSESSED_DETAIL =
   'One or more versions have not been fully assessed yet. '
@@ -69,6 +80,7 @@ export const LIBRARY_READINESS_ACTION = Object.freeze({
   CREATE_PROPOSAL: 'Create Proposal',
   VIEW_PROPOSAL_CENTRE: 'View Proposal Centre',
   UPDATE_REQUIRED: 'Update required reports',
+  GENERATE_REQUIRED: 'Generate required reports',
   VIEW_REPORTS: 'View reports',
   OPEN_ROOM_DESIGNER: 'Open Room Designer',
 });
@@ -98,6 +110,16 @@ function blockedReportCell(row) {
     if (cell && !cell.current && !cell.checking) return { source, label, cell };
   }
   return null;
+}
+
+/**
+ * Whether every report standing in the way was simply never created, as opposed
+ * to one the design has moved past. The two read as different jobs, so they are
+ * never described with the same words.
+ */
+function allBlockersMissing(rows) {
+  const blocked = (Array.isArray(rows) ? rows : []).map((row) => blockedReportCell(row)).filter(Boolean);
+  return blocked.length > 0 && blocked.every(({ cell }) => cell.state === READINESS_STATE.MISSING);
 }
 
 /**
@@ -133,10 +155,18 @@ function fixActionFor(row) {
       versionId: row?.versionId || null,
     });
   }
-  return readinessAction(LIBRARY_READINESS_ACTION.UPDATE_REQUIRED, 'update', {
-    reportType: reportTypeOf(blocked.source),
-    versionId: row?.versionId || null,
-  });
+  // A report that was never created is GENERATED. "Update" is offered only for
+  // a report that exists and has been overtaken by the design — the only case
+  // the report page has something to update.
+  const neverCreated = blocked.cell.state === READINESS_STATE.MISSING;
+  return readinessAction(
+    neverCreated ? LIBRARY_READINESS_ACTION.GENERATE_REQUIRED : LIBRARY_READINESS_ACTION.UPDATE_REQUIRED,
+    neverCreated ? 'generate' : 'update',
+    {
+      reportType: reportTypeOf(blocked.source),
+      versionId: row?.versionId || null,
+    },
+  );
 }
 
 /** The verdict the gate's own rows read as, in the Library's words. */
@@ -195,6 +225,9 @@ export function buildLibraryProposalReadiness({ rows = [], loading = false, vers
   const firstBlockedRow = rowsInOrder.find((row) => !row.ready) || null;
   const verdict = verdictFor({ checking: gate.checking, ready: gate.ready, rows: rowsInOrder });
   const ready = verdict === LIBRARY_VERDICT.READY;
+  // A report that was never created and a report the design has moved past are
+  // two different jobs, so the headline and the one action say which is asked.
+  const missingReportsOnly = verdict === LIBRARY_VERDICT.UPDATES_NEEDED && allBlockersMissing(rowsInOrder);
 
   return {
     checking: gate.checking,

@@ -1430,6 +1430,11 @@ function RP22ReportInner() {
                         exportTimeoutRef={exportTimeoutRef}
                         EXPORT_TIMEOUT_MS={EXPORT_TIMEOUT_MS}
                         printTitle={technicalReportPrintTitle}
+                        // The on-screen cover states the same identity line as the
+                        // printed first page — project, client, design version and
+                        // project reference — from the one shared builder, so the
+                        // page itself names the version it documents.
+                        screenMeta={technicalFirstPageMeta}
                         printWindowRef={printWindowRef}
                         onPrintFallback={printTechnicalReport}
                         resolveScreenMetricsSnapshot={resolveScreenMetricsSnapshot}
