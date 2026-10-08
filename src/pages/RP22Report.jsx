@@ -1,5 +1,6 @@
 import React, { useEffect, useState, useMemo, useCallback, useRef, useSyncExternalStore } from 'react';
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
+import { frozenReportAppState } from '@/components/report/frozenReportAppState';
 import { useAppState } from '../components/AppStateProvider';
 // TEMP DEBUG: remove after sub persistence proven
 import { useActiveProjectId } from '@/components/state/project-session';
@@ -112,7 +113,7 @@ import { REPORT_UPDATE_PARAM, useReportActionIntent } from '@/components/report/
 
 // --- Main component ---
 function RP22ReportInner() {
-    const app = useAppState();
+    const liveApp = useAppState();
 
     // ── Authoritative Read-Only Mode ──────────────────────────────────────
     // While the Technical Report is mounted, authoritative write boundaries
@@ -226,6 +227,9 @@ function RP22ReportInner() {
     // therefore still restores the published report instead of reporting that
     // no analysis exists. Still read-only: no engine, no recalculation.
     const reportAuthority = useVersionedEngineeringAuthority(explicitProjectId, reportVersionId, { finalReport: true });
+    const app = useMemo(() => frozenReportAppState(liveApp, reportAuthority.publication), [liveApp, reportAuthority.publication]);
+    const frozenProject = reportAuthority.publication?.report_snapshot?.report_project || null;
+    const reportProjectDetails = useMemo(() => frozenProject ? { ...projectDetails, ...frozenProject } : projectDetails, [projectDetails, frozenProject]);
     const completedBassAuthority = useCompletedBassAuthority(
         explicitProjectId || "free",
         reportVersionId || "free",
@@ -1159,12 +1163,12 @@ function RP22ReportInner() {
     const frontPageProjectDetails = React.useMemo(() => {
         if (!projectDetails) return null;
         return {
-            ...projectDetails,
+            ...reportProjectDetails,
             extraItems: [
                 { label: 'Date', value: exportDateLabel },
             ],
         };
-    }, [projectDetails, exportDateLabel, exportSystemConfiguration]);
+    }, [reportProjectDetails, exportDateLabel, exportSystemConfiguration]);
 
     // FIX 3: If autoPrint was requested but no explicit project ID was provided,
     // block the report entirely. Never substitute a globally active project.
@@ -1567,7 +1571,7 @@ function RP22ReportInner() {
                             {/* ── Page 2: Project & System Overview ── */}
                             <div className="report-page-block report-page-block--summary" data-report-block="project-overview" data-report-page-start="true">
                                 <TechnicalProjectOverview
-                                    projectDetails={projectDetails}
+                                    projectDetails={reportProjectDetails}
                                     exportDateLabel={exportDateLabel}
                                     exportSystemConfiguration={exportSystemConfiguration}
                                     screenChoiceLabel={formatScreenChoiceLabel(app?.screen)}
