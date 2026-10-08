@@ -100,6 +100,12 @@ export const WRITER_REJECTION = Object.freeze({
   /** A seat-group claim at a scope, or at a level, the pack does not state. */
   SCOPE_MISMATCH: 'scope_mismatch',
   /**
+   * An assumed or administrative parameter (P8, P15, P21) named in the copy
+   * without the designer asking for it, or named without being labelled as an
+   * assumption, or used as a performance differentiator.
+   */
+  ASSUMED_PARAMETER_MENTION: 'assumed_parameter_mention',
+  /**
    * Design-stage commentary: the copy tells the client what still needs
    * attention, improvement, calibration, optimisation or further design work, or
    * suggests a future correction. The proposal states the finished design, so
@@ -224,6 +230,7 @@ export const WRITER_WRITING_RULES = Object.freeze([
   'Never name a product the pack does not list for the option it belongs to.',
   'Never present a claim the pack blocks, and never describe a shared result as a change or a gain.',
   'Never recommend changing the design, and never describe the proposal as an upgrade path.',
+  'Never reference an assumed or administrative check (P8 upfiring/elevation speakers, P15 background noise floor, P21 early reflections): where the pack records one as requested, state it once, label it as an assumption, and never use it as a result or a differentiator.',
   'Where P20 does not support seat-to-seat bass consistency, describe bass only as output authority, physical capability and the subwoofer specification.',
   'State a primary-seat or a secondary-seat result only where the pack states that scope\'s own claim, word it for that scope alone, and never present it as a result for the seating area or the room.',
   'Sell what is strong: state a supported strength positively and stop there, and where one scope is the stronger, keep the claim to that scope rather than reporting the weaker one beside it.',

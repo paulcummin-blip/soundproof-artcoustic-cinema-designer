@@ -28,6 +28,10 @@ import {
   PARAMETER_PLAIN_LANGUAGE,
 } from './adiReportEvidenceRules.js';
 import {
+  ASSUMED_PARAMETER_LABEL,
+  assumedParameterUseIssue,
+} from './clientFacingParameterAuthority.js';
+import {
   NUMBER_RE,
   normaliseLevel,
   normaliseNumber,
@@ -231,14 +235,32 @@ function matchParameterPhrase(text, facts) {
  * Every number must match the canonical value for what it describes, and every
  * named result must exist for this version.
  *
+ * @param {Object|null} [policy] — the proposal exclusion policy. An assumed or
+ *   administrative parameter (P8, P15, P21) may only be suggested when the
+ *   designer explicitly asked for it, and then only labelled as an assumption.
  * @returns {{ status: 'passed'|'rejected', violations: Array<Object> }}
  */
-export function validateNarrativeChip(label, facts) {
+export function validateNarrativeChip(label, facts, policy = null) {
   const text = String(label || '').trim();
   const violations = [];
   if (!text) return { status: 'rejected', violations: [{ rule: 'empty_chip' }] };
   if (!facts || facts.available !== true) {
     return { status: 'rejected', violations: [{ rule: 'no_authority' }] };
+  }
+
+  // An assumed or administrative parameter is never a suggestion: no chip may
+  // offer to compare it, improve it or discuss it unless it was asked for, and
+  // then only as a labelled assumption.
+  const assumed = assumedParameterUseIssue(text, policy, { broad: true });
+  if (assumed) {
+    return {
+      status: 'rejected',
+      violations: [{
+        rule: assumed.rule,
+        value: assumed.code,
+        allowed: policy?.allows?.(assumed.code) === true ? ASSUMED_PARAMETER_LABEL : null,
+      }],
+    };
   }
 
   // A high-channel-count design has no speaker-count or spacing upgrade to offer.
@@ -358,10 +380,10 @@ function rewriteChip(label, check, facts) {
  * diagnostics record — chip text, source fields, source value and outcome — so
  * each example can be traced to the data it came from.
  *
- * @param {{ aiChips?: Array<Object>, facts: Object }} params
+ * @param {{ aiChips?: Array<Object>, facts: Object, policy?: Object|null }} params
  * @returns {{ suggestions: Array<Object>, diagnostics: Array<Object> }}
  */
-export function resolveNarrativeChips({ aiChips = [], facts } = {}) {
+export function resolveNarrativeChips({ aiChips = [], facts, policy = null } = {}) {
   const suggestions = [];
   const diagnostics = [];
   const seen = new Set();
@@ -401,7 +423,7 @@ export function resolveNarrativeChips({ aiChips = [], facts } = {}) {
     if (suggestions.length >= CHIP_LIMIT) break;
     const label = String(raw?.label || '').trim();
     if (!label) continue;
-    const check = validateNarrativeChip(label, facts);
+    const check = validateNarrativeChip(label, facts, policy);
     if (check.status === 'passed') {
       add(
         { label, reason: String(raw?.reason || '').trim(), source: 'adi', sourceFields: [], sourceValues: [] },
@@ -411,7 +433,7 @@ export function resolveNarrativeChips({ aiChips = [], facts } = {}) {
     }
     const rewrite = rewriteChip(label, check, facts);
     if (rewrite) {
-      const recheck = validateNarrativeChip(rewrite.label, facts);
+      const recheck = validateNarrativeChip(rewrite.label, facts, policy);
       if (recheck.status === 'passed') {
         add(
           { ...rewrite, source: 'authority' },

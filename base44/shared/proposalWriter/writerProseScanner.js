@@ -2,7 +2,7 @@
 import { isBassConsistencyClaim } from '../proposalEvidence/proposalEvidenceWording.js';
 import { WRITER_REJECTION, violation } from './writerContractSchema.js';
 import { claimLevels, hasRecommendationClaim, isPackProse, isRecommendation, kindSatisfiesAssertion, levelTokens, measurementTokens, p20BlocksConsistency, packProseSentences, parameterIds, seatScopeInText, sentenceParts, stripOptionNames, blockedChangeBlocks, blockPatterns } from './writerVocabulary.js';
-import { anchorPatternFor, assertedKind, claimsArea, isDenied, isConsistencyCaveat, seatConsistencyClaim, scopedClaimIssue, referencePositionScopeIssue, CHANNEL_FAMILY, CHANGE_SIGNAL, CONSISTENCY_ANCHOR, NEGATION_SHAPED_CLAIM } from './writerOutputTextRules.js';
+import { anchorPatternFor, assertedKind, assumedParameterIssue, claimsArea, isDenied, isConsistencyCaveat, seatConsistencyClaim, scopedClaimIssue, referencePositionScopeIssue, CHANNEL_FAMILY, CHANGE_SIGNAL, CONSISTENCY_ANCHOR, NEGATION_SHAPED_CLAIM } from './writerOutputTextRules.js';
 import { productScopeViolations } from './writerProductScope.js';
 import { designStageCommentary } from './writerDesignStageRules.js';
 import { framingContrastGrounded, independentClauses, supportedChangeClause } from './writerClausePrecision.js';
@@ -54,6 +54,17 @@ export function scanProse({ input, vocabulary, section, text, claims = [], claim
       if (designStage) {
         context.ruleId = `design_stage_commentary:${designStage.rule}`;
         report(WRITER_REJECTION.DESIGN_STAGE_COMMENTARY, { section, detail: `design_stage_commentary:${designStage.rule}` });
+      }
+      // An assumed or administrative parameter is never referenced unless the
+      // designer asked for it, and then only as a labelled assumption.
+      const assumedIssue = assumedParameterIssue({
+        sentence: claimed,
+        policy: input?.assumed_parameter_policy || null,
+        packProse,
+      });
+      if (assumedIssue) {
+        context.ruleId = `assumed_parameter:${assumedIssue}`;
+        report(WRITER_REJECTION.ASSUMED_PARAMETER_MENTION, { section, detail: assumedIssue });
       }
       context = { text, sentence, clause };
       const seatScope = seatScopeInText(claimed);

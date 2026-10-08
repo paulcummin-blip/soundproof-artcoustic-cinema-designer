@@ -48,6 +48,7 @@
  */
 
 import { isBassConsistencyClaim } from '../proposalEvidence/proposalEvidenceWording.js';
+import { assumedParameterUseIssue } from '../clientFacingParameterAuthority.js';
 import { WRITER_REJECTION, violation } from './writerContractSchema.js';
 import {
   areaAnchorTerms,
@@ -455,6 +456,25 @@ export function optionNameById(input, versionId) {
   const option = (Array.isArray(input?.evidence_pack?.options) ? input.evidence_pack.options : [])
     .find((entry) => entry?.version_id === versionId) || null;
   return option?.version_name || null;
+}
+
+/**
+ * Whether a sentence names an assumed or administrative parameter (P8, P15,
+ * P21) the pack does not admit, names one without labelling it as an assumption,
+ * or uses one as a performance differentiator.
+ *
+ * The pack's own prose is exempt, exactly as it is for the other prose rules.
+ * The rule reads the ONE assumed-parameter authority, so the validator, the ADI
+ * chips and the writer prompt can never disagree about what is allowed.
+ *
+ * @returns {string|null} the reason, or null when the sentence is sound
+ */
+export function assumedParameterIssue({ sentence, policy, packProse = [] } = {}) {
+  const text = String(sentence || '');
+  if (text.length === 0) return null;
+  if (isPackProse(text, packProse)) return null;
+  const issue = assumedParameterUseIssue(text, policy);
+  return issue ? `${issue.rule}:${issue.code}` : null;
 }
 
 // Preserve the public scanner import while keeping rules and scanner modular.

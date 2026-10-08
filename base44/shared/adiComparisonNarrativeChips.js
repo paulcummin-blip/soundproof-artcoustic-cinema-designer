@@ -374,16 +374,18 @@ function dedupeViolations(violations) {
  * Comparative → every value it states must belong to one of the versions, and a
  * value no version states is rejected.
  *
+ * @param {Object|null} [policy] — the proposal exclusion policy, so an assumed or
+ *   administrative parameter can only be suggested when it was asked for.
  * @returns {{ status: 'passed'|'rejected', violations: Array<Object> }}
  */
-export function validateComparisonChip(label, versions) {
+export function validateComparisonChip(label, versions, policy = null) {
   const list = (versions || []).filter((entry) => entry?.facts?.available === true);
   if (list.length === 0) return { status: 'rejected', violations: [{ rule: 'no_authority' }] };
 
   const working = stripLabels(label, list).trim();
   if (!working) return { status: 'rejected', violations: [{ rule: 'empty_chip' }] };
 
-  const checks = list.map((entry) => validateNarrativeChip(working, entry.facts));
+  const checks = list.map((entry) => validateNarrativeChip(working, entry.facts, policy));
   if (checks.every((check) => check.status === 'passed')) {
     return { status: 'passed', violations: [] };
   }
@@ -421,10 +423,10 @@ export function validateComparisonChip(label, versions) {
  * examples that hold in every selected version, then the ADI suggestions that
  * pass validation against every selected version.
  *
- * @param {{ aiChips?: Array<Object>, versions: Array<{ version_name, facts }> }} params
+ * @param {{ aiChips?: Array<Object>, versions: Array<{ version_name, facts }>, policy?: Object|null }} params
  * @returns {{ suggestions: Array<Object>, diagnostics: Array<Object> }}
  */
-export function resolveComparisonNarrativeChips({ aiChips = [], versions = [] } = {}) {
+export function resolveComparisonNarrativeChips({ aiChips = [], versions = [], policy = null } = {}) {
   const list = (versions || []).filter((entry) => entry?.facts?.available === true);
   const suggestions = [];
   const diagnostics = [];
@@ -452,13 +454,13 @@ export function resolveComparisonNarrativeChips({ aiChips = [], versions = [] } 
 
   for (const entry of buildComparisonAuthorityChips(list)) {
     if (suggestions.length >= COMPARISON_CHIP_LIMIT) break;
-    const check = validateComparisonChip(entry.label, list);
+    const check = validateComparisonChip(entry.label, list, policy);
     add(entry, { status: check.status, violations: check.violations });
   }
 
   for (const entry of buildSharedAuthorityChips(list)) {
     if (suggestions.length >= SHARED_CHIP_LIMIT) break;
-    const check = validateComparisonChip(entry.label, list);
+    const check = validateComparisonChip(entry.label, list, policy);
     add(entry, { status: check.status, violations: check.violations });
   }
 
@@ -466,7 +468,7 @@ export function resolveComparisonNarrativeChips({ aiChips = [], versions = [] } 
     if (suggestions.length >= CHIP_LIMIT) break;
     const label = String(raw?.label || '').trim();
     if (!label) continue;
-    const check = validateComparisonChip(label, list);
+    const check = validateComparisonChip(label, list, policy);
     if (check.status !== 'passed') {
       diagnostics.push({
         text: label,

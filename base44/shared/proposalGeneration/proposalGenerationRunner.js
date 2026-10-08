@@ -37,6 +37,18 @@ import { validateWriterOutput } from '../proposalWriter/writerOutputValidator.js
 import { GENERATION_STATUS } from './generationStatuses.js';
 import { createGenerationHistory } from './proposalGenerationRepository.js';
 
+/**
+ * The designer's explicit requests, as the evidence pack reads them. The one
+ * thing that can admit an assumed parameter (P8, P15, P21) into a proposal is
+ * the designer asking for it — never the evidence, and never the writer.
+ */
+export function proposalRequestContext(proposal = {}) {
+  return {
+    clientBrief: [proposal?.client_brief, proposal?.narrative_brief].filter(Boolean).join('\n'),
+    dealerNotes: proposal?.metadata?.dealer_notes || '',
+  };
+}
+
 /** Why a generation attempt was refused before it was made. */
 export const WRITER_REFUSAL = Object.freeze({
   FLAG_OFF: 'writer_flag_off',
@@ -168,7 +180,7 @@ export async function runProposalCopyGeneration({
   let pack = null;
   let writerInput = null;
   try {
-    pack = buildProposalEvidence({ versions, generatedAt: now });
+    pack = buildProposalEvidence({ versions, generatedAt: now, requestContext: proposalRequestContext(proposal) });
     writerInput = buildWriterInput({ pack });
     assertWriterInputCarriesNoLiveState(writerInput);
   } catch (error) {

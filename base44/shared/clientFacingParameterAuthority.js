@@ -57,6 +57,133 @@ export const EXCLUDED_CLIENT_PARAMETERS = Object.freeze([
 export const EXCLUDED_CLIENT_PARAMETER_IDS = Object.freeze(EXCLUDED_CLIENT_PARAMETERS.map((entry) => entry.id));
 export const EXCLUDED_CLIENT_PARAMETER_CODES = Object.freeze(EXCLUDED_CLIENT_PARAMETERS.map((entry) => entry.code));
 
+export const CLIENT_FACING_PROPOSAL_PARAMETER_IDS = Object.freeze([
+  2, 4, 5, 6, 7, 9, 10, 12, 13, 14, 16, 17, 18, 19, 20,
+]);
+
+/** The label every explicitly requested assumed parameter must be stated with. */
+export const ASSUMED_PARAMETER_LABEL = 'assumption / administrative check';
+
+/** True when a parameter is an assumed or administrative check (P8, P15, P21). */
+export function isAssumedAdministrativeParameter(parameterId) {
+  return EXCLUDED_CLIENT_PARAMETER_IDS.includes(Number(parameterId));
+}
+
+/** True when a parameter may appear in a client-facing proposal by default. */
+export function isClientFacingProposalParameter(parameterId) {
+  const id = Number(parameterId);
+  if (!Number.isFinite(id)) return false;
+  return CLIENT_FACING_PROPOSAL_PARAMETER_IDS.includes(id);
+}
+
+/** The plain-language label of one assumed parameter. */
+export function assumedParameterLabel(code) {
+  const match = EXCLUDED_CLIENT_PARAMETERS.find((entry) => entry.code === String(code).toUpperCase());
+  return match ? match.label : String(code);
+}
+
+/** The assumed parameter codes a text names, by the careful sentence patterns. */
+export function assumedParameterMentions(text) {
+  const value = String(text ?? '');
+  if (!value) return [];
+  return EXCLUDED_CLIENT_PARAMETERS
+    .filter((entry) => entry.sentence.test(value))
+    .map((entry) => entry.code);
+}
+
+/** The assumed parameter codes a text names, including a bare subject reference. */
+export function assumedParameterRowMentions(text) {
+  const value = String(text ?? '');
+  if (!value) return [];
+  return EXCLUDED_CLIENT_PARAMETERS
+    .filter((entry) => entry.sentence.test(value) || entry.row.test(value))
+    .map((entry) => entry.code);
+}
+
+/** Wording that labels an assumed parameter as an assumption, not a result. */
+const ASSUMPTION_LABEL = /\b(?:assum\w*|administrative|not\s+(?:a\s+)?(?:calculated|measured|assessed|verified)|design\s+(?:assumption|input)|input\s+assumption)\b/i;
+
+/** Wording that treats an assumed parameter as a performance differentiator. */
+const ASSUMPTION_DIFFERENTIATOR = /\b(?:improve\w*|better|best|great\w*|excellent|outstanding|superior|gain\w*|advantage\w*|benefit\w*|stronger|higher|boost\w*|differentiat\w*|headline|win\w*|recommend\w*|highlight\w*)\b/i;
+
+/** True when a text labels an assumed parameter as an assumption, not a result. */
+export function isAssumptionLabelled(text) {
+  return ASSUMPTION_LABEL.test(String(text ?? ''));
+}
+
+/** True when a text uses an assumed parameter as a performance differentiator. */
+export function isAssumedParameterDifferentiator(text) {
+  return ASSUMPTION_DIFFERENTIATOR.test(String(text ?? ''));
+}
+
+/**
+ * Room treatment genuinely controls early reflections, so copy about the
+ * treatment itself is design information rather than the P21 administrative
+ * assumption. A mention of early reflections in that context is left alone.
+ */
+const TREATMENT_CONTEXT = /\b(?:treatment|treatments|absor\w*|diffus\w*|abfuser|panel|panels|reverberation|reverb)\b/i;
+
+/**
+ * Whether the designer explicitly asked for one assumed parameter. Accepts a
+ * resolved policy (buildExcludedParameterPolicy output) or the raw request
+ * context ({ clientBrief, narrativeBrief, dealerNotes }).
+ */
+export function isExplicitlyRequestedAssumedParameter(parameterId, requestContext) {
+  if (!isAssumedAdministrativeParameter(parameterId)) return false;
+  if (!requestContext) return false;
+  const code = `P${Number(parameterId)}`;
+  if (typeof requestContext.allows === 'function') return requestContext.allows(code) === true;
+  const { clientBrief = '', narrativeBrief = '', dealerNotes = '' } = requestContext;
+  const policy = buildExcludedParameterPolicy({
+    clientBrief: [clientBrief, narrativeBrief].filter(Boolean).join('\n'),
+    dealerNotes,
+  });
+  return policy.allows(code) === true;
+}
+
+/**
+ * The ONE question a proposal-facing surface asks about a sentence, a chip or a
+ * row: may this text name this assumed parameter, and is it written correctly?
+ *
+ * @param {string} text
+ * @param {Object|null} policy — a resolved exclusion policy
+ * @param {{ broad?: boolean }} [options] — broad also catches a bare subject
+ *   reference ("compare the noise floor"), which only a chip label needs
+ * @returns {{ rule: string, code: string }|null}
+ */
+export function assumedParameterUseIssue(text, policy, { broad = false } = {}) {
+  const value = String(text ?? '');
+  const codes = (broad ? assumedParameterRowMentions(value) : assumedParameterMentions(value))
+    .filter((code) => !(code === 'P21' && TREATMENT_CONTEXT.test(value)));
+  if (codes.length === 0) return null;
+  const unrequested = codes.filter((code) => policy?.allows?.(code) !== true);
+  if (unrequested.length > 0) {
+    return { rule: 'assumed_parameter_not_requested', code: unrequested[0] };
+  }
+  if (isAssumedParameterDifferentiator(value)) {
+    return { rule: 'assumed_parameter_used_as_a_differentiator', code: codes[0] };
+  }
+  if (!isAssumptionLabelled(value)) {
+    return { rule: 'assumed_parameter_not_labelled_as_an_assumption', code: codes[0] };
+  }
+  return null;
+}
+
+/** The chips a client proposal may offer: none that names an unrequested assumed parameter. */
+export function filterAssumedParameterChips(chips, policy) {
+  return (Array.isArray(chips) ? chips : []).filter((entry) => {
+    const label = String(entry?.label ?? entry ?? '');
+    return !assumedParameterUseIssue(label, policy, { broad: true });
+  });
+}
+
+/** The rule text stating how an explicitly requested assumed parameter may be used. */
+export function buildRequestedAssumptionRule(codes = []) {
+  if (codes.length === 0) return null;
+  const plural = codes.length > 1;
+  return `DESIGNER-REQUESTED ASSUMPTIONS: ${codes.join(', ')} may be stated once, labelled as an ${ASSUMED_PARAMETER_LABEL} rather than a calculated or measured result. Never present ${plural ? 'them' : 'it'} as a performance differentiator, never as a headline claim, and never as a reason one option is better.`;
+}
+
 /**
  * The parameters proposal storytelling does focus on, by theme. Stated in the
  * prompts so the writer knows what it may use, not only what it must avoid.

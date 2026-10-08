@@ -24,6 +24,10 @@
  */
 
 import { isReportParameter, structureForParameter, plainLanguageName } from '../adiReportEvidenceRules.js';
+import {
+  ASSUMED_PARAMETER_LABEL,
+  isAssumedAdministrativeParameter,
+} from '../clientFacingParameterAuthority.js';
 import { savedVersionIdentity } from './proposalEvidenceIdentity.js';
 import { stripBassWordingDeep } from './proposalEvidenceWording.js';
 
@@ -134,25 +138,42 @@ function productRows(snapshot) {
   }));
 }
 
-/** The report's parameter rows, excluded parameters filtered out. */
-function parameterRows(snapshot) {
+/**
+ * The report's parameter rows. Excluded parameters (P8, P15, P21) are filtered
+ * out here, by the existing report rule, so they cannot enter the pack at all —
+ * unless the designer explicitly asked for one, in which case it is carried as a
+ * labelled assumption and never as a client-facing result.
+ */
+function parameterRows(snapshot, policy = null) {
   const rows = Array.isArray(snapshot?.report_parameters) ? snapshot.report_parameters : [];
   return rows
-    .filter((row) => isReportParameter(row?.parameter_id))
     .map((row) => {
-      const id = Number(row.parameter_id);
+      const id = Number(row?.parameter_id);
+      if (!Number.isFinite(id)) return null;
+      const assumedRequested = isAssumedAdministrativeParameter(id)
+        && policy?.allows?.(`P${id}`) === true;
+      if (!isReportParameter(id) && !assumedRequested) return null;
       const level = asText(row.level);
       const value = valueText(row.value);
-      return {
+      const entry = {
         parameter_id: id,
         key: asText(row.key) || `P${id}`,
         label: plainLanguageName(id, row.title),
-        structure: structureForParameter(id),
+        structure: assumedRequested ? null : structureForParameter(id),
         level,
         value,
         text: asText(row.text) || [level, value].filter(Boolean).join(' · ') || null,
       };
-    });
+      // An assumed parameter carries no client-facing structure, so it can never
+      // be classified, can never become a difference between options, and is
+      // always stated with the assumption label it was admitted under.
+      if (assumedRequested) {
+        entry.kind = 'assumed_parameter';
+        entry.assumption_label = ASSUMED_PARAMETER_LABEL;
+      }
+      return entry;
+    })
+    .filter(Boolean);
 }
 
 /**
@@ -194,7 +215,7 @@ function areaReadings({ room, screen, seating, viewing, system, parameters, prod
  * @param {string} label — the option label this version is given ("Option A")
  * @returns {{ version_id, version_name, version_name_source, label, facts, areas, wording_removed }}
  */
-export function buildOptionFacts(entry, label) {
+export function buildOptionFacts(entry, label, { policy = null } = {}) {
   const snapshot = entry?.snapshot;
   const versionId = entry?.version_id || snapshot?.identity?.versionId || null;
   if (!versionId) throw new Error('A selected version could not be identified from its report evidence.');
@@ -212,7 +233,7 @@ export function buildOptionFacts(entry, label) {
   const seating = room.seating || {};
   const viewing = snapshot.viewing || {};
   const system = snapshot.system || {};
-  const parameters = parameterRows(snapshot);
+  const parameters = parameterRows(snapshot, policy);
   const products = productRows(snapshot);
   const perSeat = Array.isArray(viewing.per_seat) ? viewing.per_seat : [];
 
@@ -311,6 +332,23 @@ export function buildOptionFacts(entry, label) {
       },
     },
   };
+
+  // The assumed parameters the designer explicitly asked for, carried only as
+  // labelled assumptions: they support no performance claim, are never a
+  // client-facing result and are never a difference between options. Added only
+  // when one was requested, so a pack built with no request is unchanged.
+  const assumed = frozen.facts.parameters.filter((row) => row.kind === 'assumed_parameter');
+  if (assumed.length > 0) {
+    frozen.facts.assumed_parameters = assumed.map((row) => ({
+      parameter_id: row.parameter_id,
+      key: row.key,
+      label: row.label,
+      level: row.level,
+      value: row.value,
+      text: row.text,
+      assumption_label: row.assumption_label,
+    }));
+  }
 
   // The scoped seat-group results, added only where the saved evidence states
   // them: per parameter and per scope, with the number of seats each scope holds,

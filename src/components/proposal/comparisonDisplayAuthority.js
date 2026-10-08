@@ -2,6 +2,12 @@
 // page and the printed pack. Stored values are never altered: the report's own
 // version order is kept, so a stored derived change always matches the columns
 // printed beside it.
+//
+// Every row passes the client-facing filter on the way out, so an assumed or
+// administrative parameter (P8, P15, P21) and the internal Design Index are
+// dropped whatever a stored, legacy or recovered table carries. The stored
+// record is never modified.
+import { excludeClientFacingRows } from './designIndexRowAuthority';
 export function isCompleteComparisonTable(table, ids = []) {
   const columns = table?.versions || [];
   return columns.length >= 2 && new Set(columns.map(c => c.version_id)).size === columns.length
@@ -31,9 +37,9 @@ export function resolveComparisonDisplay(rows, versions, fallback = null) {
   const splitEquipment = sourceRows.some((row) => row.key === 'lcr');
   return {
     versions: sourceVersions,
-    rows: sourceRows
-      .filter((row) => !(splitEquipment && row.key === 'speakers'))
-      .map((row) => ({ ...row, values: row.values || [] })),
+    rows: excludeClientFacingRows(
+      sourceRows.filter((row) => !(splitEquipment && row.key === 'speakers')),
+    ).map((row) => ({ ...row, values: row.values || [] })),
   };
 }
 export default resolveComparisonDisplay;

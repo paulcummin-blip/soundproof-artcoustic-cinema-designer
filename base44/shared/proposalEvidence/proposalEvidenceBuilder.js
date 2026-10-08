@@ -37,9 +37,16 @@
 
 import { optionLabel } from '../comparisonEvidence.js';
 import {
+  BLOCK_REASON,
   PROPOSAL_EVIDENCE_SCHEMA_VERSION,
   PROPOSAL_EVIDENCE_AREAS,
 } from './evidencePackSchema.js';
+import {
+  ASSUMED_PARAMETER_LABEL,
+  EXCLUDED_CLIENT_PARAMETER_CODES,
+  buildExcludedParameterPolicy,
+  buildRequestedAssumptionRule,
+} from '../clientFacingParameterAuthority.js';
 import { buildOptionFacts } from './proposalEvidenceFacts.js';
 import { classifyAreas } from './proposalEvidenceClassification.js';
 import {
@@ -92,15 +99,25 @@ export function proposalEvidenceFingerprint(pack) {
  * @param {Array<Object>} input.versions — readProposalReportEvidence output, in
  *   report order (Option A first)
  * @param {string} [input.generatedAt] — the timestamp to record (an ISO string)
+ * @param {Object} [input.requestContext] — the designer's explicit requests
+ *   ({ clientBrief, narrativeBrief, dealerNotes }) or an already resolved
+ *   exclusion policy. It is the ONLY thing that can admit an assumed parameter
+ *   (P8, P15, P21), and only as a labelled assumption.
  * @returns {Object} the frozen pack
  */
-export function buildProposalEvidence({ versions = [], generatedAt = null } = {}) {
+export function buildProposalEvidence({ versions = [], generatedAt = null, requestContext = null } = {}) {
   const list = (Array.isArray(versions) ? versions : []).filter(Boolean);
   if (list.length === 0) {
     throw new Error('No version report evidence was supplied. Select at least one version with a current Visual and Technical Report.');
   }
 
-  const options = list.map((entry, index) => buildOptionFacts(entry, optionLabel(index)));
+  // The ONE assumed-parameter admission rule for this proposal. With no request
+  // context every assumed parameter stays excluded, exactly as before.
+  const policy = typeof requestContext?.allows === 'function'
+    ? requestContext
+    : buildExcludedParameterPolicy(requestContext || {});
+
+  const options = list.map((entry, index) => buildOptionFacts(entry, optionLabel(index), { policy }));
   const compared = options.length >= 2;
 
   const classification = compared ? classifyAreas(options.map((option) => option.areas)) : [];
@@ -126,6 +143,19 @@ export function buildProposalEvidence({ versions = [], generatedAt = null } = {}
     ? buildBassClaims(classification, options, allowedClaims)
     : emptyBassClaims();
   const blockedClaims = buildBlockedClaims(classification, options, decisionFraming, bassClaims);
+
+  // The assumed-parameter rule, minted once: an assumed or administrative check
+  // is never a performance result, a differentiator or a headline claim.
+  const assumedBlocks = [{
+    block_id: 'block_global_no_assumed_parameter_differentiator_01',
+    scope: 'global',
+    area: null,
+    reason: BLOCK_REASON.NO_ASSUMED_PARAMETER_DIFFERENTIATOR,
+    prohibited: policy.requested.length === 0
+      ? 'Never reference an assumed or administrative parameter (P8 upfiring/elevation speakers, P15 background noise floor, P21 early reflections): none was requested for this proposal.'
+      : `Never present ${policy.requested.join(', ')} as a performance result, a differentiator or a headline claim: ${policy.requested.length > 1 ? 'they are' : 'it is'} an ${ASSUMED_PARAMETER_LABEL} only.`,
+    detail: policy.requested.length > 0 ? `requested:${policy.requested.join(',')}` : null,
+  }];
 
   // The bass consistency rule is minted once, in the packed rule list; the bass
   // contract points at that same block instead of minting a second id for it.
@@ -160,7 +190,21 @@ export function buildProposalEvidence({ versions = [], generatedAt = null } = {}
     classification,
     materiality_notes: buildMaterialityNotes(allowedClaims, { p20Note: bass.note }),
     allowed_claims: allowedClaims,
-    blocked_claims: blockedClaims,
+    blocked_claims: policy.requested.length > 0 ? [...blockedClaims, ...assumedBlocks] : blockedClaims,
+    // The assumed-parameter rule this pack was built under: which of P8, P15 and
+    // P21 the designer explicitly asked for, and how they may be used. Every
+    // proposal-facing boundary reads this rather than deciding for itself. It is
+    // carried only when something WAS requested, so a pack built with no request
+    // is byte-identical to the pack that excludes the three by default.
+    ...(policy.requested.length > 0 ? {
+      assumed_parameter_policy: {
+        assumed: [...EXCLUDED_CLIENT_PARAMETER_CODES],
+        excluded: policy.excluded.map((entry) => entry.code),
+        requested: [...policy.requested],
+        label: ASSUMED_PARAMETER_LABEL,
+        rule: buildRequestedAssumptionRule(policy.requested),
+      },
+    } : {}),
     bass_claims: bass,
     decision_framing: decisionFraming,
     // The audit spine of the pack: which saved reports it was built from, where

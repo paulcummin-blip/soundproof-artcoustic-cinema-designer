@@ -25,6 +25,10 @@ import { buildAuthorityChips, resolveNarrativeChips } from '../../shared/adiNarr
 import { buildComparisonAuthorityChips, resolveComparisonNarrativeChips } from '../../shared/adiComparisonNarrativeChips.js';
 import { buildNarrativeFacts, buildNarrativeFactsBlock } from '../../shared/adiNarrativeFacts.js';
 import { resolveReportLayout } from '../../shared/highChannelDensityRule.js';
+import {
+  buildClientFacingParameterRule,
+  buildExcludedParameterPolicy,
+} from '../../shared/clientFacingParameterAuthority.js';
 
 const FALLBACK_MESSAGE = 'Calculate the project to get examples powered by Artcoustic Design Intelligence.';
 
@@ -55,7 +59,7 @@ const REPORT_TYPE_LABELS = {
   system_summary: 'a System Design Summary covering one design version',
 };
 
-function buildPrompt({ evidence, factsBlock, authorityChips, proposalType, versionCount, projectName, highDensity }) {
+function buildPrompt({ evidence, factsBlock, authorityChips, proposalType, versionCount, projectName, highDensity, parameterRule }) {
   return [
     evidence,
     '',
@@ -77,6 +81,7 @@ function buildPrompt({ evidence, factsBlock, authorityChips, proposalType, versi
     'Look at what the calculated data above actually shows: system layout, screen size and viewing angle, RP23, seats and rows, room size and compactness, channel count (P2), surround spacing (P5), front wides (P7), overhead spacing (P9), Dynamic Range (P12, P13, P14), timbre (P16, P17), bass (P18, P19, P20), the strongest and weakest parameters, and whether the design is simple, mid-level or high performance.',
     '',
     'RULES:',
+    parameterRule,
     '- State only values that appear in THIS PROJECT VERSION above. Never write a number that is not in that block.',
     '- Every number is checked against the project data before the designer sees the chip: a screen size, level, channel count, subwoofer count, dB, Hz or angle figure that does not match this version is discarded.',
     '- If a fact is not in that block, write the point without a number (for example, the screen scale and viewing geometry) instead of guessing a value.',
@@ -102,7 +107,7 @@ function buildPrompt({ evidence, factsBlock, authorityChips, proposalType, versi
  * rule that a suggestion is about the versions together — never one version's
  * fact presented as though it applied to the whole comparison.
  */
-function buildComparisonPrompt({ versions, authorityChips, projectName }) {
+function buildComparisonPrompt({ versions, authorityChips, projectName, parameterRule }) {
   const names = versions.map((entry, index) => entry.version_name || entry.version_id || `Version ${index + 1}`);
   const blocks = versions.map((entry, index) => [
     `=== VERSION: ${names[index]} ===`,
@@ -131,6 +136,7 @@ function buildComparisonPrompt({ versions, authorityChips, projectName }) {
     'This is a comparison, so every suggestion must be about the selected versions together.',
     '',
     'RULES:',
+    parameterRule,
     '- Every suggestion must compare the selected versions, or state a fact that is true of EVERY selected version. Never write a suggestion that states one version\'s fact as though it applied to the whole comparison.',
     '- Prefer the areas the comparison is built on: dynamic range, bass layout, spatial resolution, speaker layout, screen and seating experience, viewing experience, system scale, upgrade benefits, which system is stronger.',
     `- Name a version only by its exact saved name (${names.join(', ')}).`,
@@ -177,6 +183,15 @@ export default async function (req) {
     const body = await req.json().catch(() => ({}));
     const snapshot = body?.engineering_snapshot || null;
 
+    // The designer's explicit requests. An assumed or administrative parameter
+    // (P8, P15, P21) is only ever offered as an example when the brief asks for
+    // it, and then only labelled as an assumption.
+    const parameterPolicy = buildExcludedParameterPolicy({
+      clientBrief: body?.client_brief || '',
+      dealerNotes: body?.dealer_notes || '',
+    });
+    const parameterRule = buildClientFacingParameterRule(parameterPolicy);
+
     // ── Comparison mode ──
     // Two or more selected versions arrive with their own frozen snapshot, so
     // every example is built and checked against all of them. One version's
@@ -201,6 +216,7 @@ export default async function (req) {
             versions: versionEntries,
             authorityChips,
             projectName: versionEntries[0]?.snapshot?.project?.name || snapshot?.project?.name || null,
+            parameterRule,
           }),
           response_json_schema: SUGGESTIONS_JSON_SCHEMA,
         });
@@ -212,6 +228,7 @@ export default async function (req) {
       const { suggestions, diagnostics } = resolveComparisonNarrativeChips({
         aiChips: comparisonAiChips,
         versions: versionEntries,
+        policy: parameterPolicy,
       });
       if (suggestions.length === 0) return unavailable();
 
@@ -250,6 +267,7 @@ export default async function (req) {
             : 1,
           projectName: snapshot?.project?.name || null,
           highDensity: resolveReportLayout(snapshot).highDensity,
+          parameterRule,
         }),
         response_json_schema: SUGGESTIONS_JSON_SCHEMA,
       });
@@ -259,7 +277,7 @@ export default async function (req) {
     }
 
     // Validate every chip against the same snapshot before it is returned.
-    const { suggestions, diagnostics } = resolveNarrativeChips({ aiChips, facts });
+    const { suggestions, diagnostics } = resolveNarrativeChips({ aiChips, facts, policy: parameterPolicy });
     if (suggestions.length === 0) return unavailable();
 
     // Diagnostics trail for every chip: text, source fields, source values and

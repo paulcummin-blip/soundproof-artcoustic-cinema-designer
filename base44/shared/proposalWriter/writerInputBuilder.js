@@ -112,6 +112,10 @@ export function buildWriterInput({ pack, promptVersion = WRITER_PROMPT_VERSION }
     },
     // The frozen pack itself: the writer's only source, carried verbatim.
     evidence_pack: pack,
+    // The assumed-parameter rule the pack was built under, so a draft can be
+    // validated against exactly the admission it was written against: with no
+    // designer request, P8, P15 and P21 may not be referenced at all.
+    assumed_parameter_policy: pack.assumed_parameter_policy || null,
     writing_rules: [...WRITER_WRITING_RULES],
     word_limits: writerWordLimits(),
     section_requirements: writerSectionRequirements(),

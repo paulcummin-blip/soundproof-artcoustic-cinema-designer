@@ -66,6 +66,10 @@ export default function AdiSuggestionChips({
   versionSnapshots = [],
   snapshotLoading = false,
   versionsLoading = false,
+  // The brief being written: it carries the designer's explicit requests, so an
+  // assumed or administrative parameter (P8, P15, P21) is only ever offered as
+  // an example when the designer has actually asked for it.
+  clientBrief = '',
   onAddSelected,
 }) {
   const [suggestions, setSuggestions] = useState([]);
@@ -131,6 +135,7 @@ export default function AdiSuggestionChips({
         proposal_type: proposalType,
         selected_version_ids: selectedVersionIds,
         engineering_snapshot: engineeringSnapshot,
+        client_brief: clientBrief || '',
         // In comparison mode the function receives every selected version's own
         // frozen snapshot and builds its examples from all of them.
         version_snapshots: comparisonSelected ? comparisonEntriesRef.current : [],
@@ -150,7 +155,7 @@ export default function AdiSuggestionChips({
     } finally {
       if (requestRef.current === token) setLoading(false);
     }
-  }, [hasResults, projectId, proposalType, selectedVersionIds, engineeringSnapshot, comparisonSelected, comparisonKey]);
+  }, [hasResults, projectId, proposalType, selectedVersionIds, engineeringSnapshot, clientBrief, comparisonSelected, comparisonKey]);
 
   useEffect(() => {
     if (hasResults) {

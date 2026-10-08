@@ -109,6 +109,8 @@ export const BLOCK_REASON = Object.freeze({
   NO_SCREEN_CHANGE: 'no_screen_change',
   NO_SEATING_CHANGE: 'no_seating_change',
   NO_SOLVED_BASS_CONSISTENCY: 'no_solved_bass_consistency',
+  /** An assumed or administrative parameter presented as a result or a differentiator. */
+  NO_ASSUMED_PARAMETER_DIFFERENTIATOR: 'no_assumed_parameter_differentiator',
   NOT_COMPARABLE: 'not_comparable',
 });
 

@@ -69,6 +69,7 @@ export default function ClientBriefStep({
         projectId={projectId}
         selectedVersionIds={selectedVersionIds}
         proposalType={proposalType}
+        clientBrief={value}
         engineeringSnapshot={engineeringSnapshot}
         versionSnapshots={versionSnapshots}
         versionsLoading={versionsLoading}

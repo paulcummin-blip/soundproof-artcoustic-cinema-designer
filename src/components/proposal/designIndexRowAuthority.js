@@ -36,9 +36,9 @@ export const DESIGN_INDEX_BANNED_TERMS = [
 /** The assumed / administrative parameters no proposal may show. */
 export const EXCLUDED_CLIENT_PARAMETER_CODES = ['P8', 'P15', 'P21'];
 
-const EXCLUDED_CLIENT_PARAMETER_IDS = [8, 15, 21];
+export const EXCLUDED_CLIENT_PARAMETER_IDS = [8, 15, 21];
 
-const EXCLUDED_CLIENT_PARAMETER_ROW_PATTERN = /\bP8\b|\bP15\b|\bP21\b|\bParameter\s*(?:8|15|21)\b|background noise|noise floor|up-?firing|elevation speaker/i;
+const EXCLUDED_CLIENT_PARAMETER_ROW_PATTERN = /\bP8\b|\bP15\b|\bP21\b|\bParameter\s*(?:8|15|21)\b|background noise|noise floor|up-?firing|elevation speaker|early reflection/i;
 
 /** True when a row is about the internal Design Index rather than a design result. */
 export function isDesignIndexRow(row) {
