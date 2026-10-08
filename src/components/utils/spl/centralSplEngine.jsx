@@ -618,7 +618,9 @@ export function computeSingleSeatSplAtDistance({
     resolvedMeta = findSpeakerData(speakerModelId);
   }
   
-  if (!resolvedMeta) {
+  // A model with no product data reports nothing — never a generic figure that
+  // would read as this product's own measured capability.
+  if (!resolvedMeta || resolvedMeta.notFound) {
     return {
       spl_continuous_db_at_seat: null,
       spl_peak_cf6_db_at_seat: null,
