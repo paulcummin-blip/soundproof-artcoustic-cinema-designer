@@ -273,7 +273,7 @@ function RP22ReportInner() {
         () => currentSourceFingerprints({
             authoritySnapshot: designReviewHandoff,
             engineeringSummary,
-            liveSeatPriorityFingerprint: readSeatPriorityFingerprint(explicitProjectId),
+            // Final report identity follows the publication's frozen seating priorities.
         }),
         [designReviewHandoff, engineeringSummary, explicitProjectId]
     );
