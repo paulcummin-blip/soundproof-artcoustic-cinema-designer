@@ -1,3 +1,5 @@
+import { discreteChannelCounts } from './channelArchitecture.js';
+import { assessEngineeringReportCompleteness, isExplicitNotApplicable, isTerminalAssessment } from './assessmentTerminal.js';
 /** Versioned, pure producer contract. Mirrored server/client; no defaults or live report fallback. */
 export const PUBLICATION_CONTRACT_VERSION = 2;
 const copy = value => value == null ? value : JSON.parse(JSON.stringify(value));
@@ -33,8 +35,13 @@ export function buildFrozenReportProject(state, { projectId, versionId } = {}) {
   requireField('seatingPositions', Array.isArray(d.seatingPositions) && d.seatingPositions.length>0);
   const counts = rowCounts(d.seatingPositions);
   requireField('seatingPositions[].row', !!counts);
-  requireField('seatingRows', Number(d.seatingRows) === counts?.length);
-  requireField('seatsPerRowByRow', same(d.seatsPerRowByRow, counts));
+  const hasRowCount = stated(d.seatingRows) && Number(d.seatingRows) > 0;
+  const hasSeatCounts = Array.isArray(d.seatsPerRowByRow) && d.seatsPerRowByRow.length > 0;
+  if (hasRowCount && Number(d.seatingRows) !== counts?.length) errors.push('seatingRows conflicts with authoritative seat rows');
+  if (hasSeatCounts && !same(d.seatsPerRowByRow.map(Number), counts)) errors.push('seatsPerRowByRow conflicts with authoritative seat rows');
+  if (d.seatsPerRowByRow != null && !Array.isArray(d.seatsPerRowByRow)) errors.push('seatsPerRowByRow is invalid');
+  const resolvedSeatingRows = counts?.length;
+  const resolvedSeatCounts = counts;
   requireField('placedSpeakers', Array.isArray(d.placedSpeakers) && d.placedSpeakers.length>0);
   for(const [i, speaker] of (d.placedSpeakers || []).entries()) {
     requireField('placedSpeakers['+i+'].model', stated(speaker.model));
@@ -50,6 +57,7 @@ export function buildFrozenReportProject(state, { projectId, versionId } = {}) {
     project_id:projectId, version_id:versionId, version_name:d.versionName, name:d.name,
     roomDims:JSON.stringify(d.roomDims), room_width:Number(d.roomDims.widthM),
     room_length:Number(d.roomDims.lengthM), room_height:Number(d.roomDims.heightM),
+    report_screen:copy(d.screen),
     screen_size:Number(d.screen.visibleWidthInches), aspect_ratio:d.screen.aspectRatio,
     manual_dimensions:d.screen.manualMode, manual_width_m:d.screen.manualWidthM,
     manual_height_m:d.screen.manualHeightM, screen_width_m:d.screen.manualMode ? d.screen.manualWidthM : Number(d.screen.visibleWidthInches)*0.0254,
@@ -57,8 +65,8 @@ export function buildFrozenReportProject(state, { projectId, versionId } = {}) {
     screen_front_plane_m:d.screenFrontPlaneM, border_thickness_m:d.screen.borderThicknessM,
     float_depth_m:d.screen.floatDepthM, speaker_clearance_m:d.screen.speakerClearanceM,
     tv_width_mm:d.screen.tvWidthMm, tv_preset_key:d.screen.tvPresetKey,
-    seating_positions:copy(d.seatingPositions), seating_rows:d.seatingRows,
-    seats_per_row_by_row:copy(d.seatsPerRowByRow), seats_per_row:d.seatsPerRow,
+    seating_positions:copy(d.seatingPositions), seating_rows:resolvedSeatingRows,
+    seats_per_row_by_row:copy(resolvedSeatCounts), seats_per_row:d.seatsPerRow,
     row_ear_heights:copy(d.rowEarHeights), row_spacing_m:d.rowSpacingM,
     seat_spacing:d.seatSpacing, seating_block_offset:d.seatingBlockOffset,
     dolby_config:d.dolbyLayout, selected_speakers:copy(d.placedSpeakers),
@@ -72,11 +80,15 @@ export function buildFrozenReportProject(state, { projectId, versionId } = {}) {
     assumed_p15_level:d.assumedP15Level, assumed_p21_level:d.assumedP21Level,
     manual_extras:copy(d.manualExtras), price_mode:d.priceMode, show_prices:d.showPrices,
     difficulty_multiplier:d.difficultyMultiplier, lcr_aim_mode:d.lcrAimMode,
+    seven_bed_layout_type:d.sevenBedLayoutType,
+    aim_front_wides_at_mlp:d.aimFrontWidesAtMLP, aim_side_surrounds_at_mlp:d.aimSideSurroundsAtMLP,
+    aim_rear_surrounds_at_mlp:d.aimRearSurroundsAtMLP,
   };
   return { reportProject, missing:[] };
 }
 function chooseSeat(rows, id) {
-  return [...rows].sort((a,b) => rank(level(a.level))-rank(level(b.level))
+  const scored = rows.filter(row => !isExplicitNotApplicable(row));
+  return [...(scored.length ? scored : rows)].sort((a,b) => rank(level(a.level))-rank(level(b.level))
     || ((id===10 || id===20) ? Number(b.value)-Number(a.value) : 0))[0] || null;
 }
 function atomicRow(row, id, scope, publication) {
@@ -103,7 +115,11 @@ export function buildAtomicParameterIndex(publication) {
   for(let id=1;id<=21;id++) {
     const seats=summary?.project?.reportCounts?.seatResultsByParameter?.['p'+id] || [];
     const room=summary?.roomResultsByParameter?.[id];
-    const source=(id===10 || id===20 || !room) ? chooseSeat(seats,id) : room;
+    const selected=(id===10 || id===20 || !room) ? chooseSeat(seats,id) : room;
+    const parameter=summary?.parameterAuthority?.['p'+id];
+    const source=selected || (isExplicitNotApplicable(parameter) ? {
+      ...parameter, applicable:false, level:'N/A', formatted:'N/A', value:null,
+    } : null);
     const scope=(id===10 || id===20 || !room) ? 'project' : id===19 ? 'rsp' : 'room';
     const item=atomicRow(source,id,scope,publication);
     if (!item) continue;
@@ -131,6 +147,8 @@ export function auditPublicationContract(publication) {
   if (publication === null) return blockedAudit(PUBLICATION_AUDIT_STATUS.MISSING, ['engineering_authority'],
     'No saved engineering assessment exists for this version. Run the assessment before generating reports.');
   const missing=[], fail=(path,reason='is missing or invalid')=>missing.push(path+' '+reason);
+  const terminal = assessEngineeringReportCompleteness(publication?.engineering_summary);
+  if (!terminal.complete) for (const key of [...terminal.missingParameterKeys, ...terminal.incompleteSeatParameterKeys]) fail('engineering_summary.'+key, 'is not terminal');
   if (publication?.publication_contract_version!==PUBLICATION_CONTRACT_VERSION) fail('publication_contract_version');
   const report=publication?.report_snapshot, p=report?.report_project;
   for(const field of ['engineering_fingerprint','published_at','engine_version','rp22_version','algorithm_version']) if(!stated(publication?.[field]) || publication[field]==='unknown') fail(field);
@@ -151,9 +169,9 @@ export function auditPublicationContract(publication) {
     if(!same(p.seating_positions,report?.seatingPositions)) fail('report_project.seating_positions','conflicts with seatingPositions');
     if(!same(p.selected_speakers,report?.placedSpeakers)) fail('report_project.selected_speakers','conflicts with placedSpeakers');
     const parts=String(p.dolby_config).split('.').map(Number);
-    const speakers=report?.placedSpeakers || [], overheads=speakers.filter(s=>/^T|^OH/.test(s.role || '')).length;
+    const architecture=discreteChannelCounts(report?.placedSpeakers || []);
     // The middle channel-format digit describes LFE channels, not physical sub count.
-    if(parts.length<2 || parts[0]!==speakers.length-overheads || (parts[2] || 0)!==overheads) fail('report_project.dolby_config','conflicts with speaker roles');
+    if(parts.length<2 || parts[0]!==architecture.bed || (parts[2] || 0)!==architecture.overhead) fail('report_project.dolby_config','conflicts with speaker roles');
     if(!Array.isArray(p.subwooferInstances)) fail('report_project.subwooferInstances');
     for(const [i,sub] of (p.subwooferInstances || []).entries()) {
       if(!stated(sub.id) || !stated(sub.model) || !numeric(sub.position?.x) || !numeric(sub.position?.y) || typeof sub.enabled!=='boolean') fail('report_project.subwooferInstances['+i+']');
@@ -169,9 +187,9 @@ export function auditPublicationContract(publication) {
     const key='P'+id, item=publication?.parameter_index?.[key];
     if(!item) { fail('parameter_index.'+key); continue; }
     for(const field of ['key','title','scope','value','level','authority_fingerprint','authority_timestamp','source_type']) if(!stated(item[field])) fail('parameter_index.'+key+'.'+field);
-    const explicitNA = item.source_row?.applicable === false && item.level === 'N/A';
-    if (!/^L[1-4]$/.test(String(item.level)) && item.level !== 'FAIL' && !explicitNA) fail('parameter_index.'+key+'.level','is not a terminal published result');
-    if (item.value === '—' || item.value === '' || ['provisional','pending','calculating','no_data'].includes(item.source_row?.status)) fail('parameter_index.'+key+'.value','is not a terminal published result');
+    const explicitNA = isExplicitNotApplicable(item.source_row) && item.level === 'N/A';
+    if (!isTerminalAssessment({ ...item.source_row, level:item.level }, { requireState:false })) fail('parameter_index.'+key+'.level','is not a terminal published result');
+    if ((!explicitNA && (item.value == null || item.value === '—' || item.value === '')) || ['provisional','pending','calculating','no_data'].includes(item.source_row?.status)) fail('parameter_index.'+key+'.value','is not a terminal published result');
     // Re-derive ONLY for validation, never as read-time authority.
     if(!same(item,expected[key])) fail('parameter_index.'+key,'conflicts with its source row/provenance');
   }
