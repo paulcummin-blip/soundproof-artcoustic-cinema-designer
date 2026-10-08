@@ -23,6 +23,7 @@ import {
 } from "@/components/room/bass/appliedCalibrationAuthority/appliedCalibrationPersistence";
 import { hydrateOptimiserPlan } from "@/components/room/bass/optimiserPlan/optimiserPlanPersistence.js";
 import { canonicalProductId, canonicaliseRoleModelMap } from "@/components/utils/modelKeyNormaliser";
+import { manualSizeFromPersisted } from "@/components/models/screen/manualScreenConfig";
 
 const parseMaybe = (val, fallback) => {
   if (val == null) return fallback;
@@ -134,9 +135,12 @@ export function hydrateProjectIntoAppState(p, appState, setters = {}) {
   const screenSizeInches = Number(p?.screen_size) || 120;
   const aspectRatio = p?.aspect_ratio || "16:9";
   const hasTvPreset = !!p?.tv_preset_key;
-  const hydratedManualSize = p?.manual_dimensions && Number(p?.manual_width_m) > 0 && Number(p?.manual_height_m) > 0
-    ? { enabled: true, mode: "wh", widthM: Number(p.manual_width_m), heightM: Number(p.manual_height_m) }
-    : undefined;
+  // The manual override is restored from the same single authority the writer
+  // saved: its full configuration when present, otherwise the flat manual trio.
+  // An enabled override is never dropped, so its toggle, its dropdown, its
+  // dimensions and the screen geometry all come back exactly as the designer
+  // left them.
+  const hydratedManualSize = manualSizeFromPersisted(p);
   if (typeof setScreen === "function") {
     setScreen((prev) => ({
       ...prev,

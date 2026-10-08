@@ -4,6 +4,7 @@ import { Project } from "@/entities/Project";
 import { base44 } from "@/api/base44Client";
 import { readProjectRecord, readProjectVersionRecord, invalidateProjectRead } from "@/components/state/projectReadCache";
 import { mergeProjectAndVersion, buildDesignState, buildSharedUpdate } from "@/lib/versionAuthority";
+import { manualSizeFromPersisted } from "@/components/models/screen/manualScreenConfig";
 import { serializeProject } from "@/components/utils/serializeProject";
 import { resolveAbfuserQuantityFromProject } from "@/components/utils/abfuserQuantityMigration";
 import { readPersistedScreenPlaneM } from "@/components/utils/screenPlanePersistence";
@@ -436,6 +437,9 @@ appState, // Pass appState directly for setters
           manualMode: !!mergedP?.manual_dimensions,
           manualWidthM: Number(mergedP?.manual_width_m) || 0,
           manualHeightM: Number(mergedP?.manual_height_m) || 0,
+          // The baseline must carry the same manual authority hydration restores,
+          // so a freshly loaded project is never marked dirty by the override.
+          manualSize: manualSizeFromPersisted(mergedP),
           mountMode: mergedP?.screen_mount_mode || "floating",
           floatDepthM: Number(mergedP?.float_depth_m) || 0.2,
           showScreenPlane: !!mergedP?.show_screen_plane,

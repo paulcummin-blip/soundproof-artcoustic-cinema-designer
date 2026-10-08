@@ -11,6 +11,7 @@ import { migrateP12Mode } from "@/components/utils/p12ModeAuthority";
 import { normaliseViewingPriority } from "@/components/utils/viewingPriorityAuthority";
 import { resolveRoomDimensionsEdited } from "@/components/utils/roomDimensionsEditedAuthority";
 import { canonicalProductId, canonicaliseRoleModelMap } from "@/components/utils/modelKeyNormaliser";
+import { manualScreenConfigForPersist } from "@/components/models/screen/manualScreenConfig";
 
 // Helper: safely parse JSON strings or return native types unchanged
 function safeParseJson(value) {
@@ -176,9 +177,14 @@ export function serializeProject(input = {}) {
   // Screen
   const visibleWidthInches = Number(screen?.visibleWidthInches) || 0;
   const aspectRatio = screen?.aspectRatio || "16:9";
-  const manualMode = !!screen?.manualMode;
-  const manualWidthM = Number(screen?.manualWidthM) || 0;
-  const manualHeightM = Number(screen?.manualHeightM) || 0;
+  // The manual override is derived from the ONE authority — screen.manualSize —
+  // so the saved configuration can never disagree with the controls, the drawing
+  // or the geometry. screen_manual_config carries the same configuration
+  // including its mode, so an override is restored exactly as it was left.
+  const manualConfig = manualScreenConfigForPersist(screen);
+  const manualMode = manualConfig.enabled;
+  const manualWidthM = manualConfig.widthM;
+  const manualHeightM = manualConfig.heightM;
   const screenHeightFromFloorM =
     typeof screen?.heightFromFloorM === "number"
       ? screen.heightFromFloorM
@@ -227,6 +233,7 @@ export function serializeProject(input = {}) {
     manual_dimensions: manualMode,
     manual_width_m: manualWidthM,
     manual_height_m: manualHeightM,
+    screen_manual_config: manualConfig,
     screen_height_from_floor: screenHeightFromFloorM,
     screen_mount_mode: screen?.mountMode || "floating",
     float_depth_m: floatDepthM,

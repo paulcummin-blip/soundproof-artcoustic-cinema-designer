@@ -119,6 +119,19 @@ export function applyManualOverrideToScreen(prev, next) {
   const prevManualActive = isManualOverrideActive(prev);
   const nextManualActive = manual != null;
 
+  // The persisted manual fields are DERIVED from the one authority — manualSize —
+  // on every screen write, so the saved configuration can never disagree with the
+  // toggle, the dropdown, the drawing or the geometry. Without this, an unrelated
+  // screen write persisted "not manual" and the override was lost on reload.
+  // manualMode mirrors the toggle itself; the dimensions appear only when the
+  // override is valid, so an enabled-but-empty override still falls back to the
+  // automatic width instead of sizing the screen from nothing.
+  const manualFields = {
+    manualMode: next.manualSize?.enabled === true,
+    manualWidthM: manual ? manual.widthM : 0,
+    manualHeightM: manual ? manual.heightM : 0,
+  };
+
   if (nextManualActive) {
     // Backup preset values from the cleanest available source.
     // If backup already exists on next, keep it; otherwise take from prev
@@ -141,6 +154,7 @@ export function applyManualOverrideToScreen(prev, next) {
     return {
       ...next,
       ...backup,
+      ...manualFields,
       visibleWidthInches: manual.widthInches,
       aspectRatio: manual.aspectRatio,
       viewableWidthM: manual.widthM,
@@ -159,6 +173,7 @@ export function applyManualOverrideToScreen(prev, next) {
     return {
       ...next,
       ...restore,
+      ...manualFields,
       viewableWidthM: undefined,
       viewableHeightM: undefined,
       presetVisibleWidthInches: undefined,
@@ -168,5 +183,5 @@ export function applyManualOverrideToScreen(prev, next) {
     };
   }
 
-  return next;
+  return { ...next, ...manualFields };
 }
