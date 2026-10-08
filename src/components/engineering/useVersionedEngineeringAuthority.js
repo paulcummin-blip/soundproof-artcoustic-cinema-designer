@@ -21,6 +21,7 @@ import {
   extractEngineeringSummary,
   fetchDurablePublication,
   invalidateDurablePublicationRead,
+  subscribeDurablePublication,
   isAuthorityAvailable,
   readLocalHandoff,
 } from './versionedEngineeringAuthority';
@@ -43,6 +44,10 @@ export function useVersionedEngineeringAuthority(projectId, versionId, { finalRe
   const [durableSnapshot, setDurableSnapshot] = useState(null);
   const [durableLoading, setDurableLoading] = useState(false);
   const [readAttempt, setReadAttempt] = useState(0);
+
+  useEffect(() => subscribeDurablePublication(projectId, versionId, () => {
+    setDurable(null); setDurableSnapshot(null); setReadAttempt(value => value + 1);
+  }), [projectId, versionId]);
 
   // ── Browser handoff (fast path) — unchanged live/session transport ──────
   useEffect(() => {
@@ -118,10 +123,12 @@ export function useVersionedEngineeringAuthority(projectId, versionId, { finalRe
   useBassReconciliationStatus(projectId, versionId);
   const composedSnapshot = composeAuthoritySnapshot({ localSnapshot, durableSnapshot, finalReport });
   const composedSummary = extractEngineeringSummary(composedSnapshot);
-  const restoredSummary = applyRestoredBassAuthority(
+  const publishedBassMatches = !finalReport || !durable?.publication
+    || durable.publication.provenance?.bass_fingerprint === completedBassAuthority?.currentFingerprint;
+  const restoredSummary = publishedBassMatches ? applyRestoredBassAuthority(
     composedSummary,
     { projectId, versionId, completedBassAuthority },
-  );
+  ) : composedSummary;
   // The bass overlay operates on the engineering summary, not the outer
   // handoff-shaped snapshot. Reinsert the restored summary at both compatibility
   // paths so Technical Report, Compliance, Visual Report and Proposal all read
@@ -149,8 +156,10 @@ export function useVersionedEngineeringAuthority(projectId, versionId, { finalRe
     : null;
   const summaryCompleteness = assessEngineeringReportCompleteness(extractEngineeringSummary(snapshot));
   const finalAuthorityGate = finalReport ? auditFinalReportAuthority(durable?.publication) : { allowed: true };
-  const reportCompleteness = finalAuthorityGate.allowed ? summaryCompleteness
-    : { ...summaryCompleteness, complete: false, reason: finalAuthorityGate.reason };
+  const reportCompleteness = !publishedBassMatches
+    ? { ...summaryCompleteness, complete:false, reason:'Saved publication stale: its bass fingerprint differs from the current version authority. Publish the completed current assessment before generating reports.' }
+    : finalAuthorityGate.allowed ? summaryCompleteness
+      : { ...summaryCompleteness, complete:false, reason:finalAuthorityGate.reason };
 
   // ── DURABLE PUBLICATION GATE ─────────────────────────────────────────────
   // A report or proposal may only be generated from a DURABLY PUBLISHED
@@ -165,6 +174,8 @@ export function useVersionedEngineeringAuthority(projectId, versionId, { finalRe
     authorityComplete: reportCompleteness.complete,
     authorityReason: reportCompleteness.reason,
     attempt: publicationAttempt,
+    assessmentExists: !!extractEngineeringSummary(localSnapshot) || !!durable?.publication,
+    assessmentComplete: assessEngineeringReportCompleteness(extractEngineeringSummary(localSnapshot)).complete,
   });
   const gatedCompleteness = publicationGate.allowed
     ? reportCompleteness
@@ -211,6 +222,7 @@ export function useVersionedEngineeringAuthority(projectId, versionId, { finalRe
     retry,
     bassHydrationPending,
     bassRestoreFailed,
+    completedBassAuthority,
     bassAuthorityStatus: completedBassAuthority?.authorityStatus || null,
     bassAuthorityOutOfDate: reportCompleteness.bassAuthorityOutOfDate === true,
     bassAuthorityRejectionReason: reportCompleteness.bassAuthorityRejectionReason || null,
