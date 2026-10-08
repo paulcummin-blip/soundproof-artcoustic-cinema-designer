@@ -235,14 +235,12 @@ export function buildLibraryProposalReadiness({ rows = [], loading = false, vers
     verdict,
     headline: verdict === LIBRARY_VERDICT.CHECKING
       ? null
-      : LIBRARY_READINESS_HEADLINE[
-        verdict === LIBRARY_VERDICT.READY
-          ? 'READY'
-          : verdict === LIBRARY_VERDICT.UPDATES_NEEDED
-            ? 'UPDATES_NEEDED'
-            : 'NOT_ASSESSED'
-      ],
-    detail: VERDICT_DETAIL[verdict],
+      : verdict === LIBRARY_VERDICT.READY
+        ? LIBRARY_READINESS_HEADLINE.READY
+        : verdict === LIBRARY_VERDICT.UPDATES_NEEDED
+          ? (missingReportsOnly ? LIBRARY_MISSING_REPORTS_HEADLINE : LIBRARY_READINESS_HEADLINE.UPDATES_NEEDED)
+          : LIBRARY_READINESS_HEADLINE.NOT_ASSESSED,
+    detail: missingReportsOnly ? LIBRARY_MISSING_REPORTS_DETAIL : VERDICT_DETAIL[verdict],
     checklist,
     // The short per-version list is shown whenever a report stands in the way,
     // so the designer sees which report and which version at a glance.
