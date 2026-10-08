@@ -78,6 +78,7 @@ export function recordPublicationAttempt(projectId, versionId, attempt) {
     message: attempt?.message || null,
     gates: Array.isArray(attempt?.gates) ? attempt.gates : [],
     httpStatus: attempt?.httpStatus || null,
+    assessmentComplete: attempt?.assessmentComplete === true,
     at: new Date().toISOString(),
   };
   attempts.set(key, record);
