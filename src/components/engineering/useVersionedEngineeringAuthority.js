@@ -171,6 +171,14 @@ export function useVersionedEngineeringAuthority(projectId, versionId, { finalRe
   // Browser assessment is diagnostics only, never final report authority.
   const localSummary = extractEngineeringSummary(localSnapshot);
   const localCompleteness = assessEngineeringReportCompleteness(localSummary);
+  // A cold report read may have no browser summary. Keep the recorded preflight
+  // diagnostics rather than claiming every parameter never ran.
+  const terminalGate = publicationAttempt?.gates?.find(gate => gate.key === 'rp22_terminal' && gate.ok === false);
+  const attemptedMissingKeys = terminalGate?.detail?.split(',').map(key => key.trim())
+    .filter(key => /^p([1-9]|1[0-9]|2[01])$/.test(key)) || null;
+  const diagnosticCompleteness = localSummary ? localCompleteness
+    : attemptedMissingKeys?.length ? { missingParameterKeys:attemptedMissingKeys, incompleteSeatParameterKeys:[] }
+    : publicationAttempt?.assessmentComplete === true ? { missingParameterKeys:[], incompleteSeatParameterKeys:[] } : null;
   const publicationGate = auditDurablePublication({
     durable,
     versionName: durable?.version?.version_name || null,
@@ -186,9 +194,9 @@ export function useVersionedEngineeringAuthority(projectId, versionId, { finalRe
         ...reportCompleteness,
         // Do not translate an absent saved publication into an assertion that
         // the displayed assessment never ran. This cannot make the gate pass.
-        ...(!durable?.publication && localSummary ? {
-          missingParameterKeys:localCompleteness.missingParameterKeys,
-          incompleteSeatParameterKeys:localCompleteness.incompleteSeatParameterKeys,
+        ...(!durable?.publication && diagnosticCompleteness ? {
+          missingParameterKeys:diagnosticCompleteness.missingParameterKeys,
+          incompleteSeatParameterKeys:diagnosticCompleteness.incompleteSeatParameterKeys,
         } : {}),
         complete: false,
         publicationBlocked: true,
