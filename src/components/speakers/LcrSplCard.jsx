@@ -90,6 +90,25 @@ export default function LcrSplCard({ role, label, allSeatSplMetrics, integratedL
   const powerW = effectiveSplInputs.powerW || 100;
   const eqHeadroomDb = effectiveSplInputs.eqHeadroomDb || 0;
 
+  // Dual centre (TV): the card states the selected cabinet's own SPL — the
+  // existing single-speaker calculation at the centre-channel amplifier power —
+  // plus the fixed allowance for the arrangement. No summation model is
+  // introduced, and the figure is presentation only: it never feeds the RP22 /
+  // P12 authority.
+  const dualCentreDb = useMemo(() => {
+    if (!dualCentre || !speaker?.model || !Number.isFinite(distanceM)) return null;
+    const result = computeSingleSeatSplAtDistance({
+      speakerModelId: speaker.model,
+      distance_m: distanceM,
+      powerW,
+      radiationMode: effectiveSplInputs.radiationMode,
+      screenLoss_dB: effectiveSplInputs.screenLoss_dB || 0,
+      eqHeadroom_dB: eqHeadroomDb,
+    });
+    const base = result?.spl_continuous_db_at_seat;
+    return Number.isFinite(base) ? base + DUAL_CENTRE_SPL_GAIN_DB : null;
+  }, [dualCentre, speaker, distanceM, powerW, effectiveSplInputs, eqHeadroomDb]);
+
   return (
     <Card className="bg-white">
       <CardHeader className="pb-2 pt-3 px-3">

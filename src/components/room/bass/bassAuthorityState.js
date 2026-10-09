@@ -133,7 +133,7 @@ export function resolveBassAuthorityState({
       && durable?.acknowledgement?.durably_published === true;
     const attemptStatus = matchingAttempt?.status || null;
     if (attemptStatus === ATTEMPT.ACKNOWLEDGED || durableMatches) return withCopy(BASS_AUTHORITY_STATE.CURRENT);
-    if (attemptStatus === ATTEMPT.QUEUED || attemptStatus === ATTEMPT.PUBLISHING) {
+    if (attemptStatus === ATTEMPT.PUBLISHING) {
       return withCopy(BASS_AUTHORITY_STATE.PUBLISHING);
     }
     // Saved, current, but the publication has not acknowledged it. Say exactly
