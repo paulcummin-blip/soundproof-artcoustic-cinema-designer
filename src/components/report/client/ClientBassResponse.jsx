@@ -33,6 +33,16 @@ import { resolveCoordinate } from "./selectClientSpeakerBalance";
 // internal RSP / MLP flag, which marks the single reference seat — priority
 // and the reference position are independent facts about the design.
 import { resolveSeatPriority, PRIMARY } from "@/components/utils/seatPriorityAuthority";
+import {
+  PROJECT_REPORT_SECTION,
+  projectReportSectionHeading,
+} from "@/components/report/projectReport/projectReportRegistry";
+
+// The detailed P19/P20 page sits under the RP22 category those parameters belong
+// to: Timbre Matching. The heading is supplied by the report's composition
+// authority, so this bass-support page can never headline a category of its own.
+// The default keeps the canonical category if rendered on its own.
+const DEFAULT_HEADING = projectReportSectionHeading(PROJECT_REPORT_SECTION.TIMBRE_MATCHING);
 
 import {
   REPORT_FONT_HEADING as HEADING_FONT,
@@ -169,6 +179,7 @@ function SeatLevelBadge({ level, strong }) {
 // ── Main component ──
 
 export default function ClientBassResponse({
+  heading = DEFAULT_HEADING,
   bassPerformance,
   roomDims,
   seatingPositions,
@@ -208,7 +219,7 @@ export default function ClientBassResponse({
           fontFamily: HEADING_FONT,
           textAlign: "center",
         }}>
-          Bass Performance
+          {heading}
         </h1>
         <p style={{
           margin: "6px 0 32px 0",
@@ -337,7 +348,7 @@ export default function ClientBassResponse({
             fontFamily: HEADING_FONT,
             textAlign: "center",
           }}>
-            Bass Performance
+            {heading}
           </h1>
           <p style={{
             margin: "6px 0 0 0",

@@ -32,6 +32,7 @@ import { computeHaloRadiusPx, PRIMARY_STROKE_WIDTH } from "./seatMarkerGeometry"
 // the internal RSP / MLP flag, which marks the single reference seat: the plan
 // below must never present the reference seat as the only primary seat.
 import { resolveSeatPriority, PRIMARY } from "@/components/utils/seatPriorityAuthority";
+import { statedFrequencyHz } from "@/components/utils/rp22/statedFrequencyAuthority";
 
 import {
   REPORT_FONT_HEADING as FONT_HEADING,
@@ -82,7 +83,24 @@ const MISSING_EVIDENCE_MESSAGE =
 // P19 is assessed at the Reference Seating Position only, so it has no per-seat
 // result at all: a legacy per-seat P19 row is never read as P19 authority, and
 // its presence does not make this page render a result.
-function resolveRspResult(bassPerformance) {
+/**
+ * The ONE frequency the P19 result may name.
+ *
+ * The published RSP result's own frequency when the saved evidence carries a
+ * real one; otherwise the limiting frequency the P19 evidence graph resolved
+ * from the same saved completed bass contract, which is the authoritative
+ * completed bass evidence for this version.
+ *
+ * A missing frequency is never coerced: an absent value (including a legacy
+ * publication's 0) stays absent, and the page then states no frequency at all
+ * rather than "0 Hz". Nothing is invented in its place.
+ */
+function resolveWorstFrequencyHz(published, p19Graph) {
+  return statedFrequencyHz(published)
+    ?? statedFrequencyHz(p19Graph?.markers?.limitingFrequencyHz);
+}
+
+function resolveRspResult(bassPerformance, p19Graph = null) {
   const published = bassPerformance?.p19?.rspResult || null;
   if (!published) return null;
   const publishedLevel = levelToLabel(published.level);
@@ -91,7 +109,7 @@ function resolveRspResult(bassPerformance) {
     level: publishedLevel,
     deviationDb: finiteOrNull(published.deviationDb),
     displayedValue: published.displayedValue || null,
-    worstFrequencyHz: finiteOrNull(published.worstFrequencyHz),
+    worstFrequencyHz: resolveWorstFrequencyHz(published.worstFrequencyHz, p19Graph),
   };
 }
 
@@ -107,7 +125,7 @@ export default function ClientP19RspPresentation({
   print,
   printPart,
 }) {
-  const result = resolveRspResult(bassPerformance);
+  const result = resolveRspResult(bassPerformance, p19Graph);
   // P19 is RSP-only: when the reference-position result is absent the page says
   // so plainly. It never substitutes a legacy per-seat P19 row, and it never
   // infers a result from P20.

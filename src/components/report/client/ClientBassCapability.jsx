@@ -29,6 +29,16 @@ import {
   REPORT_FONT_HEADING as HEADING_FONT,
   REPORT_FONT_BODY as BODY_FONT,
 } from '@/components/report/typography/reportTypography';
+import {
+  PROJECT_REPORT_SECTION,
+  projectReportSectionHeading,
+} from '@/components/report/projectReport/projectReportRegistry';
+
+// The detailed P14/P18 page sits under the RP22 category P14 belongs to:
+// Dynamic Range. The heading is supplied by the report's composition authority,
+// so this page can never headline a category of its own. The default keeps the
+// canonical category if the page is ever rendered on its own.
+const DEFAULT_HEADING = projectReportSectionHeading(PROJECT_REPORT_SECTION.DYNAMIC_RANGE);
 
 // ── Level helpers ──
 
@@ -114,7 +124,7 @@ function P14LevelProgression({ selectedLevel, achieved, pass }) {
 
 // ── Main component ──
 
-export default function ClientBassCapability({ bassPerformance }) {
+export default function ClientBassCapability({ bassPerformance, heading = DEFAULT_HEADING }) {
   if (!bassPerformance) return null;
 
   const { p14, p18 } = bassPerformance;
@@ -139,7 +149,7 @@ export default function ClientBassCapability({ bassPerformance }) {
           fontFamily: HEADING_FONT,
           marginBottom: 4,
         }}>
-          Bass Performance
+          {heading}
         </div>
         <div style={{
           fontSize: 12,
@@ -194,7 +204,7 @@ export default function ClientBassCapability({ bassPerformance }) {
         fontFamily: HEADING_FONT,
         textAlign: "center",
       }}>
-        Bass Performance
+        {heading}
       </h1>
       <p style={{
         margin: "6px 0 28px 0",

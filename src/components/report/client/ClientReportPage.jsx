@@ -40,6 +40,8 @@ import ProjectReportProducts from '@/components/report/projectReport/ProjectRepo
 import ProjectReportSectionPage from '@/components/report/projectReport/ProjectReportSectionPage';
 import { PROJECT_REPORT_TITLE } from '@/components/report/projectReport/projectReportIdentity';
 
+import ProjectReportSummaryOpening from "@/components/report/projectReport/ProjectReportSummaryOpening";
+
 // Level → canonical grade colour for P12/P13 print result badges.
 // Derived from RP22_GRADE_TOKENS — the same authority as grading pills.
 function printLevelColor(lvl) {
@@ -97,8 +99,9 @@ export default function ClientReportPage({
   const sectionContinued = printData?.sectionContinued === true;
   // The canonical heading the composition authority resolved for this page —
   // its RP22 category (from technicalParameterMeta) or its document section —
-  // with "— Continued" already stated for every page after the first of that
-  // section.
+  // with "— Continued" already stated ONCE for every page after the first of
+  // that section. The composition authority is the only place the suffix is
+  // applied: nothing here (or in the stylesheet) appends a second one.
   const sectionHeading = printData?.sectionHeading || null;
   // A page with no printable composition is never laid out for paper.
   const prints = PRINTABLE_PAGE_TYPES.has(printData?.type);
@@ -111,11 +114,12 @@ export default function ClientReportPage({
       data-section-continued={sectionContinued ? "true" : "false"}
     >
       {/* A category heading is repeated on every page of its section: the first
-          page states it, each later page states that it continues. The heading
-          always stays with the first content block beneath it, so it can never be
-          orphaned at the foot of a page. */}
+          page states it, each later page states that it continues — the
+          continuation suffix arrives in the heading TEXT from the composition
+          authority, so it is stated once and this stylesheet never appends a
+          second one. The heading always stays with the first content block
+          beneath it, so it can never be orphaned at the foot of a page. */}
       <style>{`
-        .client-report-page[data-section-continued="true"] .client-report-print-heading__title::after { content: " — Continued"; }
         .client-report-print-heading { break-after: avoid; page-break-after: avoid; }
       `}</style>
       {/* First-page masthead — the Technical Report's cover structure: logo,
@@ -171,6 +175,13 @@ export default function ClientReportPage({
             </div>
             {/* The summary statement sits centred, with its own breathing room
                 below the heading rather than crowding it. */}
+            {/* The Design Summary opens on this actual cinema: the project-specific
+                summary the report composed from its own evidence. */}
+            {printData.summaryOpening && (
+              <div style={{ padding: "0 24px", marginTop: "8mm", marginBottom: "4mm", textAlign: "center" }}>
+                <ProjectReportSummaryOpening sentence={printData.summaryOpening} print />
+              </div>
+            )}
             {printData.coverageSentence && (
               <div style={{ padding: "0 24px", marginTop: "8mm", marginBottom: "4mm", textAlign: "center" }}>
                 <Rp22SeatCoverageSentence sentence={printData.coverageSentence} variant="print" />
@@ -443,11 +454,19 @@ export default function ClientReportPage({
             </div>
           </>
         )}
+        {/* The detailed P14/P18 page prints under its own RP22 category heading
+            (Dynamic Range), and the P19/P20 page under Timbre Matching — the same
+            heading every other page of that section states, never a category of
+            the bass page's own. */}
         {printData?.type === "bass-capability" && (
-          <PrintBassCapabilityContent bassPerformance={printData.bassPerformance} />
+          <PrintBassCapabilityContent
+            bassPerformance={printData.bassPerformance}
+            heading={sectionHeading}
+          />
         )}
         {printData?.type === "bass-response" && (
           <PrintBassResponseContent
+            heading={sectionHeading}
             bassPerformance={printData.bassPerformance}
             roomDims={printData.roomDims}
             seatingPositions={printData.seatingPositions}

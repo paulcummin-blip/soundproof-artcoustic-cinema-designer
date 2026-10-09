@@ -18,6 +18,16 @@ import {
   REPORT_FONT_HEADING as HEADING_FONT,
   REPORT_FONT_BODY as BODY_FONT,
 } from '@/components/report/typography/reportTypography';
+import {
+  PROJECT_REPORT_SECTION,
+  projectReportSectionHeading,
+} from '@/components/report/projectReport/projectReportRegistry';
+
+// The page's RP22 category heading. P14 is a Dynamic Range parameter — the
+// detail page sits under Dynamic Range, never a category of its own. The heading
+// is supplied by the composition authority; this default keeps the canonical
+// category if the page is ever rendered on its own.
+const DEFAULT_HEADING = projectReportSectionHeading(PROJECT_REPORT_SECTION.DYNAMIC_RANGE);
 
 function levelToNumber(level) {
   if (level == null) return null;
@@ -97,7 +107,7 @@ function P14LevelProgression({ selectedLevel, pass }) {
   );
 }
 
-export default function PrintBassCapabilityContent({ bassPerformance }) {
+export default function PrintBassCapabilityContent({ bassPerformance, heading = DEFAULT_HEADING }) {
   if (!bassPerformance) return null;
 
   const { p14, p18 } = bassPerformance;
@@ -108,7 +118,7 @@ export default function PrintBassCapabilityContent({ bassPerformance }) {
     return (
       <>
         <div className="client-report-print-heading">
-          <h1 className="client-report-print-heading__title">Bass Performance</h1>
+          <h1 className="client-report-print-heading__title">{heading}</h1>
           <p className="client-report-print-heading__subtitle">RP22 Parameters 14 &amp; 18 — Output Capability and Low-Frequency Extension</p>
         </div>
         <div className="client-report-print-drawing" style={{ display: "flex", alignItems: "center", justifyContent: "center" }}>
@@ -140,7 +150,7 @@ export default function PrintBassCapabilityContent({ bassPerformance }) {
   return (
     <>
       <div className="client-report-print-heading">
-        <h1 className="client-report-print-heading__title">Bass Performance</h1>
+        <h1 className="client-report-print-heading__title">{heading}</h1>
         <p className="client-report-print-heading__subtitle">RP22 Parameters 14 &amp; 18 — Output Capability and Low-Frequency Extension</p>
       </div>
       <div className="client-report-print-drawing" style={{

@@ -39,14 +39,18 @@ import { buildClientAcousticTreatmentPage } from "@/components/report/client/aco
 import { planSeatRowPages } from "@/components/report/client/perSeatCardLayout";
 import { isAssessedLevel } from "@/components/report/client/visualReportSeatStyle";
 import {
+  PROJECT_REPORT_SECTION,
   buildParameterIndexPages,
   orderProjectReportPages,
+  projectReportSectionHeading,
   sectionForPage,
 } from "@/components/report/projectReport/projectReportRegistry";
+import { buildProjectReportSummaryOpening } from "@/components/report/projectReport/projectReportSummaryOpening";
 import ProjectReportCover from "@/components/report/projectReport/ProjectReportCover";
 import ProjectReportParameterIndex from "@/components/report/projectReport/ProjectReportParameterIndex";
 import ProjectReportProducts from "@/components/report/projectReport/ProjectReportProducts";
 import ProjectReportSectionPage from "@/components/report/projectReport/ProjectReportSectionPage";
+import ProjectReportSummaryOpening from "@/components/report/projectReport/ProjectReportSummaryOpening";
 
 export function useProjectReportPages({
   hydrating,
@@ -92,6 +96,15 @@ export function useProjectReportPages({
   versionId,
 }) {
   const activePages = useMemo(() => {
+    // The Design Summary's opening: one project-specific statement of the cinema
+    // this report documents, composed from the report's own evidence. Null when
+    // the report carries too little project evidence for one.
+    const summaryOpening = buildProjectReportSummaryOpening({
+      projectDetails,
+      productsSelected,
+      seatingPositions,
+      engineeringSummary,
+    });
     const overviewPages = [];
     const dynamicPages = [];
     const spatialPages = [];
@@ -104,16 +117,19 @@ export function useProjectReportPages({
       overviewPages.push({
         id: "design-summary",
         category: "Design Summary",
+        // The Design Summary opens on this project — its architecture, screen,
+        // seating and specified system, with only the strengths the published
+        // assessment supports — instead of a generic statement about seats.
         visual: (
-          <ClientDesignHighlights
-            highlights={highlights}
-            coverageSentence={coverageSentence}
-          />
+          <>
+            {summaryOpening && <ProjectReportSummaryOpening sentence={summaryOpening} />}
+            <ClientDesignHighlights highlights={highlights} />
+          </>
         ),
         printData: {
           type: "highlights",
           highlights,
-          coverageSentence,
+          summaryOpening,
         },
       });
     }

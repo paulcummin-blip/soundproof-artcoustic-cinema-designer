@@ -16,8 +16,19 @@ import ClientBassResponse from "../ClientBassResponse";
 import { isAssessedLevel } from "../visualReportSeatStyle";
 
 import { REPORT_FONT_BODY as BODY_FONT } from '@/components/report/typography/reportTypography';
+import {
+  PROJECT_REPORT_SECTION,
+  projectReportSectionHeading,
+} from '@/components/report/projectReport/projectReportRegistry';
+
+// The page's RP22 category heading. P19 and P20 are Timbre Matching parameters —
+// this detailed bass-support page sits under Timbre Matching, never a category of
+// its own. Supplied by the composition authority; the default keeps the canonical
+// category if the page is ever rendered on its own.
+const DEFAULT_HEADING = projectReportSectionHeading(PROJECT_REPORT_SECTION.TIMBRE_MATCHING);
 
 export default function PrintBassResponseContent({
+  heading = DEFAULT_HEADING,
   bassPerformance,
   roomDims,
   seatingPositions,
@@ -37,7 +48,7 @@ export default function PrintBassResponseContent({
     return (
       <>
         <div className="client-report-print-heading">
-          <h1 className="client-report-print-heading__title">Bass Performance</h1>
+          <h1 className="client-report-print-heading__title">{heading}</h1>
           <p className="client-report-print-heading__subtitle">RP22 Parameters 19 &amp; 20 — Response Quality and Seat Consistency</p>
         </div>
         <div className="client-report-print-drawing" style={{ display: "flex", alignItems: "center", justifyContent: "center" }}>
@@ -60,7 +71,7 @@ export default function PrintBassResponseContent({
   return (
     <>
       <div className="client-report-print-heading">
-        <h1 className="client-report-print-heading__title">Bass Performance</h1>
+        <h1 className="client-report-print-heading__title">{heading}</h1>
         <p className="client-report-print-heading__subtitle">RP22 Parameters 19 &amp; 20 — Response Quality and Seat Consistency</p>
       </div>
       <div className="client-report-print-drawing">

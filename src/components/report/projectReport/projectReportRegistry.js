@@ -16,7 +16,8 @@
  * WHAT THIS MODULE OWNS
  *   — the document's sections and the order they print in
  *   — which section each page belongs to, and the heading that section prints
- *     (with "— Continued" on every page after the first of that section)
+ *     (with "— Continued" on every page after the first of that section — the
+ *     suffix is applied HERE and only here, so no page can state it twice)
  *   — the P1–P21 inclusion rule: every parameter has an explicit row in its
  *     category's index table, so no parameter can silently disappear even when
  *     it carries no drawing of its own
@@ -85,6 +86,10 @@ export function projectReportSection(sectionId) {
 export function projectReportSectionHeading(sectionId) {
   return SECTION_BY_ID[sectionId]?.label || null;
 }
+
+/** The continuation suffix a section's later pages state — applied exactly once. */
+export const CONTINUATION_SUFFIX_LABEL = ' — Continued';
+const CONTINUATION_SUFFIX = /\s*—\s*Continued\s*$/i;
 
 /* ── Parameters ─────────────────────────────────────────────────────────── */
 
@@ -223,13 +228,19 @@ export function sectionForPage(page) {
  * other sections print their own section label. Every page after the first of a
  * section states that it continues: heading and first content block stay
  * together, so a continuation heading is never orphaned at the foot of a page.
+ *
+ * THE ONLY PLACE THE CONTINUATION SUFFIX IS APPLIED. Nothing downstream appends
+ * it again (the report stylesheet used to, which is what produced a doubled
+ * "— CONTINUED — CONTINUED"), and a base heading that already carries the suffix
+ * is never given a second one.
  */
 export function headingForPage(page, { continued = false } = {}) {
   const section = sectionForPage(page);
   if (!section) return null;
   const base = projectReportSectionHeading(section);
   if (!base || section === PROJECT_REPORT_SECTION.COVER) return null;
-  return continued ? `${base} — Continued` : base;
+  if (!continued || CONTINUATION_SUFFIX.test(base)) return base;
+  return `${base}${CONTINUATION_SUFFIX_LABEL}`;
 }
 
 /* ── Ordering ───────────────────────────────────────────────────────────── */
