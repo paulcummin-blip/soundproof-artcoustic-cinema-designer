@@ -16,13 +16,14 @@
 
 import React, { useEffect, useState } from "react";
 import { formatOfficialBassResults } from "@/components/room/bass/bassResultsPresentation";
-import { useSharedBassResults } from "@/components/room/bass/bassResultsStore";
+import useSharedBassAuthorityState from "@/components/room/bass/useSharedBassAuthorityState";
+import BassStateBadge from "@/components/room/bass/BassStateBadge";
 import { resolveP14TargetSelectionState } from "@/components/room/bass/p14TargetSelectionState";
 import SharedP19P20SeatResults from "@/components/room/bass/SharedP19P20SeatResults";
 import { useEffectiveBassLifecycleState } from "@/components/room/bass/bda/useEffectiveBassLifecycle";
 
 export default function P20SeatStrip() {
-  const shared = useSharedBassResults();
+  const { shared, authorityState } = useSharedBassAuthorityState();
   const [nowMs, setNowMs] = useState(Date.now());
   const active = shared.calculationInProgress || shared.bassLifecycleState === "stale_needs_recalculation";
 
@@ -69,14 +70,10 @@ export default function P20SeatStrip() {
         p14TargetUnselected={p14Selection.noP14TargetSelected}
       />
       <div className="flex items-center gap-2 text-[10px] font-medium text-[#625143]" aria-live="polite">
-        {isStale && (
-          <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-bold uppercase tracking-wide bg-[#F5F0E6] text-[#8A6D3B] border border-[#E0D5C0]">
-            Out of Date
-          </span>
-        )}
+        <BassStateBadge state={authorityState} />
         {effectiveLifecycle === "failed" && shared.onRetry
           ? <button type="button" onClick={shared.onRetry} className="font-semibold text-red-700 underline">{formatted.statusText}</button>
-          : <span>{formatted.statusText}</span>}
+          : null}
       </div>
     </div>
   );
