@@ -25,7 +25,6 @@ import RvRoomElementsLayer from "@/components/room/rv/render/RvRoomElementsLayer
 import { clampOverheadToZone, clampSymmetricOverheadPair, clampOverheadPairPosition } from "@/components/utils/overheadDragClamping";
 import RvDolbyZones from "@/components/room/rv/render/RvDolbyZones";
 import RvBaffleAndScreen from "@/components/room/rv/render/RvBaffleAndScreen";
-import RvSpeakerTooltip from "@/components/room/rv/render/RvSpeakerTooltip";
 import RvPlanCanvas from "@/components/room/rv/render/RvPlanCanvas";
 import { useSubwooferDraftResetSignal } from "@/components/room/bass/bda/subwooferDraftResetStore";
 import { useOverheadAutoPlacement } from "@/components/hooks/useOverheadAutoPlacement";
