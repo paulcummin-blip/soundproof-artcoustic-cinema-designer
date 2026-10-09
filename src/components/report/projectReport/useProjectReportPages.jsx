@@ -255,6 +255,7 @@ export function useProjectReportPages({
             counts={p9Overhead.counts}
             summary={p9Overhead.summary}
             placedSpeakers={placedSpeakers}
+            p9Snapshot={p9Snapshot}
           />
         ),
         printData: {

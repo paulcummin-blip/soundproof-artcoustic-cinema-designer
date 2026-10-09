@@ -1,32 +1,33 @@
 /**
  * ClientP9Overhead
  * ----------------
- * Per-seat SVG plan component for the P9 Overhead Speaker Spacing Visual
- * Report page (RP22 Parameter 9 — Overhead speaker spacing).
+ * Screen page for the P9 Overhead Speaker Spacing Visual Report page
+ * (RP22 Parameter 9 — Overhead speaker spacing).
  *
- * P9 is a SEAT-scope parameter. This component shows every active seat with
- * its own canonical P9 level and worst vertical gap in degrees, sourced from
- * analysisResult.perSeatRp22 via selectClientP9Overhead. It does NOT present
- * a single RSP-level result as the overall P9 grade.
+ * The drawing is a TRUE SIDE SECTION built from the saved design geometry: the
+ * RSP at its real room position and ear height, each overhead row at its real
+ * ceiling position, and the P9 adjacent-row angles drawn at the RSP itself.
+ * No speaker is moved to make an angle readable — the rows shown are the
+ * installed TFL/TFR, TML/TMR and TRL/TRR rows (see P9SideSectionDrawing).
+ *
+ * P9 is a SEAT-scope parameter. Below the drawing, every active seat is shown
+ * with its own canonical published P9 level and worst vertical gap in degrees,
+ * sourced from the published seat results via selectClientP9Overhead. The
+ * drawing explains the RSP geometry; it never replaces the per-seat authority
+ * and never presents itself as the overall P9 grade.
  *
  * Layout:
- *   - Plan view SVG (top-down) with room outline, screen, seats coloured by
- *     P9 level, primary/secondary distinction, RSP marker
- *   - Level key (only levels present)
+ *   - Side section SVG (real geometry, angles measured from the RSP)
  *   - Seat result grid (P9 level + degrees per seat)
  *   - Summary card with actual distribution wording (no single RSP badge)
  *
  * P9 thresholds: L4 <= 50°, L3 <= 60°, L2 <= 80°, >80° = L1 (open-ended — no upper L1 threshold).
  */
 
-import React from "react";
-import { resolveRspLabelPlacement } from "./ClientSpeakerBalance";
-import { getSeatGradeColors, PRIORITY_LEGEND } from "./visualReportSeatStyle";
-import SeatMarker from "./SeatMarker";
-import { computeHaloRadiusPx, PRIMARY_STROKE_WIDTH } from "./seatMarkerGeometry";
-
-const RSP_RING_R = 8;
-const RSP_DOT_R = 3;
+import React, { useMemo } from "react";
+import { getSeatGradeColors } from "./visualReportSeatStyle";
+import P9SideSectionDrawing from "./P9SideSectionDrawing";
+import { buildP9SideSection } from "./p9SideSectionGeometry";
 
 // Y-tolerance for grouping seats into the same physical row (meters)
 const ROW_TOLERANCE_M = 0.05;
@@ -82,12 +83,6 @@ function P9SeatBadge({ level, degrees }) {
   );
 }
 
-const OVERHEAD_PREFIXES = ["T", "U"];
-
-function isOverheadRole(canonRole) {
-  return OVERHEAD_PREFIXES.some((p) => canonRole.startsWith(p));
-}
-
 export default function ClientP9Overhead({
   roomDims,
   seats,
@@ -97,52 +92,14 @@ export default function ClientP9Overhead({
   counts,
   summary,
   placedSpeakers,
+  p9Snapshot,
 }) {
-  const W = Number(roomDims?.widthM) || 4.5;
-  const L = Number(roomDims?.lengthM) || 6.0;
-
-  const PADDING_M = 0.6;
-  const totalW = W + PADDING_M * 2;
-  const totalL = L + PADDING_M * 2;
-  const SVG_W = 760;
-  const SVG_H = Math.round(SVG_W * (totalL / totalW));
-  const SCALE = SVG_W / totalW;
-
-  const toPx = (x, y) => ({
-    px: (x + PADDING_M) * SCALE,
-    py: (y + PADDING_M) * SCALE,
-  });
-
-  // Compute spacing-aware common halo radius from actual seat centres.
-  const seatPointsPx = (seats || []).map((seat) => toPx(seat.x, seat.y));
-  const haloRadius = computeHaloRadiusPx(seatPointsPx);
-
-  // Screen geometry
-  const screenY = Number(screenFrontPlaneM) || 0.2;
-  const screenW = Number(screenWidthM) || 3;
-  const screenLeftX = (W - screenW) / 2;
-  const screenRightX = (W + screenW) / 2;
-  const screenLeftPx = toPx(screenLeftX, screenY);
-  const screenRightPx = toPx(screenRightX, screenY);
-
-  const roomTopLeft = toPx(0, 0);
-  const roomBottomRight = toPx(W, L);
-
-  // RSP validity
-  const rspX = Number(rsp?.x);
-  const rspY = Number(rsp?.y);
-  const rspValid = Number.isFinite(rspX) && Number.isFinite(rspY);
-  const rspPx = rspValid ? toPx(rspX, rspY) : null;
-
-  // Actual installed overhead speakers — same geometry authority as Room Designer.
-  // Rendered at their real plan coordinates so the P9 result has spatial meaning.
-  const overheadSpeakers = (Array.isArray(placedSpeakers) ? placedSpeakers : [])
-    .filter((s) => s?.position && Number.isFinite(s.position.x) && Number.isFinite(s.position.y))
-    .map((s) => {
-      const role = String(s.role || "").toUpperCase();
-      return { role, x: Number(s.position.x), y: Number(s.position.y) };
-    })
-    .filter((s) => isOverheadRole(s.role));
+  // The side section is built only from the published P9 snapshot's own
+  // geometry — the real RSP and the real overhead row positions.
+  const sideSection = useMemo(
+    () => buildP9SideSection({ p9Snapshot, roomDims }),
+    [p9Snapshot, roomDims],
+  );
 
   if (!seats || seats.length === 0) {
     return (
@@ -203,175 +160,29 @@ export default function ClientP9Overhead({
         </p>
       </div>
 
-      {/* ── Plan view SVG ── */}
-      <svg
-        viewBox={`0 0 ${SVG_W} ${SVG_H}`}
-        style={{ width: "100%", maxWidth: 760, height: "auto" }}
-      >
-        {/* Room outline */}
-        <rect
-          x={roomTopLeft.px}
-          y={roomTopLeft.py}
-          width={roomBottomRight.px - roomTopLeft.px}
-          height={roomBottomRight.py - roomTopLeft.py}
-          fill="#F8F8F7"
-          stroke="#625143"
-          strokeWidth={2}
+      {/* ── Side elevation: the real room section, with the P9 adjacent-row
+             angles measured from the RSP itself ── */}
+      {sideSection ? (
+        <P9SideSectionDrawing
+          geometry={sideSection}
+          levelLabel={p9Snapshot?.level ?? null}
+          style={{ width: "100%", maxWidth: 760, height: "auto" }}
         />
-
-        {/* Screen */}
-        <line
-          x1={screenLeftPx.px}
-          y1={screenLeftPx.py}
-          x2={screenRightPx.px}
-          y2={screenRightPx.py}
-          stroke="#3E4349"
-          strokeWidth={5}
-        />
-        <text
-          x={(screenLeftPx.px + screenRightPx.px) / 2}
-          y={screenLeftPx.py - 10}
-          fill="#625143"
-          fontSize={11}
-          textAnchor="middle"
-          fontFamily="Didact Gothic, Century Gothic, sans-serif"
-          letterSpacing="0.06em"
-        >
-          SCREEN
-        </text>
-
-        {/* Rays from RSP to each overhead speaker — spatial context for the
-             P9 angle result. Thin, low-opacity so they don't clutter the seats. */}
-        {rspPx && overheadSpeakers.map((spk, i) => {
-          const sp = toPx(spk.x, spk.y);
-          return (
-            <line
-              key={`p9-ray-${i}`}
-              x1={rspPx.px}
-              y1={rspPx.py}
-              x2={sp.px}
-              y2={sp.py}
-              stroke="#8A7B6A"
-              strokeWidth={1}
-              strokeOpacity={0.35}
-              strokeDasharray="3 3"
-            />
-          );
-        })}
-
-        {/* Actual installed overhead speakers at their real plan coordinates */}
-        {overheadSpeakers.map((spk, i) => {
-          const sp = toPx(spk.x, spk.y);
-          return (
-            <g key={`p9-ovh-${i}`}>
-              <circle
-                cx={sp.px}
-                cy={sp.py}
-                r={6}
-                fill="none"
-                stroke="#8A7B6A"
-                strokeWidth={1.5}
-                strokeDasharray="2 2"
-              />
-              <text
-                x={sp.px}
-                y={sp.py - 12}
-                fill="#8A7B6A"
-                fontSize={10}
-                textAnchor="middle"
-                fontFamily="Didact Gothic, Century Gothic, sans-serif"
-                fontWeight={600}
-              >
-                {spk.role}
-              </text>
-            </g>
-          );
-        })}
-
-        {/* Seat markers — compact spacing-aware single-result halo.
-             Primary seats get an additional bold dark outer keyline. */}
-        {seats.map((seat) => {
-          const sp = toPx(seat.x, seat.y);
-          return (
-            <SeatMarker
-              key={seat.id}
-              cx={sp.px}
-              cy={sp.py}
-              haloRadius={haloRadius}
-              isPrimary={seat.isPrimary}
-              singleLevel={seat.p9Level}
-            />
-          );
-        })}
-
-        {/* RSP marker — reference only, no classification */}
-        {rspPx && (() => {
-          const seatCircles = seats.map((seat) => {
-            const sp = toPx(seat.x, seat.y);
-            return { cx: sp.px, cy: sp.py, r: haloRadius + PRIMARY_STROKE_WIDTH };
-          });
-          const screenCx = (screenLeftPx.px + screenRightPx.px) / 2;
-          const screenRect = {
-            x1: Math.min(screenLeftPx.px, screenCx - 25),
-            y1: screenLeftPx.py - 22,
-            x2: Math.max(screenRightPx.px, screenCx + 25),
-            y2: screenLeftPx.py + 3,
-          };
-          const placement = resolveRspLabelPlacement(rspPx, seatCircles, [], screenRect, { w: SVG_W, h: SVG_H }, { markerRadius: haloRadius + PRIMARY_STROKE_WIDTH });
-          return (
-            <g>
-              <circle cx={rspPx.px} cy={rspPx.py} r={RSP_RING_R} fill="none" stroke="#213428" strokeWidth={2.5} />
-              <circle cx={rspPx.px} cy={rspPx.py} r={RSP_DOT_R} fill="#213428" />
-              <text
-                x={placement.x}
-                y={placement.y}
-                fill="#213428"
-                fontSize={12}
-                textAnchor={placement.anchor}
-                dominantBaseline="middle"
-                fontWeight={600}
-                fontFamily="Didact Gothic, Century Gothic, sans-serif"
-                letterSpacing="0.08em"
-              >
-                RSP
-              </text>
-            </g>
-          );
-        })()}
-      </svg>
-
-      {/* ── Priority key (outline weight = priority, NOT grade colour) ── */}
-      <div style={{
-        display: "flex",
-        flexWrap: "wrap",
-        justifyContent: "center",
-        gap: 16,
-        padding: "12px 16px",
-        background: "#F1F0EE",
-        borderRadius: 8,
-        border: "1px solid #DCDBD6",
-        width: "100%",
-        maxWidth: 600,
-        fontFamily: "Didact Gothic, Century Gothic, sans-serif",
-      }}>
-        {PRIORITY_LEGEND.map((entry) => (
-          <div key={entry.key} style={{ display: "flex", alignItems: "center", gap: 8 }}>
-            <svg width={20} height={20} viewBox="0 0 20 20">
-              <circle
-                cx={10}
-                cy={10}
-                r={8}
-                fill="none"
-                stroke={entry.stroke}
-                strokeWidth={entry.strokeWidth}
-              />
-            </svg>
-            <span style={{ fontSize: 12, color: "#3E4349", letterSpacing: "0.02em" }}>
-              {entry.label}
-            </span>
-          </div>
-        ))}
-      </div>
+      ) : (
+        <div style={{
+          width: "100%",
+          maxWidth: 760,
+          padding: "24px 20px",
+          textAlign: "center",
+          fontSize: 12,
+          color: "#625143",
+          background: "#F8F8F7",
+          borderRadius: 12,
+          border: "1px solid #DCDBD6",
+        }}>
+          Side elevation unavailable — overhead row geometry is not present in this report.
+        </div>
+      )}
 
       {/* ── Seat result grid ── */}
       {matrixRows.length > 0 && (

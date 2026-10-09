@@ -15,12 +15,11 @@
  */
 
 import React from "react";
+import { P9_SIDE_ROW_COLORS, P9_SIDE_ROW_ROLE_LABELS } from "./p9SideSectionGeometry";
 
-export const P9_ROW_COLORS = {
-  front: "#625143",
-  mid: "#213428",
-  rear: "#4A230F",
-};
+// Row colours and role labels come from the P9 side-section geometry authority,
+// so the drawing and its row labels can never disagree.
+export const P9_ROW_COLORS = P9_SIDE_ROW_COLORS;
 
 export const P9_ROW_LABELS = {
   front: "45° forward",
@@ -28,11 +27,7 @@ export const P9_ROW_LABELS = {
   rear: "45° rear",
 };
 
-export const P9_ROW_ROLE_LABELS = {
-  front: "TFL / TFR",
-  mid: "TML / TMR",
-  rear: "TRL / TRR",
-};
+export const P9_ROW_ROLE_LABELS = P9_SIDE_ROW_ROLE_LABELS;
 
 export const P9_LABEL_OFFSETS = {
   roleLabel: -48,
