@@ -1,5 +1,6 @@
 import { usesIntegratedLcrStage } from '../../../../shared/channelArchitecture.js';
-import { detectDualCentreStage, isCentreCabinetRole, centreCabinetPowerW } from '@/components/utils/frontStageModeAuthority';
+import { detectDualCentreStage, isCentreCabinetRole, centreCabinetPowerW, centreCabinets, DUAL_CENTRE_SPL_GAIN_DB } from '@/components/utils/frontStageModeAuthority';
+import { effectiveCentreAcousticMidpoint } from '@/components/utils/dualCentrePairAuthority';
 import { isListenerLevelSurroundRole } from '@/components/utils/rp22/listenerLevelSurroundRoles';
 // components/utils/spl/centralSplEngine.js
 // ─────────────────────────────────────────────────────────────────────────────
@@ -466,15 +467,16 @@ export function computeAllSeatSplMetrics({
   // For SPL/RP22 reporting only, expose virtual FL/FC/FR screen-channel entries.
   const isIntegratedLcr = usesIntegratedLcrStage(placedLCR, getModelDimsM);
 
-  // Dual centre (TV): the two physical centre cabinets (FCL/FCR) carry the ONE
-  // centre channel. For SPL they resolve to a SINGLE FC screen channel — the
-  // cabinet's own capability at HALF the centre-channel amplifier power. No
-  // +3 dB / +6 dB combining gain is ever added, and the cabinets never appear as
-  // screen channels of their own, so the centre is neither overstated nor
-  // double-counted.
-  const centreCabinet = detectDualCentreStage(placedSpeakers)
-    ? placedSpeakers.find((s) => hasPos(s) && hasRealModel(s) && isCentreCabinetRole(s.role))
-    : null;
+  // Two physical cabinets resolve to ONE logical FC at the existing midpoint.
+  // Capability uses half channel power per cabinet plus the approved flat
+  // allowance once for a complete pair. This is a design estimate, NOT an exact
+  // two-source sound-field/interference model. Physical drawings stay unchanged.
+  const dualCabinets = detectDualCentreStage(placedSpeakers)
+    ? centreCabinets(placedSpeakers).filter((s) => hasPos(s) && hasRealModel(s))
+    : [];
+  const centreCabinet = dualCabinets[0] || null;
+  const centreMidpoint = effectiveCentreAcousticMidpoint(dualCabinets);
+  const completeDualPair = ['FCL', 'FCR'].every((role) => dualCabinets.some((s) => getCanonicalRole(s.role) === role));
 
   const screenSpeakersForSpl = isIntegratedLcr
     ? (() => {
@@ -493,8 +495,10 @@ export function computeAllSeatSplMetrics({
             ...centreCabinet,
             role: 'FC',
             id: `${centreCabinet.id || 'FC'}__dual_centre_FC`,
+            position: centreMidpoint,
             virtualFromDualCentre: true,
             dualCentreHalfPower: true,
+            dualCentreAllowanceDb: completeDualPair ? DUAL_CENTRE_SPL_GAIN_DB : 0,
           },
         ]
       : placedLCR;
@@ -534,8 +538,8 @@ export function computeAllSeatSplMetrics({
         // Get effective SPL inputs (power, sensitivity overrides)
         const effectiveSplInputs = getEffectiveSplInputs(spk.role);
         // The dual-centre cabinet carries ONE centre channel split between the two
-        // cabinets: it is driven at half the centre-channel amplifier power, with
-        // no combining gain of any kind.
+        // cabinets: it is driven at half the centre-channel amplifier power.
+        // The approved arrangement allowance is applied below, exactly once.
         const channelPowerW = effectiveSplInputs?.powerW || 100;
         const powerW = spk.dualCentreHalfPower ? centreCabinetPowerW(channelPowerW) : channelPowerW;
 
@@ -563,7 +567,7 @@ export function computeAllSeatSplMetrics({
                                speakerMeta?.sensitivity || 
                                87,
           // Power from effective inputs (dual centre: the per-cabinet share —
-          // X/2, with no combining gain applied)
+          // X/2; the approved flat arrangement allowance is applied below)
           powerW,
           // Screen loss and EQ headroom
           screenLoss_dB: screenLoss_dB || 0,
@@ -574,8 +578,9 @@ export function computeAllSeatSplMetrics({
           roomVolumeM3,
         });
 
-        const splValue = splResult?.spl ?? null;
-        const splTheoretical = splResult?.spl_theoretical ?? null;
+        const allowanceDb = spk.virtualFromDualCentre ? (spk.dualCentreAllowanceDb || 0) : 0;
+        const splValue = Number.isFinite(splResult?.spl) ? splResult.spl + allowanceDb : null;
+        const splTheoretical = Number.isFinite(splResult?.spl_theoretical) ? splResult.spl_theoretical + allowanceDb : null;
 
         if (Number.isFinite(splValue)) {
           spl[categoryKey][role] = {
@@ -586,6 +591,13 @@ export function computeAllSeatSplMetrics({
               ...(splResult?.debug || {}),
               role: spk.role,
               canonicalRole: role,
+              ...(spk.virtualFromDualCentre ? {
+                dualCentreAllowanceDb: allowanceDb,
+                centreChannelPowerW: channelPowerW,
+                centreCabinetPowerW: powerW,
+                logicalCentrePosition: { ...speakerPosForSpl },
+                capabilityBasis: 'split-power-plus-approved-flat-allowance',
+              } : {}),
             },
           };
         }
