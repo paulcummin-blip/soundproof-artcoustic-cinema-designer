@@ -39,28 +39,33 @@ export const PROPOSAL_SOURCE_STATE = Object.freeze({
 });
 
 export const PROPOSAL_SOURCE_REPORT = Object.freeze({
+  /** The ONE report a proposal is built from. */
+  PROJECT: 'project',
+  /** Legacy report identities: retained so historical records stay readable. */
   VISUAL: 'visual',
   TECHNICAL: 'technical',
 });
 
 export const PROPOSAL_SOURCE_REPORT_LABEL = Object.freeze({
+  project: 'Project Report',
   visual: 'Visual Report',
   technical: 'Technical Report',
 });
 
 /** Where each report is generated, so a blocker can offer the right action. */
 export const PROPOSAL_SOURCE_REPORT_ROUTE = Object.freeze({
+  project: '/RP22ClientReport',
   visual: '/RP22ClientReport',
   technical: '/RP22Report',
 });
 
 /** The blocking message, shown verbatim whenever a proposal cannot be generated. */
 export const PROPOSAL_SOURCE_REQUIRED_MESSAGE =
-  'Generate the Visual and Technical Reports before creating a proposal. This ensures the proposal uses the current project data and RP22 results.';
+  'Create the Project Report for every selected version before creating a proposal. This ensures the proposal uses the current project data and RP22 results.';
 
 /** The one-line rule, for documentation and tests. */
 export const PROPOSAL_SOURCE_RULE =
-  'No current Visual Report + current Technical Report = no proposal.';
+  'No current Project Report = no proposal.';
 
 /** Panel heading. */
 export const PROPOSAL_SOURCE_TITLE = 'Proposal Source Data';

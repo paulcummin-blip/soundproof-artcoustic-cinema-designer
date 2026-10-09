@@ -36,29 +36,29 @@ export const LIBRARY_VERDICT = Object.freeze({
 /** The banner's title, per verdict. */
 export const LIBRARY_READINESS_HEADLINE = Object.freeze({
   READY: 'Ready for Proposal',
-  UPDATES_NEEDED: 'Update reports before creating a proposal',
-  NOT_ASSESSED: 'Reports are not ready yet',
+  UPDATES_NEEDED: 'Update the Project Report before creating a proposal',
+  NOT_ASSESSED: 'The Project Report is not ready yet',
 });
 
 /** Shown under Ready for Proposal. */
 export const LIBRARY_READY_DETAIL =
-  'The current Visual and Technical Reports are ready for proposal creation.';
+  'The current Project Report is ready for proposal creation.';
 
-/** Shown when the design has moved past one or more reports. */
+/** Shown when the design has moved past one or more Project Reports. */
 export const LIBRARY_UPDATES_NEEDED_DETAIL =
-  'The design has changed since one or more reports were created. '
-  + 'Create updated reports before preparing the proposal.';
+  'The design has changed since one or more Project Reports were created. '
+  + 'Create an updated Project Report before preparing the proposal.';
 
 /**
- * Shown when a version's reports were never created. The designer is told to
- * create them — not to "update" something that does not exist.
+ * Shown when a version's Project Report was never created. The designer is told
+ * to create it — not to "update" something that does not exist.
  */
-export const LIBRARY_MISSING_REPORTS_HEADLINE = 'Create the reports before creating a proposal';
+export const LIBRARY_MISSING_REPORTS_HEADLINE = 'Create the Project Report before creating a proposal';
 
-/** Shown under the missing-reports headline: exactly which report is absent. */
+/** Shown under the missing-report headline: exactly which report is absent. */
 export const LIBRARY_MISSING_REPORTS_DETAIL =
-  'One or more versions have no Visual or Technical Report yet. '
-  + 'Create the reports named below, then prepare the proposal.';
+  'One or more versions have no Project Report yet. '
+  + 'Create the Project Report named below, then prepare the proposal.';
 
 /** Shown when a version has not been assessed, so its reports cannot be created. */
 export const LIBRARY_NOT_ASSESSED_DETAIL =
@@ -85,10 +85,9 @@ export const LIBRARY_READINESS_ACTION = Object.freeze({
   OPEN_ROOM_DESIGNER: 'Open Room Designer',
 });
 
-/** The compact list's report rows, in reading order. */
+/** The compact list's report rows, in reading order: the ONE report. */
 export const LIBRARY_READINESS_CELLS = Object.freeze([
-  { source: READINESS_SOURCE.VISUAL, label: 'Visual Report' },
-  { source: READINESS_SOURCE.TECHNICAL, label: 'Technical Report' },
+  { source: READINESS_SOURCE.PROJECT, label: 'Project Report' },
 ]);
 
 /** An action the banner can offer, with the version and report it acts on. */
@@ -96,11 +95,9 @@ function readinessAction(label, kind, extra = {}) {
   return { label, kind, reportType: null, versionId: null, ...extra };
 }
 
-/** The report type a readiness source names. */
-function reportTypeOf(source) {
-  return source === READINESS_SOURCE.VISUAL
-    ? PROPOSAL_SOURCE_REPORT.VISUAL
-    : PROPOSAL_SOURCE_REPORT.TECHNICAL;
+/** The report type a readiness source names: the Project Report. */
+function reportTypeOf() {
+  return PROPOSAL_SOURCE_REPORT.PROJECT;
 }
 
 /** A report cell that stands between this version and a proposal. */
