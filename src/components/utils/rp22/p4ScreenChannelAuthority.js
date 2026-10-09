@@ -11,12 +11,14 @@
  * the same figure a conventional centre speaker at that position produces.
  * FCL and FCR are never additional independent channels in P4.
  *
- * The dual-centre +4 dB arrangement allowance is a FLAT CAPABILITY allowance for
- * the pair, not a seat-to-seat propagation difference. Including it would shift
- * the centre against FL/FR at every seat by a constant and distort P4, so the
- * comparison reads the speaker's own propagation result instead. Capability
- * surfaces (P12, the centre SPL cards) keep reading the allowance-bearing
- * `value` and are unaffected.
+ * The +4 dB dual-centre arrangement allowance is part of the pair's OWN SPL, not
+ * a separate capability figure: the two cabinets driven at full centre-channel
+ * power really do produce that sound pressure at the seat, and that is exactly the
+ * logical Centre SPL the LCR/centre SPL cards and P12 state. P4 therefore reads
+ * each channel's effective SPL — the same figure every other surface uses — so a
+ * dual-mono pair is compared where it actually plays. Backing the allowance out
+ * compared the centre 4 dB below its own stated output and pushed every seat past
+ * the bottom of the P4 scale ('Below L1'), which left P4 ungraded.
  *
  * Thresholds and grading are untouched — they stay in the existing grading
  * authority (rp22LevelForP4 / resolveRp22DesignValue).
@@ -34,8 +36,9 @@ export const P4_SCREEN_CHANNELS = ['FL', 'FC', 'FR'];
  */
 export function p4ChannelSplDb(entry) {
   if (!entry) return null;
+  const effectiveSpl = Number(entry.value);
   const ownSpl = Number(entry.splBeforeArrangementAllowanceDb);
-  const spl = Number.isFinite(ownSpl) ? ownSpl : Number(entry.value);
+  const spl = Number.isFinite(effectiveSpl) ? effectiveSpl : ownSpl;
   return Number.isFinite(spl) ? spl : null;
 }
 

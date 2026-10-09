@@ -103,11 +103,12 @@ test('conventional minimum-system eligibility is unchanged',()=>{
 });
 
 import { p4ScreenChannelDeltaDb, P4_SCREEN_CHANNELS } from '@/components/utils/rp22/p4ScreenChannelAuthority';
-// ACCEPTANCE (P4): a conventional centre and a dual centre sharing the same
-// virtual acoustic-centre position must give IDENTICAL P4 at EVERY seat. Both
-// present one logical FC at the same position, through the same P4 methodology
-// and RSP normalisation — so the pair is never two independent channels and the
-// flat +4 dB pair allowance never reaches P4.
+// ACCEPTANCE (P4): a dual centre presents ONE logical FC at the pair midpoint and
+// is compared at the SPL the pair actually plays. That is the effective centre
+// SPL the LCR/centre SPL cards and P12 state (the pair's own result plus the
+// approved arrangement allowance, applied once) — so P4 reads the pair exactly
+// DUAL_CENTRE_SPL_GAIN_DB closer to FL/FR than a conventional centre at the same
+// position, and never as two independent channels.
 const eightSeats = Array.from({length:8},(_,i)=>({id:`seat-${i+1}`,...point(0.6+(i%4)*1.6,3+Math.floor(i/4)*1.6)}));
 const mapsOn = (seatList,speakers) => computeAllSeatSplMetrics({
   seats:seatList, placedSpeakers:speakers, getCanonicalRole:r=>r,
@@ -115,22 +116,25 @@ const mapsOn = (seatList,speakers) => computeAllSeatSplMetrics({
   getModelDimsM:resolveSpeakerSplMeta, mlpPoint:point(2.5,3.5),
   widthM:5,lengthM:6,heightM:2.4
 });
-test('P4 is identical for a conventional centre and a dual centre at the same centre position, all eight seats',()=>{
+test('P4 compares the dual centre at its effective SPL, all eight seats',()=>{
  const dual=mapsOn(eightSeats,[...unchanged,...pair]);
  const conventional=mapsOn(eightSeats,[...unchanged,single]);
  for(const seat of eightSeats){
   const a=p4ScreenChannelDeltaDb(getSeatSplMetrics(dual,seat.id).screen);
   const b=p4ScreenChannelDeltaDb(getSeatSplMetrics(conventional,seat.id).screen);
   assert.ok(Number.isFinite(a));
-  near(a,b);
-  assert.equal(resolveRp22DesignValue(4,a),resolveRp22DesignValue(4,b));
+  assert.ok(Number.isFinite(b));
+  // The pair plays the approved arrangement allowance louder than one cabinet, so
+  // the logical FC sits exactly that much closer to the L/R in the comparison.
+  near(a,b-DUAL_CENTRE_SPL_GAIN_DB);
+  assert.notEqual(resolveRp22DesignValue(4,a),'—');
  }
 });
 test('P4 compares exactly the three logical screen channels',()=>{
  assert.deepEqual([...P4_SCREEN_CHANNELS],['FL','FC','FR']);
  assert.deepEqual(Object.keys(getSeatSplMetrics(maps([...unchanged,...pair]),'mlp').screen).sort(),['FC','FL','FR']);
 });
-test('the +4 dB pair allowance stays a capability allowance and never enters P4',()=>{
+test('the +4 dB pair allowance is applied once to the pair\'s own result',()=>{
  const dual=getSeatSplMetrics(maps([...unchanged,...pair]),'mlp').screen;
  const conventional=getSeatSplMetrics(maps([...unchanged,single]),'mlp').screen;
  near(dual.FC.value-dual.FC.splBeforeArrangementAllowanceDb,DUAL_CENTRE_SPL_GAIN_DB);
