@@ -5,9 +5,13 @@
  *
  * Hierarchy: the seating plan drawing, then the RP23 result itself — seat pills
  * laid out in the same row/seat arrangement as the plan, with each seat's
- * viewing angle beneath its pill — then the short interpretation, the projector
- * light output, and last the level key as a small footnote. The result is the
- * page's statement; nothing else competes with it.
+ * viewing angle beneath its pill — then the short interpretation. A projection
+ * screen adds its projector light output beneath that; a television shows no
+ * light output and no projector copy at all, because there is no projector in the
+ * design. The result is the page's statement; nothing else competes with it.
+ *
+ * There is deliberately no level key: the seat pills state each result, and a
+ * second row of L1–L4 legend pills only competed with them.
  *
  * Banded longitudinal viewing zones (L1|L2|L3|L4|L3|L2|L1) are drawn from the
  * SAME RP23 angle thresholds used by the live app. Per-seat levels come from
@@ -26,13 +30,14 @@ import { PositionMarker } from "./SeatMarker";
 import { computeHaloRadiusPx, PRIMARY_STROKE_WIDTH } from "./seatMarkerGeometry";
 import { resolveRspLabelPlacement } from "./ClientSpeakerBalance";
 import { RP22_GRADE_TOKENS } from "@/components/utils/rp22Colors";
-import RP22GradingPill from "@/components/ui/RP22GradingPill";
 import { PROJECTOR_BASIS_COPY } from "@/components/report/projectorLumenRecommendation";
-import { DISPLAY_TYPE_TV } from "@/components/models/screen/displayTypeAuthority";
+import {
+  DISPLAY_TYPE_TV,
+  displayNoun,
+  projectorPresentationApplies,
+} from "@/components/models/screen/displayTypeAuthority";
 import ClientSeatResultRows from "./ClientSeatResultRows";
 import { VIEWING_RESULT_HEADING } from "./viewingResultCopy";
-
-const LEGEND_LEVELS = ["L1", "L2", "L3", "L4"];
 
 // Maps zone.level keys from selectClientScreenSeating to canonical grade-token keys.
 const ZONE_TOKEN = { l1: "L1", l2: "L2", l3: "L3", l4: "L4" };
@@ -114,6 +119,11 @@ export default function ClientScreenSeating({
 
   const showDrawing = !print || printPart !== "support";
   const showSupport = !print || printPart !== "drawing";
+  // Projector light output is projection presentation only. The canonical display
+  // authority decides — a television is never shown a projector panel, a lumen
+  // figure or any gain/calibration copy, on screen or in print.
+  const showProjectorOutput = projectorLumens != null
+    && projectorPresentationApplies({ display_type: displayType });
 
   const containerStyle = !print
     ? {
@@ -289,7 +299,7 @@ export default function ClientScreenSeating({
           fontFamily="Didact Gothic, Century Gothic, sans-serif"
           letterSpacing="0.06em"
         >
-          SCREEN
+          {displayNoun({ display_type: displayType }).toUpperCase()}
         </text>
 
         {/* ── Seats — compact spacing-aware position markers ── */}
@@ -363,8 +373,10 @@ export default function ClientScreenSeating({
         </div>
       )}
 
-      {/* ── Projector light output — below the viewing result ── */}
-      {projectorLumens != null && (
+      {/* ── Projector light output — below the viewing result, on a projection
+             screen only. A television states no light output and none of the
+             projector copy that belongs to it. ── */}
+      {showProjectorOutput && (
         <div
           style={{
             display: "flex",
@@ -406,48 +418,6 @@ export default function ClientScreenSeating({
         </div>
       )}
 
-      {/* ── Level key — a small footnote beneath the result, never the
-             headline. Kept for reference only. ── */}
-      <div
-        style={{
-          display: "flex",
-          flexWrap: "wrap",
-          justifyContent: "center",
-          alignItems: "center",
-          gap: print ? 8 : 12,
-          fontFamily: "Didact Gothic, Century Gothic, sans-serif",
-        }}
-      >
-        {LEGEND_LEVELS.map((lvl) => (
-          <RP22GradingPill key={lvl} level={lvl} variant="printCompact" />
-        ))}
-        {/* Below L1 — custom swatch matching the diluted zone fill + dark border */}
-        <div style={{ display: "flex", alignItems: "center", gap: 5 }}>
-          <span
-            style={{
-              display: "inline-block",
-              width: 22,
-              height: 11,
-              background: LEVEL_FILLS["below-l1"],
-              border: `1px solid ${RP22_GRADE_TOKENS.FAIL.border}`,
-              borderRadius: 3,
-              boxSizing: "border-box",
-            }}
-          />
-          <span
-            style={{
-              fontSize: print ? 8.5 : 10,
-              color: LEVEL_LABEL_COLORS["below-l1"],
-              fontFamily: "Didact Gothic, Century Gothic, sans-serif",
-              fontWeight: 600,
-              letterSpacing: "0.01em",
-              whiteSpace: "nowrap",
-            }}
-          >
-            Below L1
-          </span>
-        </div>
-      </div>
       </>)}
 
     </div>

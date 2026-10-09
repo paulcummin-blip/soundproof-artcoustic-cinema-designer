@@ -11,8 +11,9 @@
 //   TEST 5  The interpretation reads the published levels
 //   TEST 6  The linear Seat 1…N row is gone
 //   TEST 7  Pills use the canonical L1–L4 grading treatment
-//   TEST 8  Hierarchy: result, interpretation, projector output, level key
+//   TEST 8  Hierarchy: result, interpretation, then projector output — no level key
 //   TEST 9  The printed page keeps the result, the angles and the output
+//   TEST 10 A television shows no projector panel, lumens or gain copy
 // ---------------------------------------------------------------------------
 import { test } from 'vitest';
 import assert from 'node:assert/strict';
@@ -54,6 +55,9 @@ const renderPage = (extra = {}) => renderToStaticMarkup(
     zones: [],
     explanation: interpretation,
     projectorLumens: 2600,
+    // A projection screen is the default presentation here; the television case
+    // is proved separately below.
+    displayType: 'projector_screen',
     ...extra,
   }),
 );
@@ -115,17 +119,24 @@ test('pills use the canonical L1–L4 grading treatment', () => {
   assert.ok(SCREEN.includes(RP22_GRADE_TOKENS.L3.border), 'L3 pill uses the canonical border');
 });
 
-test('hierarchy: result, interpretation, projector output, level key', () => {
+test('hierarchy: result, interpretation, then projector output — and no level key', () => {
   const heading = SCREEN.indexOf('RP23 Viewing Result');
   const pills = SCREEN.indexOf('Front row');
   const text = SCREEN.indexOf(interpretation);
   const projector = SCREEN.indexOf('Projector Light Output');
-  const legend = SCREEN.indexOf('Level key');
-  const legendMarkup = SCREEN.lastIndexOf('Below L1');
   assert.ok(heading < pills && pills < text, 'result then interpretation');
   assert.ok(text < projector, 'projector output sits below the viewing result');
-  assert.ok(projector < legendMarkup, 'the level key is the last element');
-  assert.ok(legend === -1, 'the legend comment is source-only');
+
+  // The level key is gone. The seat pills state each result on its own, and the
+  // page no longer repeats the same grades as a legend beneath them: every level
+  // the page prints is a seat result.
+  assert.ok(!SCREEN.includes('Below L1'), 'no legend swatch on the page');
+  assert.ok(!SCREEN.includes('Level key'), 'no legend block on the page');
+  assert.equal(
+    (SCREEN.match(/>L[1-4]</g) || []).length,
+    publishedSeats.length,
+    'exactly one pill per assessed seat — no second row of level pills',
+  );
 });
 
 test('the printed page keeps the result, the angles and the projector output', () => {
@@ -143,4 +154,37 @@ test('the printed page keeps the result, the angles and the projector output', (
   // The drawing part carries the seating plan only.
   assert.ok(PRINT_DRAWING.includes('<svg'), 'printed drawing part renders the plan');
   assert.ok(!textOf(PRINT_DRAWING).includes('RP23 Viewing Result'), 'drawing part carries no result block');
+});
+
+test('a television shows no projector panel, lumens or gain copy', () => {
+  // The page is handed a projector figure anyway: the canonical display authority
+  // refuses it, so a television can never be shown projector-only information.
+  const tv = renderPage({ displayType: 'tv' });
+  const tvText = textOf(tv);
+
+  assert.ok(!tvText.includes('Projector Light Output'), 'no projector panel');
+  assert.ok(!tvText.includes('lumens'), 'no lumen figure');
+  assert.ok(!/gain/i.test(tvText), 'no screen-gain copy');
+  assert.ok(!/calibrated|calibration/i.test(tvText), 'no projector calibration wording');
+  assert.ok(!/projector/i.test(tvText), 'no projector wording at all');
+
+  // The RP23 results and the viewing angles are untouched.
+  assert.ok(tv.includes('RP23 Viewing Result'), 'the RP23 result block remains');
+  assert.ok(tvText.includes('63.5°') && tvText.includes('44.4°'), 'the viewing angles remain');
+  assert.ok(
+    tv.includes(RP22_GRADE_TOKENS.L4.border) && tv.includes(RP22_GRADE_TOKENS.L3.border),
+    'the seat result pills remain',
+  );
+  assert.ok(!tvText.includes('Below L1'), 'no legend row on a television page');
+
+  // The display is named as a television, never as a screen.
+  assert.ok(tvText.includes('TV'), 'the page names the television');
+  assert.ok(!tvText.includes('SCREEN'), 'no screen wording on a television page');
+
+  // The printed page follows the same rule, on both printed parts.
+  for (const part of [{ print: true, printPart: 'drawing' }, { print: true, printPart: 'support' }]) {
+    const printed = textOf(renderPage({ displayType: 'tv', ...part }));
+    assert.ok(!printed.includes('Projector Light Output'), 'printed television page has no projector panel');
+    assert.ok(!/lumens|gain/i.test(printed), 'printed television page states no lumens or gain');
+  }
 });

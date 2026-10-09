@@ -407,16 +407,28 @@ test("pages 2 and 3 render this design's own content, with every live level as t
   assert.doesNotMatch(withoutLevelPills(page3), /\bL[1-4]\b/, "no row prints a bare level as text");
 });
 
-test("each product's engineering link is stated only where the evidence supports it", () => {
+test("each product's engineering link is stated only where the evidence supports it, with its level as the canonical pill", () => {
   const strong = buildSpecificationConnections({
     productsSelected: PRODUCTS,
     engineeringSummary,
     dolbyConfig: liveEvidence.project?.dolby_config || fixture.project.dolby_layout || "9.1.6",
   });
-  assert.match(strong.lcr, /RP22 P12 L4/);
-  assert.match(strong.surrounds, /RP22 P13 L4/);
-  assert.match(strong.subwoofers, /RP22 P14 L4/);
-  assert.match(strong.acoustic_treatment, /reflection control/);
+  // A cited strength is three separate parts: the parameter, its published level
+  // and the job the layer does — so the page can render the level as the pill.
+  assert.match(strong.lcr[0].parameter, /RP22 P12/);
+  assert.equal(strong.lcr[0].level, "L4");
+  assert.match(strong.lcr[0].text, /Screen-stage output/);
+  assert.match(strong.surrounds[0].parameter, /RP22 P13/);
+  assert.equal(strong.surrounds[0].level, "L4");
+  assert.match(strong.subwoofers[0].parameter, /RP22 P14/);
+  assert.equal(strong.subwoofers[0].level, "L4");
+  assert.match(strong.acoustic_treatment[0].text, /reflection control/);
+
+  // No connection line writes its own level into its text.
+  for (const lines of Object.values(strong)) {
+    if (!Array.isArray(lines)) continue;
+    for (const line of lines) assert.doesNotMatch(String(line.text || ""), /\bL[1-4]\b/);
+  }
 
   // With a weak screen-stage result the LCR link must not cite a strength.
   const weak = JSON.parse(JSON.stringify(engineeringSummary));
@@ -426,7 +438,8 @@ test("each product's engineering link is stated only where the evidence supports
     engineeringSummary: weak,
     dolbyConfig: "9.1.6",
   });
-  assert.match(cautious.lcr, /Screen stage/);
-  assert.doesNotMatch(cautious.lcr, /RP22 P12/);
-  assert.match(cautious.surrounds, /RP22 P13 L4/);
+  assert.match(cautious.lcr[0].text, /Screen stage/);
+  assert.equal(cautious.lcr[0].parameter, null);
+  assert.equal(cautious.lcr[0].level, null, "a weak result is never cited as a strength");
+  assert.equal(cautious.surrounds[0].level, "L4");
 });

@@ -11,8 +11,9 @@
 //   TEST 5  A single level across the seating area collapses to one sentence
 //   TEST 6  A row below Level 1 is reported honestly, never dressed up
 //   TEST 7  The linear Seat 1…N table is gone from the page
-//   TEST 8  The page renders the mapped block, the angles, the projector
-//           output and the demoted level key in hierarchy order
+//   TEST 8  The page renders the mapped block, the angles and the projector
+//           output in hierarchy order — with no level key, and with the
+//           projector block gated on the canonical display authority
 //   TEST 9  Both the screen page and the printed page supply the rows
 //   TEST 10 No RP23 or projector maths is performed by the presentation
 // ---------------------------------------------------------------------------
@@ -149,7 +150,7 @@ test('the linear Seat 1…N table is gone from the viewing page', () => {
   );
 });
 
-test('the page renders the mapped result, angles, projector output and level key in order', () => {
+test('the page renders the mapped result and angles, then the projector output — with no level key', () => {
   const src = readFileSync(join(CLIENT, 'ClientScreenSeating.jsx'), 'utf8');
   const at = (needle) => {
     const index = src.indexOf(needle);
@@ -160,11 +161,16 @@ test('the page renders the mapped result, angles, projector output and level key
   const result = at('<ClientSeatResultRows');
   const interpretation = at('{explanation}');
   const projector = at('Projector Light Output');
-  const legend = at('Level key');
   assert.ok(drawing < result, 'the seating plan precedes the result');
   assert.ok(result < interpretation, 'the interpretation follows the result');
   assert.ok(interpretation < projector, 'projector output sits below the viewing result');
-  assert.ok(projector < legend, 'the level key is the last, smallest element');
+
+  // The level key is gone — the seat pills state each result — and the projector
+  // block is gated on the canonical display authority, so it can only appear for
+  // a projection screen.
+  assert.ok(!src.includes('LEGEND_LEVELS'), 'no level-key list remains');
+  assert.ok(!src.includes('RP22GradingPill'), 'the page supplies no legend pills of its own');
+  assert.ok(src.includes('showProjectorOutput'), 'the projector block is gated on the display authority');
 
   // The result block uses the canonical grading pill, and the seat's viewing
   // angle stays visible beneath it.
@@ -175,10 +181,15 @@ test('the page renders the mapped result, angles, projector output and level key
 });
 
 test('both the screen page and the printed page supply the mapped rows', () => {
-  const page = readFileSync(join(HERE, '..', 'pages', 'RP22ClientReport.jsx'), 'utf8');
+  // The report renders its pages (and each printed part) through the project
+  // report composition, so the seat-mapped rows are supplied there.
+  const composition = readFileSync(
+    join(HERE, '..', 'components', 'report', 'projectReport', 'useProjectReportPages.jsx'),
+    'utf8',
+  );
   const printPage = readFileSync(join(CLIENT, 'ClientReportPage.jsx'), 'utf8');
-  assert.ok(page.includes('rows={screenSeating.rows}'), 'screen page passes the rows');
-  assert.ok(page.includes('rows: screenSeating.rows'), 'print data carries the rows');
+  assert.ok(composition.includes('rows={screenSeating.rows}'), 'screen page passes the rows');
+  assert.ok(composition.includes('rows: screenSeating.rows'), 'print data carries the rows');
   assert.ok(
     (printPage.match(/rows=\{printData\.rows\}/g) || []).length === 2,
     'both printed parts receive the rows',

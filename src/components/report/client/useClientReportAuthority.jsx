@@ -34,6 +34,7 @@ import { normalizeSeat } from "@/components/report/client/reportSeatNormalisatio
 import { useOverheadZonesComputed } from "@/components/room/rv/hooks/useOverheadZonesComputed";
 import { useActiveProjectId } from "@/components/state/project-session";
 import { resolveEffectiveVisibleWidthInches, isManualOverrideActive } from "@/components/models/screen/resolveEffectiveScreen";
+import { resolveDisplayType } from "@/components/models/screen/displayTypeAuthority";
 import { readDesignReviewHandoff, subscribeDesignReviewHandoff } from "@/components/state/designReviewHandoff";
 import { useVersionedEngineeringAuthority } from "@/components/engineering/useVersionedEngineeringAuthority";
 import {
@@ -682,13 +683,25 @@ export function useClientReportAuthority(projectId, requestedVersionId = null) {
     };
   }, [p9Snapshot, canonicalP9, canonicalReportSeatId]);
 
+  // The canonical saved display authority, stated once for the whole report. The
+  // project's own record and the design state's own screen both carry it, so a
+  // television is named and presented as a television whether its type was chosen
+  // in the display dropdown or in the manual size workflow. It is never inferred
+  // from an aspect ratio or a dimension: resolveDisplayType is the one authority.
+  const reportProjectDetails = useMemo(() => {
+    const merged = engineeringAuthority.publication?.report_snapshot?.report_project
+      ? { ...projectDetails, ...engineeringAuthority.publication.report_snapshot.report_project }
+      : projectDetails;
+    if (!merged) return merged;
+    return { ...merged, display_type: resolveDisplayType({ ...merged, ...(screen || {}) }) };
+  }, [projectDetails, engineeringAuthority.publication, screen]);
+
   return {
     projectId,
     versionId,
     versionNumber,
     versionName,
-    projectDetails:engineeringAuthority.publication?.report_snapshot?.report_project
-      ? { ...projectDetails, ...engineeringAuthority.publication.report_snapshot.report_project } : projectDetails,
+    projectDetails: reportProjectDetails,
     reportApp:app,
     publicationGate:engineeringAuthority.publicationGate,
     publicationAttempt:engineeringAuthority.publicationAttempt,
