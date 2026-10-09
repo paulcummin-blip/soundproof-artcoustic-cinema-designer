@@ -18,6 +18,7 @@ import { normaliseViewingPriority } from "@/components/utils/viewingPriorityAuth
 import { normaliseP14Level } from "@/components/room/bass/p14TargetSelectionState";
 import { applyManualOverrideToScreen } from "@/components/models/screen/resolveEffectiveScreen";
 import { sameCentreCabinetAim } from "@/components/utils/dualCentrePairAuthority";
+import { isCentreCabinetRole } from "@/components/utils/frontStageModeAuthority";
 // Seat priority is an independent user classification. It is intentionally
 // not coupled to the acoustic RSP / legacy isPrimary authority here.
 
@@ -1162,6 +1163,10 @@ function useDesignerState() {
 
   const getSpeakerVisibility = useCallback((role, model) => {
     const canon = safeCanonRole(role);
+
+    // FCL/FCR are physical cabinets of the expected ONE logical FC channel.
+    // Keep them in the analysis input so the SPL engine can resolve its midpoint.
+    if (isCentreCabinetRole(canon)) return visibleRoles.has("FC");
 
     // Never show LFE
     if (canon.startsWith("LFE")) return false;
