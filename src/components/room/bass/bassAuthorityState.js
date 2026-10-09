@@ -83,6 +83,9 @@ const ATTEMPT = Object.freeze({
 export function resolveBassAuthorityState({
   completedBassAuthority = null,
   publicationAttempt = null,
+  engineeringFingerprint = null,
+  publicationBassFingerprint = null,
+  durable = null,
   lifecycleState = null,
   calculationInProgress = false,
   placementPreviewActive = false,
@@ -104,7 +107,8 @@ export function resolveBassAuthorityState({
     || status === BASS_AUTHORITY_STATUS.STALE
     || lifecycleState === "stale_needs_recalculation"
     || placementPreviewActive === true;
-  if (contract && designMovedOn) return withCopy(BASS_AUTHORITY_STATE.PREVIEW_ONLY);
+  if (contract && (placementPreviewActive || lifecycleState === "restoring")) return withCopy(BASS_AUTHORITY_STATE.PREVIEW_ONLY);
+  if (designMovedOn) return withCopy(BASS_AUTHORITY_STATE.NEEDS_CALCULATION);
 
   // Saved AND current: the completed contract is the authority for the design
   // as it stands now. This is the same completion test the readiness authority
@@ -115,8 +119,20 @@ export function resolveBassAuthorityState({
     && currentFingerprint === resultFingerprint;
 
   if (resultIsCurrent) {
-    const attemptStatus = publicationAttempt?.status || null;
-    if (attemptStatus === ATTEMPT.ACKNOWLEDGED) return withCopy(BASS_AUTHORITY_STATE.CURRENT);
+    // Completion is not engineering publication. A receipt must name this
+    // engineering assessment AND the same completed bass calculation.
+    const identityMatches = !!engineeringFingerprint
+      && publicationBassFingerprint === currentFingerprint;
+    const matchingAttempt = identityMatches
+      && publicationAttempt?.fingerprint === engineeringFingerprint ? publicationAttempt : null;
+    const saved = durable?.publication;
+    const durableMatches = identityMatches
+      && durable?.version?.published_fingerprint === engineeringFingerprint
+      && saved?.engineering_fingerprint === engineeringFingerprint
+      && saved?.provenance?.bass_fingerprint === currentFingerprint
+      && durable?.acknowledgement?.durably_published === true;
+    const attemptStatus = matchingAttempt?.status || null;
+    if (attemptStatus === ATTEMPT.ACKNOWLEDGED || durableMatches) return withCopy(BASS_AUTHORITY_STATE.CURRENT);
     if (attemptStatus === ATTEMPT.QUEUED || attemptStatus === ATTEMPT.PUBLISHING) {
       return withCopy(BASS_AUTHORITY_STATE.PUBLISHING);
     }
@@ -127,8 +143,8 @@ export function resolveBassAuthorityState({
     return {
       code: BASS_AUTHORITY_STATE.CALCULATED_NOT_PUBLISHED,
       label: copy.label,
-      message: publicationAttempt?.message
-        ? `${copy.message} ${publicationAttempt.message}`
+      message: matchingAttempt?.message
+        ? `${copy.message} ${matchingAttempt.message}`
         : copy.message,
       actionLabel: copy.actionLabel,
     };
