@@ -15,6 +15,8 @@
 
 import React from 'react';
 import RP22GradingPill from '@/components/ui/RP22GradingPill';
+import PillCompletenessOutline from '@/components/ui/PillCompletenessOutline';
+import { assessDesignRatingSectionCompleteness } from '@/components/report/technical/designRatingSectionCompleteness';
 import { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider } from '@/components/ui/tooltip';
 
 function levelNum(key) {
@@ -70,7 +72,7 @@ function FloorPillWithTooltip({ pill, scope, label, isPrimary }) {
 
 // One category block — Primary + Secondary seat-scoped floor results.
 // Stable two-column grid: label left, result pill right (shared right edge).
-function CategoryBlock({ label, primary, secondary, isScreen }) {
+function CategoryBlock({ label, primary, secondary, isScreen, sectionIncomplete = false }) {
   const renderScopeLine = (scope, isPrimary) => {
     if (!scope?.hasContribs) {
       return (
@@ -99,7 +101,9 @@ function CategoryBlock({ label, primary, secondary, isScreen }) {
       return (
         <div style={{ display: 'grid', gridTemplateColumns: '1fr auto', alignItems: 'center', gap: '2px 8px' }}>
           <span style={{ fontSize: 10, fontWeight: 600, color: '#625143' }}>{lead}</span>
-          <RP22GradingPill level={lvl} compact>{pillLabel}</RP22GradingPill>
+          <PillCompletenessOutline incomplete={sectionIncomplete}>
+            <RP22GradingPill level={lvl} compact>{pillLabel}</RP22GradingPill>
+          </PillCompletenessOutline>
         </div>
       );
     }
@@ -113,7 +117,11 @@ function CategoryBlock({ label, primary, secondary, isScreen }) {
         <div style={{ display: 'grid', gridTemplateColumns: '1fr auto', alignItems: 'center', gap: '2px 8px' }}>
           <span style={{ fontSize: 10, fontWeight: 600, color: '#625143' }}>{lead}</span>
           <FloorPillWithTooltip
-            pill={<RP22GradingPill level="FAIL" compact />}
+            pill={
+              <PillCompletenessOutline incomplete={sectionIncomplete}>
+                <RP22GradingPill level="FAIL" compact />
+              </PillCompletenessOutline>
+            }
             scope={scope}
             label={label}
             isPrimary={isPrimary}
@@ -124,7 +132,9 @@ function CategoryBlock({ label, primary, secondary, isScreen }) {
 
     const lead = isPrimary ? 'Primary Seats — no lower than' : 'Secondary Seats — no lower than';
     const pill = floor ? (
-      <RP22GradingPill level={floor} compact />
+      <PillCompletenessOutline incomplete={sectionIncomplete}>
+        <RP22GradingPill level={floor} compact />
+      </PillCompletenessOutline>
     ) : (
       <span style={{ fontSize: 10, fontWeight: 600, color: '#213428', justifySelf: 'end' }}>—</span>
     );
@@ -160,6 +170,16 @@ export default function DesignRatingSummary({
   p14TargetUnselected = false,
   staleScope = false,
 }) {
+  // Completion state for the four Design Rating sections, read from the ONE
+  // canonical engineering completeness authority — the same terminal contract
+  // that gates reports, proposals and publication. The outline never reflects
+  // the level itself: a completed L1 section carries no outline, an incomplete
+  // provisional L4 section does.
+  const sectionCompleteness = React.useMemo(
+    () => assessDesignRatingSectionCompleteness(engineeringSummary),
+    [engineeringSummary],
+  );
+
   if (!showAsdr) return null;
 
   const unavailableCard = (message) => (
@@ -261,6 +281,7 @@ export default function DesignRatingSummary({
                 primary={primaryCats[idx]}
                 secondary={secondaryCats[idx]}
                 isScreen={primaryCats[idx]?.isScreen}
+                sectionIncomplete={sectionCompleteness.sections[label]?.complete === false}
               />
             );
           })}

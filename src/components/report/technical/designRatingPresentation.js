@@ -850,6 +850,27 @@ function getFloorGroupForContrib(contrib) {
 }
 
 /**
+ * The Design Rating section a parameter key belongs to.
+ *
+ * Uses the SAME category membership as the floor authority the section pills
+ * are built from (FLOOR_CATEGORY_RANGES), so a section's completion state can
+ * never disagree with the section whose pill it outlines:
+ *   "p1".."p11" → Spatial Resolution · "p12".."p16" → Dynamic Range ·
+ *   "p17".."p21" → Timbre Matching · "screen" → Screen / Viewing Geometry.
+ *
+ * @param {string} key — canonical parameter key ("p1".."p21") or "screen"
+ * @returns {string|null}
+ */
+export function designRatingSectionForParameterKey(key) {
+  const normalized = String(key || "").trim().toLowerCase();
+  if (!normalized) return null;
+  if (normalized === "screen") return SCREEN_CATEGORY_LABEL;
+  const num = Number(normalized.replace(/^p/, ""));
+  if (!Number.isFinite(num)) return null;
+  return getFloorGroupForContrib({ key: normalized, parameter: num });
+}
+
+/**
  * Per-category floor (lowest achieved level) for a scoped rating.
  *
  * For the three RP22 performance categories, returns the lowest achieved
