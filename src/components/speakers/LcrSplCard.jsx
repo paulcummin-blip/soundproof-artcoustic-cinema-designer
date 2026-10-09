@@ -3,10 +3,11 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Volume2 } from 'lucide-react';
 import { useAppState } from '@/components/AppStateProvider';
 import { getSpeakerModelMeta } from '@/components/models/speakers/registry';
-import { getSeatSplMetrics, getMlpSeat } from '@/components/utils/spl/centralSplEngine';
+import { getSeatSplMetrics, getMlpSeat, computeSingleSeatSplAtDistance } from '@/components/utils/spl/centralSplEngine';
 import { formatDb } from '@/components/utils/formatDb';
+import { isCentreCabinetRole, DUAL_CENTRE_SPL_GAIN_DB } from '@/components/utils/frontStageModeAuthority';
 
-export default function LcrSplCard({ role, label, allSeatSplMetrics, integratedLcrMode = false }) {
+export default function LcrSplCard({ role, label, allSeatSplMetrics, integratedLcrMode = false, dualCentre = false }) {
   const appState = useAppState();
   
   // Get MLP seat and its SPL data
@@ -32,10 +33,14 @@ export default function LcrSplCard({ role, label, allSeatSplMetrics, integratedL
   const placedSpeakers = appState?.speakerSystem?.placedSpeakers || [];
   const speaker = useMemo(() => {
     const canonical = { 'L': 'FL', 'C': 'FC', 'R': 'FR' }[role] || role;
-    return placedSpeakers.find(s => {
+    const direct = placedSpeakers.find(s => {
       const sRole = String(s?.role || '').toUpperCase();
       return sRole === canonical || sRole === role;
     });
+    if (direct) return direct;
+    // Dual centre (TV): there is no single FC speaker — the centre channel's own
+    // cabinet is the speaker this card states (FCL and FCR carry the same model).
+    return placedSpeakers.find(s => isCentreCabinetRole(s?.role) && s?.model) || null;
   }, [placedSpeakers, role]);
 
   // Get SPL value from centralized data
@@ -101,9 +106,14 @@ export default function LcrSplCard({ role, label, allSeatSplMetrics, integratedL
         ) : (
           <>
             <div className="text-lg font-bold" style={{ color: '#1B1A1A' }}>
-              {formatDb(finalSplDb)}
+              {formatDb(dualCentreDb !== null ? dualCentreDb : finalSplDb)}
             </div>
-            {isOutputLimited && (
+            {dualCentreDb !== null && (
+              <div className="text-xs mt-0.5" style={{ color: '#625143' }}>
+                Two cabinets · +{DUAL_CENTRE_SPL_GAIN_DB} dB
+              </div>
+            )}
+            {dualCentreDb === null && isOutputLimited && (
               <div className="text-xs mt-0.5" style={{ color: '#b08060' }}>
                 Output limited by speaker
               </div>

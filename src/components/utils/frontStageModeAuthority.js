@@ -171,21 +171,32 @@ export function resolveCentreCabinetX({ screen, role, cabinetWidthM, roomWidthM 
 
 // ── Centre model eligibility ───────────────────────────────────────────────
 
-/** A centre cabinet is never offered below this impedance: a 3 Ω load is refused. */
-export const DUAL_CENTRE_MIN_IMPEDANCE_OHM = 4;
+/** Speaker categories never offered as a physical centre cabinet. */
+export const DUAL_CENTRE_EXCLUDED_CATEGORIES = Object.freeze(['ARCHITECT', 'SUBWOOFERS']);
+
+/**
+ * Nominal impedance at or below which a cabinet carries the series/parallel
+ * wiring note. LOW IMPEDANCE IS NEVER A RESTRICTION: a 4 Ω (or lower) model is
+ * offered and may be selected exactly like any other — the note is advice, not
+ * a block, and no electrical calculation is performed.
+ */
+export const DUAL_CENTRE_WARN_IMPEDANCE_OHM = 4;
+
+/**
+ * The fixed allowance the Centre SPL card adds for the dual-centre arrangement:
+ * two cabinets, one centre channel. Deliberately a flat figure — no summation
+ * model is introduced.
+ */
+export const DUAL_CENTRE_SPL_GAIN_DB = 4;
 
 /**
  * Whether a model may be used as a physical centre cabinet in this mode.
  *
- * The Artcoustic purpose-built front-wall centre cabinets, and nothing else:
- * C-1, C4-1, Multi (Mono) and HSPL (Mono) — each ONE cabinet carrying the centre
- * channel, whatever orientation it is normally drawn in (a TV-width bar is never
- * excluded for being drawn horizontally).
- *
- * Excluded: the Architect (in-ceiling / round) range; the discrete L/R ranges,
- * which are not centre cabinets; the integrated LCR bars — Multi (LCR) and
- * HSPL (LCR) are soundbars, ONE cabinet carrying three channels, a front stage
- * of their own; and any cabinet below the minimum impedance.
+ * The WHOLE Artcoustic catalogue is offered — Spitfire, Evolve, Q, C-1, C4-1,
+ * Multi and HSPL alike, in whatever orientation the cabinet is normally drawn
+ * (a TV-width bar is never excluded for being drawn horizontally). The only
+ * exclusions are the Architect range and subwoofers. Impedance is never a
+ * restriction; a 4 Ω or lower model is allowed and carries a wiring note.
  */
 export function isEligibleDualCentreCentreModel(modelKey) {
   const key = String(modelKey ?? '').trim();
@@ -193,12 +204,17 @@ export function isEligibleDualCentreCentreModel(modelKey) {
   const meta = getSpeakerModelMeta(key);
   if (!meta || meta.notFound) return false;
 
-  if (meta.category !== 'LCR') return false;                          // Artcoustic LCR range only
-  if (meta.round === true) return false;                              // in-ceiling / overhead form factor
-  if (meta.frontStageType !== FRONT_STAGE_CENTER_ONLY) return false;  // centre cabinets only — never a soundbar
+  return !DUAL_CENTRE_EXCLUDED_CATEGORIES.includes(String(meta.category || '').toUpperCase());
+}
 
+/** Whether the selected cabinet carries the series/parallel wiring note. */
+export function needsSeriesParallelWarning(modelKey) {
+  const key = String(modelKey ?? '').trim();
+  if (!key) return false;
+  const meta = getSpeakerModelMeta(key);
+  if (!meta || meta.notFound) return false;
   const ohms = Number(meta.nominalOhms);
-  return Number.isFinite(ohms) && ohms >= DUAL_CENTRE_MIN_IMPEDANCE_OHM;
+  return Number.isFinite(ohms) && ohms > 0 && ohms <= DUAL_CENTRE_WARN_IMPEDANCE_OHM;
 }
 
 /** Filter a product-option list to the eligible centre cabinets. */
@@ -234,19 +250,14 @@ export function normaliseCabinetOrientation(value) {
 }
 
 /**
- * The orientation a NEW centre cabinet starts in — the product's own form.
+ * The orientation a NEW centre cabinet starts in — always VERTICAL.
  *
- * A TV-width bar (C4-1, Multi (Mono), HSPL (Mono)) spans the TV horizontally:
- * as a centre cabinet it can only flank the TV standing VERTICALLY, so that is
- * its default here. Every other cabinet keeps its normal drawn orientation.
+ * The two cabinets flank the TV outside its left and right edges, so whatever
+ * form the product is normally drawn in they are installed standing vertically.
  * The designer's own selection always overrides this.
  */
 export function defaultCentreCabinetOrientation(modelKey, tvPresetKey = null) {
-  const meta = getSpeakerModelMeta(String(modelKey || '').trim(), tvPresetKey || null);
-  if (!meta || meta.notFound) return CABINET_ORIENTATION_HORIZONTAL;
-  return meta.widthType === 'tv_linked'
-    ? CABINET_ORIENTATION_VERTICAL
-    : CABINET_ORIENTATION_HORIZONTAL;
+  return CABINET_ORIENTATION_VERTICAL;
 }
 
 /** The model's normal (as-drawn) footprint in metres, or null when unknown. */

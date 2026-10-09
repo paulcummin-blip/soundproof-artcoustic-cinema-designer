@@ -130,10 +130,11 @@ export function buildFrontStageSeed({
           : tvCentreM;
       }
       if (frontStageMode === 'dual_centre' && isCentreCabinetRole(role)) {
-        // The cabinets' acoustic centre is the TV midpoint height — the same TV
-        // geometry authority that drives the L/R height. A designer's manual
-        // override (saved as lcrHeightM) always wins.
-        return Number.isFinite(Number(splConfig?.lcrHeightM))
+        // The cabinets' acoustic centre DEFAULTS to the TV vertical midpoint —
+        // 50% of the screen height above its actual position above the floor —
+        // the same TV geometry authority that drives the L/R height. A designer's
+        // manual override (lcrHeightManual, saved as lcrHeightM) always wins.
+        return splConfig?.lcrHeightManual === true && Number.isFinite(Number(splConfig?.lcrHeightM))
           ? Number(splConfig.lcrHeightM)
           : tvCentreM;
       }

@@ -783,9 +783,12 @@ export default function FrontElevation({ dimensions, screen, placedSpeakers = []
                 // A vertically mounted centre cabinet draws its face rotated.
                 vertical: spk.vertical === true,
                 labelY: annotation.label.y,
-                // The cabinets are not dragged in the elevation: FL/FC/FR keep
-                // their existing drag behaviour untouched.
-                onMouseDown: (onLcrSpeakerMoved && canonFront(spk.role)) ? (e) => handleLcrMouseDown(e, spk.role, spk.x, spk.z) : undefined,
+                // FL/FC/FR keep their existing drag behaviour; a dual-centre
+                // cabinet is draggable by its own role (FCL / FCR), so its
+                // automatic position can always be adjusted by hand.
+                onMouseDown: (onLcrSpeakerMoved && (canonFront(spk.role) || isCentreCabinetRole(spk.role)))
+                  ? (e) => handleLcrMouseDown(e, spk.role, spk.x, spk.z)
+                  : undefined,
               })}
               {/* Dimension labels — placed outside speaker artwork via annotation layout */}
               {heightCm !== null && (

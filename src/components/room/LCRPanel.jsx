@@ -38,6 +38,7 @@ import {
   centreCabinets,
   detectDualCentreStage,
   eligibleDualCentreCentreOptions,
+  needsSeriesParallelWarning,
   normaliseCabinetOrientation,
   normaliseFrontStageMode,
 } from '@/components/utils/frontStageModeAuthority';
@@ -170,13 +171,15 @@ export default function LCRPanel({ setSpeakers, dimensions, lcrAimMode, onChange
     return meta && !meta.notFound ? (meta.label || fcModel) : fcModel;
   }, [fcModel, fcMeta?.frontStageType, soundbarOptions]);
 
-  // Dual-centre centre cabinets: Artcoustic LCR-range models above 4 Ω. The
-  // Architect (in-ceiling) range and the integrated LCR soundbars are never
-  // offered; a suitable on-wall model is never excluded for being normally drawn
-  // horizontally (the orientation selector covers that).
+  // Dual-centre centre cabinets: the whole Artcoustic catalogue except the
+  // Architect range and subwoofers — drawn from BOTH product lists, because the
+  // purpose-built centre cabinets (C-1, C4-1, Multi, HSPL) live in the
+  // centre/soundbar list and the LCR ranges (Q, Evolve, Spitfire) in the other.
+  // Impedance is never a restriction: a low-impedance model is offered and
+  // carries a wiring note instead.
   const centreOptions = useMemo(
-    () => eligibleDualCentreCentreOptions(standardLcrOptions),
-    [standardLcrOptions],
+    () => eligibleDualCentreCentreOptions([...standardLcrOptions, ...soundbarOptions]),
+    [standardLcrOptions, soundbarOptions],
   );
 
   // The installed cabinets are the authority for the two selectors, so a reopened
@@ -713,6 +716,9 @@ export default function LCRPanel({ setSpeakers, dimensions, lcrAimMode, onChange
                       ))}
                     </SelectContent>
                   </Select>
+                  {needsSeriesParallelWarning(centreModel) && (
+                    <p className="text-[11px] font-semibold text-amber-700 bg-amber-50 border border-amber-200 rounded px-2 py-1">Wire series/parallel</p>
+                  )}
                 </div>
 
                 <div className="space-y-1">
@@ -732,7 +738,7 @@ export default function LCRPanel({ setSpeakers, dimensions, lcrAimMode, onChange
                 </div>
               </div>
               <p className="text-[11px] text-[#8B7F76]">
-                One cabinet at each edge of the TV, acoustic centre at the TV midpoint. The two cabinets are the one centre channel: the centre amplifier power is split between them, and no combining gain is added.
+                One vertical cabinet at each edge of the TV, acoustic centre at the TV midpoint. The two cabinets are the one centre channel; the Centre SPL card states the cabinet's own SPL plus 4 dB for the arrangement.
               </p>
             </div>
           )}
@@ -752,6 +758,7 @@ export default function LCRPanel({ setSpeakers, dimensions, lcrAimMode, onChange
                   label={role === 'FL' ? 'Left' : role === 'FC' ? 'Center' : 'Right'}
                   allSeatSplMetrics={allSeatSplMetrics}
                   integratedLcrMode={derivedFrontStageMode === 'integrated_lcr'}
+                  dualCentre={role === 'FC' && derivedFrontStageMode === FRONT_STAGE_DUAL_CENTRE}
                 />
               ))}
             </div>
