@@ -46,6 +46,23 @@ export const PAGE_BLOCK_MM = Object.freeze({
 /** Characters of body copy that fit on one 186mm line at the report body size. */
 export const CHARS_PER_LINE = 108;
 
+/**
+ * The Compact composition cost, used by the highlights page once it carries more
+ * than COMPACT_HIGHLIGHT_THRESHOLD cards. The page's own hierarchy is tightened
+ * for a fuller page — the title sits in the standard size, the evidence stays on
+ * one row and the copy is kept to its short form — so six or seven genuine
+ * strengths can be stated without the page ever clipping, and without dropping a
+ * materially important story to preserve a four-card layout.
+ *
+ * These figures remain an upper bound (they are still well above what the page
+ * actually occupies), so a page that fits this estimate always fits the paper.
+ */
+export const COMPACT_HIGHLIGHT_THRESHOLD = 5;
+export const COMPACT_BLOCK_MM = Object.freeze({
+  highlightFixed: 12,
+  highlightGap: 4,
+});
+
 /** How many lines a piece of copy occupies. */
 export function estimateLines(text, charsPerLine = CHARS_PER_LINE) {
   const length = String(text ?? '').replace(/\s+/g, ' ').trim().length;
