@@ -49,6 +49,7 @@ const SCORECARD = '../src/components/report/technical/TechnicalAsdrScorecard.jsx
 const NOTICE = '../src/components/report/technical/TechnicalReportNotice.jsx';
 const ABOUT_PAGE = '../src/components/report/AboutSoundProofReportPage.jsx';
 const REPORT_PAGE = '../src/pages/RP22Report.jsx';
+const HOW_TO_READ = '../src/components/report/HowToReadThisReportPage.jsx';
 const PRINT_STYLES = '../src/components/report/ReportPrintStyles.jsx';
 const PRINT_WINDOW = '../src/components/report/reportPrintWindow.js';
 const TECH_PRINT_WINDOW = '../src/components/report/technical/technicalReportPrintWindow.js';
@@ -97,9 +98,21 @@ test('A. the report page carries the brand stacks through the tokens', () => {
   assert.match(source, /import \{[\s\S]*REPORT_FONT_HEADING,[\s\S]*\} from '@\/components\/report\/typography\/reportTypography'/);
   assert.match(source, /fontFamily: REPORT_FONT_HEADING/);
   assert.match(source, /fontFamily: REPORT_FONT_BODY/);
-  // The cover's RP22 and RP23 explanations are document headings.
+  // The RP22 and RP23 explanations are document headings, and they are the
+  // report's reference material: they print once, word for word, on the How to
+  // Read page in the back matter. The Technical Report's own front page carries
+  // the cover and this report's seating-coverage statement only.
   const coverHeadings = (source.match(/data-report-section-heading="true" style=\{reportSectionHeadingStyle\(/g) || []).length;
-  assert.equal(coverHeadings, 2);
+  assert.equal(coverHeadings, 0);
+
+  const reference = read(HOW_TO_READ);
+  assert.match(reference, /data-report-section-heading="true"[\s\S]{0,60}reportSectionHeadingStyle\('11pt'/, 'the reference headings read the shared heading token');
+  assert.match(reference, /CEDIA RP22 - Immersive Audio Performance Levels/);
+  assert.match(reference, /RP23 - Image Performance/);
+  assert.match(reference, /The minimum level of performance necessary to convey basic artistic intent\./);
+  assert.match(reference, /The maximum level of achievable performance across every parameter\./);
+  assert.match(reference, /CEDIA's forthcoming RP23 document will address best practice for image\./);
+  assert.match(reference, /Performance levels apply to both individual seating positions as well as the room/);
 });
 
 test('B. report headings are uppercase, tracked +100, leading 1.2', () => {
