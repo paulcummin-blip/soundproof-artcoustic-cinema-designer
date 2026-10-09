@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { resolveBassAuthorityState as resolve } from '../src/components/room/bass/bassAuthorityState.js';
+import { publicationBassIdentityMatches } from '../src/components/engineering/engineeringPublicationPreflight.js';
 import { createBassResultsScope } from '../src/components/room/bass/bassResultsStore.js';
 import { registerEngineeringPublishTrigger, readEngineeringPublishTrigger } from '../src/components/engineering/engineeringPublishTrigger.js';
 
@@ -50,6 +51,14 @@ test('preflight and backend failure reasons are visible and safely retryable', (
     assert.match(state.message,/P9 is incomplete/);
     assert.equal(state.actionLabel,'Publish Current Assessment');
   }
+});
+test('publication refuses an earlier target while selected-target presentation advances', () => {
+  const authority={currentFingerprint:'cal:a',contract:{job:{resultFingerprint:'cal:a'},requestedP14TargetDb:118,requestedP14Basis:'minimum',requestedP14Level:4}};
+  const input={completedBassAuthority:authority,bassFingerprint:'cal:a',designState:{splConfig:{selectedP14TargetBasis:'minimum',selectedP14Level:4}}};
+  assert.equal(publicationBassIdentityMatches(input),true);
+  assert.equal(publicationBassIdentityMatches({...input,designState:{splConfig:{selectedP14TargetBasis:'minimum',selectedP14Level:3}}}),false);
+  assert.equal(publicationBassIdentityMatches({...input,bassFingerprint:'cal:b'}),false);
+  assert.equal(publicationBassIdentityMatches({...input,completedBassAuthority:null}),false);
 });
 test('scope preserves exact project/version and dispatches only its registered publisher', () => {
   const free=createBassResultsScope('p','free'), saved=createBassResultsScope('p','v');
