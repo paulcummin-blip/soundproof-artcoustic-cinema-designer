@@ -13,6 +13,10 @@ import {
   centreCabinetPartnerRole,
   linkedCentreCabinetPositions,
 } from "@/components/utils/dualCentrePairAuthority";
+import SpeakerInfoTooltip from "@/components/room/speakerInfo/SpeakerInfoTooltip";
+import { useSpeakerInfoTooltip } from "@/components/room/speakerInfo/useSpeakerInfoTooltip";
+import { buildSpeakerInfo } from "@/components/room/speakerInfo/speakerInfoModel";
+import { scaleSvgBoxToContainer } from "@/components/room/speakerInfo/speakerTooltipPlacement";
 
 // Roles displayed in front elevation
 const FRONT_ROLES = new Set(["FL", "FC", "FR", "L", "C", "R"]);
@@ -57,6 +61,13 @@ export default function FrontElevation({ dimensions, screen, placedSpeakers = []
   useEffect(() => { onMovedRef.current = onLcrSpeakerMoved; }, [onLcrSpeakerMoved]);
   const onSubMovedRef = useRef(onFrontSubMoved);
   useEffect(() => { onSubMovedRef.current = onFrontSubMoved; }, [onFrontSubMoved]);
+
+  // Speaker information tooltip — hover or tap a speaker to read the stored
+  // height, cabinet size and orientation. The card is inert (pointer-events:
+  // none), so it can never interfere with dragging.
+  const wrapRef = useRef(null);
+  const drawingRef = useRef(null);
+  const speakerInfo = useSpeakerInfoTooltip({ containerRef: wrapRef, boundsRef: drawingRef });
 
   // Alignment guide state
   const [alignGuide, setAlignGuide] = useState(null); // { draggingRole, liveZ } | null
@@ -339,6 +350,11 @@ export default function FrontElevation({ dimensions, screen, placedSpeakers = []
           hM,
           label: role,
           modelKey,
+          // Raw stored model + installed orientation, read only by the hover
+          // information card; drawing and dragging keep using modelKey.
+          model: s?.model ?? modelKey,
+          orientation: footprint ? footprint.orientation : null,
+          isCabinet: cabinet,
           vertical: !!footprint && footprint.orientation === 'vertical',
         };
       });
@@ -357,7 +373,7 @@ export default function FrontElevation({ dimensions, screen, placedSpeakers = []
       const liveOverride = liveDragSubs?.[i];
       const x = liveOverride ? liveOverride.x : baseX;
       const z = liveOverride ? liveOverride.z : baseZ;
-      return { x, z, wM, hM, label: "SUB", index: i, id: s?.id };
+      return { x, z, wM, hM, label: "SUB", index: i, id: s?.id, model: s?.model ?? null, orientation: orientation ?? null };
     });
   }, [frontSubs, roomW, liveDragSubs]);
   // Front stage mode — drives whether FL/FR z-drag syncs the paired speaker.
@@ -428,6 +444,23 @@ export default function FrontElevation({ dimensions, screen, placedSpeakers = []
   }, [lcrSpeakers, subItems, roomW, roomH, drawW, drawH]);
 
   const roomBounds = { left: offsetX, right: offsetX + drawW, top: offsetY, bottom: offsetY + drawH };
+
+  // Neighbouring speakers and the screen, mapped into container pixels, so the
+  // information card can prefer empty space and avoid sitting over a neighbour.
+  const speakerInfoExclusions = useCallback((exceptId) => {
+    const svgEl = svgRef.current;
+    const containerEl = wrapRef.current;
+    if (!svgEl || !containerEl) return [];
+    const svgRect = svgEl.getBoundingClientRect();
+    const containerRect = containerEl.getBoundingClientRect();
+    const boxes = (allSpeakerBoxes || [])
+      .filter((b) => b.id !== exceptId)
+      .map((b) => scaleSvgBoxToContainer(b.box, svgRect, containerRect, SVG_W))
+      .filter(Boolean);
+    const screenBox = scaleSvgBoxToContainer(screenBoxSvg, svgRect, containerRect, SVG_W);
+    if (screenBox) boxes.push(screenBox);
+    return boxes;
+  }, [allSpeakerBoxes, screenBoxSvg]);
 
   // Projector element from roomElements
   const projectorEl = useMemo(() => {
@@ -592,9 +625,9 @@ export default function FrontElevation({ dimensions, screen, placedSpeakers = []
   };
 
   return (
-    <div style={{ width: "100%", padding: 16, background: "#F8F8F7", boxSizing: "border-box" }}>
+    <div ref={wrapRef} style={{ position: "relative", width: "100%", padding: 16, background: "#F8F8F7", boxSizing: "border-box" }}>
       {/* Responsive wrapper: aspect-ratio drives height from available width */}
-      <div style={{ width: "100%", aspectRatio: `${SVG_W} / ${SVG_H}` }}>
+      <div ref={drawingRef} style={{ width: "100%", aspectRatio: `${SVG_W} / ${SVG_H}` }}>
       <svg
         ref={svgRef}
         width="100%"
@@ -799,7 +832,20 @@ export default function FrontElevation({ dimensions, screen, placedSpeakers = []
             sizeLabel,
           });
           return (
-            <g key={spk.role}>
+            <g
+              key={spk.role}
+              {...speakerInfo.bind(() => ({
+                ...buildSpeakerInfo({
+                  role: spk.role,
+                  model: spk.model,
+                  acousticCentreZ_m: spk.z,
+                  cabinetWidth_m: spk.wM,
+                  cabinetHeight_m: spk.hM,
+                  orientation: spk.orientation,
+                }),
+                exclusions: speakerInfoExclusions(`lcr-${idx}`),
+              }))}
+            >
               {drawSpeakerFront({
                 key: spk.role + '-body',
                 cx: spkCx,
@@ -823,17 +869,8 @@ export default function FrontElevation({ dimensions, screen, placedSpeakers = []
                   ? (e) => handleLcrMouseDown(e, spk.role, spk.x, spk.z)
                   : undefined,
               })}
-              {/* Dimension labels — placed outside speaker artwork via annotation layout */}
-              {heightCm !== null && (
-                <text x={annotation.dim.x} y={annotation.dim.yHeight} textAnchor={annotation.dim.anchor} fontSize={6.5} fill={DIM_COLOR} letterSpacing="0.02em">
-                  {heightLabel}
-                </text>
-              )}
-              {wCm !== null && hCm !== null && (
-                <text x={annotation.dim.x} y={annotation.dim.ySize} textAnchor={annotation.dim.anchor} fontSize={6} fill={DIM_COLOR} opacity={0.85}>
-                  {sizeLabel}
-                </text>
-              )}
+              {/* Height and cabinet dimensions are no longer drawn permanently:
+                  they are read on hover or tap in the speaker information card. */}
             </g>
           );
         })}
@@ -859,7 +896,20 @@ export default function FrontElevation({ dimensions, screen, placedSpeakers = []
             sizeLabel,
           });
           return (
-            <g key={`sub-${i}`}>
+            <g
+              key={`sub-${i}`}
+              {...speakerInfo.bind(() => ({
+                ...buildSpeakerInfo({
+                  role: sub.label,
+                  model: sub.model,
+                  acousticCentreZ_m: sub.z,
+                  cabinetWidth_m: sub.wM,
+                  cabinetHeight_m: sub.hM,
+                  orientation: sub.orientation,
+                }),
+                exclusions: speakerInfoExclusions(`sub-${i}`),
+              }))}
+            >
               {drawSpeakerFront({
                 key: `sub-${i}-body`,
                 cx: subCx,
@@ -874,16 +924,7 @@ export default function FrontElevation({ dimensions, screen, placedSpeakers = []
                 labelInsideBox: true,
                 onMouseDown: onFrontSubMoved ? (e) => handleSubMouseDown(e, i, sub.id, sub.x, sub.z) : undefined,
               })}
-              {subHCm !== null && (
-                <text x={annotation.dim.x} y={annotation.dim.yHeight} textAnchor={annotation.dim.anchor} fontSize={6.5} fill={DIM_COLOR} letterSpacing="0.02em">
-                  {heightLabel}
-                </text>
-              )}
-              {subWCm !== null && subDimCm !== null && (
-                <text x={annotation.dim.x} y={annotation.dim.ySize} textAnchor={annotation.dim.anchor} fontSize={6} fill={DIM_COLOR} opacity={0.85}>
-                  {sizeLabel}
-                </text>
-              )}
+              {/* Dimensions are read on hover or tap instead of being drawn. */}
             </g>
           );
         })}
@@ -1032,6 +1073,17 @@ export default function FrontElevation({ dimensions, screen, placedSpeakers = []
         )}
       </svg>
       </div>
+
+      {/* Speaker information card — anchored to the hovered or tapped speaker,
+          outside the SVG so the drawing can never clip it. */}
+      <SpeakerInfoTooltip
+        visible={speakerInfo.visible}
+        title={speakerInfo.info?.title}
+        lines={speakerInfo.info?.lines}
+        anchor={speakerInfo.anchor}
+        bounds={speakerInfo.bounds}
+        exclusions={speakerInfo.info?.exclusions}
+      />
     </div>
   );
 }

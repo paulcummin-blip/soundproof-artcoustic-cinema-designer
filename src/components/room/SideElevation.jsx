@@ -11,6 +11,9 @@ import { useResolvedSpeakerLayout } from "@/components/room/rv/utils/resolveActi
 import { resolveProjectorPosition } from "@/components/room/rv/utils/resolveProjectorPosition";
 import { getCanonicalRole as getCanonicalRoleShared } from "@/components/utils/surroundRoleMap";
 import { resolveEffectiveViewableDimsM } from "@/components/models/screen/resolveEffectiveScreen";
+import SpeakerInfoTooltip from "@/components/room/speakerInfo/SpeakerInfoTooltip";
+import { useSpeakerInfoTooltip } from "@/components/room/speakerInfo/useSpeakerInfoTooltip";
+import { buildSpeakerInfo } from "@/components/room/speakerInfo/speakerInfoModel";
 
 // ---------------------------------------------------------------------------
 // SideElevation – static read-only engineering drawing
@@ -259,6 +262,13 @@ export default function SideElevation({
 
   // --- Drag handlers for vertical screen dragging ---
   const svgRef = useRef(null);
+
+  // Speaker information tooltip — hover or tap any speaker or subwoofer to read
+  // the stored height, cabinet size and orientation. The card is inert, so it
+  // never interferes with vertical dragging.
+  const wrapRef = useRef(null);
+  const drawingRef = useRef(null);
+  const speakerInfo = useSpeakerInfoTooltip({ containerRef: wrapRef, boundsRef: drawingRef });
   const dragStartRef = useRef(null);
   const listenersRef = useRef(null); // tracks active window listeners for unmount cleanup
 
@@ -702,7 +712,18 @@ export default function SideElevation({
                   return (
                     <g key={`fsub-${i}`}
                       onMouseDown={canDrag ? (e) => handleSubMouseDown(e, 'front', staticBottom, subHeightM) : undefined}
-                      style={{ cursor: canDrag ? 'ns-resize' : 'default' }}>
+                      style={{ cursor: canDrag ? 'ns-resize' : 'default' }}
+                      {...speakerInfo.bind(() => ({
+                        ...buildSpeakerInfo({
+                          role: label,
+                          model: sub?.model,
+                          acousticCentreZ_m: bottomZ + subHeightM / 2,
+                          orientationOrPreset: orientation,
+                          orientation,
+                          extras: [Number.isFinite(bottomZ) ? `Bottom height AFF: ${Math.round(bottomZ * 100)} cm` : null],
+                        }),
+                        exclusions: [],
+                      }))}>
                       <rect
                         x={frontX} y={svgTop}
                         width={svgW} height={svgH}
@@ -718,17 +739,8 @@ export default function SideElevation({
                         fill={LABEL_COLOR} fontWeight={600}>
                         {label}
                       </text>
-                      {/* Front sub dimension labels */}
-                      {Number.isFinite(bottomZ) && (
-                        <text x={frontX - 4} y={(svgTop + svgBot) / 2 - 6} textAnchor="end" fontSize={6.5} fill={DIM_COLOR} letterSpacing="0.02em">
-                          B{Math.round(bottomZ * 100)}cm
-                        </text>
-                      )}
-                      {Number.isFinite(subDepthM) && Number.isFinite(subHeightM) && (
-                        <text x={frontX - 4} y={(svgTop + svgBot) / 2 + 13} textAnchor="end" fontSize={6} fill={DIM_COLOR} opacity={0.85}>
-                          {Math.round(subDepthM * 100)}×{Math.round(subHeightM * 100)}cm
-                        </text>
-                      )}
+                      {/* Subwoofer dimensions and bottom height are read on hover
+                          or tap in the speaker information card. */}
                       {canDrag && (
                         <rect
                           x={frontX - 7} y={svgTop - 7}
@@ -776,7 +788,18 @@ export default function SideElevation({
                   return (
                     <g key={`rsub-${i}`}
                       onMouseDown={canDrag ? (e) => handleSubMouseDown(e, 'rear', staticBottom, subHeightM) : undefined}
-                      style={{ cursor: canDrag ? 'ns-resize' : 'default' }}>
+                      style={{ cursor: canDrag ? 'ns-resize' : 'default' }}
+                      {...speakerInfo.bind(() => ({
+                        ...buildSpeakerInfo({
+                          role: label,
+                          model: sub?.model,
+                          acousticCentreZ_m: bottomZ + subHeightM / 2,
+                          orientationOrPreset: orientation,
+                          orientation,
+                          extras: [Number.isFinite(bottomZ) ? `Bottom height AFF: ${Math.round(bottomZ * 100)} cm` : null],
+                        }),
+                        exclusions: [],
+                      }))}>
                       <rect
                         x={frontX} y={svgTop}
                         width={svgW} height={svgH}
@@ -792,17 +815,7 @@ export default function SideElevation({
                         fill={LABEL_COLOR} fontWeight={600}>
                         {label}
                       </text>
-                      {/* Rear sub dimension labels */}
-                      {Number.isFinite(bottomZ) && (
-                        <text x={frontX - 4} y={(svgTop + svgBot) / 2 - 6} textAnchor="end" fontSize={6.5} fill={DIM_COLOR} letterSpacing="0.02em">
-                          B{Math.round(bottomZ * 100)}cm
-                        </text>
-                      )}
-                      {Number.isFinite(subDepthM) && Number.isFinite(subHeightM) && (
-                        <text x={frontX - 4} y={(svgTop + svgBot) / 2 + 13} textAnchor="end" fontSize={6} fill={DIM_COLOR} opacity={0.85}>
-                          {Math.round(subDepthM * 100)}×{Math.round(subHeightM * 100)}cm
-                        </text>
-                      )}
+                      {/* Dimensions read on hover or tap instead of being drawn. */}
                       {canDrag && (
                         <rect
                           x={frontX - 7} y={svgTop - 7}
@@ -969,6 +982,14 @@ export default function SideElevation({
               <g key={`rear-${i}`} opacity={0.92}
                 onMouseDown={isDraggableGrp ? (e) => handleSpeakerMouseDown(e, grpRole, effectiveGrpZ) : undefined}
                 style={{ cursor: isDraggableGrp ? 'ns-resize' : 'default' }}
+                {...speakerInfo.bind(() => ({
+                  ...buildSpeakerInfo({
+                    role: label,
+                    model: grp.model,
+                    acousticCentreZ_m: effectiveGrpZ,
+                  }),
+                  exclusions: [],
+                }))}
               >
                 {/* Cabinet outline — white fill, clean dark stroke */}
                 <rect
@@ -1189,7 +1210,16 @@ export default function SideElevation({
               const svgBodyH = Math.max(3, svgBodyBottom - svgBodyTop);
               const svgGrille = rz(roomH); // ceiling line
               return (
-                <g key={`spk-${i}`} opacity={0.92}>
+                <g key={`spk-${i}`} opacity={0.92}
+                  {...speakerInfo.bind(() => ({
+                    ...buildSpeakerInfo({
+                      role: spk.role,
+                      model: spk.model,
+                      acousticCentreZ_m: spk.z,
+                    }),
+                    exclusions: [],
+                  }))}
+                >
                   {/* Speaker body — extends upward into ceiling void */}
                   <rect
                     x={cx - svgHalfW} y={svgBodyTop}
@@ -1251,6 +1281,14 @@ export default function SideElevation({
               <g key={`spk-${i}`} opacity={0.85}
                 onMouseDown={isDraggable ? (e) => handleSpeakerMouseDown(e, roleUp, effectiveZ) : undefined}
                 style={{ cursor: isDraggable ? 'ns-resize' : 'default' }}
+                {...speakerInfo.bind(() => ({
+                  ...buildSpeakerInfo({
+                    role: spk.role,
+                    model: spk.model,
+                    acousticCentreZ_m: effectiveZ,
+                  }),
+                  exclusions: [],
+                }))}
               >
                 {FaceIcon ? (
                   <>
@@ -1282,34 +1320,8 @@ export default function SideElevation({
                   fontWeight={600}>
                   {spk.role}
                 </text>
-                {sideSpkHCm !== null && (() => {
-                  const dimX = spkX + svgW / 2 + 7;
-                  const floorPx = rz(0);
-                  const centrePx = rz(effectiveZ);
-                  return (
-                    <g opacity={0.75}>
-                      <line x1={dimX} y1={floorPx} x2={dimX} y2={centrePx} stroke={DIM_COLOR} strokeWidth={0.7} />
-                      <line x1={dimX - 3} y1={floorPx} x2={dimX + 3} y2={floorPx} stroke={DIM_COLOR} strokeWidth={0.7} />
-                      <line x1={dimX - 3} y1={centrePx} x2={dimX + 3} y2={centrePx} stroke={DIM_COLOR} strokeWidth={0.7} />
-                      {(() => {
-                        const midY = (floorPx + centrePx) / 2;
-                        return (
-                          <text
-                            x={dimX + 4} y={midY}
-                            textAnchor="middle" fontSize={6.5} fill={DIM_COLOR} letterSpacing="0.02em"
-                            transform={`rotate(-90, ${dimX + 4}, ${midY})`}>
-                            H{sideSpkHCm}cm
-                          </text>
-                        );
-                      })()}
-                    </g>
-                  );
-                })()}
-                {sideSpkWCm !== null && sideSpkDimHCm !== null && (
-                  <text x={spkX + svgW / 2 + 7} y={svgBot + 8} textAnchor="start" fontSize={6} fill={DIM_COLOR} opacity={0.75}>
-                    {sideSpkWCm}×{sideSpkDimHCm}cm
-                  </text>
-                )}
+                {/* Height and cabinet dimensions are read on hover or tap in the
+                    speaker information card rather than drawn permanently. */}
                 {isDraggable && (
                   <rect
                     x={cabinetX - 7} y={cabinetY - 7}
