@@ -111,7 +111,7 @@ export default function LcrSplCard({ role, label, allSeatSplMetrics, integratedL
             </div>
             {dualCentreDb !== null && (
               <div className="text-xs mt-0.5" style={{ color: '#625143' }}>
-                Two cabinets · shared power · +{DUAL_CENTRE_SPL_GAIN_DB} dB estimate
+                Two cabinets · one virtual centre · +{DUAL_CENTRE_SPL_GAIN_DB} dB
               </div>
             )}
             {dualCentreDb === null && isOutputLimited && (

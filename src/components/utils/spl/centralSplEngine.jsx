@@ -1,5 +1,5 @@
 import { usesIntegratedLcrStage } from '../../../../shared/channelArchitecture.js';
-import { detectDualCentreStage, isCentreCabinetRole, centreCabinetPowerW, centreCabinets, DUAL_CENTRE_SPL_GAIN_DB } from '@/components/utils/frontStageModeAuthority';
+import { detectDualCentreStage, centreCabinets, DUAL_CENTRE_SPL_GAIN_DB } from '@/components/utils/frontStageModeAuthority';
 import { effectiveCentreAcousticMidpoint } from '@/components/utils/dualCentrePairAuthority';
 import { isListenerLevelSurroundRole } from '@/components/utils/rp22/listenerLevelSurroundRoles';
 // components/utils/spl/centralSplEngine.js
@@ -467,10 +467,13 @@ export function computeAllSeatSplMetrics({
   // For SPL/RP22 reporting only, expose virtual FL/FC/FR screen-channel entries.
   const isIntegratedLcr = usesIntegratedLcrStage(placedLCR, getModelDimsM);
 
-  // Two physical cabinets resolve to ONE logical FC at the existing midpoint.
-  // Capability uses half channel power per cabinet plus the approved flat
-  // allowance once for a complete pair. This is a design estimate, NOT an exact
-  // two-source sound-field/interference model. Physical drawings stay unchanged.
+  // Two physical cabinets resolve to ONE virtual centre speaker, placed exactly
+  // midway between them and driven at the FULL centre-channel amplifier power —
+  // never halved. Its capability is the selected model's existing SPL calculation
+  // at that midpoint, plus the approved +4 dB arrangement allowance once for a
+  // complete pair. A design estimate, NOT an exact two-source
+  // sound-field/interference model. Physical cabinets, drawings and equipment
+  // schedules are untouched.
   const dualCabinets = detectDualCentreStage(placedSpeakers)
     ? centreCabinets(placedSpeakers).filter((s) => hasPos(s) && hasRealModel(s))
     : [];
@@ -497,7 +500,6 @@ export function computeAllSeatSplMetrics({
             id: `${centreCabinet.id || 'FC'}__dual_centre_FC`,
             position: centreMidpoint,
             virtualFromDualCentre: true,
-            dualCentreHalfPower: true,
             dualCentreAllowanceDb: completeDualPair ? DUAL_CENTRE_SPL_GAIN_DB : 0,
           },
         ]
@@ -537,11 +539,10 @@ export function computeAllSeatSplMetrics({
         
         // Get effective SPL inputs (power, sensitivity overrides)
         const effectiveSplInputs = getEffectiveSplInputs(spk.role);
-        // The dual-centre cabinet carries ONE centre channel split between the two
-        // cabinets: it is driven at half the centre-channel amplifier power.
-        // The approved arrangement allowance is applied below, exactly once.
-        const channelPowerW = effectiveSplInputs?.powerW || 100;
-        const powerW = spk.dualCentreHalfPower ? centreCabinetPowerW(channelPowerW) : channelPowerW;
+        // The dual-centre pair is ONE virtual centre speaker driven at the FULL
+        // centre-channel amplifier power — never halved. The existing 1 m
+        // capability calculation caps it at the speaker's own power limit.
+        const powerW = effectiveSplInputs?.powerW || 100;
 
         // --- Overhead SPL must always assume ceiling mount height ---
         // Do NOT trust spk.position.z for overheads (often missing/0/legacy).
@@ -566,8 +567,9 @@ export function computeAllSeatSplMetrics({
                                speakerMeta?.sensitivity_dB_1w1m || 
                                speakerMeta?.sensitivity || 
                                87,
-          // Power from effective inputs (dual centre: the per-cabinet share —
-          // X/2; the approved flat arrangement allowance is applied below)
+          // Power from effective inputs: the full centre-channel amplifier power
+          // (dual centre is never halved); the +4 dB arrangement allowance is
+          // applied once, after propagation, to the virtual centre's result.
           powerW,
           // Screen loss and EQ headroom
           screenLoss_dB: screenLoss_dB || 0,
@@ -593,10 +595,9 @@ export function computeAllSeatSplMetrics({
               canonicalRole: role,
               ...(spk.virtualFromDualCentre ? {
                 dualCentreAllowanceDb: allowanceDb,
-                centreChannelPowerW: channelPowerW,
-                centreCabinetPowerW: powerW,
+                appliedPowerW: powerW,
                 logicalCentrePosition: { ...speakerPosForSpl },
-                capabilityBasis: 'split-power-plus-approved-flat-allowance',
+                capabilityBasis: 'full-power-plus-approved-flat-allowance',
               } : {}),
             },
           };
