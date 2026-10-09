@@ -98,3 +98,23 @@ test('conventional minimum-system eligibility is unchanged',()=>{
  assert.equal(hasMinimumSystemForAsdr([...unchanged,single],bassState),true);
  assert.equal(hasMinimumSystemForAsdr(unchanged,bassState),false);
 });
+
+import { isCentreCabinetRole } from '@/components/utils/frontStageModeAuthority';
+function productionVisibility(visibleRoles){
+ const source=readFileSync('src/components/AppStateProvider.jsx','utf8');
+ const start=source.indexOf('const getSpeakerVisibility = useCallback((role, model) => {');
+ const body=source.slice(start,source.indexOf('}, [visibleRoles, OVERHEAD_CANON_ROLES]);',start));
+ return new Function('safeCanonRole','visibleRoles','OVERHEAD_CANON_ROLES','isCentreCabinetRole',body.replace('const getSpeakerVisibility = useCallback(', 'return ')+ '}')(
+  r=>r,visibleRoles,new Set(['TFL','TFR','TML','TMR','TRL','TRR']),isCentreCabinetRole);
+}
+test('production visibility maps both centre cabinets to expected logical FC',()=>{
+ const visible=productionVisibility(new Set(['FL','FC','FR','SL','SR']));
+ assert.equal(visible('FCL','c4-1'),true);assert.equal(visible('FCR','c4-1'),true);
+ assert.equal(visible('FL','q8-5'),true);assert.equal(visible('SL2','c4-1'),true);
+ assert.equal(visible('LW','c4-1'),false);
+});
+test('centre cabinets remain excluded if the logical centre is not expected',()=>{
+ const visible=productionVisibility(new Set(['SL','SR']));
+ assert.equal(visible('FCL','c4-1'),false);assert.equal(visible('FCR','c4-1'),false);
+});
+
