@@ -221,10 +221,14 @@ export function C41FaceIcon({ x, y, width, height }) {
  * icons give their source screenshots — and the visible cabinet fills its
  * boundary box edge to edge.
  *
- * The screenshot sits on a white page. One luminance-to-alpha colour matrix
- * drops that white to transparent while keeping the drawing's black lines and
- * grey accents, so the cabinet renders as clean line art on any background and
- * never as a white box.
+ * The screenshot sits on a white page and the drawing itself is grey line art.
+ * It takes the same treatment the Multi Soundbar artwork icons give their source
+ * screenshots — a grayscale matrix followed by a threshold table — so the page
+ * stays solid white (the cabinet's white face, matching the FL/FR product
+ * artwork) and the grey lines resolve to solid black with a consistent weight.
+ * The threshold sits inside the drawing's own line tone (measured 0.44–0.75
+ * luma, minimum 0.44) so the line weights stay faithful to the reference rather
+ * than thickening into blobs.
  */
 export function C1FaceIcon({ x, y, width, height }) {
   return (
@@ -241,8 +245,13 @@ export function C1FaceIcon({ x, y, width, height }) {
         <filter id="c1-line-art" colorInterpolationFilters="sRGB">
           <feColorMatrix
             type="matrix"
-            values="0 0 0 0 0  0 0 0 0 0  0 0 0 0 0  -0.2126 -0.7152 -0.0722 0 1"
+            values="0.2126 0.7152 0.0722 0 0  0.2126 0.7152 0.0722 0 0  0.2126 0.7152 0.0722 0 0  0 0 0 1 0"
           />
+          <feComponentTransfer>
+            <feFuncR type="table" tableValues="0 0 0 0 0 0 0 1 1 1" />
+            <feFuncG type="table" tableValues="0 0 0 0 0 0 0 1 1 1" />
+            <feFuncB type="table" tableValues="0 0 0 0 0 0 0 1 1 1" />
+          </feComponentTransfer>
         </filter>
       </defs>
       <image
