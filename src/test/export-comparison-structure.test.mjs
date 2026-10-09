@@ -107,7 +107,17 @@ test('TEST 4 — a Level 1 bass consistency row is not described as a strength',
   );
 
   const strong = comparisonClientMeaning({ key: 'p20', values: ['L3 · 2.0 dB', 'L4 · 1.4 dB'] });
-  assert.match(strong, /consistent bass from seat to seat/i, 'a Level 3 / Level 4 result keeps its approved line');
+  assert.equal(
+    strong,
+    'Measured seat-to-seat variation; lower variation means less difference between seats.',
+    'the comparison fallback explains the measured variation without inventing a strength claim',
+  );
+  assert.equal(strong, meaning, 'the evidence-neutral fallback does not change with the stated levels');
+  assert.equal(
+    comparisonClientMeaning({ key: 'p20', client_meaning: 'Frozen evidence wording', values: ['L3', 'L4'] }),
+    'Frozen evidence wording',
+    'an evidence-provided client meaning remains authoritative',
+  );
 });
 
 // ── TEST 5 — an unstated level supports no claim ──────────────────────────
