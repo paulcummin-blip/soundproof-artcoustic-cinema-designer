@@ -10,17 +10,23 @@
 // product's apparent cabinet size and its visual spacing wrong.
 //
 // This wrapper knocks the white page out of the artwork, so the graphic shows
-// only the product's own line art on the drawing's own surface. Nothing else
-// changes: the box it is given, the position, the rotation and the aspect
-// handling all stay exactly as they were, and the artwork is never resized onto
-// a different shape.
+// only the product's own line art. To stop the drawing's own surface reading
+// through the cabinet, it also lays a TIGHT opaque white backing behind the
+// artwork: the caller passes the cabinet's own scaled footprint, and nothing
+// larger is ever drawn. Nothing else changes: the box it is given, the
+// position, the rotation and the aspect handling all stay exactly as they were,
+// and the artwork is never resized onto a different shape.
 //
 // It is applied at the DRAW SITE, so one solution covers every model and every
 // drawing — wrap the face icon wherever it is placed:
 //
-//   <ProductArtwork>
+//   <ProductArtwork backing={{ x, y, width: w, height: h }}>
 //     <Q63FaceIcon x={x} y={y} width={w} height={h} />
 //   </ProductArtwork>
+//
+// `backing` is optional: a call site that already paints its own opaque cabinet
+// (or a drawing that has no cabinet to back) simply omits it and keeps the
+// previous knock-out-only behaviour.
 // ---------------------------------------------------------------------------
 import React, { useId } from "react";
 
@@ -35,7 +41,7 @@ const WHITE_PAGE_KNOCKOUT = [
   "-0.333 -0.333 -0.333 1 0",
 ].join("   ");
 
-export default function ProductArtwork({ children }) {
+export default function ProductArtwork({ children, backing = null }) {
   // A per-instance id keeps the filter self-contained: the artwork is never
   // rendered with a reference to a filter that is not in the document.
   const rawId = useId();
@@ -43,6 +49,23 @@ export default function ProductArtwork({ children }) {
 
   return (
     <>
+      {/* Tight opaque white backing — the cabinet's own scaled footprint, drawn
+          BEFORE the knotted-out artwork and OUTSIDE its filter, so the technical
+          symbol reads as printed on white paper and no drawing line shows
+          through the cabinet. It carries no margin and no stroke, so it can
+          never bleed beyond the cabinet, and it takes the caller's transform, so
+          a cabinet rotated a quarter turn brings its backing round with it. */}
+      {backing ? (
+        <rect
+          x={backing.x}
+          y={backing.y}
+          width={backing.width}
+          height={backing.height}
+          fill="#ffffff"
+          shapeRendering="crispEdges"
+          data-product-backing="true"
+        />
+      ) : null}
       <defs>
         <filter
           id={filterId}

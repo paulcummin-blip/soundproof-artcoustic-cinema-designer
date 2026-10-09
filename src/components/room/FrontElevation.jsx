@@ -633,8 +633,15 @@ export default function FrontElevation({ dimensions, screen, placedSpeakers = []
         {hasFaceIcon ? (
           <g transform={vertical ? `rotate(90 ${cx} ${cy})` : undefined}>
             {/* Product artwork is line art on an opaque white page — the page is
-                knocked out so the graphic shows only the cabinet's own drawing. */}
-            <ProductArtwork>{renderFaceIcon()}</ProductArtwork>
+                knocked out so the graphic shows only the cabinet's own drawing.
+                The tight opaque white backing is the cabinet's OWN scaled
+                footprint (iconBoxW × iconBoxH): a vertical cabinet brings its
+                backing round with the rotated face, and nothing larger appears. */}
+            <ProductArtwork
+              backing={{ x: cx - iconBoxW / 2, y: cy - iconBoxH / 2, width: iconBoxW, height: iconBoxH }}
+            >
+              {renderFaceIcon()}
+            </ProductArtwork>
           </g>
         ) : isRound ? (
           <circle cx={cx} cy={cy} r={Math.max(6, sw / 2)} fill={fill} stroke={stroke} strokeWidth={1.2} opacity={0.90} />

@@ -1175,7 +1175,7 @@ export default function SideElevation({
             const sideSpkDimHCm = Number.isFinite(spkHeightM) ? Math.round(spkHeightM * 100) : null;
             const sideDimX = spkX + svgW / 2 + 4;
             return (
-              <g key={`spk-${i}`} opacity={0.85}
+              <g key={`spk-${i}`}
                 onMouseDown={isDraggable ? (e) => handleSpeakerMouseDown(e, roleUp, effectiveZ) : undefined}
                 style={{ cursor: isDraggable ? 'ns-resize' : 'default' }}
                 {...speakerInfo.bind(() => ({
@@ -1210,7 +1210,8 @@ export default function SideElevation({
                   <rect
                     x={cabinetX} y={cabinetY}
                     width={svgW} height={svgH}
-                    fill={SPK_COLOR} stroke={SPK_COLOR} strokeWidth={1} rx={2} />
+                    fill={SPK_COLOR} stroke={SPK_COLOR} strokeWidth={1} rx={2}
+                    opacity={0.85} />
                 )}
                 <text
                   x={spkX}

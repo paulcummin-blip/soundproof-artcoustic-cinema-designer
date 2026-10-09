@@ -441,10 +441,10 @@ export default function ScreenWallConstructionGraphic({
           const y = mapY(drawZM) - h / 2;
           return (
             <g key={`${item.role}-${item.xM}-${item.zM}`}>
-              {isQ63 ? <ProductArtwork><Q63FaceIcon x={x} y={y} width={w} height={h} /></ProductArtwork> :
-               isQ43 ? <ProductArtwork><Q43FaceIcon x={x} y={y} width={w} height={h} /></ProductArtwork> :
-               isQ45 ? <ProductArtwork><Q45FaceIcon x={x} y={y} width={w} height={h} /></ProductArtwork> :
-               isQ85 ? <ProductArtwork><Q85FaceIcon x={x} y={y} width={w} height={h} /></ProductArtwork> :
+              {isQ63 ? <ProductArtwork backing={{ x, y, width: w, height: h }}><Q63FaceIcon x={x} y={y} width={w} height={h} /></ProductArtwork> :
+               isQ43 ? <ProductArtwork backing={{ x, y, width: w, height: h }}><Q43FaceIcon x={x} y={y} width={w} height={h} /></ProductArtwork> :
+               isQ45 ? <ProductArtwork backing={{ x, y, width: w, height: h }}><Q45FaceIcon x={x} y={y} width={w} height={h} /></ProductArtwork> :
+               isQ85 ? <ProductArtwork backing={{ x, y, width: w, height: h }}><Q85FaceIcon x={x} y={y} width={w} height={h} /></ProductArtwork> :
                <rect x={x} y={y} width={w} height={h} fill="none" stroke={COLORS.speaker} strokeWidth="1" />}
               <text x={x + w / 2} y={y - 6} fontSize="8" fill={COLORS.text} textAnchor="middle" fontFamily={BODY_FONT} fontWeight="600">
                 {item.role}
