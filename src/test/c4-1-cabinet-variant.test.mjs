@@ -436,3 +436,102 @@ test('TEST 21 The +4 dB dual-cabinet allowance and the dual-centre default are u
   assert.equal(at1711.nominalOhms, at1222.nominalOhms);
   assert.equal(at1711.max_power, at1222.max_power);
 });
+
+// ── 10. Undistorted artwork — the rendering correction ────────────────────
+
+// The real Front Elevation mapping (src/components/room/FrontElevation.jsx): a
+// fixed 640 px canvas whose height is derived from its width, so both axes share
+// ONE scale — 532 px across a default 4.5 m room, i.e. 118.2 px per metre either
+// way. That is what lets the artwork keep its own proportions on screen.
+const ELEV_DRAW_W = 640 - 36 * 2 - 36;
+const PX_PER_M = ELEV_DRAW_W / 4.5;
+const CABINET_H_M = 0.12;
+
+// The three source PNGs' own pixel sizes, measured from the files themselves.
+const PNG_PX = { 1222: [2172, 724], 1441: [2167, 726], 1711: [2167, 726] };
+
+// SVG's two mapping rules, evaluated the way a browser does.
+const axisScales = (preserveAspectRatio, targetW, targetH, vbW, vbH) => {
+  if (preserveAspectRatio === 'none') return [targetW / vbW, targetH / vbH];
+  const s = Math.min(targetW / vbW, targetH / vbH);
+  return [s, s];
+};
+
+/** The rendered geometry of one artwork icon, read from its own source. */
+function iconGeometry(name) {
+  const start = c41Artwork.indexOf(`export function ${name}`);
+  const block = c41Artwork.slice(start, c41Artwork.indexOf('\n}', start));
+  const vb = block.match(/viewBox="([^"]+)"/)[1].trim().split(/\s+/).map(Number);
+  const attr = (a) => Number(block.match(new RegExp(`${a}="(\\d+)"`))[1]);
+  const pars = [...block.matchAll(/preserveAspectRatio="([^"]+)"/g)].map((m) => m[1]);
+  return {
+    vbW: vb[2], vbH: vb[3],
+    imageW: attr('width'), imageH: attr('height'),
+    fit: pars[0], mapping: pars[1],
+  };
+}
+
+test('TEST 22 The artwork is cropped and fitted proportionally — never stretched', () => {
+  // No icon may scale its artwork differently on the two axes: a stretched
+  // drawing is exactly what turned the C4-1 drivers into slivers.
+  assert.ok(!c41Artwork.includes('preserveAspectRatio="none"'),
+    'no axis-independent stretching anywhere in the C4-1 artwork');
+
+  const ICONS = { 1222: 'C41_1222FaceIcon', 1441: 'C41_1441FaceIcon', 1711: 'C41_1711FaceIcon' };
+
+  Object.entries(ICONS).forEach(([mm, name]) => {
+    const g = iconGeometry(name);
+    const [pngW, pngH] = PNG_PX[mm];
+
+    // The crop: the source is drawn at its NATIVE pixel size inside the ink-box
+    // viewBox, so the drawing is cropped rather than resized onto it.
+    assert.equal(g.imageW, pngW, `${mm} mm: the image is drawn at its native width`);
+    assert.equal(g.imageH, pngH, `${mm} mm: the image is drawn at its native height`);
+    assert.equal(g.fit, 'xMidYMid meet', `${mm} mm: the cabinet box fits the artwork proportionally`);
+
+    const cabinetW = (Number(mm) / 1000) * PX_PER_M;
+    const cabinetH = CABINET_H_M * PX_PER_M;
+
+    // Horizontal: the cabinet's own rectangle. Vertical: the same cabinet
+    // rotated — the box Front Elevation hands the icon before turning the whole
+    // illustration a quarter turn about the cabinet centre.
+    const ORIENTATIONS = { horizontal: [cabinetW, cabinetH], vertical: [cabinetH, cabinetW] };
+
+    Object.entries(ORIENTATIONS).forEach(([orientation, [boxW, boxH]]) => {
+      const [fitX, fitY] = axisScales(g.fit, boxW, boxH, g.vbW, g.vbH);
+      const [imgX, imgY] = axisScales(g.mapping, g.imageW, g.imageH, pngW, pngH);
+      const sx = fitX * imgX;
+      const sy = fitY * imgY;
+      const distortion = Math.max(sx, sy) / Math.min(sx, sy);
+
+      assert.ok(distortion < 1.005,
+        `${mm} mm ${orientation}: a source pixel is scaled ${sx.toFixed(4)} x ${sy.toFixed(4)}, so the drivers would be ${((distortion - 1) * 100).toFixed(1)}% oval`);
+
+      // The outline still stands at the catalogue footprint: the artwork fills the
+      // cabinet's long axis and keeps the cabinet's own proportions.
+      const drawnW = g.vbW * fitX;
+      const drawnH = g.vbH * fitY;
+      const longFill = Math.max(drawnW / boxW, drawnH / boxH);
+      assert.ok(longFill > 0.97,
+        `${mm} mm ${orientation}: the artwork fills ${(longFill * 100).toFixed(1)}% of the cabinet's long axis`);
+
+      const drawnAspect = Math.max(drawnW, drawnH) / Math.min(drawnW, drawnH);
+      const cabinetAspect = Math.max(boxW, boxH) / Math.min(boxW, boxH);
+      assert.ok(Math.abs(drawnAspect - cabinetAspect) / cabinetAspect < 0.03,
+        `${mm} mm ${orientation}: the drawn outline keeps the catalogue proportions (${drawnAspect.toFixed(2)} vs ${cabinetAspect.toFixed(2)})`);
+    });
+  });
+});
+
+test('TEST 23 A vertical cabinet is the whole artwork turned 90°, not re-fitted', () => {
+  assert.ok(frontElevation.includes('const iconBoxW = vertical ? sh : sw;'), 'the icon box follows the rotated cabinet');
+  assert.ok(frontElevation.includes('const iconBoxH = vertical ? sw : sh;'));
+  assert.ok(frontElevation.includes('<g transform={vertical ? `rotate(90 ${cx} ${cy})` : undefined}>{renderFaceIcon()}</g>'),
+    'the complete illustration is rotated a quarter turn about the cabinet centre');
+  assert.ok(frontElevation.includes('vertical: spk.vertical === true'),
+    'a centre cabinet passes its installed orientation through');
+  // The cabinet rectangle itself is untouched: the catalogue footprint is used
+  // as-is, so no stored dimension had to change to suit the artwork.
+  assert.ok(frontElevation.includes('const FACE_ICON_VISIBLE_RATIO = (isC41 || isC1) ? 1.0 : 0.72;'),
+    'the C4-1 keeps its catalogue footprint with no artwork padding');
+});

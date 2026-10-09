@@ -15,11 +15,23 @@
 // Every other C4-1 cabinet length keeps the catalogue's own C4-1 artwork, which
 // lives in SpeakerFaceIcons.jsx as C41FaceIcon.
 //
-// Each icon is the supplied technical line drawing (black on white) whose viewBox
-// is the drawing's own MEASURED ink box, so the white page around it is cropped
-// away and the drawing is drawn at the cabinet's catalogue footprint edge to edge.
-// The catalogue's dimensions remain the authority: nothing here derives a
-// physical size from the artwork, and nothing here touches SPL, RP22 or impedance.
+// HOW THE ARTWORK IS PLACED — the two rules that keep it undistorted:
+//
+//   1. CROP, NEVER RESIZE. The viewBox is the drawing's own MEASURED ink box and
+//      the source image inside it is drawn at its NATIVE pixel size (1 image pixel
+//      = 1 user unit), so the viewBox shows exactly the ink and the surrounding
+//      white page is cropped away. The image is never resized onto the ink box: an
+//      image drawn wider on one axis than the other squashes the drawing and turns
+//      the driver circles into slivers.
+//   2. FIT PROPORTIONALLY. The outer svg fits that ink box into whatever cabinet
+//      rectangle it is given with preserveAspectRatio="xMidYMid meet" — one scale
+//      for both axes, centred — so the drawing keeps its own proportions inside
+//      the cabinet outline instead of being stretched to fill it, and a vertically
+//      mounted cabinet is that same artwork turned a quarter turn.
+//
+// The catalogue's dimensions remain the authority: the rectangle comes from them,
+// nothing here derives a physical size from the artwork, and nothing here touches
+// SPL, RP22 or impedance.
 // ---------------------------------------------------------------------------
 
 /**
@@ -28,10 +40,10 @@
  * The approved front-face line artwork: black lines on a white page. The ink
  * occupies x 45–2127, y 257–464 of the 2172 × 724 px source (measured from the
  * file itself), so the viewBox is that ink box: the surrounding white page is
- * cropped away and the drawing fills the cabinet's own catalogue footprint edge
- * to edge. The drawing IS the 1222 × 120 mm cabinet — 10.18 : 1 against the ink
- * box's 10.01 : 1 — so filling that footprint adjusts it by under 2% and never
- * stretches it onto a different cabinet's shape. It is used only for the
+ * cropped away. The drawing IS the 1222 × 120 mm cabinet — 10.18 : 1 against the
+ * ink box's 10.01 : 1 — and it is fitted proportionally inside that footprint
+ * (one scale for both axes, centred), so it is never stretched onto a different
+ * cabinet's shape and its driver circles stay circular. It is used only for the
  * 1222 mm variant; the other C4-1 lengths keep their own artwork.
  */
 export function C41_1222FaceIcon({ x, y, width, height }) {
@@ -43,15 +55,17 @@ export function C41_1222FaceIcon({ x, y, width, height }) {
       height={height}
       viewBox="45 257 2083 208"
       xmlns="http://www.w3.org/2000/svg"
-      preserveAspectRatio="none"
+      preserveAspectRatio="xMidYMid meet"
     >
+      {/* Native pixel size — 1 image pixel = 1 user unit, so the viewBox above
+          crops the white page instead of resizing the drawing onto the ink box. */}
       <image
-        x="45"
-        y="257"
-        width="2083"
-        height="208"
+        x="0"
+        y="0"
+        width="2172"
+        height="724"
         href="https://media.base44.com/images/public/6a1166c68ddc81e5ea2cdf6b/0103ea1cc_ChatGPTImage9Oct202610_47_24.png"
-        preserveAspectRatio="none"
+        preserveAspectRatio="xMidYMid meet"
       />
     </svg>
   );
@@ -66,9 +80,10 @@ export function C41_1222FaceIcon({ x, y, width, height }) {
  * of the 2167 × 726 px source, measured from the file itself on the SAME basis
  * as the 1222 mm artwork (any pixel below full white), so the viewBox is that
  * ink box and the surrounding white page is cropped away. The drawing is a
- * 1441 × 120 mm cabinet — 12.01 : 1 against the ink box's 12.32 : 1 — so filling
- * the catalogue footprint adjusts it by under 3% and never stretches it onto a
- * different cabinet's shape. It is used only for the 1441 mm variant; the
+ * 1441 × 120 mm cabinet — 12.01 : 1 against the ink box's 12.32 : 1 — and it is
+ * fitted proportionally inside that footprint (one scale for both axes, centred),
+ * so it is never stretched onto a different cabinet's shape and its driver
+ * circles stay circular. It is used only for the 1441 mm variant; the
  * 1222 mm cabinet keeps its own artwork and the other lengths keep the catalogue
  * drawing.
  */
@@ -81,15 +96,17 @@ export function C41_1441FaceIcon({ x, y, width, height }) {
       height={height}
       viewBox="36 275 2095 170"
       xmlns="http://www.w3.org/2000/svg"
-      preserveAspectRatio="none"
+      preserveAspectRatio="xMidYMid meet"
     >
+      {/* Native pixel size — 1 image pixel = 1 user unit, so the viewBox above
+          crops the white page instead of resizing the drawing onto the ink box. */}
       <image
-        x="36"
-        y="275"
-        width="2095"
-        height="170"
+        x="0"
+        y="0"
+        width="2167"
+        height="726"
         href="https://media.base44.com/images/public/6a1166c68ddc81e5ea2cdf6b/40ad34db7_ChatGPTImage9Oct202610_49_42.png"
-        preserveAspectRatio="none"
+        preserveAspectRatio="xMidYMid meet"
       />
     </svg>
   );
@@ -104,10 +121,11 @@ export function C41_1441FaceIcon({ x, y, width, height }) {
  * itself on the SAME basis as the other C4-1 artworks (any pixel below full
  * white), so the viewBox is that ink box and the surrounding white page is
  * cropped away. The drawing is the 1711 × 120 mm cabinet — 14.26 : 1 against the
- * ink box's 14.07 : 1 — so filling the catalogue footprint adjusts it by under
- * 2% and never stretches it onto a different cabinet's shape. It is used only
- * for the 1711 mm variant; the 1222 mm and 1441 mm cabinets keep their own
- * artwork and the other lengths keep the catalogue drawing.
+ * ink box's 14.07 : 1 — and it is fitted proportionally inside that footprint
+ * (one scale for both axes, centred), so it is never stretched onto a different
+ * cabinet's shape and its driver circles stay circular. It is used only for the
+ * 1711 mm variant; the 1222 mm and 1441 mm cabinets keep their own artwork and
+ * the other lengths keep the catalogue drawing.
  */
 export function C41_1711FaceIcon({ x, y, width, height }) {
   return (
@@ -118,15 +136,17 @@ export function C41_1711FaceIcon({ x, y, width, height }) {
       height={height}
       viewBox="35 277 2097 149"
       xmlns="http://www.w3.org/2000/svg"
-      preserveAspectRatio="none"
+      preserveAspectRatio="xMidYMid meet"
     >
+      {/* Native pixel size — 1 image pixel = 1 user unit, so the viewBox above
+          crops the white page instead of resizing the drawing onto the ink box. */}
       <image
-        x="35"
-        y="277"
-        width="2097"
-        height="149"
+        x="0"
+        y="0"
+        width="2167"
+        height="726"
         href="https://media.base44.com/images/public/6a1166c68ddc81e5ea2cdf6b/7759b8f47_ChatGPTImage9Oct202610_54_00.png"
-        preserveAspectRatio="none"
+        preserveAspectRatio="xMidYMid meet"
       />
     </svg>
   );
