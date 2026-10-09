@@ -2,11 +2,21 @@ import { PUBLICATION_CONTRACT_VERSION, buildAtomicParameterIndex, auditPublicati
 import { publicationSectionReport, RP22_PARAMETER_KEYS } from './publicationGateCore';
 import { assessEngineeringReportCompleteness, isExplicitNotApplicable } from '../../../shared/assessmentTerminal.js';
 import { statesBassAuthority } from './versionedEngineeringAuthority';
+import { bassContractMatchesRequestedP14 } from '../room/bass/completedBassResultPersistence';
+import { deriveRequestedCalibrationConfig } from '../room/bass/requestedCalibrationConfig';
+
+export function publicationBassIdentityMatches({ completedBassAuthority, bassFingerprint, designState }) {
+  if (!bassFingerprint) return true; // Explicit non-applicability is checked by the existing terminal gates.
+  const contract = completedBassAuthority?.contract;
+  return completedBassAuthority?.currentFingerprint === bassFingerprint
+    && contract?.job?.resultFingerprint === bassFingerprint
+    && bassContractMatchesRequestedP14(contract, deriveRequestedCalibrationConfig({ splConfig: designState?.splConfig }));
+}
 
 export function engineeringPublicationPreflight({
   projectId, versionId, ready, isPublishable, engineeringSummary,
   engineeringFingerprint, bassReadiness = {}, retainedFromRefresh = false,
-  reportSnapshot, designState, versions,
+  reportSnapshot, designState, versions, completedBassAuthority,
 }) {
   const bassReady = bassReadiness.ready === true || retainedFromRefresh === true;
   const candidate = {
@@ -36,6 +46,7 @@ export function engineeringPublicationPreflight({
     { key: 'hydration', label: 'Version loaded and minimum system selected', ok: ready === true },
     { key: 'rp22_terminal', label: 'RP22 P1–P21 terminal (verified bass or explicit N/A)', ok: provisional.length === 0, detail: provisional.join(', ') },
     { key: 'bass_current', label: 'Current verified bass / P19', ok: bassReady, detail: bassReady ? null : bassReason },
+    ...(completedBassAuthority !== undefined ? [{ key: 'bass_identity', label: 'Completed bass assessment matches the selected target', ok: publicationBassIdentityMatches({ completedBassAuthority, bassFingerprint: bassReadiness.fingerprint, designState }), detail: 'Wait for the selected target assessment to settle, then retry.' }] : []),
     { key: 'p20_available', label: 'P20 seat results available', ok: isExplicitNotApplicable(parameters.p20) || engineeringSummary?.project?.reportCounts?.seatResultsByParameter?.p20?.some(row => row?.status === 'scored') === true },
     { key: 'design_rating', label: 'Publishable settled design rating', ok: isPublishable === true },
     { key: 'bass_summary', label: 'Bass results in engineering summary', ok: statesBassAuthority(engineeringSummary) },
