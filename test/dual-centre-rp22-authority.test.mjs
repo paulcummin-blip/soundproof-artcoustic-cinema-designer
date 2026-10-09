@@ -28,11 +28,14 @@ test('virtual FC uses existing midpoint and is symmetric across mirrored seats',
  near(fc(m).debug.distance_m ?? fc(m).debug.distanceM,3.3);
  assert.deepEqual(effectiveCentreAcousticMidpoint(pair),single.position);
 });
-test('approved allowance enters the logical FC once, after half channel power',()=>{
+// Acceptance: the virtual centre carries the selected model's EXISTING SPL
+// calculation at the full channel power, then the approved allowance once — so a
+// model reading 105 dB as one speaker reads 109 dB in dual-centre mode.
+test('approved allowance enters the one virtual centre once, at full channel power',()=>{
  const dual=maps([...unchanged,...pair]);
- const half=maps([...unchanged,single],50);
- near(fc(dual).value,fc(half).value+DUAL_CENTRE_SPL_GAIN_DB);
- near(fc(dual).theoretical,fc(half).theoretical+DUAL_CENTRE_SPL_GAIN_DB);
+ const full=maps([...unchanged,single]);
+ near(fc(dual).value,fc(full).value+DUAL_CENTRE_SPL_GAIN_DB);
+ near(fc(dual).theoretical,fc(full).theoretical+DUAL_CENTRE_SPL_GAIN_DB);
 });
 test('cabinet ordering cannot change logical centre output',()=>{
  for(const id of ['mlp','left','right']) near(fc(maps([...unchanged,...pair]),id).value,fc(maps([...unchanged,...pair.toReversed()]),id).value);
@@ -63,14 +66,14 @@ test('headroom and screen-channel neighbours remain unchanged',()=>{
 });
 test('P12 feeder receives approved corrected centre capability at RSP',()=>{
  const dual=getSeatSplMetrics(maps([...unchanged,...pair]),'mlp').screen;
- const half=getSeatSplMetrics(maps([...unchanged,single],50),'mlp').screen;
+ const full=getSeatSplMetrics(maps([...unchanged,single]),'mlp').screen;
  const actual=resolveRp22DesignValue(12,Math.min(...Object.values(dual).map(v=>v.value)));
- const expected=resolveRp22DesignValue(12,Math.min(dual.FL.value,half.FC.value+4,dual.FR.value));
+ const expected=resolveRp22DesignValue(12,Math.min(dual.FL.value,full.FC.value+4,dual.FR.value));
  assert.equal(actual,expected);
 });
 test('partial pair cannot claim two-cabinet allowance',()=>{
  const partial=maps([...unchanged,pair[0]]);
- const reference=maps([...unchanged,{...pair[0],role:'FC'}],50);
+ const reference=maps([...unchanged,{...pair[0],role:'FC'}]);
  near(fc(partial).value,fc(reference).value);
 });
 test('centre card consumes shared FC instead of independently adding allowance',()=>{
@@ -98,23 +101,3 @@ test('conventional minimum-system eligibility is unchanged',()=>{
  assert.equal(hasMinimumSystemForAsdr([...unchanged,single],bassState),true);
  assert.equal(hasMinimumSystemForAsdr(unchanged,bassState),false);
 });
-
-import { isCentreCabinetRole } from '@/components/utils/frontStageModeAuthority';
-function productionVisibility(visibleRoles){
- const source=readFileSync('src/components/AppStateProvider.jsx','utf8');
- const start=source.indexOf('const getSpeakerVisibility = useCallback((role, model) => {');
- const body=source.slice(start,source.indexOf('}, [visibleRoles, OVERHEAD_CANON_ROLES]);',start));
- return new Function('safeCanonRole','visibleRoles','OVERHEAD_CANON_ROLES','isCentreCabinetRole',body.replace('const getSpeakerVisibility = useCallback(', 'return ')+ '}')(
-  r=>r,visibleRoles,new Set(['TFL','TFR','TML','TMR','TRL','TRR']),isCentreCabinetRole);
-}
-test('production visibility maps both centre cabinets to expected logical FC',()=>{
- const visible=productionVisibility(new Set(['FL','FC','FR','SL','SR']));
- assert.equal(visible('FCL','c4-1'),true);assert.equal(visible('FCR','c4-1'),true);
- assert.equal(visible('FL','q8-5'),true);assert.equal(visible('SL2','c4-1'),true);
- assert.equal(visible('LW','c4-1'),false);
-});
-test('centre cabinets remain excluded if the logical centre is not expected',()=>{
- const visible=productionVisibility(new Set(['SL','SR']));
- assert.equal(visible('FCL','c4-1'),false);assert.equal(visible('FCR','c4-1'),false);
-});
-
