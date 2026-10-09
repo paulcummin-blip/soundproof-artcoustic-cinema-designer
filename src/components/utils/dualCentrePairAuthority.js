@@ -10,6 +10,7 @@
 // and the drawing components alike.
 
 import { isCentreCabinetRole } from "@/components/utils/frontStageModeAuthority";
+import { getCanonicalRole } from "@/components/utils/surroundRoleMap";
 
 const PAIR_PARTNER = { FCL: "FCR", FCR: "FCL" };
 
@@ -141,4 +142,31 @@ export function withCentreCabinetAim(placedSpeakers, atRsp) {
   return (Array.isArray(placedSpeakers) ? placedSpeakers : []).map((s) => (
     isCentreCabinetRole(s?.role) ? { ...s, aimAtRsp: aimed } : s
   ));
+}
+
+// ── The aiming mode as part of a speaker's equality ─────────────────────────
+//
+// The aiming mode changes NO id, role, model or position — it only decides how
+// the two cabinets are resolved when they are drawn. The speakers-equality
+// guards that filter redundant writes (SpeakerPlacement's write filter and
+// AppStateProvider's idempotence check) would therefore judge an aiming change
+// to be "the same speakers" and discard it, so the selection never reached the
+// cabinets and the Plan View never aimed them.
+//
+// The mode is configuration, so it is compared here, once, by both guards: a
+// change of mode is a change of speakers (the write lands), and an unchanged
+// mode stays a no-op (no extra writes, no loops).
+
+/** The pair's aiming mode as a comparable signature, or '' when no cabinet is installed. */
+export function centreCabinetAimSignature(placedSpeakers) {
+  return (Array.isArray(placedSpeakers) ? placedSpeakers : [])
+    .filter((s) => isCentreCabinetRole(s?.role))
+    .map((s) => `${getCanonicalRole(s?.role)}:${s?.aimAtRsp === true ? 'rsp' : 'straight'}`)
+    .sort()
+    .join('|');
+}
+
+/** Whether two speaker lists carry the same cabinet aiming mode. */
+export function sameCentreCabinetAim(a, b) {
+  return centreCabinetAimSignature(a) === centreCabinetAimSignature(b);
 }

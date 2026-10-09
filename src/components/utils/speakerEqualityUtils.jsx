@@ -1,3 +1,5 @@
+import { sameCentreCabinetAim } from "@/components/utils/dualCentrePairAuthority";
+
 export const __b44SigFor = (v) => {
   try {
     return JSON.stringify(v);
@@ -10,6 +12,12 @@ export function __b44SameSpeakers(a, b) {
   if (a === b) return true;
   if (!Array.isArray(a) || !Array.isArray(b)) return false;
   if (a.length !== b.length) return false;
+
+  // The dual-centre cabinets' aiming mode is part of the configuration and
+  // changes no id, role, model or position, so it is compared explicitly: an
+  // aiming change must never be judged "the same speakers" and discarded by the
+  // write filter that uses this helper.
+  if (!sameCentreCabinetAim(a, b)) return false;
 
   for (let i = 0; i < a.length; i++) {
     const A = a[i] || {};

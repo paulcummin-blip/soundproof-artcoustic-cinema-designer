@@ -17,6 +17,7 @@ import { migrateP12Mode, P12_MODE_MINIMUM, P12_MODE_RECOMMENDED } from "@/compon
 import { normaliseViewingPriority } from "@/components/utils/viewingPriorityAuthority";
 import { normaliseP14Level } from "@/components/room/bass/p14TargetSelectionState";
 import { applyManualOverrideToScreen } from "@/components/models/screen/resolveEffectiveScreen";
+import { sameCentreCabinetAim } from "@/components/utils/dualCentrePairAuthority";
 // Seat priority is an independent user classification. It is intentionally
 // not coupled to the acoustic RSP / legacy isPrimary authority here.
 
@@ -148,6 +149,12 @@ function speakersShallowEqual(a = [], b = []) {
   const A = byRole(a), B = byRole(b);
 
   if (A.size !== B.size) return false;
+
+  // The dual-centre cabinets' aiming mode is configuration, not a position: it
+  // changes no role, model or coordinate, so without this comparison the
+  // idempotence check would judge an aiming change "unchanged" and drop the
+  // write — the cabinets would never aim. One shared authority decides.
+  if (!sameCentreCabinetAim(a, b)) return false;
 
   for (const [role, sa] of A) {
     const sb = B.get(role);
