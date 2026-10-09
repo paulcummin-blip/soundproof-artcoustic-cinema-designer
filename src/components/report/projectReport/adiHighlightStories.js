@@ -76,18 +76,15 @@ export function joinList(items) {
 /* ── Evidence line helpers ────────────────────────────────────────────────── */
 
 /**
- * One evidence line. The published level may be stated in the line's own key
- * ("P12 L4") or given explicitly; either way it is carried as the line's level,
- * so the page colours each piece of evidence by its own published grade.
+ * One evidence line: the label it rests on (a parameter number, or the fact it
+ * states), the published level that result reached, and the value that states
+ * it. The level is ALWAYS passed separately and never written into the label —
+ * the page renders it as the canonical level pill, so a level can neither be
+ * printed twice nor appear as loose plain text beside its own pill.
  */
-const levelFromKey = (key) => {
-  const match = /(?:^|\s)(L[1-4])$/.exec(String(key || '').trim());
-  return match ? match[1] : null;
-};
-
-export const evidence = (key, level, value, detail = null) => ({
-  key,
-  level: level ?? levelFromKey(key),
+export const evidence = (label, level, value, detail = null) => ({
+  key: label,
+  level: level ?? null,
   value: value ?? null,
   detail,
 });
@@ -261,10 +258,10 @@ export function buildCandidates(sources, { byKey, floor, connections }) {
       members: [p12, p13],
       level: levelRank(p12.level) <= levelRank(p13.level) ? p12.level : p13.level,
       evidence: [
-        evidence(`P12 ${p12.level}`, null, p12Row?.value ? `Screen speakers · ${p12Row.value}` : 'Screen speakers'),
-        evidence(`P13 ${p13.level}`, null, p13Row?.value ? `Surround & overhead · ${p13Row.value}` : 'Surround & overhead'),
+        evidence('P12', p12.level, p12Row?.value ? `Screen speakers · ${p12Row.value}` : 'Screen speakers'),
+        evidence('P13', p13.level, p13Row?.value ? `Surround & overhead · ${p13Row.value}` : 'Surround & overhead'),
       ],
-      explanation: `the screen stage is assessed at ${p12Row?.value || p12.level} and the surround and overhead layer at ${p13Row?.value || p13.level}, so the system carries the output capability that demanding film soundtracks ask for at the reference seating position.`,
+      explanation: `the screen stage is assessed at ${p12Row?.value || 'its published capability'} and the surround and overhead layer at ${p13Row?.value || 'its published capability'}, so the system carries the output capability that demanding film soundtracks ask for at the reference seating position.`,
       sources: ['P12', 'P13'],
     }));
   }
@@ -282,10 +279,10 @@ export function buildCandidates(sources, { byKey, floor, connections }) {
       members: [byKey.p16, byKey.p17],
       level: levelRank(p16.level) <= levelRank(p17.level) ? p16.level : p17.level,
       evidence: [
-        evidence(`P16 ${p16.level}`, null, p16.value ? `Screen-to-surround level match · ${p16.value}` : 'Screen-to-surround level match'),
-        evidence(`P17 ${p17.level}`, null, p17.value ? `Across the seating area · ${p17.value}` : 'Across the seating area'),
+        evidence('P16', p16.level, p16.value ? `Screen-to-surround level match · ${p16.value}` : 'Screen-to-surround level match'),
+        evidence('P17', p17.level, p17.value ? `Across the seating area · ${p17.value}` : 'Across the seating area'),
       ],
-      explanation: `both parameters hold at ${levelRank(p16.level) <= levelRank(p17.level) ? p16.level : p17.level}${seats ? ` across all ${seats} assessed seating positions` : ' across the assessed seating positions'}, so the tonal character stays consistent as sound moves between the screen, surround and overhead channels.`,
+      explanation: `both parameters hold${seats ? ` across all ${seats} assessed seating positions` : ' across the assessed seating positions'}, so the tonal character stays consistent as sound moves between the screen, surround and overhead channels.`,
       sources: ['P16', 'P17'],
     }));
   }
@@ -300,8 +297,8 @@ export function buildCandidates(sources, { byKey, floor, connections }) {
       category: 'Bass Performance',
       members: [p14],
       scope: 'room',
-      evidence: [evidence(`P14 ${p14.level}`, null, p14.value ? `LFE output · ${p14.value}` : 'LFE output at the reference seating position')],
-      explanation: `the subwoofers deliver ${p14.value || p14.level} of low-frequency output at the reference seating position, the output authority the bass system is specified to reach.`,
+      evidence: [evidence('P14', p14.level, p14.value ? `LFE output · ${p14.value}` : 'LFE output at the reference seating position')],
+      explanation: `the subwoofers deliver ${p14.value ? `${p14.value} of low-frequency output` : 'the low-frequency output'} at the reference seating position, the output authority the bass system is specified to reach.`,
       sources: ['P14'],
     }));
   }
@@ -316,7 +313,7 @@ export function buildCandidates(sources, { byKey, floor, connections }) {
       category: 'Bass Performance',
       members: [p18],
       scope: 'room',
-      evidence: [evidence(`P18 ${p18.level}`, null, p18.value ? `Extension to ${p18.value}` : 'In-room bass extension')],
+      evidence: [evidence('P18', p18.level, p18.value ? `Extension to ${p18.value}` : 'In-room bass extension')],
       explanation: `the system reaches ${p18.value || 'the published limit'} in the room, so the lowest octaves of a film mix are reproduced rather than rolled off.`,
       sources: ['P18'],
     }));
@@ -334,8 +331,8 @@ export function buildCandidates(sources, { byKey, floor, connections }) {
       members: [p18, p19],
       scope: 'rsp',
       evidence: [
-        evidence(`P18 ${p18.level}`, null, p18.value ? `Extension to ${p18.value}` : 'In-room bass extension'),
-        evidence(`P19 ${p19.level}`, null, p19.value ? `At the reference seating position · ${p19.value}` : 'At the reference seating position'),
+        evidence('P18', p18.level, p18.value ? `Extension to ${p18.value}` : 'In-room bass extension'),
+        evidence('P19', p19.level, p19.value ? `At the reference seating position · ${p19.value}` : 'At the reference seating position'),
       ],
       explanation: `the system reaches ${p18.value || 'the published limit'} and the corrected response at the reference seating position sits ${p19.value || 'within the target window'} of the design target, so the bass is both extended and even.`,
       sources: ['P18', 'P19'],
@@ -358,8 +355,8 @@ export function buildCandidates(sources, { byKey, floor, connections }) {
       members: placementMembers,
       scope: 'room',
       evidence: strongest.map((member) => evidence(
-        `${String(member.key).toUpperCase()} ${member.level}`,
-        null,
+        String(member.key).toUpperCase(),
+        member.level,
         PLACEMENT_PHRASES[member.key] || getOfficialRp22Title(member.id),
       )),
       explanation: `${joinList(strongest.map((member) => PLACEMENT_PHRASES[member.key] || getOfficialRp22Title(member.id)))}, each stated on its own published result.`,
@@ -377,7 +374,9 @@ export function buildCandidates(sources, { byKey, floor, connections }) {
     const rowIndex = (row) => rows.findIndex((entry) => entry.rowNumber === row.rowNumber);
     const described = claimedRows.map((row) => {
       const angle = row.maxAngleDeg != null ? `${row.maxAngleDeg.toFixed(1)}°` : null;
-      return `the ${rowLabel(rowIndex(row), rows.length).toLowerCase()} ${angle ? `views the ${displayNoun} at ${angle}` : 'holds a strong viewing position'} (RP23 ${row.level})`;
+      // The row's own result is stated by the pill beside its evidence line, so
+      // the sentence states the geometry and never repeats the level as text.
+      return `the ${rowLabel(rowIndex(row), rows.length).toLowerCase()} ${angle ? `views the ${displayNoun} at ${angle}` : 'holds a strong viewing position'}`;
     });
     const allRows = claimedRows.length === rows.length;
     const single = claimedRows.length === 1;
@@ -402,9 +401,13 @@ export function buildCandidates(sources, { byKey, floor, connections }) {
       level: claimedRows.reduce((acc, row) => (levelRank(row.level) < levelRank(acc) ? row.level : acc), claimedRows[0].level),
       scope: 'row',
       evidence: claimedRows.slice(0, 3).map((row) => evidence(
-        `RP23 · ${rowLabel(rowIndex(row), rows.length)} ${row.level}`,
-        null,
-        row.maxAngleDeg != null ? `${row.maxAngleDeg.toFixed(1)}° · ${row.seats} seat${row.seats === 1 ? '' : 's'}` : `${row.seats} seats`,
+        'RP23',
+        row.level,
+        [
+          rowLabel(rowIndex(row), rows.length),
+          row.maxAngleDeg != null ? `${row.maxAngleDeg.toFixed(1)}°` : null,
+          `${row.seats} seat${row.seats === 1 ? '' : 's'}`,
+        ].filter(Boolean).join(' · '),
       )),
       explanation: `${joinList(described)}${allRows ? ', so every seating row sits inside a strong viewing position.' : ', the rows that reach it are stated on their own result.'}`,
       sources: claimedRows.map((row) => `RP23:${row.rowNumber}:${row.level}`),
@@ -429,7 +432,7 @@ export function buildCandidates(sources, { byKey, floor, connections }) {
       members: p2IsStrength ? [p2] : [],
       evidence: [
         evidence(String(dolbyConfig), null, 'system format'),
-        p2IsStrength ? evidence(`P2 ${p2.level}`, null, p2.value || 'discrete speakers') : null,
+        p2IsStrength ? evidence('P2', p2.level, p2.value || 'discrete speakers') : null,
         evidence(`${overheadCount} overheads`, null, subCount > 0 ? `${subCount} subwoofers` : null),
       ].filter(Boolean),
       explanation: `the design is built as a ${dolbyConfig} system with ${overheadCount} overhead speakers${subCount > 0 ? ` and ${subCount} subwoofers` : ''}, so effects move above and around the audience instead of staying on the screen plane.`,

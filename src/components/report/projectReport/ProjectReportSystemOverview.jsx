@@ -18,7 +18,12 @@
 
 import React from 'react';
 import ProjectReportProducts from '@/components/report/projectReport/ProjectReportProducts';
-import { buildSpecificationConnections, productEntries } from '@/components/report/projectReport/adiDesignHighlights';
+import ReportLevelValue from '@/components/report/ReportLevelValue';
+import {
+  buildSpecificationConnections,
+  connectionLine,
+  productEntries,
+} from '@/components/report/projectReport/adiDesignHighlights';
 import {
   REPORT_FONT_HEADING as FONT_HEADING,
   REPORT_FONT_BODY as FONT_BODY,
@@ -54,7 +59,9 @@ function rowGeometry(row) {
     label: row?.label || `Row ${row?.rowIndex ?? ''}`.trim(),
     seats: seats.length,
     angleText,
-    levelText: levels.length ? levels.join(' / ') : DASH,
+    // The row's own published RP23 result(s), kept as levels so the page can
+    // render each as the canonical pill. A row whose seats differ states both.
+    levels,
   };
 }
 
@@ -81,10 +88,14 @@ export default function ProjectReportSystemOverview({
     counts.acoustic_treatment > 0 ? `${counts.acoustic_treatment} × Abfuser` : null,
   ].filter(Boolean).join(' · ');
 
-  // Each specified role is stated with the connection the evidence supports.
+  // Each specified role is stated with the connection the evidence supports; a
+  // role carrying no engineering connection still names what is specified for it.
+  const subwooferValue = productValue(productsSelected, 'subwoofers');
   const scheduleConnections = {
     ...connections,
-    subwoofers: connections.subwoofers || productValue(productsSelected, 'subwoofers'),
+    subwoofers: (connections.subwoofers || []).length
+      ? connections.subwoofers
+      : (subwooferValue ? [connectionLine(null, null, subwooferValue)] : []),
   };
 
   const geometry = (Array.isArray(rows) ? rows : [])
@@ -152,7 +163,9 @@ export default function ProjectReportSystemOverview({
             display: 'grid',
             gridTemplateColumns: '1fr auto auto auto',
             gap: print ? '2mm 4mm' : '8px 14px',
-            alignItems: 'baseline',
+            // Centred, so each row's level pill sits on the same line as the
+            // seat count and viewing angle beside it.
+            alignItems: 'center',
             fontSize: print ? 9 : 12,
             color: '#3E4349',
           }}>
@@ -165,7 +178,8 @@ export default function ProjectReportSystemOverview({
                 <div>{row.label}</div>
                 <div>{row.seats}</div>
                 <div>{row.angleText}</div>
-                <div>{row.levelText}</div>
+                {/* Each row's own RP23 result, as the canonical level pill. */}
+                <div>{row.levels.length ? <ReportLevelValue levels={row.levels} /> : DASH}</div>
               </React.Fragment>
             ))}
           </div>

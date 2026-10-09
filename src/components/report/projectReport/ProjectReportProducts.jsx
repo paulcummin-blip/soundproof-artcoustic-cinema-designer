@@ -15,6 +15,7 @@
  */
 
 import React from 'react';
+import ReportLevelValue from '@/components/report/ReportLevelValue';
 import {
   REPORT_FONT_HEADING,
   REPORT_FONT_BODY,
@@ -78,7 +79,7 @@ export default function ProjectReportProducts({ rows = [], connections = {}, pri
       <div>
         {rows.map((row) => {
           const models = modelLines(row.value);
-          const connection = connections?.[row.key] || null;
+          const connectionLines = Array.isArray(connections?.[row.key]) ? connections[row.key] : [];
           return (
             <div
               key={row.key || row.area}
@@ -110,10 +111,26 @@ export default function ProjectReportProducts({ rows = [], connections = {}, pri
                 width: print ? '58mm' : 240,
                 flexShrink: 0,
                 fontSize: print ? 8 : 11,
-                color: connection ? '#3E4349' : '#625143',
+                color: connectionLines.length > 0 ? '#3E4349' : '#625143',
                 lineHeight: 1.35,
               }}>
-                {connection || '—'}
+                {connectionLines.length > 0
+                  ? connectionLines.map((line, index) => (
+                    <div
+                      key={`${row.key || row.area}-link-${index}`}
+                      style={{ marginTop: index === 0 ? 0 : print ? '1mm' : 4 }}
+                    >
+                      {/* The level of the published result this layer delivers —
+                          the canonical pill, never plain text. */}
+                      <ReportLevelValue
+                        label={line.parameter}
+                        level={line.level}
+                        value={line.text}
+                        gap={print ? 5 : 6}
+                      />
+                    </div>
+                  ))
+                  : '—'}
               </div>
             </div>
           );

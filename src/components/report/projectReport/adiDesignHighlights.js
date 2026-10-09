@@ -81,7 +81,23 @@ export { productEntries } from './adiHighlightStories';
  * published results — stated only where that result genuinely supports it.
  * The same connections are used by the highlights page and by the System &
  * Products page, so the two can never state a different reason.
+ *
+ * Each role's connection is a LIST OF LINES. A line keeps the three parts apart
+ * — { parameter, level, text } — so the page renders the parameter and the copy
+ * as ordinary text and the level as the canonical pill. A level is never written
+ * into the line's text as well. Any part is null when the design does not state
+ * it; a role the design does not specify has no lines at all.
  */
+
+/**
+ * One line of a role's engineering connection. Pure shape helper, so the
+ * connection authority and every page that states a connection agree on it.
+ */
+export const connectionLine = (parameter, level, text) => ({
+  parameter: parameter || null,
+  level: level || null,
+  text: text || null,
+});
 export function buildSpecificationConnections({
   productsSelected = null,
   engineeringSummary = null,
@@ -105,24 +121,30 @@ export function buildSpecificationConnections({
   const treatmentTotal = treatment.reduce((sum, entry) => sum + entry.count, 0);
 
   return {
-    lcr: lcrTotal > 0 && isStrength(p12?.level)
-      ? `Screen-stage output — RP22 P12 ${p12.level}${p12.value ? `, ${p12.value}` : ''}`
-      : lcrTotal > 0 ? 'Screen stage — left, centre and right' : null,
-    surrounds: surroundTotal > 0 && isStrength(p13?.level)
-      ? `Non-screen output — RP22 P13 ${p13.level}${p13.value ? `, ${p13.value}` : ''}`
-      : surroundTotal > 0 ? 'Surround and wide coverage around the seats' : null,
+    lcr: lcrTotal > 0
+      ? (isStrength(p12?.level)
+        ? [connectionLine('RP22 P12', p12.level, `Screen-stage output${p12.value ? ` · ${p12.value}` : ''}`)]
+        : [connectionLine(null, null, 'Screen stage — left, centre and right')])
+      : [],
+    surrounds: surroundTotal > 0
+      ? (isStrength(p13?.level)
+        ? [connectionLine('RP22 P13', p13.level, `Non-screen output${p13.value ? ` · ${p13.value}` : ''}`)]
+        : [connectionLine(null, null, 'Surround and wide coverage around the seats')])
+      : [],
     overheads: overheadTotal > 0
-      ? `Overhead layer completing the ${String(dolbyConfig || 'immersive').trim()} field`
-      : null,
+      ? [connectionLine(null, null, `Overhead layer completing the ${String(dolbyConfig || 'immersive').trim()} field`)]
+      : [],
     subwoofers: subTotal > 0
       ? [
-          isStrength(p14?.level) ? `Bass output authority — RP22 P14 ${p14.level}${p14.value ? `, ${p14.value}` : ''}` : 'Bass output',
-          p18 ? `extension to ${p18.value || 'the published limit'} (RP22 P18 ${p18.level})` : null,
-        ].filter(Boolean).join(' · ')
-      : null,
+          isStrength(p14?.level)
+            ? connectionLine('RP22 P14', p14.level, `Bass output authority${p14.value ? ` · ${p14.value}` : ''}`)
+            : connectionLine(null, null, 'Bass output'),
+          p18 ? connectionLine('RP22 P18', p18.level, `Extension to ${p18.value || 'the published limit'}`) : null,
+        ].filter(Boolean)
+      : [],
     acoustic_treatment: treatmentTotal > 0
-      ? 'Planned reflection control at the first reflection points'
-      : null,
+      ? [connectionLine(null, null, 'Planned reflection control at the first reflection points')]
+      : [],
     counts: { lcr: lcrTotal, surrounds: surroundTotal, overheads: overheadTotal, subwoofers: subTotal, acoustic_treatment: treatmentTotal },
   };
 }

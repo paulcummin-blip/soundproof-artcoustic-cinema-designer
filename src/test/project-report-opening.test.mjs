@@ -44,6 +44,15 @@ import { buildProjectReportSummaryOpening } from "../components/report/projectRe
 import ProjectReportDesignSummary from "../components/report/projectReport/ProjectReportDesignSummary.jsx";
 import AdiDesignHighlightsPage from "../components/report/projectReport/AdiDesignHighlightsPage.jsx";
 import ProjectReportSystemOverview from "../components/report/projectReport/ProjectReportSystemOverview.jsx";
+import ReportLevelValue from "../components/report/ReportLevelValue.jsx";
+import { RP22_GRADE_TOKENS } from "../components/utils/rp22Colors.jsx";
+
+/**
+ * The page's markup with every canonical level pill taken out. What is left must
+ * contain no level token at all: a performance level stated anywhere other than
+ * a pill is exactly what the client-facing report must never do.
+ */
+const withoutLevelPills = (html) => html.replace(/<span style="[^"]*">(L[1-4]|FAIL)<\/span>/g, "");
 
 /**
  * The report's own canonical schedule for this version — the same rows the
@@ -131,7 +140,9 @@ test("the dynamic highlight states the published P12 and P13 values", () => {
 
   assert.equal(dynamic.category, "Dynamic Range");
   assert.equal(dynamic.weight, 3);
-  assert.equal(dynamic.evidence[0].key, "P12 L4");
+  // The parameter and its level are separate parts: the level is never written
+  // into the label text, so the page cannot print it twice.
+  assert.equal(dynamic.evidence[0].key, "P12");
   assert.equal(dynamic.evidence[0].level, "L4");
   assert.match(dynamic.evidence[0].value, /116 dBC/);
   assert.equal(dynamic.evidence[1].level, "L4");
@@ -159,7 +170,8 @@ test("bass is claimed from the LFE output authority — a provisional P19 and a 
 
   assert.equal(bass.scope, "room");
   assert.deepEqual(bass.sources, ["P14"]);
-  assert.equal(bass.evidence[0].key, "P14 L4");
+  assert.equal(bass.evidence[0].key, "P14");
+  assert.equal(bass.evidence[0].level, "L4");
   assert.match(bass.explanation, /reference seating position/);
   assert.doesNotMatch(bass.explanation, /across the room|throughout the room|every seat/i);
 
@@ -187,6 +199,36 @@ test("the viewing highlight states each row's own published RP23 result", () => 
   assert.match(viewing.explanation, /45\.0°/);
   assert.equal(viewing.evidence[0].level, "L4");
   assert.equal(viewing.evidence[1].level, "L3");
+  // Each row states its own result as the pill beside its own evidence line, and
+  // the sentence states the geometry rather than repeating the level as text.
+  assert.equal(viewing.evidence[0].key, "RP23");
+  assert.match(viewing.evidence[0].value, /front row/i);
+  assert.doesNotMatch(viewing.explanation, /\bL[1-4]\b/, "no level is repeated in the sentence");
+});
+
+test("ReportLevelValue states the parameter and its value as text and the level as the canonical pill", () => {
+  const single = renderToStaticMarkup(React.createElement(ReportLevelValue, {
+    label: "P16",
+    level: "L4",
+    value: "±0.5 dB",
+  }));
+  assert.ok(single.includes("P16"));
+  assert.ok(single.includes("±0.5 dB"));
+  // The canonical pill, by its own grade token — and the level appears once only.
+  assert.ok(single.includes(RP22_GRADE_TOKENS.L4.border), "the L4 pill uses the canonical grade token");
+  assert.equal((single.match(/L4/g) || []).length, 1, "the level is stated once");
+  assert.doesNotMatch(single, /\bP16\s+L4\b/, "the label never restates its own level");
+
+  // A row whose seats differ states each published level as its own pill.
+  const multi = renderToStaticMarkup(React.createElement(ReportLevelValue, { levels: ["L4", "L1"] }));
+  assert.ok(multi.includes(RP22_GRADE_TOKENS.L4.border));
+  assert.ok(multi.includes(RP22_GRADE_TOKENS.L1.border));
+
+  // A part with no published level keeps its text and states no level at all.
+  const plain = renderToStaticMarkup(React.createElement(ReportLevelValue, { label: "9.4.4", value: "system format" }));
+  assert.match(plain, /9\.4\.4/);
+  assert.match(plain, /system format/);
+  assert.doesNotMatch(plain, /\bL[1-4]\b/);
 });
 
 test("the layout highlight states the specified system, and the specification never displaces an evidence story", () => {
@@ -196,7 +238,8 @@ test("the layout highlight states the specified system, and the specification ne
   assert.match(layout.explanation, /9\.1\.6/);
   assert.match(layout.explanation, /6 overhead speakers/);
   assert.match(layout.explanation, /4 subwoofers/);
-  assert.equal(layout.evidence[1].key, "P2 L4");
+  assert.equal(layout.evidence[1].key, "P2");
+  assert.equal(layout.evidence[1].level, "L4");
 
   // The specification-only story may fill a page the evidence has not filled; this
   // design's own published results already fill it, so the schedule is stated on
@@ -299,9 +342,17 @@ test("page 2 (ADI Design Highlights) fits its page, and the fit guard reduces co
   const fitted = fitHighlightsToBudget(oversized, PROJECT_REPORT_PAGE_BUDGET_MM.page);
   assert.ok(fitted.length >= 1 && fitted.length < oversized.length);
   assert.ok(estimateHighlightsMm(fitted) <= PROJECT_REPORT_PAGE_BUDGET_MM.page);
+
+  // The canonical level pill is a little taller than the plain text it replaces.
+  // The page keeps real headroom above its own estimate for that, so paper stays
+  // inside the fixed frame with the pills in place.
+  assert.ok(
+    usedMm + 12 <= PROJECT_REPORT_PAGE_BUDGET_MM.page,
+    `page 2 keeps pill headroom: about ${usedMm}mm of ${PROJECT_REPORT_PAGE_BUDGET_MM.page}mm`,
+  );
 });
 
-test("pages 2 and 3 render this design's own content", () => {
+test("pages 2 and 3 render this design's own content, with every live level as the canonical pill", () => {
   const highlights = buildAdiDesignHighlights(sources);
 
   const page2 = renderToStaticMarkup(React.createElement(AdiDesignHighlightsPage, { highlights }));
@@ -309,8 +360,13 @@ test("pages 2 and 3 render this design's own content", () => {
   for (const highlight of highlights) {
     assert.ok(page2.includes(highlight.title), `${highlight.title} renders`);
   }
-  assert.ok(page2.includes("P12 L4"));
+  assert.ok(page2.includes("P12"));
   assert.ok(page2.includes("116 dBC"));
+  // Every level on the page is the canonical pill: with the pills taken out, no
+  // level token remains in the page's copy at all.
+  assert.ok(page2.includes(RP22_GRADE_TOKENS.L4.border), "the L4 pill renders its canonical grade token");
+  assert.doesNotMatch(withoutLevelPills(page2), /\bL[1-4]\b/, "no level is printed as plain text");
+  assert.doesNotMatch(page2, /\bP\d+\s+L[1-4]\b/, "no parameter restates its level as text");
   // P19's own authority is provisional, so no bass-response result is stated here.
   assert.ok(!page2.includes("P19"), "a provisional result is never printed");
   // The internal spec tier is audit metadata only — it never reaches the page.
@@ -324,7 +380,11 @@ test("pages 2 and 3 render this design's own content", () => {
     projectDetails: fixture.project,
     productsSelected: PRODUCTS,
     engineeringSummary,
-    rows: [],
+    // Two rows with their own published RP23 results, as the report states them.
+    rows: [
+      { rowIndex: 1, label: "Front row", seats: [{ level: "L4", angleDeg: 64.6 }, { level: "L4", angleDeg: 63.1 }] },
+      { rowIndex: 2, label: "Rear row", seats: [{ level: "L1", angleDeg: 45.0 }] },
+    ],
   }));
   assert.ok(page3.includes("System &amp; Products") || page3.includes("System & Products"));
   assert.ok(page3.includes("Q8-5 × 3"));
@@ -332,9 +392,19 @@ test("pages 2 and 3 render this design's own content", () => {
   assert.ok(page3.includes("Spitfire Cloud × 6"));
   assert.ok(page3.includes("SUB4-12 × 2 (front)"));
   assert.ok(page3.includes("Artcoustic Abfuser × 8"));
-  assert.ok(page3.includes("RP22 P12 L4"));
-  assert.ok(page3.includes("RP22 P14 L4"));
+  // The engineering link beside each role states its parameter and its copy as
+  // text, and its published level as the canonical pill.
+  assert.ok(page3.includes("RP22 P12"));
+  assert.ok(page3.includes("RP22 P14"));
+  assert.ok(page3.includes(RP22_GRADE_TOKENS.L4.border), "the link's L4 is the canonical pill");
   assert.ok(page3.includes("15 speakers"));
+
+  // Viewing geometry by row: each row's own RP23 result is the canonical pill,
+  // and the row never prints that level as ordinary text beside it.
+  assert.ok(page3.includes("Front row"));
+  assert.ok(page3.includes("Rear row"));
+  assert.ok(page3.includes(RP22_GRADE_TOKENS.L1.border), "the rear row's L1 is the canonical pill");
+  assert.doesNotMatch(withoutLevelPills(page3), /\bL[1-4]\b/, "no row prints a bare level as text");
 });
 
 test("each product's engineering link is stated only where the evidence supports it", () => {

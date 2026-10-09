@@ -10,11 +10,13 @@
  * take equal space.
  *
  * Presentation only. The copy and the evidence arrive from the ADI highlight
- * authority; nothing is composed, graded or inferred here.
+ * authority; nothing is composed, graded or inferred here. Every published level
+ * an evidence line states is shown as the canonical level pill, never as plain
+ * text (see ReportLevelValue).
  */
 
 import React from 'react';
-import { getSeatGradeColors } from '@/components/report/client/visualReportSeatStyle';
+import ReportLevelValue from '@/components/report/ReportLevelValue';
 import {
   REPORT_FONT_HEADING as FONT_HEADING,
   REPORT_FONT_BODY as FONT_BODY,
@@ -25,26 +27,33 @@ const BODY = '#3E4349';
 const MUTED = '#625143';
 const RULE = '#DCDBD6';
 
-function EvidencePill({ item, print, fontSize }) {
-  const level = item?.level ? String(item.level).match(/^L?([1-4])$|^FAIL$/) : null;
-  const grade = level ? getSeatGradeColors(item.level) : null;
-  const text = [item?.key, item?.value].filter(Boolean).join(' · ');
-
+/**
+ * ONE evidence line: the parameter it rests on, the published level that result
+ * reached, and the value that states it. The parameter and the value stay
+ * ordinary text; the level is the shared canonical pill, so it reads as the same
+ * result everywhere else in the report. The level is never also written into the
+ * text — one level, stated once, as a pill.
+ */
+function EvidenceLine({ item, print, fontSize }) {
   return (
     <span style={{
       display: 'inline-flex',
       alignItems: 'center',
-      gap: 6,
       padding: print ? '1mm 2mm' : '4px 8px',
       borderRadius: 4,
-      border: `1px solid ${grade ? grade.border : RULE}`,
-      background: grade ? grade.fill : '#F8F8F7',
-      color: grade ? grade.text : BODY,
+      border: `1px solid ${RULE}`,
+      background: '#F8F8F7',
+      color: BODY,
       fontFamily: FONT_BODY,
       fontSize: fontSize ?? (print ? 8 : 11),
       lineHeight: 1.2,
     }}>
-      {text}
+      <ReportLevelValue
+        label={item?.key || null}
+        level={item?.level || null}
+        value={item?.value || null}
+        gap={print ? 5 : 6}
+      />
     </span>
   );
 }
@@ -123,7 +132,7 @@ export default function AdiHighlightCard({ highlight, print = false }) {
             marginTop: print ? '2mm' : 7,
           }}>
             {evidence.map((item, index) => (
-              <EvidencePill
+              <EvidenceLine
                 key={`${highlight.id}-evidence-${index}`}
                 item={item}
                 print={print}
