@@ -19,7 +19,8 @@ import {
   resolveProposalSourceState,
 } from './proposalSourceState';
 
-const REPORT_TYPES = ['visual', 'technical'];
+/** The ONE report a proposal is built from. */
+const REPORT_TYPES = ['project'];
 
 function asItems(result) {
   if (Array.isArray(result)) return result;

@@ -138,7 +138,7 @@ export function useProposalReadiness({ projectId = null, versionIds = [] } = {})
           // design the saved Project Report was generated from.
           const calculationAuthority = resolveCalculationAuthority({
             cacheRecord: cacheRecords[index] || null,
-            savedTechnicalReport: savedProjectReport,
+            savedProjectReport,
           });
           // The current fingerprints come from the publication this version has
           // actually saved — the same values the server gate compares against.

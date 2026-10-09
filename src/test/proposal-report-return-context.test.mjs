@@ -2,13 +2,13 @@
 // ---------------------------------------
 // The contextual route back from a generated report to the proposal workflow.
 //
-//   Proposal Centre → Visual / Technical Report → "Back to Proposal"
+//   Proposal Centre → Project Report → "Back to Proposal"
 //
 // Product rules pinned here:
 //   • the way back appears only when the report was opened from the proposal
 //     workflow (?from=proposal) — never for a report opened from the project;
 //   • it returns to the proposal flow, never to an arbitrary or external URL;
-//   • the context survives a Visual ↔ Technical move;
+//   • the context survives a report-to-report move;
 //   • it is app navigation only, so it never reaches a downloaded PDF;
 //   • nothing about report content, report generation or proposal generation changes.
 
@@ -23,7 +23,6 @@ import {
   resolveProposalReturnUrl,
   withProposalContext,
 } from '../components/report/proposalReportContext.js';
-import { resolveReportActionRows } from '../components/proposal/sourceAuthority/proposalReportActions.js';
 
 const read = (path) => fs.readFileSync(new URL(`../../${path}`, import.meta.url), 'utf8');
 
@@ -32,10 +31,7 @@ const VISUAL_PAGE = read('src/pages/RP22ClientReport.jsx');
 const TECH_HEADER = read('src/components/report/ReportHeader.jsx');
 const TECH_PAGE = read('src/pages/RP22Report.jsx');
 const REVIEW_ACTIONS = read('src/components/designreview/DesignReviewActions.jsx');
-const SOURCE_PANEL = read('src/components/proposal/sourceAuthority/ProposalSourcePanel.jsx');
-const WIZARD_GATE = read('src/components/proposal/wizard/ReportReadinessGate.jsx');
-const SOURCE_AUTHORITY = read('src/components/proposal/sourceAuthority/proposalSourceAuthority.js');
-const REPORT_ACTIONS = read('src/components/proposal/sourceAuthority/proposalReportActions.js');
+const READINESS_TABLE = read('src/components/proposal/sourceAuthority/VersionReadinessTable.jsx');
 
 /* ── Context detection ────────────────────────────────────────────────── */
 
@@ -120,12 +116,15 @@ test('a report-to-report move keeps the context, a project-flow move does not', 
 
 /* ── Wiring: every surface ────────────────────────────────────────────── */
 
-test('Proposal Centre report links carry the proposal context', () => {
-  expect(SOURCE_PANEL).toMatch(/withProposalContext\(row\.actionUrl\)/);
-  expect(WIZARD_GATE).toMatch(/withProposalContext\(row\.actionUrl\)/);
+test('the readiness table sends a blocked version to its Project Report, with the proposal context', () => {
+  // The ONE report a proposal is gated on, opened with the context so the way
+  // back exists on the report it sends the designer to.
+  expect(READINESS_TABLE).toMatch(/buildProjectReportAction\(\{/);
+  expect(READINESS_TABLE).toMatch(/withProposalContext\(action\.url\)/);
+  expect(READINESS_TABLE).not.toMatch(/RP22Report|Visual Report|Technical Report/);
 });
 
-test('the Visual Report shows the way back and preserves it when moving on', () => {
+test('the Project Report shows the way back and preserves it when moving on', () => {
   expect(VISUAL_PAGE).toMatch(/<BackToProposalLink className="client-report-screen-only" \/>/);
   // The pairing hop is built by the shared report context authority, so the
   // proposal context rides along with the version being viewed and the Library
@@ -138,7 +137,7 @@ test('the Visual Report shows the way back and preserves it when moving on', () 
 
 test('the Technical Report shows the way back and preserves it when moving on', () => {
   expect(TECH_HEADER).toMatch(/<BackToProposalLink \/>/);
-  // The header's own Visual hop goes through the same authority, so it carries
+  // The header's own hop goes through the same authority, so it carries
   // the version being viewed rather than the designer's loaded version.
   expect(TECH_HEADER).toMatch(/buildReportPairingUrl\(\{/);
   expect(TECH_HEADER).toMatch(/route: REPORT_ROUTE\.VISUAL/);
@@ -150,7 +149,7 @@ test('the Technical Report shows the way back and preserves it when moving on', 
 
 test('the Design Review carries the context between the two reports', () => {
   expect(REVIEW_ACTIONS).toMatch(/<BackToProposalLink \/>/);
-  // Both hops — back to the Visual, and the Technical PDF — go through the shared
+  // Both hops — back to the report, and the Technical PDF — go through the shared
   // pairing authority for the version the Design Review was opened for.
   expect(REVIEW_ACTIONS).toMatch(/route: REPORT_ROUTE\.VISUAL/);
   expect(REVIEW_ACTIONS).toMatch(/route: REPORT_ROUTE\.TECHNICAL/);
@@ -165,7 +164,7 @@ test('the way back is screen navigation, never part of an exported PDF', () => {
   // The Technical Report renders its header inside the screen-only layer…
   expect(TECH_PAGE.indexOf('<div className="screen-only">')).toBeGreaterThan(-1);
   expect(TECH_PAGE.indexOf('<div className="screen-only">')).toBeLessThan(TECH_PAGE.indexOf('<ReportHeader'));
-  // …and the Visual Report hides it with its own screen-only class.
+  // …and the Project Report hides it with its own screen-only class.
   expect(VISUAL_PAGE).toMatch(/<BackToProposalLink className="client-report-screen-only" \/>/);
   expect(read('src/components/report/client/ClientReportPrintStyles.jsx'))
     .toMatch(/\.client-report-screen-only\s*\{\s*display: none !important;/);
@@ -175,26 +174,4 @@ test('the way back is screen navigation, never part of an exported PDF', () => {
 test('the label is the product wording', () => {
   expect(BACK_TO_PROPOSAL_LABEL).toBe('Back to Proposal');
   expect(LINK).toMatch(/\{BACK_TO_PROPOSAL_LABEL\}/);
-});
-
-/* ── Nothing else changes ─────────────────────────────────────────────── */
-
-test('the proposal report links are unchanged until a proposal surface marks them', () => {
-  const rows = resolveReportActionRows({
-    reports: {
-      visual: { report: 'visual', label: 'Visual Report', state: 'current', route: '/RP22ClientReport' },
-      technical: { report: 'technical', label: 'Technical Report', state: 'current', route: '/RP22Report' },
-    },
-    projectId: 'p1',
-    versionId: 'v1',
-  });
-
-  // The action state itself is untouched — no report-context vocabulary leaks in.
-  expect(rows.map((r) => r.actionUrl)).toEqual([
-    '/RP22ClientReport?projectId=p1&versionId=v1',
-    '/RP22Report?projectId=p1&versionId=v1',
-  ]);
-  expect(rows.every((r) => r.actionLabel.startsWith('Generate '))).toBe(true);
-  expect(REPORT_ACTIONS).not.toMatch(/from=proposal|proposalReportContext/);
-  expect(SOURCE_AUTHORITY).not.toMatch(/from=proposal|proposalReportContext/);
 });

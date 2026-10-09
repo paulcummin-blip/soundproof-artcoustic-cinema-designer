@@ -30,7 +30,8 @@ export const PROPOSAL_LIBRARY_SOURCE_LABEL = Object.freeze({
   [PROPOSAL_LIBRARY_SOURCE_STATE.MISSING_SOURCE]: 'Missing source',
 });
 
-const REPORT_TYPES = ['visual', 'technical'];
+/** The ONE report a proposal is built from — read back for this proposal's source state. */
+const REPORT_TYPES = ['project'];
 
 /** The version ids a proposal was built from, oldest field first. */
 export function proposalVersionIds(proposal) {
@@ -53,7 +54,7 @@ export function resolveVersionSourceState({ version = null, savedReports = {}, v
   if (missingReports.length > 0) {
     return {
       state: PROPOSAL_LIBRARY_SOURCE_STATE.MISSING_SOURCE,
-      reason: `${versionName} has no saved ${missingReports.map((type) => (type === 'visual' ? 'Visual' : 'Technical')).join(' and ')} Report`,
+      reason: `${versionName} needs a current Project Report`,
     };
   }
 

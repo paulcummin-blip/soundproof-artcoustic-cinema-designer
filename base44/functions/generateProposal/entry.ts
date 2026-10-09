@@ -261,7 +261,7 @@ export default async function(req) {
       // Project Report was generated from — the rule the client applies too.
       const calculationAuthority = resolveCalculationAuthority({
         cacheRecord: cacheRecordByVersionId.get(versionId) || null,
-        savedTechnicalReport: savedProjectReport,
+        savedProjectReport,
       });
       return resolveVersionReadiness({
         version: versionRecord,

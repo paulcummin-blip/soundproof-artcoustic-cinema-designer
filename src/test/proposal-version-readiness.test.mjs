@@ -259,9 +259,10 @@ test('TEST 10 — a saved proposal reads Current, Source changed or Missing sour
     ['v1', { id: 'v1', version_name: 'Original Design', version_number: 1, published_fingerprint: 'fp-1' }],
     ['v2', { id: 'v2', version_name: 'Level 4 version', version_number: 2, published_fingerprint: 'fp-2' }],
   ]);
+  // ONE report per version: the Project Report the proposal was built from.
   const currentReports = new Map([
-    ['v1', { visual: snapshot('fp-1'), technical: snapshot('fp-1') }],
-    ['v2', { visual: snapshot('fp-2'), technical: snapshot('fp-2') }],
+    ['v1', { project: snapshot('fp-1') }],
+    ['v2', { project: snapshot('fp-2') }],
   ]);
 
   const currentState = resolveProposalSourceState({
@@ -275,8 +276,8 @@ test('TEST 10 — a saved proposal reads Current, Source changed or Missing sour
 
   // v2's reports were regenerated after this proposal was written.
   const movedReports = new Map([
-    ['v1', { visual: snapshot('fp-1'), technical: snapshot('fp-1') }],
-    ['v2', { visual: snapshot('fp-0'), technical: snapshot('fp-0') }],
+    ['v1', { project: snapshot('fp-1') }],
+    ['v2', { project: snapshot('fp-0') }],
   ]);
   const changed = resolveProposalSourceState({
     proposal: { id: 'b', selected_version_ids: ['v1', 'v2'] },
@@ -297,7 +298,8 @@ test('TEST 10 — a saved proposal reads Current, Source changed or Missing sour
   });
   expect(missingSource.state).toBe(PROPOSAL_LIBRARY_SOURCE_STATE.MISSING_SOURCE);
   expect(missingSource.label).toBe('Missing source');
-  expect(missingSource.reason).toContain('has no saved Visual and Technical Report');
+  expect(missingSource.reason).toContain('needs a current Project Report');
+  expect(missingSource.reason).not.toMatch(/Visual Report|Technical Report/);
 
   expect(PROPOSAL_LIBRARY_SOURCE_LABEL[PROPOSAL_LIBRARY_SOURCE_STATE.SOURCE_CHANGED]).toBe('Source changed');
   // A legacy single-version proposal is read the same way.

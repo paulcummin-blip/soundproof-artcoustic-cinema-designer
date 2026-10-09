@@ -138,7 +138,7 @@ function asFingerprint(value) {
  *
  * @returns {{fingerprint, source, completedAt}|null}
  */
-export function resolveCalculationAuthority({ cacheRecord = null, savedTechnicalReport = null } = {}) {
+export function resolveCalculationAuthority({ cacheRecord = null, savedProjectReport = null } = {}) {
   const record = (cacheRecord && typeof cacheRecord === 'object' && !Array.isArray(cacheRecord))
     ? cacheRecord
     : null;
@@ -172,7 +172,7 @@ export function resolveCalculationAuthority({ cacheRecord = null, savedTechnical
   const current = authority(foundFor(record.current_fingerprint), CALCULATION_AUTHORITY_SOURCE.COMPLETED_AUTHORITY);
   if (current) return current;
 
-  const stated = asFingerprint(savedTechnicalReport?.source_fingerprints?.calculationFingerprint);
+  const stated = asFingerprint(savedProjectReport?.source_fingerprints?.calculationFingerprint);
   return authority(foundFor(stated), CALCULATION_AUTHORITY_SOURCE.REPORT_SOURCE);
 }
 
