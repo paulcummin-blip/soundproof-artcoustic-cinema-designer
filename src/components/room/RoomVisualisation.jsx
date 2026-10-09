@@ -1653,6 +1653,7 @@ const byId = useEntitiesById({
     handleIconEnter,
     handleIconMove,
     handleIconLeave,
+    handleIconClick,
   } = useSeatHoverLogic({
     seatingPositions,
     appState,
@@ -2038,7 +2039,7 @@ const byId = useEntitiesById({
   const p9Corridors = p9StaticGuides.applicable ? p9StaticGuides : p9DynamicCorridors;
 
   // Overhead speaker icons — extracted to hook
-  const overheadIconElements = useOverheadIconElements({ placedSpeakers: renderSpeakers, toPx, scale, setHoveredSpeaker, overheadGlobalModel, useFrontGlobal, useMidGlobal, useRearGlobal, overheadFrontOverride, overheadMidOverride,   overheadRearOverride, bedLayerSpeakerMouseDownHandler: bedLayerSpeakerMouseDownHandlerWithSelection, handleIconEnter, handleIconMove, handleIconLeave });
+  const overheadIconElements = useOverheadIconElements({ placedSpeakers: renderSpeakers, toPx, scale, setHoveredSpeaker, overheadGlobalModel, useFrontGlobal, useMidGlobal, useRearGlobal, overheadFrontOverride, overheadMidOverride,   overheadRearOverride, bedLayerSpeakerMouseDownHandler: bedLayerSpeakerMouseDownHandlerWithSelection, handleIconEnter, handleIconMove, handleIconLeave, handleIconClick });
 
   // Front-wide zone rendering helper — extracted to hook
   const renderFrontWideZones = useRenderFrontWideZones({
@@ -2386,6 +2387,7 @@ const idsClip = (ids && ids.clip) ? ids.clip : 'b44_clip_fallback';
         handleIconEnter={handleIconEnter}
         handleIconMove={handleIconMove}
         handleIconLeave={handleIconLeave}
+        handleIconClick={handleIconClick}
         effectiveHoveredSeat={effectiveHoveredSeat}
         visiblePlanSpeakers={visiblePlanSpeakers}
         floorDeg={floorDeg}

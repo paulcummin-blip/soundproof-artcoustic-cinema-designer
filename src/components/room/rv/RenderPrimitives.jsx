@@ -129,6 +129,7 @@ export const SpeakerIcon = React.memo(function SpeakerIcon({
   onIconEnter,
   onIconMove,
   onIconLeave,
+  onIconClick,
   tvPresetKey,
 }) {
   const { model, role, id } = speaker || {};
@@ -189,6 +190,7 @@ export const SpeakerIcon = React.memo(function SpeakerIcon({
           onMouseEnter={(e) => onIconEnter?.(e, speaker)}
           onMouseMove={(e) => onIconMove?.(e, speaker)}
           onMouseLeave={(e) => onIconLeave?.(e)}
+          onClick={(e) => onIconClick?.(e, speaker)}
         />
       </g>
     );
@@ -217,6 +219,7 @@ export const SpeakerIcon = React.memo(function SpeakerIcon({
         onMouseEnter={(e) => onIconEnter?.(e, speaker)}
         onMouseMove={(e) => onIconMove?.(e, speaker)}
         onMouseLeave={(e) => onIconLeave?.(e)}
+        onClick={(e) => onIconClick?.(e, speaker)}
       />
     </g>
   );

@@ -17,7 +17,7 @@ import SpeakerPositionsOverlay from "@/components/room/overlays/SpeakerPositions
 import RvSeatLayer from "@/components/room/rv/render/RvSeatLayer";
 import PlanMessages from "@/components/room/PlanMessages";
 import RvSeatHudLayer from "@/components/room/rv/render/RvSeatHudLayer";
-import RvSpeakerTooltip from "@/components/room/rv/render/RvSpeakerTooltip";
+import SpeakerInfoTooltip from "@/components/room/speakerInfo/SpeakerInfoTooltip";
 import SeatingDragImpactCard from "@/components/room/SeatingDragImpactCard";
 import RvRoomElementDragDims from "@/components/room/rv/render/RvRoomElementDragDims";
 import RvMlpDragDims from "@/components/room/rv/render/RvMlpDragDims";
@@ -170,6 +170,7 @@ export default function RvPlanCanvas({
   handleIconEnter,
   handleIconMove,
   handleIconLeave,
+  handleIconClick,
   dragImpact,
   onAcceptBaseline,
   onDismissCard,
@@ -653,6 +654,7 @@ export default function RvPlanCanvas({
               handleIconEnter={handleIconEnter}
               handleIconMove={handleIconMove}
               handleIconLeave={handleIconLeave}
+              handleIconClick={handleIconClick}
             />
 
 
@@ -779,8 +781,15 @@ export default function RvPlanCanvas({
           isHudPinned={isHudPinned}
         />
 
-        {/* SPEAKER TOOLTIP - Light style, non-interfering */}
-        <RvSpeakerTooltip speakerTooltip={speakerTooltip} />
+        {/* SPEAKER INFORMATION CARD — anchored to the icon, clamped inside the canvas */}
+        <SpeakerInfoTooltip
+          visible={speakerTooltip?.visible}
+          title={speakerTooltip?.title}
+          lines={speakerTooltip?.lines}
+          anchor={speakerTooltip?.anchor}
+          bounds={speakerTooltip?.bounds}
+          exclusions={speakerTooltip?.exclusions}
+        />
 
         {/* UNIVERSAL DRAG RP22/RP23 IMPACT CARD */}
         {dragImpact?.cardVisible && (

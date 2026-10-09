@@ -31,6 +31,7 @@ export default function RvSpeakerLayer({
   handleIconEnter,
   handleIconMove,
   handleIconLeave,
+  handleIconClick,
   screen,
 }) {
   // Read screen from appState directly — RvPlanCanvas does not pass screen prop to RvSpeakerLayer,
@@ -175,6 +176,7 @@ export default function RvSpeakerLayer({
               onIconEnter={handleIconEnter}
               onIconMove={handleIconMove}
               onIconLeave={handleIconLeave}
+              onIconClick={handleIconClick}
               tvPresetKey={tvPresetKey}
             />
           </g>

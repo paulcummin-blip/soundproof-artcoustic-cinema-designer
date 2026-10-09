@@ -497,7 +497,7 @@ export default function SideElevation({
   const frameBotPx = rz(frameBottomM);
 
   return (
-    <div style={{ width: "100%", padding: 16, background: "#F8F8F7", boxSizing: "border-box" }}>
+    <div ref={wrapRef} style={{ position: "relative", width: "100%", padding: 16, background: "#F8F8F7", boxSizing: "border-box" }}>
       <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 4 }}>
         <button
           onClick={() => setShowSightlines(s => !s)}
@@ -506,7 +506,7 @@ export default function SideElevation({
           {showSightlines ? '◉ Hide Sightlines' : '○ Show Sightlines'}
         </button>
       </div>
-      <div style={{ width: "100%", aspectRatio: `${SVG_W} / ${SVG_H}` }}>
+      <div ref={drawingRef} style={{ width: "100%", aspectRatio: `${SVG_W} / ${SVG_H}` }}>
         <svg
           ref={svgRef}
           width="100%"
@@ -1007,35 +1007,8 @@ export default function SideElevation({
                   fill={LABEL_COLOR} fontWeight={600}>
                   {label}
                 </text>
-                {/* Vertical dimension line — floor to group centre, outside room (right of rear wall) */}
-                {Number.isFinite(effectiveGrpZ) && (() => {
-                  const dimX = offsetX + drawW + 12;
-                  const floorPx = rz(0);
-                  const centrePx = rz(effectiveGrpZ);
-                  return (
-                    <g opacity={0.75}>
-                      <line x1={dimX} y1={floorPx} x2={dimX} y2={centrePx} stroke={DIM_COLOR} strokeWidth={0.7} />
-                      <line x1={dimX - 3} y1={floorPx} x2={dimX + 3} y2={floorPx} stroke={DIM_COLOR} strokeWidth={0.7} />
-                      <line x1={dimX - 3} y1={centrePx} x2={dimX + 3} y2={centrePx} stroke={DIM_COLOR} strokeWidth={0.7} />
-                      {(() => {
-                        const midY = (floorPx + centrePx) / 2;
-                        return (
-                          <text
-                            x={dimX + 4} y={midY}
-                            textAnchor="middle" fontSize={6.5} fill={DIM_COLOR} letterSpacing="0.02em"
-                            transform={`rotate(-90, ${dimX + 4}, ${midY})`}>
-                            H{Math.round(effectiveGrpZ * 100)}cm
-                          </text>
-                        );
-                      })()}
-                    </g>
-                  );
-                })()}
-                {Number.isFinite(spkDepthM) && Number.isFinite(spkHeightM) && (
-                  <text x={frontX - 4} y={svgBot + 8} textAnchor="end" fontSize={6} fill={DIM_COLOR} opacity={0.75}>
-                    {Math.round(spkDepthM * 100)}×{Math.round(spkHeightM * 100)}cm
-                  </text>
-                )}
+                {/* Height and cabinet dimensions are read on hover or tap in the
+                    speaker information card rather than drawn permanently. */}
                 {isDraggableGrp && (
                   <rect
                     x={frontX - 7} y={svgTop - 7}
@@ -1358,6 +1331,15 @@ export default function SideElevation({
           )}
         </svg>
       </div>
+
+      <SpeakerInfoTooltip
+        visible={speakerInfo.visible}
+        title={speakerInfo.info?.title}
+        lines={speakerInfo.info?.lines}
+        anchor={speakerInfo.anchor}
+        bounds={speakerInfo.bounds}
+        exclusions={speakerInfo.info?.exclusions}
+      />
     </div>
   );
 }

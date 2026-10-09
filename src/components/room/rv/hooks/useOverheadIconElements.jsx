@@ -33,6 +33,7 @@ export function useOverheadIconElements({
   handleIconEnter,
   handleIconMove,
   handleIconLeave,
+  handleIconClick,
 }) {
   return useMemo(() => {
     if (!placedSpeakers || !placedSpeakers.length) return null;
@@ -119,6 +120,7 @@ export function useOverheadIconElements({
               onIconEnter={handleIconEnter}
               onIconMove={handleIconMove}
               onIconLeave={handleIconLeave}
+              onIconClick={handleIconClick}
             />
           );
         })}

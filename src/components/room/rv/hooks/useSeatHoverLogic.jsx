@@ -2,6 +2,8 @@ import { useCallback, useMemo, useState, useEffect, useRef } from "react";
 import { useTooltipData } from "@/components/room/hooks/useTooltipData";
 import getSpeakerWallDepthCm from "@/components/room/rv/utils/getSpeakerWallDepthCm";
 import { formatDb } from '@/components/utils/formatDb';
+import { useSpeakerInfoTooltip } from "@/components/room/speakerInfo/useSpeakerInfoTooltip";
+import { buildSpeakerInfo } from "@/components/room/speakerInfo/speakerInfoModel";
 
 export function useSeatHoverLogic({
   seatingPositions,
@@ -38,7 +40,9 @@ export function useSeatHoverLogic({
 }) {
   // Hover state
   const [hoveredSeat, setHoveredSeat] = useState(null);
-  const [speakerTooltip, setSpeakerTooltip] = useState({ visible: false, text: '', x: 0, y: 0 });
+  // Speaker information card — the same card the elevations show. Anchored to
+  // the icon rather than the pointer, so it never drifts.
+  const speakerInfo = useSpeakerInfoTooltip({ containerRef: rvWrapRef, boundsRef: rvWrapRef });
 
   // Seat hover handlers
   // The seat's one click action: open (or move) that seat's HUD. Clicking the
@@ -95,22 +99,11 @@ export function useSeatHoverLogic({
   // Use prop if available, otherwise use local computation
   const allSeatSplMetrics = allSeatSplMetricsProp || allSeatSplMetricsLocal;
 
-  // Speaker icon tooltip handlers
-  const handleIconMove = useCallback((e, speaker) => {
-    const rect = rvWrapRef.current?.getBoundingClientRect();
-    if (!rect) return;
-    
-    setSpeakerTooltip(prev => ({
-      ...prev,
-      x: e.clientX - rect.left + 12,
-      y: e.clientY - rect.top + 12
-    }));
-  }, [rvWrapRef]);
-
-  const handleIconEnter = useCallback((e, speaker) => {
-    if (!speaker) return;
+  // Speaker icon tooltip content: the shared speaker information card plus the
+  // two plan readings the icon hover has always carried.
+  const buildIconInfo = useCallback((speaker) => {
+    if (!speaker) return null;
     const role = getCanonicalRole(speaker.role);
-    const displayName = getSpeakerModelDisplayName(speaker.model);
     const mlpSpl = allSeatSplMetrics?.get?.("mlp")?.spl;
     const speakerMetrics = role
       ? mlpSpl?.screen?.[role] || mlpSpl?.surrounds?.[role] || mlpSpl?.uppers?.[role] || null
@@ -126,15 +119,38 @@ export function useSeatHoverLogic({
       getCanonicalRole,
       getSpeakerModelMeta,
     });
-    const text = `${role} — ${displayName}\nSPL @ RSP: ${splLabel}\nDistance from wall: ${Number.isFinite(wallDepthCm) ? `${wallDepthCm} cm` : '—'}`;
 
-    setSpeakerTooltip({ visible: true, text, x: 0, y: 0 });
-    handleIconMove(e, speaker);
-  }, [getSpeakerModelDisplayName, getCanonicalRole, seatingPositions, allSeatSplMetrics, handleIconMove, widthM, lengthM, mlp, appState, getSpeakerModelMeta]);
+    return {
+      ...buildSpeakerInfo({
+        role,
+        model: speaker.model,
+        acousticCentreZ_m: speaker.position?.z,
+        extras: [
+          `SPL @ RSP: ${splLabel}`,
+          `Distance from wall: ${Number.isFinite(wallDepthCm) ? `${wallDepthCm} cm` : '—'}`,
+        ],
+      }),
+      exclusions: [],
+    };
+  }, [getCanonicalRole, allSeatSplMetrics, widthM, lengthM, mlp, appState, getSpeakerModelMeta]);
+
+  const handleIconEnter = useCallback((e, speaker) => {
+    const info = buildIconInfo(speaker);
+    if (info) speakerInfo.show(e, info);
+  }, [buildIconInfo, speakerInfo.show]);
+
+  // A tap or click pins the card, so it can be read on a touch screen too.
+  const handleIconClick = useCallback((e, speaker) => {
+    const info = buildIconInfo(speaker);
+    if (info) speakerInfo.show(e, info);
+  }, [buildIconInfo, speakerInfo.show]);
+
+  // The card is anchored to the icon, so pointer tracking is no longer needed.
+  const handleIconMove = useCallback(() => {}, []);
 
   const handleIconLeave = useCallback(() => {
-    setSpeakerTooltip({ visible: false, text: '', x: 0, y: 0 });
-  }, []);
+    speakerInfo.hide();
+  }, [speakerInfo.hide]);
 
   // Combine hoveredSeat and pinnedSeat for effective display
   const effectiveHoveredSeat = useMemo(() => {
@@ -248,7 +264,14 @@ export function useSeatHoverLogic({
     hoveredSeat,
     effectiveHoveredSeat,
     tooltipData,
-    speakerTooltip,
+    speakerTooltip: {
+      visible: speakerInfo.visible,
+      title: speakerInfo.info?.title,
+      lines: speakerInfo.info?.lines,
+      anchor: speakerInfo.anchor,
+      bounds: speakerInfo.bounds,
+      exclusions: speakerInfo.info?.exclusions,
+    },
     handleSeatClick,
     dismissSeatHud,
     handleSeatMouseEnter,
@@ -256,5 +279,6 @@ export function useSeatHoverLogic({
     handleIconEnter,
     handleIconMove,
     handleIconLeave,
+    handleIconClick,
   };
 }
