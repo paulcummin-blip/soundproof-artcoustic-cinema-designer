@@ -225,6 +225,60 @@ export function eligibleDualCentreCentreOptions(options) {
   ));
 }
 
+/**
+ * The SMALLEST eligible centre cabinet, measured from the catalogue's own
+ * dimensions — never inferred from a model name.
+ *
+ * "Smallest" is the cabinet's physical volume (width × height × depth), resolved
+ * through the same catalogue authority the drawings use, so a TV-linked bar is
+ * measured at its real installed size rather than by the number in its code.
+ * Volume does not change with orientation, so the answer is the same whether the
+ * cabinets are installed horizontally or vertically. A model the catalogue
+ * cannot measure never wins: an unknown size is never treated as small.
+ *
+ * Ties fall back to the front-baffle footprint, then to the catalogue's own
+ * option order, so the default is deterministic.
+ *
+ * @returns the smallest eligible option, or null when nothing is measurable.
+ */
+export function smallestEligibleCentreModel(options, tvPresetKey = null) {
+  const measured = eligibleDualCentreCentreOptions(options)
+    .map((option) => {
+      const key = option?.key ?? option?.value ?? option?.engineering_key ?? option?.label;
+      const meta = getSpeakerModelMeta(String(key ?? '').trim(), tvPresetKey || null);
+      const widthM = Number(meta?.widthM);
+      const heightM = Number(meta?.heightM);
+      const depthM = Number(meta?.depthM);
+      const measurable = !!meta && !meta.notFound
+        && Number.isFinite(widthM) && widthM > 0
+        && Number.isFinite(heightM) && heightM > 0
+        && Number.isFinite(depthM) && depthM > 0;
+      return {
+        option,
+        volume: measurable ? widthM * heightM * depthM : null,
+        footprint: measurable ? widthM * heightM : null,
+      };
+    })
+    .filter((candidate) => candidate.volume !== null);
+
+  if (measured.length === 0) return null;
+
+  return measured.reduce((best, candidate) => {
+    if (candidate.volume < best.volume - 1e-12) return candidate;
+    if (candidate.volume > best.volume + 1e-12) return best;
+    if (candidate.footprint < best.footprint - 1e-12) return candidate;
+    return best;
+  }).option;
+}
+
+/**
+ * The label the dual-centre centre selector starts on: the smallest eligible
+ * cabinet from the catalogue. Empty only when no eligible cabinet is measurable.
+ */
+export function defaultDualCentreCentreModelLabel(options, tvPresetKey = null) {
+  return String(smallestEligibleCentreModel(options, tvPresetKey)?.label ?? '');
+}
+
 // ── Cabinet orientation ────────────────────────────────────────────────────
 //
 // Each physical centre cabinet may be installed horizontally or vertically.

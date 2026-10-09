@@ -1,7 +1,7 @@
 import React, { useMemo, useRef, useEffect, useCallback, useState } from "react";
 import { getSpeakerModelMeta, normaliseModelKey } from "@/components/models/speakers/registry";
 import { isRenderableSpeaker } from "@/components/room/rv/RenderPrimitives";
-import { Q43FaceIcon, Q45FaceIcon, Q85FaceIcon, Q63FaceIcon, Evolve11FaceIcon, Evolve21FaceIcon, Evolve31FaceIcon, Evolve42FaceIcon, Evolve63FaceIcon, Evolve84FaceIcon, C41FaceIcon, MultiSoundbarArtworkFaceIcon, MultiSoundbar77ArtworkFaceIcon, MultiSoundbar65ArtworkFaceIcon, MultiSoundbar100ArtworkFaceIcon } from "@/components/report/SpeakerFaceIcons";
+import { Q43FaceIcon, Q45FaceIcon, Q85FaceIcon, Q63FaceIcon, Evolve11FaceIcon, Evolve21FaceIcon, Evolve31FaceIcon, Evolve42FaceIcon, Evolve63FaceIcon, Evolve84FaceIcon, C1FaceIcon, C41FaceIcon, MultiSoundbarArtworkFaceIcon, MultiSoundbar77ArtworkFaceIcon, MultiSoundbar65ArtworkFaceIcon, MultiSoundbar100ArtworkFaceIcon } from "@/components/report/SpeakerFaceIcons";
 import { computeSpeakerAnnotation, speakerBBox } from "@/components/room/frontElevationAnnotationLayout";
 import { resolveEffectiveViewableDimsM, isManualOverrideActive } from "@/components/models/screen/resolveEffectiveScreen";
 import { detectFrontStageMode } from "@/components/roomdesigner/utils/lcrHeightAuthority";
@@ -490,6 +490,8 @@ export default function FrontElevation({ dimensions, screen, placedSpeakers = []
     const isEv63 = !isEv31 && mk.includes("evolve-6-3");
     const isEv84 = mk.includes("evolve-8-4");
     const isC41 = mk.includes("c4-1");
+    // The C-1 is its own product ("c-1"); "c4-1" never contains that key.
+    const isC1 = mk.includes("c-1");
     const isMultiSoundbar = mk.includes("multi-lcr") || mk.includes("multi-mono");
     const isTv65 = speakerTvPreset === "tv65";
     const isTv77 = speakerTvPreset === "tv77";
@@ -526,12 +528,16 @@ export default function FrontElevation({ dimensions, screen, placedSpeakers = []
       );
     }
 
-    const hasFaceIcon = isQ43 || isQ45 || isQ85 || isQ63 || isEv11 || isEv21 || isEv31 || isEv42 || isEv63 || isEv84 || isC41;
+    const hasFaceIcon = isQ43 || isQ45 || isQ85 || isQ63 || isEv11 || isEv21 || isEv31 || isEv42 || isEv63 || isEv84 || isC41 || isC1;
 
     // C4-1 and Multi Soundbar vector icons fill edge-to-edge — no transparent padding, so ratio = 1.0.
     // All other Artcoustic PNG assets have internal transparent padding; enlarge them so
     // the visible cabinet drawing fills the speaker boundary box with ~2–4px clearance.
-    const FACE_ICON_VISIBLE_RATIO = isC41 ? 1.0 : 0.72;
+    // C4-1, C-1 and Multi Soundbar icons are cropped to their own cabinet edges,
+    // so their drawing fills the boundary box exactly (ratio 1.0). Every other
+    // Artcoustic PNG carries internal transparent padding and is enlarged to
+    // compensate.
+    const FACE_ICON_VISIBLE_RATIO = (isC41 || isC1) ? 1.0 : 0.72;
     // A vertically mounted cabinet draws the SAME face rotated a quarter turn:
     // the face icon's own long axis is the box's height, and the whole icon is
     // turned 90° about the cabinet centre, so the drawn footprint is the cabinet's
@@ -544,6 +550,7 @@ export default function FrontElevation({ dimensions, screen, placedSpeakers = []
     const adjustedY = hasFaceIcon ? cy - adjustedH / 2 : sy;
 
     const renderFaceIcon = () => {
+      if (isC1) return <C1FaceIcon x={adjustedX} y={adjustedY} width={adjustedW} height={adjustedH} />;
       if (isC41) return <C41FaceIcon x={adjustedX} y={adjustedY} width={adjustedW} height={adjustedH} />;
       if (isQ43) return <Q43FaceIcon x={adjustedX} y={adjustedY} width={adjustedW} height={adjustedH} />;
       if (isQ45) return <Q45FaceIcon x={adjustedX} y={adjustedY} width={adjustedW} height={adjustedH} />;
@@ -768,8 +775,11 @@ export default function FrontElevation({ dimensions, screen, placedSpeakers = []
 
         {/* LCR Speakers — via drawSpeakerFront helper */}
         {(Array.isArray(lcrSpeakers) ? lcrSpeakers : []).map((spk, idx) => {
-          const isC41Spk = (spk.modelKey || "").includes("c4-1");
-          const hMultiplier = isC41Spk ? 1.0 : 1.20;
+          // A cropped, edge-to-edge icon (C4-1, C-1) is drawn at the cabinet's own
+          // catalogue size; the padded PNG icons are enlarged to compensate for
+          // their internal transparent padding.
+          const isEdgeToEdgeSpk = (spk.modelKey || "").includes("c4-1") || (spk.modelKey || "").includes("c-1");
+          const hMultiplier = isEdgeToEdgeSpk ? 1.0 : 1.20;
           const spkCx = rx(spk.x);
           const spkCy = ry(spk.z);
           const spkSw = Math.max(12, (spk.wM / roomW) * drawW);

@@ -38,6 +38,7 @@ import {
   FRONT_STAGE_STANDARD,
   centreCabinetOrientation,
   centreCabinets,
+  defaultDualCentreCentreModelLabel,
   detectDualCentreStage,
   eligibleDualCentreCentreOptions,
   needsSeriesParallelWarning,
@@ -631,8 +632,13 @@ export default function LCRPanel({ setSpeakers, dimensions, lcrAimMode, onChange
     // Dual centre: the two physical cabinets are the mode's record, so the mode
     // needs its centre model. The orientation starts from the product's own form
     // (the seed resolves it) and the designer's selector overrides it.
+    // Dual centre opens on the SMALLEST eligible cabinet — measured from the
+    // catalogue's own dimensions, never from the model name — and a model the
+    // designer has explicitly selected is never replaced.
     const nextCentreModel = nextMode === FRONT_STAGE_DUAL_CENTRE
-      ? (centreOptions.some(opt => opt.label === centreModel) ? centreModel : (centreOptions[0]?.label || ''))
+      ? (centreOptions.some(opt => opt.label === centreModel)
+        ? centreModel
+        : defaultDualCentreCentreModelLabel(centreOptions, screen?.tvPresetKey))
       : '';
     if (nextMode === FRONT_STAGE_DUAL_CENTRE) setCentreModel(nextCentreModel);
 
@@ -647,7 +653,7 @@ export default function LCRPanel({ setSpeakers, dimensions, lcrAimMode, onChange
     setFrontStageMode(nextMode);
     setSoundbarModel(nextSoundbarModel);
     applyFrontStage(lcrModel, nextMode, nextSoundbarModel, nextCentreModel, null);
-  }, [applyFrontStage, lcrModel, soundbarModel, centreModel, centreOptions, splConfig?.lcrLRHeightM, splConfig?.lcrHeightM, defaultLcrHeightM, clampLcrHeight, updateGlobalSpl, tvVerticalCentreM]);
+  }, [applyFrontStage, lcrModel, soundbarModel, centreModel, centreOptions, splConfig?.lcrLRHeightM, splConfig?.lcrHeightM, defaultLcrHeightM, clampLcrHeight, updateGlobalSpl, tvVerticalCentreM, screen?.tvPresetKey]);
 
   const onChooseSoundbarModel = useCallback((modelLabel) => {
     if (!soundbarOptions.some(opt => opt.label === modelLabel)) return;

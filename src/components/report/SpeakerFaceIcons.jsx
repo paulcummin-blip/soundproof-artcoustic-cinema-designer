@@ -211,6 +211,54 @@ export function C41FaceIcon({ x, y, width, height }) {
 }
 
 /**
+ * Artcoustic C-1 centre cabinet — catalogue 400 × 120 mm.
+ *
+ * The supplied reference is a tightly cropped technical line drawing (1240 × 312
+ * px of ink inside a 1250 × 322 px screenshot), and it is a FRONT-FACE
+ * reference, not dimensional engineering data. The catalogue's own 400 × 120 mm
+ * footprint therefore remains the dimension authority, so the drawing is mapped
+ * onto exactly that footprint — the same treatment the Multi Soundbar artwork
+ * icons give their source screenshots — and the visible cabinet fills its
+ * boundary box edge to edge.
+ *
+ * The screenshot sits on a white page. One luminance-to-alpha colour matrix
+ * drops that white to transparent while keeping the drawing's black lines and
+ * grey accents, so the cabinet renders as clean line art on any background and
+ * never as a white box.
+ */
+export function C1FaceIcon({ x, y, width, height }) {
+  return (
+    <svg
+      x={x}
+      y={y}
+      width={width}
+      height={height}
+      viewBox="6 4 1240 312"
+      xmlns="http://www.w3.org/2000/svg"
+      preserveAspectRatio="none"
+    >
+      <defs>
+        <filter id="c1-line-art" colorInterpolationFilters="sRGB">
+          <feColorMatrix
+            type="matrix"
+            values="0 0 0 0 0  0 0 0 0 0  0 0 0 0 0  -0.2126 -0.7152 -0.0722 0 1"
+          />
+        </filter>
+      </defs>
+      <image
+        x="0"
+        y="0"
+        width="1250"
+        height="322"
+        href="https://media.base44.com/images/public/6a1166c68ddc81e5ea2cdf6b/634ab2ddc_Screenshot2026-10-09at094937.png"
+        preserveAspectRatio="none"
+        filter="url(#c1-line-art)"
+      />
+    </svg>
+  );
+}
+
+/**
  * Multi Soundbar — wide integrated LCR/center soundbar.
  * Normalised black-and-white line art matching the WooferCircles/TweeterCircles
  * primitives used by other face icons. Three driver clusters (left, center,
