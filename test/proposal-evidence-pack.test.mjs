@@ -267,6 +267,7 @@ test('the pack modules can reach no live project, entity client or session store
     '../comparisonClientMeaning.js',
     '../comparisonEvidence.js',
     '../adiReportEvidenceRules.js',
+    '../clientFacingParameterAuthority.js',
   ]);
 
   for (const name of files) {

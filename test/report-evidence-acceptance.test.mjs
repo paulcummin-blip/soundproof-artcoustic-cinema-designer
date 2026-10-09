@@ -96,11 +96,15 @@ const capture = ({
   },
   rp22: { parameter_headlines: HEADLINES(authorityP13) },
   report_parameters: PARAM_IDS.map((id) => ({
-    parameter_id: id,
+    key: `P${id}`, parameter_id: id, scope: 'room',
     level: id === 13 ? p13.level : 'L3',
     value: id === 13 ? p13.value : `P${id} value`,
+    text: `${id === 13 ? p13.level : 'L3'} · ${id === 13 ? p13.value : `P${id} value`}`,
+    authority_fingerprint: [14,18,19,20].includes(id) ? 'bass:v1:abc' : FINGERPRINT,
+    authority_timestamp: '2026-10-05T10:00:00.000Z',
+    source_type: [14,18,19,20].includes(id) ? 'durable-current-bass-authority' : 'durable-engineering-publication',
   })),
-  bass: { available: true, p14: { text: 'L3 · 30 Hz' }, p18: { text: 'L3 · 25 Hz' }, p19: { text: 'L3 · ±3 dB' }, p20: { text: 'L3 · ±4 dB' } },
+  bass: { available: true, p14: { text: 'L3 · 30 Hz', achieved_level: 'L3' }, p18: { text: 'L3 · 25 Hz' }, p19: { text: 'L3 · ±3 dB' }, p20: { text: 'L3 · ±4 dB' } },
 });
 
 const buildEvidence = (captured, reportType = 'technical') => buildReportEvidence({
@@ -136,6 +140,11 @@ const EVIDENCE = ({
       text: `${level} · ${value}`,
       unit: null,
       context: null,
+      scope: 'room',
+      authority_fingerprint: [14,18,19,20].includes(id) ? 'bass:v1:abc' : fingerprint,
+      authority_timestamp: '2026-10-05T10:00:00.000Z',
+      source_type: [14,18,19,20].includes(id) ? 'durable-current-bass-authority' : 'durable-engineering-publication',
+      authority_value: value, authority_level: level,
       source: 'technical_report',
     };
   });
@@ -148,6 +157,7 @@ const EVIDENCE = ({
       version_id: versionId,
       report_type: reportType,
       source_fingerprint: fingerprint,
+      bass_fingerprint: 'bass:v1:abc',
       generated_at: '2026-10-05T10:00:00.000Z',
     },
     room,
@@ -162,7 +172,7 @@ const EVIDENCE = ({
     system: { products_selected: layer, products_selected_by_layer: { lcr: layer } },
     parameters,
     parameter_index: Object.fromEntries(parameters.map((row) => [row.key, row])),
-    bass: { current: false },
+    bass: { current: false, p14: { achieved_level: 'L3' } },
     proposal_ready: ready,
     evidence_fingerprint: `re1-${versionId}-${reportType}-${fingerprint}`,
   };
@@ -264,7 +274,8 @@ test('1. a newly generated report writes a complete reportEvidence snapshot', ()
   const evidence = buildEvidence(capture());
 
   assert.equal(evidence.evidence_version, 1);
-  assert.equal(validateReportEvidence(evidence, 'technical', { requireProposalReady: false }).complete, true, 'the evidence states every fact a proposal needs');
+  const validation = validateReportEvidence(evidence, 'technical', { requireProposalReady: false });
+  assert.equal(validation.complete, true, JSON.stringify(validation.missing));
   assert.equal(evidence.parameter_index.P13.text, 'L4 · 108 dBC (OH)', 'P13 is stated as the report prints it');
   assert.deepEqual(evidence.system.products_selected_by_layer.lcr, [{ role: 'LCR', model: 'Q8-5', quantity: 3, position: null }]);
   assert.equal(evidence.room.width_m, 4.5);
@@ -284,6 +295,7 @@ test('2. a parity failure blocks proposal readiness', async () => {
   // with proposal_ready = false.
   const conflicting = capture({ authorityP13: { level: 'L3', value: '108 dBC (OH)' } });
   const evidence = buildEvidence(conflicting);
+  evidence.parameter_index.P13.authority_level = 'L3';
   const parity = checkReportEvidenceParity({ evidence, captured: conflicting, reportType: 'technical' });
 
   assert.equal(parity.passed, false, 'a report may never state a figure its own authority did not state');
@@ -301,6 +313,7 @@ test('3. a parity failure shows the report as Incomplete for proposal use, never
   const evidence = { ...buildEvidence(capture()), proposal_ready: false };
   const saved = {
     report_schema_version: 1,
+    report_type: 'technical',
     status: 'current',
     generated_at: '2026-10-05T10:00:00.000Z',
     source_fingerprints: { engineeringFingerprint: FINGERPRINT },
@@ -312,14 +325,14 @@ test('3. a parity failure shows the report as Incomplete for proposal use, never
   assert.equal(cell.status, 'Incomplete');
   assert.notEqual(cell.status, 'Missing');
   assert.equal(cell.current, false);
-  assert.match(cell.reason, /proposal_ready is missing/);
+  assert.match(cell.reason, /Project Report needs to be completed/);
 });
 
 /* ── 4 + 5. Legacy evidence: recovered from the frozen source, or refused ── */
 
 test('4. legacy proposalSource cannot be promoted to report authority', () => {
   assert.doesNotMatch(HOOK, /const stored = saved\.payload\?\.proposalSource;/);
-  assert.match(HOOK, /seatingPublication: durableRead\.publication/);
+  assert.match(HOOK, /seatingPublication: publication/);
   assert.match(HOOK, /auditReportSaveAuthority/);
 });
 
@@ -345,7 +358,7 @@ test('6. a proposal reads reportEvidence, never the report own frozen values', a
     technicalFrozen: FROZEN({ p13: 'L3 · 99 dBC (OH)', lcr: 'DFC-2 × 1' }),
   }), [VERSION('v4')]);
 
-  assert.equal(result.decision, 'ALLOWED');
+  assert.equal(result.decision, 'ALLOWED', result.detail);
   const [entry] = result.entries;
   assert.equal(
     entry.snapshot.report_parameters.find((item) => item.parameter_id === 13).text,
@@ -391,7 +404,7 @@ test('8. one version evidence never leaks into another version', async () => {
   ];
 
   const result = await gate(rows, [VERSION('v4'), VERSION('v1')]);
-  assert.equal(result.decision, 'ALLOWED');
+  assert.equal(result.decision, 'ALLOWED', result.detail);
   assert.equal(result.entries.length, 2);
 
   const byVersion = new Map(result.entries.map((entry) => [entry.version_id, entry]));
@@ -418,9 +431,11 @@ test('9. P13 parity is exact against the Technical Report own authority', () => 
   assert.equal(clean.passed, true, 'the report and its evidence state the same P13');
   assert.equal(clean.blocking.some((entry) => entry.key === 'P13'), false);
 
-  const disagreeing = capture({ authorityP13: { level: 'L3', value: '108 dBC (OH)' } });
+  const disagreeing = capture();
+  const mixed = buildEvidence(disagreeing);
+  mixed.parameter_index.P13.authority_level = 'L3';
   const failed = checkReportEvidenceParity({
-    evidence: buildEvidence(disagreeing), captured: disagreeing, reportType: 'technical',
+    evidence: mixed, captured: disagreeing, reportType: 'technical',
   });
   const p13 = failed.blocking.find((entry) => entry.key === 'P13');
   assert.ok(p13, 'P13 is a blocking parameter for a Technical Report');
@@ -510,7 +525,7 @@ test('13. conflicting room data: the proposal receives the evidence room only', 
     frozenRoom: { length_m: 6, width_m: 9.9, height_m: 2.4 },
   }), [VERSION('v4')]);
 
-  assert.equal(result.decision, 'ALLOWED');
+  assert.equal(result.decision, 'ALLOWED', result.detail);
   assert.equal(result.entries[0].snapshot.room.dimensions.width_m, 5.2, 'the evidence room is the room the proposal states');
   assert.equal(result.entries[0].snapshot.room.dimensions.length_m, 6);
 });
@@ -521,7 +536,7 @@ test('14. conflicting seating data: the proposal receives the evidence distance 
     frozenSeat: { distance_m: 4.8, horizontal_angle_deg: 0 },
   }), [VERSION('v4')]);
 
-  assert.equal(result.decision, 'ALLOWED');
+  assert.equal(result.decision, 'ALLOWED', result.detail);
   assert.equal(result.entries[0].snapshot.viewing.per_seat[0].distance_m, 3.4, 'the evidence distance is the distance the proposal states');
 });
 
@@ -532,7 +547,7 @@ test('15. conflicting viewing data: the proposal receives the evidence RP23 angl
   }), [VERSION('v4')]);
 
   const seat = result.entries[0].snapshot.viewing.per_seat[0];
-  assert.equal(result.decision, 'ALLOWED');
+  assert.equal(result.decision, 'ALLOWED', result.detail);
   assert.equal(seat.horizontal_angle_deg, 63, 'the evidence angle is the angle the proposal states');
   assert.equal(seat.level, 'Level 4', 'the RP23 level is the level the evidence states');
 });

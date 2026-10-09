@@ -1,9 +1,10 @@
-import { test } from 'vitest';
+import { test, vi } from 'vitest';
+vi.mock('../src/api/base44Client.js', () => ({ base44: { entities: {}, functions: { invoke: vi.fn() } } }));
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import { engineeringPublicationPreflight } from '../src/components/engineering/engineeringPublicationPreflight.js';
 import { auditDurablePublication, auditReportSaveAuthority } from '../src/components/engineering/publicationGateAuthority.js';
-import { resolveEngineeringCell, PUBLICATION_STATUS } from '../src/components/proposal/sourceAuthority/proposalReadinessAuthority.js';
+import { buildFrozenReportProject, buildAtomicParameterIndex, PUBLICATION_CONTRACT_VERSION } from '../shared/engineeringPublicationContract.js';
 import { PUBLICATION_ATTEMPT, recordPublicationAttempt, readPublicationAttempt } from '../src/components/engineering/publicationAcknowledgementStore.js';
 import { resolveBassReadiness } from '../src/components/hooks/useAppDesignRating.js';
 
@@ -11,26 +12,41 @@ const summary = {
   parameterAuthority: Object.fromEntries(Array.from({ length: 21 }, (_, i) => ['p' + (i + 1), { state: 'scored', rawValue: 1, level: 'L4' }])),
   designRating: { rating: { level: 'L3' } }, seatPriorityFingerprint: 'seats:v1',
   viewing: { perSeatRp23: { s1: { level: 'L3' } } },
-  roomResultsByParameter: Object.fromEntries([12, 13, 14, 18, 19].map(id => [id, { value: 1 }])),
-  project: { reportCounts: { seatResultsByParameter: { p20: [{ status: 'scored', value: 1 }] } } },
+  roomResultsByParameter: Object.fromEntries(Array.from({ length: 21 }, (_, i) => [i + 1, { state: 'scored', status: 'scored', value: 1, formatted: '1 dB', level: 'L4' }])),
+  project: { reportCounts: { seatResultsByParameter: Object.fromEntries([10, 20].map(id => ['p' + id, [{ seatId: 's1', row: 1, column: 1, priority: 'primary', status: 'scored', value: 1, level: 'L4', valueFormatted: '1 dB' }]])) } },
 };
-const payload = { analysisResult: { perSeatRp22: {} }, priceData: { total: 1 }, seatingPositions: [{ id: 's1' }], placedSpeakers: [{ id: 'lcr' }] };
+const designState = {
+  name: 'Publication fixture', versionName: 'Original Design',
+  roomDims: { widthM: 5, lengthM: 7, heightM: 3 },
+  screen: { visibleWidthInches: 170, aspectRatio: '16:9', manualMode: false, heightFromFloorM: 0.5, mountMode: 'baffle' },
+  screenFrontPlaneM: 0.1, dolbyLayout: '3.1',
+  seatingPositions: [{ id: 's1', rowNumber: 1, priority: 'primary', x: 2.5, y: 4, z: 1.2 }],
+  placedSpeakers: ['FL', 'FC', 'FR'].map((role, i) => ({ id: role, role, model: 'Q8-5', position: { x: i, y: 0.5, z: 1.2 } })),
+  subwooferInstances: [], acousticTreatmentEnabled: false, selectedAbfuserQty: 0,
+};
+const payload = {
+  analysisResult: { perSeatRp22: {} }, priceData: { total: 1 },
+  seatingPositions: designState.seatingPositions, placedSpeakers: designState.placedSpeakers,
+  report_project: buildFrozenReportProject(designState, { projectId: 'p', versionId: 'l1' }).reportProject,
+};
 const versions = { engine_version: '1', rp22_version: '21', algorithm_version: '24' };
 const input = { projectId: 'p', versionId: 'l1', ready: true, isPublishable: true,
   engineeringSummary: summary, engineeringFingerprint: 'eng:v1:l1',
   bassReadiness: { ready: true, fingerprint: 'cal:l1' }, reportSnapshot: payload,
-  designState: { roomDims: { widthM: 5, lengthM: 7 }, screen: { visibleWidthInches: 170 } }, versions };
+  designState, versions };
 const publication = { engineering_fingerprint: input.engineeringFingerprint, published_at: '2026-10-05T20:00:00Z',
-  engineering_summary: summary, report_snapshot: payload, provenance: { bass_fingerprint: 'cal:l1' }, ...versions };
+  engineering_summary: summary, report_snapshot: payload, provenance: { bass_fingerprint: 'cal:l1' },
+  publication_contract_version: PUBLICATION_CONTRACT_VERSION, ...versions };
+publication.parameter_index = buildAtomicParameterIndex(publication);
 
 test('Displayed assessment plus bass cache but no publication never reads Current', () => {
-  assert.equal(resolveEngineeringCell({ calculationAuthority: { fingerprint: 'cal:l1' } }).state, 'missing');
-  assert.equal(resolveEngineeringCell({ publication, publicationStatus: PUBLICATION_STATUS.NOT_CALCULATED }).state, 'missing');
+  assert.equal(auditDurablePublication({ durable: { publication: null }, assessmentExists: true }).allowed, false);
+  assert.equal(auditDurablePublication({ durable: { publication, version: {} } }).allowed, false);
   assert.equal(auditReportSaveAuthority({ publication, version: { published_fingerprint: null } }).allowed, false);
 });
 test('Preflight lists every section and succeeds for complete own-version inputs', () => {
   const preflight = engineeringPublicationPreflight(input);
-  assert.equal(preflight.ready, true);
+  assert.equal(preflight.ready, true, preflight.reason);
   for (const key of ['rp22_terminal', 'bass_current', 'design_rating', 'products', 'room', 'screen', 'seating', 'seat_priority', 'rp23_viewing', 'source_fingerprints']) {
     assert.equal(preflight.gates.find(gate => gate.key === key)?.ok, true, key);
   }

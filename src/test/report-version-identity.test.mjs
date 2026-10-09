@@ -203,11 +203,10 @@ test('TEST 7 — Proposal Centre states which version each report status belongs
 
   const table = read('src/components/proposal/sourceAuthority/VersionReadinessTable.jsx');
   assert.ok(table.includes('{row.versionName}'), 'the version name is shown on every row');
-  assert.ok(table.includes('READINESS_COLUMNS.map'), 'each version states its Visual and Technical report status');
-  for (const column of ['Visual Report', 'Technical Report']) {
-    assert.ok(read('src/components/proposal/sourceAuthority/proposalReadinessAuthority.js').includes(column),
-      `the readiness columns include the ${column}`);
-  }
+  assert.ok(table.includes('row.project'), 'each version states its canonical Project Report status');
+  assert.ok(table.includes('READINESS_REPORT_LABEL'), 'the status uses the shared Project Report label');
+  assert.ok(read('src/components/proposal/sourceAuthority/proposalReadinessAuthority.js').includes("'Project Report'"));
+  assert.equal(table.includes('READINESS_COLUMNS.map'), false, 'retired dual-report columns are not rendered');
 });
 
 // ── TEST 8 — a System Design Summary ───────────────────────────────────────

@@ -1,4 +1,4 @@
-import test from 'node:test';
+import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import { buildFrozenReportProject, buildAtomicParameterIndex, auditPublicationContract } from '../shared/engineeringPublicationContract.js';
@@ -101,4 +101,3 @@ test('final report source identity never includes newer live seating priorities'
   assert.match(hook,/terminalGate\?\.detail\?\.split/);
   assert.match(hook,/complete: false,\s*publicationBlocked: true/);
 });
-

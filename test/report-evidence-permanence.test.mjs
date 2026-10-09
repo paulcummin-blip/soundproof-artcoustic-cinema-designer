@@ -11,6 +11,7 @@
  */
 
 import { test } from 'vitest';
+import { projectEvidence } from './fixtures/proposalReadinessFixtures.mjs';
 import assert from 'node:assert/strict';
 
 import {
@@ -27,15 +28,15 @@ const FINGERPRINTS = Object.freeze({
   seatPriorityFingerprint: 'seat:r1c1:primary',
 });
 
-const readyEvidence = (fingerprint = FINGERPRINTS.engineeringFingerprint) => ({
-  evidence_version: 1, report_type: 'technical', proposal_ready: true,
-  identity: { project_id: 'p1', version_id: 'v1', report_type: 'technical', source_fingerprint: fingerprint, engineering_fingerprint: fingerprint },
-  room: { length_m: 6, width_m: 5, height_m: 3 },
-  screen: { screen_type: 'Projection screen', format: '16:9', viewable_width_cm: 300 },
-  system: { products_selected: [{model:'Q8-5',quantity:3}] },
-  parameter_index: Object.fromEntries([12,13,14,18,19,20].map(id=>['P'+id,{level:'L3',value:'stated value'}])),
-  seating: {seats:1, per_seat:[{seat_id:'s1',row:1,column:1,priority:'primary',distance_m:3,horizontal_angle_deg:50}]},
-});
+const readyEvidence = (fingerprint = FINGERPRINTS.engineeringFingerprint) => {
+  const evidence = projectEvidence({ versionId: 'v1' });
+  evidence.identity.source_fingerprint = fingerprint;
+  evidence.identity.engineering_fingerprint = fingerprint;
+  for (const entry of evidence.parameters) {
+    if (entry.source_type === 'durable-engineering-publication') entry.authority_fingerprint = fingerprint;
+  }
+  return evidence;
+};
 
 const incompleteEvidence = () => ({
   evidence_version: 1,
@@ -46,7 +47,7 @@ const incompleteEvidence = () => ({
 function row({
   id,
   versionId = 'v1',
-  type = 'technical',
+  type = 'project',
   generatedAt = '2026-10-01T10:00:00.000Z',
   reportEvidence = null,
   fingerprints = FINGERPRINTS,
@@ -69,7 +70,7 @@ function row({
   };
 }
 
-const stateOf = (rows, { reportType = 'technical', currentFingerprints = FINGERPRINTS } = {}) => {
+const stateOf = (rows, { reportType = 'project', currentFingerprints = FINGERPRINTS } = {}) => {
   const saved = selectCanonicalReportSnapshot(rows, { reportType });
   return {
     id: saved?.id || null,
@@ -115,7 +116,7 @@ test('5. a genuine design change reads Stale', () => {
 
 test('6. an existing report is never Missing, and a version with no row is', () => {
   const legacy = [row({ id: 'snap-legacy' })];
-  assert.equal(stateOf(legacy).state, READINESS_STATE.LEGACY);
+  assert.equal(stateOf(legacy).state, READINESS_STATE.INCOMPLETE);
   assert.deepEqual(stateOf([]), { id: null, state: READINESS_STATE.MISSING });
 });
 
@@ -169,7 +170,7 @@ test('12. rewritten incomplete evidence never looks like an upgrade', () => {
 
 test('13. a recovered report stays Current across refresh, reopen, export and proposal', () => {
   const legacy = row({ id: 'snap-a', generatedAt: '2026-09-20T09:00:00.000Z' });
-  assert.equal(stateOf([legacy]).state, READINESS_STATE.LEGACY);
+  assert.equal(stateOf([legacy]).state, READINESS_STATE.INCOMPLETE);
 
   const write = resolveEvidenceWrite({ existing: legacy, incoming: readyEvidence() });
   const recovered = { ...legacy, payload: { ...legacy.payload, reportEvidence: write.evidence } };
@@ -193,15 +194,15 @@ test('14. each version keeps its own saved report and its own evidence', () => {
     row({ id: 'level-1-visual', versionId: 'level-1', type: 'visual', reportEvidence: readyEvidence('eng:v1:level1') }),
   ];
   const byKey = selectCanonicalReportSnapshotsByKey(rows);
-  assert.equal(byKey.get('level-1::technical').id, 'level-1-technical');
+  assert.equal(byKey.get('level-1::project').id, 'level-1-technical');
   assert.equal(byKey.get('level-1::visual').id, 'level-1-visual');
-  assert.equal(byKey.get('level-4::technical').id, 'l4-technical');
+  assert.equal(byKey.get('level-4::project').id, 'l4-technical');
 
   // A version whose own report is missing is Missing — never filled from another
   // version's report, and never filled from the project's other versions.
   assert.equal(stateOf([rows[0]], { reportType: 'visual' }).state, READINESS_STATE.MISSING);
   assert.equal(stateOf([rows[0]], {
-    reportType: 'technical',
+    reportType: 'project',
     currentFingerprints: { ...FINGERPRINTS, engineeringFingerprint: 'eng:v1:level1' },
   }).state, READINESS_STATE.STALE);
 });

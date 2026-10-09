@@ -116,8 +116,9 @@ test('the proposal evidence is captured on the save path, not on a later visit',
     /reportEvidence: evidence,\n\s+evidence_parity: buildParityRecord\(parity\)/,
     'the evidence is written into the same payload as the report, with its parity outcome',
   );
-  assert.match(HOOK, /buildSavedSourceFingerprints\(/, 'the published engineering fingerprint is recorded');
-  assert.match(HOOK, /publishedFingerprint: version\.published_fingerprint/);
+  assert.match(HOOK, /engineeringFingerprint: publication\.engineering_fingerprint/, 'the durable publication fingerprint is recorded');
+  assert.match(HOOK, /sourceFingerprints: savedFingerprints/);
+  assert.match(HOOK, /project: publication\.report_snapshot\.report_project/, 'capture uses frozen publication facts');
 
   // The report save waits for the project record the capture reads, so a report
   // generated on a fast in-session load still saves complete evidence NOW instead
@@ -127,18 +128,14 @@ test('the proposal evidence is captured on the save path, not on a later visit',
   assert.equal(waits.length, 1, 'the report save waits for the project record; the evidence backfill never does');
 });
 
-test('the legacy backfill augments a CURRENT report in place, and never a stale one', () => {
-  assert.match(
-    HOOK,
-    /if \(resolution\.status !== REPORT_SNAPSHOT_STATUS\.CURRENT\) return;/,
-    'a report the design has moved past is left to Regenerate, never silently refreshed',
-  );
-  assert.match(HOOK, /if \(readStoredEvidence\(saved\)\) return;/, 'a report that already carries evidence is left alone');
-  // The backfill reads the report's OWN stored frozen source. It never reads the
-  // live project, so a report opened after the design moved on cannot have its
-  // evidence rebuilt from the current design.
-  assert.match(HOOK, /const stored = saved\.payload\?\.proposalSource;/, 'recovery reads the report frozen source');
-  assert.match(HOOK, /captured: stored,/, 'the evidence is rebuilt from that stored source alone');
+test('evidence refresh uses durable authority, never historical frozen-source recovery', () => {
+  assert.match(HOOK, /shouldRefreshEvidence\(\{/);
+  assert.match(HOOK, /status: resolution\.status/);
+  assert.match(HOOK, /hasEvidence: !!readStoredEvidence\(saved\)/);
+  assert.match(HOOK, /fetchDurablePublication\(projectId, versionId, \{ force: true \}\)/);
+  assert.match(HOOK, /auditReportSaveAuthority\(durableRead/);
+  assert.doesNotMatch(HOOK, /const stored = saved\.payload\?\.proposalSource;/);
+  assert.match(HOOK, /record\.generated_at = saved\.generated_at/);
 });
 
 /* ── 3. What decides staleness ──────────────────────────────────────────── */
@@ -159,22 +156,22 @@ test('staleness is the published fingerprint, never a version record modified ti
 test('the readiness table judges a report by fingerprints, never by a modified time', () => {
   assert.match(
     READINESS_HOOK,
-    /compareSourceFingerprints\(saved\.source_fingerprints, currentFingerprints\)/,
-    'the table uses the same fingerprint comparison the report page uses',
+    /resolveSavedReportCell\(\{ saved: savedProjectReport, currentFingerprints \}\)/,
+    'the table delegates the fingerprint verdict to the shared Project Report authority',
   );
   assert.doesNotMatch(READINESS_HOOK, /updated_date/, 'a record modified time never decides readiness');
 });
 
 /* ── 4. How a legacy snapshot reads ─────────────────────────────────────── */
 
-test('a legacy report reads as a one-time refresh in both the client and server authority', () => {
+test('an evidence-free Project Report reads Incomplete in both readiness authorities', () => {
   for (const relative of [
     'src/components/proposal/sourceAuthority/proposalReadinessAuthority.js',
     'base44/shared/proposalReadinessAuthority.js',
   ]) {
     const source = read(relative);
-    assert.match(source, /\[READINESS_STATE\.LEGACY\]: 'Needs one-time evidence refresh'/);
-    assert.match(source, /one-time evidence refresh/);
+    assert.match(source, /\[READINESS_STATE\.INCOMPLETE\]: 'Incomplete'/);
+    assert.match(source, /This Project Report needs to be completed/);
     assert.doesNotMatch(source, /but it needs refreshing for proposal comparison/);
   }
 });

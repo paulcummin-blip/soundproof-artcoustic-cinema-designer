@@ -115,8 +115,16 @@ const capture = ({
     assessment_basis: { p12_mode: 'minimum', p13_mode: 'minimum' },
     categories: null,
   },
-  bass: { available: true },
-  report_parameters: PARAMETERS,
+  bass: { available: true, p14: { achieved_level: 'L4' } },
+  report_parameters: PARAMETERS.map(row => ({
+    ...row, key: `P${row.parameter_id}`, scope: 'room',
+    authority_fingerprint: [14,18,19,20].includes(row.parameter_id)
+      ? fingerprints.calculationFingerprint
+      : fingerprints.engineeringFingerprint || fingerprints.calculationFingerprint,
+    authority_timestamp: '2026-10-01T10:00:00.000Z',
+    source_type: [14,18,19,20].includes(row.parameter_id)
+      ? 'durable-current-bass-authority' : 'durable-engineering-publication',
+  })),
   reportType,
 });
 
@@ -170,7 +178,7 @@ test('A. opening a legacy Technical Report writes evidence and reads Current', (
   }), true);
 
   const refreshed = savedFrom(captured);
-  assert.equal(refreshed.parity.passed, true, 'the evidence states exactly what the report shows');
+  assert.equal(refreshed.parity.passed, true, JSON.stringify(refreshed.parity));
   assert.ok(readStoredEvidence(refreshed), 'the refreshed report carries evidence');
   assert.equal(cellFor(refreshed, LEVEL_4_FINGERPRINTS).state, READINESS_STATE.CURRENT);
 });

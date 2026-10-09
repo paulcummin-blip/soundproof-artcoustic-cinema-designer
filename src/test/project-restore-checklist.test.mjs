@@ -1,7 +1,7 @@
 // project-restore-checklist.test.mjs
 // The Project Open Gate owns core design only. Report, bass, proposal and
 // pricing authorities are route/action owned and must not delay Room Designer.
-import { test } from "node:test";
+import { test } from "vitest";
 import assert from "node:assert/strict";
 import fs from "node:fs";
 

@@ -1,4 +1,5 @@
-import test from 'node:test';
+import { test, vi } from 'vitest';
+vi.mock('../src/api/base44Client.js', () => ({ base44: { entities: {}, functions: { invoke: vi.fn() } } }));
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import { buildDurableSnapshot, composeAuthoritySnapshot } from '../src/components/engineering/versionedEngineeringAuthority.js';
