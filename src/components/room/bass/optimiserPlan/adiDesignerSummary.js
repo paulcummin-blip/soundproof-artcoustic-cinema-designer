@@ -31,7 +31,13 @@ import {
   resolveLeverVerdict,
   resolveLimitingMetric,
 } from "./optimiserLeverVerdict.js";
-import { deltaText, deviationText, frequencyText, levelText } from "./optimiserWholeNumberDb.js";
+import {
+  deltaText,
+  deviationText,
+  frequencyText,
+  levelText,
+  wholeDbImprovement,
+} from "./optimiserWholeNumberDb.js";
 import { leverIsOfferable } from "./optimiserPlanSave.js";
 import { estimateOptimiserCalculations, resultSentence } from "./optimiserCalculationEstimate.js";
 import { resolveAbsorptionAdvice } from "./absorptionAdviceAuthority.js";
@@ -168,6 +174,22 @@ function resolveRecommendedLever(planView, { suppressedLeverKeys = [] } = {}) {
  * value is read from the lever's persisted effect and the plan's baseline —
  * nothing here is recalculated. Null for every other recommendation.
  */
+/**
+ * The seating lever's own evaluated result: "P20: ±13 dB (14 dB improvement)".
+ * The movement it evaluated is the card's recommendation headline, so this
+ * states the performance the move produced — the final deviation first, with
+ * the size of the improvement beside it, in whole dB. When nothing improved,
+ * the final value is stated on its own and no gain is claimed.
+ */
+function seatingResultPhrase(row, baseline = null) {
+  const deviation = deviationText(row?.effect?.p20VariationDb);
+  if (!deviation) return null;
+  const improvement = wholeDbImprovement(baseline?.p20VariationDb, row?.effect?.p20VariationDb);
+  return improvement != null
+    ? `P20: ${deviation} (${improvement} dB improvement)`
+    : `P20: ${deviation}`;
+}
+
 function seatingRecommendationDetail({ row, baseline = null, currentP20 = null } = {}) {
   if (!row?.seating?.movementLabel) return null;
   const effect = row.effect || null;
@@ -180,6 +202,9 @@ function seatingRecommendationDetail({ row, baseline = null, currentP20 = null }
     // stated: the run's own figures are explained in baselineNote instead.
     p20Before: currentP20?.runBaselineDiffers ? null : deviationText(baseline?.p20VariationDb),
     p20After: deviationText(effect?.p20VariationDb),
+    // Taken from the two published whole values themselves, so the stated
+    // improvement always adds up with the before → after figures beside it.
+    p20ImprovementDb: wholeDbImprovement(baseline?.p20VariationDb, effect?.p20VariationDb),
     baselineNote: currentP20?.runBaselineDiffers
       ? `Measured in that evaluation, which compared against a different current result (P20 ${currentP20.runBaselineDeviation}). Current design: P20 ${currentP20.deviationText}.`
       : null,
@@ -263,7 +288,11 @@ export function buildTestedOptionRows(
         key,
         label,
         status: ADI_ROW_STATUS.RECOMMENDED,
-        outcome: movement ? (effect ? `${movement} ${effect}` : movement) : (effect || null),
+        // The seating lever's movement is the card's own recommendation
+        // headline, so this row states the result that move produced.
+        outcome: row?.seating
+          ? (seatingResultPhrase(row, planView?.baseline || null) || movement || effect || null)
+          : (movement ? (effect ? `${movement} ${effect}` : movement) : (effect || null)),
         action: "apply",
       };
     }
@@ -452,7 +481,8 @@ export function buildTestedOptionRows(
       key,
       label,
       status: ADI_ROW_STATUS.TESTED,
-      outcome: row?.seating?.movementLabel
+      outcome: (row?.seating ? seatingResultPhrase(row, planView?.baseline || null) : null)
+        || row?.seating?.movementLabel
         || leverVerdict.summary
         || phrase
         || ADI_ROW_OUTCOME.NO_USEFUL,
@@ -708,8 +738,13 @@ export function buildAdiDesignerSummary({
     // here.
     futureCapability: buildFutureCapabilityNotes(),
     attemptsWithoutGain,
+    // The recommendation the designer acts on. A seating change is stated as
+    // the move itself — that IS what the designer has to do — and the numbers it
+    // produced sit directly beneath it in the seating result block.
     recommendation: recommendedLever
-      ? shortPhrase(recommendedRow?.reason) || describeLeverEffect(recommendedRow?.effect) || null
+      ? (recommendedRow?.seating?.movementLabel
+        ? `${recommendedRow.seating.movementLabel}${recommendedRow.seating.wholeBlockMoved ? " (whole seating block)" : ""}`
+        : shortPhrase(recommendedRow?.reason) || describeLeverEffect(recommendedRow?.effect) || null)
       : null,
     recommendedLever,
     recommendedLeverLabel: recommendedLever ? displayLabel(recommendedLever) : null,

@@ -36,6 +36,7 @@ import OptimiserCalculationDetail from "./OptimiserCalculationDetail.jsx";
 import AdiTestedOptionsTable from "./AdiTestedOptionsTable.jsx";
 import AdiDesignerActionBar from "./AdiDesignerActionBar.jsx";
 import PlacementRecommendationPanel from "./PlacementRecommendationPanel.jsx";
+import AdiBeforeAfterResult from "./AdiBeforeAfterResult.jsx";
 import { OPTIMISER_LEVER } from "./optimiserPlanConstants.js";
 import AcousticDelayAlignmentCard from "@/components/room/bass/improveBassV2/AcousticDelayAlignmentCard.jsx";
 import { PLACEMENT_PREVIEW_UNAVAILABLE } from "./placementMoveAuthority.js";
@@ -322,25 +323,21 @@ export default function AdiOptimisationJourney({
         </div>
       )}
 
-      {/* The seating recommendation's own evaluated detail — the movement, the
-          before/after, the trade-offs and whether every destination seat position
-          is legal. Read from the saved plan; nothing is recalculated. */}
+      {/* The seating recommendation's own evaluated result — the before/after
+          performance, the trade-offs and whether every destination seat position
+          is legal. The movement itself is the recommendation headline above, so
+          it is never repeated here. Read from the saved plan; nothing is
+          recalculated. */}
       {summary.seatingRecommendation && (
         <div className="rounded-md border border-[#E7E5E0] bg-white px-3 py-2 space-y-1">
-          <div className="text-[12px] font-semibold text-[#1B1A1A]">
-            {summary.seatingRecommendation.movementLabel}
-            {summary.seatingRecommendation.wholeBlockMoved ? " (whole seating block)" : ""}
-          </div>
-          <div className="text-[11px] text-[#3E4349] leading-relaxed">
-            {summary.seatingRecommendation.p20Before && summary.seatingRecommendation.p20After
-              ? `P20 ${summary.seatingRecommendation.p20Before} → ${summary.seatingRecommendation.p20After}`
-              : summary.seatingRecommendation.p20After
-                ? `P20 ${summary.seatingRecommendation.p20After}`
-                : null}
-            {summary.seatingRecommendation.p20LevelBefore || summary.seatingRecommendation.p20LevelAfter
-              ? ` · ${summary.seatingRecommendation.p20LevelBefore || "—"} → ${summary.seatingRecommendation.p20LevelAfter || "—"}`
-              : ""}
-          </div>
+          <AdiBeforeAfterResult
+            metricLabel="P20"
+            beforeText={summary.seatingRecommendation.p20Before}
+            afterText={summary.seatingRecommendation.p20After}
+            improvementDb={summary.seatingRecommendation.p20ImprovementDb}
+            levelBefore={summary.seatingRecommendation.p20LevelBefore}
+            levelAfter={summary.seatingRecommendation.p20LevelAfter}
+          />
           {summary.seatingRecommendation.baselineNote && (
             <div className="text-[11px] text-[#8A5A2B] leading-relaxed">
               {summary.seatingRecommendation.baselineNote}

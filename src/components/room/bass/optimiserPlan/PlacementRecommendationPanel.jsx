@@ -18,6 +18,7 @@ import { ArrowRight, Check, Loader2, MapPin, RotateCcw, Undo2 } from "lucide-rea
 import { PLACEMENT_KIND } from "./placementRecommendationAuthority.js";
 import { ADI_BASS_OPTIMISER_LABEL } from "./resolveAdiOptimiserJourney.js";
 import { PLACEMENT_PREVIEW_UNAVAILABLE } from "./placementMoveAuthority.js";
+import AdiBeforeAfterResult from "./AdiBeforeAfterResult.jsx";
 
 const PRIMARY = "inline-flex items-center gap-1.5 rounded-md bg-[#213428] px-4 py-2 text-[12px] font-semibold text-white transition-colors hover:bg-[#3E4349] disabled:opacity-60";
 const SECONDARY = "inline-flex items-center gap-1.5 rounded-md border border-[#D9D5CE] bg-white px-4 py-2 text-[12px] font-semibold text-[#213428] transition-colors hover:border-[#213428] disabled:opacity-60";
@@ -98,10 +99,23 @@ export default function PlacementRecommendationPanel({
           </div>
           <div className="space-y-0.5">
             {placement.expected.map((row) => (
-              <div key={row.label} className="flex items-baseline gap-2 text-[11px]">
-                <span className="w-32 shrink-0 font-semibold text-[#1B1A1A]">{row.label}</span>
-                <span className="text-[#3E4349]">{row.value}</span>
-              </div>
+              // A before → after row uses the card's one result presentation, so
+              // the predicted final deviation and the improvement read the same
+              // way wherever ADI states them.
+              row.before && row.after ? (
+                <AdiBeforeAfterResult
+                  key={row.label}
+                  metricLabel={row.label}
+                  beforeText={row.before}
+                  afterText={row.after}
+                  improvementDb={row.improvementDb}
+                />
+              ) : (
+                <div key={row.label} className="flex items-baseline gap-2 text-[11px]">
+                  <span className="w-32 shrink-0 font-semibold text-[#1B1A1A]">{row.label}</span>
+                  <span className="text-[#3E4349]">{row.value}</span>
+                </div>
+              )
             ))}
           </div>
         </div>

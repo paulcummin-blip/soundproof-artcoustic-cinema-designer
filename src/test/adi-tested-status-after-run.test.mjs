@@ -158,10 +158,15 @@ describe("a completed pass leaves no lever unresolved", () => {
 describe("a completed pass with seating recommended", () => {
   const summary = summaryFor(SEATING_PLAN);
 
-  it("states the recommendation in the seating row", () => {
+  it("states the result in the seating row and the move in the recommendation", () => {
     const seating = rowFor(summary.rows, "seating");
     expect(seating.status).toBe(ADI_ROW_STATUS.RECOMMENDED);
-    expect(seating.outcome).toMatch(/move the seating/i);
+    // The row states the performance the evaluated move produced — the final
+    // P20 first, with the improvement beside it — not the movement on its own.
+    expect(seating.outcome).toMatch(/^P20: ±10 dB/);
+    expect(seating.outcome).not.toMatch(/move the seating/i);
+    // The movement itself is the card's recommendation headline.
+    expect(summary.recommendation).toMatch(/move the seating/i);
   });
 
   it("carries exactly one Apply, on the recommended row", () => {

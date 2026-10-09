@@ -13,6 +13,7 @@
 // ---------------------------------------------------------------------------
 
 import {
+  floorP19P20Deviation,
   formatP19P20DeviationText,
   formatP19P20DeltaText,
   resolveRp22DesignValue,
@@ -71,4 +72,20 @@ export function validFrequencyHz(value) {
 export function frequencyText(value) {
   const whole = validFrequencyHz(value);
   return whole == null ? null : `${whole} Hz`;
+}
+
+/**
+ * The size of a P19/P20 improvement between two deviations, as a whole number:
+ * the published whole values themselves are compared, so a stated improvement
+ * always adds up with the before → after figures it sits beside
+ * (±27 dB → ±13 dB reads "(14 dB improvement)").
+ *
+ * Null unless the after value is genuinely better (smaller) than the before
+ * value, or when either value was not measured.
+ */
+export function wholeDbImprovement(beforeValue, afterValue) {
+  const before = floorP19P20Deviation(beforeValue);
+  const after = floorP19P20Deviation(afterValue);
+  if (before == null || after == null || after >= before) return null;
+  return before - after;
 }

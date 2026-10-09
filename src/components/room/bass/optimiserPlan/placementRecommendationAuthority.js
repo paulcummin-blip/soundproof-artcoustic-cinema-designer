@@ -25,7 +25,12 @@ import {
 import { ADI_BASS_OPTIMISER_LABEL } from "./resolveAdiOptimiserJourney.js";
 import { resolveLeverVerdict } from "./optimiserLeverVerdict.js";
 import { LEVER_APPLY_LABEL, LEVER_UNDO_LABEL } from "./optimiserPlanLeverApply.js";
-import { deltaText, deviationText, levelText } from "./optimiserWholeNumberDb.js";
+import {
+  deltaText,
+  deviationText,
+  levelText,
+  wholeDbImprovement,
+} from "./optimiserWholeNumberDb.js";
 import {
   PLACEMENT_APPLIED_MESSAGE,
   PLACEMENT_BASELINE_MISMATCH,
@@ -159,7 +164,17 @@ function expectedRows({ baseline = null, effect = null, evidence = null, current
   const rows = [];
   const before = deviationText(baseline?.p20VariationDb);
   const after = deviationText(effect?.p20VariationDb);
-  if (after) rows.push({ label: "P20", value: before && before !== after ? `${before} → ${after}` : after });
+  if (after) {
+    rows.push({
+      label: "P20",
+      value: before && before !== after ? `${before} → ${after}` : after,
+      // The same before/after, structured, so the panel can present the
+      // predicted final deviation as the prominent figure on the row.
+      before,
+      after,
+      improvementDb: wholeDbImprovement(baseline?.p20VariationDb, effect?.p20VariationDb),
+    });
+  }
   else if (before) rows.push({ label: "P20", value: before });
 
   const p19Delta = deltaText(effect?.p19DeltaDb);
