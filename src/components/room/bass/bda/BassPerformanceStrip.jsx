@@ -23,12 +23,12 @@ import React, { useEffect, useState } from "react";
 import RP22GradingPill from "@/components/ui/RP22GradingPill";
 import BassResultDetailTooltip from "@/components/room/bass/BassResultDetailTooltip";
 import { formatOfficialBassResults } from "@/components/room/bass/bassResultsPresentation";
-import { useSharedBassResults } from "@/components/room/bass/bassResultsStore";
+import useSharedBassAuthorityState from "@/components/room/bass/useSharedBassAuthorityState";
 import { resolveP14TargetSelectionState } from "@/components/room/bass/p14TargetSelectionState";
 import { useGraphInteraction, setGraphInteraction, clearGraphInteraction } from "@/components/room/bass/bda/graphInteractionStore";
 import { useEffectiveBassLifecycleState } from "@/components/room/bass/bda/useEffectiveBassLifecycle";
-import { usePublicationAttempt } from "@/components/engineering/publicationAcknowledgementStore";
-import { resolveBassAuthorityState, BASS_AUTHORITY_STATE } from "@/components/room/bass/bassAuthorityState";
+import { recordPublicationAttempt, PUBLICATION_ATTEMPT } from "@/components/engineering/publicationAcknowledgementStore";
+import { BASS_AUTHORITY_STATE } from "@/components/room/bass/bassAuthorityState";
 import BassAuthorityStateBar from "@/components/room/bass/bda/BassAuthorityStateBar";
 import { readEngineeringPublishTrigger } from "@/components/engineering/engineeringPublishTrigger";
 
@@ -46,27 +46,24 @@ function splitPillContent(resultText) {
 }
 
 export default function BassPerformanceStrip() {
-  const shared = useSharedBassResults();
+  const { shared, authorityState } = useSharedBassAuthorityState();
   const interaction = useGraphInteraction();
   const [clock, setClock] = useState(Date.now());
 
   // The state of the band, from the shared authority: preview only, needs
   // calculation, calculated but not published, or current. The label replaces
   // the old vague "Out of date", and carries the one action that resolves it.
-  const publicationAttempt = usePublicationAttempt(shared?.scopeId || null, shared?.versionId || null);
-  const authorityState = resolveBassAuthorityState({
-    completedBassAuthority: shared?.completedBassAuthority,
-    publicationAttempt,
-    lifecycleState: shared?.bassLifecycleState,
-    calculationInProgress: shared?.calculationInProgress,
-    placementPreviewActive: shared?.placementPreviewActive,
-  });
   const stateAction = authorityState.code === BASS_AUTHORITY_STATE.CALCULATED_NOT_PUBLISHED
     // The publish action is the one the publication effect already owns, read
     // from its registration seam — never a second publication path.
     ? () => {
         const publish = readEngineeringPublishTrigger(shared?.scopeId, shared?.versionId);
         if (publish) publish();
+        else recordPublicationAttempt(shared?.scopeId, shared?.versionId, {
+          status: PUBLICATION_ATTEMPT.FAILED,
+          fingerprint: shared?.engineeringPublication?.fingerprint,
+          message: "Publication is unavailable for this version. Reopen the version and retry.",
+        });
       }
     : (typeof shared?.onCalculate === "function" ? shared.onCalculate : null);
 
@@ -162,7 +159,7 @@ export default function BassPerformanceStrip() {
               )}
 
               {/* Stale marker — retains prominence, names the actual state */}
-              {pill.stale && (
+              {authorityState.code !== BASS_AUTHORITY_STATE.CURRENT && (
                 <span
                   className="font-semibold uppercase tracking-wide rounded px-1.5 py-0.5 shrink-0"
                   style={{
