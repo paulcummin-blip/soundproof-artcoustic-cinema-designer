@@ -42,17 +42,11 @@ import { selectClientP7FrontWides } from "@/components/report/client/selectClien
 import TechnicalReportDocument from "@/components/report/technical/TechnicalReportDocument";
 import { LOGO_URL } from "@/components/report/ReportCover";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, FileText, Download } from "lucide-react";
+import { ArrowLeft, Download } from "lucide-react";
 import ReportStatePanel from "@/components/report/ReportStatePanel";
 import { buildReportGateDiagnostics } from "@/components/report/reportGateDiagnostics";
 import BackToProposalLink from "@/components/report/BackToProposalLink";
-import { readProposalContext } from "@/components/report/proposalReportContext";
 import BackToProjectLibraryLink from "@/components/report/BackToProjectLibraryLink";
-import {
-  buildReportPairingUrl,
-  readLibraryContext,
-  REPORT_ROUTE,
-} from "@/components/report/reportLibraryContext";
 import { readRequestedVersionId } from "@/components/report/reportVersionRequest";
 import { deriveReportReadiness, REPORT_STATE } from "@/components/report/reportReadinessAuthority";
 import { useReportSnapshot } from "@/components/report/useReportSnapshot";
@@ -646,24 +640,7 @@ export default function RP22ClientReport() {
     navigate(`/RoomDesigner?projectId=${projectId}${targetVersion ? `&versionId=${targetVersion}` : ""}`);
   };
 
-  // The Visual and Technical Reports are one pairing: moving between them must
-  // not drop the version being viewed, nor either return route. The shared
-  // pairing builder carries project, version and both contexts — the version is
-  // the one this report is showing, never the version loaded in the designer.
-  const currentProposalContext = () => readProposalContext(searchParams);
-  const currentLibraryContext = () => readLibraryContext(searchParams);
   const viewedVersionId = authority.versionId || requestedVersionId || null;
-
-  const handleTechnicalReport = () => {
-    if (!projectId) return;
-    navigate(buildReportPairingUrl({
-      route: REPORT_ROUTE.DESIGN_REVIEW,
-      projectId,
-      versionId: viewedVersionId,
-      libraryContext: currentLibraryContext(),
-      proposalContext: currentProposalContext(),
-    }));
-  };
 
   const handleOpenBassSimulation = () => {
     if (!projectId) return;
@@ -737,23 +714,6 @@ export default function RP22ClientReport() {
           >
             <ArrowLeft className="w-4 h-4 mr-2" style={{ color: "#213428", flexShrink: 0 }} />
             Back to Project
-          </Button>
-          <Button
-            type="button"
-            onClick={handleTechnicalReport}
-            disabled={!projectId}
-            style={{
-              fontFamily: "Didact Gothic, Century Gothic, sans-serif",
-              backgroundColor: "#F1F0EE",
-              border: "1px solid #625143",
-              color: "#625143",
-              opacity: 1,
-              whiteSpace: 'nowrap',
-              flexShrink: 0,
-            }}
-          >
-            <FileText className="w-4 h-4 mr-2" style={{ color: "#625143", flexShrink: 0 }} />
-            Technical Report
           </Button>
           <Button
             type="button"
