@@ -291,14 +291,30 @@ export function useEngineeringPublicationEffect({
   // this effect to run again — it publishes nothing itself, and adds no second
   // path to publishEngineering.
   const publish = useCallback(() => {
+    // The same preflight as auto-publication: a manual click must explain a
+    // refused assessment immediately, never bypass it or silently do nothing.
+    if (!preflight.ready) {
+      recordPublicationAttempt(projectId, versionId, {
+        status: PUBLICATION_ATTEMPT.NOT_READY, fingerprint: engineeringFingerprint,
+        message: 'Cannot publish yet: ' + preflight.reason,
+        missing: preflight.missing, gates: preflight.gates,
+        assessmentComplete: preflight.assessmentComplete,
+      });
+      return;
+    }
+    recordPublicationAttempt(projectId, versionId, {
+      status: PUBLICATION_ATTEMPT.QUEUED, fingerprint: engineeringFingerprint,
+      message: 'Publishing the current assessment.', gates: preflight.gates,
+      assessmentComplete: preflight.assessmentComplete,
+    });
     lastPublishedFingerprintRef.current = null;
     setRetrySequence((value) => value + 1);
-  }, []);
+  }, [projectId, versionId, engineeringFingerprint, preflightKey]);
 
   useEffect(() => {
     if (!projectId || !versionId) return undefined;
     return registerEngineeringPublishTrigger(projectId, versionId, publish);
   }, [projectId, versionId, publish]);
 
-  return { preflight, attempt, fingerprint: engineeringFingerprint, publish };
+  return { preflight, attempt, fingerprint: engineeringFingerprint, bassFingerprint, publish };
 }
