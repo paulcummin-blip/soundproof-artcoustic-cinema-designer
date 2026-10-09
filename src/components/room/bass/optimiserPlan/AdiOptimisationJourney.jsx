@@ -264,7 +264,7 @@ export default function AdiOptimisationJourney({
           className="inline-flex shrink-0 items-center gap-1 whitespace-nowrap rounded-full px-2.5 py-1 text-[10px] font-semibold uppercase"
           style={theme.pill}
         >
-          {journey.statusLabel}
+          Optimiser evaluation: {journey.statusLabel}
         </span>
       </div>
 
