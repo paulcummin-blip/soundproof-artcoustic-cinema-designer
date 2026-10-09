@@ -40,9 +40,9 @@ export default function BassAuthorityStateBar({ state = null, onPrimaryAction = 
       >
         {state.label}
       </span>
-      {state.message && (
+      {(state.message || state.note) && (
         <span className="min-w-0 flex-1" style={{ fontSize: "11.5px", color: "#3E4349", lineHeight: 1.4 }}>
-          {state.message}
+          {state.message || state.note}
         </span>
       )}
       {showAction && (

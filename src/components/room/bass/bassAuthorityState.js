@@ -17,6 +17,12 @@
  * This module reads state only. It changes no score, threshold, fingerprint or
  * calculation: it compares the SAME completion/fingerprint conditions the bass
  * readiness authority already uses, and reports which label they imply.
+ *
+ * DOMAIN RULE — the bass band speaks only in the bass domain (P14, P18, P19,
+ * P20). When a save is refused, only a bass-domain parameter may be named. A
+ * gate outside that domain (P1–P13, P15–P17, P21) is a whole-design position,
+ * never a bass problem: the completed bass assessment then stays current and
+ * the overall position is stated without naming a non-bass parameter.
  */
 
 import { BASS_AUTHORITY_STATUS } from "./completedBassResultStore";
@@ -71,25 +77,75 @@ export const BASS_AUTHORITY_COPY = Object.freeze({
 export const BASS_AUTHORITY_BLOCKED_COPY = Object.freeze({
   label: "Assessment needs attention",
   actionLabel: "Save Assessment",
+  message: "This assessment needs updating before it can be saved.",
 });
 
-const PARAMETER_IN_REASON = /\bp(1[0-9]|2[01]|[1-9])\b/i;
+/**
+ * The bass domain: the ONLY parameters the bass panel may name as blockers.
+ * P1–P13, P15–P17 and P21 sit outside it and are never named here.
+ */
+export const BASS_DOMAIN_PARAMETERS = Object.freeze([14, 18, 19, 20]);
 
 /**
- * A short explanation for a blocked save. Internal field names
- * (engineering_summary.p4, parameter_index.P4.level) are never shown — the
- * parameter that needs attention is named instead.
+ * The one global line the bass panel may show when the completed bass result is
+ * current and only a non-bass gate is holding up the overall publication.
  */
-export function publicationBlockNote(attempt = null) {
-  const reasons = [
+export const BASS_OVERALL_ASSESSMENT_NOTE = "Overall design assessment is not yet complete.";
+
+/** Publication gates that are bass-domain facts, by the gate's own key. */
+const BASS_DOMAIN_GATES = Object.freeze([
+  "bass_current",
+  "bass_identity",
+  "bass_summary",
+  "bass_authority",
+  "p20_available",
+]);
+
+const BASS_PARAMETER_IN_REASON = /\bp(14|18|19|20)\b/i;
+
+const failedGates = (attempt) => (
+  Array.isArray(attempt?.gates) ? attempt.gates.filter((gate) => gate?.ok === false) : []
+);
+
+function firstBassParameter(text) {
+  const match = String(text || "").match(BASS_PARAMETER_IN_REASON);
+  return match ? Number(match[1]) : null;
+}
+
+/**
+ * The reasons a save was refused, in the order the attempt recorded them.
+ *
+ * Internal field names (engineering_summary.p4, parameter_index.P4.level) stay
+ * internal — they are read for a parameter NUMBER, never shown. A failing
+ * bass-domain gate also contributes its label, so the gate's own parameter can
+ * be named ("Current verified bass / P19", "P20 seat results available").
+ */
+function blockReasons(attempt = null) {
+  return [
     ...(attempt?.missing || []).flatMap((item) => [item?.key, item?.label, item?.detail]),
-    ...(attempt?.gates || []).filter((gate) => gate?.ok === false).map((gate) => gate?.detail),
+    ...failedGates(attempt).flatMap((gate) => (
+      BASS_DOMAIN_GATES.includes(gate?.key) ? [gate?.detail, gate?.label] : [gate?.detail]
+    )),
     attempt?.message,
   ].filter((reason) => typeof reason === "string");
-  const match = reasons.join(" ").match(PARAMETER_IN_REASON);
-  return match
-    ? `P${match[1]} assessment needs updating.`
-    : "This assessment needs updating before it can be saved.";
+}
+
+/**
+ * The first BASS-DOMAIN parameter the attempt named, as the one short sentence
+ * the bass panel may show, or null when no bass-domain parameter is at fault.
+ */
+export function bassDomainBlockNote(attempt = null) {
+  for (const reason of blockReasons(attempt)) {
+    const parameter = firstBassParameter(reason);
+    if (parameter !== null) return `P${parameter} assessment needs updating.`;
+  }
+  return null;
+}
+
+/** Whether anything in the bass domain — a gate, or a named parameter — blocks. */
+export function hasBassDomainBlocker(attempt = null) {
+  return failedGates(attempt).some((gate) => BASS_DOMAIN_GATES.includes(gate?.key))
+    || bassDomainBlockNote(attempt) !== null;
 }
 
 const ATTEMPT = Object.freeze({
@@ -177,11 +233,23 @@ export function resolveBassAuthorityState({
     // internal field names are never shown, and the status is not repeated on
     // each parameter result.
     if (attemptStatus === ATTEMPT.FAILED || attemptStatus === ATTEMPT.NOT_READY) {
+      // Only a bass-domain parameter may be named here. A blocker outside
+      // P14/P18/P19/P20 is not a bass problem, so it is never presented as one.
+      if (hasBassDomainBlocker(matchingAttempt)) {
+        return {
+          code: BASS_AUTHORITY_STATE.CALCULATED_NOT_PUBLISHED,
+          ...BASS_AUTHORITY_BLOCKED_COPY,
+          message: bassDomainBlockNote(matchingAttempt) || BASS_AUTHORITY_BLOCKED_COPY.message,
+          attention: true,
+        };
+      }
+      // The completed bass assessment is saved and current; a non-bass gate is
+      // holding up the overall engineering publication. The bass band reports
+      // the bass assessment as current and states the overall position, without
+      // naming the parameter or offering a bass action for a non-bass blocker.
       return {
-        code: BASS_AUTHORITY_STATE.CALCULATED_NOT_PUBLISHED,
-        ...BASS_AUTHORITY_BLOCKED_COPY,
-        message: publicationBlockNote(matchingAttempt),
-        attention: true,
+        ...withCopy(BASS_AUTHORITY_STATE.CURRENT),
+        note: BASS_OVERALL_ASSESSMENT_NOTE,
       };
     }
     // Saved, current, but the publication has not acknowledged it yet: the values

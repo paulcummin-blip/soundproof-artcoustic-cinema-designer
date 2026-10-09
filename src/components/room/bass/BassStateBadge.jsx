@@ -23,7 +23,7 @@ export default function BassStateBadge({ state = null, compact = false }) {
   return (
     <span
       data-bass-authority-state={state.code}
-      title={state.message || state.label}
+      title={state.message || state.note || state.label}
       className="font-semibold uppercase tracking-wide rounded whitespace-nowrap"
       style={{
         fontSize: compact ? "9px" : "9.5px",

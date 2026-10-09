@@ -10,8 +10,9 @@
 //           terminal-state requirement is NOT relaxed.
 //   TEST 3  Calculated but unsaved → ONE "Ready to save" status, no repeated
 //           developer wording.
-//   TEST 4  Publication blocked → ONE "Assessment needs attention" status with
-//           a short explanation ("P4 assessment needs updating.").
+//   TEST 4  Publication blocked by P4 only → the bass band stays in the bass
+//           domain: the completed bass result is current, the overall position
+//           is stated without naming P4, and no bass action is offered.
 //   TEST 5  Saved and acknowledged → "Performance Current" (the state a refresh
 //           restores from the durable publication).
 //
@@ -122,7 +123,7 @@ test('TEST 3 — calculated but unsaved is one Ready to save status', () => {
   expect(state.message).not.toMatch(/engineering_summary|parameter_index|calculated_not_published/i);
 });
 
-test('TEST 4 — a blocked save is one status with a short explanation', () => {
+test('TEST 4 — a P4-only blocker is never named inside the bass band', () => {
   const state = resolveBassAuthorityState({
     ...currentAuthority,
     publicationAttempt: {
@@ -132,9 +133,16 @@ test('TEST 4 — a blocked save is one status with a short explanation', () => {
       missing: [{ key: 'engineering_summary.p4' }, { key: 'parameter_index.P4.level' }],
     },
   });
-  expect(state.label).toBe('Assessment needs attention');
-  expect(state.message).toBe('P4 assessment needs updating.');
-  expect(state.actionLabel).toBe('Save Assessment');
+
+  // P4 is not a bass parameter: the completed bass result is saved and current,
+  // and the whole-design position is stated without naming P4.
+  expect(state.code).toBe('current');
+  expect(state.label).toBe('Performance Current');
+  expect(state.attention).not.toBe(true);
+  expect(state.message).toBeNull();
+  expect(state.note).toBe('Overall design assessment is not yet complete.');
+  expect(state.actionLabel).toBeNull();
+  expect(JSON.stringify(state)).not.toMatch(/\bP4\b/);
 });
 
 test('TEST 5 — a saved and acknowledged assessment restores Performance Current', () => {
