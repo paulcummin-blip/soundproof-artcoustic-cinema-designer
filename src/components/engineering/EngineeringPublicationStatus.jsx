@@ -11,9 +11,9 @@ import { useAuth } from '@/lib/AuthContext';
 // a client. Internal gate labels and field names stay inside the diagnostics
 // disclosure — never in the normal workflow.
 const TONES = {
-  published: { dot: '#2F7D4F', label: 'Saved' },
+  published: { dot: '#2F7D4F', label: 'Performance Current' },
   publishing: { dot: '#B7791F', label: 'Saving…' },
-  failed: { dot: '#B3261E', label: 'Assessment not saved' },
+  failed: { dot: '#B3261E', label: 'Assessment needs attention' },
   'not-ready': { dot: '#B7791F', label: 'Complete design assessment' },
   'not-saved': { dot: '#B7791F', label: 'Ready to save' },
 };

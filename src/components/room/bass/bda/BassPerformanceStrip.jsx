@@ -17,8 +17,9 @@
 // optimiser, or publication. Clicking a result focuses the graph on that
 // RP22 parameter (preserved from GraphHeaderPills).
 //
-// Stale state: the strip remains visible with previous values and an
-// "Out of date" marker — prominence is NOT reduced.
+// Stale state: the strip remains visible with previous values — prominence is
+// NOT reduced. The assessment status is stated ONCE, by the authority band
+// below the four results, and is never repeated on each result.
 import React, { useEffect, useState } from "react";
 import RP22GradingPill from "@/components/ui/RP22GradingPill";
 import BassResultDetailTooltip from "@/components/room/bass/BassResultDetailTooltip";
@@ -158,20 +159,6 @@ export default function BassPerformanceStrip() {
                 </span>
               )}
 
-              {/* Stale marker — retains prominence, names the actual state */}
-              {authorityState.code !== BASS_AUTHORITY_STATE.CURRENT && (
-                <span
-                  className="font-semibold uppercase tracking-wide rounded px-1.5 py-0.5 shrink-0"
-                  style={{
-                    fontSize: "9px",
-                    color: "#92400E",
-                    background: "#FEF3C7",
-                    border: "1px solid #FCD34D",
-                  }}
-                >
-                  {authorityState.label}
-                </span>
-              )}
             </button>
           </BassResultDetailTooltip>
         );

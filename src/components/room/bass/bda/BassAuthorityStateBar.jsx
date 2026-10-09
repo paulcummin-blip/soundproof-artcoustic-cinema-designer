@@ -3,8 +3,8 @@
 //
 // PRESENTATION ONLY. It renders the state the shared authority resolved and
 // calls back for the single action that state needs — Calculate Bass
-// Performance, or Publish Current Assessment. It computes nothing, changes no
-// value, and holds no state of its own.
+// Performance, or Save Assessment. It computes nothing, changes no value, and
+// holds no state of its own.
 import React from "react";
 import { BASS_AUTHORITY_STATE } from "@/components/room/bass/bassAuthorityState";
 
@@ -13,13 +13,19 @@ const TONES = {
   [BASS_AUTHORITY_STATE.PUBLISHING]: { color: "#92400E", background: "#FEF3C7", border: "#FCD34D" },
   [BASS_AUTHORITY_STATE.PREVIEW_ONLY]: { color: "#92400E", background: "#FEF3C7", border: "#FCD34D" },
   [BASS_AUTHORITY_STATE.NEEDS_CALCULATION]: { color: "#92400E", background: "#FEF3C7", border: "#FCD34D" },
-  [BASS_AUTHORITY_STATE.CALCULATED_NOT_PUBLISHED]: { color: "#92400E", background: "#FEF3C7", border: "#FCD34D" },
+  [BASS_AUTHORITY_STATE.CALCULATED_NOT_PUBLISHED]: { color: "#3E4349", background: "#F8F8F7", border: "#DCDBD6" },
   [BASS_AUTHORITY_STATE.CALCULATING]: { color: "#3E4349", background: "#F8F8F7", border: "#DCDBD6" },
 };
 
+// The one attention tone: used only for the single status when something needs
+// attention, never repeated on the individual parameter results.
+const ATTENTION_TONE = { color: "#92400E", background: "#FEF3C7", border: "#FCD34D" };
+
 export default function BassAuthorityStateBar({ state = null, onPrimaryAction = null, primaryDisabled = false }) {
   if (!state?.label) return null;
-  const tone = TONES[state.code] || TONES[BASS_AUTHORITY_STATE.NEEDS_CALCULATION];
+  const tone = state.attention
+    ? ATTENTION_TONE
+    : (TONES[state.code] || TONES[BASS_AUTHORITY_STATE.NEEDS_CALCULATION]);
   const showAction = !!state.actionLabel && typeof onPrimaryAction === "function";
 
   return (

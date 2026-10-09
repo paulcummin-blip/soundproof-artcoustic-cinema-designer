@@ -7,18 +7,15 @@
 // [thumbnail]  Current Design                    [Change Speakers] [Change Layout]
 //              SUB3-12 ×2
 //              2 Subwoofers · Pair Layout
-//              ● Performance is current
 //
 // Lifecycle status is consumed from bassCalculationLifecycle — this component
 // does NOT derive lifecycle state independently.
 // ---------------------------------------------------------------------------
 
 import React from "react";
-import useSharedBassAuthorityState from "@/components/room/bass/useSharedBassAuthorityState";
-import BassStateBadge from "@/components/room/bass/BassStateBadge";
 import { Settings2, RefreshCw, CheckCircle2, AlertCircle, Loader2 } from "lucide-react";
 import { formatSubwooferSystemLabel } from "@/components/utils/subwooferDisplayLabel";
-import { deriveBassDisplayStatus, BASS_DISPLAY_ICON, BASS_LIFECYCLE_STATE } from "../bassCalculationLifecycle";
+import { BASS_DISPLAY_ICON, BASS_LIFECYCLE_STATE } from "../bassCalculationLifecycle";
 
 function LayoutThumbnail({ subwooferInstances, roomDims }) {
   const enabled = (Array.isArray(subwooferInstances) ? subwooferInstances : [])
@@ -101,7 +98,6 @@ export default function CurrentDesignBar({
   statusText = null,
   onChangeSpeakers, onChangeLayout,
 }) {
-  const { authorityState } = useSharedBassAuthorityState();
   const hasFront = frontCount > 0 && frontModel;
   const hasRear = rearCount > 0 && rearModel;
 
@@ -125,9 +121,6 @@ export default function CurrentDesignBar({
 
   const layout = deriveLayoutLabel(subwooferInstances);
 
-  // Lifecycle display from the sole authority — no independent derivation.
-  const display = deriveBassDisplayStatus(bassLifecycleState);
-
   return (
     <div className="flex items-center gap-3 rounded-lg border border-[#D9D5CE] bg-white px-4 py-3">
       <LayoutThumbnail subwooferInstances={subwooferInstances} roomDims={roomDims} />
@@ -141,9 +134,6 @@ export default function CurrentDesignBar({
             {layout.count} Subwoofer{layout.count > 1 ? "s" : ""} · {layout.layoutName}
           </div>
         )}
-        <div className="mt-1 flex items-center gap-1 text-[10px]" style={{ color: display.color }}>
-          <BassStateBadge state={authorityState} />
-        </div>
       </div>
       <div className="flex items-center gap-2">
         <button

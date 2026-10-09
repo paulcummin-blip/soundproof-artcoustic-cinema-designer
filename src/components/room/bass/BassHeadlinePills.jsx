@@ -6,7 +6,7 @@
 // and supporting value underneath. All four parameters split
 // "L2 · 112 dBC" into pill label "L2" and supporting text "112 dBC".
 // When the shown value is not the current authority, the shared state badge
-// (Preview only, Calculated — not published, …) appears beneath the pill.
+// (Preview only, Ready to save, Performance Current, …) appears beneath the pill.
 //
 // Publication-gated: only a canonically published completed result may be
 // presented as an official RP22 result. During calculation with a published

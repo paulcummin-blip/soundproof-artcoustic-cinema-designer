@@ -45,12 +45,14 @@ test('changed design needs calculation and retains prior evidence', () => {
   assert.equal(resolve({ ...current, completedBassAuthority:stale, durable }).code, 'needs_calculation');
   assert.equal(stale.contract.job.resultFingerprint, 'cal:a');
 });
-test('preflight and backend failure reasons are visible and safely retryable', () => {
+test('a blocked save is one status with a short reason, and stays retryable', () => {
   for (const status of ['not_ready','failed']) {
     const state=resolve({ ...current, publicationAttempt:{ status, fingerprint:'eng:a', message:'P9 is incomplete' } });
     assert.equal(state.code,'calculated_not_published');
-    assert.match(state.message,/P9 is incomplete/);
-    assert.equal(state.actionLabel,'Publish Current Assessment');
+    assert.equal(state.label,'Assessment needs attention');
+    assert.match(state.message,/P9 assessment needs updating/);
+    assert.doesNotMatch(state.message,/engineering_summary|parameter_index/);
+    assert.equal(state.actionLabel,'Save Assessment');
   }
 });
 test('publication refuses an earlier target while selected-target presentation advances', () => {

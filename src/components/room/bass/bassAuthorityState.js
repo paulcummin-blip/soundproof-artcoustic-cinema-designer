@@ -9,9 +9,10 @@
  *   PREVIEW ONLY              a previous result is retained while the design has
  *                             moved on — the values shown are a preview
  *   NEEDS CALCULATION         no result exists for the current design yet
- *   CALCULATED — NOT PUBLISHED the completed result is saved but the engineering
- *                             publication has not acknowledged it yet
- *   CURRENT                   the completed result is saved AND published
+ *   READY TO SAVE             the completed result is saved but the engineering
+ *                             publication has not acknowledged it yet — shown as
+ *                             "Assessment needs attention" when saving is blocked
+ *   PERFORMANCE CURRENT       the completed result is saved AND published
  *
  * This module reads state only. It changes no score, threshold, fingerprint or
  * calculation: it compares the SAME completion/fingerprint conditions the bass
@@ -47,9 +48,9 @@ export const BASS_AUTHORITY_COPY = Object.freeze({
     actionLabel: "Calculate Bass Performance",
   },
   [BASS_AUTHORITY_STATE.CALCULATED_NOT_PUBLISHED]: {
-    label: "Calculated — not published",
-    message: "Calculated but not published. Publish the current assessment so the Project Report can read it.",
-    actionLabel: "Publish Current Assessment",
+    label: "Ready to save",
+    message: "Calculated — save so reports and proposals can use it.",
+    actionLabel: "Save Assessment",
   },
   [BASS_AUTHORITY_STATE.PUBLISHING]: {
     label: "Publishing",
@@ -57,14 +58,44 @@ export const BASS_AUTHORITY_COPY = Object.freeze({
     actionLabel: null,
   },
   [BASS_AUTHORITY_STATE.CURRENT]: {
-    label: "Current",
+    label: "Performance Current",
     message: null,
     actionLabel: null,
   },
 });
 
+/**
+ * The one designer-facing status when saving is blocked: one label, one short
+ * explanation, and the same retry action as "Ready to save".
+ */
+export const BASS_AUTHORITY_BLOCKED_COPY = Object.freeze({
+  label: "Assessment needs attention",
+  actionLabel: "Save Assessment",
+});
+
+const PARAMETER_IN_REASON = /\bp(1[0-9]|2[01]|[1-9])\b/i;
+
+/**
+ * A short explanation for a blocked save. Internal field names
+ * (engineering_summary.p4, parameter_index.P4.level) are never shown — the
+ * parameter that needs attention is named instead.
+ */
+export function publicationBlockNote(attempt = null) {
+  const reasons = [
+    ...(attempt?.missing || []).flatMap((item) => [item?.key, item?.label, item?.detail]),
+    ...(attempt?.gates || []).filter((gate) => gate?.ok === false).map((gate) => gate?.detail),
+    attempt?.message,
+  ].filter((reason) => typeof reason === "string");
+  const match = reasons.join(" ").match(PARAMETER_IN_REASON);
+  return match
+    ? `P${match[1]} assessment needs updating.`
+    : "This assessment needs updating before it can be saved.";
+}
+
 const ATTEMPT = Object.freeze({
   QUEUED: "queued",
+  NOT_READY: "not_ready",
+  FAILED: "failed",
   PUBLISHING: "publishing",
   ACKNOWLEDGED: "acknowledged",
 });
@@ -142,18 +173,20 @@ export function resolveBassAuthorityState({
     if (attemptStatus === ATTEMPT.PUBLISHING) {
       return withCopy(BASS_AUTHORITY_STATE.PUBLISHING);
     }
-    // Saved, current, but the publication has not acknowledged it. Say exactly
-    // that instead of "out of date" — the values are correct, the publication
-    // is what is outstanding.
-    const copy = BASS_AUTHORITY_COPY[BASS_AUTHORITY_STATE.CALCULATED_NOT_PUBLISHED];
-    return {
-      code: BASS_AUTHORITY_STATE.CALCULATED_NOT_PUBLISHED,
-      label: copy.label,
-      message: matchingAttempt?.message
-        ? `${copy.message} ${matchingAttempt.message}`
-        : copy.message,
-      actionLabel: copy.actionLabel,
-    };
+    // Saving is blocked: ONE status, with ONE short explanation. The attempt's
+    // internal field names are never shown, and the status is not repeated on
+    // each parameter result.
+    if (attemptStatus === ATTEMPT.FAILED || attemptStatus === ATTEMPT.NOT_READY) {
+      return {
+        code: BASS_AUTHORITY_STATE.CALCULATED_NOT_PUBLISHED,
+        ...BASS_AUTHORITY_BLOCKED_COPY,
+        message: publicationBlockNote(matchingAttempt),
+        attention: true,
+      };
+    }
+    // Saved, current, but the publication has not acknowledged it yet: the values
+    // are correct, saving is what is outstanding.
+    return withCopy(BASS_AUTHORITY_STATE.CALCULATED_NOT_PUBLISHED);
   }
 
   // A previous result is retained while the design has moved on: the values on

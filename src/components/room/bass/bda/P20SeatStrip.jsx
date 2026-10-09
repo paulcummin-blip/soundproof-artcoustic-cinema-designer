@@ -17,13 +17,12 @@
 import React, { useEffect, useState } from "react";
 import { formatOfficialBassResults } from "@/components/room/bass/bassResultsPresentation";
 import useSharedBassAuthorityState from "@/components/room/bass/useSharedBassAuthorityState";
-import BassStateBadge from "@/components/room/bass/BassStateBadge";
 import { resolveP14TargetSelectionState } from "@/components/room/bass/p14TargetSelectionState";
 import SharedP19P20SeatResults from "@/components/room/bass/SharedP19P20SeatResults";
 import { useEffectiveBassLifecycleState } from "@/components/room/bass/bda/useEffectiveBassLifecycle";
 
 export default function P20SeatStrip() {
-  const { shared, authorityState } = useSharedBassAuthorityState();
+  const { shared } = useSharedBassAuthorityState();
   const [nowMs, setNowMs] = useState(Date.now());
   const active = shared.calculationInProgress || shared.bassLifecycleState === "stale_needs_recalculation";
 
@@ -69,12 +68,11 @@ export default function P20SeatStrip() {
         authorityStatus={shared.completedBassAuthority?.authorityStatus}
         p14TargetUnselected={p14Selection.noP14TargetSelected}
       />
-      <div className="flex items-center gap-2 text-[10px] font-medium text-[#625143]" aria-live="polite">
-        <BassStateBadge state={authorityState} />
-        {effectiveLifecycle === "failed" && shared.onRetry
-          ? <button type="button" onClick={shared.onRetry} className="font-semibold text-red-700 underline">{formatted.statusText}</button>
-          : null}
-      </div>
+      {effectiveLifecycle === "failed" && shared.onRetry ? (
+        <div className="flex items-center gap-2 text-[10px] font-medium text-[#625143]" aria-live="polite">
+          <button type="button" onClick={shared.onRetry} className="font-semibold text-red-700 underline">{formatted.statusText}</button>
+        </div>
+      ) : null}
     </div>
   );
 }

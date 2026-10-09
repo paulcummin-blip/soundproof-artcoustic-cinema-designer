@@ -5,7 +5,7 @@
  *
  * The publish action belongs to the publication effect that already owns it
  * (useEngineeringPublicationEffect). Surfaces that must be able to ASK for a
- * publish — the bass result band's "Publish Current Assessment" — read that
+ * publish — the bass result band's "Save Assessment" — read that
  * same callback here instead of creating a second publication path or a second
  * fingerprint computation.
  *

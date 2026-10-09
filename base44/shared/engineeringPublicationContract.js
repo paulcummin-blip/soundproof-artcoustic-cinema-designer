@@ -115,12 +115,16 @@ export function buildAtomicParameterIndex(publication) {
   for(let id=1;id<=21;id++) {
     const seats=summary?.project?.reportCounts?.seatResultsByParameter?.['p'+id] || [];
     const room=summary?.roomResultsByParameter?.[id];
-    const selected=(id===10 || id===20 || !room) ? chooseSeat(seats,id) : room;
+    // P4 is a seat-based parameter: the individual seat results are its authority,
+    // so a room-level P4 entry can never override completed seat results. The
+    // project summary is the existing canonical seat aggregation (chooseSeat).
+    const seatFirst=(id===4 && seats.length>0) || id===10 || id===20;
+    const selected=(seatFirst || !room) ? chooseSeat(seats,id) : room;
     const parameter=summary?.parameterAuthority?.['p'+id];
     const source=selected || (isExplicitNotApplicable(parameter) ? {
       ...parameter, applicable:false, level:'N/A', formatted:'N/A', value:null,
     } : null);
-    const scope=(id===10 || id===20 || !room) ? 'project' : id===19 ? 'rsp' : 'room';
+    const scope=(seatFirst || !room) ? 'project' : id===19 ? 'rsp' : 'room';
     const item=atomicRow(source,id,scope,publication);
     if (!item) continue;
     item.supporting_per_seat=seats.map(row => ({ ...atomicRow(row,id,'per-seat',publication), seat_id:row.seatId, row:row.row, column:row.column, priority:row.priority }));
