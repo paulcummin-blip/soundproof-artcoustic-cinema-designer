@@ -6,8 +6,9 @@
 //        arrangement uses the catalogue's named 1222 mm cabinet, that an
 //        explicit choice survives a screen change, and that the four TV presets
 //        resolve exactly as they did before — so existing projects are untouched.
-//        It also guards the approved 1222 mm artwork and the fact that both
-//        drawings resolve the variant through the ONE authority.
+//        It also guards both approved artworks (the 1222 mm and 1441 mm
+//        cabinets) and the fact that every drawing resolves the variant through
+//        the ONE authority.
 // ENGINEERING SCOPE  None of this touches SPL, RP22, impedance, aiming or the
 //        logical centre channel. TEST 9 asserts the C4-1's engineering data is
 //        byte-for-byte what it was.
@@ -37,7 +38,7 @@ import {
 } from '@/components/utils/frontStageModeAuthority';
 
 // ── Fixtures ───────────────────────────────────────────────────────────────
-const C41_LENGTHS = [1222, 1411, 1711, 1872, 2230];
+const C41_LENGTHS = [1222, 1411, 1441, 1711, 1872, 2230];
 
 const tv = (key, mm) => ({ tvPresetKey: key, tvWidthMm: mm, aspectRatio: '16:9' });
 const manualWh = (widthM, heightM) => ({
@@ -50,15 +51,19 @@ const lengthFor = (modelKey, screen, extra = {}) => resolveSoundbarCabinetLength
 const read = (rel) => fs.readFileSync(path.resolve(process.cwd(), rel), 'utf8');
 
 const faceIcons = read('src/components/report/SpeakerFaceIcons.jsx');
+const c41Artwork = read('src/components/report/C41ArtworkFaceIcons.jsx');
 const frontElevation = read('src/components/room/FrontElevation.jsx');
 const planLayer = read('src/components/room/rv/render/RvSpeakerLayer.jsx');
 const planIcons = read('src/components/room/rv/RenderPrimitives.jsx');
 
 // ── 1. The catalogue ──────────────────────────────────────────────────────
 
-test('TEST 1  The catalogue publishes five C4-1 cabinet lengths and names the dual-centre one', () => {
+test('TEST 1  The catalogue publishes six C4-1 cabinet lengths, names the dual-centre one, and lists 1441 mm', () => {
   assert.deepEqual(getSoundbarCabinetLengthsMm('c4-1'), C41_LENGTHS);
   assert.equal(getDualCentreCabinetLengthMm('c4-1'), 1222);
+  // 1441 mm is a catalogue length of its own — a new variant, never a copy of the
+  // 1411 mm row — and it changes nothing about the dual-centre requirement.
+  assert.ok(C41_LENGTHS.includes(1441), 'the 1441 mm cabinet is an available variant');
   // A catalogue product, not a new one: exactly one C4-1 row, no duplicates.
   assert.equal(MODELS.filter((m) => m.key === 'c4-1').length, 1);
   // The other TV-linked soundbars keep the lengths they already published.
@@ -91,6 +96,12 @@ test('TEST 3  The physical width decides, never the screen diagonal', () => {
   // screen behaviour, not a cabinet rule).
   assert.equal(lengthFor('c4-1', { aspectRatio: '16:9', tvWidthMm: 1250 }), 1222,
     'a 1250 mm screen is closest to the 1222 mm cabinet');
+
+  // The 1441 mm cabinet is reachable, and it is chosen for its own width: the
+  // 1411 mm cabinet is no longer substituted there.
+  assert.equal(lengthFor('c4-1', manualWh(1.441, 0.8106)), 1441);
+  assert.equal(lengthFor('c4-1', widthInches(56.73)), 1441);
+  assert.equal(nearestCabinetLengthMm(C41_LENGTHS, 1441), 1441);
 });
 
 test('TEST 4  Widths between variants pick the closest catalogue length', () => {
@@ -120,6 +131,8 @@ test('TEST 6  An explicitly selected length is preserved when the screen changes
   assert.equal(resolvePlacedCabinetLengthMm(chosen, tv('tv65', 1411)), 1711);
   // A value that is not a real catalogue variant is ignored, not honoured.
   assert.equal(resolvePlacedCabinetLengthMm({ model: 'c4-1', cabinetLengthMm: 1500 }, tv('tv65', 1411)), 1411);
+  // An explicitly chosen 1441 mm cabinet is honoured on any screen too.
+  assert.equal(resolvePlacedCabinetLengthMm({ model: 'c4-1', cabinetLengthMm: 1441 }, manualWh(2.4, 1.35)), 1441);
 });
 
 // ── 3. Dual Mono Centre — the 1222 mm variant ─────────────────────────────
@@ -175,10 +188,12 @@ test('TEST 9  The C4-1 engineering data is unchanged by the variant work', () =>
 
   // The variant only ever changes the cabinet's LENGTH.
   const at1222 = getSpeakerModelMeta('c4-1', null, { cabinetLengthMm: 1222 });
+  const at1441 = getSpeakerModelMeta('c4-1', null, { cabinetLengthMm: 1441 });
   const at2230 = getSpeakerModelMeta('c4-1', null, { cabinetLengthMm: 2230 });
   assert.equal(at1222.widthM, 1.222);
+  assert.equal(at1441.widthM, 1.441);
   assert.equal(at2230.widthM, 2.23);
-  [at1222, at2230].forEach((m) => {
+  [at1222, at1441, at2230].forEach((m) => {
     assert.equal(m.heightM, 0.12);
     assert.equal(m.depthM, 0.081);
     assert.equal(m.sensitivity_dB_1w1m, 98);
@@ -189,12 +204,12 @@ test('TEST 9  The C4-1 engineering data is unchanged by the variant work', () =>
 // ── 5. The approved 1222 mm artwork ───────────────────────────────────────
 
 test('TEST 10 The 1222 mm artwork is cropped to its ink and keeps the cabinet proportions', () => {
-  assert.ok(faceIcons.includes('export function C41_1222FaceIcon'), 'the approved artwork has its own icon');
-  assert.ok(faceIcons.includes('https://media.base44.com/images/public/6a1166c68ddc81e5ea2cdf6b/0103ea1cc_ChatGPTImage9Oct202610_47_24.png'));
+  assert.ok(c41Artwork.includes('export function C41_1222FaceIcon'), 'the approved artwork has its own icon');
+  assert.ok(c41Artwork.includes('https://media.base44.com/images/public/6a1166c68ddc81e5ea2cdf6b/0103ea1cc_ChatGPTImage9Oct202610_47_24.png'));
 
   // Measured from the source file: 2172 × 724 px, ink at x 45–2127, y 257–464.
   // That ink box is the viewBox, so the white page around the drawing is gone.
-  assert.ok(faceIcons.includes('viewBox="45 257 2083 208"'), 'the surrounding whitespace is cropped');
+  assert.ok(c41Artwork.includes('viewBox="45 257 2083 208"'), 'the surrounding whitespace is cropped');
 
   const inkAspect = 2083 / 208;
   const cabinetAspect = 1222 / 120;
@@ -253,7 +268,72 @@ test('TEST 14 Model, orientation and variant are restored on reopen', () => {
     assert.equal(footprint.orientation, 'vertical');
   });
 
-  // A single-centre installation re-resolves to the same variant too.
-  const screen = manualWh(1.222, 0.687);
-  assert.equal(lengthFor('c4-1', screen), lengthFor('c4-1', JSON.parse(JSON.stringify(screen))));
+  // A single-centre installation re-resolves to the same variant too: both the
+  // 1222 mm and the 1441 mm cabinet survive a save and reopen unchanged.
+  const screen1222 = manualWh(1.222, 0.687);
+  assert.equal(lengthFor('c4-1', screen1222), 1222);
+  assert.equal(lengthFor('c4-1', screen1222), lengthFor('c4-1', JSON.parse(JSON.stringify(screen1222))));
+
+  const screen1441 = manualWh(1.441, 0.8106);
+  assert.equal(lengthFor('c4-1', screen1441), 1441);
+  assert.equal(lengthFor('c4-1', screen1441), lengthFor('c4-1', JSON.parse(JSON.stringify(screen1441))));
+  // An explicitly stored 1441 mm choice is restored verbatim.
+  assert.equal(
+    resolvePlacedCabinetLengthMm(JSON.parse(JSON.stringify({ model: 'c4-1', cabinetLengthMm: 1441 })), screen1441),
+    1441,
+  );
+});
+
+// ── 8. The approved 1441 mm artwork ───────────────────────────────────────
+
+test('TEST 15 The 1222 mm artwork is unchanged by the 1441 mm addition', () => {
+  assert.ok(c41Artwork.includes('export function C41_1222FaceIcon'), 'the 1222 mm icon is still published');
+  assert.ok(c41Artwork.includes('https://media.base44.com/images/public/6a1166c68ddc81e5ea2cdf6b/0103ea1cc_ChatGPTImage9Oct202610_47_24.png'),
+    'the approved 1222 mm illustration is untouched');
+  assert.ok(c41Artwork.includes('viewBox="45 257 2083 208"'), 'the 1222 mm crop is untouched');
+  assert.ok(frontElevation.includes('if (isC41 && isC41_1222) return <C41_1222FaceIcon'),
+    'the 1222 mm cabinet still draws its own artwork');
+});
+
+test('TEST 16 The 1441 mm artwork is cropped to its ink and keeps the cabinet proportions', () => {
+  assert.ok(c41Artwork.includes('export function C41_1441FaceIcon'), 'the 1441 mm cabinet has its own icon');
+  assert.ok(c41Artwork.includes('https://media.base44.com/images/public/6a1166c68ddc81e5ea2cdf6b/40ad34db7_ChatGPTImage9Oct202610_49_42.png'),
+    'the approved illustration is the one referenced');
+
+  // Measured from the source file: 2167 × 726 px, ink at x 36–2130, y 275–444 —
+  // the same measurement basis as the 1222 mm artwork. That ink box is the
+  // viewBox, so the white page around the drawing is cropped away.
+  assert.ok(c41Artwork.includes('viewBox="36 275 2095 170"'), 'the surrounding whitespace is cropped');
+
+  const inkAspect = 2095 / 170;
+  const cabinetAspect = 1441 / 120;
+  assert.ok(Math.abs(inkAspect - cabinetAspect) / cabinetAspect < 0.03,
+    `the artwork is the 1441 × 120 mm cabinet itself (ink ${inkAspect.toFixed(3)} vs cabinet ${cabinetAspect.toFixed(3)})`);
+});
+
+test('TEST 17 Each C4-1 artwork is drawn for its own variant only', () => {
+  assert.ok(frontElevation.includes('const isC41_1441 = isC41 && Number(cabinetLengthMm) === 1441;'),
+    'the 1441 mm artwork is gated on the installed cabinet length');
+  assert.ok(frontElevation.includes('if (isC41 && isC41_1441) return <C41_1441FaceIcon'),
+    'the 1441 mm cabinet draws the approved artwork');
+  // The catalogue drawing remains the fallback for every other length.
+  assert.ok(frontElevation.includes('if (isC41) return <C41FaceIcon'));
+  // They are drawn through the one face-icon path, which the vertical orientation
+  // rotates — so a vertically mounted cabinet is turned, not redrawn.
+  assert.ok(frontElevation.includes('rotate(90 ${cx} ${cy})'));
+  // One catalogue row, no duplicate product entry, and no variant artwork left
+  // behind in the shared icon library.
+  assert.equal(MODELS.filter((m) => m.key === 'c4-1').length, 1);
+  assert.ok(!faceIcons.includes('C41_1441FaceIcon'), 'the icon library stays free of variant artwork');
+});
+
+test('TEST 18 Dual Mono Centre still defaults to the 1222 mm cabinet with 1441 mm available', () => {
+  assert.equal(getDualCentreCabinetLengthMm('c4-1'), 1222);
+  [tv('tv65', 1411), tv('tv83', 1872), tv('tv100', 2230), manualWh(1.441, 0.8106), manualWh(2.4, 1.35)].forEach((screen) => {
+    assert.equal(lengthFor('c4-1', screen, { dualCentre: true }), 1222,
+      'a 1441 mm screen never changes the dual-centre cabinet');
+  });
+  assert.equal(defaultCentreCabinetOrientation('c4-1', 'tv100'), 'vertical');
+  assert.equal(CENTRE_CABINET_ROLES.left, 'FCL');
+  assert.equal(CENTRE_CABINET_ROLES.right, 'FCR');
 });

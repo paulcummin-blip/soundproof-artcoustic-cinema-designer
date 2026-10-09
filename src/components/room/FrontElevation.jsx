@@ -1,7 +1,8 @@
 import React, { useMemo, useRef, useEffect, useCallback, useState } from "react";
 import { getSpeakerModelMeta, normaliseModelKey } from "@/components/models/speakers/registry";
 import { isRenderableSpeaker } from "@/components/room/rv/RenderPrimitives";
-import { Q43FaceIcon, Q45FaceIcon, Q85FaceIcon, Q63FaceIcon, Evolve11FaceIcon, Evolve21FaceIcon, Evolve31FaceIcon, Evolve42FaceIcon, Evolve63FaceIcon, Evolve84FaceIcon, C1FaceIcon, C41FaceIcon, C41_1222FaceIcon, MultiSoundbarArtworkFaceIcon, MultiSoundbar77ArtworkFaceIcon, MultiSoundbar65ArtworkFaceIcon, MultiSoundbar100ArtworkFaceIcon } from "@/components/report/SpeakerFaceIcons";
+import { Q43FaceIcon, Q45FaceIcon, Q85FaceIcon, Q63FaceIcon, Evolve11FaceIcon, Evolve21FaceIcon, Evolve31FaceIcon, Evolve42FaceIcon, Evolve63FaceIcon, Evolve84FaceIcon, C1FaceIcon, C41FaceIcon, MultiSoundbarArtworkFaceIcon, MultiSoundbar77ArtworkFaceIcon, MultiSoundbar65ArtworkFaceIcon, MultiSoundbar100ArtworkFaceIcon } from "@/components/report/SpeakerFaceIcons";
+import { C41_1222FaceIcon, C41_1441FaceIcon } from "@/components/report/C41ArtworkFaceIcons";
 import { computeSpeakerAnnotation, speakerBBox } from "@/components/room/frontElevationAnnotationLayout";
 import { resolveEffectiveViewableDimsM, isManualOverrideActive } from "@/components/models/screen/resolveEffectiveScreen";
 import { detectFrontStageMode } from "@/components/roomdesigner/utils/lcrHeightAuthority";
@@ -539,9 +540,10 @@ export default function FrontElevation({ dimensions, screen, placedSpeakers = []
     const isEv63 = !isEv31 && mk.includes("evolve-6-3");
     const isEv84 = mk.includes("evolve-8-4");
     const isC41 = mk.includes("c4-1");
-    // The 1222 mm C4-1 cabinet has its own approved artwork; every other C4-1
-    // length keeps the existing drawing.
+    // The 1222 mm and 1441 mm C4-1 cabinets each have their own approved
+    // artwork; every other C4-1 length keeps the existing drawing.
     const isC41_1222 = isC41 && Number(cabinetLengthMm) === 1222;
+    const isC41_1441 = isC41 && Number(cabinetLengthMm) === 1441;
     // The C-1 is its own product ("c-1"); "c4-1" never contains that key.
     const isC1 = mk.includes("c-1");
     const isMultiSoundbar = mk.includes("multi-lcr") || mk.includes("multi-mono");
@@ -603,10 +605,11 @@ export default function FrontElevation({ dimensions, screen, placedSpeakers = []
 
     const renderFaceIcon = () => {
       if (isC1) return <C1FaceIcon x={adjustedX} y={adjustedY} width={adjustedW} height={adjustedH} />;
-      // Both C4-1 artworks are drawn at the cabinet's installed footprint (and
+      // Every C4-1 artwork is drawn at the cabinet's installed footprint (and
       // rotated with the cabinet when it is mounted vertically) — never
       // stretched onto another cabinet's shape.
       if (isC41 && isC41_1222) return <C41_1222FaceIcon x={adjustedX} y={adjustedY} width={adjustedW} height={adjustedH} />;
+      if (isC41 && isC41_1441) return <C41_1441FaceIcon x={adjustedX} y={adjustedY} width={adjustedW} height={adjustedH} />;
       if (isC41) return <C41FaceIcon x={adjustedX} y={adjustedY} width={adjustedW} height={adjustedH} />;
       if (isQ43) return <Q43FaceIcon x={adjustedX} y={adjustedY} width={adjustedW} height={adjustedH} />;
       if (isQ45) return <Q45FaceIcon x={adjustedX} y={adjustedY} width={adjustedW} height={adjustedH} />;

@@ -210,40 +210,9 @@ export function C41FaceIcon({ x, y, width, height }) {
   );
 }
 
-/**
- * Artcoustic C4-1 soundbar — the 1222 mm cabinet variant.
- *
- * The approved front-face line artwork: black lines on a white page. The ink
- * occupies x 45–2127, y 257–464 of the 2172 × 724 px source (measured from the
- * file itself), so the viewBox is that ink box: the surrounding white page is
- * cropped away and the drawing fills the cabinet's own catalogue footprint edge
- * to edge. The drawing IS the 1222 × 120 mm cabinet — 10.18 : 1 against the ink
- * box's 10.01 : 1 — so filling that footprint adjusts it by under 2% and never
- * stretches it onto a different cabinet's shape. It is used only for the
- * 1222 mm variant; the other C4-1 lengths keep their own artwork.
- */
-export function C41_1222FaceIcon({ x, y, width, height }) {
-  return (
-    <svg
-      x={x}
-      y={y}
-      width={width}
-      height={height}
-      viewBox="45 257 2083 208"
-      xmlns="http://www.w3.org/2000/svg"
-      preserveAspectRatio="none"
-    >
-      <image
-        x="45"
-        y="257"
-        width="2083"
-        height="208"
-        href="https://media.base44.com/images/public/6a1166c68ddc81e5ea2cdf6b/0103ea1cc_ChatGPTImage9Oct202610_47_24.png"
-        preserveAspectRatio="none"
-      />
-    </svg>
-  );
-}
+// The approved C4-1 cabinet artwork (the 1222 mm and 1441 mm variants) now lives
+// in C41ArtworkFaceIcons.jsx, one icon per illustrated cabinet length. The C4-1's
+// other lengths keep the catalogue artwork below.
 
 /**
  * Artcoustic C-1 centre cabinet — catalogue 400 × 120 mm.
