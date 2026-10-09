@@ -589,6 +589,14 @@ export function computeAllSeatSplMetrics({
             value: splValue,
             formatted: `${splValue.toFixed(1)} dB`,
             theoretical: Number.isFinite(splTheoretical) ? splTheoretical : null,
+            // The SPL this speaker's own geometry, power and model produce, before
+            // any flat arrangement allowance. Equal to `value` for every ordinary
+            // speaker; for a dual-centre virtual centre it is exactly what a
+            // conventional centre speaker at that same position returns, so
+            // seat-to-seat comparisons (P4) read THIS and are never displaced by the
+            // constant +4 dB pair allowance. Capability surfaces (P12, the centre
+            // SPL cards) keep reading `value`.
+            splBeforeArrangementAllowanceDb: Number.isFinite(splResult?.spl) ? splResult.spl : null,
             debug: {
               ...(splResult?.debug || {}),
               role: spk.role,

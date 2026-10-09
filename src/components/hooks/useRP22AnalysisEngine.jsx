@@ -30,6 +30,7 @@ import {
 } from "@/components/utils/rp22BassMetrics";
 import { evaluateCanonicalP2 } from "@/components/utils/rp22/canonicalP2Authority";
 import { computeP10RspNormalisedSpread } from "@/components/utils/rp22/p10RspNormalisation";
+import { p4ScreenChannelDeltaDb } from "@/components/utils/rp22/p4ScreenChannelAuthority";
 import { p7WholeDegrees } from "@/components/utils/rp22/p7DisplayAuthority";
 import { resolveRp22DesignValue } from "@/components/utils/rp22/resolveRp22DesignValue";
 import { formatSplDisplay } from "@/components/utils/splDisplayFormatter";
@@ -1379,7 +1380,7 @@ export const useRP22AnalysisEngine = ({ placedSpeakers, seatingPositions, dimens
         }
       }
 
-      // P4 - Max SPL difference between screen speakers
+      // P4 - Max seat SPL difference between screen speakers
       if (seatSplMetrics) {
         const seatSpl = getSeatSplMetrics(seatSplMetrics, seatId);
         if (seatSpl?.screen) {

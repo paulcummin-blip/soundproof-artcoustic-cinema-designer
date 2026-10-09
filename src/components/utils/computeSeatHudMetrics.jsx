@@ -12,6 +12,7 @@ import {
 } from "@/components/utils/seatMetrics";
 import { getSeatSplMetrics } from "@/components/utils/spl/centralSplEngine";
 import { computeP6Authority } from "@/components/utils/rp22/canonicalP6Authority";
+import { p4ScreenChannelDeltaDb } from "@/components/utils/rp22/p4ScreenChannelAuthority";
 import { rp23LevelForAngleDeg, rp23DisplayAngleDeg } from '@/components/utils/viewingAngleUtils';
 // Overhead acoustic-axis geometry — the SAME authority the P17 engine uses, so the seat HUD
 // and the graded result can never disagree on where a ceiling speaker's axis points.
@@ -163,20 +164,11 @@ export function computeSeatHudMetrics({
   // Get SPL data for this seat
   const seatSplData = getSeatSplMetrics(allSeatSplMetrics, seat.id);
 
-  // Helper for pairwise delta
-  const maxPairwiseDelta = (values) => {
-    if (!values || values.length < 2) return null;
-    let maxDelta = 0;
-    for (let i = 0; i < values.length; i++) {
-      for (let j = i + 1; j < values.length; j++) {
-        const delta = Math.abs(values[i] - values[j]);
-        if (delta > maxDelta) maxDelta = delta;
-      }
-    }
-    return maxDelta;
-  };
-
   // --- P4 ---
+  // Shared P4 input authority: the three logical screen channels only (a
+  // dual-centre pair is ONE FC, never FCL/FCR as extra channels), and the centre
+  // contributes its own SPL without the flat dual-centre arrangement allowance,
+  // which is a capability allowance and not a seat-to-seat propagation difference.
   const lcrRoles = new Set(['FL', 'FC', 'FR', 'L', 'C', 'R']);
   const placedLCR = (placedSpeakers || []).filter(sp => {
     const canon = getCanonicalRole(sp.role);
@@ -184,10 +176,7 @@ export function computeSeatHudMetrics({
   });
 
   if (placedLCR.length >= 2 && seatSplData?.screen) {
-    const lcrSplValues = Object.values(seatSplData.screen)
-      .map(s => s.value)
-      .filter(Number.isFinite);
-    const valueDb = maxPairwiseDelta(lcrSplValues);
+    const valueDb = p4ScreenChannelDeltaDb(seatSplData.screen);
     if (Number.isFinite(valueDb)) {
       metrics.rp22.p4 = {
         valueDb,

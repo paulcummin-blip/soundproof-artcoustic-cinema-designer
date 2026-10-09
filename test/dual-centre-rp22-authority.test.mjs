@@ -101,3 +101,38 @@ test('conventional minimum-system eligibility is unchanged',()=>{
  assert.equal(hasMinimumSystemForAsdr([...unchanged,single],bassState),true);
  assert.equal(hasMinimumSystemForAsdr(unchanged,bassState),false);
 });
+
+import { p4ScreenChannelDeltaDb, P4_SCREEN_CHANNELS } from '@/components/utils/rp22/p4ScreenChannelAuthority';
+// ACCEPTANCE (P4): a conventional centre and a dual centre sharing the same
+// virtual acoustic-centre position must give IDENTICAL P4 at EVERY seat. Both
+// present one logical FC at the same position, through the same P4 methodology
+// and RSP normalisation — so the pair is never two independent channels and the
+// flat +4 dB pair allowance never reaches P4.
+const eightSeats = Array.from({length:8},(_,i)=>({id:`seat-${i+1}`,...point(0.6+(i%4)*1.6,3+Math.floor(i/4)*1.6)}));
+const mapsOn = (seatList,speakers) => computeAllSeatSplMetrics({
+  seats:seatList, placedSpeakers:speakers, getCanonicalRole:r=>r,
+  getEffectiveSplInputs:()=>({powerW:100,radiationMode:'half-space'}),
+  getModelDimsM:resolveSpeakerSplMeta, mlpPoint:point(2.5,3.5),
+  widthM:5,lengthM:6,heightM:2.4
+});
+test('P4 is identical for a conventional centre and a dual centre at the same centre position, all eight seats',()=>{
+ const dual=mapsOn(eightSeats,[...unchanged,...pair]);
+ const conventional=mapsOn(eightSeats,[...unchanged,single]);
+ for(const seat of eightSeats){
+  const a=p4ScreenChannelDeltaDb(getSeatSplMetrics(dual,seat.id).screen);
+  const b=p4ScreenChannelDeltaDb(getSeatSplMetrics(conventional,seat.id).screen);
+  assert.ok(Number.isFinite(a));
+  near(a,b);
+  assert.equal(resolveRp22DesignValue(4,a),resolveRp22DesignValue(4,b));
+ }
+});
+test('P4 compares exactly the three logical screen channels',()=>{
+ assert.deepEqual([...P4_SCREEN_CHANNELS],['FL','FC','FR']);
+ assert.deepEqual(Object.keys(getSeatSplMetrics(maps([...unchanged,...pair]),'mlp').screen).sort(),['FC','FL','FR']);
+});
+test('the +4 dB pair allowance stays a capability allowance and never enters P4',()=>{
+ const dual=getSeatSplMetrics(maps([...unchanged,...pair]),'mlp').screen;
+ const conventional=getSeatSplMetrics(maps([...unchanged,single]),'mlp').screen;
+ near(dual.FC.value-dual.FC.splBeforeArrangementAllowanceDb,DUAL_CENTRE_SPL_GAIN_DB);
+ near(dual.FC.splBeforeArrangementAllowanceDb,conventional.FC.value);
+});

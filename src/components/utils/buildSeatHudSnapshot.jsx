@@ -6,6 +6,7 @@
 
 import { getSeatSplMetrics } from '@/components/utils/spl/centralSplEngine';
 import { computeP6Authority } from '@/components/utils/rp22/canonicalP6Authority';
+import { p4ScreenChannelDeltaDb } from '@/components/utils/rp22/p4ScreenChannelAuthority';
 import { getSpeakerModelMeta } from '@/components/models/speakers/registry';
 import { 
   metricP1_nearestWallM, 
@@ -59,19 +60,6 @@ const getCanonicalRole = (role) => {
   const map = { SL:'SL',LS:'SL', SR:'SR',RS:'SR', SBL:'SBL',SBR:'SBR', LW:'LW',RW:'RW', FL:'FL',L:'FL', FC:'FC',C:'FC', FR:'FR',R:'FR' };
   const r = String(role || '').toUpperCase();
   return map[r] || r;
-};
-
-// Helper: max pairwise delta
-const maxPairwiseDelta = (values) => {
-  if (!values || values.length < 2) return null;
-  let maxDelta = 0;
-  for (let i = 0; i < values.length; i++) {
-    for (let j = i + 1; j < values.length; j++) {
-      const delta = Math.abs(values[i] - values[j]);
-      if (delta > maxDelta) maxDelta = delta;
-    }
-  }
-  return maxDelta;
 };
 
 // Helper: convert full included angle to half-angle (±off-axis), rounded up
@@ -512,12 +500,12 @@ export function buildSeatHudSnapshot({
   }
 
   // --- Compute P4: Max SPL difference between screen speakers ---
+  // Shared P4 input authority: the three logical screen channels only (a
+  // dual-centre pair is ONE FC, never FCL/FCR as extra channels), and the centre
+  // contributes its own SPL without the flat dual-centre arrangement allowance,
+  // which is a capability allowance and not a seat-to-seat propagation difference.
   if (!engineSeatRp22?.[4]) {
-    const lcrSplValues = Object.values(seatSplData?.screen || {})
-      .map(s => s?.value)
-      .filter(Number.isFinite);
-
-    const valueDb = maxPairwiseDelta(lcrSplValues);
+    const valueDb = p4ScreenChannelDeltaDb(seatSplData?.screen);
 
     if (Number.isFinite(valueDb)) {
       data.rp22.p4 = {
