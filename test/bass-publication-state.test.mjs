@@ -12,8 +12,9 @@ const current = {
 };
 const acknowledged = { status: 'acknowledged', fingerprint: 'eng:a' };
 const durable = {
-  version: { id: 'version:a', project_id: 'project:a', published_fingerprint: 'eng:a' },
-  publication: { engineering_fingerprint: 'eng:a', provenance: { bass_fingerprint: 'cal:a' } },
+  // Actual readPublishedEngineering response: version contains id, not project_id.
+  version: { id: 'version:a', published_fingerprint: 'eng:a' },
+  publication: { engineering_fingerprint: 'eng:a', provenance: { bass_fingerprint: 'cal:a' }, report_snapshot: { report_project: { project_id:'project:a', version_id:'version:a' } } },
   acknowledgement: { durably_published: true },
 };
 test('completed bass without publication is calculated-not-published', () => assert.equal(resolve(current).code, 'calculated_not_published'));
