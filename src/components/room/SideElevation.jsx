@@ -14,6 +14,13 @@ import { resolveEffectiveViewableDimsM } from "@/components/models/screen/resolv
 import SpeakerInfoTooltip from "@/components/room/speakerInfo/SpeakerInfoTooltip";
 import { useSpeakerInfoTooltip } from "@/components/room/speakerInfo/useSpeakerInfoTooltip";
 import { buildSpeakerInfo } from "@/components/room/speakerInfo/speakerInfoModel";
+import { isCentreCabinetRole } from "@/components/utils/frontStageModeAuthority";
+import {
+  resolveCentreCabinetSideProjections,
+  groupCoincidentSideProjections,
+} from "@/components/utils/dualCentreSideProjection";
+import SideViewCentreCabinets from "@/components/room/dualCentre/SideViewCentreCabinets";
+import SideViewSubwoofers from "@/components/room/sideview/SideViewSubwoofers";
 
 // ---------------------------------------------------------------------------
 // SideElevation – static read-only engineering drawing
@@ -211,6 +218,10 @@ export default function SideElevation({
       .filter(s => {
         if (!Number.isFinite(s?.position?.y) || !Number.isFinite(s?.position?.z)) return false;
         const role = String(s.role || '').trim().toUpperCase();
+        // The dual-centre centre cabinets are drawn once, as a projected side
+        // profile from the shared projection authority — never as a generic
+        // marker, and never on only one wall.
+        if (isCentreCabinetRole(role)) return false;
         const lcrRoles = new Set(['FL', 'FC', 'FR', 'L', 'C', 'R']);
         // LCR speakers are front-wall — always include them (shown faintly)
         if (lcrRoles.has(role)) return true;
@@ -228,6 +239,22 @@ export default function SideElevation({
         z: s.position.z,
       }));
   }, [resolvedSpeakers, wall]);
+
+  // --- Dual-centre centre cabinets: projected from the SAME geometry the Plan
+  // View places them by — the installed footprint (orientation-aware), the front
+  // -wall lock and the live aim angle — so no view can show a different
+  // installation. Empty for every other front stage, so a conventional single
+  // centre and the existing FL/FR arrangement are untouched.
+  const dualCentreGroups = useMemo(
+    () => groupCoincidentSideProjections(resolveCentreCabinetSideProjections({
+      placedSpeakers: resolvedSpeakers,
+      mlpPoint,
+      tvPresetKey: screen?.tvPresetKey || null,
+      appState,
+    })),
+    [resolvedSpeakers, mlpPoint, screen?.tvPresetKey, appState],
+  );
+  const hasDualCentreCabinets = dualCentreGroups.length > 0;
 
   // Rear-wall surround roles (overlap in side elevation)
   const REAR_ROLES = new Set(['SBL','SBR','SCL','SCR','SC']);
@@ -630,7 +657,9 @@ export default function SideElevation({
             // Side projection preserves the product's Y/Z position and cabinet depth/height.
             // Always show FC when present, plus the main speaker on the viewed wall.
             const visibleRoles = new Set();
-            if (hasFC) visibleRoles.add('FC');
+            // In the dual-centre mode the centre channel is carried by the two
+            // physical cabinets, so no conventional centre cabinet is drawn.
+            if (hasFC && !hasDualCentreCabinets) visibleRoles.add('FC');
             if (wall === 'right' && hasFR) visibleRoles.add('FR');
             if (wall === 'left' && hasFL) visibleRoles.add('FL');
 
@@ -683,154 +712,44 @@ export default function SideElevation({
             );
           })()}
 
-          {/* Front subwoofers — side profile, sourced from frontSubs (same as FrontElevation / Plan View) */}
-          {(() => {
-            const safeSubs = Array.isArray(frontSubs) ? frontSubs.filter((s) => s?.enabled !== false) : [];
-            if (!safeSubs.length) return null;
-            const isDraggingFront = liveSubDrag?.group === 'front';
-            return (
-              <g opacity={0.88}>
-                {safeSubs.map((sub, i) => {
-                  const orientation = sub?.orientation || frontSubsCfg?.orientation;
-                  const meta = getSpeakerModelMeta(sub?.model, orientation) || {};
-                  const subHeightM = Number(meta.heightM) > 0 ? Number(meta.heightM) : 0.40;
-                  const subDepthM  = Number(meta.depthM)  > 0 ? Number(meta.depthM)  : 0.35;
-                  const subCentreY = Number.isFinite(sub?.position?.y) ? Number(sub.position.y) : 0.01;
-                  const frontX = rx(subCentreY - subDepthM / 2);
-                  const backX  = rx(subCentreY + subDepthM / 2);
-                  const svgW   = Math.max(4, backX - frontX);
-                  const staticBottom = Number.isFinite(sub?.bottomHeightM) ? sub.bottomHeightM
-                    : Number.isFinite(sub?.position?.z) ? sub.position.z - subHeightM / 2
-                    : 0;
-                  const bottomZ = isDraggingFront ? liveSubDrag.liveBottomHeightM : staticBottom;
-                  const topZ   = bottomZ + subHeightM;
-                  const svgTop = rz(topZ);
-                  const svgBot = rz(bottomZ);
-                  const svgH   = Math.max(4, svgBot - svgTop);
-                  const label  = `SUB${i + 1}`;
-                  const canDrag = !!onFrontSubHeightChange;
-                  return (
-                    <g key={`fsub-${i}`}
-                      onMouseDown={canDrag ? (e) => handleSubMouseDown(e, 'front', staticBottom, subHeightM) : undefined}
-                      style={{ cursor: canDrag ? 'ns-resize' : 'default' }}
-                      {...speakerInfo.bind(() => ({
-                        ...buildSpeakerInfo({
-                          role: label,
-                          model: sub?.model,
-                          acousticCentreZ_m: bottomZ + subHeightM / 2,
-                          orientationOrPreset: orientation,
-                          orientation,
-                          extras: [Number.isFinite(bottomZ) ? `Bottom height AFF: ${Math.round(bottomZ * 100)} cm` : null],
-                        }),
-                        exclusions: [],
-                      }))}>
-                      <rect
-                        x={frontX} y={svgTop}
-                        width={svgW} height={svgH}
-                        fill="#fff" stroke="#4A4540" strokeWidth={0.9} rx={1} />
-                      {/* Front face baffle line */}
-                      <line
-                        x1={frontX} y1={svgTop}
-                        x2={frontX} y2={svgBot}
-                        stroke="#4A4540" strokeWidth={1.4} />
-                      <text
-                        x={frontX - 4} y={(svgTop + svgBot) / 2 + 3}
-                        textAnchor="end" fontSize={6}
-                        fill={LABEL_COLOR} fontWeight={600}>
-                        {label}
-                      </text>
-                      {/* Subwoofer dimensions and bottom height are read on hover
-                          or tap in the speaker information card. */}
-                      {canDrag && (
-                        <rect
-                          x={frontX - 7} y={svgTop - 7}
-                          width={svgW + 14} height={svgH + 14}
-                          fill="transparent" pointerEvents="all"
-                          style={{ cursor: 'ns-resize' }}
-                          onMouseDown={(e) => handleSubMouseDown(e, 'front', staticBottom, subHeightM)}
-                        />
-                      )}
-                    </g>
-                  );
-                })}
-              </g>
-            );
-          })()}
+          {/* Dual-centre centre cabinets — the pair projected from the physical
+              installation: installed depth rotated by each cabinet's own aim, at
+              its stored acoustic-centre height, locked to the front wall. Where
+              the two projections coincide they are drawn once, labelled
+              "FCL / FCR". */}
+          <SideViewCentreCabinets
+            groups={dualCentreGroups}
+            rx={rx}
+            rz={rz}
+            bindSpeakerInfo={(group) => speakerInfo.bind(() => ({
+              ...buildSpeakerInfo({
+                role: group.label,
+                model: group.model,
+                acousticCentreZ_m: group.zM,
+                cabinetWidth_m: group.widthM,
+                cabinetHeight_m: group.heightM,
+                orientation: group.orientation,
+              }),
+              exclusions: [],
+            }))}
+          />
 
-          {/* Rear subwoofers — side profile, mirroring front sub style, against rear wall */}
-          {(() => {
-            const safeRearSubs = Array.isArray(rearSubs) ? rearSubs.filter((s) => s?.enabled !== false) : [];
-            if (!safeRearSubs.length) return null;
-            const isDraggingRear = liveSubDrag?.group === 'rear';
-            return (
-              <g opacity={0.88}>
-                {safeRearSubs.map((sub, i) => {
-                  const orientation = sub?.orientation || rearSubsCfg?.orientation;
-                  const meta = getSpeakerModelMeta(sub?.model, orientation) || {};
-                  const subHeightM = Number(meta.heightM) > 0 ? Number(meta.heightM) : 0.40;
-                  const subDepthM  = Number(meta.depthM)  > 0 ? Number(meta.depthM)  : 0.35;
-                  const subCentreY = Number.isFinite(sub?.position?.y)
-                    ? Number(sub.position.y)
-                    : roomL - subDepthM / 2;
-                  const frontX = rx(subCentreY - subDepthM / 2);
-                  const backX  = rx(subCentreY + subDepthM / 2);
-                  const svgW   = Math.max(4, backX - frontX);
-                  const staticBottom = Number.isFinite(sub?.bottomHeightM) ? sub.bottomHeightM
-                    : Number.isFinite(sub?.position?.z) ? sub.position.z - subHeightM / 2
-                    : 0;
-                  const bottomZ = isDraggingRear ? liveSubDrag.liveBottomHeightM : staticBottom;
-                  const topZ   = bottomZ + subHeightM;
-                  const svgTop = rz(topZ);
-                  const svgBot = rz(bottomZ);
-                  const svgH   = Math.max(4, svgBot - svgTop);
-                  const label  = `RSUB${i + 1}`;
-                  const canDrag = !!onRearSubHeightChange;
-                  return (
-                    <g key={`rsub-${i}`}
-                      onMouseDown={canDrag ? (e) => handleSubMouseDown(e, 'rear', staticBottom, subHeightM) : undefined}
-                      style={{ cursor: canDrag ? 'ns-resize' : 'default' }}
-                      {...speakerInfo.bind(() => ({
-                        ...buildSpeakerInfo({
-                          role: label,
-                          model: sub?.model,
-                          acousticCentreZ_m: bottomZ + subHeightM / 2,
-                          orientationOrPreset: orientation,
-                          orientation,
-                          extras: [Number.isFinite(bottomZ) ? `Bottom height AFF: ${Math.round(bottomZ * 100)} cm` : null],
-                        }),
-                        exclusions: [],
-                      }))}>
-                      <rect
-                        x={frontX} y={svgTop}
-                        width={svgW} height={svgH}
-                        fill="#fff" stroke="#4A4540" strokeWidth={0.9} rx={1} />
-                      {/* Front face baffle line */}
-                      <line
-                        x1={frontX} y1={svgTop}
-                        x2={frontX} y2={svgBot}
-                        stroke="#4A4540" strokeWidth={1.4} />
-                      <text
-                        x={frontX - 4} y={(svgTop + svgBot) / 2 + 3}
-                        textAnchor="end" fontSize={6}
-                        fill={LABEL_COLOR} fontWeight={600}>
-                        {label}
-                      </text>
-                      {/* Dimensions read on hover or tap instead of being drawn. */}
-                      {canDrag && (
-                        <rect
-                          x={frontX - 7} y={svgTop - 7}
-                          width={svgW + 14} height={svgH + 14}
-                          fill="transparent" pointerEvents="all"
-                          style={{ cursor: 'ns-resize' }}
-                          onMouseDown={(e) => handleSubMouseDown(e, 'rear', staticBottom, subHeightM)}
-                        />
-                      )}
-                    </g>
-                  );
-                })}
-              </g>
-            );
-          })()}
+          {/* Front and rear subwoofer side profiles — extracted component,
+              behaviour, geometry and styling unchanged. */}
+          <SideViewSubwoofers
+            frontSubs={frontSubs}
+            frontSubsCfg={frontSubsCfg}
+            rearSubs={rearSubs}
+            rearSubsCfg={rearSubsCfg}
+            rx={rx}
+            rz={rz}
+            roomL={roomL}
+            liveSubDrag={liveSubDrag}
+            onFrontSubHeightChange={onFrontSubHeightChange}
+            onRearSubHeightChange={onRearSubHeightChange}
+            handleSubMouseDown={handleSubMouseDown}
+            speakerInfo={speakerInfo}
+          />
 
           {/* Doors / Windows */}
           {openingEls.map((el, i) => {
