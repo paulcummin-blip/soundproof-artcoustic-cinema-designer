@@ -9,6 +9,7 @@
 import { useSharedBassResults } from "@/components/room/bass/bassResultsStore";
 import { usePublicationAttempt } from "@/components/engineering/publicationAcknowledgementStore";
 import { resolveBassAuthorityState } from "@/components/room/bass/bassAuthorityState";
+import { useEffectiveBassLifecycleState } from "@/components/room/bass/bda/useEffectiveBassLifecycle";
 
 export default function useSharedBassAuthorityState() {
   const shared = useSharedBassResults();
@@ -17,13 +18,18 @@ export default function useSharedBassAuthorityState() {
     shared?.versionId || null,
   );
 
+  const effectiveLifecycle = useEffectiveBassLifecycleState(shared?.scopeId, shared?.versionId, shared?.bassLifecycleState);
+  const publication = shared?.engineeringPublication;
   return {
     shared,
     publicationAttempt,
     authorityState: resolveBassAuthorityState({
       completedBassAuthority: shared?.completedBassAuthority,
       publicationAttempt,
-      lifecycleState: shared?.bassLifecycleState,
+      engineeringFingerprint: publication?.fingerprint,
+      publicationBassFingerprint: publication?.bassFingerprint,
+      durable: publication?.durable,
+      lifecycleState: effectiveLifecycle,
       calculationInProgress: shared?.calculationInProgress,
       placementPreviewActive: shared?.placementPreviewActive,
     }),
