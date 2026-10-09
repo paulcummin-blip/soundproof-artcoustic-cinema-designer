@@ -1,0 +1,864 @@
+{
+  "_note": "Frozen evidence slice for Marquee Home, version 'Level 4 version' — extracted from the published engineering publication (eng:v1:bcd7564a7c3136f8) and the saved design state. Values are copied verbatim; nothing is recomputed.",
+  "project": {
+    "name": "Marquee Home",
+    "client_name": "",
+    "project_reference": "34 AR",
+    "dolby_config": "9.1.6",
+    "seven_bed_layout_type": "rears",
+    "screen_size": 170,
+    "aspect_ratio": "2.35:1"
+  },
+  "roomDims": {
+    "widthM": 5.18,
+    "lengthM": 7.29,
+    "heightM": 2.8
+  },
+  "seatingPositions": [
+    {
+      "id": "seat-r1-c1",
+      "rowNumber": 1,
+      "x": 1.69,
+      "y": 3.780110153632747,
+      "z": 1.2
+    },
+    {
+      "id": "seat-r1-c2",
+      "rowNumber": 1,
+      "x": 2.29,
+      "y": 3.780110153632747,
+      "z": 1.2
+    },
+    {
+      "id": "seat-r1-c3",
+      "rowNumber": 1,
+      "x": 2.8899999999999997,
+      "y": 3.780110153632747,
+      "z": 1.2
+    },
+    {
+      "id": "seat-r1-c4",
+      "rowNumber": 1,
+      "x": 3.4899999999999998,
+      "y": 3.780110153632747,
+      "z": 1.2
+    },
+    {
+      "id": "seat-r2-c1",
+      "rowNumber": 2,
+      "x": 1.39,
+      "y": 5.580110153632747,
+      "z": 1.6
+    },
+    {
+      "id": "seat-r2-c2",
+      "rowNumber": 2,
+      "x": 1.9899999999999998,
+      "y": 5.580110153632747,
+      "z": 1.6
+    },
+    {
+      "id": "seat-r2-c3",
+      "rowNumber": 2,
+      "x": 2.59,
+      "y": 5.580110153632747,
+      "z": 1.6
+    },
+    {
+      "id": "seat-r2-c4",
+      "rowNumber": 2,
+      "x": 3.1899999999999995,
+      "y": 5.580110153632747,
+      "z": 1.6
+    },
+    {
+      "id": "seat-r2-c5",
+      "rowNumber": 2,
+      "x": 3.79,
+      "y": 5.580110153632747,
+      "z": 1.6
+    }
+  ],
+  "speakers": [
+    {
+      "role": "SL",
+      "model": "q6-3"
+    },
+    {
+      "role": "SR",
+      "model": "q6-3"
+    },
+    {
+      "role": "SBL",
+      "model": "q6-3"
+    },
+    {
+      "role": "SBR",
+      "model": "q6-3"
+    },
+    {
+      "role": "LW",
+      "model": "q6-3"
+    },
+    {
+      "role": "RW",
+      "model": "q6-3"
+    },
+    {
+      "role": "FL",
+      "model": "q8-5"
+    },
+    {
+      "role": "FC",
+      "model": "q8-5"
+    },
+    {
+      "role": "FR",
+      "model": "q8-5"
+    },
+    {
+      "role": "TFL",
+      "model": "spitfire-cloud"
+    },
+    {
+      "role": "TFR",
+      "model": "spitfire-cloud"
+    },
+    {
+      "role": "TML",
+      "model": "spitfire-cloud"
+    },
+    {
+      "role": "TMR",
+      "model": "spitfire-cloud"
+    },
+    {
+      "role": "TRL",
+      "model": "spitfire-cloud"
+    },
+    {
+      "role": "TRR",
+      "model": "spitfire-cloud"
+    }
+  ],
+  "subwooferCfg": {
+    "front": {
+      "model": "sub4-12",
+      "count": 2
+    },
+    "rear": {
+      "model": "sub4-12",
+      "count": 2
+    }
+  },
+  "subwooferInstances": [
+    {
+      "model": "sub4-12",
+      "legacyGroup": "front",
+      "enabled": true
+    },
+    {
+      "model": "sub4-12",
+      "legacyGroup": "front",
+      "enabled": true
+    },
+    {
+      "model": "sub4-12",
+      "legacyGroup": "rear",
+      "enabled": true
+    },
+    {
+      "model": "sub4-12",
+      "legacyGroup": "rear",
+      "enabled": true
+    }
+  ],
+  "abfuser": {
+    "enabled": true,
+    "qty": 8
+  },
+  "engineeringSummary": {
+    "roomResultsByParameter": {
+      "2": {
+        "level": "L4",
+        "value": 15,
+        "formatted": "15 speakers",
+        "unit": "count",
+        "limitingGroup": null
+      },
+      "3": {
+        "level": "L4",
+        "value": 0,
+        "formatted": "0 speakers",
+        "unit": "speakers",
+        "limitingGroup": null
+      },
+      "5": {
+        "level": 4,
+        "value": 46.3,
+        "formatted": null,
+        "unit": "deg",
+        "limitingGroup": null
+      },
+      "7": {
+        "level": "L2",
+        "value": 6,
+        "formatted": null,
+        "unit": "deg (±)",
+        "limitingGroup": null
+      },
+      "8": {
+        "level": "L4",
+        "value": "No",
+        "formatted": "No",
+        "unit": null,
+        "limitingGroup": null
+      },
+      "11": {
+        "level": "L4",
+        "value": 0,
+        "formatted": null,
+        "unit": "count",
+        "limitingGroup": null
+      },
+      "12": {
+        "level": "L4",
+        "value": 116,
+        "formatted": "116 dBC",
+        "unit": "dB SPL (C)",
+        "limitingGroup": null
+      },
+      "13": {
+        "level": "L4",
+        "value": 108,
+        "formatted": "108 dBC (OH)",
+        "unit": "dB SPL (C)",
+        "limitingGroup": "OH"
+      },
+      "14": {
+        "level": "L4",
+        "value": 118,
+        "formatted": "118 dBC",
+        "unit": "dB SPL (C)",
+        "limitingGroup": null
+      },
+      "15": {
+        "level": "L2",
+        "value": 22,
+        "formatted": "NCB 22",
+        "unit": null,
+        "limitingGroup": null
+      },
+      "18": {
+        "level": "L3",
+        "value": 16.596890802647643,
+        "formatted": "16 Hz",
+        "unit": "Hz",
+        "limitingGroup": null
+      },
+      "19": {
+        "level": "L4",
+        "value": 0.9326074248371867,
+        "formatted": "±0 dB",
+        "unit": "± dB",
+        "limitingGroup": null
+      },
+      "21": {
+        "level": "L2",
+        "value": -8,
+        "formatted": "Assumed",
+        "unit": null,
+        "limitingGroup": null
+      }
+    },
+    "project": {
+      "reportCounts": {
+        "seatResultsByParameter": {
+          "p1": [
+            {
+              "seatId": "seat-r1-c1",
+              "priority": "secondary",
+              "level": "L4",
+              "valueFormatted": "1.69m"
+            },
+            {
+              "seatId": "seat-r1-c2",
+              "priority": "primary",
+              "level": "L4",
+              "valueFormatted": "2.29m"
+            },
+            {
+              "seatId": "seat-r1-c3",
+              "priority": "primary",
+              "level": "L4",
+              "valueFormatted": "2.29m"
+            },
+            {
+              "seatId": "seat-r1-c4",
+              "priority": "secondary",
+              "level": "L4",
+              "valueFormatted": "1.69m"
+            },
+            {
+              "seatId": "seat-r2-c1",
+              "priority": "secondary",
+              "level": "L3",
+              "valueFormatted": "1.39m"
+            },
+            {
+              "seatId": "seat-r2-c2",
+              "priority": "secondary",
+              "level": "L4",
+              "valueFormatted": "1.71m"
+            },
+            {
+              "seatId": "seat-r2-c3",
+              "priority": "primary",
+              "level": "L4",
+              "valueFormatted": "1.71m"
+            },
+            {
+              "seatId": "seat-r2-c4",
+              "priority": "secondary",
+              "level": "L4",
+              "valueFormatted": "1.71m"
+            },
+            {
+              "seatId": "seat-r2-c5",
+              "priority": "secondary",
+              "level": "L3",
+              "valueFormatted": "1.39m"
+            }
+          ],
+          "p4": [
+            {
+              "seatId": "seat-r1-c1",
+              "priority": "secondary",
+              "level": "L4",
+              "valueFormatted": "1 dB"
+            },
+            {
+              "seatId": "seat-r1-c2",
+              "priority": "primary",
+              "level": "L4",
+              "valueFormatted": "1 dB"
+            },
+            {
+              "seatId": "seat-r1-c3",
+              "priority": "primary",
+              "level": "L4",
+              "valueFormatted": "1 dB"
+            },
+            {
+              "seatId": "seat-r1-c4",
+              "priority": "secondary",
+              "level": "L4",
+              "valueFormatted": "1 dB"
+            },
+            {
+              "seatId": "seat-r2-c1",
+              "priority": "secondary",
+              "level": "L4",
+              "valueFormatted": "1 dB"
+            },
+            {
+              "seatId": "seat-r2-c2",
+              "priority": "secondary",
+              "level": "L4",
+              "valueFormatted": "0 dB"
+            },
+            {
+              "seatId": "seat-r2-c3",
+              "priority": "primary",
+              "level": "L4",
+              "valueFormatted": "0 dB"
+            },
+            {
+              "seatId": "seat-r2-c4",
+              "priority": "secondary",
+              "level": "L4",
+              "valueFormatted": "0 dB"
+            },
+            {
+              "seatId": "seat-r2-c5",
+              "priority": "secondary",
+              "level": "L4",
+              "valueFormatted": "1 dB"
+            }
+          ],
+          "p5": [
+            {
+              "seatId": "seat-r1-c1",
+              "priority": "secondary",
+              "level": "L2",
+              "valueFormatted": "66°"
+            },
+            {
+              "seatId": "seat-r1-c2",
+              "priority": "primary",
+              "level": "L3",
+              "valueFormatted": "51°"
+            },
+            {
+              "seatId": "seat-r1-c3",
+              "priority": "primary",
+              "level": "L3",
+              "valueFormatted": "51°"
+            },
+            {
+              "seatId": "seat-r1-c4",
+              "priority": "secondary",
+              "level": "L2",
+              "valueFormatted": "66°"
+            },
+            {
+              "seatId": "seat-r2-c1",
+              "priority": "secondary",
+              "level": "L1",
+              "valueFormatted": "114°"
+            },
+            {
+              "seatId": "seat-r2-c2",
+              "priority": "secondary",
+              "level": "L1",
+              "valueFormatted": "86°"
+            },
+            {
+              "seatId": "seat-r2-c3",
+              "priority": "primary",
+              "level": "L2",
+              "valueFormatted": "79°"
+            },
+            {
+              "seatId": "seat-r2-c4",
+              "priority": "secondary",
+              "level": "L1",
+              "valueFormatted": "86°"
+            },
+            {
+              "seatId": "seat-r2-c5",
+              "priority": "secondary",
+              "level": "L1",
+              "valueFormatted": "114°"
+            }
+          ],
+          "p6": [
+            {
+              "seatId": "seat-r1-c1",
+              "priority": "secondary",
+              "level": "L1",
+              "valueFormatted": "7 dB"
+            },
+            {
+              "seatId": "seat-r1-c2",
+              "priority": "primary",
+              "level": "L3",
+              "valueFormatted": "4 dB"
+            },
+            {
+              "seatId": "seat-r1-c3",
+              "priority": "primary",
+              "level": "L3",
+              "valueFormatted": "4 dB"
+            },
+            {
+              "seatId": "seat-r1-c4",
+              "priority": "secondary",
+              "level": "L1",
+              "valueFormatted": "7 dB"
+            },
+            {
+              "seatId": "seat-r2-c1",
+              "priority": "secondary",
+              "level": "L1",
+              "valueFormatted": "8 dB"
+            },
+            {
+              "seatId": "seat-r2-c2",
+              "priority": "secondary",
+              "level": "L2",
+              "valueFormatted": "6 dB"
+            },
+            {
+              "seatId": "seat-r2-c3",
+              "priority": "primary",
+              "level": "L3",
+              "valueFormatted": "4 dB"
+            },
+            {
+              "seatId": "seat-r2-c4",
+              "priority": "secondary",
+              "level": "L2",
+              "valueFormatted": "6 dB"
+            },
+            {
+              "seatId": "seat-r2-c5",
+              "priority": "secondary",
+              "level": "L1",
+              "valueFormatted": "8 dB"
+            }
+          ],
+          "p9": [
+            {
+              "seatId": "seat-r1-c1",
+              "priority": "secondary",
+              "level": "L4",
+              "valueFormatted": "44.5°"
+            },
+            {
+              "seatId": "seat-r1-c2",
+              "priority": "primary",
+              "level": "L4",
+              "valueFormatted": "44.5°"
+            },
+            {
+              "seatId": "seat-r1-c3",
+              "priority": "primary",
+              "level": "L4",
+              "valueFormatted": "44.5°"
+            },
+            {
+              "seatId": "seat-r1-c4",
+              "priority": "secondary",
+              "level": "L4",
+              "valueFormatted": "44.5°"
+            },
+            {
+              "seatId": "seat-r2-c1",
+              "priority": "secondary",
+              "level": "L3",
+              "valueFormatted": "53.1°"
+            },
+            {
+              "seatId": "seat-r2-c2",
+              "priority": "secondary",
+              "level": "L3",
+              "valueFormatted": "53.1°"
+            },
+            {
+              "seatId": "seat-r2-c3",
+              "priority": "primary",
+              "level": "L3",
+              "valueFormatted": "53.1°"
+            },
+            {
+              "seatId": "seat-r2-c4",
+              "priority": "secondary",
+              "level": "L3",
+              "valueFormatted": "53.1°"
+            },
+            {
+              "seatId": "seat-r2-c5",
+              "priority": "secondary",
+              "level": "L3",
+              "valueFormatted": "53.1°"
+            }
+          ],
+          "p10": [
+            {
+              "seatId": "seat-r1-c1",
+              "priority": "secondary",
+              "level": "L2",
+              "valueFormatted": "6 dB"
+            },
+            {
+              "seatId": "seat-r1-c2",
+              "priority": "primary",
+              "level": "L3",
+              "valueFormatted": "4 dB"
+            },
+            {
+              "seatId": "seat-r1-c3",
+              "priority": "primary",
+              "level": "L3",
+              "valueFormatted": "4 dB"
+            },
+            {
+              "seatId": "seat-r1-c4",
+              "priority": "secondary",
+              "level": "L2",
+              "valueFormatted": "6 dB"
+            },
+            {
+              "seatId": "seat-r2-c1",
+              "priority": "secondary",
+              "level": "L1",
+              "valueFormatted": "9 dB"
+            },
+            {
+              "seatId": "seat-r2-c2",
+              "priority": "secondary",
+              "level": "L2",
+              "valueFormatted": "6 dB"
+            },
+            {
+              "seatId": "seat-r2-c3",
+              "priority": "primary",
+              "level": "L3",
+              "valueFormatted": "3 dB"
+            },
+            {
+              "seatId": "seat-r2-c4",
+              "priority": "secondary",
+              "level": "L2",
+              "valueFormatted": "6 dB"
+            },
+            {
+              "seatId": "seat-r2-c5",
+              "priority": "secondary",
+              "level": "L1",
+              "valueFormatted": "9 dB"
+            }
+          ],
+          "p16": [
+            {
+              "seatId": "seat-r1-c1",
+              "priority": "secondary",
+              "level": "L4",
+              "valueFormatted": "±0.5 dB"
+            },
+            {
+              "seatId": "seat-r1-c2",
+              "priority": "primary",
+              "level": "L4",
+              "valueFormatted": "±0 dB"
+            },
+            {
+              "seatId": "seat-r1-c3",
+              "priority": "primary",
+              "level": "L4",
+              "valueFormatted": "±0 dB"
+            },
+            {
+              "seatId": "seat-r1-c4",
+              "priority": "secondary",
+              "level": "L4",
+              "valueFormatted": "±0.5 dB"
+            },
+            {
+              "seatId": "seat-r2-c1",
+              "priority": "secondary",
+              "level": "L4",
+              "valueFormatted": "±0.5 dB"
+            },
+            {
+              "seatId": "seat-r2-c2",
+              "priority": "secondary",
+              "level": "L4",
+              "valueFormatted": "±0 dB"
+            },
+            {
+              "seatId": "seat-r2-c3",
+              "priority": "primary",
+              "level": "L4",
+              "valueFormatted": "±0 dB"
+            },
+            {
+              "seatId": "seat-r2-c4",
+              "priority": "secondary",
+              "level": "L4",
+              "valueFormatted": "±0 dB"
+            },
+            {
+              "seatId": "seat-r2-c5",
+              "priority": "secondary",
+              "level": "L4",
+              "valueFormatted": "±0.5 dB"
+            }
+          ],
+          "p17": [
+            {
+              "seatId": "seat-r1-c1",
+              "priority": "secondary",
+              "level": "L4",
+              "valueFormatted": "≤1.5 dB window"
+            },
+            {
+              "seatId": "seat-r1-c2",
+              "priority": "primary",
+              "level": "L4",
+              "valueFormatted": "≤1.5 dB window"
+            },
+            {
+              "seatId": "seat-r1-c3",
+              "priority": "primary",
+              "level": "L4",
+              "valueFormatted": "≤1.5 dB window"
+            },
+            {
+              "seatId": "seat-r1-c4",
+              "priority": "secondary",
+              "level": "L4",
+              "valueFormatted": "≤1.5 dB window"
+            },
+            {
+              "seatId": "seat-r2-c1",
+              "priority": "secondary",
+              "level": "L4",
+              "valueFormatted": "≤1.5 dB window"
+            },
+            {
+              "seatId": "seat-r2-c2",
+              "priority": "secondary",
+              "level": "L4",
+              "valueFormatted": "≤1.5 dB window"
+            },
+            {
+              "seatId": "seat-r2-c3",
+              "priority": "primary",
+              "level": "L4",
+              "valueFormatted": "≤1.5 dB window"
+            },
+            {
+              "seatId": "seat-r2-c4",
+              "priority": "secondary",
+              "level": "L4",
+              "valueFormatted": "≤1.5 dB window"
+            },
+            {
+              "seatId": "seat-r2-c5",
+              "priority": "secondary",
+              "level": "L4",
+              "valueFormatted": "≤1.5 dB window"
+            }
+          ],
+          "p20": [
+            {
+              "seatId": "seat-r1-c1",
+              "priority": "secondary",
+              "level": "L1",
+              "valueFormatted": "±10.5 dB"
+            },
+            {
+              "seatId": "seat-r1-c2",
+              "priority": "primary",
+              "level": "L1",
+              "valueFormatted": "±8.9 dB"
+            },
+            {
+              "seatId": "seat-r1-c3",
+              "priority": "primary",
+              "level": "L1",
+              "valueFormatted": "±8.6 dB"
+            },
+            {
+              "seatId": "seat-r1-c4",
+              "priority": "secondary",
+              "level": "L1",
+              "valueFormatted": "±8.2 dB"
+            },
+            {
+              "seatId": "seat-r2-c1",
+              "priority": "secondary",
+              "level": "L1",
+              "valueFormatted": "±12.9 dB"
+            },
+            {
+              "seatId": "seat-r2-c2",
+              "priority": "secondary",
+              "level": "L1",
+              "valueFormatted": "±13.2 dB"
+            },
+            {
+              "seatId": "seat-r2-c3",
+              "priority": "primary",
+              "level": "L1",
+              "valueFormatted": "±10.7 dB"
+            },
+            {
+              "seatId": "seat-r2-c4",
+              "priority": "secondary",
+              "level": "L1",
+              "valueFormatted": "±8.9 dB"
+            },
+            {
+              "seatId": "seat-r2-c5",
+              "priority": "secondary",
+              "level": "L1",
+              "valueFormatted": "±9.1 dB"
+            }
+          ]
+        }
+      }
+    },
+    "viewing": {
+      "available": true,
+      "per_seat": [
+        {
+          "seat_id": "seat-r1-c1",
+          "priority": "secondary",
+          "horizontal_angle_deg": 64.5559278803079,
+          "rp23_level": "L4"
+        },
+        {
+          "seat_id": "seat-r1-c2",
+          "priority": "primary",
+          "horizontal_angle_deg": 64.5559278803079,
+          "rp23_level": "L4"
+        },
+        {
+          "seat_id": "seat-r1-c3",
+          "priority": "primary",
+          "horizontal_angle_deg": 64.5559278803079,
+          "rp23_level": "L4"
+        },
+        {
+          "seat_id": "seat-r1-c4",
+          "priority": "secondary",
+          "horizontal_angle_deg": 64.5559278803079,
+          "rp23_level": "L4"
+        },
+        {
+          "seat_id": "seat-r2-c1",
+          "priority": "secondary",
+          "horizontal_angle_deg": 44.95478135497027,
+          "rp23_level": "L3"
+        },
+        {
+          "seat_id": "seat-r2-c2",
+          "priority": "secondary",
+          "horizontal_angle_deg": 44.95478135497027,
+          "rp23_level": "L3"
+        },
+        {
+          "seat_id": "seat-r2-c3",
+          "priority": "primary",
+          "horizontal_angle_deg": 44.95478135497027,
+          "rp23_level": "L3"
+        },
+        {
+          "seat_id": "seat-r2-c4",
+          "priority": "secondary",
+          "horizontal_angle_deg": 44.95478135497027,
+          "rp23_level": "L3"
+        },
+        {
+          "seat_id": "seat-r2-c5",
+          "priority": "secondary",
+          "horizontal_angle_deg": 44.95478135497027,
+          "rp23_level": "L3"
+        }
+      ],
+      "primary_floor": "L3",
+      "secondary_floor": "L3",
+      "project_floor": "L3"
+    },
+    "primary": {
+      "seatIds": [
+        "seat-r1-c2",
+        "seat-r1-c3",
+        "seat-r2-c3"
+      ]
+    },
+    "secondary": {
+      "seatIds": [
+        "seat-r1-c1",
+        "seat-r1-c4",
+        "seat-r2-c1",
+        "seat-r2-c2",
+        "seat-r2-c4",
+        "seat-r2-c5"
+      ]
+    }
+  }
+}
