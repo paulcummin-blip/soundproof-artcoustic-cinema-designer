@@ -98,7 +98,7 @@ export default function GraphHeaderPills() {
               {supportingText && (
                 <span className="text-[10px] text-[#625143]">{supportingText}</span>
               )}
-              {pill.stale && <BassStateBadge state={authorityState} compact />}
+              <BassStateBadge state={authorityState} compact />
             </button>
           </BassResultDetailTooltip>
         );
