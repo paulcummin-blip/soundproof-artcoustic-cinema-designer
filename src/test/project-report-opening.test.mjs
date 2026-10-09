@@ -25,6 +25,7 @@ import React from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 
 import fixture from "./fixtures/marqueeAdiEvidence.json";
+import liveEvidence from "./fixtures/marqueeLiveAdiEvidence.json";
 import {
   selectAdiHighlights,
   buildAdiDesignHighlights,
@@ -57,11 +58,19 @@ const PRODUCTS = {
   ],
 };
 
+/**
+ * The engineering evidence the highlights are selected from is the REAL published
+ * publication (parameterAuthority, room results, seat results and RP23 viewing),
+ * taken live from Marquee Home's published engineering summary. `fixture` carries
+ * the project's own facts (room, screen, seating) used by pages 1 and 3.
+ */
+const engineeringSummary = liveEvidence.engineeringSummary;
+
 const sources = {
-  engineeringSummary: fixture.engineeringSummary,
+  engineeringSummary,
   productsSelected: PRODUCTS,
-  seatingPositions: fixture.seatingPositions,
-  dolbyConfig: fixture.project.dolby_config,
+  seatingPositions: liveEvidence.seatingPositions,
+  dolbyConfig: liveEvidence.project?.dolby_config || fixture.project.dolby_config,
 };
 
 const BANNED_GENERIC = [
@@ -78,15 +87,20 @@ const BANNED_GENERIC = [
 test("Marquee: ADI selects this design's strongest highlights, strongest first", () => {
   const { highlights, selected, rejected } = selectAdiHighlights(sources);
 
+  // The whole published picture: the two output capabilities lead, the timbre and
+  // architecture stories follow, then the extended bass, the placement measures
+  // that genuinely hold and the per-row viewing result. P19 is provisional in its
+  // own authority, so no bass-response story is raised at all.
   assert.deepEqual(selected, [
     "dynamic-capability",
     "tonal-consistency",
-    "reference-seat-bass",
-    "viewing-geometry",
+    "bass-output",
     "immersive-layout",
-    "product-selection",
+    "low-frequency-extension",
+    "spatial-resolution",
+    "viewing-geometry",
   ]);
-  assert.equal(highlights.length, 6);
+  assert.equal(highlights.length, 7);
 
   // Every highlight states its own evidence and a short client explanation.
   for (const highlight of highlights) {
@@ -101,8 +115,10 @@ test("Marquee: ADI selects this design's strongest highlights, strongest first",
   // The claims ADI deliberately did not make are audited with their reason.
   const rejectedIds = rejected.map((entry) => entry.id);
   assert.ok(rejectedIds.includes("room-wide-bass-consistency"));
-  assert.ok(rejectedIds.includes("spatial-resolution"));
+  assert.ok(rejectedIds.includes("seat-placement-consistency"));
   assert.ok(rejectedIds.includes("background-noise"));
+  assert.ok(rejectedIds.includes("early-reflections"));
+  assert.ok(rejectedIds.includes("reference-seat-bass"));
   for (const entry of rejected) assert.ok(String(entry.reason).length > 20);
 });
 
@@ -134,19 +150,24 @@ test("the tonal highlight holds across every assessed seat, not the best one", (
   assert.match(tonal.evidence[0].value, /±0\.5 dB/);
 });
 
-test("bass is claimed at the reference seating position only — P20 is never used", () => {
+test("bass is claimed from the LFE output authority — a provisional P19 and a weak P20 are never used", () => {
   const highlights = buildAdiDesignHighlights(sources);
-  const bass = highlights.find((highlight) => highlight.id === "reference-seat-bass");
+  const bass = highlights.find((highlight) => highlight.id === "bass-output");
 
-  assert.equal(bass.scope, "rsp");
-  assert.deepEqual(bass.sources, ["P19"]);
+  assert.equal(bass.scope, "room");
+  assert.deepEqual(bass.sources, ["P14"]);
+  assert.equal(bass.evidence[0].key, "P14 L4");
   assert.match(bass.explanation, /reference seating position/);
   assert.doesNotMatch(bass.explanation, /across the room|throughout the room|every seat/i);
 
-  // No selected highlight rests on a weak or assumed parameter.
+  // No bass-response story is raised while P19's own authority is provisional.
+  assert.ok(!highlights.some((highlight) => highlight.id === "reference-seat-bass"));
+  assert.ok(!highlights.some((highlight) => highlight.id === "bass-extension-and-response"));
+
+  // No selected highlight rests on weak, assumed or provisional evidence.
   for (const highlight of highlights) {
     for (const source of highlight.sources) {
-      assert.doesNotMatch(source, /P20|P5|P6|P7|P10|P15|P18|P21/, `${highlight.id} must not rest on ${source}`);
+      assert.doesNotMatch(source, /P19|P20|P5|P6|P7|P10|P15|P21/, `${highlight.id} must not rest on ${source}`);
     }
     assert.doesNotMatch(JSON.stringify(highlight), /room-wide|throughout the room|equally strong/i);
   }
@@ -194,21 +215,34 @@ test("nothing generic is stated: every claim is a fact of this design", () => {
   }
 });
 
-test("a genuinely strong spatial design raises the spatial highlight; a mixed one does not", () => {
-  const mixed = buildAdiDesignHighlights(sources);
-  assert.ok(!mixed.some((highlight) => highlight.id === "spatial-resolution"), "mixed spatial results raise nothing");
-
-  const strong = JSON.parse(JSON.stringify(fixture.engineeringSummary));
-  for (const key of ["p5", "p6", "p10"]) {
-    strong.project.reportCounts.seatResultsByParameter[key] =
-      strong.project.reportCounts.seatResultsByParameter[key].map((row) => ({ ...row, level: "L4" }));
-  }
-  const raised = buildAdiDesignHighlights({ ...sources, engineeringSummary: strong });
-  const spatial = raised.find((highlight) => highlight.id === "spatial-resolution");
-  assert.ok(spatial, "an unusually strong spatial design states it");
+test("a genuinely strong placement picture raises the spatial highlight; a weak one does not, and the seat-scoped mix is never hidden", () => {
+  // This design's own picture: the room-scope placement measures hold (P1, P3,
+  // P4, P9, P11), so the story is raised — and each measure is stated on its own
+  // published result, with the seat-by-seat placement results that are mixed
+  // (P5, P6, P10) audited rather than folded into the claim.
+  const { highlights, rejected } = selectAdiHighlights(sources);
+  const spatial = highlights.find((highlight) => highlight.id === "spatial-resolution");
+  assert.ok(spatial, "the placement measures that genuinely hold are stated");
   assert.equal(spatial.evidence.length, 3);
-  // The weakest assessed spatial parameter governs the claim (P1 and P9 are L3).
-  assert.match(spatial.explanation, /L3 or better/);
+  assert.equal(spatial.level, "L3", "the weakest claimed measure governs the story");
+  assert.match(spatial.explanation, /each stated on its own published result/);
+  for (const source of spatial.sources) {
+    assert.doesNotMatch(source, /P5|P6|P7|P10/, "a mixed seat-scoped measure is never part of the claim");
+  }
+  assert.ok(rejected.some((entry) => entry.id === "seat-placement-consistency" && /P5|P6|P10/.test(entry.reason)));
+
+  // Downgrade the placement measures below the strength floor: nothing is stated.
+  const weak = JSON.parse(JSON.stringify(engineeringSummary));
+  for (const key of ["p1", "p3", "p4", "p7", "p9", "p11"]) {
+    const entry = weak.parameterAuthority[key];
+    if (entry?.seats) {
+      for (const seatId of Object.keys(entry.seats)) entry.seats[seatId] = { ...entry.seats[seatId], level: "L2" };
+    } else if (entry) {
+      weak.parameterAuthority[key] = { ...entry, level: "L2" };
+    }
+  }
+  const lowered = buildAdiDesignHighlights({ ...sources, engineeringSummary: weak });
+  assert.ok(!lowered.some((highlight) => highlight.id === "spatial-resolution"), "weak placement results raise nothing");
 });
 
 // ── PAGE FIT: the fixed A4 composition ───────────────────────────────────────

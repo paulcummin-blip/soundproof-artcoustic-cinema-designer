@@ -85,26 +85,35 @@ export function estimateProjectSummaryMm({ factCount = 0, paragraph = null } = {
 }
 
 /** One highlight card: heading block, its evidence line, its copy and the gap. */
-export function estimateHighlightMm(highlight) {
+export function estimateHighlightMm(highlight, { compact = false } = {}) {
+  const block = compact ? COMPACT_BLOCK_MM : PAGE_BLOCK_MM;
   const evidenceLines = Array.isArray(highlight?.evidence) && highlight.evidence.length > 2 ? 2 : 1;
   const copyLines = estimateLines(highlight?.explanation);
-  return PAGE_BLOCK_MM.highlightFixed
+  return block.highlightFixed
     + (evidenceLines - 1) * PAGE_BLOCK_MM.line
     + copyLines * PAGE_BLOCK_MM.line
-    + PAGE_BLOCK_MM.highlightGap;
+    + block.highlightGap;
 }
 
-/** The whole highlights page: heading + every card. */
-export function estimateHighlightsMm(highlights) {
+/**
+ * The whole highlights page: heading + every card. Once the page carries more
+ * cards than COMPACT_HIGHLIGHT_THRESHOLD it is composed compactly, and the
+ * estimate follows that same composition — so the authority and the page always
+ * agree on what fits, and a fuller page is never cut back to a four-card layout.
+ */
+export function estimateHighlightsMm(highlights, { compact } = {}) {
   const list = Array.isArray(highlights) ? highlights : [];
+  const useCompact = compact ?? list.length > COMPACT_HIGHLIGHT_THRESHOLD;
   return PAGE_BLOCK_MM.heading
-    + list.reduce((total, highlight) => total + estimateHighlightMm(highlight), 0);
+    + list.reduce((total, highlight) => total + estimateHighlightMm(highlight, { compact: useCompact }), 0);
 }
 
 /**
  * Fit the selected highlights to the page: drop the lowest-ranked highlight
  * until the page fits. The list arrives already ranked strongest first, so the
- * weakest are the ones that go, and the page never clips.
+ * weakest are the ones that go, and the page never clips. Because the compact
+ * composition is used for a fuller page, a materially important story is never
+ * dropped merely to preserve a four-card layout.
  */
 export function fitHighlightsToBudget(
   highlights,
@@ -112,7 +121,7 @@ export function fitHighlightsToBudget(
   headingMm = PAGE_BLOCK_MM.heading,
 ) {
   const kept = (Array.isArray(highlights) ? highlights : []).filter(Boolean);
-  while (kept.length > 1 && estimateHighlightsMm(kept) - headingMm + headingMm > budgetMm) {
+  while (kept.length > 1 && estimateHighlightsMm(kept) > budgetMm) {
     kept.pop();
   }
   return kept;

@@ -17,6 +17,7 @@
 
 import React from 'react';
 import AdiHighlightCard from './AdiHighlightCard';
+import { COMPACT_HIGHLIGHT_THRESHOLD } from './projectReportPageBudget';
 import {
   REPORT_FONT_HEADING as FONT_HEADING,
   REPORT_FONT_BODY as FONT_BODY,
@@ -28,6 +29,13 @@ const MUTED = '#625143';
 export default function AdiDesignHighlightsPage({ highlights = [], print = false }) {
   const list = (Array.isArray(highlights) ? highlights : []).filter(Boolean);
   if (list.length === 0) return null;
+
+  // A fuller page (more stories than the four-card layout the page grew from) is
+  // composed compactly so five to seven genuine strengths are all stated on one
+  // page. Only the space between cards tightens: each card keeps its own type
+  // size and its own emphasis, so the strongest story still reads largest and a
+  // supporting one still reads smaller.
+  const compact = list.length > COMPACT_HIGHLIGHT_THRESHOLD;
 
   const containerStyle = print
     ? { width: '100%', fontFamily: FONT_BODY }
@@ -74,7 +82,7 @@ export default function AdiDesignHighlightsPage({ highlights = [], print = false
       <div style={{
         display: 'flex',
         flexDirection: 'column',
-        gap: print ? '3.4mm' : 12,
+        gap: print ? (compact ? '2.2mm' : '3.4mm') : compact ? 8 : 12,
       }}>
         {list.map((highlight) => (
           <AdiHighlightCard key={highlight.id} highlight={highlight} print={print} />

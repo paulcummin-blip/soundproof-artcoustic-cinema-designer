@@ -29,6 +29,13 @@ import { PARAM_WEIGHTS } from '@/components/report/technical/artcousticSystemDes
 import { isTerminalAssessment } from '../../../../shared/assessmentTerminal.js';
 import { ASSUMED_FLOOR_EXCLUDED_KEYS } from '@/components/report/technical/designRatingPresentation';
 
+/**
+ * The canonical weight table itself, re-exported for the selector's own
+ * consumers (audit panels and tests) so they read the SAME table this module
+ * ranks by. It is never copied, and it is never a second table.
+ */
+export { PARAM_WEIGHTS };
+
 /** The level floor a client-facing strength must reach (L3 or better). */
 export const MIN_STRENGTH_LEVEL = 3;
 

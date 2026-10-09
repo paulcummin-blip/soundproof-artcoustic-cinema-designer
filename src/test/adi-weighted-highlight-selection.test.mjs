@@ -30,6 +30,7 @@ import {
 } from "../components/report/projectReport/adiDesignHighlights.js";
 import {
   PARAM_WEIGHTS,
+  parameterWeight,
   MIN_HIGHLIGHTS,
   MAX_HIGHLIGHTS,
 } from "../components/report/projectReport/adiHighlightImportance.js";
@@ -104,9 +105,14 @@ test("Genesis: the selector reads its internal spec tier from the eligible weigh
   // authority is provisional, so none of them contributes weight.
   assert.equal(specTier, "lower");
   assert.equal(distribution.totalWeight, 113);
-  assert.deepEqual(distribution.byLevel, { L4: 29, L3: 9, L2: 42, L1: 33 });
+  assert.deepEqual(distribution.byLevel, { L4: 29, L3: 9, L2: 42, L1: 33, FAIL: 0 });
   assert.ok(distribution.shareL2Plus > 0.5);
   assert.ok(distribution.shareL3Plus < 0.5, "Genesis is not a mid-spec design");
+
+  // The weight authority is the ONE canonical table: the selector's own fallback
+  // reads it, and there is no second table anywhere in the selector.
+  assert.ok(Object.keys(PARAM_WEIGHTS).length >= 21);
+  assert.equal(parameterWeight("p12", null), PARAM_WEIGHTS.p12);
 });
 
 test("Genesis: the strongest genuine stories are selected in rank order", () => {
@@ -175,7 +181,7 @@ test("Genesis: the weaker results are audited, not hidden", () => {
   assert.match(byId["room-wide-bass-consistency"], /P20 is L1/);
   assert.match(byId["background-noise"], /assumed design assumption/);
   assert.match(byId["early-reflections"], /assumed performance level/);
-  assert.match(byId["spatial-resolution"], /P5 L1, P6 L1, P10 L2/);
+  assert.match(byId["seat-placement-consistency"], /P5 L1, P6 L1, P10 L2/);
   for (const reason of Object.values(byId)) assert.ok(String(reason).length > 20);
 
   // No highlight rests on L1, on an assumed parameter, or on provisional P19.
@@ -260,7 +266,12 @@ test("eligibility is strict: provisional, assumed and non-terminal evidence rais
     engineeringSummary: provisionalDynamic,
   });
   assert.ok(!selected.includes("dynamic-capability"));
-  assert.equal(distribution.totalWeight, 117 - PARAM_WEIGHTS.p12);
+  // The removed story's own weight leaves the distribution with it, read from the
+  // same authority the selector read it from.
+  assert.equal(
+    distribution.totalWeight,
+    117 - parameterWeight("p12", MARQUEE_SOURCES.engineeringSummary.parameterAuthority),
+  );
 
   // An assumed parameter never becomes a highlight, whatever level it carries.
   const assumed = withState(GENESIS_SOURCES.engineeringSummary, "p15", { state: "scored", level: "L4" });

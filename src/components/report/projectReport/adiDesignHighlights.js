@@ -219,8 +219,8 @@ function rejectedClaims({ engineeringSummary, productsSelected } = {}, { byKey =
   const mixedPlacement = [p5, p6, p10].filter(Boolean).map((row) => `${row.key} ${row.level}`);
   if (mixedPlacement.length > 0) {
     rejected.push({
-      id: 'spatial-resolution',
-      reason: `the seat-scoped placement results are mixed (${mixedPlacement.join(', ')}) — each placement measure is stated on its own result, and none of these is raised as a strength`,
+      id: 'seat-placement-consistency',
+      reason: `the seat-scoped placement results are mixed (${mixedPlacement.join(', ')}) — each placement measure is stated on its own result, and no seat-by-seat placement consistency is claimed`,
     });
   }
   if (p20) {
