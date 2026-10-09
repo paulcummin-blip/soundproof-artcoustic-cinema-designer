@@ -22,6 +22,7 @@ import {
   POLARITY_NOT_EVALUATED_REASON,
 } from "./optimiserPlanConstants.js";
 import { existingTradeOff, leverEffectFrom, summariseResult, summariseSeats } from "./optimiserPlanMetrics.js";
+import { buildAcousticDelayEvidence, buildAlignmentCurves } from "../improveBassV2/acousticDelayAlignment.js";
 import { activeInstances, instanceById, polarityLabel, resolveAppliedMap } from "./optimiserPlanMatching.js";
 import {
   buildSeatingComponent,
@@ -434,6 +435,23 @@ export function buildOptimiserPlan({
         effect: leverEffectFrom(selection.calibrationResult, baselineResult),
         reason: selection?.calibrationMaterial?.reason || null,
         tradeOff: existingTradeOff(selection.calibrationResult),
+        // The best acoustic delay found by the grouped front/rear sweep: the
+        // signed offset, the objective it serves, the canonical P19/P20 before
+        // and after, the limiting seat and frequency, and the RSP before/after
+        // curves re-read from the design's own captured transfers.
+        alignment: buildAcousticDelayEvidence({
+          calibrationResult: selection.calibrationResult,
+          baselineResult,
+          grouping: selection.calibrationDiagnostics?.grouping || null,
+          groupedDelay: selection.calibrationResult?.groupedDelay || null,
+          objectives: selection.objectives || null,
+          changes,
+          curves: buildAlignmentCurves({
+            rawTransfer: selection.previewRawTransfers?.current || null,
+            beforeTuning: baselineResult?.appliedTuning || null,
+            afterTuning: selection.calibrationResult?.appliedTuning || null,
+          }),
+        }),
       };
     }
   }

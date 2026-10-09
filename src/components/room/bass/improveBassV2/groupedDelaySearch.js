@@ -13,17 +13,20 @@ export function defineDelayGroups(instances, roomDims) {
   if(!(W>0&&L>0)||new Set(active.map(s=>s.id)).size!==active.length||active.some(s=>!s.id||!Number.isFinite(s.position?.x)||!Number.isFinite(s.position?.y)))return ambiguous("Missing or duplicate source identity/geometry.");
   const side=s=>s.position.y<L/2-GEOMETRY_TOLERANCE_M?"front":s.position.y>L/2+GEOMETRY_TOLERANCE_M?"rear":null;
   for(const s of active){const declared=s.legacyGroup || s.group;if(["front","rear"].includes(declared)&&declared!==side(s))return ambiguous("Group metadata conflicts with source geometry: "+s.id);}
-  const group=(id,label,rows)=>({id,label,sourceIds:rows.map(s=>s.id).sort()});
+  // `role` records the group's physical side so a signed rear-group offset can
+  // be stated honestly downstream. Group A is always the screen-side group and
+  // group B the far-side group, so the sign never has to be guessed.
+  const group=(id,label,rows,role)=>({id,label,role,sourceIds:rows.map(s=>s.id).sort()});
   if(active.length===4){
     const front=active.filter(s=>side(s)==="front"),rear=active.filter(s=>side(s)==="rear");
     if(front.length!==2||rear.length!==2)return ambiguous("Four-source timing requires two front and two rear sources.");
-    return {status:"eligible",groups:[group("A","Front pair",front),group("B","Rear pair",rear)]};
+    return {status:"eligible",groups:[group("A","Front pair",front,"front"),group("B","Rear pair",rear,"rear")]};
   }
   if(active.length===2){
     const [a,b]=active;
     if(side(a)&&side(a)===side(b)&&Math.abs(a.position.y-b.position.y)<=GEOMETRY_TOLERANCE_M&&Math.abs(a.position.x+b.position.x-W)<=GEOMETRY_TOLERANCE_M)return skipped("Symmetric same-wall pair: differential grouped timing is disabled by default.");
     const ordered=[...active].sort((a,b)=>a.position.y-b.position.y||a.id.localeCompare(b.id));
-    return {status:"eligible",groups:[group("A","First source",[ordered[0]]),group("B","Second source",[ordered[1]])]};
+    return {status:"eligible",groups:[group("A","First source",[ordered[0]],"front"),group("B","Second source",[ordered[1]],"rear")]};
   }
   return ambiguous("Grouped delay search supports one, two or four active sources.");
 }
@@ -35,7 +38,12 @@ export function createGroupedDelayCandidate(grouping, baseline, direction, adjus
   const id=adjustmentMs===0?"current":"grouped-delay:"+JSON.stringify(group.sourceIds)+":"+adjustmentMs;
   const limit=typeof processorDelayLimitMs==="number"&&Number.isFinite(processorDelayLimitMs)?processorDelayLimitMs:null;
   const rejection=limit!==null&&tuning.some(t=>t.delayMs>limit)?"Effective delay exceeds established processor limit ("+limit+" ms)":null;
-  return {id,direction:adjustmentMs===0?"current":direction,adjustmentMs,tuning,rejection,isCurrent:adjustmentMs===0};
+  // Signed offset of the REAR (far-side) group relative to the FRONT
+  // (screen-side) group. Delaying the front group leaves the rear group
+  // effectively advanced, which is how a negative effective offset is reached on
+  // a processor that can only add delay. Null when the physical role is unknown.
+  const effectiveOffsetMs=adjustmentMs===0?0:(group?.role==="front"?-adjustmentMs:group?.role==="rear"?adjustmentMs:null);
+  return {id,direction:adjustmentMs===0?"current":direction,adjustmentMs,effectiveOffsetMs,tuning,rejection,isCurrent:adjustmentMs===0};
 }
 
 export function generateGroupedCoarseCandidates(grouping, baseline, processorDelayLimitMs=null) {

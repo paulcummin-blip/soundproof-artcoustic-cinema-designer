@@ -37,6 +37,7 @@ import AdiTestedOptionsTable from "./AdiTestedOptionsTable.jsx";
 import AdiDesignerActionBar from "./AdiDesignerActionBar.jsx";
 import PlacementRecommendationPanel from "./PlacementRecommendationPanel.jsx";
 import { OPTIMISER_LEVER } from "./optimiserPlanConstants.js";
+import AcousticDelayAlignmentCard from "@/components/room/bass/improveBassV2/AcousticDelayAlignmentCard.jsx";
 import { PLACEMENT_PREVIEW_UNAVAILABLE } from "./placementMoveAuthority.js";
 import { ADI_ENGINEER_DETAILS_TITLE, buildAdiDesignerSummary } from "./adiDesignerSummary.js";
 import { FUTURE_CAPABILITY_TITLE } from "./optimiserLiveFamilies.js";
@@ -219,6 +220,12 @@ export default function AdiOptimisationJourney({
   const placement = summary.placementRecommendation || null;
   const placementLever = (planView?.levers || [])
     .find((lever) => (lever?.key ?? lever?.lever) === OPTIMISER_LEVER.PLACEMENT) || null;
+  // The delay lever carries the best acoustic delay the grouped front/rear sweep
+  // found: signed offset, objective served, canonical P19/P20 before and after,
+  // limiting seat and frequency. Absent = no delay change was proposed.
+  const delayLever = Array.isArray(planView?.levers)
+    ? planView.levers.find((lever) => (lever?.key ?? lever?.lever) === OPTIMISER_LEVER.DELAY) || null
+    : planView?.levers?.[OPTIMISER_LEVER.DELAY] || null;
   const panelShowsApply = placement?.kind === "recommended" && placement.canApply === true;
   const panelShowsUndo = placement?.kind === "applied" && placement.canUndo === true;
   const panelShowsRerun = placement?.kind === "previous";
@@ -369,6 +376,13 @@ export default function AdiOptimisationJourney({
           tested" panel; the absorption block that used to repeat below it is
           gone, and its evidence sits in Engineer details. */}
       <AdiTestedOptionsTable summary={summary} />
+
+      {/* The best acoustic delay the grouped front/rear sweep confirmed. It is a
+          detail of the delay lever ADI already tested — never a second
+          recommendation surface — and it states "no useful delay improvement
+          found" rather than claiming an improvement the canonical P19/P20
+          results do not support. */}
+      <AcousticDelayAlignmentCard lever={delayLever} />
 
       {/* The pre-run summary. The calculation count is stated ONCE, near the top
           of the card, so this line never repeats it. */}
