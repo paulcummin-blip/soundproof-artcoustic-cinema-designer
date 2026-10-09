@@ -38,18 +38,29 @@ import { readReportParameter } from '@/components/report/reportParameterEvidence
 
 export const PROJECT_REPORT_SECTION = Object.freeze({
   COVER: 'cover',
-  DESIGN_SUMMARY: 'design-summary',
+  DESIGN_STORY: 'design-story',
+  SYSTEM_PRODUCTS: 'system-products',
+  DESIGN_OVERVIEW: 'design-overview',
   VIEWING_EXPERIENCE: 'viewing-experience',
+  VIEWING_GEOMETRY: 'viewing-geometry',
+  PERFORMANCE_OVERVIEW: 'performance-overview',
   SPATIAL_RESOLUTION: 'spatial-resolution',
   DYNAMIC_RANGE: 'dynamic-range',
   TIMBRE_MATCHING: 'timbre-matching',
-  BASS_EVIDENCE: 'bass-evidence',
   PER_SEAT: 'per-seat',
   ACOUSTIC_TREATMENT: 'acoustic-treatment',
-  SYSTEMS_PRODUCTS: 'systems-products',
   ENGINEERING_DRAWINGS: 'engineering-drawings',
-  ABOUT: 'about',
+  METHOD: 'method-assumptions',
 });
+
+/**
+ * The three RP22 category headings are stated in capitals: they name a CEDIA
+ * assessment area, they are the document's own category headings, and they are
+ * exactly what a continuation page repeats ("SPATIAL RESOLUTION — CONTINUED").
+ * The category NAME still comes from `technicalParameterMeta`, so this only
+ * chooses the casing of a label that is already canonical.
+ */
+const categoryHeading = (paramId) => String(getCategoryForParam(paramId) || '').toUpperCase();
 
 /**
  * The consolidated report's own structure, in print order.
@@ -60,17 +71,21 @@ export const PROJECT_REPORT_SECTION = Object.freeze({
  */
 export const PROJECT_REPORT_SECTIONS = Object.freeze([
   { id: PROJECT_REPORT_SECTION.COVER, ordinal: '01', label: 'Cover' },
-  { id: PROJECT_REPORT_SECTION.DESIGN_SUMMARY, ordinal: '02', label: 'Design Summary' },
-  { id: PROJECT_REPORT_SECTION.VIEWING_EXPERIENCE, ordinal: '03', label: 'Viewing Experience' },
-  { id: PROJECT_REPORT_SECTION.SPATIAL_RESOLUTION, ordinal: '04', label: getCategoryForParam(1) },
-  { id: PROJECT_REPORT_SECTION.DYNAMIC_RANGE, ordinal: '05', label: getCategoryForParam(12) },
-  { id: PROJECT_REPORT_SECTION.TIMBRE_MATCHING, ordinal: '06', label: getCategoryForParam(17) },
-  { id: PROJECT_REPORT_SECTION.BASS_EVIDENCE, ordinal: '07', label: 'Detailed Bass Evidence' },
-  { id: PROJECT_REPORT_SECTION.PER_SEAT, ordinal: '08', label: 'Per-Seat Performance' },
-  { id: PROJECT_REPORT_SECTION.ACOUSTIC_TREATMENT, ordinal: '09', label: 'Acoustic Treatment' },
-  { id: PROJECT_REPORT_SECTION.SYSTEMS_PRODUCTS, ordinal: '10', label: 'Systems / Products Selected' },
-  { id: PROJECT_REPORT_SECTION.ENGINEERING_DRAWINGS, ordinal: '11', label: 'Engineering Drawings' },
-  { id: PROJECT_REPORT_SECTION.ABOUT, ordinal: '12', label: 'About Sound Proof' },
+  { id: PROJECT_REPORT_SECTION.DESIGN_STORY, ordinal: '02', label: 'Design Story' },
+  // The specified system is stated third, immediately after the design story,
+  // so the products are brought forward instead of trailing the document.
+  { id: PROJECT_REPORT_SECTION.SYSTEM_PRODUCTS, ordinal: '03', label: 'Systems / Products Selected' },
+  { id: PROJECT_REPORT_SECTION.DESIGN_OVERVIEW, ordinal: '04', label: 'Design Overview' },
+  { id: PROJECT_REPORT_SECTION.VIEWING_EXPERIENCE, ordinal: '05', label: 'Viewing Experience' },
+  { id: PROJECT_REPORT_SECTION.VIEWING_GEOMETRY, ordinal: '06', label: 'Viewing Geometry' },
+  { id: PROJECT_REPORT_SECTION.PERFORMANCE_OVERVIEW, ordinal: '07', label: 'Performance Overview' },
+  { id: PROJECT_REPORT_SECTION.SPATIAL_RESOLUTION, ordinal: '08', label: categoryHeading(1) },
+  { id: PROJECT_REPORT_SECTION.DYNAMIC_RANGE, ordinal: '09', label: categoryHeading(12) },
+  { id: PROJECT_REPORT_SECTION.TIMBRE_MATCHING, ordinal: '10', label: categoryHeading(17) },
+  { id: PROJECT_REPORT_SECTION.PER_SEAT, ordinal: '11', label: 'Per-Seat Performance' },
+  { id: PROJECT_REPORT_SECTION.ACOUSTIC_TREATMENT, ordinal: '12', label: 'Acoustic Treatment' },
+  { id: PROJECT_REPORT_SECTION.ENGINEERING_DRAWINGS, ordinal: '13', label: 'Engineering Drawings' },
+  { id: PROJECT_REPORT_SECTION.METHOD, ordinal: '14', label: 'Method / Assumptions' },
 ]);
 
 const SECTION_ORDER = PROJECT_REPORT_SECTIONS.map((section) => section.id);
@@ -87,8 +102,15 @@ export function projectReportSectionHeading(sectionId) {
   return SECTION_BY_ID[sectionId]?.label || null;
 }
 
-/** The continuation suffix a section's later pages state — applied exactly once. */
-export const CONTINUATION_SUFFIX_LABEL = ' — Continued';
+/**
+ * The continuation suffix a section's later pages state — applied exactly once.
+ *
+ * Stated in capitals, matching the category headings it follows: a page of
+ * "SPATIAL RESOLUTION" that continues says exactly "SPATIAL RESOLUTION —
+ * CONTINUED". This is the only place the suffix text is decided, and this module
+ * is the only place it is applied, so no page can state it twice.
+ */
+export const CONTINUATION_SUFFIX_LABEL = ' — CONTINUED';
 const CONTINUATION_SUFFIX = /\s*—\s*Continued\s*$/i;
 
 /* ── Parameters ─────────────────────────────────────────────────────────── */
@@ -162,6 +184,72 @@ export function buildParameterIndexPages(engineeringSummary) {
   }));
 }
 
+/* ── Technical evidence per page ────────────────────────────────────────── */
+
+/**
+ * The technical evidence each page states — which of P1–P21 the page is the
+ * detailed evidence for.
+ *
+ * The visual evidence and its technical evidence are stated on the SAME report
+ * page: the page's printData carries these ids, and the print composition
+ * renders the full parameter cards directly after the page's own visual
+ * composition. A reader never has to hold a drawing in mind while hunting for
+ * its card, and no parameter is left without one.
+ *
+ * Every parameter P1–P21 appears exactly once: P3, P8 and P11 carry no drawing
+ * page of their own, so they are stated on the Spatial Resolution overview
+ * beside the category's navigation table; P15 and P16 on the Dynamic Range
+ * overview; P18 and P21 on the Timbre Matching overview; every other parameter
+ * on its own detail page.
+ */
+export const PROJECT_REPORT_TECHNICAL_EVIDENCE = Object.freeze({
+  'p2-system-architecture': Object.freeze([2]),
+  'seating-position': Object.freeze([1]),
+  'p5-spatial-resolution': Object.freeze([5]),
+  'p7-front-wides': Object.freeze([7]),
+  'p9-spatial-resolution': Object.freeze([9]),
+  'best-listening-area': Object.freeze([4, 6, 10]),
+  'spatial-resolution-index': Object.freeze([3, 8, 11]),
+  'dynamic-range-index': Object.freeze([15, 16]),
+  'front-soundstage-dynamic-range': Object.freeze([12]),
+  'non-screen-dynamic-range': Object.freeze([13]),
+  'bass-capability': Object.freeze([14]),
+  'timbre-matching-index': Object.freeze([18, 21]),
+  'timbre-consistency': Object.freeze([17]),
+  'p19-rsp': Object.freeze([19]),
+  'bass-response': Object.freeze([20]),
+});
+
+/** The parameters one page is the detailed evidence for. */
+export function technicalEvidenceForPage(pageId) {
+  const ids = PROJECT_REPORT_TECHNICAL_EVIDENCE[String(pageId || '')];
+  return Array.isArray(ids) ? [...ids] : [];
+}
+
+/**
+ * Which of P1–P21 the technical evidence states, and whether any parameter is
+ * stated twice. Both are acceptance failures: a parameter with no card has lost
+ * its technical evidence, and a parameter with two has been duplicated.
+ */
+export function projectReportTechnicalEvidenceCoverage() {
+  const counts = new Map();
+  for (const ids of Object.values(PROJECT_REPORT_TECHNICAL_EVIDENCE)) {
+    for (const id of ids) counts.set(Number(id), (counts.get(Number(id)) || 0) + 1);
+  }
+  const missingIds = PROJECT_REPORT_PARAMETER_IDS.filter((id) => !counts.has(id));
+  const duplicatedIds = [...counts.entries()]
+    .filter(([, count]) => count > 1)
+    .map(([id]) => id)
+    .sort((a, b) => a - b);
+  return {
+    missingIds,
+    duplicatedIds,
+    complete: missingIds.length === 0 && duplicatedIds.length === 0,
+    expectedCount: PROJECT_REPORT_PARAMETER_IDS.length,
+    statedCount: counts.size,
+  };
+}
+
 /* ── Page → section ─────────────────────────────────────────────────────── */
 
 /**
@@ -171,31 +259,58 @@ export function buildParameterIndexPages(engineeringSummary) {
  */
 const PAGE_STRUCTURE = Object.freeze({
   'project-report-cover': { section: PROJECT_REPORT_SECTION.COVER },
-  highlights: { section: PROJECT_REPORT_SECTION.DESIGN_SUMMARY },
-  'adi-design-summary': { section: PROJECT_REPORT_SECTION.DESIGN_SUMMARY },
+  // 02 — the design story: the project's own opening statement, the supported
+  // strengths and the ADI summary.
+  highlights: { section: PROJECT_REPORT_SECTION.DESIGN_STORY },
+  'adi-design-summary': { section: PROJECT_REPORT_SECTION.DESIGN_STORY },
+  // 03 — the specified system, stated as a specification page.
+  'products-selected': { section: PROJECT_REPORT_SECTION.SYSTEM_PRODUCTS },
+  // 04–05 — the design overview drawings (plan + front elevation, then the two
+  // side elevations). Registered here so the drawing pages compose under their
+  // own section when they are added; no heading is ever invented for them.
+  'design-overview-plan-front': { section: PROJECT_REPORT_SECTION.DESIGN_OVERVIEW },
+  'design-overview-elevations': { section: PROJECT_REPORT_SECTION.DESIGN_OVERVIEW },
+  // 06 — RP23 viewing experience.
   'screen-seating': { section: PROJECT_REPORT_SECTION.VIEWING_EXPERIENCE },
-  // Parameter detail pages — P2 architecture, P5 spacing, P7 wides, P9 overheads,
-  // P4/P6/P10 across the seats, P1 listener distance.
+  // 07 — sightlines and viewing geometry.
+  sightlines: { section: PROJECT_REPORT_SECTION.VIEWING_GEOMETRY },
+  'viewing-geometry': { section: PROJECT_REPORT_SECTION.VIEWING_GEOMETRY },
+  // 08 — the performance overview and its scorecard.
+  'performance-overview': { section: PROJECT_REPORT_SECTION.PERFORMANCE_OVERVIEW },
+  // 09–14 — SPATIAL RESOLUTION (P1–P11): P2 architecture, P1 listener distance,
+  // P5 spacing, P7 wides, P9 overheads, P4/P6/P10 across the seats.
   'p2-system-architecture': { section: PROJECT_REPORT_SECTION.SPATIAL_RESOLUTION, parameterIds: [2] },
+  'seating-position': { section: PROJECT_REPORT_SECTION.SPATIAL_RESOLUTION, parameterIds: [1] },
   p5: { section: PROJECT_REPORT_SECTION.SPATIAL_RESOLUTION, parameterIds: [5] },
   'p7-front-wides': { section: PROJECT_REPORT_SECTION.SPATIAL_RESOLUTION, parameterIds: [7] },
   p9: { section: PROJECT_REPORT_SECTION.SPATIAL_RESOLUTION, parameterIds: [9] },
   'best-listening-area': { section: PROJECT_REPORT_SECTION.SPATIAL_RESOLUTION, parameterIds: [4, 6, 10] },
-  'seating-position': { section: PROJECT_REPORT_SECTION.SPATIAL_RESOLUTION, parameterIds: [1] },
-  // SPL capability — P12 screen, P13 non-screen, P14/P18 output & extension.
+  // 15–17 — DYNAMIC RANGE (P12–P16): P12 screen, P13 non-screen, P14 output,
+  // P15 assumed noise floor, P16 seat evidence. P16 stays in Dynamic Range.
   'front-soundstage-dynamic-range': { section: PROJECT_REPORT_SECTION.DYNAMIC_RANGE, parameterIds: [12] },
   'non-screen-dynamic-range': { section: PROJECT_REPORT_SECTION.DYNAMIC_RANGE, parameterIds: [13] },
-  'bass-capability': { section: PROJECT_REPORT_SECTION.DYNAMIC_RANGE, parameterIds: [14, 18] },
-  // Timbre — P17 surround/overhead, P19 response, P20 seat-to-seat consistency.
+  'bass-capability': { section: PROJECT_REPORT_SECTION.DYNAMIC_RANGE, parameterIds: [14] },
+  // 18–22 — TIMBRE MATCHING (P17–P21): P17 consistency, P18 extension, P19
+  // response at the RSP, P20 seat-to-seat consistency, P21 early reflections.
+  //
+  // The detailed bass evidence — the P19 RSP response and the primary-seat
+  // response curves — prints inside this section as supporting evidence for
+  // P19/P20. It is not a fourth RP22 category, so it never states a heading or
+  // an ordinal of its own.
   'timbre-consistency': { section: PROJECT_REPORT_SECTION.TIMBRE_MATCHING, parameterIds: [17] },
-  'bass-response': { section: PROJECT_REPORT_SECTION.TIMBRE_MATCHING, parameterIds: [19, 20] },
-  // Detailed bass evidence — the curves and maps that support P18/P19/P20. It is
-  // supporting evidence, not a fourth RP22 category.
-  'p19-rsp': { section: PROJECT_REPORT_SECTION.BASS_EVIDENCE, parameterIds: [19] },
+  'p16-p17-comparison': { section: PROJECT_REPORT_SECTION.TIMBRE_MATCHING, parameterIds: [16, 17] },
+  'p19-rsp': { section: PROJECT_REPORT_SECTION.TIMBRE_MATCHING, parameterIds: [19] },
+  'primary-seat-bass-curves': { section: PROJECT_REPORT_SECTION.TIMBRE_MATCHING, parameterIds: [19, 20] },
+  'bass-response': { section: PROJECT_REPORT_SECTION.TIMBRE_MATCHING, parameterIds: [20] },
+  // 23–28 — per-seat results, treatment, the engineering drawings and the
+  // closing method page.
   'per-seat-performance': { section: PROJECT_REPORT_SECTION.PER_SEAT },
   'acoustic-treatment': { section: PROJECT_REPORT_SECTION.ACOUSTIC_TREATMENT },
-  'products-selected': { section: PROJECT_REPORT_SECTION.SYSTEMS_PRODUCTS },
-  'about-sound-proof': { section: PROJECT_REPORT_SECTION.ABOUT },
+  'dimensioned-speaker-plan': { section: PROJECT_REPORT_SECTION.ENGINEERING_DRAWINGS },
+  'installation-schedule': { section: PROJECT_REPORT_SECTION.ENGINEERING_DRAWINGS },
+  'screen-wall-detail': { section: PROJECT_REPORT_SECTION.ENGINEERING_DRAWINGS },
+  'method-assumptions': { section: PROJECT_REPORT_SECTION.METHOD },
+  'about-sound-proof': { section: PROJECT_REPORT_SECTION.METHOD },
 });
 
 /** A page's own structure entry, or null when its type is not registered. */

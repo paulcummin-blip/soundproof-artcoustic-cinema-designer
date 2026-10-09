@@ -41,6 +41,7 @@ import ProjectReportSectionPage from '@/components/report/projectReport/ProjectR
 import { PROJECT_REPORT_TITLE } from '@/components/report/projectReport/projectReportIdentity';
 
 import ProjectReportSummaryOpening from "@/components/report/projectReport/ProjectReportSummaryOpening";
+import ProjectReportParameterCards from "@/components/report/projectReport/ProjectReportParameterCards";
 
 // Level → canonical grade colour for P12/P13 print result badges.
 // Derived from RP22_GRADE_TOKENS — the same authority as grading pills.
@@ -89,6 +90,13 @@ export default function ClientReportPage({
   // The document's own name — the Project Report. Passed in from the report's
   // identity authority so the masthead can never state an internal report name.
   reportTitle = PROJECT_REPORT_TITLE,
+  // The published engineering summary and the design's seating, supplied by the
+  // report page so a page's technical-evidence cards can be rendered in print.
+  // They are never stored on printData: the report stays a consumer of the one
+  // engineering authority rather than a second copy of it.
+  engineeringSummary = null,
+  seatingPositions = null,
+  contributionsByKey = null,
 }) {
   // One project metadata line, composed once for the masthead: the same words
   // on screen and in the exported PDF, including the design version this report
@@ -552,6 +560,21 @@ export default function ClientReportPage({
           <ProjectReportSectionPage heading={sectionHeading} print>
             <ProjectReportProducts rows={printData.rows} print />
           </ProjectReportSectionPage>
+        )}
+        {/* The page's own technical evidence — the full TechnicalParameterCard
+            for every parameter this page is the detailed page for: title, RP22
+            level pill, achieved value, thresholds, scope, assumed/target-basis
+            note and the per-seat result grid. It prints directly after the
+            page's visual composition, so the drawing and its evidence stay
+            together, and each card stays atomic on the page. */}
+        {Array.isArray(printData?.technicalCardIds) && printData.technicalCardIds.length > 0 && (
+          <ProjectReportParameterCards
+            engineeringSummary={engineeringSummary}
+            seatingPositions={seatingPositions}
+            parameterIds={printData.technicalCardIds}
+            contributionsByKey={contributionsByKey}
+            variant="print"
+          />
         )}
       </div>
 

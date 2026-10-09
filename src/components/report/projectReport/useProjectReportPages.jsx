@@ -44,10 +44,12 @@ import {
   orderProjectReportPages,
   projectReportSectionHeading,
   sectionForPage,
+  technicalEvidenceForPage,
 } from "@/components/report/projectReport/projectReportRegistry";
 import { buildProjectReportSummaryOpening } from "@/components/report/projectReport/projectReportSummaryOpening";
 import ProjectReportCover from "@/components/report/projectReport/ProjectReportCover";
 import ProjectReportParameterIndex from "@/components/report/projectReport/ProjectReportParameterIndex";
+import ProjectReportParameterCards from "@/components/report/projectReport/ProjectReportParameterCards";
 import ProjectReportProducts from "@/components/report/projectReport/ProjectReportProducts";
 import ProjectReportSectionPage from "@/components/report/projectReport/ProjectReportSectionPage";
 import ProjectReportSummaryOpening from "@/components/report/projectReport/ProjectReportSummaryOpening";
@@ -699,8 +701,34 @@ export function useProjectReportPages({
       visual: <ProjectReportProducts rows={productsSelected.rows} />,
     };
 
+    // Attach each page's technical evidence. The cards read the published
+    // engineering summary through the report's own parameter-grid authority —
+    // the same authority and the same TechnicalParameterCard the Technical
+    // Report prints — so the consolidated report adds the technical evidence
+    // without adding a second source of any value.
+    const withTechnicalEvidence = (page) => {
+      const cardIds = technicalEvidenceForPage(page?.id);
+      if (!Array.isArray(cardIds) || cardIds.length === 0) return page;
+      return {
+        ...page,
+        visual: (
+          <>
+            {page.visual}
+            <ProjectReportParameterCards
+              engineeringSummary={engineeringSummary}
+              seatingPositions={seatingPositions}
+              parameterIds={cardIds}
+            />
+          </>
+        ),
+        printData: { ...(page.printData || {}), technicalCardIds: cardIds },
+      };
+    };
+
     // The registry orders the document by its own section order and resolves
     // each page's heading and continuation state.
-    return orderProjectReportPages([coverPage, ...withOpeners, productsPage]);
-  }, [activePages, engineeringSummary, projectDetails, reportVersion, reportOnDate, productsSelected]);
+    return orderProjectReportPages(
+      [coverPage, ...withOpeners, productsPage].map(withTechnicalEvidence),
+    );
+  }, [activePages, engineeringSummary, projectDetails, reportVersion, reportOnDate, productsSelected, seatingPositions]);
 }

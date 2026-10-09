@@ -865,6 +865,8 @@ export default function RP22ClientReport() {
               logoUrl={LOGO_URL}
               printData={page.printData}
               version={reportVersion}
+              engineeringSummary={engineeringSummary}
+              seatingPositions={seatingPositions}
             >
               {page.visual}
             </ClientReportPage>
