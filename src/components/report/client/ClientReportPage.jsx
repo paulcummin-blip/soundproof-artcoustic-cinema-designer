@@ -37,6 +37,7 @@ import { clientReportHeaderMeta } from '@/components/report/client/clientReportH
 import ProjectReportCover from '@/components/report/projectReport/ProjectReportCover';
 import ProjectReportParameterIndex from '@/components/report/projectReport/ProjectReportParameterIndex';
 import ProjectReportProducts from '@/components/report/projectReport/ProjectReportProducts';
+import ProjectReportSectionPage from '@/components/report/projectReport/ProjectReportSectionPage';
 import { PROJECT_REPORT_TITLE } from '@/components/report/projectReport/projectReportIdentity';
 
 // Level → canonical grade colour for P12/P13 print result badges.
@@ -515,17 +516,23 @@ export default function ClientReportPage({
           />
         )}
         {/* 04–06 Every parameter of the category, explicitly assessed — including
-            the parameters that carry no drawing page of their own. */}
+            the parameters that carry no drawing page of their own. The category
+            heading is the composition authority's own heading for the section, so
+            a continuation page states it with "— Continued". */}
         {printData?.type === "parameter-index" && (
-          <ProjectReportParameterIndex
-            category={printData.category}
-            rows={printData.rows}
-            print
-          />
+          <ProjectReportSectionPage heading={sectionHeading} print>
+            <ProjectReportParameterIndex
+              category={printData.category}
+              rows={printData.rows}
+              print
+            />
+          </ProjectReportSectionPage>
         )}
         {/* 10 Systems / Products Selected — the complete equipment schedule. */}
         {printData?.type === "products-selected" && (
-          <ProjectReportProducts rows={printData.rows} print />
+          <ProjectReportSectionPage heading={sectionHeading} print>
+            <ProjectReportProducts rows={printData.rows} print />
+          </ProjectReportSectionPage>
         )}
       </div>
 

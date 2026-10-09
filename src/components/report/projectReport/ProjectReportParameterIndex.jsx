@@ -32,16 +32,6 @@ export default function ProjectReportParameterIndex({ category, rows = [], print
 
   return (
     <div style={{ fontFamily: REPORT_FONT_BODY, color: '#1B1A1A' }}>
-      <div style={{
-        fontSize: print ? 9 : 10,
-        letterSpacing: '0.06em',
-        textTransform: 'uppercase',
-        color: '#625143',
-        marginBottom: print ? '4mm' : 10,
-      }}>
-        {category} — every parameter stated
-      </div>
-
       <table style={{
         width: '100%',
         borderCollapse: 'collapse',

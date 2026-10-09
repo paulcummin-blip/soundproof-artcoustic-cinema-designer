@@ -1,5 +1,6 @@
 import { deriveP18SelectedTargetExplanation, formatP18MarkerSuffix } from "@/components/room/bass/p18SelectedTargetExplanation";
 import { resolveP20SeatDisplay } from "@/components/room/bass/p20DisplayAuthority";
+import { statedFrequencyHz } from "@/components/utils/rp22/statedFrequencyAuthority";
 
 const finite = (value) => value !== null && value !== "" && Number.isFinite(Number(value));
 
@@ -31,9 +32,9 @@ export function buildRp22GraphMarkers(finalBassResponse, selectedSeatId = null) 
   // below transition. There is no per-seat P19, so this is never resolved from the
   // selected seat — doing so made the marker vanish the moment a seat was clicked,
   // and would have claimed a per-seat result that does not exist.
-  const p19WorstFrequencyHz = finite(seatVariation?.p19?.worstFrequencyHz)
-    ? Number(seatVariation.p19.worstFrequencyHz)
-    : null;
+  // A frequency is stated only when the saved evidence carries one: a legacy
+  // publication's 0 (or blank) means "no frequency", never a 0 Hz measurement.
+  const p19WorstFrequencyHz = statedFrequencyHz(seatVariation?.p19?.worstFrequencyHz);
 
   // ── P20: the official project-worst point, always ──
   // The published P20 result is the worst seat in the project, under one

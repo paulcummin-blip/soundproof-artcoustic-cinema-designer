@@ -7,6 +7,8 @@
  * raw bass contract, and P19 is never built from per-seat rows: P19 is RSP-only.
  */
 
+import { statedFrequencyHz } from "@/components/utils/rp22/statedFrequencyAuthority";
+
 function finite(value) {
   const number = Number(value);
   return Number.isFinite(number) ? number : null;
@@ -60,7 +62,9 @@ export function selectClientBassPerformance(engineeringSummary, seatingPositions
       level: p19Room.level ?? null,
       deviationDb: finite(p19Room.value ?? p19Room.rawValue),
       displayedValue: p19Room.formatted ?? p19Room.valueText ?? null,
-      worstFrequencyHz: finite(p19Room.worstFrequencyHz),
+      // Stated only when the saved evidence carries a real frequency — a legacy
+      // 0 is absent, and the page then states no frequency at all.
+      worstFrequencyHz: statedFrequencyHz(p19Room.worstFrequencyHz),
     },
   } : null;
 
