@@ -1,9 +1,14 @@
 /**
  * AsdrCategorySection.jsx
  * -----------------------
- * One design-category block in the Technical Report ASDR scorecard (PDF).
- * Leads with the category name, followed by Primary / Secondary seat-scoped
- * floor results using standard RP22GradingPill / RP23 pills.
+ * One RP22 / RP23 design-category block in the Technical Report: the category
+ * name, followed by its Primary / Secondary seat-scoped floor results using the
+ * standard RP22GradingPill / RP23 pills.
+ *
+ * Used by the RP22 Performance Summary page (TechnicalPerformanceSummary), the
+ * page that answers "how does this cinema perform against RP22 / RP23?". These
+ * floor results are RP22 / RP23 performance, not Artcoustic System Design
+ * Rating scores, and they are never shown on the ASDR page.
  *
  * Pure presentation — consumes floor summaries from getCategoryFloorSummaries()
  * in designRatingPresentation (the SAME shared authority as the Room Designer

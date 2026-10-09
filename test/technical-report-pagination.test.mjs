@@ -10,6 +10,14 @@ const scorecard = await readFile(
   new URL("../src/components/report/technical/TechnicalAsdrScorecard.jsx", import.meta.url),
   "utf8",
 );
+const seatScoreGrid = await readFile(
+  new URL("../src/components/report/technical/AsdrSeatScoreGrid.jsx", import.meta.url),
+  "utf8",
+);
+const performanceSummary = await readFile(
+  new URL("../src/components/report/technical/TechnicalPerformanceSummary.jsx", import.meta.url),
+  "utf8",
+);
 const recommendations = await readFile(
   new URL("../src/components/report/technical/TechnicalAsdrRecommendations.jsx", import.meta.url),
   "utf8",
@@ -23,14 +31,22 @@ const parameterGrid = await readFile(
   "utf8",
 );
 
-test("ASDR recommendations stay together and the redesigned scorecard leads with categories", () => {
+test("RP22 results and ASDR scores each stay on their own page", () => {
   assert.match(recommendations, /className="tech-asdr-recommendations"/);
   assert.match(recommendations, /className="tech-rec-columns"/);
-  // Redesigned scorecard: four categories lead, seating summaries support
-  assert.match(scorecard, /className="tech-asdr-categories"/);
-  assert.match(scorecard, /AsdrCategorySection/);
+  // The ASDR page carries the proprietary rating only: the three scoped scores
+  // and the per-seat score grid, with no RP22 / RP23 category floor.
   assert.match(scorecard, /AsdrSeatingSummary/);
-  assert.match(scorecard, /getCategoryModalSummaries/);
+  assert.match(scorecard, /AsdrSeatScoreGrid/);
+  assert.doesNotMatch(scorecard, /AsdrCategorySection/);
+  assert.doesNotMatch(scorecard, /no lower than/);
+  // The RP22 Performance Summary page carries the four category floor results
+  // and none of the ASDR scores.
+  assert.match(performanceSummary, /className="tech-asdr-categories"/);
+  assert.match(performanceSummary, /AsdrCategorySection/);
+  assert.doesNotMatch(performanceSummary, /ScopedAsdrSummary|AsdrSeatScoreGrid/);
+  // The per-seat ASDR grid is the ASDR page's own component.
+  assert.match(seatScoreGrid, /tech-asdr-seat-grid/);
   // Old per-parameter scorecard table is gone
   assert.doesNotMatch(scorecard, /tech-asdr-scorecard-row/);
   assert.doesNotMatch(scorecard, /tech-asdr-scorecard-group/);

@@ -223,7 +223,7 @@ test('technical report surfaces render the index through the shared authority', 
   const surfaces = [
     '../src/components/report/technical/ScopedAsdrSummary.jsx',
     '../src/components/report/technical/AsdrSeatingSummary.jsx',
-    '../src/components/report/technical/TechnicalPerformanceSummary.jsx',
+    '../src/components/report/technical/AsdrSeatScoreGrid.jsx',
     '../src/components/report/technical/TechnicalReportRecommendations.jsx',
   ];
   for (const surface of surfaces) {
@@ -235,6 +235,13 @@ test('technical report surfaces render the index through the shared authority', 
       `${surface} must use the internal / technical label rather than the legacy wording`,
     );
   }
+  // The RP22 Performance Summary page carries RP22 / RP23 results only. The
+  // proprietary Design Index is rendered on the ASDR page, never here.
+  assert.doesNotMatch(
+    readSource('../src/components/report/technical/TechnicalPerformanceSummary.jsx'),
+    /designIndexDisplay|Design Index/,
+    'the RP22 Performance Summary page must carry no Design Index',
+  );
   assert.doesNotMatch(
     readSource('../src/components/report/technical/designIndexDisplay.js'),
     /%\s*`|`\s*%\s*`/,

@@ -1630,6 +1630,7 @@ function RP22ReportInner({ embed = false } = {}) {
                                         roomDesignRating={roomDesignRating}
                                         showDesignRating={showDesignRating}
                                         engineeringSummary={engineeringSummary}
+                                        rspSeatId={rspSeatId}
                                     />
                                 </div>
                             )}
