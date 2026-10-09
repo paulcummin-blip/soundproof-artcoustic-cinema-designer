@@ -115,6 +115,16 @@ export default function ClientReportPrintStyles() {
         margin-top: 24px;
       }
 
+      /* ── Top-spacing grid ────────────────────────────────────────────────
+         ONE top grid for every client-facing page, on screen and on paper: the
+         first page's masthead and every continuation page's heading region begin
+         the same distance below the page frame's top line, so page 1's opening
+         spread and every Visual page that follows it start on the same line. ── */
+      .client-report-page {
+        padding-top: var(--client-report-top-grid, 6mm);
+        box-sizing: border-box;
+      }
+
       /* ── Pre-print measurement phase: body class added before window.print() ── */
       body.client-report-printing {
         background: #FFFFFF !important;
@@ -147,6 +157,8 @@ export default function ClientReportPrintStyles() {
         height: 271mm !important;
         min-height: 271mm !important;
         box-sizing: border-box !important;
+        /* Top-spacing grid — kept identical to the @media print block below. */
+        padding-top: var(--client-report-top-grid, 6mm) !important;
         display: grid !important;
         grid-template-rows: auto 1fr;
         break-inside: avoid !important;
@@ -450,6 +462,8 @@ export default function ClientReportPrintStyles() {
           height: 271mm !important;
           min-height: 271mm !important;
           box-sizing: border-box !important;
+          /* Top-spacing grid — kept identical to the measurement block above. */
+          padding-top: var(--client-report-top-grid, 6mm) !important;
           display: grid !important;
           grid-template-rows: auto 1fr;
           break-inside: avoid !important;

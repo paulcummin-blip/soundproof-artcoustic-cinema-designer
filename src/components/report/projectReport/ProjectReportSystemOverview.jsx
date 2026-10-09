@@ -134,11 +134,15 @@ export default function ProjectReportSystemOverview({
             fontSize: print ? 7.5 : 10,
             letterSpacing: '0.08em',
             textTransform: 'uppercase',
-            color: '#213428',
-            marginBottom: print ? '3mm' : 8,
+            color: '#625143',
           }}>
             Viewing geometry by row
           </div>
+          <div style={{
+            height: 1,
+            background: '#DCDBD6',
+            margin: print ? '2mm 0 3mm 0' : '5px 0 8px 0',
+          }} />
           <div style={{
             display: 'grid',
             gridTemplateColumns: '1fr auto auto auto',

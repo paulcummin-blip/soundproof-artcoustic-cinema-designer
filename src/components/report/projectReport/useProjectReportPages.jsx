@@ -48,6 +48,7 @@ import { buildClientAcousticTreatmentPage } from "@/components/report/client/aco
 import { planSeatRowPages } from "@/components/report/client/perSeatCardLayout";
 import { isAssessedLevel } from "@/components/report/client/visualReportSeatStyle";
 import { buildProjectReportSummaryOpening } from "@/components/report/projectReport/projectReportSummaryOpening";
+import { buildProjectReportOpening } from "@/components/report/projectReport/projectReportOpening";
 import ProjectReportDesignSummary from "@/components/report/projectReport/ProjectReportDesignSummary";
 import AdiDesignHighlightsPage from "@/components/report/projectReport/AdiDesignHighlightsPage";
 import ProjectReportSystemOverview from "@/components/report/projectReport/ProjectReportSystemOverview";
@@ -105,6 +106,17 @@ export function useProjectReportPages({
     seatingPositions,
     engineeringSummary,
   }), [projectDetails, productsSelected, seatingPositions, engineeringSummary]);
+
+  // Page 1's own opening statement: the project-specific headline and the single
+  // supporting line of facts beneath it, composed by the report's opening
+  // authority from the same evidence the fact sheet and the paragraph state.
+  const opening = useMemo(() => buildProjectReportOpening({
+    projectDetails,
+    roomDims,
+    productsSelected,
+    seatingPositions,
+    engineeringSummary,
+  }), [projectDetails, roomDims, productsSelected, seatingPositions, engineeringSummary]);
 
   // The ADI Design Highlights page's content: the highlights ADI selects from
   // this design's own frozen evidence — the published RP22 and RP23 results and
@@ -630,6 +642,7 @@ export function useProjectReportPages({
         screenWidthM,
         productsSelected,
         summaryOpening,
+        opening,
       },
       visual: (
         <ProjectReportDesignSummary
@@ -639,6 +652,7 @@ export function useProjectReportPages({
           screenWidthM={screenWidthM}
           productsSelected={productsSelected}
           summaryOpening={summaryOpening}
+          opening={opening}
         />
       ),
     };
@@ -684,5 +698,5 @@ export function useProjectReportPages({
     // where the complete P1–P21 parameter-card sequence, the drawing set, the
     // bass curves and the single closing About Sound Proof page print.
     return [projectSummaryPage, adiHighlightsPage, systemProductsPage, ...pageList];
-  }, [activePages, summaryOpening, projectDetails, roomDims, seatingPositions, screenWidthM, productsSelected, adiHighlights, screenSeating, engineeringSummary]);
+  }, [activePages, summaryOpening, opening, projectDetails, roomDims, seatingPositions, screenWidthM, productsSelected, adiHighlights, screenSeating, engineeringSummary]);
 }

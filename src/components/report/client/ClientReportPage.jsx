@@ -176,6 +176,7 @@ export default function ClientReportPage({
             screenWidthM={printData.screenWidthM}
             productsSelected={printData.productsSelected}
             summaryOpening={printData.summaryOpening}
+            opening={printData.opening || null}
             print
           />
         )}

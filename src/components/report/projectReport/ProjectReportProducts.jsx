@@ -48,14 +48,19 @@ export default function ProjectReportProducts({ rows = [], connections = {}, pri
   return (
     <div style={{ fontFamily: REPORT_FONT_BODY, color: '#1B1A1A' }}>
       <div style={{
-        fontSize: print ? 9 : 10,
-        letterSpacing: '0.06em',
+        fontFamily: REPORT_FONT_HEADING,
+        fontSize: print ? 7.5 : 10,
+        letterSpacing: '0.08em',
         textTransform: 'uppercase',
         color: '#625143',
-        marginBottom: print ? '3mm' : 10,
       }}>
         System specification
       </div>
+      <div style={{
+        height: 1,
+        background: '#DCDBD6',
+        margin: print ? '2mm 0 3mm 0' : '5px 0 10px 0',
+      }} />
 
       <div style={{
         display: 'flex',

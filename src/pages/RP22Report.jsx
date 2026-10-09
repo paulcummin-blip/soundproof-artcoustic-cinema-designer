@@ -98,6 +98,7 @@ import {
     closeTechnicalReportPrintWindow,
 } from '@/components/report/technical/technicalReportPrintWindow';
 import TechnicalAboutSoundProofSection from '@/components/report/technical/TechnicalAboutSoundProofSection';
+import TechnicalHowToReadSection from '@/components/report/technical/TechnicalHowToReadSection';
 import { ISSUED_DOCUMENT_TYPE } from '@/components/library/issuedDocument/issuedDocumentTypes';
 import {
     recordIssuedExportInBackground,
@@ -1577,31 +1578,26 @@ function RP22ReportInner({ embed = false } = {}) {
                     <div className="print-container rp22-report">
                         <ReportTypographyStyles scope=".rp22-report" profile="a4" />
                         <section id="pdf-cover">
-                            {/* ── Page 1: Logo + title + RP22/RP23 explanations ── */}
-                            <div className="print-summary report-page-block report-page-block--cover" data-report-block="cover" data-report-page-start="true">
-                                {/* The brand cover belongs to the Technical Report's own
-                                    document. The consolidated Project Report opens on its own
-                                    front section, so the embedded pages keep this page's level
-                                    definitions and drop only the second cover. */}
-                                {!embed && <ReportCover variant="print" project={projectDetails} meta={technicalFirstPageMeta} />}
-                                {/* RP22 explanation */}
-                                <div style={{ maxWidth: '185mm', margin: '0 auto', paddingTop: '5mm', fontFamily: REPORT_FONT_BODY, fontSize: '10pt', color: '#3E4349', lineHeight: 1.55, textAlign: 'left' }}>
-                                    <div data-report-section-heading="true" style={reportSectionHeadingStyle('11pt', { color: '#1B1A1A', marginBottom: `${REPORT_SECTION_HEADING_GAP_PX}px` })}>CEDIA RP22 - Immersive Audio Performance Levels</div>
-                                    <div><strong>Level 1</strong> – The minimum level of performance necessary to convey basic artistic intent.</div>
-                                    <div><strong>Level 2</strong> – A higher level of performance that more accurately conveys artistic intent.</div>
-                                    <div><strong>Level 3</strong> – Meets or exceeds reference commercial cinema exhibition standards.</div>
-                                    <div><strong>Level 4</strong> – The maximum level of achievable performance across every parameter.</div>
-                                    <div style={{ marginTop: '2mm' }}>Performance levels apply to both individual seating positions as well as the room, with parameters therein attributed to one or the other.</div>
-                                </div>
-                                {/* RP23 explanation */}
-                                <div style={{ maxWidth: '185mm', margin: '0 auto', marginTop: '5mm', paddingTop: '5mm', borderTop: '1px solid #D9D5CE', fontFamily: REPORT_FONT_BODY, fontSize: '10pt', color: '#3E4349', lineHeight: 1.55, textAlign: 'left' }}>
-                                    <div data-report-section-heading="true" style={reportSectionHeadingStyle('11pt', { color: '#1B1A1A', marginBottom: `${REPORT_SECTION_HEADING_GAP_PX}px` })}>RP23 - Image Performance</div>
-                                    <div>CEDIA's forthcoming RP23 document will address best practice for image. Currently, we only have the size of the images based on the horizontal viewing angle, and the brightness which is known.</div>
+                            {/* ── The Technical Report's own front page ──────────────
+                                The RP22 level definitions and the RP23 image statement
+                                are the report's reference material: they now print on the
+                                "How to Read This Report" page in the back matter,
+                                immediately before the closing About page. This page keeps
+                                the cover and this report's own seating-coverage statement.
+                                In the consolidated Project Report the cover belongs to the
+                                document's own front section, so this page is not printed
+                                there at all and the technical pages open on Project &
+                                System Overview. ── */}
+                            {!embed && (
+                                <div className="print-summary report-page-block report-page-block--cover" data-report-block="cover" data-report-page-start="true">
+                                    <ReportCover variant="print" project={projectDetails} meta={technicalFirstPageMeta} />
                                     {coverageSentence && (
-                                        <Rp22SeatCoverageSentence sentence={coverageSentence} variant="cover" />
+                                        <div style={{ maxWidth: '185mm', margin: '0 auto', marginTop: '5mm' }}>
+                                            <Rp22SeatCoverageSentence sentence={coverageSentence} variant="cover" />
+                                        </div>
                                     )}
                                 </div>
-                            </div>
+                            )}
 
                             {/* ── Page 2: Project & System Overview ── */}
                             <div className="report-page-block report-page-block--summary" data-report-block="project-overview" data-report-page-start="true">
@@ -1842,6 +1838,13 @@ function RP22ReportInner({ embed = false } = {}) {
                             p19Result={p19ReportResult}
                             variant="print"
                         />
+
+                        {/* ── How to Read This Report — the report's reference
+                            page: the CEDIA RP22 performance levels, how room-wide
+                            and seat-scoped parameters are read, and the RP23 image
+                            statement. It follows the technical evidence and prints
+                            immediately before the closing About page. ── */}
+                        <TechnicalHowToReadSection />
 
                         {/* ── About Sound Proof — the closing brand page, and a
                             mandatory part of the report: it always renders, from

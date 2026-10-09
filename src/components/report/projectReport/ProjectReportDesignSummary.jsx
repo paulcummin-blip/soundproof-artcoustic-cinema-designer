@@ -22,6 +22,8 @@
 
 import React from 'react';
 import ProjectReportSummaryOpening from '@/components/report/projectReport/ProjectReportSummaryOpening';
+import ProjectReportOpeningBlock from '@/components/report/projectReport/ProjectReportOpeningBlock';
+import ProjectReportFactsGrid from '@/components/report/projectReport/ProjectReportFactsGrid';
 import { groupSeatsIntoRows } from '@/components/report/client/seatRowGrouping';
 import {
   REPORT_FONT_HEADING as FONT_HEADING,
@@ -56,30 +58,16 @@ function screenFact(projectDetails, screenWidthM) {
   return parts.join(' · ') || null;
 }
 
-function FactRow({ label, value, print }) {
-  return (
-    <div style={{
-      display: 'flex',
-      gap: 12,
-      padding: print ? '2mm 0' : '8px 0',
-      borderBottom: '1px solid #E5E5E5',
-    }}>
-      <div style={{
-        width: print ? '42mm' : 160,
-        flexShrink: 0,
-        fontFamily: FONT_HEADING,
-        fontSize: print ? 7.5 : 10,
-        letterSpacing: '0.08em',
-        textTransform: 'uppercase',
-        color: '#213428',
-      }}>
-        {label}
-      </div>
-      <div style={{ fontSize: print ? 9 : 12, color: '#3E4349' }}>
-        {value || DASH}
-      </div>
-    </div>
-  );
+/** The facts that describe the room, as opposed to the system built into it. */
+const ROOM_FACT_LABELS = new Set(['Room', 'Screen', 'Seating']);
+
+/** The fact sheet's two columns: the room the design is built in, and the system. */
+function factColumns(facts) {
+  const list = Array.isArray(facts) ? facts : [];
+  return [
+    list.filter((fact) => ROOM_FACT_LABELS.has(fact.label)),
+    list.filter((fact) => !ROOM_FACT_LABELS.has(fact.label)),
+  ];
 }
 
 export default function ProjectReportDesignSummary({
@@ -89,6 +77,7 @@ export default function ProjectReportDesignSummary({
   screenWidthM = null,
   productsSelected = null,
   summaryOpening = null,
+  opening = null,
   print = false,
 }) {
   const seatRows = groupSeatsIntoRows(seatingPositions);
@@ -121,6 +110,9 @@ export default function ProjectReportDesignSummary({
     { label: 'Acoustic treatment', value: productValue(productsSelected, 'acoustic_treatment') },
   ];
 
+  // The fact sheet's own two columns — every fact stays on the page.
+  const columns = factColumns(facts);
+
   return (
     <div style={{ fontFamily: FONT_BODY, color: '#1B1A1A' }}>
       <div className="client-report-print-heading">
@@ -139,10 +131,14 @@ export default function ProjectReportDesignSummary({
         </h1>
       </div>
 
-      <div>
-        {facts.map((fact) => (
-          <FactRow key={fact.label} label={fact.label} value={fact.value} print={print} />
-        ))}
+      <ProjectReportOpeningBlock
+        headline={opening?.headline || null}
+        supportingLine={opening?.supportingLine || null}
+        print={print}
+      />
+
+      <div style={{ marginTop: print ? '4mm' : 14 }}>
+        <ProjectReportFactsGrid columns={columns} print={print} />
       </div>
 
       {summaryOpening && (

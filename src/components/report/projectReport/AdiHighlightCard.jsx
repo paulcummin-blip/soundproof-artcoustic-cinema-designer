@@ -25,7 +25,7 @@ const BODY = '#3E4349';
 const MUTED = '#625143';
 const RULE = '#DCDBD6';
 
-function EvidencePill({ item, print }) {
+function EvidencePill({ item, print, fontSize }) {
   const level = item?.level ? String(item.level).match(/^L?([1-4])$|^FAIL$/) : null;
   const grade = level ? getSeatGradeColors(item.level) : null;
   const text = [item?.key, item?.value].filter(Boolean).join(' · ');
@@ -41,7 +41,7 @@ function EvidencePill({ item, print }) {
       background: grade ? grade.fill : '#F8F8F7',
       color: grade ? grade.text : BODY,
       fontFamily: FONT_BODY,
-      fontSize: print ? 8 : 11,
+      fontSize: fontSize ?? (print ? 8 : 11),
       lineHeight: 1.2,
     }}>
       {text}
@@ -52,7 +52,18 @@ function EvidencePill({ item, print }) {
 export default function AdiHighlightCard({ highlight, print = false }) {
   if (!highlight) return null;
 
-  const prominent = Number(highlight.weight) >= 3;
+  // Emphasis follows ADI's own ranking of this design's evidence: the strongest
+  // result states the highlight, a solid supporting result is stated plainly,
+  // and a brief supporting note is stated smallest. The page therefore reads in
+  // one visual order of importance instead of giving every item equal weight.
+  const weight = Number(highlight.weight);
+  const tier = weight >= 3 ? 'feature' : weight >= 2 ? 'standard' : 'supporting';
+  const emphasis = {
+    feature: { bar: print ? '1.2mm' : 3, title: print ? 12 : 17, titleWeight: 400, pillFont: print ? 8 : 11, copyFont: print ? 9 : 12.5, copyColor: BODY },
+    standard: { bar: print ? '0.9mm' : 2, title: print ? 11 : 15.5, titleWeight: 400, pillFont: print ? 7.5 : 10.5, copyFont: print ? 9 : 12, copyColor: BODY },
+    supporting: { bar: print ? '0.6mm' : 1, title: print ? 10 : 14, titleWeight: 300, pillFont: print ? 7 : 10, copyFont: print ? 8.5 : 11.5, copyColor: MUTED },
+  }[tier];
+  const prominent = tier === 'feature';
   const evidence = Array.isArray(highlight.evidence) ? highlight.evidence.filter(Boolean) : [];
 
   return (
@@ -65,7 +76,7 @@ export default function AdiHighlightCard({ highlight, print = false }) {
       border: print ? 'none' : `1px solid ${RULE}`,
     }}>
       <div style={{
-        width: prominent ? (print ? '1.2mm' : 3) : (print ? '0.6mm' : 1),
+        width: emphasis.bar,
         flexShrink: 0,
         alignSelf: 'stretch',
         background: prominent ? INK : RULE,
@@ -82,8 +93,8 @@ export default function AdiHighlightCard({ highlight, print = false }) {
         }}>
           <div style={{
             fontFamily: FONT_HEADING,
-            fontSize: print ? (prominent ? 12 : 10.5) : (prominent ? 17 : 15),
-            fontWeight: prominent ? 400 : 300,
+            fontSize: emphasis.title,
+            fontWeight: emphasis.titleWeight,
             color: INK,
             letterSpacing: '0.01em',
             lineHeight: 1.2,
@@ -112,7 +123,12 @@ export default function AdiHighlightCard({ highlight, print = false }) {
             marginTop: print ? '2mm' : 7,
           }}>
             {evidence.map((item, index) => (
-              <EvidencePill key={`${highlight.id}-evidence-${index}`} item={item} print={print} />
+              <EvidencePill
+                key={`${highlight.id}-evidence-${index}`}
+                item={item}
+                print={print}
+                fontSize={emphasis.pillFont}
+              />
             ))}
           </div>
         )}
@@ -120,9 +136,9 @@ export default function AdiHighlightCard({ highlight, print = false }) {
         <div style={{
           marginTop: print ? '2mm' : 7,
           fontFamily: FONT_BODY,
-          fontSize: print ? 9 : 12.5,
+          fontSize: emphasis.copyFont,
           lineHeight: 1.45,
-          color: BODY,
+          color: emphasis.copyColor,
         }}>
           {highlight.explanation}
         </div>
