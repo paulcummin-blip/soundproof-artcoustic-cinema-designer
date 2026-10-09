@@ -25,7 +25,7 @@ export default function BassAuthorityStateBar({ state = null, onPrimaryAction = 
   return (
     <div
       data-bass-authority-state={state.code}
-      className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-2 rounded-md px-2.5 py-2"
+      className="col-span-2 sm:col-span-4 mt-2 flex flex-wrap items-center gap-x-3 gap-y-2 rounded-md px-2.5 py-2"
       style={{ border: `1px solid ${tone.border}`, background: tone.background }}
     >
       <span
