@@ -78,3 +78,23 @@ test('centre card consumes shared FC instead of independently adding allowance',
  assert.ok(!src.includes('base + DUAL_CENTRE_SPL_GAIN_DB'));
  assert.ok(!src.includes('computeSingleSeatSplAtDistance'));
 });
+
+import { hasMinimumSystemForAsdr } from '@/components/utils/minimumSystemForAsdr';
+const bassState = {subwooferInstances:[{id:'sub',enabled:true}]};
+test('complete dual-centre stage passes the existing minimum-system handoff gate',()=>{
+ assert.equal(hasMinimumSystemForAsdr([...unchanged,...pair],bassState),true);
+});
+test('partial or uninstalled dual-centre stage remains incomplete',()=>{
+ for(const centres of [[pair[0]],[pair[0],{...pair[1],model:'none'}],[pair[0],{...pair[1],position:null}]]){
+ assert.equal(hasMinimumSystemForAsdr([...unchanged,...centres],bassState),false);
+ }
+});
+test('dual centre cannot bypass missing left/right, surrounds or subwoofer',()=>{
+ assert.equal(hasMinimumSystemForAsdr(pair,bassState),false);
+ assert.equal(hasMinimumSystemForAsdr([...unchanged,...pair],{}),false);
+ assert.equal(hasMinimumSystemForAsdr([...unchanged.filter(s=>['FL','FR'].includes(s.role)),...pair],bassState),false);
+});
+test('conventional minimum-system eligibility is unchanged',()=>{
+ assert.equal(hasMinimumSystemForAsdr([...unchanged,single],bassState),true);
+ assert.equal(hasMinimumSystemForAsdr(unchanged,bassState),false);
+});
