@@ -1,23 +1,32 @@
 /**
  * useProjectReportPages.jsx
  * -------------------------
- * Builds the Project Report's page list — the CONTENT of each page — and hands
- * it to the composition authority (projectReportRegistry) to be ordered into the
- * document.
+ * The consolidated Project Report's page list.
  *
- * One page here owns one section of the story: the cover, the category
- * assessment tables, the parameter detail pages, the detailed bass evidence, the
- * per-seat results, treatment, the products schedule, and the closing brand
- * page. Every value is read passively from the published engineering summary and
- * the saved design — nothing is recalculated, re-graded or inferred.
+ * THE PROJECT REPORT IS AN EDIT OF THE TWO REPORTS, NOT A THIRD ONE:
  *
- * The report's structure (section order, headings, continuation state and the
- * P1–P21 inclusion rule) belongs to the registry, not here.
+ *   01  Project Report / Design Summary       — the merged front page
+ *   02  System + Products / Project Overview  — the equipment brought forward
+ *   THEN the Visual Report's own pages, in their existing order and their
+ *        existing presentation
+ *   THEN the Technical Report's own pages, in their existing order, mounted by
+ *        the report page itself (see TechnicalReportDocument): the complete
+ *        P1–P21 parameter-card sequence, the drawings, the bass curves and the
+ *        single closing About Sound Proof page.
+ *
+ * Two pages stand in for pages the two reports already state, which is what
+ * makes this an edit rather than a merge of duplicates: the front page replaces
+ * both the Visual Report's design-summary page and the Technical Report's cover,
+ * and the Technical Report's closing About page is the document's only About
+ * page. Everything else is kept as it is.
+ *
+ * Every value is read passively from the published engineering summary and the
+ * saved design: nothing is recalculated, re-graded or inferred, no parameter
+ * card is moved between reports, and no drawing leaves the section it prints in.
  */
 
 import React, { useMemo } from "react";
 
-import ClientDesignHighlights from "@/components/report/client/ClientDesignHighlights";
 import ClientAdiDesignSummary from "@/components/report/client/ClientAdiDesignSummary";
 import ClientScreenSeating from "@/components/report/client/ClientScreenSeating";
 import ClientP2SystemArchitecture from "@/components/report/client/ClientP2SystemArchitecture";
@@ -34,25 +43,12 @@ import ClientP19RspPresentation from "@/components/report/client/ClientP19RspPre
 import ClientRecommendedSeatingPosition from "@/components/report/client/ClientRecommendedSeatingPosition";
 import ClientAcousticTreatment from "@/components/report/client/ClientAcousticTreatment";
 import ClientPerSeatPerformance from "@/components/report/client/ClientPerSeatPerformance";
-import AboutSoundProofReportPage from "@/components/report/AboutSoundProofReportPage";
 import { buildClientAcousticTreatmentPage } from "@/components/report/client/acousticTreatmentPageAuthority";
 import { planSeatRowPages } from "@/components/report/client/perSeatCardLayout";
 import { isAssessedLevel } from "@/components/report/client/visualReportSeatStyle";
-import {
-  PROJECT_REPORT_SECTION,
-  buildParameterIndexPages,
-  orderProjectReportPages,
-  projectReportSectionHeading,
-  sectionForPage,
-  technicalEvidenceForPage,
-} from "@/components/report/projectReport/projectReportRegistry";
 import { buildProjectReportSummaryOpening } from "@/components/report/projectReport/projectReportSummaryOpening";
-import ProjectReportCover from "@/components/report/projectReport/ProjectReportCover";
-import ProjectReportParameterIndex from "@/components/report/projectReport/ProjectReportParameterIndex";
-import ProjectReportParameterCards from "@/components/report/projectReport/ProjectReportParameterCards";
-import ProjectReportProducts from "@/components/report/projectReport/ProjectReportProducts";
-import ProjectReportSectionPage from "@/components/report/projectReport/ProjectReportSectionPage";
-import ProjectReportSummaryOpening from "@/components/report/projectReport/ProjectReportSummaryOpening";
+import ProjectReportDesignSummary from "@/components/report/projectReport/ProjectReportDesignSummary";
+import ProjectReportSystemOverview from "@/components/report/projectReport/ProjectReportSystemOverview";
 
 export function useProjectReportPages({
   hydrating,
@@ -92,21 +88,25 @@ export function useProjectReportPages({
   coverageSentence,
   reportGeometry,
   reportSystem,
-  aboutSoundProofHtml,
   appState,
   projectId,
   versionId,
 }) {
+  // The Design Summary's opening: one project-specific statement of the cinema
+  // this report documents, composed from the report's own evidence. Null when
+  // the report carries too little project evidence for one. It opens the merged
+  // document's first page.
+  const summaryOpening = useMemo(() => buildProjectReportSummaryOpening({
+    projectDetails,
+    productsSelected,
+    seatingPositions,
+    engineeringSummary,
+  }), [projectDetails, productsSelected, seatingPositions, engineeringSummary]);
+
+  // The Visual Report's own pages — its existing order and its existing
+  // presentation, exactly as the Visual Report prints them. No parameter card is
+  // inserted between its drawings, and no page is re-sectioned.
   const activePages = useMemo(() => {
-    // The Design Summary's opening: one project-specific statement of the cinema
-    // this report documents, composed from the report's own evidence. Null when
-    // the report carries too little project evidence for one.
-    const summaryOpening = buildProjectReportSummaryOpening({
-      projectDetails,
-      productsSelected,
-      seatingPositions,
-      engineeringSummary,
-    });
     const overviewPages = [];
     const dynamicPages = [];
     const spatialPages = [];
@@ -114,27 +114,6 @@ export function useProjectReportPages({
     const bassPages = [];
     const summaryPages = [];
     const closingPages = [];
-    // Design Summary — always first (intro page)
-    if (highlights.length > 0) {
-      overviewPages.push({
-        id: "design-summary",
-        category: "Design Summary",
-        // The Design Summary opens on this project — its architecture, screen,
-        // seating and specified system, with only the strengths the published
-        // assessment supports — instead of a generic statement about seats.
-        visual: (
-          <>
-            {summaryOpening && <ProjectReportSummaryOpening sentence={summaryOpening} />}
-            <ClientDesignHighlights highlights={highlights} />
-          </>
-        ),
-        printData: {
-          type: "highlights",
-          highlights,
-          summaryOpening,
-        },
-      });
-    }
     // ADI Design Summary — what Artcoustic Design Intelligence contributes:
     // the project's genuine strengths, the main limiting factor and the
     // practical next actions. Immediately after the performance highlights.
@@ -599,26 +578,9 @@ export function useProjectReportPages({
         });
       });
     }
-    // About Sound Proof — the short brand closing section, always last and always
-    // present. Its copy is the published copy or the built-in fallback, resolved
-    // synchronously, so the page always prints complete: never omitted, never
-    // blank, never a loading page.
-    closingPages.push({
-      id: "about-sound-proof",
-      category: "About Sound Proof",
-      visual: (
-        <div style={{
-          background: "#FFFFFF",
-          borderRadius: 16,
-          padding: "28px 32px",
-          boxShadow: "0 2px 12px rgba(0, 0, 0, 0.06)",
-          border: "1px solid #DCDBD6",
-        }}>
-          <AboutSoundProofReportPage variant="compact" html={aboutSoundProofHtml} />
-        </div>
-      ),
-      printData: { type: "about-sound-proof", aboutHtml: aboutSoundProofHtml },
-    });
+    // The document's closing About Sound Proof page is the Technical Report's own,
+    // mounted with the Technical pages by the report page. The consolidated
+    // document therefore states About Sound Proof once, never twice.
 
     return [
       ...overviewPages,
@@ -629,7 +591,7 @@ export function useProjectReportPages({
       ...summaryPages,
       ...closingPages,
     ];
-  }, [p5Snapshot, p5SeatResults, p9Snapshot, p9Overhead, bestListeningArea, timbreConsistency, frontSoundstage, nonScreenSoundstage, highlights, screenSeating, hasSeatingPosition, recommendedSeatingPosition, bassPerformance, roomDims, rsp, rspSourceLabel, screenFrontPlaneM, screenWidthM, screen, placedSpeakers, appState?.acousticTreatmentEnabled, appState?.selectedAbfuserQty, appState?.abfuserQtySource, coverageSentence, reportGeometry, reportSystem, perSeatPerformance, aboutSoundProofHtml, projectId]);
+  }, [p5Snapshot, p5SeatResults, p9Snapshot, p9Overhead, bestListeningArea, timbreConsistency, frontSoundstage, nonScreenSoundstage, highlights, screenSeating, hasSeatingPosition, recommendedSeatingPosition, bassPerformance, roomDims, rsp, rspSourceLabel, screenFrontPlaneM, screenWidthM, screen, placedSpeakers, appState?.acousticTreatmentEnabled, appState?.selectedAbfuserQty, appState?.abfuserQtySource, coverageSentence, reportGeometry, reportSystem, perSeatPerformance, projectId]);
 
   // ── The Project Report's composition ────────────────────────────────────
   // ONE composition authority decides the document: the cover, the three
@@ -642,93 +604,63 @@ export function useProjectReportPages({
   return useMemo(() => {
     const pageList = Array.isArray(activePages) ? activePages.filter(Boolean) : [];
 
-    // The three category assessment tables, built once from the published
-    // engineering summary. Each opens its own section.
-    const indexPages = buildParameterIndexPages(engineeringSummary).map((descriptor) => ({
-      id: descriptor.id,
-      section: descriptor.section,
-      category: descriptor.category,
-      parameterIds: descriptor.parameterIds,
-      printData: descriptor.printData,
-      visual: (
-        <ProjectReportSectionPage heading={descriptor.category}>
-          <ProjectReportParameterIndex category={descriptor.category} rows={descriptor.rows} />
-        </ProjectReportSectionPage>
-      ),
-    }));
-
-    // A section's opening page: its assessment table, stated before its first
-    // detail page. A table whose section has no detail page still prints.
-    const openers = new Map(indexPages.map((page) => [page.section, page]));
-    const withOpeners = [];
-    let currentSection = null;
-    for (const page of pageList) {
-      const section = sectionForPage(page);
-      if (section !== currentSection) {
-        currentSection = section;
-        const opener = openers.get(section);
-        if (opener) {
-          withOpeners.push(opener);
-          openers.delete(section);
-        }
-      }
-      withOpeners.push(page);
-    }
-    withOpeners.push(...openers.values());
-
-    const coverPage = {
-      id: "project-report-cover",
+    // The registry used to state each category's assessment table before its
+    // first detail page. The consolidated report states no such table: every
+    // parameter card stays in the Technical Report's own P1–P21 sequence, where
+    // the engineering is explained properly and the sequence is not fragmented.
+    // 01 Project Report / Design Summary — the stronger opening: the design's key
+    // facts, the report's own project-specific Design Summary and the strengths
+    // the published assessment supports.
+    const designSummaryPage = {
+      id: "project-report-design-summary",
       printData: {
-        type: "project-report-cover",
+        type: "design-summary",
         projectDetails,
-        version: reportVersion,
-        reference: projectDetails?.project_reference || null,
-        generatedOn: reportOnDate,
+        roomDims,
+        seatingPositions,
+        screenWidthM,
+        productsSelected,
+        summaryOpening,
+        highlights,
       },
       visual: (
-        <ProjectReportCover
+        <ProjectReportDesignSummary
           projectDetails={projectDetails}
-          version={reportVersion}
-          reference={projectDetails?.project_reference || null}
-          generatedOn={reportOnDate}
+          roomDims={roomDims}
+          seatingPositions={seatingPositions}
+          screenWidthM={screenWidthM}
+          productsSelected={productsSelected}
+          summaryOpening={summaryOpening}
+          highlights={highlights}
         />
       ),
     };
 
-    const productsPage = {
-      id: "products-selected",
-      printData: { type: "products-selected", rows: productsSelected.rows },
-      visual: <ProjectReportProducts rows={productsSelected.rows} />,
+    // 02 System + Products / Project Overview — the equipment brought forward:
+    // the complete System specification schedule, the system configuration and
+    // the viewing geometry of every seating row.
+    const systemOverviewPage = {
+      id: "project-report-system-overview",
+      printData: {
+        type: "system-overview",
+        projectDetails,
+        productsSelected,
+        rows: screenSeating.rows,
+      },
+      visual: (
+        <ProjectReportSystemOverview
+          projectDetails={projectDetails}
+          productsSelected={productsSelected}
+          rows={screenSeating.rows}
+        />
+      ),
     };
 
-    // Attach each page's technical evidence. The cards read the published
-    // engineering summary through the report's own parameter-grid authority —
-    // the same authority and the same TechnicalParameterCard the Technical
-    // Report prints — so the consolidated report adds the technical evidence
-    // without adding a second source of any value.
-    const withTechnicalEvidence = (page) => {
-      const cardIds = technicalEvidenceForPage(page?.id);
-      if (!Array.isArray(cardIds) || cardIds.length === 0) return page;
-      return {
-        ...page,
-        visual: (
-          <>
-            {page.visual}
-            <ProjectReportParameterCards
-              engineeringSummary={engineeringSummary}
-              seatingPositions={seatingPositions}
-              parameterIds={cardIds}
-            />
-          </>
-        ),
-        printData: { ...(page.printData || {}), technicalCardIds: cardIds },
-      };
-    };
-
-    // The registry orders the document by its own section order and resolves
-    // each page's heading and continuation state.
-    return orderProjectReportPages(
-      [coverPage, ...withOpeners, productsPage].map(withTechnicalEvidence),
-    );
-  }, [activePages, engineeringSummary, projectDetails, reportVersion, reportOnDate, productsSelected, seatingPositions]);
+    // THE DOCUMENT: the two front pages, then the Visual Report's own pages in
+    // their existing order, unchanged. The Technical Report's pages follow them,
+    // mounted by the report page itself (TechnicalReportDocument) — that is where
+    // the complete P1–P21 parameter-card sequence, the drawing set, the bass
+    // curves and the single closing About Sound Proof page print.
+    return [designSummaryPage, systemOverviewPage, ...pageList];
+  }, [activePages, summaryOpening, projectDetails, roomDims, seatingPositions, screenWidthM, productsSelected, highlights, screenSeating]);
 }

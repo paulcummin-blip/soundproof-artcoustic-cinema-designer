@@ -38,7 +38,7 @@ import { selectClientBassPerformance } from "@/components/report/client/selectCl
 import { selectClientP2SystemArchitecture } from "@/components/report/client/selectClientP2SystemArchitecture";
 import { selectClientPerSeatPerformance } from "@/components/report/client/selectClientPerSeatPerformance";
 import { selectClientP7FrontWides } from "@/components/report/client/selectClientP7FrontWides";
-import { usePublicationContent } from "@/components/publicationContent/usePublicationContent";
+import TechnicalReportDocument from "@/components/report/technical/TechnicalReportDocument";
 import { LOGO_URL } from "@/components/report/ReportCover";
 import { Button } from "@/components/ui/button";
 import { ArrowLeft, FileText, Download } from "lucide-react";
@@ -299,17 +299,14 @@ export default function RP22ClientReport() {
       .filter((sub) => sub && sub.enabled !== false).length,
   }), [subwooferInstances]);
 
-  // The closing About Sound Proof page is a MANDATORY part of this report. The
-  // copy is never awaited: the hook seeds the built-in fallback, so the published
-  // copy or the fallback is available synchronously and the page always has
-  // finished copy — never blank, never "Loading…", never omitted.
-  const aboutSoundProof = usePublicationContent("about_sound_proof");
-  const aboutSoundProofHtml = aboutSoundProof.html;
+  // The document's closing About Sound Proof page is the Technical Report's own,
+  // mounted with the Technical pages below: the consolidated report states About
+  // Sound Proof exactly once.
 
-  // The page CONTENT is assembled by the Project Report's own composition hook;
-  // the section order, headings and P1–P21 inclusion rule belong to the
-  // composition authority (projectReportRegistry). No competing page order or
-  // heading logic exists here.
+  // The page list is the consolidated document: the two front pages, then the
+  // Visual Report's own pages in their existing order. The Technical Report's
+  // pages follow them, mounted by this page — see the render below. No competing
+  // page order or heading logic exists here.
 
   // ── Canonical report state ──────────────────────────────────────────────
   // One authority decides whether this report is Not Ready, Preparing, Ready
@@ -483,7 +480,6 @@ export default function RP22ClientReport() {
     coverageSentence,
     reportGeometry,
     reportSystem,
-    aboutSoundProofHtml,
     appState,
     projectId,
     versionId: authority.versionId || null,
@@ -865,13 +861,23 @@ export default function RP22ClientReport() {
               logoUrl={LOGO_URL}
               printData={page.printData}
               version={reportVersion}
-              engineeringSummary={engineeringSummary}
-              seatingPositions={seatingPositions}
             >
               {page.visual}
             </ClientReportPage>
           ))
         )}
+
+        {/* THE TECHNICAL REPORT'S OWN PAGES, EXACTLY AS IT PRINTS THEM.
+            Mounted after the Visual pages so the document moves from the
+            client-facing story and its visual evidence into the detailed
+            engineering: the level definitions, the project and system overview,
+            the performance summary, the ASDR scorecard, the room plan, dimensions
+            and speaker position plan, the complete P1–P21 parameter-card sequence
+            in its own block, the elevations, the sightlines, the screen-wall
+            detail, the primary-seat bass curves and the single closing About
+            Sound Proof page. Nothing about those pages is edited, re-sectioned,
+            split apart or given a competing presentation. */}
+        {reportReady && orderedPages.length > 0 && <TechnicalReportDocument />}
         {exportError && (
           <div className="client-report-screen-only" style={{
             marginTop: 16,

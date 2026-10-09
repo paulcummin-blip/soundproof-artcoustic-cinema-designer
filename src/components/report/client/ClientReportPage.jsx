@@ -34,14 +34,9 @@ import { getSeatGradeColors } from "@/components/report/client/visualReportSeatS
 import ReportPrintHeader from '@/components/report/ReportPrintHeader';
 import { REPORT_STRAPLINE } from '@/components/report/reportPrintHeader';
 import { clientReportHeaderMeta } from '@/components/report/client/clientReportHeaderMeta';
-import ProjectReportCover from '@/components/report/projectReport/ProjectReportCover';
-import ProjectReportParameterIndex from '@/components/report/projectReport/ProjectReportParameterIndex';
-import ProjectReportProducts from '@/components/report/projectReport/ProjectReportProducts';
-import ProjectReportSectionPage from '@/components/report/projectReport/ProjectReportSectionPage';
+import ProjectReportDesignSummary from '@/components/report/projectReport/ProjectReportDesignSummary';
+import ProjectReportSystemOverview from '@/components/report/projectReport/ProjectReportSystemOverview';
 import { PROJECT_REPORT_TITLE } from '@/components/report/projectReport/projectReportIdentity';
-
-import ProjectReportSummaryOpening from "@/components/report/projectReport/ProjectReportSummaryOpening";
-import ProjectReportParameterCards from "@/components/report/projectReport/ProjectReportParameterCards";
 
 // Level → canonical grade colour for P12/P13 print result badges.
 // Derived from RP22_GRADE_TOKENS — the same authority as grading pills.
@@ -57,12 +52,12 @@ function printLevelColor(lvl) {
 // `client-report-page--no-print` in the print stylesheet) while the on-screen
 // report keeps showing it unchanged.
 const PRINTABLE_PAGE_TYPES = new Set([
-  "project-report-cover",
-  "parameter-index",
-  "products-selected",
+  // The consolidated front section: one stronger opening, then the system and
+  // products brought forward.
+  "design-summary",
+  "system-overview",
   "p5",
   "p9",
-  "highlights",
   "best-listening-area",
   "timbre-consistency",
   "front-soundstage-dynamic-range",
@@ -76,7 +71,6 @@ const PRINTABLE_PAGE_TYPES = new Set([
   "p19-rsp",
   "per-seat-performance",
   "acoustic-treatment",
-  "about-sound-proof",
 ]);
 
 export default function ClientReportPage({
@@ -90,13 +84,6 @@ export default function ClientReportPage({
   // The document's own name — the Project Report. Passed in from the report's
   // identity authority so the masthead can never state an internal report name.
   reportTitle = PROJECT_REPORT_TITLE,
-  // The published engineering summary and the design's seating, supplied by the
-  // report page so a page's technical-evidence cards can be rendered in print.
-  // They are never stored on printData: the report stays a consumer of the one
-  // engineering authority rather than a second copy of it.
-  engineeringSummary = null,
-  seatingPositions = null,
-  contributionsByKey = null,
 }) {
   // One project metadata line, composed once for the masthead: the same words
   // on screen and in the exported PDF, including the design version this report
@@ -176,29 +163,31 @@ export default function ClientReportPage({
             roomDims={printData.roomDims}
           />
         )}
-        {printData?.type === "highlights" && (
-          <>
-            <div className="client-report-print-heading client-report-print-heading--centered">
-              <h1 className="client-report-print-heading__title">{sectionHeading || "Design Summary"}</h1>
-            </div>
-            {/* The summary statement sits centred, with its own breathing room
-                below the heading rather than crowding it. */}
-            {/* The Design Summary opens on this actual cinema: the project-specific
-                summary the report composed from its own evidence. */}
-            {printData.summaryOpening && (
-              <div style={{ padding: "0 24px", marginTop: "8mm", marginBottom: "4mm", textAlign: "center" }}>
-                <ProjectReportSummaryOpening sentence={printData.summaryOpening} print />
-              </div>
-            )}
-            {printData.coverageSentence && (
-              <div style={{ padding: "0 24px", marginTop: "8mm", marginBottom: "4mm", textAlign: "center" }}>
-                <Rp22SeatCoverageSentence sentence={printData.coverageSentence} variant="print" />
-              </div>
-            )}
-            <div className="client-report-print-drawing" style={{ display: "flex", alignItems: "center", justifyContent: "center" }}>
-              <ClientDesignHighlights highlights={printData.highlights} print />
-            </div>
-          </>
+        {/* 01 Project Report / Design Summary — the consolidated front page: the
+            design's key facts, its project-specific summary and the strengths the
+            published assessment supports. */}
+        {printData?.type === "design-summary" && (
+          <ProjectReportDesignSummary
+            projectDetails={printData.projectDetails || projectDetails}
+            roomDims={printData.roomDims}
+            seatingPositions={printData.seatingPositions}
+            screenWidthM={printData.screenWidthM}
+            productsSelected={printData.productsSelected}
+            summaryOpening={printData.summaryOpening}
+            highlights={printData.highlights}
+            print
+          />
+        )}
+        {/* 02 System + Products / Project Overview — the equipment brought
+            forward, with the system configuration and the viewing geometry of
+            every seating row. */}
+        {printData?.type === "system-overview" && (
+          <ProjectReportSystemOverview
+            projectDetails={printData.projectDetails || projectDetails}
+            productsSelected={printData.productsSelected}
+            rows={printData.rows}
+            print
+          />
         )}
         {printData?.type === "best-listening-area" && (
           <>
@@ -528,53 +517,6 @@ export default function ClientReportPage({
             treatment, so this composition always has something to print. */}
         {printData?.type === "acoustic-treatment" && (
           <PrintAcousticTreatmentContent {...printData} />
-        )}
-        {printData?.type === "about-sound-proof" && (
-          <AboutSoundProofReportPage html={printData.aboutHtml} />
-        )}
-        {/* 01 Cover — the project's own identity and the report's contents. */}
-        {printData?.type === "project-report-cover" && (
-          <ProjectReportCover
-            projectDetails={printData.projectDetails || projectDetails}
-            version={printData.version || version}
-            reference={printData.reference || null}
-            generatedOn={printData.generatedOn || null}
-            print
-          />
-        )}
-        {/* 04–06 Every parameter of the category, explicitly assessed — including
-            the parameters that carry no drawing page of their own. The category
-            heading is the composition authority's own heading for the section, so
-            a continuation page states it with "— Continued". */}
-        {printData?.type === "parameter-index" && (
-          <ProjectReportSectionPage heading={sectionHeading} print>
-            <ProjectReportParameterIndex
-              category={printData.category}
-              rows={printData.rows}
-              print
-            />
-          </ProjectReportSectionPage>
-        )}
-        {/* 10 Systems / Products Selected — the complete equipment schedule. */}
-        {printData?.type === "products-selected" && (
-          <ProjectReportSectionPage heading={sectionHeading} print>
-            <ProjectReportProducts rows={printData.rows} print />
-          </ProjectReportSectionPage>
-        )}
-        {/* The page's own technical evidence — the full TechnicalParameterCard
-            for every parameter this page is the detailed page for: title, RP22
-            level pill, achieved value, thresholds, scope, assumed/target-basis
-            note and the per-seat result grid. It prints directly after the
-            page's visual composition, so the drawing and its evidence stay
-            together, and each card stays atomic on the page. */}
-        {Array.isArray(printData?.technicalCardIds) && printData.technicalCardIds.length > 0 && (
-          <ProjectReportParameterCards
-            engineeringSummary={engineeringSummary}
-            seatingPositions={seatingPositions}
-            parameterIds={printData.technicalCardIds}
-            contributionsByKey={contributionsByKey}
-            variant="print"
-          />
         )}
       </div>
 

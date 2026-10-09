@@ -112,7 +112,15 @@ import useReportBlockPagination from '@/components/report/useReportBlockPaginati
 import { REPORT_UPDATE_PARAM, useReportActionIntent } from '@/components/report/reportActionIntent';
 
 // --- Main component ---
-function RP22ReportInner() {
+/**
+ * @param {{embed?: boolean}} [options]
+ *   embed — mount the report's DOCUMENT only. Used by the consolidated Project
+ *   Report, which carries the Technical pages as part of its own document: the
+ *   Technical Report's review chrome, its gates and its export/print machinery
+ *   belong to this route, never to the merged document. Nothing about the
+ *   report's pages changes; only the chrome around them is left to the route.
+ */
+function RP22ReportInner({ embed = false } = {}) {
     const liveApp = useAppState();
 
     // ── Authoritative Read-Only Mode ──────────────────────────────────────
@@ -306,7 +314,10 @@ function RP22ReportInner() {
         currentFingerprints: snapshotFingerprints,
         payload: snapshotPayload,
         reportSource: { project: projectDetails, engineeringSummary, app },
-        ready: !!engineeringSummary && !authorityResolving && !reportHydrating && !bassReportPending && !bassRestoreFailed && !reportDataIncomplete,
+        // An embedded document is not this report's own generation: the Technical
+        // Report is saved by its own route, never by the consolidated Project
+        // Report that carries its pages.
+        ready: !embed && !!engineeringSummary && !authorityResolving && !reportHydrating && !bassReportPending && !bassRestoreFailed && !reportDataIncomplete,
     });
 
     // updateReport: when the Project Library's row asks for an updated report,
@@ -664,7 +675,9 @@ function RP22ReportInner() {
 
     // autoPrint: when navigated from Design Review with ?autoPrint=1, auto-trigger
     // the print pipeline once the report is hydrated and ready.
-    const autoPrintRequested = searchParams.get("autoPrint") === "1";
+    // An embedded document never auto-prints: the merged document owns its own
+    // export, and a second print would open a second print window.
+    const autoPrintRequested = !embed && searchParams.get("autoPrint") === "1";
     const autoPrintTriggeredRef = React.useRef(false);
 
     // Preparation screen: when autoPrint=1 is present, suppress the full interactive
@@ -1184,7 +1197,7 @@ function RP22ReportInner() {
 
     // FIX 3: If autoPrint was requested but no explicit project ID was provided,
     // block the report entirely. Never substitute a globally active project.
-    if (reportProjectError) {
+    if (!embed && reportProjectError) {
         return (
             <div className="min-h-screen bg-[#F9F8F6] p-6 flex items-center justify-center">
                 <Card className="max-w-xl mx-auto w-full">
@@ -1198,7 +1211,7 @@ function RP22ReportInner() {
         );
     }
 
-    if (authorityReadFailed || bassRestoreFailed) {
+    if (!embed && (authorityReadFailed || bassRestoreFailed)) {
         const readFailureMessage = reportAuthority.readError
             || reportAuthority.bassRestoreError
             || "Saved engineering authority could not be read. Nothing has been treated as missing or uncalculated.";
@@ -1219,7 +1232,7 @@ function RP22ReportInner() {
         );
     }
 
-    if (reportDataIncomplete) {
+    if (!embed && reportDataIncomplete) {
         return (
             <div className="min-h-screen bg-[#F9F8F6] p-6 flex items-center justify-center">
                 <Card className="max-w-xl mx-auto w-full">
@@ -1242,7 +1255,7 @@ function RP22ReportInner() {
         );
     }
 
-    if (!app) {
+    if (!embed && !app) {
         return (
             <div className="min-h-screen bg-[#F9F8F6] p-6 flex items-center justify-center">
                 <div className="text-center text-[#3E4349]">
@@ -1331,7 +1344,7 @@ function RP22ReportInner() {
         );
     }
 
-    return showLoadingReport ? (
+    return !embed && showLoadingReport ? (
         <div className="min-h-screen bg-[#F9F8F6] p-6 flex items-center justify-center">
             <Card className="max-w-xl mx-auto w-full">
                 <CardHeader><CardTitle className="text-[#1B1A1A] font-header">RP22 Compliance Report</CardTitle></CardHeader>
@@ -1342,7 +1355,7 @@ function RP22ReportInner() {
             </Card>
         </div>
     ) : (
-        <div className="min-h-screen bg-[#F9F8F6] p-6">
+        <div className={embed ? 'technical-report-embedded' : 'min-h-screen bg-[#F9F8F6] p-6'}>
             <ReportPrintStyles />
 
             {/* Saved report: generated before the latest changes. The report
@@ -1566,7 +1579,11 @@ function RP22ReportInner() {
                         <section id="pdf-cover">
                             {/* ── Page 1: Logo + title + RP22/RP23 explanations ── */}
                             <div className="print-summary report-page-block report-page-block--cover" data-report-block="cover" data-report-page-start="true">
-                                <ReportCover variant="print" project={projectDetails} meta={technicalFirstPageMeta} />
+                                {/* The brand cover belongs to the Technical Report's own
+                                    document. The consolidated Project Report opens on its own
+                                    front section, so the embedded pages keep this page's level
+                                    definitions and drop only the second cover. */}
+                                {!embed && <ReportCover variant="print" project={projectDetails} meta={technicalFirstPageMeta} />}
                                 {/* RP22 explanation */}
                                 <div style={{ maxWidth: '185mm', margin: '0 auto', paddingTop: '5mm', fontFamily: REPORT_FONT_BODY, fontSize: '10pt', color: '#3E4349', lineHeight: 1.55, textAlign: 'left' }}>
                                     <div data-report-section-heading="true" style={reportSectionHeadingStyle('11pt', { color: '#1B1A1A', marginBottom: `${REPORT_SECTION_HEADING_GAP_PX}px` })}>CEDIA RP22 - Immersive Audio Performance Levels</div>
@@ -1842,4 +1859,13 @@ function RP22ReportInner() {
 
 export default function RP22Report() {
     return <RP22ReportInner />;
+}
+
+/**
+ * The Technical Report's pages, mounted inside another document — the
+ * consolidated Project Report. It is the same report, the same pages and the
+ * same print layout; see TechnicalReportDocument.
+ */
+export function TechnicalReportEmbedded() {
+    return <RP22ReportInner embed />;
 }
