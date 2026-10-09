@@ -23,9 +23,9 @@ test('unacknowledged or wrong-pointer durable evidence cannot name Current', () 
   assert.equal(resolve({ ...current, durable: { ...durable, acknowledgement: null } }).code, 'calculated_not_published');
   assert.equal(resolve({ ...current, durable: { ...durable, version: { published_fingerprint: 'eng:b' } } }).code, 'calculated_not_published');
 });
-test('queued and publishing apply only to this assessment', () => {
+test('settling remains unpublished; Publishing starts only when this request sends', () => {
   for (const status of ['queued','publishing']) {
-    assert.equal(resolve({ ...current, publicationAttempt: { status, fingerprint:'eng:a' } }).code, 'publishing');
+    assert.equal(resolve({ ...current, publicationAttempt: { status, fingerprint:'eng:a' } }).code, status === 'queued' ? 'calculated_not_published' : 'publishing');
     assert.equal(resolve({ ...current, publicationAttempt: { status, fingerprint:'eng:b' } }).code, 'calculated_not_published');
   }
 });
