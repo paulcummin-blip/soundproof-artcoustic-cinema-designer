@@ -8,6 +8,11 @@ import { buildSelectedVersionEvidence } from '../base44/shared/comparisonEvidenc
 import { buildComparisonTable } from '../base44/shared/comparisonTable.js';
 
 const ids = [12, 13, 14, 18, 19, 20];
+// The evidence fixture states a fingerprint for every row: a report whose
+// evidence omits its own source is not usable as a proposal source.
+const DEFAULT_ENG = 'eng:v1:current-design';
+const BASS = 'cal:v8:cbf2c9881a3c211a';
+const GENERATED_AT = '2026-10-05T12:00:00Z';
 // No modified time on the fixture: a version record's own mtime is never
 // consulted, because it moves whenever the record is written for any reason.
 const version = (id, publishedFingerprint = null) => ({
@@ -39,19 +44,31 @@ const productsByLayer = () => ({
   subwoofers: [{ role: 'Subwoofers', model: 'SUB4-12', quantity: 2, position: 'front' }],
 });
 
-const reportEvidence = (id, type, engineeringFingerprint = null) => {
-  const parameters = source(id).report_parameters.map((row) => ({
-    key: `P${row.parameter_id}`,
-    parameter_id: row.parameter_id,
-    title: `P${row.parameter_id}`,
-    area: 'RP22',
-    level: row.level,
-    value: row.value,
-    text: row.text,
-    unit: null,
-    context: null,
-    source: 'technical_report',
-  }));
+const reportEvidence = (id, type, engineeringFingerprint = DEFAULT_ENG) => {
+  const parameters = source(id).report_parameters.map((row) => {
+    const key = `P${row.parameter_id}`;
+    const bass = ['P14', 'P18', 'P19', 'P20'].includes(key);
+    return {
+      key,
+      parameter_id: row.parameter_id,
+      title: key,
+      area: 'RP22',
+      scope: key === 'P10' ? 'project' : 'room',
+      level: row.level,
+      value: row.value,
+      text: row.text,
+      unit: null,
+      context: null,
+      authority_value: row.value,
+      authority_level: row.level,
+      authority_fingerprint: bass ? BASS : engineeringFingerprint,
+      authority_timestamp: GENERATED_AT,
+      source_type: bass ? 'durable-current-bass-authority' : 'durable-engineering-publication',
+      ...(key === 'P14' ? { raw_value: 4 } : {}),
+      source: `${type}_report`,
+    };
+  });
+  const p14 = parameters.find((row) => row.key === 'P14');
   return {
     evidence_version: 1,
     report_type: type,
@@ -60,14 +77,17 @@ const reportEvidence = (id, type, engineeringFingerprint = null) => {
       version_id: id,
       report_type: type,
       source_fingerprint: engineeringFingerprint,
-      generated_at: '2026-10-05T12:00:00Z',
+      bass_fingerprint: BASS,
+      generated_at: GENERATED_AT,
     },
     room: { length_m: 6, width_m: 4.5, height_m: 2.4 },
     screen: { screen_type: 'Projection screen', format: '16:9', viewable_width_cm: 265.5 },
     seating: {
       row_count: 1,
+      seats: 1,
       per_seat: [{
-        row: 1, seat_id: 'r1c1', seat_label: 'Row 1 seat 1',
+        row: 1, seat_id: 'r1c1', column: 1, priority: 'primary',
+        seat_label: 'Row 1 seat 1',
         distance_m: 3.2, horizontal_angle_deg: 0, vertical_angle_deg: 0, rp23_level: 'Level 4',
       }],
     },
@@ -77,13 +97,13 @@ const reportEvidence = (id, type, engineeringFingerprint = null) => {
     },
     parameters,
     parameter_index: Object.fromEntries(parameters.map((row) => [row.key, row])),
-    bass: { current: false, p14: null, p18: null, p19: null, p20: null },
+    bass: { current: true, p14: { raw_value: 4, achieved_level: p14.level }, p18: null, p19: null, p20: null },
     proposal_ready: true,
     evidence_fingerprint: `re1-evidence-${id}-${type}`,
   };
 };
 
-const report = (id, type, engineeringFingerprint = null) => ({
+const report = (id, type, engineeringFingerprint = DEFAULT_ENG) => ({
   id: `${id}-${type}`, version_id: id, report_type: type, status: 'current',
   generated_at: '2026-10-05T12:00:00Z',
   source_fingerprints: { engineeringFingerprint },
@@ -94,7 +114,8 @@ const report = (id, type, engineeringFingerprint = null) => ({
 });
 const db = (rows) => ({ ReportSnapshot: { filter: async (q) => ({ items: rows.filter((r) => r.version_id === q.version_id) }) } });
 const rows = ['4', '1'].flatMap((id) => ['technical', 'visual'].map((type) => report(id, type)));
-const entries = await readProposalReportEvidence(db(rows), 'project', ['4', '1'].map(version));
+// No published pointer on either version: nothing states the design moved on.
+const entries = await readProposalReportEvidence(db(rows), 'project', ['4', '1'].map((id) => version(id)));
 const evidence = buildSelectedVersionEvidence(entries);
 const table = buildComparisonTable(evidence);
 
@@ -145,7 +166,12 @@ test('E: missing, stale, legacy payload and missing P13 reject with named errors
     missing[0].payload.proposalSource.report_parameters.some((r) => r.parameter_id === 13),
     'the frozen source still states P13 — it is simply not what the proposal reads',
   );
-  await assert.rejects(readProposalReportEvidence(db(missing), 'project', [version('4')]), /Level 4 version: missing Technical Report parameter P13/);
+  // The completeness contract names the exact parameter that is absent, so the
+  // refusal is still specific to P13 — only the wording it uses has moved.
+  await assert.rejects(
+    readProposalReportEvidence(db(missing), 'project', [version('4')]),
+    /Level 4 version: incomplete Technical Report evidence — parameter_index\.P13 is missing/,
+  );
 });
 
 test('a legacy snapshot is never described as a missing report', async () => {
