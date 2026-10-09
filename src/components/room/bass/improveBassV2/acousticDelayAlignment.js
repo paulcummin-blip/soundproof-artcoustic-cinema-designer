@@ -77,23 +77,29 @@ export function formatDelayMs(value) {
   return Number.isInteger(ms) ? `${ms}` : ms.toFixed(1);
 }
 
-/** The grouped adjustment implied by a lever's per-sub changes, when uniform. */
+/** The sources a lever actually changed, with their physical side. */
+function changedDeltas(changes) {
+  return (Array.isArray(changes) ? changes : [])
+    .map((change) => ({
+      delta: finite(change?.toMs) - finite(change?.fromMs),
+      group: change?.group,
+    }))
+    .filter((entry) => Number.isFinite(entry.delta) && Math.abs(entry.delta) > DELAY_ALIGNMENT_TOLERANCE_DB);
+}
+
+/** The grouped adjustment implied by the sources that changed, when uniform. */
 function groupedAdjustmentFromChanges(changes) {
-  const deltas = (Array.isArray(changes) ? changes : [])
-    .map((change) => finite(change?.toMs) - finite(change?.fromMs))
-    .filter(Number.isFinite);
+  const deltas = changedDeltas(changes).map((entry) => entry.delta);
   if (!deltas.length) return null;
-  const magnitudes = deltas.map((delta) => Math.abs(delta));
-  const magnitude = Math.max(...magnitudes);
-  const uniform = magnitudes.every((value) => Math.abs(value - magnitude) <= 0.1);
-  return uniform && magnitude > 0 ? magnitude : null;
+  const magnitude = Math.max(...deltas.map((delta) => Math.abs(delta)));
+  const uniform = deltas.every((delta) => Math.abs(Math.abs(delta) - magnitude) <= 0.1);
+  return uniform ? magnitude : null;
 }
 
 /** The physical role of the changed sources, when they all share one side. */
 function roleFromChanges(changes) {
   const roles = new Set(
-    (Array.isArray(changes) ? changes : [])
-      .map((change) => (change?.group === "front" || change?.group === "rear" ? change.group : null)),
+    changedDeltas(changes).map((entry) => (entry.group === "front" || entry.group === "rear" ? entry.group : null)),
   );
   if (roles.size !== 1) return null;
   return [...roles][0];

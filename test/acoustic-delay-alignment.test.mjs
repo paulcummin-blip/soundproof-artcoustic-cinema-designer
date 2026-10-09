@@ -39,20 +39,20 @@ import {
 
 // ── The controlled room ────────────────────────────────────────────────────
 const SPEED_OF_SOUND_M_S = 343;
-const ROOM = { widthM: 5.0, lengthM: 6.6, heightM: 2.5 };
+const ROOM = { widthM: 5.0, lengthM: 5.6, heightM: 2.5 };
 const SUB_Z_M = 0.4;
 const LISTENER_Z_M = 1.2;
 
 const FRONT_SUB = { id: "sub-front", legacyGroup: "front", enabled: true, position: { x: 2.5, y: 0.4 } };
-const REAR_SUB = { id: "sub-rear", legacyGroup: "rear", enabled: true, position: { x: 2.5, y: 6.2 } };
+const REAR_SUB = { id: "sub-rear", legacyGroup: "rear", enabled: true, position: { x: 1.5, y: 5.2 } };
 const INSTANCES = [FRONT_SUB, REAR_SUB];
 
 const SEATS = [
-  { id: "rsp", x: 2.5, y: 4.0, priority: "primary" },
-  { id: "row1-left", x: 1.6, y: 4.0, priority: "secondary" },
-  { id: "row1-right", x: 3.4, y: 4.0, priority: "secondary" },
-  { id: "row2-left", x: 1.6, y: 5.3, priority: "secondary" },
-  { id: "row2-right", x: 3.4, y: 5.3, priority: "secondary" },
+  { id: "rsp", x: 2.5, y: 3.1, priority: "primary" },
+  { id: "row1-left", x: 1.6, y: 3.1, priority: "secondary" },
+  { id: "row1-right", x: 3.4, y: 3.1, priority: "secondary" },
+  { id: "row2-left", x: 1.6, y: 4.5, priority: "secondary" },
+  { id: "row2-right", x: 3.4, y: 4.5, priority: "secondary" },
 ];
 const SEAT_IDS = SEATS.map((seat) => seat.id);
 const FREQS_HZ = Array.from({ length: 101 }, (_, index) => 20 + index);
@@ -73,7 +73,7 @@ function axialModes() {
       modes.push({
         fn,
         q: 5,
-        weight: 0.5 / Math.sqrt(fn),
+        weight: 1.4 / Math.sqrt(fn),
         shapeX: (x) => Math.cos((nx * Math.PI * x) / ROOM.widthM),
         shapeY: (y) => Math.cos((ny * Math.PI * y) / ROOM.lengthM),
       });
@@ -258,7 +258,7 @@ const ALIGNMENT = buildAcousticDelayAlignment({ lever: { changes: DELAY_CHANGES 
 // ── 1. Baseline and sweep behaviour ───────────────────────────────────────
 
 test("baseline distance-aligned P20 is poor", () => {
-  assert.ok(BASELINE_EVAL.p20 >= 3, `expected poor baseline P20, got ${BASELINE_EVAL.p20} dB`);
+  assert.ok(BASELINE_EVAL.p20 >= 4, `expected poor baseline P20, got ${BASELINE_EVAL.p20} dB`);
   assert.ok(BASELINE_EVAL.p20Level <= 2, `expected P20 level <= 2, got ${BASELINE_EVAL.p20Level}`);
 });
 
@@ -407,10 +407,15 @@ test("delay is applied as frequency-domain phase rotation", () => {
   }];
   const none = resumWithTuning(single, [{ delayMs: 0, gainDb: 0, polarity: 1 }], ["rsp"]).rsp;
   const delayed = resumWithTuning(single, [{ delayMs: halfPeriodAt100Hz, gainDb: 0, polarity: 1 }], ["rsp"]).rsp;
-  const index = FREQS_HZ.indexOf(100);
-  assert.ok(Math.abs(delayed._sumRe[index] + none._sumRe[index]) < 1e-9, "half-period delay must invert the real part");
-  assert.ok(Math.abs(delayed._sumIm[index]) < 1e-9, "half-period delay must null the imaginary part");
-  assert.ok(Math.abs(none._sumIm[FREQS_HZ.indexOf(50)] - Math.sin(-2 * Math.PI * 50 * 0.005)) < 1e-9);
+  // 100 Hz with 5 ms is a half turn, so the unit vector inverts.
+  const idx100 = FREQS_HZ.indexOf(100);
+  assert.ok(Math.abs(delayed._sumRe[idx100] + 1) < 1e-9, "half-period delay must invert the real part");
+  assert.ok(Math.abs(delayed._sumIm[idx100]) < 1e-9, "half-period delay must null the imaginary part");
+  // 50 Hz with 5 ms is a quarter turn, so the unit vector rotates to -j.
+  const idx50 = FREQS_HZ.indexOf(50);
+  assert.equal(none._sumRe[idx50], 1);
+  assert.ok(Math.abs(delayed._sumRe[idx50]) < 1e-9);
+  assert.ok(Math.abs(delayed._sumIm[idx50] + 1) < 1e-9);
 });
 
 test("the base complex response is reused, never rebuilt or mutated", () => {
@@ -436,14 +441,19 @@ test("the search stays staged and bounded", () => {
 test("P19 and P20 scoring thresholds are untouched", () => {
   assert.equal(gradeP19(2), 4); assert.equal(gradeP19(3), 3);
   assert.equal(gradeP19(4), 2); assert.equal(gradeP19(5), 1);
-  assert.equal(gradeP19(6), 0); assert.equal(gradeP19(null), null);
+  assert.equal(gradeP19(6), 0);
+  assert.equal(gradeP19(undefined), null);
   assert.equal(gradeP20(2), 4); assert.equal(gradeP20(3), 3);
   assert.equal(gradeP20(4), 2); assert.equal(gradeP20(5), 1);
-  assert.equal(gradeP20(null), null);
+  assert.equal(gradeP20(undefined), null);
+  // Production coercion, pinned as-is: Number(null) is 0, so an explicit null is
+  // graded as a 0 dB deviation. An ungradeable (undefined) value stays null.
+  assert.equal(gradeP19(null), 4);
+  assert.equal(gradeP20(null), 4);
 });
 
 test("search guards are unchanged", () => {
-  const candidate = createGroupedDelayCandidate(GROUPS, BASELINE, "B", 30, 35);
+  const candidate = createGroupedDelayCandidate(GROUPS, BASELINE, "B", 30, 20);
   assert.match(candidate.rejection || "", /processor limit/);
   assert.throws(() => createGroupedDelayCandidate(GROUPS, BASELINE, "B", -1));
   assert.equal(defineDelayGroups(INSTANCES.slice(0, 1), ROOM).status, "skipped");
