@@ -26,7 +26,13 @@ export const MODELS = [
   { key: "evolve-8-4", label: "EVOLVE 8-4", category: "LCR", widthMm: 270, heightMm: 370, depthMm: 82, sensitivity_dB_1w1m: 102, sensitivity_dB_2p83: 106, nominalOhms: 3, max_power: 240, max_spl_cont_db_1m_halfspace: 120, max_spl_peak_db_cf6_1m_halfspace: 126, max_spl_cont_db_1m_anechoic: 114, max_spl_peak_db_cf6_1m_anechoic: 120, frequency_response_low: 95, frequency_response_high: 30000, usable_lf_hz_minus6db: 92, coverage_deg: { horizontal: 90, vertical: 50 }, price_gbp_exVat: 2720, retailPriceGBP: 2720.00, currency: "GBP", vatIncluded: true, vatRate: 0.20, hfOffAxis16k: { minus3deg: 30, minus5deg: 40 }, dispersion: { horizontal: { minus1p5dB: 36, minus3dB: 52, minus5dB: 70 } } },
   // TODO: Replace C-1 dimensions with verified source dimensions if/when available.
   { key: "c-1", label: "C-1", category: "LCR", frontStageType: "center_only", widthType: "fixed", fixedWidthMm: 400, widthMm: 400, heightMm: 120, depthMm: 81, placementOffsetFromScreenBottomMm: 200, sensitivity_dB_1w1m: 96, sensitivity_dB_2p83: 96, nominalOhms: 4, max_power: 60, max_spl: 108, peak_spl: 114, frequency_response_low: 90, usable_lf_hz_minus6db: 87, recommended_hpf_hz: 100, recommended_hpf_slope: "24dB/oct", hfOffAxis16k: { minus3deg: 35, minus5deg: 45 }, dispersion: { horizontal: { minus1p5dB: 50, minus3dB: 70, minus5dB: 85 }, vertical: { minus1p5dB: 65, minus3dB: 90, minus5dB: 100 } } },
-  { key: "c4-1", label: "C4-1", category: "LCR", frontStageType: "center_only", widthType: "tv_linked", tvWidthMap: { tv65: 1411, tv77: 1711, tv83: 1872, tv100: 2230 }, heightMm: 120, depthMm: 81, placementOffsetFromScreenBottomMm: 200, sensitivity_dB_1w1m: 98, sensitivity_dB_2p83: 98, nominalOhms: 8, max_power: 120, max_spl: 109, peak_spl: 115, max_spl_cont_db_1m_halfspace: 109, max_spl_peak_db_cf6_1m_halfspace: 115, max_spl_cont_db_1m_anechoic: 103, max_spl_peak_db_cf6_1m_anechoic: 109, frequency_response_low: 80, usable_lf_hz_minus6db: 77, hfOffAxis16k: { minus3deg: 45, minus5deg: 60 }, dispersion: { horizontal: { minus1p5dB: 65, minus3dB: 90, minus5dB: 105 }, vertical: { minus1p5dB: 65, minus3dB: 90, minus5dB: 105 } } },
+  // The C4-1 is published in five cabinet lengths: 1222 mm (its smallest, the
+  // approved 1222 × 120 mm cabinet) through 2230 mm. tvWidthMap stays the
+  // preset-key lookup the TV presets resolve through; cabinetLengthsMm is the
+  // catalogue's own list of available variants, which the shared variant
+  // authority resolves against the screen's physical width. dualCentreCabinetLengthMm
+  // names the variant the dual-centre arrangement requires.
+  { key: "c4-1", label: "C4-1", category: "LCR", frontStageType: "center_only", widthType: "tv_linked", tvWidthMap: { tv65: 1411, tv77: 1711, tv83: 1872, tv100: 2230 }, cabinetLengthsMm: [1222, 1411, 1711, 1872, 2230], dualCentreCabinetLengthMm: 1222, heightMm: 120, depthMm: 81, placementOffsetFromScreenBottomMm: 200, sensitivity_dB_1w1m: 98, sensitivity_dB_2p83: 98, nominalOhms: 8, max_power: 120, max_spl: 109, peak_spl: 115, max_spl_cont_db_1m_halfspace: 109, max_spl_peak_db_cf6_1m_halfspace: 115, max_spl_cont_db_1m_anechoic: 103, max_spl_peak_db_cf6_1m_anechoic: 109, frequency_response_low: 80, usable_lf_hz_minus6db: 77, hfOffAxis16k: { minus3deg: 45, minus5deg: 60 }, dispersion: { horizontal: { minus1p5dB: 65, minus3dB: 90, minus5dB: 105 }, vertical: { minus1p5dB: 65, minus3dB: 90, minus5dB: 105 } } },
   { key: "multi-lcr", label: "Multi (LCR)", category: "LCR", frontStageType: "integrated_lcr", widthType: "tv_linked", tvWidthMap: { tv65: 1411, tv77: 1711, tv83: 1872, tv100: 2230 }, heightMm: 100, depthMm: 80, placementOffsetFromScreenBottomMm: 200, sensitivity_dB_1w1m: 96, sensitivity_dB_2p83: 96, nominalOhms: 12, max_power: 60, max_spl: 108, peak_spl: 114, max_spl_cont_db_1m_halfspace: 108, max_spl_peak_db_cf6_1m_halfspace: 114, max_spl_cont_db_1m_anechoic: 102, max_spl_peak_db_cf6_1m_anechoic: 108, frequency_response_low: 80, usable_lf_hz_minus6db: 77, hfOffAxis16k: { minus3deg: 45, minus5deg: 60 }, dispersion: { horizontal: { minus1p5dB: 65, minus3dB: 90, minus5dB: 105 }, vertical: { minus1p5dB: 65, minus3dB: 90, minus5dB: 105 } } },
   { key: "multi-mono", label: "Multi (Mono)", category: "LCR", frontStageType: "center_only", widthType: "tv_linked", tvWidthMap: { tv65: 1411, tv77: 1711, tv83: 1872, tv100: 2230 }, heightMm: 100, depthMm: 80, placementOffsetFromScreenBottomMm: 200, sensitivity_dB_1w1m: 101, sensitivity_dB_2p83: 101, nominalOhms: 12, max_power: 180, max_spl: 113, peak_spl: 119, frequency_response_low: 80, usable_lf_hz_minus6db: 77, hfOffAxis16k: { minus3deg: 45, minus5deg: 60 }, dispersion: { horizontal: { minus1p5dB: 65, minus3dB: 90, minus5dB: 105 }, vertical: { minus1p5dB: 65, minus3dB: 90, minus5dB: 105 } } },
   { key: "hspl-lcr", label: "HSPL (LCR)", category: "LCR", frontStageType: "integrated_lcr", widthType: "tv_linked", tvWidthMap: { tv65: 1411, tv77: 1711, tv83: 1872, tv100: 2230 }, heightMm: 100, depthMm: 80, placementOffsetFromScreenBottomMm: 200, sensitivity_dB_1w1m: 98, sensitivity_dB_2p83: 98, nominalOhms: 8, max_power: 120, max_spl: 110, peak_spl: 116, max_spl_cont_db_1m_halfspace: 110, max_spl_peak_db_cf6_1m_halfspace: 116, max_spl_cont_db_1m_anechoic: 104, max_spl_peak_db_cf6_1m_anechoic: 110, frequency_response_low: 80, usable_lf_hz_minus6db: 77, hfOffAxis16k: { minus3deg: 35, minus5deg: 45 }, dispersion: { horizontal: { minus1p5dB: 50, minus3dB: 70, minus5dB: 85 }, vertical: { minus1p5dB: 65, minus3dB: 90, minus5dB: 100 } } },
@@ -393,7 +399,7 @@ export function displayModelKey(modelKey = "") {
 }
 
 // PRIMARY ACCESSOR — RETURNS METRICS IN METRES, WITH PLAN SHAPE HINTS
-export function getSpeakerModelMeta(modelName, orientation) {
+export function getSpeakerModelMeta(modelName, orientation, options = {}) {
   const key = normaliseModelKey(modelName);
   const hit =
     MODELS.find(m => m.key === key) ||
@@ -470,8 +476,18 @@ export function getSpeakerModelMeta(modelName, orientation) {
     resolvedWidthMm = hit.fixedWidthMm;
   }
 
-  if (hit.widthType === "tv_linked" && hit.tvWidthMap && orientation) {
-    resolvedWidthMm = hit.tvWidthMap[orientation] || hit.widthMm || hit.fixedWidthMm;
+  // A TV-linked soundbar is published in several cabinet lengths. The installed
+  // one is resolved by the shared variant authority and passed in here
+  // (options.cabinetLengthMm); the TV preset key stays the fallback for callers
+  // that have no screen to measure, so existing projects resolve unchanged.
+  if (hit.widthType === "tv_linked" && hit.tvWidthMap) {
+    const lengths = getSoundbarCabinetLengthsMm(hit.key);
+    const selected = Number(options?.cabinetLengthMm);
+    if (Number.isFinite(selected) && lengths.includes(selected)) {
+      resolvedWidthMm = selected;
+    } else if (orientation) {
+      resolvedWidthMm = hit.tvWidthMap[orientation] || hit.widthMm || hit.fixedWidthMm;
+    }
   }
 
   let widthM = mmToM(resolvedWidthMm);
@@ -488,6 +504,11 @@ export function getSpeakerModelMeta(modelName, orientation) {
     widthM,
     heightM,
     depthM,
+    // The cabinet length actually installed, and every length the catalogue
+    // publishes for this model. Null/empty for anything that is not a
+    // TV-linked soundbar.
+    cabinetLengthMm: hit.widthType === "tv_linked" && Number.isFinite(resolvedWidthMm) ? resolvedWidthMm : null,
+    cabinetLengthsMm: hit.widthType === "tv_linked" ? getSoundbarCabinetLengthsMm(hit.key) : [],
     key: hit.key,
     label: hit.label,
     category: hit.category,
@@ -543,6 +564,34 @@ export function getLcrRecommendationFamily(modelKey) {
   if (typeof key === "string" && (key.startsWith("evolve-") || key.startsWith("sl-evolve-"))) return "EVOLVE";
   if (typeof key === "string" && /^q\d+-\d+$/.test(key)) return "SPITFIRE_Q";
   return "OTHER";
+}
+
+// TV-LINKED SOUNDBAR CABINET LENGTHS
+// The catalogue's own list of available cabinet lengths for a TV-linked
+// soundbar, smallest first. A model that publishes an explicit
+// cabinetLengthsMm list uses it; otherwise the lengths are the tvWidthMap
+// values, so no variant is duplicated anywhere in the codebase.
+export function getSoundbarCabinetLengthsMm(modelName) {
+  const key = normaliseModelKey(modelName);
+  const model = MODELS.find(m => m.key === key);
+  if (!model || model.widthType !== "tv_linked") return [];
+
+  const declared = Array.isArray(model.cabinetLengthsMm) ? model.cabinetLengthsMm : null;
+  const fromMap = model.tvWidthMap ? Object.values(model.tvWidthMap) : [];
+  const lengths = (declared || fromMap)
+    .map(Number)
+    .filter((n) => Number.isFinite(n) && n > 0);
+
+  return [...new Set(lengths)].sort((a, b) => a - b);
+}
+
+// The cabinet length the dual-centre arrangement requires for a model, when the
+// catalogue names one. Null for every other model.
+export function getDualCentreCabinetLengthMm(modelName) {
+  const key = normaliseModelKey(modelName);
+  const model = MODELS.find(m => m.key === key);
+  const required = Number(model?.dualCentreCabinetLengthMm);
+  return Number.isFinite(required) && required > 0 ? required : null;
 }
 
 // SUBWOOFER RESPONSE CURVE ACCESSOR (for engine use)
@@ -680,4 +729,4 @@ export function getModelsByCategoryOrdered() {
   return ordered;
 }
 
-export default { getSpeakerModelMeta, getModelsByCategoryOrdered, getModelDisplayOrder, DISPLAY_ORDER, normaliseModelKey, getSubResponseCurve, getSubwooferCurve, getProductCurveFrequencyRange, isValidCurve, getSpeakerPriceGbp, hasSpeakerModel, isGraphDerivedEstimate, getApprovedContinuousSplDb, getApprovedContinuousSplAt30HzDb, getApprovedPeakSplDb, getApprovedFrequencyRangeHz, CATEGORY_ORDER, MODELS };
+export default { getSpeakerModelMeta, getModelsByCategoryOrdered, getModelDisplayOrder, DISPLAY_ORDER, normaliseModelKey, getSubResponseCurve, getSubwooferCurve, getProductCurveFrequencyRange, isValidCurve, getSpeakerPriceGbp, hasSpeakerModel, isGraphDerivedEstimate, getApprovedContinuousSplDb, getApprovedContinuousSplAt30HzDb, getApprovedPeakSplDb, getApprovedFrequencyRangeHz, getSoundbarCabinetLengthsMm, getDualCentreCabinetLengthMm, CATEGORY_ORDER, MODELS };

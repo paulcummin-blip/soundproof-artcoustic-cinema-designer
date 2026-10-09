@@ -1,7 +1,7 @@
 import React, { useMemo, useRef, useEffect, useCallback, useState } from "react";
 import { getSpeakerModelMeta, normaliseModelKey } from "@/components/models/speakers/registry";
 import { isRenderableSpeaker } from "@/components/room/rv/RenderPrimitives";
-import { Q43FaceIcon, Q45FaceIcon, Q85FaceIcon, Q63FaceIcon, Evolve11FaceIcon, Evolve21FaceIcon, Evolve31FaceIcon, Evolve42FaceIcon, Evolve63FaceIcon, Evolve84FaceIcon, C1FaceIcon, C41FaceIcon, MultiSoundbarArtworkFaceIcon, MultiSoundbar77ArtworkFaceIcon, MultiSoundbar65ArtworkFaceIcon, MultiSoundbar100ArtworkFaceIcon } from "@/components/report/SpeakerFaceIcons";
+import { Q43FaceIcon, Q45FaceIcon, Q85FaceIcon, Q63FaceIcon, Evolve11FaceIcon, Evolve21FaceIcon, Evolve31FaceIcon, Evolve42FaceIcon, Evolve63FaceIcon, Evolve84FaceIcon, C1FaceIcon, C41FaceIcon, C41_1222FaceIcon, MultiSoundbarArtworkFaceIcon, MultiSoundbar77ArtworkFaceIcon, MultiSoundbar65ArtworkFaceIcon, MultiSoundbar100ArtworkFaceIcon } from "@/components/report/SpeakerFaceIcons";
 import { computeSpeakerAnnotation, speakerBBox } from "@/components/room/frontElevationAnnotationLayout";
 import { resolveEffectiveViewableDimsM, isManualOverrideActive } from "@/components/models/screen/resolveEffectiveScreen";
 import { detectFrontStageMode } from "@/components/roomdesigner/utils/lcrHeightAuthority";
@@ -9,6 +9,7 @@ import {
   isCentreCabinetRole,
   resolveCentreCabinetFootprintM,
 } from "@/components/utils/frontStageModeAuthority";
+import { resolveSoundbarCabinetLengthMm } from "@/components/models/speakers/soundbarCabinetVariant";
 import {
   centreCabinetPartnerRole,
   linkedCentreCabinetPositions,
@@ -330,9 +331,21 @@ export default function FrontElevation({ dimensions, screen, placedSpeakers = []
         // vertically it is the same cabinet rotated a quarter turn, so its drawn
         // width and height swap while its acoustic centre stays the centre.
         const footprint = cabinet
-          ? resolveCentreCabinetFootprintM(s?.model, s?.orientation, tvPresetKey)
+          ? resolveCentreCabinetFootprintM(s?.model, s?.orientation, tvPresetKey, { cabinetLengthMm: s?.cabinetLengthMm })
           : null;
-        const meta = getSpeakerModelMeta(s?.model, tvPresetKey);
+        // A TV-linked soundbar is drawn at its INSTALLED cabinet length: the
+        // catalogue variant closest to the screen's physical width, or the
+        // designer's own recorded choice. The shared variant authority owns that
+        // decision, so Plan View and the reports resolve the same cabinet.
+        const meta = cabinet
+          ? getSpeakerModelMeta(s?.model, tvPresetKey)
+          : getSpeakerModelMeta(s?.model, tvPresetKey, {
+            cabinetLengthMm: resolveSoundbarCabinetLengthMm({
+              modelKey: s?.model,
+              screen,
+              explicitMm: s?.cabinetLengthMm,
+            }),
+          });
         const wM = footprint ? footprint.widthM : ((meta && !meta.notFound && meta.widthM) ? meta.widthM : 0.20);
         const hM = footprint ? footprint.heightM : ((meta && !meta.notFound && meta.heightM) ? meta.heightM : 0.20);
         const baseX = Number.isFinite(s?.position?.x) ? s.position.x : roomW / 2;
@@ -355,10 +368,13 @@ export default function FrontElevation({ dimensions, screen, placedSpeakers = []
           model: s?.model ?? modelKey,
           orientation: footprint ? footprint.orientation : null,
           isCabinet: cabinet,
+          // Which C4-1 cabinet length is installed: the drawings pick the
+          // artwork for that variant and for nothing else.
+          cabinetLengthMm: footprint?.cabinetLengthMm ?? meta?.cabinetLengthMm ?? null,
           vertical: !!footprint && footprint.orientation === 'vertical',
         };
       });
-  }, [placedSpeakers, roomW, tvPresetKey, liveDragLcr]);
+  }, [placedSpeakers, roomW, tvPresetKey, liveDragLcr, screen]);
 
   // Front subs — always returns a plain array
   const subItems = useMemo(() => {
@@ -506,7 +522,7 @@ export default function FrontElevation({ dimensions, screen, placedSpeakers = []
    * @param {number}  zM     - acoustic centre height in metres (for z= annotation)
    * @param {boolean} labelInsideBox - if true, centre label inside the shape; if false, above
    */
-  const drawSpeakerFront = ({ key, cx, cy, sw, sh, isRound, fill, stroke, label, zM, modelKey, tvPresetKey: speakerTvPreset, labelInsideBox = false, labelY, onMouseDown, vertical = false }) => {
+  const drawSpeakerFront = ({ key, cx, cy, sw, sh, isRound, fill, stroke, label, zM, modelKey, tvPresetKey: speakerTvPreset, labelInsideBox = false, labelY, onMouseDown, vertical = false, cabinetLengthMm = null }) => {
     const sx = cx - sw / 2;
     const sy = cy - sh / 2;
 
@@ -523,6 +539,9 @@ export default function FrontElevation({ dimensions, screen, placedSpeakers = []
     const isEv63 = !isEv31 && mk.includes("evolve-6-3");
     const isEv84 = mk.includes("evolve-8-4");
     const isC41 = mk.includes("c4-1");
+    // The 1222 mm C4-1 cabinet has its own approved artwork; every other C4-1
+    // length keeps the existing drawing.
+    const isC41_1222 = isC41 && Number(cabinetLengthMm) === 1222;
     // The C-1 is its own product ("c-1"); "c4-1" never contains that key.
     const isC1 = mk.includes("c-1");
     const isMultiSoundbar = mk.includes("multi-lcr") || mk.includes("multi-mono");
@@ -584,6 +603,10 @@ export default function FrontElevation({ dimensions, screen, placedSpeakers = []
 
     const renderFaceIcon = () => {
       if (isC1) return <C1FaceIcon x={adjustedX} y={adjustedY} width={adjustedW} height={adjustedH} />;
+      // Both C4-1 artworks are drawn at the cabinet's installed footprint (and
+      // rotated with the cabinet when it is mounted vertically) — never
+      // stretched onto another cabinet's shape.
+      if (isC41 && isC41_1222) return <C41_1222FaceIcon x={adjustedX} y={adjustedY} width={adjustedW} height={adjustedH} />;
       if (isC41) return <C41FaceIcon x={adjustedX} y={adjustedY} width={adjustedW} height={adjustedH} />;
       if (isQ43) return <Q43FaceIcon x={adjustedX} y={adjustedY} width={adjustedW} height={adjustedH} />;
       if (isQ45) return <Q45FaceIcon x={adjustedX} y={adjustedY} width={adjustedW} height={adjustedH} />;
@@ -861,6 +884,8 @@ export default function FrontElevation({ dimensions, screen, placedSpeakers = []
                 tvPresetKey: tvPresetKey,
                 // A vertically mounted centre cabinet draws its face rotated.
                 vertical: spk.vertical === true,
+                // The installed cabinet variant decides which artwork is drawn.
+                cabinetLengthMm: spk.cabinetLengthMm ?? null,
                 labelY: annotation.label.y,
                 // FL/FC/FR keep their existing drag behaviour; a dual-centre
                 // cabinet is draggable by its own role (FCL / FCR), so its

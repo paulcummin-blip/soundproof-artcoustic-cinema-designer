@@ -4,6 +4,7 @@ import { getCanonicalRole as defaultGetCanonicalRole } from "@/components/utils/
 import { getPlanAimDeg } from "@/components/room/rv/utils/rvAiming";
 import { sideWallX, rearWallY } from "@/components/room/rv/utils/rvGeometry";
 import { getSpeakerModelMeta } from "@/components/models/speakers/registry";
+import { resolveSoundbarCabinetLengthMm } from "@/components/models/speakers/soundbarCabinetVariant";
 import {
   isCentreCabinetRole,
   resolveCentreCabinetFootprintM,
@@ -54,7 +55,15 @@ export default function RvSpeakerLayer({
         const role = resolveRole(speaker.role);
         if (hideDiscreteFronts && (role === 'FL' || role === 'FR')) return null;
 
-        const speakerMeta = getSpeakerModelMeta(speaker.model, tvPresetKey || undefined);
+        // A TV-linked soundbar is measured at its INSTALLED cabinet length, so
+        // the plan footprint is the cabinet the Front Elevation draws.
+        const speakerMeta = getSpeakerModelMeta(speaker.model, tvPresetKey || undefined, {
+          cabinetLengthMm: resolveSoundbarCabinetLengthMm({
+            modelKey: speaker.model,
+            screen: resolvedScreen,
+            explicitMm: speaker.cabinetLengthMm,
+          }),
+        });
         const { widthM: metaWidthM, depthM: speakerDepthM } = speakerMeta?.notFound
           ? getSpeakerDims(speaker.model, tvPresetKey || null)
           : speakerMeta;
@@ -63,7 +72,7 @@ export default function RvSpeakerLayer({
         // vertically it is the same cabinet rotated, so its plan width is the
         // cabinet's own height while its depth is unchanged.
         const cabinetFootprint = isCentreCabinetRole(role)
-          ? resolveCentreCabinetFootprintM(speaker.model, speaker.orientation, tvPresetKey || null)
+          ? resolveCentreCabinetFootprintM(speaker.model, speaker.orientation, tvPresetKey || null, { cabinetLengthMm: speaker.cabinetLengthMm })
           : null;
         const speakerWidthM = cabinetFootprint ? cabinetFootprint.widthM : metaWidthM;
 

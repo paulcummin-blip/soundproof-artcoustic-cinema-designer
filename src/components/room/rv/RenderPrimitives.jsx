@@ -1,5 +1,6 @@
 import React from "react";
 import { getSpeakerModelMeta } from "@/components/models/speakers/registry";
+import { resolveSoundbarCabinetLengthMm } from "@/components/models/speakers/soundbarCabinetVariant";
 import { getCanonicalRole } from "@/components/utils/surroundRoleMap";
 import { useAppState } from "@/components/AppStateProvider";
 
@@ -138,8 +139,15 @@ export const SpeakerIcon = React.memo(function SpeakerIcon({
   const appState = useAppState();
   const resolvedTvPresetKey = appState?.screen?.tvPresetKey ?? tvPresetKey ?? null;
   
-  // Get speaker metadata from registry — pass tvPresetKey so TV-linked models resolve correct width
-  const modelMeta = getSpeakerModelMeta(model, resolvedTvPresetKey);
+  // Get speaker metadata from registry — the tv preset key is the fallback, and a
+  // TV-linked soundbar is measured at its INSTALLED cabinet length for this screen.
+  const modelMeta = getSpeakerModelMeta(model, resolvedTvPresetKey, {
+    cabinetLengthMm: resolveSoundbarCabinetLengthMm({
+      modelKey: model,
+      screen: appState?.screen ?? null,
+      explicitMm: speaker?.cabinetLengthMm,
+    }),
+  });
   
   // Log warning if model not found in registry (with better visibility for overhead debugging)
   if (false && modelMeta?.notFound && typeof console !== 'undefined') {

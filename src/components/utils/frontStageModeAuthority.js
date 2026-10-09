@@ -20,6 +20,7 @@
 // ---------------------------------------------------------------------------
 
 import { getCanonicalRole } from '@/components/utils/surroundRoleMap';
+import { resolveSoundbarCabinetLengthMm } from '@/components/models/speakers/soundbarCabinetVariant';
 import { getSpeakerModelMeta } from '@/components/models/speakers/registry';
 import { resolveEffectiveViewableDimsM } from '@/components/models/screen/resolveEffectiveScreen';
 
@@ -315,13 +316,29 @@ export function defaultCentreCabinetOrientation(modelKey, tvPresetKey = null) {
 }
 
 /** The model's normal (as-drawn) footprint in metres, or null when unknown. */
-export function centreCabinetNormalFootprintM(modelKey, tvPresetKey = null) {
-  const meta = getSpeakerModelMeta(String(modelKey || '').trim(), tvPresetKey || null);
+export function centreCabinetNormalFootprintM(modelKey, tvPresetKey = null, options = {}) {
+  // A TV-linked cabinet is drawn at its INSTALLED cabinet length. In the
+  // dual-centre arrangement the catalogue names that variant itself (the C4-1's
+  // 1222 mm cabinet), so a wider screen never substitutes a longer bar for the
+  // two flanking cabinets; the designer's own recorded length still wins.
+  const cabinetLengthMm = resolveSoundbarCabinetLengthMm({
+    modelKey,
+    screen: { tvPresetKey },
+    dualCentre: true,
+    explicitMm: options?.cabinetLengthMm ?? null,
+  });
+
+  const meta = getSpeakerModelMeta(String(modelKey || '').trim(), tvPresetKey || null, { cabinetLengthMm });
   const widthM = Number(meta?.widthM);
   const heightM = Number(meta?.heightM);
   const depthM = Number(meta?.depthM);
   if (!Number.isFinite(widthM) || !Number.isFinite(heightM) || widthM <= 0 || heightM <= 0) return null;
-  return { widthM, heightM, depthM: Number.isFinite(depthM) && depthM > 0 ? depthM : 0.08 };
+  return {
+    widthM,
+    heightM,
+    depthM: Number.isFinite(depthM) && depthM > 0 ? depthM : 0.08,
+    cabinetLengthMm: Number.isFinite(Number(meta?.cabinetLengthMm)) ? Number(meta.cabinetLengthMm) : null,
+  };
 }
 
 /**
@@ -333,8 +350,8 @@ export function centreCabinetNormalFootprintM(modelKey, tvPresetKey = null) {
  *
  * @returns {{widthM:number, heightM:number, depthM:number, orientation:string}|null}
  */
-export function resolveCentreCabinetFootprintM(modelKey, orientation, tvPresetKey = null) {
-  const normal = centreCabinetNormalFootprintM(modelKey, tvPresetKey);
+export function resolveCentreCabinetFootprintM(modelKey, orientation, tvPresetKey = null, options = {}) {
+  const normal = centreCabinetNormalFootprintM(modelKey, tvPresetKey, options);
   if (!normal) return null;
   const value = normaliseCabinetOrientation(orientation);
   if (value === CABINET_ORIENTATION_HORIZONTAL) return { ...normal, orientation: value };
@@ -342,6 +359,9 @@ export function resolveCentreCabinetFootprintM(modelKey, orientation, tvPresetKe
     widthM: normal.heightM,
     heightM: normal.widthM,
     depthM: normal.depthM,
+    // The installed cabinet length travels with the footprint, so the drawings
+    // can pick the artwork for the variant actually installed.
+    cabinetLengthMm: normal.cabinetLengthMm,
     orientation: value,
   };
 }

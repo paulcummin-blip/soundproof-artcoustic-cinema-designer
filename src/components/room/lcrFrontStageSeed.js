@@ -3,6 +3,7 @@
 // LCR/subwoofer clash check. No React — safe to import anywhere.
 
 import { getSpeakerModelMeta } from '@/components/models/speakers/registry';
+import { resolveSoundbarMetaM } from '@/components/models/speakers/soundbarCabinetVariant';
 import { getCanonicalRole } from '@/components/utils/surroundRoleMap';
 import { computeTvVerticalCentreM } from '@/components/roomdesigner/utils/lcrHeightAuthority';
 import { resolveInitialLcrPosition } from '@/components/room/placement/initialSpeakerPlacement';
@@ -69,9 +70,17 @@ export function hasFrontLcrSubClash({ speakers, frontSubs, frontSubsCfg }) {
   return lcrRects.some((lcrRect) => frontSubRects.some((subRect) => rectsOverlap(lcrRect, subRect)));
 }
 
+/**
+ * The soundbar's catalogue metadata with the INSTALLED cabinet length applied.
+ *
+ * A TV-linked soundbar (C4-1, Multi, HSPL) is published in several cabinet
+ * lengths; the one installed is the catalogue length closest to the screen's
+ * PHYSICAL width — never its diagonal, never a fixed default. The shared variant
+ * authority owns that decision, so the height and depth read here are the ones
+ * every drawing uses.
+ */
 export function resolveSoundbarMeta(modelLabel, screen) {
-  const tvPresetKey = screen?.tvPresetKey || null;
-  return getSpeakerModelMeta(modelLabel, tvPresetKey);
+  return resolveSoundbarMetaM(modelLabel, screen, { tvPresetKey: screen?.tvPresetKey || null });
 }
 
 export function buildFrontStageSeed({
