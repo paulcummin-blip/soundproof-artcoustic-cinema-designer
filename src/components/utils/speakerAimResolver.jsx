@@ -16,6 +16,10 @@
  *      - LW  / RW   → wall-flat (-90 / +90)
  */
 
+// The ONE role authority for the two physical centre cabinets of the dual-centre
+// front stage.
+import { isCentreCabinetRole } from '@/components/utils/frontStageModeAuthority';
+
 // 0° = +Y (into room), clockwise positive, range −180..+180
 // Matches yawFromToPlan convention in rp22HfOffAxis.js
 function _yawFromTo(from, to) {
@@ -48,6 +52,18 @@ export function resolveSpeakerYaw({ speaker, mlpPos, appState, getCanonicalRole 
   const isFW   = canon === 'LW'  || canon === 'RW';
   const isSide = canon === 'SL'  || canon === 'SR'  || /^SL\d+$/.test(canon) || /^SR\d+$/.test(canon);
   const isRear = canon === 'SBL' || canon === 'SBR';
+
+  // ─── 0. Dual-centre centre cabinets (FCL / FCR) ───────────────────────────
+  // The two physical cabinets of the "TV with dual centre speakers" stage carry
+  // ONE centre channel. Each cabinet is aimed INDEPENDENTLY from its own
+  // acoustic centre, so a mirrored pair converges on the RSP with equal and
+  // opposite angles — never rotated as one rigid group. The pair's stored
+  // preference decides; the angle is resolved live every time, so moving either
+  // cabinet or the RSP updates both. Straight ahead (the default) is exactly 0°.
+  if (isCentreCabinetRole(canon)) {
+    if (speaker.aimAtRsp === true && hasValidMlp) return _yawFromTo(pos, mlpPos) ?? 0;
+    return 0;
+  }
 
   // ─── 1. Manual rotation (ONLY when user explicitly placed the speaker) ────
   // NOTE: rotation?.y is intentionally excluded — it is often a default { x:0, y:0, z:0 }

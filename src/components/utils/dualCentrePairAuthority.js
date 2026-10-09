@@ -96,3 +96,49 @@ export function effectiveCentreAcousticMidpoint(cabinets = []) {
   if (Number.isFinite(z)) midpoint.z = z;
   return midpoint;
 }
+
+// ── Aiming: the pair's own installation preference ─────────────────────────
+//
+// The two cabinets are aimed INDEPENDENTLY. Each one turns about its own
+// mounting reference towards the RSP from its OWN acoustic centre, so a
+// mirrored pair converges on the RSP with equal and opposite angles instead of
+// rotating as a single rigid group. The preference below is the only thing
+// remembered: the angles themselves are always resolved live from the cabinets'
+// current positions and the current RSP by the ONE aim authority
+// (speakerAimResolver.resolveSpeakerYaw), so moving either cabinet or the RSP
+// updates both immediately and no angle is ever stored stale.
+//
+// Aiming is a physical installation choice. It is stored on the cabinets — part
+// of the dual-centre configuration itself, exactly like their orientation — and
+// it changes no SPL, no RP22 input and no centre-channel acoustic authority.
+
+/**
+ * The aiming control's two options, in the designer's reading order.
+ * `atRsp: false` is "Straight ahead" — the value an unset pair reads as.
+ */
+export const CENTRE_CABINET_AIM_OPTIONS = Object.freeze([
+  { atRsp: false, label: 'Straight ahead' },
+  { atRsp: true, label: 'Aim at RSP' },
+]);
+
+/** Whether the installed cabinets are aimed at the RSP. Unset pair = straight ahead. */
+export function centreCabinetAimAtRsp(placedSpeakers) {
+  return (Array.isArray(placedSpeakers) ? placedSpeakers : [])
+    .some((s) => isCentreCabinetRole(s?.role) && s?.aimAtRsp === true);
+}
+
+/**
+ * The cabinets with the aiming preference stamped on BOTH of them — the pair is
+ * ONE configuration, so it never carries two different answers.
+ *
+ * Nothing else on a cabinet is touched: its stored position is the wall anchor
+ * and stays exactly where it was (aiming rotates the footprint about that
+ * reference, it never translates the cabinet), and its model, orientation and
+ * acoustic-centre height are untouched, so Front Elevation is unchanged.
+ */
+export function withCentreCabinetAim(placedSpeakers, atRsp) {
+  const aimed = atRsp === true;
+  return (Array.isArray(placedSpeakers) ? placedSpeakers : []).map((s) => (
+    isCentreCabinetRole(s?.role) ? { ...s, aimAtRsp: aimed } : s
+  ));
+}

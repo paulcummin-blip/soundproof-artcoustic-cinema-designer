@@ -12,7 +12,13 @@ import { resolveModelOption } from '@/components/products/modelOptionResolver';
 import RP22LabelledLevelPill from '@/components/ui/RP22LabelledLevelPill';
 import { getCanonicalRole } from '@/components/utils/surroundRoleMap';
 import { yawDegToMLP } from '@/components/room/utils/speakerHelpers';
-import { effectiveCentreAcousticMidpoint } from '@/components/utils/dualCentrePairAuthority';
+import {
+  CENTRE_CABINET_AIM_OPTIONS,
+  centreCabinetAimAtRsp,
+  effectiveCentreAcousticMidpoint,
+  withCentreCabinetAim,
+} from '@/components/utils/dualCentrePairAuthority';
+import { resolveSpeakerYaw } from '@/components/utils/speakerAimResolver';
 import { getMlpSeat } from '@/components/utils/spl/centralSplEngine';
 import LcrSplCard from '@/components/speakers/LcrSplCard';
 import { calculateLcrAcousticCentreBand, formatHeightM } from '@/components/utils/acoustics/acousticCentreBand';
@@ -605,6 +611,32 @@ export default function LCRPanel({ setSpeakers, dimensions, lcrAimMode, onChange
     applyFrontStage(lcrModel, FRONT_STAGE_DUAL_CENTRE, soundbarModel, centreModel, next);
   }, [applyFrontStage, lcrModel, soundbarModel, centreModel]);
 
+  // Dual centre — aiming. The pair is ONE configuration, so the choice is stored
+  // on both cabinets at once; each is then aimed from its OWN acoustic centre, so
+  // the pair converges on the RSP instead of rotating as a rigid group. Physical
+  // installation only: no SPL input, no centre-channel authority and no RP22
+  // calculation is touched.
+  const onChooseCentreAim = useCallback((atRsp) => {
+    setSpeakers?.((prev) => withCentreCabinetAim(prev, atRsp));
+  }, [setSpeakers]);
+
+  const centreAimAtRsp = useMemo(
+    () => centreCabinetAimAtRsp(speakerSystem?.placedSpeakers),
+    [speakerSystem?.placedSpeakers],
+  );
+
+  // The angles the two cabinets are actually aimed at, read from the ONE aim
+  // resolver the Plan View draws from, so this readout can never disagree with
+  // the drawing. Resolved live from the current cabinet positions and the
+  // current RSP — nothing is stored, so both follow either one moving.
+  const centreCabinetAims = useMemo(() => {
+    if (!dualCentreStage || !centreAimAtRsp) return null;
+    return centreCabinets(speakerSystem?.placedSpeakers).map((cabinet) => ({
+      role: getCanonicalRole(cabinet?.role),
+      yawDeg: resolveSpeakerYaw({ speaker: cabinet, mlpPos: mlpPoint, appState: {} }),
+    }));
+  }, [dualCentreStage, centreAimAtRsp, speakerSystem?.placedSpeakers, mlpPoint]);
+
   // Clear the LCR model — remove the model from all LCR speakers and return
   // the selector to its placeholder state. No hidden fallback remains.
   const onClearLcrModel = useCallback(() => {
@@ -765,6 +797,37 @@ export default function LCRPanel({ setSpeakers, dimensions, lcrAimMode, onChange
                     </SelectContent>
                   </Select>
                 </div>
+              </div>
+
+              {/* Aiming — the pair's own installation preference. Each cabinet is
+                  aimed from its own acoustic centre, so the pair converges on the
+                  RSP; the stored positions are the wall anchors and never move. */}
+              <div className="space-y-1">
+                <Label className="text-[#3E4349] font-medium">Aiming</Label>
+                <div className="flex gap-2">
+                  {CENTRE_CABINET_AIM_OPTIONS.map((option) => (
+                    <Button
+                      key={option.label}
+                      type="button"
+                      size="sm"
+                      variant={centreAimAtRsp === option.atRsp ? 'default' : 'outline'}
+                      className={
+                        centreAimAtRsp === option.atRsp
+                          ? 'flex-1 bg-[#213428] text-white hover:bg-[#213428]/90'
+                          : 'flex-1 border-[#DCDBD6] text-[#3E4349] hover:bg-[#F8F8F7]'
+                      }
+                      onClick={() => onChooseCentreAim(option.atRsp)}
+                      disabled={disabled}
+                    >
+                      {option.label}
+                    </Button>
+                  ))}
+                </div>
+                {centreCabinetAims && centreCabinetAims.length > 0 && (
+                  <p className="text-[11px] text-[#8B7F76] pt-1">
+                    {centreCabinetAims.map((aim) => `${aim.role} ${Math.round(aim.yawDeg)}°`).join('   ·   ')}
+                  </p>
+                )}
               </div>
             </div>
           )}
