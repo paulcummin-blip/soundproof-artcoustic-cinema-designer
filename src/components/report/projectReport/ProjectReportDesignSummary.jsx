@@ -3,11 +3,12 @@
  * ------------------------------
  * PAGE 1 of the consolidated Project Report: the PROJECT SUMMARY.
  *
- * A clean, restrained opening page: the project's identity is stated by the
- * report masthead directly above it (project, client, version, reference and
- * date — composed once by the shared first-page meta line and never repeated
- * here), followed by the design's key facts and ONE short project-specific
- * paragraph.
+ * A designed opening page: the project's identity is stated by the report
+ * masthead directly above it (project, client, version, reference and date —
+ * composed once by the shared first-page meta line and never repeated here),
+ * followed by the project-specific headline, the facts that open the design up,
+ * the key facts as a two-column fact sheet, and ONE short project-specific
+ * Design Intent paragraph.
  *
  * The page carries nothing else. The strengths the published assessment
  * supports are stated on their own page (ADI Design Highlights), so this page

@@ -81,7 +81,7 @@ function reached(engineeringSummary, ids, minimum) {
 }
 
 /** The screen the cinema was designed around: 185" 2.35:1. */
-function screenPhrase(projectDetails) {
+export function screenPhrase(projectDetails) {
   const size = Number(projectDetails?.screen_size);
   const aspect = String(projectDetails?.aspect_ratio || '').trim();
   const parts = [];
@@ -91,7 +91,7 @@ function screenPhrase(projectDetails) {
 }
 
 /** The seating, as the report's own row grouping sees it. */
-function seatingRowPhrase(seatingPositions) {
+export function seatingRowPhrase(seatingPositions) {
   const seats = (Array.isArray(seatingPositions) ? seatingPositions : []).map((seat) => ({
     x: Number(seat?.x ?? seat?.position?.x),
     y: Number(seat?.y ?? seat?.position?.y),
