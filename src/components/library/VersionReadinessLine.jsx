@@ -3,7 +3,7 @@
  * --------------------
  * The one line under a design version's name on the Generated Reports tab that
  * answers the designer's question for THAT version: "Ready for Proposal", or
- * exactly what it still needs — "Needs updated Technical Report".
+ * exactly what it still needs — "Update needed" for its Project Report.
  *
  * The line is supplied by the caller, from the same readiness authority the
  * banner uses, so a version's line and the banner can never disagree.

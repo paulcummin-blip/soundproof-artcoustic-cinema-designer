@@ -31,7 +31,11 @@ import {
 import { buildVersionNameMap } from '@/components/library/libraryVersionLabels';
 import { isSnapshotRestorable } from '@/components/report/reportSnapshotAuthority';
 
-const LIVE_REPORT_TYPES = ['visual', 'technical'];
+// The ONE report a version states a current row for: the Project Report. The
+// legacy Visual and Technical Reports are retired as proposal sources — their
+// saved records and issued PDFs stay readable history, but they are never listed
+// as a current required report.
+const LIVE_REPORT_TYPES = ['project'];
 const REPORT_SNAPSHOT_LIMIT = 100;
 const ISSUED_EXPORT_LIMIT = 200;
 

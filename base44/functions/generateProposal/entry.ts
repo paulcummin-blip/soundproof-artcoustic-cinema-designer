@@ -12,11 +12,11 @@ import { selectCanonicalReportSnapshotsByKey } from '../../shared/reportSnapshot
 // The gate below is decided by the SAME per-version rule the Step 5 table shows
 // (src/components/proposal/sourceAuthority/proposalReadinessAuthority.js mirrors
 // this module and a test asserts the two agree word for word). It states, per
-// selected version, the Visual Report, the Technical Report and the published
-// engineering result, and it names the version by the name the designer saved —
-// never as "Level 1 version · V2".
+// selected version, whether that version's canonical PROJECT REPORT is current
+// and proposal-ready, and it names the version by the name the designer saved —
+// never as "Level 1 version · V2". No other report is a proposal prerequisite:
+// readiness is read from the Project Report alone.
 import {
-  PUBLICATION_STATUS,
   resolveCalculationAuthority,
   resolveProposalReadinessGate,
   resolveVersionReadiness,
@@ -28,7 +28,7 @@ import {
 // frontend cannot import from base44/ and vice versa, so the sentence lives in
 // both places and a test asserts they match.
 const PROPOSAL_SOURCE_REQUIRED_MESSAGE =
-  'Generate the Visual and Technical Reports before creating a proposal. This ensures the proposal uses the current project data and RP22 results.';
+  'Create the Project Report for every selected version before creating a proposal. This ensures the proposal uses the current project data and RP22 results.';
 
 // Section definitions and prompts are shared with the write-free preview pipeline.
 
@@ -165,8 +165,8 @@ export default async function(req) {
     }
     engineering_snapshot = suppliedSnapshots[0].snapshot;
     // ── Evidence traceability ──
-    // The exact evidence each version's facts were read from: the Visual and
-    // Technical Report snapshots, the version, when the evidence was generated
+    // The exact evidence each version's facts were read from: the version's
+    // Project Report evidence, the version, when the evidence was generated
     // and its content fingerprint. A proposal that later disagrees with a report
     // can therefore be traced back to the evidence it actually read.
     const reportEvidenceCitations = suppliedSnapshots.map((entry) => ({
@@ -195,7 +195,7 @@ export default async function(req) {
       });
       if (missingEvidence.length > 0) {
         return Response.json({
-          error: 'Comparison evidence could not be built for both selected versions. Regenerate the Visual and Technical Reports for each version, then try again.',
+          error: 'Comparison evidence could not be built for both selected versions. Create a current Project Report for each version, then try again.',
           missing_version_ids: missingEvidence,
         }, { status: 409 });
       }
@@ -206,20 +206,20 @@ export default async function(req) {
       // the reason instead of producing an empty section.
       if (comparisonTable.rows.length === 0) {
         return Response.json({
-          error: 'Comparison evidence could not be built for both selected versions. Regenerate the Visual and Technical Reports for each version, then try again.',
+          error: 'Comparison evidence could not be built for both selected versions. Create a current Project Report for each version, then try again.',
           comparison_versions: comparisonTable.versions,
         }, { status: 409 });
       }
     }
 
-    // ── SOURCE AUTHORITY: no current sources, no proposal ──
-    // A proposal is downstream of the generated Visual and Technical Reports,
-    // both of which are rendered from the version's published engineering
-    // result. Every selected version is judged on those three sources by the one
-    // shared readiness authority — the same verdict, for the same version, in
-    // the same words as the Step 5 table. The engineering source is the PUBLISHED
-    // result alone: a browser-session handoff is not visible here and so is never
-    // accepted as readiness.
+    // ── SOURCE AUTHORITY: no current Project Report, no proposal ──
+    // A proposal is downstream of the version's Project Report, which is rendered
+    // from the version's published engineering result. Every selected version is
+    // judged on its own canonical Project Report by the one shared readiness
+    // authority — the same verdict, for the same version, in the same words as
+    // the Step 5 table. The engineering source is the PUBLISHED result alone: a
+    // browser-session handoff is not visible here and so is never accepted as
+    // readiness.
     // The CANONICAL saved report per version and report type — the same rule the
     // report pages and the Step 5 readiness table apply. Complete evidence comes
     // first, then the row frozen against the version's CURRENT published
@@ -243,7 +243,7 @@ export default async function(req) {
       const pointer = String(versionRecord?.published_fingerprint || '').trim();
       // The cache row is read for EVERY selected version, not only for one that
       // has a publication pointer: it holds the version's completed calculation
-      // authority, the calculated engineering result its Technical Report renders.
+      // authority, the calculated engineering result its Project Report renders.
       const cacheRecord = await loadCacheRecord(base44, project_id, versionId);
       if (cacheRecord) cacheRecordByVersionId.set(versionId, cacheRecord);
       const publication = pointer && cacheRecord ? findPublication(cacheRecord, pointer) : null;
@@ -252,26 +252,20 @@ export default async function(req) {
 
     const readinessRows = resolvedVersionIds.map((versionId) => {
       const versionRecord = (projectVersions || []).find((version) => version.id === versionId) || null;
-      const pointer = String(versionRecord?.published_fingerprint || '').trim();
       const publication = versionPublicationById.get(versionId) || null;
-      const savedTechnical = savedReportByKey.get(`${versionId}::technical`) || null;
+      // THE canonical saved Project Report — the only report source a proposal
+      // is gated on. The legacy Visual and Technical Reports are never consulted.
+      const savedProjectReport = savedReportByKey.get(`${versionId}::project`) || null;
       // The version's calculated engineering result: the publication when it has
       // one, otherwise the completed calculation authority of the SAME design its
-      // Technical Report was generated from — the rule the client applies too.
+      // Project Report was generated from — the rule the client applies too.
       const calculationAuthority = resolveCalculationAuthority({
         cacheRecord: cacheRecordByVersionId.get(versionId) || null,
-        savedTechnicalReport: savedTechnical,
+        savedTechnicalReport: savedProjectReport,
       });
       return resolveVersionReadiness({
         version: versionRecord,
-        savedReports: {
-          visual: savedReportByKey.get(`${versionId}::visual`) || null,
-          technical: savedTechnical,
-        },
-        publication,
-        publicationStatus: pointer
-          ? (publication ? PUBLICATION_STATUS.PUBLISHED : PUBLICATION_STATUS.STALE)
-          : PUBLICATION_STATUS.NOT_CALCULATED,
+        savedProjectReport,
         currentFingerprints: {
           engineeringFingerprint: publication?.engineering_fingerprint || null,
           // When the version has no publication to speak for it, the completed
@@ -283,7 +277,6 @@ export default async function(req) {
             || null,
           seatPriorityFingerprint: publication?.engineering_summary?.seatPriorityFingerprint || null,
         },
-        calculationAuthority,
       });
     });
 

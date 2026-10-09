@@ -66,8 +66,8 @@ import {
   selectLatestExports,
 } from './librarySourceStatus';
 
-/** The two report types every version states a row for, in reading order. */
-const REPORT_TYPES = [PROPOSAL_SOURCE_REPORT.VISUAL, PROPOSAL_SOURCE_REPORT.TECHNICAL];
+/** The ONE report every version states a current row for: the Project Report. */
+const REPORT_TYPES = [PROPOSAL_SOURCE_REPORT.PROJECT];
 
 function SectionHeading({ children }) {
   return (

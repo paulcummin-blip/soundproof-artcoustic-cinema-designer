@@ -160,11 +160,11 @@ export default function CreateProposalWizard({ onCreated, onCancel, regenerateFr
 
   const handleGenerate = async () => {
     if (generationInFlightRef.current || !selectedProjectId || selectedVersionIds.length === 0) return;
-    // Source authority: no current reports, no proposal. ONE authority decides
-    // this, so the button can never disagree with the panel above it.
+    // Source authority: no current Project Report, no proposal. ONE authority
+    // decides this, so the button can never disagree with the panel above it.
     if (!readiness.ready) {
       setError(readiness.message
-        || 'Every selected version needs its current reports before this proposal can be generated.');
+        || 'Every selected version needs its current Project Report before this proposal can be generated.');
       return;
     }
     if (!engineeringSnapshot) {
@@ -201,7 +201,7 @@ export default function CreateProposalWizard({ onCreated, onCancel, regenerateFr
         // designer knows exactly which report to regenerate.
         const missingNames = missingSnapshots.map((entry) => entry.version_name || entry.version_id).join(', ');
         setError(proposalType === 'comparison'
-          ? `${missingNames}: no current report source for this comparison. Generate that version's Visual and Technical Reports, then try again.`
+          ? `${missingNames} needs a current Project Report.`
           : `No calculated engineering result was found for ${missingNames}.`);
         return;
       }
@@ -306,7 +306,7 @@ export default function CreateProposalWizard({ onCreated, onCancel, regenerateFr
       return 'The saved reports and engineering results could not be read. Retry the read, then generate the proposal.';
     }
     if (!readiness.ready) {
-      return readiness.message || 'Every selected version needs its current reports before this proposal can be generated.';
+      return readiness.message || 'Every selected version needs its current Project Report before this proposal can be generated.';
     }
     // A comparison is generated from each version's own frozen evidence, which
     // is read and verified when generation starts — so the versions are the
@@ -418,7 +418,7 @@ export default function CreateProposalWizard({ onCreated, onCancel, regenerateFr
           </div>
           <p className="text-sm text-[#8A8477] mb-4 leading-relaxed">
             Generate to create the proposal and open the editor. A complete first draft will be
-            written from the current Visual and Technical Report data for the selected versions.
+            written from the current Project Report data for the selected versions.
           </p>
           {snapshotLoading && (
             <p className="text-sm text-[#8A8477] mb-6">Reading the published engineering result…</p>

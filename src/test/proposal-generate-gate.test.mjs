@@ -46,24 +46,22 @@ const SERVER_GATE = read('base44/functions/generateProposal/entry.ts');
 const current = () => buildReadinessCell({ state: READINESS_STATE.CURRENT, generatedAt: '2026-10-04T10:00:00.000Z' });
 const missing = () => buildReadinessCell({ state: READINESS_STATE.MISSING });
 
-/** One version's readiness row, with every cell Current unless overridden. */
+/** One version's readiness row, with its Project Report Current unless overridden. */
 function readinessRow(overrides = {}, identity = {}) {
   return resolveVersionReadinessRow({
     versionId: identity.versionId || 'v1',
     versionName: identity.versionName || 'Level 1 version',
     versionNumber: identity.versionNumber ?? 1,
-    cells: { visual: current(), technical: current(), engineering: current(), ...overrides },
+    cells: { project: current(), ...overrides },
   });
 }
 
-// ── TEST 1 — three Current cells is a ready version ────────────────────────
-test('TEST 1 — a version showing Current / Current / Current is ready', () => {
+// ── TEST 1 — a Current Project Report is a ready version ───────────────────
+test('TEST 1 — a version whose Project Report is Current is ready', () => {
   const row = readinessRow();
 
-  assert.equal(row.visual_report_status, 'Current');
-  assert.equal(row.technical_report_status, 'Current');
-  assert.equal(row.engineering_result_status, 'Current');
-  assert.equal(row.ready, true, 'no source blocks a version whose reports and result are current');
+  assert.equal(row.project_report_status, 'Current');
+  assert.equal(row.ready, true, 'the current Project Report is the whole report requirement');
   assert.equal(row.blockers.length, 0);
 
   const gate = resolveProposalReadinessGate({ rows: [row], minVersions: 1 });
@@ -110,14 +108,14 @@ test('TEST 3 — no legacy report-ready boolean can contradict the panel', () =>
 
   assert.match(
     WIZARD,
-    /readiness\.message \|\| 'Every selected version needs its current reports/,
+    /readiness\.message \|\| 'Every selected version needs its current Project Report/,
     'the one blocking sentence comes from the readiness authority',
   );
 });
 
 // ── TEST 4 — a blocked version names what is missing ───────────────────────
 test('TEST 4 — a blocked reason names the version and the exact missing item', () => {
-  const blocked = readinessRow({ technical: missing() });
+  const blocked = readinessRow({ project: missing() });
   const gate = resolveProposalReadinessGate({ rows: [blocked], minVersions: 1 });
 
   assert.equal(gate.ready, false);
@@ -125,23 +123,39 @@ test('TEST 4 — a blocked reason names the version and the exact missing item',
   assert.equal(gate.blockedVersions[0].version_name, 'Level 1 version', 'the saved version name is used');
   assert.deepEqual(
     gate.blockedVersions[0].blockers.map((blocker) => blocker.source),
-    [READINESS_SOURCE.TECHNICAL],
-    'only the source that is actually missing is named',
+    [READINESS_SOURCE.PROJECT],
+    'the Project Report is the one source that can block a version',
   );
   assert.match(gate.message, /Level 1 version/);
-  assert.match(gate.message, /Technical Report/);
-  assert.equal(gate.message.includes('Visual Report'), false, 'a current report is never called missing');
+  assert.match(gate.message, /Project Report/);
+  assert.equal(
+    /Visual Report|Technical Report/.test(gate.message),
+    false,
+    'no retired report is ever named',
+  );
 
   // The retry the table offers reads the same authority again — nothing else.
   assert.match(WIZARD, /onRetry=\{readinessError \? retryReadiness : null\}/);
   assert.match(READINESS_HOOK, /return \{ rows, loading, error, retry \}/);
 });
 
+// ── TEST 8 — no retired report is named anywhere on the path ──────────────
+test('TEST 8 — the wizard, the table and the server name the Project Report only', () => {
+  const TABLE_SRC = read('src/components/proposal/sourceAuthority/VersionReadinessTable.jsx');
+  for (const source of [WIZARD, TABLE_SRC, SERVER_GATE]) {
+    assert.equal(/Visual Report|Technical Report/.test(source), false, 'no retired report is required or named');
+    assert.equal(/Visual and Technical Reports/.test(source), false, 'the dual-report sentence is gone');
+  }
+  assert.match(TABLE_SRC, /READINESS_REPORT_LABEL/, 'the table states the one report label');
+  assert.match(SERVER_GATE, /savedProjectReport/, 'the server gate reads the saved Project Report');
+  assert.equal(SERVER_GATE.includes('savedReports'), false, 'the server no longer feeds report cells by type');
+});
+
 // ── TEST 5 — the comparison path is unchanged ─────────────────────────────
 test('TEST 5 — a comparison is still judged version by version', () => {
   const first = readinessRow();
   const second = readinessRow(
-    { engineering: missing() },
+    { project: missing() },
     { versionId: 'v2', versionName: 'Level 4 version', versionNumber: 4 },
   );
 

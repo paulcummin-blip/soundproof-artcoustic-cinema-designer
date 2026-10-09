@@ -9,8 +9,8 @@
  * generated or Incomplete — and, when it is not Current, the one action that
  * fixes it (Create Project Report, or Create Updated Report).
  *
- * The retired Visual and Technical Reports have no column, no button and no
- * requirement here.
+ * No other report has a column, a button or a requirement here: the Project
+ * Report is the only report a proposal is gated on.
  *
  * Presentation only: every value comes from proposalReadinessAuthority.
  */

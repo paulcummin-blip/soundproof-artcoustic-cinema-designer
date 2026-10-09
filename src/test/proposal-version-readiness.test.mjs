@@ -60,7 +60,7 @@ const readyRow = (versionId, versionName, versionNumber) => resolveVersionReadin
   versionId,
   versionName,
   versionNumber,
-  cells: { visual: current(), technical: current(), engineering: current() },
+  cells: { project: current() },
 });
 
 /* ── TEST 1 — a comparison is judged per version ───────────────────────── */
@@ -71,7 +71,7 @@ test('TEST 1 — a comparison is judged per version, never from the first select
     versionId: 'v2',
     versionName: 'Level 4 version',
     versionNumber: 2,
-    cells: { visual: current(), technical: missing(), engineering: current() },
+    cells: { project: missing() },
   });
   const gate = resolveProposalReadinessGate({ rows: [ready, blocked], minVersions: 2 });
 
@@ -79,9 +79,10 @@ test('TEST 1 — a comparison is judged per version, never from the first select
   expect(gate.ready).toBe(false);
   expect(gate.rows).toHaveLength(2);
   expect(gate.blockers).toHaveLength(1);
-  expect(gate.blockers[0].source).toBe('technical');
-  expect(gate.message).toContain('Level 4 version is missing the Technical Report');
+  expect(gate.blockers[0].source).toBe('project');
+  expect(gate.message).toContain('Level 4 version needs a Project Report.');
   expect(gate.message).not.toContain('Original Design');
+  expect(gate.message).not.toMatch(/Visual Report|Technical Report/);
 });
 
 /* ── TEST 2 — all versions current ────────────────────────────────────── */
@@ -96,8 +97,8 @@ test('TEST 2 — every selected version current reads ready, with the ready copy
   expect(gate.ready).toBe(true);
   expect(gate.message).toBeNull();
   expect(gate.detail).toBe(PROPOSAL_READINESS_READY_COPY);
-  expect(gate.detail).toContain('Every selected version has its current reports');
-  expect(rows.every((row) => row.visual.status === 'Current')).toBe(true);
+  expect(gate.detail).toContain('Every selected version has its current Project Report');
+  expect(rows.every((row) => row.project.status === 'Current')).toBe(true);
 });
 
 /* ── TEST 3 — the version count ───────────────────────────────────────── */
@@ -124,7 +125,7 @@ test('TEST 4 — a read in flight reads Checking, and nothing is reported as mis
     versionId: 'v1',
     versionName: 'Original Design',
     versionNumber: 1,
-    cells: { visual: checking(), technical: checking(), engineering: checking() },
+    cells: { project: checking() },
   });
   const gate = resolveProposalReadinessGate({ rows: [row] });
 
@@ -132,8 +133,8 @@ test('TEST 4 — a read in flight reads Checking, and nothing is reported as mis
   expect(gate.ready).toBe(false);
   expect(gate.message).toBeNull();
   expect(row.blockers).toEqual([]);
-  expect(row.visual.status).toBe('Checking…');
-  expect(TABLE).toContain('Checking each selected version’s current reports…');
+  expect(row.project.status).toBe('Checking…');
+  expect(TABLE).toContain('Checking each selected version’s Project Report…');
 });
 
 /* ── TEST 5 — named blocking messages ─────────────────────────────────── */
@@ -145,26 +146,26 @@ test('TEST 5 — the blocking message names every blocked version and the source
       versionId: 'v2',
       versionName: 'Level 4 version',
       versionNumber: 2,
-      cells: { visual: current(), technical: missing(), engineering: current() },
+      cells: { project: missing() },
     }),
     resolveVersionReadinessRow({
       versionId: 'v3',
       versionName: 'Wides trial',
       versionNumber: 3,
-      cells: { visual: current(), technical: current(), engineering: stale() },
+      cells: { project: stale() },
     }),
   ];
   const gate = resolveProposalReadinessGate({ rows, minVersions: 2 });
 
   expect(gate.message).toBe(
-    'Level 4 version is missing the Technical Report. Wides trial has a stale bass authority.',
+    'Level 4 version needs a Project Report. Wides trial needs an updated Project Report.',
   );
   expect(gate.blockers.map((blocker) => blocker.sentence)).toEqual([
-    'Level 4 version is missing the Technical Report',
-    'Wides trial has a stale bass authority',
+    'Level 4 version needs a Project Report.',
+    'Wides trial needs an updated Project Report.',
   ]);
-  // The engine column names what is actually missing, never a generic phrase.
-  expect(gate.blockers[1].label).toBe('bass authority');
+  // The one requirement is named plainly, never an internal state name.
+  expect(gate.blockers[1].label).toBe('Project Report');
   expect(rows[0].blockingSentence).toBeNull();
 });
 
@@ -195,19 +196,16 @@ test('TEST 7 — Step 5 shows the same table, every version by name, and gates G
   expect(WIZARD).toContain('if (!readiness.ready) {');
   expect(WIZARD).toContain('disabled={!!generateBlockReason}');
   expect(WIZARD).toContain('{generateBlockReason}');
-  expect(WIZARD).toContain('Every selected version needs its current reports before this proposal can be generated.');
+  expect(WIZARD).toContain('Every selected version needs its current Project Report before this proposal can be generated.');
 
-  // The table states the three columns and the reported state of each.
-  expect(READINESS_COLUMNS.map((column) => column.label)).toEqual([
-    'Visual Report',
-    'Technical Report',
-    'Engineering Authority',
-  ]);
+  // The table states the ONE report column and the reported state of it.
+  expect(READINESS_COLUMNS.map((column) => column.label)).toEqual(['Project Report']);
   expect(PROPOSAL_READINESS_TITLE).toBe('Version readiness');
   expect(TABLE).toContain('{PROPOSAL_READINESS_TITLE}');
   expect(TABLE).toContain('{row.versionName}');
   expect(TABLE).toContain('{gate.message}');
-  expect(TABLE).toContain('READINESS_COLUMNS.map');
+  expect(TABLE).toContain('READINESS_REPORT_LABEL');
+  expect(TABLE).not.toMatch(/Visual Report|Technical Report/);
 });
 
 /* ── TEST 8 — the server agrees ───────────────────────────────────────── */
@@ -381,8 +379,8 @@ test('TEST 12 — a comparison’s readiness rows and cards state the exact save
     expect(row.versionName).not.toMatch(/·\s*V\d/);
     expect(row.blockingSentence).toContain(row.versionName);
   }
-  expect(gate.message).toContain('Level 4 version is missing');
-  expect(gate.message).toContain('Original Design is missing');
+  expect(gate.message).toContain('Level 4 version needs a Project Report.');
+  expect(gate.message).toContain('Original Design needs a Project Report.');
 
   // A proposal card shows EVERY version it was built from, by saved name.
   const card = read('src/components/proposal/ProposalCard.jsx');
