@@ -11,6 +11,8 @@ import { PRODUCT_ROLES } from '@/components/products/productMaster';
 import { resolveModelOption } from '@/components/products/modelOptionResolver';
 import RP22LabelledLevelPill from '@/components/ui/RP22LabelledLevelPill';
 import { getCanonicalRole } from '@/components/utils/surroundRoleMap';
+import { yawDegToMLP } from '@/components/room/utils/speakerHelpers';
+import { effectiveCentreAcousticMidpoint } from '@/components/utils/dualCentrePairAuthority';
 import { getMlpSeat } from '@/components/utils/spl/centralSplEngine';
 import LcrSplCard from '@/components/speakers/LcrSplCard';
 import { calculateLcrAcousticCentreBand, formatHeightM } from '@/components/utils/acoustics/acousticCentreBand';
@@ -192,6 +194,27 @@ export default function LCRPanel({ setSpeakers, dimensions, lcrAimMode, onChange
     return resolveModelOption(centreOptions, model)?.label
       || (getSpeakerModelMeta(model)?.label || model);
   }, [dualCentreStage, speakerSystem?.placedSpeakers, centreOptions]);
+
+  // The centre channel's own horizontal angle. A linked dual-centre pair is ONE
+  // centre channel, and its reference position is the midpoint of the two
+  // cabinets' acoustic centres — never either cabinet on its own. Read in the
+  // same convention as every other aim angle (0° = straight down the room,
+  // positive clockwise), so a pair flanking the screen symmetrically with the
+  // listening position on the centreline reads about 0°, exactly like a
+  // conventional centre speaker installed at that midpoint.
+  const centreChannelAngleDeg = useMemo(() => {
+    if (!dualCentreStage) return null;
+    const midpoint = effectiveCentreAcousticMidpoint(centreCabinets(speakerSystem?.placedSpeakers));
+    if (!midpoint) return null;
+    const target = (mlpPoint
+      && Number.isFinite(Number(mlpPoint.x))
+      && Number.isFinite(Number(mlpPoint.y)))
+      ? { x: Number(mlpPoint.x), y: Number(mlpPoint.y) }
+      : null;
+    if (!target) return null;
+    const deg = yawDegToMLP(midpoint, target);
+    return Number.isFinite(deg) ? deg : null;
+  }, [dualCentreStage, speakerSystem?.placedSpeakers, mlpPoint]);
 
   const roomH = Number(dimensions?.height ?? dimensions?.heightM) || 2.8;
   const screenBottomM = Number(screen?.heightFromFloorM);
@@ -737,14 +760,16 @@ export default function LCRPanel({ setSpeakers, dimensions, lcrAimMode, onChange
                   </Select>
                 </div>
               </div>
-              <p className="text-[11px] text-[#8B7F76]">
-                One vertical cabinet at each edge of the TV, acoustic centre at the TV midpoint. The two cabinets are the one centre channel; the Centre SPL card states the cabinet's own SPL plus 4 dB for the arrangement.
-              </p>
             </div>
           )}
 
+          {/* The centre channel's angle: the linked dual-centre pair reports it
+              from the effective acoustic midpoint, every other front stage
+              reports the front-stage aim angle exactly as before. */}
           <p className="text-[11px] text-[#8B7F76]">
-            Angle to MLP: <span className="font-medium text-[#625143]">{Math.round(lcrAngleDeg)}°</span>
+            {centreChannelAngleDeg === null
+              ? <>Angle to MLP: <span className="font-medium text-[#625143]">{Math.round(lcrAngleDeg)}°</span></>
+              : <>Centre Angle: <span className="font-medium text-[#625143]">{Math.round(centreChannelAngleDeg)}°</span></>}
           </p>
 
           {/* SPL @ RSP */}

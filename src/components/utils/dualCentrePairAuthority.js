@@ -65,3 +65,34 @@ export function linkedCentreCabinetPositions({
     },
   };
 }
+
+/**
+ * The effective centre-channel acoustic centre: the midpoint of the pair's
+ * acoustic centres. This is the ONE position the centre channel is referenced
+ * from — its horizontal angle to the listening position, and its height — never
+ * either individual cabinet. With the pair symmetrically flanking the screen the
+ * midpoint falls on the screen centreline, exactly where a conventional single
+ * centre speaker sits, so the centre channel behaves the same in both cases.
+ *
+ * Physical cabinet coordinates are untouched: this is a reference position for
+ * the centre channel, not a substitute for either cabinet's own position.
+ *
+ * Returns null when no cabinet carries a usable position.
+ */
+export function effectiveCentreAcousticMidpoint(cabinets = []) {
+  const positions = (Array.isArray(cabinets) ? cabinets : [])
+    .map((c) => c?.position)
+    .filter((p) => p && Number.isFinite(Number(p.x)) && Number.isFinite(Number(p.y)));
+  if (positions.length === 0) return null;
+
+  const mean = (key) => {
+    const values = positions.map((p) => Number(p[key])).filter(Number.isFinite);
+    if (values.length === 0) return undefined;
+    return values.reduce((sum, v) => sum + v, 0) / values.length;
+  };
+
+  const midpoint = { x: mean('x'), y: mean('y') };
+  const z = mean('z');
+  if (Number.isFinite(z)) midpoint.z = z;
+  return midpoint;
+}
