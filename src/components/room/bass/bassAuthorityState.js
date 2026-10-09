@@ -131,7 +131,8 @@ export function resolveBassAuthorityState({
     const durableMatches = identityMatches
       && !!projectId && !!versionId
       && durable?.version?.id === versionId
-      && durable?.version?.project_id === projectId
+      && saved?.report_snapshot?.report_project?.project_id === projectId
+      && saved?.report_snapshot?.report_project?.version_id === versionId
       && durable?.version?.published_fingerprint === engineeringFingerprint
       && saved?.engineering_fingerprint === engineeringFingerprint
       && saved?.provenance?.bass_fingerprint === currentFingerprint
