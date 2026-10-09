@@ -109,11 +109,6 @@ export default function LcrSplCard({ role, label, allSeatSplMetrics, integratedL
             <div className="text-lg font-bold" style={{ color: '#1B1A1A' }}>
               {formatDb(dualCentreDb !== null ? dualCentreDb : finalSplDb)}
             </div>
-            {dualCentreDb !== null && (
-              <div className="text-xs mt-0.5" style={{ color: '#625143' }}>
-                Two cabinets · one virtual centre · +{DUAL_CENTRE_SPL_GAIN_DB} dB
-              </div>
-            )}
             {dualCentreDb === null && isOutputLimited && (
               <div className="text-xs mt-0.5" style={{ color: '#b08060' }}>
                 Output limited by speaker
