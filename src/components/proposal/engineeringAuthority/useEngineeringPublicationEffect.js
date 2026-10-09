@@ -40,6 +40,7 @@
 
 import { useEffect, useMemo, useRef, useState, useCallback } from 'react';
 import { PUBLICATION_CONTRACT_VERSION, buildFrozenReportProject } from '../../../../shared/engineeringPublicationContract.js';
+import { useCompletedBassAuthority } from '@/components/room/bass/completedBassResultStore';
 import { engineeringPublicationPreflight } from '@/components/engineering/engineeringPublicationPreflight';
 import { base44 } from '@/api/base44Client';
 import { ENGINEERING_AUTHORITY_VERSION } from '@/components/proposal/engineeringAuthority';
@@ -122,6 +123,7 @@ export function useEngineeringPublicationEffect({
   const designState = useMemo(() => ({ ...assessmentDesignState,
     versionName: selectedVersion?.id === versionId ? selectedVersion.version_name : null,
   }), [assessmentDesignState, selectedVersion, versionId]);
+  const completedBassAuthority = useCompletedBassAuthority(projectId || 'free', versionId || 'free');
   const [retrySequence, setRetrySequence] = useState(0);
   const attempt = usePublicationAttempt(projectId, versionId);
   const lastPublishedFingerprintRef = useRef(null);
@@ -144,7 +146,7 @@ export function useEngineeringPublicationEffect({
 
   const preflight = engineeringPublicationPreflight({
     projectId, versionId, ready, isPublishable, engineeringSummary,
-    engineeringFingerprint, bassReadiness, retainedFromRefresh, designState,
+    engineeringFingerprint, bassReadiness, retainedFromRefresh, designState, completedBassAuthority,
     reportSnapshot: buildReportSnapshot(projectId, versionId, designState),
     versions: {
       engine_version: ENGINEERING_AUTHORITY_VERSION,
