@@ -80,10 +80,12 @@ export default function RvSpeakerLayer({
           lcrAngleInfo,
         );
 
-        // For front-wall LCR (FL/FC/FR): anchor the rear edge to the front wall.
-        // The stored position is the wall anchor; shift the render centre into the room
-        // by the yaw-projected half-depth so the cabinet stays flush to the front wall
-        // regardless of rotation angle.
+        // For front-wall LCR (FL/FC/FR) and the dual-centre cabinets (FCL/FCR):
+        // anchor the rear edge to the front wall. The stored position is the wall
+        // anchor; shift the render centre into the room by the yaw-projected
+        // half-depth so the cabinet stays flush to the front wall regardless of
+        // rotation angle. A dual-centre cabinet is a front-wall mounted cabinet,
+        // so it takes exactly this rule and no separate wall-locking path.
         const LCR_ROLES = ['FL', 'FC', 'FR'];
         const isSideSurroundRole =
           role === 'SL' || role === 'SR' ||
@@ -121,7 +123,7 @@ export default function RvSpeakerLayer({
         let renderX = speaker.position.x;
         let renderY = speaker.position.y;
 
-        if (LCR_ROLES.includes(role)) {
+        if (LCR_ROLES.includes(role) || isCentreCabinetRole(role)) {
           const yawRad = (yawDeg || 0) * (Math.PI / 180);
           const halfDepth = speakerDepthM / 2;
           const halfWidth = speakerWidthM / 2;

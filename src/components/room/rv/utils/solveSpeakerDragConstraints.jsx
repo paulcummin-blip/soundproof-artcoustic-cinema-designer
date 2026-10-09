@@ -13,6 +13,10 @@
 
 import { sideWallX, rearWallY, OVERHEAD_PAIR_MAP } from "@/components/room/rv/utils/rvGeometry";
 import { getPlanAimDeg } from "@/components/room/rv/utils/rvAiming";
+import {
+  isCentreCabinetRole,
+  resolveCentreCabinetFootprintM,
+} from "@/components/utils/frontStageModeAuthority";
 
 // ─── small local helpers ───────────────────────────────────────────────────
 
@@ -585,7 +589,36 @@ export function solveSpeakerDragConstraints({
     return { finalPositions, additionalUpdates };
   }
 
-  // ── 6. Generic fallback ───────────────────────────────────────────────────
+  // ── 6. Dual-centre cabinets FCL / FCR ────────────────────────────────────
+  // A centre cabinet is front-wall mounted, exactly like the LCRs: only its X
+  // moves, and its rear face stays against the front wall at the cabinet's own
+  // installed depth (the cabinets face the room, so the projected half-depth is
+  // simply the installed depth / 2 — computed from the cabinet's own footprint,
+  // so a vertical cabinet keeps the same depth and the same wall alignment).
+  // X stays inside the room by the cabinet's installed footprint. The paired
+  // cabinet's mirrored position is applied by the linked-pair authority, so the
+  // pair keeps its symmetry and its front-wall constraint together.
+  if (isCentreCabinetRole(canonicalRole)) {
+    const footprint = resolveCentreCabinetFootprintM(spk.model, spk.orientation, null);
+    const dims = getModelDimsM?.(spk.model) || {};
+    const depthM = Number(footprint?.depthM) || Number(dims.depthM) || 0.082;
+    const halfWidthM = (Number(footprint?.widthM) || Number(dims.widthM) || 0.20) / 2;
+    const buf = Number(WALL_BUFFER_M) || 0.01;
+    const W = Number(widthM) || 4.5;
+
+    finalPositions.push({
+      id: speakerId,
+      position: {
+        ...(spk.position || {}),
+        x: clamp(rawX, halfWidthM + buf, W - halfWidthM - buf),
+        y: buf + depthM / 2,
+      },
+      positionSource: 'user',
+    });
+    return { finalPositions, additionalUpdates };
+  }
+
+  // ── 7. Generic fallback ───────────────────────────────────────────────────
   const currentX = spk.position?.x ?? 0;
   const currentY = spk.position?.y ?? 0;
   if (Math.abs(rawX - currentX) > 0.001 || Math.abs(rawY - currentY) > 0.001) {
