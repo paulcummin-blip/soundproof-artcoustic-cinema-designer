@@ -1,5 +1,5 @@
 /**
- * Technical Report category grouping, continuation headings, assumed-parameter
+ * Technical Report category grouping, category banners, assumed-parameter
  * exclusion and category colour authority.
  */
 import test from "node:test";
@@ -8,7 +8,10 @@ import { readFile } from "node:fs/promises";
 
 import {
   PARAM_CATEGORIES,
+  PARAM_CATEGORY_BANNER_COLOURS,
+  PARAM_CATEGORY_BANNER_TEXT,
   PARAM_CATEGORY_COLOURS,
+  getCategoryBannerColour,
   getCategoryColour,
 } from "../src/components/report/technical/technicalParameterMeta.js";
 import {
@@ -119,6 +122,22 @@ test("G — the three categories use distinct on-brand colours", () => {
   assert.equal(Object.keys(PARAM_CATEGORY_COLOURS).length >= 3, true);
 });
 
+test("G — the category banner carries its own section-identity palette", () => {
+  // Green for Spatial Resolution, slate for Dynamic Range, warm brown for
+  // Timbre Matching. The parameter card's own small category label keeps the
+  // palette asserted above, unchanged.
+  assert.deepEqual(
+    [
+      getCategoryBannerColour("Spatial Resolution"),
+      getCategoryBannerColour("Dynamic Range"),
+      getCategoryBannerColour("Timbre Matching"),
+    ],
+    ["#213428", "#3E4349", "#625143"],
+  );
+  assert.equal(PARAM_CATEGORY_BANNER_TEXT, "#FFFFFF");
+  assert.equal(Object.keys(PARAM_CATEGORY_BANNER_COLOURS).length >= 3, true);
+});
+
 test("B/C/D/H — continuation heading, mid-page divider and print rules are wired", async () => {
   const page = await readFile(
     new URL("../src/components/report/technical/TechnicalParameterPage.jsx", import.meta.url),
@@ -133,16 +152,25 @@ test("B/C/D/H — continuation heading, mid-page divider and print rules are wir
     "utf8",
   );
 
-  // The continued heading and the category colour are part of the page itself.
-  assert.match(page, /continued \? " continued" : ""/);
-  assert.match(page, /data-report-section-heading="true"/);
-  assert.match(page, /getCategoryColour/);
+  // One uniform banner heads every category run, on the category's first page
+  // and on a page that continues it alike. The heading states the canonical
+  // category name only — no page note, and no continuation flag anywhere.
+  assert.doesNotMatch(page, /continued/i);
+  assert.doesNotMatch(grid, /continued/i);
+  assert.match(page, /<TechnicalCategoryBanner category=\{segment\.category\} \/>/);
+  assert.match(banner, /data-report-section-heading="true"/);
   assert.match(page, /breakInside: "avoid"/);
   assert.match(page, /pageBreakInside: "avoid"/);
   assert.match(page, /className="tech-param-page__cards"/);
 
-  // The grid marks a group as continued when the category began earlier.
-  assert.match(grid, /continued: globalIndex >/);
+  // The banner strip itself owns the colour authority and the bold heading.
+  const banner = await readFile(
+    new URL("../src/components/report/technical/TechnicalCategoryBanner.jsx", import.meta.url),
+    "utf8",
+  );
+  assert.match(banner, /getCategoryBannerColour/);
+  assert.match(banner, /fontWeight: 700/);
+  assert.doesNotMatch(banner, /continued/i);
 
   // Print: heading travels with its cards and the divider page reclaims height.
   assert.match(styles, /\.tech-param-segment[\s\S]*?break-inside:\s*avoid\s*!important/);

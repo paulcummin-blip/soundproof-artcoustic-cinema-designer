@@ -59,6 +59,27 @@ export const PARAM_CATEGORY_COLOURS = Object.freeze({
   "Screen / Viewing Geometry": "#3E4349",
 });
 
+/**
+ * Category BANNER colours — navigation / section identity only, used by the
+ * full-width strip that heads every Technical parameter page.
+ *   Spatial Resolution  deep green  #213428
+ *   Dynamic Range       slate       #3E4349
+ *   Timbre Matching     warm brown  #625143
+ * Deliberately separate from PARAM_CATEGORY_COLOURS: the parameter card's own
+ * small category label keeps the palette it already used, unchanged. A banner
+ * colour is never used for a grade, a level pill, a threshold or any result.
+ */
+export const PARAM_CATEGORY_BANNER_COLOURS = Object.freeze({
+  "Spatial Resolution": "#213428",
+  "Dynamic Range": "#3E4349",
+  "Timbre Matching": "#625143",
+  // Screen / Viewing Geometry is governed by RP23 and shares the neutral slate.
+  "Screen / Viewing Geometry": "#3E4349",
+});
+
+/** Text on a category banner — white, the strip itself being a brand tone. */
+export const PARAM_CATEGORY_BANNER_TEXT = "#FFFFFF";
+
 const DEFAULT_CATEGORY_COLOUR = "#213428";
 
 export const PARAM_HUMAN_TITLES = {
@@ -91,6 +112,10 @@ export function getCategoryForParam(paramId) {
 
 export function getCategoryColour(category) {
   return PARAM_CATEGORY_COLOURS[category] || DEFAULT_CATEGORY_COLOUR;
+}
+
+export function getCategoryBannerColour(category) {
+  return PARAM_CATEGORY_BANNER_COLOURS[category] || DEFAULT_CATEGORY_COLOUR;
 }
 
 export function getHumanTitleForParam(paramId) {
