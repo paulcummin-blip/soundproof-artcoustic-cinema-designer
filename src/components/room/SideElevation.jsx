@@ -6,6 +6,7 @@ import {
   Evolve42FaceIcon, Evolve63FaceIcon, Evolve84FaceIcon,
   Q43FaceIcon, Q45FaceIcon, Q63FaceIcon, Q85FaceIcon,
 } from "../report/SpeakerFaceIcons";
+import ProductArtwork from "@/components/report/ProductArtwork";
 import { useAppState } from "@/components/AppStateProvider";
 import { useResolvedSpeakerLayout } from "@/components/room/rv/utils/resolveActiveSpeakerLayout";
 import { resolveProjectorPosition } from "@/components/room/rv/utils/resolveProjectorPosition";
@@ -589,57 +590,7 @@ export default function SideElevation({
             {roomH.toFixed(2)}m
           </text>
 
-          {/* Screen frame */}
-          {(() => {
-            const sxPx = rx(screenFrontY);
-            const frameTopPx = rz(frameTopM);
-            const frameBotPx = rz(frameBottomM);
-            const frameH_px  = frameBotPx - frameTopPx;   // equal border top & bottom
-            const viewTopPx  = rz(screenTopM);
-            const viewH_px   = rz(screenFloorM) - rz(screenTopM);
-            const FRAME_W = 7;
-            return (
-              <g
-                onMouseDown={handleScreenMouseDown}
-                style={{ cursor: onScreenHeightFromFloorChange ? 'ns-resize' : 'default' }}
-                title="Drag screen up/down"
-              >
-              {/* Frame casing — equal border on all 4 sides */}
-                <rect
-                  x={sxPx - FRAME_W / 2} y={frameTopPx}
-                  width={FRAME_W} height={frameH_px}
-                  fill={SCREEN_STROKE} stroke="none" rx={1} />
-                {/* Viewable image area — inset equally on all sides */}
-                <rect
-                  x={sxPx - FRAME_W / 2 + 1.5} y={viewTopPx}
-                  width={FRAME_W - 3} height={viewH_px}
-                  fill="#fff" stroke="#999" strokeWidth={0.4} />
-                {/* Screen label */}
-                <text x={sxPx} y={offsetY - 4}
-                  textAnchor="middle" fontSize={7.5} fill={SCREEN_STROKE}
-                  letterSpacing="0.04em">
-                  SCREEN
-                </text>
-                {/* Screen bottom height dim */}
-                <line x1={sxPx + 8} y1={rz(0)} x2={sxPx + 8} y2={rz(screenFloorM)}
-                  stroke={DIM_COLOR} strokeWidth={0.6} strokeDasharray="3 2" />
-                <line x1={sxPx + 5} y1={rz(screenFloorM)} x2={sxPx + 11} y2={rz(screenFloorM)}
-                  stroke={DIM_COLOR} strokeWidth={0.7} />
-                <text x={sxPx + 13} y={rz(screenFloorM) + 3}
-                  fontSize={7} fill={DIM_COLOR} textAnchor="start">
-                  {screenFloorM.toFixed(2)}m
-                </text>
-                {/* Screen top height dim */}
-                <line x1={sxPx + 8} y1={rz(screenTopM)} x2={sxPx + 11} y2={rz(screenTopM)}
-                  stroke={DIM_COLOR} strokeWidth={0.7} />
-                <text x={sxPx + 13} y={rz(screenTopM) + 3}
-                  fontSize={7} fill={DIM_COLOR} textAnchor="start">
-                  {screenTopM.toFixed(2)}m
-                </text>
-                {/* Screen drag hit rect moved to end of SVG so it sits above all speaker layers */}
-              </g>
-            );
-          })()}
+
 
           {/* Front-stage speakers — architectural side profile, wall-filtered */}
           {(() => {
@@ -750,6 +701,60 @@ export default function SideElevation({
             handleSubMouseDown={handleSubMouseDown}
             speakerInfo={speakerInfo}
           />
+
+          {/* Screen frame — drawn AFTER the speaker and subwoofer layers, so the
+              screen sits in front of every cabinet graphic on the screen wall. */}
+          {(() => {
+            const sxPx = rx(screenFrontY);
+            const frameTopPx = rz(frameTopM);
+            const frameBotPx = rz(frameBottomM);
+            const frameH_px  = frameBotPx - frameTopPx;   // equal border top & bottom
+            const viewTopPx  = rz(screenTopM);
+            const viewH_px   = rz(screenFloorM) - rz(screenTopM);
+            const FRAME_W = 7;
+
+            return (
+              <g
+                onMouseDown={handleScreenMouseDown}
+                style={{ cursor: onScreenHeightFromFloorChange ? 'ns-resize' : 'default' }}
+                title="Drag screen up/down"
+              >
+              {/* Frame casing — equal border on all 4 sides */}
+                <rect
+                  x={sxPx - FRAME_W / 2} y={frameTopPx}
+                  width={FRAME_W} height={frameH_px}
+                  fill={SCREEN_STROKE} stroke="none" rx={1} />
+                {/* Viewable image area — inset equally on all sides */}
+                <rect
+                  x={sxPx - FRAME_W / 2 + 1.5} y={viewTopPx}
+                  width={FRAME_W - 3} height={viewH_px}
+                  fill="#fff" stroke="#999" strokeWidth={0.4} />
+                {/* Screen label */}
+                <text x={sxPx} y={offsetY - 4}
+                  textAnchor="middle" fontSize={7.5} fill={SCREEN_STROKE}
+                  letterSpacing="0.04em">
+                  SCREEN
+                </text>
+                {/* Screen bottom height dim */}
+                <line x1={sxPx + 8} y1={rz(0)} x2={sxPx + 8} y2={rz(screenFloorM)}
+                  stroke={DIM_COLOR} strokeWidth={0.6} strokeDasharray="3 2" />
+                <line x1={sxPx + 5} y1={rz(screenFloorM)} x2={sxPx + 11} y2={rz(screenFloorM)}
+                  stroke={DIM_COLOR} strokeWidth={0.7} />
+                <text x={sxPx + 13} y={rz(screenFloorM) + 3}
+                  fontSize={7} fill={DIM_COLOR} textAnchor="start">
+                  {screenFloorM.toFixed(2)}m
+                </text>
+                {/* Screen top height dim */}
+                <line x1={sxPx + 8} y1={rz(screenTopM)} x2={sxPx + 11} y2={rz(screenTopM)}
+                  stroke={DIM_COLOR} strokeWidth={0.7} />
+                <text x={sxPx + 13} y={rz(screenTopM) + 3}
+                  fontSize={7} fill={DIM_COLOR} textAnchor="start">
+                  {screenTopM.toFixed(2)}m
+                </text>
+                {/* Screen drag hit rect moved to end of SVG so it sits above all speaker layers */}
+              </g>
+            );
+          })()}
 
           {/* Doors / Windows */}
           {openingEls.map((el, i) => {
@@ -1194,7 +1199,11 @@ export default function SideElevation({
                       width={svgW} height={svgH}
                       fill="#fff" stroke="#4A4540" strokeWidth={0.9} rx={1} />
                     <g clipPath={`url(#${clipId})`}>
-                      <FaceIcon x={adjustedIconX} y={adjustedIconY} width={adjustedIconW} height={adjustedIconH} />
+                      {/* Product artwork is line art on an opaque white page — the
+                          page is knocked out so only the cabinet's own drawing shows. */}
+                      <ProductArtwork>
+                        <FaceIcon x={adjustedIconX} y={adjustedIconY} width={adjustedIconW} height={adjustedIconH} />
+                      </ProductArtwork>
                     </g>
                   </>
                 ) : (

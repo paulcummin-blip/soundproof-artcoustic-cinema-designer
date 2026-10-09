@@ -1,6 +1,7 @@
 import React, { useMemo } from 'react';
 import { getSpeakerModelMeta } from '@/components/models/speakers/registry';
 import { Q43FaceIcon, Q45FaceIcon, Q63FaceIcon, Q85FaceIcon } from '@/components/report/SpeakerFaceIcons';
+import ProductArtwork from '@/components/report/ProductArtwork';
 import { yHalfExtentM_physical } from '@/components/room/rv/RenderPrimitives';
 import { calculateAzimuth } from '@/components/utils/aimingUtils';
 import { SCREEN_BUFFER_M } from '@/components/room/rv/utils/rvGeometry';
@@ -418,17 +419,6 @@ export default function ScreenWallConstructionGraphic({
         {/* Room boundary (strong) */}
         <rect x={wallX} y={wallY} width={wallPxW} height={wallPxH} fill="none" stroke={COLORS.wall} strokeWidth="1.4" />
 
-        {/* Overall screen (medium solid) */}
-        <rect x={mapX(screenOuterX)} y={mapY(screenOuterTop)} width={screenOuterW * scale} height={screenOuterH * scale} fill="none" stroke={COLORS.screen} strokeWidth="1.1" />
-
-        {/* Viewable image (subtle dashed) */}
-        <rect x={mapX(screenInnerX)} y={mapY(screenInnerTop)} width={screenViewW * scale} height={screenViewH * scale} fill="none" stroke={COLORS.viewable} strokeWidth="0.8" strokeDasharray="4 4" />
-
-        {/* Acoustic centre band (light dashed/tinted) */}
-        <rect x={mapX(screenInnerX)} y={mapY(bandTop)} width={screenViewW * scale} height={(bandTop - bandBottom) * scale} fill={COLORS.bandFill} fillOpacity="0.04" stroke={COLORS.bandStroke} strokeWidth="0.5" strokeDasharray="3 3" />
-        <text x={mapX(screenInnerX + screenViewW / 2)} y={mapY(bandTop) - 6} fontSize="7.5" fill={COLORS.muted} textAnchor="middle" fontFamily={BODY_FONT}>
-          Acoustic centre band
-        </text>
 
         {/* Right vertical dimensions (5 staggered) */}
         <DimLine x1={wallX + wallPxW} y1={mapY(0)} x2={wallX + wallPxW} y2={mapY(roomH)} text={['ROOM HEIGHT', fmtM(roomH)]} offset={40} vertical textOffset={8} textY={mapY(roomH / 2)} textRotate={-90} textBackground />
@@ -451,10 +441,10 @@ export default function ScreenWallConstructionGraphic({
           const y = mapY(drawZM) - h / 2;
           return (
             <g key={`${item.role}-${item.xM}-${item.zM}`}>
-              {isQ63 ? <Q63FaceIcon x={x} y={y} width={w} height={h} /> :
-               isQ43 ? <Q43FaceIcon x={x} y={y} width={w} height={h} /> :
-               isQ45 ? <Q45FaceIcon x={x} y={y} width={w} height={h} /> :
-               isQ85 ? <Q85FaceIcon x={x} y={y} width={w} height={h} /> :
+              {isQ63 ? <ProductArtwork><Q63FaceIcon x={x} y={y} width={w} height={h} /></ProductArtwork> :
+               isQ43 ? <ProductArtwork><Q43FaceIcon x={x} y={y} width={w} height={h} /></ProductArtwork> :
+               isQ45 ? <ProductArtwork><Q45FaceIcon x={x} y={y} width={w} height={h} /></ProductArtwork> :
+               isQ85 ? <ProductArtwork><Q85FaceIcon x={x} y={y} width={w} height={h} /></ProductArtwork> :
                <rect x={x} y={y} width={w} height={h} fill="none" stroke={COLORS.speaker} strokeWidth="1" />}
               <text x={x + w / 2} y={y - 6} fontSize="8" fill={COLORS.text} textAnchor="middle" fontFamily={BODY_FONT} fontWeight="600">
                 {item.role}
@@ -479,6 +469,20 @@ export default function ScreenWallConstructionGraphic({
             </g>
           );
         })}
+
+        {/* Screen outline — drawn AFTER the speaker and subwoofer icons so the
+            screen perimeter is never cut by a loudspeaker graphic. */}
+        {/* Overall screen (medium solid) */}
+        <rect x={mapX(screenOuterX)} y={mapY(screenOuterTop)} width={screenOuterW * scale} height={screenOuterH * scale} fill="none" stroke={COLORS.screen} strokeWidth="1.1" />
+
+        {/* Viewable image (subtle dashed) */}
+        <rect x={mapX(screenInnerX)} y={mapY(screenInnerTop)} width={screenViewW * scale} height={screenViewH * scale} fill="none" stroke={COLORS.viewable} strokeWidth="0.8" strokeDasharray="4 4" />
+
+        {/* Acoustic centre band (light dashed/tinted) */}
+        <rect x={mapX(screenInnerX)} y={mapY(bandTop)} width={screenViewW * scale} height={(bandTop - bandBottom) * scale} fill={COLORS.bandFill} fillOpacity="0.04" stroke={COLORS.bandStroke} strokeWidth="0.5" strokeDasharray="3 3" />
+        <text x={mapX(screenInnerX + screenViewW / 2)} y={mapY(bandTop) - 6} fontSize="7.5" fill={COLORS.muted} textAnchor="middle" fontFamily={BODY_FONT}>
+          Acoustic centre band
+        </text>
 
         {/* Bottom horizontal positioning chain */}
         {sortedByX.length > 0 && (() => {

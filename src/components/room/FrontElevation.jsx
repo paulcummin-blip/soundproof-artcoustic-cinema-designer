@@ -3,6 +3,7 @@ import { getSpeakerModelMeta, normaliseModelKey } from "@/components/models/spea
 import { isRenderableSpeaker } from "@/components/room/rv/RenderPrimitives";
 import { Q43FaceIcon, Q45FaceIcon, Q85FaceIcon, Q63FaceIcon, Evolve11FaceIcon, Evolve21FaceIcon, Evolve31FaceIcon, Evolve42FaceIcon, Evolve63FaceIcon, Evolve84FaceIcon, C1FaceIcon, C41FaceIcon, MultiSoundbarArtworkFaceIcon, MultiSoundbar77ArtworkFaceIcon, MultiSoundbar65ArtworkFaceIcon, MultiSoundbar100ArtworkFaceIcon } from "@/components/report/SpeakerFaceIcons";
 import { C41_1222FaceIcon, C41_1441FaceIcon, C41_1711FaceIcon } from "@/components/report/C41ArtworkFaceIcons";
+import ProductArtwork from "@/components/report/ProductArtwork";
 import { computeSpeakerAnnotation, speakerBBox } from "@/components/room/frontElevationAnnotationLayout";
 import { resolveEffectiveViewableDimsM, isManualOverrideActive } from "@/components/models/screen/resolveEffectiveScreen";
 import { detectFrontStageMode } from "@/components/roomdesigner/utils/lcrHeightAuthority";
@@ -630,7 +631,11 @@ export default function FrontElevation({ dimensions, screen, placedSpeakers = []
       <g key={key} onMouseDown={onMouseDown} style={onMouseDown ? { cursor: 'grab', userSelect: 'none' } : undefined}>
         {/* Body */}
         {hasFaceIcon ? (
-          <g transform={vertical ? `rotate(90 ${cx} ${cy})` : undefined}>{renderFaceIcon()}</g>
+          <g transform={vertical ? `rotate(90 ${cx} ${cy})` : undefined}>
+            {/* Product artwork is line art on an opaque white page — the page is
+                knocked out so the graphic shows only the cabinet's own drawing. */}
+            <ProductArtwork>{renderFaceIcon()}</ProductArtwork>
+          </g>
         ) : isRound ? (
           <circle cx={cx} cy={cy} r={Math.max(6, sw / 2)} fill={fill} stroke={stroke} strokeWidth={1.2} opacity={0.90} />
         ) : (
@@ -726,54 +731,7 @@ export default function FrontElevation({ dimensions, screen, placedSpeakers = []
           {roomH.toFixed(2)}m
         </text>
 
-        {/* Screen: overall frame (black), then viewable area (white) */}
-        {(() => {
-          // Overall frame rect (viewable + border on all sides)
-          const oW = (overallW / roomW) * drawW;
-          const oH = (overallH / roomH) * drawH;
-          const ox = rx(screenCenterX) - oW / 2;
-          const oy = ry(screenFloorM + screenData.h + borderM);
 
-          // Viewable rect
-          const sw = (screenData.w / roomW) * drawW;
-          const sh = (screenData.h / roomH) * drawH;
-          const sx = rx(screenCenterX) - sw / 2;
-          const syTop = ry(screenFloorM + screenData.h);
-
-          const labelViewable = `${(screenData.w * 100).toFixed(0)} × ${(screenData.h * 100).toFixed(0)} cm (viewable)`;
-          const labelOverall = `${(overallW * 100).toFixed(0)} × ${(overallH * 100).toFixed(0)} cm overall${!hasBorderData ? ' (est. frame)' : ''}`;
-
-          return (
-            <g>
-              {/* Black frame */}
-              <rect x={ox} y={oy} width={oW} height={oH} fill={SCREEN_STROKE} stroke={SCREEN_STROKE} strokeWidth={1} rx={2} />
-              {/* White viewable area */}
-              <rect x={sx} y={syTop} width={sw} height={sh} fill="#fff" stroke="#555" strokeWidth={0.5} />
-              {/* Screen labels: inside white area top-left if there is room, else below frame */}
-              {sw >= 90 && sh >= 36 ? (
-                // Enough room — render inside top-left of the white viewable area
-                <g>
-                  <text x={sx + 5} y={syTop + 11} textAnchor="start" fontSize={7} fill="#888">
-                    {labelOverall}
-                  </text>
-                  <text x={sx + 5} y={syTop + 21} textAnchor="start" fontSize={7} fill="#444" fontWeight={600}>
-                    {labelViewable}
-                  </text>
-                </g>
-              ) : (
-                // Too small — render below the frame, centred
-                <g>
-                  <text x={rx(screenCenterX)} y={oy + oH + 12} textAnchor="middle" fontSize={7} fill={DIM_COLOR}>
-                    {labelOverall}
-                  </text>
-                  <text x={rx(screenCenterX)} y={oy + oH + 22} textAnchor="middle" fontSize={7} fill={LABEL_COLOR} fontWeight={600}>
-                    {labelViewable}
-                  </text>
-                </g>
-              )}
-            </g>
-          );
-        })()}
 
         {/* ── drawSpeakerFront ─────────────────────────────────────────────────
            Internal helper: renders a single speaker in the XZ (front elevation)
@@ -958,6 +916,58 @@ export default function FrontElevation({ dimensions, screen, placedSpeakers = []
             </g>
           );
         })}
+
+        {/* Screen: overall frame (black), then viewable area (white).
+            Drawn AFTER the loudspeaker and subwoofer layers, so the cabinet's
+            screen frame and surface sit in front of every graphic on the front
+            wall and no speaker can cut through the screen perimeter. */}
+        {(() => {
+          // Overall frame rect (viewable + border on all sides)
+          const oW = (overallW / roomW) * drawW;
+          const oH = (overallH / roomH) * drawH;
+          const ox = rx(screenCenterX) - oW / 2;
+          const oy = ry(screenFloorM + screenData.h + borderM);
+
+          // Viewable rect
+          const sw = (screenData.w / roomW) * drawW;
+          const sh = (screenData.h / roomH) * drawH;
+          const sx = rx(screenCenterX) - sw / 2;
+          const syTop = ry(screenFloorM + screenData.h);
+
+          const labelViewable = `${(screenData.w * 100).toFixed(0)} × ${(screenData.h * 100).toFixed(0)} cm (viewable)`;
+          const labelOverall = `${(overallW * 100).toFixed(0)} × ${(overallH * 100).toFixed(0)} cm overall${!hasBorderData ? ' (est. frame)' : ''}`;
+
+          return (
+            <g>
+              {/* Black frame */}
+              <rect x={ox} y={oy} width={oW} height={oH} fill={SCREEN_STROKE} stroke={SCREEN_STROKE} strokeWidth={1} rx={2} />
+              {/* White viewable area */}
+              <rect x={sx} y={syTop} width={sw} height={sh} fill="#fff" stroke="#555" strokeWidth={0.5} />
+              {/* Screen labels: inside white area top-left if there is room, else below frame */}
+              {sw >= 90 && sh >= 36 ? (
+                // Enough room — render inside top-left of the white viewable area
+                <g>
+                  <text x={sx + 5} y={syTop + 11} textAnchor="start" fontSize={7} fill="#888">
+                    {labelOverall}
+                  </text>
+                  <text x={sx + 5} y={syTop + 21} textAnchor="start" fontSize={7} fill="#444" fontWeight={600}>
+                    {labelViewable}
+                  </text>
+                </g>
+              ) : (
+                // Too small — render below the frame, centred
+                <g>
+                  <text x={rx(screenCenterX)} y={oy + oH + 12} textAnchor="middle" fontSize={7} fill={DIM_COLOR}>
+                    {labelOverall}
+                  </text>
+                  <text x={rx(screenCenterX)} y={oy + oH + 22} textAnchor="middle" fontSize={7} fill={LABEL_COLOR} fontWeight={600}>
+                    {labelViewable}
+                  </text>
+                </g>
+              )}
+            </g>
+          );
+        })()}
 
         {/* Projector element if present */}
         {projectorEl && (() => {
