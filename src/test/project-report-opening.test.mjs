@@ -2,8 +2,12 @@
  * project-report-opening.test.mjs
  * -------------------------------
  * Acceptance for the Project Report's opening three pages, against the REAL
- * frozen evidence of Marquee Home (version "Level 4 version"), extracted from
- * the published engineering publication into ./fixtures/marqueeAdiEvidence.json.
+ * frozen evidence of Marquee Home (version "Level 4 version"):
+ *   · the current published engineering authority (parameterAuthority, room
+ *     results, seat results and RP23 viewing) — ./fixtures/marqueeLiveAdiEvidence.json
+ *   · the project's own facts (room, screen, seating, dolby configuration) —
+ *     ./fixtures/marqueeAdiEvidence.json, whose pre-authority engineeringSummary
+ *     is a legacy record and is no longer read here.
  *
  *   Page 1  Project Summary        — key facts, one project-specific paragraph
  *   Page 2  ADI Design Highlights  — ADI's selection from this design's evidence
@@ -13,9 +17,8 @@
  *   · the highlights are THIS design's, selected from its own evidence — never a
  *     fixed template;
  *   · every claim carries its own evidence, and only genuinely strong results are
- *     raised (L3 or better, weakest assessed seat governing);
- *   · P19 is stated at the reference seating position only, and P20 (L1) never
- *     becomes a room-wide bass claim;
+ *     raised (the adaptive floor, weakest assessed seat governing);
+ *   · a provisional P19 and a weak P20 never become a bass claim;
  *   · weak and assumed parameters raise nothing;
  *   · page 1 and page 2 fit their fixed A4 composition — no clipping.
  */
@@ -186,23 +189,19 @@ test("the viewing highlight states each row's own published RP23 result", () => 
   assert.equal(viewing.evidence[1].level, "L3");
 });
 
-test("the layout and product highlights state the system that was specified", () => {
+test("the layout highlight states the specified system, and the specification never displaces an evidence story", () => {
   const highlights = buildAdiDesignHighlights(sources);
   const layout = highlights.find((highlight) => highlight.id === "immersive-layout");
-  const products = highlights.find((highlight) => highlight.id === "product-selection");
 
   assert.match(layout.explanation, /9\.1\.6/);
   assert.match(layout.explanation, /6 overhead speakers/);
   assert.match(layout.explanation, /4 subwoofers/);
   assert.equal(layout.evidence[1].key, "P2 L4");
 
-  assert.match(products.explanation, /Q8-5 × 3/);
-  assert.match(products.explanation, /Q6-3 × 6/);
-  assert.match(products.explanation, /Spitfire Cloud × 6/);
-  assert.match(products.explanation, /SUB4-12 × 4/);
-  assert.match(products.explanation, /Abfuser × 8/);
-  assert.match(products.explanation, /P12 screen-stage capability/);
-  assert.match(products.explanation, /P14 bass output capability/);
+  // The specification-only story may fill a page the evidence has not filled; this
+  // design's own published results already fill it, so the schedule is stated on
+  // the System & Products page rather than raised as a highlight.
+  assert.ok(!highlights.some((highlight) => highlight.id === "product-selection"));
 });
 
 test("nothing generic is stated: every claim is a fact of this design", () => {
@@ -251,8 +250,8 @@ test("page 1 (Project Summary) fits its page and carries no performance sections
   const opening = buildProjectReportSummaryOpening({
     projectDetails: fixture.project,
     productsSelected: PRODUCTS,
-    seatingPositions: fixture.seatingPositions,
-    engineeringSummary: fixture.engineeringSummary,
+    seatingPositions: liveEvidence.seatingPositions,
+    engineeringSummary,
   });
   assert.ok(opening && opening.length > 80, "the project-specific paragraph exists");
 
@@ -312,7 +311,11 @@ test("pages 2 and 3 render this design's own content", () => {
   }
   assert.ok(page2.includes("P12 L4"));
   assert.ok(page2.includes("116 dBC"));
-  assert.ok(page2.includes("P19 L4"));
+  // P19's own authority is provisional, so no bass-response result is stated here.
+  assert.ok(!page2.includes("P19"), "a provisional result is never printed");
+  // The internal spec tier is audit metadata only — it never reaches the page.
+  assert.equal(selectAdiHighlights(sources).specTier, "mid");
+  assert.doesNotMatch(page2, /\btier\b|\bweighted\b|\bspec\b/i);
   for (const phrase of BANNED_GENERIC) {
     assert.ok(!page2.toLowerCase().includes(phrase), `page 2 must not state "${phrase}"`);
   }
@@ -320,7 +323,7 @@ test("pages 2 and 3 render this design's own content", () => {
   const page3 = renderToStaticMarkup(React.createElement(ProjectReportSystemOverview, {
     projectDetails: fixture.project,
     productsSelected: PRODUCTS,
-    engineeringSummary: fixture.engineeringSummary,
+    engineeringSummary,
     rows: [],
   }));
   assert.ok(page3.includes("System &amp; Products") || page3.includes("System & Products"));
@@ -337,8 +340,8 @@ test("pages 2 and 3 render this design's own content", () => {
 test("each product's engineering link is stated only where the evidence supports it", () => {
   const strong = buildSpecificationConnections({
     productsSelected: PRODUCTS,
-    engineeringSummary: fixture.engineeringSummary,
-    dolbyConfig: fixture.project.dolby_layout || "9.1.6",
+    engineeringSummary,
+    dolbyConfig: liveEvidence.project?.dolby_config || fixture.project.dolby_layout || "9.1.6",
   });
   assert.match(strong.lcr, /RP22 P12 L4/);
   assert.match(strong.surrounds, /RP22 P13 L4/);
@@ -346,7 +349,7 @@ test("each product's engineering link is stated only where the evidence supports
   assert.match(strong.acoustic_treatment, /reflection control/);
 
   // With a weak screen-stage result the LCR link must not cite a strength.
-  const weak = JSON.parse(JSON.stringify(fixture.engineeringSummary));
+  const weak = JSON.parse(JSON.stringify(engineeringSummary));
   weak.roomResultsByParameter["12"] = { level: "L2", value: 96, formatted: "96 dBC" };
   const cautious = buildSpecificationConnections({
     productsSelected: PRODUCTS,
