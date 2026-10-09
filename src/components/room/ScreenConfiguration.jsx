@@ -14,6 +14,8 @@ import { rp23DisplayAngleDeg, rp23LevelForAngleDeg } from "@/components/utils/vi
 
 import { getSpeakerModelMeta } from "@/components/models/speakers/registry";
 import ManualSizeInput from "./ManualSizeInput";
+import DisplayTypeSelector from "./DisplayTypeSelector";
+import { DISPLAY_TYPE_PROJECTOR } from "@/components/models/screen/displayTypeAuthority";
 import RP22GradingPill from "@/components/ui/RP22GradingPill";
 
 export default function ScreenConfiguration(props) {
@@ -518,6 +520,20 @@ export default function ScreenConfiguration(props) {
 
           {manualSize.enabled && (
             <div className="mt-3 space-y-4">
+              {/* DISPLAY TYPE — how the display is described to a client.
+                  A television is stated as a television ("115" TV"); a projector
+                  screen keeps the existing screen wording. Never inferred from the
+                  dimensions: an unset value is a projector screen. */}
+              <div>
+                <Label className={fieldLabelStyle}>Display Type</Label>
+                <DisplayTypeSelector
+                  value={manualSize.displayType || DISPLAY_TYPE_PROJECTOR}
+                  onChange={(displayType) => handleUpdate({
+                    manualSize: { ...manualSize, displayType }
+                  })}
+                  disabled={disabled}
+                />
+              </div>
               <div>
                 <Label className={fieldLabelStyle}>Mode</Label>
                 <Select

@@ -234,6 +234,11 @@ export function serializeProject(input = {}) {
     manual_width_m: manualWidthM,
     manual_height_m: manualHeightM,
     screen_manual_config: manualConfig,
+    // How the display is described to a client: a television or a projection
+    // screen. Derived from the same one authority the manual configuration
+    // carries, so the saved design, the report and the published evidence all
+    // state the same display.
+    display_type: manualConfig.displayType,
     screen_height_from_floor: screenHeightFromFloorM,
     screen_mount_mode: screen?.mountMode || "floating",
     float_depth_m: floatDepthM,

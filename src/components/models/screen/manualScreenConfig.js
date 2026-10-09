@@ -14,6 +14,11 @@
 //
 // Pure: no React, no side effects.
 
+import {
+  DISPLAY_TYPE_PROJECTOR,
+  canonicalDisplayType,
+} from "./displayTypeAuthority";
+
 const CANONICAL_MODES = new Set(["wh", "diagonal"]);
 const DEFAULT_ASPECT = "16:9";
 // The UI's own starting values for the diagonal mode's inputs. They are inert
@@ -46,6 +51,10 @@ export function manualScreenConfigForPersist(screen) {
   if (manualSize?.enabled === true) {
     return {
       enabled: true,
+      // The display type the designer chose travels with the manual
+      // configuration it belongs to, so the saved record states the same display
+      // the panel, the report and the evidence all read.
+      displayType: canonicalDisplayType(manualSize.displayType) || DISPLAY_TYPE_PROJECTOR,
       mode: canonicalMode(manualSize.mode),
       widthM: toPositiveNumber(manualSize.widthM),
       heightM: toPositiveNumber(manualSize.heightM),
@@ -76,6 +85,9 @@ export function manualScreenConfigForPersist(screen) {
 
   return {
     enabled: false,
+    // The designer's chosen display type is kept while the override is switched
+    // off, so turning the override back on restores the same display.
+    displayType: canonicalDisplayType(screen?.manualSize?.displayType) || DISPLAY_TYPE_PROJECTOR,
     mode: "wh",
     widthM: 0,
     heightM: 0,
@@ -100,6 +112,7 @@ export function manualSizeFromPersisted(project) {
   if (config?.enabled === true) {
     return {
       enabled: true,
+      displayType: canonicalDisplayType(config.displayType) || DISPLAY_TYPE_PROJECTOR,
       mode: canonicalMode(config.mode),
       widthM: toPositiveNumber(config.widthM),
       heightM: toPositiveNumber(config.heightM),

@@ -52,6 +52,7 @@ import { buildProjectReportOpening } from "@/components/report/projectReport/pro
 import ProjectReportDesignSummary from "@/components/report/projectReport/ProjectReportDesignSummary";
 import AdiDesignHighlightsPage from "@/components/report/projectReport/AdiDesignHighlightsPage";
 import ProjectReportSystemOverview from "@/components/report/projectReport/ProjectReportSystemOverview";
+import { resolveDisplayType } from "@/components/models/screen/displayTypeAuthority";
 import { buildAdiDesignHighlights } from "@/components/report/projectReport/adiDesignHighlights";
 
 export function useProjectReportPages({
@@ -128,6 +129,9 @@ export function useProjectReportPages({
     productsSelected,
     seatingPositions,
     dolbyConfig: projectDetails?.dolby_config,
+    // How the design's display is named in ADI's own copy: a television or a
+    // projection screen, read from the saved design's own authority.
+    displayType: resolveDisplayType(projectDetails),
   }), [engineeringSummary, productsSelected, seatingPositions, projectDetails]);
 
   // The Visual Report's own pages — its existing order and its existing
@@ -175,6 +179,7 @@ export function useProjectReportPages({
             zones={screenSeating.zones}
             explanation={screenSeating.explanation}
             projectorLumens={screenSeating.projectorLumens}
+            displayType={screenSeating.displayType}
           />
         ),
         printData: {
@@ -188,6 +193,7 @@ export function useProjectReportPages({
           zones: screenSeating.zones,
           explanation: screenSeating.explanation,
           projectorLumens: screenSeating.projectorLumens,
+          displayType: screenSeating.displayType,
         },
       });
     }

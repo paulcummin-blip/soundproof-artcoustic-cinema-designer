@@ -12,6 +12,11 @@ import {
   resolveCanonicalScreen,
   resolveStatedScreenSize,
 } from '@/components/models/screen/canonicalScreenSize';
+import {
+  DISPLAY_TYPE_PROJECTOR,
+  DISPLAY_TYPE_TV,
+  resolveDisplayType,
+} from '@/components/models/screen/displayTypeAuthority';
 
 function interpretScreen(project) {
   const screenSize = Number(project?.screen_size) || null;
@@ -32,6 +37,7 @@ function interpretScreen(project) {
       size_inches: null,
       diagonal_inches: null,
       television: false,
+      display_type: DISPLAY_TYPE_PROJECTOR,
       aspect_ratio: aspectRatio,
       height_from_floor_m: heightFromFloor,
       manual_dimensions: false,
@@ -83,6 +89,9 @@ function interpretScreen(project) {
     // A television is known by its nominal size; a projection screen by its
     // viewable image width. Reports label the two differently.
     television: isTelevisionScreen(project),
+    // The designer's own display authority, frozen into the engineering
+    // publication so every consumer states the same display.
+    display_type: resolveDisplayType(project),
     height_from_floor_m: heightFromFloor,
     manual_dimensions: manualDims,
     manual_width_m: manualDims ? manualWidthM : null,
@@ -93,7 +102,7 @@ function interpretScreen(project) {
     mount_mode: mountMode,
     float_depth_m: floatDepthM,
     front_plane_m: Number(project?.screen_front_plane_m ?? (mountMode === 'floating' ? floatDepthM : 0)),
-    interpretation: `${sizeText} screen on ${screenWall} wall, ${mountMode === 'floating' ? 'floating mount' : 'baffle wall'} construction${heightFromFloor != null ? `, screen bottom at ${heightFromFloor.toFixed(2)}m from floor` : ''}.`,
+    interpretation: `${sizeText} ${resolveDisplayType(project) === DISPLAY_TYPE_TV ? 'TV' : 'screen'} on ${screenWall} wall, ${mountMode === 'floating' ? 'floating mount' : 'baffle wall'} construction${heightFromFloor != null ? `, screen bottom at ${heightFromFloor.toFixed(2)}m from floor` : ''}.`,
   };
 }
 

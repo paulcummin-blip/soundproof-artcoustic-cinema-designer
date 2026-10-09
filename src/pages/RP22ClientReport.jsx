@@ -14,6 +14,7 @@
 import React, { useMemo } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { useClientReportAuthority } from "@/components/report/client/useClientReportAuthority";
+import { resolveDisplayType } from "@/components/models/screen/displayTypeAuthority";
 import { selectClientP9Overhead } from "@/components/report/client/selectClientP9Overhead";
 import { selectClientP5SeatResults } from "@/components/report/client/selectClientP5SeatResults";
 import ClientReportPage from "@/components/report/client/ClientReportPage";
@@ -147,8 +148,11 @@ export default function RP22ClientReport() {
       screenWidthM,
       aspectRatio: screen?.aspectRatio,
       engineeringSummary,
+      // The design's own display authority, so the page is named and presented for
+      // the display it actually documents.
+      displayType: resolveDisplayType(projectDetails),
     });
-  }, [hydrating, engineeringSummary, seatingPositions, screenFrontPlaneM, screenWidthM, screen?.aspectRatio]);
+  }, [hydrating, engineeringSummary, seatingPositions, screenFrontPlaneM, screenWidthM, screen?.aspectRatio, projectDetails]);
 
   // ── Best Listening Area — passive read from the canonical summary ──
   const bestListeningArea = useMemo(() => {

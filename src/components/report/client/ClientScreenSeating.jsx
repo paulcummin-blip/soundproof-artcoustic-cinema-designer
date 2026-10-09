@@ -28,6 +28,7 @@ import { resolveRspLabelPlacement } from "./ClientSpeakerBalance";
 import { RP22_GRADE_TOKENS } from "@/components/utils/rp22Colors";
 import RP22GradingPill from "@/components/ui/RP22GradingPill";
 import { PROJECTOR_BASIS_COPY } from "@/components/report/projectorLumenRecommendation";
+import { DISPLAY_TYPE_TV } from "@/components/models/screen/displayTypeAuthority";
 import ClientSeatResultRows from "./ClientSeatResultRows";
 import { VIEWING_RESULT_HEADING } from "./viewingResultCopy";
 
@@ -46,6 +47,8 @@ export default function ClientScreenSeating({
   zones,
   explanation,
   projectorLumens,
+  // The design's display authority: a television page is headed as a television.
+  displayType = null,
   print,
   printPart,
 }) {
@@ -160,7 +163,7 @@ export default function ClientScreenSeating({
               fontFamily: "Didact Gothic, Century Gothic, sans-serif",
             }}
           >
-            RP23 — Screen Size &amp; Seating Position
+            {displayType === DISPLAY_TYPE_TV ? 'RP23 — TV & Seating Position' : 'RP23 — Screen Size & Seating Position'}
           </p>
         </div>
       )}

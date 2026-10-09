@@ -25,6 +25,7 @@
 
 import { groupSeatsIntoRows } from '@/components/report/client/seatRowGrouping';
 import { readReportParameter } from '@/components/report/reportParameterEvidence';
+import { displayPhrase, isTvDisplay } from '@/components/models/screen/displayTypeAuthority';
 
 const NUMBER_WORDS = Object.freeze({
   1: 'one', 2: 'two', 3: 'three', 4: 'four', 5: 'five',
@@ -80,14 +81,14 @@ function reached(engineeringSummary, ids, minimum) {
   });
 }
 
-/** The screen the cinema was designed around: 185" 2.35:1. */
+/**
+ * The display the cinema was designed around.
+ * A television by its own size — `115" TV`; a projection screen exactly as
+ * before — `185" 2.35:1`. Delegated to the one display-type authority, so the
+ * report never states a television as a screen.
+ */
 export function screenPhrase(projectDetails) {
-  const size = Number(projectDetails?.screen_size);
-  const aspect = String(projectDetails?.aspect_ratio || '').trim();
-  const parts = [];
-  if (Number.isFinite(size) && size > 0) parts.push(`${Math.round(size)}"`);
-  if (aspect) parts.push(aspect);
-  return parts.join(' ') || null;
+  return displayPhrase(projectDetails);
 }
 
 /** The seating, as the report's own row grouping sees it. */
@@ -144,7 +145,9 @@ export function buildProjectReportSummaryOpening({
   ].filter(Boolean);
 
   const around = [];
-  if (screen) around.push(`a ${screen} screen`);
+  // A television is a television: its phrase already names it ("115\" TV"), so
+  // the noun is not repeated after it.
+  if (screen) around.push(isTvDisplay(projectDetails) ? `a ${screen}` : `a ${screen} screen`);
   if (rows) around.push(rows);
 
   const opening = architecture ? `This ${architecture} cinema` : 'This cinema';

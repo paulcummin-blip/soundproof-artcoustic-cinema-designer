@@ -7,6 +7,10 @@ export function frozenReportAppState(live, publication) {
   try { roomDims = typeof p.roomDims === 'string' ? JSON.parse(p.roomDims) : p.roomDims; } catch { roomDims = null; }
   const screen = p.report_screen || {
     visibleWidthInches:p.screen_size, aspectRatio:p.aspect_ratio, manualMode:p.manual_dimensions,
+    // The saved display authority travels into the frozen report state with the
+    // screen itself, so the report's own evidence states the display the designer
+    // chose rather than re-deriving it from the dimensions.
+    display_type:p.display_type, screen_manual_config:p.screen_manual_config,
     manualWidthM:p.manual_width_m, manualHeightM:p.manual_height_m, heightFromFloorM:p.screen_height_from_floor,
     mountMode:p.screen_mount_mode, screenPlaneY_m:p.screen_front_plane_m, floatDepthM:p.float_depth_m,
     borderThicknessM:p.border_thickness_m, speakerClearanceM:p.speaker_clearance_m,

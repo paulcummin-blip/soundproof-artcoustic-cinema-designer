@@ -26,6 +26,11 @@ import ProjectReportOpeningBlock from '@/components/report/projectReport/Project
 import ProjectReportFactsGrid from '@/components/report/projectReport/ProjectReportFactsGrid';
 import { groupSeatsIntoRows } from '@/components/report/client/seatRowGrouping';
 import {
+  displayFactLabel,
+  displayPhrase,
+  isTvDisplay,
+} from '@/components/models/screen/displayTypeAuthority';
+import {
   REPORT_FONT_HEADING as FONT_HEADING,
   REPORT_FONT_BODY as FONT_BODY,
 } from '@/components/report/typography/reportTypography';
@@ -39,8 +44,12 @@ function productValue(productsSelected, key) {
   return value || null;
 }
 
-/** How the design's screen is stated: the specified size, then its viewable width. */
+/** How the design's display is stated: a television by its own size, a screen as before. */
 function screenFact(projectDetails, screenWidthM) {
+  // A television is stated as a television — its saved diagonal authority and
+  // nothing else: no aspect ratio, no viewable width × height.
+  if (isTvDisplay(projectDetails)) return displayPhrase(projectDetails);
+
   const widthM = Number(screenWidthM);
   const aspect = String(projectDetails?.aspect_ratio || '').trim();
 
@@ -59,7 +68,9 @@ function screenFact(projectDetails, screenWidthM) {
 }
 
 /** The facts that describe the room, as opposed to the system built into it. */
-const ROOM_FACT_LABELS = new Set(['Room', 'Screen', 'Seating']);
+// 'TV' is the display fact's label when the design's display is a television, so
+// it sits with the room facts exactly as 'Screen' does.
+const ROOM_FACT_LABELS = new Set(['Room', 'Screen', 'TV', 'Seating']);
 
 /** The fact sheet's two columns: the room the design is built in, and the system. */
 function factColumns(facts) {
@@ -102,7 +113,7 @@ export default function ProjectReportDesignSummary({
 
   const facts = [
     { label: 'Room', value: roomFact },
-    { label: 'Screen', value: screenFact(projectDetails, screenWidthM) },
+    { label: displayFactLabel(projectDetails), value: screenFact(projectDetails, screenWidthM) },
     { label: 'Seating', value: seatingFact },
     { label: 'System format', value: String(projectDetails?.dolby_config || '').trim() || null },
     { label: 'Key loudspeakers', value: keyLoudspeakers },

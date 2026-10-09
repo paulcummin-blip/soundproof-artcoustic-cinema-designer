@@ -8,6 +8,7 @@
 import { computeProjectorLumens } from "@/components/report/projectorLumenRecommendation";
 import { groupSeatsIntoRows } from "./seatRowGrouping";
 import { buildViewingInterpretation } from "./viewingResultCopy";
+import { DISPLAY_TYPE_TV, resolveDisplayType } from "@/components/models/screen/displayTypeAuthority";
 
 function levelToKey(level) {
   return level ? String(level).toLowerCase() : "below-l1";
@@ -23,10 +24,17 @@ export function selectClientScreenSeating({
   screenWidthM,
   aspectRatio,
   engineeringSummary,
+  displayType = null,
 }) {
+  // The design's own display authority decides how the display is named here and
+  // whether projector-only presentation applies at all.
+  const resolvedDisplayType = resolveDisplayType({ display_type: displayType });
   const viewing = engineeringSummary?.viewing;
   if (!Array.isArray(seatingPositions) || !viewing?.available) {
-    return { seats: [], rows: [], zones: [], hasAny: false, explanation: "", projectorLumens: null };
+    return {
+      seats: [], rows: [], zones: [], hasAny: false, explanation: "",
+      projectorLumens: null, displayType: resolvedDisplayType,
+    };
   }
 
   const authorityBySeatId = new Map(
@@ -66,6 +74,12 @@ export function selectClientScreenSeating({
     zones: [],
     hasAny: seats.length > 0,
     explanation: buildViewingInterpretation(rows),
-    projectorLumens: computeProjectorLumens(screenWidthM, aspectRatio),
+    displayType: resolvedDisplayType,
+    // Projector light output is projection presentation only: a television has no
+    // projector, so no light-output figure is raised for it. The calculation
+    // itself is unchanged.
+    projectorLumens: resolvedDisplayType === DISPLAY_TYPE_TV
+      ? null
+      : computeProjectorLumens(screenWidthM, aspectRatio),
   };
 }

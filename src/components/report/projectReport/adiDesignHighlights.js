@@ -352,7 +352,10 @@ function buildCandidates(sources) {
     const described = rows.map((row, index) => {
       const angle = row.maxAngleDeg != null ? `${row.maxAngleDeg.toFixed(1)}°` : null;
       const label = rowLabel(index, rows.length).toLowerCase();
-      return `the ${label} ${angle ? `views the screen at ${angle} ` : ''}(RP23 ${row.level})`;
+      // The display is named as the design's own display type states it: a
+      // television is watched on a TV, never on a screen.
+      const displayNoun = sources?.displayType === 'tv' ? 'TV' : 'screen';
+      return `the ${label} ${angle ? `views the ${displayNoun} at ${angle} ` : ''}(RP23 ${row.level})`;
     });
     candidates.push({
       id: 'viewing-geometry',

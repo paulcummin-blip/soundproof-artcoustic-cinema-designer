@@ -119,6 +119,12 @@ function buildIdentity({ reportType, captured, sourceFingerprint }) {
   };
 }
 
+import {
+  DISPLAY_TYPE_PROJECTOR,
+  DISPLAY_TYPE_TV,
+  resolveDisplayType,
+} from '@/components/models/screen/displayTypeAuthority';
+
 function buildRoom(captured) {
   const dimensions = captured?.room?.dimensions || null;
   return {
@@ -131,10 +137,24 @@ function buildRoom(captured) {
 
 function buildScreen(captured, borderThicknessM) {
   const screen = captured?.room?.screen || null;
+  // The display's own type, and the phrase a client-facing surface states for it:
+  // a television is stated as a television and never re-derived from its size.
+  const displayType = resolveDisplayType({
+    display_type: screen?.display_type,
+    screen_manual_config: screen?.screen_manual_config,
+    television: screen?.television,
+  });
+  const viewableDiagonalIn = round(screen?.diagonal_inches ?? screen?.size_inches, 1);
+  const displayLabel = displayType === DISPLAY_TYPE_TV
+    && Number.isFinite(Number(viewableDiagonalIn))
+    && Number(viewableDiagonalIn) > 0
+      ? `${Math.round(Number(viewableDiagonalIn))}" TV`
+      : null;
   if (!screen) {
     return {
       format: null, viewable_diagonal_in: null, viewable_width_cm: null, viewable_height_cm: null,
       overall_width_cm: null, overall_height_cm: null, screen_type: null,
+      display_type: DISPLAY_TYPE_PROJECTOR, display_label: null,
     };
   }
   const viewableWidthCm = cmFromM(screen.computed_width_m);
@@ -148,6 +168,8 @@ function buildScreen(captured, borderThicknessM) {
     overall_width_cm: (viewableWidthCm === null || borderCm === null) ? viewableWidthCm : round(viewableWidthCm + 2 * borderCm, 1),
     overall_height_cm: (viewableHeightCm === null || borderCm === null) ? viewableHeightCm : round(viewableHeightCm + 2 * borderCm, 1),
     screen_type: screen.television === true ? 'Television' : 'Projection screen',
+    display_type: displayType,
+    display_label: displayLabel,
   };
 }
 

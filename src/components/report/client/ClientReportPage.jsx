@@ -378,6 +378,7 @@ export default function ClientReportPage({
                 zones={printData.zones}
                 explanation={printData.explanation}
                 projectorLumens={printData.projectorLumens}
+                displayType={printData.displayType}
                 print
                 printPart="drawing"
               />
@@ -393,6 +394,7 @@ export default function ClientReportPage({
                 zones={printData.zones}
                 explanation={printData.explanation}
                 projectorLumens={printData.projectorLumens}
+                displayType={printData.displayType}
                 print
                 printPart="support"
               />
