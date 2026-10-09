@@ -6,9 +6,10 @@
 //        arrangement uses the catalogue's named 1222 mm cabinet, that an
 //        explicit choice survives a screen change, and that the four TV presets
 //        resolve exactly as they did before — so existing projects are untouched.
-//        It also guards both approved artworks (the 1222 mm and 1441 mm
-//        cabinets) and the fact that every drawing resolves the variant through
-//        the ONE authority.
+//        It also guards all three approved artworks (the 1222 mm, 1441 mm and
+//        1711 mm cabinets), that the three widths are ONE acoustic
+//        specification, and that every drawing resolves the variant through the
+//        ONE authority.
 // ENGINEERING SCOPE  None of this touches SPL, RP22, impedance, aiming or the
 //        logical centre channel. TEST 9 asserts the C4-1's engineering data is
 //        byte-for-byte what it was.
@@ -33,6 +34,8 @@ import {
 } from '@/components/models/speakers/soundbarCabinetVariant';
 import {
   CENTRE_CABINET_ROLES,
+  DUAL_CENTRE_CABINET_COUNT,
+  DUAL_CENTRE_SPL_GAIN_DB,
   defaultCentreCabinetOrientation,
   resolveCentreCabinetFootprintM,
 } from '@/components/utils/frontStageModeAuthority';
@@ -64,6 +67,8 @@ test('TEST 1  The catalogue publishes six C4-1 cabinet lengths, names the dual-c
   // 1441 mm is a catalogue length of its own — a new variant, never a copy of the
   // 1411 mm row — and it changes nothing about the dual-centre requirement.
   assert.ok(C41_LENGTHS.includes(1441), 'the 1441 mm cabinet is an available variant');
+  // All three illustrated widths are real catalogue lengths of the ONE model.
+  [1222, 1441, 1711].forEach((mm) => assert.ok(C41_LENGTHS.includes(mm), `${mm} mm is a catalogue length`));
   // A catalogue product, not a new one: exactly one C4-1 row, no duplicates.
   assert.equal(MODELS.filter((m) => m.key === 'c4-1').length, 1);
   // The other TV-linked soundbars keep the lengths they already published.
@@ -102,6 +107,10 @@ test('TEST 3  The physical width decides, never the screen diagonal', () => {
   assert.equal(lengthFor('c4-1', manualWh(1.441, 0.8106)), 1441);
   assert.equal(lengthFor('c4-1', widthInches(56.73)), 1441);
   assert.equal(nearestCabinetLengthMm(C41_LENGTHS, 1441), 1441);
+
+  // The 1711 mm cabinet likewise installs for its own physical width.
+  assert.equal(lengthFor('c4-1', manualWh(1.711, 0.9625)), 1711);
+  assert.equal(lengthFor('c4-1', widthInches(67.36)), 1711);
 });
 
 test('TEST 4  Widths between variants pick the closest catalogue length', () => {
@@ -133,6 +142,8 @@ test('TEST 6  An explicitly selected length is preserved when the screen changes
   assert.equal(resolvePlacedCabinetLengthMm({ model: 'c4-1', cabinetLengthMm: 1500 }, tv('tv65', 1411)), 1411);
   // An explicitly chosen 1441 mm cabinet is honoured on any screen too.
   assert.equal(resolvePlacedCabinetLengthMm({ model: 'c4-1', cabinetLengthMm: 1441 }, manualWh(2.4, 1.35)), 1441);
+  // …and so is an explicitly chosen 1711 mm cabinet.
+  assert.equal(resolvePlacedCabinetLengthMm({ model: 'c4-1', cabinetLengthMm: 1711 }, tv('tv65', 1411)), 1711);
 });
 
 // ── 3. Dual Mono Centre — the 1222 mm variant ─────────────────────────────
@@ -189,11 +200,13 @@ test('TEST 9  The C4-1 engineering data is unchanged by the variant work', () =>
   // The variant only ever changes the cabinet's LENGTH.
   const at1222 = getSpeakerModelMeta('c4-1', null, { cabinetLengthMm: 1222 });
   const at1441 = getSpeakerModelMeta('c4-1', null, { cabinetLengthMm: 1441 });
+  const at1711 = getSpeakerModelMeta('c4-1', null, { cabinetLengthMm: 1711 });
   const at2230 = getSpeakerModelMeta('c4-1', null, { cabinetLengthMm: 2230 });
   assert.equal(at1222.widthM, 1.222);
   assert.equal(at1441.widthM, 1.441);
+  assert.equal(at1711.widthM, 1.711);
   assert.equal(at2230.widthM, 2.23);
-  [at1222, at1441, at2230].forEach((m) => {
+  [at1222, at1441, at1711, at2230].forEach((m) => {
     assert.equal(m.heightM, 0.12);
     assert.equal(m.depthM, 0.081);
     assert.equal(m.sensitivity_dB_1w1m, 98);
@@ -277,6 +290,10 @@ test('TEST 14 Model, orientation and variant are restored on reopen', () => {
   const screen1441 = manualWh(1.441, 0.8106);
   assert.equal(lengthFor('c4-1', screen1441), 1441);
   assert.equal(lengthFor('c4-1', screen1441), lengthFor('c4-1', JSON.parse(JSON.stringify(screen1441))));
+
+  const screen1711 = manualWh(1.711, 0.9625);
+  assert.equal(lengthFor('c4-1', screen1711), 1711);
+  assert.equal(lengthFor('c4-1', screen1711), lengthFor('c4-1', JSON.parse(JSON.stringify(screen1711))));
   // An explicitly stored 1441 mm choice is restored verbatim.
   assert.equal(
     resolvePlacedCabinetLengthMm(JSON.parse(JSON.stringify({ model: 'c4-1', cabinetLengthMm: 1441 })), screen1441),
@@ -336,4 +353,86 @@ test('TEST 18 Dual Mono Centre still defaults to the 1222 mm cabinet with 1441 m
   assert.equal(defaultCentreCabinetOrientation('c4-1', 'tv100'), 'vertical');
   assert.equal(CENTRE_CABINET_ROLES.left, 'FCL');
   assert.equal(CENTRE_CABINET_ROLES.right, 'FCR');
+});
+
+// ── 9. One loudspeaker in three widths ────────────────────────────────────
+
+test('TEST 19 The three widths are ONE loudspeaker — only the cabinet width differs', () => {
+  const widths = [1222, 1441, 1711];
+  const metas = widths.map((mm) => getSpeakerModelMeta('c4-1', null, { cabinetLengthMm: mm }));
+
+  // Each width reports its own cabinet width, and the other verified catalogue
+  // dimensions are the same for all three.
+  metas.forEach((meta, i) => {
+    assert.equal(meta.widthM, widths[i] / 1000);
+    assert.equal(meta.cabinetLengthMm, widths[i], 'the installed width travels with the model the drawings read');
+    assert.equal(meta.heightM, 0.12);
+    assert.equal(meta.depthM, 0.081);
+  });
+
+  // Every acoustic field is identical across the three widths, so changing the
+  // cabinet width can never change an SPL, impedance or RP22 result.
+  const ACOUSTIC_FIELDS = [
+    'sensitivity_dB_1w1m', 'sensitivity_dB_2p83', 'nominalOhms', 'max_power',
+    'max_spl', 'peak_spl',
+    'max_spl_cont_db_1m_halfspace', 'max_spl_peak_db_cf6_1m_halfspace',
+    'max_spl_cont_db_1m_anechoic', 'max_spl_peak_db_cf6_1m_anechoic',
+    'frequency_response_low', 'usable_lf_hz_minus6db',
+    'hfOffAxis16k', 'dispersion',
+    'placementOffsetFromScreenBottomMm', 'frontStageType', 'category', 'price_gbp_exVat',
+  ];
+  const base = metas[0];
+  metas.slice(1).forEach((meta, i) => {
+    ACOUSTIC_FIELDS.forEach((field) => {
+      assert.deepEqual(meta[field], base[field], `${field} differs at ${widths[i + 1]} mm`);
+    });
+    assert.equal(meta.key, 'c4-1', 'every width is the same catalogue model');
+  });
+
+  // One catalogue row — never three independent speaker models.
+  assert.equal(MODELS.filter((m) => m.key === 'c4-1').length, 1);
+  assert.equal(MODELS.filter((m) => String(m.label || '').startsWith('C4-1')).length, 1);
+});
+
+test('TEST 20 The 1711 mm artwork is cropped to its ink and used for its variant only', () => {
+  assert.ok(c41Artwork.includes('export function C41_1711FaceIcon'), 'the 1711 mm cabinet has its own icon');
+  assert.ok(c41Artwork.includes('https://media.base44.com/images/public/6a1166c68ddc81e5ea2cdf6b/7759b8f47_ChatGPTImage9Oct202610_54_00.png'),
+    'the approved illustration is the one referenced');
+
+  // Measured from the source file: 2167 × 726 px, ink at x 35–2131, y 277–425 —
+  // the same measurement basis as the other C4-1 artworks.
+  assert.ok(c41Artwork.includes('viewBox="35 277 2097 149"'), 'the surrounding whitespace is cropped');
+
+  const inkAspect = 2097 / 149;
+  const cabinetAspect = 1711 / 120;
+  assert.ok(Math.abs(inkAspect - cabinetAspect) / cabinetAspect < 0.03,
+    `the artwork is the 1711 × 120 mm cabinet itself (ink ${inkAspect.toFixed(3)} vs cabinet ${cabinetAspect.toFixed(3)})`);
+
+  // Gated on the installed width, and the other two artworks plus the fallback
+  // are untouched.
+  assert.ok(frontElevation.includes('const isC41_1711 = isC41 && Number(cabinetLengthMm) === 1711;'));
+  assert.ok(frontElevation.includes('if (isC41 && isC41_1711) return <C41_1711FaceIcon'));
+  assert.ok(c41Artwork.includes('viewBox="45 257 2083 208"'), 'the 1222 mm crop is unchanged');
+  assert.ok(c41Artwork.includes('viewBox="36 275 2095 170"'), 'the 1441 mm crop is unchanged');
+  assert.ok(frontElevation.includes('if (isC41) return <C41FaceIcon'), 'the other lengths keep the catalogue drawing');
+});
+
+test('TEST 21 The +4 dB dual-cabinet allowance and the dual-centre default are unchanged', () => {
+  assert.equal(DUAL_CENTRE_SPL_GAIN_DB, 4, 'the dual-cabinet allowance is untouched');
+  assert.equal(DUAL_CENTRE_CABINET_COUNT, 2);
+  assert.equal(getDualCentreCabinetLengthMm('c4-1'), 1222);
+
+  // A 1711 mm screen changes nothing about the dual-centre arrangement.
+  [tv('tv65', 1411), tv('tv77', 1711), tv('tv83', 1872), manualWh(1.711, 0.9625)].forEach((screen) => {
+    assert.equal(lengthFor('c4-1', screen, { dualCentre: true }), 1222);
+  });
+  assert.equal(defaultCentreCabinetOrientation('c4-1', 'tv77'), 'vertical');
+
+  // The allowance itself rests on the shared acoustic specification, so the
+  // installed width cannot move it.
+  const at1222 = getSpeakerModelMeta('c4-1', null, { cabinetLengthMm: 1222 });
+  const at1711 = getSpeakerModelMeta('c4-1', null, { cabinetLengthMm: 1711 });
+  assert.equal(at1711.max_spl_cont_db_1m_halfspace, at1222.max_spl_cont_db_1m_halfspace);
+  assert.equal(at1711.nominalOhms, at1222.nominalOhms);
+  assert.equal(at1711.max_power, at1222.max_power);
 });
