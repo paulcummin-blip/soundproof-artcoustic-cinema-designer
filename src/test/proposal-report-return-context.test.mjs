@@ -29,6 +29,7 @@ const read = (path) => fs.readFileSync(new URL(`../../${path}`, import.meta.url)
 const LINK = read('src/components/report/BackToProposalLink.jsx');
 const VISUAL_PAGE = read('src/pages/RP22ClientReport.jsx');
 const TECH_HEADER = read('src/components/report/ReportHeader.jsx');
+const PAIRING_OWNER = read('src/components/report/reportLibraryContext.js');
 const TECH_PAGE = read('src/pages/RP22Report.jsx');
 const REVIEW_ACTIONS = read('src/components/designreview/DesignReviewActions.jsx');
 const READINESS_TABLE = read('src/components/proposal/sourceAuthority/VersionReadinessTable.jsx');
@@ -129,10 +130,9 @@ test('the Project Report shows the way back and preserves it when moving on', ()
   // The pairing hop is built by the shared report context authority, so the
   // proposal context rides along with the version being viewed and the Library
   // return — one builder, no hand-written URL to drop any of them.
-  expect(VISUAL_PAGE).toMatch(/buildReportPairingUrl\(\{/);
-  expect(VISUAL_PAGE).toMatch(/route: REPORT_ROUTE\.DESIGN_REVIEW/);
-  expect(VISUAL_PAGE).toMatch(/versionId: viewedVersionId/);
-  expect(VISUAL_PAGE).toMatch(/const currentProposalContext = \(\) => readProposalContext\(searchParams\);/);
+  expect(PAIRING_OWNER).toMatch(/export function buildReportPairingUrl\(\{/);
+  expect(PAIRING_OWNER).toMatch(/buildReportActionUrl\(\{ route, projectId, versionId \}\)/);
+  expect(PAIRING_OWNER).toMatch(/withProposalContext\(href, proposalContext\)/);
 });
 
 test('the Technical Report shows the way back and preserves it when moving on', () => {

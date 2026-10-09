@@ -254,7 +254,7 @@ export default async function(req) {
       const versionRecord = (projectVersions || []).find((version) => version.id === versionId) || null;
       const publication = versionPublicationById.get(versionId) || null;
       // THE canonical saved Project Report — the only report source a proposal
-      // is gated on. The legacy Visual and Technical Reports are never consulted.
+      // is gated on. No other saved report is consulted.
       const savedProjectReport = savedReportByKey.get(`${versionId}::project`) || null;
       // The version's calculated engineering result: the publication when it has
       // one, otherwise the completed calculation authority of the SAME design its

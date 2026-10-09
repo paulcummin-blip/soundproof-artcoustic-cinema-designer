@@ -1,47 +1,7 @@
 /**
- * Acceptance tests — ONE proposal readiness authority, ONE report source.
- *
- * Sound Proof has ONE report: the Project Report. It carries the visual and
- * technical content, the P1–P21 evidence, the drawings, the products and the
- * bass evidence, and it is the only report a proposal is gated on.
- *
- * The rule under test:
- *
- *   Every selected version must have a CURRENT, proposal-ready Project Report
- *   before a proposal can be generated.
- *
- * A version's Project Report reads as one of four states, and only the first
- * lets a proposal through:
- *
- *   Current        the report exists, matches the version's current design and
- *                  carries complete, proposal-ready evidence
- *   Update needed  the report exists but the design has moved past it
- *   Not generated  no Project Report has been saved for the version
- *   Incomplete     the report exists and its evidence is not proposal-ready
- *
- *   TEST 1  Both modules (client mirror + server authority) share one vocabulary
- *   TEST 2  The one column states the Project Report, and no exported copy names
- *           any other report
- *   TEST 3  Current: complete, proposal-ready report → version ready, gate open
- *   TEST 4  Not generated: no saved report → named, with the create action
- *   TEST 5  Update needed: the design moved on → named, with the update action
- *   TEST 6  Update needed: the report's own stored status says the project has
- *           moved past it
- *   TEST 7  Incomplete: evidence stored but not proposal-ready — never Missing
- *   TEST 8  Incomplete: failing evidence parity is refused too
- *   TEST 9  The evidence contract requires a proposal-ready report, by itself
- *   TEST 10 A report from another payload generation is not a usable source
- *   TEST 11 Retired report identities neither satisfy readiness nor block it
- *   TEST 12 The gate is open only when EVERY selected version is Current
- *   TEST 13 A version is always named by the name the designer saved
- *   TEST 14 Client and server derive the same verdicts, sentences and gate
- *   TEST 15 The Project Library banner reads the same rows, in the same words
- *   TEST 16 The calculated engineering result resolves from the version's own
- *           authority, and takes the Project Report by that name
- *
- * Pure: no React, no database.
- *
- * Run: npx vitest run test/proposal-readiness-authority.test.mjs
+ * Single-Project-Report readiness: vocabulary, evidence validity, per-version
+ * gates, client/server parity, Library copy and calculation authority.
+ * Reusable stored-source fixtures live in fixtures/proposalReadinessFixtures.mjs.
  */
 
 import assert from 'node:assert/strict';
@@ -106,160 +66,12 @@ const readSource = (path) => fs.readFileSync(new URL(path, import.meta.url), 'ut
 const SHARED_AUTHORITY_SOURCE = readSource('../base44/shared/proposalReadinessAuthority.js');
 const CLIENT_AUTHORITY_SOURCE = readSource('../src/components/proposal/sourceAuthority/proposalReadinessAuthority.js');
 
-// ── The stored sources: one version, one Project Report ─────────────────────
-
-const PROJECT_ID = 'p1';
-const ENGINEERING_FP = 'eng:v1:c19ceb2efb6c3d9c';
-const BASS_FP = 'cal:v8:2b7f4c91d0a8e63f|mode:canonical-physics-eq';
-const SEAT_PRIORITY = 'seat-r1-c1:primary|seat-r1-c2:secondary';
-const GENERATED_AT = '2026-10-04T17:11:05.564Z';
-
-const LEVEL_4_VERSION = {
-  id: '6abbca6e199f13dc4d74ec4a',
-  version_name: 'Level 4 version',
-  version_number: 1,
-};
-
-const ORIGINAL_VERSION = {
-  id: '6ac22230d40d8bb0a925ecab',
-  version_name: 'Original Design',
-  version_number: 2,
-};
-
-const CURRENT_FINGERPRINTS = {
-  engineeringFingerprint: ENGINEERING_FP,
-  calculationFingerprint: BASS_FP,
-  seatPriorityFingerprint: SEAT_PRIORITY,
-};
-
-/**
- * One parameter row exactly as the capture writes it: the reading, the scope it
- * was taken at, and the durable authority it came from. The parameter index and
- * the parallel `parameters` list share these very objects, which is how the
- * contract requires the two to agree field for field.
- */
-function parameterRow({ key, value, level, scope, rawValue = null }) {
-  const bass = ['P14', 'P18', 'P19', 'P20'].includes(key);
-  return {
-    key,
-    parameter_id: Number(key.slice(1)),
-    scope,
-    value,
-    level,
-    ...(rawValue === null ? {} : { raw_value: rawValue }),
-    authority_value: value,
-    authority_level: level,
-    authority_fingerprint: bass ? BASS_FP : ENGINEERING_FP,
-    authority_timestamp: GENERATED_AT,
-    source_type: bass ? 'durable-current-bass-authority' : 'durable-engineering-publication',
-  };
-}
-
-/** The parameter readings the Project Report's evidence states. */
-function projectParameters() {
-  return [
-    parameterRow({ key: 'P4', value: 4.02, level: 'L3', scope: 'room' }),
-    parameterRow({ key: 'P5', value: 41.2, level: 'L2', scope: 'room' }),
-    parameterRow({ key: 'P10', value: 4, level: 'L3', scope: 'project' }),
-    // The bass row states its reading exactly as the bass authority does, which
-    // is the atomic pair the contract compares against evidence.bass.p14.
-    parameterRow({ key: 'P14', value: 4, level: 'L4', scope: 'room', rawValue: 4 }),
-  ];
-}
-
-const EVIDENCE_SEATS = [
-  { row: 1, seat_id: 'seat-r1-c1', column: 1, priority: 'primary', distance_m: 4.12, horizontal_angle_deg: -3.1 },
-  { row: 1, seat_id: 'seat-r1-c2', column: 2, priority: 'secondary', distance_m: 4.02, horizontal_angle_deg: 3.1 },
-];
-
-/** One complete, proposal-ready Project Report evidence payload. */
-function projectEvidence({ versionId = LEVEL_4_VERSION.id } = {}) {
-  const parameters = projectParameters();
-  return {
-    evidence_version: 1,
-    report_type: 'project',
-    identity: {
-      project_id: PROJECT_ID,
-      version_id: versionId,
-      report_type: 'project',
-      source_fingerprint: ENGINEERING_FP,
-      bass_fingerprint: BASS_FP,
-    },
-    room: { length_m: 6.2, width_m: 4.6, height_m: 2.5, volume_m3: 71.3 },
-    screen: { screen_type: 'Projection screen', format: '16:9', viewable_diagonal_in: 120 },
-    system: { products_selected: [{ role: 'Screen LCR', model: 'DF-48', quantity: 3 }] },
-    seating: { seats: EVIDENCE_SEATS.length, per_seat: EVIDENCE_SEATS.map((seat) => ({ ...seat })) },
-    parameters,
-    parameter_index: Object.fromEntries(parameters.map((row) => [row.key, row])),
-    bass: { current: true, p14: { raw_value: 4, achieved_level: 'L4' } },
-    proposal_ready: true,
-    evidence_fingerprint: 're1-project-8c1f0f2a-2a0',
-  };
-}
-
-/**
- * A saved Project Report snapshot: its payload, its frozen source fingerprints
- * and its stored status. Omitting `evidence` is the report written before the
- * evidence capture existed — it exists and is current, and its evidence is not
- * proposal-ready.
- */
-function savedProjectReport({
-  versionId = LEVEL_4_VERSION.id,
-  evidence = null,
-  fingerprints = CURRENT_FINGERPRINTS,
-  generatedAt = GENERATED_AT,
-  status = 'current',
-  reportSchemaVersion = 1,
-  parity = null,
-} = {}) {
-  return {
-    report_type: 'project',
-    project_id: PROJECT_ID,
-    version_id: versionId,
-    report_schema_version: reportSchemaVersion,
-    status,
-    payload: {
-      pages: [{ id: 'cover', category: 'cover' }],
-      proposalSource: { report_source_version: 1 },
-      ...(evidence ? { reportEvidence: evidence } : {}),
-      ...(parity ? { evidence_parity: parity } : {}),
-    },
-    source_fingerprints: fingerprints,
-    generated_at: generatedAt,
-  };
-}
-
-const CURRENT_REPORT = savedProjectReport({ evidence: projectEvidence() });
-const CURRENT_SOURCES = { version: LEVEL_4_VERSION, savedProjectReport: CURRENT_REPORT };
-
-/** The same version read the way the Step 3/5 table assembles its row. */
-const asClientRow = (sources, currentFingerprints = CURRENT_FINGERPRINTS) => {
-  const cell = clientSavedReportCell({
-    saved: sources.savedProjectReport,
-    currentFingerprints,
-  });
-  return clientRow({
-    versionId: sources.version.id,
-    versionName: clientVersionDisplayName(sources.version),
-    versionNumber: sources.version.version_number,
-    cells: { project: cell },
-  });
-};
-
-/** The version's completed calculation authority, in its own cache record. */
-const BASS_FINGERPRINT = 'cal:v8:395d1a338da6c449|mode:canonical-physics-eq';
-const CALC_COMPLETED_AT_MS = 1791108297487;
-const CACHE_RECORD = {
-  version_id: LEVEL_4_VERSION.id,
-  status: 'complete',
-  current_fingerprint: BASS_FINGERPRINT,
-  completed_by_fingerprint: {
-    [BASS_FINGERPRINT]: {
-      metricSchemaVersion: 21,
-      job: { status: 'complete', completedAtMs: CALC_COMPLETED_AT_MS },
-    },
-  },
-};
+import {
+  PROJECT_ID, ENGINEERING_FP, SEAT_PRIORITY, GENERATED_AT, LEVEL_4_VERSION,
+  ORIGINAL_VERSION, CURRENT_FINGERPRINTS, CURRENT_REPORT, CURRENT_SOURCES,
+  projectEvidence, savedProjectReport, asClientRow, BASS_FINGERPRINT,
+  CALC_COMPLETED_AT_MS, CACHE_RECORD,
+} from './fixtures/proposalReadinessFixtures.mjs';
 
 const results = [];
 const test = (name, fn) => {
@@ -742,7 +554,7 @@ test('15. the Library banner reads the same rows in the same words', () => {
     assert.equal(banner.headline, expectedHeadline, `${name}: headline`);
     if (verdict !== LIBRARY_VERDICT.READY) {
       assert.equal(banner.showChecklist, true, `${name}: the blocked version is listed`);
-      assert.match(banner.primaryAction.label, /Project Report|Room Designer/, `${name}: one action`);
+      assert.equal(banner.primaryAction.reportType, 'project', `${name}: one report action`);
     }
     assert.equal(banner.ready, row.ready, `${name}: banner verdict follows the row`);
   }

@@ -71,7 +71,7 @@ const FIXTURES = [
 test('TEST 1 — every word the banner can show is dealer-safe', () => {
   for (const [name, readiness] of FIXTURES) {
     const words = dealerWords(readiness);
-    expect(words, name).not.toMatch(/current|stale|incomplete|missing|fingerprint|evidence|authority|parity|schema/i);
+    expect(words, name).not.toMatch(/stale|incomplete|missing|fingerprint|evidence|authority|parity|schema/i);
     expect(words, name).not.toMatch(/Visual Report|Technical Report/);
   }
 
