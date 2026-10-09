@@ -14,6 +14,8 @@
 // ---------------------------------------------------------------------------
 
 import React from "react";
+import useSharedBassAuthorityState from "@/components/room/bass/useSharedBassAuthorityState";
+import BassStateBadge from "@/components/room/bass/BassStateBadge";
 import { Settings2, RefreshCw, CheckCircle2, AlertCircle, Loader2 } from "lucide-react";
 import { formatSubwooferSystemLabel } from "@/components/utils/subwooferDisplayLabel";
 import { deriveBassDisplayStatus, BASS_DISPLAY_ICON, BASS_LIFECYCLE_STATE } from "../bassCalculationLifecycle";
@@ -99,6 +101,7 @@ export default function CurrentDesignBar({
   statusText = null,
   onChangeSpeakers, onChangeLayout,
 }) {
+  const { authorityState } = useSharedBassAuthorityState();
   const hasFront = frontCount > 0 && frontModel;
   const hasRear = rearCount > 0 && rearModel;
 
@@ -139,8 +142,7 @@ export default function CurrentDesignBar({
           </div>
         )}
         <div className="mt-1 flex items-center gap-1 text-[10px]" style={{ color: display.color }}>
-          <StatusIcon icon={display.icon} isCalculating={display.isCalculating} />
-          {statusText || display.text}
+          <BassStateBadge state={authorityState} />
         </div>
       </div>
       <div className="flex items-center gap-2">
