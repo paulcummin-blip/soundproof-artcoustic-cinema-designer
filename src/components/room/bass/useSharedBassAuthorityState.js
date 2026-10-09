@@ -24,6 +24,8 @@ export default function useSharedBassAuthorityState() {
     shared,
     publicationAttempt,
     authorityState: resolveBassAuthorityState({
+      projectId: shared?.scopeId,
+      versionId: shared?.versionId,
       completedBassAuthority: shared?.completedBassAuthority,
       publicationAttempt,
       engineeringFingerprint: publication?.fingerprint,
