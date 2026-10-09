@@ -99,6 +99,7 @@ import {
 } from '@/components/report/technical/technicalReportPrintWindow';
 import TechnicalAboutSoundProofSection from '@/components/report/technical/TechnicalAboutSoundProofSection';
 import TechnicalHowToReadSection from '@/components/report/technical/TechnicalHowToReadSection';
+import TechnicalRp22ParameterReferenceSection from '@/components/report/technical/TechnicalRp22ParameterReferenceSection';
 import { ISSUED_DOCUMENT_TYPE } from '@/components/library/issuedDocument/issuedDocumentTypes';
 import {
     recordIssuedExportInBackground,
@@ -1853,6 +1854,10 @@ function RP22ReportInner({ embed = false } = {}) {
                             export never carries a "Loading…" page, never a blank
                             page, and never leaves the page out. ── */}
                         <TechnicalAboutSoundProofSection />
+
+                        {/* ── RP22 Parameter Reference — the final page: P1–P21
+                            wording verbatim from the RP22 Parameters document. ── */}
+                        <TechnicalRp22ParameterReferenceSection />
 
                     </div>
                 </div>
