@@ -449,7 +449,15 @@ test("search guards are unchanged", () => {
   assert.equal(defineDelayGroups(INSTANCES.slice(0, 1), ROOM).status, "skipped");
 });
 
-// ── Report payload (read by the acceptance summary) ───────────────────────
+// ── Report payload ────────────────────────────────────────────────────────
+
+// Self-documenting: one run prints the measured fixture values so the
+// acceptance table can quote real numbers rather than remembered ones.
+test("acceptance fixture summary", () => {
+  console.log("[acoustic-delay-fixture]", JSON.stringify(ACCEPTANCE_FIXTURE));
+  assert.ok(ACCEPTANCE_FIXTURE.sweepCount > 0);
+});
+
 export const ACCEPTANCE_FIXTURE = {
   baseline: BASELINE_EVAL,
   bestImprovementP19,
