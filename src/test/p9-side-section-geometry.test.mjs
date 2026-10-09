@@ -1,206 +1,105 @@
 /**
  * p9-side-section-geometry.test.mjs
  * ---------------------------------
- * Proves the P9 side section is drawn from the REAL saved geometry:
- *   1. every overhead row is drawn at its real position (never moved),
- *   2. the RSP is drawn at its real room position and ear height,
- *   3. every ray originates at the RSP,
- *   4. every arc is centred on the RSP and spans only the two real rays,
- *   5. only ADJACENT rows are compared,
- *   6. the limiting (largest) adjacent gap is marked, exactly once.
+ * Proves the redesigned P9 visual page is SEAT-scoped and drawn from the real
+ * saved geometry:
  *
- * The fixture mirrors exactly how the report authority builds the P9 snapshot
- * (per-side row centres averaged into one representative row per row name,
- * elevation = atan2(dz, dy) from the RSP) — the module under test consumes that
- * snapshot verbatim.
+ *   1. the page is only applicable with two or more overhead rows,
+ *   2. the seat scope carries every seat's own PUBLISHED result,
+ *   3. each seating row's listening point is a real seat at its real ear height,
+ *   4. every overhead row is drawn at its real installed position — never moved,
+ *   5. each row's rays originate at that row's own listening point,
+ *   6. only ADJACENT overhead rows are compared, and the limiting gap for each
+ *      row is its own largest adjacent gap,
+ *   7. the drawn geometry agrees with the published per-seat result,
+ *   8. the two adjacent gaps are drawn as two visibly different wedges, and only
+ *      the limiting gap gets the heavier outline,
+ *   9. no RSP fan exists: nothing is measured or drawn from the RSP,
+ *  10. nothing is invented when the geometry cannot support a drawing.
+ *
+ * The fixture is the real Marquee Home design: the published per-seat P9 results
+ * for its two seating rows are 44.5° · L4 (4 seats) and 53.1° · L3 (5 seats), and
+ * the geometry below reproduces them from the saved speaker centres and the real
+ * per-seat ear heights.
  */
 import { test } from "vitest";
 import assert from "node:assert/strict";
 
 import {
-  buildP9SideSection,
+  buildP9SeatScopeSection,
   p9SidePolarPoint,
   P9_SIDE_ARC_RADIUS_FRACTION,
+  P9_WEDGE_FILLS,
+  P9_WEDGE_FILL_OPACITY,
+  P9_WEDGE_LIMITING_INK,
 } from "../components/report/client/p9SideSectionGeometry.js";
+import {
+  buildP9SeatScope,
+  isP9ReportApplicable,
+} from "../components/report/client/p9SeatScopeAuthority.js";
 
-const ROOM = { widthM: 4.8, lengthM: 6.4, heightM: 2.4 };
-const RSP = { x: 2.4, y: 4.0, z: 1.2 };
+const ROOM = { widthM: 5.18, lengthM: 7.29, heightM: 2.8 };
 
 // Real installed overhead rows: L/R pairs at one ceiling height.
-const ROW_POSITIONS = {
-  front: { y: 3.0, z: 2.4 },
-  mid: { y: 4.6, z: 2.4 },
-  rear: { y: 5.8, z: 2.4 },
-};
-
-const ROLES = {
-  front: ["TFL", "TFR"],
-  mid: ["TML", "TMR"],
-  rear: ["TRL", "TRR"],
-};
-
-function makeSnapshot() {
-  const upperSpeakers = [];
-  const representativeRows = [];
-  let rowIndex = 0;
-  for (const rowName of ["front", "mid", "rear"]) {
-    const point = ROW_POSITIONS[rowName];
-    for (const role of ROLES[rowName]) {
-      upperSpeakers.push({
-        role,
-        position: { x: rowName === "front" ? 1.4 : 1.6, y: point.y, z: point.z },
-      });
-    }
-    representativeRows.push({
-      rowName,
-      rowIndex,
-      avgY: point.y,
-      avgZ: point.z,
-      elevDeg: (Math.atan2(point.z - RSP.z, point.y - RSP.y) * 180) / Math.PI,
-    });
-    rowIndex += 1;
-  }
-  const representativeGaps = [];
-  for (let i = 1; i < representativeRows.length; i++) {
-    const prev = representativeRows[i - 1];
-    const next = representativeRows[i];
-    representativeGaps.push({
-      fromRow: prev.rowName,
-      toRow: next.rowName,
-      deg: Math.abs(next.elevDeg - prev.elevDeg),
-      fromElevDeg: prev.elevDeg,
-      toElevDeg: next.elevDeg,
-    });
-  }
-  return {
-    rsp: RSP,
-    earHeightM: RSP.z,
-    upperSpeakers,
-    representativeRows,
-    representativeGaps,
-    worstGapDeg: representativeGaps[0].deg,
-    level: "L3",
-  };
-}
-
-test("every overhead row is drawn at its real position — nothing is moved", () => {
-  const section = buildP9SideSection({ p9Snapshot: makeSnapshot(), roomDims: ROOM });
-  assert.equal(section.rays.length, 3);
-  for (const ray of section.rays) {
-    const real = ROW_POSITIONS[ray.rowName];
-    assert.equal(ray.point.y, real.y);
-    assert.equal(ray.point.z, real.z);
-    const expected = section.toPx(real.y, real.z);
-    assert.equal(ray.px.px, expected.px);
-    assert.equal(ray.px.py, expected.py);
-    // The installed L/R pair shares one position in side section: one marker,
-    // never two shifted apart to separate them. Both roles keep their label.
-    assert.equal(ray.speakers.length, 1);
-    assert.deepEqual(ray.speakers[0].roles, ROLES[ray.rowName]);
-    assert.equal(ray.speakers[0].y, real.y);
-    assert.equal(ray.speakers[0].z, real.z);
-  }
-});
-
-test("the RSP is drawn at its real room position and ear height", () => {
-  const section = buildP9SideSection({ p9Snapshot: makeSnapshot(), roomDims: ROOM });
-  assert.equal(section.rsp.y, RSP.y);
-  assert.equal(section.rsp.z, RSP.z);
-  const expected = section.toPx(RSP.y, RSP.z);
-  assert.equal(section.rsp.px.px, expected.px);
-  assert.equal(section.rsp.px.py, expected.py);
-});
-
-test("every ray originates at the RSP, at the real elevation of its row", () => {
-  const section = buildP9SideSection({ p9Snapshot: makeSnapshot(), roomDims: ROOM });
-  for (const ray of section.rays) {
-    const expectedDeg =
-      (Math.atan2(ray.point.z - RSP.z, ray.point.y - RSP.y) * 180) / Math.PI;
-    assert.ok(Math.abs(ray.elevDeg - expectedDeg) < 1e-9);
-    // The drawn ray length is the true RSP→row distance in metres.
-    assert.ok(
-      Math.abs(ray.lengthM - Math.hypot(ray.point.y - RSP.y, ray.point.z - RSP.z)) < 1e-9,
-    );
-  }
-});
-
-test("every arc is centred on the RSP and its ends lie on the two real rays", () => {
-  const section = buildP9SideSection({ p9Snapshot: makeSnapshot(), roomDims: ROOM });
-  assert.equal(section.gaps.length, 2);
-  for (const gap of section.gaps) {
-    // Radius comes from the real rays — never a decorative constant.
-    assert.ok(gap.radiusPx > 0);
-    const fromRay = section.rays.find((r) => r.rowName === gap.fromRowName);
-    const toRay = section.rays.find((r) => r.rowName === gap.toRowName);
-    const expectedRadius =
-      P9_SIDE_ARC_RADIUS_FRACTION * Math.min(fromRay.lengthM, toRay.lengthM) * section.scale;
-    assert.ok(Math.abs(gap.radiusPx - expectedRadius) < 1e-9);
-
-    // Both arc ends are exactly the arc radius from the RSP centre.
-    const start = p9SidePolarPoint(section.rsp.px.px, section.rsp.px.py, gap.radiusPx, gap.fromDeg);
-    const end = p9SidePolarPoint(section.rsp.px.px, section.rsp.px.py, gap.radiusPx, gap.toDeg);
-    for (const pt of [start, end]) {
-      const dist = Math.hypot(pt.x - section.rsp.px.px, pt.y - section.rsp.px.py);
-      assert.ok(Math.abs(dist - gap.radiusPx) < 1e-6, "arc end must sit on the RSP radius");
-    }
-    assert.ok(gap.path.startsWith(`M ${start.x} ${start.y}`));
-    assert.ok(gap.path.includes(`A ${gap.radiusPx} ${gap.radiusPx}`));
-
-    // The arc spans exactly the two row elevations it claims to compare.
-    assert.equal(gap.fromDeg, fromRay.elevDeg);
-    assert.equal(gap.toDeg, toRay.elevDeg);
-    assert.ok(Math.abs(gap.deg - Math.abs(toRay.elevDeg - fromRay.elevDeg)) < 1e-9);
-  }
-});
-
-test("only adjacent overhead rows are compared", () => {
-  const section = buildP9SideSection({ p9Snapshot: makeSnapshot(), roomDims: ROOM });
-  const pairs = section.gaps.map((g) => `${g.fromRowName}→${g.toRowName}`);
-  assert.deepEqual(pairs, ["front→mid", "mid→rear"]);
-  // No front→rear (non-adjacent) comparison is ever drawn.
-  assert.ok(!pairs.some((p) => p === "front→rear"));
-});
-
-test("the largest adjacent gap is marked, and it is the only limiting gap", () => {
-  const section = buildP9SideSection({ p9Snapshot: makeSnapshot(), roomDims: ROOM });
-  const maxDeg = Math.max(...section.gaps.map((g) => g.deg));
-  assert.equal(section.limitingGap.deg, maxDeg);
-  assert.equal(section.gaps.filter((g) => g.isLimiting).length, 1);
-  assert.equal(section.limitingGap.isLimiting, true);
-  assert.equal(section.limitingGap.label, "FRONT ↔ MIDDLE");
-  // Published level is passed through untouched.
-  assert.equal(section.level, "L3");
-});
-
-test("no drawing is invented when the geometry cannot support one", () => {
-  const twoRows = makeSnapshot();
-  assert.equal(
-    buildP9SideSection({
-      p9Snapshot: { ...twoRows, representativeRows: twoRows.representativeRows.slice(0, 1) },
-      roomDims: ROOM,
-    }),
-    null,
-  );
-  assert.equal(buildP9SideSection({ p9Snapshot: { ...twoRows, rsp: null }, roomDims: ROOM }), null);
-  assert.equal(buildP9SideSection({ p9Snapshot: null, roomDims: ROOM }), null);
-});
-
-// ── Real saved geometry: Marquee Home, version "Level 4 version" ──────────
-// The row/gap rule used by the RP22 upper-seat metric engine reproduces this
-// project's published per-seat P9 values exactly (seat row 1 = 44.521°,
-// seat row 2 = 53.142°), so the RSP row geometry asserted here is the engine's
-// own geometry — not a re-derived or decorative one.
-const MARQUEE_ROOM = { widthM: 5.18, lengthM: 7.29, heightM: 2.8 };
-const MARQUEE_RSP = { x: 0, y: 4.636746034861809, z: 1.2 };
-const MARQUEE_ROWS = [
+const ROWS = [
   { rowName: "front", rowIndex: 0, avgY: 3.3350529631087165, avgZ: 2.65, roles: ["TFL", "TFR"] },
   { rowName: "mid", rowIndex: 1, avgY: 4.53358458961474, avgZ: 2.65, roles: ["TML", "TMR"] },
   { rowName: "rear", rowIndex: 2, avgY: 5.732116216120764, avgZ: 2.65, roles: ["TRL", "TRR"] },
 ];
 
-function makeMarqueeSnapshot() {
+// Real seating: front row at 1.2 m ear height, rear row on its riser at 1.6 m.
+const SEAT_ROWS = [
+  {
+    y: 3.780110153632747,
+    z: 1.2,
+    angle: 44.5,
+    level: "L4",
+    seats: [
+      { id: "seat-r1-c1", x: 1.69, priority: "secondary" },
+      { id: "seat-r1-c2", x: 2.29, priority: "primary" },
+      { id: "seat-r1-c3", x: 2.8899999999999997, priority: "primary" },
+      { id: "seat-r1-c4", x: 3.4899999999999998, priority: "secondary" },
+    ],
+  },
+  {
+    y: 5.580110153632747,
+    z: 1.6,
+    angle: 53.1,
+    level: "L3",
+    seats: [
+      { id: "seat-r2-c1", x: 1.39, priority: "secondary" },
+      { id: "seat-r2-c2", x: 1.9899999999999998, priority: "secondary" },
+      { id: "seat-r2-c3", x: 2.59, priority: "primary" },
+      { id: "seat-r2-c4", x: 3.1899999999999995, priority: "secondary" },
+      { id: "seat-r2-c5", x: 3.79, priority: "secondary" },
+    ],
+  },
+];
+
+/** The published seat rows exactly as selectClientP9Overhead hands them over. */
+function makeSeats() {
+  return SEAT_ROWS.flatMap((row) =>
+    row.seats.map((seat) => ({
+      id: seat.id,
+      x: seat.x,
+      y: row.y,
+      z: row.z,
+      priority: seat.priority,
+      isPrimary: seat.priority === "primary",
+      p9Level: row.level,
+      p9Degrees: row.angle,
+      applicable: true,
+    })),
+  );
+}
+
+function makeRsp() {
+  return { x: 2.59, y: 4.636746034861809, z: 1.2 };
+}
+
+function makeSnapshot() {
   const upperSpeakers = [];
-  const representativeRows = MARQUEE_ROWS.map((row) => {
+  const representativeRows = ROWS.map((row) => {
     for (const role of row.roles) {
       upperSpeakers.push({ role, position: { x: 1.2190787269681738, y: row.avgY, z: row.avgZ } });
     }
@@ -209,47 +108,232 @@ function makeMarqueeSnapshot() {
       rowIndex: row.rowIndex,
       avgY: row.avgY,
       avgZ: row.avgZ,
-      elevDeg: (Math.atan2(row.avgZ - MARQUEE_RSP.z, row.avgY - MARQUEE_RSP.y) * 180) / Math.PI,
+      elevDeg: Math.atan2(row.avgZ - 1.2, row.avgY - 4.636746034861809) * 180 / Math.PI,
     };
   });
   return {
-    rsp: MARQUEE_RSP,
+    rsp: makeRsp(),
     earHeightM: 1.2,
     upperSpeakers,
     representativeRows,
-    level: "L4",
-    worstGapDeg: 41.138,
+    level: "L3",
+    value: 53.1424,
+    worstGapDeg: 53.1424,
   };
 }
 
-test("real saved geometry: Marquee overhead rows and their P9 angles from the RSP", () => {
-  const section = buildP9SideSection({ p9Snapshot: makeMarqueeSnapshot(), roomDims: MARQUEE_ROOM });
-  const byRow = Object.fromEntries(section.rays.map((r) => [r.rowName, r]));
+function build() {
+  const seatScope = buildP9SeatScope({ seats: makeSeats() });
+  const section = buildP9SeatScopeSection({
+    p9Snapshot: makeSnapshot(),
+    seatScope,
+    roomDims: ROOM,
+  });
+  return { seatScope, section };
+}
 
-  // The real saved speaker rows, at the coordinates the design holds.
-  assert.equal(byRow.front.point.y, 3.3350529631087165);
-  assert.equal(byRow.mid.point.y, 4.53358458961474);
-  assert.equal(byRow.rear.point.y, 5.732116216120764);
-  for (const ray of section.rays) assert.equal(ray.point.z, 2.65);
+test("P9 is only applicable with two or more overhead rows", () => {
+  const snapshot = makeSnapshot();
+  assert.equal(isP9ReportApplicable(snapshot), true);
+  assert.equal(
+    isP9ReportApplicable({ ...snapshot, representativeRows: snapshot.representativeRows.slice(0, 1) }),
+    false,
+  );
+  assert.equal(isP9ReportApplicable({ ...snapshot, representativeRows: [] }), false);
+  assert.equal(isP9ReportApplicable(null), false);
+});
 
-  // Elevations measured from the RSP itself.
-  assert.ok(Math.abs(byRow.front.elevDeg - 131.915) < 0.01);
-  assert.ok(Math.abs(byRow.mid.elevDeg - 94.069) < 0.01);
-  assert.ok(Math.abs(byRow.rear.elevDeg - 52.932) < 0.01);
+test("the seat scope carries every seat's own published result, by physical row", () => {
+  const { seatScope } = build();
+  assert.equal(seatScope.rows.length, 2);
 
-  // The two adjacent-row gaps that the page draws.
-  const [frontMid, midRear] = section.gaps;
-  assert.ok(Math.abs(frontMid.deg - 37.846) < 0.01, `front↔mid was ${frontMid.deg}`);
-  assert.ok(Math.abs(midRear.deg - 41.137) < 0.01, `mid↔rear was ${midRear.deg}`);
+  const [front, rear] = seatScope.rows;
+  assert.equal(front.label, "Front row");
+  assert.equal(front.seatCount, 4);
+  assert.equal(front.angle, 44.5);
+  assert.equal(front.level, "L4");
+  assert.deepEqual(front.seats.map((seat) => seat.angle), [44.5, 44.5, 44.5, 44.5]);
+  assert.deepEqual(front.seats.map((seat) => seat.level), ["L4", "L4", "L4", "L4"]);
 
-  // The limiting gap is the engine's own RSP worst gap for this version.
-  assert.equal(section.limitingGap.deg, midRear.deg);
-  assert.equal(section.limitingGap.label, "MIDDLE ↔ REAR");
-  assert.equal(section.limitingGap.isLimiting, true);
-  assert.equal(section.gaps.filter((g) => g.isLimiting).length, 1);
-  assert.ok(Math.abs(section.limitingGap.deg - 41.138) < 0.01);
+  assert.equal(rear.label, "Rear row");
+  assert.equal(rear.seatCount, 5);
+  assert.equal(rear.angle, 53.1);
+  assert.equal(rear.level, "L3");
+  assert.deepEqual(rear.seats.map((seat) => seat.angle), [53.1, 53.1, 53.1, 53.1, 53.1]);
 
-  // RSP drawn at its saved position and ear height.
-  assert.equal(section.rsp.y, MARQUEE_RSP.y);
-  assert.equal(section.rsp.z, 1.2);
+  // Seat identities and priorities survive untouched (Primary heavier outline).
+  assert.equal(front.seats[0].label, "Row 1 - Seat 1");
+  assert.equal(front.seats[0].priority, "secondary");
+  assert.equal(front.seats[1].priority, "primary");
+  assert.equal(rear.seats[2].label, "Row 2 - Seat 3");
+  assert.equal(rear.seats[2].priority, "primary");
+
+  // The project's limiting seat is the rear-row seat with the largest angle.
+  assert.equal(seatScope.projectResult.angle, 53.1);
+  assert.equal(seatScope.projectResult.level, "L3");
+  assert.equal(seatScope.projectResult.seatLabel, "Row 2 - Seat 1");
+  assert.equal(seatScope.projectResult.rowLabel, "Rear row");
+});
+
+test("each seating row's listening point is a real seat at its real ear height", () => {
+  const { section } = build();
+  assert.equal(section.views.length, 2);
+
+  const [frontView, rearView] = section.views;
+  // Front row: its limiting seat's own depth and 1.2 m ear height.
+  assert.equal(frontView.listening.y, SEAT_ROWS[0].y);
+  assert.equal(frontView.listening.z, SEAT_ROWS[0].z);
+  assert.deepEqual(frontView.px, section.toPx(SEAT_ROWS[0].y, SEAT_ROWS[0].z));
+  // Rear row: its own riser ear height, never flattened to the front row's.
+  assert.equal(rearView.listening.y, SEAT_ROWS[1].y);
+  assert.equal(rearView.listening.z, SEAT_ROWS[1].z);
+  assert.deepEqual(rearView.px, section.toPx(SEAT_ROWS[1].y, SEAT_ROWS[1].z));
+
+  // It is a seat, not the reference seating position.
+  const rspPx = section.toPx(makeRsp().y, makeRsp().z);
+  for (const view of section.views) {
+    assert.notDeepEqual(view.px, rspPx);
+  }
+});
+
+test("every overhead row is drawn at its real installed position — nothing is moved", () => {
+  const { section } = build();
+  assert.equal(section.rows.length, 3);
+  for (const row of section.rows) {
+    const real = ROWS.find((entry) => entry.rowName === row.rowName);
+    assert.equal(row.point.y, real.avgY);
+    assert.equal(row.point.z, real.avgZ);
+    assert.deepEqual(row.px, section.toPx(real.avgY, real.avgZ));
+    // The installed L/R pair shares one position in side section: one marker,
+    // never two shifted apart to separate them.
+    assert.equal(row.speakers.length, 1);
+    assert.deepEqual(row.speakers[0].roles, real.roles);
+  }
+});
+
+test("each row's rays originate at that row's own listening point", () => {
+  const { section } = build();
+  for (const view of section.views) {
+    assert.equal(view.rays.length, section.rows.length);
+    for (const ray of view.rays) {
+      const row = section.rows.find((entry) => entry.rowName === ray.rowName);
+      const expectedDeg =
+        (Math.atan2(row.point.z - view.listening.z, row.point.y - view.listening.y) * 180) / Math.PI;
+      assert.ok(Math.abs(ray.elevDeg - expectedDeg) < 1e-9);
+      assert.ok(
+        Math.abs(ray.lengthM - Math.hypot(row.point.y - view.listening.y, row.point.z - view.listening.z)) < 1e-9,
+      );
+    }
+  }
+});
+
+test("only adjacent overhead rows are compared, and each row's limiting gap is its own largest", () => {
+  const { section } = build();
+  for (const view of section.views) {
+    const pairs = view.wedges.map((wedge) => `${wedge.fromRowName}→${wedge.toRowName}`);
+    assert.deepEqual(pairs, ["front→mid", "mid→rear"]);
+    assert.ok(!pairs.includes("front→rear"));
+
+    const maxDeg = Math.max(...view.wedges.map((wedge) => wedge.deg));
+    assert.equal(view.limitingWedge.deg, maxDeg);
+    assert.equal(view.wedges.filter((wedge) => wedge.isLimiting).length, 1);
+    assert.equal(view.limitingWedge.isLimiting, true);
+  }
+
+  const [frontView, rearView] = section.views;
+  // The front row's limiting gap is the front↔middle pair...
+  assert.equal(frontView.limitingWedge.label, "FRONT ↔ MIDDLE");
+  // ...and the rear row's is the middle↔rear pair: that is why the rows differ.
+  assert.equal(rearView.limitingWedge.label, "MIDDLE ↔ REAR");
+});
+
+test("the drawn geometry agrees with the published per-seat result", () => {
+  const { seatScope, section } = build();
+  const [frontView, rearView] = section.views;
+
+  for (const [view, seatRow] of [[frontView, seatScope.rows[0]], [rearView, seatScope.rows[1]]]) {
+    // The published row result, and the geometry drawn from that row's own point.
+    assert.ok(Math.abs(view.angle - seatRow.angle) < 1e-9);
+    assert.ok(
+      Math.abs(view.limitingWedge.deg - seatRow.angle) <= 0.05,
+      `${seatRow.label}: drawn ${view.limitingWedge.deg} vs published ${seatRow.angle}`,
+    );
+  }
+
+  // Marquee's published authority, unchanged: 44.5° · L4 and 53.1° · L3.
+  assert.ok(Math.abs(frontView.limitingWedge.deg - 44.5) <= 0.05);
+  assert.ok(Math.abs(rearView.limitingWedge.deg - 53.1) <= 0.05);
+  assert.ok(frontView.wedges[1].deg < frontView.limitingWedge.deg);
+  assert.ok(rearView.wedges[0].deg < rearView.limitingWedge.deg);
+});
+
+test("the two adjacent gaps are drawn as two different, low-opacity wedges", () => {
+  const { section } = build();
+  assert.equal(P9_WEDGE_FILLS.length, 2);
+  assert.notEqual(P9_WEDGE_FILLS[0], P9_WEDGE_FILLS[1]);
+  assert.ok(P9_WEDGE_FILL_OPACITY >= 0.12 && P9_WEDGE_FILL_OPACITY <= 0.18);
+  assert.equal(P9_WEDGE_LIMITING_INK, "#4A230F");
+
+  for (const view of section.views) {
+    assert.deepEqual(view.wedges.map((wedge) => wedge.fill), P9_WEDGE_FILLS);
+  }
+});
+
+test("every wedge stays inside the two real rays it compares", () => {
+  const { section } = build();
+  for (const view of section.views) {
+    for (const wedge of view.wedges) {
+      const fromRay = view.rays.find((ray) => ray.rowName === wedge.fromRowName);
+      const toRay = view.rays.find((ray) => ray.rowName === wedge.toRowName);
+      const expectedRadius =
+        P9_SIDE_ARC_RADIUS_FRACTION * Math.min(fromRay.lengthM, toRay.lengthM) * section.scale;
+      assert.ok(Math.abs(wedge.radiusPx - expectedRadius) < 1e-9);
+
+      // The wedge starts at the listening point and its arc ends lie on the rays.
+      assert.ok(wedge.sectorPath.startsWith(`M ${view.px.px} ${view.px.py} L`));
+      assert.equal(wedge.fromDeg, fromRay.elevDeg);
+      assert.equal(wedge.toDeg, toRay.elevDeg);
+      assert.ok(Math.abs(wedge.deg - Math.abs(toRay.elevDeg - fromRay.elevDeg)) < 1e-9);
+
+      for (const deg of [wedge.fromDeg, wedge.toDeg]) {
+        const pt = p9SidePolarPoint(view.px.px, view.px.py, wedge.radiusPx, deg);
+        const dist = Math.hypot(pt.x - view.px.px, pt.y - view.px.py);
+        assert.ok(Math.abs(dist - wedge.radiusPx) < 1e-6);
+      }
+      assert.ok(wedge.arcPath.includes(`A ${wedge.radiusPx} ${wedge.radiusPx}`));
+    }
+  }
+});
+
+test("no RSP fan: nothing in the section is measured or drawn from the RSP", () => {
+  const { section } = build();
+  assert.equal(section.rsp, undefined);
+  for (const view of section.views) {
+    for (const ray of view.rays) {
+      const rspPx = section.toPx(makeRsp().y, makeRsp().z);
+      assert.ok(ray.px.px !== undefined);
+      assert.notDeepEqual(view.px, rspPx);
+    }
+  }
+});
+
+test("no drawing is invented when the geometry cannot support one", () => {
+  const snapshot = makeSnapshot();
+  const seatScope = buildP9SeatScope({ seats: makeSeats() });
+
+  // A single overhead row cannot be compared with anything.
+  assert.equal(
+    buildP9SeatScopeSection({
+      p9Snapshot: { ...snapshot, representativeRows: snapshot.representativeRows.slice(0, 1) },
+      seatScope,
+      roomDims: ROOM,
+    }),
+    null,
+  );
+  // No seating row carrying a published result: nothing to draw from.
+  assert.equal(
+    buildP9SeatScopeSection({ p9Snapshot: snapshot, seatScope: { rows: [] }, roomDims: ROOM }),
+    null,
+  );
+  assert.equal(buildP9SeatScopeSection({ p9Snapshot: null, seatScope, roomDims: ROOM }), null);
 });

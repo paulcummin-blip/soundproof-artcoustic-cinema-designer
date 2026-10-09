@@ -161,6 +161,8 @@ export default function ClientReportPage({
           <PrintP9Content
             p9Snapshot={printData.p9Snapshot}
             roomDims={printData.roomDims}
+            seats={printData.p9Overhead?.seats}
+            summary={printData.p9Overhead?.summary}
           />
         )}
         {/* 01 Project Summary — the consolidated front page: the design's key

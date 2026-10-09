@@ -1,57 +1,50 @@
 /**
  * PrintP9Content
  * -------------
- * Print-only P9 page content: heading + side-section drawing + result summary.
+ * Print-only P9 page content: heading, the "how P9 is measured" side section, the
+ * per-seat P9 result map, and the project limiting seat result.
  *
- * The drawing is the shared P9SideSectionDrawing — the same true room section the
- * screen page shows, built from the same published P9 snapshot geometry — so the
- * printed page and the on-screen page can never disagree. It is the primary
- * scaling authority for the drawing region: it scales via CSS, not via a JS
- * transform on the whole card.
+ * It renders exactly the same evidence as the screen page (ClientP9Overhead) from
+ * the same published P9 snapshot and the same published per-seat results, so the
+ * printed page and the on-screen page can never disagree. The drawing region is
+ * the primary scaling authority: it scales via CSS, not via a JS transform on the
+ * whole card.
  *
- * Screen behaviour: this component is only rendered inside a print-only
- * container (client-report-print-only) and is never visible on screen.
+ * Screen behaviour: this component is only rendered inside a print-only container
+ * (client-report-print-only) and is never visible on screen.
  */
 
 import React from "react";
-import { resolveGradeToken } from "@/components/utils/rp22Colors";
 import P9SideSectionDrawing from "@/components/report/client/P9SideSectionDrawing";
-import { buildP9SideSection } from "@/components/report/client/p9SideSectionGeometry";
+import P9SeatResultsMap from "@/components/report/client/P9SeatResultsMap";
+import P9ProjectResultPanel from "@/components/report/client/P9ProjectResultPanel";
+import { buildP9SeatScope } from "@/components/report/client/p9SeatScopeAuthority";
+import { buildP9SeatScopeSection } from "@/components/report/client/p9SideSectionGeometry";
 
-// ── Status copy (frozen — matches ClientSoundAboveListener) ───────────────
-const STATUS_COPY = {
-  L4: { label: "Overhead Speaker Spacing", explanation: "Maximum vertical angle between adjacent height speakers." },
-  L3: { label: "Overhead Speaker Spacing", explanation: "Maximum vertical angle between adjacent height speakers." },
-  L2: { label: "Overhead Speaker Spacing", explanation: "Maximum vertical angle between adjacent height speakers." },
-  L1: { label: "Overhead Speaker Spacing", explanation: "Maximum vertical angle between adjacent height speakers." },
-  Fail: { label: "Overhead Speaker Spacing", explanation: "Maximum vertical angle between adjacent height speakers." },
-  "N/A": { label: "Single Overhead Row", explanation: "This layout uses one overhead row, so spacing between rows is not assessed." },
-  "—": { label: "Overhead Speaker Spacing", explanation: "Maximum vertical angle between adjacent height speakers." },
-};
+const FONT_BODY = "Didact Gothic, Century Gothic, sans-serif";
 
-function getStatusInfo(level) {
-  const base = STATUS_COPY[level] || STATUS_COPY["—"];
-  const { token } = resolveGradeToken(level);
-  return { ...base, color: token.border, tokenBg: token.bg, tokenText: token.text, tokenSolid: token.solid };
+function PrintSectionLabel({ children }) {
+  return (
+    <div
+      style={{
+        fontSize: "7.5pt",
+        fontWeight: 600,
+        color: "#625143",
+        letterSpacing: "0.08em",
+        textTransform: "uppercase",
+      }}
+    >
+      {children}
+    </div>
+  );
 }
 
-function normaliseClientLevel(level) {
-  const raw = String(level ?? "").trim().toUpperCase();
-  if (/^[1-4]$/.test(raw)) return `L${raw}`;
-  if (/^L[1-4]$/.test(raw)) return raw;
-  if (raw === "N/A" || raw === "NA") return "N/A";
-  return "—";
-}
+export default function PrintP9Content({ p9Snapshot, roomDims, seats, summary }) {
+  const seatScope = buildP9SeatScope({ seats });
 
-export default function PrintP9Content({ p9Snapshot, roomDims }) {
-  // Built only from the published P9 snapshot's own geometry: the real RSP and
-  // the real overhead row positions. Nothing is projected or repositioned.
-  const sideSection = buildP9SideSection({ p9Snapshot, roomDims });
-
-  const displayLevel = normaliseClientLevel(p9Snapshot?.level);
-  const value = p9Snapshot?.value;
-  const statusInfo = getStatusInfo(displayLevel);
-  const displayExplanation = statusInfo.explanation;
+  // Built only from published evidence: the P9 snapshot's own overhead geometry
+  // and the published per-seat results' own listening points.
+  const sideSection = buildP9SeatScopeSection({ p9Snapshot, seatScope, roomDims });
 
   if (!p9Snapshot) return null;
 
@@ -63,36 +56,38 @@ export default function PrintP9Content({ p9Snapshot, roomDims }) {
         <p className="client-report-print-heading__subtitle">RP22 Parameter 9 — Overhead speaker spacing</p>
       </div>
 
-      {/* ── Drawing: real room section, P9 angles measured from the RSP ── */}
+      {/* ── How P9 is measured ── */}
+      <div style={{ flexShrink: 0, width: "100%", paddingBottom: "2mm" }}>
+        <PrintSectionLabel>How P9 is measured</PrintSectionLabel>
+        <div style={{ fontSize: "8pt", color: "#625143", lineHeight: 1.45, marginTop: "1mm" }}>
+          Each seat's result is the largest vertical angle between adjacent overhead speaker rows, seen
+          from that seat. The section shows the installed overhead rows at their real positions, with
+          both gaps drawn from a real front-row seat and a real rear-row seat.
+        </div>
+      </div>
+
       <div className="client-report-print-drawing">
         {sideSection && (
           <P9SideSectionDrawing
             geometry={sideSection}
-            levelLabel={displayLevel}
             className="client-report-print-svg"
           />
         )}
       </div>
 
-      {/* ── Result ── */}
-      <div className="client-report-print-result" style={{ borderColor: `${statusInfo.color}40` }}>
-        <div className="client-report-print-result__badge" style={{
-          borderColor: statusInfo.color,
-          background: statusInfo.tokenBg,
-          color: statusInfo.tokenText,
-        }}>
-          {displayLevel}
-        </div>
-        <div className="client-report-print-result__content">
-          <div className="client-report-print-result__label">{statusInfo.label}</div>
-          <div className="client-report-print-result__explanation">{displayExplanation}</div>
-          {Number.isFinite(value) && (
-            <div className="client-report-print-result__supporting">
-              {Math.round(value)}° largest gap — RP22 Parameter 9
-            </div>
-          )}
-        </div>
+      {/* ── P9 results by seat: the per-seat authority ── */}
+      <div className="client-report-print-support">
+        <PrintSectionLabel>P9 results by seat</PrintSectionLabel>
+        {summary && (
+          <div style={{ fontSize: "8pt", color: "#625143", lineHeight: 1.45, marginTop: "1mm", marginBottom: "2mm" }}>
+            {summary}
+          </div>
+        )}
+        <P9SeatResultsMap rows={seatScope.rows} print />
       </div>
+
+      {/* ── Project limiting seat result ── */}
+      <P9ProjectResultPanel result={seatScope.projectResult} print />
     </>
   );
 }

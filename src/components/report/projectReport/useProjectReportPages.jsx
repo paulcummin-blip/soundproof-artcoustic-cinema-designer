@@ -33,6 +33,7 @@ import ClientP2SystemArchitecture from "@/components/report/client/ClientP2Syste
 import ClientSoundAroundListener from "@/components/report/client/ClientSoundAroundListener";
 import ClientP7FrontWides from "@/components/report/client/ClientP7FrontWides";
 import ClientP9Overhead from "@/components/report/client/ClientP9Overhead";
+import { isP9ReportApplicable } from "@/components/report/client/p9SeatScopeAuthority";
 import ClientBestListeningArea from "@/components/report/client/ClientBestListeningArea";
 import ClientTimbreConsistency from "@/components/report/client/ClientTimbreConsistency";
 import ClientFrontSoundstageDynamicRange from "@/components/report/client/ClientFrontSoundstageDynamicRange";
@@ -253,9 +254,11 @@ export function useProjectReportPages({
         },
       });
     }
-    // P9 only when at least one seat has a genuine assessed result (L1-L4 or FAIL).
-    // Excludes N/A / Not assessed / Not calculated (e.g. single overhead row).
-    if (p9Overhead.hasAnyValidResult) {
+    // P9 only when at least one seat has a genuine assessed result (L1-L4 or FAIL)
+    // AND the system has two or more applicable overhead rows. With no overhead
+    // speakers, or a single overhead row, spacing between rows is not assessed:
+    // the page is not rendered at all, and no angle is ever invented for it.
+    if (p9Overhead.hasAnyValidResult && isP9ReportApplicable(p9Snapshot)) {
       spatialPages.push({
         id: "p9-spatial-resolution",
         category: "Spatial Resolution",
@@ -263,12 +266,7 @@ export function useProjectReportPages({
           <ClientP9Overhead
             roomDims={roomDims}
             seats={p9Overhead.seats}
-            rsp={rsp}
-            screenFrontPlaneM={screenFrontPlaneM}
-            screenWidthM={screenWidthM}
-            counts={p9Overhead.counts}
             summary={p9Overhead.summary}
-            placedSpeakers={placedSpeakers}
             p9Snapshot={p9Snapshot}
           />
         ),

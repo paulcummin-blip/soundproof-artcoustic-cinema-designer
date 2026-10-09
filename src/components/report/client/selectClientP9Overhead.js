@@ -2,7 +2,9 @@
  * Passive selector for the P9 Visual Report page.
  *
  * Reads the exact P9 seat rows and distribution published by
- * summariseEngineeringResults(). It only joins them to seat geometry.
+ * summariseEngineeringResults(). It only joins them to seat geometry, carrying
+ * each seat's own ear height and priority so the report can explain the geometry
+ * from the same seat the result belongs to.
  */
 import { resolveCoordinate } from "./selectClientSpeakerBalance";
 
@@ -28,12 +30,26 @@ export function selectClientP9Overhead({ engineeringSummary, seatingPositions })
       if (x == null || y == null) return null;
       const result = resultBySeat.get(String(seat.id));
       const assessed = result?.status === "scored";
+      const isPrimary = result?.priority === "primary" || result?.isPrimary === true;
       return {
         id: seat.id,
         x,
         y,
-        isPrimary: result?.isPrimary === true,
+        // The seat's own ear height: the geometry explanation draws each seating
+        // row's rays from a real seat at its real listening height.
+        z: Number.isFinite(Number(seat.z))
+          ? Number(seat.z)
+          : Number.isFinite(Number(seat.earHeightM))
+            ? Number(seat.earHeightM)
+            : Number.isFinite(Number(seat.ear_h))
+              ? Number(seat.ear_h)
+              : Number.isFinite(Number(seat.position?.z))
+                ? Number(seat.position.z)
+                : 1.2,
+        isPrimary,
         isSecondary: result?.priority === "secondary",
+        // Seat priority, carried for the result map's outline weight.
+        priority: isPrimary ? "primary" : "secondary",
         p9Level: assessed ? result.level : null,
         p9Degrees: assessed && Number.isFinite(Number(result.value)) ? Number(result.value) : null,
         applicable: assessed,
