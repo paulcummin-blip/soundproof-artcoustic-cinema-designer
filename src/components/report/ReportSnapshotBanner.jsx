@@ -1,58 +1,108 @@
 // ReportSnapshotBanner.jsx
 // ------------------------
-// The saved-report banner shown above a report that was created before the
-// latest design update. The report itself stays fully visible and is never
-// blanked; the banner states plainly that the design moved on, and offers the
-// one action that brings the report up to date.
+// The notice shown above a report that was created before the latest design
+// change. It is deliberately small and secondary: the report itself stays the
+// headline act on the page.
 //
-// The dealer-facing wording is deliberately plain: no bass, gate, stale,
-// evidence or publication vocabulary reaches the screen. Which inputs moved on,
-// when the report was generated and by whom, and any evidence mismatch are
-// diagnostics: they are shown only to a master admin or with Engineering Mode on
-// (the development preview flag).
+// A dealer or client reads exactly three things: the design has moved on, the
+// report on screen is the previous saved report, and one action creates an
+// updated one. Nothing else reaches the screen — no fingerprint or gate detail,
+// no stale vocabulary, no publication wording, no generation metadata.
+//
+// Which inputs moved on, when the report was generated and by whom, and any
+// evidence mismatch are diagnostics: they are mounted only for a true internal
+// master admin or an Engineering Mode session, and even then they are collapsed.
 //
 // Presentation only: the caller supplies the status and the regenerate action.
+// No staleness, fingerprint or regeneration rule lives here.
 
 import React from 'react';
 import { AlertTriangle, RefreshCw } from 'lucide-react';
-import { useAuth } from '@/lib/AuthContext';
-import { isMasterAdmin } from '@/lib/accountAccess';
-import { useEngineeringMode } from '@/components/state/useEngineeringMode';
+import useInternalReportAudience from './useInternalReportAudience';
 import {
   REPORT_SNAPSHOT_STATUS,
   buildStaleSentence,
   reportTypeLabel,
 } from './reportSnapshotAuthority';
 
-const BANNER = {
+/** Dealer-facing copy. Exported so it can be asserted as written. */
+export const DESIGN_UPDATED_HEADLINE = 'DESIGN UPDATED';
+export const DESIGN_UPDATED_TEXT = 'This report was created before the latest design changes.';
+export const DESIGN_UPDATED_SECONDARY = 'You are viewing the previous report.';
+export const UPDATE_NEEDED_HEADLINE = 'REPORT NEEDS UPDATING';
+export const UPDATE_NEEDED_BANNER_TEXT = 'This report needs updating before it can be used in a proposal.';
+export const CREATE_UPDATED_REPORT_LABEL = 'Create Updated Report';
+export const CREATING_UPDATED_REPORT_LABEL = 'Creating Updated Report…';
+
+const NOTICE = {
   display: 'flex',
-  alignItems: 'flex-start',
+  alignItems: 'center',
   gap: 12,
-  background: '#F7F1E6',
-  border: '1px solid #E2D7BE',
+  flexWrap: 'wrap',
+  background: '#FBF7EF',
+  border: '1px solid #EAE0CD',
   borderRadius: 8,
-  padding: '12px 16px',
-  marginBottom: 20,
-  color: '#7A6640',
-  fontSize: 13,
-  lineHeight: 1.55,
+  padding: '8px 12px',
+  marginBottom: 16,
   fontFamily: "'Didact Gothic', 'Century Gothic', sans-serif",
 };
 
-/** What the designer reads when the design has moved past the saved report. */
-export const STALE_BANNER_TEXT = 'This report was created before the latest design update.';
+const TEXT = { flex: '1 1 260px', minWidth: 0 };
 
-/** What the designer reads when the saved report must be recreated to be usable. */
-export const UPDATE_NEEDED_BANNER_TEXT = 'This report needs updating before it can be used in a proposal.';
+const HEADLINE = {
+  display: 'flex',
+  alignItems: 'center',
+  gap: 6,
+  fontSize: 10.5,
+  fontWeight: 700,
+  letterSpacing: '0.1em',
+  color: '#8A6A2F',
+  marginBottom: 2,
+};
 
-/** The line both states end on. */
-export const BANNER_UNCHANGED_TEXT = 'The saved report is shown unchanged.';
+const COPY = { fontSize: 12.5, lineHeight: 1.45, color: '#3E4349' };
+const SECONDARY = { fontSize: 11.5, lineHeight: 1.4, color: '#7A7468', marginTop: 1 };
 
-const DIAGNOSTIC = {
+const BUTTON = {
+  display: 'inline-flex',
+  alignItems: 'center',
+  gap: 6,
+  flexShrink: 0,
+  cursor: 'pointer',
+  background: '#213428',
+  border: '1px solid #213428',
+  borderRadius: 6,
+  padding: '6px 12px',
+  color: '#FFFFFF',
+  fontFamily: "'Didact Gothic', 'Century Gothic', sans-serif",
+  fontSize: 11.5,
+  fontWeight: 600,
+  letterSpacing: '0.02em',
+  whiteSpace: 'nowrap',
+};
+
+const BUTTON_BUSY = {
+  cursor: 'default',
+  background: '#EDE6D6',
+  color: '#7A6640',
+};
+
+const DIAGNOSTICS = {
   marginTop: 6,
+  fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Consolas, monospace',
   fontSize: 11,
   color: '#8A8580',
-  fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Consolas, monospace',
+  wordBreak: 'break-word',
+};
+
+const DIAGNOSTICS_SUMMARY = {
+  cursor: 'pointer',
+  fontSize: 10,
+  fontWeight: 700,
+  letterSpacing: '0.08em',
+  textTransform: 'uppercase',
+  color: '#A39C90',
+  listStyle: 'none',
 };
 
 function formatGeneratedAt(value) {
@@ -76,15 +126,12 @@ export default function ReportSnapshotBanner({
   evidenceMismatches = [],
   className = '',
 }) {
-  const { user } = useAuth();
-  const { engineeringMode } = useEngineeringMode();
+  const internalAudience = useInternalReportAudience();
 
   const stale = status === REPORT_SNAPSHOT_STATUS.STALE;
   if (!stale && !evidenceIncomplete) return null;
 
-  // Diagnostics only: master admin, or the development preview flag.
-  const showDiagnostics = isMasterAdmin(user) || engineeringMode === true;
-
+  // Diagnostics: internal audiences only, and collapsed whenever they exist.
   const when = formatGeneratedAt(generatedAt);
   const author = (typeof generatedBy === 'string' && generatedBy.trim()) ? generatedBy.trim() : null;
   const stamp = [when ? `Generated ${when}` : null, author ? `by ${author}` : null]
@@ -103,15 +150,23 @@ export default function ReportSnapshotBanner({
     ].filter(Boolean).join(' ');
 
   return (
-    <div className={className} style={BANNER} data-report-snapshot-banner={stale ? 'stale' : 'update-needed'}>
-      <AlertTriangle className="w-4 h-4 mt-[2px] flex-shrink-0" style={{ color: '#B08A3E' }} />
-      <div style={{ flex: 1, minWidth: 0 }}>
-        <strong style={{ color: '#213428' }}>
-          {stale ? STALE_BANNER_TEXT : UPDATE_NEEDED_BANNER_TEXT}
-        </strong>{' '}
-        {BANNER_UNCHANGED_TEXT}
-        {showDiagnostics && diagnosticLine ? (
-          <div style={DIAGNOSTIC} data-report-snapshot-diagnostics="true">{diagnosticLine}</div>
+    <div
+      className={className}
+      style={NOTICE}
+      data-report-snapshot-banner={stale ? 'stale' : 'update-needed'}
+    >
+      <div style={TEXT}>
+        <div style={HEADLINE}>
+          <AlertTriangle className="w-3.5 h-3.5 flex-shrink-0" style={{ color: '#B08A3E' }} />
+          {stale ? DESIGN_UPDATED_HEADLINE : UPDATE_NEEDED_HEADLINE}
+        </div>
+        <div style={COPY}>{stale ? DESIGN_UPDATED_TEXT : UPDATE_NEEDED_BANNER_TEXT}</div>
+        {stale ? <div style={SECONDARY}>{DESIGN_UPDATED_SECONDARY}</div> : null}
+        {internalAudience && diagnosticLine ? (
+          <details style={{ marginTop: 6 }}>
+            <summary style={DIAGNOSTICS_SUMMARY}>Show diagnostics</summary>
+            <div style={DIAGNOSTICS} data-report-snapshot-diagnostics="true">{diagnosticLine}</div>
+          </details>
         ) : null}
       </div>
       {onRegenerate && (
@@ -119,25 +174,11 @@ export default function ReportSnapshotBanner({
           type="button"
           onClick={onRegenerate}
           disabled={regenerating}
-          style={{
-            display: 'inline-flex',
-            alignItems: 'center',
-            gap: 6,
-            flexShrink: 0,
-            cursor: regenerating ? 'default' : 'pointer',
-            background: regenerating ? '#EDE6D6' : '#213428',
-            border: '1px solid #213428',
-            borderRadius: 8,
-            padding: '7px 14px',
-            color: regenerating ? '#7A6640' : '#FFFFFF',
-            fontFamily: "'Didact Gothic', 'Century Gothic', sans-serif",
-            fontSize: 12,
-            fontWeight: 600,
-            letterSpacing: '0.02em',
-          }}
+          aria-busy={regenerating}
+          style={regenerating ? { ...BUTTON, ...BUTTON_BUSY } : BUTTON}
         >
           <RefreshCw className="w-3.5 h-3.5" style={{ color: regenerating ? '#7A6640' : '#FFFFFF' }} />
-          {regenerating ? 'Creating updated report…' : 'Create updated report'}
+          {regenerating ? CREATING_UPDATED_REPORT_LABEL : CREATE_UPDATED_REPORT_LABEL}
         </button>
       )}
     </div>

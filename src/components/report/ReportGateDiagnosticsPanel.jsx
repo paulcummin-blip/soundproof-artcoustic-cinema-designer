@@ -5,18 +5,16 @@
  * can see exactly which authority is missing instead of guessing.
  *
  * It is a DIAGNOSTIC surface and never reaches a dealer or a client: it renders
- * nothing at all unless the viewer is a master admin or has Engineering Mode on
- * (the development preview flag), and even then it is collapsed behind "Show
- * diagnostics" — the block message stays the headline.
+ * nothing at all unless the viewer is a true internal master admin or has
+ * Engineering Mode on (the development preview flag), and even then it is
+ * collapsed behind "Show diagnostics" — the block message stays the headline.
  *
  * Presentation only: it renders the diagnostics object it is given.
  */
 
 import React from "react";
-import { useAuth } from "@/lib/AuthContext";
-import { isMasterAdmin } from "@/lib/accountAccess";
-import { useEngineeringMode } from "@/components/state/useEngineeringMode";
 import { buildReportGateDiagnosticRows } from "./reportGateDiagnostics";
+import useInternalReportAudience from "./useInternalReportAudience";
 import BassReconciliationDiagnosticRows from "@/components/report/BassReconciliationDiagnosticRows";
 
 const PANEL = {
@@ -50,11 +48,10 @@ const ROW = {
 const LABEL = { color: "#8A8580" };
 
 export default function ReportGateDiagnosticsPanel({ diagnostics = null }) {
-  const { user } = useAuth();
-  const { engineeringMode } = useEngineeringMode();
-
-  // Admin or development preview only: a dealer never sees this panel.
-  const allowed = isMasterAdmin(user) || engineeringMode === true;
+  // Internal audience only: an Engineering Mode / developer session, or a true
+  // master admin. A dealer, a dealer's own account administrator and a client
+  // all resolve to false, so no diagnostics affordance exists for them.
+  const allowed = useInternalReportAudience();
   const rows = buildReportGateDiagnosticRows(diagnostics);
   if (!allowed || !rows.length) return null;
 
