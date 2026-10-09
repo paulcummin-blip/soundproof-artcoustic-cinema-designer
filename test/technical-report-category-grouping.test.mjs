@@ -138,7 +138,7 @@ test("G — the category banner carries its own section-identity palette", () =>
   assert.equal(Object.keys(PARAM_CATEGORY_BANNER_COLOURS).length >= 3, true);
 });
 
-test("B/C/D/H — continuation heading, mid-page divider and print rules are wired", async () => {
+test("B/C/D/H — the category banner, its heading marker and the print rules are wired", async () => {
   const page = await readFile(
     new URL("../src/components/report/technical/TechnicalParameterPage.jsx", import.meta.url),
     "utf8",
@@ -149,6 +149,10 @@ test("B/C/D/H — continuation heading, mid-page divider and print rules are wir
   );
   const styles = await readFile(
     new URL("../src/components/report/ReportPrintStyles.jsx", import.meta.url),
+    "utf8",
+  );
+  const banner = await readFile(
+    new URL("../src/components/report/technical/TechnicalCategoryBanner.jsx", import.meta.url),
     "utf8",
   );
 
@@ -164,15 +168,12 @@ test("B/C/D/H — continuation heading, mid-page divider and print rules are wir
   assert.match(page, /className="tech-param-page__cards"/);
 
   // The banner strip itself owns the colour authority and the bold heading.
-  const banner = await readFile(
-    new URL("../src/components/report/technical/TechnicalCategoryBanner.jsx", import.meta.url),
-    "utf8",
-  );
   assert.match(banner, /getCategoryBannerColour/);
   assert.match(banner, /fontWeight: 700/);
   assert.doesNotMatch(banner, /continued/i);
 
-  // Print: heading travels with its cards and the divider page reclaims height.
+  // Print: the banner travels with its cards, and the reclaimed gap plus its
+  // restrained height keep the three-card frame budget unchanged.
   assert.match(styles, /\.tech-param-segment[\s\S]*?break-inside:\s*avoid\s*!important/);
   assert.match(styles, /\.tech-param-page--multi/);
 });
