@@ -5,8 +5,9 @@
  *
  * Presents the existing live RP22 level-count distribution as:
  *   - Room parameters: wide low-profile summary card with L4/L3/L2/L1 counts
- *   - Seat parameters: per-row seating matrix with compact seat cards
- *     showing Active count and level distribution
+ *   - Seat parameters: per-row seating matrix with compact seat cards, each
+ *     naming the seat and stating its Artcoustic System Design Rating score.
+ *     The rating is labelled once above the grid, so no card repeats it.
  *   - RSP seat marked subtly
  *   - Explanatory technical note at bottom
  *
@@ -18,10 +19,7 @@
 import React from "react";
 import TechnicalLevelBadge from "./TechnicalLevelBadge";
 import ScopedAsdrSummary from "./ScopedAsdrSummary";
-import {
-  TECHNICAL_DESIGN_INDEX_LABEL,
-  formatDesignIndex,
-} from "./designIndexDisplay";
+import { formatDesignIndex } from "./designIndexDisplay";
 
 import {
   REPORT_FONT_HEADING as FONT_HEADING,
@@ -59,10 +57,16 @@ function LevelCountBlock({ level, count }) {
   );
 }
 
-/** Compact per-seat summary card: seat label, Active count, level distribution. */
+/**
+ * Compact per-seat card: the seat's identity, then its Artcoustic System Design
+ * Rating score as the prominent value. The rating is named once above the grid,
+ * so no card repeats a label, an active count or explanatory wording.
+ */
 function SeatSummaryCard({ seat, isRsp, isCompromised, showDesignRating, designRating, designRatingIndex }) {
   const seatNum = extractSeatCol(seat.seatId);
-  const { counts, activeCount } = seat;
+  const score = designRating && designRating.status !== "NOT_ASSESSED"
+    ? formatDesignIndex(designRatingIndex)
+    : null;
 
   return (
     <div
@@ -71,22 +75,25 @@ function SeatSummaryCard({ seat, isRsp, isCompromised, showDesignRating, designR
         border: `1px solid ${isRsp ? COLORS.primary : COLORS.border}`,
         borderWidth: isRsp ? "1.5px" : "1px",
         borderRadius: 6,
-        padding: "4mm 5mm",
+        padding: "2.5mm 3mm",
         display: "flex",
         flexDirection: "column",
-        gap: "3mm",
+        alignItems: "center",
+        justifyContent: "center",
+        gap: "1mm",
         breakInside: "avoid",
         pageBreakInside: "avoid",
       }}
     >
-      {/* Seat label + RSP marker */}
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+      {/* Seat identity — smaller than the score that follows it */}
+      <div style={{ display: "flex", alignItems: "center", gap: "1.5mm" }}>
         <span
           style={{
-            fontSize: "10pt",
+            fontSize: "8.5pt",
             fontWeight: 600,
-            color: COLORS.primary,
+            color: COLORS.secondary,
             fontFamily: FONT_HEADING,
+            letterSpacing: "0.04em",
           }}
         >
           Seat {seatNum ?? "?"}
@@ -94,11 +101,11 @@ function SeatSummaryCard({ seat, isRsp, isCompromised, showDesignRating, designR
         {isRsp && (
           <span
             style={{
-              fontSize: "7pt",
+              fontSize: "6.5pt",
               fontWeight: 700,
               color: "#FFFFFF",
               background: COLORS.primary,
-              padding: "0.8mm 2mm",
+              padding: "0.6mm 1.4mm",
               borderRadius: 2,
               letterSpacing: "0.1em",
               fontFamily: FONT_BODY,
@@ -114,59 +121,49 @@ function SeatSummaryCard({ seat, isRsp, isCompromised, showDesignRating, designR
       {isCompromised && (
         <div
           style={{
-            fontSize: "6.5pt",
+            fontSize: "6pt",
             fontWeight: 700,
             color: "#8B5E34",
             background: "#F5EDE3",
             border: "1px solid #E0D4C2",
-            padding: "0.8mm 2mm",
+            padding: "0.6mm 1.4mm",
             borderRadius: 2,
-            letterSpacing: "0.08em",
+            letterSpacing: "0.06em",
             fontFamily: FONT_BODY,
             lineHeight: 1,
-            alignSelf: "flex-start",
           }}
         >
           MORE COMPROMISED
         </div>
       )}
 
-      {/* Active count */}
-      <div
-        style={{
-          fontSize: "8.5pt",
-          color: COLORS.secondary,
-          fontFamily: FONT_BODY,
-        }}
-      >
-        Active: {activeCount ?? 0} of {seat.total ?? 0}
-      </div>
-
-      {/* Design Rating — secondary to seat name, prominent enough to compare */}
+      {/* The seat's Artcoustic System Design Rating — the prominent value.
+          The rating is named once above the grid, so the score needs no label
+          of its own and the active count is not repeated on every card. */}
       {showDesignRating && designRating && (
-        <div
-          style={{
-            marginTop: "1mm",
-            paddingTop: "2mm",
-            borderTop: `1px solid ${COLORS.border}`,
-          }}
-        >
+        score ? (
+          <div
+            style={{
+              fontSize: "20pt",
+              fontWeight: 600,
+              color: COLORS.primary,
+              fontFamily: FONT_HEADING,
+              lineHeight: 1,
+            }}
+          >
+            {score}
+          </div>
+        ) : (
           <div
             style={{
               fontSize: "7.5pt",
-              fontWeight: 700,
-              color: COLORS.secondary,
-              letterSpacing: "0.06em",
+              color: COLORS.label,
               fontFamily: FONT_BODY,
             }}
           >
-            {TECHNICAL_DESIGN_INDEX_LABEL.toUpperCase()}{" "}
-            {designRating.status === "NOT_ASSESSED"
-              ? "NOT ASSESSED"
-              : formatDesignIndex(designRatingIndex) ?? "—"}
+            Not assessed
           </div>
-
-        </div>
+        )
       )}
     </div>
   );
@@ -195,7 +192,7 @@ export default function TechnicalPerformanceSummary({
       style={{
         background: COLORS.bg,
         minHeight: "268mm",
-        padding: "8mm 10mm",
+        padding: "7mm 10mm",
         boxSizing: "border-box",
         WebkitPrintColorAdjust: "exact",
         printColorAdjust: "exact",
@@ -299,18 +296,20 @@ export default function TechnicalPerformanceSummary({
         )}
       </div>
 
-      {/* ── Seat parameters ── */}
+      {/* ── Per-seat ratings ──
+          ONE clear label above the grid names what every seat card states, so
+          no card carries a label, a repeated active count or explanatory copy. */}
       <div className="print-avoid-break">
         <div
           style={{
             display: "flex",
             alignItems: "baseline",
             gap: "4mm",
-            marginBottom: "5mm",
+            marginBottom: "3.5mm",
           }}
         >
           <span style={reportSectionHeadingStyle("12pt", { fontWeight: 600, color: COLORS.primary })}>
-            SEAT PARAMETERS
+            ARTCOUSTIC SYSTEM DESIGN RATING
           </span>
           <span style={{ fontSize: "9pt", color: COLORS.secondary, fontFamily: FONT_BODY }}>
             {totalSeatParameters} parameters · {reportCounts.seatCalculatedParamCount || 0} calculated · {reportCounts.seatsEvaluated || 0} seats
@@ -318,14 +317,14 @@ export default function TechnicalPerformanceSummary({
         </div>
 
         {(seatCountsByRow || []).map(({ rowNum, seats }) => (
-          <div key={rowNum} style={{ marginBottom: "5mm" }}>
+          <div key={rowNum} style={{ marginBottom: "3.5mm" }}>
             <div
               style={{
                 fontSize: "9pt",
                 fontWeight: 600,
                 color: COLORS.secondary,
                 letterSpacing: "0.1em",
-                marginBottom: "3mm",
+                marginBottom: "2mm",
                 fontFamily: FONT_HEADING,
               }}
             >
@@ -356,11 +355,11 @@ export default function TechnicalPerformanceSummary({
 
       {/* ── Seat comparison summary line ── */}
       {reportCounts.compromisedSeatCount === 0 ? (
-        <div style={{ marginTop: "3mm", fontSize: "8.5pt", color: COLORS.secondary, fontFamily: FONT_BODY, fontStyle: "italic" }}>
+        <div style={{ marginTop: "2.5mm", fontSize: "8.5pt", color: COLORS.secondary, fontFamily: FONT_BODY, fontStyle: "italic" }}>
           No listening position shows material compromise across the calculated seat-scope RP22 parameters.
         </div>
       ) : (
-        <div style={{ marginTop: "3mm", fontSize: "8.5pt", color: COLORS.secondary, fontFamily: FONT_BODY, fontStyle: "italic" }}>
+        <div style={{ marginTop: "2.5mm", fontSize: "8.5pt", color: COLORS.secondary, fontFamily: FONT_BODY, fontStyle: "italic" }}>
           Some positions show material compromise across multiple calculated seat-scope RP22 parameters.
         </div>
       )}
@@ -368,8 +367,8 @@ export default function TechnicalPerformanceSummary({
       {/* ── Explanatory note ── */}
       <div
         style={{
-          marginTop: "4mm",
-          paddingTop: "4mm",
+          marginTop: "3mm",
+          paddingTop: "3mm",
           borderTop: `1px solid ${COLORS.border}`,
           fontSize: "8.5pt",
           color: COLORS.secondary,
@@ -388,7 +387,7 @@ export default function TechnicalPerformanceSummary({
       {showDesignRating && (
         <div
           style={{
-            marginTop: "3mm",
+            marginTop: "2.5mm",
             fontSize: "7.5pt",
             color: COLORS.secondary,
             fontFamily: FONT_BODY,
