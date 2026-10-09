@@ -2139,7 +2139,7 @@ function RoomDesignerWithState() {
         onConfirm={handleResetPositions}
       />
 
-      <BassBackgroundAnalysisOwner key={resolvedProjectId || "free"} scopeId={resolvedProjectId || "free"} versionId={appState?.activeVersionId || "free"}>
+      <BassBackgroundAnalysisOwner key={`${resolvedProjectId || "free"}::${appState?.activeVersionId || "free"}`} scopeId={resolvedProjectId || "free"} versionId={appState?.activeVersionId || "free"} engineeringPublication={{ ...engineeringPublication, durable: restoredEngineeringAuthority.durable }}>
       {showAsdr && minimumSystemMet && (
         <DesignRecommendationEngine
           key={`asdr-recommendations:${resolvedProjectId || projectIdState || "free"}`}
