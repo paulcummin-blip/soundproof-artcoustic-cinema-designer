@@ -81,6 +81,8 @@ const ATTEMPT = Object.freeze({
  * @returns {{ code: string, label: string, message: string|null, actionLabel: string|null }}
  */
 export function resolveBassAuthorityState({
+  projectId = null,
+  versionId = null,
   completedBassAuthority = null,
   publicationAttempt = null,
   engineeringFingerprint = null,
@@ -127,6 +129,9 @@ export function resolveBassAuthorityState({
       && publicationAttempt?.fingerprint === engineeringFingerprint ? publicationAttempt : null;
     const saved = durable?.publication;
     const durableMatches = identityMatches
+      && !!projectId && !!versionId
+      && durable?.version?.id === versionId
+      && durable?.version?.project_id === projectId
       && durable?.version?.published_fingerprint === engineeringFingerprint
       && saved?.engineering_fingerprint === engineeringFingerprint
       && saved?.provenance?.bass_fingerprint === currentFingerprint
