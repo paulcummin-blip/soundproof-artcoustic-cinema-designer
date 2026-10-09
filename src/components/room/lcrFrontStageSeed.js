@@ -7,10 +7,12 @@ import { getCanonicalRole } from '@/components/utils/surroundRoleMap';
 import { computeTvVerticalCentreM } from '@/components/roomdesigner/utils/lcrHeightAuthority';
 import { resolveInitialLcrPosition } from '@/components/room/placement/initialSpeakerPlacement';
 import {
+  CABINET_AIM_STRAIGHT,
   CENTRE_CABINET_ROLES,
   defaultCentreCabinetOrientation,
   isCentreCabinetRole,
   normaliseCabinetOrientation,
+  normaliseCentreCabinetAimMode,
 } from '@/components/utils/frontStageModeAuthority';
 
 export const CENTER_ONLY_SOUNDBAR_LABELS = ['C-1', 'C4-1', 'Multi (Mono)', 'HSPL (Mono)'];
@@ -80,6 +82,7 @@ export function buildFrontStageSeed({
   soundbarModelLabel,
   centreModelLabel = null,
   centreOrientation = null,
+  centreAimMode = null,
   dimensions,
   screen,
   splConfig,
@@ -202,6 +205,16 @@ export function buildFrontStageSeed({
       return defaultCentreCabinetOrientation(centreLabel, screen?.tvPresetKey || null);
     };
 
+    // The aiming mode the cabinets are INSTALLED with — part of the same
+    // dual-centre configuration as the orientation. A saved preference on the
+    // cabinet always wins; a newly created cabinet starts straight ahead.
+    const cabinetAimMode = (existing) => {
+      const recorded = String(existing?.aim_mode || '').trim();
+      if (recorded) return normaliseCentreCabinetAimMode(recorded);
+      if (centreAimMode) return normaliseCentreCabinetAimMode(centreAimMode);
+      return CABINET_AIM_STRAIGHT;
+    };
+
     const fallbackPosition = (role) => {
       if (isCentreCabinetRole(role)) {
         const left = getCanonicalRole(role) === CENTRE_CABINET_ROLES.left;
@@ -283,6 +296,7 @@ export function buildFrontStageSeed({
           id: FCL.id || 'FCL-1',
           model: centreLabel,
           orientation: cabinetOrientation(FCL),
+          aim_mode: cabinetAimMode(FCL),
           position: placeRole('FCL', centreLabel, FCL, cabinetOrientation(FCL)) || fallbackPosition('FCL'),
           rotation: FCL.rotation || { x: 0, y: 0, z: 0 },
         },
@@ -292,6 +306,7 @@ export function buildFrontStageSeed({
           id: FCR.id || 'FCR-1',
           model: centreLabel,
           orientation: cabinetOrientation(FCR),
+          aim_mode: cabinetAimMode(FCR),
           position: placeRole('FCR', centreLabel, FCR, cabinetOrientation(FCR)) || fallbackPosition('FCR'),
           rotation: FCR.rotation || { x: 0, y: 0, z: 0 },
         },

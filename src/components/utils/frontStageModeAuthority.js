@@ -355,3 +355,66 @@ export function centreCabinetOrientation(placedSpeakers) {
   const recorded = centreCabinets(placedSpeakers).find((c) => String(c?.orientation || '').trim());
   return normaliseCabinetOrientation(recorded?.orientation);
 }
+
+// ── Cabinet aiming ─────────────────────────────────────────────────────────
+//
+// The two cabinets are ONE linked pair and share ONE aiming setting, stored on
+// the cabinets themselves exactly like their orientation. It therefore travels
+// with the design: save, refresh, project reopening, version switching and
+// report drawing generation all read the same stored value, and no second
+// aiming authority exists.
+//
+// Straight ahead is the default. Aim at RSP points each cabinet at the listening
+// position from its OWN acoustic centre, so the pair converges on the one RSP
+// and a symmetric installation gives equal and opposite angles. The selected
+// orientation is never changed by aiming.
+//
+// This is a physical placement and installation setting: it rotates the cabinet
+// footprint about the existing front-wall mounting reference, translates no
+// stored position, and introduces no aiming gain, no directivity model and no
+// change to SPL or RP22.
+
+export const CABINET_AIM_STRAIGHT = 'straight';
+export const CABINET_AIM_AT_RSP = 'rsp';
+
+/** Aiming choices, in selector order. */
+export const CABINET_AIM_OPTIONS = Object.freeze([
+  { value: CABINET_AIM_STRAIGHT, label: 'Straight ahead' },
+  { value: CABINET_AIM_AT_RSP, label: 'Aim at RSP' },
+]);
+
+/** A stored aiming mode, validated: anything unrecognised is straight ahead. */
+export function normaliseCentreCabinetAimMode(value) {
+  return String(value || '').trim().toLowerCase() === CABINET_AIM_AT_RSP
+    ? CABINET_AIM_AT_RSP
+    : CABINET_AIM_STRAIGHT;
+}
+
+/**
+ * The aiming mode the INSTALLED cabinets carry. The pair shares one setting;
+ * straight ahead is returned when nothing is installed or nothing is recorded.
+ */
+export function centreCabinetAimMode(placedSpeakers) {
+  const recorded = centreCabinets(placedSpeakers).find((c) => String(c?.aim_mode || '').trim());
+  return normaliseCentreCabinetAimMode(recorded?.aim_mode);
+}
+
+/**
+ * A cabinet's plan-view aiming yaw in degrees: 0 straight ahead, otherwise the
+ * angle from THIS cabinet's own acoustic centre to the RSP.
+ *
+ * Uses the same convention as the existing LCR aim (−atan2(dx, dy)) so the
+ * cabinets and FL/FR are drawn with one geometry rule.
+ */
+export function resolveCentreCabinetYaw({ position, aimMode, rsp }) {
+  if (normaliseCentreCabinetAimMode(aimMode) !== CABINET_AIM_AT_RSP) return 0;
+  const fromX = Number(position?.x);
+  const fromY = Number(position?.y);
+  const toX = Number(rsp?.x);
+  const toY = Number(rsp?.y);
+  if (![fromX, fromY, toX, toY].every(Number.isFinite)) return 0;
+  const dx = toX - fromX;
+  const dy = toY - fromY;
+  if (dx === 0 && dy === 0) return 0;
+  return -(Math.atan2(dx, dy) * 180) / Math.PI;
+}

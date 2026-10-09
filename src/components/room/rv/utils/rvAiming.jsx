@@ -9,6 +9,10 @@
 import { safeYawToMLP } from '@/components/room/rv/RenderPrimitives';
 import { getCanonicalRole } from '@/components/utils/surroundRoleMap';
 import { resolveSpeakerYaw } from '@/components/utils/speakerAimResolver';
+import {
+  isCentreCabinetRole,
+  resolveCentreCabinetYaw,
+} from '@/components/utils/frontStageModeAuthority';
 
 // ─── Low-level helpers ────────────────────────────────────────────────────────
 
@@ -79,6 +83,21 @@ export function getPlanAimDeg(
   if (role === 'FC' || role === 'C') return 0;
   if (role === 'FR' || role === 'R') {
     return lcrAngleInfo?.R ?? 0;
+  }
+
+  // ── Dual-centre cabinets (FCL / FCR): the linked pair of the dual-centre
+  // front stage. Each cabinet is aimed from its OWN acoustic centre at the RSP,
+  // so the pair converges on one RSP and a symmetric installation gives equal
+  // and opposite angles. The aiming mode is stored on the cabinet itself (part
+  // of the existing dual-centre configuration), so the drawing needs no extra
+  // plumbing. This stays a drawing/placement rule: the acoustic yaw used by the
+  // RP22 off-axis path is untouched, so no SPL or RP22 result moves.
+  if (isCentreCabinetRole(role)) {
+    return resolveCentreCabinetYaw({
+      position: speaker.position ?? { x: speaker.x, y: speaker.y },
+      aimMode: speaker.aim_mode,
+      rsp: mlp,
+    });
   }
 
   // ── Surrounds / Wides: delegate to single source of truth ─────────────────
