@@ -12,6 +12,10 @@
 
 import { useCallback } from "react";
 import { solveSpeakerDragConstraints } from "@/components/room/rv/utils/solveSpeakerDragConstraints";
+import {
+  centreCabinetPartnerRole,
+  linkedCentreCabinetPositions,
+} from "@/components/utils/dualCentrePairAuthority";
 
 export function useSpeakerDragUpdate({
   // lookup
@@ -157,6 +161,32 @@ export function useSpeakerDragUpdate({
           finalPositions.push({
             id: speakerId,
             position: { ...(spk.position || {}), x: safeX },
+          });
+        }
+      }
+
+      // ── dual-centre linked pair ───────────────────────────────────────
+      // The two centre cabinets (FCL / FCR) move as ONE pair: whichever one is
+      // dragged keeps its new position and its partner takes the mirrored
+      // position, so the pair stays symmetrical about the room centreline in
+      // Plan View exactly as it does in Front Elevation.
+      const cabinetPairRole = centreCabinetPartnerRole(spk.role);
+      if (cabinetPairRole) {
+        const draggedEntry = finalPositions.find(p => p.id === speakerId);
+        const partnerSpk = placedSpeakers.find(s => getCanonicalRole(s.role) === cabinetPairRole);
+        const linked = (draggedEntry && partnerSpk)
+          ? linkedCentreCabinetPositions({
+              roomWidthM: widthM,
+              draggedRole: spk.role,
+              draggedPosition: draggedEntry.position,
+              partnerPosition: partnerSpk.position || {},
+            })
+          : null;
+        if (linked) {
+          finalPositions.push({
+            id: partnerSpk.id,
+            position: linked.partner,
+            positionSource: 'user',
           });
         }
       }

@@ -2,6 +2,10 @@ import { useCallback } from "react";
 import { safeCanon } from "@/components/room/utils/speakerHelpers";
 import { getSpeakerModelMeta } from "@/components/models/speakers/registry";
 import { detectFrontStageMode, resolveLcrHeightAuthority } from "@/components/roomdesigner/utils/lcrHeightAuthority";
+import {
+  centreCabinetPartnerRole,
+  linkedCentreCabinetPositions,
+} from "@/components/utils/dualCentrePairAuthority";
 
 /**
  * Provides drag callbacks for the Front Elevation and Side Elevation views.
@@ -35,6 +39,26 @@ export function useElevationDragHandlers({
     const frontStageMode = detectFrontStageMode(placedSpeakers);
     const isCenterOnly = frontStageMode === 'center_only';
 
+    // Dual-centre linked pair: a cabinet drag carries its partner with it.
+    // The dragged cabinet moves on the dragged axis only; the partner takes the
+    // mirrored position (x reflected about the room centreline, y and z shared).
+    const pairPartnerRole = centreCabinetPartnerRole(role);
+    let linked = null;
+    if (pairPartnerRole) {
+      const draggedSpk = placedSpeakers.find(s => safeCanon(s.role) === role);
+      const partnerSpk = placedSpeakers.find(s => safeCanon(s.role) === pairPartnerRole);
+      linked = linkedCentreCabinetPositions({
+        roomWidthM: rW,
+        draggedRole: role,
+        draggedPosition: {
+          ...(draggedSpk?.position || {}),
+          ...(axis === 'x' ? { x: newX } : {}),
+          ...(axis === 'z' ? { z: newZ } : {}),
+        },
+        partnerPosition: partnerSpk?.position || {},
+      });
+    }
+
     setSpeakers(prev => prev.map(spk => {
       const canon = safeCanon(spk.role);
       const isLcrRole = canon === 'FL' || canon === 'FC' || canon === 'FR';
@@ -49,6 +73,11 @@ export function useElevationDragHandlers({
             ...(axis === 'z' ? { z: newZ } : {}),
           },
         };
+      }
+      // The pair's other cabinet takes the mirrored position, so both cabinets
+      // move as one pair in the elevation exactly as in Plan View.
+      if (linked && canon === pairPartnerRole) {
+        return { ...spk, positionSource: 'user', position: linked.partner };
       }
       if (axis === 'x' && role === 'FL' && canon === 'FR') {
         return { ...spk, position: { ...spk.position, x: rW - newX } };
@@ -70,7 +99,10 @@ export function useElevationDragHandlers({
       return spk;
     }));
 
-    if (axis === 'z') {
+    // A centre-cabinet height drag sets the pair's own stored heights only: the
+    // LCR height authority belongs to FL/FC/FR and must not be rewritten by a
+    // cabinet move.
+    if (axis === 'z' && !pairPartnerRole) {
       const patch = resolveLcrHeightAuthority({ role, newZ, frontStageMode });
       appState?.updateGlobalSpl?.(patch);
     }

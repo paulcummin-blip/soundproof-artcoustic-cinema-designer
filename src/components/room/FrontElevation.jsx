@@ -9,6 +9,10 @@ import {
   isCentreCabinetRole,
   resolveCentreCabinetFootprintM,
 } from "@/components/utils/frontStageModeAuthority";
+import {
+  centreCabinetPartnerRole,
+  linkedCentreCabinetPositions,
+} from "@/components/utils/dualCentrePairAuthority";
 
 // Roles displayed in front elevation
 const FRONT_ROLES = new Set(["FL", "FC", "FR", "L", "C", "R"]);
@@ -134,7 +138,11 @@ export default function FrontElevation({ dimensions, screen, placedSpeakers = []
       const isDraggedItem = (s) => isDragSub
         ? (typeof s.index === 'number' && s.index === drag.subIndex)
         : (s.role || s.label) === drag.role;
-      const allOtherSpks = [...lcrSpeakersRef.current, ...subItemsRef.current].filter(s => !isDraggedItem(s));
+      // A dual-centre cabinet is never a snap target for its own partner: the
+      // pair is linked, so the partner's position is derived from this drag.
+      const pairPartnerRole = centreCabinetPartnerRole(drag.role);
+      const allOtherSpks = [...lcrSpeakersRef.current, ...subItemsRef.current]
+        .filter(s => !isDraggedItem(s) && !(pairPartnerRole && (s.role || s.label) === pairPartnerRole));
       let snappedX = rawX, snappedZ = rawZ, snapResult = null;
       if (drag.axisLocked === 'x') {
         const xTargets = [
@@ -181,6 +189,21 @@ export default function FrontElevation({ dimensions, screen, placedSpeakers = []
         // Pairing logic mirrors handleLcrSpeakerMoved's setSpeakers logic.
         const liveMap = { ...(liveDragLcrRef.current || {}) };
         liveMap[drag.role] = { x: snappedX, z: snappedZ };
+        // Linked pair: the partner cabinet mirrors this drag instantly — x
+        // reflected about the room centreline, height shared — so the two
+        // cabinets move as one on every axis, live, before any commit.
+        if (pairPartnerRole) {
+          const partnerSpk = lcrSpeakersRef.current.find(s => s.role === pairPartnerRole);
+          const linked = linkedCentreCabinetPositions({
+            roomWidthM: rW,
+            draggedRole: drag.role,
+            draggedPosition: { x: snappedX, z: snappedZ },
+            partnerPosition: { x: partnerSpk?.x, z: partnerSpk?.z },
+          });
+          if (linked) {
+            liveMap[pairPartnerRole] = { x: linked.partner.x, z: linked.partner.z };
+          }
+        }
         if (drag.axisLocked === 'x' && drag.role === 'FL') {
           const frSpk = lcrSpeakersRef.current.find(s => s.role === 'FR');
           liveMap['FR'] = { x: rW - snappedX, z: liveMap['FR']?.z ?? frSpk?.z ?? snappedZ };
