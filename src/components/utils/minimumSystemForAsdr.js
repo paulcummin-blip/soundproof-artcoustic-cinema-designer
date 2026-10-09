@@ -11,6 +11,7 @@
 
 import { isIntegratedLcrSpeaker } from '../../../shared/channelArchitecture.js';
 import { getCanonicalRole } from '@/components/utils/surroundRoleMap';
+import { isCentreCabinetRole, hasInstalledModel } from '@/components/utils/frontStageModeAuthority';
 import { getSpeakerModelMeta } from '@/components/models/speakers/registry';
 
 const LCR_ROLES = new Set(['FL', 'FC', 'FR']);
@@ -25,10 +26,15 @@ export function hasMinimumSystemForAsdr(placedSpeakers, appState) {
   const speakers = Array.isArray(placedSpeakers) ? placedSpeakers : [];
 
   const lcrPresent = new Set();
+  const installedCentreCabinets = new Set();
   let hasSurround = false;
   let integratedLcr = false;
   for (const s of speakers) {
     const role = getCanonicalRole(s?.role);
+    if (isCentreCabinetRole(role) && hasInstalledModel(s?.model)
+      && Number.isFinite(s?.position?.x) && Number.isFinite(s?.position?.y)) {
+      installedCentreCabinets.add(role);
+    }
     if (LCR_ROLES.has(role)) {
       lcrPresent.add(role);
       // An integrated LCR soundbar (FC with frontStageType=integrated_lcr)
@@ -43,6 +49,11 @@ export function hasMinimumSystemForAsdr(placedSpeakers, appState) {
     } else if (SURROUND_ROLES.has(role)) {
       hasSurround = true;
     }
+  }
+  // A complete installed dual-centre pair carries ONE logical FC. This is
+  // eligibility only: never add a physical cabinet or bypass missing evidence.
+  if (installedCentreCabinets.has('FCL') && installedCentreCabinets.has('FCR')) {
+    lcrPresent.add('FC');
   }
   const hasDiscreteLcr = lcrPresent.has('FL') && lcrPresent.has('FC') && lcrPresent.has('FR');
   const hasLcr = hasDiscreteLcr || integratedLcr;
