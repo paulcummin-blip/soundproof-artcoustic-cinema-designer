@@ -24,9 +24,15 @@ The fixture-backed legacy reader tests verify the reader as it currently exists.
 
 Not safely executable within this task: any live generateProposal invocation, proposal-generation/end-to-end flow that may create/update/delete production records, report regeneration, version/project changes, generation/edit-history mutation, and any integration requiring destructive production permissions. These paths are deliberately not invoked; they are excluded scenarios, not Vitest skipped-test counters. No production permission was requested.
 
+## Follow-up fixture and stale-assertion cleanup
+
+Moved the frozen report-evidence acceptance fixture factories into `reportEvidenceAcceptanceFixtures.mjs` alongside this audit. The acceptance suite is now 363 lines and the fixture module 210 lines; the fixture values and legacy-reader assertions are preserved. Corrected the stale acceptance-header statement that legacy frozen source is recovered as authority: the test already verifies that it cannot be promoted.
+
+Added safe coverage from the proposal dry-run, immutable generation history, edit layer, edit records and editor integration suites. All use pure functions, in-memory histories or an injected stub `invokeLLM`; deployed functions are only inspected as text, never invoked. The dry-run suite's stale P17 comparison-copy assertion expected the literal “trade-off” in a row whose low grade selects the shipped modest wording. It now checks that exact modest wording and independently verifies the stronger/weaker option direction; no production narrative rule changed.
+
 ## Final verification
 
-Final selected batch: 26 suites passed; 277 tests passed; 0 failed; 0 runner-skipped tests. Production build: passed, exit status 0. `git diff --check` also passed. The build emitted a non-blocking outdated Browserslist-data warning; no dependencies were changed.
+Final expanded follow-up batch: 31 suites passed; 330 tests passed; 0 failed; 0 runner-skipped tests. The initial expanded run reproduced one stale P17 assertion failure (329 passed, 1 failed); after the assertion-only repair the full selected batch passed. Earlier batch: 26 suites, 277 tests passed. Production build: passed, exit status 0. `git diff --check` also passed. The build emitted a non-blocking outdated Browserslist-data warning; no dependencies were changed.
 
 The safe batch covers project restore and version routing; proposal source, readiness, return context and static generation gates; report snapshot generation, identity, canonical selection and in-memory atomic writes; publication gate/handoff and atomic provenance; library readiness/vocabulary; report evidence completeness, refresh, permanence and seating; P19 RSP scope; proposal evidence-pack construction; and comparison export structure/copy.
 
