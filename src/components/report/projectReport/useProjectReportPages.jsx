@@ -594,20 +594,15 @@ export function useProjectReportPages({
   }, [p5Snapshot, p5SeatResults, p9Snapshot, p9Overhead, bestListeningArea, timbreConsistency, frontSoundstage, nonScreenSoundstage, highlights, screenSeating, hasSeatingPosition, recommendedSeatingPosition, bassPerformance, roomDims, rsp, rspSourceLabel, screenFrontPlaneM, screenWidthM, screen, placedSpeakers, appState?.acousticTreatmentEnabled, appState?.selectedAbfuserQty, appState?.abfuserQtySource, coverageSentence, reportGeometry, reportSystem, perSeatPerformance, projectId]);
 
   // ── The Project Report's composition ────────────────────────────────────
-  // ONE composition authority decides the document: the cover, the three
-  // category assessment tables (every parameter P1–P21 explicitly stated,
-  // including the ones that carry no drawing page of their own), the parameter
-  // detail pages, the detailed bass evidence, the per-seat results, treatment,
-  // the Systems / Products Selected schedule, the drawings and the closing brand
-  // page — in the agreed section order, with every continuation page headed
-  // "<section> — Continued".
+  // The document is an EDIT of the two reports, not a third one: the merged
+  // front section, then the Visual Report's own pages in the order it already
+  // prints them, then the Technical Report's own pages, mounted by the report
+  // page, and its single closing About page. No cover page, no category
+  // assessment tables, no second About page and no parameter card inserted
+  // between the Visual pages.
   return useMemo(() => {
     const pageList = Array.isArray(activePages) ? activePages.filter(Boolean) : [];
 
-    // The registry used to state each category's assessment table before its
-    // first detail page. The consolidated report states no such table: every
-    // parameter card stays in the Technical Report's own P1–P21 sequence, where
-    // the engineering is explained properly and the sequence is not fragmented.
     // 01 Project Report / Design Summary — the stronger opening: the design's key
     // facts, the report's own project-specific Design Summary and the strengths
     // the published assessment supports.

@@ -19,17 +19,14 @@ import PrintBassResponseContent from "@/components/report/client/print/PrintBass
 import ClientP19RspPresentation from "@/components/report/client/ClientP19RspPresentation";
 import PrintP2Content from "@/components/report/client/print/PrintP2Content";
 import PrintP7Content from "@/components/report/client/print/PrintP7Content";
-import AboutSoundProofReportPage from "@/components/report/AboutSoundProofReportPage";
 import PrintPerSeatPerformanceContent from "@/components/report/client/print/PrintPerSeatPerformanceContent";
 import PrintAcousticTreatmentContent from "@/components/report/client/print/PrintAcousticTreatmentContent";
-import ClientDesignHighlights from "@/components/report/client/ClientDesignHighlights";
 import ClientRecommendedSeatingPosition from "@/components/report/client/ClientRecommendedSeatingPosition";
 import ClientBestListeningArea from "@/components/report/client/ClientBestListeningArea";
 import ClientTimbreConsistency from "@/components/report/client/ClientTimbreConsistency";
 import ClientFrontSoundstageDynamicRange from "@/components/report/client/ClientFrontSoundstageDynamicRange";
 import ClientNonScreenDynamicRange from "@/components/report/client/ClientNonScreenDynamicRange";
 import ClientScreenSeating from "@/components/report/client/ClientScreenSeating";
-import Rp22SeatCoverageSentence from "@/components/report/Rp22SeatCoverageSentence";
 import { getSeatGradeColors } from "@/components/report/client/visualReportSeatStyle";
 import ReportPrintHeader from '@/components/report/ReportPrintHeader';
 import { REPORT_STRAPLINE } from '@/components/report/reportPrintHeader';
