@@ -54,7 +54,7 @@ import { validateCanonicalBassResult } from "./canonicalBassResult";
 
 const LEGACY_STATUS = { idle: "IDLE", queued: "QUEUED", calculating: "CALCULATING", ready: "COMPLETE", stale: "OUT_OF_DATE", error: "ERROR" };
 
-export default function BassBackgroundAnalysisOwner({ children, scopeId = "free", versionId = "free" }) {
+export default function BassBackgroundAnalysisOwner({ children, scopeId = "free", versionId = "free", engineeringPublication = null }) {
   const appState = useAppState();
   const recommendationsActive = useRecommendationGate();
   const calcAllTargetsRequest = useCalculateAllTargetsRequest();
@@ -2408,6 +2408,6 @@ export default function BassBackgroundAnalysisOwner({ children, scopeId = "free"
         captureEligible,
         captureEligibilityDebug,
       };
-  const value = scopeRef.current.replace({ scopeId, versionId, contract: effectiveContract, lifecycle, selectedPriorityMode, optimisationResult: effectiveOptimisationResult, fingerprint: calibrationFingerprint, cacheKey, payload, inputsValid, detailedStatus: effectiveDetailedStatus, detailedError: lifecycle.errorMessage, onPriorityChange: null, onCalculate, onRetry, onCancel, onClearTerminal, canCalculate, calculationInProgress, calculationPhaseLabel, calculationOutcome, bassLifecycleState, terminalMessage, hasCurrentResult, authoritative: sharedAuthoritative, completedBassAuthority: effectiveBassAuthority, seatingPositions, p19SeatAuthority, p14FamilyProgress: targetFamilyProgress, bankIdentityCoherent: bankIdentityCoherence.coherent, bankBaseDesignFingerprint: targetBankIdentity.baseDesignFingerprint, placementPreviewActive, placementPreviewResult });
+  const value = scopeRef.current.replace({ scopeId, versionId, engineeringPublication, contract: effectiveContract, lifecycle, selectedPriorityMode, optimisationResult: effectiveOptimisationResult, fingerprint: calibrationFingerprint, cacheKey, payload, inputsValid, detailedStatus: effectiveDetailedStatus, detailedError: lifecycle.errorMessage, onPriorityChange: null, onCalculate, onRetry, onCancel, onClearTerminal, canCalculate, calculationInProgress, calculationPhaseLabel, calculationOutcome, bassLifecycleState, terminalMessage, hasCurrentResult, authoritative: sharedAuthoritative, completedBassAuthority: effectiveBassAuthority, seatingPositions, p19SeatAuthority, p14FamilyProgress: targetFamilyProgress, bankIdentityCoherent: bankIdentityCoherence.coherent, bankBaseDesignFingerprint: targetBankIdentity.baseDesignFingerprint, placementPreviewActive, placementPreviewResult });
   return <BassResultsProvider value={value}>{children}</BassResultsProvider>;
 }
