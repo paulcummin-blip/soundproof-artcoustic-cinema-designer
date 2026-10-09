@@ -25,7 +25,8 @@ import {
   useReportActionIntent,
 } from "@/components/report/reportActionIntent";
 import useReportFilenameIdentity from '@/components/report/useReportFilenameIdentity';
-import { selectClientDesignHighlights } from "@/components/report/client/selectClientDesignHighlights";
+// The opening's strengths are no longer a fixed list: ADI selects this design's
+// own highlights from the frozen evidence inside useProjectReportPages.
 import { selectClientRecommendedSeatingPosition } from "@/components/report/client/selectClientRecommendedSeatingPosition";
 import { selectClientBestListeningArea } from "@/components/report/client/selectClientBestListeningArea";
 import { selectClientTimbreConsistency } from "@/components/report/client/selectClientTimbreConsistency";
@@ -133,10 +134,8 @@ export default function RP22ClientReport() {
     roomDims,
   }), [completedBassAuthority?.contract, completedBassAuthority?.authoritative, roomDims]);
 
-  // ── Design Summary (static intro) ──
-  // Design assumptions (P15/P21) are deliberately absent from the Visual Report:
-  // they are engineering caveats and remain in the Technical Report.
-  const highlights = useMemo(() => selectClientDesignHighlights(), []);
+  // Design assumptions (P15/P21) are deliberately absent from the client-facing
+  // report: they are engineering caveats and remain in the Technical Report.
 
   // PASSIVE CONSUMER: the Visual Report reads the exact coverage result
   // published by the Room Designer's canonical engineering summary.
@@ -459,7 +458,6 @@ export default function RP22ClientReport() {
     timbreConsistency,
     frontSoundstage,
     nonScreenSoundstage,
-    highlights,
     screenSeating,
     p2SystemArchitecture,
     p7FrontWides,

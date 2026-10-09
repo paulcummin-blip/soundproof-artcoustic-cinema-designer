@@ -30,6 +30,7 @@
  */
 
 import { readReportParameter } from '@/components/report/reportParameterEvidence';
+import { getOfficialRp22Title } from '@/components/utils/rp22OfficialTitles';
 import { fitHighlightsToBudget, PROJECT_REPORT_PAGE_BUDGET_MM } from './projectReportPageBudget';
 
 /** The level floor a client-facing strength must reach (L3 or better). */
@@ -174,9 +175,19 @@ function joinList(items) {
   return `${list.slice(0, -1).join(', ')} and ${list[list.length - 1]}`;
 }
 
+/**
+ * One evidence line. The published level may be stated in the line's own key
+ * ("P12 L4") or given explicitly; either way it is carried as the line's level,
+ * so the page colours each piece of evidence by its own published grade.
+ */
+const levelFromKey = (key) => {
+  const match = /(?:^|\s)(L[1-4])$/.exec(String(key || '').trim());
+  return match ? match[1] : null;
+};
+
 const evidence = (key, level, value, detail = null) => ({
   key,
-  level: level ?? null,
+  level: level ?? levelFromKey(key),
   value: value ?? null,
   detail,
 });
@@ -192,7 +203,11 @@ const sentence = (text) => {
  * The same connections are used by the highlights page and by the System &
  * Products page, so the two can never state a different reason.
  */
-export function buildSpecificationConnections({ productsSelected = null, engineeringSummary = null } = {}) {
+export function buildSpecificationConnections({
+  productsSelected = null,
+  engineeringSummary = null,
+  dolbyConfig = null,
+} = {}) {
   const lcr = productEntries(productsSelected, 'lcr');
   const surrounds = productEntries(productsSelected, 'surrounds');
   const overheads = productEntries(productsSelected, 'overheads');
@@ -218,7 +233,7 @@ export function buildSpecificationConnections({ productsSelected = null, enginee
       ? `Non-screen output — RP22 P13 ${p13.level}${p13.value ? `, ${p13.value}` : ''}`
       : surroundTotal > 0 ? 'Surround and wide coverage around the seats' : null,
     overheads: overheadTotal > 0
-      ? `Overhead layer completing the ${String(productsSelected?.overheadFormat || '').trim() || 'immersive'} field`
+      ? `Overhead layer completing the ${String(dolbyConfig || 'immersive').trim()} field`
       : null,
     subwoofers: subTotal > 0
       ? [
@@ -243,9 +258,38 @@ function buildCandidates(sources) {
   } = sources;
   const candidates = [];
 
+  // 0 · Spatial resolution — raised only where EVERY assessed spatial parameter
+  // is genuinely strong. A mixed spatial picture is never presented as a
+  // strength (see the rejected claims at the foot of this authority).
+  const SPATIAL_SEAT_IDS = [1, 5, 6, 9, 10];
+  const spatialFloors = SPATIAL_SEAT_IDS
+    .map((id) => seatFloor(engineeringSummary, id))
+    .filter(Boolean);
+  if (spatialFloors.length >= 3 && spatialFloors.every((row) => isStrength(row.level))) {
+    const weakest = spatialFloors.reduce(
+      (acc, row) => (levelRank(row.level) < levelRank(acc.level) ? row : acc),
+      spatialFloors[0],
+    );
+    candidates.push({
+      id: 'spatial-resolution',
+      order: 2,
+      weight: levelRank(weakest.level) >= 4 ? 3 : 2,
+      title: 'Spatial resolution across the seating area',
+      category: 'Spatial Resolution',
+      evidence: spatialFloors.slice(0, 3).map((row) => evidence(
+        `${row.key} ${row.level}`,
+        null,
+        getOfficialRp22Title(row.id) || `Parameter ${row.id}`,
+      )),
+      explanation: sentence(`every assessed spatial parameter holds at ${weakest.level} or better across the seating area — listener distance from the room boundaries, surround coverage and overhead spacing are all measured at each seat rather than assumed from the plan.`),
+      sources: SPATIAL_SEAT_IDS.map((id) => `P${id}`),
+    });
+  }
+
   // 1 · Cinema-scale dynamic capability — the screen stage and the non-screen layer.
   const p12 = parameter(engineeringSummary, 12);
   const p13 = parameter(engineeringSummary, 13);
+  const p14 = parameter(engineeringSummary, 14);
   if (isStrength(p12?.level) && isStrength(p13?.level)) {
     const weakest = Math.min(levelRank(p12.level), levelRank(p13.level));
     candidates.push({
@@ -328,7 +372,7 @@ function buildCandidates(sources) {
 
   // 5 · The immersive layout itself — the architecture the design is built on.
   const p2 = parameter(engineeringSummary, 2);
-  const connections = buildSpecificationConnections({ productsSelected, engineeringSummary });
+  const connections = buildSpecificationConnections({ productsSelected, engineeringSummary, dolbyConfig });
   const { overheads: overheadCount, subwoofers: subCount } = connections.counts;
   if (dolbyConfig && overheadCount > 0) {
     candidates.push({
@@ -342,7 +386,7 @@ function buildCandidates(sources) {
         p2 ? evidence(`P2 ${p2.level}`, null, `${p2.value || 'discrete speakers'}`) : null,
         evidence(`${overheadCount} overheads`, null, subCount > 0 ? `${subCount} subwoofers` : null),
       ].filter(Boolean),
-      explanation: sentence(`the design is built as a ${dolbyConfig} system with ${overheadCount} overhead speakers${subCount > 0 ? ` and ${subCount} subwoofers` : ''}${p2?.value ? ` across ${p2.value}` : ''}, so effects move above and around the audience instead of staying on the screen plane.`),
+      explanation: sentence(`the design is built as a ${dolbyConfig} system with ${overheadCount} overhead speakers${subCount > 0 ? ` and ${subCount} subwoofers` : ''}, so effects move above and around the audience instead of staying on the screen plane.`),
       sources: ['P2', 'architecture'],
     });
   }
@@ -356,11 +400,11 @@ function buildCandidates(sources) {
     const treatment = productEntries(productsSelected, 'acoustic_treatment');
 
     const jobs = [
-      lcr.length > 0 && isStrength(p12?.level) && `${modelCountLabel(lcr)} front stage for the P12 screen-stage capability`,
-      surrounds.length > 0 && isStrength(p13?.level) && `${modelCountLabel(surrounds)} layer for the P13 non-screen output`,
-      overheads.length > 0 && `${modelCountLabel(overheads)} overheads completing the immersive field`,
-      subs.length > 0 && isStrength(p14?.level) && `${modelCountLabel(subs)} subwoofers delivering the P14 bass output capability`,
-      treatment.length > 0 && `${modelCountLabel(treatment)} acoustic treatment for planned reflection control`,
+      lcr.length > 0 && isStrength(p12?.level) && `${modelCountLabel(lcr)} for the P12 screen-stage capability`,
+      surrounds.length > 0 && isStrength(p13?.level) && `${modelCountLabel(surrounds)} for the P13 non-screen output`,
+      overheads.length > 0 && `${modelCountLabel(overheads)} for the overhead field`,
+      subs.length > 0 && isStrength(p14?.level) && `${modelCountLabel(subs)} for the P14 bass output capability`,
+      treatment.length > 0 && `${modelCountLabel(treatment)} for planned reflection control`,
     ].filter(Boolean);
 
     if (jobs.length > 0) {

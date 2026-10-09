@@ -1,23 +1,24 @@
 /**
  * ProjectReportSystemOverview.jsx
  * -------------------------------
- * PAGE 2 of the consolidated Project Report: System + Products / Project
- * Overview.
+ * PAGE 3 of the consolidated Project Report: System & Products.
  *
- * It brings the equipment forward so the client understands immediately what has
- * been specified — the complete System specification schedule, stated as the
- * Technical Report states it — followed by the system configuration line and the
+ * The equipment brought forward so the client understands what has been
+ * specified and why: the system stated in one line, the specification schedule
+ * (role, model, quantity and the engineering job each layer performs), and the
  * viewing geometry of every seating row.
  *
  * Presentation only: the schedule is the report's own canonical product
- * derivation, and the viewing geometry is read from the same published per-seat
- * viewing results the Visual Report's Viewing Experience page prints. Nothing is
- * graded, recalculated or inferred, and no result is stated here that the report
- * does not already publish elsewhere in its own presentation.
+ * derivation, the engineering links come from the ADI highlight authority (and
+ * are stated only where the published evidence supports them), and the viewing
+ * geometry is read from the same published per-seat viewing results the Visual
+ * Report's Viewing Experience page prints. Nothing is graded, recalculated or
+ * inferred.
  */
 
 import React from 'react';
 import ProjectReportProducts from '@/components/report/projectReport/ProjectReportProducts';
+import { buildSpecificationConnections, productEntries } from '@/components/report/projectReport/adiDesignHighlights';
 import {
   REPORT_FONT_HEADING as FONT_HEADING,
   REPORT_FONT_BODY as FONT_BODY,
@@ -60,18 +61,37 @@ function rowGeometry(row) {
 export default function ProjectReportSystemOverview({
   projectDetails = null,
   productsSelected = null,
+  engineeringSummary = null,
   rows = [],
   print = false,
 }) {
-  const configuration = [
+  const connections = buildSpecificationConnections({ productsSelected, engineeringSummary, dolbyConfig: projectDetails?.dolby_config });
+  const { counts } = connections;
+
+  const speakerCount = counts.lcr + counts.surrounds + counts.overheads;
+  const summaryLine = [
     String(projectDetails?.dolby_config || '').trim() || null,
-    productValue(productsSelected, 'subwoofers'),
-    productValue(productsSelected, 'acoustic_treatment'),
+    speakerCount > 0 ? `${speakerCount} speakers` : null,
+    counts.subwoofers > 0 ? `${counts.subwoofers} subwoofers` : null,
+    counts.acoustic_treatment > 0 ? `${counts.acoustic_treatment} × Abfuser` : null,
   ].filter(Boolean).join(' · ');
+
+  // Each specified role is stated with the connection the evidence supports.
+  const scheduleConnections = {
+    ...connections,
+    subwoofers: connections.subwoofers || productValue(productsSelected, 'subwoofers'),
+  };
 
   const geometry = (Array.isArray(rows) ? rows : [])
     .map(rowGeometry)
     .filter((row) => row.seats > 0);
+
+  // The schedule rows carry the design's own layers; a role the design does not
+  // specify (no product) is not stated.
+  const scheduleRows = (productsSelected?.rows || []).filter((row) => {
+    const entries = productEntries(productsSelected, row.key);
+    return entries.length > 0;
+  });
 
   return (
     <div style={{ fontFamily: FONT_BODY, color: '#1B1A1A' }}>
@@ -91,17 +111,21 @@ export default function ProjectReportSystemOverview({
         </h1>
       </div>
 
-      {configuration && (
+      {summaryLine && (
         <div style={{
           fontSize: print ? 9 : 12,
           color: '#3E4349',
           marginBottom: print ? '5mm' : 16,
         }}>
-          {configuration}
+          {summaryLine}
         </div>
       )}
 
-      <ProjectReportProducts rows={productsSelected?.rows || []} print={print} />
+      <ProjectReportProducts
+        rows={scheduleRows}
+        connections={scheduleConnections}
+        print={print}
+      />
 
       {geometry.length > 0 && (
         <div style={{ marginTop: print ? '6mm' : 22 }}>

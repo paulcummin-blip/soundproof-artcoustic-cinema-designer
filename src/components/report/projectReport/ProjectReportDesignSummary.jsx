@@ -1,17 +1,18 @@
 /**
  * ProjectReportDesignSummary.jsx
  * ------------------------------
- * PAGE 1 of the consolidated Project Report: Project Report / Design Summary.
+ * PAGE 1 of the consolidated Project Report: the PROJECT SUMMARY.
  *
- * One stronger opening instead of the two the reports used to carry — the
- * design's key facts at a glance (room, screen, seating, system format, the
- * specified products, the subwoofer arrangement and the treatment), then the
- * report's own concise, project-specific Design Summary and the strengths the
- * published assessment supports.
+ * A clean, restrained opening page: the project's identity is stated by the
+ * report masthead directly above it (project, client, version, reference and
+ * date — composed once by the shared first-page meta line and never repeated
+ * here), followed by the design's key facts and ONE short project-specific
+ * paragraph.
  *
- * The report's identity line above it (project, client, version, reference and
- * date) is the shared report masthead, stated once by ClientReportPage. It is
- * never repeated here.
+ * The page carries nothing else. The strengths the published assessment
+ * supports are stated on their own page (ADI Design Highlights), so this page
+ * can never overfill or clip — the sections that used to be stacked onto it
+ * have moved to the page that gives them room.
  *
  * Presentation only. Every fact comes from the saved project, the report's own
  * canonical product derivation and the published engineering summary. Nothing is
@@ -19,7 +20,6 @@
  */
 
 import React from 'react';
-import ClientDesignHighlights from '@/components/report/client/ClientDesignHighlights';
 import ProjectReportSummaryOpening from '@/components/report/projectReport/ProjectReportSummaryOpening';
 import { groupSeatsIntoRows } from '@/components/report/client/seatRowGrouping';
 import {
@@ -88,7 +88,6 @@ export default function ProjectReportDesignSummary({
   screenWidthM = null,
   productsSelected = null,
   summaryOpening = null,
-  highlights = [],
   print = false,
 }) {
   const seatRows = groupSeatsIntoRows(seatingPositions);
@@ -105,7 +104,8 @@ export default function ProjectReportDesignSummary({
     ? `${seatRows.length} row${seatRows.length === 1 ? '' : 's'} · ${seatCount} seat${seatCount === 1 ? '' : 's'}`
     : null;
 
-  const keyProducts = ['lcr', 'surrounds', 'overheads']
+  // The loudspeaker families the design is built on, each with its own count.
+  const keyLoudspeakers = ['lcr', 'surrounds', 'overheads']
     .map((key) => productValue(productsSelected, key))
     .filter(Boolean)
     .join(' · ') || null;
@@ -115,7 +115,7 @@ export default function ProjectReportDesignSummary({
     { label: 'Screen', value: screenFact(projectDetails, screenWidthM) },
     { label: 'Seating', value: seatingFact },
     { label: 'System format', value: String(projectDetails?.dolby_config || '').trim() || null },
-    { label: 'Key products', value: keyProducts },
+    { label: 'Key loudspeakers', value: keyLoudspeakers },
     { label: 'Subwoofers', value: productValue(productsSelected, 'subwoofers') },
     { label: 'Acoustic treatment', value: productValue(productsSelected, 'acoustic_treatment') },
   ];
@@ -134,7 +134,7 @@ export default function ProjectReportDesignSummary({
             color: '#213428',
           }}
         >
-          Design Summary
+          Project Summary
         </h1>
       </div>
 
@@ -150,12 +150,6 @@ export default function ProjectReportDesignSummary({
           marginBottom: print ? '6mm' : 20,
         }}>
           <ProjectReportSummaryOpening sentence={summaryOpening} print={print} />
-        </div>
-      )}
-
-      {Array.isArray(highlights) && highlights.length > 0 && (
-        <div style={{ marginTop: print ? '4mm' : 8 }}>
-          <ClientDesignHighlights highlights={highlights} print={print} />
         </div>
       )}
     </div>

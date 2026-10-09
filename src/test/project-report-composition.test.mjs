@@ -3,8 +3,8 @@
 // ACCEPTANCE — the consolidated Project Report is an EDIT of the existing
 // Visual and Technical Reports, not a third report.
 //
-//   TEST 1  The document opens on the two front pages: the Project Report /
-//           Design Summary, then the System + Products / Project Overview.
+//   TEST 1  The document opens on its three pages: the Project Summary, the ADI
+//           Design Highlights, then System & Products.
 //   TEST 2  The Visual Report's pages keep their existing order, their print
 //           composition and their presentation, and no page is lost.
 //   TEST 3  No front page and no About page is duplicated: the Visual Report's
@@ -63,39 +63,51 @@ function technicalPrintLayout() {
 
 /* ── TEST 1 — the front section comes first ─────────────────────────────── */
 
-test('TEST 1 — the Project Report front page is first and the System + Products overview is second', () => {
+test('TEST 1 — the Project Report opens on three pages: Project Summary, ADI Design Highlights, then System & Products', () => {
   const hook = read(PROJECT_REPORT_HOOK);
 
-  // The document begins with the two front pages, then the Visual pages.
+  // The document begins with the three opening pages, then the Visual pages.
   assert.match(
     hook,
-    /return \[designSummaryPage, systemOverviewPage, \.\.\.pageList\];/,
-    'the document must open on the two front pages, followed by the Visual pages',
+    /return \[projectSummaryPage, adiHighlightsPage, systemProductsPage, \.\.\.pageList\];/,
+    'the document must open on the three opening pages, followed by the Visual pages',
   );
 
-  // Page 01 — the merged front page, with the report's own Design Summary.
+  // Page 01 — the Project Summary: the design's key facts and one short
+  // project-specific paragraph, and nothing else on the page.
   assert.match(hook, /id: "project-report-design-summary"/);
   assert.match(hook, /type: "design-summary"/);
   assert.match(hook, /<ProjectReportDesignSummary/);
-  assert.ok(hook.includes('summaryOpening={summaryOpening}'), 'the front page carries the report’s own summary');
+  assert.ok(hook.includes('summaryOpening={summaryOpening}'), 'the summary page carries the report’s own paragraph');
+  assert.ok(!hook.includes('highlights={highlights}'), 'the summary page must not carry the highlights');
 
-  // Page 02 — the equipment brought forward: the System specification schedule,
-  // the system configuration and the viewing geometry by row.
+  // Page 02 — the ADI Design Highlights: the highlights ADI selects from this
+  // design's own frozen evidence. Never a fixed list.
+  assert.match(hook, /id: "project-report-adi-highlights"/);
+  assert.match(hook, /type: "adi-highlights"/);
+  assert.match(hook, /<AdiDesignHighlightsPage/);
+  assert.ok(hook.includes('buildAdiDesignHighlights('), 'the highlights are selected from the evidence');
+  assert.ok(!hook.includes('selectClientDesignHighlights'), 'the fixed highlight list must not reach the report');
+
+  // Page 03 — the equipment brought forward: the System specification schedule,
+  // each layer's engineering job and the viewing geometry by row.
   assert.match(hook, /id: "project-report-system-overview"/);
   assert.match(hook, /type: "system-overview"/);
   assert.match(hook, /<ProjectReportSystemOverview/);
-  assert.ok(hook.includes('productsSelected={productsSelected}'), 'the second page carries the products schedule');
-  assert.ok(hook.includes('rows={screenSeating.rows}'), 'the second page carries the viewing geometry');
+  assert.ok(hook.includes('productsSelected={productsSelected}'), 'the third page carries the products schedule');
+  assert.ok(hook.includes('rows={screenSeating.rows}'), 'the third page carries the viewing geometry');
 
-  // Both front pages print: each has a print composition in the page wrapper.
+  // All three opening pages print: each has a print composition in the wrapper.
   const clientPage = read(CLIENT_REPORT_PAGE);
-  assert.ok(clientPage.includes('"design-summary"'), 'the front page type must be printable');
-  assert.ok(clientPage.includes('"system-overview"'), 'the second page type must be printable');
+  assert.ok(clientPage.includes('"design-summary"'), 'the summary page type must be printable');
+  assert.ok(clientPage.includes('"adi-highlights"'), 'the highlights page type must be printable');
+  assert.ok(clientPage.includes('"system-overview"'), 'the products page type must be printable');
   assert.match(clientPage, /printData\?\.type === "design-summary"/);
+  assert.match(clientPage, /printData\?\.type === "adi-highlights"/);
   assert.match(clientPage, /printData\?\.type === "system-overview"/);
 
-  // …and the second page is the FIRST page of the equipment: the products
-  // schedule is no longer stated on its own page at the back of the document.
+  // …and the products are stated on the opening pages: the products schedule is
+  // no longer stated on its own page at the back of the document.
   assert.ok(!hook.includes('id: "products-selected"'), 'no separate products page may remain');
 });
 
@@ -127,7 +139,7 @@ test('TEST 2 — the Visual Report keeps its pages, its order, and every print c
   // The per-seat page keeps its own print composition and its row-split pages.
   const summaryBlock = hook.slice(
     hook.indexOf('summaryPages.push({'),
-    hook.indexOf('return [designSummaryPage'),
+    hook.indexOf('return [projectSummaryPage'),
   );
   assert.ok(summaryBlock.includes('type: "per-seat-performance"'), 'the per-seat page must keep its print composition');
   assert.ok(summaryBlock.includes('"per-seat-performance"'), 'the per-seat page must stay in the summary group');
@@ -164,6 +176,7 @@ test('TEST 2 — the Visual Report keeps its pages, its order, and every print c
     'per-seat-performance',
     'acoustic-treatment',
     'design-summary',
+    'adi-highlights',
     'system-overview',
   ];
   for (const type of printTypes) {

@@ -48,7 +48,9 @@ import { planSeatRowPages } from "@/components/report/client/perSeatCardLayout";
 import { isAssessedLevel } from "@/components/report/client/visualReportSeatStyle";
 import { buildProjectReportSummaryOpening } from "@/components/report/projectReport/projectReportSummaryOpening";
 import ProjectReportDesignSummary from "@/components/report/projectReport/ProjectReportDesignSummary";
+import AdiDesignHighlightsPage from "@/components/report/projectReport/AdiDesignHighlightsPage";
 import ProjectReportSystemOverview from "@/components/report/projectReport/ProjectReportSystemOverview";
+import { buildAdiDesignHighlights } from "@/components/report/projectReport/adiDesignHighlights";
 
 export function useProjectReportPages({
   hydrating,
@@ -102,6 +104,18 @@ export function useProjectReportPages({
     seatingPositions,
     engineeringSummary,
   }), [projectDetails, productsSelected, seatingPositions, engineeringSummary]);
+
+  // The ADI Design Highlights page's content: the highlights ADI selects from
+  // this design's own frozen evidence — the published RP22 and RP23 results and
+  // their seat scope, the products specified, the seating and the architecture.
+  // Only genuine strengths are raised, and the list is already fitted to its
+  // page budget, so the Highlights page can never clip.
+  const adiHighlights = useMemo(() => buildAdiDesignHighlights({
+    engineeringSummary,
+    productsSelected,
+    seatingPositions,
+    dolbyConfig: projectDetails?.dolby_config,
+  }), [engineeringSummary, productsSelected, seatingPositions, projectDetails]);
 
   // The Visual Report's own pages — its existing order and its existing
   // presentation, exactly as the Visual Report prints them. No parameter card is
@@ -604,10 +618,11 @@ export function useProjectReportPages({
   return useMemo(() => {
     const pageList = Array.isArray(activePages) ? activePages.filter(Boolean) : [];
 
-    // 01 Project Report / Design Summary — the stronger opening: the design's key
-    // facts, the report's own project-specific Design Summary and the strengths
-    // the published assessment supports.
-    const designSummaryPage = {
+    // 01 PROJECT SUMMARY — the design's key facts, then one short
+    // project-specific paragraph. Nothing else belongs on this page: the
+    // strengths the published assessment supports have their own page, so this
+    // page can never overfill or clip.
+    const projectSummaryPage = {
       id: "project-report-design-summary",
       printData: {
         type: "design-summary",
@@ -617,7 +632,6 @@ export function useProjectReportPages({
         screenWidthM,
         productsSelected,
         summaryOpening,
-        highlights,
       },
       visual: (
         <ProjectReportDesignSummary
@@ -627,36 +641,50 @@ export function useProjectReportPages({
           screenWidthM={screenWidthM}
           productsSelected={productsSelected}
           summaryOpening={summaryOpening}
-          highlights={highlights}
         />
       ),
     };
 
-    // 02 System + Products / Project Overview — the equipment brought forward:
-    // the complete System specification schedule, the system configuration and
-    // the viewing geometry of every seating row.
-    const systemOverviewPage = {
+    // 02 ADI DESIGN HIGHLIGHTS — the highlights ADI selected from this design's
+    // own frozen engineering evidence: the strongest, most client-relevant
+    // results of THIS system, each with the evidence it rests on. Generated from
+    // the evidence, never from a fixed template.
+    const adiHighlightsPage = {
+      id: "project-report-adi-highlights",
+      printData: {
+        type: "adi-highlights",
+        highlights: adiHighlights,
+      },
+      visual: <AdiDesignHighlightsPage highlights={adiHighlights} />,
+    };
+
+    // 03 SYSTEM & PRODUCTS — the equipment brought forward: the complete
+    // specification schedule, each layer's own engineering job and the viewing
+    // geometry of every seating row.
+    const systemProductsPage = {
       id: "project-report-system-overview",
       printData: {
         type: "system-overview",
         projectDetails,
         productsSelected,
+        engineeringSummary,
         rows: screenSeating.rows,
       },
       visual: (
         <ProjectReportSystemOverview
           projectDetails={projectDetails}
           productsSelected={productsSelected}
+          engineeringSummary={engineeringSummary}
           rows={screenSeating.rows}
         />
       ),
     };
 
-    // THE DOCUMENT: the two front pages, then the Visual Report's own pages in
-    // their existing order, unchanged. The Technical Report's pages follow them,
-    // mounted by the report page itself (TechnicalReportDocument) — that is where
-    // the complete P1–P21 parameter-card sequence, the drawing set, the bass
-    // curves and the single closing About Sound Proof page print.
-    return [designSummaryPage, systemOverviewPage, ...pageList];
-  }, [activePages, summaryOpening, projectDetails, roomDims, seatingPositions, screenWidthM, productsSelected, highlights, screenSeating]);
+    // THE DOCUMENT: the three opening pages, then the Visual Report's own pages
+    // in their existing order, unchanged. The Technical Report's pages follow
+    // them, mounted by the report page itself (TechnicalReportDocument) — that is
+    // where the complete P1–P21 parameter-card sequence, the drawing set, the
+    // bass curves and the single closing About Sound Proof page print.
+    return [projectSummaryPage, adiHighlightsPage, systemProductsPage, ...pageList];
+  }, [activePages, summaryOpening, projectDetails, roomDims, seatingPositions, screenWidthM, productsSelected, adiHighlights, screenSeating, engineeringSummary]);
 }

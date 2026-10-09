@@ -26,8 +26,11 @@ export const A4_CONTENT_MM = Object.freeze({ width: 186, height: 271 });
  * Page 1 carries the report masthead above its content, so it has less room.
  */
 export const PROJECT_REPORT_PAGE_BUDGET_MM = Object.freeze({
+  // The first page carries the report masthead above its content; the second and
+  // third are full-height content pages. Both figures are deliberately below what
+  // the 271mm frame can hold, so a page that fits its budget always fits paper.
   first: 146,
-  page: 206,
+  page: 228,
 });
 
 /** Fixed costs, in millimetres, of the blocks the opening pages use. */
@@ -36,8 +39,8 @@ export const PAGE_BLOCK_MM = Object.freeze({
   factRow: 8,
   paragraphSpacing: 12,
   line: 5,
-  highlightFixed: 13,
-  highlightGap: 6,
+  highlightFixed: 15,
+  highlightGap: 7,
 });
 
 /** Characters of body copy that fit on one 186mm line at the report body size. */

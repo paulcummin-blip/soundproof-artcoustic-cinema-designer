@@ -32,6 +32,7 @@ import ReportPrintHeader from '@/components/report/ReportPrintHeader';
 import { REPORT_STRAPLINE } from '@/components/report/reportPrintHeader';
 import { clientReportHeaderMeta } from '@/components/report/client/clientReportHeaderMeta';
 import ProjectReportDesignSummary from '@/components/report/projectReport/ProjectReportDesignSummary';
+import AdiDesignHighlightsPage from '@/components/report/projectReport/AdiDesignHighlightsPage';
 import ProjectReportSystemOverview from '@/components/report/projectReport/ProjectReportSystemOverview';
 import { PROJECT_REPORT_TITLE } from '@/components/report/projectReport/projectReportIdentity';
 
@@ -49,9 +50,11 @@ function printLevelColor(lvl) {
 // `client-report-page--no-print` in the print stylesheet) while the on-screen
 // report keeps showing it unchanged.
 const PRINTABLE_PAGE_TYPES = new Set([
-  // The consolidated front section: one stronger opening, then the system and
+  // The consolidated front section: the project summary, the ADI design
+  // highlights this design's own evidence selected, then the system and
   // products brought forward.
   "design-summary",
+  "adi-highlights",
   "system-overview",
   "p5",
   "p9",
@@ -160,9 +163,9 @@ export default function ClientReportPage({
             roomDims={printData.roomDims}
           />
         )}
-        {/* 01 Project Report / Design Summary — the consolidated front page: the
-            design's key facts, its project-specific summary and the strengths the
-            published assessment supports. */}
+        {/* 01 Project Summary — the consolidated front page: the design's key
+            facts and its one project-specific paragraph. Nothing else prints on
+            this page, so it can never overfill or clip. */}
         {printData?.type === "design-summary" && (
           <ProjectReportDesignSummary
             projectDetails={printData.projectDetails || projectDetails}
@@ -171,17 +174,22 @@ export default function ClientReportPage({
             screenWidthM={printData.screenWidthM}
             productsSelected={printData.productsSelected}
             summaryOpening={printData.summaryOpening}
-            highlights={printData.highlights}
             print
           />
         )}
-        {/* 02 System + Products / Project Overview — the equipment brought
-            forward, with the system configuration and the viewing geometry of
-            every seating row. */}
+        {/* 02 ADI Design Highlights — the highlights ADI selected from this
+            design's own frozen engineering evidence. The list arrives already
+            fitted to this page's budget, so it cannot clip. */}
+        {printData?.type === "adi-highlights" && (
+          <AdiDesignHighlightsPage highlights={printData.highlights} print />
+        )}
+        {/* 03 System & Products — the equipment brought forward, each layer's
+            own engineering job and the viewing geometry of every seating row. */}
         {printData?.type === "system-overview" && (
           <ProjectReportSystemOverview
             projectDetails={printData.projectDetails || projectDetails}
             productsSelected={printData.productsSelected}
+            engineeringSummary={printData.engineeringSummary}
             rows={printData.rows}
             print
           />
