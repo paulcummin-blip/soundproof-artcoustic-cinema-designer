@@ -43,6 +43,12 @@ const SECTION_SOURCE = fs.readFileSync('src/components/report/client/ClientPerSe
 const CARD_SOURCE = fs.readFileSync('src/components/report/client/PerSeatPerformanceCard.jsx', 'utf8');
 const ROWS_SOURCE = fs.readFileSync('src/components/report/client/PerSeatPerformanceRows.jsx', 'utf8');
 const REPORT_PAGE_SOURCE = fs.readFileSync('src/pages/RP22ClientReport.jsx', 'utf8');
+// The report's page list — each page's id, its continuation ids and its print
+// type — is composed in the project report composition the page renders.
+const REPORT_COMPOSITION_SOURCE = fs.readFileSync(
+  'src/components/report/projectReport/useProjectReportPages.jsx',
+  'utf8',
+);
 const PRINT_PAGE_SOURCE = fs.readFileSync('src/components/report/client/ClientReportPage.jsx', 'utf8');
 
 // ── The project's real seating plan: 9 seats, 3 PRIMARY, 6 SECONDARY ────────
@@ -374,9 +380,9 @@ test('the PDF page carries the same cards and heading', () => {
   assert.ok(PRINT_TEXT.includes('RP22 and RP23 results by seating position'), 'with its subtitle');
   assert.ok(PRINT_TEXT.includes('Primary seat') && PRINT_TEXT.includes('Reference position'), 'key printed too');
   // Registration: the report page includes it and the print dispatcher renders it.
-  assert.ok(REPORT_PAGE_SOURCE.includes('"per-seat-performance"'), 'registered as a report page');
-  assert.ok(REPORT_PAGE_SOURCE.includes('id: continuation'), 'with a continuation page id when it splits by row');
-  assert.ok(REPORT_PAGE_SOURCE.includes('type: "per-seat-performance"'), 'with its print type');
+  assert.ok(REPORT_COMPOSITION_SOURCE.includes('"per-seat-performance"'), 'registered as a report page');
+  assert.ok(REPORT_COMPOSITION_SOURCE.includes('id: continuation'), 'with a continuation page id when it splits by row');
+  assert.ok(REPORT_COMPOSITION_SOURCE.includes('type: "per-seat-performance"'), 'with its print type');
   assert.ok(PRINT_PAGE_SOURCE.includes('printData?.type === "per-seat-performance"'), 'print dispatcher handles it');
   assert.ok(PRINT_PAGE_SOURCE.includes('row.label') === false, 'the dispatcher stays declarative');
 });

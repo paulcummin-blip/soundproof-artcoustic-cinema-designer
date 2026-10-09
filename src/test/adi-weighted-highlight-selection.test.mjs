@@ -137,7 +137,10 @@ test("Genesis: the strongest genuine stories are selected in rank order", () => 
   assert.equal(architecture.id, "immersive-layout");
   assert.equal(architecture.level, "L4");
   assert.match(architecture.explanation, /9\.1\.6/);
-  assert.equal(architecture.evidence[1].key, "P2 L4");
+  // The level travels as its own field, so the page renders it as the canonical
+  // pill — it is never written into the evidence label.
+  assert.equal(architecture.evidence[1].key, "P2");
+  assert.equal(architecture.evidence[1].level, "L4");
 
   const bassOutput = highlights[2];
   assert.equal(bassOutput.level, "L3");

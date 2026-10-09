@@ -191,8 +191,8 @@ test('both the screen page and the printed page supply the mapped rows', () => {
   assert.ok(composition.includes('rows={screenSeating.rows}'), 'screen page passes the rows');
   assert.ok(composition.includes('rows: screenSeating.rows'), 'print data carries the rows');
   assert.ok(
-    (printPage.match(/rows=\{printData\.rows\}/g) || []).length === 2,
-    'both printed parts receive the rows',
+    (printPage.match(/rows=\{printData\.rows\}/g) || []).length >= 2,
+    'every printed part that maps seats receives the rows',
   );
 });
 

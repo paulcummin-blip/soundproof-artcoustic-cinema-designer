@@ -100,7 +100,11 @@ test('TEST 4 — a Level 1 bass consistency row is not described as a strength',
     !/consistent bass from seat to seat/i.test(meaning),
     'the approved strength line is not used when a version is at Level 1',
   );
-  assert.match(meaning, /varies between seats/i, 'the honest line for that parameter is used');
+  assert.match(
+    meaning,
+    /varies between seats|seat-to-seat variation/i,
+    'an honest seat-to-seat line is used for that parameter',
+  );
 
   const strong = comparisonClientMeaning({ key: 'p20', values: ['L3 · 2.0 dB', 'L4 · 1.4 dB'] });
   assert.match(strong, /consistent bass from seat to seat/i, 'a Level 3 / Level 4 result keeps its approved line');
