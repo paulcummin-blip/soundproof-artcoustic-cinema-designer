@@ -2,12 +2,6 @@ import { useCallback, useMemo, useState, useEffect, useRef } from "react";
 import { useTooltipData } from "@/components/room/hooks/useTooltipData";
 import getSpeakerWallDepthCm from "@/components/room/rv/utils/getSpeakerWallDepthCm";
 import { formatDb } from '@/components/utils/formatDb';
-import {
-  CABINET_AIM_AT_RSP,
-  isCentreCabinetRole,
-  normaliseCentreCabinetAimMode,
-  resolveCentreCabinetYaw,
-} from '@/components/utils/frontStageModeAuthority';
 
 export function useSeatHoverLogic({
   seatingPositions,
@@ -132,27 +126,7 @@ export function useSeatHoverLogic({
       getCanonicalRole,
       getSpeakerModelMeta,
     });
-    // A dual-centre cabinet also reports its own horizontal aiming angle: the
-    // pair converges on the one RSP, so a symmetric installation reads equal and
-    // opposite angles for FCL and FCR.
-    const aimLine = isCentreCabinetRole(role)
-      ? (() => {
-          const aimMode = normaliseCentreCabinetAimMode(speaker.aim_mode);
-          if (aimMode !== CABINET_AIM_AT_RSP) return 'Aim: Straight ahead';
-          const yaw = resolveCentreCabinetYaw({
-            position: speaker.position,
-            aimMode,
-            rsp: mlp,
-          });
-          return `Aim: ${yaw > 0 ? '+' : ''}${yaw.toFixed(1)}° to RSP`;
-        })()
-      : null;
-    const text = [
-      `${role} — ${displayName}`,
-      `SPL @ RSP: ${splLabel}`,
-      `Distance from wall: ${Number.isFinite(wallDepthCm) ? `${wallDepthCm} cm` : '—'}`,
-      aimLine,
-    ].filter(Boolean).join('\n');
+    const text = `${role} — ${displayName}\nSPL @ RSP: ${splLabel}\nDistance from wall: ${Number.isFinite(wallDepthCm) ? `${wallDepthCm} cm` : '—'}`;
 
     setSpeakerTooltip({ visible: true, text, x: 0, y: 0 });
     handleIconMove(e, speaker);
