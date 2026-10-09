@@ -125,7 +125,10 @@ test('TEST 2 — the Visual Report keeps its pages, its order, and every print c
     'recommended-seating-position',
   ]);
   // The per-seat page keeps its own print composition and its row-split pages.
-  const summaryBlock = hook.slice(hook.indexOf('summaryPages.push({'), hook.indexOf('closingPages.push({'));
+  const summaryBlock = hook.slice(
+    hook.indexOf('summaryPages.push({'),
+    hook.indexOf('return [designSummaryPage'),
+  );
   assert.ok(summaryBlock.includes('type: "per-seat-performance"'), 'the per-seat page must keep its print composition');
   assert.ok(summaryBlock.includes('"per-seat-performance"'), 'the per-seat page must stay in the summary group');
   assert.deepEqual(pushedIds(hook, 'closingPages'), ['acoustic-treatment']);
