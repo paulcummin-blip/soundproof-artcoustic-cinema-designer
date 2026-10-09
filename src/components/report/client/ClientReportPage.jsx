@@ -34,6 +34,10 @@ import { getSeatGradeColors } from "@/components/report/client/visualReportSeatS
 import ReportPrintHeader from '@/components/report/ReportPrintHeader';
 import { REPORT_STRAPLINE } from '@/components/report/reportPrintHeader';
 import { clientReportHeaderMeta } from '@/components/report/client/clientReportHeaderMeta';
+import ProjectReportCover from '@/components/report/projectReport/ProjectReportCover';
+import ProjectReportParameterIndex from '@/components/report/projectReport/ProjectReportParameterIndex';
+import ProjectReportProducts from '@/components/report/projectReport/ProjectReportProducts';
+import { PROJECT_REPORT_TITLE } from '@/components/report/projectReport/projectReportIdentity';
 
 // Level → canonical grade colour for P12/P13 print result badges.
 // Derived from RP22_GRADE_TOKENS — the same authority as grading pills.
@@ -49,6 +53,9 @@ function printLevelColor(lvl) {
 // `client-report-page--no-print` in the print stylesheet) while the on-screen
 // report keeps showing it unchanged.
 const PRINTABLE_PAGE_TYPES = new Set([
+  "project-report-cover",
+  "parameter-index",
+  "products-selected",
   "p5",
   "p9",
   "highlights",
@@ -68,13 +75,30 @@ const PRINTABLE_PAGE_TYPES = new Set([
   "about-sound-proof",
 ]);
 
-export default function ClientReportPage({ children, isFirst, projectDetails, logoUrl, pageId, printData, version = null }) {
+export default function ClientReportPage({
+  children,
+  isFirst,
+  projectDetails,
+  logoUrl,
+  pageId,
+  printData,
+  version = null,
+  // The document's own name — the Project Report. Passed in from the report's
+  // identity authority so the masthead can never state an internal report name.
+  reportTitle = PROJECT_REPORT_TITLE,
+}) {
   // One project metadata line, composed once for the masthead: the same words
   // on screen and in the exported PDF, including the design version this report
   // documents.
   const metaLine = clientReportHeaderMeta(projectDetails, version);
 
-  const categoryFirst = printData?.categoryFirst !== false;
+  const sectionFirst = printData?.sectionFirst !== false;
+  const sectionContinued = printData?.sectionContinued === true;
+  // The canonical heading the composition authority resolved for this page —
+  // its RP22 category (from technicalParameterMeta) or its document section —
+  // with "— Continued" already stated for every page after the first of that
+  // section.
+  const sectionHeading = printData?.sectionHeading || null;
   // A page with no printable composition is never laid out for paper.
   const prints = PRINTABLE_PAGE_TYPES.has(printData?.type);
 
@@ -82,13 +106,16 @@ export default function ClientReportPage({ children, isFirst, projectDetails, lo
     <div
       className={`client-report-page print-avoid-break${isFirst ? " client-report-page--first" : ""}${prints ? "" : " client-report-page--no-print"}`}
       data-page-id={pageId}
-      data-category-first={categoryFirst ? "true" : "false"}
+      data-section-first={sectionFirst ? "true" : "false"}
+      data-section-continued={sectionContinued ? "true" : "false"}
     >
-      {/* Each report category heading is printed once. Continuation pages keep
-          their own subtitle but never repeat the major category heading. */}
+      {/* A category heading is repeated on every page of its section: the first
+          page states it, each later page states that it continues. The heading
+          always stays with the first content block beneath it, so it can never be
+          orphaned at the foot of a page. */}
       <style>{`
-        .client-report-page[data-category-first="false"] .client-report-print-heading__title { display: none; }
-        .client-report-page[data-category-first="false"] .client-report-print-heading { margin-bottom: 2mm; }
+        .client-report-page[data-section-continued="true"] .client-report-print-heading__title::after { content: " — Continued"; }
+        .client-report-print-heading { break-after: avoid; page-break-after: avoid; }
       `}</style>
       {/* First-page masthead — the Technical Report's cover structure: logo,
           brand strapline, small rule, the report title as the main headline,
@@ -98,7 +125,7 @@ export default function ClientReportPage({ children, isFirst, projectDetails, lo
       {isFirst && (
         <div className="client-report-page__header">
           <ReportPrintHeader
-            title="Visual Report"
+            title={reportTitle}
             project={projectDetails}
             meta={metaLine}
             className="client-report-print-only"
@@ -107,7 +134,7 @@ export default function ClientReportPage({ children, isFirst, projectDetails, lo
           <div className="client-report-page__header-strapline client-report-screen-only">{REPORT_STRAPLINE.title}</div>
           <div className="client-report-page__header-strapline client-report-page__header-strapline--sub client-report-screen-only">{REPORT_STRAPLINE.sub}</div>
           <div className="client-report-page__header-rule client-report-screen-only" />
-          <div className="client-report-page__header-title client-report-screen-only">Visual Report</div>
+          <div className="client-report-page__header-title client-report-screen-only">{reportTitle}</div>
           <div className="client-report-page__header-meta client-report-screen-only">
             <span>{metaLine}</span>
           </div>
@@ -139,7 +166,7 @@ export default function ClientReportPage({ children, isFirst, projectDetails, lo
         {printData?.type === "highlights" && (
           <>
             <div className="client-report-print-heading client-report-print-heading--centered">
-              <h1 className="client-report-print-heading__title">Design Summary</h1>
+              <h1 className="client-report-print-heading__title">{sectionHeading || "Design Summary"}</h1>
             </div>
             {/* The summary statement sits centred, with its own breathing room
                 below the heading rather than crowding it. */}
@@ -156,7 +183,7 @@ export default function ClientReportPage({ children, isFirst, projectDetails, lo
         {printData?.type === "best-listening-area" && (
           <>
             <div className="client-report-print-heading">
-              <h1 className="client-report-print-heading__title">Spatial Resolution</h1>
+              <h1 className="client-report-print-heading__title">{sectionHeading || "Spatial Resolution"}</h1>
               <p className="client-report-print-heading__subtitle">RP22 Parameters 4, 6 & 10 — Listening Quality Across the Seats</p>
             </div>
             <div className="client-report-print-drawing">
@@ -190,8 +217,8 @@ export default function ClientReportPage({ children, isFirst, projectDetails, lo
         {printData?.type === "timbre-consistency" && (
           <>
             <div className="client-report-print-heading">
-              <h1 className="client-report-print-heading__title">Timbre Matching</h1>
-              <p className="client-report-print-heading__subtitle">RP22 Parameters 16 & 17 — Consistent Sound Across the Seats</p>
+              <h1 className="client-report-print-heading__title">{sectionHeading || "Timbre Matching"}</h1>
+              <p className="client-report-print-heading__subtitle">RP22 Parameter 17 — Consistent Sound Across the Seats</p>
             </div>
             <div className="client-report-print-drawing">
               <ClientTimbreConsistency
@@ -232,7 +259,7 @@ export default function ClientReportPage({ children, isFirst, projectDetails, lo
           return (
             <>
               <div className="client-report-print-heading">
-                <h1 className="client-report-print-heading__title">Dynamic Range</h1>
+                <h1 className="client-report-print-heading__title">{sectionHeading || "Dynamic Range"}</h1>
                 <p className="client-report-print-heading__subtitle">RP22 Parameter 12 — Screen Speakers SPL Capability at RSP</p>
               </div>
               <div className="client-report-print-drawing">
@@ -278,7 +305,7 @@ export default function ClientReportPage({ children, isFirst, projectDetails, lo
           return (
             <>
               <div className="client-report-print-heading">
-                <h1 className="client-report-print-heading__title">Dynamic Range</h1>
+                <h1 className="client-report-print-heading__title">{sectionHeading || "Dynamic Range"}</h1>
                 <p className="client-report-print-heading__subtitle">RP22 Parameter 13 — Non-Screen Speakers SPL Capability at RSP</p>
               </div>
               <div className="client-report-print-drawing">
@@ -320,7 +347,7 @@ export default function ClientReportPage({ children, isFirst, projectDetails, lo
         {printData?.type === "screen-seating" && (
           <>
             <div className="client-report-print-heading">
-              <h1 className="client-report-print-heading__title">Viewing Experience</h1>
+              <h1 className="client-report-print-heading__title">{sectionHeading || "Viewing Experience"}</h1>
               <p className="client-report-print-heading__subtitle">RP23 — Screen Size &amp; Seating Position</p>
             </div>
             <div className="client-report-print-drawing">
@@ -386,7 +413,7 @@ export default function ClientReportPage({ children, isFirst, projectDetails, lo
         {printData?.type === "seating-position" && (
           <>
             <div className="client-report-print-heading">
-              <h1 className="client-report-print-heading__title">Spatial Resolution</h1>
+              <h1 className="client-report-print-heading__title">{sectionHeading || "Spatial Resolution"}</h1>
               <p className="client-report-print-heading__subtitle">RP22 Parameter 1 — Listener Distance from Room Boundaries</p>
             </div>
             <div className="client-report-print-drawing">
@@ -431,7 +458,7 @@ export default function ClientReportPage({ children, isFirst, projectDetails, lo
         {printData?.type === "p19-rsp" && (
           <>
             <div className="client-report-print-heading">
-              <h1 className="client-report-print-heading__title">Bass Performance</h1>
+              <h1 className="client-report-print-heading__title">{sectionHeading || "Detailed Bass Evidence"}</h1>
               <p className="client-report-print-heading__subtitle">RP22 Parameter 19 — Bass Response at the Reference Seating Position</p>
             </div>
             <div className="client-report-print-drawing">
@@ -476,6 +503,29 @@ export default function ClientReportPage({ children, isFirst, projectDetails, lo
         )}
         {printData?.type === "about-sound-proof" && (
           <AboutSoundProofReportPage html={printData.aboutHtml} />
+        )}
+        {/* 01 Cover — the project's own identity and the report's contents. */}
+        {printData?.type === "project-report-cover" && (
+          <ProjectReportCover
+            projectDetails={printData.projectDetails || projectDetails}
+            version={printData.version || version}
+            reference={printData.reference || null}
+            generatedOn={printData.generatedOn || null}
+            print
+          />
+        )}
+        {/* 04–06 Every parameter of the category, explicitly assessed — including
+            the parameters that carry no drawing page of their own. */}
+        {printData?.type === "parameter-index" && (
+          <ProjectReportParameterIndex
+            category={printData.category}
+            rows={printData.rows}
+            print
+          />
+        )}
+        {/* 10 Systems / Products Selected — the complete equipment schedule. */}
+        {printData?.type === "products-selected" && (
+          <ProjectReportProducts rows={printData.rows} print />
         )}
       </div>
 

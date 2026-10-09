@@ -30,6 +30,9 @@
 export const REPORT_SNAPSHOT_SCHEMA_VERSION = 1;
 
 export const REPORT_SNAPSHOT_TYPE = Object.freeze({
+  /** The consolidated Project Report — the whole engineering document. */
+  PROJECT: 'project',
+  /** Legacy Visual Report identity. No longer written; read for history only. */
   VISUAL: 'visual',
   TECHNICAL: 'technical',
   SYSTEM_DESIGN_SUMMARY: 'system_design_summary',
@@ -70,6 +73,7 @@ function asText(value) {
 /** Human label for a report type. */
 export function reportTypeLabel(reportType) {
   switch (reportType) {
+    case REPORT_SNAPSHOT_TYPE.PROJECT: return 'Project Report';
     case REPORT_SNAPSHOT_TYPE.VISUAL: return 'Visual Report';
     case REPORT_SNAPSHOT_TYPE.TECHNICAL: return 'Technical Report';
     case REPORT_SNAPSHOT_TYPE.SYSTEM_DESIGN_SUMMARY: return 'System Design Summary';

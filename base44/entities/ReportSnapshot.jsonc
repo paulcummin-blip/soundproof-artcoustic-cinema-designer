@@ -1,7 +1,7 @@
 {
   "name": "ReportSnapshot",
   "type": "object",
-  "description": "One saved report per project version and report type (Visual Report, Technical Report, System Design Summary). A report is saved against the project version when it is generated, and overwritten in place when it is regenerated. Reopening restores the saved report when the source fingerprints it was generated from still match; when a source input has moved on the saved report stays visible and is marked as generated before the latest changes, with Regenerate offered. The payload records the report's own identity: the engineering publication it was generated from, its frozen presentation inputs and its page inventory. It never copies an engineering value - every number in the saved report is read back from the immutable published engineering publication the payload points at, so the report remains a consumer of the single engineering authority rather than a second copy of it.",
+  "description": "One saved report per project version and report type (the consolidated Project Report, the Technical Report, the System Design Summary, and the legacy Visual Report type retained for history). A report is saved against the project version when it is generated, and overwritten in place when it is regenerated. Reopening restores the saved report when the source fingerprints it was generated from still match; when a source input has moved on the saved report stays visible and is marked as generated before the latest changes, with Regenerate offered. The payload records the report's own identity: the engineering publication it was generated from, its frozen presentation inputs and its page inventory. It never copies an engineering value - every number in the saved report is read back from the immutable published engineering publication the payload points at, so the report remains a consumer of the single engineering authority rather than a second copy of it.",
   "properties": {
     "project_id": {
       "type": "string",
@@ -18,11 +18,12 @@
     "report_type": {
       "type": "string",
       "enum": [
+        "project",
         "visual",
         "technical",
         "system_design_summary"
       ],
-      "description": "Which report this snapshot is. One saved report per project version and report type."
+      "description": "Which report this snapshot is. One saved report per project version and report type. 'project' = the consolidated Project Report (the client-facing engineering document; this is the type the Project Report route writes). 'visual' = legacy Visual Report identity, retained so reports saved under it remain readable history; it is no longer written. 'technical' = Technical Report. 'system_design_summary' = System Design Summary."
     },
     "report_schema_version": {
       "type": "integer",

@@ -15,6 +15,9 @@
  */
 
 export const ISSUED_DOCUMENT_TYPE = Object.freeze({
+  /** The consolidated Project Report — the client-facing engineering document. */
+  PROJECT: 'project',
+  /** Legacy Visual Report identity. Never written; listed for history only. */
   VISUAL: 'visual',
   TECHNICAL: 'technical',
   SYSTEM_DESIGN_SUMMARY: 'system_design_summary',
@@ -23,6 +26,7 @@ export const ISSUED_DOCUMENT_TYPE = Object.freeze({
 });
 
 export const ISSUED_DOCUMENT_LABEL = Object.freeze({
+  [ISSUED_DOCUMENT_TYPE.PROJECT]: 'Project Report',
   [ISSUED_DOCUMENT_TYPE.VISUAL]: 'Visual Report',
   [ISSUED_DOCUMENT_TYPE.TECHNICAL]: 'Technical Report',
   [ISSUED_DOCUMENT_TYPE.SYSTEM_DESIGN_SUMMARY]: 'System Design Summary',
@@ -32,6 +36,7 @@ export const ISSUED_DOCUMENT_LABEL = Object.freeze({
 
 /** The document types that belong to the Library's Generated Reports section. */
 export const REPORT_DOCUMENT_TYPES = Object.freeze([
+  ISSUED_DOCUMENT_TYPE.PROJECT,
   ISSUED_DOCUMENT_TYPE.VISUAL,
   ISSUED_DOCUMENT_TYPE.TECHNICAL,
   ISSUED_DOCUMENT_TYPE.SYSTEM_DESIGN_SUMMARY,
@@ -74,6 +79,14 @@ const PROPOSAL_PAGE_FRAME = Object.freeze({
  *   page margin) — the paper every stored report PDF has always used.
  */
 export const ISSUED_DOCUMENT_COMPOSITION = Object.freeze({
+  // The consolidated Project Report prints from the same mounted composition the
+  // Project Report route renders — the same node, the same page frames and the
+  // same export body class.
+  [ISSUED_DOCUMENT_TYPE.PROJECT]: Object.freeze({
+    nodeSelector: '.client-report-root',
+    pageSelector: '.client-report-page',
+    bodyClass: 'client-report-printing',
+  }),
   [ISSUED_DOCUMENT_TYPE.VISUAL]: Object.freeze({
     nodeSelector: '.client-report-root',
     pageSelector: '.client-report-page',

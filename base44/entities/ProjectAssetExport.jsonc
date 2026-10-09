@@ -14,13 +14,14 @@
     "document_type": {
       "type": "string",
       "enum": [
+        "project",
         "visual",
         "technical",
         "system_design_summary",
         "proposal",
         "comparison"
       ],
-      "description": "Which issued document this is: a Visual Report, a Technical Report, a System Design Summary, a single-version Proposal, or a System Design Comparison. Decides which Library section and label the asset appears under."
+      "description": "Which issued document this is: the consolidated Project Report, a Technical Report, a System Design Summary, a single-version Proposal, or a System Design Comparison. 'visual' is the legacy Visual Report identity, retained so documents issued under it remain readable history. Decides which Library section and label the asset appears under."
     },
     "title": {
       "type": "string",
