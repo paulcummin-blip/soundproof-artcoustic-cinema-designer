@@ -109,7 +109,7 @@ export default function BassHeadlinePills({ nowMs }) {
             {supportingText
               ? <div className="text-center text-[10px] text-[#625143]">{supportingText}</div>
               : null}
-            {pill.stale && <BassStateBadge state={authorityState} />}
+            <BassStateBadge state={authorityState} />
           </div>
         );
       })}
