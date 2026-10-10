@@ -85,6 +85,25 @@ export const METHOD_PAGE = Object.freeze({
   ]),
 });
 
+/**
+ * The seating-style page. Fixed, approved copy, held here with the other page
+ * copy. It states the seating style for what it is — a comfort and interior
+ * choice — and never as a performance result.
+ */
+export const SEATING_STYLE_PAGE = Object.freeze({
+  lead: 'Seating style is your own choice. Both of these alternatives work with the seating layout this design specifies.',
+  notes: Object.freeze([
+    {
+      title: 'A personal choice',
+      text: 'The style of seating is a comfort and interior decision rather than a technical one. Both alternatives are compatible with the seating layout described in this document.',
+    },
+    {
+      title: 'The layout stays the same',
+      text: 'The seating style itself does not change the system performance. What the engineering depends on is where the seating positions are, and that is what this design specifies.',
+    },
+  ]),
+});
+
 /** Appendix: method notes, references and the prediction disclaimer. */
 export const APPENDIX_PAGE = Object.freeze({
   title: 'Method and notes',

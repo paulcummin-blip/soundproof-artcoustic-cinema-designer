@@ -1,7 +1,7 @@
 {
   "name": "ProposalAsset",
   "type": "object",
-  "description": "A visual asset (image) attached to a project for use in reports and proposals. The project gallery is deliberately simple: one Cover Image plus Image 1 to Image 10, each with an optional caption. The slot field is the label authority. Legacy assets uploaded under the previous labelled model (front view, rear view, plan, elevation, construction, client logo, reference photography, technical drawings, documents, gallery) keep their asset_type and are placed into slots by the gallery mapping \u2014 they are never moved or deleted. Every image also carries a scope: project-wide (applies to every design version) or version-specific (applies only to the one version it is assigned to). An image with no scope recorded is project-wide, so every image uploaded before scope existed keeps working unchanged.",
+  "description": "A visual asset (image) attached to a project for use in reports and proposals. The project gallery is deliberately simple: one Cover Image plus Image 1 to Image 10, each with an optional caption. The slot field is the label authority. Legacy assets uploaded under the previous labelled model (front view, rear view, plan, elevation, construction, client logo, reference photography, technical drawings, documents, gallery) keep their asset_type and are placed into slots by the gallery mapping \u2014 they are never moved or deleted. Every image also carries a scope: project-wide (applies to every design version) or version-specific (applies only to the one version it is assigned to). An image with no scope recorded is project-wide, so every image uploaded before scope existed keeps working unchanged. Three further fields are presentation choices for the proposal only \u2014 whether the image may be placed in the document, whether it is grouped as a seating-style alternative, and which part of the frame its crop keeps. They change nothing about the stored file, the caption, the scope or any engineering value.",
   "properties": {
     "project_id": {
       "type": "string",
@@ -113,7 +113,39 @@
         "do_not_use"
       ],
       "default": "gallery",
-      "description": "How the Proposal Engine should use this image. 'cover' = available as cover image, 'gallery' = include in gallery, 'do_not_use' = ignore (GPT will skip). Superseded by proposal_importance for gallery images but retained for backward compatibility."
+      "description": "How the proposal's image plan may use this image. 'cover' = it occupies the cover slot of its scope, 'gallery' = it is available to the plan, 'do_not_use' = the designer has hidden it from the proposal, so the plan never places it. Presentation only: hiding an image removes it from the document and changes nothing about the stored file, the caption or the scope. Retained alongside proposal_importance for backward compatibility."
+    },
+    "seating_style": {
+      "type": "string",
+      "enum": [
+        "lounge",
+        "recliner"
+      ],
+      "nullable": true,
+      "default": null,
+      "description": "Marks the image as a seating-style alternative for the proposal's seating-style page: 'lounge' = lounge / sofa seating, 'recliner' = individual cinema recliners. Null = not a seating option, so the image takes part in the document's normal editorial placement instead. A seating-style image is presented as a comfort and interior choice and is never presented as a performance difference: the seating style does not change the system performance, only the actual seating positions do."
+    },
+    "focal_horizontal": {
+      "type": "string",
+      "enum": [
+        "left",
+        "centre",
+        "right"
+      ],
+      "nullable": true,
+      "default": "centre",
+      "description": "Which part of the frame a crop keeps horizontally. Null or unset reads as 'centre'. Simple focal point only \u2014 no crop coordinates are stored, and nothing here changes the stored file."
+    },
+    "focal_vertical": {
+      "type": "string",
+      "enum": [
+        "top",
+        "middle",
+        "bottom"
+      ],
+      "nullable": true,
+      "default": "middle",
+      "description": "Which part of the frame a crop keeps vertically. Null or unset reads as 'middle'. Used mainly by the cover and portrait crops, which are tighter than the full-width landscape."
     }
   },
   "required": [

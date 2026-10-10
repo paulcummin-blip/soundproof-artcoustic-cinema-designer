@@ -3,6 +3,7 @@ import { base44 } from '@/api/base44Client';
 import { Loader2, ImageOff } from 'lucide-react';
 import ImageUploadField from '@/components/proposal/ImageUploadField';
 import {
+  ASSET_SLOT,
   ASSET_SLOT_OPTIONS,
   slotAssetType,
   slotNumber,
@@ -18,6 +19,7 @@ import {
 } from '@/components/library/imageScopeAuthority';
 import ImageScopeBadge from '@/components/library/ImageScopeBadge';
 import ImageScopeSelect from '@/components/library/ImageScopeSelect';
+import ImageProposalControls from '@/components/library/ImageProposalControls';
 
 /**
  * Project gallery panel — one Cover Image plus Image 1 to Image 10.
@@ -202,6 +204,71 @@ export default function ProposalAssetsPanel({
     }
   };
 
+  /** Whether the proposal's image plan may place this image. */
+  const handleUsageChange = async (asset, usage) => {
+    if (!asset?.id) return;
+    try {
+      await base44.entities.ProposalAsset.update(asset.id, { usage });
+      setAssets((prev) => prev.map((a) => (a.id === asset.id ? { ...a, usage } : a)));
+    } catch (err) {
+      console.error('Failed to change image usage:', err);
+      alert('Failed to change this image usage. Please try again.');
+    }
+  };
+
+  /** The seating-style alternative this image stands for, if any. */
+  const handleSeatingChange = async (asset, seating_style) => {
+    if (!asset?.id) return;
+    const value = seating_style || null;
+    try {
+      await base44.entities.ProposalAsset.update(asset.id, { seating_style: value });
+      setAssets((prev) => prev.map((a) => (a.id === asset.id ? { ...a, seating_style: value } : a)));
+    } catch (err) {
+      console.error('Failed to change the seating option:', err);
+      alert('Failed to change this seating option. Please try again.');
+    }
+  };
+
+  /** Which part of the frame this image's crops keep. */
+  const handleFocalChange = async (asset, patch) => {
+    if (!asset?.id) return;
+    try {
+      await base44.entities.ProposalAsset.update(asset.id, patch);
+      setAssets((prev) => prev.map((a) => (a.id === asset.id ? { ...a, ...patch } : a)));
+    } catch (err) {
+      console.error('Failed to change the focal point:', err);
+      alert('Failed to change this focal point. Please try again.');
+    }
+  };
+
+  /**
+   * Move an image into this gallery's cover slot, and the image already there
+   * into the slot this one leaves. Both records, files, captions and scopes are
+   * kept: only the slot each image occupies is exchanged.
+   */
+  const handleUseAsCover = async (group, slot, asset) => {
+    if (!asset?.id || slot === ASSET_SLOT.COVER) return;
+    const current = assignmentsFor(group).bySlot[ASSET_SLOT.COVER] || null;
+    try {
+      if (current && current.id !== asset.id) {
+        await base44.entities.ProposalAsset.update(current.id, {
+          slot,
+          asset_type: slotAssetType(slot),
+          usage: 'gallery',
+        });
+      }
+      await base44.entities.ProposalAsset.update(asset.id, {
+        slot: ASSET_SLOT.COVER,
+        asset_type: 'cover_image',
+        usage: 'cover',
+      });
+      await load();
+    } catch (err) {
+      console.error('Failed to set the cover image:', err);
+      alert('Failed to set this image as the cover. Please try again.');
+    }
+  };
+
   if (!projectId) {
     return (
       <div className="p-8 text-center bg-white border border-[#DCDBD6] rounded-lg">
@@ -297,6 +364,19 @@ export default function ProposalAssetsPanel({
                         </>
                       )}
                     </div>
+
+                    {/* The proposal-side choices for this one image: whether it
+                        may be placed, as what, and how its crop is framed. */}
+                    {existing && (
+                      <ImageProposalControls
+                        asset={existing}
+                        canUseAsCover={slot !== ASSET_SLOT.COVER}
+                        onUsageChange={(usage) => handleUsageChange(existing, usage)}
+                        onSeatingChange={(value) => handleSeatingChange(existing, value)}
+                        onFocalChange={(patch) => handleFocalChange(existing, patch)}
+                        onUseAsCover={() => handleUseAsCover(group, slot, existing)}
+                      />
+                    )}
                   </div>
                 );
               })}

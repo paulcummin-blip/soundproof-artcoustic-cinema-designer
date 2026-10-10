@@ -23,9 +23,20 @@ import { resolveProposalComparison } from '@/components/proposal/comparisonDispl
 import ComparisonEvidenceState from '@/components/proposal/ComparisonEvidenceState';
 import ProposalCoverPage from '@/components/proposal/cover/ProposalCoverPage';
 import KeyPerformanceHighlightsTable from '@/components/proposal/KeyPerformanceHighlightsTable';
-import ProjectImagesBlock, { projectGalleryImages } from '@/components/proposal/ProjectImagesBlock';
+import ProjectImagesBlock from '@/components/proposal/ProjectImagesBlock';
 import ProjectImagesPage from '@/components/proposal/print/ProjectImagesPage';
 import { imagePagesFor } from '@/components/proposal/print/imagePageLayout';
+import ProposalImagePlacement from '@/components/proposal/print/ProposalImagePlacement';
+import ProposalImagePlacementStyles from '@/components/proposal/print/ProposalImagePlacementStyles';
+import SeatingStylePage from '@/components/proposal/print/SeatingStylePage';
+import {
+  SEATING_IMAGES_PER_PAGE,
+  composeSectionSlots,
+  planProposalImages,
+  resolveCoverAssetId,
+} from '@/components/proposal/images/proposalImagePlanner';
+import { validateProposalImagePlan } from '@/components/proposal/images/proposalImagePlanValidator';
+import { EDITORIAL_ROLE } from '@/components/proposal/images/proposalImagePlacementAuthority';
 import AtAGlancePage from '@/components/proposal/print/AtAGlancePage';
 import MethodPage from '@/components/proposal/print/MethodPage';
 import DecisionSummaryPage from '@/components/proposal/print/DecisionSummaryPage';
@@ -66,6 +77,9 @@ export default function ProposalPackDocument({
   const snapshot = proposal?.engineering_snapshot || null;
   const reportType = proposal?.proposal_type;
   const reportTypeLabel = getProposalTypeLabel(reportType);
+  // Held across renders, so a placement rule that is broken is reported once
+  // rather than on every re-render of the editor.
+  const reportedPlanRef = React.useRef(null);
   const generatedDate = proposal?.proposal_date || proposal?.created_date;
   const clientName = statementValue(snapshot?.project?.client_name) || null;
   const isDesignedPack = reportType !== 'single';
@@ -101,14 +115,66 @@ export default function ProposalPackDocument({
   const glance = isDesignedPack
     ? buildAtAGlance({ snapshot, projectName, projectReference, generatedDate })
     : { projectCards: [], roomCards: [], systemCards: [], packageRows: [] };
-  const gallery = projectGalleryImages(projectImages);
   const hasImagesSection = canonical.some((def) => def.type === 'room_images');
+
+  // ── Editorial image placement ────────────────────────────────────────────
+  // The document's images are planned before its pages are composed: the planner
+  // decides which stored source carries which page, in which crop, and how far
+  // apart a source may return. Presentation only — it reads the project's images
+  // and the composed section order, it never reads an engineering value, and it
+  // writes nothing.
+  const imagePlan = planProposalImages({
+    assets: projectImages,
+    sectionSlots: composeSectionSlots({
+      sections,
+      sectionTypes: canonical.map((def) => def.type),
+    }),
+    coverAssetId: resolveCoverAssetId({ assets: projectImages, coverImageUrl }),
+  });
+
+  // The spacing, crop and role rules, checked at layout time. A document that
+  // breaks one is reported and still prints: validation never blocks a pack.
+  const imagePlanCheck = validateProposalImagePlan(imagePlan);
+  const violationSignature = imagePlanCheck.violations
+    .map((violation) => `${violation.code}:${violation.detail}`)
+    .join(' | ');
+  if (!imagePlanCheck.valid && reportedPlanRef.current !== violationSignature) {
+    reportedPlanRef.current = violationSignature;
+    console.warn('[ProposalPack] image placement:', imagePlanCheck.violations);
+  }
+
+  const placementsBySection = imagePlan.bySection;
+
+  // The seating-style page is not a stored section and carries no narrative: it
+  // is composed from the images the designer grouped as seating options.
+  const seatingChunks = [];
+  for (let index = 0; index < imagePlan.seatingPlacements.length; index += SEATING_IMAGES_PER_PAGE) {
+    seatingChunks.push(imagePlan.seatingPlacements.slice(index, index + SEATING_IMAGES_PER_PAGE));
+  }
+  let seatingPagesPlaced = false;
 
   // Page order, with the numbers assigned as the pages are composed.
   let number = 1;
   const takeNumber = () => String((number += 1)).padStart(2, '0');
 
   const pages = [];
+
+  // The seating-style page: the large lifestyle alternatives, placed immediately
+  // before the closing section (the planner names that anchor) or at the end of
+  // the narrative when there is no closing section.
+  const pushSeatingPages = () => {
+    seatingChunks.forEach((chunk, index) => {
+      pages.push(
+        <SeatingStylePage
+          key={`seating:${index}`}
+          number={takeNumber()}
+          placements={chunk}
+          showCopy={index === 0}
+        />
+      );
+    });
+    seatingPagesPlaced = true;
+  };
 
   // One page carries the project, the room and the brief: no second page
   // restates the same facts.
@@ -155,6 +221,10 @@ export default function ProposalPackDocument({
   canonical
     .filter((def) => def.type !== 'cover')
     .forEach((def) => {
+      // The seating-style page sits before the section the planner anchors it to.
+      if (seatingChunks.length > 0 && !seatingPagesPlaced && def.type === imagePlan.seatingPageAnchorType) {
+        pushSeatingPages();
+      }
       const section = byType.get(def.type);
       if (!section) return;
       const title = section.title || def.title;
@@ -174,10 +244,15 @@ export default function ProposalPackDocument({
       });
 
       if (section.section_type === 'room_images') {
-        // Image-led: one image page per group of images, so four or more images
-        // become further image pages instead of shrinking everything to fit.
-        const imagePages = imagePagesFor(gallery.map(({ asset }) => asset));
-        if (imagePages.length === 0) {
+        // A dedicated gallery spread is kept ONLY when genuinely unused strong
+        // images remain. With two or three images the gallery is retired: those
+        // images already carry the document editorially, and repeating them here
+        // is exactly the gallery-first layout the editorial standard replaces.
+        const spreadImages = imagePlan.retainedGallery ? imagePlan.galleryImages : [];
+        if (spreadImages.length === 0) {
+          // No images page: either the document places its images editorially,
+          // or there are no images at all — which is stated, once.
+          if (imagePlan.usableCount > 0) return;
           pages.push(
             <section key={section.id} className="proposal-print-section pp-page pp-page--images">
               <ProposalPageHeader number={takeNumber()} kicker="Visualisation" title={displayTitle} />
@@ -186,7 +261,9 @@ export default function ProposalPackDocument({
           );
           return;
         }
-        imagePages.forEach((pageImages, index) => {
+        // Image-led: one image page per group of images, so four or more unused
+        // images become further image pages instead of shrinking to fit.
+        imagePagesFor(spreadImages).forEach((pageImages, index) => {
           pages.push(
             <ProjectImagesPage
               key={`${section.id}:${index}`}
@@ -236,19 +313,45 @@ export default function ProposalPackDocument({
         ? buildEvidenceCards(section.metadata?.highlight_rows, section.section_type)
         : [];
 
+      // The images this page carries. The planner decided which source, which
+      // crop and which page; the page only composes what it was given, so the
+      // document never places an image arbitrarily because space is free.
+      const media = placementsBySection[section.id] || [];
+      const landscape = media.find((placement) => placement.editorial_role === EDITORIAL_ROLE.LANDSCAPE_FEATURE
+        || placement.editorial_role === EDITORIAL_ROLE.CLOSING_FEATURE) || null;
+      const portrait = media.find((placement) => placement.editorial_role === EDITORIAL_ROLE.PORTRAIT_EDITORIAL) || null;
+
       pages.push(
         <section
           key={section.id}
-          className={`proposal-print-section pp-page pp-page--${section.section_type}`}
+          className={`proposal-print-section pp-page pp-page--${section.section_type}${media.length > 0 ? ' pp-page--imaged' : ''}`}
         >
           <ProposalPageHeader number={takeNumber()} kicker="Design" title={displayTitle} />
-          {body ? (
-            <div className="pp-body" dangerouslySetInnerHTML={{ __html: body }} />
-          ) : null}
+          {/* The dominant treatment leads the page: full-width, image-first. */}
+          {landscape ? <ProposalImagePlacement placement={landscape} /> : null}
+          {/* The portrait accent sits smaller, beside the copy it illustrates. */}
+          {portrait ? (
+            <div className="pp-media-row">
+              <div className="pp-media-row__copy">
+                {body ? (
+                  <div className="pp-body" dangerouslySetInnerHTML={{ __html: body }} />
+                ) : null}
+              </div>
+              <ProposalImagePlacement placement={portrait} />
+            </div>
+          ) : (
+            body ? <div className="pp-body" dangerouslySetInnerHTML={{ __html: body }} /> : null
+          )}
           {evidence.length > 0 ? <ProposalMetricCards cards={evidence} /> : null}
         </section>
       );
     });
+
+  // A seating-style page whose closing anchor was not composed still belongs in
+  // the document, after the narrative it supports.
+  if (seatingChunks.length > 0 && !seatingPagesPlaced) {
+    pushSeatingPages();
+  }
 
   const hasAppendixSection = canonical.some((def) => def.type === 'appendix');
   if (isDesignedPack && !hasAppendixSection) {
@@ -258,6 +361,7 @@ export default function ProposalPackDocument({
   return (
     <div className="proposal-print-portal">
       <ProposalPackStyles />
+      <ProposalImagePlacementStyles />
 
       <div className="proposal-print-cover">
         <ProposalCoverPage
@@ -269,6 +373,9 @@ export default function ProposalPackDocument({
           reportTypeLabel={reportTypeLabel}
           coverImageUrl={coverImageUrl}
           heroImageUrl={heroImageUrl}
+          // Where the planned cover crop is framed. Null (no plan) reads as
+          // centre / middle, which is the framing the cover has always used.
+          focalPoint={imagePlan.coverPlacement?.focal_point || null}
           logoUrl={logoUrl}
           generatedDate={generatedDate}
         />

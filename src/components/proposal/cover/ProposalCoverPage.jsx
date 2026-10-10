@@ -32,6 +32,7 @@ import { useBrandImage } from '@/components/account/useBrandImage';
 import { APPROVED_DEALER_BRANDING } from '@/components/account/defaultDealerBranding';
 import BrandLockup from '@/components/ui/BrandLockup';
 import CoverVersionBlock from '@/components/proposal/cover/CoverVersionBlock';
+import { objectPositionForFocalPoint } from '@/components/proposal/images/proposalImagePlacementAuthority';
 import { REPORT_FONT_BODY as FONT } from '@/components/report/typography/reportTypography';
 import {
   PROPOSAL_FONT_HEADING,
@@ -125,6 +126,9 @@ export default function ProposalCoverPage({
   heroImageUrl,
   logoUrl,
   generatedDate,
+  // Where the cover crop is framed: the plan's focal point for the cover
+  // placement, or null, which reads as centre / middle.
+  focalPoint = null,
 }) {
   // Approved art stays visible while a dealer upload loads, and a failed
   // upload returns to the approved default.
@@ -145,7 +149,13 @@ export default function ProposalCoverPage({
         alt=""
         aria-hidden="true"
         className="absolute inset-0 w-full h-full"
-        style={{ objectFit: 'cover', objectPosition: 'center', filter: 'brightness(0.94)' }}
+        style={{
+          objectFit: 'cover',
+          // The crop is framed on the planned focal point; centre / middle until
+          // one is chosen, which is the framing the cover has always used.
+          objectPosition: objectPositionForFocalPoint(focalPoint),
+          filter: 'brightness(0.94)',
+        }}
       />
 
       {/* Dark overlay — keeps white branding and text readable */}

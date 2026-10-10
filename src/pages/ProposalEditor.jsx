@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { useSearchParams, useNavigate, Link, Navigate } from 'react-router-dom';
 import { base44 } from '@/api/base44Client';
-import { getSectionDef, getSectionLabel, resolveSectionTitle } from '@/components/proposal/proposalSections';
+import { getSectionDef, getSectionLabel, resolveSectionTitle, getSectionsForProposalType } from '@/components/proposal/proposalSections';
 import KeyPerformanceHighlightsTable from '@/components/proposal/KeyPerformanceHighlightsTable';
 import { compactViewingResult } from '@/components/proposal/print/snapshotViewingRows';
 import { getProposalTypeLabel } from '@/components/proposal/proposalTypes';
@@ -25,6 +25,14 @@ import { resolveDealerIdentityName } from '@/components/account/dealerIdentityDi
 import ProposalWorkspaceToolbar from '@/components/proposal/ProposalWorkspaceToolbar';
 import ProposalCoverPage from '@/components/proposal/cover/ProposalCoverPage';
 import ProjectImagesBlock, { projectGalleryImages } from '@/components/proposal/ProjectImagesBlock';
+import ProposalImagePlacement from '@/components/proposal/print/ProposalImagePlacement';
+import SeatingStylePage from '@/components/proposal/print/SeatingStylePage';
+import {
+  composeSectionSlots,
+  planProposalImages,
+  resolveCoverAssetId,
+} from '@/components/proposal/images/proposalImagePlanner';
+import { EDITORIAL_ROLE } from '@/components/proposal/images/proposalImagePlacementAuthority';
 import { prepareSectionBody } from '@/components/proposal/sectionBodyAuthority';
 import { isHighChannelDesign } from '@/components/proposal/highChannelLayoutAuthority';
 import ProposalPrintDocument from '@/components/proposal/export/ProposalPrintDocument';
@@ -689,6 +697,21 @@ export default function ProposalEditor() {
     versionNameById,
   }), [projectContext.projectImages, proposal?.selected_version_ids, proposal?.version_id, versionNameById]);
 
+  // The same editorial image plan the printed pack composes, so the preview and
+  // the PDF place the same image on the same page in the same crop. The preview
+  // never re-plans, so it cannot disagree with the document that prints.
+  const imagePlan = useMemo(() => planProposalImages({
+    assets: packImages,
+    sectionSlots: composeSectionSlots({
+      sections,
+      sectionTypes: getSectionsForProposalType(proposal?.proposal_type).map((def) => def.type),
+    }),
+    coverAssetId: resolveCoverAssetId({
+      assets: packImages,
+      coverImageUrl: projectContext.coverImageUrl,
+    }),
+  }), [packImages, sections, proposal?.proposal_type, projectContext.coverImageUrl]);
+
   // ── Export — full proposal PDF ──
   // Exports the whole proposal (every enabled section). Section-level export is
   // not implemented, so it is deliberately not exposed.
@@ -877,9 +900,57 @@ export default function ProposalEditor() {
             const isActive = section.section_key === activeSectionKey;
             const editingThisSection = editingSectionId === section.id;
 
+            // The images this section carries, from the one plan the whole
+            // document was composed with: a landscape feature leads the page, a
+            // portrait accent sits smaller beside the copy it illustrates.
+            const media = imagePlan.bySection[section.id] || [];
+            const landscapePlacement = media.find((placement) => placement.editorial_role === EDITORIAL_ROLE.LANDSCAPE_FEATURE
+              || placement.editorial_role === EDITORIAL_ROLE.CLOSING_FEATURE) || null;
+            const portraitPlacement = media.find((placement) => placement.editorial_role === EDITORIAL_ROLE.PORTRAIT_EDITORIAL) || null;
+
+            const bodyEditor = (
+              <InlineRichTextEditor
+                html={prepareSectionBody(section.body, {
+                  title: section.title,
+                  sectionType: section.section_type,
+                  // The editor preview shows the same copy the PDF prints.
+                  highChannel: isHighChannelDesign(proposal?.engineering_snapshot),
+                })}
+                // In manual edit mode nothing auto-saves: Save commits and
+                // Cancel discards. Outside it, the normal autosave applies.
+                onSave={editingThisSection ? undefined : (html, editedAt) => handleBodySave(section.id, html, editedAt)}
+                onDirty={
+                  editingThisSection
+                    ? (html) => handleEditDirty(section.id, html)
+                    : (html, editedAt) => handleDirty(section.id, html, editedAt)
+                }
+                onUnloadSave={editingThisSection ? undefined : (html, editedAt) => handleUnloadSave(section.id, html, editedAt)}
+                editable={isActive && editingThisSection && !archived}
+                saveStatus={saveStatuses[section.id] || SAVE_STATUS.IDLE}
+              />
+            );
+
+            // The seating-style page is not a stored section: it is previewed
+            // where it prints, immediately before the closing section.
+            const showSeatingPreview = imagePlan.seatingPlacements.length > 0
+              && section.section_type === imagePlan.seatingPageAnchorType;
+
             return (
+              <React.Fragment key={section.id}>
+                {showSeatingPreview && (
+                  <div className="mb-12 border-t border-dashed border-[#DCDBD6] pt-8">
+                    <h2
+                      className="proposal-section-title text-[#1B1A1A] mb-4"
+                      style={proposalRoleStyle('header')}
+                    >
+                      Seating Style
+                    </h2>
+                    <div className="rounded-xl overflow-hidden border border-[#DCDBD6] p-6">
+                      <SeatingStylePage placements={imagePlan.seatingPlacements} showHeader={false} />
+                    </div>
+                  </div>
+                )}
               <div
-                key={section.id}
                 className={`mb-12 ${isActive ? '' : 'opacity-60'}`}
                 onClick={() => setActiveSectionKey(section.section_key)}
               >
@@ -933,9 +1004,20 @@ export default function ProposalEditor() {
 
                 {section.section_type === 'room_images' ? (
                   /* Project Images is imagery only: the uploaded project images,
-                     never generated narrative. */
+                     never generated narrative. A dedicated spread is kept only
+                     when genuinely unused strong images remain — otherwise the
+                     images already carry the document editorially, and repeating
+                     them here would be the gallery-first layout being replaced. */
                   <div>
-                    <ProjectImagesBlock images={packImages} />
+                    {imagePlan.retainedGallery ? (
+                      <ProjectImagesBlock images={imagePlan.galleryImages} />
+                    ) : (
+                      <p className="text-sm text-[#625143]" style={{ fontFamily: 'Didact Gothic, sans-serif' }}>
+                        {imagePlan.usableCount > 0
+                          ? `Images are placed editorially through this document — ${imagePlan.placements.length} placement${imagePlan.placements.length === 1 ? '' : 's'} from ${imagePlan.usableCount} source image${imagePlan.usableCount === 1 ? '' : 's'}.`
+                          : 'No project images selected.'}
+                      </p>
+                    )}
                     <div
                       className="flex items-center justify-between gap-4 mt-3 text-[11px] text-[#625143]"
                       style={{ fontFamily: 'Didact Gothic, sans-serif' }}
@@ -956,25 +1038,20 @@ export default function ProposalEditor() {
                     </div>
                   </div>
                 ) : def.canEditBody ? (
-                  <InlineRichTextEditor
-                    html={prepareSectionBody(section.body, {
-                      title: section.title,
-                      sectionType: section.section_type,
-                      // The editor preview shows the same copy the PDF prints.
-                      highChannel: isHighChannelDesign(proposal?.engineering_snapshot),
-                    })}
-                    // In manual edit mode nothing auto-saves: Save commits and
-                    // Cancel discards. Outside it, the normal autosave applies.
-                    onSave={editingThisSection ? undefined : (html, editedAt) => handleBodySave(section.id, html, editedAt)}
-                    onDirty={
-                      editingThisSection
-                        ? (html) => handleEditDirty(section.id, html)
-                        : (html, editedAt) => handleDirty(section.id, html, editedAt)
-                    }
-                    onUnloadSave={editingThisSection ? undefined : (html, editedAt) => handleUnloadSave(section.id, html, editedAt)}
-                    editable={isActive && editingThisSection && !archived}
-                    saveStatus={saveStatuses[section.id] || SAVE_STATUS.IDLE}
-                  />
+                  <div>
+                    {/* The dominant treatment leads the page, exactly as the
+                        printed pack composes it. */}
+                    {landscapePlacement ? (
+                      <ProposalImagePlacement placement={landscapePlacement} className="mb-4" />
+                    ) : null}
+                    {/* The portrait accent sits beside the copy, not above it. */}
+                    {portraitPlacement ? (
+                      <div className="pp-media-row">
+                        <div className="pp-media-row__copy">{bodyEditor}</div>
+                        <ProposalImagePlacement placement={portraitPlacement} />
+                      </div>
+                    ) : bodyEditor}
+                  </div>
                 ) : (
                   <div>
                     <div className="rounded-xl overflow-hidden shadow-lg" style={{ aspectRatio: '4/5' }}>
@@ -987,6 +1064,7 @@ export default function ProposalEditor() {
                         projectReference={projectContext.projectReference}
                         coverImageUrl={projectContext.coverImageUrl}
                         heroImageUrl={projectContext.heroImageUrl}
+                        focalPoint={imagePlan.coverPlacement?.focal_point || null}
                         logoUrl={projectContext.logoUrl}
                         generatedDate={proposal?.proposal_date || proposal?.created_date}
                       />
@@ -1031,6 +1109,7 @@ export default function ProposalEditor() {
                   </div>
                 )}
               </div>
+              </React.Fragment>
             );
           })}
         </div>
