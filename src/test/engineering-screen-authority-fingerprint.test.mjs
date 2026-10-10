@@ -91,8 +91,8 @@ const SPEAKERS = [
 ];
 
 const SUBS = [
-  { id: 'sub-1', model: 'sub3-12', enabled: true, position: { x: 0.9, y: 0.6 }, bottomHeightM: 0.1, rotationDeg: 0, positionSource: 'manual', tuning: { gainDb: 0, delayMs: 0, polarity: 0 } },
-  { id: 'sub-2', model: 'sub3-12', enabled: true, position: { x: 3.6, y: 0.6 }, bottomHeightM: 0.1, rotationDeg: 0, positionSource: 'manual', tuning: { gainDb: 0, delayMs: 0, polarity: 0 } },
+  { id: 'sub-1', model: 'sub3-12', enabled: true, position: { x: 0.9, y: 0.6 }, bottomHeightM: 0.1, rotationDeg: 0, positionSource: 'manual', legacyGroup: null, symmetryLinkId: null, gainDb: 0, delayMs: 0, polarity: 1 },
+  { id: 'sub-2', model: 'sub3-12', enabled: true, position: { x: 3.6, y: 0.6 }, bottomHeightM: 0.1, rotationDeg: 0, positionSource: 'manual', legacyGroup: null, symmetryLinkId: null, gainDb: 0, delayMs: 0, polarity: 1 },
 ];
 
 /** The design state the Room Designer hands to the fingerprint. */
@@ -203,8 +203,7 @@ test('4. genesis manual-TV design survives save → load with its engineering id
   assert.deepEqual(loaded.screen.manualSize, original.screen.manualSize);
 
   const subFacts = (subs) => (subs || []).map((sub) => [
-    sub.id, sub.model, sub.position?.x, sub.position?.y,
-    sub.tuning?.gainDb ?? sub.gainDb, sub.tuning?.delayMs ?? sub.delayMs, sub.enabled,
+    sub.id, sub.model, sub.position?.x, sub.position?.y, sub.gainDb, sub.delayMs, sub.polarity, sub.enabled,
   ]);
   assert.deepEqual(subFacts(hydrated.subwooferInstances), subFacts(original.subwooferInstances));
 });
@@ -335,6 +334,14 @@ test('7. an active preset is authority; an inactive manual backup is not', () =>
   assert.notEqual(fingerprintOf(designState({ screen: preset({ tvWidthMm: 2240, visibleWidthInches: 88.19 }) })),
     canonical, 'changing the active preset width in millimetres changes the design identity');
 
-  assert.equal(fingerprintOf(designState({ screen: preset({ presetVisibleWidthInches: 100.23118676932316, manualWidthM: 2.5458721439408083 }) })),
-    canonical, 'an inactive manual backup cannot change the design identity');
+  // Only the INACTIVE manual branch is mutated. In preset mode the preset backup
+  // holds the active preset's own geometry, so it is not an inactive input.
+  const leakedManualBackup = preset({
+    manualMode: true,
+    manualWidthM: 2.5458721439408083,
+    manualHeightM: 1.4320530809667047,
+    manualSize: { enabled: false, displayType: 'tv', mode: 'wh', widthM: 2.55, heightM: 1.43, diagonalInches: 100 },
+  });
+  assert.equal(fingerprintOf(designState({ screen: leakedManualBackup })), canonical,
+    'an inactive manual backup cannot change the design identity while a preset is active');
 });
