@@ -23,7 +23,7 @@ import { createClientFromRequest } from 'npm:@base44/sdk@0.8.52';
 import { buildEngineeringEvidence } from '../../shared/engineeringSnapshotEvidence.js';
 import { buildAuthorityChips, resolveNarrativeChips } from '../../shared/adiNarrativeAuthority.js';
 import { buildComparisonAuthorityChips, resolveComparisonNarrativeChips } from '../../shared/adiComparisonNarrativeChips.js';
-import { buildNarrativeFacts, buildNarrativeFactsBlock } from '../../shared/adiNarrativeFacts.js';
+import { buildDisplayLanguageRule, buildNarrativeFacts, buildNarrativeFactsBlock } from '../../shared/adiNarrativeFacts.js';
 import { resolveReportLayout } from '../../shared/highChannelDensityRule.js';
 import {
   buildClientFacingParameterRule,
@@ -59,7 +59,7 @@ const REPORT_TYPE_LABELS = {
   system_summary: 'a System Design Summary covering one design version',
 };
 
-function buildPrompt({ evidence, factsBlock, authorityChips, proposalType, versionCount, projectName, highDensity, parameterRule }) {
+function buildPrompt({ evidence, factsBlock, authorityChips, proposalType, versionCount, projectName, highDensity, parameterRule, displayRule }) {
   return [
     evidence,
     '',
@@ -82,6 +82,7 @@ function buildPrompt({ evidence, factsBlock, authorityChips, proposalType, versi
     '',
     'RULES:',
     parameterRule,
+    displayRule,
     '- State only values that appear in THIS PROJECT VERSION above. Never write a number that is not in that block.',
     '- Every number is checked against the project data before the designer sees the chip: a screen size, level, channel count, subwoofer count, dB, Hz or angle figure that does not match this version is discarded.',
     '- If a fact is not in that block, write the point without a number (for example, the screen scale and viewing geometry) instead of guessing a value.',
@@ -107,7 +108,7 @@ function buildPrompt({ evidence, factsBlock, authorityChips, proposalType, versi
  * rule that a suggestion is about the versions together — never one version's
  * fact presented as though it applied to the whole comparison.
  */
-function buildComparisonPrompt({ versions, authorityChips, projectName, parameterRule }) {
+function buildComparisonPrompt({ versions, authorityChips, projectName, parameterRule, displayRule }) {
   const names = versions.map((entry, index) => entry.version_name || entry.version_id || `Version ${index + 1}`);
   const blocks = versions.map((entry, index) => [
     `=== VERSION: ${names[index]} ===`,
@@ -137,6 +138,7 @@ function buildComparisonPrompt({ versions, authorityChips, projectName, paramete
     '',
     'RULES:',
     parameterRule,
+    displayRule,
     '- Every suggestion must compare the selected versions, or state a fact that is true of EVERY selected version. Never write a suggestion that states one version\'s fact as though it applied to the whole comparison.',
     '- Prefer the areas the comparison is built on: dynamic range, bass layout, spatial resolution, speaker layout, screen and seating experience, viewing experience, system scale, upgrade benefits, which system is stronger.',
     `- Name a version only by its exact saved name (${names.join(', ')}).`,
@@ -217,6 +219,11 @@ export default async function (req) {
             authorityChips,
             projectName: versionEntries[0]?.snapshot?.project?.name || snapshot?.project?.name || null,
             parameterRule,
+            // Every selected version being a television is what makes the TV
+            // display rule safe to state for the comparison as a whole.
+            displayRule: versionEntries.every((entry) => entry.facts.screen.isTv)
+              ? buildDisplayLanguageRule(versionEntries[0].facts)
+              : '',
           }),
           response_json_schema: SUGGESTIONS_JSON_SCHEMA,
         });
@@ -268,6 +275,7 @@ export default async function (req) {
           projectName: snapshot?.project?.name || null,
           highDensity: resolveReportLayout(snapshot).highDensity,
           parameterRule,
+          displayRule: buildDisplayLanguageRule(facts),
         }),
         response_json_schema: SUGGESTIONS_JSON_SCHEMA,
       });

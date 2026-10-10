@@ -131,9 +131,13 @@ function parameterLine(facts, ids) {
 
 function screenSeatingLine(facts) {
   const parts = [
-    facts?.screen?.available && Number.isFinite(facts.screen.sizeInches)
-      ? `${facts.screen.sizeInches}"${facts.screen.aspectRatio ? ` ${facts.screen.aspectRatio}` : ''} screen`
-      : null,
+    // A television by its authoritative diagonal and the noun TV; a projection
+    // screen by its screen size and aspect ratio, exactly as before.
+    facts?.screen?.isTv
+      ? (facts.screen.tvDisplayPhrase || null)
+      : facts?.screen?.available && Number.isFinite(facts.screen.sizeInches)
+        ? `${facts.screen.sizeInches}"${facts.screen.aspectRatio ? ` ${facts.screen.aspectRatio}` : ''} screen`
+        : null,
     Number.isFinite(facts?.seating?.seats) ? `${facts.seating.seats} seats` : null,
     Number.isFinite(facts?.seating?.rows) ? `${facts.seating.rows} rows` : null,
   ].filter(Boolean);
@@ -219,8 +223,12 @@ export function buildComparisonAuthorityChips(versions = []) {
   }
 
   if (everyVersion(list, screenSeatingLine)) {
+    // A television is never described as a screen, so an all-television
+    // comparison is offered as the viewing experience it is.
     core.push(chip(
-      'Compare the screen and seating experience',
+      everyVersion(list, (facts) => facts?.screen?.isTv === true)
+        ? 'Compare the viewing experience and seating'
+        : 'Compare the screen and seating experience',
       perVersion(list, screenSeatingLine),
       ['snapshot.room.screen', 'snapshot.room.seating (every selected version)'],
       [],

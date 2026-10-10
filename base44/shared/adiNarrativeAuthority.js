@@ -48,6 +48,9 @@ import {
 /** The generic screen example, used when this version states no screen. */
 export const SCREEN_GENERIC_CHIP = 'Emphasise the screen scale and viewing geometry';
 
+/** The generic television example, used when a version states a TV without a diagonal. */
+export const TV_GENERIC_CHIP = 'Highlight the immersive viewing experience from the TV';
+
 /** How many deterministic examples the authority builds. */
 export const AUTHORITY_CHIP_LIMIT = 8;
 
@@ -85,12 +88,34 @@ const UNIT_RULES = Object.freeze([
 
 function screenSizeAllowed(facts, _value, context) {
   const allowed = new Set();
+  // A television states one figure only: its authoritative diagonal. A viewable
+  // width, a preset width or a screen size is never stated for a TV.
+  if (facts.screen.isTv) {
+    if (Number.isFinite(facts.screen.diagonalInches)) {
+      allowed.add(String(facts.screen.diagonalInches));
+      allowed.add(String(Math.round(facts.screen.diagonalInches)));
+    }
+    return allowed.size === 0 ? null : allowed;
+  }
   if (Number.isFinite(facts.screen.sizeInches)) allowed.add(String(facts.screen.sizeInches));
   if (/viewable/i.test(context) && Number.isFinite(facts.screen.viewableWidthInches)) {
     allowed.add(String(facts.screen.viewableWidthInches));
   }
   return allowed.size === 0 ? null : allowed;
 }
+
+/**
+ * For a television, the display is never named as a screen or a projector.
+ * These match the display being described as a screen — never the RP22 'screen'
+ * result names (P12 screen Dynamic Range, P16 screen timbre), which stay as they
+ * are.
+ */
+const TV_FORBIDDEN_DISPLAY_RE = Object.freeze([
+  /\bprojector\b/i,
+  /\b\d+(?:\.\d+)*\s*(?:inch(?:es)?|["”])\s*screens?\b/i,
+  /\bscreens?\s+(?:size|scale|width|height|diagonal)\b/i,
+  /\bviewable\s+width\b/i,
+]);
 
 function chip(label, reason, sourceFields, sourceValues) {
   return { label, reason, source: 'authority', sourceFields, sourceValues };
@@ -102,6 +127,51 @@ function levelPrefix(entry) {
 }
 
 /**
+ * The canonical television example: the display's own diagonal and the noun TV,
+ * never a screen, an aspect ratio or an image width.
+ */
+function tvDisplayChip(facts) {
+  return facts.screen.tvDisplayPhrase
+    ? chip(
+      `Emphasise the ${facts.screen.tvDisplayPhrase}`,
+      'The television this version states, by its diagonal size.',
+      ['snapshot.room.screen.display_type', 'snapshot.room.screen.diagonal_inches'],
+      [facts.screen.tvDisplayPhrase],
+    )
+    : chip(
+      TV_GENERIC_CHIP,
+      'This version states a television, so the example carries no number.',
+      ['snapshot.room.screen.display_type'],
+      [],
+    );
+}
+
+/**
+ * The display example for this version.
+ *
+ * A television is stated by its authoritative diagonal and the noun TV — never
+ * by a viewable width, a preset width or an aspect ratio. A projection screen
+ * keeps the existing screen size and aspect ratio wording.
+ */
+function displayChip(facts) {
+  if (facts.screen.isTv) return tvDisplayChip(facts);
+  if (facts.screen.available && Number.isFinite(facts.screen.sizeInches)) {
+    return chip(
+      `Emphasise the ${facts.screen.sizeInches} inch${facts.screen.aspectRatio ? ` ${facts.screen.aspectRatio}` : ''} screen`,
+      'Screen size and aspect ratio as stated for this version.',
+      ['snapshot.room.screen.size_inches', 'snapshot.room.screen.aspect_ratio'],
+      [String(facts.screen.sizeInches), facts.screen.aspectRatio].filter(Boolean),
+    );
+  }
+  return chip(
+    SCREEN_GENERIC_CHIP,
+    'This version states no screen size, so the example carries no number.',
+    ['snapshot.room.screen'],
+    [],
+  );
+}
+
+/**
  * The deterministic examples, assembled from the calculated facts. Every value
  * in the label comes from a named snapshot field; where a fact is missing the
  * example is either omitted or stated without a number.
@@ -109,23 +179,9 @@ function levelPrefix(entry) {
 export function buildAuthorityChips(facts) {
   if (!facts?.available) return [];
   const chips = [];
-  const { screen, channels, seating, parameters } = facts;
+  const { channels, seating, parameters } = facts;
 
-  if (screen.available && Number.isFinite(screen.sizeInches)) {
-    chips.push(chip(
-      `Emphasise the ${screen.sizeInches} inch${screen.aspectRatio ? ` ${screen.aspectRatio}` : ''} screen`,
-      'Screen size and aspect ratio as stated for this version.',
-      ['snapshot.room.screen.size_inches', 'snapshot.room.screen.aspect_ratio'],
-      [String(screen.sizeInches), screen.aspectRatio].filter(Boolean),
-    ));
-  } else {
-    chips.push(chip(
-      SCREEN_GENERIC_CHIP,
-      'This version states no screen size, so the example carries no number.',
-      ['snapshot.room.screen'],
-      [],
-    ));
-  }
+  chips.push(displayChip(facts));
 
   if (channels.configuration) {
     chips.push(chip(
@@ -289,13 +345,24 @@ export function validateNarrativeChip(label, facts, policy = null) {
     }
   }
 
+  // ── Display language: a television is never described as a screen. ──
+  if (facts.screen.isTv) {
+    for (const pattern of TV_FORBIDDEN_DISPLAY_RE) {
+      const match = pattern.exec(text);
+      if (match) violations.push({ rule: 'display_noun', value: match[0], allowed: 'TV' });
+    }
+  }
+
   let working = text;
 
   // ── Aspect ratio: a stated aspect must be this design's aspect. ──
+  // A television is never described by an aspect ratio, so the aspect a TV may
+  // state is none at all.
+  const allowedAspect = facts.screen.displayAspectRatio ?? null;
   for (const match of text.matchAll(/(\d+(?:\.\d+)*)\s*:\s*(\d+(?:\.\d+)*)/g)) {
     const value = `${match[1]}:${match[2]}`;
-    if (!facts.screen.aspectRatio || value !== facts.screen.aspectRatio) {
-      violations.push({ rule: 'aspect_ratio', value, allowed: facts.screen.aspectRatio });
+    if (!allowedAspect || value !== allowedAspect) {
+      violations.push({ rule: 'aspect_ratio', value, allowed: allowedAspect });
     }
   }
   if (facts.screen.aspectRatio) working = working.split(facts.screen.aspectRatio).join(' ');
@@ -354,8 +421,27 @@ export function validateNarrativeChip(label, facts, policy = null) {
  * example (or to the generic wording when this version states no screen).
  */
 function rewriteChip(label, check, facts) {
-  const screenOnly = check.violations.length > 0
-    && check.violations.every((violation) => violation.rule === 'screen_size');
+  const violations = check.violations || [];
+
+  // A television: an example that describes the display as something else — a
+  // screen, an aspect ratio, an image width — is replaced by the canonical TV
+  // example, so refreshing the examples can never reintroduce screen wording.
+  if (facts.screen.isTv) {
+    const describesDisplay = violations.some((violation) => violation.rule === 'screen_size'
+      || violation.rule === 'aspect_ratio'
+      || violation.rule === 'display_noun');
+    if (!describesDisplay) return null;
+    const display = tvDisplayChip(facts);
+    return {
+      label: display.label,
+      reason: 'The display in this example did not match this version, so it was rewritten from the television this version states.',
+      sourceFields: display.sourceFields,
+      sourceValues: display.sourceValues,
+    };
+  }
+
+  const screenOnly = violations.length > 0
+    && violations.every((violation) => violation.rule === 'screen_size');
   if (!screenOnly || !/screen/i.test(label)) return null;
 
   if (facts.screen.available && Number.isFinite(facts.screen.sizeInches)) {

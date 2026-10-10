@@ -21,6 +21,7 @@ import {
   splitParameterEvidence,
 } from './adiReportEvidenceRules.js';
 import { summariseSubwooferConfiguration } from './subwooferConfigurationSummary.js';
+import { readDisplayIdentity } from './canonicalDisplayIdentity.js';
 
 export const NUMBER_RE = /\d+(?:\.\d+)*/g;
 
@@ -89,11 +90,28 @@ export function buildNarrativeFacts(snapshot) {
   const layout = system.channel_layout || {};
   const screenRaw = room.screen || {};
 
+  // The display's own identity, read from the frozen snapshot's canonical fields
+  // — `display_type` and the authoritative diagonal — and never reconstructed
+  // from a viewable width, a preset width or an aspect ratio. A television is
+  // stated by its diagonal and the noun TV; a projection screen keeps the
+  // existing screen size and aspect ratio wording.
+  const display = readDisplayIdentity(screenRaw);
+
   const screen = {
+    // What kind of display this version has: 'tv' or 'projector_screen'.
+    displayType: display.displayType,
+    isTv: display.isTv,
+    // A television's authoritative diagonal, and the client-facing phrase for it.
+    diagonalInches: display.diagonalInches,
+    tvDisplayPhrase: display.tvPhrase,
+    // The projection-screen facts, read exactly as before.
     sizeInches: toNumber(screenRaw.size_inches),
     viewableWidthInches: toNumber(screenRaw.viewable_width_inches),
     aspectRatio: screenRaw.aspect_ratio ? String(screenRaw.aspect_ratio) : null,
   };
+  // A television is never described by an aspect ratio, so the aspect one may
+  // state is none at all.
+  screen.displayAspectRatio = screen.isTv ? null : screen.aspectRatio;
   screen.available = Number.isFinite(screen.sizeInches) || screenRaw.manual_dimensions === true;
 
   // The subwoofer configuration is read from this version's own subwoofer
@@ -220,7 +238,13 @@ export function buildNarrativeFactsBlock(facts) {
   if (!facts?.available) return '';
   const lines = ['=== THIS PROJECT VERSION (the only values a suggestion may state) ==='];
 
-  if (facts.screen.available && Number.isFinite(facts.screen.sizeInches)) {
+  if (facts.screen.isTv) {
+    // A television is stated by its diagonal size and the noun TV only: no
+    // aspect ratio, no image width, and never the noun screen.
+    lines.push(facts.screen.tvDisplayPhrase
+      ? `Display: ${facts.screen.tvDisplayPhrase}. This design's display is a TELEVISION: describe it by that diagonal size and the noun TV only, and where the data supports it emphasise the viewing immersion it gives. Never call it a screen, never state an aspect ratio, and never state an image width, height or preset width.`
+      : 'Display: a television. Never state a size, an aspect ratio or an image width, and never call it a screen.');
+  } else if (facts.screen.available && Number.isFinite(facts.screen.sizeInches)) {
     const viewable = Number.isFinite(facts.screen.viewableWidthInches)
       && facts.screen.viewableWidthInches !== facts.screen.sizeInches
       ? ` (${facts.screen.viewableWidthInches}" viewable width)`
@@ -265,6 +289,19 @@ export function buildNarrativeFactsBlock(facts) {
   lines.push(`Viewing (RP23): ${facts.viewing.available ? `assessed${facts.viewing.floor ? `, ${facts.viewing.floor}` : ''}` : 'not calculated for this version'}`);
   lines.push('=== END THIS PROJECT VERSION ===');
   return lines.join('\n');
+}
+
+/**
+ * The display rule handed to the ADI writer, so a suggestion never describes the
+ * display as something it is not: a television is TV language by its diagonal
+ * size, a projection screen keeps the existing screen and aspect-ratio wording.
+ */
+export function buildDisplayLanguageRule(facts) {
+  if (!facts?.screen?.available) return '';
+  if (facts.screen.isTv) {
+    return `- This design's display is a TELEVISION${facts.screen.tvDisplayPhrase ? ` (${facts.screen.tvDisplayPhrase})` : ''}: describe it by its diagonal size and the noun TV only, and where the data supports it emphasise the viewing immersion the television gives. Never call it a screen, never mention an aspect ratio, and never mention an image width, height or preset width.`;
+  }
+  return '- This design uses a projection screen: state its screen size and aspect ratio as the calculated data gives them.';
 }
 
 export default buildNarrativeFacts;
