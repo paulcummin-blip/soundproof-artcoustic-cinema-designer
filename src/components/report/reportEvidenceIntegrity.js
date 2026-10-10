@@ -1,5 +1,6 @@
 import { buildReportEvidence } from './reportEvidenceAuthority';
 import { readReportParameter } from './reportParameterEvidence';
+import { compareOptionalCurveReference } from '@/shared/pinnedReportEvidenceParity';
 
 const stable = value => JSON.stringify(value, (key, v) => v && typeof v === 'object' && !Array.isArray(v)
   ? Object.fromEntries(Object.keys(v).sort().map(k => [k, v[k]])) : v);
@@ -31,7 +32,9 @@ export default function reportEvidenceIntegrity(evidence, captured, reportType) 
     if (Number(row.parameter_id) === 5 && actual?.scope === 'room')
       mismatches.push({ area: 'parameter_scope', key, evidence: 'room', report: 'seat-scoped', blocking: true });
   }
-  for (const key of ['p19', 'rsp_curve_ref']) compare('bass', key, evidence?.bass?.[key], expected.bass[key]);
+  compare('bass', 'p19', evidence?.bass?.p19, expected.bass.p19);
+  if (!compareOptionalCurveReference(evidence?.bass?.rsp_curve_ref, expected.bass.rsp_curve_ref))
+    compare('bass', 'rsp_curve_ref', evidence?.bass?.rsp_curve_ref, expected.bass.rsp_curve_ref);
   compare('bass', 'rsp_bass', evidence?.seating?.rsp_bass, expected.seating.rsp_bass);
   compare('bass', 'current', evidence?.bass?.current, expected.bass.current);
   return mismatches;

@@ -1,0 +1,1 @@
+export { evidenceFingerprint } from '../../shared/reportEvidenceFingerprint.js';

@@ -20,6 +20,7 @@ import { EVIDENCE_REQUIRED_PARAMETERS, validateReportEvidence } from './reportEv
 import { PRODUCTS_SELECTED_ROWS } from './reportProductsSelected';
 import reportEvidenceIntegrity from './reportEvidenceIntegrity';
 import { renderReportProduct } from './reportStructuredProducts';
+import { checkPinnedReportEvidenceParity } from '@/shared/pinnedReportEvidenceParity';
 
 /** Values are compared for equality after this normalisation — glyph only. */
 function normaliseValue(value) {
@@ -237,7 +238,8 @@ function viewingMismatches(evidence, captured) {
  *
  * @returns {{passed: boolean, mismatches: Array, missing: Array}}
  */
-export function checkReportEvidenceParity({ evidence, captured, reportType = null } = {}) {
+export function checkReportEvidenceParity({ evidence, captured, reportType = null, pinnedPublication = null, snapshot = null } = {}) {
+  if (pinnedPublication && snapshot) return checkPinnedReportEvidenceParity({ evidence, publication: pinnedPublication, snapshot });
   const validation = validateReportEvidence(evidence, reportType, { requireProposalReady: false });
   const mismatches = [
     ...reportEvidenceIntegrity(evidence, captured, reportType),

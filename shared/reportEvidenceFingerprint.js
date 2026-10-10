@@ -1,0 +1,1 @@
+export { evidenceFingerprint } from '../base44/shared/reportEvidenceFingerprint.js';
