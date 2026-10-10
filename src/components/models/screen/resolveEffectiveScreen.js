@@ -63,15 +63,26 @@ export function isManualOverrideActive(screen) {
  * Resolve the effective visible width in inches, accounting for manual override.
  * Checks manualSize FIRST, then TV preset, then visibleWidthInches.
  */
+/** Preset key → viewable width in inches. One map, so a preset a design states
+ * resolves to the same width wherever that design is read. */
+export const TV_PRESET_KEY_TO_INCHES = Object.freeze({
+  tv65: 55.55,
+  tv77: 67.36,
+  tv83: 72.52,
+  tv100: 87.80,
+});
+
+/** The aspect a screen is read with when the design itself states none. */
+const DEFAULT_SCREEN_ASPECT = "16:9";
+
 export function resolveEffectiveVisibleWidthInches(screen) {
   if (!screen) return 100;
 
   const manual = computeManualDimensions(screen.manualSize);
   if (manual) return manual.widthInches;
 
-  const TV_KEY_TO_INCHES = { tv65: 55.55, tv77: 67.36, tv83: 72.52, tv100: 87.80 };
-  if (screen.tvPresetKey && TV_KEY_TO_INCHES[screen.tvPresetKey]) {
-    return TV_KEY_TO_INCHES[screen.tvPresetKey];
+  if (screen.tvPresetKey && TV_PRESET_KEY_TO_INCHES[screen.tvPresetKey]) {
+    return TV_PRESET_KEY_TO_INCHES[screen.tvPresetKey];
   }
   const tvMm = Number(screen.tvWidthMm);
   if (Number.isFinite(tvMm) && tvMm > 0) return tvMm / 25.4;
@@ -184,4 +195,118 @@ export function applyManualOverrideToScreen(prev, next) {
   }
 
   return { ...next, ...manualFields };
+}
+
+/* ───────────────────────────────────────────────────────────────────────────
+ * Inactive-branch authority
+ *
+ * A screen carries both display branches at once: the active one, and the
+ * INACTIVE backup kept so the other mode can be restored (the preset width kept
+ * while a manual override is on, the manual geometry kept while a preset is
+ * active). Only the ACTIVE branch is design authority. The helpers below state
+ * the inactive branch canonically, so a save/load round trip — or any later
+ * write into that backup — can never change the design's engineering identity.
+ * ─────────────────────────────────────────────────────────────────────────── */
+
+/**
+ * The canonical UNSET preset: the geometry the screen authority resolves when a
+ * design states no preset at all. It is the authority for the inactive preset
+ * branch of a manual display, exactly as it is for a design with no override.
+ */
+export function resolveCanonicalUnsetPreset() {
+  return {
+    visibleWidthInches: resolveEffectiveVisibleWidthInches({
+      manualSize: undefined,
+      tvPresetKey: null,
+      tvWidthMm: null,
+      visibleWidthInches: null,
+    }),
+    aspectRatio: DEFAULT_SCREEN_ASPECT,
+    tvPresetKey: null,
+    tvWidthMm: null,
+  };
+}
+
+/**
+ * The preset geometry a manual-active screen must back up: the preset the design
+ * actually states (its preset key or its width in millimetres), otherwise the
+ * canonical unset preset.
+ *
+ * The effective manual width is NEVER a preset backup. Writing it there is what
+ * turned an inactive UI field into an engineering input: the effective manual
+ * width was saved as `screen_size`, restored into the inactive preset backup, and
+ * hashed into the engineering fingerprint.
+ *
+ * @param {object} screen - a screen config (live state or persisted fields)
+ * @returns {{visibleWidthInches:number, aspectRatio:string, tvPresetKey:string|null, tvWidthMm:number|null}}
+ */
+export function resolvePresetBackupGeometry(screen = {}) {
+  const unset = resolveCanonicalUnsetPreset();
+  const tvWidthMm = Number(screen?.tvWidthMm);
+  const hasWidthMm = Number.isFinite(tvWidthMm) && tvWidthMm > 0;
+  const tvPresetKey = typeof screen?.tvPresetKey === "string" && screen.tvPresetKey ? screen.tvPresetKey : null;
+  const presetInches = tvPresetKey && TV_PRESET_KEY_TO_INCHES[tvPresetKey]
+    ? TV_PRESET_KEY_TO_INCHES[tvPresetKey]
+    : (hasWidthMm ? tvWidthMm / 25.4 : null);
+
+  if (presetInches == null) return unset;
+
+  return {
+    visibleWidthInches: presetInches,
+    aspectRatio: typeof screen?.aspectRatio === "string" && screen.aspectRatio
+      ? screen.aspectRatio
+      : unset.aspectRatio,
+    tvPresetKey,
+    tvWidthMm: hasWidthMm ? tvWidthMm : null,
+  };
+}
+
+/**
+ * Replace only values of keys the screen already carries, so a canonical state
+ * never introduces a key the live state did not have.
+ */
+function withCanonicalValues(screen, canonical) {
+  const facts = { ...screen };
+  for (const [key, value] of Object.entries(canonical)) {
+    if (key in facts) facts[key] = value;
+  }
+  return facts;
+}
+
+/**
+ * The screen facts an engineering identity may hash: the ACTIVE display branch as
+ * the design states it, with the INACTIVE branch stated canonically.
+ *
+ *   manual override active  → the manual geometry and its display type are the
+ *                             authority; the preset backup is canonical.
+ *   preset/automatic active → the preset geometry is the authority; the manual
+ *                             backup keeps only its display-type authority, never
+ *                             its geometry.
+ *
+ * Inactive UI state is therefore fingerprint-inert in both directions.
+ */
+export function screenEngineeringFacts(screen) {
+  if (!screen || typeof screen !== "object") return screen ?? null;
+
+  if (isManualOverrideActive(screen)) {
+    const preset = resolvePresetBackupGeometry(screen);
+    return withCanonicalValues(screen, {
+      presetVisibleWidthInches: preset.visibleWidthInches,
+      presetAspectRatio: preset.aspectRatio,
+      presetTvPresetKey: preset.tvPresetKey,
+      presetTvWidthMm: preset.tvWidthMm,
+    });
+  }
+
+  const manualSize = screen.manualSize;
+  return withCanonicalValues(screen, {
+    manualMode: false,
+    manualWidthM: 0,
+    manualHeightM: 0,
+    // The display type is authority that belongs to the screen, not to the
+    // inactive geometry, so it survives; the inactive geometry does not.
+    manualSize: manualSize && typeof manualSize === "object"
+      ? { displayType: manualSize.displayType ?? null }
+      : manualSize ?? null,
+  });
 }

@@ -24,6 +24,7 @@ import {
 import { hydrateOptimiserPlan } from "@/components/room/bass/optimiserPlan/optimiserPlanPersistence.js";
 import { canonicalProductId, canonicaliseRoleModelMap } from "@/components/utils/modelKeyNormaliser";
 import { manualSizeFromPersisted } from "@/components/models/screen/manualScreenConfig";
+import { resolvePresetBackupGeometry } from "@/components/models/screen/resolveEffectiveScreen";
 
 const parseMaybe = (val, fallback) => {
   if (val == null) return fallback;
@@ -141,16 +142,26 @@ export function hydrateProjectIntoAppState(p, appState, setters = {}) {
   // dimensions and the screen geometry all come back exactly as the designer
   // left them.
   const hydratedManualSize = manualSizeFromPersisted(p);
+  // The inactive preset backup restores the PRESET the design states — never the
+  // effective width. Saving an effective manual width as `screen_size` and reading
+  // it back into this backup is what let an inactive UI field enter the design's
+  // engineering identity. With no preset stated, the backup is the canonical unset
+  // preset, so a save/load round trip leaves inactive state exactly as it was.
+  const presetBackup = resolvePresetBackupGeometry({
+    tvPresetKey: p?.tv_preset_key ?? null,
+    tvWidthMm: Number(p?.tv_width_mm) || null,
+    aspectRatio: p?.aspect_ratio,
+  });
   if (typeof setScreen === "function") {
     setScreen((prev) => ({
       ...prev,
       // A previous project must not override the screen being hydrated.
       // Clear transient manual/preset geometry and restore this project alone.
       manualSize: hydratedManualSize,
-      presetVisibleWidthInches: hydratedManualSize ? screenSizeInches : undefined,
-      presetAspectRatio: hydratedManualSize ? aspectRatio : undefined,
-      presetTvPresetKey: hydratedManualSize ? (p?.tv_preset_key ?? null) : undefined,
-      presetTvWidthMm: hydratedManualSize ? (Number(p?.tv_width_mm) || null) : undefined,
+      presetVisibleWidthInches: hydratedManualSize ? presetBackup.visibleWidthInches : undefined,
+      presetAspectRatio: hydratedManualSize ? presetBackup.aspectRatio : undefined,
+      presetTvPresetKey: hydratedManualSize ? presetBackup.tvPresetKey : undefined,
+      presetTvWidthMm: hydratedManualSize ? presetBackup.tvWidthMm : undefined,
       viewableWidthM: undefined,
       viewableHeightM: undefined,
       screenPlaneY_m: readPersistedScreenPlaneM(p?.screen_front_plane_m) ?? undefined,

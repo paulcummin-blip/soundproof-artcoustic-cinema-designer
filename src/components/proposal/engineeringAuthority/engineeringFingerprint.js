@@ -28,7 +28,14 @@
  *   - No external dependencies. No raw JSON.stringify without sorted keys.
  *   - Result carries a version prefix: "eng:v1:hash".
  *   - NaN, Infinity, and non-serializable values are coerced to null.
+ *   - Only the ACTIVE display authority is hashed. A screen keeps both display
+ *     branches at once (the active one plus the inactive backup the other mode is
+ *     restored from); the inactive branch is stated canonically through
+ *     screenEngineeringFacts, so an inactive UI/preset backup can never alter a
+ *     design's engineering identity.
  */
+
+import { screenEngineeringFacts } from '@/components/models/screen/resolveEffectiveScreen';
 
 export const ENGINEERING_FINGERPRINT_VERSION = 1;
 
@@ -216,6 +223,13 @@ export function computeEngineeringFingerprint(designState, versions = {}) {
   const ds = designState || {};
   const v = versions || {};
 
+  // The screen facts an identity may hash: the ACTIVE display authority only.
+  // Never hashed: the inactive preset backup of a manual display, the inactive
+  // manual geometry of a preset display.
+  const screenFacts = (ds.screen && typeof ds.screen === "object")
+    ? screenEngineeringFacts(ds.screen)
+    : null;
+
   const canonical = {
     // Version stamps — a revision change must invalidate all publications
     engineVersion: v.engineVersion || null,
@@ -223,7 +237,14 @@ export function computeEngineeringFingerprint(designState, versions = {}) {
     algorithmVersion: v.algorithmVersion || null,
     instanceAuthorityVersion: v.instanceAuthorityVersion || null,
     summarySchemaVersion: v.summarySchemaVersion || null,
-    ...(v.publicationContractVersion ? { publicationContractVersion: v.publicationContractVersion, publicationBassFingerprint: v.bassFingerprint, frozenReportFacts: ds } : {}),
+    ...(v.publicationContractVersion ? {
+      publicationContractVersion: v.publicationContractVersion,
+      publicationBassFingerprint: v.bassFingerprint,
+      // Frozen report facts, with the screen's inactive branch stated canonically.
+      // The rest of the design state is hashed exactly as it stands, and the
+      // screen key is only replaced when the design actually states a screen.
+      frozenReportFacts: screenFacts ? { ...ds, screen: screenFacts } : ds,
+    } : {}),
 
     // Room geometry
     room: {
@@ -263,8 +284,8 @@ export function computeEngineeringFingerprint(designState, versions = {}) {
     // Subwoofers (instances — the sole bass analysis authority)
     subwooferInstances: normalizeSubwooferInstances(ds.subwooferInstances),
 
-    // Screen
-    screen: normalizeScreen(ds.screen),
+    // Screen (active display authority only)
+    screen: normalizeScreen(screenFacts || ds.screen),
     screenFrontPlaneM: num(ds.screenFrontPlaneM),
     lcrAimMode: ds.lcrAimMode || null,
 
