@@ -43,12 +43,22 @@ export default async function(req) {
 
     // Phase 6: the single provider call.
     const request = buildWriterProviderRequest({ input });
-    const raw = await base44.integrations.Core.InvokeLLM({
+    // An explicitly supplied editorial review is validated against the same
+    // freshly read frozen pack, without another provider call or any write.
+    const raw = body.writer_output ?? await base44.integrations.Core.InvokeLLM({
       prompt: request.prompt,
       response_json_schema: request.response_json_schema,
     });
 
     const validation = validateWriterOutput({ input, output: raw });
+    if (body.writer_output != null) {
+      return Response.json({
+        dry_run: true, persisted: false, editorial_review: true,
+        prompt_version: WRITER_PROMPT_VERSION,
+        pack_fingerprint: pack.pack_fingerprint, input_fingerprint: input.input_fingerprint,
+        writer_output: raw, validation,
+      });
+    }
 
     const options = (pack.options || []).map((option) => ({
       version_id: option.version_id,
@@ -60,6 +70,7 @@ export default async function(req) {
     return Response.json({
       dry_run: true,
       persisted: false,
+      editorial_review: body.writer_output != null,
       prompt_version: WRITER_PROMPT_VERSION,
       pack_schema_version: pack.schema_version,
       pack_fingerprint: pack.pack_fingerprint,

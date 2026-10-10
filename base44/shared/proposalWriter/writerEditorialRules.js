@@ -109,9 +109,20 @@ function firstRule(text, rules) {
   return null;
 }
 
-/** The software-report register a sentence carries, or null. */
-export function reportVoicePhrase(text) {
-  return firstRule(text, REPORT_VOICE_RULES);
+const EXTENDED_REPORT_VOICE_RULES = Object.freeze([
+  { rule: 'assessed_at', pattern: /\bassessed\s+at\b/i },
+  { rule: 'published_result', pattern: /\bpublished\s+results?\b/i },
+  { rule: 'results_derived', pattern: /\bresults?\s+are\s+derived\s+from\b/i },
+  { rule: 'technical_evaluation', pattern: /\btechnical\s+evaluation\s+of\b/i },
+  { rule: 'engineering_model', pattern: /\bengineering\s+model\b/i },
+  { rule: 'own_result', pattern: /\bstated\s+on\s+(?:its|their)\s+own\s+(?:published\s+)?results?\b/i },
+  { rule: 'both_parameters', pattern: /\bboth\s+(?:tonal\s+)?parameters\b/i },
+]);
+
+/** Appendix may need source terminology; existing report-voice bans still hold. */
+export function reportVoicePhrase(text, { section = null } = {}) {
+  return firstRule(text, REPORT_VOICE_RULES)
+    || (section === 'appendix_notes' ? null : firstRule(text, EXTENDED_REPORT_VOICE_RULES));
 }
 
 /**

@@ -279,7 +279,7 @@ test('the proposal prompt sells scoped strengths and asks for no design-stage ca
   assert.ok(WRITER_WRITING_RULES.some((rule) => /not a design review/i.test(rule)), JSON.stringify(WRITER_WRITING_RULES));
   assert.ok(WRITER_WRITING_RULES.some((rule) => /Sell what is strong/i.test(rule)));
   assert.equal(WRITER_SECTIONS.length, 9, 'the nine sections are untouched');
-  assert.ok(prompt.includes('proposal-writer-prompt-8'), 'the generation is filed under the current prompt version');
+  assert.ok(prompt.includes('proposal-writer-prompt-9'), 'the generation is filed under the current prompt version');
 });
 
 /* ── G: the scoped claim is the sentence the copy writes ───────────────────── */

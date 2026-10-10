@@ -60,7 +60,8 @@ export const WRITER_CONTRACT_VERSION = 1;
  * rejections are added for the wording this pass forbids, so a draft filed under
  * generation 8 is distinguishable from every generation before it.
  */
-export const WRITER_PROMPT_VERSION = 'proposal-writer-prompt-8';
+// Generation 9 adds human-sales-language controls; evidence and grounding are unchanged.
+export const WRITER_PROMPT_VERSION = 'proposal-writer-prompt-9';
 
 /** The only pack generation a draft may be written from. */
 export const WRITER_ACCEPTED_PACK_SCHEMA_VERSION = 2;
@@ -150,6 +151,11 @@ export const WRITER_REJECTION = Object.freeze({
    * screen, a projector, an aspect ratio, a viewable width or a screen size.
    */
   DISPLAY_TERMINOLOGY: 'display_terminology',
+  CROSS_SECTION_DUPLICATION: 'cross_section_duplication',
+  TONAL_SCOPE_STRETCH: 'tonal_scope_stretch',
+  INTERNAL_LEVEL_LANGUAGE: 'internal_level_language',
+  UNEXPLAINED_ABBREVIATION: 'unexplained_abbreviation',
+  SINGLE_OPTION_FRAMING: 'single_option_framing',
   /** A section over its word limit. */
   SECTION_TOO_LONG: 'section_too_long',
 });
@@ -162,6 +168,8 @@ export const WRITER_SECTIONS = Object.freeze([
   {
     section: 'decision_summary',
     title: 'Decision Summary',
+    title_single: 'Design Summary',
+    requirement_single: 'Introduce the finished design in 2–3 confident, experience-led sentences. Use its frozen display, immersive architecture and seating identity naturally, not as a specification dump. Never say this proposal outlines, this design presents, this option, decision or selected option.',
     word_limit: 140,
     requirement: 'State the decision between the options in the pack\'s own framing, and only where the pack allows a framing.',
   },
@@ -186,6 +194,7 @@ export const WRITER_SECTIONS = Object.freeze([
   {
     section: 'key_performance_highlights',
     title: 'Key Performance Highlights',
+    requirement_single: 'Write 2–3 concise benefit-led sentences, following the supplied strength ranking. No dBC values, Hz values, angles, channel counts or grades here: put proof in the specialist section. Never copy complete evidence statements. No overall-seat equality claim.',
     word_limit: 170,
     requirement: 'State the pack\'s recorded results, in the pack\'s own words, for the areas that carry a claim.',
   },
@@ -198,24 +207,28 @@ export const WRITER_SECTIONS = Object.freeze([
   {
     section: 'dynamic_range',
     title: 'Dynamic Range',
+    requirement_single: 'Open with what happens during demanding playback. Then give the exact frozen output figures at the reference seating position, once each; this is the only section for dBC proof. If only bass-output is a selected strength, sell only that capability, never broaden it to front/surround dynamic ease. Do not claim bass response quality or seat-to-seat consistency from output evidence.',
     word_limit: 170,
     requirement: 'Explain the dynamic-range results the pack records, and present no other.',
   },
   {
     section: 'timbre_matching',
     title: 'Timbre Matching',
+    requirement_single: 'Explain how voices and effects retain their tonal character as they move between screen, surround and overhead channels, across only the supported seats. Keep every seat statement explicitly limited to tonal character, not overall balance, bass or placement. No bass-extension detour and no both parameters wording.',
     word_limit: 150,
     requirement: 'Explain the loudspeaker and coverage evidence the pack records, and claim nothing beyond it.',
   },
   {
     section: 'overall_design',
     title: 'Overall Design',
+    requirement_single: 'Close in 2–3 natural, project-specific sentences: connect the particular picture and viewing experience to convincing movement, consistent tonal character and the supported bass/dynamic strengths. Do not repeat any numbers, specification list or earlier sentence. Never claim consistent overall experience for every viewer from tonal evidence.',
     word_limit: 190,
     requirement: 'Close on the design as a whole, using only the credibility and recommendation claims the pack allows.',
   },
   {
     section: 'appendix_notes',
     title: 'Appendix Notes',
+    requirement_single: 'Two brief source-only sentences: based on the frozen Project Report for this design; detailed RP22, RP23, product and room evidence is in the accompanying report. No performance claims or sales story.',
     word_limit: 200,
     requirement: 'Note the report evidence the pack was built from, with no performance claim.',
   },
@@ -314,6 +327,14 @@ export const WRITER_WRITING_RULES = Object.freeze([
   'Sell what is strong: state a supported strength positively and stop there, and where one scope is the stronger, keep the claim to that scope rather than reporting the weaker one beside it.',
   'The proposal is not a design review: never write that something needs attention, improvement, calibration, optimisation or further design work, and never suggest a future correction, a recalibration or an upgrade path.',
   'Write to the client: benefit-led, dealer-safe language, with no internal parameter codes and no engineering jargon.',
+  'No sentence of 10 or more words may appear verbatim in more than one section. Do not reuse complete evidence sentences with minor word substitutions. Facts may recur only for a genuinely different editorial purpose.',
+  'Give each section its own job: Why This Specification explains the choice; Highlights gives concise benefits without repeating figures; Dynamic Range supplies useful output figures and demanding-playback proof; Overall Design synthesises the project-specific experience without recycling numbers.',
+  'Use each engineering figure normally once in main prose. Keep output figures in Dynamic Range, viewing angles in Spatial Resolution and extension proof where it explains deep bass. Repeat only where it adds real value, never in Overall Design.',
+  'Never write L1, L2, L3, L4, L4 result or RP22 Level 4 in narrative prose. Never write (OH); write overhead channels. Structured grading tables and pills are not narrative prose.',
+  'Tonal consistency across seats supports only tonal character: never broaden it into equal seats, overall experience balance, bass consistency, placement consistency or whole-room balance.',
+  'Use the ranked story as evidence, not as a sentence to read aloud. Translate its meaning into natural client language while retaining its scope, exact facts and claim IDs.',
+  'Keep Appendix Notes brief, factual and source-only: this proposal is based on the frozen Project Report for this design, with detailed RP22, RP23, product and room evidence in the accompanying report. No sales story, acoustic-treatment performance promise or engineering-model explanation.',
+  'Close on this design\'s particular viewing experience, movement, tonal character and bass capability, not treats every seat as a priority, balances high-resolution spatial imaging with authoritative bass performance, high-quality experience for everyone or immersive and consistent experience for the home.',
   'Keep every paragraph to one to three sentences, and keep every section inside its word limit.',
   'Explain what each recorded result means for the room, rather than naming the number and moving on.',
   'Return structured JSON only, in the nine sections of this contract, with no extra fields and no commentary.',

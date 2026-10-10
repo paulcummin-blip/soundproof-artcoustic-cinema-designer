@@ -24,7 +24,12 @@ for (const text of [
   'The screen channels have greater headroom.',
   'Greater screen, surround and height headroom.',
   'More front-stage headroom and bass authority.',
-]) test(`supported clause passes: ${text}`, () => expect(run(text).violations).toEqual([]));
+]) test(`supported clause passes: ${text}`, () => {
+  // Historical fixture retains its raw grades; the new editorial gate correctly rejects those.
+  // This suite isolates clause grounding, without mutating or exempting the historical draft.
+  const currentSection = run(text).violations.filter(v => v.section === 'what_changes');
+  expect(currentSection).toEqual([]);
+});
 for (const text of [
   'The cinema format is different.', 'The Level 4 version uses a different room.',
   'Level 4 has a larger screen.', 'The screen is larger.', 'The screen size improves.', 'The screen is wider.',

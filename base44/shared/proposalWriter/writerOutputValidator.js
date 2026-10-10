@@ -31,6 +31,7 @@ import {
 } from './writerContractSchema.js';
 import { scanProse } from './writerOutputTextRules.js';
 import { validatorProvenance } from './validatorProvenance.js';
+import { crossSectionDuplicates } from './writerSalesPolishRules.js';
 import { attributeViolation } from './writerViolationAudit.js';
 import {
   blockIdSet,
@@ -213,6 +214,7 @@ export function validateWriterOutput({ input, output } = {}) {
 
   violations.push(...schemaViolations({ input, draft }));
   const byId = indexSections({ draft, violations });
+  violations.push(...crossSectionDuplicates(Array.from(byId.values())));
 
   const claimsById = claimIndex(input);
   const blocks = blockIdSet(input);

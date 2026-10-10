@@ -15,6 +15,7 @@ import {
   unsupportedComparative,
 } from './writerEditorialRules.js';
 import { attributeViolation } from './writerViolationAudit.js';
+import { internalLevelLanguage, unexplainedOverhead, singleOptionFraming, tonalScopeStretch, proposalSentences } from './writerSalesPolishRules.js';
 
 export function scanProse({ input, vocabulary, section, text, claims = [], claimKinds = [] }) {
   const found = [];
@@ -41,6 +42,22 @@ export function scanProse({ input, vocabulary, section, text, claims = [], claim
     input?.section_structure?.proposal_mode ?? input?.evidence_pack?.mode,
   );
   const displayType = displayTypeOfPack(input?.evidence_pack);
+
+  // Read complete sentences before clause splitting: tonal scope can stretch in a second clause.
+  for (const sentence of proposalSentences(text)) {
+    const named = stripOptionNames(sentence, vocabulary.optionNames);
+    const checks = [
+      [internalLevelLanguage(named), WRITER_REJECTION.INTERNAL_LEVEL_LANGUAGE, 'narrative_level_language'],
+      [unexplainedOverhead(sentence), WRITER_REJECTION.UNEXPLAINED_ABBREVIATION, 'unexplained_OH'],
+      [singleOption && singleOptionFraming(named), WRITER_REJECTION.SINGLE_OPTION_FRAMING, 'single_option_decision_filler'],
+      [tonalScopeStretch(sentence, citedClaims), WRITER_REJECTION.TONAL_SCOPE_STRETCH, 'tonal_evidence_is_not_whole_experience_equality'],
+    ];
+    for (const [applies, code, rule] of checks) {
+      if (!applies) continue;
+      context = { text, sentence, ruleId: `sales_polish:${rule}` };
+      report(code, { section, detail: rule });
+    }
+  }
 
   for (const sentence of sentences) {
     for (const { clause } of independentClauses(sentence)) {
@@ -84,7 +101,7 @@ export function scanProse({ input, vocabulary, section, text, claims = [], claim
       // single-option proposal has nothing to compare against, an
       // installation-state claim, and terminology that misdescribes the frozen
       // display. Grounding is untouched.
-      const reportVoice = reportVoicePhrase(claimed);
+      const reportVoice = reportVoicePhrase(claimed, { section });
       if (reportVoice) {
         context.ruleId = `report_voice:${reportVoice.rule}`;
         report(WRITER_REJECTION.REPORT_VOICE, { section, detail: `report_voice:${reportVoice.rule}` });
