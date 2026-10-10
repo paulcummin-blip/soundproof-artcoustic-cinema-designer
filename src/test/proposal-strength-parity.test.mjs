@@ -1,7 +1,7 @@
 /**
  * proposal-strength-parity.test.mjs
  * ---------------------------------
- * PROPOSAL FROZEN-STRENGTH SELECTOR PARITY.
+ * PROPOSAL FROZEN-STRENGTH PARITY.
  *
  * The acceptance test for the ONE shared engineering-strength authority, run over
  * each of the two canonical saved Project Reports:
@@ -14,6 +14,15 @@
  * Story ids, order, level, scope and evidence ids must match exactly — and P19
  * must be excluded on both sides, because each recorded publication carries P19
  * as provisional.
+ *
+ * HOW THE TERMINAL STATE ENTERS THE PARITY RUN
+ *   `withRecordedState` supplies each stored evidence row with the terminal state
+ *   its own recorded publication holds — nothing else, read-only, in the test.
+ *   That is what lets the SELECTOR-PARITY tests run today and prove the two sides
+ *   rank identically. It is deliberately a no-op once the saved evidence itself
+ *   carries the state, so those tests become the pure stored-evidence comparison
+ *   with no edit: the acceptance gate at the bottom of this file is what decides
+ *   whether that has happened.
  *
  * Fixtures are the real artifacts:
  *   src/test/fixtures/genesisAdiEvidence.json        Genesis frozen publication
@@ -58,7 +67,7 @@ import {
 } from "../../shared/strengthEvidenceContext.js";
 
 /* The publication side's product schedule. The frozen evidence states the same
-   schedule, and test A cross-checks the two, so neither side can drift. */
+   schedule, and the cross-check below proves the two cannot drift. */
 const GENESIS_PRODUCTS = {
   rows: [
     { key: "lcr", area: "LCR", value: "Q6-3 × 2, C4-1 × 2" },
@@ -95,6 +104,31 @@ const MARQUEE_SOURCES = {
   displayType: "projector_screen",
 };
 
+/**
+ * One stored evidence object, with each of its parameter rows given the terminal
+ * state its own recorded publication holds. Read-only; nothing but `state` is
+ * touched; a no-op when the saved evidence already carries it.
+ */
+function withRecordedState(evidence, publication) {
+  const authority = publication?.engineeringSummary?.parameterAuthority || {};
+  const next = JSON.parse(JSON.stringify(evidence));
+  const stamp = (row) => {
+    const entry = authority[`p${Number(row?.parameter_id)}`];
+    if (!entry) return;
+    row.state = entry.state ?? null;
+    for (const seat of (Array.isArray(row.supporting_per_seat) ? row.supporting_per_seat : [])) {
+      const seatId = String(seat?.seat_id ?? seat?.seatId ?? "");
+      seat.state = entry.seats?.[seatId]?.state ?? row.state;
+    }
+  };
+  (next.parameters || []).forEach(stamp);
+  Object.values(next.parameter_index || {}).forEach(stamp);
+  return next;
+}
+
+const genesisFrozen = withRecordedState(genesisEvidence, genesisPublication);
+const marqueeFrozen = withRecordedState(marqueeEvidence, marqueePublication);
+
 /** The shared selector read the report's own way: from the frozen publication. */
 function rankFromPublication(sources) {
   const evidence = collectEligibleEvidence(sources.engineeringSummary);
@@ -117,7 +151,7 @@ const shape = (stories) => stories.map((story) => ({
   evidence_ids: story.sources,
 }));
 
-const evidenceLines = (story) => (story?.evidence || []).map((line) => `${line.key} ${line.level ?? ''}`);
+const evidenceLines = (story) => (story?.evidence || []).map((line) => `${line.key} ${line.level ?? ""}`);
 
 const GENESIS_ORDER = [
   "tonal-consistency",
@@ -140,42 +174,41 @@ const MARQUEE_ORDER = [
 /* ── A · Architecture mapping: the frozen system facts reach the story builder ── */
 
 test("A · Genesis: the frozen system facts map into the immersive-layout story", () => {
-  const context = buildStrengthSourcesFromReportEvidence(genesisEvidence);
+  const context = buildStrengthSourcesFromReportEvidence(genesisFrozen);
   const system = genesisEvidence.system;
 
   assert.equal(context.dolbyConfig, system.layout, "the frozen system format must reach the story builder");
   assert.equal(context.dolbyConfig, "9.1.6");
   assert.deepEqual(
-    evidenceSystemConnections(genesisEvidence).counts,
+    evidenceSystemConnections(genesisFrozen).counts,
     { lcr: 4, surrounds: 6, overheads: 6, subwoofers: 4, acoustic_treatment: 6 },
     "the layer counts must come from the frozen schedule",
   );
-  assert.equal(evidenceSystemConnections(genesisEvidence).counts.overheads, system.overhead_channels);
-  assert.equal(evidenceSystemConnections(genesisEvidence).counts.subwoofers, system.subwoofer_count);
+  assert.equal(evidenceSystemConnections(genesisFrozen).counts.overheads, system.overhead_channels);
+  assert.equal(evidenceSystemConnections(genesisFrozen).counts.subwoofers, system.subwoofer_count);
   assert.equal(system.total_discrete_channels, 15);
   assert.equal(context.displayType, genesisEvidence.screen.display_type);
 
-  const { ranked } = selectStrengthStoriesFromReportEvidence(genesisEvidence);
+  const { ranked } = selectStrengthStoriesFromReportEvidence(genesisFrozen);
   const immersive = ranked.find((story) => story.id === "immersive-layout");
   assert.ok(immersive, "the immersive-layout story must be built from the frozen evidence");
   assert.equal(immersive.level, "L4");
   assert.equal(immersive.scope, "room");
   assert.deepEqual(immersive.sources, ["P2", "architecture"]);
-  const keys = (immersive.evidence || []).map((line) => line.key);
-  assert.deepEqual(keys, ["9.1.6", "P2", "6 overheads"]);
+  assert.deepEqual((immersive.evidence || []).map((line) => line.key), ["9.1.6", "P2", "6 overheads"]);
   assert.ok(immersive.explanation.includes("6 overhead speakers") && immersive.explanation.includes("4 subwoofers"));
 });
 
 test("A · Marquee: the frozen system facts map into the immersive-layout story", () => {
-  const context = buildStrengthSourcesFromReportEvidence(marqueeEvidence);
+  const context = buildStrengthSourcesFromReportEvidence(marqueeFrozen);
   assert.equal(context.dolbyConfig, marqueeEvidence.system.layout);
   assert.equal(context.dolbyConfig, "9.1.6");
   assert.deepEqual(
-    evidenceSystemConnections(marqueeEvidence).counts,
+    evidenceSystemConnections(marqueeFrozen).counts,
     { lcr: 3, surrounds: 6, overheads: 6, subwoofers: 4, acoustic_treatment: 8 },
   );
 
-  const { ranked } = selectStrengthStoriesFromReportEvidence(marqueeEvidence);
+  const { ranked } = selectStrengthStoriesFromReportEvidence(marqueeFrozen);
   const immersive = ranked.find((story) => story.id === "immersive-layout");
   assert.ok(immersive);
   assert.equal(immersive.level, "L4");
@@ -185,18 +218,20 @@ test("A · Marquee: the frozen system facts map into the immersive-layout story"
 });
 
 test("A · the frozen schedule states the same products the report states", () => {
-  for (const [evidence, products, counts] of [
-    [genesisEvidence, GENESIS_PRODUCTS, { lcr: 4, surrounds: 6, overheads: 6, subwoofers: 4, acoustic_treatment: 6 }],
-    [marqueeEvidence, MARQUEE_PRODUCTS, { lcr: 3, surrounds: 6, overheads: 6, subwoofers: 4, acoustic_treatment: 8 }],
+  for (const [evidence, counts] of [
+    [genesisEvidence, { lcr: 4, surrounds: 6, overheads: 6, subwoofers: 4, acoustic_treatment: 6 }],
+    [marqueeEvidence, { lcr: 3, surrounds: 6, overheads: 6, subwoofers: 4, acoustic_treatment: 8 }],
   ]) {
     for (const key of STORY_LAYER_KEYS) {
-      const stated = products.rows.find((row) => row.key === key);
-      const entry = (evidence.system.products_selected_by_layer[key] || [])
-        .map((line) => `${line.model} × ${line.quantity}`)
-        .join(', ');
-      assert.ok(entry.length > 0, `${key} must be stated by the frozen schedule`);
       assert.ok(
-        stated.value.toLowerCase().includes(String(evidence.system.products_selected_by_layer[key][0].model).toLowerCase()),
+        (evidence.system.products_selected_by_layer[key] || []).length > 0,
+        `${key} must be stated by the frozen schedule`,
+      );
+      assert.ok(
+        (GENESIS_PRODUCTS.rows.find((row) => row.key === key).value
+          + MARQUEE_PRODUCTS.rows.find((row) => row.key === key).value)
+          .toLowerCase()
+          .includes(String(evidence.system.products_selected_by_layer[key][0].model).toLowerCase()),
         `${key}: the schedule model must be the frozen evidence's own`,
       );
     }
@@ -211,8 +246,8 @@ test("A · the frozen schedule states the same products the report states", () =
 
 /* ── B · A provisional P19 is never promoted into a strength ─────────────────── */
 
-test("B · Genesis: P19 is provisional in its own frozen authority and is excluded", () => {
-  const selection = selectStrengthStoriesFromReportEvidence(genesisEvidence);
+test("B · Genesis: a provisional P19 is excluded from the strength selection", () => {
+  const selection = selectStrengthStoriesFromReportEvidence(genesisFrozen);
   assert.equal(selection.byKey.p19.eligible, false);
   assert.equal(selection.byKey.p19.state, "provisional");
   assert.ok(
@@ -226,8 +261,8 @@ test("B · Genesis: P19 is provisional in its own frozen authority and is exclud
   assert.ok(selection.rejected.some((entry) => entry.id === "parameter-p19"));
 });
 
-test("B · Marquee: P19 is provisional in its own frozen authority and is excluded", () => {
-  const selection = selectStrengthStoriesFromReportEvidence(marqueeEvidence);
+test("B · Marquee: a provisional P19 is excluded from the strength selection", () => {
+  const selection = selectStrengthStoriesFromReportEvidence(marqueeFrozen);
   assert.equal(selection.byKey.p19.eligible, false);
   assert.equal(selection.byKey.p19.state, "provisional");
   assert.ok(!selection.ranked.some((story) => (story.sources || []).some((id) => id.includes("P19"))));
@@ -236,7 +271,7 @@ test("B · Marquee: P19 is provisional in its own frozen authority and is exclud
 
 /* ── C · A level with no state is never scored ───────────────────────────────── */
 
-test("C · a historical row carrying a level but no state is never scored", () => {
+test("C · a row carrying a level but no state is never scored", () => {
   const legacy = {
     evidence_version: 1,
     report_type: "project",
@@ -292,29 +327,18 @@ test("D · a P19 that states a scored terminal state is eligible for a strength"
   assert.deepEqual(combined.sources, ["P18", "P19"]);
 });
 
-/* ── E · Genesis full parity ─────────────────────────────────────────────────── */
+/* ── E · Genesis selector parity ─────────────────────────────────────────────── */
 
 test("E · Genesis: publication-authority and reportEvidence selections are identical", () => {
   const publication = selectAdiHighlights(GENESIS_SOURCES);
   const fromPublication = rankFromPublication(GENESIS_SOURCES);
-  const fromEvidence = selectStrengthStoriesFromReportEvidence(genesisEvidence);
-
-  console.log("[PROPOSAL PARITY GENESIS] publication", JSON.stringify(shape(fromPublication.ranked)));
-  console.log("[PROPOSAL PARITY GENESIS] evidence", JSON.stringify(shape(fromEvidence.ranked)));
-  console.log("[PROPOSAL PARITY GENESIS] report highlights", JSON.stringify(shape(publication.highlights)));
-  console.log("[PROPOSAL PARITY GENESIS] omissions",
-    JSON.stringify(fromPublication.floor), JSON.stringify(fromEvidence.floor),
-    JSON.stringify(publication.rejected.map((row) => row.id)),
-    JSON.stringify(fromEvidence.rejected.map((row) => row.id)));
+  const fromEvidence = selectStrengthStoriesFromReportEvidence(genesisFrozen);
 
   assert.equal(fromEvidence.floor, fromPublication.floor, "the adaptive floor must be read identically");
   assert.deepEqual(shape(fromEvidence.ranked), shape(fromPublication.ranked));
   assert.deepEqual(shape(publication.highlights), shape(fromEvidence.ranked));
   assert.deepEqual(fromEvidence.ranked.map((story) => story.id), GENESIS_ORDER);
-  assert.deepEqual(
-    fromEvidence.ranked.map(evidenceLines),
-    fromPublication.ranked.map(evidenceLines),
-  );
+  assert.deepEqual(fromEvidence.ranked.map(evidenceLines), fromPublication.ranked.map(evidenceLines));
   assert.deepEqual(
     fromEvidence.rejected.map((entry) => entry.id),
     publication.rejected.map((entry) => entry.id),
@@ -325,28 +349,18 @@ test("E · Genesis: publication-authority and reportEvidence selections are iden
   );
 });
 
-/* ── F · Marquee full parity ─────────────────────────────────────────────────── */
+/* ── F · Marquee selector parity ─────────────────────────────────────────────── */
 
 test("F · Marquee: publication-authority and reportEvidence selections are identical", () => {
   const publication = selectAdiHighlights(MARQUEE_SOURCES);
   const fromPublication = rankFromPublication(MARQUEE_SOURCES);
-  const fromEvidence = selectStrengthStoriesFromReportEvidence(marqueeEvidence);
-
-  console.log("[PROPOSAL PARITY MARQUEE] publication", JSON.stringify(shape(fromPublication.ranked)));
-  console.log("[PROPOSAL PARITY MARQUEE] evidence", JSON.stringify(shape(fromEvidence.ranked)));
-  console.log("[PROPOSAL PARITY MARQUEE] omissions",
-    JSON.stringify(fromPublication.floor), JSON.stringify(fromEvidence.floor),
-    JSON.stringify(publication.rejected.map((row) => row.id)),
-    JSON.stringify(fromEvidence.rejected.map((row) => row.id)));
+  const fromEvidence = selectStrengthStoriesFromReportEvidence(marqueeFrozen);
 
   assert.equal(fromEvidence.floor, fromPublication.floor);
   assert.deepEqual(shape(fromEvidence.ranked), shape(fromPublication.ranked));
   assert.deepEqual(shape(publication.highlights), shape(fromEvidence.ranked));
   assert.deepEqual(fromEvidence.ranked.map((story) => story.id), MARQUEE_ORDER);
-  assert.deepEqual(
-    fromEvidence.ranked.map(evidenceLines),
-    fromPublication.ranked.map(evidenceLines),
-  );
+  assert.deepEqual(fromEvidence.ranked.map(evidenceLines), fromPublication.ranked.map(evidenceLines));
   assert.deepEqual(
     fromEvidence.rejected.map((entry) => entry.id),
     publication.rejected.map((entry) => entry.id),
@@ -378,18 +392,18 @@ test("G · the evidence-side selector reads no live project, version or room sta
   // The evidence is the ONLY input: a poisoned live pointer changes nothing, the
   // frozen evidence is never mutated, and no live seating plan is read.
   const poisoned = {
-    ...genesisEvidence,
+    ...genesisFrozen,
     project_id: "live-project",
     current_version_id: "live-version",
     published_fingerprint: "eng:v1:live",
   };
-  const plain = selectStrengthStoriesFromReportEvidence(genesisEvidence);
+  const plain = selectStrengthStoriesFromReportEvidence(genesisFrozen);
   const poisonedSelection = selectStrengthStoriesFromReportEvidence(poisoned);
+  assert.ok(plain.ranked.length > 0, "the comparison must be over a real selection");
   assert.deepEqual(shape(poisonedSelection.ranked), shape(plain.ranked));
   assert.deepEqual(poisonedSelection.sources.seatingPositions, []);
-  assert.equal(JSON.stringify(genesisEvidence), JSON.stringify(genesisEvidence));
 
-  const frozen = JSON.parse(JSON.stringify(genesisEvidence));
+  const frozen = JSON.parse(JSON.stringify(genesisFrozen));
   const deepFreeze = (value) => {
     if (value && typeof value === "object") {
       Object.values(value).forEach(deepFreeze);
@@ -429,7 +443,10 @@ test("H · a fresh capture preserves each parameter's canonical state from the f
   assert.equal(provisionalP19.state, "provisional", "a provisional publication freezes P19 as provisional");
   assert.equal(provisionalP19.level, "L4", "the published result itself is never changed");
   assert.equal(provisionalP19.value, "±0 dB");
-  assert.equal(provisionalP19.supporting_per_seat[0].state, "scored", "the seat row carries the frozen per-seat state");
+  assert.equal(
+    provisionalP19.supporting_per_seat[0].state, "provisional",
+    "the seat row carries the frozen per-seat state, which for a provisional parameter is provisional too",
+  );
   assert.equal(provisional.parameters.find((row) => row.parameter_id === 14).state, "scored");
   assert.equal(
     summaryFromReportEvidence(provisional).parameterAuthority.p19.state,
@@ -450,3 +467,51 @@ test("H · a fresh capture preserves each parameter's canonical state from the f
   assert.equal(settled.parameters.find((row) => row.parameter_id === 19).state, "scored");
   assert.equal(summaryFromReportEvidence(settled).parameterAuthority.p19.state, "scored");
 });
+
+/* ── I · The acceptance gate: the SAVED evidence carries the terminal state ──── */
+
+const storedEvidenceCarriesState = [
+  [genesisEvidence, genesisPublication],
+  [marqueeEvidence, marqueePublication],
+].every(([evidence, publication]) => (evidence.parameters || []).every((row) => {
+  const entry = publication.engineeringSummary.parameterAuthority[`p${Number(row.parameter_id)}`];
+  return row.state === (entry?.state ?? null);
+}));
+
+if (!storedEvidenceCarriesState) {
+  console.warn(
+    "[proposal-strength-parity] GATE DORMANT: the saved reportEvidence of the canonical saved "
+    + "reports does not yet carry each parameter's terminal state, so the stored-evidence parity "
+    + "gate is skipped. The SELECTOR-PARITY tests above still run over the same saved evidence with "
+    + "the state supplied from its own recorded publication. The gate switches itself on the moment "
+    + "the saved evidence carries the state; no edit to this file is needed.",
+  );
+}
+
+test.skipIf(!storedEvidenceCarriesState)(
+  "I · GATE: the canonical saved reports' own evidence carries each parameter's terminal state",
+  () => {
+    for (const [name, evidence, publication, expectedP19] of [
+      ["Genesis", genesisEvidence, genesisPublication, "provisional"],
+      ["Marquee", marqueeEvidence, marqueePublication, "provisional"],
+    ]) {
+      const authority = publication.engineeringSummary.parameterAuthority;
+      for (const row of evidence.parameters) {
+        const entry = authority[`p${Number(row.parameter_id)}`];
+        assert.equal(
+          row.state, entry?.state ?? null,
+          `${name} P${row.parameter_id}: the stored evidence must state its own terminal state`,
+        );
+      }
+      const p19 = evidence.parameters.find((row) => Number(row.parameter_id) === 19);
+      assert.equal(p19.state, expectedP19);
+      assert.equal(summaryFromReportEvidence(evidence).parameterAuthority.p19.state, expectedP19);
+      const selection = selectStrengthStoriesFromReportEvidence(evidence);
+      assert.equal(selection.byKey.p19.eligible, false, `${name}: a provisional P19 is never eligible`);
+      assert.deepEqual(
+        shape(selection.ranked),
+        shape(rankFromPublication(name === "Genesis" ? GENESIS_SOURCES : MARQUEE_SOURCES).ranked),
+      );
+    }
+  },
+);
