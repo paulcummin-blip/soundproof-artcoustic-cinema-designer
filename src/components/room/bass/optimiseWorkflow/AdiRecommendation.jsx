@@ -37,6 +37,7 @@ import AdiOptimisationJourney from "@/components/room/bass/optimiserPlan/AdiOpti
 import { firstSentence } from "@/components/room/bass/optimiserPlan/resolveAdiOptimiserJourney.js";
 import { useOptimiserPlanView } from "@/components/room/bass/optimiserPlan/useOptimiserPlanView.js";
 import { resolveOptimiserPresentationState } from "@/components/room/bass/optimiserPlan/resolveOptimiserPresentationState.js";
+import { buildDesignChangeRecommendations } from "@/components/room/bass/optimiseWorkflow/adiCalibrationAutoApplyAuthority.js";
 
 // ── Displacement helpers ──
 
@@ -262,6 +263,18 @@ export default function AdiRecommendation({
     return { ...leverOutcome, after: current };
   }, [leverOutcome, completedBassAuthority]);
 
+  // ── The physical changes ADI found but must not apply ──
+  // Stated under their own heading, from the same canonically confirmed stage
+  // results the placement panel acts on — never applied by ADI itself.
+  const designChanges = useMemo(
+    () => buildDesignChangeRecommendations({
+      baseline: v2State?.currentResult || null,
+      subPositionResult: recommendations?.subPositions || null,
+      seatingResult: recommendations?.seating || null,
+    }),
+    [v2State?.currentResult, recommendations?.subPositions, recommendations?.seating],
+  );
+
   // ── Render ──
   // ONE panel — the Bass Optimisation card. Every ADI outcome (no run, running,
   // stale, no useful improvement, incomplete, failed, or an evaluated change
@@ -328,6 +341,10 @@ export default function AdiRecommendation({
       assessment={recommendation?.assessment || null}
       why={recommendation?.why || null}
       presentation={optimiserPresentation}
+      // What ADI applied on its own this run (settings, objective, canonical
+      // before/after) and the physical changes that remain the designer's call.
+      appliedCalibrationEvidence={autoApplied?.calibration || null}
+      designChanges={designChanges}
     />
   );
 }

@@ -40,9 +40,12 @@ import {
 import {
   runOptimisation,
   buildAutoApplySummary,
-  hasCalibrationImprovement,
   hasPhysicalRecommendations,
 } from "./optimiseWorkflowOrchestrator";
+import {
+  CALIBRATION_APPLY_DECISION,
+  resolveCalibrationAutoApply,
+} from "./adiCalibrationAutoApplyAuthority.js";
 import { publishRecommendation } from "@/components/recommendationEngine";
 import { DEFAULT_SUB_AMPLIFIER_POWER_PER_SUB_W } from "@/components/utils/subwooferCapability";
 import { buildAuthoritativeRspPosition } from "../authoritativeRspPosition";
@@ -494,10 +497,29 @@ export default function OptimiseAndCalculate({
       const selection = result.selection;
       const autoApplySummary = buildAutoApplySummary(selection, subInstancesRef.current);
       const stageResults = autoApplySummary.stageResults;
-      const hasCal = hasCalibrationImprovement(stageResults);
       const hasPhysical = hasPhysicalRecommendations(autoApplySummary);
 
-      if (hasCal && autoApplySummary.tuning) {
+      // ── The calibration decision ──
+      // ADI may apply a CALIBRATION change on its own — subwoofer delay, group
+      // delay, rear-sub acoustic delay offset, gain trim, polarity, all-pass
+      // phase — when the CONFIRMED canonical P19/P20 results support it: an
+      // improvement to one objective that does not materially worsen the other,
+      // or the best balanced candidate improving the overall result.
+      //
+      // It never applies a PHYSICAL change, a material P19/P20 trade-off, a
+      // primary-seat regression, an immaterial or ambiguous result, or an
+      // overwrite of calibration a human set by hand. Those are stated and left
+      // to the designer. The only thing this path can write is the tuning.
+      const calibrationApplication = resolveCalibrationAutoApply({
+        baseline: selection?.currentResult || null,
+        candidate: selection?.calibrationResult || selection?.winner || null,
+        objectives: selection?.objectives || null,
+        instances: subInstancesRef.current,
+        appliedCalibration: getAppliedCalibrationAuthority(projectId, versionId),
+      });
+      const hasCal = calibrationApplication.decision === CALIBRATION_APPLY_DECISION.APPLIED;
+
+      if (calibrationApplication.tuning.length > 0) {
         const rspPosition = buildAuthoritativeRspPosition(roomDims, appState?.mlpY_m, appState?.mlpX_m, appState?.designatedRspSeatId);
         const selectedSubModel = frontSubsCfg?.model || rearSubsCfg?.model || null;
         const requested = shared?.authoritative?.requested || {};
@@ -534,10 +556,10 @@ export default function OptimiseAndCalculate({
           });
           setRecommendation(projectId, versionId, recommendation);
 
-          // 3. First run (no Applied Calibration): auto-accept.
-          //    Existing calibration: STOP — let BassDecisionActions decide.
-          const existingCalibration = getAppliedCalibrationAuthority(projectId, versionId);
-          if (!existingCalibration) {
+          // 3. Apply ONLY the calibration the decision authorised. Anything the
+          //    decision held back is left for the designer — never applied
+          //    silently, whatever it would have gained.
+          if (hasCal) {
             try {
               acceptRecommendation(projectId, versionId, {
                 currentGeometryFingerprint: basisFp,
@@ -553,14 +575,17 @@ export default function OptimiseAndCalculate({
               // Accept transition failed — non-fatal, workflow continues
             }
           } else {
-            // Existing calibration — STOP. Recommendation is ready.
-            // No recalculation — the designer's Accept/Continue triggers it.
+            // Not applied — a trade-off, an immaterial or ambiguous result, or a
+            // hand-set calibration. The recommendation is ready for the designer
+            // and NOTHING is recalculated: nothing changed, so the published RP22
+            // results still describe the current design.
             setComplete(projectId, versionId, {
               phase: false,
               delay: false,
               gain: false,
               globalBassTrim: false,
               details: autoApplySummary.changeSummary,
+              calibration: calibrationApplication,
             }, {
               subPositions: autoApplySummary.hasPositions
                 ? autoApplySummary.stageResults?.subPositions?.result || null
@@ -604,13 +629,21 @@ export default function OptimiseAndCalculate({
       setPublishing(projectId, versionId);
       await sleep(300);
 
-      // Build the summary
+      // Build the summary from the settings ACTUALLY applied to the instances —
+      // not from a stage verdict, which says what was found, not what was written.
+      const appliedSettingKeys = new Set(
+        calibrationApplication.settings.map((setting) => setting.key.split(":")[0]),
+      );
       const autoApplied = {
-        phase: stageResults?.phase?.verdict === "improvement",
-        delay: stageResults?.delay?.verdict === "improvement",
-        gain: stageResults?.gain?.verdict === "improvement",
+        phase: appliedSettingKeys.has("phase"),
+        delay: appliedSettingKeys.has("delay"),
+        gain: appliedSettingKeys.has("gain"),
+        polarity: appliedSettingKeys.has("polarity"),
         globalBassTrim: false, // determined from the authority after recalculation
         details: autoApplySummary.changeSummary,
+        // The full record: what was applied, its previous and new values, the
+        // objective it served and the canonical P19/P20 before and after.
+        calibration: calibrationApplication,
       };
 
       // Check for global bass trim from the authority — read live state so the

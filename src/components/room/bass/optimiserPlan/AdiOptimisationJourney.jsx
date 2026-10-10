@@ -37,6 +37,8 @@ import AdiTestedOptionsTable from "./AdiTestedOptionsTable.jsx";
 import AdiDesignerActionBar from "./AdiDesignerActionBar.jsx";
 import PlacementRecommendationPanel from "./PlacementRecommendationPanel.jsx";
 import AdiBeforeAfterResult from "./AdiBeforeAfterResult.jsx";
+import AdiAppliedBassCalibration from "./AdiAppliedBassCalibration.jsx";
+import { useAppliedCalibrationAuthority } from "../appliedCalibrationAuthority/appliedCalibrationAuthorityStore.js";
 import { OPTIMISER_LEVER } from "./optimiserPlanConstants.js";
 import AcousticDelayAlignmentCard from "@/components/room/bass/improveBassV2/AcousticDelayAlignmentCard.jsx";
 import { PLACEMENT_PREVIEW_UNAVAILABLE } from "./placementMoveAuthority.js";
@@ -125,6 +127,10 @@ export default function AdiOptimisationJourney({
   assessment = null,
   why = null,
   presentation = null,
+  // What ADI applied on its own this run, and the physical changes it confirmed
+  // but must not apply. Both are stated on the card, in two separate lists.
+  appliedCalibrationEvidence = null,
+  designChanges = [],
   // One short line for a design that cannot meet its selected target.
   designLimitation = null,
   className = "",
@@ -137,6 +143,11 @@ export default function AdiOptimisationJourney({
     instances,
     seatingPositions,
   });
+
+  // The calibration already applied to this design — from the persisted
+  // authority, so the settings survive a refresh even when this session's own
+  // record of the run is gone.
+  const persistedAppliedCalibration = useAppliedCalibrationAuthority(projectId, versionId);
 
   const resolved = resolveAdiOptimiserJourney({
     planView,
@@ -322,6 +333,17 @@ export default function AdiOptimisationJourney({
           )}
         </div>
       )}
+
+      {/* What ADI applied on its own, and what still needs the designer. Two
+          separate lists: the calibration it applied (each setting with its
+          previous value, the objective it served and the canonical P19/P20
+          before and after), and the physical changes it confirmed but must not
+          apply. */}
+      <AdiAppliedBassCalibration
+        evidence={appliedCalibrationEvidence}
+        appliedCalibration={persistedAppliedCalibration}
+        designChanges={designChanges}
+      />
 
       {/* The seating recommendation's own evaluated result — the before/after
           performance, the trade-offs and whether every destination seat position
