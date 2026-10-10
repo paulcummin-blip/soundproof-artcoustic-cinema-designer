@@ -289,13 +289,24 @@ export function isMaterialStory(members) {
 /** A row's stated level. */
 const rowLevel = (row) => levelLabel(row?.level ?? row?.achieved_level);
 
-/** A row's terminal state, read from its own status. */
-function rowState(row, level) {
-  const state = String(row?.source_row?.status ?? row?.source_row?.state ?? row?.state ?? '').trim().toLowerCase();
+/**
+ * A row's terminal state. It is read from the row's OWN frozen `state` — the
+ * parameter's canonical design-rating state, frozen beside its result by the
+ * capture. Neither the presence of a level nor the completion status of the
+ * underlying result row is a substitute for it: a provisional parameter carries
+ * both a level and a complete result row, and promoting one to a scored result on
+ * either signal is exactly the error this rule exists to prevent. A seat row that
+ * states no state of its own falls back to its parent parameter's frozen state; a
+ * row that states nothing at all is non-terminal, so it can never be selected as
+ * a strength. Only an explicit scored/complete/ok state counts as scored.
+ */
+function rowState(row, parentState = null) {
+  const state = String(row?.state ?? row?.status ?? '').trim().toLowerCase()
+    || String(parentState ?? '').trim().toLowerCase();
   if (state === 'na' || state === 'not_applicable') return 'na';
   if (state === 'scored' || state === 'complete' || state === 'ok') return 'scored';
   if (state) return state;
-  return level ? 'scored' : 'unavailable';
+  return 'unavailable';
 }
 
 /** The value text a row states. */
@@ -324,6 +335,9 @@ export function summaryFromReportEvidence(reportEvidence) {
     if (!Number.isFinite(id)) continue;
     const key = `p${id}`;
     const level = rowLevel(row);
+    // The parameter's own frozen terminal state, read once so every seat row of
+    // this parameter falls back to the same authority.
+    const parameterState = rowState(row);
     const scope = String(row?.scope || '').toLowerCase();
     // The canonical scope classification: the frozen evidence's own per-parameter
     // scope where it states one, else the canonical seat-scoped set.
@@ -336,7 +350,7 @@ export function summaryFromReportEvidence(reportEvidence) {
       if (!seatId) continue;
       const seatLevel = rowLevel(seatRow) || level;
       seats[seatId] = {
-        state: rowState(seatRow, seatLevel),
+        state: rowState(seatRow, parameterState),
         level: seatLevel,
         valueFormatted: rowValue(seatRow),
         isPrimary: seatRow?.priority === 'primary' || seatRow?.isPrimary === true,
@@ -350,7 +364,7 @@ export function summaryFromReportEvidence(reportEvidence) {
       weight: PARAM_WEIGHTS[key] ?? 0,
       effectiveWeight: PARAM_WEIGHTS[key] ?? 0,
       scope: seatScoped ? 'seat' : 'room',
-      state: rowState(row, level),
+      state: parameterState,
       level,
       seats: seatScoped ? seats : null,
     };

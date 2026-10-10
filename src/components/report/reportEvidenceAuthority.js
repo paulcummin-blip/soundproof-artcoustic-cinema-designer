@@ -252,12 +252,32 @@ function buildSystem(captured) {
 function buildParameters(captured) {
   // Presentation may add title/area, but all engineering fields are copied
   // together from the selected authority row. No headline/context inference.
-  return (captured?.report_parameters || []).map(row => ({
-    ...row,
-    authority_level: row.level,
-    authority_value: row.value,
-    source: row.source_type,
-  }));
+  //
+  // The parameter's TERMINAL STATE is frozen beside its result. It is what tells
+  // a downstream reader whether this result carries terminal authority — scored,
+  // provisional, assumed, not applicable or unresolved — and it is never left to
+  // be re-inferred from the presence of a level. Both the parameter row and every
+  // seat row of it carry their own state, taken from the SAME frozen publication
+  // the report itself was generated from.
+  const authority = captured?.report_engineering_summary?.parameterAuthority || {};
+  return (captured?.report_parameters || []).map(row => {
+    const entry = authority[`p${Number(row?.parameter_id)}`] || null;
+    const seatAuthority = entry?.seats || null;
+    return {
+      ...row,
+      state: row.state || row.status || entry?.state || row.source_row?.status || null,
+      supporting_per_seat: (Array.isArray(row?.supporting_per_seat) ? row.supporting_per_seat : [])
+        .map(seat => ({
+          ...seat,
+          state: seat.state || seat.status
+            || seatAuthority?.[String(seat?.seat_id ?? seat?.seatId ?? '')]?.state
+            || null,
+        })),
+      authority_level: row.level,
+      authority_value: row.value,
+      source: row.source_type,
+    };
+  });
 }
 
 function buildParameterIndex(parameters) {

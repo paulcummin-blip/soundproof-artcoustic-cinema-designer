@@ -4,6 +4,20 @@ import { formatP7Degrees, isP7Number } from '@/components/utils/rp22/p7DisplayAu
 const normaliseLevel = value => String(value) === '0' ? 'FAIL' : /^[1-4]$/.test(String(value)) ? 'L' + value : value;
 const rank = value => value === 'FAIL' ? 0 : /^L[1-4]$/.test(String(value)) ? Number(String(value).slice(1)) : -1;
 
+/**
+ * The parameter's own terminal state — scored, provisional, assumed, not
+ * applicable or unresolved — read from the canonical parameter authority first,
+ * so the state travels WITH the result instead of being re-inferred downstream
+ * from the presence of a level. A level and a terminal state are different
+ * facts: a provisional result carries a level too.
+ */
+function parameterState(summary, id, row) {
+  const authorityState = summary?.parameterAuthority?.['p' + id]?.state ?? null;
+  const stated = authorityState
+    ?? row?.state ?? row?.status ?? row?.source_row?.state ?? row?.source_row?.status ?? null;
+  return stated ? String(stated).trim().toLowerCase() : null;
+}
+
 // Select a complete source row. Never borrow its grade from an aggregate.
 export function readReportParameter(summary, id, { scope = 'project', seatId = null } = {}) {
   // P18 has ONE authority: the canonical published room result. A stored
@@ -16,11 +30,14 @@ export function readReportParameter(summary, id, { scope = 'project', seatId = n
     // existing published limiting seat row, without recalculation or regrading.
     if (Number(id) === 5 && scope === 'project' && saved?.supporting_per_seat?.length) {
       const seat = [...saved.supporting_per_seat].sort((a, b) => rank(a.level) - rank(b.level))[0];
-      return { ...seat, scope: 'project', supporting_per_seat: saved.supporting_per_seat,
+      return { ...seat, scope: 'project', state: parameterState(summary, id, saved),
+        supporting_per_seat: saved.supporting_per_seat,
         scopes: saved.scopes, text: seat.level + ' · ' + seat.value };
     }
     const row = scope === 'per-seat' ? saved?.supporting_per_seat?.find(item => String(item.seat_id) === String(seatId)) : scope === 'primary' || scope === 'secondary' ? saved?.scopes?.[scope] : saved;
-    return row ? { ...row, text: (scope === 'primary' ? 'Primary ' : scope === 'secondary' ? 'Secondary ' : '') + row.level + ' · ' + row.value } : { key:'P'+id, scope, value:'—', level:'—', source_type:'unavailable' };
+    return row
+      ? { ...row, state: parameterState(summary, id, row), text: (scope === 'primary' ? 'Primary ' : scope === 'secondary' ? 'Secondary ' : '') + row.level + ' · ' + row.value }
+      : { key:'P'+id, scope, value:'—', level:'—', state:'unavailable', source_type:'unavailable' };
   }
   const key = 'p' + id;
   const room = summary?.roomResultsByParameter?.[id];
@@ -49,7 +66,8 @@ export function readReportParameter(summary, id, { scope = 'project', seatId = n
   return {
     key: 'P' + id, parameter_id: id, scope: resultScope,
     raw_value: rawValue, value, unit: row?.unit ?? (id === 10 || id === 20 ? 'dB' : null),
-    level, limiting_group: row?.limitingGroup ?? row?.seatId ?? null,
+    level, state: parameterState(summary, id, row),
+    limiting_group: row?.limitingGroup ?? row?.seatId ?? null,
     context: row?.detail ?? row?.note ?? (row?.seatId ? 'Limiting seat ' + row.seatId : resultScope),
     authority_fingerprint: origin?.authority_fingerprint ?? summary?.reportAuthority?.authority_fingerprint ?? null,
     authority_timestamp: origin?.authority_timestamp ?? summary?.reportAuthority?.authority_timestamp ?? null,
