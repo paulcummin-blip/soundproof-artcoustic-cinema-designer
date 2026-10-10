@@ -36,7 +36,7 @@ import { auditFinalReportAuthority } from '@/components/report/finalReportAuthor
 import { auditDurablePublication } from './publicationGateAuthority';
 import { usePublicationAttempt } from './publicationAcknowledgementStore';
 
-export function useVersionedEngineeringAuthority(projectId, versionId, { finalReport = false } = {}) {
+export function useVersionedEngineeringAuthority(projectId, versionId, { finalReport = false, engineeringFingerprint = null } = {}) {
   const [localSnapshot, setLocalSnapshot] = useState(
     () => (projectId && versionId ? readLocalHandoff(projectId, versionId) : null),
   );
@@ -75,7 +75,11 @@ export function useVersionedEngineeringAuthority(projectId, versionId, { finalRe
 
     setDurableLoading(true);
     (async () => {
-      const result = await fetchDurablePublication(projectId, versionId);
+      // The SAVED report's own engineering fingerprint, when the caller has one:
+      // a saved report reads the exact immutable publication it recorded, never
+      // whatever the version pointer has since moved on to. No fingerprint means
+      // the current publication — generation mode.
+      const result = await fetchDurablePublication(projectId, versionId, { engineeringFingerprint });
       if (cancelled) return;
       setDurable(result);
 
@@ -105,7 +109,7 @@ export function useVersionedEngineeringAuthority(projectId, versionId, { finalRe
     })();
 
     return () => { cancelled = true; };
-  }, [projectId, versionId, readAttempt]);
+  }, [projectId, versionId, readAttempt, engineeringFingerprint]);
 
   // The saved bass authority is restored here — on every page that reads the
   // engineering authority, not only where the Room Designer (and its Bass
@@ -222,7 +226,7 @@ export function useVersionedEngineeringAuthority(projectId, versionId, { finalRe
 
   const retry = useCallback(() => {
     if (!projectId || !versionId) return;
-    invalidateDurablePublicationRead(projectId, versionId);
+    invalidateDurablePublicationRead(projectId, versionId, engineeringFingerprint);
     invalidateProjectAnalysisCacheRead(projectId, versionId);
     retryCompletedBassAuthority(projectId, versionId);
     setDurable(null);

@@ -125,8 +125,13 @@ export default async function(req) {
     }
 
     const audit = auditEngineeringPublication(publication, {
-      // The version pointer is the authority the publication must match.
-      expectedFingerprint: version.published_fingerprint || fingerprint,
+      // The fingerprint THIS read resolved is the authority the publication must
+      // match. A read with no explicit fingerprint resolves the version pointer
+      // and is audited against it exactly as before; an explicit fingerprint (a
+      // saved report reading its own recorded publication) is audited against
+      // itself, so a report whose design has since moved on still reads the
+      // immutable publication it was generated from.
+      expectedFingerprint: fingerprint,
       project,
       bassAuthorityAvailable: Object.keys(cacheRecord?.completed_by_fingerprint || {}).length > 0,
     });

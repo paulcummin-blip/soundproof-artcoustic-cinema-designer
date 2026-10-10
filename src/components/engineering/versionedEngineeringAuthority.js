@@ -140,8 +140,8 @@ export function fetchDurablePublication(
   return read;
 }
 
-export function invalidateDurablePublicationRead(projectId, versionId) {
-  durablePublicationReads.delete(publicationReadKey(projectId, versionId));
+export function invalidateDurablePublicationRead(projectId, versionId, engineeringFingerprint = null) {
+  durablePublicationReads.delete(publicationReadKey(projectId, versionId, engineeringFingerprint));
 }
 export function subscribeDurablePublication(projectId, versionId, listener) {
   const key = publicationReadKey(projectId, versionId);

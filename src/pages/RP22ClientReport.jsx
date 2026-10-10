@@ -51,6 +51,7 @@ import BackToProjectLibraryLink from "@/components/report/BackToProjectLibraryLi
 import { readRequestedVersionId } from "@/components/report/reportVersionRequest";
 import { deriveReportReadiness, REPORT_STATE } from "@/components/report/reportReadinessAuthority";
 import { useReportSnapshot } from "@/components/report/useReportSnapshot";
+import { useSavedReportFingerprint } from "@/components/report/useSavedReportFingerprint";
 import ReportSnapshotBanner from "@/components/report/ReportSnapshotBanner";
 import ReportGateDiagnosticsPanel from "@/components/report/ReportGateDiagnosticsPanel";
 import {
@@ -85,7 +86,19 @@ export default function RP22ClientReport() {
   // opened the wrong version's report.
   const requestedVersionId = useMemo(() => readRequestedVersionId(searchParams), [searchParams]);
 
-  const authority = useClientReportAuthority(projectId, requestedVersionId);
+  // VIEW vs GENERATE. A saved report's OWN engineering fingerprint is resolved
+  // first: while a saved Project Report exists this page renders from that exact
+  // immutable publication, so a later design change can mark it Update Needed but
+  // can never alter it. With no saved report the current version authority is
+  // used, which is generation mode.
+  const savedReport = useSavedReportFingerprint({
+    projectId,
+    requestedVersionId,
+    reportType: PROJECT_REPORT_SNAPSHOT_TYPE,
+  });
+  const authority = useClientReportAuthority(projectId, requestedVersionId, {
+    savedEngineeringFingerprint: savedReport.fingerprint,
+  });
   // The P19 evidence graph reads the same saved completed bass contract the
   // Room Designer and the Technical Report read. Nothing is recalculated, and
   // when the saved post-EQ RSP curve and target are unavailable the P19 page
@@ -331,7 +344,9 @@ export default function RP22ClientReport() {
     : "unknown";
 
   const derivedReadiness = deriveReportReadiness({
-    hydrating,
+    // A saved report is never rendered from the current authority while its own
+    // recorded fingerprint is still being resolved.
+    hydrating: hydrating || !savedReport.resolved,
     roomDims,
     placedSpeakers,
     engineeringSummary,

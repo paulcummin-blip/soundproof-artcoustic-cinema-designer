@@ -71,7 +71,7 @@ function resolveScreenVisibleWidthInches(screen) {
   return 120;
 }
 
-export function useClientReportAuthority(projectId, requestedVersionId = null) {
+export function useClientReportAuthority(projectId, requestedVersionId = null, { savedEngineeringFingerprint = null } = {}) {
   const liveApp = useAppState();
   const activeProjectId = useActiveProjectId();
   // The version the shared app state currently holds. The in-session shortcut
@@ -88,7 +88,14 @@ export function useClientReportAuthority(projectId, requestedVersionId = null) {
   const [versionNumber, setVersionNumber] = useState(null);
   const [versionName, setVersionName] = useState(null);
 
-  const engineeringAuthority = useVersionedEngineeringAuthority(projectId, versionId, { finalReport:true });
+  // VIEW vs GENERATE. When a saved report exists, ITS OWN recorded engineering
+  // fingerprint is the authority this report renders from — so a later design
+  // change can never alter the visible saved report. No saved report means the
+  // current version authority, which is generation mode.
+  const engineeringAuthority = useVersionedEngineeringAuthority(projectId, versionId, {
+    finalReport: true,
+    engineeringFingerprint: savedEngineeringFingerprint,
+  });
   const app = useMemo(() => frozenReportAppState(liveApp, engineeringAuthority.publication), [liveApp, engineeringAuthority.publication]);
 
   // ── 1) Fetch + hydrate ──────────────────────────────────────────────────

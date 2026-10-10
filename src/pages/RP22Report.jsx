@@ -51,6 +51,8 @@ import TechnicalReportNotice from '../components/report/technical/TechnicalRepor
 import ReportGateDiagnosticsPanel from '@/components/report/ReportGateDiagnosticsPanel';
 import { buildReportGateDiagnostics } from '@/components/report/reportGateDiagnostics';
 import { useReportSnapshot } from '@/components/report/useReportSnapshot';
+import { useSavedReportFingerprint } from '@/components/report/useSavedReportFingerprint';
+import { PROJECT_REPORT_SNAPSHOT_TYPE } from '@/components/report/projectReport/projectReportIdentity';
 import ReportSnapshotBanner from '@/components/report/ReportSnapshotBanner';
 import {
     REPORT_SNAPSHOT_TYPE,
@@ -236,7 +238,22 @@ function RP22ReportInner({ embed = false } = {}) {
     // handoff overlaid as an optimisation. A cold load with empty site storage
     // therefore still restores the published report instead of reporting that
     // no analysis exists. Still read-only: no engine, no recalculation.
-    const reportAuthority = useVersionedEngineeringAuthority(explicitProjectId, reportVersionId, { finalReport: true });
+    // VIEW vs GENERATE — the ONE resolved frozen authority for this document.
+    // A saved report is read from the exact immutable publication it recorded,
+    // never from whatever the version pointer has since moved on to. The pages
+    // mounted inside the consolidated Project Report read that document's own
+    // saved authority, so the Technical pages cannot diverge from the rest of
+    // the report they are printed in. With no saved report (first generation, or
+    // the Update action) the current version authority is the source.
+    const savedReport = useSavedReportFingerprint({
+        projectId: explicitProjectId,
+        requestedVersionId: reportVersionId || requestedVersionId,
+        reportType: embed ? PROJECT_REPORT_SNAPSHOT_TYPE : REPORT_SNAPSHOT_TYPE.TECHNICAL,
+    });
+    const reportAuthority = useVersionedEngineeringAuthority(explicitProjectId, reportVersionId, {
+        finalReport: true,
+        engineeringFingerprint: savedReport.fingerprint,
+    });
     const app = useMemo(() => frozenReportAppState(liveApp, reportAuthority.publication), [liveApp, reportAuthority.publication]);
     const frozenProject = reportAuthority.publication?.report_snapshot?.report_project || null;
     const reportProjectDetails = useMemo(() => frozenProject ? { ...projectDetails, ...frozenProject } : projectDetails, [projectDetails, frozenProject]);
@@ -973,7 +990,7 @@ function RP22ReportInner({ embed = false } = {}) {
 
     // The report waits for project, engineering publication, and durable bass
     // hydration. It must never render or print a partial summary first.
-    const showLoadingReport = reportHydrating || (explicitProjectId && reportReadyProjectId !== explicitProjectId) || authorityReportPending || authorityResolving || bassReportPending;
+    const showLoadingReport = reportHydrating || (explicitProjectId && reportReadyProjectId !== explicitProjectId) || authorityReportPending || authorityResolving || bassReportPending || !savedReport.resolved;
 
     // READ-ONLY: useAnalysisSpeakers, useAllSeatSplMetrics, and
     // useRP22AnalysisEngine are NOT called here. The authoritative RP22

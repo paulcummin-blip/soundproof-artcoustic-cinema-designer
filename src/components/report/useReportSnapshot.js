@@ -20,6 +20,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useAuth } from '@/lib/AuthContext';
 import { base44 } from '@/api/base44Client';
 import captureReportProposalSource from './captureReportProposalSource';
+import { publishSavedReportFingerprint } from './useSavedReportFingerprint';
 import { readStoredEvidence, validateReportEvidence } from './reportEvidenceAuthority';
 import { buildParityRecord, checkReportEvidenceParity } from './reportEvidenceParity';
 import { loadReportSnapshot, saveReportSnapshot } from './reportSnapshotStore';
@@ -231,6 +232,10 @@ export function useReportSnapshot({
       });
       if (mountedRef.current) {
         setSaved(written || { ...record, id: saved?.id || null });
+        // This report has just been written: the saved-report fingerprint is
+        // re-resolved, so the document renders from the authority it was frozen
+        // against from here on.
+        publishSavedReportFingerprint();
         setEvidenceIncomplete(!parity.passed);
         setEvidenceMismatches([...parity.mismatches, ...parity.missing.map((field) => ({ area: field }))]);
       }
