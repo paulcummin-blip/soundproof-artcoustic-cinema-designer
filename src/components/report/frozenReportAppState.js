@@ -43,7 +43,8 @@ export function frozenReportAppState(live, publication) {
     acousticTreatmentEnabled:p.acoustic_treatment_enabled, selectedAbfuserQty:p.selected_abfuser_qty,
     abfuserQtySource:'frozen-publication', legacyAbfuserAutoQty:0,
     getSpeakerVisibility:role => (/^FC[LR]$/.test(String(role || '').toUpperCase()) || visibility.has(String(role || '').toUpperCase())),
-    projectName:p.name,
+    projectName:p.name, clientName:p.client_name ?? null,
+    reportPriceData:publication.report_snapshot.priceData || null,
     reportEngineeringFingerprint:publication.engineering_fingerprint, reportVersionId:p.version_id,
   };
 }

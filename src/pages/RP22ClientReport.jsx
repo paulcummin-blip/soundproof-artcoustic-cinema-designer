@@ -52,6 +52,7 @@ import { readRequestedVersionId } from "@/components/report/reportVersionRequest
 import { deriveReportReadiness, REPORT_STATE } from "@/components/report/reportReadinessAuthority";
 import { useReportSnapshot } from "@/components/report/useReportSnapshot";
 import { useSavedReportFingerprint } from "@/components/report/useSavedReportFingerprint";
+import useFrozenReportBass from '@/components/report/useFrozenReportBass';
 import ReportSnapshotBanner from "@/components/report/ReportSnapshotBanner";
 import ReportGateDiagnosticsPanel from "@/components/report/ReportGateDiagnosticsPanel";
 import {
@@ -98,12 +99,13 @@ export default function RP22ClientReport() {
   });
   const authority = useClientReportAuthority(projectId, requestedVersionId, {
     savedEngineeringFingerprint: savedReport.fingerprint,
+    savedSnapshot: savedReport.saved,
   });
   // The P19 evidence graph reads the same saved completed bass contract the
   // Room Designer and the Technical Report read. Nothing is recalculated, and
   // when the saved post-EQ RSP curve and target are unavailable the P19 page
   // states that plainly instead of drawing an unrelated curve.
-  const completedBassAuthority = useCompletedBassAuthority(projectId || "free", authority.versionId || "free");
+  const completedBassAuthority = useFrozenReportBass(projectId, authority.versionId, authority.publication);
   const engineeringSummary = authority.engineeringSummary || null;
   const p19SeatAuthority = engineeringSummary?.p19SeatAuthority || null;
   const appState = authority.reportApp;
@@ -330,12 +332,7 @@ export default function RP22ClientReport() {
     return () => clearInterval(interval);
   }, []);
 
-  const windowPriceSummary = typeof window !== "undefined" ? window.__ROOM_DESIGNER_PRICE__ : null;
-  const priceSummary = windowPriceSummary
-    && projectId
-    && String(windowPriceSummary.projectId || "") === String(projectId)
-    ? windowPriceSummary
-    : null;
+  const priceSummary = authority.authoritySnapshot?.priceData || null;
 
   // Pricing is only reported as incomplete when it genuinely is — an absent
   // price summary for this project is treated as unknown, never as a blocker.
@@ -529,13 +526,13 @@ export default function RP22ClientReport() {
   });
 
   // A failed export resolves the report to the canonical Failed state.
-  const authorityReadFailed = authority.readFailed || authority.bassRestoreFailed;
+  const authorityReadFailed = authority.readFailed || authority.bassRestoreFailed || !!savedReport.error;
   const readiness = authorityReadFailed
     ? {
         state: REPORT_STATE.FAILED,
         missing: [],
         nextAction: "Retry the saved engineering read, or return to the project.",
-        reason: authority.readError || "Saved engineering authority could not be read. Nothing has been treated as missing or uncalculated.",
+        reason: savedReport.error || authority.readError || "Saved engineering authority could not be read. Nothing has been treated as missing or uncalculated.",
         canExport: false,
       }
     : exportError
@@ -586,7 +583,8 @@ export default function RP22ClientReport() {
     versionId: authority.versionId,
     accountId: projectDetails?.account_id || null,
     reportType: PROJECT_REPORT_SNAPSHOT_TYPE,
-    currentFingerprints: snapshotFingerprints,
+    currentFingerprints: { ...snapshotFingerprints,
+      engineeringFingerprint: savedReport.currentFingerprint || snapshotFingerprints.engineeringFingerprint },
     payload: snapshotPayload,
     reportSource: { project: projectDetails, engineeringSummary, app: appState,
       presentation: { seatingPositions, placedSpeakers, priceData: authority.authoritySnapshot?.priceData } },

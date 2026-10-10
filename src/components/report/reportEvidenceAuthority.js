@@ -22,6 +22,7 @@ import { REPORT_SNAPSHOT_TYPE, reportTypeLabel } from './reportSnapshotAuthority
 import { PRODUCTS_SELECTED_ROWS } from './reportProductsSelected';
 import { validateReportEvidence as validateCompleteness } from '../../../shared/reportEvidenceCompleteness.js';
 import { buildReportSeating } from '../../../shared/reportEvidenceSeating.js';
+import { parseReportProduct } from './reportStructuredProducts';
 
 export const REPORT_EVIDENCE_VERSION = 1;
 
@@ -167,7 +168,7 @@ function buildScreen(captured, borderThicknessM) {
     viewable_height_cm: viewableHeightCm,
     overall_width_cm: (viewableWidthCm === null || borderCm === null) ? viewableWidthCm : round(viewableWidthCm + 2 * borderCm, 1),
     overall_height_cm: (viewableHeightCm === null || borderCm === null) ? viewableHeightCm : round(viewableHeightCm + 2 * borderCm, 1),
-    screen_type: screen.television === true ? 'Television' : 'Projection screen',
+    screen_type: displayType === DISPLAY_TYPE_TV ? 'Television' : 'Projection screen',
     display_type: displayType,
     display_label: displayLabel,
   };
@@ -197,7 +198,10 @@ function buildSeating(captured) {
     p19: (captured?.report_parameters || []).find(entry => Number(entry.parameter_id) === 19 && /^L[1-4]$/.test(String(entry.level))) || null,
   });
   const rsp = captured?.room?.rsp || null;
-  return { ...seating, rsp: rsp ? { mode: rsp.mode || null,
+  return { ...seating,
+    rsp_bass: captured?.bass?.p19?.rsp ? { scope: 'RSP', p19: copy(captured.bass.p19.rsp),
+      curve_ref: copy(captured.bass.rsp_curve_ref) } : null,
+    rsp: rsp ? { mode: rsp.mode || null,
     x_m: round(rsp.x_m ?? rsp.manual_x_m, 2),
     y_m: round(rsp.y_m ?? rsp.manual_y_m, 2) } : null };
 }
@@ -225,7 +229,7 @@ function buildSystem(captured) {
   const byLayer = {};
   for (const { key, area } of PRODUCTS_SELECTED_ROWS) {
     const values = Array.isArray(built[key]) ? built[key] : [];
-    const entries = values.map((value) => parseProductValue(value, area)).filter(Boolean);
+    const entries = values.map((value) => parseReportProduct(value, area)).filter(Boolean);
     byLayer[key] = entries;
     products.push(...entries);
   }
@@ -270,7 +274,7 @@ function buildBass(captured) {
     p18: bass?.p18 ?? null,
     p19: bass?.p19 ?? null,
     p20: bass?.p20 ?? null,
-    rsp_curve_ref: null,
+    rsp_curve_ref: bass?.rsp_curve_ref ?? null,
     primary_seat_curve_refs: [],
   };
 }

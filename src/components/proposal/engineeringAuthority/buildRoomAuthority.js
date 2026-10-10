@@ -88,7 +88,7 @@ function interpretScreen(project) {
     viewable_width_inches: canonical?.widthInches ?? null,
     // A television is known by its nominal size; a projection screen by its
     // viewable image width. Reports label the two differently.
-    television: isTelevisionScreen(project),
+    television: resolveDisplayType(project) === DISPLAY_TYPE_TV,
     // The designer's own display authority, frozen into the engineering
     // publication so every consumer states the same display.
     display_type: resolveDisplayType(project),

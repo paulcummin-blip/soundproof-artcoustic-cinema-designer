@@ -14,6 +14,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { frozenReportAppState } from '@/components/report/frozenReportAppState';
+import frozenPublicationProject from '@/components/report/frozenPublicationProject';
 import { useAppState } from "@/components/AppStateProvider";
 import {
   readProjectRecord,
@@ -71,7 +72,7 @@ function resolveScreenVisibleWidthInches(screen) {
   return 120;
 }
 
-export function useClientReportAuthority(projectId, requestedVersionId = null, { savedEngineeringFingerprint = null } = {}) {
+export function useClientReportAuthority(projectId, requestedVersionId = null, { savedEngineeringFingerprint = null, savedSnapshot = null } = {}) {
   const liveApp = useAppState();
   const activeProjectId = useActiveProjectId();
   // The version the shared app state currently holds. The in-session shortcut
@@ -696,18 +697,17 @@ export function useClientReportAuthority(projectId, requestedVersionId = null, {
   // in the display dropdown or in the manual size workflow. It is never inferred
   // from an aspect ratio or a dimension: resolveDisplayType is the one authority.
   const reportProjectDetails = useMemo(() => {
-    const merged = engineeringAuthority.publication?.report_snapshot?.report_project
-      ? { ...projectDetails, ...engineeringAuthority.publication.report_snapshot.report_project }
-      : projectDetails;
+    const merged = frozenPublicationProject(engineeringAuthority.publication, savedSnapshot) || projectDetails;
     if (!merged) return merged;
     return { ...merged, display_type: resolveDisplayType({ ...merged, ...(screen || {}) }) };
-  }, [projectDetails, engineeringAuthority.publication, screen]);
+  }, [projectDetails, engineeringAuthority.publication, screen, savedSnapshot]);
 
   return {
     projectId,
     versionId,
-    versionNumber,
-    versionName,
+    versionNumber: reportProjectDetails?.version_number ?? versionNumber,
+    versionName: reportProjectDetails?.version_name ?? versionName,
+    publication: engineeringAuthority.publication,
     projectDetails: reportProjectDetails,
     reportApp:app,
     publicationGate:engineeringAuthority.publicationGate,

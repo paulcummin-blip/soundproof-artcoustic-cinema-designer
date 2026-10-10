@@ -43,6 +43,7 @@ export function useVersionedEngineeringAuthority(projectId, versionId, { finalRe
   const [durable, setDurable] = useState(null);
   const [durableSnapshot, setDurableSnapshot] = useState(null);
   const [durableLoading, setDurableLoading] = useState(false);
+  const [resolvedFingerprint, setResolvedFingerprint] = useState(undefined);
   const [readAttempt, setReadAttempt] = useState(0);
 
   useEffect(() => subscribeDurablePublication(projectId, versionId, () => {
@@ -67,6 +68,7 @@ export function useVersionedEngineeringAuthority(projectId, versionId, { finalRe
   useEffect(() => {
     let cancelled = false;
     if (!projectId || !versionId) {
+      setResolvedFingerprint(undefined);
       setDurable(null);
       setDurableSnapshot(null);
       setDurableLoading(false);
@@ -82,6 +84,7 @@ export function useVersionedEngineeringAuthority(projectId, versionId, { finalRe
       const result = await fetchDurablePublication(projectId, versionId, { engineeringFingerprint });
       if (cancelled) return;
       setDurable(result);
+      setResolvedFingerprint(engineeringFingerprint);
 
       const publication = result?.publication;
       if (!publication) {
@@ -95,7 +98,7 @@ export function useVersionedEngineeringAuthority(projectId, versionId, { finalRe
       // report_snapshot existed).
       let designState = null;
       try {
-        const version = await readProjectVersionRecord(versionId);
+        const version = engineeringFingerprint ? null : await readProjectVersionRecord(versionId);
         designState = version?.design_state || null;
       } catch (error) {
         console.warn('[engineeringAuthority] design_state read failed:', error?.message || error);
@@ -128,8 +131,9 @@ export function useVersionedEngineeringAuthority(projectId, versionId, { finalRe
   const composedSnapshot = composeAuthoritySnapshot({ localSnapshot, durableSnapshot, finalReport });
   const composedSummary = extractEngineeringSummary(composedSnapshot);
   const publishedBassMatches = !finalReport || !durable?.publication
+    || !!engineeringFingerprint
     || durable.publication.provenance?.bass_fingerprint === completedBassAuthority?.currentFingerprint;
-  const restoredSummary = publishedBassMatches ? applyRestoredBassAuthority(
+  const restoredSummary = publishedBassMatches && !engineeringFingerprint ? applyRestoredBassAuthority(
     composedSummary,
     { projectId, versionId, completedBassAuthority },
   ) : composedSummary;
@@ -220,7 +224,8 @@ export function useVersionedEngineeringAuthority(projectId, versionId, { finalRe
   // A report must not render a partial saved summary while the bass contract is
   // still hydrating independently of the Room Designer/Bass UI.
   const loading = !readFailed && (
-    (!localHasSummary && (durableLoading || durable === null))
+    (finalReport && (durableLoading || resolvedFingerprint !== engineeringFingerprint))
+    || (!localHasSummary && (durableLoading || durable === null))
     || bassHydrationPending
   );
 
@@ -232,7 +237,7 @@ export function useVersionedEngineeringAuthority(projectId, versionId, { finalRe
     setDurable(null);
     setDurableSnapshot(null);
     setReadAttempt((value) => value + 1);
-  }, [projectId, versionId]);
+  }, [projectId, versionId, engineeringFingerprint]);
 
   return {
     snapshot,

@@ -18,6 +18,8 @@
 
 import { EVIDENCE_REQUIRED_PARAMETERS, validateReportEvidence } from './reportEvidenceAuthority';
 import { PRODUCTS_SELECTED_ROWS } from './reportProductsSelected';
+import reportEvidenceIntegrity from './reportEvidenceIntegrity';
+import { renderReportProduct } from './reportStructuredProducts';
 
 /** Values are compared for equality after this normalisation — glyph only. */
 function normaliseValue(value) {
@@ -84,10 +86,7 @@ export function evidenceProductsByLayer(evidence) {
   const rendered = {};
   for (const { key } of PRODUCTS_SELECTED_ROWS) {
     const entries = Array.isArray(byLayer?.[key]) ? byLayer[key] : [];
-    const values = entries.map((entry) => {
-      const base = entry.quantity > 1 ? `${entry.model} × ${entry.quantity}` : `${entry.model}`;
-      return entry.position ? `${base} (${entry.position})` : base;
-    });
+    const values = entries.map(renderReportProduct);
     rendered[key] = values.length > 0 ? values : ['None specified'];
   }
   return rendered;
@@ -241,6 +240,7 @@ function viewingMismatches(evidence, captured) {
 export function checkReportEvidenceParity({ evidence, captured, reportType = null } = {}) {
   const validation = validateReportEvidence(evidence, reportType, { requireProposalReady: false });
   const mismatches = [
+    ...reportEvidenceIntegrity(evidence, captured, reportType),
     ...parameterMismatches(evidence, reportType),
     ...productMismatches(evidence, captured).map((entry) => ({ ...entry, blocking: true })),
     ...viewingMismatches(evidence, captured).map((entry) => ({ ...entry, blocking: true })),

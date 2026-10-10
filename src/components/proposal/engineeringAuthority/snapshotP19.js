@@ -8,12 +8,13 @@
  */
 
 export function buildSnapshotP19(engineeringSummary) {
-  const p19Param = engineeringSummary?.parameterSummaries?.project?.p19 ?? null;
+  const p19Param = engineeringSummary?.roomResultsByParameter?.[19]
+    ?? engineeringSummary?.parameterSummaries?.project?.p19 ?? null;
   const rsp = p19Param
     ? {
       level: p19Param.level ?? null,
-      raw_value: p19Param.value ?? null,
-      display_value: p19Param.valueFormatted ?? null,
+      raw_value: p19Param.rawValue ?? p19Param.value ?? null,
+      display_value: p19Param.formatted ?? p19Param.valueFormatted ?? p19Param.valueText ?? null,
       worst_frequency_hz: p19Param.worstFrequencyHz ?? null,
     }
     : null;

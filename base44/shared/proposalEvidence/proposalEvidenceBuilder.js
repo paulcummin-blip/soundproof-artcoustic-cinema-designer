@@ -108,7 +108,7 @@ export function proposalEvidenceFingerprint(pack) {
 export function buildProposalEvidence({ versions = [], generatedAt = null, requestContext = null } = {}) {
   const list = (Array.isArray(versions) ? versions : []).filter(Boolean);
   if (list.length === 0) {
-    throw new Error('No version report evidence was supplied. Select at least one version with a current Visual and Technical Report.');
+    throw new Error('No version report evidence was supplied. Select at least one version with a current Project Report.');
   }
 
   // The ONE assumed-parameter admission rule for this proposal. With no request
@@ -218,6 +218,7 @@ export function buildProposalEvidence({ versions = [], generatedAt = null, reque
       })),
       report_snapshot_ids: options.map((option) => ({
         version_id: option.version_id,
+        project_report_snapshot_id: option.facts?.report_snapshot_ids?.project ?? null,
         visual_report_snapshot_id: option.facts?.report_snapshot_ids?.visual ?? null,
         technical_report_snapshot_id: option.facts?.report_snapshot_ids?.technical ?? null,
       })),

@@ -552,12 +552,7 @@ export function useProjectReportPages({
       abfuserQtySource: appState?.abfuserQtySource || null,
     });
     if (acousticTreatmentPage.hasPage) {
-      const reportPriceSummary = (() => {
-        const summary = typeof window !== "undefined" ? window.__ROOM_DESIGNER_PRICE__ : null;
-        return summary && projectId && String(summary.projectId || "") === String(projectId)
-          ? summary
-          : null;
-      })();
+      const reportPriceSummary = appState?.reportPriceData || null;
       const acousticTreatmentProps = {
         roomDims,
         seatingPositions,

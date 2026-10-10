@@ -75,6 +75,7 @@ function formatText(system) {
 
 /** The screen as the Visual Report states it, in the comparison table's words. */
 function screenText(screen) {
+  if (screen?.display_type === 'tv') return asText(screen.display_label);
   if (screen?.manual_dimensions === true && screen?.manual_width_m) {
     return screen.manual_height_m
       ? `${screen.manual_width_m}m x ${screen.manual_height_m}m (manual)`
@@ -258,6 +259,7 @@ export function buildOptionFacts(entry, label, { policy = null } = {}) {
         dealer_name: asText(identity.dealer_name),
       },
       report_snapshot_ids: {
+        project: identity.projectReportId || null,
         visual: identity.visualReportId || null,
         technical: identity.technicalReportId || null,
       },
@@ -278,6 +280,9 @@ export function buildOptionFacts(entry, label, { policy = null } = {}) {
       },
       screen: {
         size_inches: screen.size_inches ?? null,
+        display_type: screen.display_type ?? null,
+        display_label: screen.display_label ?? null,
+        diagonal_inches: screen.diagonal_inches ?? null,
         aspect_ratio: asText(screen.aspect_ratio),
         screen_type: asText(screen.screen_type),
         viewable_width_cm: screen.viewable_width_cm ?? null,

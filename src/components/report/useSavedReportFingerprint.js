@@ -21,6 +21,8 @@
 import { useEffect, useState } from 'react';
 import { base44 } from '@/api/base44Client';
 import { readProjectRecord } from '@/components/state/projectReadCache';
+import { loadReportSnapshot } from './reportSnapshotStore';
+import frozenReportRead from './frozenReportRead';
 
 const EMPTY = { fingerprint: null, versionId: null, resolved: false };
 const listeners = new Set();
@@ -77,18 +79,15 @@ export function useSavedReportFingerprint({
           if (!cancelled) setState({ fingerprint: null, versionId: null, resolved: true });
           return;
         }
-        const result = await base44.entities.ReportSnapshot.filter(
-          { project_id: projectId, version_id: resolvedVersionId, report_type: reportType },
-          { limit: 1, sort: '-generated_at' },
-        );
-        const saved = Array.isArray(result) ? result[0] : result?.items?.[0];
-        const fingerprint = saved?.source_fingerprints?.engineeringFingerprint || null;
-        if (!cancelled) setState({ fingerprint, versionId: resolvedVersionId, resolved: true });
+        const version = await base44.entities.ProjectVersion.get(resolvedVersionId);
+        const currentFingerprint = version.published_fingerprint || null;
+        const saved = await loadReportSnapshot({ projectId, versionId: resolvedVersionId, reportType, currentFingerprint });
+        const fingerprint = saved ? frozenReportRead(saved, currentFingerprint).fingerprint : null;
+        if (!cancelled) setState({ fingerprint, currentFingerprint, saved, versionId: resolvedVersionId, resolved: true, error: null });
       } catch (error) {
-        // An unreadable saved report resolves as "no saved fingerprint": the
-        // current authority is used, which is the pre-existing behaviour.
-        console.warn('[savedReportFingerprint] read failed:', error?.message || error);
-        if (!cancelled) setState({ fingerprint: null, versionId: null, resolved: true });
+        // Fail closed: an unreadable saved report must never become current design.
+        if (!cancelled) setState({ fingerprint: null, versionId: null, resolved: true,
+          error: error?.message || 'Saved report could not be read.' });
       }
     })();
 

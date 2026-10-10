@@ -171,6 +171,7 @@ function productsFromEvidence(evidence) {
     const entries = Array.isArray(byLayer[key]) ? byLayer[key] : [];
     const values = entries.map((entry) => {
       const base = entry.quantity > 1 ? `${entry.model} × ${entry.quantity}` : `${entry.model}`;
+      if (entry.structure === 'dual-centre') return `${base} centre cabinets${entry.orientation ? ` (${entry.orientation})` : ''}`;
       return entry.position ? `${base} (${entry.position})` : base;
     });
     rendered[key] = values.length > 0 ? values : [NONE];
@@ -184,8 +185,7 @@ function productsFromEvidence(evidence) {
 /** The five evidence IDs a proposal cites, for later tracing. */
 export function buildEvidenceCitation({ technicalEvidence, visualEvidence, technicalRow, visualRow } = {}) {
   return {
-    visual_report_snapshot_id: visualRow?.id || null,
-    technical_report_snapshot_id: technicalRow?.id || null,
+    project_report_snapshot_id: technicalRow?.id || visualRow?.id || null,
     version_id: technicalEvidence?.identity?.version_id || visualEvidence?.identity?.version_id || null,
     evidence_generated_at: technicalEvidence?.identity?.generated_at
       || visualEvidence?.identity?.generated_at
@@ -330,8 +330,7 @@ function buildSnapshot({ version, projectId, technicalEvidence, visualEvidence, 
       // a scoped claim can name the scope authority it rests on.
       seatingFingerprint: identity.seating_fingerprint || null,
       generatedAt: identity.generated_at || null,
-      technicalReportId: technicalRow?.id || null,
-      visualReportId: visualRow?.id || null,
+      projectReportId: technicalRow?.id || null,
       technicalEvidenceFingerprint: technicalEvidence.evidence_fingerprint || null,
       visualEvidenceFingerprint: visualEvidence.evidence_fingerprint || null,
     },
@@ -341,7 +340,7 @@ function buildSnapshot({ version, projectId, technicalEvidence, visualEvidence, 
       project_reference: identity.project_reference || null,
     },
     dealer: { company_name: identity.dealer_name || null },
-    version: { id: version.id, name: version.version_name },
+    version: { id: version.id, name: identity.version_name },
     room: {
       dimensions: {
         length_m: geometry.room.length_m,
@@ -362,6 +361,9 @@ function buildSnapshot({ version, projectId, technicalEvidence, visualEvidence, 
         viewable_width_cm: geometry.screen.viewable_width_cm ?? null,
         viewable_height_cm: geometry.screen.viewable_height_cm ?? null,
         screen_type: geometry.screen.screen_type || null,
+        display_type: geometry.screen.display_type || null,
+        display_label: geometry.screen.display_label || null,
+        diagonal_inches: geometry.screen.viewable_diagonal_in ?? null,
       },
       seating: {
         interpretation: asText(seatingFacts.interpretation) || null,
@@ -440,7 +442,7 @@ export async function readProposalReportEvidence(entities, projectId, versions) 
     if (!version?.id) throw new Error('A selected version could not be read. Reopen the project and try again.');
 
     const reports = await entities.ReportSnapshot.filter(
-      { project_id: projectId, version_id: version.id },
+      { project_id: projectId, version_id: version.id, report_type: 'project' },
       { sort: '-generated_at', limit: 50 },
     );
     const rows = Array.isArray(reports) ? reports : (reports?.items || []);
@@ -449,28 +451,33 @@ export async function readProposalReportEvidence(entities, projectId, versions) 
     // table apply. A newer duplicate that is stale or incomplete never displaces
     // the valid Current report a proposal must read.
     const currentFingerprint = version.published_fingerprint || null;
-    const technicalRow = selectCanonicalReportSnapshot(rows, { reportType: 'technical', currentFingerprint });
-    const visualRow = selectCanonicalReportSnapshot(rows, { reportType: 'visual', currentFingerprint });
+    const projectRow = selectCanonicalReportSnapshot(rows, { reportType: 'project', currentFingerprint });
+    // Compatibility adapter names below denote layers of this ONE Project Report,
+    // not reads of legacy report rows.
+    const technicalRow = projectRow;
+    const visualRow = projectRow;
 
     // Evidence only: each report's own machine-readable snapshot, or a block
     // that names this version and this report.
-    const technicalEvidence = requireEvidence(technicalRow, version, 'Technical');
-    const visualEvidence = requireEvidence(visualRow, version, 'Visual');
+    const technicalEvidence = requireEvidence(projectRow, version, 'Project');
+    const visualEvidence = technicalEvidence;
 
     for (const id of REQUIRED_PARAMETERS) {
       const entry = technicalEvidence.parameter_index?.[`P${id}`];
       if (!entry || !/^L[1-4]$/.test(String(entry.level)) || entry.value == null || UNSTATED.test(String(entry.value))) {
-        throw new Error(`${version.version_name}: missing Technical Report parameter P${id} in its evidence. Regenerate the report.`);
+        throw new Error(`${version.version_name}: missing Project Report parameter P${id} in its evidence. Regenerate the report.`);
       }
     }
     if (!Array.isArray(technicalEvidence.system?.products_selected) || technicalEvidence.system.products_selected.length === 0) {
-      throw new Error(`${version.version_name}: missing Technical Report Products Selected in its evidence. Regenerate the report.`);
+      throw new Error(`${version.version_name}: missing Project Report Products Selected in its evidence. Regenerate the report.`);
     }
     if (!Array.isArray(visualEvidence.seating?.per_seat) || visualEvidence.seating.per_seat.length === 0) {
-      throw new Error(`${version.version_name}: missing Visual Report RP23 values in its evidence. Regenerate the report.`);
+      throw new Error(`${version.version_name}: missing Project Report RP23 values in its evidence. Regenerate the report.`);
     }
 
-    const citation = buildEvidenceCitation({ technicalEvidence, visualEvidence, technicalRow, visualRow });
+    const citation = { project_report_snapshot_id: projectRow.id,
+      version_id: version.id, evidence_generated_at: technicalEvidence.identity.generated_at,
+      evidence_fingerprint: technicalEvidence.evidence_fingerprint };
 
     // The one snapshot a proposal reads. Every fact in it is taken from the two
     // reports' own reportEvidence above — no frozen-source field and no live
@@ -480,7 +487,7 @@ export async function readProposalReportEvidence(entities, projectId, versions) 
       version_name: version.version_name,
       source: 'report-evidence',
       engineeringState: 'current',
-      evidence: { technical: technicalEvidence, visual: visualEvidence, citation },
+      evidence: { project: technicalEvidence, technical: technicalEvidence, visual: technicalEvidence, citation },
       snapshot: buildSnapshot({
         version, projectId, technicalEvidence, visualEvidence, technicalRow, visualRow, citation,
       }),

@@ -14,7 +14,7 @@ export default function useReportFilenameIdentity(project) {
   const identity = canonical.projectId === project?.id ? canonical.identity : null;
   const canonicalAccount = identity?.accountId === project?.account_id && identity?.accountName
     ? { id: project.account_id, name: identity.accountName } : null;
-  const needsAccount = !!project?.account_id && !project?.dealer_name?.trim() && !canonicalAccount;
+  const needsAccount = project?.report_frozen !== true && !!project?.account_id && !project?.dealer_name?.trim() && !canonicalAccount;
   const account = useQuery({
     queryKey: ['report-filename-account', project?.account_id],
     enabled: needsAccount,
@@ -25,7 +25,7 @@ export default function useReportFilenameIdentity(project) {
     staleTime: 60000,
   });
   const resolved = {
-    ...resolveReportFilenameDetails(project, canonicalAccount || account.data),
+    ...resolveReportFilenameDetails(project, project?.report_frozen ? null : canonicalAccount || account.data),
     ready: !!project && (!needsAccount || account.isSuccess),
   };
 

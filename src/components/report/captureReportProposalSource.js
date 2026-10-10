@@ -3,6 +3,8 @@ import { mergeProjectAndVersion } from '@/lib/versionAuthority';
 import { buildProductsSelected } from '@/components/report/reportProductsSelected';
 import { readReportParameter } from '@/components/report/reportParameterEvidence';
 import { buildReportEvidence } from '@/components/report/reportEvidenceAuthority';
+import frozenPublicationProject from '@/components/report/frozenPublicationProject';
+import { buildSnapshotP19 } from '@/components/proposal/engineeringAuthority/snapshotP19';
 
 // Called only by a generated report's save action, never by proposal generation.
 export default function captureReportProposalSource({
@@ -21,22 +23,26 @@ export default function captureReportProposalSource({
   // record carries no version design, so capturing from it would freeze stale
   // screen, display, seating and product facts into the evidence a proposal later
   // reads. A caller that supplies no version keeps the previous behaviour exactly.
+  const frozenProject = frozenPublicationProject(seatingPublication);
   const design = {
     ...(version ? mergeProjectAndVersion(project, version) : project),
+    // Merge is for generation compatibility; pinned publication facts always win.
+    ...frozenProject,
     selected_speakers: speakers,
   };
   const snapshot = buildEngineeringSnapshot({
-    projectId, versionId, project, mergedProject: design,
-    version: { id: versionId, version_name: project.version_name },
+    projectId, versionId, project: frozenProject, mergedProject: design,
+    version: { id: versionId, version_name: frozenProject.version_name, version_number: frozenProject.version_number },
     engineeringSummary, seats, placedSpeakers: speakers,
     priceCalculation: presentation?.priceData,
   });
   const products = buildProductsSelected({
     placedSpeakers: speakers,
-    frontSubsCfg: project.front_subs_cfg,
-    rearSubsCfg: project.rear_subs_cfg,
-    acousticTreatmentEnabled: project.acoustic_treatment_enabled,
-    selectedAbfuserQty: project.selected_abfuser_qty,
+    frontSubsCfg: design.front_subs_cfg,
+    rearSubsCfg: design.rear_subs_cfg,
+    subwooferInstances: design.subwooferInstances,
+    acousticTreatmentEnabled: design.acoustic_treatment_enabled,
+    selectedAbfuserQty: design.selected_abfuser_qty,
   });
   const ids = Object.keys(engineeringSummary.parameterSummaries?.project || {})
     .filter((key) => /^p\d+$/.test(key)).map((key) => Number(key.slice(1)));
@@ -49,6 +55,10 @@ export default function captureReportProposalSource({
   });
   const captured = {
     ...snapshot,
+    identity: { ...snapshot.identity, engineeringFingerprint: seatingPublication.engineering_fingerprint },
+    bass: { ...snapshot.bass, available: Boolean(snapshot.bass.available), p19: buildSnapshotP19(engineeringSummary),
+      rsp_curve_ref: seatingPublication.provenance?.bass_fingerprint
+        ? { fingerprint: seatingPublication.provenance.bass_fingerprint, curve: 'post-eq-rsp' } : null },
     system: { ...snapshot.system, products_selected: products },
     rp22: { ...snapshot.rp22, parameter_headlines: authorityHeadlines.map((row) => {
       const stated = parameters.find((entry) => entry.parameter_id === row.parameter_id);
@@ -75,7 +85,7 @@ export default function captureReportProposalSource({
     // visible rows overwrote the headlines. Parity compares the two, so a report
     // can never show a figure its own authority did not state.
     authorityHeadlines,
-    borderThicknessM: project?.border_thickness_m ?? null,
+    borderThicknessM: design?.border_thickness_m ?? null,
   });
   return captured;
 }

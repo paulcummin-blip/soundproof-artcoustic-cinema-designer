@@ -12,6 +12,13 @@ export function readReportParameter(summary, id, { scope = 'project', seatId = n
   const canonicalRoomFirst = Number(id) === 18 && !!summary?.roomResultsByParameter?.[18];
   if (summary?.parameter_index && !canonicalRoomFirst) {
     const saved = summary.parameter_index['P' + id];
+    // P5's legacy MLP room headline is not its seat-scoped authority. Read an
+    // existing published limiting seat row, without recalculation or regrading.
+    if (Number(id) === 5 && scope === 'project' && saved?.supporting_per_seat?.length) {
+      const seat = [...saved.supporting_per_seat].sort((a, b) => rank(a.level) - rank(b.level))[0];
+      return { ...seat, scope: 'project', supporting_per_seat: saved.supporting_per_seat,
+        scopes: saved.scopes, text: seat.level + ' · ' + seat.value };
+    }
     const row = scope === 'per-seat' ? saved?.supporting_per_seat?.find(item => String(item.seat_id) === String(seatId)) : scope === 'primary' || scope === 'secondary' ? saved?.scopes?.[scope] : saved;
     return row ? { ...row, text: (scope === 'primary' ? 'Primary ' : scope === 'secondary' ? 'Secondary ' : '') + row.level + ' · ' + row.value } : { key:'P'+id, scope, value:'—', level:'—', source_type:'unavailable' };
   }
@@ -32,7 +39,8 @@ export function readReportParameter(summary, id, { scope = 'project', seatId = n
     row = [...selected].sort((a, b) => rank(normaliseLevel(a.level)) - rank(normaliseLevel(b.level)))[0] || null;
     resultScope = scope;
   }
-  const origin = row?.authority_fingerprint ? row : summary?.reportAuthority;
+  const origin = canonicalRoomFirst && summary?.parameter_index?.P18
+    ? summary.parameter_index.P18 : row?.authority_fingerprint ? row : summary?.reportAuthority;
   const level = normaliseLevel(row?.level) || '—';
   const rawValue = row?.value ?? row?.rawValue ?? null;
   const value = isP7Number(id)
@@ -43,9 +51,9 @@ export function readReportParameter(summary, id, { scope = 'project', seatId = n
     raw_value: rawValue, value, unit: row?.unit ?? (id === 10 || id === 20 ? 'dB' : null),
     level, limiting_group: row?.limitingGroup ?? row?.seatId ?? null,
     context: row?.detail ?? row?.note ?? (row?.seatId ? 'Limiting seat ' + row.seatId : resultScope),
-    authority_fingerprint: origin?.authority_fingerprint ?? null,
-    authority_timestamp: origin?.authority_timestamp ?? null,
-    source_type: origin?.source_type ?? 'preview',
+    authority_fingerprint: origin?.authority_fingerprint ?? summary?.reportAuthority?.authority_fingerprint ?? null,
+    authority_timestamp: origin?.authority_timestamp ?? summary?.reportAuthority?.authority_timestamp ?? null,
+    source_type: origin?.source_type ?? summary?.reportAuthority?.source_type ?? 'preview',
     text: (scope === 'primary' ? 'Primary ' : scope === 'secondary' ? 'Secondary ' : '')
       + level + ' · ' + value,
   };

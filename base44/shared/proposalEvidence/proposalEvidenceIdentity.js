@@ -41,6 +41,10 @@ function asText(value) {
  * @throws when the saved report evidence states no version name
  */
 export function savedVersionIdentity(entry, versionId = null) {
+  const project = asText(entry?.evidence?.project?.identity?.version_name);
+  if (project) return { version_id: versionId || entry.version_id,
+    version_name: project, from: 'project_report', stated_by: ['project_report'], reports_agree: true };
+  // Old immutable generation records remain readable; this is history only.
   const technical = asText(entry?.evidence?.technical?.identity?.version_name);
   const visual = asText(entry?.evidence?.visual?.identity?.version_name);
   const versionName = technical || visual;
@@ -51,7 +55,7 @@ export function savedVersionIdentity(entry, versionId = null) {
       `${id || 'A selected version'}: the saved report evidence does not state this version's name. `
       + 'The proposal evidence pack is built only from saved report evidence, so it is not built at all: '
       + 'a version name is never taken from live project state. '
-      + 'Regenerate the Visual and Technical Reports for this version so their evidence states the name, then try again.',
+      + 'Regenerate the Project Report for this version so its evidence states the name, then try again.',
     );
   }
 

@@ -52,6 +52,10 @@ import ReportGateDiagnosticsPanel from '@/components/report/ReportGateDiagnostic
 import { buildReportGateDiagnostics } from '@/components/report/reportGateDiagnostics';
 import { useReportSnapshot } from '@/components/report/useReportSnapshot';
 import { useSavedReportFingerprint } from '@/components/report/useSavedReportFingerprint';
+import useFrozenReportBass from '@/components/report/useFrozenReportBass';
+import frozenPublicationProject from '@/components/report/frozenPublicationProject';
+import TechnicalReportDrawings from '@/components/report/technical/TechnicalReportDrawings';
+import useTechnicalReportHydration from '@/components/report/technical/useTechnicalReportHydration';
 import { PROJECT_REPORT_SNAPSHOT_TYPE } from '@/components/report/projectReport/projectReportIdentity';
 import ReportSnapshotBanner from '@/components/report/ReportSnapshotBanner';
 import {
@@ -162,21 +166,7 @@ function RP22ReportInner({ embed = false } = {}) {
     // the stalled-export fallback both use exactly this string, so a downloaded
     // Technical Report always identifies itself: brand, report type, dealer,
     // project and reference.
-    const filenameIdentity = useReportFilenameIdentity(projectDetails);
-    const technicalReportPrintTitle = buildTechnicalReportTitle(
-        projectDetails?.name,
-        { number: reportVersionNumber, name: reportVersionName },
-        filenameIdentity
-    );
-
-    // The Technical Report's first page states the same identity line as the
-    // Visual Report — Project, Client, Version, Reference, Date — read from the
-    // one shared builder, naming the design version this report documents.
-    const technicalFirstPageMeta = reportHeaderMetadata(projectDetails, {
-        number: reportVersionNumber,
-        name: reportVersionName,
-    });
-    const showDesignRating = useSyncExternalStore(subscribeAsdrVisibility, getAsdrVisibility);
+    const showDesignRatingPreference = useSyncExternalStore(subscribeAsdrVisibility, getAsdrVisibility);
 
     // ── ASDR recommendation wiring ───────────────────────────────────────
     // READ-ONLY REPORT: The report does NOT mount DesignRecommendationEngine.
@@ -255,12 +245,15 @@ function RP22ReportInner({ embed = false } = {}) {
         engineeringFingerprint: savedReport.fingerprint,
     });
     const app = useMemo(() => frozenReportAppState(liveApp, reportAuthority.publication), [liveApp, reportAuthority.publication]);
-    const frozenProject = reportAuthority.publication?.report_snapshot?.report_project || null;
-    const reportProjectDetails = useMemo(() => frozenProject ? { ...projectDetails, ...frozenProject } : projectDetails, [projectDetails, frozenProject]);
-    const completedBassAuthority = useCompletedBassAuthority(
-        explicitProjectId || "free",
-        reportVersionId || "free",
-    );
+    const frozenProject = useMemo(() => frozenPublicationProject(reportAuthority.publication, savedReport.saved), [reportAuthority.publication, savedReport.saved]);
+    const reportProjectDetails = frozenProject || projectDetails;
+    const showDesignRating = reportAuthority.publication ? reportAuthority.publication.report_snapshot?.showAsdr !== false : showDesignRatingPreference;
+    const filenameIdentity = useReportFilenameIdentity(reportProjectDetails);
+    const frozenVersion = { number: frozenProject?.version_number ?? reportVersionNumber,
+      name: frozenProject?.version_name ?? reportVersionName };
+    const technicalReportPrintTitle = buildTechnicalReportTitle(reportProjectDetails?.name, frozenVersion, filenameIdentity);
+    const technicalFirstPageMeta = reportHeaderMetadata(reportProjectDetails, frozenVersion);
+    const completedBassAuthority = useFrozenReportBass(explicitProjectId, reportVersionId, reportAuthority.publication);
     const bassScopeId = String(completedBassAuthority?.projectId || "").split("::")[0] || null;
     const projectIdMatch = !!explicitProjectId
         && !!reportVersionId
@@ -272,7 +265,7 @@ function RP22ReportInner({ embed = false } = {}) {
         && !completedBassAuthority?.contract;
     const designReviewHandoff = reportAuthority.snapshot;
     const authorityResolving = reportAuthority.loading;
-    const authorityReadFailed = reportAuthority.readFailed === true;
+    const authorityReadFailed = reportAuthority.readFailed === true || !!savedReport.error;
     const designRecommendations = designReviewHandoff?.recommendations ?? null;
 
     // One published engineering summary is the sole report authority.
@@ -330,7 +323,8 @@ function RP22ReportInner({ embed = false } = {}) {
         versionId: reportVersionId,
         accountId: projectDetails?.account_id || null,
         reportType: REPORT_SNAPSHOT_TYPE.TECHNICAL,
-        currentFingerprints: snapshotFingerprints,
+        currentFingerprints: { ...snapshotFingerprints,
+            engineeringFingerprint: savedReport.currentFingerprint || snapshotFingerprints.engineeringFingerprint },
         payload: snapshotPayload,
         reportSource: { project: projectDetails, engineeringSummary, app },
         // An embedded document is not this report's own generation: the Technical
@@ -378,192 +372,10 @@ function RP22ReportInner({ embed = false } = {}) {
         blockReason: reportDataIncomplete ? reportDataIncompleteReason : null,
     });
 
-    // Full project hydration for RP22Report — mirrors Room Designer's useProjectLoader path
-    useEffect(() => {
-        let cancelled = false;
-
-        if (!app) return;
-
-        if (!explicitProjectId) {
-            setProjectDetails(null);
-            setReportHydrating(false);
-            setReportReadyProjectId(null);
-            setReportProjectError("Project could not be resolved for Technical Report.");
-            return;
-        }
-
-        // Clear any prior error when resolving a new valid project.
-        setReportProjectError(null);
-
-        // ── FAST PATH (SPA navigation from Room Designer) ──────────────────
-        // If the shared AppStateProvider is already hydrated for the EXACT
-        // requested project (identity match via session store + usable
-        // hydrated design state via isProjectHydrationReady), skip the
-        // redundant network hydration and mark ready immediately. Project
-        // details (name/client) are fetched non-blocking for the header.
-        // Hard refresh fails this check (isProjectHydrationReady=false) and
-        // falls through to the full fetch/hydrate path below.
-        // The shortcut may only be taken when the shared state holds the version
-        // this report was ASKED FOR. A request for another version hydrates that
-        // version explicitly, so an in-session load can never answer a Level 4
-        // request with the loaded Level 1 design.
-        const sharedProviderReady =
-            activeProjectId === explicitProjectId &&
-            app?.isProjectHydrationReady === true &&
-            sharedHydrationMatchesRequest({
-                requestedVersionId,
-                hydratedVersionId: sharedHydratedVersionId,
-            }) &&
-            Number.isFinite(Number(app?.roomDims?.widthM)) &&
-            Number.isFinite(Number(app?.roomDims?.lengthM));
-
-        if (sharedProviderReady) {
-            setReportHydrating(false);
-            setReportReadyProjectId(explicitProjectId);
-            setReportReadyVersionId(reportVersionId || null);
-            readProjectRecord(explicitProjectId).then(async (p) => {
-                if (cancelled) return;
-                if (!p) return;
-                setProjectDetails({
-                    id: p.id,
-                    name: p.name,
-                    client_name: p.client_name,
-                    project_status: p.project_status,
-                    notes: p.notes,
-                    created_date: p.created_date,
-                    updated_date: p.updated_date,
-                    account_id: p.account_id || null,
-                    dealer_name: p.dealer_name || null,
-                    project_reference: p.project_reference || null,
-                    active_version_id: p.active_version_id || null,
-                });
-                // The fast path states the version exactly as the full load does:
-                // the saved version name is read here too, so an in-session export
-                // or front page never falls back to a generic version label.
-                const version = await readVersionIdentity(
-                    resolveReportVersionId({
-                        requestedVersionId,
-                        activeVersionId: p.active_version_id,
-                    }),
-                );
-                if (cancelled) return;
-                setReportVersionNumber(version.number);
-                setReportVersionName(version.name);
-            }).catch(() => { /* non-blocking metadata fetch */ });
-            return () => { cancelled = true; };
-        }
-
-        // Ready for this exact project AND this exact version.
-        if (reportReadyProjectId === explicitProjectId
-            && reportReadyVersionId === (reportVersionId || null)
-            && reportHydrating === false) {
-            return;
-        }
-
-        if (reportReadyProjectId !== explicitProjectId
-            || reportReadyVersionId !== (reportVersionId || null)) {
-            setReportHydrating(true);
-            setReportReadyProjectId(null);
-            setReportReadyVersionId(null);
-        }
-
-        readProjectRecord(explicitProjectId).then(async (p) => {
-            if (cancelled) return;
-            if (!p) {
-                setProjectDetails(null);
-                setReportHydrating(false);
-                setReportReadyProjectId(null);
-                setReportProjectError("Project could not be resolved for Technical Report.");
-                return;
-            }
-            setProjectDetails({
-                id: p.id,
-                name: p.name,
-                client_name: p.client_name,
-                project_status: p.project_status,
-                notes: p.notes,
-                created_date: p.created_date,
-                updated_date: p.updated_date,
-                account_id: p.account_id || null,
-                dealer_name: p.dealer_name || null,
-                project_reference: p.project_reference || null,
-                active_version_id: p.active_version_id || null,
-            });
-            // Merge with the version this report was ASKED FOR — the explicit
-            // request first, the project's active version only as the fallback.
-            // Per-version design fields come from that version's design_state,
-            // never from the legacy Project position and never from whichever
-            // version the Room Designer happens to have loaded.
-            let merged = p;
-            const versionId = resolveReportVersionId({
-                requestedVersionId,
-                activeVersionId: p.active_version_id,
-            });
-            if (versionId) {
-                try {
-                    const v = await readProjectVersionRecord(versionId);
-                    if (!cancelled && v) {
-                        merged = mergeProjectAndVersion(p, v);
-                        setReportVersionNumber(typeof v.version_number === "number" ? v.version_number : null);
-                        setReportVersionName(typeof v.version_name === "string" ? v.version_name : null);
-                    }
-                } catch (verErr) {
-                    console.warn("[RP22Report] Version fetch failed, using project-only:", verErr);
-                }
-            }
-            hydrateProjectIntoAppState(merged, app, {
-                setScreen: app.setScreen,
-                setDolbyConfig: app.setDolbyConfig,
-                setDolbyPreset: app.setDolbyLayout,
-                setSevenBedLayoutType: app.setSevenBedLayoutType,
-                setLcrAimMode: app.setLcrAimMode,
-                setEnableFrontWides: app.setEnableFrontWides,
-                setOverheadGlobalModel: app.setOverheadGlobalModel,
-                setOverheadFrontOverride: app.setOverheadFrontOverride,
-                setOverheadMidOverride: app.setOverheadMidOverride,
-                setOverheadRearOverride: app.setOverheadRearOverride,
-                setUseFrontGlobal: app.setUseFrontGlobal,
-                setUseMidGlobal: app.setUseMidGlobal,
-                setUseRearGlobal: app.setUseRearGlobal,
-                setRowSpacingM: app.setRowSpacingM,
-                setSeatsPerRowByRow: app.setSeatsPerRowByRow,
-                setOverlays: app.setOverlays,
-                setSeatingPositions: app.setSeatingPositions,
-                setRoomElements: app.setRoomElements,
-                setFrontSubsCfg: app.setFrontSubsCfg,
-                setRearSubsCfg: app.setRearSubsCfg,
-                setSpeakerSystem: app.setSpeakerSystem,
-                setSeatingRows: app.setSeatingRows,
-                setSeatsPerRow: app.setSeatsPerRow,
-                setSeatSpacing: app.setSeatSpacing,
-                setMlpBasis: app.setMlpBasis,
-                setSeatingBlockOffset: app.setSeatingBlockOffset,
-                setRowEarHeights: app.setRowEarHeights,
-                setSelectedSpeakersByRole: app.setSelectedSpeakersByRole,
-                setSpeakerNodes: app.setSpeakerNodes,
-                setGlobalSurroundModel: app.setGlobalSurroundModel,
-                setExtraSurroundCount: app.setExtraSurroundCount,
-                setFreeMoveLcr: app.setFreeMoveLcr,
-                setRspMode: app.setRspMode,
-                setManualRspY_m: app.setManualRspY_m,
-                setManualRspX_m: app.setManualRspX_m,
-                setDesignatedRspSeatId: app.setDesignatedRspSeatId,
-            });
-            setReportReadyProjectId(p.id);
-            setReportReadyVersionId(versionId || null);
-            setReportHydrating(false);
-        }).catch(() => {
-            if (cancelled) return;
-            setProjectDetails(null);
-            setReportHydrating(false);
-            setReportReadyProjectId(null);
-            setReportProjectError("Project could not be resolved for Technical Report.");
-        });
-
-        return () => {
-            cancelled = true;
-        };
-    }, [explicitProjectId, requestedVersionId]);
+    useTechnicalReportHydration({ app: liveApp, explicitProjectId, requestedVersionId,
+      activeProjectId, sharedHydratedVersionId, reportVersionId, reportReadyProjectId, reportReadyVersionId,
+      reportHydrating, setProjectDetails, setReportHydrating, setReportReadyProjectId, setReportReadyVersionId,
+      setReportProjectError, setReportVersionNumber, setReportVersionName });
 
     const [printReady, setPrintReady] = useState(false);
     const printReportRef = useRef(null);
@@ -875,6 +687,7 @@ function RP22ReportInner({ embed = false } = {}) {
     };
 
     const formatScreenChoiceLabel = (scr) => {
+        if (scr?.manualSize?.enabled && scr.manualSize.displayType === 'tv') return `${Math.round(scr.manualSize.diagonalInches)}" TV`;
         const TV_PRESET_LABELS = { tv65: 'TV 65"', tv77: 'TV 77"', tv83: 'TV 83"', tv100: 'TV 100"' };
         const tvKey = scr?.tvPresetKey;
         if (tvKey && TV_PRESET_LABELS[tvKey]) return TV_PRESET_LABELS[tvKey];
@@ -1201,8 +1014,9 @@ function RP22ReportInner({ embed = false } = {}) {
     }, [app?.dolbyLayout, app?.frontSubsCfg?.count, app?.rearSubsCfg?.count]);
 
     const exportDateLabel = React.useMemo(() => {
-        return new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'long', year: 'numeric' });
-    }, []);
+        const generatedAt = savedReport.saved?.generated_at || reportAuthority.publication?.published_at;
+        return generatedAt ? new Date(generatedAt).toLocaleDateString('en-GB', { day: '2-digit', month: 'long', year: 'numeric' }) : '';
+    }, [savedReport.saved?.generated_at, reportAuthority.publication?.published_at]);
 
     const frontPageProjectDetails = React.useMemo(() => {
         if (!projectDetails) return null;
@@ -1293,62 +1107,6 @@ function RP22ReportInner({ embed = false } = {}) {
         mlpSeatId: rspSeatId,
         contributionsByKey: showDesignRating ? asdrContributionsByKey : null,
     };
-
-    const coverBoxStyle = {
-        border: '1.5px solid #D9D5CE',
-        borderRadius: '10px',
-        padding: '9mm 11mm',
-        background: '#FBFAF8',
-        width: '100%',
-        boxShadow: 'none',
-    };
-
-    const coverBoxTitleStyle = {
-        fontSize: '16pt',
-        fontWeight: 700,
-        color: '#1B1A1A',
-        marginBottom: '5mm',
-        textAlign: 'center',
-        lineHeight: 1.15,
-    };
-
-    const coverBoxSubtitleStyle = {
-        fontSize: '10.5pt',
-        color: '#3E4349',
-        marginBottom: '5mm',
-        textAlign: 'center',
-        lineHeight: 1.35,
-    };
-
-    const coverSectionTitleStyle = {
-        fontWeight: 600,
-        fontSize: '11.5pt',
-        color: '#1B1A1A',
-        marginBottom: '3.5mm',
-        lineHeight: 1.2,
-    };
-
-    const coverLabelValueRowStyle = {
-        display: 'grid',
-        gridTemplateColumns: '32mm 1fr',
-        columnGap: '4mm',
-        alignItems: 'baseline',
-    };
-
-    const coverLabelStyle = {
-        fontSize: '10.5pt',
-        fontWeight: 600,
-        color: '#1B1A1A',
-        lineHeight: 1.35,
-    };
-
-    const coverValueStyle = {
-        fontSize: '10.5pt',
-        color: '#3E4349',
-        lineHeight: 1.35,
-    };
-
-    const planEnabled = true;
 
     if (showLoadingReport && isAutoPrintPreparing) {
         return (
@@ -1608,7 +1366,7 @@ function RP22ReportInner({ embed = false } = {}) {
                                 System Overview. ── */}
                             {!embed && (
                                 <div className="print-summary report-page-block report-page-block--cover" data-report-block="cover" data-report-page-start="true">
-                                    <ReportCover variant="print" project={projectDetails} meta={technicalFirstPageMeta} />
+                                    <ReportCover variant="print" project={reportProjectDetails} meta={technicalFirstPageMeta} />
                                     {coverageSentence && (
                                         <div style={{ maxWidth: '185mm', margin: '0 auto', marginTop: '5mm' }}>
                                             <Rp22SeatCoverageSentence sentence={coverageSentence} variant="cover" />
@@ -1661,185 +1419,21 @@ function RP22ReportInner({ embed = false } = {}) {
                                 result itself. */}
                             </section>
 
-                        {planEnabled && typeof planImageDataUrl === 'string' && planImageDataUrl.length > 0 && planImageDataUrl !== '__SKIP__' && (
-                            <ReportDrawingPage
-                                id="pdf-room-plan"
-                                blockName="floor-plan"
-                                title="Room Plan"
-                                projectName={projectDetails?.name || ''}
-                                clientName={projectDetails?.client_name || ''}
-                                imageSrc={planImageDataUrl}
-                                imageAlt="Room plan"
-                            />
-                        )}
-
-                        {planEnabled && typeof planDimsImageDataUrl === 'string' && planDimsImageDataUrl.length > 0 && planDimsImageDataUrl !== '__SKIP__' && (
-                            <ReportDrawingPage
-                                id="pdf-room-plan-dims"
-                                blockName="dimensioned-floor-plan"
-                                title="Room Dimensions"
-                                projectName={projectDetails?.name || ''}
-                                clientName={projectDetails?.client_name || ''}
-                                imageSrc={planDimsImageDataUrl}
-                                imageAlt="Room dimensions plan"
-                            />
-                        )}
-
-                        {planEnabled && typeof planSpeakerDimsImageDataUrl === 'string' && planSpeakerDimsImageDataUrl.length > 0 && planSpeakerDimsImageDataUrl !== '__SKIP__' && (
-                            <ReportDrawingPage
-                                id="pdf-room-plan-positions"
-                                blockName="speaker-plan"
-                                title="Speaker Position Plan"
-                                projectName={projectDetails?.name || ''}
-                                clientName={projectDetails?.client_name || ''}
-                                sheetCode="SP-01"
-                                status="NOT FOR SCALING"
-                                imageSrc={planSpeakerDimsImageDataUrl}
-                                imageAlt="Speaker position plan"
-                            />
-                        )}
+                        <TechnicalReportDrawings section="plans" project={reportProjectDetails}
+                          planImageDataUrl={planImageDataUrl} planDimsImageDataUrl={planDimsImageDataUrl}
+                          planSpeakerDimsImageDataUrl={planSpeakerDimsImageDataUrl} />
 
                         <section id="pdf-room-parameters">
                             <RP22ReportParameterGrid {...parameterGridProps} variant="print" />
                         </section>
 
-                        {/* ── Drawing set: every page uses one fixed printable frame ── */}
-                        <ReportDrawingPage
-                            id="pdf-elevation-front"
-                            blockName="front-elevation"
-                            title="Elevation Drawing · Front"
-                            projectName={projectDetails?.name || ''}
-                            clientName={projectDetails?.client_name || ''}
-                            sheetCode="EL-F"
-                            status="NOT FOR SCALING"
-                        >
-                            <FrontElevation
-                                dimensions={stableDimensions}
-                                screen={screen}
-                                placedSpeakers={placedSpeakers}
-                                frontSubs={frontSubs}
-                                frontSubsCfg={frontSubsCfg}
-                                roomElements={(app?.roomElements || []).filter(el => el?.type !== 'projector')}
-                            />
-                        </ReportDrawingPage>
-
-                        <ReportDrawingPage
-                            id="pdf-elevation-left"
-                            blockName="left-elevation"
-                            title="Elevation Drawing · Left"
-                            projectName={projectDetails?.name || ''}
-                            clientName={projectDetails?.client_name || ''}
-                            sheetCode="EL-L"
-                            status="NOT FOR SCALING"
-                        >
-                            <SideElevation
-                                wall="left"
-                                dimensions={stableDimensions}
-                                screen={screen}
-                                placedSpeakers={placedSpeakers}
-                                frontSubs={frontSubs}
-                                frontSubsCfg={frontSubsCfg}
-                                rearSubs={safeArray(app?.subwoofers).filter(s => s?.group === 'rear')}
-                                rearSubsCfg={rearSubsCfg}
-                                seatingPositions={seats}
-                                mlpPoint={primarySeatingPosition}
-                                roomElements={app?.roomElements || []}
-                            />
-                        </ReportDrawingPage>
-
-                        <ReportDrawingPage
-                            id="pdf-elevation-right"
-                            blockName="right-elevation"
-                            title="Elevation Drawing · Right"
-                            projectName={projectDetails?.name || ''}
-                            clientName={projectDetails?.client_name || ''}
-                            sheetCode="EL-R"
-                            status="NOT FOR SCALING"
-                        >
-                            <SideElevation
-                                wall="right"
-                                dimensions={stableDimensions}
-                                screen={screen}
-                                placedSpeakers={placedSpeakers}
-                                frontSubs={frontSubs}
-                                frontSubsCfg={frontSubsCfg}
-                                rearSubs={safeArray(app?.subwoofers).filter(s => s?.group === 'rear')}
-                                rearSubsCfg={rearSubsCfg}
-                                seatingPositions={seats}
-                                mlpPoint={primarySeatingPosition}
-                                roomElements={app?.roomElements || []}
-                            />
-                        </ReportDrawingPage>
-
-                        {canRenderSightlinePage && sightlineScreenMetrics && sightlineRowData.length > 0 && (
-                            <>
-                                <ReportDrawingPage
-                                    id="pdf-sightlines"
-                                    blockName="sightline-drawing"
-                                    title="Sightlines & Viewing Angles"
-                                    projectName={projectDetails?.name || ''}
-                                    clientName={projectDetails?.client_name || ''}
-                                    sheetCode="SL-01"
-                                    status="NOT FOR SCALING"
-                                >
-                                    <SightlineGraphic
-                                        showHeader={false}
-                                        projectName={app?.projectName || ''}
-                                        clientName={app?.clientName || ''}
-                                        roomWidthM={stableDimensions.width}
-                                        roomLengthM={stableDimensions.length}
-                                        roomHeightM={stableDimensions.height}
-                                        screenWidthM={sightlineScreenMetrics.screenWidthM}
-                                        screenHeightM={sightlineScreenMetrics.screenHeightM}
-                                        screenTotalWidthM={sightlineScreenMetrics.screenTotalWidthM}
-                                        screenTotalHeightM={sightlineScreenMetrics.screenTotalHeightM}
-                                        screenFrontPlaneY={sightlineScreenMetrics.screenFrontPlaneY}
-                                        screenCenterHeightM={sightlineScreenMetrics.screenCenterHeightM}
-                                        screenBottomHeightM={sightlineScreenMetrics.screenBottomHeightM}
-                                        screenTopHeightM={sightlineScreenMetrics.screenTopHeightM}
-                                        projectorLensX={projector?.x_lens_m}
-                                        projectorLensY={projector?.y_lens_m}
-                                        projectorLensZ={projector?.z_lens_m}
-                                        projectorBodyWidth={projector?.body_width_m}
-                                        projectorBodyHeight={projector?.body_height_m}
-                                        projectorBodyDepth={projector?.body_depth_m}
-                                        rowData={sightlineRowData}
-                                        dolbyConfig={exportSystemConfiguration || ''}
-                                    />
-                                </ReportDrawingPage>
-
-                                <ReportDrawingPage
-                                    id="pdf-screen-wall-construction"
-                                    blockName="screen-wall-detail"
-                                    title="Screen Wall Construction Detail"
-                                    projectName={projectDetails?.name || ''}
-                                    clientName={projectDetails?.client_name || ''}
-                                    sheetCode="SW-01"
-                                    status="NOT FOR SCALING"
-                                >
-                                    <ScreenWallConstructionGraphic
-                                        showHeader={false}
-                                        projectName={projectDetails?.name || ''}
-                                        clientName={projectDetails?.client_name || ''}
-                                        roomWidthM={stableDimensions.width}
-                                        roomHeightM={stableDimensions.height}
-                                        screenWidthM={sightlineScreenMetrics.screenWidthM}
-                                        screenHeightM={sightlineScreenMetrics.screenHeightM}
-                                        screenTotalWidthM={sightlineScreenMetrics.screenTotalWidthM}
-                                        screenTotalHeightM={sightlineScreenMetrics.screenTotalHeightM}
-                                        screenBottomHeightM={sightlineScreenMetrics.screenBottomHeightM}
-                                        screenTopHeightM={sightlineScreenMetrics.screenTopHeightM}
-                                        screenFrontPlaneM={reportScreenFrontPlaneM}
-                                        placedSpeakers={placedSpeakers}
-                                        frontSubs={frontSubs}
-                                        frontSubsCfg={app?.frontSubsCfg}
-                                        primarySeatingPosition={primarySeatingPosition}
-                                        lcrAimMode={app?.lcrAimMode}
-                                        speakerClearanceM={app?.speaker_clearance_m}
-                                    />
-                                </ReportDrawingPage>
-                            </>
-                        )}
+                        <TechnicalReportDrawings section="elevations" project={reportProjectDetails}
+                          app={app} stableDimensions={stableDimensions} screen={screen} placedSpeakers={placedSpeakers}
+                          frontSubs={frontSubs} frontSubsCfg={frontSubsCfg} rearSubsCfg={rearSubsCfg} seats={seats}
+                          primarySeatingPosition={primarySeatingPosition} canRenderSightlinePage={canRenderSightlinePage}
+                          sightlineScreenMetrics={sightlineScreenMetrics} sightlineRowData={sightlineRowData}
+                          projector={projector} exportSystemConfiguration={exportSystemConfiguration}
+                          reportScreenFrontPlaneM={reportScreenFrontPlaneM} />
 
                         {/* ── Bass response graph pages — the final technical evidence
                             pages, immediately before the closing About Sound Proof

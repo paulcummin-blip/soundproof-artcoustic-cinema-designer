@@ -226,7 +226,10 @@ export default async function(req) {
     // authority, and only then the newest: a stale or incomplete duplicate never
     // displaces the valid Current report, so the gate judges the report the
     // designer actually generated.
-    const savedReportRows = await base44.entities.ReportSnapshot.filter({ project_id }, '-generated_at', 200);
+    const savedReportPage = await base44.entities.ReportSnapshot.filter(
+      { project_id, version_id: { $in: resolvedVersionIds }, report_type: 'project' },
+      { sort: '-generated_at', limit: 50 });
+    const savedReportRows = savedReportPage.items;
     const savedReportByKey = selectCanonicalReportSnapshotsByKey(
       Array.isArray(savedReportRows) ? savedReportRows : [],
       {
