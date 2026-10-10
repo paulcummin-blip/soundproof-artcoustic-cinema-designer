@@ -47,8 +47,20 @@ export const WRITER_CONTRACT_VERSION = 1;
  * its meaning, so a draft filed under generation 1 is still read against the same
  * agreement. One rejection was added, for the design-stage commentary a proposal
  * no longer carries.
+ *
+ * Bumped to 8 for the proposal sales-language pass: a single-option proposal
+ * stops carrying the comparison's two headings (its sections are labelled Design
+ * Overview and Why This Specification), the copy is written experience first,
+ * value second and engineering proof third, the display is named as the frozen
+ * authority names it (a TV as a TV, never as a screen, an aspect ratio or a
+ * projector), the software-report register is refused, comparative capability
+ * language is refused where there is no baseline to compare against, and an
+ * installation-state claim is refused because the proposal is written before
+ * installation. Section IDs, order and word limits are unchanged; four
+ * rejections are added for the wording this pass forbids, so a draft filed under
+ * generation 8 is distinguishable from every generation before it.
  */
-export const WRITER_PROMPT_VERSION = 'proposal-writer-prompt-7';
+export const WRITER_PROMPT_VERSION = 'proposal-writer-prompt-8';
 
 /** The only pack generation a draft may be written from. */
 export const WRITER_ACCEPTED_PACK_SCHEMA_VERSION = 2;
@@ -113,6 +125,31 @@ export const WRITER_REJECTION = Object.freeze({
    * held for human review instead of becoming advice in the copy.
    */
   DESIGN_STAGE_COMMENTARY: 'design_stage_commentary',
+  /**
+   * The software-report register: the copy reports fields rather than talking to
+   * a client ("assessed for", "this parameter", "performance result", "this
+   * proposal details"), or writes filler such as "there are no changes to
+   * report" where there is no comparison to report on.
+   */
+  REPORT_VOICE: 'report_voice',
+  /**
+   * Comparative capability language (increase, greater, improved, more capable,
+   * additional headroom, higher output, upgrade, compared to) in a
+   * SINGLE-OPTION proposal, where there is no baseline and no second option to
+   * compare against. A comparison proposal legitimately compares.
+   */
+  UNSUPPORTED_COMPARATIVE: 'unsupported_comparative',
+  /**
+   * An installation-state claim ("installed", "installation"). The proposal is
+   * written before installation: the design is specified, selected, designed,
+   * modelled or proposed.
+   */
+  INSTALLATION_STATE_CLAIM: 'installation_state_claim',
+  /**
+   * Display terminology that misdescribes the frozen display: a TV written as a
+   * screen, a projector, an aspect ratio, a viewable width or a screen size.
+   */
+  DISPLAY_TERMINOLOGY: 'display_terminology',
   /** A section over its word limit. */
   SECTION_TOO_LONG: 'section_too_long',
 });
@@ -131,14 +168,20 @@ export const WRITER_SECTIONS = Object.freeze([
   {
     section: 'what_stays_same',
     title: 'What Stays the Same',
+    // A single-option proposal is not a comparison: the same section, the same
+    // slot and the same word limit, labelled for what it actually says.
+    title_single: 'Design Overview',
     word_limit: 130,
     requirement: 'State only what every option shares, from the shared-result claims the pack allows. Where the copy also contrasts the options, cite the shared-result claims for what is unchanged and the pack\'s factual-change or material-gain claims for what differs.',
+    requirement_single: 'Introduce the design the client is being offered: the room, the system and what it delivers, from the design-identity and shared-result claims the pack allows. Never mention another option or a baseline.',
   },
   {
     section: 'what_changes',
     title: 'What Changes',
+    title_single: 'Why This Specification',
     word_limit: 180,
     requirement: 'State only the differences the pack records, and call one a gain only where the pack allows a gain.',
+    requirement_single: 'Explain why this specification was chosen and what it gives the client, from the ranked strength stories and the credibility claims the pack allows. Never state or imply a comparison with another option or a baseline, and never write filler such as "there are no changes to report".',
   },
   {
     section: 'key_performance_highlights',
@@ -181,6 +224,33 @@ export const WRITER_SECTIONS = Object.freeze([
 /** The section IDs, in order. */
 export const WRITER_SECTION_IDS = Object.freeze(WRITER_SECTIONS.map((entry) => entry.section));
 
+/** The proposal modes a frozen pack may carry. */
+export const WRITER_PROPOSAL_MODES = Object.freeze(['single', 'comparison']);
+
+/** True only for a pack the builder marked as a single-option proposal. */
+export function isSingleOptionPack(mode) {
+  return mode === 'single';
+}
+
+/**
+ * The nine sections as the given proposal mode labels them. A single-option
+ * proposal never carries the comparison's two headings; a comparison keeps them.
+ * Section IDs, order and word limits are identical in both modes, so the
+ * returned draft is the same shape either way.
+ *
+ * @param {string} [mode] — 'single' | 'comparison'
+ */
+export function writerSectionsForMode(mode = 'comparison') {
+  const single = isSingleOptionPack(mode);
+  return WRITER_SECTIONS.map((entry) => (single
+    ? {
+      ...entry,
+      title: entry.title_single || entry.title,
+      requirement: entry.requirement_single || entry.requirement,
+    }
+    : { ...entry }));
+}
+
 /** The word limit of every section, keyed by section ID. */
 export function writerWordLimits() {
   return Object.fromEntries(WRITER_SECTIONS.map((entry) => [entry.section, entry.word_limit]));
@@ -191,8 +261,8 @@ export function writerWordLimits() {
  * grounding rule attached, so a section can never be written without knowing
  * that every claim in it must cite a claim ID.
  */
-export function writerSectionRequirements() {
-  return WRITER_SECTIONS.map((entry) => ({ ...entry, requires_grounding: true }));
+export function writerSectionRequirements(mode = 'comparison') {
+  return writerSectionsForMode(mode).map((entry) => ({ ...entry, requires_grounding: true }));
 }
 
 /** One section definition, or null. */
@@ -204,7 +274,7 @@ export function writerSection(sectionId) {
  * The output schema as the writer is given it: JSON only, these top-level keys,
  * these per-section keys, and these nine sections. There is no other shape.
  */
-export function writerOutputSchema() {
+export function writerOutputSchema(mode = 'comparison') {
   return {
     mode: WRITER_OUTPUT_MODE,
     schema_version: WRITER_OUTPUT_SCHEMA_VERSION,
@@ -212,7 +282,7 @@ export function writerOutputSchema() {
     section_keys: [...WRITER_OUTPUT_SECTION_KEYS],
     claim_id_prefixes: [ALLOWED_CLAIM_PREFIX, BLOCKED_CLAIM_PREFIX],
     grounding_rule: 'every client-facing claim must cite one or more allowed claim IDs in that section\'s claim_ids',
-    sections: WRITER_SECTIONS.map((entry) => ({ ...entry })),
+    sections: writerSectionsForMode(mode).map((entry) => ({ ...entry })),
   };
 }
 
@@ -226,7 +296,12 @@ export const WRITER_WRITING_RULES = Object.freeze([
   'Write only from the evidence pack. It is the sole source of every fact, figure, level and claim.',
   'Write the ranked strength stories you are given, in rank order. Never decide for yourself which parameters matter: the ranking is already decided, and the strongest supported story leads.',
   'Sell what the design delivers, not how it was analysed. This is the proposal stage: state the finished design and what the client will experience, never the design-stage work that produced it.',
-  'Open each story with the experience the client will have, then why they will value it, then the engineering proof. The number is the proof, never the story, so never lead a paragraph with a parameter number.',
+  'Open each story with the experience the client will have, then why they will value it, then the engineering proof. The number is the proof, never the story, so never lead a paragraph with a parameter number, a Performance Level, a channel count or a dB value.',
+  'Write the section the pack asks for under its own label: where the pack is a single-option proposal it carries no comparison headings, so write the design the client is being offered and why this specification was chosen, and never write filler such as "there are no changes to report".',
+  'Name the display exactly as the frozen evidence names it. Where the display is a TV, write the TV (for example 115" TV) and use it in the viewing story with the viewing angle and the front-row seating; never write a screen size, an aspect ratio, a viewable width or any projector word. A projection screen keeps its projector-screen language.',
+  'Never write in the software-report register: no "assessed for", "this parameter", "according to the report", "performance result", "this proposal details", "established configuration" or "calculated design result".',
+  'In a single-option proposal, never compare the design to a baseline or another option: no increase, greater, improved, more capable, additional headroom, higher output, upgrade or compared to. Describe the capability directly.',
+  'This proposal is written before installation: write specified, selected, designed, modelled or proposed, never installed or installation, unless the frozen evidence says the system is installed.',
   'Every client-facing claim must cite one or more allowed claim IDs in that section\'s claim_ids.',
   'Where a section states what is shared and also contrasts the options, cite both: the shared-result claims for the unchanged facts and the factual-change or material-gain claims for the facts that differ.',
   'Copy every figure, Performance Level and product name exactly as the pack states it. Never round, convert, restate or estimate.',

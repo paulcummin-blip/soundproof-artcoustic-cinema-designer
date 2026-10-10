@@ -9,6 +9,13 @@
  * held to. Nothing is generated here and nothing is calculated: the input is the
  * pack plus the contract, assembled deterministically.
  *
+ * The sections are labelled for the proposal mode the pack was built in. A
+ * single-option proposal is not a comparison, so it carries no comparison
+ * headings: the same two section IDs are labelled Design Overview and Why This
+ * Specification, with the requirement each one then holds. Section IDs, order and
+ * word limits are identical in both modes, so the returned draft is the same
+ * shape either way.
+ *
  * The input is deterministic for a given pack — it carries no timestamp of its
  * own — so the same evidence always produces the same input, the same
  * fingerprint, and so a draft can always be traced to exactly what it read.
@@ -24,6 +31,7 @@ import {
   WRITER_CONTRACT_VERSION,
   WRITER_PROMPT_VERSION,
   WRITER_WRITING_RULES,
+  isSingleOptionPack,
   writerOutputSchema,
   writerSectionRequirements,
   writerWordLimits,
@@ -104,15 +112,30 @@ export function buildWriterInput({ pack, promptVersion = WRITER_PROMPT_VERSION }
 
   const options = (Array.isArray(pack.options) ? pack.options : []).map(optionRef);
   const bass = pack.bass_claims || {};
+  // The proposal mode the frozen pack was built in: 'single' or 'comparison'.
+  const mode = pack.mode ?? null;
+  const single = isSingleOptionPack(mode);
+  const sections = writerSectionRequirements(mode);
 
   const core = {
     contract_version: WRITER_CONTRACT_VERSION,
     prompt_version: promptVersion,
-    output: writerOutputSchema(),
+    output: writerOutputSchema(mode),
+    // What the nine sections are called in THIS proposal, and what each one is
+    // required to say. A single-option proposal is not a comparison, so it
+    // carries no comparison headings and compares the design to nothing.
+    section_structure: {
+      proposal_mode: mode,
+      comparison: !single,
+      rule: single
+        ? 'this is a single-option proposal: it states the design being offered and why it was chosen, and compares the design to nothing'
+        : 'this is a comparison proposal: it states what the options share and what changes between them',
+      labels: Object.fromEntries(sections.map((entry) => [entry.section, entry.title])),
+    },
     evidence: {
       pack_schema_version: pack.schema_version,
       pack_fingerprint: pack.pack_fingerprint ?? null,
-      mode: pack.mode ?? null,
+      mode,
       options,
       areas: (Array.isArray(pack.areas) ? pack.areas : []).map((entry) => ({ ...entry })),
     },
@@ -124,7 +147,7 @@ export function buildWriterInput({ pack, promptVersion = WRITER_PROMPT_VERSION }
     assumed_parameter_policy: pack.assumed_parameter_policy || null,
     writing_rules: [...WRITER_WRITING_RULES],
     word_limits: writerWordLimits(),
-    section_requirements: writerSectionRequirements(),
+    section_requirements: sections.map((entry) => ({ ...entry, requires_grounding: true })),
     allowed_claims: (Array.isArray(pack.allowed_claims) ? pack.allowed_claims : []).map(allowedClaim),
     blocked_claims: (Array.isArray(pack.blocked_claims) ? pack.blocked_claims : []).map(blockedClaim),
     bass: {
@@ -148,6 +171,18 @@ export function buildWriterInput({ pack, promptVersion = WRITER_PROMPT_VERSION }
       order: 'rank_ascending',
       claim_field: 'allowed_claim_ids',
       omitted_field: 'omitted_stories',
+    },
+    // The editorial rules of this pass, stated where the writer reads its
+    // contract rather than only in the prompt: the register, the comparative ban
+    // that follows from the proposal mode, and the installation default.
+    editorial_rules: {
+      experience_first: 'experience first, then why it matters, then the engineering proof: never open a paragraph with a parameter, a level, a channel count or a dB value',
+      display: 'name the display exactly as the frozen evidence names it; where it is a TV write the TV and never a screen size, aspect ratio, viewable width or projector word',
+      report_voice: 'never write in the software-report register ("assessed for", "this parameter", "performance result", "this proposal details")',
+      comparative: single
+        ? 'single-option proposal: never compare to a baseline or another option (no increase, greater, improved, more capable, additional headroom, higher output, upgrade or compared to)'
+        : 'comparison proposal: comparing the options is the point, so state the differences directly',
+      installation_default: 'written before installation: specified, selected, designed, modelled or proposed, never installed or installation, unless the frozen evidence says the system is installed',
     },
   };
 

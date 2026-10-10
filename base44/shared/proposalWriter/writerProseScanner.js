@@ -6,6 +6,14 @@ import { anchorPatternFor, assertedKind, assumedParameterIssue, claimsArea, isDe
 import { productScopeViolations } from './writerProductScope.js';
 import { designStageCommentary } from './writerDesignStageRules.js';
 import { framingContrastGrounded, independentClauses, supportedChangeClause } from './writerClausePrecision.js';
+import {
+  displayTerminologyIssue,
+  displayTypeOfPack,
+  installationStateClaim,
+  isSingleOptionProposal,
+  reportVoicePhrase,
+  unsupportedComparative,
+} from './writerEditorialRules.js';
 import { attributeViolation } from './writerViolationAudit.js';
 
 export function scanProse({ input, vocabulary, section, text, claims = [], claimKinds = [] }) {
@@ -26,6 +34,13 @@ export function scanProse({ input, vocabulary, section, text, claims = [], claim
   // strength-led; a comparison draft (which cites material-gain claims) is
   // unchanged, because there its cited kinds are never all strength stories.
   const strengthLed = citedKinds.length > 0 && citedKinds.every((kind) => kind === 'strength_story');
+  // The proposal mode and the frozen display the pack states. A single-option
+  // proposal has nothing to compare against, and a TV is never written as a
+  // screen, an aspect ratio or a projector.
+  const singleOption = isSingleOptionProposal(
+    input?.section_structure?.proposal_mode ?? input?.evidence_pack?.mode,
+  );
+  const displayType = displayTypeOfPack(input?.evidence_pack);
 
   for (const sentence of sentences) {
     for (const { clause } of independentClauses(sentence)) {
@@ -62,6 +77,34 @@ export function scanProse({ input, vocabulary, section, text, claims = [], claim
       if (designStage) {
         context.ruleId = `design_stage_commentary:${designStage.rule}`;
         report(WRITER_REJECTION.DESIGN_STAGE_COMMENTARY, { section, detail: `design_stage_commentary:${designStage.rule}` });
+      }
+      // ── the editorial rules of the proposal voice ──
+      // These read HOW a supported fact is written, never whether it is
+      // supported: the software-report register, the comparative language a
+      // single-option proposal has nothing to compare against, an
+      // installation-state claim, and terminology that misdescribes the frozen
+      // display. Grounding is untouched.
+      const reportVoice = reportVoicePhrase(claimed);
+      if (reportVoice) {
+        context.ruleId = `report_voice:${reportVoice.rule}`;
+        report(WRITER_REJECTION.REPORT_VOICE, { section, detail: `report_voice:${reportVoice.rule}` });
+      }
+      const comparative = singleOption ? unsupportedComparative(claimed) : null;
+      if (comparative) {
+        context.ruleId = `unsupported_comparative:${comparative.rule}`;
+        report(WRITER_REJECTION.UNSUPPORTED_COMPARATIVE, {
+          section, detail: `single_option_has_no_baseline_to_compare_against:${comparative.rule}`,
+        });
+      }
+      const installation = installationStateClaim(claimed);
+      if (installation) {
+        context.ruleId = `installation_state:${installation.rule}`;
+        report(WRITER_REJECTION.INSTALLATION_STATE_CLAIM, { section, detail: `installation_state_claim:${installation.rule}` });
+      }
+      const displayIssue = displayTerminologyIssue({ text: claimed, displayType });
+      if (displayIssue) {
+        context.ruleId = `display_terminology:${displayIssue.rule}`;
+        report(WRITER_REJECTION.DISPLAY_TERMINOLOGY, { section, detail: `tv_display_terminology:${displayIssue.rule}` });
       }
       // An assumed or administrative parameter is never referenced unless the
       // designer asked for it, and then only as a labelled assumption.
