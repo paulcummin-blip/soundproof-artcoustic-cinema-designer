@@ -29,7 +29,7 @@ const pack = historical.input.evidence_pack;
 
 const VERSION_1 = 'proposal-writer-prompt-1';
 const VERSION_3 = 'proposal-writer-prompt-3';
-const CURRENT = 'proposal-writer-prompt-6';
+const CURRENT = 'proposal-writer-prompt-7';
 
 test('the writer prompt version is the current one', () => {
   assert.equal(WRITER_PROMPT_VERSION, CURRENT);

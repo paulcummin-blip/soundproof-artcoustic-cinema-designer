@@ -263,6 +263,12 @@ test('the pack modules can reach no live project, entity client or session store
     './proposalEvidenceIdentity.js',
     './proposalEvidenceSeatScopes.js',
     './proposalEvidenceWording.js',
+    // The ranked strength-story authority the pack now carries: the ONE shared
+    // selection over the saved report evidence. Both modules read only the
+    // evidence handed to them and reach no live state.
+    './proposalStrengthStories.js',
+    '../strengthEvidenceContext.js',
+    '../strengthStoryEvidence.js',
     '../comparisonTable.js',
     '../comparisonClientMeaning.js',
     '../comparisonEvidence.js',

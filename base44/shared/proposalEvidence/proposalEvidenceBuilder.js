@@ -61,6 +61,7 @@ import {
   emptyBassClaims,
 } from './proposalEvidenceDesignClaims.js';
 import { buildScopedSeatClaims } from './proposalEvidenceSeatScopes.js';
+import { buildProposalStrengthStories } from './proposalStrengthStories.js';
 import { assertBassWordingSafe } from './proposalEvidenceWording.js';
 
 /** Deterministic key order, so the same content always serialises identically. */
@@ -118,6 +119,42 @@ export function buildProposalEvidence({ versions = [], generatedAt = null, reque
     : buildExcludedParameterPolicy(requestContext || {});
 
   const options = list.map((entry, index) => buildOptionFacts(entry, optionLabel(index), { policy }));
+
+  // ── RANKED STRENGTH STORIES (the ONE shared authority) ──
+  // Each version's strengths are read from its canonical Project Report evidence
+  // by the same authority the report page uses. The writer is GIVEN this ranked
+  // list: it never decides which parameters matter. Ranking, canonical weights and
+  // internal tier labels stay inside the authority — only the ordered stories,
+  // their evidence and one claim each travel onward.
+  const storyClaims = [];
+  const storiesByVersion = new Map();
+  list.forEach((entry, index) => {
+    const reportEvidence = entry?.evidence?.project || null;
+    const { strength_stories, omitted_stories } = buildProposalStrengthStories(reportEvidence);
+    const option = options[index];
+    const claims = strength_stories.map((story) => {
+      const claim = {
+        claim_id: `claim_story_${story.story_id}_01`,
+        area: story.category || 'design',
+        label: story.title,
+        kind: 'strength_story',
+        statement: story.statement,
+        option: { version_id: option.version_id, version_name: option.version_name, label: option.label },
+        favours: false,
+        scope: story.scope,
+        seat_count: null,
+        level: story.level,
+        wording_class: 'strength',
+        wording: story.statement,
+        basis: { levels: story.level ? [story.level] : [] },
+      };
+      story.allowed_claim_ids = [claim.claim_id];
+      return claim;
+    });
+    storiesByVersion.set(option.version_id, { strength_stories, omitted_stories });
+    storyClaims.push(...claims);
+  });
+
   const compared = options.length >= 2;
 
   const classification = compared ? classifyAreas(options.map((option) => option.areas)) : [];
@@ -127,17 +164,23 @@ export function buildProposalEvidence({ versions = [], generatedAt = null, reque
 
   // The area claims first, then the whole-design claims, which rest on them: a
   // credibility claim on the shared format, a recommendation on the framing.
-  const allowedClaims = compared
-    ? [
-      ...buildAllowedClaims(classification, options),
-      // The scoped seat-group claims: a result the saved evidence states for the
-      // primary or the secondary seats, at a level that carries a positive
-      // adjective. Minted per option, and only where that option's evidence
-      // states the scope's own level and the scope holds at least two seats.
-      ...options.flatMap((option, index) => buildScopedSeatClaims(option, index)),
-      ...buildDesignClaims(classification, options, decisionFraming),
-    ]
-    : [];
+  const allowedClaims = [
+    ...(compared
+      ? [
+        ...buildAllowedClaims(classification, options),
+        // The scoped seat-group claims: a result the saved evidence states for the
+        // primary or the secondary seats, at a level that carries a positive
+        // adjective. Minted per option, and only where that option's evidence
+        // states the scope's own level and the scope holds at least two seats.
+        ...options.flatMap((option, index) => buildScopedSeatClaims(option, index)),
+        ...buildDesignClaims(classification, options, decisionFraming),
+      ]
+      : []),
+    // One claim per ranked strength story, for every option. A story claim is the
+    // sentence a writer may state for that story, and its ID is the only claim ID
+    // that story carries.
+    ...storyClaims,
+  ];
 
   const bassClaims = compared
     ? buildBassClaims(classification, options, allowedClaims)
@@ -186,6 +229,11 @@ export function buildProposalEvidence({ versions = [], generatedAt = null, reque
       label: option.label,
       version_name_source: option.version_name_source,
       facts: option.facts,
+      // The ranked strength stories this version's canonical Project Report
+      // supports, and the deterministic record of the strengths it deliberately
+      // did not state, each with its reason. No weight, tier or score travels.
+      strength_stories: (storiesByVersion.get(option.version_id) || {}).strength_stories || [],
+      omitted_stories: (storiesByVersion.get(option.version_id) || {}).omitted_stories || [],
     })),
     classification,
     materiality_notes: buildMaterialityNotes(allowedClaims, { p20Note: bass.note }),

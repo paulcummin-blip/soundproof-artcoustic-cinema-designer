@@ -201,9 +201,17 @@ export function buildWriterPrompt({ input } = {}) {
     JSON.stringify(input),
     '',
     '=== HOW TO WRITE ===',
+    // The stage discipline: this writer is at the PROPOSAL stage, where the
+    // engineering has already been proven and the job is to sell what the
+    // finished design delivers. The design stage diagnoses and the report stage
+    // proves; neither voice belongs here.
+    'You are writing at the PROPOSAL stage. The engineering is already done and proven: sell what the finished design delivers to the client. Sound like an experienced home cinema designer presenting a completed design, not an engineer auditing it.',
     'Read the pack, then write each of the nine sections in the order the pack presents them.',
     'Copy every figure, Performance Level and product name exactly as the pack states it. Never round, convert, combine, restate or estimate one.',
     'Ground every client-facing claim by citing one or more allowed claim IDs in that section\'s claim_ids. Use only claim IDs that appear in allowed_claims.',
+    'The ranked strength stories are already decided and given to you per option in strength_stories, in rank order. Write them in that order, and never decide for yourself which parameters matter. State each story by citing its own allowed_claim_ids.',
+    'Build every story as experience first, then why the client will value it, then the engineering proof. The number is the proof, never the story: never open a paragraph with a parameter number or a parameter code.',
+    'Name the client\'s experience in plain words (weight, movement, depth, scale, immersion, consistency) before any figure. Where a figure follows, it confirms the experience rather than replacing it.',
     'Never present something the pack blocks, and never describe a shared result as a change or a gain.',
     'Never recommend changing the design, and never describe the proposal as an upgrade path.',
     'Sell what is strong. Where a result is strong for the primary seats, state it positively for the primary seats and stop there: do not add a caveat about the secondary seats, and do not report a weaker scope beside a stronger one.',

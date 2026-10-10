@@ -35,6 +35,12 @@ function optionRef(option) {
     version_id: option?.version_id ?? null,
     version_name: option?.version_name ?? null,
     label: option?.label ?? null,
+    // The ranked strength stories this version supports, exactly as the pack
+    // froze them. The writer is GIVEN the ranking and never decides it.
+    strength_stories: (Array.isArray(option?.strength_stories) ? option.strength_stories : [])
+      .map((story) => ({ ...story })),
+    omitted_stories: (Array.isArray(option?.omitted_stories) ? option.omitted_stories : [])
+      .map((story) => ({ ...story })),
   };
 }
 
@@ -132,6 +138,16 @@ export function buildWriterInput({ pack, promptVersion = WRITER_PROMPT_VERSION }
       section_field: 'claim_ids',
       allowed_prefix: ALLOWED_CLAIM_PREFIX,
       blocked_prefix: BLOCKED_CLAIM_PREFIX,
+    },
+    // The ranked strength authority the writer is handed. Each option carries its
+    // own ordered `strength_stories`; each story carries the claim ID it is stated
+    // by. The writer writes these stories and nothing it decides for itself.
+    story_grounding: {
+      rule: 'write the option\'s ranked strength_stories in rank order; each story is stated by citing its own allowed_claim_ids; never choose which parameters matter',
+      field: 'strength_stories',
+      order: 'rank_ascending',
+      claim_field: 'allowed_claim_ids',
+      omitted_field: 'omitted_stories',
     },
   };
 

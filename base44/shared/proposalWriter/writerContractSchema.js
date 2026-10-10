@@ -48,7 +48,7 @@ export const WRITER_CONTRACT_VERSION = 1;
  * agreement. One rejection was added, for the design-stage commentary a proposal
  * no longer carries.
  */
-export const WRITER_PROMPT_VERSION = 'proposal-writer-prompt-6';
+export const WRITER_PROMPT_VERSION = 'proposal-writer-prompt-7';
 
 /** The only pack generation a draft may be written from. */
 export const WRITER_ACCEPTED_PACK_SCHEMA_VERSION = 2;
@@ -224,6 +224,9 @@ export function writerOutputSchema() {
  */
 export const WRITER_WRITING_RULES = Object.freeze([
   'Write only from the evidence pack. It is the sole source of every fact, figure, level and claim.',
+  'Write the ranked strength stories you are given, in rank order. Never decide for yourself which parameters matter: the ranking is already decided, and the strongest supported story leads.',
+  'Sell what the design delivers, not how it was analysed. This is the proposal stage: state the finished design and what the client will experience, never the design-stage work that produced it.',
+  'Open each story with the experience the client will have, then why they will value it, then the engineering proof. The number is the proof, never the story, so never lead a paragraph with a parameter number.',
   'Every client-facing claim must cite one or more allowed claim IDs in that section\'s claim_ids.',
   'Where a section states what is shared and also contrasts the options, cite both: the shared-result claims for the unchanged facts and the factual-change or material-gain claims for the facts that differ.',
   'Copy every figure, Performance Level and product name exactly as the pack states it. Never round, convert, restate or estimate.',
