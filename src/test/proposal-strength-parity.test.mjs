@@ -18,11 +18,9 @@
  * HOW THE TERMINAL STATE ENTERS THE PARITY RUN
  *   `withRecordedState` supplies each stored evidence row with the terminal state
  *   its own recorded publication holds — nothing else, read-only, in the test.
- *   That is what lets the SELECTOR-PARITY tests run today and prove the two sides
- *   rank identically. It is deliberately a no-op once the saved evidence itself
- *   carries the state, so those tests become the pure stored-evidence comparison
- *   with no edit: the acceptance gate at the bottom of this file is what decides
- *   whether that has happened.
+ *   The enrichment changes only in-memory copies, never disk fixtures or live
+ *   records. The unmodified stored evidence is also checked explicitly: missing
+ *   terminal state stays unavailable and cannot silently become scored.
  *
  * Fixtures are the real artifacts:
  *   src/test/fixtures/genesisAdiEvidence.json        Genesis frozen publication
@@ -58,6 +56,7 @@ import {
   buildCandidates,
   admitStrengthStories,
   rankStrengthStories,
+  auditOmittedStories,
 } from "../../shared/strengthStories.js";
 import {
   STORY_LAYER_KEYS,
@@ -139,16 +138,25 @@ function rankFromPublication(sources) {
     dolbyConfig: sources.dolbyConfig,
   });
   const { candidates } = buildCandidates(sources, { byKey: evidence.byKey, floor, connections });
-  const { admitted } = admitStrengthStories(candidates, { floor });
-  return { floor, byKey: evidence.byKey, ranked: rankStrengthStories(admitted, MAX_HIGHLIGHTS) };
+  const admission = admitStrengthStories(candidates, { floor });
+  const ranked = rankStrengthStories(admission.admitted, MAX_HIGHLIGHTS);
+  const rejected = auditOmittedStories({
+    candidates, selectedIds: ranked.map(story => story.id), floor,
+    strongCount: admission.strongCount, fillFromLowerLevels: admission.fillFromLowerLevels,
+    engineeringSummary: sources.engineeringSummary,
+    productsSelected: sources.productsSelected, byKey: evidence.byKey,
+  });
+  return { floor, byKey: evidence.byKey, ranked, rejected };
 }
 
 /** The comparison shape: story identity, level, scope and the evidence it rests on. */
 const shape = (stories) => stories.map((story) => ({
   id: story.id,
+  order: story.order,
   level: story.level,
   scope: story.scope,
   evidence_ids: story.sources,
+  evidence_lines: (story.evidence || []).map(line => ({ id: line.key, level: line.level })),
 }));
 
 const evidenceLines = (story) => (story?.evidence || []).map((line) => `${line.key} ${line.level ?? ""}`);
@@ -336,6 +344,12 @@ test("E · Genesis: publication-authority and reportEvidence selections are iden
 
   assert.equal(fromEvidence.floor, fromPublication.floor, "the adaptive floor must be read identically");
   assert.deepEqual(shape(fromEvidence.ranked), shape(fromPublication.ranked));
+  assert.deepEqual(fromEvidence.rejected, fromPublication.rejected, "all shared deterministic omission reasons must match");
+  console.log("[FROZEN PARITY]", JSON.stringify({
+    publication: shape(fromPublication.ranked), evidence: shape(fromEvidence.ranked),
+    omissions: fromEvidence.rejected,
+    p19: { publication: fromPublication.byKey.p19, evidence: fromEvidence.byKey.p19 },
+  }));
   assert.deepEqual(shape(publication.highlights), shape(fromEvidence.ranked));
   assert.deepEqual(fromEvidence.ranked.map((story) => story.id), GENESIS_ORDER);
   assert.deepEqual(fromEvidence.ranked.map(evidenceLines), fromPublication.ranked.map(evidenceLines));
@@ -358,6 +372,12 @@ test("F · Marquee: publication-authority and reportEvidence selections are iden
 
   assert.equal(fromEvidence.floor, fromPublication.floor);
   assert.deepEqual(shape(fromEvidence.ranked), shape(fromPublication.ranked));
+  assert.deepEqual(fromEvidence.rejected, fromPublication.rejected, "all shared deterministic omission reasons must match");
+  console.log("[FROZEN PARITY]", JSON.stringify({
+    publication: shape(fromPublication.ranked), evidence: shape(fromEvidence.ranked),
+    omissions: fromEvidence.rejected,
+    p19: { publication: fromPublication.byKey.p19, evidence: fromEvidence.byKey.p19 },
+  }));
   assert.deepEqual(shape(publication.highlights), shape(fromEvidence.ranked));
   assert.deepEqual(fromEvidence.ranked.map((story) => story.id), MARQUEE_ORDER);
   assert.deepEqual(fromEvidence.ranked.map(evidenceLines), fromPublication.ranked.map(evidenceLines));
@@ -468,50 +488,20 @@ test("H · a fresh capture preserves each parameter's canonical state from the f
   assert.equal(summaryFromReportEvidence(settled).parameterAuthority.p19.state, "scored");
 });
 
-/* ── I · The acceptance gate: the SAVED evidence carries the terminal state ──── */
+/* ── I · Historical evidence stays untouched; missing state stays ineligible ── */
 
-const storedEvidenceCarriesState = [
-  [genesisEvidence, genesisPublication],
-  [marqueeEvidence, marqueePublication],
-].every(([evidence, publication]) => (evidence.parameters || []).every((row) => {
-  const entry = publication.engineeringSummary.parameterAuthority[`p${Number(row.parameter_id)}`];
-  return row.state === (entry?.state ?? null);
-}));
-
-if (!storedEvidenceCarriesState) {
-  console.warn(
-    "[proposal-strength-parity] GATE DORMANT: the saved reportEvidence of the canonical saved "
-    + "reports does not yet carry each parameter's terminal state, so the stored-evidence parity "
-    + "gate is skipped. The SELECTOR-PARITY tests above still run over the same saved evidence with "
-    + "the state supplied from its own recorded publication. The gate switches itself on the moment "
-    + "the saved evidence carries the state; no edit to this file is needed.",
-  );
-}
-
-test.skipIf(!storedEvidenceCarriesState)(
-  "I · GATE: the canonical saved reports' own evidence carries each parameter's terminal state",
-  () => {
-    for (const [name, evidence, publication, expectedP19] of [
-      ["Genesis", genesisEvidence, genesisPublication, "provisional"],
-      ["Marquee", marqueeEvidence, marqueePublication, "provisional"],
-    ]) {
-      const authority = publication.engineeringSummary.parameterAuthority;
-      for (const row of evidence.parameters) {
-        const entry = authority[`p${Number(row.parameter_id)}`];
-        assert.equal(
-          row.state, entry?.state ?? null,
-          `${name} P${row.parameter_id}: the stored evidence must state its own terminal state`,
-        );
-      }
-      const p19 = evidence.parameters.find((row) => Number(row.parameter_id) === 19);
-      assert.equal(p19.state, expectedP19);
-      assert.equal(summaryFromReportEvidence(evidence).parameterAuthority.p19.state, expectedP19);
-      const selection = selectStrengthStoriesFromReportEvidence(evidence);
-      assert.equal(selection.byKey.p19.eligible, false, `${name}: a provisional P19 is never eligible`);
-      assert.deepEqual(
-        shape(selection.ranked),
-        shape(rankFromPublication(name === "Genesis" ? GENESIS_SOURCES : MARQUEE_SOURCES).ranked),
-      );
-    }
-  },
-);
+test("I · stored fixtures remain unchanged and missing state is never silently repaired", () => {
+  for (const [file, stored, publication] of [
+    ["genesisReportEvidence.json", genesisEvidence, genesisPublication],
+    ["marqueeReportEvidence.json", marqueeEvidence, marqueePublication],
+  ]) {
+    const before = JSON.stringify(stored);
+    const raw = selectStrengthStoriesFromReportEvidence(stored);
+    assert.equal(raw.byKey.p19.state, "unavailable");
+    assert.equal(raw.byKey.p19.eligible, false);
+    const copied = withRecordedState(stored, publication);
+    assert.equal(selectStrengthStoriesFromReportEvidence(copied).byKey.p19.state, "provisional");
+    assert.equal(JSON.stringify(stored), before);
+    assert.deepEqual(readFixture(file), stored, "the disk fixture must also remain unchanged");
+  }
+});

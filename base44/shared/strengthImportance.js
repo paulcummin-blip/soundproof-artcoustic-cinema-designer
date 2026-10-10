@@ -301,7 +301,7 @@ const rowLevel = (row) => levelLabel(row?.level ?? row?.achieved_level);
  * a strength. Only an explicit scored/complete/ok state counts as scored.
  */
 function rowState(row, parentState = null) {
-  const state = String(row?.state ?? row?.status ?? '').trim().toLowerCase()
+  const state = String(row?.state ?? '').trim().toLowerCase()
     || String(parentState ?? '').trim().toLowerCase();
   if (state === 'na' || state === 'not_applicable') return 'na';
   if (state === 'scored' || state === 'complete' || state === 'ok') return 'scored';

@@ -265,13 +265,12 @@ function buildParameters(captured) {
     const seatAuthority = entry?.seats || null;
     return {
       ...row,
-      state: row.state || row.status || entry?.state || row.source_row?.status || null,
+      state: entry?.state ?? row.state ?? null,
       supporting_per_seat: (Array.isArray(row?.supporting_per_seat) ? row.supporting_per_seat : [])
         .map(seat => ({
           ...seat,
-          state: seat.state || seat.status
-            || seatAuthority?.[String(seat?.seat_id ?? seat?.seatId ?? '')]?.state
-            || null,
+          state: seatAuthority?.[String(seat?.seat_id ?? seat?.seatId ?? '')]?.state
+            ?? entry?.state ?? seat.state ?? row.state ?? null,
         })),
       authority_level: row.level,
       authority_value: row.value,

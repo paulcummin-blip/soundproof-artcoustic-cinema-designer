@@ -13,8 +13,7 @@ const rank = value => value === 'FAIL' ? 0 : /^L[1-4]$/.test(String(value)) ? Nu
  */
 function parameterState(summary, id, row) {
   const authorityState = summary?.parameterAuthority?.['p' + id]?.state ?? null;
-  const stated = authorityState
-    ?? row?.state ?? row?.status ?? row?.source_row?.state ?? row?.source_row?.status ?? null;
+  const stated = authorityState ?? row?.state ?? null;
   return stated ? String(stated).trim().toLowerCase() : null;
 }
 
