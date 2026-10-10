@@ -168,6 +168,9 @@ export function useReportSnapshot({
         engineeringSummary: summary,
         seatingPublication: publication,
         project: publication.report_snapshot.report_project,
+        // The saved version record, so the capture merges THIS version's design
+        // over the project exactly as the Project Report authority does.
+        version,
         presentation: frozen,
         reportType,
         sourceFingerprint: savedFingerprints,

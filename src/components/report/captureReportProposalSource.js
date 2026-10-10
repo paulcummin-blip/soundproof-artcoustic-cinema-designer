@@ -1,11 +1,12 @@
 import { buildEngineeringSnapshot } from '@/components/proposal/engineeringAuthority/buildEngineeringSnapshot';
+import { mergeProjectAndVersion } from '@/lib/versionAuthority';
 import { buildProductsSelected } from '@/components/report/reportProductsSelected';
 import { readReportParameter } from '@/components/report/reportParameterEvidence';
 import { buildReportEvidence } from '@/components/report/reportEvidenceAuthority';
 
 // Called only by a generated report's save action, never by proposal generation.
 export default function captureReportProposalSource({
-  projectId, versionId, project, engineeringSummary, app, presentation,
+  projectId, versionId, project, version = null, engineeringSummary, app, presentation,
   reportType = null, sourceFingerprint = null, seatingPublication = null,
 }) {
   if (!engineeringSummary || !projectId || !versionId || !project) return null;
@@ -15,7 +16,15 @@ export default function captureReportProposalSource({
   const seats = seatingPublication
     ? seatingPublication.report_snapshot?.seatingPositions || []
     : presentation?.seatingPositions || app?.seatingPositions || [];
-  const design = { ...project, selected_speakers: speakers };
+  // The design this evidence is captured from is the canonical project + selected
+  // version merge the Project Report authority itself renders. The bare project
+  // record carries no version design, so capturing from it would freeze stale
+  // screen, display, seating and product facts into the evidence a proposal later
+  // reads. A caller that supplies no version keeps the previous behaviour exactly.
+  const design = {
+    ...(version ? mergeProjectAndVersion(project, version) : project),
+    selected_speakers: speakers,
+  };
   const snapshot = buildEngineeringSnapshot({
     projectId, versionId, project, mergedProject: design,
     version: { id: versionId, version_name: project.version_name },
