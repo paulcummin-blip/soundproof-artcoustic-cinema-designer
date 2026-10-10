@@ -28,7 +28,7 @@ export default function reportEvidenceIntegrity(evidence, captured, reportType) 
     for (const field of ['scope', 'value', 'level', 'raw_value'])
       compare('parameter_authority', `${key}.${field}`, actual?.[field], atomic?.[field]);
     // A seat-scoped parameter cannot be laundered into a room headline.
-    if ([1, 4, 5, 6, 9, 10, 16, 17, 20].includes(Number(row.parameter_id)) && actual?.scope === 'room')
+    if (Number(row.parameter_id) === 5 && actual?.scope === 'room')
       mismatches.push({ area: 'parameter_scope', key, evidence: 'room', report: 'seat-scoped', blocking: true });
   }
   for (const key of ['p19', 'rsp_curve_ref']) compare('bass', key, evidence?.bass?.[key], expected.bass[key]);

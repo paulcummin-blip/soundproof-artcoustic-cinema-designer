@@ -35,12 +35,32 @@ export default function frozenIntegrityRegression({ saved, publication, caches }
   assert('new report display is 120 inch TV', frozenReportAppState({}, B).screen.manualSize.diagonalInches === 120);
   const summary = { ...A.engineering_summary, parameter_index: A.parameter_index,
     reportAuthority: { source_type: 'durable-engineering-publication', authority_fingerprint: A.engineering_fingerprint, authority_timestamp: A.published_at } };
-  const captured = captureReportProposalSource({ projectId: saved.project_id, versionId: saved.version_id,
-    project: A.report_snapshot.report_project, version: { design_state: B.report_snapshot.report_project },
-    seatingPublication: A, engineeringSummary: summary, reportType: 'project', sourceFingerprint: saved.source_fingerprints });
+  // A LATER version design (products, subwoofers, treatment) must not reach a saved report's evidence.
+  const later = clone(B.report_snapshot.report_project);
+  later.subwooferInstances = (later.subwooferInstances || []).map(s => ({ ...s, model: 'SUB-CHANGED' }));
+  later.front_subs_cfg = { ...(later.front_subs_cfg || {}), count: 99 };
+  later.acoustic_treatment_enabled = false;
+  later.selected_abfuser_qty = 0;
+  const captureArgs = version => ({ projectId: saved.project_id, versionId: saved.version_id,
+    project: A.report_snapshot.report_project, version, seatingPublication: A, engineeringSummary: summary,
+    reportType: 'project', sourceFingerprint: saved.source_fingerprints });
+  const frozenOnly = captureReportProposalSource(captureArgs(null));
+  const captured = captureReportProposalSource(captureArgs({ design_state: later }));
   assert('capture cannot import newer display', captured.reportEvidence.screen.display_label === '115" TV');
+  const abfuser = e => (e.system.products_selected || []).filter(p => /abfuser/i.test(String(p.model)));
+  assert('capture freezes products', JSON.stringify(captured.system.products_selected) === JSON.stringify(frozenOnly.system.products_selected));
+  assert('capture freezes seating', JSON.stringify(captured.reportEvidence.seating.per_seat) === JSON.stringify(frozenOnly.reportEvidence.seating.per_seat));
+  assert('capture freezes treatment', JSON.stringify(abfuser(captured.reportEvidence)) === JSON.stringify(abfuser(frozenOnly.reportEvidence)));
+  assert('no later-version fact reaches evidence', !JSON.stringify(captured).includes('SUB-CHANGED'));
   const parity = evidence => checkReportEvidenceParity({ evidence, captured, reportType: 'project' });
   assert('stored repaired evidence parity passes', parity(saved.payload.reportEvidence).passed);
+  // Reproduce the repaired categories as a fixture: reverting display_type/display_label
+  // must be caught again, so the repaired record is what makes parity zero.
+  const reverted = clone(saved.payload.reportEvidence);
+  reverted.screen.display_type = 'projector_screen';
+  reverted.screen.display_label = '115" Projection screen';
+  const beforeCategories = [...new Set(parity(reverted).mismatches.map(m => m.area + ':' + m.key))];
+  assert('parity re-detects repaired display categories', beforeCategories.length >= 2);
   const tamper = (name, edit) => { const e = clone(captured.reportEvidence); edit(e); assert(name, !parity(e).passed); };
   tamper('TV/projector contradiction rejected', e => { e.screen.display_type = 'projector_screen'; e.screen.display_label = '115" Projection screen'; });
   tamper('identity mutation rejected', e => { e.identity.client_name = 'Changed'; });
