@@ -38,12 +38,12 @@ import {
 } from './fixtures/proposalWriterFixtures.mjs';
 
 /** The recorded Marquee pack fingerprint, from the Phase 1 audit. */
-// The Marquee pack's own content fingerprint. It moved from 4fe44d7e when the
-// pack's P20 block gained the sentence that says which scope it governs — the
-// block is part of the pack, so its wording is part of what the fingerprint
-// identifies. Nothing else in the pack changed, and the draft's values are
-// untouched by it: this is the pack the audit's draft is still read against.
-const MARQUEE_PACK_FINGERPRINT = '87e62fb7';
+// The Marquee pack's own content fingerprint. It moved from 87e62fb7 when every
+// option gained its ranked strength stories (strength_stories / omitted_stories):
+// the ranked story authority is part of the pack, so it is part of what the
+// fingerprint identifies. The draft's own values are untouched by it, and this is
+// the pack the audit's draft is still read against.
+const MARQUEE_PACK_FINGERPRINT = '7135f66f';
 
 const pack = (versions = twoOptions()) => buildProposalEvidence({ versions, generatedAt: AT });
 const writerInput = (versions) => buildWriterInput({ pack: pack(versions) });

@@ -378,7 +378,7 @@ test('I. every record carries its permission and audit metadata, and refuses an 
   assert.equal(record.created_at, AT_FIRST);
   assert.equal(record.provider, 'base44');
   assert.equal(record.model, 'gpt-5');
-  assert.equal(record.prompt_version, 'proposal-writer-prompt-6');
+  assert.equal(record.prompt_version, 'proposal-writer-prompt-8');
   assert.equal(record.schema_version, 1);
   assert.equal(record.contract_version, 1);
   assert.equal(record.account_id, ACCOUNT_ID);
