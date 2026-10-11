@@ -94,6 +94,7 @@ export function resolveOptimiserPlanStatus({
       versionId: null,
       target: null,
       staleReason: null,
+      calibrationEvidence: null,
       levers: [],
       individualEffectsEvaluated: false,
       baseline: null,
@@ -125,6 +126,9 @@ export function resolveOptimiserPlanStatus({
       versionId: plan.versionId || null,
       target: plan.target || null,
       staleReason: null,
+      // The evidence is kept even when the payload version cannot be read: the
+      // panel still reports what that run retained.
+      calibrationEvidence: plan.calibrationEvidence || null,
       levers: [],
       individualEffectsEvaluated: false,
       baseline: null,
@@ -186,6 +190,7 @@ export function resolveOptimiserPlanStatus({
       // No levers: a rejected candidate is never presented as an available change.
       levers: [],
       individualEffectsEvaluated: false,
+      calibrationEvidence: plan.calibrationEvidence || null,
       baseline: plan.baseline || null,
       layoutCounts: plan.layoutCounts || null,
       combined: null,
@@ -335,6 +340,9 @@ export function resolveOptimiserPlanStatus({
     levers,
     individualEffectsEvaluated: plan.individualEffectsEvaluated === true,
     baselineParity,
+    // The calibration evidence this run retained, read by the panel's
+    // calibration section and its tested-ledger rows.
+    calibrationEvidence: plan.calibrationEvidence || null,
     baseline: plan.baseline || null,
     // The subwoofer census the run evaluated, so every surface can judge the
     // evaluated move against the layout it was measured in.

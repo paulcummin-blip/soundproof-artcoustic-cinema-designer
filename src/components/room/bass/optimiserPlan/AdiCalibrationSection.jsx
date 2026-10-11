@@ -27,6 +27,10 @@ import {
   ADI_NO_CALIBRATION_IMPROVEMENT,
   ADI_SECTION_TITLE,
 } from "./adiPanelSections.js";
+import {
+  CALIBRATION_EVIDENCE_MISSING_MESSAGE,
+  CALIBRATION_TRADE_OFF_MESSAGE,
+} from "./optimiserCalibrationEvidence.js";
 
 export default function AdiCalibrationSection({
   kind = ADI_CALIBRATION_KIND.NOT_TESTED,
@@ -35,12 +39,18 @@ export default function AdiCalibrationSection({
   // A recommendation sentence for an ELECTRONIC change belongs to this layer —
   // the design recommendation never states it, and it is never stated twice.
   recommendation = null,
+  // What the saved calibration evidence actually proves. The no-improvement
+  // sentence is shown only when it does.
+  evidenceState = null,
   children = null,
   className = "",
 }) {
   const showsApplied = kind === ADI_CALIBRATION_KIND.APPLIED
     || kind === ADI_CALIBRATION_KIND.HELD
     || kind === ADI_CALIBRATION_KIND.PERSISTED;
+  const noImprovementProven = kind === ADI_CALIBRATION_KIND.TESTED
+    && evidenceState?.noImprovementProven !== false;
+  const evidenceLines = Array.isArray(evidenceState?.leverLines) ? evidenceState.leverLines : [];
 
   return (
     <div
@@ -61,14 +71,40 @@ export default function AdiCalibrationSection({
         />
       )}
 
-      {kind === ADI_CALIBRATION_KIND.TESTED && (
+      {/* The retained record kept no calibration evidence: nothing may be claimed. */}
+      {kind === ADI_CALIBRATION_KIND.EVIDENCE_MISSING && (
+        <div className="text-[12px] font-semibold text-[#1B1A1A] leading-relaxed">
+          {CALIBRATION_EVIDENCE_MISSING_MESSAGE}
+        </div>
+      )}
+
+      {(kind === ADI_CALIBRATION_KIND.TESTED || kind === ADI_CALIBRATION_KIND.TRADE_OFF_HELD) && (
         <div className="space-y-0.5">
-          <div className="text-[12px] text-[#3E4349] leading-relaxed">
-            {ADI_CALIBRATION_TESTED_SENTENCE}
-          </div>
-          <div className="text-[12px] font-semibold text-[#1B1A1A] leading-relaxed">
-            {ADI_NO_CALIBRATION_IMPROVEMENT}
-          </div>
+          {kind === ADI_CALIBRATION_KIND.TESTED && (
+            <div className="text-[12px] text-[#3E4349] leading-relaxed">
+              {ADI_CALIBRATION_TESTED_SENTENCE}
+            </div>
+          )}
+          {noImprovementProven ? (
+            <div className="text-[12px] font-semibold text-[#1B1A1A] leading-relaxed">
+              {ADI_NO_CALIBRATION_IMPROVEMENT}
+            </div>
+          ) : (
+            <>
+              {/* A trade-off, or an improvement that was not applied: stated with
+                  the best candidate's own values, never as "no improvement". */}
+              {kind === ADI_CALIBRATION_KIND.TRADE_OFF_HELD && (
+                <div className="text-[12px] font-semibold text-[#1B1A1A] leading-relaxed">
+                  {evidenceState?.tradeOffMessage || CALIBRATION_TRADE_OFF_MESSAGE}
+                </div>
+              )}
+              {evidenceLines.map((line) => (
+                <div key={line.lever} className="text-[11px] text-[#3E4349] leading-relaxed">
+                  <span className="text-[#625143]">{line.label}:</span> {line.text}
+                </div>
+              ))}
+            </>
+          )}
         </div>
       )}
 

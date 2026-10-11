@@ -18,6 +18,10 @@
 // ---------------------------------------------------------------------------
 
 import { CALIBRATION_APPLY_DECISION } from "../optimiseWorkflow/adiCalibrationAutoApplyAuthority.js";
+import {
+  CALIBRATION_EVIDENCE_MISSING_MESSAGE,
+  CALIBRATION_TRADE_OFF_MESSAGE,
+} from "./optimiserCalibrationEvidence.js";
 
 export const ADI_PANEL_TITLE = "Bass Optimisation — Powered by ADI";
 
@@ -38,6 +42,12 @@ export const ADI_PANEL_FINDING = Object.freeze({
   CALIBRATION_APPLIED: "ADI applied safe calibration settings.",
   TESTED_NO_CALIBRATION: "ADI tested calibration changes, but no useful calibration-only improvement was found.",
   TESTED_NO_IMPROVEMENT: "ADI tested calibration and design options. No useful improvement was found.",
+  /**
+   * The run or the saved record kept no calibration evidence to read, so neither
+   * of the two claims above may be made. The mandated sentence asks for the
+   * re-run that produces the evidence.
+   */
+  EVIDENCE_MISSING: CALIBRATION_EVIDENCE_MISSING_MESSAGE,
   NOT_TESTED: "ADI has not evaluated this design yet.",
 });
 
@@ -69,6 +79,10 @@ export const ADI_CALIBRATION_KIND = Object.freeze({
   HELD: "held",
   PERSISTED: "persisted",
   TESTED: "tested",
+  /** The run kept no calibration evidence, so nothing may be claimed. */
+  EVIDENCE_MISSING: "evidence_missing",
+  /** The best calibration candidate was a trade-off — stated, never applied. */
+  TRADE_OFF_HELD: "trade_off_held",
   NOT_TESTED: "not_tested",
 });
 
@@ -81,9 +95,13 @@ export function resolveAdiPanelFinding({
   calibrationApplied = false,
   designRecommended = false,
   evaluated = false,
+  calibrationEvidenceRetained = true,
 } = {}) {
   if (isRunning) return ADI_PANEL_FINDING.RUNNING;
   if (calibrationApplied) return ADI_PANEL_FINDING.CALIBRATION_APPLIED;
+  // The two findings below both state that calibration was tested and found not
+  // useful. Neither may be stated without the evidence that proves it.
+  if (evaluated && calibrationEvidenceRetained === false) return ADI_PANEL_FINDING.EVIDENCE_MISSING;
   if (designRecommended) return ADI_PANEL_FINDING.TESTED_NO_CALIBRATION;
   if (evaluated) return ADI_PANEL_FINDING.TESTED_NO_IMPROVEMENT;
   return ADI_PANEL_FINDING.NOT_TESTED;
@@ -126,11 +144,19 @@ export function resolveCalibrationSectionKind({
   decision = null,
   hasPersistedValues = false,
   evaluated = false,
+  evidenceRetained = true,
+  tradeOffHeld = false,
 } = {}) {
   if (decision === CALIBRATION_APPLY_DECISION.APPLIED) return ADI_CALIBRATION_KIND.APPLIED;
   if (decision === CALIBRATION_APPLY_DECISION.HOLD) return ADI_CALIBRATION_KIND.HELD;
   if (hasPersistedValues) return ADI_CALIBRATION_KIND.PERSISTED;
-  return evaluated ? ADI_CALIBRATION_KIND.TESTED : ADI_CALIBRATION_KIND.NOT_TESTED;
+  if (!evaluated) return ADI_CALIBRATION_KIND.NOT_TESTED;
+  // "Tested — no useful calibration-only improvement" requires the retained
+  // evidence that proves it. Without it the section states that plainly; with a
+  // trade-off it states the trade-off instead of a no-improvement conclusion.
+  if (evidenceRetained === false) return ADI_CALIBRATION_KIND.EVIDENCE_MISSING;
+  if (tradeOffHeld) return ADI_CALIBRATION_KIND.TRADE_OFF_HELD;
+  return ADI_CALIBRATION_KIND.TESTED;
 }
 
 /**

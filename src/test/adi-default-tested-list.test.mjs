@@ -80,8 +80,65 @@ const SAVED_FAMILIES = [
     reason: null },
 ];
 
+/**
+ * The calibration evidence a completed pass saves with the run: per lever, the
+ * search's candidate count, the best candidate it canonically confirmed with its
+ * P19/P20 before → after, and the reason nothing was accepted.
+ *
+ * The card may state "no useful improvement found" for delay, gain or polarity
+ * ONLY when this record proves the search ran. Without it the row states that the
+ * evidence was not retained and asks for the re-run.
+ */
+const CALIBRATION_EVIDENCE = {
+  schemaVersion: 1,
+  levers: {
+    delay: {
+      lever: "delay", label: "Delay", tested: true, evidenceStatus: "retained", candidateCount: 3,
+      bestCandidate: {
+        candidateId: "d1", signedOffsetMs: 2,
+        p19Before: -3, p19After: -3.1, p20Before: -9, p20After: -9.1,
+        p19DeltaDb: -0.1, p20DeltaDb: -0.1,
+      },
+      result: "no_useful_improvement",
+      reason: "No calibration candidate cleared the 1 dB action threshold",
+    },
+    gain: {
+      lever: "gain", label: "Gain", tested: true, evidenceStatus: "retained", candidateCount: 3,
+      bestCandidate: {
+        candidateId: "g1", adjustmentDb: 1.5,
+        p19Before: -3, p19After: -3, p20Before: -8.7, p20After: -8.8,
+        p19DeltaDb: 0, p20DeltaDb: -0.1,
+      },
+      result: "no_useful_improvement",
+      reason: "No calibration candidate cleared the 1 dB action threshold",
+    },
+    polarity: {
+      lever: "polarity", label: "Polarity", tested: true, evidenceStatus: "retained", candidateCount: 4,
+      bestCandidate: {
+        candidateId: "c1",
+        p19Before: -3, p19After: -3, p20Before: -9.2, p20After: -9.2,
+        p19DeltaDb: 0, p20DeltaDb: 0,
+      },
+      result: "no_useful_improvement",
+      reason: null,
+      scope: "No standalone search — evaluated inside the combined candidate",
+    },
+    phase: {
+      lever: "phase", label: "Phase", tested: false, evidenceStatus: "retained", candidateCount: null,
+      bestCandidate: null, result: "not_tested_in_run",
+      reason: "Subwoofer-only all-pass alignment — the speaker/sub crossover region is not evaluated",
+    },
+  },
+};
+
 /** The plan-shaped view the card reads: no lever rows, the run's family ledger. */
-const planViewFor = (families) => ({ status: "current", levers: [], baseline: null, run: { families } });
+const planViewFor = (families) => ({
+  status: "current",
+  levers: [],
+  baseline: null,
+  run: { families },
+  calibrationEvidence: CALIBRATION_EVIDENCE,
+});
 
 const keysOf = (rows) => rows.map((row) => row.key);
 const rowFor = (rows, key) => rows.find((row) => row.key === key) || null;
@@ -165,7 +222,11 @@ describe("the default tested table", () => {
   });
 
   it("keeps the ledger to the stated levers", () => {
-    const ledger = buildFamilyLedgerRows({ families: SAVED_FAMILIES, baseline: null });
+    const ledger = buildFamilyLedgerRows({
+      families: SAVED_FAMILIES,
+      baseline: null,
+      calibrationEvidence: CALIBRATION_EVIDENCE,
+    });
     expect(Object.keys(ledger)).toEqual(TABLE_KEYS);
     expect(ADI_LEDGER_FAMILY_KEYS).toEqual(TABLE_KEYS);
   });

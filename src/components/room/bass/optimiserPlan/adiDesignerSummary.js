@@ -62,6 +62,15 @@ import { OPTIMISER_PRESENTATION_STATE } from "./resolveOptimiserPresentationStat
 import { resolveOptimiserCurrentP20 } from "./optimiserCurrentP20.js";
 import { parityBlocksApply } from "./optimiserBaselineAuthority.js";
 import { buildFutureCapabilityNotes, liveFamilyKeys } from "./optimiserLiveFamilies.js";
+import {
+  CALIBRATION_CLAIM_LEVERS,
+  CALIBRATION_EVIDENCE_MISSING_MESSAGE,
+  CALIBRATION_EVIDENCE_RESULT,
+  CALIBRATION_EVIDENCE_STATUS,
+  calibrationEvidenceFor,
+  describeCalibrationLever,
+  resolveCalibrationEvidenceState,
+} from "./optimiserCalibrationEvidence.js";
 
 export const ADI_TESTED_TITLE = "What ADI tested";
 export const ADI_ENGINEER_DETAILS_TITLE = "Engineer details";
@@ -261,6 +270,9 @@ export function buildTestedOptionRows(
     families: planView?.run?.families,
     baseline: planView?.baseline || null,
     runComplete,
+    // The calibration levers' own retained evidence: a calibration row may state
+    // "no useful improvement found" only when this proves the search ran.
+    calibrationEvidence: planView?.calibrationEvidence || null,
   });
   return leverOrder().map((key) => {
     const row = findLeverRow(planView, key);
@@ -321,6 +333,34 @@ export function buildTestedOptionRows(
     // so; a family this evaluation did not search says that, and never the
     // vague "Not tested", "Not evaluated" or "Not available".
     if (!evaluated) {
+      // ── Calibration levers ── the panel's calibration finding names delay,
+      // gain and polarity. Their rows may state "no useful improvement found"
+      // ONLY when the saved record proves the run tested them and kept the best
+      // candidate that came of it; otherwise the row says the evidence was not
+      // retained and asks for the re-run. This is the same rule the per-family
+      // ledger applies, so a saved record that kept no family ledger cannot make
+      // the claim either.
+      if (CALIBRATION_CLAIM_LEVERS.includes(key)) {
+        const leverEvidence = calibrationEvidenceFor(planView?.calibrationEvidence, key);
+        if (leverEvidence?.evidenceStatus !== CALIBRATION_EVIDENCE_STATUS.RETAINED) {
+          return {
+            key,
+            label,
+            status: ADI_ROW_STATUS.NOT_RUN,
+            outcome: CALIBRATION_EVIDENCE_MISSING_MESSAGE,
+            action: null,
+          };
+        }
+        return {
+          key,
+          label,
+          status: leverEvidence.result === CALIBRATION_EVIDENCE_RESULT.TRADE_OFF
+            ? ADI_ROW_STATUS.TRADE_OFF
+            : ADI_ROW_STATUS.TESTED,
+          outcome: describeCalibrationLever(leverEvidence) || ADI_ROW_OUTCOME.NO_USEFUL,
+          action: null,
+        };
+      }
       // A different subwoofer model or quantity is a design decision, not a
       // search — it is never silently omitted, and it never claims the lever was
       // tested.
@@ -342,7 +382,11 @@ export function buildTestedOptionRows(
         // pool, so its outcome is stated either way.
         const layoutSearched = runComplete
           || placement?.evaluated === true
-          || buildFamilyLedgerRows({ families: planView?.run?.families, runComplete })
+          || buildFamilyLedgerRows({
+            families: planView?.run?.families,
+            runComplete,
+            calibrationEvidence: planView?.calibrationEvidence || null,
+          })
             ?.["placement"]?.status === ADI_ROW_STATUS.TESTED;
         return {
           key,
@@ -732,6 +776,10 @@ export function buildAdiDesignerSummary({
         ? `${ADI_STALE_COPY.PREVIOUS_LABEL} P20: ${baselineDeviation}`
         : null,
     absorption,
+    // The calibration levers' own retained evidence, and what the panel may
+    // therefore state about calibration. Read, never recalculated.
+    calibrationEvidence: planView?.calibrationEvidence || null,
+    calibrationEvidenceState: resolveCalibrationEvidenceState(planView?.calibrationEvidence),
     // Capabilities the optimiser does not evaluate, stated once for the
     // collapsed Engineer details. The levers themselves — including phase, whose
     // crossover-region limitation is stated in its own row — are never repeated

@@ -31,6 +31,7 @@ import {
 } from "./optimiserSeatingEvidence.js";
 import { describePlacementMove } from "./placementMoveAuthority.js";
 import { subwooferGroupCounts } from "./placementPlausibilityAuthority.js";
+import { buildCalibrationEvidence } from "./optimiserCalibrationEvidence.js";
 
 const num = (value) => (Number.isFinite(Number(value)) ? Number(value) : null);
 const round = (value, digits = 2) => (value == null ? null : Number(Number(value).toFixed(digits)));
@@ -524,6 +525,16 @@ export function buildOptimiserPlan({
     );
   }
 
+  // The calibration levers' own evidence, recorded from this run alone: what the
+  // grouped delay and gain searches and the phase/polarity search produced, and
+  // the run's own reason for accepting nothing. Persisted so the panel can prove
+  // its calibration finding instead of asserting it.
+  const calibrationEvidence = buildCalibrationEvidence({
+    selection,
+    baseline: baselineResult,
+    appliedLevers: Object.keys(levers),
+  });
+
   return {
     planVersion: OPTIMISER_PLAN_VERSION,
     savedAt: new Date().toISOString(),
@@ -571,6 +582,11 @@ export function buildOptimiserPlan({
       components,
     } : null,
     levers,
+    // The per-lever calibration evidence this run retained (delay, gain,
+    // polarity, phase): the candidate counts, the best confirmed candidate with
+    // its canonical P19/P20 before and after, the lever's own signed value, and
+    // the run's own reason for accepting nothing.
+    calibrationEvidence,
     individualEffectsEvaluated,
     leverDecisions: normaliseDecisions(leverDecisions),
     applied: resolveAppliedMap(levers, instances, seatingPositions),

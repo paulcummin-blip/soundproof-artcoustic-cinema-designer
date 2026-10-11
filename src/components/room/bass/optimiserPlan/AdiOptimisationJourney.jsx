@@ -53,6 +53,7 @@ import AdiCalibrationSection from "./AdiCalibrationSection.jsx";
 import AdiDesignRecommendationSection from "./AdiDesignRecommendationSection.jsx";
 import AdiPanelSummary from "./AdiPanelSummary.jsx";
 import AdiEngineerEvidenceBlock from "./AdiEngineerEvidenceBlock.jsx";
+import AdiCalibrationEvidenceBlock from "./AdiCalibrationEvidenceBlock.jsx";
 import AdiDesignerActionBar from "./AdiDesignerActionBar.jsx";
 import PlacementRecommendationPanel from "./PlacementRecommendationPanel.jsx";
 import AdiBeforeAfterResult from "./AdiBeforeAfterResult.jsx";
@@ -308,11 +309,18 @@ export default function AdiOptimisationJourney({
   // — no eligibility, no threshold and no engineering value is touched.
   const designChangeList = Array.isArray(designChanges) ? designChanges : [];
   const evaluated = summary.noRun !== true && !isRunning;
+  // What the saved calibration evidence proves. Both the section and the panel's
+  // finding read this one authority, so neither can claim a test that the saved
+  // record does not evidence.
+  const calibrationEvidenceState = summary.calibrationEvidenceState || null;
+  const calibrationEvidenceRetained = calibrationEvidenceState?.evidenceRetained !== false;
   const calibrationKind = resolveCalibrationSectionKind({
     decision: appliedCalibrationEvidence?.decision || null,
     hasPersistedValues: Array.isArray(persistedAppliedCalibration?.values)
       && persistedAppliedCalibration.values.length > 0,
     evaluated,
+    evidenceRetained: calibrationEvidenceRetained,
+    tradeOffHeld: calibrationEvidenceState?.tradeOffHeld === true,
   });
   const panelFinding = resolveAdiPanelFinding({
     isRunning,
@@ -321,6 +329,7 @@ export default function AdiOptimisationJourney({
       || Boolean(summary.seatingRecommendation)
       || placement?.kind === PLACEMENT_KIND.RECOMMENDED,
     evaluated,
+    calibrationEvidenceRetained,
   });
   const primaryAction = resolveAdiPrimaryAction({
     isRunning,
@@ -398,6 +407,7 @@ export default function AdiOptimisationJourney({
         appliedEvidence={appliedCalibrationEvidence}
         appliedCalibration={persistedAppliedCalibration}
         recommendation={calibrationRecommendation}
+        evidenceState={calibrationEvidenceState}
       >
         <ReoptimiseCalibrationAction
           onReoptimise={isRunning ? null : onReoptimiseCalibration}
@@ -547,6 +557,12 @@ export default function AdiOptimisationJourney({
             parityStatus={planView?.baselineParity?.status ?? null}
             appliedCalibration={persistedAppliedCalibration}
           />
+
+          {/* The calibration evidence the saved run kept: per lever, the candidate
+              count, the best confirmed candidate with its canonical P19/P20
+              before → after, and the run's own reason for accepting nothing.
+              Without it the panel never claims a lever was tested. */}
+          <AdiCalibrationEvidenceBlock evidence={summary.calibrationEvidence} />
 
           {/* The per-lever detail, and the best acoustic delay the grouped
               front/rear sweep confirmed — a detail of the delay lever ADI

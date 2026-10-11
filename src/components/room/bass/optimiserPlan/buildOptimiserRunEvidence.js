@@ -35,6 +35,7 @@ import {
   OPTIMISER_RUN_FAMILY,
   buildFamilyLedger,
 } from "./optimiserRunFamilies.js";
+import { buildCalibrationEvidence } from "./optimiserCalibrationEvidence.js";
 
 const num = (value) => {
   if (value === null || value === undefined || value === "") return null;
@@ -295,6 +296,14 @@ export function buildOptimiserRunEvidence({
     }
     : null;
 
+  // The calibration levers' own evidence for a run that produced no actionable
+  // plan: a run that states a calibration lever found nothing must keep the
+  // counts and the best candidate that prove it.
+  const calibrationEvidence = buildCalibrationEvidence({
+    selection,
+    baseline: selection?.currentResult || null,
+  });
+
   return {
     recordKind: OPTIMISER_RECORD_KIND.RUN_EVIDENCE,
     planVersion: OPTIMISER_PLAN_VERSION,
@@ -341,6 +350,9 @@ export function buildOptimiserRunEvidence({
     },
     // No levers: a rejected candidate is never presented as an available change.
     levers: {},
+    // What the calibration searches themselves produced, so "no useful
+    // calibration improvement" is a statement the saved record can prove.
+    calibrationEvidence,
     individualEffectsEvaluated: false,
     leverDecisions: {},
     applied: {},

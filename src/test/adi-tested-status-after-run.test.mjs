@@ -39,9 +39,59 @@ import { OPTIMISER_PRESENTATION_STATE } from "@/components/room/bass/optimiserPl
 import { ADI_OPTIMISER_COPY } from "@/components/room/bass/optimiserPlan/resolveAdiOptimiserJourney.js";
 import { PLACEMENT_THEORETICAL_NOTE } from "@/components/room/bass/optimiserPlan/placementMoveAuthority.js";
 import { BASELINE_PARITY_STATUS } from "@/components/room/bass/optimiserPlan/optimiserBaselineAuthority.js";
+import { CALIBRATION_EVIDENCE_MISSING_MESSAGE } from "@/components/room/bass/optimiserPlan/optimiserCalibrationEvidence.js";
 
 const COMPLETED_AT = "2026-01-01T00:00:00.000Z";
 const CALIBRATION_KEYS = ["delay", "gain", "polarity"];
+
+/**
+ * The calibration evidence a completed pass saves with the run: per lever, the
+ * search's candidate count, the best candidate it canonically confirmed with its
+ * P19/P20 before → after, and the reason nothing was accepted. "No useful
+ * improvement found" may be stated for a calibration lever only when this record
+ * proves the search ran.
+ */
+const CALIBRATION_EVIDENCE = {
+  schemaVersion: 1,
+  levers: {
+    delay: {
+      lever: "delay", label: "Delay", tested: true, evidenceStatus: "retained", candidateCount: 3,
+      bestCandidate: {
+        candidateId: "d1", signedOffsetMs: 2,
+        p19Before: -3, p19After: -3.1, p20Before: -9, p20After: -9.1,
+        p19DeltaDb: -0.1, p20DeltaDb: -0.1,
+      },
+      result: "no_useful_improvement",
+      reason: "No calibration candidate cleared the 1 dB action threshold",
+    },
+    gain: {
+      lever: "gain", label: "Gain", tested: true, evidenceStatus: "retained", candidateCount: 3,
+      bestCandidate: {
+        candidateId: "g1", adjustmentDb: 1.5,
+        p19Before: -3, p19After: -3, p20Before: -8.7, p20After: -8.8,
+        p19DeltaDb: 0, p20DeltaDb: -0.1,
+      },
+      result: "no_useful_improvement",
+      reason: "No calibration candidate cleared the 1 dB action threshold",
+    },
+    polarity: {
+      lever: "polarity", label: "Polarity", tested: true, evidenceStatus: "retained", candidateCount: 4,
+      bestCandidate: {
+        candidateId: "c1",
+        p19Before: -3, p19After: -3, p20Before: -9.2, p20After: -9.2,
+        p19DeltaDb: 0, p20DeltaDb: 0,
+      },
+      result: "no_useful_improvement",
+      reason: null,
+      scope: "No standalone search — evaluated inside the combined candidate",
+    },
+    phase: {
+      lever: "phase", label: "Phase", tested: false, evidenceStatus: "retained", candidateCount: null,
+      bestCandidate: null, result: "not_tested_in_run",
+      reason: "Subwoofer-only all-pass alignment — the speaker/sub crossover region is not evaluated",
+    },
+  },
+};
 
 /** Placement was evaluated, and its best attempt stayed inside the 1 dB gate. */
 const BELOW_THRESHOLD_PLACEMENT = {
@@ -62,6 +112,7 @@ const COMPLETED_PLAN = {
   status: "current",
   baseline: { p20Level: 1, p20VariationDb: 13, p19Level: 1, p19VariationDb: -3 },
   run: { completedAt: COMPLETED_AT, outcome: "actionable_plan_produced", families: [] },
+  calibrationEvidence: CALIBRATION_EVIDENCE,
   levers: [BELOW_THRESHOLD_PLACEMENT],
 };
 
@@ -74,6 +125,7 @@ const SEATING_PLAN = {
   // applyable — the same record a saved winning run carries.
   baselineParity: { status: BASELINE_PARITY_STATUS.MATCH },
   run: { completedAt: COMPLETED_AT, outcome: "actionable_plan_produced", families: [] },
+  calibrationEvidence: CALIBRATION_EVIDENCE,
   levers: [{
     key: "seating",
     lever: "seating",
@@ -91,6 +143,7 @@ const THEORETICAL_PLACEMENT_PLAN = {
   status: "current",
   baseline: null,
   run: { completedAt: COMPLETED_AT, outcome: "actionable_plan_produced", families: [] },
+  calibrationEvidence: CALIBRATION_EVIDENCE,
   levers: [{
     ...BELOW_THRESHOLD_PLACEMENT,
     practical: false,
@@ -115,12 +168,16 @@ const rowFor = (rows, key) => rows.find((row) => row.key === key) || null;
 const rowText = (row) => `${row.label} ${row.status} ${row.outcome || ""} ${row.actionText || ""}`;
 
 describe("a completed pass leaves no lever unresolved", () => {
-  it("states the calibration levers as Tested with no useful improvement", () => {
+  it("states the calibration levers as Tested, from the evidence the pass saved", () => {
     const rows = buildTestedOptionRows(COMPLETED_PLAN, { runComplete: true });
     CALIBRATION_KEYS.forEach((key) => {
       const row = rowFor(rows, key);
       expect(row.status).toBe(ADI_ROW_STATUS.TESTED);
-      expect(row.outcome).toBe(ADI_ROW_OUTCOME.NO_USEFUL);
+      // The row states the best candidate the search confirmed and the run's own
+      // reason nothing was accepted — not a bare "no useful improvement".
+      expect(row.outcome).toMatch(/no useful improvement/i);
+      expect(row.outcome).toContain("Best");
+      expect(row.outcome).toMatch(/P20/);
     });
   });
 
@@ -129,12 +186,24 @@ describe("a completed pass leaves no lever unresolved", () => {
     rows.forEach((row) => expect(rowText(row)).not.toMatch(/not yet run/i));
   });
 
+  it("states the missing evidence instead of claiming a calibration test", () => {
+    // The same completed pass, with the calibration evidence dropped: no lever
+    // may be reported as tested and found not useful.
+    const planWithoutEvidence = { ...COMPLETED_PLAN, calibrationEvidence: null };
+    const rows = buildTestedOptionRows(planWithoutEvidence, { runComplete: true });
+    CALIBRATION_KEYS.forEach((key) => {
+      const row = rowFor(rows, key);
+      expect(row.status).toBe(ADI_ROW_STATUS.NOT_RUN);
+      expect(row.outcome).toBe(CALIBRATION_EVIDENCE_MISSING_MESSAGE);
+    });
+  });
+
   it("reads the completed pass from the plan itself, through the card summary", () => {
     const summary = summaryFor(COMPLETED_PLAN);
     summary.rows.forEach((row) => expect(rowText(row)).not.toMatch(/not yet run|waiting/i));
     CALIBRATION_KEYS.forEach((key) => {
       expect(rowFor(summary.rows, key).status).toBe(ADI_ROW_STATUS.TESTED);
-      expect(rowFor(summary.rows, key).outcome).toBe(ADI_ROW_OUTCOME.NO_USEFUL);
+      expect(rowFor(summary.rows, key).outcome).toMatch(/no useful improvement/i);
     });
   });
 
@@ -145,10 +214,22 @@ describe("a completed pass leaves no lever unresolved", () => {
       { family: "gain", status: "not_tested", tested: false, candidatesEvaluated: null, bestAttempt: null },
       { family: "polarity", status: "not_tested_separately", tested: false, candidatesEvaluated: null, bestAttempt: null },
     ];
-    const rows = buildFamilyLedgerRows({ families, baseline: null, runComplete: true });
-    expect(rows.delay).toEqual({ status: ADI_ROW_STATUS.TESTED, outcome: ADI_ROW_OUTCOME.NO_USEFUL });
-    expect(rows.gain).toEqual({ status: ADI_ROW_STATUS.TESTED, outcome: ADI_ROW_OUTCOME.NO_USEFUL });
+    const rows = buildFamilyLedgerRows({
+      families,
+      baseline: null,
+      runComplete: true,
+      calibrationEvidence: CALIBRATION_EVIDENCE,
+    });
+    // Each calibration row states what that search's own retained evidence
+    // proves: the best candidate it confirmed and the reason nothing was taken.
+    ["delay", "gain"].forEach((key) => {
+      expect(rows[key].status).toBe(ADI_ROW_STATUS.TESTED);
+      expect(rows[key].outcome).toMatch(/no useful improvement/i);
+    });
+    // Polarity is explored inside the combined candidate: its own fixed scope fact
+    // is stated, and the retained evidence is what allows it to be stated at all.
     expect(rows.polarity.status).toBe(ADI_ROW_STATUS.TESTED);
+    expect(rows.polarity.outcome).toMatch(/combined candidate/i);
     // With no completed pass the same evidence states the run-scope fact instead.
     const preRun = buildFamilyLedgerRows({ families, baseline: null });
     expect(preRun.delay.status).toBe(ADI_ROW_STATUS.NOT_RUN);

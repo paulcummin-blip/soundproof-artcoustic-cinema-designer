@@ -50,6 +50,9 @@ export function serializeOptimiserPlan(plan) {
     candidateId: plan.candidateId || null,
     candidateKind: plan.candidateKind || null,
     baseline: plan.baseline || null,
+    // The calibration levers' own evidence (delay, gain, polarity, phase), so
+    // the panel's calibration finding survives refresh and reopen.
+    calibrationEvidence: plan.calibrationEvidence || null,
     combined: plan.combined || null,
     levers: plan.levers || {},
     individualEffectsEvaluated: plan.individualEffectsEvaluated === true,

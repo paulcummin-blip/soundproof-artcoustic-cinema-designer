@@ -42,6 +42,14 @@ import {
 import { OPTIMISER_LEVER_VERDICT, resolveLeverVerdict } from "./optimiserLeverVerdict.js";
 import { deltaText } from "./optimiserWholeNumberDb.js";
 import { liveFamilyKeys } from "./optimiserLiveFamilies.js";
+import {
+  CALIBRATION_CLAIM_LEVERS,
+  CALIBRATION_EVIDENCE_MISSING_MESSAGE,
+  CALIBRATION_EVIDENCE_RESULT,
+  CALIBRATION_EVIDENCE_STATUS,
+  calibrationEvidenceFor,
+  describeCalibrationLever,
+} from "./optimiserCalibrationEvidence.js";
 
 /**
  * The action column's own words. A change that cannot be applied says what to do
@@ -279,6 +287,32 @@ function testedOutcome(entry, baseline) {
 }
 
 /**
+ * The row for a calibration lever whose OWN saved evidence is the authority.
+ *
+ * The panel may state "no useful improvement found" only when the saved record
+ * proves the search ran and kept the best candidate it confirmed. This reads that
+ * record — the count, the best candidate's canonical P19/P20 before → after, the
+ * lever's own signed value and the run's own reason — and states it. Nothing is
+ * inferred from a family the run never kept, and no claim is made without it.
+ */
+function calibrationOutcomeRow(record) {
+  // Not a calibration lever (placement, layout, seating): the completed pass
+  // still covered it, so its row keeps the fixed outcome.
+  if (!record) return { status: ADI_ROW_STATUS.TESTED, outcome: ADI_ROW_OUTCOME.NO_USEFUL };
+  const text = describeCalibrationLever(record) || null;
+  if (record.tested !== true) {
+    return {
+      status: ADI_ROW_STATUS.NOT_RUN,
+      outcome: record.reason || ADI_ROW_OUTCOME.NOT_SEARCHED_IN_RUN,
+    };
+  }
+  if (record.result === CALIBRATION_EVIDENCE_RESULT.TRADE_OFF) {
+    return { status: ADI_ROW_STATUS.TRADE_OFF, outcome: text || ADI_ROW_OUTCOME.TRADE_OFF };
+  }
+  return { status: ADI_ROW_STATUS.TESTED, outcome: text || ADI_ROW_OUTCOME.NO_USEFUL };
+}
+
+/**
  * One row's status and outcome, from that family's own evidence.
  *
  * Two families are reported by what they are rather than by a verdict: an
@@ -286,9 +320,27 @@ function testedOutcome(entry, baseline) {
  * SUBWOOFER OPTION is never searched at all. Neither may read as an unevaluated
  * family, and neither is reported as a tested lever in its own right.
  */
-function rowFor(key, entry, families, baseline, runComplete = false) {
+function rowFor(key, entry, families, baseline, runComplete = false, calibrationEvidence = null) {
   const status = entry?.status || null;
   const tested = wasTested(entry);
+
+  // ── Calibration levers ── delay, gain and polarity are the levers the panel's
+  // calibration finding names. "No useful improvement found" may be stated for
+  // one of them ONLY when the saved record proves the run tested it: the retained
+  // evidence carries that search's candidate count and the best candidate it
+  // canonically confirmed. With no such evidence the row says so, and asks for
+  // the re-run that produces it — a claim is never made from missing evidence.
+  const calibrationLever = CALIBRATION_CLAIM_LEVERS.includes(key)
+    ? calibrationEvidenceFor(calibrationEvidence, key)
+    : null;
+  if (CALIBRATION_CLAIM_LEVERS.includes(key)
+    && calibrationLever?.evidenceStatus !== CALIBRATION_EVIDENCE_STATUS.RETAINED) {
+    return {
+      status: ADI_ROW_STATUS.NOT_RUN,
+      outcome: CALIBRATION_EVIDENCE_MISSING_MESSAGE,
+      actionText: ADI_ROW_ACTION.RERUN_ADI,
+    };
+  }
   /** The completed pass covered this lever and improved nothing. */
   const testedNoImprovement = () => ({
     status: ADI_ROW_STATUS.TESTED,
@@ -351,8 +403,8 @@ function rowFor(key, entry, families, baseline, runComplete = false) {
     }
     // The pass completed and covered gain: the row states what came of it —
     // Tested with no useful improvement — never "Not yet run" after a completed
-    // optimiser pass.
-    if (runComplete) return testedNoImprovement();
+    // optimiser pass. The outcome itself comes from gain's own retained evidence.
+    if (runComplete) return calibrationOutcomeRow(calibrationLever);
     // Gain IS a supported lever wherever the groups can be trimmed: a saved run
     // that kept no gain attempt is a statement about THAT RUN, and is worded as
     // one — never as a capability the optimiser lacks.
@@ -388,9 +440,17 @@ function rowFor(key, entry, families, baseline, runComplete = false) {
 
   if (!tested) {
     // A completed pass covered every supported calibration lever (delay, gain,
-    // polarity): the row reports its outcome, never "Not yet run".
-    if (runComplete) return testedNoImprovement();
+    // polarity): the row reports its own retained evidence, never "Not yet run".
+    if (runComplete) return calibrationOutcomeRow(calibrationLever);
     return notRun(familyReason(entry));
+  }
+
+  // A calibration lever whose family record kept no attempt of its own still has
+  // its own retained evidence: the candidate count and the best candidate the
+  // search canonically confirmed. The row states that record — with its P19/P20
+  // before → after and the run's own reason — rather than a vague conclusion.
+  if (calibrationLever?.evidenceStatus === CALIBRATION_EVIDENCE_STATUS.RETAINED && !entry?.bestAttempt) {
+    return calibrationOutcomeRow(calibrationLever);
   }
 
   return testedOutcome(entry, baseline);
@@ -413,7 +473,12 @@ function rowFor(key, entry, families, baseline, runComplete = false) {
  *   saved record carries no per-family evidence (older plans) — the caller then
  *   falls back to the plan's own lever rows.
  */
-export function buildFamilyLedgerRows({ families = null, baseline = null, runComplete = false } = {}) {
+export function buildFamilyLedgerRows({
+  families = null,
+  baseline = null,
+  runComplete = false,
+  calibrationEvidence = null,
+} = {}) {
   if (!Array.isArray(families) || families.length === 0) return null;
 
   const rows = {};
@@ -425,7 +490,7 @@ export function buildFamilyLedgerRows({ families = null, baseline = null, runCom
       continue;
     }
     recognised += 1;
-    rows[key] = rowFor(key, entry, families, baseline, runComplete);
+    rows[key] = rowFor(key, entry, families, baseline, runComplete, calibrationEvidence);
   }
   return recognised > 0 ? rows : null;
 }
