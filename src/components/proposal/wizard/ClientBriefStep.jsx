@@ -52,8 +52,7 @@ export default function ClientBriefStep({
           Client Brief &amp; Narrative Focus
         </h3>
         <p className="text-xs text-[#625143] leading-relaxed">
-          Describe anything you would like the report to emphasise. These notes guide the
-          narrative only and never alter the engineering results.
+          What would you like this proposal to emphasise?
         </p>
       </div>
 
@@ -82,14 +81,6 @@ export default function ClientBriefStep({
           state no message of their own: the note the designer writes here is
           what the comparison page prints above both options. */}
       <ComparisonMessagePrompt projectId={projectId} />
-
-      <div className="mt-6 p-3 bg-[#F5F4F0] border-l-2 border-[#213428] rounded-r">
-        <p className="text-[11px] text-[#625143] leading-relaxed">
-          <strong className="text-[#213428]">Note:</strong> The Client Brief influences the
-          wording and emphasis of the report. It must never change any engineering result,
-          RP22 value, Design Rating, or recommendation.
-        </p>
-      </div>
     </div>
   );
 }

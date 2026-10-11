@@ -200,14 +200,6 @@ export default function AdiSuggestionChips({
         )}
       </div>
 
-      {usingCalculatedResults && (
-        <p className="text-[11px] text-[#8A8477] mb-3">
-          {comparisonSelected
-            ? `These examples compare the ${selectedVersionCount} selected versions. Any number they state is checked against every selected version before display.`
-            : "These examples are based on this project's calculated design results. Any number they state is checked against this version before display."}
-        </p>
-      )}
-
       {busy && (
         <p className="text-[11px] text-[#8A8477] mb-3">
           {snapshotLoading || versionsLoading
