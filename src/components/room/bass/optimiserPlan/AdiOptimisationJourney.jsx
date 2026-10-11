@@ -60,6 +60,7 @@ import AdiDesignerActionBar from "./AdiDesignerActionBar.jsx";
 import PlacementRecommendationPanel from "./PlacementRecommendationPanel.jsx";
 import AdiBeforeAfterResult from "./AdiBeforeAfterResult.jsx";
 import AdiAppliedBassCalibration from "./AdiAppliedBassCalibration.jsx";
+import AdiAbsoluteGroupDelays from "./AdiAbsoluteGroupDelays.jsx";
 import ReoptimiseCalibrationAction from "./ReoptimiseCalibrationAction.jsx";
 import { useAppliedCalibrationAuthority } from "../appliedCalibrationAuthority/appliedCalibrationAuthorityStore.js";
 import { OPTIMISER_LEVER } from "./optimiserPlanConstants.js";
@@ -422,6 +423,8 @@ export default function AdiOptimisationJourney({
         recommendation={calibrationRecommendation}
         evidenceState={calibrationEvidenceState}
         bestResult={bestCalibrationResult}
+        instances={instances}
+        roomDims={roomDims}
       >
         <ReoptimiseCalibrationAction
           onReoptimise={isRunning ? null : onReoptimiseCalibration}
@@ -582,6 +585,13 @@ export default function AdiOptimisationJourney({
               front/rear sweep confirmed — a detail of the delay lever ADI
               already tested, never a second recommendation surface. */}
           <AdiTestedOptionsTable summary={summary} />
+          {/* The absolute saved processor delays behind the relative group
+              offset the panel states — traceability only, read never written. */}
+          <AdiAbsoluteGroupDelays
+            instances={instances}
+            settings={calibrationApplyEvidence?.settings || []}
+            roomDims={roomDims}
+          />
           <AcousticDelayAlignmentCard lever={delayLever} />
 
           {journey.showPlan && (

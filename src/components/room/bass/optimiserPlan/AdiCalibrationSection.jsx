@@ -47,6 +47,11 @@ export default function AdiCalibrationSection({
   // several levers retuned together — with its state, its P19/P20 before → after
   // and the settings it changed. Null when the decision names no result.
   bestResult = null,
+  // The design's own subwoofers: subwoofer timing is stated as a relative group
+  // offset in this panel, so the groups behind an applied calibration have to be
+  // readable here. Presentation only — nothing is applied or recalculated.
+  instances = [],
+  roomDims = null,
   children = null,
   className = "",
 }) {
@@ -83,6 +88,8 @@ export default function AdiCalibrationSection({
           evidence={kind === ADI_CALIBRATION_KIND.PERSISTED ? null : appliedEvidence}
           appliedCalibration={appliedCalibration}
           designChanges={[]}
+          instances={instances}
+          roomDims={roomDims}
         />
       )}
 

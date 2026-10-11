@@ -12,6 +12,12 @@
 //   2. Recommended design changes — the physical changes ADI found but must not
 //      apply. Each states its confirmed benefit and that it awaits approval.
 //
+// SUBWOOFER TIMING IS STATED RELATIVELY. Bass summation depends on the timing
+// relationship between the sub groups, so the delay is led with as "Rear sub
+// group +1 ms relative to the front group" rather than as two absolute processor
+// delays the designer has to subtract. The absolute saved values do not leave
+// the app: Engineer details keeps them (AdiAbsoluteGroupDelays.jsx).
+//
 // Presentation only. It reads the decision authority's own record and the
 // persisted Applied Calibration authority; it computes no engineering value and
 // never claims an improvement the canonical results do not carry.
@@ -26,6 +32,8 @@ import {
   CALIBRATION_APPLY_DECISION,
   formatLevelValue,
 } from "../optimiseWorkflow/adiCalibrationAutoApplyAuthority.js";
+import { buildRelativeGroupDelays } from "./relativeGroupDelayAuthority.js";
+import AdiRelativeGroupDelay from "./AdiRelativeGroupDelay.jsx";
 
 const SETTLED = { border: "#CFDCCF", background: "#F4F7F4", accent: "#213428" };
 const AWAITING = { border: "#E8D5AE", background: "#FDF6E9", accent: "#B45309" };
@@ -71,7 +79,7 @@ function SettingsTable({ settings }) {
 }
 
 /** The settings a previously applied calibration is holding, with no history. */
-function AppliedValuesList({ appliedCalibration }) {
+function AppliedValuesList({ appliedCalibration, showDelay = true }) {
   const values = Array.isArray(appliedCalibration?.values) ? appliedCalibration.values : [];
   if (!values.length) return null;
   return (
@@ -81,7 +89,8 @@ function AppliedValuesList({ appliedCalibration }) {
       </div>
       {values.map((value, index) => (
         <div key={String(value.id || index)}>
-          Sub {index + 1}: delay {Number(value.delayMs) || 0} ms · gain {(Number(value.gainDb) || 0) > 0 ? "+" : ""}
+          Sub {index + 1}: {showDelay ? `delay ${Number(value.delayMs) || 0} ms · ` : ""}gain{" "}
+          {(Number(value.gainDb) || 0) > 0 ? "+" : ""}
           {Number(value.gainDb) || 0} dB · polarity {Number(value.polarity) < 0 ? "inverted" : "normal"} · phase{" "}
           {Math.round(Number(value.phaseControlDeg) || 0)}° at 80 Hz
         </div>
@@ -97,9 +106,27 @@ export default function AdiAppliedBassCalibration({
   evidence = null,
   appliedCalibration = null,
   designChanges = [],
+  // The design's own subwoofers, so the group delays behind an applied (or
+  // held) calibration are stated as a relative group offset. Absent, the
+  // absolute settings table is shown unchanged.
+  instances = [],
+  roomDims = null,
   className = "",
 }) {
   const decision = evidence?.decision || null;
+  // The relative statement of the subwoofer groups' timing, read from the
+  // design's own delays and the decision's own applied rows. Null when the
+  // groups are not recorded — no offset is ever guessed at.
+  const relativeDelay = buildRelativeGroupDelays({
+    instances,
+    settings: Array.isArray(evidence?.settings) ? evidence.settings : [],
+    roomDims,
+  });
+  // The delay rows leave the main panel only when the relative statement
+  // replaced them: they are kept in Engineer details either way.
+  const mainRows = (rows) => (relativeDelay
+    ? (Array.isArray(rows) ? rows : []).filter((row) => row?.setting !== "Delay")
+    : rows);
   const applied = decision === CALIBRATION_APPLY_DECISION.APPLIED;
   const held = decision === CALIBRATION_APPLY_DECISION.HOLD;
   const nothing = decision === CALIBRATION_APPLY_DECISION.NONE;
@@ -138,7 +165,9 @@ export default function AdiAppliedBassCalibration({
             </div>
           )}
 
-          <SettingsTable settings={evidence.settings} />
+          <AdiRelativeGroupDelay display={relativeDelay} />
+
+          <SettingsTable settings={mainRows(evidence.settings)} />
 
           <div className="space-y-1">
             <ValueRow
@@ -183,7 +212,8 @@ export default function AdiAppliedBassCalibration({
             <Wrench className="h-3.5 w-3.5 text-[#625143]" />
             <span className="text-[12px] font-bold text-[#1B1A1A]">{ADI_APPLIED_CALIBRATION_TITLE}</span>
           </div>
-          <AppliedValuesList appliedCalibration={appliedCalibration} />
+          <AdiRelativeGroupDelay display={relativeDelay} />
+          <AppliedValuesList appliedCalibration={appliedCalibration} showDelay={!relativeDelay} />
         </div>
       )}
 
@@ -200,7 +230,9 @@ export default function AdiAppliedBassCalibration({
           <div className="text-[11px] leading-relaxed" style={{ color: AWAITING.accent }}>
             {evidence.statement}
           </div>
-          <SettingsTable settings={evidence.settings} />
+          <AdiRelativeGroupDelay display={relativeDelay} />
+
+          <SettingsTable settings={mainRows(evidence.settings)} />
         </div>
       )}
 
