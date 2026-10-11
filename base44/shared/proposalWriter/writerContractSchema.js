@@ -87,7 +87,16 @@ export const WRITER_CONTRACT_VERSION = 2;
 // the new presented_options section, where the approved validator checks it.
 // The document's comparison pages carry that validated prose and never the
 // designer's raw note.
-export const WRITER_PROMPT_VERSION = 'proposal-writer-prompt-11';
+// Bumped to 12 for the multi-cabinet arrangement and the positive register. Where
+// the frozen evidence states a stage position built from more physical cabinets
+// than that position has channels, the copy explains that arrangement once —
+// naming the cabinets the evidence places and the ONE channel they reproduce —
+// instead of omitting it or writing the cabinets as several channels; and the copy
+// states what the design delivers rather than disclaiming its own claims. The
+// sections, the word limits, the grounding rule and every earlier rejection keep
+// their meaning, so a historical generation is still read against the agreement it
+// was written under.
+export const WRITER_PROMPT_VERSION = 'proposal-writer-prompt-12';
 
 /** The only pack generation a draft may be written from. */
 export const WRITER_ACCEPTED_PACK_SCHEMA_VERSION = 2;
@@ -201,6 +210,25 @@ export const WRITER_REJECTION = Object.freeze({
    * lead it, which is a refusal rather than a page.
    */
   OPTION_COPY_MISSING: 'option_copy_missing',
+  /**
+   * The multi-cabinet arrangement the pack states for a stage position: more
+   * physical cabinets placed at ONE position than that position has channels. The
+   * copy explains the arrangement once, naturally — the position, the cabinets the
+   * evidence places, and the one channel they reproduce. Raised for copy that
+   * never explains it, copy that writes the physical cabinets as several
+   * independent channels, and copy that states a cabinet count the frozen
+   * evidence does not place.
+   */
+  MULTI_CABINET_CHANNEL: 'multi_cabinet_channel',
+  /**
+   * The validation register: client copy defending its own claim rather than
+   * stating what the design delivers ("this is not a claim", "no claim is made",
+   * "it does not establish"). A proposal sells the supported result and leaves
+   * every other parameter to the evidence that measures it, so an internal
+   * validation note is never written into client prose. A legitimate qualification
+   * the client needs is untouched.
+   */
+  VALIDATION_REGISTER: 'validation_register',
 });
 
 /**
