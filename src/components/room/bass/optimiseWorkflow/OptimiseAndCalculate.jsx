@@ -288,6 +288,15 @@ export default function OptimiseAndCalculate({
   // Choose Starting Layout.
   const isStale = bassLifecycleState === BASS_LIFECYCLE_STATE.STALE_NEEDS_RECALCULATION;
 
+  // Why the calibration apply action cannot run yet. These are the SAME gates
+  // the workflow itself enforces, stated before the press — so pressing it can
+  // never be a silent no-op. Null = it can run.
+  const reoptimiseDisabledReason = !hasActiveSubModel
+    ? "Select a subwoofer model and quantity before optimising."
+    : shared?.canCalculate !== true
+      ? "The bass calculation is not ready for this design yet. Let the design settle, then try again."
+      : null;
+
   // ── Main orchestration: triggered by the OPTIMISE & CALCULATE button ──
   const handleStart = useCallback(async () => {
     if (runningRef.current) return;
@@ -719,14 +728,23 @@ export default function OptimiseAndCalculate({
   handleStartRef.current = handleStart;
   handleResetRef.current = handleReset;
 
+  // ONE calibration apply action, shared by every surface that offers it: the
+  // registered header control and the "Re-optimise Bass Calibration" action on
+  // the ADI journey card. It clears the previous run's terminal state and starts
+  // the full workflow — the only path that can auto-apply safe calibration,
+  // recalculate P14/P18/P19/P20 from the applied state and republish the
+  // authority. Nothing here decides what may be applied: that is the calibration
+  // decision's own job.
+  const runCalibrationAutoApply = useCallback(() => {
+    handleResetRef.current();
+    setTimeout(() => handleStartRef.current(), 50);
+  }, []);
+
   useEffect(() => {
     if (!registerRecalculate) return;
-    registerRecalculate(() => {
-      handleResetRef.current();
-      setTimeout(() => handleStartRef.current(), 50);
-    });
+    registerRecalculate(runCalibrationAutoApply);
     return () => registerRecalculate(null);
-  }, [registerRecalculate]);
+  }, [registerRecalculate, runCalibrationAutoApply]);
 
   // A physical Apply commits room state first. Wait until React has produced
   // the new calculation fingerprint, then calculate that exact design. Calling
@@ -945,6 +963,13 @@ export default function OptimiseAndCalculate({
             onCalculateBassPerformance={() => {
               if (typeof sharedRef.current?.onCalculate === "function") sharedRef.current.onCalculate();
             }}
+            // The calibration apply workflow is offered whenever saved authority
+            // exists AND the design is current. When the design is stale, the
+            // "Update Bass Performance" action above already runs this same
+            // workflow, so the card does not offer a second run button for it.
+            onReoptimiseCalibration={hasResults && !isStale ? runCalibrationAutoApply : null}
+            reoptimiseBusy={isCalculating}
+            reoptimiseDisabledReason={reoptimiseDisabledReason}
           />
         </div>
       )}

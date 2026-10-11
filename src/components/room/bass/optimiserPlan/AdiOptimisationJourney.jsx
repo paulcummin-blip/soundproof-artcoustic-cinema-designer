@@ -38,6 +38,7 @@ import AdiDesignerActionBar from "./AdiDesignerActionBar.jsx";
 import PlacementRecommendationPanel from "./PlacementRecommendationPanel.jsx";
 import AdiBeforeAfterResult from "./AdiBeforeAfterResult.jsx";
 import AdiAppliedBassCalibration from "./AdiAppliedBassCalibration.jsx";
+import ReoptimiseCalibrationAction from "./ReoptimiseCalibrationAction.jsx";
 import { useAppliedCalibrationAuthority } from "../appliedCalibrationAuthority/appliedCalibrationAuthorityStore.js";
 import { OPTIMISER_LEVER } from "./optimiserPlanConstants.js";
 import AcousticDelayAlignmentCard from "@/components/room/bass/improveBassV2/AcousticDelayAlignmentCard.jsx";
@@ -120,6 +121,14 @@ export default function AdiOptimisationJourney({
   runError = null,
   onRunOptimisationPlan = null,
   onCalculateBassPerformance = null,
+  // The CALIBRATION APPLY workflow — the only action that can write processor
+  // calibration (delay, gain, polarity, phase), recalculate and republish. It is
+  // null when it is not offered: no saved authority, a stale design whose own
+  // "Update Bass Performance" action already runs it, or a design that is not
+  // calculate-ready. Distinct from onRunOptimisationPlan, which never applies.
+  onReoptimiseCalibration = null,
+  reoptimiseBusy = false,
+  reoptimiseDisabledReason = null,
   onApplyLever = null,
   onUndoLever = null,
   leverApplyBusy = null,
@@ -446,6 +455,20 @@ export default function AdiOptimisationJourney({
           {journey.actionLabel}
           <ArrowRight className="h-3.5 w-3.5" />
         </button>
+      )}
+
+      {/* The SECOND, distinct action. The Bass Optimiser above evaluates only and
+          is offered in every state that has something to run; this one runs the
+          calibration apply workflow — it may APPLY safe delay, gain, polarity and
+          phase, recalculate and republish. It states its own scope before it is
+          pressed, and it stands down while a run is in progress so a second run
+          can never be started. */}
+      {!isRunning && (
+        <ReoptimiseCalibrationAction
+          onReoptimise={onReoptimiseCalibration}
+          busy={reoptimiseBusy}
+          disabledReason={reoptimiseDisabledReason}
+        />
       )}
 
       {/* Collapsed by default, and below the primary action. Every technical

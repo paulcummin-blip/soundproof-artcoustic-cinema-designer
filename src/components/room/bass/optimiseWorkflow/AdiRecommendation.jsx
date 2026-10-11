@@ -90,6 +90,12 @@ export default function AdiRecommendation({
   optimisationRunError,
   onRunOptimisationPlan,
   onCalculateBassPerformance,
+  // The calibration apply workflow, plus its state — forwarded to the journey
+  // card so the second, distinct action is reachable. Null when it is not
+  // offered for the current design state.
+  onReoptimiseCalibration = null,
+  reoptimiseBusy = false,
+  reoptimiseDisabledReason = null,
 }) {
   // The design's own seat count, so the acoustic estimate spans this design's
   // seats rather than an assumed number.
@@ -334,6 +340,9 @@ export default function AdiRecommendation({
       runError={optimisationRunError || null}
       onRunOptimisationPlan={onRunOptimisationPlan}
       onCalculateBassPerformance={onCalculateBassPerformance || null}
+      onReoptimiseCalibration={onReoptimiseCalibration}
+      reoptimiseBusy={reoptimiseBusy}
+      reoptimiseDisabledReason={reoptimiseDisabledReason}
       onApplyLever={handleApplyLever}
       onUndoLever={handleUndoLever}
       leverApplyBusy={leverApplyBusy}
