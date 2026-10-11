@@ -43,6 +43,7 @@ import {
   hasPhysicalRecommendations,
 } from "./optimiseWorkflowOrchestrator";
 import { resolveCalibrationApplicationPlan } from "./adiCalibrationCandidateSelection.js";
+import { applyCalibrationTuning } from "../improveBassV2/improveBassV2ApplyCalibration.js";
 import { publishRecommendation } from "@/components/recommendationEngine";
 import { DEFAULT_SUB_AMPLIFIER_POWER_PER_SUB_W } from "@/components/utils/subwooferCapability";
 import { buildAuthoritativeRspPosition } from "../authoritativeRspPosition";
@@ -136,25 +137,15 @@ async function waitForCurrentPublication(sharedRef, phaseRef) {
   }
 }
 
-// ── Helper: apply recommendation values to subwoofer instances ──
-// Mirrors BassDecisionActions.applyRecommendationToInstances — the single
-// canonical way to commit accepted calibration values to instances after
-// an Accept Transition. No provenance stamping (the Accept Transition
-// owns the authority write; this helper only updates the instances).
+// Confirmed values are absolute effective tuning, including baseline alignment.
+// Reuse the existing calibration boundary so the normal engine does not add
+// automatic alignment a second time. Accept Transition owns the authority write.
 function applyRecommendationToInstances(instances, values) {
   if (!Array.isArray(instances) || !Array.isArray(values)) return instances;
-  const byId = new Map(values.map((v) => [String(v.id), v]));
-  return instances.map((inst) => {
-    const v = byId.get(String(inst.id));
-    if (!v) return inst;
-    return {
-      ...inst,
-      delayMs: Number(v.delayMs) || 0,
-      gainDb: Number(v.gainDb) || 0,
-      polarity: Number(v.polarity) || 1,
-      phaseControlDeg: Number(v.phaseControlDeg) || 0,
-    };
-  });
+  return applyCalibrationTuning(instances, values.map((value) => ({
+    ...value,
+    sourceId: value.id,
+  })));
 }
 
 export default function OptimiseAndCalculate({
