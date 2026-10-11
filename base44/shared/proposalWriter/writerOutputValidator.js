@@ -26,6 +26,8 @@ import {
   WRITER_OUTPUT_SECTION_KEYS,
   WRITER_REJECTION,
   WRITER_SECTIONS,
+  contractSectionsOf,
+  inputHasOptionGuidance,
   violation,
   writerSection,
 } from './writerContractSchema.js';
@@ -136,7 +138,7 @@ function schemaViolations({ input, draft }) {
 }
 
 /** Every section the draft returns, by section ID, with its own schema checked. */
-function indexSections({ draft, violations }) {
+function indexSections({ draft, violations, sections = WRITER_SECTIONS }) {
   const byId = new Map();
   if (!Array.isArray(draft.sections)) return byId;
   const seen = new Set();
@@ -174,7 +176,7 @@ function indexSections({ draft, violations }) {
     byId.set(id, entry);
   }
 
-  for (const spec of WRITER_SECTIONS) {
+  for (const spec of sections) {
     if (byId.has(spec.section)) continue;
     violations.push(violation(WRITER_REJECTION.SCHEMA_VIOLATION, {
       section: spec.section,
@@ -213,7 +215,12 @@ export function validateWriterOutput({ input, output } = {}) {
   }
 
   violations.push(...schemaViolations({ input, draft }));
-  const byId = indexSections({ draft, violations });
+  // The section set is the one the writer was GIVEN, so a generation filed
+  // before the contract gained presented_options is still read against its own
+  // agreement on a replay.
+  const contractSections = contractSectionsOf(input);
+  const guidanceRequired = inputHasOptionGuidance(input);
+  const byId = indexSections({ draft, violations, sections: contractSections });
   violations.push(...crossSectionDuplicates(Array.from(byId.values())));
 
   const claimsById = claimIndex(input);
@@ -221,16 +228,33 @@ export function validateWriterOutput({ input, output } = {}) {
   const vocabulary = packVocabulary(input?.evidence_pack);
   const sections = [];
 
-  for (const spec of WRITER_SECTIONS) {
+  for (const spec of contractSections) {
     const entry = byId.get(spec.section);
     if (!entry) continue;
 
     const text = typeof entry.text === 'string' ? entry.text : '';
+    // presented_options is the one section whose copy answers guidance the pack
+    // may not carry. With no guidance it is legitimately empty; with guidance,
+    // an empty answer is the refusal — a page whose lead copy was never
+    // written and never validated.
+    const optionalEmpty = text.trim().length === 0
+      && spec.optional_without_guidance === true
+      && !guidanceRequired;
     if (text.trim().length === 0) {
-      violations.push(violation(WRITER_REJECTION.SCHEMA_VIOLATION, {
-        section: spec.section,
-        detail: 'section_text_missing',
-      }));
+      if (!optionalEmpty) {
+        violations.push(violation(
+          spec.optional_without_guidance === true
+            ? WRITER_REJECTION.OPTION_COPY_MISSING
+            : WRITER_REJECTION.SCHEMA_VIOLATION,
+          {
+            section: spec.section,
+            detail: spec.optional_without_guidance === true
+              ? 'option_guidance_was_not_answered'
+              : 'section_text_missing',
+          },
+        ));
+      }
+      sections.push({ section: spec.section, words: 0, word_limit: spec.word_limit, claim_ids: [] });
       continue;
     }
 

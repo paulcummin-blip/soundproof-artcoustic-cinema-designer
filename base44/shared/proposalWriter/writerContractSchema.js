@@ -7,7 +7,9 @@
  * this contract, and nothing else. The contract is versioned, so a draft can
  * always be traced to the exact agreement it was written against. It names:
  *
- *   - the nine sections a draft must return, and the word limit each one holds;
+ *   - the ten sections a draft must return, and the word limit each one holds
+ *     (the tenth, presented_options, is filled only where the pack supplies
+ *     option guidance and is returned empty where it supplies none);
  *   - the writing rules the writer is held to;
  *   - the exact JSON shape returned, and the claim-ID grounding rule;
  *   - every reason a returned draft is rejected.
@@ -18,8 +20,18 @@
  * Pure: no React, no SDK, no runtime-specific APIs.
  */
 
-/** The contract generation. A draft is only read against the revision it cites. */
-export const WRITER_CONTRACT_VERSION = 1;
+/**
+ * The contract generation. A draft is only read against the revision it cites.
+ *
+ * Bumped to 2 when the contract gained the presented_options section, so the
+ * client-facing copy a comparison page carries is written and validated by the
+ * same authority as the rest of the document. The nine earlier sections, their
+ * word limits and the grounding rule are unchanged, so a draft filed under
+ * generation 1 is still read against generation 1: the validator reads the
+ * section set from the input it is given, never from this constant, and a
+ * historical generation is never rewritten.
+ */
+export const WRITER_CONTRACT_VERSION = 2;
 
 /**
  * The writer prompt generation this contract is issued with.
@@ -69,7 +81,13 @@ export const WRITER_CONTRACT_VERSION = 1;
 // limits and the claim grounding rule are unchanged, so the contract version
 // stays where it is and a draft filed under an earlier generation is still read
 // against the same agreement.
-export const WRITER_PROMPT_VERSION = 'proposal-writer-prompt-10';
+// Bumped to 11 for the option-copy pass: where the brief supplies seating or
+// layout options, the designer's own notes are handed to the writer as
+// INSTRUCTIONS and the writer returns its own client-facing prose for them in
+// the new presented_options section, where the approved validator checks it.
+// The document's comparison pages carry that validated prose and never the
+// designer's raw note.
+export const WRITER_PROMPT_VERSION = 'proposal-writer-prompt-11';
 
 /** The only pack generation a draft may be written from. */
 export const WRITER_ACCEPTED_PACK_SCHEMA_VERSION = 2;
@@ -175,11 +193,25 @@ export const WRITER_REJECTION = Object.freeze({
   SINGLE_OPTION_FRAMING: 'single_option_framing',
   /** A section over its word limit. */
   SECTION_TOO_LONG: 'section_too_long',
+  /**
+   * The pack supplied option guidance — the designer's own seating or layout
+   * notes — and no client-facing option copy was returned for it. The guidance
+   * is an instruction, so the copy has to be written: an empty or missing
+   * presented_options section leaves a document page with nothing validated to
+   * lead it, which is a refusal rather than a page.
+   */
+  OPTION_COPY_MISSING: 'option_copy_missing',
 });
 
 /**
- * The nine sections of a draft, in the order a pack presents them. Each carries
+ * The ten sections of a draft, in the order a pack presents them. Each carries
  * its own word limit and the one requirement that section exists to meet.
+ *
+ * `presented_options` is the one section whose text is conditionally required:
+ * a pack that supplies option guidance must be answered with copy, and a pack
+ * that supplies none must be answered with an empty string. That is stated per
+ * section as `optional_without_guidance`, so the validator reads the rule from
+ * the contract rather than deciding for itself.
  */
 export const WRITER_SECTIONS = Object.freeze([
   {
@@ -234,6 +266,17 @@ export const WRITER_SECTIONS = Object.freeze([
     requirement_single: 'Explain how voices and effects retain their tonal character as they move between screen, surround and overhead channels, across only the supported seats. Keep every seat statement explicitly limited to tonal character, not overall balance, bass or placement. No bass-extension detour and no both parameters wording.',
     word_limit: 150,
     requirement: 'Explain the loudspeaker and coverage evidence the pack records, and claim nothing beyond it.',
+  },
+  {
+    section: 'presented_options',
+    title: 'Presented Options',
+    // The designer's own seating or layout notes arrive as INSTRUCTIONS, never
+    // as copy: this is the polished client-facing prose written from them, and
+    // it is what the document's option pages carry.
+    requirement_single: 'Where the brief supplies seating or layout options, present them in 2–3 natural sentences: say what each arrangement gives the room, that both work within the seating positions this design specifies, and that the final choice is one of comfort and personal preference. State that the predicted acoustic performance is unchanged provided the assessed listening positions and the relevant room geometry are maintained. Present the options as alternatives within ONE design, never as a performance difference, and claim no performance result. Where the brief supplies no option, return an empty string for this section.',
+    requirement: 'Where the pack supplies option guidance, present the options it describes in 2–3 natural sentences as alternatives within one design, and state plainly what the choice rests on. Where the pack supplies no option guidance, return an empty string for this section.',
+    word_limit: 170,
+    optional_without_guidance: true,
   },
   {
     section: 'overall_design',
@@ -301,6 +344,39 @@ export function writerSection(sectionId) {
 }
 
 /**
+ * The section set a returned draft is read against, taken from the input the
+ * writer was ACTUALLY given rather than from today's contract.
+ *
+ * A generation filed before the contract gained presented_options still lists
+ * its own sections, so it is validated — on a replay, months later — against the
+ * exact agreement it was written under. A new input carries the whole contract.
+ *
+ * @param {Object} input — buildWriterInput output
+ * @returns {Array<Object>}
+ */
+export function contractSectionsOf(input) {
+  const listed = Array.isArray(input?.section_requirements) ? input.section_requirements : [];
+  const known = listed
+    .map((entry) => (entry && typeof entry.section === 'string' ? writerSection(entry.section) : null))
+    .filter(Boolean);
+  if (known.length === 0) return WRITER_SECTIONS.map((entry) => ({ ...entry }));
+  return known.map((entry) => {
+    const limit = Number(listed.find((row) => row?.section === entry.section)?.word_limit);
+    return { ...entry, word_limit: Number.isFinite(limit) ? limit : entry.word_limit };
+  });
+}
+
+/**
+ * Whether the input carries the designer's own option guidance. When it does,
+ * the draft must answer it with client-facing copy; when it does not, the
+ * presented_options section is returned empty.
+ */
+export function inputHasOptionGuidance(input) {
+  const groups = input?.option_guidance?.groups;
+  return Array.isArray(groups) && groups.length > 0;
+}
+
+/**
  * The output schema as the writer is given it: JSON only, these top-level keys,
  * these per-section keys, and these nine sections. There is no other shape.
  */
@@ -337,6 +413,8 @@ export const WRITER_WRITING_RULES = Object.freeze([
   'Copy every figure, Performance Level and product name exactly as the pack states it. Never round, convert, restate or estimate.',
   'Never name a product the pack does not list for the option it belongs to.',
   'Where the pack states a dual-centre screen stage, name the stage position by position: the left and right channels with their own model, and the centre with its own cabinet count and model (for example Front Left / Right: Q6-3 and Centre: 2 × C4-1 dual physical centre cabinets). Never write the three screen channels as one LCR of the left/right model, never write the centre as that model, and never write three loudspeakers of it: the centre is two physical cabinets fed from one centre channel, and the layout is unchanged.',
+  'Where the pack supplies option guidance, that guidance is the designer\'s instruction and never copy: write your own polished client-facing prose from it, and never reproduce a note, an instruction or a filename in the draft. Where the pack supplies no option guidance, return the presented_options section as an empty string and write nothing into it.',
+  'Present seating and layout options as alternatives within ONE design. Say what each arrangement gives the room, that both work within the seating positions this design specifies, and that the final choice rests on comfort and personal preference. State that the predicted acoustic performance is unchanged provided the assessed listening positions and the relevant room geometry are maintained. Never present a seating style as a performance difference, and never make a performance claim from one.',
   'Never present a claim the pack blocks, and never describe a shared result as a change or a gain.',
   'Never recommend changing the design, and never describe the proposal as an upgrade path.',
   'Never reference an assumed or administrative check (P8 upfiring/elevation speakers, P15 background noise floor, P21 early reflections): where the pack records one as requested, state it once, label it as an assumption, and never use it as a result or a differentiator.',
