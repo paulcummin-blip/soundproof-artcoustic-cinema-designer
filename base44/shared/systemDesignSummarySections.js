@@ -67,6 +67,11 @@ export const SYSTEM_SUMMARY_SECTIONS = [
   { type: HIGHLIGHTS_SECTION_TYPE, key: HIGHLIGHTS_SECTION_TYPE, title: 'Key Performance Highlights', canEditBody: true },
   { type: 'overall_design', key: 'overall_design', title: 'Overall Design', canEditBody: true },
   { type: 'room_images', key: 'room_images', title: 'Project Images', canEditBody: true },
+  // The source-only note the approved writer closes its draft with: what the
+  // proposal was written from, with no performance claim. It is the report's own
+  // Appendix section, so the note is published into the document rather than
+  // left out of it.
+  { type: 'appendix', key: 'appendix', title: 'Appendix', canEditBody: true },
 ];
 
 /**

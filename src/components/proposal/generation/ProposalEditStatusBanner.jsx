@@ -10,6 +10,7 @@
  *
  * Props:
  * - layer: the resolved copy layer
+ * - masterAdmin: whether the diagnostic legacy wording may be shown
  * - children: the actions row the panel supplies
  */
 
@@ -19,6 +20,20 @@ import {
   REPORT_FONT_BODY as FONT_BODY,
   REPORT_FONT_HEADING as FONT_HEADING,
 } from '@/components/report/typography/reportTypography';
+
+/**
+ * What a dealer is shown where the technical legacy wording would otherwise
+ * appear. A proposal written before generated copy was recorded is simply a
+ * proposal: its sections hold its copy, nothing is blocked, and every section
+ * stays editable. The diagnostic wording itself is kept for a master admin.
+ *
+ * The copy lives here rather than in the shared edit-copy module because it is a
+ * presentation choice made by this banner, and the frontend cannot read the
+ * backend's shared modules.
+ */
+const LEGACY_DEALER_TITLE = 'Proposal';
+const LEGACY_DEALER_MESSAGE =
+  'The copy is held in the sections below, exactly as it was written. Nothing is blocked and every section stays editable.';
 
 const TONE = {
   ready: { bg: '#EDF3EC', border: '#C6D6C4', text: '#213428', icon: CheckCircle2 },
@@ -45,12 +60,20 @@ const TEXT = {
   lineHeight: 1.55,
 };
 
-export default function ProposalEditStatusBanner({ layer, children = null }) {
+export default function ProposalEditStatusBanner({ layer, children = null, masterAdmin = false }) {
   if (!layer) return null;
 
-  const tone = layer.legacy ? 'legacy' : (layer.ready ? 'ready' : 'review');
+  const legacy = layer.legacy === true;
+  // The diagnostic legacy wording is for a master admin; a dealer reads the
+  // same state in plain words.
+  const legacyDiagnostic = legacy && masterAdmin === true;
+  const tone = legacy ? 'legacy' : (layer.ready ? 'ready' : 'review');
   const palette = TONE[tone];
   const Icon = palette.icon;
+  const bannerTitle = legacy
+    ? (legacyDiagnostic ? layer.title : LEGACY_DEALER_TITLE)
+    : (layer.status_label || layer.title);
+  const bannerMessage = legacy && !legacyDiagnostic ? LEGACY_DEALER_MESSAGE : layer.message;
 
   return (
     <section
@@ -65,7 +88,7 @@ export default function ProposalEditStatusBanner({ layer, children = null }) {
         <Icon style={{ color: palette.text, width: 16, height: 16, marginTop: 2, flexShrink: 0 }} />
         <div style={{ flex: 1, minWidth: 0 }}>
           <p style={{ ...TITLE, color: palette.text }}>
-            {layer.legacy ? layer.title : (layer.status_label || layer.title)}
+            {bannerTitle}
             {!layer.legacy && layer.copy?.source && (
               <span style={{ ...TEXT, marginLeft: 10, color: palette.text, opacity: 0.85 }}>
                 {SOURCE_LABEL[layer.copy.source] || layer.copy.source}
@@ -73,7 +96,7 @@ export default function ProposalEditStatusBanner({ layer, children = null }) {
             )}
           </p>
 
-          {layer.message && <p style={{ ...TEXT, color: palette.text }}>{layer.message}</p>}
+          {bannerMessage && <p style={{ ...TEXT, color: palette.text }}>{bannerMessage}</p>}
 
           {layer.export_blocked_reason && !layer.legacy && (
             <p style={{ ...TEXT, color: palette.text, fontWeight: 600 }}>{layer.export_blocked_reason}</p>

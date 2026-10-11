@@ -1,7 +1,18 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.49';
 import { readProposalReportEvidence } from '../../shared/proposalReportEvidenceReader.js';
-import { prepareProposalEvidence, prepareProposalInterpretation, generateProposalDraftContent } from '../../shared/proposalDraftPipeline.js';
-import { resolveSections, buildProjectContext } from '../../shared/proposalGenerationPrompts.js';
+import { prepareProposalEvidence, prepareProposalInterpretation } from '../../shared/proposalDraftPipeline.js';
+import { resolveSections } from '../../shared/proposalGenerationPrompts.js';
+// ── THE APPROVED WRITER IS THE GENERATION AUTHORITY ──
+// The copy is written by the approved proposal writer (its own prompt, its own
+// contract, its own validator) from the frozen evidence pack built from the
+// canonical Project Report evidence below. The proposal it writes becomes the
+// proposal record's own sections, so the editor and the PDF read the copy the
+// validator passed rather than a second, separately written draft.
+import { generationEntityPayload } from '../../shared/proposalGeneration/proposalGenerationEntity.js';
+import { runProposalCopyGeneration } from '../../shared/proposalGeneration/proposalGenerationRunner.js';
+import { mergeHighlightRows, selectHighlightRows } from '../../shared/engineeringSnapshotEvidence.js';
+import { composeWriterSectionBodies } from '../../shared/proposalWriter/writerSectionMapping.js';
+import { GPT_WRITER_FLAG_FIELD, normaliseGptWriterConfig } from '../../shared/proposalWriter/proposalWriterFlag.js';
 import { HIGHLIGHTS_SECTION_TYPE, resolveSectionTitle } from '../../shared/systemDesignSummarySections.js';
 import { comparisonSectionMetadata, verifyComparisonPersisted } from '../../shared/comparisonPersistence.js';
 import { formatInterpretationForLog } from '../../shared/adiProjectInterpretation.js';
@@ -73,18 +84,17 @@ export default async function(req) {
     const project = projects?.[0];
     if (!project) return Response.json({ error: 'Project not found' }, { status: 404 });
 
-    // ── Load brand assets ──
-    let brandAsset = null;
+    // ── The account this proposal belongs to ──
+    // The draft is written from the frozen evidence pack alone, so no brand
+    // asset and no live project field is loaded for the writer. The account is
+    // still resolved and checked, because it is what the proposal, its sections
+    // and its generation record are scoped to.
     const effectiveAccountId = project.account_id;
     if (!effectiveAccountId) {
       return Response.json({ error: 'Project account is missing.' }, { status: 409 });
     }
     if (account_id && account_id !== effectiveAccountId) {
       return Response.json({ error: 'Project account does not match the active account.' }, { status: 403 });
-    }
-    if (effectiveAccountId) {
-      const brandResults = await base44.entities.BrandAsset.filter({ account_id: effectiveAccountId });
-      brandAsset = brandResults?.[0] || null;
     }
 
     // ── Resolve version IDs ──
@@ -184,7 +194,7 @@ export default async function(req) {
     // A comparison report receives the frozen engineering evidence for EVERY
     // selected version, so neither the calculated comparison table nor the
     // narrative can ever fall back to a single version's results.
-    const { versionEvidence, comparisonTable, comparisonEvidenceText } = prepareProposalEvidence(suppliedSnapshots, projectVersions || [], resolvedType);
+    const { versionEvidence, comparisonTable } = prepareProposalEvidence(suppliedSnapshots, projectVersions || [], resolvedType);
 
     // A comparison is only generated from calculated evidence for every
     // version: a missing version would force an invented comparison value.
@@ -314,7 +324,7 @@ export default async function(req) {
       engineering_fingerprint: primaryPublication?.engineering_fingerprint || null,
       published_at: primaryPublication?.published_at || null,
     };
-    const { primaryInterpretation, comparisonReading, interpretationBlock } = prepareProposalInterpretation({
+    const { primaryInterpretation, comparisonReading } = prepareProposalInterpretation({
       suppliedSnapshots, project, client_brief, resolvedType, resolvedVersionIds, versionLabelById,
     });
     console.log(`[generateProposal] ADI stage 1 interpretation | ${formatInterpretationForLog(primaryInterpretation)}`);
@@ -346,6 +356,10 @@ export default async function(req) {
       // design story a report was written from can be audited later.
       metadata: {
         project_interpretation: primaryInterpretation,
+        // The report identity every project fact in this proposal came from: the
+        // primary version and its published engineering fingerprint. Kept with
+        // the proposal, so the report a draft was written from stays auditable.
+        source_identity: sourceIdentity,
         // The evidence this proposal was generated from, per version.
         report_evidence: reportEvidenceCitations,
         ...(comparisonReading ? { comparison_reading: comparisonReading } : {}),
@@ -384,44 +398,99 @@ export default async function(req) {
       }))
     );
 
-    // ── Build project context for GPT ──
-    // Report identity: the versions this report covers, in selection order.
-    const reportVersions = resolvedVersionIds.map((id, index) => {
-      const record = (projectVersions || []).find((version) => version.id === id);
-      return record?.version_name || 'Untitled';
+    // ── ONE ATTEMPT BY THE APPROVED WRITER ──
+    // The writer is given the frozen evidence pack built from the canonical
+    // Project Report evidence read above, and nothing else. The versions read for
+    // the readiness gate ARE that evidence, so the pack is built from the same
+    // frozen rows the gate judged rather than from a second read.
+    //
+    // Generating a proposal IS the writer's job, so this path is not gated on the
+    // writer's controlled-test flag: only that flag's model override, where a
+    // master admin has set one, is read. There is no second generator here and no
+    // fallback to one — a refusal, a provider failure or a draft that fails the
+    // contract is reported as a failed generation and nothing is saved.
+    const generatedAt = new Date().toISOString();
+    const writerConfig = await readWriterConfig(base44);
+    const attempt = await runProposalCopyGeneration({
+      proposal,
+      projectId: project_id,
+      accountId: effectiveAccountId,
+      existingGenerations: [],
+      flag: { enabled: true, model: writerConfig.model },
+      user,
+      now: generatedAt,
+      readEvidence: async () => suppliedSnapshots,
+      invokeLLM: (request) => base44.integrations.Core.InvokeLLM(request),
     });
-    const projectContext = buildProjectContext(
-      project,
-      narrative_goal,
-      brandAsset,
-      client_brief,
-      engineering_snapshot,
-      resolvedType,
-      reportVersions,
-      sourceIdentity,
-      comparisonEvidenceText,
+
+    if (!attempt.ok) {
+      // A refusal read nothing, sent nothing and wrote nothing: the reason is the
+      // whole outcome and it is reported as it stands.
+      console.error(`[generateProposal] approved writer refused | code=${attempt.code} | ${attempt.message}`);
+      throw new Error(attempt.message);
+    }
+
+    if (attempt.valid !== true) {
+      // The draft arrived and broke the writer's own contract. It is never
+      // published and never replaced by another generator.
+      const violations = Array.isArray(attempt.validation_errors) ? attempt.validation_errors : [];
+      console.error(
+        `[generateProposal] approved writer draft rejected | generation=${attempt.generation_id} `
+        + `status=${attempt.status} provider=${attempt.provider || 'none'} violations=${violations.length} `
+        + `first=${violations[0]?.code || 'none'} section=${violations[0]?.section || 'none'}`,
+      );
+      throw new Error(WRITER_DRAFT_REJECTED_MESSAGE);
+    }
+
+    // ── The one appended generation record, linked to this proposal ──
+    // Written only once the draft has passed its own contract, so the record
+    // points at a proposal that really carries the copy it was written for. The
+    // entity is append-only: nothing here updates or rewrites an earlier attempt.
+    await base44.entities.ProposalGeneration.create(
+      generationEntityPayload({ record: attempt.record, accountId: effectiveAccountId }),
     );
 
-    // Saved and preview drafts run the identical prompt assembly and LLM calls.
-    // This helper has no entity client and cannot persist anything.
-    const generatedContent = await generateProposalDraftContent({
-      invokeLLM: (args) => base44.integrations.Core.InvokeLLM(args),
-      sectionRecords, sectionDefs, resolvedType, engineering_snapshot,
-      comparisonTable, versionEvidence, projectContext, interpretationBlock,
-      // The Client Brief decides whether the designer explicitly asked for an
-      // assumed parameter (P8, P15, P21), which is the only way one is mentioned.
-      clientBrief: client_brief || '',
+    // ── Publish the validated copy into the proposal's own sections ──
+    // The editor, the image planner, the page-break rules and the printed pack
+    // all read the report's own section set, so the validated copy is published
+    // into it rather than into a structure of the writer's own. A writer section
+    // this report type has no home for is a failure, never a silent omission.
+    const { bodies, unmapped } = composeWriterSectionBodies({
+      output: attempt.record.gpt_output,
+      mode: attempt.record.evidence_pack?.mode || 'single',
+      sectionTypes: sectionDefs.map((section) => section.type),
     });
+    if (bodies.length === 0 || unmapped.length > 0) {
+      console.error(
+        `[generateProposal] validated copy could not be published | report_type=${resolvedType} `
+        + `unmapped=${unmapped.join(', ') || 'none'} bodies=${bodies.length}`,
+      );
+      throw new Error(
+        `The validated copy could not be published into a ${resolvedType} report, so no proposal was saved.`,
+      );
+    }
 
-    // ── Update sections with generated content ──
-    const generatedAt = new Date().toISOString();
-    await Promise.all(generatedContent.map(({ section, html, metadata }) =>
-      base44.entities.ProposalSection.update(section.id, {
+    const bodyByType = new Map(bodies.map((body) => [body.section_type, body.html]));
+    // The calculated highlights rows are frozen engineering evidence, not copy:
+    // they are read from the same frozen snapshot the report was generated from,
+    // so the table the highlights page prints is unchanged by this pass. A
+    // comparison keeps the calculated comparison table its section already
+    // carries, and is therefore left alone here.
+    const summaryHighlightRows = resolvedType === 'system_summary'
+      ? mergeHighlightRows(selectHighlightRows(engineering_snapshot), null)
+      : null;
+
+    await Promise.all(sectionRecords.map((section) => {
+      const html = bodyByType.get(section.section_type);
+      if (!html) return null;
+      return base44.entities.ProposalSection.update(section.id, {
         body: html,
-        ...(metadata ? { metadata } : {}),
+        ...(summaryHighlightRows && section.section_type === HIGHLIGHTS_SECTION_TYPE
+          ? { metadata: { highlight_rows: summaryHighlightRows } }
+          : {}),
         last_gpt_generated_at: generatedAt,
-      })
-    ));
+      });
+    }));
 
     if (resolvedType === 'comparison') {
       const highlights = sectionRecords.find(s => s.section_type === HIGHLIGHTS_SECTION_TYPE);
@@ -448,6 +517,35 @@ export default async function(req) {
       cleanup_succeeded: cleanupSucceeded,
       proposal_id: cleanupSucceeded ? null : proposal?.id || null,
     }, { status: 500 });
+  }
+}
+
+/**
+ * The sentence a draft that failed the approved writer's own contract is
+ * reported with. The reasons themselves are logged server-side; the designer is
+ * told what happened to the proposal and what to do about it.
+ */
+const WRITER_DRAFT_REJECTED_MESSAGE =
+  'The proposal copy did not pass its evidence check, so no proposal was saved. '
+  + 'Generate the proposal again, and if this repeats, contact support.';
+
+/**
+ * The approved writer's configuration, read for one value only: the model
+ * override a master admin may have set through manageProposalWriterFlag.
+ *
+ * Generation is not gated on the writer's controlled-test flag — writing the
+ * proposal IS the writer's job — so the flag's enablement is deliberately not
+ * read here. When no override exists the writer's own default model is used.
+ */
+async function readWriterConfig(base44) {
+  try {
+    const result = await base44.asServiceRole.entities.SystemConfig.filter({}, { limit: 1 });
+    const record = (Array.isArray(result) ? result : (result?.items || []))[0] || null;
+    return normaliseGptWriterConfig(record?.[GPT_WRITER_FLAG_FIELD] || null);
+  } catch {
+    // An unreadable configuration leaves the writer on its own default model, so
+    // generation is never blocked by a settings read.
+    return normaliseGptWriterConfig(null);
   }
 }
 

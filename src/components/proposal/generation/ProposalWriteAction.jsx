@@ -8,6 +8,11 @@
  * proposal's own editing flow is unchanged and uncluttered. It is labelled as a
  * test tool, and it says what the writer may write from.
  *
+ * The approved writer is now the normal generation authority, so a proposal a
+ * dealer generates already carries its validated copy. This action is therefore
+ * the CONTROLLED TEST TOOL, and it is offered to a master admin only: a dealer's
+ * workflow is generate, review, edit, export, with nothing to press here.
+ *
  * The browser submits a proposal id and, on a retry, the attempt being retried.
  * Nothing else: the evidence, the pack, the writer input, the provider call, the
  * validation and the record all happen on the server, and the editor then re-reads
@@ -18,6 +23,7 @@
  * - writer: the resolved flag state from the copy layer read
  * - layer: the copy layer (which attempts exist, and which failed)
  * - readOnly: the proposal is archived
+ * - masterAdmin: whether this login may see the controlled test tool
  * - onGenerated(): re-read the copy layer after an attempt
  */
 
@@ -56,9 +62,10 @@ export default function ProposalWriteAction({
   writer = null,
   layer = null,
   readOnly = false,
+  masterAdmin = false,
   onGenerated,
 }) {
-  const model = proposalWriteActionModel({ writer, layer, readOnly });
+  const model = proposalWriteActionModel({ writer, layer, readOnly, masterAdmin });
   const [busy, setBusy] = useState(false);
   const [outcome, setOutcome] = useState(null);
 

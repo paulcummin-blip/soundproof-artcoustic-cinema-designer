@@ -37,6 +37,10 @@ export const LEGACY_TITLE = 'Legacy proposal';
 export const LEGACY_MESSAGE =
   'This proposal was not written by the copy writer, so it has no generation history. Its saved sections stay fully editable, exactly as before.';
 
+// The wording a dealer reads for a legacy proposal is presented by the Proposal
+// Editor's copy status banner. It is deliberately not stored here: the editor's
+// bundle cannot read a backend shared module, so the banner holds its own.
+
 /** Why a proposal's copy cannot be issued, exported, completed or sent. */
 export const LATEST_EDIT_INVALID_SENTENCE =
   'The most recent edit did not pass validation. Issue and export are blocked until it is corrected or reverted.';

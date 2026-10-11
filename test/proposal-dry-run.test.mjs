@@ -29,8 +29,28 @@ test('dry-run is admin-only with no writes, live invocation or rollback',()=>{
  const src=fs.readFileSync('base44/functions/previewProposalGeneration/entry.ts','utf8');assert.match(src,/user.role !== 'admin'/);assert.match(src,/dry_run:true,preview_only:true,persisted:false/);
  assert.doesNotMatch(src,/\.(create|bulkCreate|update|bulkUpdate|updateMany|delete|deleteMany|upsert)\s*\(/);assert.doesNotMatch(src,/functions\.invoke|rollbackCreatedProposal|recordIssuedExport/);
 });
-test('live and preview call the identical extraction, interpretation and prompt pipeline',()=>{
- for(const name of ['generateProposal','previewProposalGeneration']){const src=fs.readFileSync(`base44/functions/${name}/entry.ts`,'utf8');for(const fn of ['prepareProposalEvidence','prepareProposalInterpretation','generateProposalDraftContent','buildProjectContext'])assert.match(src,new RegExp(`${fn}\\(`));}
+test('the approved writer is the live generation authority and the legacy generator is bypassed',()=>{
+ // The live path reads the SAME canonical report evidence and the SAME ADI
+ // interpretation as before, but writes through the approved writer: its own
+ // prompt, contract, validator and append-only record. The legacy section
+ // generator is no longer called by the live path at all.
+ const live=fs.readFileSync('base44/functions/generateProposal/entry.ts','utf8');
+ for(const fn of ['prepareProposalEvidence','prepareProposalInterpretation','resolveSections'])assert.match(live,new RegExp(`${fn}\\(`));
+ for(const fn of ['runProposalCopyGeneration','composeWriterSectionBodies','generationEntityPayload'])assert.match(live,new RegExp(`${fn}\\(`));
+ assert.doesNotMatch(live,/generateProposalDraftContent/, 'the legacy section generator is still called by the live path');
+ assert.doesNotMatch(live,/buildProjectContext/, 'the live path still assembles a legacy prompt context');
+ // No fallback: a refused attempt and a draft that failed its contract both end
+ // the generation, and only a validated draft may be published.
+ assert.match(live,/if \(!attempt\.ok\)/);
+ assert.match(live,/if \(attempt\.valid !== true\)/);
+ assert.match(live,/throw new Error\(attempt\.message\)/);
+ assert.match(live,/throw new Error\(WRITER_DRAFT_REJECTED_MESSAGE\)/);
+
+ // The dry run still uses the legacy prompt pipeline: it is the retired
+ // admin-only preview, it writes nothing, and it is not a generation path.
+ const preview=fs.readFileSync('base44/functions/previewProposalGeneration/entry.ts','utf8');
+ for(const fn of ['prepareProposalEvidence','prepareProposalInterpretation','generateProposalDraftContent','buildProjectContext'])assert.match(preview,new RegExp(`${fn}\\(`));
+
  const pipeline=fs.readFileSync('base44/shared/proposalDraftPipeline.js','utf8');assert.match(pipeline,/buildSelectedVersionEvidence\(/);assert.match(pipeline,/buildComparisonTable\(/);assert.match(pipeline,/buildSectionPrompt\(/);assert.doesNotMatch(pipeline,/\.entities|functions\.invoke/);
 });
 test('both version objects preserve fingerprints',()=>{assert.deepEqual(evidence.versionEvidence.map(v=>v.version_id),['low','high']);assert.deepEqual(evidence.versionEvidence.map(v=>v.source_identity.engineeringFingerprint),['fp-low','fp-high']);});

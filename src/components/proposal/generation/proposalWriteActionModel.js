@@ -20,8 +20,12 @@ function failedAttempts(layer) {
   return Array.isArray(layer?.failures) ? layer.failures : [];
 }
 
-export function proposalWriteActionModel({ writer = null, layer = null, readOnly = false } = {}) {
-  const enabled = writer?.enabled === true;
+export function proposalWriteActionModel({ writer = null, layer = null, readOnly = false, masterAdmin = false } = {}) {
+  // Normal proposal generation IS the approved writer, so on a normally
+  // generated proposal there is nothing for a dealer to press. The action that
+  // remains is the controlled test tool, and it is offered to a master admin
+  // only — it is a diagnostic, not part of the dealer's workflow.
+  const enabled = writer?.enabled === true && masterAdmin === true;
 
   if (!enabled || readOnly) {
     return {

@@ -15,9 +15,12 @@
  * did before.
  *
  * The Phase 6 GPT writer action is offered here only while the feature flag is on
- * for this login. Everything the action needs — whether to exist at all — is
- * resolved by the server with the copy layer, so nothing in this panel can switch
- * it on.
+ * for this login AND only to a master admin. It is the controlled test tool, not
+ * part of the dealer's workflow: a proposal generated through Create Proposal has
+ * already been written by the approved writer, and its validated copy is what the
+ * document below shows. Everything the action needs — whether to exist at all —
+ * is resolved by the server with the copy layer, so nothing in this panel can
+ * switch it on.
  *
  * Props:
  * - proposal: the saved proposal record
@@ -28,6 +31,8 @@
 
 import React, { useEffect, useState } from 'react';
 import { ChevronDown, ChevronRight, History, PenLine } from 'lucide-react';
+import { useAuth } from '@/lib/AuthContext';
+import { isMasterAdmin } from '@/lib/accountAccess';
 import {
   REPORT_FONT_BODY as FONT_BODY,
   REPORT_FONT_HEADING as FONT_HEADING,
@@ -77,6 +82,14 @@ export default function ProposalGenerationPanel({ proposal, readOnly = false, on
     revertToCopy,
   } = useProposalEditLayer({ proposalId: proposal?.id ?? null });
 
+  // Normal proposal generation IS the approved writer, so a normally generated
+  // proposal already carries its validated copy and a dealer has nothing to press
+  // here. What remains is the controlled test tool and the diagnostic wording,
+  // and both are for a master admin: a dealer's workflow is generate, review,
+  // edit, export. The copy's own status is shown to everyone.
+  const { user } = useAuth();
+  const masterAdmin = isMasterAdmin(user);
+
   const [showCopy, setShowCopy] = useState(false);
   const [showAudit, setShowAudit] = useState(false);
 
@@ -100,7 +113,7 @@ export default function ProposalGenerationPanel({ proposal, readOnly = false, on
 
   return (
     <div>
-      <ProposalEditStatusBanner layer={layer}>
+      <ProposalEditStatusBanner layer={layer} masterAdmin={masterAdmin}>
         {layer.mode === 'edit_layer' && (
           <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center' }}>
             <button
@@ -137,6 +150,7 @@ export default function ProposalGenerationPanel({ proposal, readOnly = false, on
         writer={writer}
         layer={layer}
         readOnly={readOnly}
+        masterAdmin={masterAdmin}
         onGenerated={refresh}
       />
 
