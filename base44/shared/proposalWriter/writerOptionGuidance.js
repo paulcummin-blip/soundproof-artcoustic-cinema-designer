@@ -25,7 +25,7 @@
  */
 
 /** The set name an image is read under when the designer named none. */
-export const DEFAULT_OPTION_GROUP = 'Seating options';
+export const DEFAULT_OPTION_GROUP = 'Comparison options';
 
 const recorded = (value) => String(value ?? '').trim();
 
@@ -46,7 +46,8 @@ function isUsable(asset) {
   return true;
 }
 
-const groupNameOf = (asset) => recorded(asset?.comparison_group) || DEFAULT_OPTION_GROUP;
+const groupNameOf = (asset) => ['lounge', 'recliner'].includes(asset?.seating_style) && !isOptionImage(asset)
+  ? 'Seating style' : (recorded(asset?.comparison_group) || DEFAULT_OPTION_GROUP);
 
 function orderOf(asset) {
   const value = Number(asset?.comparison_order);
@@ -74,7 +75,7 @@ function orderedImages(images, name) {
  * @returns {{groups: Array<{group: string, options: Array<string>, note: string|null}>}|null}
  */
 export function buildOptionGuidance(assets = []) {
-  const images = (Array.isArray(assets) ? assets : []).filter((asset) => isUsable(asset) && isOptionImage(asset));
+  const images = (Array.isArray(assets) ? assets : []).filter((asset) => isUsable(asset) && (isOptionImage(asset) || ['lounge', 'recliner'].includes(asset.seating_style)));
   if (images.length === 0) return null;
 
   const names = [];
@@ -86,11 +87,12 @@ export function buildOptionGuidance(assets = []) {
   const groups = names.map((name) => {
     const ordered = orderedImages(images, name);
     const options = ordered
-      .map((asset) => recorded(asset.comparison_option_label) || recorded(asset.caption) || null)
+      .map((asset) => recorded(asset.comparison_option_label) || recorded(asset.caption) || (asset.seating_style === 'lounge' ? 'Lounge seating' : asset.seating_style === 'recliner' ? 'Cinema recliners' : null))
       .filter(Boolean);
     const note = ordered.map((asset) => recorded(asset.comparison_note)).find(Boolean) || null;
-    return { group: name, options, note };
-  }).filter((group) => group.note || group.options.length > 0);
+    return { group: name, options, note, image_count: ordered.length };
+  }).filter((group) => group.image_count >= 2 && group.options.length >= 2)
+    .map(({ image_count, ...group }) => group);
 
   return groups.length > 0 ? { groups } : null;
 }

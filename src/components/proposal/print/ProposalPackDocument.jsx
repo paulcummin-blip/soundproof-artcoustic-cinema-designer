@@ -70,6 +70,7 @@ export default function ProposalPackDocument({
   heroImageUrl,
   logoUrl,
   sections,
+  validatedOptionsCopy = '',
   projectImages = [],
   // A comparison saved before its comparison metadata was persisted: the table
   // rebuilt read-only from each version's own frozen engineering evidence.
@@ -154,14 +155,14 @@ export default function ProposalPackDocument({
   // The seating-style page is not a stored section and carries no narrative: it
   // is composed from the images the designer grouped as seating options.
   const seatingChunks = [];
-  for (let index = 0; index < imagePlan.seatingPlacements.length; index += SEATING_IMAGES_PER_PAGE) {
+  for (let index = 0; imagePlan.seatingPlacements.length >= 2 && index < imagePlan.seatingPlacements.length; index += SEATING_IMAGES_PER_PAGE) {
     seatingChunks.push(imagePlan.seatingPlacements.slice(index, index + SEATING_IMAGES_PER_PAGE));
   }
   let seatingPagesPlaced = false;
 
   // A comparison group is not a stored section either: each group takes a page
   // of its own, carrying the designer's message and both options full width.
-  const comparisonGroups = imagePlan.comparisonPages || [];
+  const comparisonGroups = (imagePlan.comparisonPages || []).filter(group => group.placements?.length >= 2);
   let comparisonPagesPlaced = false;
 
   // Page order, with the numbers assigned as the pages are composed.
@@ -181,6 +182,7 @@ export default function ProposalPackDocument({
           number={takeNumber()}
           placements={chunk}
           showCopy={index === 0}
+          validatedCopy={validatedOptionsCopy}
         />
       );
     });
@@ -197,7 +199,7 @@ export default function ProposalPackDocument({
           key={`comparison:${group.id}`}
           number={takeNumber()}
           title={group.title}
-          message={group.message}
+          validatedCopy={validatedOptionsCopy}
           placements={group.placements}
         />
       );

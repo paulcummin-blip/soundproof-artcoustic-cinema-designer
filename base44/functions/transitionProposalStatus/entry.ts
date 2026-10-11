@@ -1,5 +1,6 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.49';
 import { validateTransition, normaliseStatus, computeRestoreStatus } from '../../shared/proposalLifecycleAuthority.ts';
+import { readCompleteDocument } from '../../shared/proposalEdit/readCompleteDocument.js';
 
 /**
  * Server-authoritative proposal lifecycle transition.
@@ -46,6 +47,11 @@ export default async function(req) {
     const result = validateTransition(currentStatus, target_status, previousStatus, hasContent);
     if (!result.valid) {
       return Response.json({ error: result.reason || 'Invalid transition.' }, { status: 409 });
+    }
+
+    if (['reviewed', 'issued', 'accepted', 'sent'].includes(normaliseStatus(target_status))) {
+      const validation = await readCompleteDocument(base44.entities, proposal);
+      if (!validation.valid) return Response.json({ error: validation.blocked_reason, validation }, { status: 409 });
     }
 
     const update = { status: target_status };

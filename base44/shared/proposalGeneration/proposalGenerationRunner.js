@@ -189,7 +189,7 @@ export async function runProposalCopyGeneration({
     try {
       optionGuidance = await readOptionGuidance({ projectId, proposal });
     } catch (error) {
-      optionGuidance = null;
+      return refusal(WRITER_REFUSAL.EVIDENCE_UNAVAILABLE, error?.message || 'The design instructions could not be read.');
     }
   }
 

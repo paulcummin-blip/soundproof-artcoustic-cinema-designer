@@ -26,7 +26,7 @@ export default function ComparisonOptionsPage({
   number,
   title,
   kicker = 'Options',
-  message = null,
+  validatedCopy = '',
   placements = [],
   // The printed pack draws its own page header; the editor preview draws the
   // section heading itself, so it does not ask for a second one.
@@ -39,9 +39,9 @@ export default function ComparisonOptionsPage({
     <section className="proposal-print-section pp-page pp-page--comparison">
       {showHeader ? <ProposalPageHeader number={number} kicker={kicker} title={title} /> : null}
 
-      {message ? (
+      {validatedCopy ? (
         <div className="pp-body pp-comparison__lead">
-          <p>{message}</p>
+          <p>{validatedCopy}</p>
         </div>
       ) : null}
 

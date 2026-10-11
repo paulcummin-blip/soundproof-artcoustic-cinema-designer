@@ -69,7 +69,7 @@ const TOGGLE = {
   cursor: 'pointer',
 };
 
-export default function ProposalGenerationPanel({ proposal, readOnly = false, onBlockedReasonChange }) {
+export default function ProposalGenerationPanel({ proposal, readOnly = false, onBlockedReasonChange, onLayerChange }) {
   const {
     layer,
     writer,
@@ -93,7 +93,11 @@ export default function ProposalGenerationPanel({ proposal, readOnly = false, on
   const [showCopy, setShowCopy] = useState(false);
   const [showAudit, setShowAudit] = useState(false);
 
-  const blockReason = layer?.export_blocked_reason ?? null;
+  const blockReason = loading ? 'Checking complete proposal…' : (error || layer?.export_blocked_reason || null);
+
+  useEffect(() => {
+    onLayerChange?.(layer);
+  }, [layer, onLayerChange]);
 
   useEffect(() => {
     if (typeof onBlockedReasonChange === 'function') onBlockedReasonChange(blockReason);

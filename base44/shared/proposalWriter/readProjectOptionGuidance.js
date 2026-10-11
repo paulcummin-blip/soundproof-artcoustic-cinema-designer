@@ -23,11 +23,16 @@ import { buildOptionGuidance } from './writerOptionGuidance.js';
  * @returns {Promise<Object|null>} buildOptionGuidance output, or null when the
  *   project states no alternatives
  */
-export async function readProjectOptionGuidance(entities, projectId) {
+export async function readProjectOptionGuidance(entities, projectId, versionIds = []) {
   if (!projectId) return null;
-  const result = await entities.ProposalAsset.filter({ project_id: projectId }, { limit: 200 });
-  const assets = Array.isArray(result) ? result : (result?.items || []);
-  return buildOptionGuidance(assets);
+  const assets = [];
+  let cursor;
+  do {
+    const result = await entities.ProposalAsset.filter({ project_id: projectId }, { limit: 50, cursor });
+    assets.push(...(Array.isArray(result) ? result : (result?.items || [])));
+    cursor = result?.has_more ? result.next_cursor : null;
+  } while (cursor);
+  return buildOptionGuidance(assets.filter(asset => asset.scope !== 'version' || versionIds.includes(asset.version_id)));
 }
 
 export default readProjectOptionGuidance;

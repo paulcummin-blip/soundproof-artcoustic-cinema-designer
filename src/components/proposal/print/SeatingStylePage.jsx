@@ -18,13 +18,14 @@
 import React from 'react';
 import ProposalPageHeader from '@/components/proposal/print/ProposalPageHeader';
 import ProposalImagePlacement from '@/components/proposal/print/ProposalImagePlacement';
-import { SEATING_STYLE_PAGE } from '@/components/proposal/print/proposalPackAuthority';
+
 
 export default function SeatingStylePage({
   number,
   title = 'Seating Style',
   kicker = 'Comfort',
   placements = [],
+  validatedCopy = '',
   // The first seating page carries the framing copy; a continuation page does not
   // repeat it.
   showCopy = true,
@@ -38,9 +39,9 @@ export default function SeatingStylePage({
     <section className="proposal-print-section pp-page pp-page--seating">
       {showHeader ? <ProposalPageHeader number={number} kicker={kicker} title={title} /> : null}
 
-      {showCopy ? (
+      {showCopy && validatedCopy ? (
         <div className="pp-body pp-seating__lead">
-          <p>{SEATING_STYLE_PAGE.lead}</p>
+          <p>{validatedCopy}</p>
         </div>
       ) : null}
 
@@ -50,16 +51,7 @@ export default function SeatingStylePage({
         ))}
       </div>
 
-      {showCopy ? (
-        <div className="pp-notes">
-          {SEATING_STYLE_PAGE.notes.map((note) => (
-            <div className="pp-note" key={note.title}>
-              <div className="pp-note__title">{note.title}</div>
-              <p className="pp-note__text">{note.text}</p>
-            </div>
-          ))}
-        </div>
-      ) : null}
+
     </section>
   );
 }

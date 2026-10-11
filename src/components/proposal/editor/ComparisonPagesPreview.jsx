@@ -13,7 +13,7 @@
 import React from 'react';
 import ComparisonOptionsPage from '@/components/proposal/print/ComparisonOptionsPage';
 
-export default function ComparisonPagesPreview({ groups = [], roleStyle = null }) {
+export default function ComparisonPagesPreview({ groups = [], roleStyle = null, validatedCopy = '' }) {
   const list = Array.isArray(groups) ? groups : [];
   if (list.length === 0) return null;
 
@@ -30,7 +30,7 @@ export default function ComparisonPagesPreview({ groups = [], roleStyle = null }
           <div className="rounded-xl overflow-hidden border border-[#DCDBD6] p-6">
             <ComparisonOptionsPage
               title={group.title}
-              message={group.message}
+              validatedCopy={validatedCopy}
               placements={group.placements}
               showHeader={false}
             />

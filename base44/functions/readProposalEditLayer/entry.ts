@@ -1,6 +1,7 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.52';
 import { resolveAccountAccess } from '../../shared/accountAccessAuthority.js';
 import { resolveEditorLayer } from '../../shared/proposalEdit/proposalEditEditorModel.js';
+import { readCompleteDocument } from '../../shared/proposalEdit/readCompleteDocument.js';
 import { GPT_WRITER_FLAG_FIELD, gptWriterClientState, resolveGptWriterFlag } from '../../shared/proposalWriter/proposalWriterFlag.js';
 
 /**
@@ -58,6 +59,25 @@ export default async function(req) {
       draftProposalId: draft_proposal_id ?? null,
       canViewAudit,
     });
+
+    if (proposal_id) {
+      const proposal = await base44.entities.Proposal.get(proposal_id);
+      if (!proposal) return Response.json({ error: 'Proposal not found.' }, { status: 404 });
+      const documentValidation = await readCompleteDocument(base44.entities, proposal);
+      layer.document_validation = documentValidation;
+      layer.ready = documentValidation.valid;
+      layer.export_blocked_reason = documentValidation.blocked_reason;
+      if (body.action === 'export') {
+        const composition = rows => (rows || []).map(row => ({ type: row.section_type, body: row.body || '', enabled: row.is_enabled !== false })).sort((a, b) => a.type.localeCompare(b.type));
+        if (JSON.stringify(composition(body.rendered_sections)) !== JSON.stringify(composition(documentValidation.document_sections))
+          || JSON.stringify(body.engineering_snapshot) !== JSON.stringify(proposal.engineering_snapshot)) {
+          return Response.json({ error: 'The document changed. Reopen the proposal before exporting.' }, { status: 409 });
+        }
+      }
+      if (body.action === 'export' && !documentValidation.valid) {
+        return Response.json({ error: documentValidation.blocked_reason, validation: documentValidation }, { status: 409 });
+      }
+    }
 
     // The writer flag, resolved server-side for this login only. It defaults OFF:
     // while it is off the editor simply shows no writer action.

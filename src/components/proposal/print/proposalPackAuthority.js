@@ -360,7 +360,15 @@ export function buildPackageRows(snapshot) {
 
   const rows = [...groups.keys()]
     .sort((a, b) => rank(a) - rank(b))
-    .map((label) => ({ role: label, model: groups.get(label).join(' · ') }));
+    .flatMap((label) => {
+      const model = groups.get(label).join(' · ');
+      if (label === 'Front Left / Right') return [{ role: 'Front Left', model }, { role: 'Front Right', model }];
+      const centre = system.product_roles?.find(role => role.position_label === label && role.role === 'centre');
+      if (centre?.cabinet_count === 2 && centre?.channel_count === 1) {
+        return [{ role: 'Centre (one logical centre channel)', model: `2 × ${centre.model_label || centre.model_key} physical cabinets` }];
+      }
+      return [{ role: label, model }];
+    });
 
   const subwoofers = subwooferGlanceStatement(system);
   if (subwoofers.value) rows.push({ role: 'Subwoofers', model: subwoofers.value });

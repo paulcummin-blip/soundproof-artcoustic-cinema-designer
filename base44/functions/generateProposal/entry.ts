@@ -425,7 +425,7 @@ export default async function(req) {
       // The designer's own seating or layout alternatives, read from the images
       // they marked as options. They are a BRIEF for the writer, never published
       // copy: the writer's own prose is what the document prints.
-      readOptionGuidance: () => readProjectOptionGuidance(base44.entities, project_id),
+      readOptionGuidance: () => readProjectOptionGuidance(base44.entities, project_id, resolvedVersionIds),
     });
 
     if (!attempt.ok) {

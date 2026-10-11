@@ -16,6 +16,7 @@
  */
 
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { base44 } from '@/api/base44Client';
 import { buildProposalReportTitle } from '@/components/report/reportPdfTitle';
 import {
   applyPrintDocumentTitle,
@@ -160,23 +161,19 @@ export function useProposalExport({
     const printWindow = openProposalPrintWindow(title);
     printWindowRef.current = printWindow;
 
-    // The issued copy is taken from the SAME composition this export prints and
-    // stored in the background, so the export dialog opens exactly as it did.
-    if (issuedDocument?.documentType) {
-      const issuedSnapshot = snapshotIssuedComposition(issuedDocument.documentType);
-      if (issuedSnapshot) {
-        recordIssuedExportInBackground({
-          identity: { ...issuedDocument, filename: title },
-          snapshot: issuedSnapshot,
-        });
-      }
-    }
-
     try {
+      // Fresh server authorization occurs before printing OR storing an issued copy.
+      const authorization = await base44.functions.invoke('readProposalEditLayer', { proposal_id: proposal.id, action: 'export', rendered_sections: sections, engineering_snapshot: proposal.engineering_snapshot });
+      const validation = authorization?.data?.layer?.document_validation;
+      if (!validation?.valid) throw new Error(authorization?.data?.error || 'The complete proposal must pass validation before export.');
       if (document.fonts && document.fonts.ready) {
         await document.fonts.ready;
       }
 
+      if (issuedDocument?.documentType) {
+        const issuedSnapshot = snapshotIssuedComposition(issuedDocument.documentType);
+        if (issuedSnapshot) recordIssuedExportInBackground({ identity: { ...issuedDocument, filename: title }, snapshot: issuedSnapshot });
+      }
       const printNode = findPrintNode();
       if (printWindow && printNode) {
         const printed = await printProposalInWindow(printWindow, {
@@ -213,9 +210,7 @@ export function useProposalExport({
 
       window.print();
     } catch (err) {
-      setError(
-        'The proposal PDF could not be prepared for printing. Check your browser print settings and try again.'
-      );
+      setError(err?.response?.data?.error || err?.message || 'The proposal PDF could not be prepared for printing.');
       cleanup();
     }
   }, [proposal, sections, comparisonBlockReason, projectName, dealerName, clientName, projectReference, versionNames, issuedDocument, cleanup]);

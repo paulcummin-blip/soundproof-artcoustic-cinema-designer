@@ -50,6 +50,7 @@ import { Loader2, ChevronLeft, Archive, RotateCcw } from 'lucide-react';
 import ProposalEditorState from '@/components/proposal/editor/ProposalEditorState';
 import ProposalRenderBoundary from '@/components/proposal/editor/ProposalRenderBoundary';
 import ProposalGenerationPanel from '@/components/proposal/generation/ProposalGenerationPanel';
+import { validatedOptionsCopy } from '@/components/proposal/options/validatedOptionsCopy';
 import {
   PROPOSAL_EDITOR_STATE,
   GENERATION_POLL_LIMIT,
@@ -80,7 +81,10 @@ export default function ProposalEditor() {
   const [loadErrorDetail, setLoadErrorDetail] = useState(null);
   // Whether the generated copy layer blocks issue and export. Null when it does
   // not, and null for a proposal with no generated copy at all.
-  const [editLayerBlockReason, setEditLayerBlockReason] = useState(null);
+  const [editLayerBlockReason, setEditLayerBlockReason] = useState('Checking complete proposal…');
+  const [documentLayer, setDocumentLayer] = useState(null);
+  const optionsCopy = validatedOptionsCopy(documentLayer);
+  const documentSections = documentLayer?.document_validation?.document_sections || sections.filter(section => section.section_type !== 'presented_options');
   // How long the editor has waited for a generating proposal's sections.
   const [pollCount, setPollCount] = useState(0);
   const [showNotes, setShowNotes] = useState(false);
@@ -717,12 +721,12 @@ export default function ProposalEditor() {
   // never rendered, and a section the designer switched off is not previewed.
   // Both are initialized HERE — before the comparison anchoring below reads
   // them — so no consumer can ever reach them first.
-  const readableSections = sections.filter((s) => !!getSectionDef(s.section_type));
+  const readableSections = documentSections.filter((s) => !!getSectionDef(s.section_type));
   const visibleSections = readableSections.filter((s) => s.is_enabled !== false);
 
   // The comparison group pages the plan composed: previewed from the same plan
   // the printed pack composes, so the preview and the PDF show the same page.
-  const comparisonPreviewGroups = imagePlan.comparisonPages || [];
+  const comparisonPreviewGroups = (imagePlan.comparisonPages || []).filter(group => group.placements?.length >= 2);
   const comparisonPreviewAnchored = comparisonPreviewGroups.length > 0
     && !!imagePlan.seatingPageAnchorType
     && visibleSections.some((section) => section.section_type === imagePlan.seatingPageAnchorType);
@@ -737,8 +741,8 @@ export default function ProposalEditor() {
     handleExport,
   } = useProposalExport({
     proposal,
-    sections,
-    comparisonBlockReason,
+    sections: documentSections,
+    comparisonBlockReason: comparisonBlockReason || editLayerBlockReason,
     projectName: projectContext.projectName,
     dealerName: projectContext.filenameDealerName,
     clientName: projectContext.filenameClientName,
@@ -864,6 +868,7 @@ export default function ProposalEditor() {
           proposal={proposal}
           readOnly={archived}
           onBlockedReasonChange={setEditLayerBlockReason}
+          onLayerChange={setDocumentLayer}
         />
         {/* Proposal typography scope — cover, section headings and body copy
             follow the Artcoustic rule: Futura PT Light headings, Didact Gothic
@@ -945,7 +950,7 @@ export default function ProposalEditor() {
 
             // The seating-style page is not a stored section: it is previewed
             // where it prints, immediately before the closing section.
-            const showSeatingPreview = imagePlan.seatingPlacements.length > 0
+            const showSeatingPreview = imagePlan.seatingPlacements.length >= 2
               && section.section_type === imagePlan.seatingPageAnchorType;
 
             return (
@@ -959,7 +964,7 @@ export default function ProposalEditor() {
                       Seating Style
                     </h2>
                     <div className="rounded-xl overflow-hidden border border-[#DCDBD6] p-6">
-                      <SeatingStylePage placements={imagePlan.seatingPlacements} showHeader={false} />
+                      <SeatingStylePage placements={imagePlan.seatingPlacements} showHeader={false} validatedCopy={optionsCopy} />
                     </div>
                   </div>
                 )}
@@ -969,6 +974,7 @@ export default function ProposalEditor() {
                 {comparisonPreviewAnchored && section.section_type === imagePlan.seatingPageAnchorType && (
                   <ComparisonPagesPreview
                     groups={comparisonPreviewGroups}
+                    validatedCopy={optionsCopy}
                     roleStyle={proposalRoleStyle}
                   />
                 )}
@@ -1138,7 +1144,7 @@ export default function ProposalEditor() {
           {/* A comparison page whose anchor section was not composed still
               belongs in the document, exactly where the printed pack places it. */}
           {!comparisonPreviewAnchored && (
-            <ComparisonPagesPreview groups={comparisonPreviewGroups} roleStyle={proposalRoleStyle} />
+            <ComparisonPagesPreview groups={comparisonPreviewGroups} roleStyle={proposalRoleStyle} validatedCopy={optionsCopy} />
           )}
         </div>
       </div>
@@ -1243,7 +1249,8 @@ export default function ProposalEditor() {
         coverImageUrl={projectContext.coverImageUrl}
         heroImageUrl={projectContext.heroImageUrl}
         logoUrl={projectContext.logoUrl}
-        sections={sections}
+        sections={documentSections}
+        validatedOptionsCopy={optionsCopy}
         projectImages={packImages}
         recoveredComparisonTable={comparisonTableForDisplay}
       />
