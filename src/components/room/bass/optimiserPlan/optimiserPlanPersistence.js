@@ -50,6 +50,10 @@ export function serializeOptimiserPlan(plan) {
     candidateId: plan.candidateId || null,
     candidateKind: plan.candidateKind || null,
     baseline: plan.baseline || null,
+    // Keep the run's validated baseline evidence on save and cold restore.
+    // Missing evidence must remain unknown, never be manufactured on hydration.
+    baselineParity: plan.baselineParity || plan.identity?.baselineParity || null,
+    layoutCounts: plan.layoutCounts || null,
     // The calibration levers' own evidence (delay, gain, polarity, phase), so
     // the panel's calibration finding survives refresh and reopen.
     calibrationEvidence: plan.calibrationEvidence || null,
