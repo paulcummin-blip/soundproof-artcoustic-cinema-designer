@@ -34,6 +34,10 @@ const STATUS_STYLE = {
 export default function PlacementRecommendationPanel({
   placement = null,
   busy = false,
+  // Whether this panel owns the panel's ONE primary action. When it does not,
+  // its Apply is drawn as a secondary control so two green buttons can never
+  // compete for attention.
+  primary = true,
   onApply = null,
   onUndo = null,
   onRerun = null,
@@ -132,7 +136,7 @@ export default function PlacementRecommendationPanel({
       {(showApply || showUndo || showRerun) && (
         <div className="flex flex-wrap items-center gap-2 pt-0.5">
           {showApply && (
-            <button type="button" className={PRIMARY} onClick={onApply} disabled={busy}>
+            <button type="button" className={primary ? PRIMARY : SECONDARY} onClick={onApply} disabled={busy}>
               {busy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Check className="h-3.5 w-3.5" />}
               {placement.applyLabel || "Apply placement"}
             </button>

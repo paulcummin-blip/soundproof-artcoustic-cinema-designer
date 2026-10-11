@@ -26,6 +26,9 @@ const QUIET = "inline-flex items-center gap-1.5 rounded-md px-3 py-2 text-[12px]
 export default function AdiDesignerActionBar({
   summary = null,
   busy = false,
+  // Whether this row owns the panel's ONE primary action. When the design
+  // recommendation is not the primary, its Apply is a secondary control.
+  primary = true,
   onPreview = null,
   onApply = null,
   onKeepCurrent = null,
@@ -46,7 +49,7 @@ export default function AdiDesignerActionBar({
       )}
 
       {hasApply && (
-        <button type="button" className={PRIMARY} onClick={onApply} disabled={busy}>
+        <button type="button" className={primary ? PRIMARY : SECONDARY} onClick={onApply} disabled={busy}>
           <Check className="h-3.5 w-3.5" />
           {actions.applyLabel || "Apply recommendation"}
         </button>
