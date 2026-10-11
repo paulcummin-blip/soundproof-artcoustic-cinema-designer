@@ -40,7 +40,9 @@
 
 import { useEffect, useMemo, useRef, useState, useCallback } from 'react';
 import { PUBLICATION_CONTRACT_VERSION, buildFrozenReportProject } from '../../../../shared/engineeringPublicationContract.js';
-import { useCompletedBassAuthority } from '@/components/room/bass/completedBassResultStore';
+import { useCompletedBassAuthority, isAuthoritativeBassContract } from '@/components/room/bass/completedBassResultStore';
+import { flushBassAuthorityWrite } from '@/components/room/bass/bassAuthorityWriteQueue';
+import { readProjectAnalysisCacheRecord } from '@/components/state/projectReadCache';
 import { engineeringPublicationPreflight } from '@/components/engineering/engineeringPublicationPreflight';
 import { base44 } from '@/api/base44Client';
 import { ENGINEERING_AUTHORITY_VERSION } from '@/components/proposal/engineeringAuthority';
@@ -201,10 +203,25 @@ export function useEngineeringPublicationEffect({
       message: 'Waiting for assessment to settle before publishing.', gates: preflight.gates,
     });
     let started = false;
+    let cancelled = false;
     debounceTimerRef.current = setTimeout(async () => {
       started = true;
       debounceTimerRef.current = null;
       try {
+        // Bass authority writes are coalesced for 3s; this publication debounce
+        // is 2s. Settle the existing version-scoped write first, then verify its
+        // read-back identity. Never send a premature/conflicting publication.
+        if (bassFingerprint) {
+          const written = await flushBassAuthorityWrite(projectId, versionId);
+          if (cancelled) return;
+          if (written === false) throw new Error('The current bass assessment could not be saved. Retry publication.');
+          const record = await readProjectAnalysisCacheRecord(projectId, versionId, { force: true });
+          if (cancelled) return;
+          if (record?.current_fingerprint !== bassFingerprint
+            || !isAuthoritativeBassContract(record?.completed_by_fingerprint?.[bassFingerprint])) {
+            throw new Error('The current bass assessment has not reached durable storage. Retry publication after calculation completes.');
+          }
+        }
         // Read the presentation payload at fire time so it reflects the most
         // recent settled handoff publication.
         const reportSnapshot = buildReportSnapshot(projectId, versionId, designState);
@@ -276,6 +293,7 @@ export function useEngineeringPublicationEffect({
     }, retrySequence ? 0 : PUBLISH_DEBOUNCE_MS);
 
     return () => {
+      cancelled = true;
       if (debounceTimerRef.current) {
         clearTimeout(debounceTimerRef.current);
         debounceTimerRef.current = null;
