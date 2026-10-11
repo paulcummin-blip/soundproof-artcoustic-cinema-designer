@@ -24,6 +24,7 @@
  */
 
 import { proposalEvidenceFingerprint } from '../proposalEvidence/proposalEvidenceBuilder.js';
+import { normaliseOptionGuidance } from './writerOptionGuidance.js';
 import {
   ALLOWED_CLAIM_PREFIX,
   BLOCKED_CLAIM_PREFIX,
@@ -93,14 +94,27 @@ function blockedClaim(block) {
 }
 
 /**
+ * What the Presented Options section says where the project states no seating or
+ * layout alternatives at all. The section is still returned, so a draft keeps one
+ * shape, and it is returned empty: a document with no alternatives carries no
+ * options copy.
+ */
+const NO_OPTION_GUIDANCE_REQUIREMENT =
+  'This project states no seating or layout alternatives, so return this section as an empty string and write nothing into it.';
+
+/**
  * Build the versioned writer input from a frozen evidence pack.
  *
  * @param {Object} input
  * @param {Object} input.pack — the frozen proposal evidence pack (Phase 1)
  * @param {string} [input.promptVersion]
+ * @param {Object|null} [input.optionGuidance] — the designer's own seating or
+ *   layout notes (buildOptionGuidance output). These are INSTRUCTIONS, never
+ *   copy: the writer returns its own client-facing prose for them, and no note is
+ *   ever printed.
  * @returns {Object} the writer input, carrying its own content fingerprint
  */
-export function buildWriterInput({ pack, promptVersion = WRITER_PROMPT_VERSION } = {}) {
+export function buildWriterInput({ pack, promptVersion = WRITER_PROMPT_VERSION, optionGuidance = null } = {}) {
   if (!pack || typeof pack !== 'object') {
     throw new Error('A frozen proposal evidence pack is required: the writer is given no other source.');
   }
@@ -115,7 +129,16 @@ export function buildWriterInput({ pack, promptVersion = WRITER_PROMPT_VERSION }
   // The proposal mode the frozen pack was built in: 'single' or 'comparison'.
   const mode = pack.mode ?? null;
   const single = isSingleOptionPack(mode);
-  const sections = writerSectionRequirements(mode);
+  // The designer's own seating or layout notes are a BRIEF, never copy. They are
+  // handed to the writer as instructions, and the Presented Options section is
+  // required to carry copy only where they exist.
+  const guidance = normaliseOptionGuidance(optionGuidance);
+  const guidanceSupplied = guidance.groups.length > 0;
+  const sections = writerSectionRequirements(mode).map((entry) => (
+    entry.section === 'presented_options' && !guidanceSupplied
+      ? { ...entry, requirement: NO_OPTION_GUIDANCE_REQUIREMENT }
+      : { ...entry }
+  ));
 
   const core = {
     contract_version: WRITER_CONTRACT_VERSION,
@@ -146,6 +169,16 @@ export function buildWriterInput({ pack, promptVersion = WRITER_PROMPT_VERSION }
     // designer request, P8, P15 and P21 may not be referenced at all.
     assumed_parameter_policy: pack.assumed_parameter_policy || null,
     writing_rules: [...WRITER_WRITING_RULES],
+    // The designer's own alternatives, exactly as they stated them. They are an
+    // INSTRUCTION, never copy: they are the brief for the Presented Options
+    // section, and no note, instruction or filename is ever printed.
+    option_guidance: {
+      rule: guidanceSupplied
+        ? 'these entries are the designer\'s own instructions, never copy: write your own client-facing prose for presented_options from them, and never reproduce a note, an instruction, a filename or a caption in the draft'
+        : 'this project states no seating or layout alternatives: return presented_options as an empty string',
+      supplied: guidanceSupplied,
+      groups: guidance.groups,
+    },
     word_limits: writerWordLimits(),
     section_requirements: sections.map((entry) => ({ ...entry, requires_grounding: true })),
     allowed_claims: (Array.isArray(pack.allowed_claims) ? pack.allowed_claims : []).map(allowedClaim),

@@ -55,6 +55,10 @@ export const PROPOSAL_SECTION_FOR_WRITER_SECTION = Object.freeze({
   spatial_resolution: 'spatial_resolution',
   dynamic_range: 'dynamic_range',
   timbre_matching: 'timbre_matching',
+  // The alternatives the designer's own notes describe are written by the
+  // approved writer and published into the document's own Presented Options
+  // section, which exists only where the project states such alternatives.
+  presented_options: 'presented_options',
   overall_design: 'overall_design',
   appendix_notes: 'appendix',
 });
@@ -70,6 +74,7 @@ export const WRITER_TARGET_SECTION_ORDER = Object.freeze([
   'dynamic_range',
   'timbre_matching',
   'overall_design',
+  'presented_options',
   'appendix',
 ]);
 
