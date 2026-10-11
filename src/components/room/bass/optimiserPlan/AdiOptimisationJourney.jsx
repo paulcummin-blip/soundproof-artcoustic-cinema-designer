@@ -51,6 +51,7 @@ import AdiTestedOptionsTable from "./AdiTestedOptionsTable.jsx";
 import AdiTestedSection from "./AdiTestedSection.jsx";
 import AdiCalibrationSection from "./AdiCalibrationSection.jsx";
 import savedCalibrationDecision from "./savedCalibrationDecision.js";
+import { resolveBestCalibrationResult } from "./bestCalibrationResult.js";
 import AdiDesignRecommendationSection from "./AdiDesignRecommendationSection.jsx";
 import AdiPanelSummary from "./AdiPanelSummary.jsx";
 import AdiEngineerEvidenceBlock from "./AdiEngineerEvidenceBlock.jsx";
@@ -319,6 +320,13 @@ export default function AdiOptimisationJourney({
   // is gone after a refresh — the decision saved with the run, so the section
   // states the same thing and never falls back to a bare "not applied".
   const calibrationApplyEvidence = appliedCalibrationEvidence || savedCalibrationDecision(planView);
+  // Which calibration result the run's own decision names — an isolated lever or
+  // the combined retune — and whether it was applied, held or is under review.
+  // Read from the saved decision and evidence; never re-derived from the levers.
+  const bestCalibrationResult = resolveBestCalibrationResult({
+    decision: calibrationApplyEvidence,
+    evidence: planView?.calibrationEvidence || null,
+  });
   const calibrationKind = resolveCalibrationSectionKind({
     decision: calibrationApplyEvidence?.decision || null,
     hasPersistedValues: Array.isArray(persistedAppliedCalibration?.values)
@@ -413,6 +421,7 @@ export default function AdiOptimisationJourney({
         appliedCalibration={persistedAppliedCalibration}
         recommendation={calibrationRecommendation}
         evidenceState={calibrationEvidenceState}
+        bestResult={bestCalibrationResult}
       >
         <ReoptimiseCalibrationAction
           onReoptimise={isRunning ? null : onReoptimiseCalibration}

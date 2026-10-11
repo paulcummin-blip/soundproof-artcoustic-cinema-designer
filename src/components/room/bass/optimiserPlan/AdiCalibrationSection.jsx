@@ -20,6 +20,7 @@
 
 import React from "react";
 import AdiAppliedBassCalibration from "./AdiAppliedBassCalibration.jsx";
+import AdiBestCalibrationResult from "./AdiBestCalibrationResult.jsx";
 import {
   ADI_CALIBRATION_KIND,
   ADI_CALIBRATION_NOT_TESTED_SENTENCE,
@@ -42,6 +43,10 @@ export default function AdiCalibrationSection({
   // What the saved calibration evidence actually proves. The no-improvement
   // sentence is shown only when it does.
   evidenceState = null,
+  // WHICH calibration result ADI's own decision names — one lever on its own, or
+  // several levers retuned together — with its state, its P19/P20 before → after
+  // and the settings it changed. Null when the decision names no result.
+  bestResult = null,
   children = null,
   className = "",
 }) {
@@ -64,6 +69,12 @@ export default function AdiCalibrationSection({
       <div className="text-[10px] font-semibold uppercase tracking-wide text-[#8A7B6A]">
         {ADI_SECTION_TITLE.CALIBRATION}
       </div>
+
+      {/* The result the decision itself selected, stated FIRST: whether it is
+          one lever on its own (delay only, gain only) or a combined calibration
+          result, and why the other tested results were not taken. Without this
+          the section beside it reads as delay-only versus gain-only. */}
+      <AdiBestCalibrationResult result={bestResult} />
 
       {/* The settings themselves — the one presentation the whole app uses for
           an applied calibration. Design changes are never rendered here. */}

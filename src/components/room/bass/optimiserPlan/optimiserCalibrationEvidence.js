@@ -48,7 +48,27 @@ export const CALIBRATION_EVIDENCE_LABEL = Object.freeze({
   gain: "Gain",
   polarity: "Polarity",
   phase: "Phase",
+  combined: "Combined calibration",
 });
+
+/**
+ * The combined calibration result: the levers the optimiser retuned TOGETHER on
+ * one geometry (phase → delay → gain). It is recorded separately from the four
+ * isolated levers, because a combined result is not any one lever's own result —
+ * and without it the panel can only ever compare delay-only against gain-only.
+ */
+export const COMBINED_CALIBRATION_LEVER = "combined";
+
+export const COMBINED_CALIBRATION_SCOPE =
+  "Phase, delay and gain retuned together on one geometry — never a single lever's value alone.";
+
+/** The stated detail when a saved record kept no combined calibration result. */
+export const COMBINED_EVIDENCE_MISSING_DETAIL =
+  "Saved optimiser evidence did not include a combined calibration result.";
+
+/** The reason recorded when the combined search ran and confirmed no result. */
+export const COMBINED_NO_CANDIDATE_REASON =
+  "Tested — no combined calibration candidate was confirmed in this run.";
 
 /** The mandated copy when the run kept no calibration evidence to read. */
 export const CALIBRATION_EVIDENCE_MISSING_MESSAGE =
@@ -567,6 +587,74 @@ function buildPhaseEvidence({ selection, baseline, appliedLevers }) {
 }
 
 /**
+ * The COMBINED calibration result: the candidate the optimiser's own combined
+ * retune produced, what it retuned, and what came of it.
+ *
+ * A run that searched combined calibration and confirmed nothing keeps its own
+ * count and says so — that is a tested lever with no result, never an absent
+ * capability, and never silence about a search that ran.
+ */
+function buildCombinedEvidence({ selection, baseline, appliedCandidateId = null }) {
+  const diagnostics = selection?.combinedDiagnostics || null;
+  const result = selection?.combinedResult || null;
+  const from = result?.combinedFrom || null;
+
+  const bestCandidate = result
+    ? candidateRecord({
+      candidateId: result.candidateId,
+      result,
+      baseline,
+      extra: {
+        // Which levers THIS candidate retuned. A flag the run did not record
+        // stays false: nothing is inferred from the levers it did record.
+        phaseRetuned: from?.phaseRetuned === true,
+        delayRetuned: from?.delayRetuned === true,
+        gainRetuned: from?.gainRetuned === true,
+        calibrationOnly: from?.calibrationOnly === true,
+        candidateOrigin: result.candidateOrigin || null,
+        seatingOffsetMm: num(result.seatingOffsetMm ?? from?.seatingOffsetMm),
+      },
+    })
+    : null;
+
+  const testedCount = num(diagnostics?.tested);
+  const confirmedCount = num(diagnostics?.confirmed);
+  const tested = testedCount != null || confirmedCount != null || Boolean(result);
+  const applied = appliedCandidateId != null && result?.candidateId != null
+    && String(result.candidateId) === String(appliedCandidateId);
+
+  const materialReason = typeof selection?.combinedMaterial?.reason === "string"
+    ? selection.combinedMaterial.reason
+    : null;
+
+  return leverRecord({
+    lever: COMBINED_CALIBRATION_LEVER,
+    tested,
+    candidateCount: confirmedCount ?? (result ? 1 : null),
+    candidateCounts: diagnostics ? {
+      tested: testedCount,
+      confirmed: confirmedCount,
+      valid: num(diagnostics.valid),
+      invalid: num(diagnostics.invalid),
+    } : null,
+    grouping: null,
+    testedRange: null,
+    bestCandidate,
+    result: outcomeFor({
+      applied,
+      tradeOff: Boolean(result?.tradeOff),
+      material: selection?.combinedMaterial,
+      bestCandidate,
+      tested,
+    }),
+    reason: tested
+      ? (materialReason || (bestCandidate ? null : COMBINED_NO_CANDIDATE_REASON))
+      : null,
+    scope: COMBINED_CALIBRATION_SCOPE,
+  });
+}
+
+/**
  * Build the compact calibration evidence for a completed run.
  *
  * @param {object} params
@@ -626,6 +714,11 @@ export function buildCalibrationEvidence({
   if (!selection || typeof selection !== "object") return null;
   const baselineResult = baseline || selection.currentResult || null;
   const applied = Array.isArray(appliedLevers) ? appliedLevers.filter(Boolean) : [];
+  // The result the decision actually applied, when it applied one: the combined
+  // record states whether THAT result came from the combined retune.
+  const appliedCandidateId = decisionApplied === true
+    ? (calibrationDecision?.selected?.candidateId || calibrationDecision?.candidateId || null)
+    : null;
 
   const measured = {
     delay: buildDelayEvidence({ selection, baseline: baselineResult, appliedLevers: applied }),
@@ -649,6 +742,11 @@ export function buildCalibrationEvidence({
     schemaVersion: CALIBRATION_EVIDENCE_SCHEMA_VERSION,
     recordedAt: new Date().toISOString(),
     levers,
+    // The combined calibration result, recorded beside the isolated levers: what
+    // the combined retune produced, and whether that was the result applied.
+    combined: buildCombinedEvidence({
+      selection, baseline: baselineResult, appliedCandidateId,
+    }),
     // The decision travels with the evidence, so the panel and any reader of the
     // saved record resolve what ADI did — and why — from one place.
     decision: calibrationDecision || null,
@@ -662,6 +760,39 @@ export function calibrationEvidenceFor(evidence, leverKey) {
   if (!evidence || typeof evidence !== "object") return null;
   const record = evidence.levers?.[leverKey] || null;
   return record && typeof record === "object" ? record : null;
+}
+
+/** The combined calibration result from a persisted evidence block, or null. */
+export function combinedCalibrationEvidence(evidence) {
+  if (!evidence || typeof evidence !== "object") return null;
+  const record = evidence.combined || null;
+  return record && typeof record === "object" ? record : null;
+}
+
+/**
+ * "P19 ±1 dB → ±1 dB · P20 ±27 dB → ±11 dB · Applied" — the combined result's
+ * own values, read from the record. A record whose search ran and confirmed
+ * nothing states that, and a record the run did not keep says so.
+ */
+export function describeCombinedCalibration(record) {
+  if (!record || typeof record !== "object") return null;
+  if (record.evidenceStatus !== CALIBRATION_EVIDENCE_STATUS.RETAINED) {
+    return COMBINED_EVIDENCE_MISSING_DETAIL;
+  }
+  const parts = [];
+  const best = record.bestCandidate || null;
+  if (best) {
+    const p19 = pairText("P19", best.p19Before, best.p19After);
+    const p20 = pairText("P20", best.p20Before, best.p20After);
+    if (p19) parts.push(p19);
+    if (p20) parts.push(p20);
+  } else if (num(record.candidateCount) != null) {
+    parts.push(`${record.candidateCount} candidates confirmed`);
+  }
+  const outcome = calibrationOutcomeLabel(record);
+  if (outcome) parts.push(outcome);
+  if (record.reason) parts.push(record.reason);
+  return parts.length ? parts.join(" · ") : null;
 }
 
 /** "+2 ms · P19 ±4 dB → ±4 dB · P20 ±5 dB → ±4 dB · No useful improvement" */

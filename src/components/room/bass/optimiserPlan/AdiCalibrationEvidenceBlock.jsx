@@ -23,6 +23,7 @@ import {
   calibrationEvidenceFor,
   describeCalibrationLever,
 } from "./optimiserCalibrationEvidence.js";
+import AdiCombinedCalibrationEvidence from "./AdiCombinedCalibrationEvidence.jsx";
 
 function Row({ label, text, scope }) {
   return (
@@ -57,6 +58,10 @@ export default function AdiCalibrationEvidenceBlock({ evidence = null, className
       ) : (
         rows.map((row) => <Row key={row.key} label={row.label} text={row.text} scope={row.scope} />)
       )}
+
+      {/* The combined calibration result beside the isolated levers, with every
+          confirmed calibration result and the decision taken on it. */}
+      <AdiCombinedCalibrationEvidence evidence={evidence} className="pt-0.5" />
     </div>
   );
 }
