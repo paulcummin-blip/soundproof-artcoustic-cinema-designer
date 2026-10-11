@@ -59,6 +59,12 @@ export const ADI_PANEL_FINDING = Object.freeze({
 /** Section 1 copy — concise, and never claiming a test that did not run. */
 export const ADI_CALIBRATION_TESTED_SENTENCE = "ADI tested delay, gain and polarity.";
 export const ADI_NO_CALIBRATION_IMPROVEMENT = "No useful calibration-only improvement was found.";
+/**
+ * The sentence the main panel states when the calibration result ADI's own
+ * decision named was NOT applied and makes P20 worse. The candidate itself, its
+ * before → after values and its settings belong to Engineer details.
+ */
+export const ADI_NO_SAFE_CALIBRATION_IMPROVEMENT = "No safe calibration improvement was found.";
 export const ADI_CALIBRATION_NOT_TESTED_SENTENCE = "Calibration has not been tested on this design yet.";
 
 /** Section 2 copy — the design change is never presented as applied. */

@@ -26,6 +26,7 @@ import {
   ADI_CALIBRATION_NOT_TESTED_SENTENCE,
   ADI_CALIBRATION_TESTED_SENTENCE,
   ADI_NO_CALIBRATION_IMPROVEMENT,
+  ADI_NO_SAFE_CALIBRATION_IMPROVEMENT,
   ADI_SECTION_TITLE,
 } from "./adiPanelSections.js";
 import {
@@ -55,9 +56,15 @@ export default function AdiCalibrationSection({
   children = null,
   className = "",
 }) {
-  const showsApplied = kind === ADI_CALIBRATION_KIND.APPLIED
-    || kind === ADI_CALIBRATION_KIND.HELD
-    || kind === ADI_CALIBRATION_KIND.PERSISTED;
+  // A calibration result the decision HELD that makes P20 worse is not a
+  // calibration improvement: the main panel states that none was found, and the
+  // candidate, its values and its settings stay in Engineer details.
+  const suppressedHeld = kind === ADI_CALIBRATION_KIND.HELD
+    && bestResult?.mainPanelSuppressed === true;
+  const showsApplied = !suppressedHeld
+    && (kind === ADI_CALIBRATION_KIND.APPLIED
+      || kind === ADI_CALIBRATION_KIND.HELD
+      || kind === ADI_CALIBRATION_KIND.PERSISTED);
   const noImprovementProven = kind === ADI_CALIBRATION_KIND.TESTED
     && evidenceState?.noImprovementProven !== false;
   const evidenceLines = Array.isArray(evidenceState?.leverLines) ? evidenceState.leverLines : [];
@@ -77,9 +84,22 @@ export default function AdiCalibrationSection({
 
       {/* The result the decision itself selected, stated FIRST: whether it is
           one lever on its own (delay only, gain only) or a combined calibration
-          result, and why the other tested results were not taken. Without this
-          the section beside it reads as delay-only versus gain-only. */}
-      <AdiBestCalibrationResult result={bestResult} />
+          result. The settings and the canonical P19/P20 before → after are
+          printed once, by the section beside it, so no value is repeated here.
+          A held result that worsens P20 states the outcome instead of the
+          candidate — that candidate is read in Engineer details. */}
+      {suppressedHeld ? (
+        <div className="space-y-0.5">
+          <div className="text-[12px] text-[#3E4349] leading-relaxed">
+            {bestResult.mainPanelCopy?.tested || ADI_CALIBRATION_TESTED_SENTENCE}
+          </div>
+          <div className="text-[12px] font-semibold text-[#1B1A1A] leading-relaxed">
+            {bestResult.mainPanelCopy?.sentence || ADI_NO_SAFE_CALIBRATION_IMPROVEMENT}
+          </div>
+        </div>
+      ) : (
+        <AdiBestCalibrationResult result={bestResult} compact={showsApplied} />
+      )}
 
       {/* The settings themselves — the one presentation the whole app uses for
           an applied calibration. Design changes are never rendered here. */}

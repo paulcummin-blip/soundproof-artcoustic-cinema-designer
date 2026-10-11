@@ -8,6 +8,11 @@
 // Presentation only: every value arrives already resolved by
 // bestCalibrationResult.js from the run's own decision and evidence. It applies
 // nothing, decides nothing and prints no candidate id.
+//
+// `compact` is the MAIN PANEL presentation: the headline and its state alone.
+// The section beside it already prints the settings and the canonical P19/P20
+// before → after, so those rows, the settings list and the explanation sentences
+// are rendered only where `compact` is false — Engineer details.
 // ---------------------------------------------------------------------------
 
 import React from "react";
@@ -18,7 +23,7 @@ const STATE_STYLE = Object.freeze({
   "Review required": { background: "#B45309", color: "#FFFFFF" },
 });
 
-export default function AdiBestCalibrationResult({ result = null, className = "" }) {
+export default function AdiBestCalibrationResult({ result = null, compact = false, className = "" }) {
   if (!result) return null;
 
   const stateStyle = STATE_STYLE[result.stateLabel] || { background: "#625143", color: "#FFFFFF" };
@@ -37,22 +42,22 @@ export default function AdiBestCalibrationResult({ result = null, className = ""
         </span>
       </div>
 
-      {result.valuesStatement && (
+      {!compact && result.valuesStatement && (
         <div className="text-[11px] text-[#3E4349] leading-relaxed">{result.valuesStatement}</div>
       )}
 
-      {result.settingsChanged.length > 0 && (
+      {!compact && result.settingsChanged.length > 0 && (
         <div className="text-[11px] text-[#3E4349] leading-relaxed">
           <span className="text-[#625143]">Settings changed: </span>
           {result.settingsChanged.join(", ")}
         </div>
       )}
 
-      {result.statement && (
+      {!compact && result.statement && (
         <div className="text-[11.5px] text-[#1B1A1A] leading-relaxed">{result.statement}</div>
       )}
 
-      {result.heldSentence && (
+      {!compact && result.heldSentence && (
         <div className="text-[11px] text-[#625143] leading-relaxed">{result.heldSentence}</div>
       )}
     </div>

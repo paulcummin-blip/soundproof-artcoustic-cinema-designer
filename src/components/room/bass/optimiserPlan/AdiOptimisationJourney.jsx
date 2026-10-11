@@ -52,6 +52,7 @@ import AdiTestedSection from "./AdiTestedSection.jsx";
 import AdiCalibrationSection from "./AdiCalibrationSection.jsx";
 import savedCalibrationDecision from "./savedCalibrationDecision.js";
 import { resolveBestCalibrationResult } from "./bestCalibrationResult.js";
+import AdiBestCalibrationResult from "./AdiBestCalibrationResult.jsx";
 import AdiDesignRecommendationSection from "./AdiDesignRecommendationSection.jsx";
 import AdiPanelSummary from "./AdiPanelSummary.jsx";
 import AdiEngineerEvidenceBlock from "./AdiEngineerEvidenceBlock.jsx";
@@ -580,6 +581,26 @@ export default function AdiOptimisationJourney({
               before → after, and the run's own reason for accepting nothing.
               Without it the panel never claims a lever was tested. */}
           <AdiCalibrationEvidenceBlock evidence={summary.calibrationEvidence} />
+
+          {/* A calibration result ADI HELD that makes P20 worse: its candidate,
+              its canonical P19/P20 before → after and its settings are stated
+              here, not in the main panel — where the no-safe-improvement
+              sentence stands instead. */}
+          {bestCalibrationResult?.mainPanelSuppressed === true && (
+            <div className="space-y-1" data-adi-calibration-candidate-proof="true">
+              <div className="text-[10px] font-semibold uppercase tracking-wide text-[#8A7B6A]">
+                Calibration candidate evaluated — not a safe improvement
+              </div>
+              <AdiBestCalibrationResult result={bestCalibrationResult} />
+              <AdiAppliedBassCalibration
+                evidence={calibrationApplyEvidence}
+                appliedCalibration={null}
+                designChanges={[]}
+                instances={instances}
+                roomDims={roomDims}
+              />
+            </div>
+          )}
 
           {/* The per-lever detail, and the best acoustic delay the grouped
               front/rear sweep confirmed — a detail of the delay lever ADI

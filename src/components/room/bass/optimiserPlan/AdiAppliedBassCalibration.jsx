@@ -159,12 +159,6 @@ export default function AdiAppliedBassCalibration({
             {evidence.statement}
           </div>
 
-          {evidence.objectiveLabel && (
-            <div className="text-[11px] text-[#625143]">
-              Objective: <span className="font-semibold text-[#1B1A1A]">{evidence.objectiveLabel}</span>
-            </div>
-          )}
-
           <AdiRelativeGroupDelay display={relativeDelay} />
 
           <SettingsTable settings={mainRows(evidence.settings)} />

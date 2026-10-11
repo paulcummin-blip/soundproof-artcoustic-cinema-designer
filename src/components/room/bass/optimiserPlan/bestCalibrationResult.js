@@ -19,14 +19,25 @@
 // never invents a lever the decision's own settings do not show. When the two
 // records do not say which levers a result retuned, no composition is claimed.
 //
+// ONE product rule decides WHERE the result may be stated: a result ADI APPLIED
+// leads the Safe calibration adjustments section, while a result it HELD that
+// makes P20 worse is never presented as a calibration improvement. That case
+// states that no safe calibration improvement was found in the main panel, and
+// the candidate, its values and its settings are read in Engineer details.
+//
 // Pure: no React, no side effects, no stores.
 // ---------------------------------------------------------------------------
 
 import {
   CALIBRATION_APPLY_DECISION,
   CALIBRATION_APPLY_REASON,
+  assessCalibrationDamage,
   formatLevelValue,
 } from "../optimiseWorkflow/adiCalibrationAutoApplyAuthority.js";
+import {
+  ADI_CALIBRATION_TESTED_SENTENCE,
+  ADI_NO_SAFE_CALIBRATION_IMPROVEMENT,
+} from "./adiPanelSections.js";
 import { combinedCalibrationEvidence } from "./optimiserCalibrationEvidence.js";
 
 /** The headline the Safe calibration adjustments section leads with. */
@@ -202,6 +213,20 @@ export function resolveBestCalibrationResult({ decision = null, evidence = null 
   const settingsChanged = SETTING_ORDER.filter((name) => settingsRows.some((row) => row?.setting === name));
   const valuesStatement = calibrationValuePairText(decision.before, decision.after);
 
+  // Did the result the decision names make P20 worse? Read from the decision's
+  // own damage assessment, or — for a record saved before it was recorded — from
+  // the same authority applied to its own before → after values. No threshold is
+  // invented here.
+  const damage = decision.damage && typeof decision.damage === "object"
+    ? decision.damage
+    : assessCalibrationDamage(decision.before, decision.after);
+  const worsensP20 = damage?.p20Damaged === true;
+  const worsensP19 = damage?.p19Damaged === true;
+  // A HELD result that worsens P20 is not a calibration improvement, so it never
+  // leads the main panel. The main panel states that no safe improvement was
+  // found instead; the candidate and its values are read in Engineer details.
+  const mainPanelSuppressed = held && worsensP20;
+
   return {
     label,
     headline: label ? `${BEST_CALIBRATION_RESULT_PREFIX}${label}` : BEST_CALIBRATION_RESULT_HEADLINE,
@@ -211,6 +236,13 @@ export function resolveBestCalibrationResult({ decision = null, evidence = null 
     reviewRequired,
     composition,
     appliedIsCombined,
+    // Where the result may be stated, and what the main panel says instead of it.
+    worsensP20,
+    worsensP19,
+    mainPanelSuppressed,
+    mainPanelCopy: mainPanelSuppressed
+      ? { tested: ADI_CALIBRATION_TESTED_SENTENCE, sentence: ADI_NO_SAFE_CALIBRATION_IMPROVEMENT }
+      : null,
     candidateId: appliedCandidateId,
     combinedCandidateId,
     // Stated only when the result the decision names was applied by ADI.

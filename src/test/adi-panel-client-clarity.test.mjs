@@ -26,6 +26,7 @@ import {
   ADI_DESIGN_NOT_APPLIED,
   ADI_NO_CALIBRATION_IMPROVEMENT,
   ADI_NO_DESIGN_CHANGE_APPLIED,
+  ADI_NO_SAFE_CALIBRATION_IMPROVEMENT,
   ADI_PANEL_FINDING,
   ADI_PANEL_TITLE,
   ADI_PREDICTED_RESULT_LABEL,
@@ -40,6 +41,7 @@ import {
   CALIBRATION_EVIDENCE_MISSING_MESSAGE,
   CALIBRATION_TRADE_OFF_MESSAGE,
 } from "../components/room/bass/optimiserPlan/optimiserCalibrationEvidence.js";
+import { resolveBestCalibrationResult } from "../components/room/bass/optimiserPlan/bestCalibrationResult.js";
 import { ADI_ROW_STATUS } from "../components/room/bass/optimiserPlan/optimiserFamilyLedgerRows.js";
 import { buildAdiDesignerSummary } from "../components/room/bass/optimiserPlan/adiDesignerSummary.js";
 import { OPTIMISER_PRESENTATION_STATE } from "../components/room/bass/optimiserPlan/resolveOptimiserPresentationState.js";
@@ -54,6 +56,7 @@ const MAIN_PANEL_COPY = [
   ...Object.values(ADI_PANEL_FINDING),
   ADI_CALIBRATION_TESTED_SENTENCE,
   ADI_NO_CALIBRATION_IMPROVEMENT,
+  ADI_NO_SAFE_CALIBRATION_IMPROVEMENT,
   ADI_CALIBRATION_NOT_TESTED_SENTENCE,
   ADI_DESIGN_NOT_APPLIED,
   ADI_NO_DESIGN_CHANGE_APPLIED,
@@ -230,5 +233,68 @@ describe("the design recommendation is clear about the move and the result", () 
   it("keeps the applied/not-applied statement the panel actually prints", () => {
     expect(ADI_DESIGN_NOT_APPLIED)
       .toBe("This requires a physical design change, so ADI has not applied it.");
+  });
+});
+
+describe("a calibration result that makes P20 worse never leads the panel", () => {
+  // The state this guards: the current result is P20 L1 ±10.8 dB, and the
+  // candidate ADI's own decision named took it to L1 ±20.4 dB — a material
+  // worsening, held rather than applied.
+  const heldWorseningDecision = {
+    decision: "hold",
+    reason: "trade-off-larger-than-the-improvement",
+    candidateId: "gain-candidate",
+    selected: { candidateId: "gain-candidate" },
+    settings: [{ key: "gain:sub-a", setting: "Gain trim" }],
+    before: { p19: { level: 4, deviationDb: 0.9 }, p20: { level: 1, deviationDb: 10.8 } },
+    after: { p19: { level: 4, deviationDb: 1.1 }, p20: { level: 1, deviationDb: 20.4 } },
+  };
+
+  const appliedImprovingDecision = {
+    decision: "applied",
+    reason: "improves-one-objective-without-damaging-the-other",
+    candidateId: "delay-candidate",
+    selected: { candidateId: "delay-candidate" },
+    settings: [{ key: "delay:sub-a", setting: "Delay" }],
+    before: { p19: { level: 4, deviationDb: 1 }, p20: { level: 1, deviationDb: 27.4 } },
+    after: { p19: { level: 4, deviationDb: 1 }, p20: { level: 1, deviationDb: 10.8 } },
+  };
+
+  it("recognises the worsening from the decision's own canonical values", () => {
+    const result = resolveBestCalibrationResult({ decision: heldWorseningDecision });
+    expect(result.worsensP20).toBe(true);
+    expect(result.mainPanelSuppressed).toBe(true);
+    // The values are still readable — in Engineer details, never dropped.
+    expect(result.valuesStatement).toContain("P20 L1 / 10.8 dB → L1 / 20.4 dB");
+  });
+
+  it("states no safe calibration improvement instead of that candidate", () => {
+    const result = resolveBestCalibrationResult({ decision: heldWorseningDecision });
+    expect(ADI_NO_SAFE_CALIBRATION_IMPROVEMENT)
+      .toBe("No safe calibration improvement was found.");
+    expect(result.mainPanelCopy).toEqual({
+      tested: ADI_CALIBRATION_TESTED_SENTENCE,
+      sentence: ADI_NO_SAFE_CALIBRATION_IMPROVEMENT,
+    });
+  });
+
+  it("still leads with a result ADI applied", () => {
+    const result = resolveBestCalibrationResult({ decision: appliedImprovingDecision });
+    expect(result.worsensP20).toBe(false);
+    expect(result.mainPanelSuppressed).toBe(false);
+    expect(result.mainPanelCopy).toBeNull();
+    expect(result.headline).toBe("Best calibration result: Delay only");
+    expect(result.stateLabel).toBe("Applied");
+  });
+
+  it("keeps the held candidate and its values in the collapsed Engineer details block", () => {
+    const journey = fs.readFileSync(
+      new URL("../components/room/bass/optimiserPlan/AdiOptimisationJourney.jsx", import.meta.url),
+      "utf8",
+    );
+    const openTag = journey.match(/<details[^>]*data-adi-engineer-details="true"[^>]*>/)?.[0] || "";
+    const start = journey.indexOf(openTag);
+    expect(start).toBeGreaterThan(-1);
+    expect(journey.indexOf("data-adi-calibration-candidate-proof", start)).toBeGreaterThan(start);
   });
 });

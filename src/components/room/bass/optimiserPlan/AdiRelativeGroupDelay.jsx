@@ -11,6 +11,11 @@
 // Presentation only: every value arrives already resolved by
 // relativeGroupDelayAuthority.js. It renders nothing when the groups are not
 // recorded, so no offset is ever guessed at.
+//
+// The offset itself is stated, and nothing else: the explanation sentence the
+// authority carries (relativeGroupDelayAuthority.js RELATIVE_GROUP_DELAY_NOTE)
+// is not rendered in the main panel, so the section states the installable fact
+// without a paragraph about bass summation around it.
 // ---------------------------------------------------------------------------
 
 import React from "react";
@@ -36,7 +41,6 @@ export default function AdiRelativeGroupDelay({ display = null, className = "" }
           {rows.map((row) => `${row.label} ${row.text}`).join(" · ")}
         </div>
       )}
-      <div className="text-[10px] text-[#8A7B6A] leading-relaxed">{display.note}</div>
     </div>
   );
 }
