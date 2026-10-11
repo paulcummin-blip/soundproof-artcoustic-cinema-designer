@@ -25,6 +25,7 @@
 
 import { proposalEvidenceFingerprint } from '../proposalEvidence/proposalEvidenceBuilder.js';
 import { normaliseOptionGuidance } from './writerOptionGuidance.js';
+import { requiredMultiCabinetChannels } from './writerMultiCabinetRules.js';
 import {
   ALLOWED_CLAIM_PREFIX,
   BLOCKED_CLAIM_PREFIX,
@@ -164,6 +165,11 @@ export function buildWriterInput({ pack, promptVersion = WRITER_PROMPT_VERSION, 
     },
     // The frozen pack itself: the writer's only source, carried verbatim.
     evidence_pack: pack,
+    multi_cabinet_channels: {
+      rule: 'Explain each required frozen arrangement naturally once in the System Design Summary or specification: the physical cabinet count, the position and the ONE logical audio channel. In comparisons name the appropriate design; never assign its arrangement to another option. This is a concise design explanation, not an equipment inventory.',
+      required: requiredMultiCabinetChannels(pack),
+      source: 'evidence_pack.options[].facts.system.front_stage',
+    },
     // The assumed-parameter rule the pack was built under, so a draft can be
     // validated against exactly the admission it was written against: with no
     // designer request, P8, P15 and P21 may not be referenced at all.
@@ -209,6 +215,7 @@ export function buildWriterInput({ pack, promptVersion = WRITER_PROMPT_VERSION, 
     // contract rather than only in the prompt: the register, the comparative ban
     // that follows from the proposal mode, and the installation default.
     editorial_rules: {
+      validation_register: 'Client prose states supported benefits, never internal claim-defence, validation, testing or scoring commentary. Retain practical qualifications about listening positions and geometry.',
       experience_first: 'experience first, then why it matters, then the engineering proof: never open a paragraph with a parameter, a level, a channel count or a dB value',
       display: 'name the display exactly as the frozen evidence names it; where it is a TV write the TV and never a screen size, aspect ratio, viewable width or projector word',
       report_voice: 'never write assessed at, published result, results are derived from, technical evaluation of, engineering model, performance results, stated on its own result or according to the report in main prose; Appendix is concise source attribution only',

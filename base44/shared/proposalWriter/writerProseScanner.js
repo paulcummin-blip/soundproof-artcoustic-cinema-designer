@@ -6,6 +6,7 @@ import { anchorPatternFor, assertedKind, assumedParameterIssue, claimsArea, isDe
 import { productScopeViolations } from './writerProductScope.js';
 import { frontStageScopeViolations } from './writerFrontStageRules.js';
 import { designStageCommentary } from './writerDesignStageRules.js';
+import { validationRegisterPhrase } from './writerValidationRegister.js';
 import { framingContrastGrounded, independentClauses, supportedChangeClause } from './writerClausePrecision.js';
 import {
   displayTerminologyIssue,
@@ -47,6 +48,12 @@ export function scanProse({ input, vocabulary, section, text, claims = [], claim
   // Read complete sentences before clause splitting: tonal scope can stretch in a second clause.
   for (const sentence of proposalSentences(text)) {
     const named = stripOptionNames(sentence, vocabulary.optionNames);
+    // Opt-in by the frozen agreement; earlier generations gain no new rejection.
+    const register = input?.editorial_rules?.validation_register && validationRegisterPhrase(named);
+    if (register) {
+      context = { text, sentence, match: register.match, ruleId: `validation_register:${register.rule}` };
+      report(WRITER_REJECTION.VALIDATION_REGISTER, { section, detail: register.rule });
+    }
     const checks = [
       [internalLevelLanguage(named), WRITER_REJECTION.INTERNAL_LEVEL_LANGUAGE, 'narrative_level_language'],
       [unexplainedOverhead(sentence), WRITER_REJECTION.UNEXPLAINED_ABBREVIATION, 'unexplained_OH'],

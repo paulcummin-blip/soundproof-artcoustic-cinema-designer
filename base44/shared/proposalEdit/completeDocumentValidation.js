@@ -2,6 +2,8 @@ import { latestValidGeneration } from '../proposalGeneration/proposalGenerationH
 import { proposalIssueGate, renderableProposalCopy } from './proposalEditHistory.js';
 import { contractSectionsOf } from '../proposalWriter/writerContractSchema.js';
 import { validateWriterOutput } from '../proposalWriter/writerOutputValidator.js';
+import { multiCabinetChannelViolations } from '../proposalWriter/writerMultiCabinetRules.js';
+import { validationRegisterPhrase } from '../proposalWriter/writerValidationRegister.js';
 import { buildEditedDraft } from './proposalEditCopy.js';
 import { composeWriterSectionBodies } from '../proposalWriter/writerSectionMapping.js';
 import { proposalEvidenceFingerprint } from '../proposalEvidence/proposalEvidenceBuilder.js';
@@ -86,6 +88,17 @@ export function validateCompleteDocument({ proposal, sections = [], generationRe
   }
   for (const body of mapped.bodies) {
     if (!safeSections.some(section => section.section_type === body.section_type && section.is_enabled !== false)) reject('document_section_missing', `Required document section is missing or hidden: ${body.section_type}`);
+  }
+  // Validate the very bodies returned to BOTH Editor and PDF, after mapping,
+  // enablement and private-note filtering, not merely the provider's response.
+  const publishedRows = safeSections.filter(section => section.is_enabled !== false)
+    .map(section => ({ section: section.section_type, text: plain(section.body) }));
+  errors.push(...multiCabinetChannelViolations({ input, sections: publishedRows }));
+  if (input?.editorial_rules?.validation_register) {
+    for (const row of [...publishedRows, ...publishedAssetText.map(text => ({ section: null, text: plain(text) }))]) {
+      const register = validationRegisterPhrase(row.text);
+      if (register) errors.push({ code: 'validation_register', section: row.section, detail: register.rule });
+    }
   }
   return { valid: errors.length === 0, errors, generation_id: generation?.generation_id || null,
     edit_id: selected.edit_id, options_text: safeOptionsText, options_required: optionsRequired,

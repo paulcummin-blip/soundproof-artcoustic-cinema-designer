@@ -33,8 +33,8 @@
  * lenient: it looks for a positive statement of the arrangement, so a description
  * that reads naturally is never refused, and no particular sentence is required.
  *
- * The pack's own sentences are exempt, exactly as they are for every other prose
- * rule, and the requirement is enforced only where the writer input carries this
+ * Exact evidence wording may satisfy the requirement when it explicitly states
+ * both counts. The requirement is enforced only where the writer input carries this
  * agreement's own `multi_cabinet_channels` block: a generation filed before the
  * rule existed carries no block and is never re-read under it.
  *
@@ -42,33 +42,8 @@
  */
 
 import { WRITER_REJECTION } from './writerContractSchema.js';
-import { isPackProse, isProductToken, modelTokens, packProseSentences, sentenceParts } from './writerVocabulary.js';
-
-/** A stage position the arrangement is stated at. */
-const CENTRE = /\b(?:centre|center)\b/i;
-/** The physical cabinet a count is stated against. */
-const PHYSICAL_NOUN = /\b(?:cabinets?|enclosures?|loudspeakers?|speakers?|monitors?|boxes?)\b/i;
-/** The arrangement stated as ONE channel: "a single centre channel". */
-const ONE_CHANNEL = /\b(?:one|single|1)\b(?:[\s-]+\w+){0,4}[\s-]+channels?\b/i;
-/** The adjectives that leave a count of channels multiplying the physical cabinets. */
-const MULTIPLYING = '(?:physical|separate|discrete|independent|distinct|dedicated|additional|logical|individual|full|complete)';
-/** The physical cabinets written as SEVERAL centre channels. */
-const MULTIPLIED_CHANNELS = new RegExp(
-  `\\b(?:two|three|four|five|2|3|4|5)\\b(?:\\s+${MULTIPLYING}){0,2}\\s+(?:centre|center)\\s+channels?\\b`,
-  'i',
-);
-/** The position itself written as owning more than one channel. */
-const POSITION_OWNS_CHANNELS = new RegExp(
-  `\\b(?:centre|center)\\b[^.;:]{0,24}\\b(?:uses?|use|comprises?|contains?|has|have|with|from|`
-  + `built\\s+from|made\\s+up\\s+of)\\b[^.;:]{0,16}\\b(?:two|three|2|3)\\b(?:\\s+\\w+){0,1}\\s+channels?\\b`,
-  'i',
-);
-/** A stated count of physical cabinets. */
-const STATED_CABINETS = /\b(one|two|three|four|five|six|1|2|3|4|5|6)\b[\s,×x*]*(?:[\w-]+[\s-]+){0,3}(?:centres?\s+|centers?\s+)?(?:cabinets?|enclosures?|loudspeakers?|speakers?|monitors?|boxes?)\b/gi;
-/** The number each count word states. */
-const COUNT_VALUE = Object.freeze({ one: 1, two: 2, three: 3, four: 4, five: 5, six: 6 });
-/** How far either side of a stated count the position it belongs to may sit. */
-const WINDOW = 40;
+import { isProductToken, modelTokens, sentenceParts } from './writerVocabulary.js';
+import { cabinetCounts, logicalChannelCounts, namesCabinetPosition } from './writerCabinetLanguage.js';
 
 /** The reason a requirement is reported unmet. */
 export const MULTI_CABINET_REASONS = Object.freeze({
@@ -92,9 +67,9 @@ function modelsOf(statement) {
  * alone: one entry per arrangement where a stage position is built from MORE
  * physical cabinets than that position has channels.
  *
- * Arrangements that state the same count at the same position are one requirement,
- * so an option pair that shares the arrangement is explained once rather than
- * twice, and no design the evidence states as a single cabinet ever appears here.
+ * Each arrangement keeps its own version identity. Shared arrangements may be
+ * explained once for both options; different arrangements must be attributed to
+ * the appropriate design. Single-cabinet designs gain no requirement.
  *
  * @param {Object} pack — the frozen proposal evidence pack
  * @returns {Array<Object>} the required arrangements
@@ -107,16 +82,19 @@ export function requiredMultiCabinetChannels(pack) {
     const stage = option?.facts?.system?.front_stage || null;
     if (!stage || typeof stage !== 'object') continue;
     const cabinets = Number(stage.physical_centre_cabinets);
-    const channels = Number(stage.logical_centre_channels) || 1;
+    const channels = Number(stage.logical_centre_channels);
     // One cabinet per channel is not a multi-cabinet arrangement: the evidence
     // states nothing for this rule to require.
-    if (!Number.isFinite(cabinets) || cabinets <= channels) continue;
+    if (!Number.isInteger(cabinets) || channels !== 1 || cabinets <= channels) continue;
 
-    const key = `centre|${cabinets}|${channels}`;
+    const key = `${option.version_id}|centre|${cabinets}|${channels}`;
     const existing = required.get(key);
     required.set(key, {
       position: 'centre',
       label: 'Centre',
+      version_id: option.version_id,
+      version_name: option.version_name || null,
+      option_label: option.label || null,
       cabinets,
       channels,
       models: [...new Set([...(existing?.models || []), ...modelsOf(stage.centre)])],
@@ -128,60 +106,60 @@ export function requiredMultiCabinetChannels(pack) {
   return [...required.values()];
 }
 
-/** Whether a sentence names the position, or the arrangement's own model. */
-function namesPosition(sentence, requirement) {
-  if (CENTRE.test(sentence)) return true;
-  return requirement.models.some((model) => new RegExp(`\\b${escapeToken(model)}\\b`, 'i').test(sentence));
-}
-
-/**
- * The physical cabinet count a sentence states for the arrangement, or null. A
- * count only belongs to the arrangement where its own phrase contains the
- * position, or the position sits within a short window of it — so a count stated
- * for another part of the system is never read as the centre's.
- */
-function statedCabinetCount(sentence, requirement) {
-  const pattern = new RegExp(STATED_CABINETS.source, 'gi');
-  let match = pattern.exec(sentence);
-  while (match) {
-    const at = match.index;
-    const near = sentence.slice(Math.max(0, at - WINDOW), at + match[0].length + WINDOW);
-    const belongs = CENTRE.test(match[0]) || CENTRE.test(near)
-      || requirement.models.some((model) => new RegExp(`\\b${escapeToken(model)}\\b`, 'i').test(near));
-    if (belongs) {
-      const value = COUNT_VALUE[String(match[1]).toLowerCase()] ?? Number(match[1]);
-      if (Number.isFinite(value)) return value;
+/** Keep each comparison statement attached to the design it describes. */
+function scopedSentences(rows, input, requirement) {
+  const options = input.evidence_pack?.options || [];
+  const claims = input.allowed_claims || [];
+  const signature = stage => stage && `${stage.physical_centre_cabinets}|${stage.logical_centre_channels}|${stage.centre}`;
+  const allShared = options.every(option => signature(option.facts?.system?.front_stage)
+    === signature(options.find(option => option.version_id === requirement.version_id)?.facts?.system?.front_stage));
+  const found = [];
+  for (const row of rows) {
+    const cited = [...new Set((row.claim_ids || []).flatMap(id => {
+      const versionId = claims.find(claim => claim.claim_id === id)?.option?.version_id;
+      return versionId ? [versionId] : [];
+    }))];
+    let context = cited.length === 1 ? cited : [];
+    const aliases = options.flatMap(option => [option.version_name, option.label]).filter(Boolean).map(escapeToken);
+    const boundaries = aliases.length ? new RegExp(`(?:[,;]\\s*|\\s+(?:while|whereas|but)\\s+)(?=(?:${aliases.join('|')})(?:\\W|$))`, 'i') : null;
+    const fragments = sentenceParts(row.text).flatMap(sentence => boundaries ? sentence.split(boundaries) : [sentence]);
+    for (const sentence of fragments) {
+      const named = options.filter(option => [option.version_name, option.label].filter(Boolean)
+        .some(name => new RegExp(`(^|\\W)${escapeToken(name)}(?=\\W|$)`, 'i').test(sentence)));
+      if (named.length) context = named.map(option => option.version_id);
+      const ownModel = requirement.models.some(model => new RegExp(`\\b${escapeToken(model)}\\b`, 'i').test(sentence));
+      const uniqueModel = ownModel && !options.some(option => option.version_id !== requirement.version_id
+        && modelsOf(option.facts?.system?.front_stage?.centre).some(model => requirement.models.includes(model)));
+      const belongs = context.length ? context.includes(requirement.version_id)
+        : options.length === 1 || allShared || uniqueModel;
+      // A global "both options" assertion is also checked against this option.
+      const global = /\b(?:both|all)\s+(?:options|designs|versions)\b/i.test(sentence);
+      if (belongs || global) found.push({ section: row.section, sentence });
     }
-    match = pattern.exec(sentence);
   }
-  return null;
+  return found;
 }
 
-/** The reason a sentence states the arrangement wrongly, or null when it does not. */
 function contradictionReason(sentence, requirement) {
-  if (!namesPosition(sentence, requirement)) return null;
-  if (MULTIPLIED_CHANNELS.test(sentence) || POSITION_OWNS_CHANNELS.test(sentence)) {
+  if (!namesCabinetPosition(sentence, requirement)) return null;
+  if (logicalChannelCounts(sentence, requirement).some(count => count !== requirement.channels)) {
     return `${MULTI_CABINET_REASONS.MULTIPLIED}:${requirement.position}`;
   }
-  const stated = statedCabinetCount(sentence, requirement);
-  if (stated !== null && stated !== requirement.cabinets) {
-    return `${MULTI_CABINET_REASONS.COUNT}:${requirement.position}:${stated}`;
-  }
-  return null;
+  const wrong = cabinetCounts(sentence, requirement).find(count => count !== requirement.cabinets);
+  return wrong !== undefined ? `${MULTI_CABINET_REASONS.COUNT}:${requirement.position}:${wrong}` : null;
 }
 
-/** Whether any sentence of the assembled copy explains the arrangement. */
-function described(text, requirement, packProse) {
-  for (const sentence of sentenceParts(text)) {
-    if (isPackProse(sentence, packProse)) continue;
-    if (!namesPosition(sentence, requirement)) continue;
-    if (MULTIPLIED_CHANNELS.test(sentence) || POSITION_OWNS_CHANNELS.test(sentence)) continue;
-    if (!PHYSICAL_NOUN.test(sentence) || !ONE_CHANNEL.test(sentence)) continue;
-    const stated = statedCabinetCount(sentence, requirement);
-    if (stated !== null && stated !== requirement.cabinets) continue;
-    return true;
-  }
-  return false;
+function described(sentences, requirement) {
+  const placements = new Set(['decision_summary', 'what_stays_same', 'what_changes', 'system_design_summary', 'products', 'specification', 'system_overview']);
+  const eligible = sentences.filter(row => placements.has(row.section));
+  return eligible.some(({ sentence, section }, index) => {
+    const next = eligible[index + 1];
+    const description = next?.section === section ? `${sentence} ${next.sentence}` : sentence;
+    return namesCabinetPosition(description, requirement)
+      && cabinetCounts(description, requirement).includes(requirement.cabinets)
+      && logicalChannelCounts(description, requirement).includes(requirement.channels)
+      && !contradictionReason(description, requirement);
+  });
 }
 
 /**
@@ -206,41 +184,28 @@ export function multiCabinetChannelViolations({ input = null, sections = [] } = 
   const required = requiredMultiCabinetChannels(input.evidence_pack);
   if (required.length === 0) return found;
 
-  const packProse = packProseSentences(input);
   const rows = (Array.isArray(sections) ? sections : [])
     .map((entry) => ({
       section: typeof entry?.section === 'string' ? entry.section : null,
       text: typeof entry?.text === 'string' ? entry.text : '',
+      claim_ids: entry?.claim_ids || [],
     }))
     .filter((entry) => entry.text.trim().length > 0);
 
   for (const requirement of required) {
+    const sentences = scopedSentences(rows, input, requirement);
     let contradicted = false;
-    for (const row of rows) {
-      for (const sentence of sentenceParts(row.text)) {
-        if (isPackProse(sentence, packProse)) continue;
-        const detail = contradictionReason(sentence, requirement);
-        if (!detail) continue;
-        found.push({
-          code: WRITER_REJECTION.MULTI_CABINET_CHANNEL,
-          section: row.section,
-          detail,
-          sentence,
-        });
-        contradicted = true;
-        break;
-      }
-      if (contradicted) break;
+    for (const { section, sentence } of sentences) {
+      const detail = contradictionReason(sentence, requirement);
+      if (!detail) continue;
+      found.push({ code: WRITER_REJECTION.MULTI_CABINET_CHANNEL, section, detail,
+        sentence, version_id: requirement.version_id });
+      contradicted = true;
     }
-    if (contradicted) continue;
-
-    const assembled = rows.map((row) => row.text).join('\n');
-    if (!described(assembled, requirement, packProse)) {
-      found.push({
-        code: WRITER_REJECTION.MULTI_CABINET_CHANNEL,
-        section: null,
-        detail: `${MULTI_CABINET_REASONS.OMITTED}:${requirement.position}`,
-      });
+    if (!contradicted && !described(sentences, requirement)) {
+      found.push({ code: WRITER_REJECTION.MULTI_CABINET_CHANNEL, section: null,
+        detail: `${MULTI_CABINET_REASONS.OMITTED}:${requirement.position}:${requirement.version_id}`,
+        version_id: requirement.version_id });
     }
   }
 

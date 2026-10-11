@@ -35,6 +35,7 @@ import { scanProse } from './writerOutputTextRules.js';
 import { validatorProvenance } from './validatorProvenance.js';
 import { crossSectionDuplicates } from './writerSalesPolishRules.js';
 import { attributeViolation } from './writerViolationAudit.js';
+import { multiCabinetChannelViolations } from './writerMultiCabinetRules.js';
 import {
   blockIdSet,
   claimIndex,
@@ -222,6 +223,7 @@ export function validateWriterOutput({ input, output } = {}) {
   const guidanceRequired = inputHasOptionGuidance(input);
   const byId = indexSections({ draft, violations, sections: contractSections });
   violations.push(...crossSectionDuplicates(Array.from(byId.values())));
+  violations.push(...multiCabinetChannelViolations({ input, sections: Array.from(byId.values()) }));
 
   const claimsById = claimIndex(input);
   const blocks = blockIdSet(input);
