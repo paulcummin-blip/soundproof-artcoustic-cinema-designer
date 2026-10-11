@@ -86,7 +86,7 @@ test('recommendation retry reads fresh exact fingerprint rather than cached stal
 });
 function publication(fp='eng:old') {
  const d={name:'fixture',versionName:'Original Design',roomDims,screen:{visibleWidthInches:67.36,aspectRatio:'16:9',manualMode:false,heightFromFloorM:.5,mountMode:'baffle'},screenFrontPlaneM:.1,dolbyLayout:'5.1',seatingRows:2,seatsPerRowByRow:[4,4],seatingPositions:seats,
- placedSpeakers:[['FC','multi-lcr'],['SL','sl-evolve-1-1'],['SR','sl-evolve-1-1']].map(([role,model],i)=>({id:role,role,model,position:{x:i,y:1,z:1.2}})),subwooferInstances:instances,acousticTreatmentEnabled:false};
+ placedSpeakers:[['FC','multi-lcr'],['SL','sl-evolve-1-1'],['SR','sl-evolve-1-1']].map(([role,model],i)=>({id:role,role,model,position:{x:i,y:1,z:1.2}})),subwooferInstances:instances,acousticTreatmentEnabled:false,selectedAbfuserQty:0};
  const report=buildFrozenReportProject(d,{projectId:'p',versionId:'v'});assert.deepEqual(report.missing,[]);
  const p={publication_contract_version:2,engineering_fingerprint:fp,published_at:'fixture',engine_version:'fixture',rp22_version:'fixture',algorithm_version:'fixture',provenance:{bass_fingerprint:'bass:fixture'},
  report_snapshot:{report_project:report.reportProject,seatingPositions:seats,placedSpeakers:d.placedSpeakers,analysisResult:{assessed:true},priceData:{}},
