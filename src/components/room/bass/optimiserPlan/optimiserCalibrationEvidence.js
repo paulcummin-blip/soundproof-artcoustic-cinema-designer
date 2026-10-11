@@ -46,7 +46,7 @@ export const CALIBRATION_EVIDENCE_LABEL = Object.freeze({
 
 /** The mandated copy when the run kept no calibration evidence to read. */
 export const CALIBRATION_EVIDENCE_MISSING_MESSAGE =
-  "Calibration evidence is not available for this run. Re-test calibration to evaluate delay, gain and polarity.";
+  "Calibration evidence was not retained for this run. Re-run calibration to evaluate delay, gain and polarity.";
 
 /**
  * The same fact stated once more inside Engineer details, where the reader is

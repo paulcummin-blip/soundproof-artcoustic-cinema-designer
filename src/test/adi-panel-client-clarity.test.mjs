@@ -17,6 +17,7 @@
 // ---------------------------------------------------------------------------
 
 import { describe, expect, it } from "vitest";
+import fs from "node:fs";
 import {
   ADI_BEST_IMPROVEMENT_LABEL,
   ADI_CALIBRATION_KIND,
@@ -148,6 +149,23 @@ describe("the main panel stays client-readable", () => {
 });
 
 describe("the calibration claim is evidence-backed", () => {
+  it("keeps the detailed proof inside a collapsed Engineer details block", () => {
+    const journey = fs.readFileSync(
+      new URL("../components/room/bass/optimiserPlan/AdiOptimisationJourney.jsx", import.meta.url),
+      "utf8",
+    );
+    const openTag = journey.match(/<details[^>]*data-adi-engineer-details="true"[^>]*>/)?.[0] || "";
+    expect(openTag).not.toBe("");
+    // Collapsed by default: the disclosure carries no `open` attribute.
+    expect(openTag).not.toMatch(/\bopen\b/);
+
+    const start = journey.indexOf(openTag);
+    // The candidate-level proof — calibration evidence per lever and the tested
+    // options table — renders inside that disclosure, not in the default panel.
+    expect(journey.indexOf("<AdiCalibrationEvidenceBlock", start)).toBeGreaterThan(start);
+    expect(journey.indexOf("<AdiTestedOptionsTable", start)).toBeGreaterThan(start);
+  });
+
   it("claims tested-with-no-improvement only when the record proves it", () => {
     expect(resolveCalibrationSectionKind({ evaluated: true, evidenceRetained: true }))
       .toBe(ADI_CALIBRATION_KIND.TESTED);
@@ -156,9 +174,12 @@ describe("the calibration claim is evidence-backed", () => {
   });
 
   it("asks for the re-test when the evidence is missing", () => {
-    expect(CALIBRATION_EVIDENCE_MISSING_MESSAGE).toMatch(/not available for this run/i);
-    expect(CALIBRATION_EVIDENCE_MISSING_MESSAGE).toMatch(/Re-test calibration/i);
+    expect(CALIBRATION_EVIDENCE_MISSING_MESSAGE).toMatch(/was not retained for this run/i);
+    expect(CALIBRATION_EVIDENCE_MISSING_MESSAGE).toMatch(/Re-run calibration/i);
     expect(CALIBRATION_EVIDENCE_MISSING_MESSAGE).toMatch(/delay, gain and polarity/i);
+    // It states what was kept, never that the system failed or that a lever was
+    // left unevaluated.
+    expect(CALIBRATION_EVIDENCE_MISSING_MESSAGE).not.toMatch(/not available|not evaluated|not tested|failure|error|failed/i);
   });
 
   it("never states the no-improvement claim when the evidence is missing", () => {
@@ -187,6 +208,10 @@ describe("the design recommendation is clear about the move and the result", () 
   const summary = buildAdiDesignerSummary({
     planView: genesisPlanView(),
     presentation: { state: OPTIMISER_PRESENTATION_STATE.PLAN_AVAILABLE },
+    // The published current P20 matches the state the evaluation ran on, so the
+    // run's own before → after pair is the pair the designer is shown.
+    currentP20Deviation: GENESIS_BASELINE.p20VariationDb,
+    currentP20Level: GENESIS_BASELINE.p20Level,
   });
 
   it("names the seating move as the best improvement found", () => {
