@@ -20,6 +20,7 @@
 
 import React, { useRef, useState } from 'react';
 import { Download } from 'lucide-react';
+import { base44 } from '@/api/base44Client';
 import {
   REPORT_FONT_BODY as FONT_BODY,
   REPORT_FONT_HEADING as FONT_HEADING,
@@ -40,15 +41,15 @@ const SOURCE_LABEL = {
 const SCREEN_HIDE = `@media screen { .${NODE_CLASS} { display: none; } }`;
 const PRINT_WINDOW_SHOW = `@media screen { .${NODE_CLASS} { display: block !important; } }`;
 
-export default function ProposalEditCopyPreview({ layer, title = 'Proposal', readOnly = false }) {
+export default function ProposalEditCopyPreview({ layer, proposalId, title = 'Proposal', readOnly = false }) {
   const nodeRef = useRef(null);
   const [exporting, setExporting] = useState(false);
   const [exportError, setExportError] = useState(null);
 
   const sections = layer?.export_sections || [];
 
-  const handleExport = () => {
-    if (!layer?.ready) return;
+  const handleExport = async () => {
+    if (!layer?.ready || readOnly || !proposalId) return;
     const filename = `${title} - Proposal Copy`;
     const win = openReportPrintWindow(filename);
     if (!win) {
@@ -57,12 +58,20 @@ export default function ProposalEditCopyPreview({ layer, title = 'Proposal', rea
     }
     setExportError(null);
     setExporting(true);
-    printReportInWindow(win, {
-      title: filename,
-      node: nodeRef.current,
-      bodyClass: '',
-      extraCss: PRINT_WINDOW_SHOW,
-    }).finally(() => setExporting(false));
+    try {
+      const response = await base44.functions.invoke('readProposalEditLayer', {
+        proposal_id: proposalId, action: 'export', export_kind: 'copy',
+        generation_id: layer.document_validation?.generation_id,
+        edit_id: layer.document_validation?.edit_id, rendered_copy: sections,
+      });
+      if (!response?.data?.layer?.document_validation?.valid) throw new Error(response?.data?.error || 'The complete proposal must pass validation before export.');
+      await printReportInWindow(win, { title: filename, node: nodeRef.current, bodyClass: '', extraCss: PRINT_WINDOW_SHOW });
+    } catch (error) {
+      win.close();
+      setExportError(error?.response?.data?.error || error?.message || 'The proposal copy could not be exported.');
+    } finally {
+      setExporting(false);
+    }
   };
 
   return (

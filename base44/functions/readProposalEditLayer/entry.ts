@@ -1,7 +1,8 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.52';
 import { resolveAccountAccess } from '../../shared/accountAccessAuthority.js';
 import { resolveEditorLayer } from '../../shared/proposalEdit/proposalEditEditorModel.js';
-import { readCompleteDocument } from '../../shared/proposalEdit/readCompleteDocument.js';
+import { readCompleteDocument, readProposalRecords } from '../../shared/proposalEdit/readCompleteDocument.js';
+import { authorizeProposalExport } from '../../shared/proposalEdit/proposalExportAuthorization.js';
 import { GPT_WRITER_FLAG_FIELD, gptWriterClientState, resolveGptWriterFlag } from '../../shared/proposalWriter/proposalWriterFlag.js';
 
 /**
@@ -46,11 +47,10 @@ export default async function(req) {
 
     const query = proposal_id ? { proposal_id } : { draft_proposal_id };
 
-    const generationResult = await base44.entities.ProposalGeneration.filter(query, { sort: '-created_at', limit: 50 });
-    const editResult = await base44.entities.ProposalEdit.filter(query, { sort: '-edited_at', limit: 200 });
-
-    const generationRecords = Array.isArray(generationResult) ? generationResult : (generationResult?.items || []);
-    const editRecords = Array.isArray(editResult) ? editResult : (editResult?.items || []);
+    const [generationRecords, editRecords] = await Promise.all([
+      readProposalRecords(base44.entities.ProposalGeneration, query),
+      readProposalRecords(base44.entities.ProposalEdit, query),
+    ]);
 
     const layer = resolveEditorLayer({
       generationRecords,
@@ -60,22 +60,19 @@ export default async function(req) {
       canViewAudit,
     });
 
+    layer.proposal_id = proposal_id || null;
     if (proposal_id) {
       const proposal = await base44.entities.Proposal.get(proposal_id);
       if (!proposal) return Response.json({ error: 'Proposal not found.' }, { status: 404 });
-      const documentValidation = await readCompleteDocument(base44.entities, proposal);
+      const documentValidation = await readCompleteDocument(base44.entities, proposal, { generationRecords, editRecords });
       layer.document_validation = documentValidation;
       layer.ready = documentValidation.valid;
+      layer.gate = { ...layer.gate, issuable: documentValidation.valid };
       layer.export_blocked_reason = documentValidation.blocked_reason;
+      layer.status_label = documentValidation.valid ? 'Ready to issue' : 'Needs review';
       if (body.action === 'export') {
-        const composition = rows => (rows || []).map(row => ({ type: row.section_type, body: row.body || '', enabled: row.is_enabled !== false })).sort((a, b) => a.type.localeCompare(b.type));
-        if (JSON.stringify(composition(body.rendered_sections)) !== JSON.stringify(composition(documentValidation.document_sections))
-          || JSON.stringify(body.engineering_snapshot) !== JSON.stringify(proposal.engineering_snapshot)) {
-          return Response.json({ error: 'The document changed. Reopen the proposal before exporting.' }, { status: 409 });
-        }
-      }
-      if (body.action === 'export' && !documentValidation.valid) {
-        return Response.json({ error: documentValidation.blocked_reason, validation: documentValidation }, { status: 409 });
+        const authorization = authorizeProposalExport({ validation: documentValidation, proposal, request: body, copy: layer.export_sections });
+        if (!authorization.allowed) return Response.json({ error: authorization.reason }, { status: 409 });
       }
     }
 

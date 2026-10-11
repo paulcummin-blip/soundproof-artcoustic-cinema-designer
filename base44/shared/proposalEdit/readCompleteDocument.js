@@ -1,7 +1,7 @@
 import { validateCompleteDocument } from './completeDocumentValidation.js';
 import { buildOptionGuidance } from '../proposalWriter/writerOptionGuidance.js';
 
-async function records(entity, query) {
+export async function readProposalRecords(entity, query) {
   const rows = [];
   let cursor;
   do {
@@ -14,14 +14,16 @@ async function records(entity, query) {
 }
 
 /** All reads are caller-scoped. This never changes historical records. */
-export async function readCompleteDocument(entities, proposal) {
+export async function readCompleteDocument(entities, proposal, history = {}) {
   const query = { proposal_id: proposal.id };
   const [sections, generationRecords, editRecords, assets] = await Promise.all([
-    records(entities.ProposalSection, query), records(entities.ProposalGeneration, query),
-    records(entities.ProposalEdit, query), records(entities.ProposalAsset, { project_id: proposal.project_id }),
+    readProposalRecords(entities.ProposalSection, query), history.generationRecords || readProposalRecords(entities.ProposalGeneration, query),
+    history.editRecords || readProposalRecords(entities.ProposalEdit, query), readProposalRecords(entities.ProposalAsset, { project_id: proposal.project_id }),
   ]);
   const ids = proposal.selected_version_ids?.length ? proposal.selected_version_ids : [proposal.version_id].filter(Boolean);
   const eligible = assets.filter(asset => asset.scope !== 'version' || ids.includes(asset.version_id));
   return validateCompleteDocument({ proposal, sections, generationRecords, editRecords,
-    optionGuidance: buildOptionGuidance(eligible), privateNotes: eligible.map(asset => asset.comparison_note) });
+    optionGuidance: buildOptionGuidance(eligible), privateNotes: eligible.map(asset => asset.comparison_note),
+    publishedAssetText: eligible.filter(asset => asset.usage !== 'do_not_use' && asset.proposal_importance !== 'Do Not Use')
+      .flatMap(asset => [asset.caption, asset.comparison_option_label, asset.comparison_group]) });
 }

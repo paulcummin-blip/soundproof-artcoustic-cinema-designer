@@ -98,7 +98,7 @@ export default function ProposalEditStatusBanner({ layer, children = null, maste
 
           {bannerMessage && <p style={{ ...TEXT, color: palette.text }}>{bannerMessage}</p>}
 
-          {layer.export_blocked_reason && !layer.legacy && (
+          {layer.export_blocked_reason && (
             <p style={{ ...TEXT, color: palette.text, fontWeight: 600 }}>{layer.export_blocked_reason}</p>
           )}
 

@@ -69,7 +69,7 @@ const TOGGLE = {
   cursor: 'pointer',
 };
 
-export default function ProposalGenerationPanel({ proposal, readOnly = false, onBlockedReasonChange, onLayerChange }) {
+export default function ProposalGenerationPanel({ proposal, readOnly = false, onBlockedReasonChange, onLayerChange, documentRevision = '' }) {
   const {
     layer,
     writer,
@@ -93,11 +93,19 @@ export default function ProposalGenerationPanel({ proposal, readOnly = false, on
   const [showCopy, setShowCopy] = useState(false);
   const [showAudit, setShowAudit] = useState(false);
 
-  const blockReason = loading ? 'Checking complete proposal…' : (error || layer?.export_blocked_reason || null);
+  const blockReason = error || (loading || layer?.proposal_id !== proposal?.id ? 'Checking complete proposal…' : (layer?.export_blocked_reason || null));
 
   useEffect(() => {
-    onLayerChange?.(layer);
-  }, [layer, onLayerChange]);
+    onLayerChange?.(layer?.proposal_id && layer.proposal_id !== proposal?.id ? null : layer);
+  }, [layer, onLayerChange, proposal?.id]);
+
+  // Saved section edits and visibility changes invalidate the previous gate.
+  const previousRevision = React.useRef(documentRevision);
+  useEffect(() => {
+    if (previousRevision.current === documentRevision) return;
+    previousRevision.current = documentRevision;
+    refresh();
+  }, [documentRevision, refresh]);
 
   useEffect(() => {
     if (typeof onBlockedReasonChange === 'function') onBlockedReasonChange(blockReason);
@@ -171,6 +179,7 @@ export default function ProposalGenerationPanel({ proposal, readOnly = false, on
           />
           <ProposalEditCopyPreview
             layer={layer}
+            proposalId={proposal.id}
             title={proposal.title || 'Proposal'}
             readOnly={readOnly}
           />

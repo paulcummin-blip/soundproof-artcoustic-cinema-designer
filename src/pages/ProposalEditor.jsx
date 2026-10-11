@@ -83,11 +83,12 @@ export default function ProposalEditor() {
   // not, and null for a proposal with no generated copy at all.
   const [editLayerBlockReason, setEditLayerBlockReason] = useState('Checking complete proposal…');
   const [documentLayer, setDocumentLayer] = useState(null);
-  const optionsCopy = validatedOptionsCopy(documentLayer);
+  const optionsCopy = documentLayer?.proposal_id === proposal?.id ? validatedOptionsCopy(documentLayer) : '';
   // The approved options prose is printed once: on the Presented Options page
   // when that section is part of the document, otherwise as the lead of the
   // options image page itself.
-  const documentSections = documentLayer?.document_validation?.document_sections || sections.filter(section => section.section_type !== 'presented_options');
+  const currentDocumentLayer = documentLayer?.proposal_id === proposal?.id ? documentLayer : null;
+  const documentSections = currentDocumentLayer?.document_validation?.document_sections || sections.filter(section => section.section_type !== 'presented_options');
   const optionsImageCopy = documentSections.some(
     (section) => section.section_type === 'presented_options'
       && section.is_enabled !== false
@@ -877,6 +878,7 @@ export default function ProposalEditor() {
           readOnly={archived}
           onBlockedReasonChange={setEditLayerBlockReason}
           onLayerChange={setDocumentLayer}
+          documentRevision={JSON.stringify(sections.map(section => [section.id, section.body, section.is_enabled, section.order_index, section.dealer_notes]))}
         />
         {/* Proposal typography scope — cover, section headings and body copy
             follow the Artcoustic rule: Futura PT Light headings, Didact Gothic
@@ -1245,10 +1247,9 @@ export default function ProposalEditor() {
 
       </div>
 
-      {/* Print-only proposal document. Mounted for the lifetime of the editor
-          so "Export Proposal PDF" prints without a render race; hidden on
-          screen and revealed only while the export body class is active. */}
-      <ProposalPrintDocument
+      {/* The print-only document is mounted only after complete validation;
+          export rechecks the same composition on the server before printing. */}
+      {currentDocumentLayer?.document_validation?.valid && <ProposalPrintDocument
         proposal={proposal}
         projectName={projectContext.projectName || proposal?.title}
         dealerName={projectContext.dealerName}
@@ -1261,7 +1262,7 @@ export default function ProposalEditor() {
         validatedOptionsCopy={optionsImageCopy}
         projectImages={packImages}
         recoveredComparisonTable={comparisonTableForDisplay}
-      />
+      />}
       <ProposalPrintStyles />
     </div>
     </ProposalRenderBoundary>

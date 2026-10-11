@@ -87,7 +87,7 @@ export function buildOptionGuidance(assets = []) {
   const groups = names.map((name) => {
     const ordered = orderedImages(images, name);
     const options = ordered
-      .map((asset) => recorded(asset.comparison_option_label) || recorded(asset.caption) || (asset.seating_style === 'lounge' ? 'Lounge seating' : asset.seating_style === 'recliner' ? 'Cinema recliners' : null))
+      .map((asset, index) => recorded(asset.comparison_option_label) || recorded(asset.caption) || (asset.seating_style === 'lounge' ? 'Lounge seating' : asset.seating_style === 'recliner' ? 'Cinema recliners' : `Option ${index + 1}`))
       .filter(Boolean);
     const note = ordered.map((asset) => recorded(asset.comparison_note)).find(Boolean) || null;
     return { group: name, options, note, image_count: ordered.length };

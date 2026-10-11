@@ -51,9 +51,12 @@ test('every writer section is published into the proposal and none is dropped', 
 
   assert.deepEqual(unmapped, [], 'a writer section had no section to be published into');
 
-  // The published writer sections, in document order, are the whole draft.
+  // The approved document order is SECTION_TYPES, not the writer's JSON order.
+  // Every writer section still reaches exactly one published home.
   const published = bodies.flatMap((body) => body.writer_sections);
-  assert.deepEqual(published, [...WRITER_SECTION_IDS]);
+  assert.deepEqual([...published].sort(), [...WRITER_SECTION_IDS].sort());
+  assert.equal(published.length, new Set(published).size);
+  assert.deepEqual(bodies.map((body) => body.section_type), SECTION_TYPES.filter((type) => bodies.some((body) => body.section_type === type)));
 
   // Every body lands on a section the report type really has.
   for (const body of bodies) {
@@ -204,7 +207,8 @@ test('the report section vocabulary and its frontend mirror agree', () => {
     assert.ok(start >= 0, 'SYSTEM_SUMMARY_SECTIONS not found');
     const block = source
       .slice(start, source.indexOf('\n];', start))
-      .replace(/HIGHLIGHTS_SECTION_TYPE/g, "'key_performance_highlights'");
+      .replace(/HIGHLIGHTS_SECTION_TYPE/g, "'key_performance_highlights'")
+      .replace(/PRESENTED_OPTIONS_SECTION_TYPE/g, "'presented_options'");
     return [...block.matchAll(/type:\s*'([a-z_]+)'/g)].map((match) => match[1]);
   };
 
