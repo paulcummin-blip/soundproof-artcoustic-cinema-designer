@@ -21,6 +21,14 @@
 
 import { describe, expect, it } from "vitest";
 import fs from "node:fs";
+import React from 'react';
+import { renderToStaticMarkup } from 'react-dom/server';
+import AdiCalibrationSection from '../components/room/bass/optimiserPlan/AdiCalibrationSection.jsx';
+import { ADI_CALIBRATION_KIND } from '../components/room/bass/optimiserPlan/adiPanelSections.js';
+import { buildOptimiserResultForSave } from '../components/room/bass/optimiserPlan/optimiserPlanSave.js';
+import { serializeOptimiserPlan, hydrateOptimiserPlan } from '../components/room/bass/optimiserPlan/optimiserPlanPersistence.js';
+import { getOptimiserPlanAuthority, resetOptimiserPlanAuthority } from '../components/room/bass/optimiserPlan/optimiserPlanStore.js';
+import savedCalibrationDecision from '../components/room/bass/optimiserPlan/savedCalibrationDecision.js';
 
 import { gradeP20FromRaw } from "../components/room/bass/completedBassResultPersistence.js";
 import { gradeP19, gradeP20 } from "../components/utils/rp22/bassGradingAuthority.js";
@@ -358,6 +366,84 @@ describe("the recorded reason and the panel copy", () => {
     for (const path of sources) {
       expect(read(path)).not.toContain("Improvement found — not applied");
     }
+  });
+});
+
+describe('Genesis saved-result refresh regression', () => {
+  const identity = { projectId: 'genesis-fixture', versionId: 'original-fixture', designFingerprint: 'genesis-design', resultFingerprint: 'genesis-result' };
+  const save = (decisionApplied) => {
+    const selection = genesisSelection();
+    const calibrationDecision = resolveCalibrationApplicationPlan({ baseline: baseline(), selection, instances: instances() });
+    return buildOptimiserResultForSave({ selection, identity, calibrationDecision, decisionApplied }).runEvidence;
+  };
+  const reopen = (record) => {
+    const stored = JSON.parse(JSON.stringify(serializeOptimiserPlan(record)));
+    resetOptimiserPlanAuthority(identity.projectId, identity.versionId);
+    hydrateOptimiserPlan(identity.projectId, identity.versionId, stored);
+    return getOptimiserPlanAuthority(identity.projectId, identity.versionId);
+  };
+
+  it('persists every candidate decision through saved terminal evidence and cold hydration', () => {
+    const restored = reopen(save(true));
+    expect(restored.calibrationDecision.candidateDecisions).toHaveLength(3);
+    expect(restored.calibrationEvidence.candidateDecisions.find((c) => c.lever === 'delay').outcome).toBe('applied');
+    const gain = restored.calibrationEvidence.candidateDecisions.find((c) => c.lever === 'gain');
+    expect(gain.outcome).toBe('held');
+    expect(gain.reason).toBe(CALIBRATION_APPLY_REASON.STRONGER_CANDIDATE_SELECTED);
+    expect(gain.statement).toContain('delay candidate');
+    expect(restored.calibrationDecision.perLever.gain.decision).toBe(CALIBRATION_APPLY_DECISION.HOLD);
+    expect(restored.decisionApplied).toBe(true);
+  });
+
+  it('renders the applied delay and held gain reason from refreshed saved data', () => {
+    const restored = reopen(save(true));
+    const html = renderToStaticMarkup(React.createElement(AdiCalibrationSection, {
+      kind: ADI_CALIBRATION_KIND.APPLIED,
+      appliedEvidence: savedCalibrationDecision(restored),
+      evidenceState: resolveCalibrationEvidenceState(restored.calibrationEvidence),
+    }));
+    expect(html).toContain('ADI Applied Bass Calibration');
+    expect(html).toContain('17:1');
+    expect(html).toContain('Not applied because the delay candidate gives the stronger calibration improvement.');
+    expect(html).not.toContain('Improvement found — not applied');
+  });
+
+  it('never labels an evaluated but unapplied run as applied after refresh', () => {
+    const restored = reopen(save(false));
+    expect(savedCalibrationDecision(restored).decision).toBe(CALIBRATION_APPLY_DECISION.HOLD);
+    expect(restored.calibrationEvidence.candidateDecisions.find((c) => c.lever === 'delay').outcome).toBe('held');
+    const html = renderToStaticMarkup(React.createElement(AdiCalibrationSection, {
+      kind: ADI_CALIBRATION_KIND.HELD,
+      appliedEvidence: savedCalibrationDecision(restored),
+      evidenceState: resolveCalibrationEvidenceState(restored.calibrationEvidence),
+    }));
+    expect(html).not.toContain('data-adi-applied-calibration');
+    expect(html).toContain('did not apply it');
+  });
+
+  it('retains rejected candidate reasons without changing rejection authority', () => {
+    const base = confirmed({ id: 'current', p19: 2.6, p19Level: 'L4', p20: 20, kind: 'current' });
+    const rejected = confirmed({ id: 'delay-rejected', p19: 3.6, p19Level: 'L4', p20: 19, tuning: tuning({ rearMs: 1 }) });
+    const selection = selectionWith({ base, delay: rejected });
+    const calibrationDecision = resolveCalibrationApplicationPlan({ baseline: base, selection, instances: instances() });
+    const result = buildOptimiserResultForSave({ selection, identity, calibrationDecision }).runEvidence;
+    const restored = reopen(result);
+    const candidate = restored.calibrationEvidence.candidateDecisions[0];
+    expect(candidate.outcome).toBe('rejected');
+    expect(candidate.applied).toBe(false);
+    expect(candidate.reason).toBe(CALIBRATION_APPLY_REASON.TRADEOFF_DAMAGE_EXCEEDS_BENEFIT);
+    expect(describeCalibrationLever(restored.calibrationEvidence.levers.delay)).toContain('trade-off');
+    expect(candidate.statement).toContain('trade-off');
+  });
+
+  it('retains multiple candidates for a lever and marks the actual strongest one', () => {
+    const selection = genesisSelection();
+    selection.calibrationDiagnostics.options.unshift(optionFor(confirmed({ id: 'delay-weaker', p19: 0.6, p19Level: 'L4', p20: 24, tuning: tuning({ rearMs: 1 }) })));
+    const decision = resolveCalibrationApplicationPlan({ baseline: baseline(), selection, instances: instances() });
+    expect(decision.perLever.delay.candidateId).toBe('delay:-3');
+    expect(decision.perLever.delay.applied).toBe(true);
+    expect(decision.candidateDecisions.filter((c) => c.lever === 'delay')).toHaveLength(2);
+    expect(decision.candidateDecisions.find((c) => c.candidateId === 'delay-weaker').reason).toBe(CALIBRATION_APPLY_REASON.STRONGER_CANDIDATE_SELECTED);
   });
 });
 

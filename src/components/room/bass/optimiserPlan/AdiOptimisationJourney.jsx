@@ -50,6 +50,7 @@ import OptimiserCalculationDetail from "./OptimiserCalculationDetail.jsx";
 import AdiTestedOptionsTable from "./AdiTestedOptionsTable.jsx";
 import AdiTestedSection from "./AdiTestedSection.jsx";
 import AdiCalibrationSection from "./AdiCalibrationSection.jsx";
+import savedCalibrationDecision from "./savedCalibrationDecision.js";
 import AdiDesignRecommendationSection from "./AdiDesignRecommendationSection.jsx";
 import AdiPanelSummary from "./AdiPanelSummary.jsx";
 import AdiEngineerEvidenceBlock from "./AdiEngineerEvidenceBlock.jsx";
@@ -317,7 +318,7 @@ export default function AdiOptimisationJourney({
   // The decision ADI recorded for THIS run, or — when this session's own record
   // is gone after a refresh — the decision saved with the run, so the section
   // states the same thing and never falls back to a bare "not applied".
-  const calibrationApplyEvidence = appliedCalibrationEvidence || planView?.calibrationDecision || null;
+  const calibrationApplyEvidence = appliedCalibrationEvidence || savedCalibrationDecision(planView);
   const calibrationKind = resolveCalibrationSectionKind({
     decision: calibrationApplyEvidence?.decision || null,
     hasPersistedValues: Array.isArray(persistedAppliedCalibration?.values)

@@ -393,7 +393,7 @@ export default function OptimiseAndCalculate({
         instances: subInstancesRef.current,
         appliedCalibration: getAppliedCalibrationAuthority(projectId, versionId),
       });
-      const calibrationApplied = Boolean(calibrationApplication.selected);
+      let calibrationApplied = false;
 
       const publishCurrentAdiRecommendation = async () => {
         const fingerprint = sharedRef.current?.completedBassAuthority?.contract?.job?.resultFingerprint
@@ -487,7 +487,7 @@ export default function OptimiseAndCalculate({
 
         const recommendationForPublication = {
           ...result.recommendation,
-          optimiserPlan: persistedPlan || undefined,
+          optimiserPlan: persistedPlan || runEvidence || undefined,
           publishedAdiDecision: decision?.recommendation ? {
             outcome: decision.outcome,
             intent: decision.intent,
@@ -537,7 +537,7 @@ export default function OptimiseAndCalculate({
       // It never applies a PHYSICAL change, an unconfirmed result, or an
       // overwrite of calibration a human set by hand. Those are stated and left
       // to the designer. The only thing this path can write is the tuning.
-      const hasCal = calibrationApplied;
+      const hasCal = Boolean(calibrationApplication.selected);
 
       if (calibrationApplication.tuning.length > 0) {
         const rspPosition = buildAuthoritativeRspPosition(roomDims, appState?.mlpY_m, appState?.mlpX_m, appState?.designatedRspSeatId);
@@ -556,6 +556,9 @@ export default function OptimiseAndCalculate({
           } catch { return null; }
         })();
 
+        if (hasCal && (!basisFp || !commitInstances)) {
+          throw new Error("The safe calibration could not be applied. The saved decision remains unapplied.");
+        }
         if (basisFp) {
           // 1. Build recommendationValues from the tuning ADI decided to apply:
           //    the selected safe calibration candidate, or the optimiser's own
@@ -584,20 +587,15 @@ export default function OptimiseAndCalculate({
           //    decision held back is left for the designer — never applied
           //    silently, whatever it would have gained.
           if (hasCal) {
-            try {
-              acceptRecommendation(projectId, versionId, {
-                currentGeometryFingerprint: basisFp,
-              });
-              if (commitInstances) {
-                const newInstances = applyRecommendationToInstances(
-                  subInstancesRef.current,
-                  recommendationValues,
-                );
-                commitInstances(newInstances);
-              }
-            } catch {
-              // Accept transition failed — non-fatal, workflow continues
-            }
+            acceptRecommendation(projectId, versionId, {
+              currentGeometryFingerprint: basisFp,
+            });
+            const newInstances = applyRecommendationToInstances(
+              subInstancesRef.current,
+              recommendationValues,
+            );
+            commitInstances(newInstances);
+            calibrationApplied = true;
           } else {
             // Not applied — a trade-off, an immaterial or ambiguous result, or a
             // hand-set calibration. The recommendation is ready for the designer

@@ -198,9 +198,27 @@ export function resolveCalibrationApplicationPlan({
     if (!selected || isStronger(entry.decision, selected.decision)) selected = entry;
   }
 
+  // Keep every confirmed candidate's effective decision, not just one per lever.
+  const candidateDecisions = evaluated.map((entry) => {
+    const applied = entry === selected;
+    const superseded = !applied && selected
+      && entry.decision.decision === CALIBRATION_APPLY_DECISION.APPLIED;
+    return {
+      lever: entry.lever,
+      candidateId: entry.candidateId,
+      applied,
+      decision: superseded ? CALIBRATION_APPLY_DECISION.HOLD : entry.decision.decision,
+      reason: superseded ? CALIBRATION_APPLY_REASON.STRONGER_CANDIDATE_SELECTED : entry.decision.reason,
+      statement: applied ? entry.decision.statement : notAppliedStatement({ entry, selected }),
+      decisionRecord: entry.decision,
+    };
+  });
+
   const perLever = {};
   for (const lever of CALIBRATION_CANDIDATE_ORDER) {
-    const entry = evaluated.find((candidate) => candidate.lever === lever);
+    const entries = evaluated.filter((candidate) => candidate.lever === lever);
+    const entry = selected?.lever === lever ? selected : entries.reduce((best, candidate) =>
+      !best || isStronger(candidate.decision, best.decision) ? candidate : best, null);
     if (!entry) {
       perLever[lever] = null;
       continue;
@@ -210,8 +228,8 @@ export function resolveCalibrationApplicationPlan({
       lever,
       applied,
       candidateId: entry.candidateId,
-      decision: entry.decision.decision,
-      reason: entry.decision.reason,
+      decision: candidateDecisions.find((candidate) => candidate.lever === lever && candidate.candidateId === entry.candidateId).decision,
+      reason: candidateDecisions.find((candidate) => candidate.lever === lever && candidate.candidateId === entry.candidateId).reason,
       // Stated for a lever that improved but was not applied. Null when the lever
       // is the one applied, or when it produced no improvement to hold.
       statement: applied ? null : notAppliedStatement({ entry, selected }),
@@ -244,6 +262,7 @@ export function resolveCalibrationApplicationPlan({
       }
       : null,
     candidateCount: evaluated.length,
+    candidateDecisions,
     perLever,
   };
 }

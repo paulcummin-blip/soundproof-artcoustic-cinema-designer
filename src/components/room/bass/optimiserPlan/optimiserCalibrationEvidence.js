@@ -25,6 +25,7 @@
 import { readRspP19 } from "../improveBassV2/p19Authority.js";
 import { POLARITY_NOT_EVALUATED_REASON } from "./optimiserPlanConstants.js";
 import { deviationText } from "./optimiserWholeNumberDb.js";
+import { savedCalibrationCandidates } from "./savedCalibrationDecision.js";
 import {
   CALIBRATION_NO_DECISION_RECORDED_REASON,
   CALIBRATION_READY_TO_APPLY_REASON,
@@ -98,7 +99,8 @@ const RESULT_LABEL = Object.freeze({
  */
 export function calibrationOutcomeLabel(record) {
   if (!record) return null;
-  if (record.result === CALIBRATION_EVIDENCE_RESULT.IMPROVEMENT_NOT_APPLIED) {
+  if (record.result === CALIBRATION_EVIDENCE_RESULT.IMPROVEMENT_NOT_APPLIED
+    || record.result === CALIBRATION_EVIDENCE_RESULT.TRADE_OFF) {
     return record.notAppliedReason
       || RESULT_LABEL[CALIBRATION_EVIDENCE_RESULT.IMPROVEMENT_NOT_APPLIED];
   }
@@ -596,7 +598,8 @@ function applyDecisionToLever(record, lever, { decision = null, decisionApplied 
     };
   }
 
-  if (record.result !== CALIBRATION_EVIDENCE_RESULT.IMPROVEMENT_NOT_APPLIED) {
+  if (record.result !== CALIBRATION_EVIDENCE_RESULT.IMPROVEMENT_NOT_APPLIED
+    && record.result !== CALIBRATION_EVIDENCE_RESULT.TRADE_OFF) {
     return { ...record, decision: entry?.decision || null, decisionReason: entry?.reason || null };
   }
 
@@ -649,6 +652,7 @@ export function buildCalibrationEvidence({
     // The decision travels with the evidence, so the panel and any reader of the
     // saved record resolve what ADI did — and why — from one place.
     decision: calibrationDecision || null,
+    candidateDecisions: savedCalibrationCandidates(calibrationDecision, decisionApplied),
     decisionApplied: decisionApplied === true,
   };
 }
