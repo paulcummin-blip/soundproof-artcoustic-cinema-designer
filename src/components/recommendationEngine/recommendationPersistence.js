@@ -56,7 +56,7 @@ export async function publishRecommendation(projectId, versionId, recommendation
   const write = previousWrite.catch(() => {}).then(async () => {
     for (let attempt = 0; attempt < 20; attempt += 1) {
       try {
-        const record = await readProjectAnalysisCacheRecord(projectId, versionId);
+        const record = await readProjectAnalysisCacheRecord(projectId, versionId, { force: true });
         const completedByFingerprint = record?.completed_by_fingerprint || {};
         const snapshot = completedByFingerprint[resultFingerprint];
         if (record && snapshot) {
@@ -112,7 +112,7 @@ export async function hydrateRecommendation(projectId, versionId, resultFingerpr
   if (memoryByProject.has(key)) return;
 
   try {
-    const record = await readProjectAnalysisCacheRecord(projectId, versionId);
+    const record = await readProjectAnalysisCacheRecord(projectId, versionId, { force: true });
 
     if (!record) return;
 
