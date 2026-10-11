@@ -20,6 +20,7 @@ import {
 import ImageScopeBadge from '@/components/library/ImageScopeBadge';
 import ImageScopeSelect from '@/components/library/ImageScopeSelect';
 import ImageProposalControls from '@/components/library/ImageProposalControls';
+import { comparisonGroupsOf } from '@/components/proposal/images/proposalImagePlacementAuthority';
 
 /**
  * Project gallery panel — one Cover Image plus Image 1 to Image 10.
@@ -73,6 +74,14 @@ export default function ProposalAssetsPanel({
   }, [load]);
 
   const grouped = useMemo(() => groupImagesByScope(assets), [assets]);
+
+  // The comparison groups this project's images already name, offered as a
+  // shortcut on each card so a second image joins the same group by name. Read
+  // from the one comparison authority, never re-derived here.
+  const comparisonGroupOptions = useMemo(
+    () => comparisonGroupsOf(assets).map((group) => group.name),
+    [assets],
+  );
 
   // The galleries on screen: the project-wide gallery, and each version's own.
   // Each scope fills its own Cover Image and Image 1 to Image 10, so an image
@@ -242,6 +251,23 @@ export default function ProposalAssetsPanel({
   };
 
   /**
+   * This image's part in a deliberate comparison: whether it is marked, which
+   * group it belongs to, what option it stands for, the group's message and
+   * where it reads. Presentation only — the file, the caption, the scope and
+   * every engineering value stay exactly as they are.
+   */
+  const handleComparisonChange = async (asset, patch) => {
+    if (!asset?.id) return;
+    try {
+      await base44.entities.ProposalAsset.update(asset.id, patch);
+      setAssets((prev) => prev.map((a) => (a.id === asset.id ? { ...a, ...patch } : a)));
+    } catch (err) {
+      console.error('Failed to change the comparison:', err);
+      alert('Failed to change this comparison. Please try again.');
+    }
+  };
+
+  /**
    * Move an image into this gallery's cover slot, and the image already there
    * into the slot this one leaves. Both records, files, captions and scopes are
    * kept: only the slot each image occupies is exchanged.
@@ -371,9 +397,11 @@ export default function ProposalAssetsPanel({
                       <ImageProposalControls
                         asset={existing}
                         canUseAsCover={slot !== ASSET_SLOT.COVER}
+                        comparisonGroupOptions={comparisonGroupOptions}
                         onUsageChange={(usage) => handleUsageChange(existing, usage)}
                         onSeatingChange={(value) => handleSeatingChange(existing, value)}
                         onFocalChange={(patch) => handleFocalChange(existing, patch)}
+                        onComparisonChange={(patch) => handleComparisonChange(existing, patch)}
                         onUseAsCover={() => handleUseAsCover(group, slot, existing)}
                       />
                     )}

@@ -1,5 +1,6 @@
 import React from 'react';
 import AdiSuggestionChips from '@/components/proposal/wizard/AdiSuggestionChips';
+import ComparisonMessagePrompt from '@/components/proposal/wizard/ComparisonMessagePrompt';
 import { appendSelectedPrompts } from '@/components/proposal/wizard/clientBriefChips';
 
 /**
@@ -76,6 +77,11 @@ export default function ClientBriefStep({
         snapshotLoading={snapshotLoading}
         onAddSelected={handleAddSelected}
       />
+
+      {/* Asked only when the project's Library holds comparison images that
+          state no message of their own: the note the designer writes here is
+          what the comparison page prints above both options. */}
+      <ComparisonMessagePrompt projectId={projectId} />
 
       <div className="mt-6 p-3 bg-[#F5F4F0] border-l-2 border-[#213428] rounded-r">
         <p className="text-[11px] text-[#625143] leading-relaxed">

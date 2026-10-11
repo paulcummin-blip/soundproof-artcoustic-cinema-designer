@@ -27,6 +27,7 @@ import ProposalCoverPage from '@/components/proposal/cover/ProposalCoverPage';
 import ProjectImagesBlock, { projectGalleryImages } from '@/components/proposal/ProjectImagesBlock';
 import ProposalImagePlacement from '@/components/proposal/print/ProposalImagePlacement';
 import SeatingStylePage from '@/components/proposal/print/SeatingStylePage';
+import ComparisonPagesPreview from '@/components/proposal/editor/ComparisonPagesPreview';
 import {
   composeSectionSlots,
   planProposalImages,
@@ -712,6 +713,13 @@ export default function ProposalEditor() {
     }),
   }), [packImages, sections, proposal?.proposal_type, projectContext.coverImageUrl]);
 
+  // The comparison group pages the plan composed: previewed from the same plan
+  // the printed pack composes, so the preview and the PDF show the same page.
+  const comparisonPreviewGroups = imagePlan.comparisonPages || [];
+  const comparisonPreviewAnchored = comparisonPreviewGroups.length > 0
+    && !!imagePlan.seatingPageAnchorType
+    && visibleSections.some((section) => section.section_type === imagePlan.seatingPageAnchorType);
+
   // ── Export — full proposal PDF ──
   // Exports the whole proposal (every enabled section). Section-level export is
   // not implemented, so it is deliberately not exposed.
@@ -950,6 +958,15 @@ export default function ProposalEditor() {
                     </div>
                   </div>
                 )}
+
+                {/* Each comparison group's own page, previewed where it prints:
+                    the designer's message, the options full width, in order. */}
+                {comparisonPreviewAnchored && section.section_type === imagePlan.seatingPageAnchorType && (
+                  <ComparisonPagesPreview
+                    groups={comparisonPreviewGroups}
+                    roleStyle={proposalRoleStyle}
+                  />
+                )}
               <div
                 className={`mb-12 ${isActive ? '' : 'opacity-60'}`}
                 onClick={() => setActiveSectionKey(section.section_key)}
@@ -1112,6 +1129,12 @@ export default function ProposalEditor() {
               </React.Fragment>
             );
           })}
+
+          {/* A comparison page whose anchor section was not composed still
+              belongs in the document, exactly where the printed pack places it. */}
+          {!comparisonPreviewAnchored && (
+            <ComparisonPagesPreview groups={comparisonPreviewGroups} roleStyle={proposalRoleStyle} />
+          )}
         </div>
       </div>
 

@@ -14,6 +14,7 @@
  */
 
 import React from 'react';
+import ImageComparisonControls from '@/components/library/ImageComparisonControls';
 import {
   FOCAL_HORIZONTAL,
   FOCAL_VERTICAL,
@@ -43,9 +44,13 @@ const FOCAL_VERTICAL_OPTIONS = [
 export default function ImageProposalControls({
   asset,
   canUseAsCover = false,
+  // The comparison groups already named on this project, offered to this image's
+  // comparison controls so two images are put in one group by name.
+  comparisonGroupOptions = [],
   onUsageChange,
   onSeatingChange,
   onFocalChange,
+  onComparisonChange,
   onUseAsCover,
 }) {
   if (!asset) return null;
@@ -134,6 +139,16 @@ export default function ImageProposalControls({
               </select>
             </div>
           </div>
+
+          {/* A comparison is a deliberate set the designer marks: one option of
+              two or more shown together on their own page, in the designer's own
+              words. Nothing is inferred, and nothing here changes the file, the
+              caption or any engineering value. */}
+          <ImageComparisonControls
+            asset={asset}
+            groupOptions={comparisonGroupOptions}
+            onChange={(patch) => onComparisonChange(patch)}
+          />
         </>
       )}
     </div>

@@ -331,6 +331,9 @@ export function planProposalImages({ assets = [], sectionSlots = [], coverAssetI
         && placement.comparison_group === group.name),
     })),
     galleryImages,
+    // The images the designer marked as comparison options, so the plan can be
+    // checked against where they actually landed.
+    comparisonImageIds: [...comparisonIds],
     retainedGallery: galleryImages.length >= RETAINED_GALLERY_MIN_IMAGES,
     usableCount,
     sourceUseCount: Object.fromEntries(
