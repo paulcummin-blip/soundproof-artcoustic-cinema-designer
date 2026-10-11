@@ -120,6 +120,8 @@ export function fetchDurablePublication(
         status: data.status || 'not_calculated',
         version: data.version || null,
         acknowledgement: data.acknowledgement || null,
+        // Call-owned identity: historical reports request their frozen publication.
+        requestedEngineeringFingerprint: engineeringFingerprint || null,
         readState: 'success',
         error: null,
       };
