@@ -81,7 +81,9 @@ export function auditDurablePublication({
     );
   }
 
-  if (!durable?.publication || !durable?.version?.published_fingerprint) {
+  const expectedFingerprint = durable?.requestedEngineeringFingerprint
+    || durable?.version?.published_fingerprint;
+  if (!durable?.publication || !expectedFingerprint) {
     // Not published, or the version pointer references a publication that is not
     // there. Either way there is no authority to report from.
     const missing = attempt?.missing || [];
@@ -99,7 +101,9 @@ export function auditDurablePublication({
   }
 
   const audited = auditPublicationEntry(durable.publication, {
-    expectedFingerprint: durable.version.published_fingerprint,
+    // Current reads still require the current version pointer. Frozen report
+    // reads require the explicitly requested, server-read publication instead.
+    expectedFingerprint,
     project,
     bassAuthorityAvailable: authorityComplete === true,
   });
