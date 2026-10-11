@@ -15,7 +15,6 @@
 
 import React from "react";
 import {
-  COMBINED_EVIDENCE_MISSING_DETAIL,
   CALIBRATION_EVIDENCE_STATUS,
   combinedCalibrationEvidence,
   describeCombinedCalibration,
@@ -58,23 +57,20 @@ export default function AdiCombinedCalibrationEvidence({ evidence = null, classN
 
   return (
     <div className={`space-y-0.5 ${className}`} data-adi-combined-calibration-evidence="true">
-      <div className="text-[10px] font-semibold uppercase tracking-wide text-[#8A7B6A]">
-        Combined calibration
-      </div>
-
       {retained ? (
-        <Line
-          label={composition || combined.label || "Combined calibration"}
-          text={[
-            combined.candidateId || "candidate id not recorded",
-            describeCombinedCalibration(combined) || null,
-          ].filter(Boolean).join(" · ")}
-        />
-      ) : (
-        <div className="text-[11px] text-[#8A7B6A] leading-relaxed">
-          {COMBINED_EVIDENCE_MISSING_DETAIL}
-        </div>
-      )}
+        <>
+          <div className="text-[10px] font-semibold uppercase tracking-wide text-[#8A7B6A]">
+            Combined calibration
+          </div>
+          <Line
+            label={composition || combined.label || "Combined calibration"}
+            text={[
+              describeCombinedCalibration(combined) || null,
+              combined.bestCandidate?.candidateId || "candidate id not recorded",
+            ].filter(Boolean).join(" · ")}
+          />
+        </>
+      ) : null}
 
       {decisions.length > 0 && (
         <div className="space-y-0.5">

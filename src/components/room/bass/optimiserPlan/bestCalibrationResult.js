@@ -25,9 +25,9 @@
 import {
   CALIBRATION_APPLY_DECISION,
   CALIBRATION_APPLY_REASON,
+  formatLevelValue,
 } from "../optimiseWorkflow/adiCalibrationAutoApplyAuthority.js";
 import { combinedCalibrationEvidence } from "./optimiserCalibrationEvidence.js";
-import { deviationText, levelText } from "./optimiserWholeNumberDb.js";
 
 /** The headline the Safe calibration adjustments section leads with. */
 export const BEST_CALIBRATION_RESULT_HEADLINE = "Best calibration result";
@@ -52,8 +52,6 @@ const PART_WORD = Object.freeze({
 
 /** The settings the decision records, in the order the panel names them. */
 const SETTING_ORDER = Object.freeze(["All-pass phase", "Delay", "Gain trim", "Polarity"]);
-
-const UNAVAILABLE = "unavailable";
 
 function cap(text) {
   return text ? `${text.charAt(0).toUpperCase()}${text.slice(1)}` : text;
@@ -111,19 +109,22 @@ function adjustmentPhrase(parts = []) {
   return `combined ${words.slice(0, -1).join(", ")} and ${words[words.length - 1]} adjustment`;
 }
 
-/** "L1 / ±27 dB" — the published level with the whole-number deviation. */
+/**
+ * "L1 / 27.4 dB" — the SAME presentation the applied-calibration block below
+ * prints, so the headline and the settings it changed can never disagree. A
+ * value the decision did not carry is never printed as a number.
+ */
 function valueText(level, deviationDb) {
-  const levelPart = levelText(level);
-  const deviationPart = num(deviationDb) == null ? null : deviationText(num(deviationDb));
-  if (levelPart && deviationPart) return `${levelPart} / ${deviationPart}`;
-  return deviationPart || levelPart || null;
+  return formatLevelValue(level, deviationDb);
+}
+
+function hasValue(pair) {
+  return num(pair?.deviationDb) != null || pair?.level != null;
 }
 
 function pairText(label, before, after) {
-  const beforeText = valueText(before?.level, before?.deviationDb);
-  const afterText = valueText(after?.level, after?.deviationDb);
-  if (!beforeText && !afterText) return null;
-  return `${label} ${beforeText || UNAVAILABLE} → ${afterText || UNAVAILABLE}`;
+  if (!hasValue(before) && !hasValue(after)) return null;
+  return `${label} ${valueText(before?.level, before?.deviationDb)} → ${valueText(after?.level, after?.deviationDb)}`;
 }
 
 /**
@@ -155,9 +156,10 @@ export function resolveBestCalibrationResult({ decision = null, evidence = null 
 
   const settingsRows = Array.isArray(decision.settings) ? decision.settings : [];
   const combined = combinedCalibrationEvidence(evidence);
+  const combinedCandidateId = combined?.bestCandidate?.candidateId || null;
   const appliedCandidateId = decision.selected?.candidateId || decision.candidateId || null;
-  const appliedIsCombined = Boolean(combined?.candidateId && appliedCandidateId
-    && String(combined.candidateId) === String(appliedCandidateId));
+  const appliedIsCombined = Boolean(combinedCandidateId && appliedCandidateId
+    && String(combinedCandidateId) === String(appliedCandidateId));
 
   // The settings the decision changed are the authority for what the selected
   // result retuned. Only when it kept none is the combined record read instead.
@@ -210,7 +212,7 @@ export function resolveBestCalibrationResult({ decision = null, evidence = null 
     composition,
     appliedIsCombined,
     candidateId: appliedCandidateId,
-    combinedCandidateId: combined?.candidateId || null,
+    combinedCandidateId,
     // Stated only when the result the decision names was applied by ADI.
     statement: applied && phrase ? `ADI applied the ${phrase}.` : null,
     heldSentence,

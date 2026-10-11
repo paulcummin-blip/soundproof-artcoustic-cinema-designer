@@ -732,9 +732,17 @@ export function buildCalibrationEvidence({
     levers[key] = applyDecisionToLever(measured[key], key, { decision: calibrationDecision, decisionApplied });
   }
 
+  // The combined calibration result, recorded beside the isolated levers: what
+  // the combined retune produced, and whether that was the result applied. A run
+  // whose ONLY retained result is the combined one keeps its evidence too.
+  const combined = buildCombinedEvidence({
+    selection, baseline: baselineResult, appliedCandidateId,
+  });
+
   // Nothing at all was retained: the record is absent rather than empty, so the
   // panel states the missing-evidence message instead of an empty table.
-  if (!CALIBRATION_EVIDENCE_LEVERS.some((key) => levers[key].evidenceStatus === CALIBRATION_EVIDENCE_STATUS.RETAINED)) {
+  if (combined?.evidenceStatus !== CALIBRATION_EVIDENCE_STATUS.RETAINED
+    && !CALIBRATION_EVIDENCE_LEVERS.some((key) => levers[key].evidenceStatus === CALIBRATION_EVIDENCE_STATUS.RETAINED)) {
     return null;
   }
 
@@ -742,11 +750,10 @@ export function buildCalibrationEvidence({
     schemaVersion: CALIBRATION_EVIDENCE_SCHEMA_VERSION,
     recordedAt: new Date().toISOString(),
     levers,
-    // The combined calibration result, recorded beside the isolated levers: what
-    // the combined retune produced, and whether that was the result applied.
-    combined: buildCombinedEvidence({
-      selection, baseline: baselineResult, appliedCandidateId,
-    }),
+    // Written only when the run recorded something about the combined search: a
+    // result, or that it searched and confirmed none. A run that never reached a
+    // combined retune says nothing rather than claiming one was absent.
+    combined: combined?.evidenceStatus === CALIBRATION_EVIDENCE_STATUS.RETAINED ? combined : null,
     // The decision travels with the evidence, so the panel and any reader of the
     // saved record resolve what ADI did — and why — from one place.
     decision: calibrationDecision || null,
