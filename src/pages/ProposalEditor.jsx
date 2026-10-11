@@ -713,6 +713,13 @@ export default function ProposalEditor() {
     }),
   }), [packImages, sections, proposal?.proposal_type, projectContext.coverImageUrl]);
 
+  // The sections this document actually shows: a section with no definition is
+  // never rendered, and a section the designer switched off is not previewed.
+  // Both are initialized HERE — before the comparison anchoring below reads
+  // them — so no consumer can ever reach them first.
+  const readableSections = sections.filter((s) => !!getSectionDef(s.section_type));
+  const visibleSections = readableSections.filter((s) => s.is_enabled !== false);
+
   // The comparison group pages the plan composed: previewed from the same plan
   // the printed pack composes, so the preview and the PDF show the same page.
   const comparisonPreviewGroups = imagePlan.comparisonPages || [];
@@ -760,7 +767,6 @@ export default function ProposalEditor() {
 
   const goToProposalCentre = () => navigate('/ProposalCentre');
   const goToRegeneration = () => navigate(`/ProposalCentre?regenerateFrom=${proposalId}`);
-  const readableSections = sections.filter((s) => !!getSectionDef(s.section_type));
   const editorView = resolveProposalEditorState({
     loading,
     loadError,
@@ -792,7 +798,6 @@ export default function ProposalEditor() {
     projectReadFailed: !!proposal?.project_id && !projectContext.projectName,
   });
 
-  const visibleSections = readableSections.filter((s) => s.is_enabled !== false);
   const typeLabel = getProposalTypeLabel(proposal?.proposal_type);
   const hasUnsavedChanges = dirtySections.size > 0;
 
