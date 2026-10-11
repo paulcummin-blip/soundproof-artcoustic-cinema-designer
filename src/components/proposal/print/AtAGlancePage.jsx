@@ -103,7 +103,11 @@ export default function AtAGlancePage({
         <div className="pp-facts-group">
           <h3 className="pp-facts-group__title">System</h3>
           <ProposalFactCards cards={base.systemCards} columns={3} />
-          {base.packageRows.length > 0 ? <ProposalProductTable rows={base.packageRows} /> : null}
+          {/* Compact: the package now states each screen position, so the table
+              stays one block on the page rather than pushing the page over. */}
+          {base.packageRows.length > 0
+            ? <ProposalProductTable rows={base.packageRows} compact />
+            : null}
         </div>
       )}
     </section>

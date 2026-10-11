@@ -9,6 +9,12 @@
 import { CONFIDENCE } from './confidence';
 import { getSpeakerModelMeta } from '@/components/models/speakers/registry';
 import { resolveSpeakerModelsByRole } from './resolveSpeakerModelsByRole';
+import {
+  frontStageProductRoles,
+  frontStageStatement,
+  isDualCentreStage,
+  resolveFrontStage,
+} from './resolveFrontStageRoles';
 import { buildProductsSelected, layoutVisibilityFilter } from '@/components/report/reportProductsSelected';
 
 function parseDolbyConfig(config) {
@@ -70,10 +76,20 @@ export function buildSystemAuthority(project, _version, placedSpeakers) {
     configuration_text: dolbyConfig.text,
   };
 
+  // The screen stage, read from the version's own physical speakers. A
+  // dual-centre stage is stated POSITION BY POSITION — the left/right pair and
+  // the two physical centre cabinets — and is never collapsed into one "LCR"
+  // row, nor inferred from the Dolby channel count.
+  const frontStage = resolveFrontStage(designSpeakers);
+  const dualCentre = isDualCentreStage(frontStage);
+
   // Build product roles from selected_speakers_by_role
   const productRoles = [];
+  if (dualCentre) productRoles.push(...frontStageProductRoles(frontStage));
   for (const [role, model] of Object.entries(speakersByRole)) {
     if (!model) continue;
+    // Already stated position by position above.
+    if (dualCentre && role === 'lcr') continue;
     const meta = getSpeakerModelMeta(model);
     productRoles.push({
       role,
@@ -137,6 +153,18 @@ export function buildSystemAuthority(project, _version, placedSpeakers) {
   const topology = {
     dolby_config: project?.dolby_config || null,
     channel_layout: channelLayout,
+    // The dual-centre front stage: two physical cabinets fed from ONE centre
+    // channel, with the sentence the proposal may state. Null for every other
+    // stage, so nothing changes for a single-centre design.
+    front_stage: dualCentre ? {
+      structure: 'dual_centre',
+      physical_centre_cabinets: frontStage.centreCabinets,
+      logical_centre_channels: frontStage.logicalCentreChannels,
+      left_right_model: frontStage.leftRightModel,
+      centre_model: frontStage.centreModel,
+      orientation: frontStage.orientation || null,
+      statement: frontStageStatement(frontStage, project?.dolby_config || null),
+    } : null,
     lcr_model: speakersByRole.lcr || speakersByRole.centre_soundbar || null,
     surround_model: speakersByRole.surround || null,
     rear_surround_model: speakersByRole.rear_surround || null,

@@ -120,13 +120,46 @@ function roleText(system) {
   const roles = Array.isArray(system?.product_roles) ? system.product_roles : [];
   const lines = [];
   for (const role of roles) {
-    const model = asText(role?.model_label) || asText(role?.model_key) || asText(role?.model);
+    // A role that states its own equipment wording (the dual-centre cabinets
+    // count and what they are) prints that wording rather than the bare model.
+    const model = asText(role?.model_statement)
+      || asText(role?.model_label) || asText(role?.model_key) || asText(role?.model);
     if (!model) continue;
     const label = asText(role?.role_description) || asText(role?.role);
     const line = label ? `${label}: ${model}` : model;
     if (!lines.includes(line)) lines.push(line);
   }
   return lines.length > 0 ? lines.join(' · ') : null;
+}
+
+/**
+ * The screen stage when the design builds its centre channel from two physical
+ * cabinets.
+ *
+ * Stated as its own fact, in physical terms, so the one centre channel a Dolby
+ * layout has can never be read as one centre loudspeaker of the left/right
+ * model: two cabinets, one channel, layout unchanged. Null for every other
+ * design, so nothing is added to a single-centre pack.
+ */
+function frontStageFact(system) {
+  const roles = Array.isArray(system?.product_roles) ? system.product_roles : [];
+  const centre = roles.find((role) => asText(role?.structure) === 'dual-centre'
+    || (Number(role?.cabinet_count) > 1 && asText(role?.role) === 'centre'));
+  if (!centre) return null;
+  const leftRight = roles.find((role) => asText(role?.role) === 'front_left_right');
+  const cabinets = Number(centre.cabinet_count) || 2;
+  return {
+    structure: 'dual_centre',
+    physical_centre_cabinets: cabinets,
+    logical_centre_channels: Number(centre.channel_count) || 1,
+    left_right: asText(leftRight?.model_statement) || asText(leftRight?.model_label) || null,
+    centre: asText(centre.model_statement) || asText(centre.model_label) || null,
+    screen_positions: [
+      { position: 'front_left_right', model: asText(leftRight?.model_statement) || asText(leftRight?.model_label) || null },
+      { position: 'centre', model: asText(centre.model_statement) || asText(centre.model_label) || null },
+    ].filter((position) => position.model),
+    note: `${cabinets} physical centre cabinets are fed from ONE logical centre channel. The centre is not a second channel, the left and right channels keep their own model, and the layout is unchanged.`,
+  };
 }
 
 /** The printed Products Selected rows, exactly as the Technical Report states them. */
@@ -326,6 +359,7 @@ export function buildOptionFacts(entry, label, { policy = null } = {}) {
         products,
         products_by_layer: system.products_selected_by_layer || {},
         product_roles: roleText(system),
+        front_stage: frontStageFact(system),
         subwoofer_strategy: system.subwoofer_strategy || null,
         amplification: amplificationText(system),
         acoustic_treatment: Array.isArray(system.acoustic_treatment) ? system.acoustic_treatment : [],

@@ -8,16 +8,16 @@
 import React from 'react';
 import { proposalRoleStyle } from '@/components/proposal/typography/proposalTypography';
 
-export default function ProposalProductTable({ rows = [], className = '' }) {
+export default function ProposalProductTable({ rows = [], compact = false, className = '' }) {
   const list = (rows || []).filter((row) => row && (row.role || row.model));
   if (list.length === 0) return null;
 
   return (
-    <table className={`pp-table ${className}`.trim()}>
+    <table className={`pp-table ${compact ? 'pp-table--compact' : ''} ${className}`.trim().replace(/\s+/g, ' ')}>
       <thead>
         <tr>
-          <th style={{ ...proposalRoleStyle('label'), width: '55%' }}>Channel</th>
-          <th style={{ ...proposalRoleStyle('label'), width: '45%' }}>Model</th>
+          <th style={{ ...proposalRoleStyle('label'), width: '42%' }}>Channel / Position</th>
+          <th style={{ ...proposalRoleStyle('label'), width: '58%' }}>Model</th>
         </tr>
       </thead>
       <tbody>

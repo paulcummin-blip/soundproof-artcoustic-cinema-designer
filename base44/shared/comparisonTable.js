@@ -159,7 +159,14 @@ function readRowValue(evidence, rowKey) {
   const selectedValue = selectedProducts ? selectedProducts[rowKey] : null;
   if (Array.isArray(selectedValue) && selectedValue.length > 0) return selectedValue.join(', ');
 
-  const packageRoles = { lcr: ['lcr', 'centre_soundbar'], surrounds: ['surround', 'rear_surround', 'front_wide'], overheads: ['overhead'] };
+  // The screen stage keeps its own positions: a dual-centre design states the
+  // left/right pair and the centre cabinets separately, and the fallback must
+  // carry all four keys rather than lose the centre.
+  const packageRoles = {
+    lcr: ['lcr', 'centre_soundbar', 'front_left_right', 'centre'],
+    surrounds: ['surround', 'rear_surround', 'front_wide'],
+    overheads: ['overhead'],
+  };
   if (packageRoles[rowKey]) {
     const models = (evidence.speaker_package || []).filter((role) => packageRoles[rowKey].includes(role.role)).map((role) => role.model).filter(Boolean);
     return [...new Set(models)].join(' · ') || null;

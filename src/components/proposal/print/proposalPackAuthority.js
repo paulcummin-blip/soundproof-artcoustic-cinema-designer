@@ -300,8 +300,17 @@ export function viewingGlanceStatement(snapshot) {
   return { value: minimum === maximum ? `${minimum}°` : `${minimum}° to ${maximum}°`, hint: null };
 }
 
-/** The compact package label for each group of channel roles. */
+/**
+ * The compact package label for each screen, surround and overhead position.
+ *
+ * A screen stage is only ever printed as "LCR" when it really is one model
+ * across the three screen channels. A stage built from two physical centre
+ * cabinets carries its own position labels ("Front Left / Right" and "Centre")
+ * on the roles themselves, and is stated position by position.
+ */
 const PACKAGE_GROUP_LABELS = Object.freeze({
+  front_left_right: 'Front Left / Right',
+  centre: 'Centre',
   lcr: 'LCR',
   centre_soundbar: 'Centre',
   surround: 'Surrounds / wides',
@@ -310,7 +319,13 @@ const PACKAGE_GROUP_LABELS = Object.freeze({
   overhead: 'Overheads',
 });
 
-const PACKAGE_GROUP_ORDER = Object.freeze(['LCR', 'Centre', 'Surrounds / wides', 'Overheads']);
+const PACKAGE_GROUP_ORDER = Object.freeze([
+  'Front Left / Right',
+  'Centre',
+  'LCR',
+  'Surrounds / wides',
+  'Overheads',
+]);
 
 /**
  * The selected package, one row per group of channel roles: what each group is,
@@ -324,8 +339,14 @@ export function buildPackageRows(snapshot) {
   for (const role of Array.isArray(system.product_roles) ? system.product_roles : []) {
     if (isSubwooferRole(role)) continue;
     const key = String(role?.role || '').toLowerCase();
-    const label = PACKAGE_GROUP_LABELS[key] || role?.role_description || role?.role || null;
-    const model = role?.model_label || role?.model_key || null;
+    // The role's own position label leads when it has one: the screen stage of a
+    // dual-centre design is listed as the left/right pair and the centre, never
+    // as one generic LCR row.
+    const label = role?.position_label || PACKAGE_GROUP_LABELS[key]
+      || role?.role_description || role?.role || null;
+    // Equipment wording the role itself states (the cabinet count of a
+    // dual-centre stage) prints as stated; every other role prints its model.
+    const model = role?.model_statement || role?.model_label || role?.model_key || null;
     if (!label || !model) continue;
     const models = groups.get(label) || [];
     if (!models.includes(model)) models.push(model);

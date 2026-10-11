@@ -10,6 +10,7 @@
 import { CONFIDENCE, SOURCE } from './confidence';
 import { getSpeakerModelMeta } from '@/components/models/speakers/registry';
 import { resolveSpeakerModelsByRole } from './resolveSpeakerModelsByRole';
+import { isDualCentreStage, resolveFrontStage } from './resolveFrontStageRoles';
 
 function extractProductFacts(meta, modelKey) {
   if (!meta || meta.notFound) {
@@ -67,6 +68,8 @@ function extractProductFacts(meta, modelKey) {
 function describeEngineeringPurpose(role, meta) {
   const purposes = {
     lcr: 'Left, Centre, and Right screen-wall speakers. Responsible for dialogue intelligibility, on-screen sound localisation, and the primary front soundstage.',
+    front_left_right: 'Front left and right screen-stage speakers. Responsible for the primary front soundstage and on-screen sound localisation.',
+    centre_dual: 'Centre channel, built from two physical centre cabinets sharing one centre channel. Two cabinets, ONE channel: dialogue is presented from one centre position, and no second centre channel exists.',
     centre_soundbar: 'Centre channel soundbar. Responsible for dialogue intelligibility and on-screen sound localisation.',
     surround: 'Side surround speakers. Responsible for lateral spatial envelopment and off-screen sound movement.',
     rear_surround: 'Rear surround speakers. Responsible for rear spatial envelopment and back hemisphere sound localisation.',
@@ -97,8 +100,33 @@ export function buildProductAuthority(project, _version, placedSpeakers) {
 
   const products = [];
 
-  // LCR / centre soundbar
-  if (speakersByRole.lcr) {
+  // The screen stage. A dual-centre stage is stated as two physical positions —
+  // the left/right pair and the centre cabinets — so the centre is never
+  // described with the left/right model, and the stage is never one collapsed
+  // "LCR" product.
+  const frontStage = resolveFrontStage(placedSpeakers);
+  const dualCentre = isDualCentreStage(frontStage);
+  if (dualCentre) {
+    if (frontStage.leftRightModel) {
+      const meta = getSpeakerModelMeta(frontStage.leftRightModel);
+      products.push({
+        ...extractProductFacts(meta, frontStage.leftRightModel),
+        role: 'front_left_right',
+        role_description: 'Front left / right (screen stage)',
+        quantity: 2,
+        engineering_purpose: describeEngineeringPurpose('front_left_right', meta),
+      });
+    }
+    const centreMeta = getSpeakerModelMeta(frontStage.centreModel);
+    products.push({
+      ...extractProductFacts(centreMeta, frontStage.centreModel),
+      role: 'centre',
+      role_description: 'Centre (two physical cabinets, one centre channel)',
+      quantity: frontStage.centreCabinets,
+      channel_count: frontStage.logicalCentreChannels,
+      engineering_purpose: describeEngineeringPurpose('centre_dual', centreMeta),
+    });
+  } else if (speakersByRole.lcr) {
     const meta = getSpeakerModelMeta(speakersByRole.lcr);
     const facts = extractProductFacts(meta, speakersByRole.lcr);
     products.push({

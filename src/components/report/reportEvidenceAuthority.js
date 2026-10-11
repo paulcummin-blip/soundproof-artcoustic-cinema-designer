@@ -367,11 +367,21 @@ function buildReportFacts(captured = {}) {
           || asText(channelLayout.configuration_text) || null,
       },
       channel_layout: copy(channelLayout),
+      // Each screen position travels with the wording the system authority gave
+      // it, so a dual-centre stage states its two physical centre cabinets and
+      // the one centre channel they share, and is never re-read as a single
+      // "LCR" of the left/right model.
       product_roles: (Array.isArray(system.product_roles) ? system.product_roles : []).map((role) => ({
         role: role?.role || null,
         role_description: role?.role_description || null,
+        position_label: role?.position_label || null,
+        model_statement: role?.model_statement || null,
         model_label: role?.model_label || null,
         model_key: role?.model_key || null,
+        channel_count: Number.isFinite(Number(role?.channel_count)) ? Number(role.channel_count) : null,
+        cabinet_count: Number.isFinite(Number(role?.cabinet_count)) ? Number(role.cabinet_count) : null,
+        structure: role?.structure || null,
+        orientation: role?.orientation || null,
       })),
       subwoofer_strategy: subwooferStrategy ? {
         count: asNumber(subwooferStrategy.count),
