@@ -38,13 +38,13 @@ const STATUS_CONFIG = {
     label: 'Generating',
     badgeClass: 'bg-[#FFF8E1] text-[#8B6914] border-[#E6C44E]',
     dotClass: 'bg-[#E6C44E] animate-pulse',
-    description: 'AI is generating the proposal content.',
+    description: 'Generating the proposal copy.',
   },
   generated: {
     label: 'Generated',
     badgeClass: 'bg-[#E3F2FD] text-[#1565C0] border-[#90CAF9]',
     dotClass: 'bg-[#42A5F5]',
-    description: 'Initial AI output complete and ready for review.',
+    description: 'The generated copy is ready for review.',
   },
   edited: {
     label: 'Edited',

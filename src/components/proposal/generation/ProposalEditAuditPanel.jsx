@@ -65,7 +65,7 @@ export default function ProposalEditAuditPanel({ audit }) {
     ['Generation version', `v${generation.generation_number ?? '—'}`],
     ['Status', generation.status || '—'],
     ['Written', when(generation.created_at)],
-    ['Written by', generation.created_by || '—'],
+    ['Recorded by', generation.created_by || '—'],
     ['Copy writer', [generation.provider, generation.model].filter(Boolean).join(' · ') || '—'],
     ['Contract', [generation.contract_version == null ? null : `v${generation.contract_version}`, generation.prompt_version].filter(Boolean).join(' · ') || '—'],
     ['Evidence pack', short(generation.evidence_pack_fingerprint)],

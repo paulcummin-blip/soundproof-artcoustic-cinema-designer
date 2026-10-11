@@ -49,7 +49,7 @@ export function proposalWriteActionModel({ writer = null, layer = null, readOnly
   return {
     visible: true,
     enabled: true,
-    label: writer.label || 'Generate with GPT writer',
+    label: writer.label || 'Generate design copy',
     beta: writer.beta || 'Beta — test tool',
     disclaimer: writer.disclaimer || null,
     message: null,

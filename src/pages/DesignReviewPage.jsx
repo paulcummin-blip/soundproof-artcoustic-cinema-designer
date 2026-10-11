@@ -404,7 +404,7 @@ export default function DesignReviewPage() {
         </CollapsiblePanel>
 
         <CollapsiblePanel
-          title="AI Client Summary"
+          title="Client Summary"
           icon={<Sparkles style={{ width: 16, height: 16, color: COLORS.primary }} />}
         >
           <AiSummaryPanel

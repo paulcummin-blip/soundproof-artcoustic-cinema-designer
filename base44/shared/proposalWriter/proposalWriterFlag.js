@@ -25,7 +25,7 @@
 export const GPT_WRITER_FLAG_FIELD = 'gpt_proposal_writer';
 
 /** What the action is called, wherever it is shown. */
-export const GPT_WRITER_ACTION_LABEL = 'Generate with GPT writer';
+export const GPT_WRITER_ACTION_LABEL = 'Generate design copy';
 
 /** The action is a controlled test tool, and says so. */
 export const GPT_WRITER_BETA_LABEL = 'Beta — test tool';

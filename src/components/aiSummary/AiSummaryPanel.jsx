@@ -125,7 +125,7 @@ export default function AiSummaryPanel({ projectId, versionId, publishedSnapshot
       });
       const result = response?.data || response;
       if (result?.error) { setError(result.error); return; }
-      if (!result?.summaryText) { setError("AI returned no summary text."); return; }
+      if (!result?.summaryText) { setError("No summary text was returned. Please try again."); return; }
 
       const fingerprints = extractGenerationFingerprints(publishedSnapshot);
       const now = new Date().toISOString();
@@ -161,7 +161,7 @@ export default function AiSummaryPanel({ projectId, versionId, publishedSnapshot
       }
       await loadSummary();
     } catch (err) {
-      setError(err.message || "AI generation failed.");
+      setError(err.message || "Generation failed. Please try again.");
     } finally {
       setGenerating(false);
     }
@@ -197,7 +197,7 @@ export default function AiSummaryPanel({ projectId, versionId, publishedSnapshot
       <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12 }}>
         <Sparkles style={{ width: 18, height: 18, color: COLORS.primary }} />
         <h3 style={{ margin: 0, fontSize: 15, fontWeight: 700, color: COLORS.primary, fontFamily: "'Didact Gothic', sans-serif" }}>
-          AI Client Summary
+          Client Summary
         </h3>
       </div>
 
