@@ -90,14 +90,15 @@ function publication(fp='eng:old') {
  const report=buildFrozenReportProject(d,{projectId:'p',versionId:'v'});assert.deepEqual(report.missing,[]);
  const p={publication_contract_version:2,engineering_fingerprint:fp,published_at:'fixture',engine_version:'fixture',rp22_version:'fixture',algorithm_version:'fixture',provenance:{bass_fingerprint:'bass:fixture'},
  report_snapshot:{report_project:report.reportProject,seatingPositions:seats,placedSpeakers:d.placedSpeakers,analysisResult:{assessed:true},priceData:{}},
- engineering_summary:{parameterAuthority:{},roomResultsByParameter:{},viewing:{available:true},project:{seatIds:seats.map(s=>s.id),reportCounts:{seatResultsByParameter:{p10:[],p20:[]}}}}};
+ engineering_summary:{designRating:{rating:'L3'},seatPriorityFingerprint:'seats:fixture',parameterAuthority:{},roomResultsByParameter:{},viewing:{available:true},project:{seatIds:seats.map(s=>s.id),reportCounts:{seatResultsByParameter:{p10:[],p20:[]}}}}};
  for(let i=1;i<=21;i++){p.engineering_summary.parameterAuthority['p'+i]={state:'scored',scope:'room',level:'L3'};p.engineering_summary.roomResultsByParameter[i]={state:'scored',status:'scored',value:5,formatted:'5 dB',level:'L3'};}
  const rows=seats.map((s,i)=>({seatId:s.id,row:s.rowNumber,column:i%4+1,priority:s.priority,status:'scored',value:5,level:'L3',valueFormatted:'5 dB'}));
  p.engineering_summary.project.reportCounts.seatResultsByParameter={p10:rows,p20:rows};p.parameter_index=buildAtomicParameterIndex(p);return p;
 }
 test('frozen report read uses explicitly requested publication, not newer current pointer',()=>{
  const durable={publication:publication(),version:{published_fingerprint:'eng:new'},status:'published',readState:'success',requestedEngineeringFingerprint:'eng:old'};
- assert.equal(auditDurablePublication({durable,authorityComplete:true}).allowed,true);
+ const gate=auditDurablePublication({durable,authorityComplete:true});
+ assert.equal(gate.allowed,true,JSON.stringify(gate.missing));
 });
 test('current publication reads still reject pointer mismatch',()=>{
  const durable={publication:publication(),version:{published_fingerprint:'eng:new'},status:'published',readState:'success'};
