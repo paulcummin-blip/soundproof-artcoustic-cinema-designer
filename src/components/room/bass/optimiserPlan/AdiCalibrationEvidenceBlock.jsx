@@ -19,7 +19,7 @@ import React from "react";
 import {
   CALIBRATION_EVIDENCE_LEVERS,
   CALIBRATION_EVIDENCE_STATUS,
-  CALIBRATION_EVIDENCE_MISSING_MESSAGE,
+  CALIBRATION_EVIDENCE_MISSING_DETAIL,
   calibrationEvidenceFor,
   describeCalibrationLever,
 } from "./optimiserCalibrationEvidence.js";
@@ -53,7 +53,7 @@ export default function AdiCalibrationEvidenceBlock({ evidence = null, className
         Calibration evidence
       </div>
       {rows.length === 0 ? (
-        <div className="text-[11px] text-[#8A7B6A] leading-relaxed">{CALIBRATION_EVIDENCE_MISSING_MESSAGE}</div>
+        <div className="text-[11px] text-[#8A7B6A] leading-relaxed">{CALIBRATION_EVIDENCE_MISSING_DETAIL}</div>
       ) : (
         rows.map((row) => <Row key={row.key} label={row.label} text={row.text} scope={row.scope} />)
       )}

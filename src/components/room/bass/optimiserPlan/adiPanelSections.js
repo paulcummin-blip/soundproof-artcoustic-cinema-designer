@@ -40,7 +40,12 @@ export const ADI_SECTION_GROUP = Object.freeze({
 export const ADI_PANEL_FINDING = Object.freeze({
   RUNNING: "ADI is evaluating this design…",
   CALIBRATION_APPLIED: "ADI applied safe calibration settings.",
-  TESTED_NO_CALIBRATION: "ADI tested calibration changes, but no useful calibration-only improvement was found.",
+  /**
+   * A design change was found, so the finding leads with what the designer has
+   * to do. The calibration section states the tested levers and their outcome in
+   * its own words, so the no-improvement sentence is never repeated here.
+   */
+  TESTED_NO_CALIBRATION: "ADI tested calibration changes. The best improvement requires a physical design change.",
   TESTED_NO_IMPROVEMENT: "ADI tested calibration and design options. No useful improvement was found.",
   /**
    * The run or the saved record kept no calibration evidence to read, so neither
@@ -63,6 +68,10 @@ export const ADI_NO_DESIGN_CHANGE_APPLIED = "No physical design change was appli
 
 /** Section 3 copy — what is stated when nothing has been tested yet. */
 export const ADI_TESTED_NOTHING = "Nothing has been tested on this design yet.";
+
+/** Section 2's two labels — what ADI found, and the result it predicts for it. */
+export const ADI_BEST_IMPROVEMENT_LABEL = "Best improvement found";
+export const ADI_PREDICTED_RESULT_LABEL = "Predicted result";
 
 /** Which kind of change a tested lever is. Calibration may be auto-applied. */
 export const CALIBRATION_LEVER_KEYS = Object.freeze(["delay", "gain", "phase", "polarity"]);

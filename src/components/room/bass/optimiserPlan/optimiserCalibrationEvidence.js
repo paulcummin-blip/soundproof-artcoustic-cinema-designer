@@ -46,7 +46,14 @@ export const CALIBRATION_EVIDENCE_LABEL = Object.freeze({
 
 /** The mandated copy when the run kept no calibration evidence to read. */
 export const CALIBRATION_EVIDENCE_MISSING_MESSAGE =
-  "Calibration evidence was not retained for this run. Re-run calibration to evaluate delay, gain and polarity.";
+  "Calibration evidence is not available for this run. Re-test calibration to evaluate delay, gain and polarity.";
+
+/**
+ * The same fact stated once more inside Engineer details, where the reader is
+ * already looking at the retained record: it says which part of it is absent.
+ */
+export const CALIBRATION_EVIDENCE_MISSING_DETAIL =
+  "Saved optimiser evidence did not include the calibration candidate summary.";
 
 /** The mandated copy when the best calibration candidate was a trade-off. */
 export const CALIBRATION_TRADE_OFF_MESSAGE =

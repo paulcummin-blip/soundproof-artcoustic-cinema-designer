@@ -335,7 +335,7 @@ export function resolveAdiOptimiserJourney({
   // rejected evidence. Nothing is offered for application.
   if (status === OPTIMISER_PLAN_STATUS.NO_USEFUL_IMPROVEMENT) {
     return build(ADI_OPTIMISER_JOURNEY_STATE.NO_USEFUL_IMPROVEMENT, {
-      message: withLead("The optimiser completed its search without confirming a candidate worth applying."),
+      message: withLead("ADI completed its search without finding a change worth applying."),
       explanation: "Nothing is offered for application. The evidence below is what the run evaluated.",
       action: ADI_OPTIMISER_ACTION.RERUN,
       showPlan: false,

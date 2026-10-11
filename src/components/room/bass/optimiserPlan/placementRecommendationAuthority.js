@@ -145,7 +145,7 @@ function expectedRows({ baseline = null, effect = null, evidence = null, current
     const after = deviationText(effect?.p20VariationDb);
     if (before) rows.push({ label: "Previous run", value: before });
     if (current) rows.push({ label: "Current design", value: current });
-    if (after) rows.push({ label: "Candidate from that run", value: after });
+    if (after) rows.push({ label: "With the change", value: after });
     return rows;
   }
 

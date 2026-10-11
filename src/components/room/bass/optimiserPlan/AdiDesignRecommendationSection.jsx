@@ -20,8 +20,10 @@ import { MoveHorizontal } from "lucide-react";
 import AdiAppliedBassCalibration from "./AdiAppliedBassCalibration.jsx";
 import AdiBeforeAfterResult from "./AdiBeforeAfterResult.jsx";
 import {
+  ADI_BEST_IMPROVEMENT_LABEL,
   ADI_DESIGN_NOT_APPLIED,
   ADI_NO_DESIGN_CHANGE_APPLIED,
+  ADI_PREDICTED_RESULT_LABEL,
   ADI_SECTION_TITLE,
 } from "./adiPanelSections.js";
 
@@ -62,9 +64,15 @@ export default function AdiDesignRecommendationSection({
           here as the move itself, with the performance it produced beneath it. */}
       {seatingRecommendation && (
         <div className="space-y-1 rounded-md border border-[#E7E5E0] bg-white px-3 py-2">
+          <div className="text-[10px] font-semibold uppercase tracking-wide text-[#8A7B6A]">
+            {ADI_BEST_IMPROVEMENT_LABEL}
+          </div>
           <div className="text-[12px] font-semibold text-[#1B1A1A] leading-relaxed">
             {seatingRecommendation.movementLabel}
             {seatingRecommendation.wholeBlockMoved ? " (whole seating block)" : ""}
+          </div>
+          <div className="text-[10px] font-semibold uppercase tracking-wide text-[#8A7B6A]">
+            {ADI_PREDICTED_RESULT_LABEL}
           </div>
           <AdiBeforeAfterResult
             metricLabel="P20"
@@ -88,8 +96,13 @@ export default function AdiDesignRecommendationSection({
       )}
 
       {recommendation && !seatingRecommendation && (
-        <div className="text-[12px] font-semibold text-[#1B1A1A] leading-relaxed">
-          {recommendation}
+        <div className="space-y-1">
+          <div className="text-[10px] font-semibold uppercase tracking-wide text-[#8A7B6A]">
+            {ADI_BEST_IMPROVEMENT_LABEL}
+          </div>
+          <div className="text-[12px] font-semibold text-[#1B1A1A] leading-relaxed">
+            {recommendation}
+          </div>
         </div>
       )}
 

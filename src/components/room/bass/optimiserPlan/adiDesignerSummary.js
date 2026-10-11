@@ -561,7 +561,7 @@ export function resolveApplyPermission({ planView, presentation, recommendedLeve
   if (currentP20?.runBaselineDiffers) {
     return {
       allowed: false,
-      reason: "This evaluation compared its candidate with a different current result — re-run ADI before applying any change.",
+      reason: "This evaluation was measured against a different current result — run the Bass Optimiser before applying any change.",
     };
   }
   if (presentation?.showApply !== true) {
