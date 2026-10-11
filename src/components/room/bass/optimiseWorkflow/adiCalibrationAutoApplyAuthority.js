@@ -56,6 +56,9 @@ export const CALIBRATION_APPLY_DECISION = Object.freeze({
 export const CALIBRATION_APPLY_REASON = Object.freeze({
   IMPROVES_ONE_WITHOUT_DAMAGE: "improves-one-objective-without-damaging-the-other",
   BEST_BALANCED: "best-balanced-candidate-improves-the-overall-result",
+  // A confirmed calibration improvement that a STRONGER confirmed calibration
+  // candidate superseded: the rule that blocks it is stated, never left implicit.
+  STRONGER_CANDIDATE_SELECTED: "stronger-calibration-candidate-selected",
   P19_DAMAGED: "p19-materially-worsened",
   P20_DAMAGED: "p20-materially-worsened",
   PRIMARY_SEAT_REGRESSION: "primary-seat-regressed",
@@ -81,6 +84,61 @@ export const ADI_DESIGN_CHANGE_SUBTITLE = "These require your approval — ADI h
 export const IN_ROOM_CONFIRMATION_NOTE =
   "Predicted calibration starting point — confirm in-room after installation.";
 export const NO_USEFUL_CALIBRATION_IMPROVEMENT = "No useful calibration improvement found.";
+
+/** The calibration levers, named as the designer reads them on the panel. */
+export const CALIBRATION_LEVER_LABEL = Object.freeze({
+  delay: "delay",
+  gain: "gain",
+  polarity: "polarity",
+  phase: "phase",
+  combined: "combined",
+});
+
+/**
+ * A calibration improvement that was NOT applied is never stated without the
+ * rule that held it. These are that rule, in one sentence each.
+ *
+ * @param {string|null} reason - one of CALIBRATION_APPLY_REASON
+ * @param {{lever?: string|null, selectedLever?: string|null}} [context]
+ * @returns {string|null} the sentence, or null when the reason has no sentence
+ */
+export function describeCalibrationNotApplied(reason, { selectedLever = null } = {}) {
+  const selected = CALIBRATION_LEVER_LABEL[selectedLever] || "selected";
+  switch (reason) {
+    // The stronger confirmed calibration candidate was applied instead — the
+    // case a weaker lever (typically gain behind delay) must state.
+    case CALIBRATION_APPLY_REASON.STRONGER_CANDIDATE_SELECTED:
+    case CALIBRATION_APPLY_REASON.BEST_BALANCED:
+      return `Not applied because the ${selected} candidate gives the stronger calibration improvement.`;
+    case CALIBRATION_APPLY_REASON.P19_DAMAGED:
+      return "Not applied because it worsens P19 materially — a trade-off for you to approve.";
+    case CALIBRATION_APPLY_REASON.P20_DAMAGED:
+      return "Not applied because it worsens P20 materially — a trade-off for you to approve.";
+    case CALIBRATION_APPLY_REASON.PRIMARY_SEAT_REGRESSION:
+      return "Not applied because a primary seat would regress.";
+    case CALIBRATION_APPLY_REASON.AMBIGUOUS_EVIDENCE:
+      return "Not applied because its P19/P20 evidence could not be confirmed.";
+    case CALIBRATION_APPLY_REASON.HUMAN_CALIBRATION:
+      return "Not applied because the current calibration was set by hand and is not overwritten automatically.";
+    case CALIBRATION_APPLY_REASON.ALREADY_APPLIED:
+      return "Not applied because this calibration is already applied to the design.";
+    case CALIBRATION_APPLY_REASON.NOT_MATERIAL:
+      return "Not applied because it does not clear the 1 dB action threshold.";
+    default:
+      return null;
+  }
+}
+
+/**
+ * The stated reason for an improvement the saved record held without recording a
+ * decision — the honest answer for evidence saved before a decision was recorded.
+ */
+export const CALIBRATION_NO_DECISION_RECORDED_REASON =
+  "Not applied because no automatic calibration decision was recorded for this run.";
+
+/** A safe candidate the run confirmed but did not write (evidence-only run). */
+export const CALIBRATION_READY_TO_APPLY_REASON =
+  "Ready to apply — this run evaluated the options without changing the design.";
 
 /** The canonical balanced damage threshold: a 1.0 dB material worsening. */
 export const MATERIAL_DAMAGE_DB = BALANCED_DAMAGE_THRESHOLD_DB;

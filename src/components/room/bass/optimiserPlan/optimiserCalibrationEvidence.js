@@ -25,6 +25,11 @@
 import { readRspP19 } from "../improveBassV2/p19Authority.js";
 import { POLARITY_NOT_EVALUATED_REASON } from "./optimiserPlanConstants.js";
 import { deviationText } from "./optimiserWholeNumberDb.js";
+import {
+  CALIBRATION_NO_DECISION_RECORDED_REASON,
+  CALIBRATION_READY_TO_APPLY_REASON,
+  describeCalibrationNotApplied,
+} from "../optimiseWorkflow/adiCalibrationAutoApplyAuthority.js";
 
 export const CALIBRATION_EVIDENCE_SCHEMA_VERSION = 1;
 
@@ -77,12 +82,28 @@ export const CALIBRATION_EVIDENCE_RESULT = Object.freeze({
 
 const RESULT_LABEL = Object.freeze({
   [CALIBRATION_EVIDENCE_RESULT.APPLIED]: "Applied",
-  [CALIBRATION_EVIDENCE_RESULT.IMPROVEMENT_NOT_APPLIED]: "Improvement found — not applied",
+  // An improvement that was not applied is NEVER labelled on its own: the label
+  // is the rule that held it, read from the run's own calibration decision. When
+  // a saved record predates that decision, the honest sentence below is used.
+  [CALIBRATION_EVIDENCE_RESULT.IMPROVEMENT_NOT_APPLIED]: CALIBRATION_NO_DECISION_RECORDED_REASON,
   [CALIBRATION_EVIDENCE_RESULT.TRADE_OFF]: "Trade-off — not applied automatically",
   [CALIBRATION_EVIDENCE_RESULT.NO_USEFUL_IMPROVEMENT]: "No useful improvement",
   [CALIBRATION_EVIDENCE_RESULT.NOT_TESTED_IN_RUN]: "Not tested in this run",
   [CALIBRATION_EVIDENCE_RESULT.EVIDENCE_MISSING]: "Evidence not retained",
 });
+
+/**
+ * The outcome text of one lever: for an improvement that was not applied, always
+ * the reason it was held — never a bare "not applied".
+ */
+export function calibrationOutcomeLabel(record) {
+  if (!record) return null;
+  if (record.result === CALIBRATION_EVIDENCE_RESULT.IMPROVEMENT_NOT_APPLIED) {
+    return record.notAppliedReason
+      || RESULT_LABEL[CALIBRATION_EVIDENCE_RESULT.IMPROVEMENT_NOT_APPLIED];
+  }
+  return RESULT_LABEL[record.result] || null;
+}
 
 /** The fixed reason used only when the measured deltas themselves prove it. */
 export const CALIBRATION_NO_IMPROVEMENT_REASON =
