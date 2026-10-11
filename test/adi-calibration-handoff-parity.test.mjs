@@ -9,6 +9,8 @@ import { evaluateStage2Confirmation, evaluateStage2ConfirmationWithTuning, compu
 import { BASS_NORMALIZED_PHYSICS_DEFAULTS } from '../src/components/room/bass/bassPhysicsDefaults.js';
 import { auditDurablePublication } from '../src/components/engineering/publicationGateAuthority.js';
 import { buildFrozenReportProject, buildAtomicParameterIndex } from '../shared/engineeringPublicationContract.js';
+import { serializeOptimiserPlan, hydrateOptimiserPlan } from '../src/components/room/bass/optimiserPlan/optimiserPlanPersistence.js';
+import { resolveOptimiserPlanStatus } from '../src/components/room/bass/optimiserPlan/resolveOptimiserPlanStatus.js';
 const read = p => fs.readFileSync(new URL('../'+p, import.meta.url),'utf8');
 const copy = x => JSON.parse(JSON.stringify(x));
 const source = read('src/components/room/bass/optimiseWorkflow/OptimiseAndCalculate.jsx');
@@ -83,6 +85,19 @@ test('recommendation retry reads fresh exact fingerprint rather than cached stal
  assert.equal(writes,1);assert.ok(reads>=2);
  assert.deepEqual(row.completed_by_fingerprint.new.recommendation,rec);
  assert.ok(row.completed_by_fingerprint.old);
+});
+test('validated baseline parity survives saved plan cold hydration without inventing missing evidence',()=>{
+ const parity={status:'MATCH',reasons:[],trace:{baselineFingerprint:'bass:baseline'}};
+ const plan={planVersion:100,projectId:'restore-project',versionId:'restore-version',designFingerprint:'bass:applied',resultFingerprint:'bass:applied',baselineParity:parity,layoutCounts:{front:2,rear:2},decisionApplied:true};
+ const saved=copy(serializeOptimiserPlan(plan));
+ const hydrated=hydrateOptimiserPlan(plan.projectId,plan.versionId,saved);
+ const view=resolveOptimiserPlanStatus({plan:hydrated,currentDesignFingerprint:'bass:applied'});
+ assert.equal(view.status,'current');
+ assert.deepEqual(view.baselineParity,parity);
+ assert.deepEqual(hydrated.layoutCounts,plan.layoutCounts);
+ assert.equal(view.decisionApplied,true);
+ const legacy=serializeOptimiserPlan({...plan,baselineParity:null});
+ assert.equal(resolveOptimiserPlanStatus({plan:legacy,currentDesignFingerprint:'bass:applied'}).baselineParity.status,'UNKNOWN');
 });
 function publication(fp='eng:old') {
  const d={name:'fixture',versionName:'Original Design',roomDims,screen:{visibleWidthInches:67.36,aspectRatio:'16:9',manualMode:false,heightFromFloorM:.5,mountMode:'baffle'},screenFrontPlaneM:.1,dolbyLayout:'5.1',seatingRows:2,seatsPerRowByRow:[4,4],seatingPositions:seats,
