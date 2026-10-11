@@ -61,7 +61,15 @@ export const WRITER_CONTRACT_VERSION = 1;
  * generation 8 is distinguishable from every generation before it.
  */
 // Generation 9 adds human-sales-language controls; evidence and grounding are unchanged.
-export const WRITER_PROMPT_VERSION = 'proposal-writer-prompt-9';
+//
+// Bumped to 10 for the screen-stage rule: where the pack states a dual-centre
+// stage, the copy names the left and right channels with their own model and the
+// centre with its own cabinet count, and the collapsed "LCR <left/right model>"
+// wording this replaces is refused by its own rejection. The sections, the word
+// limits and the claim grounding rule are unchanged, so the contract version
+// stays where it is and a draft filed under an earlier generation is still read
+// against the same agreement.
+export const WRITER_PROMPT_VERSION = 'proposal-writer-prompt-10';
 
 /** The only pack generation a draft may be written from. */
 export const WRITER_ACCEPTED_PACK_SCHEMA_VERSION = 2;
@@ -104,6 +112,15 @@ export const WRITER_REJECTION = Object.freeze({
   UNSELECTED_PRODUCT: 'unselected_product',
   /** A product belonging to the other option, presented as this one's. */
   EXTRA_PRODUCT: 'extra_product',
+  /**
+   * A screen stage collapsed into one LCR, or a count of three screen
+   * loudspeakers, on a design whose pack states a dual-centre stage: the left
+   * and right channels named with their own model and the centre built from two
+   * physical centre cabinets of their own. The copy would state equipment the
+   * design does not have — a centre of the left/right model, or three
+   * loudspeakers of a model the design has two of.
+   */
+  COLLAPSED_SCREEN_CHANNEL: 'collapsed_screen_channel',
   /** A recommendation the pack does not allow. */
   UNSUPPORTED_RECOMMENDATION: 'unsupported_recommendation',
   /** An improvement claimed in an area the pack blocks as unchanged. */
@@ -319,6 +336,7 @@ export const WRITER_WRITING_RULES = Object.freeze([
   'Where a section states what is shared and also contrasts the options, cite both: the shared-result claims for the unchanged facts and the factual-change or material-gain claims for the facts that differ.',
   'Copy every figure, Performance Level and product name exactly as the pack states it. Never round, convert, restate or estimate.',
   'Never name a product the pack does not list for the option it belongs to.',
+  'Where the pack states a dual-centre screen stage, name the stage position by position: the left and right channels with their own model, and the centre with its own cabinet count and model (for example Front Left / Right: Q6-3 and Centre: 2 × C4-1 dual physical centre cabinets). Never write the three screen channels as one LCR of the left/right model, never write the centre as that model, and never write three loudspeakers of it: the centre is two physical cabinets fed from one centre channel, and the layout is unchanged.',
   'Never present a claim the pack blocks, and never describe a shared result as a change or a gain.',
   'Never recommend changing the design, and never describe the proposal as an upgrade path.',
   'Never reference an assumed or administrative check (P8 upfiring/elevation speakers, P15 background noise floor, P21 early reflections): where the pack records one as requested, state it once, label it as an assumption, and never use it as a result or a differentiator.',

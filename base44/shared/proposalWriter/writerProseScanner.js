@@ -4,6 +4,7 @@ import { WRITER_REJECTION, violation } from './writerContractSchema.js';
 import { claimLevels, hasRecommendationClaim, isPackProse, isRecommendation, kindSatisfiesAssertion, levelTokens, measurementTokens, p20BlocksConsistency, packProseSentences, parameterIds, seatScopeInText, sentenceParts, stripOptionNames, blockedChangeBlocks, blockPatterns } from './writerVocabulary.js';
 import { anchorPatternFor, assertedKind, assumedParameterIssue, claimsArea, isDenied, isConsistencyCaveat, seatConsistencyClaim, scopedClaimIssue, referencePositionScopeIssue, CHANNEL_FAMILY, CHANGE_SIGNAL, CONSISTENCY_ANCHOR, NEGATION_SHAPED_CLAIM } from './writerOutputTextRules.js';
 import { productScopeViolations } from './writerProductScope.js';
+import { frontStageScopeViolations } from './writerFrontStageRules.js';
 import { designStageCommentary } from './writerDesignStageRules.js';
 import { framingContrastGrounded, independentClauses, supportedChangeClause } from './writerClausePrecision.js';
 import {
@@ -184,6 +185,14 @@ export function scanProse({ input, vocabulary, section, text, claims = [], claim
   // the same product may legitimately appear in more than one option. See
   // writerProductScope.js for the rule and the evidence it reads.
   for (const issue of productScopeViolations({ input, vocabulary, text, citedOptionIds, oneOptionOnly })) {
+    context = { text, sentence: issue.sentence, match: issue.token };
+    report(issue.code, { section, detail: issue.detail });
+  }
+  // The screen stage of a design whose centre channel is built from two physical
+  // centre cabinets is never collapsed into one LCR of the left/right model —
+  // see writerFrontStageRules.js for the rule and the pack fact it reads. A pack
+  // that states no dual-centre stage reports nothing here.
+  for (const issue of frontStageScopeViolations({ input, text, packProse })) {
     context = { text, sentence: issue.sentence, match: issue.token };
     report(issue.code, { section, detail: issue.detail });
   }

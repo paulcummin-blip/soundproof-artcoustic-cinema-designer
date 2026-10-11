@@ -16,6 +16,7 @@
  */
 
 import React from 'react';
+import { proposalPackPageBreakCss } from './proposalPageBreakRules';
 
 export default function ProposalPackStyles() {
   return (
@@ -239,6 +240,23 @@ export default function ProposalPackStyles() {
         page-break-inside: avoid;
       }
       .proposal-print-portal .pp-table thead { display: table-header-group; }
+      /* The At a Glance package table: the same table, set compactly, so the
+         system package shares the glance page with the fact cards instead of
+         pushing the page over and leaving a sheet half empty. */
+      .proposal-print-portal .pp-table--compact {
+        table-layout: fixed;
+        margin-top: 3mm;
+      }
+      .proposal-print-portal .pp-table--compact th {
+        padding: 1.8mm 3mm !important;
+        font-size: 7.5pt !important;
+      }
+      .proposal-print-portal .pp-table--compact td {
+        padding: 1.8mm 3mm !important;
+        font-size: 9pt !important;
+        line-height: 1.35 !important;
+      }
+      .proposal-print-portal .pp-table--compact tr:last-child td { border-bottom: none; }
 
       /* ── Blocks, notes, chips ── */
       .proposal-print-portal .pp-block {
@@ -380,66 +398,16 @@ export default function ProposalPackStyles() {
         page-break-after: avoid;
       }
 
-      /* ── Print page behaviour ── */
+      /* ── Print page behaviour ──
+         One authority for every print page break (proposalPageBreakRules.js): a
+         heading always keeps the first block that belongs to it, a designed block
+         or table is never split, a fact group stays with its own heading, a table
+         never starts a page away from the heading it belongs to, and each
+         one-page section — At a Glance, Key Performance Highlights, an imagery
+         page — is read as one thing. Nothing is left carrying a heading alone and
+         no page is stranded by a block pushed onto the next. */
       @media print {
-        /* Each designed page starts on its own page, except the first content
-           page, which follows the cover's own page break. */
-        body.proposal-export-mode .proposal-print-portal .pp-page {
-          break-before: page;
-          page-break-before: always;
-        }
-        body.proposal-export-mode .proposal-print-cover + .pp-page {
-          break-before: auto;
-          page-break-before: auto;
-        }
-        /* No orphan headings: a title always keeps its first block. */
-        body.proposal-export-mode .proposal-print-portal .pp-header {
-          break-after: avoid;
-          page-break-after: avoid;
-        }
-        body.proposal-export-mode .proposal-print-portal .pp-header__title,
-        body.proposal-export-mode .proposal-print-portal .pp-header__lead {
-          break-after: avoid;
-          page-break-after: avoid;
-        }
-        body.proposal-export-mode .proposal-print-portal .pp-cards,
-        body.proposal-export-mode .proposal-print-portal .pp-metrics,
-        body.proposal-export-mode .proposal-print-portal .pp-structures {
-          break-inside: avoid;
-          page-break-inside: avoid;
-        }
-
-        /* No heading is left at the foot of a page: a title always keeps the
-           first paragraph or table that belongs to it. */
-        body.proposal-export-mode .proposal-print-portal .pp-block__title {
-          break-after: avoid;
-          page-break-after: avoid;
-        }
-
-        /* A designed block is never split down the middle of a page. */
-        body.proposal-export-mode .proposal-print-portal .pp-block,
-        body.proposal-export-mode .proposal-print-portal .pp-table,
-        body.proposal-export-mode .proposal-print-portal .pp-editorial {
-          break-inside: avoid;
-          page-break-inside: avoid;
-        }
-
-        /* ── At a glance — one page that is never split across two ── */
-        body.proposal-export-mode .proposal-print-portal .pp-page--glance,
-        body.proposal-export-mode .proposal-print-portal .pp-page--glance .pp-facts-group {
-          break-inside: avoid;
-          page-break-inside: avoid;
-        }
-
-        /* ── Key Performance Highlights — one section, one page, never split ──
-           The row count is capped to what fits a page, so the section never
-           needs to continue and the table never breaks mid-row. ── */
-        body.proposal-export-mode .proposal-print-portal .pp-page--highlights,
-        body.proposal-export-mode .proposal-print-portal .pp-page--highlights .pp-body,
-        body.proposal-export-mode .proposal-print-portal .pp-page--highlights .kph-table {
-          break-inside: avoid;
-          page-break-inside: avoid;
-        }
+${proposalPackPageBreakCss()}
 
         /* ── Project Images — image-led, one dominant image per page ── */
         body.proposal-export-mode .proposal-print-portal .pp-page--images {
@@ -450,13 +418,9 @@ export default function ProposalPackStyles() {
           display: flex;
           flex-direction: column;
           gap: 0;
-          break-inside: avoid;
-          page-break-inside: avoid;
         }
         body.proposal-export-mode .proposal-print-portal .pp-gallery__figure {
           margin: 0;
-          break-inside: avoid;
-          page-break-inside: avoid;
         }
         body.proposal-export-mode .proposal-print-portal .pp-gallery__figure img {
           display: block;
@@ -471,8 +435,6 @@ export default function ProposalPackStyles() {
           display: grid;
           grid-template-columns: 1fr 1fr;
           gap: 6mm;
-          break-inside: avoid;
-          page-break-inside: avoid;
         }
         /* The image heights are a page budget, not a preference: the page frame
            is 297mm with 12mm above and 14mm below, the heading takes about 30mm,
