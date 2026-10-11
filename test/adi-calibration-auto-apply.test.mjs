@@ -283,11 +283,15 @@ check('P20 DAMAGE HELD FOR APPROVAL, NOT APPLIED', () => {
   const candidate = confirmedResult({ id: 'cal-p19-only', p19: 3.4, p19Level: 'L4', p20: 7.2, tuning: tuning({ rearMs: 1 }) });
   const decision = decisionFor(candidate);
   assert.equal(decision.decision, CALIBRATION_APPLY_DECISION.HOLD);
-  // The damage here (1.2 dB on P20) exceeds the improvement (0.7 dB on P19):
-  // the 3:1 trade-off rule rejects it, and it is held for approval.
-  assert.equal(decision.reason, CALIBRATION_APPLY_REASON.TRADEOFF_DAMAGE_EXCEEDS_BENEFIT);
+  // The damage here (1.2 dB on P20) is also a primary-seat regression, and the
+  // hard guard owns the reason: the 3:1 ratio is evaluated for the same case but
+  // a good ratio never overrules a seat losing performance.
+  assert.equal(decision.reason, CALIBRATION_APPLY_REASON.PRIMARY_SEAT_REGRESSION);
+  assert.match(decision.statement, /regresses/);
+  assert.match(decision.statement, /has not been applied/);
   assert.equal(decision.damage.p20Damaged, true);
-  return `held: P20 worsened by ${decision.damage.p20WorseDb} dB`;
+  assert.ok(decision.tradeOff, 'the trade-off is still judged for the same candidate');
+  return `held: P20 worsened by ${decision.damage.p20WorseDb} dB — ${decision.reason}`;
 });
 
 check('IMMATERIAL IMPROVEMENT NOT APPLIED', () => {
