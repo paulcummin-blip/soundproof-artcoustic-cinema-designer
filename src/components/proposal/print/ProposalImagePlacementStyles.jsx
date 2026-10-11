@@ -70,6 +70,16 @@ export default function ProposalImagePlacementStyles() {
       .pp-media--seating img { height: 56mm; }
       .pp-seating__lead { margin: 0 0 4mm !important; }
 
+      /* ── The comparison page ────────────────────────────────────────────
+         Two options read together: both at the full width of the content
+         column and at one visual scale, so the client compares them directly
+         rather than reading two small boxes. ── */
+      .pp-comparison { margin-top: 6mm; }
+      .pp-comparison .pp-media { margin: 0 0 6mm; }
+      .pp-comparison .pp-media:last-child { margin-bottom: 0; }
+      .pp-comparison__lead { margin: 0 0 5mm !important; }
+      .pp-media--comparison img { height: 56mm; }
+
       /* ── Print: the sheet is the authority ───────────────────────────────
          Usable page height is 297mm less the 22mm / 20mm content margins, so a
          landscape feature at 118mm is about half of it: dominant, with room for
@@ -79,10 +89,16 @@ export default function ProposalImagePlacementStyles() {
         .pp-media--landscape { margin-bottom: 8mm; }
         .pp-media--portrait img { height: 74mm; }
         .pp-media--seating img { height: 74mm; }
+        /* The comparison page: two full-width options and their captions share
+           the sheet with the title and the message, so each image takes a
+           little under half of the usable page height. */
+        .pp-media--comparison img { height: 88mm; }
         .pp-media-row { gap: 8mm; }
         .pp-media-row,
         .pp-seating,
-        .pp-seating .pp-media {
+        .pp-seating .pp-media,
+        .pp-comparison,
+        .pp-comparison .pp-media {
           break-inside: avoid;
           page-break-inside: avoid;
         }
@@ -97,6 +113,11 @@ export default function ProposalImagePlacementStyles() {
           margin-bottom: 8mm;
         }
         body.proposal-export-mode .proposal-print-section.pp-page--seating {
+          padding-top: 16mm;
+          break-inside: avoid;
+          page-break-inside: avoid;
+        }
+        body.proposal-export-mode .proposal-print-section.pp-page--comparison {
           padding-top: 16mm;
           break-inside: avoid;
           page-break-inside: avoid;

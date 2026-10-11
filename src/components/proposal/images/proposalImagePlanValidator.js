@@ -11,13 +11,15 @@
  *   - the same crop is never repeated for a source;
  *   - every placement names its source image;
  *   - a dedicated gallery spread never repeats a source the document placed;
- *   - a seating-style image is never presented as a performance difference.
+ *   - a seating-style image is never presented as a performance difference;
+ *   - a comparison image is placed on its group's own page and nowhere else,
+ *     and is never reused as an unrelated gallery image.
  *
  * Reporting only: it returns violations and never changes or blocks a document.
  * Pure functions, no imports beyond the placement vocabulary.
  */
 
-import { EDITORIAL_ROLE, SEATING_STYLE_SECTION_ID } from './proposalImagePlacementAuthority.js';
+import { COMPARISON_SECTION_ID, EDITORIAL_ROLE, SEATING_STYLE_SECTION_ID } from './proposalImagePlacementAuthority.js';
 
 export const IMAGE_PLAN_VIOLATION = Object.freeze({
   MISSING_SOURCE_ASSET_ID: 'MISSING_SOURCE_ASSET_ID',
@@ -26,6 +28,8 @@ export const IMAGE_PLAN_VIOLATION = Object.freeze({
   CROP_REPEATED: 'CROP_REPEATED',
   SOURCE_REPEATED_IN_GALLERY: 'SOURCE_REPEATED_IN_GALLERY',
   SEATING_OPTION_AS_PERFORMANCE: 'SEATING_OPTION_AS_PERFORMANCE',
+  COMPARISON_IMAGE_OUTSIDE_ITS_PAGE: 'COMPARISON_IMAGE_OUTSIDE_ITS_PAGE',
+  COMPARISON_IMAGE_REUSED_IN_GALLERY: 'COMPARISON_IMAGE_REUSED_IN_GALLERY',
 });
 
 export const IMAGE_PLAN_SEVERITY = Object.freeze({
@@ -38,10 +42,12 @@ const pagesBetween = (a, b) => Math.abs(Number(b?.page_position ?? 0) - Number(a
 
 /**
  * @param {Object} plan the plan returned by planProposalImages
- * @param {{galleryImages?: Array}} options the images a retained spread would show
+ * @param {{galleryImages?: Array, comparisonImageIds?: Array<string>}} options
+ *   the images a retained spread would show, and the ids of the images the
+ *   designer marked as comparison options
  * @returns {{valid: boolean, violations: Array, checked: number}}
  */
-export function validateProposalImagePlan(plan, { galleryImages = [] } = {}) {
+export function validateProposalImagePlan(plan, { galleryImages = [], comparisonImageIds = [] } = {}) {
   // Every placement takes part in the spacing rules, the cover included: the
   // cover is the anchor the document's first return is measured from.
   const everyPlacement = (Array.isArray(plan?.placements) ? plan.placements : [])
@@ -118,6 +124,55 @@ export function validateProposalImagePlan(plan, { galleryImages = [] } = {}) {
         flag(
           IMAGE_PLAN_VIOLATION.SEATING_OPTION_AS_PERFORMANCE,
           'a seating-style image is presented as a performance difference',
+        );
+      }
+    });
+
+  // A comparison image is one option in a deliberate comparison: it belongs to
+  // its group's own page and nowhere else, and it is never reused as an
+  // unrelated gallery image. Both are reported rather than assumed, so the
+  // document can be checked against the intent the designer recorded.
+  const comparedIds = new Set(comparisonImageIds || []);
+  if (comparedIds.size > 0) {
+    everyPlacement
+      .filter((placement) => comparedIds.has(placement.source_asset_id))
+      .forEach((placement) => {
+        const onItsOwnPage = placement.section_id === COMPARISON_SECTION_ID
+          && placement.editorial_role === EDITORIAL_ROLE.COMPARISON_OPTION;
+        if (!onItsOwnPage) {
+          flag(
+            IMAGE_PLAN_VIOLATION.COMPARISON_IMAGE_OUTSIDE_ITS_PAGE,
+            `a comparison image is placed as ${role(placement)} instead of on its group's comparison page`,
+          );
+        }
+      });
+
+    (Array.isArray(galleryImages) ? galleryImages : []).forEach((image) => {
+      if (image?.id && comparedIds.has(image.id)) {
+        flag(
+          IMAGE_PLAN_VIOLATION.COMPARISON_IMAGE_REUSED_IN_GALLERY,
+          'a comparison image is reused as an unrelated gallery image',
+        );
+      }
+    });
+  }
+
+  // A comparison states the choice, never a performance difference: where the
+  // designer's note says the performance is the same, the page states that, and
+  // nothing on it may carry a performance result of its own.
+  everyPlacement
+    .filter((placement) => placement.section_id === COMPARISON_SECTION_ID
+      || placement.editorial_role === EDITORIAL_ROLE.COMPARISON_OPTION)
+    .forEach((placement) => {
+      const claimsPerformance = Boolean(
+        placement.parameter_key
+        || placement.performance_level
+        || (Array.isArray(placement.claim_ids) && placement.claim_ids.length > 0),
+      );
+      if (claimsPerformance) {
+        flag(
+          IMAGE_PLAN_VIOLATION.SEATING_OPTION_AS_PERFORMANCE,
+          'a comparison option is presented as a performance difference',
         );
       }
     });

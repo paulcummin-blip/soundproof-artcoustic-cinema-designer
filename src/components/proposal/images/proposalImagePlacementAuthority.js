@@ -22,6 +22,8 @@ export const EDITORIAL_ROLE = Object.freeze({
   PORTRAIT_EDITORIAL: 'portrait_editorial',
   /** A large lifestyle image on the seating-style page. */
   SEATING_OPTION: 'seating_option',
+  /** One option on a comparison group's own page. */
+  COMPARISON_OPTION: 'comparison_option',
   /** The closing full-width landscape. */
   CLOSING_FEATURE: 'closing_feature',
 });
@@ -66,6 +68,132 @@ export const SEATING_STYLE_LABELS = Object.freeze({
 
 /** The section id the seating-style page carries: it is not a stored section. */
 export const SEATING_STYLE_SECTION_ID = 'seating_style';
+
+/**
+ * ── Comparison images ───────────────────────────────────────────────────────
+ * A comparison image is not a gallery image. It is one option in a deliberate
+ * visual comparison the designer has marked: two (or more) images that answer
+ * the same question — a seating style, a finish, a screen wall — shown together
+ * on their own page, full width, each captioned with what it is, with the
+ * designer's own message above them.
+ *
+ * The designer states what is being compared and what the client should
+ * understand from it. Nothing here infers a comparison from a caption, a file
+ * name or the image itself, and nothing here invents the message: where no note
+ * exists anywhere, the page carries neutral text stating that the images are two
+ * visual options for the same design.
+ */
+export const COMPARISON_SECTION_ID = 'comparison_options';
+
+/** The group an image marked as a comparison belongs to when it names none. */
+export const DEFAULT_COMPARISON_GROUP = 'Comparison options';
+
+/** The neutral message, used only where no note exists anywhere for the group. */
+export const NEUTRAL_COMPARISON_MESSAGE = 'These images show two visual options for the same design. Review the differences in style and layout before selecting the preferred direction.';
+
+/** The question proposal creation asks when comparison images exist. */
+export const COMPARISON_MESSAGE_QUESTION = 'What are we comparing, and what is the message?';
+
+/** The helper text that question carries. */
+export const COMPARISON_MESSAGE_HELPER = 'These images are marked as comparison images. Add a short note explaining what the client should understand from the comparison.';
+
+const recorded = (value) => String(value ?? '').trim();
+
+/**
+ * Whether the designer has marked an image as part of a comparison set.
+ * The flag is the statement of intent; an image whose flag is unset but which
+ * carries a group name or an option label is read as marked, so a value written
+ * elsewhere is never silently lost.
+ */
+export function isComparisonImage(asset) {
+  if (!asset) return false;
+  if (asset.comparison_enabled === true) return true;
+  if (asset.comparison_enabled === false) return false;
+  return recorded(asset.comparison_group).length > 0
+    || recorded(asset.comparison_option_label).length > 0;
+}
+
+/** The comparison set an image belongs to, by name, or null when it is not one. */
+export function comparisonGroupNameOf(asset) {
+  if (!isComparisonImage(asset)) return null;
+  return recorded(asset.comparison_group) || DEFAULT_COMPARISON_GROUP;
+}
+
+/** What the option this image stands for is called, or null when none is stated. */
+export function comparisonOptionLabelOf(asset) {
+  if (!isComparisonImage(asset)) return null;
+  return recorded(asset.comparison_option_label) || null;
+}
+
+/** The designer's own message recorded on this image, or null. */
+export function comparisonNoteOf(asset) {
+  return recorded(asset?.comparison_note) || null;
+}
+
+/** The display order this image states inside its group, or null when unstated. */
+export function comparisonOrderOf(asset) {
+  const value = Number(asset?.comparison_order);
+  return Number.isFinite(value) ? value : null;
+}
+
+/**
+ * The images of one comparison set in the order the page shows them: a stated
+ * display order leads (lowest number first), then the gallery order, so an
+ * unstated order is never guessed at.
+ */
+export function orderedComparisonImages(assets = []) {
+  return (Array.isArray(assets) ? assets : [])
+    .filter((asset) => comparisonGroupNameOf(asset))
+    .map((asset, index) => ({ asset, index, order: comparisonOrderOf(asset) }))
+    .sort((a, b) => {
+      if (a.order !== null && b.order !== null && a.order !== b.order) return a.order - b.order;
+      if (a.order !== null && b.order === null) return -1;
+      if (a.order === null && b.order !== null) return 1;
+      return a.index - b.index;
+    })
+    .map((entry) => entry.asset);
+}
+
+/**
+ * The comparison sets a project's images state, in the order the groups are first
+ * named, each with the message its page carries.
+ *
+ * The message is the designer's own note, read from the group's images in
+ * display order; where the group states no note, the message supplied for the
+ * proposal is used; where neither exists, the neutral message is used. The source
+ * travels with the message, so a surface can state which one it is reading.
+ *
+ * @param {Array} assets — the project's images (any mix of scopes and slots)
+ * @param {{proposalMessage?: string|null}} [options]
+ * @returns {Array<{id: string, name: string, images: Array, message: string,
+ *   message_source: 'image_note'|'proposal'|'neutral'}>}
+ */
+export function comparisonGroupsOf(assets = [], { proposalMessage = null } = {}) {
+  const list = Array.isArray(assets) ? assets : [];
+  const names = [];
+  list.forEach((asset) => {
+    const name = comparisonGroupNameOf(asset);
+    if (name && !names.includes(name)) names.push(name);
+  });
+
+  return names.map((name) => {
+    const images = orderedComparisonImages(list.filter((asset) => comparisonGroupNameOf(asset) === name));
+    const note = images.map((image) => comparisonNoteOf(image)).find(Boolean) || null;
+    const stated = recorded(proposalMessage) || null;
+    return {
+      id: name,
+      name,
+      images,
+      message: note || stated || NEUTRAL_COMPARISON_MESSAGE,
+      message_source: note ? 'image_note' : (stated ? 'proposal' : 'neutral'),
+    };
+  });
+}
+
+/** The title a comparison group's page carries: the group's own name. */
+export function comparisonPageTitle(group) {
+  return recorded(group?.name) || DEFAULT_COMPARISON_GROUP;
+}
 
 /** Mirrors ASSET_SLOT.COVER: the cover image's slot in the project gallery. */
 export const PROPOSAL_COVER_SLOT = 'cover';
@@ -136,7 +264,7 @@ export function objectPositionForFocalPoint(focalPoint) {
  * @param {number} args.pagePosition the page in the document's narrative order (cover = 1)
  * @param {number} args.order        the placement's order in the document
  */
-export function makePlacement({ source, role, sectionId, pagePosition, order }) {
+export function makePlacement({ source, role, sectionId, pagePosition, order, comparison_group = null, comparison_option_label = null }) {
   return {
     id: `${role}:${source?.id || 'unknown'}:${order}`,
     source_asset_id: source?.id || null,
@@ -149,5 +277,10 @@ export function makePlacement({ source, role, sectionId, pagePosition, order }) 
     section_id: sectionId ?? null,
     page_position: pagePosition ?? null,
     placement_order: order ?? null,
+    // A comparison option carries its own group and what it stands for, so its
+    // page states the option under the image without a second lookup. Null on
+    // every other placement.
+    comparison_group: comparison_group || null,
+    comparison_option_label: comparison_option_label || null,
   };
 }

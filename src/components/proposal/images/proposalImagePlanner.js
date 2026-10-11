@@ -11,6 +11,8 @@
  *   - the last structure section is the visual break, where the COVER source
  *     returns in the landscape crop;
  *   - a seating-style page carries the large lifestyle alternatives;
+ *   - each comparison group the designer marked carries one page of its own,
+ *     both options full width with the designer's own message;
  *   - the closing page takes a full-width landscape from the source least
  *     recently used.
  *
@@ -25,10 +27,15 @@
  */
 
 import {
+  COMPARISON_SECTION_ID,
   CROP_ORIENTATION,
   EDITORIAL_ROLE,
   PROPOSAL_COVER_SLOT,
   SEATING_STYLE_SECTION_ID,
+  comparisonGroupsOf,
+  comparisonOptionLabelOf,
+  comparisonPageTitle,
+  isComparisonImage,
   isUsableInProposal,
   makePlacement,
   seatingStyleOf,
@@ -122,10 +129,21 @@ export function planProposalImages({ assets = [], sectionSlots = [], coverAssetI
     || usable[0]
     || null;
 
+  // A comparison image is a deliberate visual comparison the designer marked:
+  // it belongs to its group's own page and is never scattered through the
+  // narrative, nor reused as an unrelated gallery image. It takes precedence
+  // over the seating grouping — an image marked as a comparison option is
+  // compared with its alternative, never used as a decorative lifestyle shot.
+  const comparisonGroupList = comparisonGroupsOf(
+    usable.filter((asset) => asset.id && asset !== coverAsset && isComparisonImage(asset)),
+  );
+  const comparisonIds = new Set(comparisonGroupList.flatMap((group) => group.images.map((image) => image.id)));
+  const isCompared = (asset) => Boolean(asset?.id) && comparisonIds.has(asset.id);
+
   // A seating-style image is a lifestyle alternative: it belongs to the seating
   // page and is never scattered through the narrative as a design feature.
-  const seatingSources = usable.filter((asset) => asset !== coverAsset && seatingStyleOf(asset));
-  const narrativeSources = usable.filter((asset) => !seatingStyleOf(asset));
+  const seatingSources = usable.filter((asset) => asset !== coverAsset && !isCompared(asset) && seatingStyleOf(asset));
+  const narrativeSources = usable.filter((asset) => !isCompared(asset) && !seatingStyleOf(asset));
 
   // ── Page order. The cover is page 1; each composed section takes the next
   // page; the seating-style page sits immediately before the closing section,
@@ -137,13 +155,25 @@ export function planProposalImages({ assets = [], sectionSlots = [], coverAssetI
   });
   const closingIndex = entries.findIndex((entry) => CLOSING_TYPES.includes(entry.section_type));
   const seatingPageAnchorType = closingIndex >= 0 ? entries[closingIndex].section_type : null;
+  const seatingCount = seatingSources.length > 0 ? 1 : 0;
+  // Each comparison group takes a page of its own, immediately after the
+  // seating-style page: the alternatives are read together, on their own page,
+  // before the document closes.
+  const comparisonPageCount = comparisonGroupList.length;
+  const extraPages = seatingCount + comparisonPageCount;
   let seatingPage = null;
-  if (seatingSources.length > 0) {
+  let comparisonPageSlots = [];
+  if (extraPages > 0) {
+    const start = closingIndex >= 0
+      ? entries[closingIndex].page
+      : (entries.length > 0 ? entries[entries.length - 1].page + 1 : 2);
+    if (seatingCount > 0) seatingPage = start;
+    comparisonPageSlots = comparisonGroupList.map((group, index) => ({
+      group,
+      page: start + seatingCount + index,
+    }));
     if (closingIndex >= 0) {
-      seatingPage = entries[closingIndex].page;
-      entries.slice(closingIndex).forEach((entry) => { entry.page += 1; });
-    } else {
-      seatingPage = entries.length > 0 ? entries[entries.length - 1].page + 1 : 2;
+      entries.slice(closingIndex).forEach((entry) => { entry.page += extraPages; });
     }
   }
 
@@ -160,7 +190,7 @@ export function planProposalImages({ assets = [], sectionSlots = [], coverAssetI
     && (pagePosition - lastUsed(asset)) >= MIN_PAGE_GAP;
 
   const placements = [];
-  const add = (asset, role, sectionId, pagePosition) => {
+  const add = (asset, role, sectionId, pagePosition, extra = {}) => {
     if (!asset || !asset.id) return null;
     const placement = makePlacement({
       source: asset,
@@ -168,6 +198,7 @@ export function planProposalImages({ assets = [], sectionSlots = [], coverAssetI
       sectionId,
       pagePosition,
       order: placements.length + 1,
+      ...extra,
     });
     const list = history.get(asset.id) || [];
     list.push({ pagePosition, crop: placement.crop_orientation });
@@ -243,6 +274,19 @@ export function planProposalImages({ assets = [], sectionSlots = [], coverAssetI
     });
   }
 
+  // 5b. Each comparison group's own page: every option it holds, full width, in
+  // the designer's display order, each stating what it stands for. The options
+  // are read together — never separated across the document, and never shown as
+  // decorative gallery images.
+  comparisonPageSlots.forEach(({ group, page: pagePosition }) => {
+    group.images.forEach((source) => {
+      add(source, EDITORIAL_ROLE.COMPARISON_OPTION, COMPARISON_SECTION_ID, pagePosition, {
+        comparison_group: group.name,
+        comparison_option_label: comparisonOptionLabelOf(source),
+      });
+    });
+  });
+
   // 6. The closing page: a full-width landscape from the source least recently used.
   const closingEntry = closingIndex >= 0 ? entries[closingIndex] : null;
   if (closingEntry) {
@@ -254,7 +298,8 @@ export function planProposalImages({ assets = [], sectionSlots = [], coverAssetI
   // placed, and with two or three images no spread is kept at all. ──
   const placedIds = new Set(placements.map((placement) => placement.source_asset_id).filter(Boolean));
   const galleryImages = usable.filter(
-    (asset) => asset.id && !placedIds.has(asset.id) && asset !== coverAsset && !seatingStyleOf(asset),
+    (asset) => asset.id && !placedIds.has(asset.id) && asset !== coverAsset
+      && !seatingStyleOf(asset) && !isCompared(asset),
   );
 
   const bySection = {};
@@ -271,6 +316,20 @@ export function planProposalImages({ assets = [], sectionSlots = [], coverAssetI
     seatingPlacements: placements.filter((placement) => placement.editorial_role === EDITORIAL_ROLE.SEATING_OPTION),
     seatingPageAnchorType,
     seatingPage,
+    // A comparison group's own page: the title it carries, the message the
+    // designer supplied (or the neutral text), and the options it shows.
+    comparisonPlacements: placements.filter(
+      (placement) => placement.editorial_role === EDITORIAL_ROLE.COMPARISON_OPTION,
+    ),
+    comparisonPages: comparisonPageSlots.map(({ group, page: pagePosition }) => ({
+      id: group.id,
+      title: comparisonPageTitle(group),
+      message: group.message,
+      message_source: group.message_source,
+      page: pagePosition,
+      placements: placements.filter((placement) => placement.section_id === COMPARISON_SECTION_ID
+        && placement.comparison_group === group.name),
+    })),
     galleryImages,
     retainedGallery: galleryImages.length >= RETAINED_GALLERY_MIN_IMAGES,
     usableCount,

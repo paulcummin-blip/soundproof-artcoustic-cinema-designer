@@ -29,6 +29,7 @@ import { imagePagesFor } from '@/components/proposal/print/imagePageLayout';
 import ProposalImagePlacement from '@/components/proposal/print/ProposalImagePlacement';
 import ProposalImagePlacementStyles from '@/components/proposal/print/ProposalImagePlacementStyles';
 import SeatingStylePage from '@/components/proposal/print/SeatingStylePage';
+import ComparisonOptionsPage from '@/components/proposal/print/ComparisonOptionsPage';
 import {
   SEATING_IMAGES_PER_PAGE,
   composeSectionSlots,
@@ -134,7 +135,12 @@ export default function ProposalPackDocument({
 
   // The spacing, crop and role rules, checked at layout time. A document that
   // breaks one is reported and still prints: validation never blocks a pack.
-  const imagePlanCheck = validateProposalImagePlan(imagePlan);
+  const imagePlanCheck = validateProposalImagePlan(imagePlan, {
+    // A comparison image belongs on its group's own page and nowhere else, so
+    // the images the designer marked are checked against where they landed.
+    galleryImages: imagePlan.galleryImages,
+    comparisonImageIds: imagePlan.comparisonImageIds,
+  });
   const violationSignature = imagePlanCheck.violations
     .map((violation) => `${violation.code}:${violation.detail}`)
     .join(' | ');
@@ -152,6 +158,11 @@ export default function ProposalPackDocument({
     seatingChunks.push(imagePlan.seatingPlacements.slice(index, index + SEATING_IMAGES_PER_PAGE));
   }
   let seatingPagesPlaced = false;
+
+  // A comparison group is not a stored section either: each group takes a page
+  // of its own, carrying the designer's message and both options full width.
+  const comparisonGroups = imagePlan.comparisonPages || [];
+  let comparisonPagesPlaced = false;
 
   // Page order, with the numbers assigned as the pages are composed.
   let number = 1;
@@ -174,6 +185,24 @@ export default function ProposalPackDocument({
       );
     });
     seatingPagesPlaced = true;
+  };
+
+  // Each comparison group's own page: the group's name as its title, the
+  // designer's own message above the images, and both options full width
+  // underneath, each captioned with what it stands for.
+  const pushComparisonPages = () => {
+    comparisonGroups.forEach((group) => {
+      pages.push(
+        <ComparisonOptionsPage
+          key={`comparison:${group.id}`}
+          number={takeNumber()}
+          title={group.title}
+          message={group.message}
+          placements={group.placements}
+        />
+      );
+    });
+    comparisonPagesPlaced = true;
   };
 
   // One page carries the project, the room and the brief: no second page
@@ -221,9 +250,11 @@ export default function ProposalPackDocument({
   canonical
     .filter((def) => def.type !== 'cover')
     .forEach((def) => {
-      // The seating-style page sits before the section the planner anchors it to.
-      if (seatingChunks.length > 0 && !seatingPagesPlaced && def.type === imagePlan.seatingPageAnchorType) {
-        pushSeatingPages();
+      // The seating-style page and each comparison page sit immediately before
+      // the section the planner anchors them to.
+      if (!seatingPagesPlaced && !comparisonPagesPlaced && def.type === imagePlan.seatingPageAnchorType) {
+        if (seatingChunks.length > 0) pushSeatingPages();
+        if (comparisonGroups.length > 0) pushComparisonPages();
       }
       const section = byType.get(def.type);
       if (!section) return;

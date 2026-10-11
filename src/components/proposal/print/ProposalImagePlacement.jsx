@@ -25,6 +25,7 @@ const TREATMENT = Object.freeze({
   [EDITORIAL_ROLE.CLOSING_FEATURE]: 'landscape',
   [EDITORIAL_ROLE.PORTRAIT_EDITORIAL]: 'portrait',
   [EDITORIAL_ROLE.SEATING_OPTION]: 'seating',
+  [EDITORIAL_ROLE.COMPARISON_OPTION]: 'comparison',
 });
 
 export default function ProposalImagePlacement({

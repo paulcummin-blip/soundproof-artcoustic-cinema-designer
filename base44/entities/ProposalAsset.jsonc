@@ -1,7 +1,7 @@
 {
   "name": "ProposalAsset",
   "type": "object",
-  "description": "A visual asset (image) attached to a project for use in reports and proposals. The project gallery is deliberately simple: one Cover Image plus Image 1 to Image 10, each with an optional caption. The slot field is the label authority. Legacy assets uploaded under the previous labelled model (front view, rear view, plan, elevation, construction, client logo, reference photography, technical drawings, documents, gallery) keep their asset_type and are placed into slots by the gallery mapping \u2014 they are never moved or deleted. Every image also carries a scope: project-wide (applies to every design version) or version-specific (applies only to the one version it is assigned to). An image with no scope recorded is project-wide, so every image uploaded before scope existed keeps working unchanged. Three further fields are presentation choices for the proposal only \u2014 whether the image may be placed in the document, whether it is grouped as a seating-style alternative, and which part of the frame its crop keeps. They change nothing about the stored file, the caption, the scope or any engineering value.",
+  "description": "A visual asset (image) attached to a project for use in reports and proposals. The project gallery is deliberately simple: one Cover Image plus Image 1 to Image 10, each with an optional caption. The slot field is the label authority. Legacy assets uploaded under the previous labelled model (front view, rear view, plan, elevation, construction, client logo, reference photography, technical drawings, documents, gallery) keep their asset_type and are placed into slots by the gallery mapping \u2014 they are never moved or deleted. Every image also carries a scope: project-wide (applies to every design version) or version-specific (applies only to the one version it is assigned to). An image with no scope recorded is project-wide, so every image uploaded before scope existed keeps working unchanged. Three further fields are presentation choices for the proposal only \u2014 whether the image may be placed in the document, whether it is grouped as a seating-style alternative, and which part of the frame its crop keeps. They change nothing about the stored file, the caption, the scope or any engineering value. A further group of fields marks an image as one option in a deliberate COMPARISON: comparison_enabled, the group it belongs to, the option label it stands for, the designer's own message and its display order. Comparison images are the designer's stated intent \u2014 they are never inferred \u2014 and they are placed on their group's own comparison page, never scattered through the narrative.",
   "properties": {
     "project_id": {
       "type": "string",
@@ -124,6 +124,35 @@
       "nullable": true,
       "default": null,
       "description": "Marks the image as a seating-style alternative for the proposal's seating-style page: 'lounge' = lounge / sofa seating, 'recliner' = individual cinema recliners. Null = not a seating option, so the image takes part in the document's normal editorial placement instead. A seating-style image is presented as a comfort and interior choice and is never presented as a performance difference: the seating style does not change the system performance, only the actual seating positions do."
+    },
+    "comparison_enabled": {
+      "type": "boolean",
+      "default": false,
+      "description": "Whether the designer has marked this image as part of a deliberate comparison \u2014 'Comparison image' in the Library's proposal controls. True = the image is one option in a comparison set, placed on its group's own comparison page with the designer's message, and never scattered through the narrative or reused as an unrelated gallery image. False or unset = the image takes part in the document's normal editorial placement. This flag is the designer's statement of intent: comparison membership is never inferred from captions, filenames or image content."
+    },
+    "comparison_group": {
+      "type": "string",
+      "nullable": true,
+      "default": null,
+      "description": "The name of the comparison set this image belongs to, e.g. 'Seating style options'. Images sharing a group name are shown together on one comparison page, and the group name is that page's title. Null or empty = the default group. Only read when the image is marked as a comparison image."
+    },
+    "comparison_option_label": {
+      "type": "string",
+      "nullable": true,
+      "default": null,
+      "description": "What this option is, shown as the caption under the image on the comparison page, e.g. 'Relaxed sofa seating' or 'Cinema recliner seating'. Null or empty = the image's own caption is used instead. Only read when the image is marked as a comparison image."
+    },
+    "comparison_note": {
+      "type": "string",
+      "nullable": true,
+      "default": null,
+      "description": "The designer's own message for the comparison this image belongs to \u2014 what the client should understand from it. It is stated on the comparison page exactly as written: nothing here is ever invented, and when no note exists anywhere the page uses neutral text that states the images are two visual options for the same design. When several images in one group state a note, the first in display order is the group's message."
+    },
+    "comparison_order": {
+      "type": "number",
+      "nullable": true,
+      "default": null,
+      "description": "Optional display order of this image inside its comparison group. Lower numbers are shown first. Null = the gallery order is used, so an order is only needed when the images should not read in gallery order."
     },
     "focal_horizontal": {
       "type": "string",
