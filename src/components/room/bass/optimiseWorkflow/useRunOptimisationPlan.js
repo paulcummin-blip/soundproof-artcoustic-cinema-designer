@@ -30,6 +30,8 @@ import { publishRecommendation } from "@/components/recommendationEngine";
 import { buildOptimiserPlan } from "@/components/room/bass/optimiserPlan/buildOptimiserPlan.js";
 import { buildOptimiserResultForSave } from "@/components/room/bass/optimiserPlan/optimiserPlanSave.js";
 import { buildOptimiserRunEvidence } from "@/components/room/bass/optimiserPlan/buildOptimiserRunEvidence.js";
+import { resolveCalibrationApplicationPlan } from "./adiCalibrationCandidateSelection.js";
+import { getAppliedCalibrationAuthority } from "@/components/room/bass/appliedCalibrationAuthority/appliedCalibrationAuthorityStore.js";
 import {
   getOptimiserPlanAuthority,
   setOptimiserPlanAuthority,
@@ -151,10 +153,23 @@ export default function useRunOptimisationPlan({
         engineVersion: result.selection?.winner?.algorithmVersion || null,
       };
 
+      // The calibration decision for this evaluation: what ADI would apply, and
+      // why it held everything else. This path changes no design, so nothing is
+      // applied here (decisionApplied: false) and the panel states the decision
+      // as held, with its reason, instead of a bare "not applied".
+      const calibrationDecision = resolveCalibrationApplicationPlan({
+        baseline: result.selection?.currentResult || null,
+        selection: result.selection,
+        objectives: result.selection?.objectives || null,
+        instances: subInstancesRef.current || [],
+        appliedCalibration: getAppliedCalibrationAuthority(projectId, versionId),
+      });
+
       const optimiserPlan = buildOptimiserPlan({
         selection: result.selection,
         baseline: result.selection?.currentResult || null,
         identity: planIdentity,
+        calibrationDecision,
         instances: subInstancesRef.current || [],
         // The design's own seating and room, so an evaluated seating movement is
         // persisted with its exact previous/evaluated positions and validity.
@@ -173,6 +188,7 @@ export default function useRunOptimisationPlan({
         selection: result.selection,
         diagnostics: result.optimisationDiagnostics || null,
         identity: planIdentity,
+        calibrationDecision,
       });
 
       if (!persistedPlan && !runEvidence) {

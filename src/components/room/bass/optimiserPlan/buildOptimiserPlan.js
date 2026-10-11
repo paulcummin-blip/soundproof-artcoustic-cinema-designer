@@ -354,6 +354,11 @@ export function buildOptimiserPlan({
   roomDims = null,
   leverDecisions = {},
   notes = [],
+  // The run's own calibration decision: what ADI applied (or held, and why). It
+  // is recorded with the evidence so the panel states the same decision after a
+  // refresh, and never re-derives one.
+  calibrationDecision = null,
+  decisionApplied = false,
 } = {}) {
   if (!selection || typeof selection !== "object") return null;
   const winner = selection.winner || null;
@@ -533,6 +538,8 @@ export function buildOptimiserPlan({
     selection,
     baseline: baselineResult,
     appliedLevers: Object.keys(levers),
+    calibrationDecision,
+    decisionApplied,
   });
 
   return {
@@ -587,6 +594,10 @@ export function buildOptimiserPlan({
     // its canonical P19/P20 before and after, the lever's own signed value, and
     // the run's own reason for accepting nothing.
     calibrationEvidence,
+    // The calibration decision itself, so a reopened plan states what ADI did and
+    // why, without re-running the decision.
+    calibrationDecision: calibrationDecision || null,
+    decisionApplied: decisionApplied === true,
     individualEffectsEvaluated,
     leverDecisions: normaliseDecisions(leverDecisions),
     applied: resolveAppliedMap(levers, instances, seatingPositions),

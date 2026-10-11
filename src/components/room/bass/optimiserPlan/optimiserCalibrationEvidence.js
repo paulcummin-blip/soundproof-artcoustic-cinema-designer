@@ -573,17 +573,68 @@ function buildPhaseEvidence({ selection, baseline, appliedLevers }) {
  * @param {string[]} [params.appliedLevers] - levers the saved plan offers to apply
  * @returns {object|null} null when the run retained nothing to read
  */
-export function buildCalibrationEvidence({ selection = null, baseline = null, appliedLevers = [] } = {}) {
+/**
+ * What the run's own calibration decision did with one lever.
+ *
+ * The decision is the authority for WHAT ADI did: a lever it applied is APPLIED;
+ * a lever whose improvement it held keeps the sentence that says why — the rule
+ * that blocked it, or the stronger candidate it lost to. An improvement that was
+ * found but not applied is NEVER left without that sentence.
+ */
+function applyDecisionToLever(record, lever, { decision = null, decisionApplied = false } = {}) {
+  const entry = decision?.perLever?.[lever] || null;
+
+  if (entry?.applied === true) {
+    return {
+      ...record,
+      result: decisionApplied
+        ? CALIBRATION_EVIDENCE_RESULT.APPLIED
+        : CALIBRATION_EVIDENCE_RESULT.IMPROVEMENT_NOT_APPLIED,
+      notAppliedReason: decisionApplied ? null : CALIBRATION_READY_TO_APPLY_REASON,
+      decision: entry.decision || null,
+      decisionReason: entry.reason || null,
+    };
+  }
+
+  if (record.result !== CALIBRATION_EVIDENCE_RESULT.IMPROVEMENT_NOT_APPLIED) {
+    return { ...record, decision: entry?.decision || null, decisionReason: entry?.reason || null };
+  }
+
+  return {
+    ...record,
+    decision: entry?.decision || null,
+    decisionReason: entry?.reason || null,
+    // The reason it was held: the decision's own sentence, or — for a record that
+    // predates the decision — the honest statement that none was recorded.
+    notAppliedReason: entry?.statement || CALIBRATION_NO_DECISION_RECORDED_REASON,
+  };
+}
+
+export function buildCalibrationEvidence({
+  selection = null,
+  baseline = null,
+  appliedLevers = [],
+  // The run's calibration decision (resolveCalibrationApplicationPlan): what ADI
+  // did with each calibration lever and why the others were held. Optional so an
+  // older caller cannot make the evidence claim an application that never ran.
+  calibrationDecision = null,
+  decisionApplied = false,
+} = {}) {
   if (!selection || typeof selection !== "object") return null;
   const baselineResult = baseline || selection.currentResult || null;
   const applied = Array.isArray(appliedLevers) ? appliedLevers.filter(Boolean) : [];
 
-  const levers = {
+  const measured = {
     delay: buildDelayEvidence({ selection, baseline: baselineResult, appliedLevers: applied }),
     gain: buildGainEvidence({ selection, baseline: baselineResult, appliedLevers: applied }),
     polarity: buildPolarityEvidence({ selection, baseline: baselineResult, appliedLevers: applied }),
     phase: buildPhaseEvidence({ selection, baseline: baselineResult, appliedLevers: applied }),
   };
+
+  const levers = {};
+  for (const key of CALIBRATION_EVIDENCE_LEVERS) {
+    levers[key] = applyDecisionToLever(measured[key], key, { decision: calibrationDecision, decisionApplied });
+  }
 
   // Nothing at all was retained: the record is absent rather than empty, so the
   // panel states the missing-evidence message instead of an empty table.
@@ -595,6 +646,10 @@ export function buildCalibrationEvidence({ selection = null, baseline = null, ap
     schemaVersion: CALIBRATION_EVIDENCE_SCHEMA_VERSION,
     recordedAt: new Date().toISOString(),
     levers,
+    // The decision travels with the evidence, so the panel and any reader of the
+    // saved record resolve what ADI did — and why — from one place.
+    decision: calibrationDecision || null,
+    decisionApplied: decisionApplied === true,
   };
 }
 
@@ -625,7 +680,7 @@ export function describeCalibrationLever(record) {
     parts.push(`${record.candidateCount} candidates tested`);
   }
 
-  const outcome = RESULT_LABEL[record.result] || null;
+  const outcome = calibrationOutcomeLabel(record);
   if (outcome) parts.push(outcome);
   if (!best && !record.tested && record.reason) parts.push(record.reason);
   else if (record.reason) parts.push(record.reason);
@@ -656,6 +711,9 @@ export function resolveCalibrationEvidenceState(evidence) {
       tradeOffMessage: null,
       improvementHeld: false,
       leverLines: [],
+      // No lever line is claimable without the evidence behind it, so no held
+      // reason is stated either — the missing-evidence sentence is.
+      heldLines: [],
     };
   }
 
@@ -682,10 +740,24 @@ export function resolveCalibrationEvidenceState(evidence) {
     tradeOffHeld,
     tradeOffMessage: tradeOffHeld ? CALIBRATION_TRADE_OFF_MESSAGE : null,
     improvementHeld,
-    leverLines: CALIBRATION_EVIDENCE_LEVERS
-      .map((key) => calibrationEvidenceFor(evidence, key))
-      .filter(Boolean)
-      .map((record) => ({ lever: record.lever, label: record.label, text: describeCalibrationLever(record) }))
-      .filter((line) => Boolean(line.text)),
+    leverLines: leverLinesOf(evidence),
+    // The levers whose improvement was found and NOT applied, each with the
+    // reason it was held. These are shown even when another lever was applied, so
+    // a held improvement is never left unexplained.
+    heldLines: leverLinesOf(evidence).filter((line) => Boolean(line.notAppliedReason)),
   };
+}
+
+/** One display line per calibration lever, with its held reason when it has one. */
+function leverLinesOf(evidence) {
+  return CALIBRATION_EVIDENCE_LEVERS
+    .map((key) => calibrationEvidenceFor(evidence, key))
+    .filter(Boolean)
+    .map((record) => ({
+      lever: record.lever,
+      label: record.label,
+      text: describeCalibrationLever(record),
+      notAppliedReason: record.notAppliedReason || null,
+    }))
+    .filter((line) => Boolean(line.text));
 }

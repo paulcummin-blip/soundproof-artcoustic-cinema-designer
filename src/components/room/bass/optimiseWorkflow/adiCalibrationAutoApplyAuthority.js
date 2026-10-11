@@ -44,6 +44,13 @@ import {
   APPLIED_CALIBRATION_STATUS,
 } from "../appliedCalibrationAuthority/appliedCalibrationAuthority.js";
 import { normalisePhaseControlDeg } from "../../../../bass/core/subwooferPhaseControl";
+import {
+  CALIBRATION_TRADEOFF_DECISION,
+  assessCalibrationTradeOff,
+  describeTradeOffAutoApply,
+  describeTradeOffRejected,
+  describeTradeOffReview,
+} from "./adiCalibrationTradeOffRule.js";
 
 // ── Decisions ────────────────────────────────────────────────────────────
 
@@ -59,6 +66,10 @@ export const CALIBRATION_APPLY_REASON = Object.freeze({
   // A confirmed calibration improvement that a STRONGER confirmed calibration
   // candidate superseded: the rule that blocks it is stated, never left implicit.
   STRONGER_CANDIDATE_SELECTED: "stronger-calibration-candidate-selected",
+  // The 3:1 trade-off rule (adiCalibrationTradeOffRule.js).
+  TRADEOFF_WITHIN_RATIO: "trade-off-improvement-at-least-three-times-the-damage",
+  TRADEOFF_REVIEW_REQUIRED: "trade-off-useful-but-under-the-three-times-rule",
+  TRADEOFF_DAMAGE_EXCEEDS_BENEFIT: "trade-off-larger-than-the-improvement",
   P19_DAMAGED: "p19-materially-worsened",
   P20_DAMAGED: "p20-materially-worsened",
   PRIMARY_SEAT_REGRESSION: "primary-seat-regressed",
@@ -110,6 +121,10 @@ export function describeCalibrationNotApplied(reason, { selectedLever = null } =
     case CALIBRATION_APPLY_REASON.STRONGER_CANDIDATE_SELECTED:
     case CALIBRATION_APPLY_REASON.BEST_BALANCED:
       return `Not applied because the ${selected} candidate gives the stronger calibration improvement.`;
+    case CALIBRATION_APPLY_REASON.TRADEOFF_REVIEW_REQUIRED:
+      return "Not applied automatically because the trade-off is useful but under the 3:1 rule — review required.";
+    case CALIBRATION_APPLY_REASON.TRADEOFF_DAMAGE_EXCEEDS_BENEFIT:
+      return "Not applied because the trade-off is larger than the improvement.";
     case CALIBRATION_APPLY_REASON.P19_DAMAGED:
       return "Not applied because it worsens P19 materially — a trade-off for you to approve.";
     case CALIBRATION_APPLY_REASON.P20_DAMAGED:
@@ -372,6 +387,10 @@ function outcome(decision, reason, statement, extra = {}) {
     after: extra.after || null,
     improvement: extra.improvement || null,
     damage: extra.damage || null,
+    // The 3:1 trade-off this candidate carried, when it carried one: the ratio,
+    // the improvement, the damage and the rule's decision.
+    tradeOff: extra.tradeOff || null,
+    tradeOffDecision: extra.tradeOff?.decision || null,
     settings: Array.isArray(extra.settings) ? extra.settings : [],
     offsetStatement: extra.offsetStatement || null,
     limitingSeat: extra.limitingSeat || null,
@@ -449,27 +468,57 @@ export function resolveCalibrationAutoApply({
       context);
   }
 
-  // A candidate that buys an improvement with a material worsening of the other
-  // objective is a TRADE-OFF. It is decided BEFORE materiality, so a trade-off is
-  // always stated and never reported as "nothing found": the designer is shown
-  // what it would gain and what it would cost, and decides.
-  if (damage.any && (improvement.p19Improved || improvement.p20Improved)) {
-    const improvedSide = damage.p19Damaged ? "P20" : "P19";
-    const improvedPair = damage.p19Damaged
-      ? [before.p20, after.p20]
-      : [before.p19, after.p19];
-    const worsenedSide = damage.p19Damaged ? "P19" : "P20";
-    const worsenedPair = damage.p19Damaged
-      ? [before.p19, after.p19]
-      : [before.p20, after.p20];
-    const worsenedDb = damage.p19Damaged ? damage.p19WorseDb : damage.p20WorseDb;
-    const cost = worsenedDb != null && worsenedDb > 0
-      ? `${worsenedDb} dB`
-      : "a level";
-    return outcome(CALIBRATION_APPLY_DECISION.HOLD,
-      damage.p19Damaged ? CALIBRATION_APPLY_REASON.P19_DAMAGED : CALIBRATION_APPLY_REASON.P20_DAMAGED,
-      `The ${objectiveLabel} candidate improves ${improvedSide} from ${formatLevelValue(improvedPair[0]?.level, improvedPair[0]?.deviationDb)} to ${formatLevelValue(improvedPair[1]?.level, improvedPair[1]?.deviationDb)} but worsens ${worsenedSide} by ${cost} (from ${formatLevelValue(worsenedPair[0]?.level, worsenedPair[0]?.deviationDb)} to ${formatLevelValue(worsenedPair[1]?.level, worsenedPair[1]?.deviationDb)}). This is a trade-off, so it has not been applied — your approval is required.`,
-      context);
+  // ── A trade-off is a JUDGEMENT, decided by the 3:1 rule ────────────────
+  // A candidate that buys an improvement with a worsening of the other objective
+  // is a TRADE-OFF. It is decided BEFORE materiality, so a trade-off is always
+  // stated and never reported as "nothing found". Whether ADI may apply it on its
+  // own is the 3:1 rule's decision (adiCalibrationTradeOffRule.js):
+  //
+  //   improvement ≥ 3 × damage        → applied automatically
+  //   improvement > damage, under 3:1 → useful, held for approval (review required)
+  //   damage ≥ improvement            → never applied
+  //
+  // A level drop, a primary-seat regression or a hand-set calibration still block
+  // an automatic application whatever the ratio says.
+  const regression = hasPrimarySeatRegression(baseline, candidate);
+  const levelDrop = damage.p19LevelDrop || damage.p20LevelDrop;
+  const tradeOff = assessCalibrationTradeOff({ before, after });
+  let tradeOffAppliedNote = null;
+
+  if (tradeOff && (improvement.p19Improved || improvement.p20Improved)) {
+    const tradeOffContext = { ...context, tradeOff };
+
+    // A primary seat that regresses is a real seat losing performance: a good
+    // ratio never overrules it.
+    if (regression?.regressed) {
+      return outcome(CALIBRATION_APPLY_DECISION.HOLD, CALIBRATION_APPLY_REASON.PRIMARY_SEAT_REGRESSION,
+        `The ${objectiveLabel} candidate regresses ${regression.parameter} at ${regression.seatId}${regression.rawDeltaDb ? ` by ${round1(regression.rawDeltaDb)} dB` : ""}. This is a trade-off, so it has not been applied — your approval is required.`,
+        tradeOffContext);
+    }
+
+    // A displayed level that drops is a hard failure, not a ratio to trade.
+    if (levelDrop) {
+      const dropped = damage.p19LevelDrop
+        ? [before.p19, after.p19, "P19"]
+        : [before.p20, after.p20, "P20"];
+      return outcome(CALIBRATION_APPLY_DECISION.HOLD,
+        damage.p19LevelDrop ? CALIBRATION_APPLY_REASON.P19_DAMAGED : CALIBRATION_APPLY_REASON.P20_DAMAGED,
+        `The ${objectiveLabel} candidate drops the ${dropped[2]} level from ${formatLevelValue(dropped[0]?.level, dropped[0]?.deviationDb)} to ${formatLevelValue(dropped[1]?.level, dropped[1]?.deviationDb)}. This is a trade-off, so it has not been applied — your approval is required.`,
+        tradeOffContext);
+    }
+
+    if (tradeOff.decision === CALIBRATION_TRADEOFF_DECISION.REVIEW_REQUIRED) {
+      return outcome(CALIBRATION_APPLY_DECISION.HOLD, CALIBRATION_APPLY_REASON.TRADEOFF_REVIEW_REQUIRED,
+        describeTradeOffReview(tradeOff), tradeOffContext);
+    }
+    if (tradeOff.decision === CALIBRATION_TRADEOFF_DECISION.REJECTED) {
+      return outcome(CALIBRATION_APPLY_DECISION.HOLD, CALIBRATION_APPLY_REASON.TRADEOFF_DAMAGE_EXCEEDS_BENEFIT,
+        describeTradeOffRejected(tradeOff), tradeOffContext);
+    }
+
+    // At or above the 3:1 rule with every hard guard passed: applied, with the
+    // ratio stated as the reason it was.
+    tradeOffAppliedNote = describeTradeOffAutoApply(tradeOff);
   }
 
   if (!materiality?.material) {
@@ -478,8 +527,8 @@ export function resolveCalibrationAutoApply({
   }
 
   // A primary seat that regresses is a real seat losing performance: never
-  // applied silently, whatever the aggregate improves.
-  const regression = hasPrimarySeatRegression(baseline, candidate);
+  // applied silently, whatever the aggregate improves. (Already assessed above,
+  // so no ratio can carry it through.)
   if (regression?.regressed) {
     return outcome(CALIBRATION_APPLY_DECISION.HOLD, CALIBRATION_APPLY_REASON.PRIMARY_SEAT_REGRESSION,
       `The ${objectiveLabel} candidate regresses ${regression.parameter} at ${regression.seatId}${regression.rawDeltaDb ? ` by ${round1(regression.rawDeltaDb)} dB` : ""}. This is a trade-off, so it has not been applied — your approval is required.`,
@@ -496,19 +545,24 @@ export function resolveCalibrationAutoApply({
 
   const bestP19 = String(objectives?.bestCanonicalP19?.candidateId || "") === candidateId;
   const bestP20 = String(objectives?.bestCanonicalP20?.candidateId || "") === candidateId;
-  const reason = bestP19 && bestP20
-    ? CALIBRATION_APPLY_REASON.IMPROVES_ONE_WITHOUT_DAMAGE
-    : objective === "balanced"
-      ? CALIBRATION_APPLY_REASON.BEST_BALANCED
-      : CALIBRATION_APPLY_REASON.IMPROVES_ONE_WITHOUT_DAMAGE;
+  const reason = tradeOffAppliedNote
+    // The improvement is at least three times the trade-off it carries.
+    ? CALIBRATION_APPLY_REASON.TRADEOFF_WITHIN_RATIO
+    : bestP19 && bestP20
+      ? CALIBRATION_APPLY_REASON.IMPROVES_ONE_WITHOUT_DAMAGE
+      : objective === "balanced"
+        ? CALIBRATION_APPLY_REASON.BEST_BALANCED
+        : CALIBRATION_APPLY_REASON.IMPROVES_ONE_WITHOUT_DAMAGE;
 
   const sentence = [
     `ADI applied the ${objectiveLabel} candidate.`,
     offsetStatement,
+    // Why it was allowed to apply a change that carries a trade-off.
+    tradeOffAppliedNote,
     changeSentence(before, after) ? `Predicted ${changeSentence(before, after)}.` : null,
   ].filter(Boolean).join(" ");
 
-  return outcome(CALIBRATION_APPLY_DECISION.APPLIED, reason, sentence, context);
+  return outcome(CALIBRATION_APPLY_DECISION.APPLIED, reason, sentence, { ...context, tradeOff });
 }
 
 // ── Physical design changes: never applied, always stated ────────────────

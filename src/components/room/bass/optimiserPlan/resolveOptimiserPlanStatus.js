@@ -95,6 +95,8 @@ export function resolveOptimiserPlanStatus({
       target: null,
       staleReason: null,
       calibrationEvidence: null,
+      calibrationDecision: null,
+      decisionApplied: false,
       levers: [],
       individualEffectsEvaluated: false,
       baseline: null,
@@ -129,6 +131,8 @@ export function resolveOptimiserPlanStatus({
       // The evidence is kept even when the payload version cannot be read: the
       // panel still reports what that run retained.
       calibrationEvidence: plan.calibrationEvidence || null,
+      calibrationDecision: plan.calibrationDecision || null,
+      decisionApplied: plan.decisionApplied === true,
       levers: [],
       individualEffectsEvaluated: false,
       baseline: null,
@@ -191,6 +195,8 @@ export function resolveOptimiserPlanStatus({
       levers: [],
       individualEffectsEvaluated: false,
       calibrationEvidence: plan.calibrationEvidence || null,
+      calibrationDecision: plan.calibrationDecision || null,
+      decisionApplied: plan.decisionApplied === true,
       baseline: plan.baseline || null,
       layoutCounts: plan.layoutCounts || null,
       combined: null,
@@ -343,6 +349,10 @@ export function resolveOptimiserPlanStatus({
     // The calibration evidence this run retained, read by the panel's
     // calibration section and its tested-ledger rows.
     calibrationEvidence: plan.calibrationEvidence || null,
+    // What ADI did with the calibration levers, and why: the decision saved with
+    // the run, so the panel states it after a refresh instead of guessing.
+    calibrationDecision: plan.calibrationDecision || null,
+    decisionApplied: plan.decisionApplied === true,
     baseline: plan.baseline || null,
     // The subwoofer census the run evaluated, so every surface can judge the
     // evaluated move against the layout it was measured in.

@@ -51,6 +51,10 @@ export default function AdiCalibrationSection({
   const noImprovementProven = kind === ADI_CALIBRATION_KIND.TESTED
     && evidenceState?.noImprovementProven !== false;
   const evidenceLines = Array.isArray(evidenceState?.leverLines) ? evidenceState.leverLines : [];
+  // The levers whose improvement was found and NOT applied, each with the reason
+  // it was held. They are stated even when another lever was applied, so a found
+  // improvement is never left without its reason.
+  const heldLines = Array.isArray(evidenceState?.heldLines) ? evidenceState.heldLines : [];
 
   return (
     <div
@@ -69,6 +73,19 @@ export default function AdiCalibrationSection({
           appliedCalibration={appliedCalibration}
           designChanges={[]}
         />
+      )}
+
+      {/* A held calibration improvement — a trade-off under review, a weaker
+          candidate than the one applied, a hand-set calibration — states its
+          reason, whether or not something else was applied. */}
+      {showsApplied && heldLines.length > 0 && (
+        <div className="space-y-0.5">
+          {heldLines.map((line) => (
+            <div key={line.lever} className="text-[11px] text-[#3E4349] leading-relaxed">
+              <span className="text-[#625143]">{line.label}:</span> {line.text}
+            </div>
+          ))}
+        </div>
       )}
 
       {/* The retained record kept no calibration evidence: nothing may be claimed. */}

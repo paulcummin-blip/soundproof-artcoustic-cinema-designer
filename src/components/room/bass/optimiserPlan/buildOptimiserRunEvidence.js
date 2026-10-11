@@ -194,6 +194,9 @@ export function buildOptimiserRunEvidence({
   terminalOutcome = null,
   notes = [],
   baselineParity = null,
+  // The run's own calibration decision: what ADI applied, or held and why.
+  calibrationDecision = null,
+  decisionApplied = false,
 } = {}) {
   // The baseline-parity record travels with the evidence: a run that stopped for
   // want of a matching published authority still saves WHY, so the block is
@@ -302,6 +305,8 @@ export function buildOptimiserRunEvidence({
   const calibrationEvidence = buildCalibrationEvidence({
     selection,
     baseline: selection?.currentResult || null,
+    calibrationDecision,
+    decisionApplied,
   });
 
   return {
@@ -353,6 +358,8 @@ export function buildOptimiserRunEvidence({
     // What the calibration searches themselves produced, so "no useful
     // calibration improvement" is a statement the saved record can prove.
     calibrationEvidence,
+    calibrationDecision: calibrationDecision || null,
+    decisionApplied: decisionApplied === true,
     individualEffectsEvaluated: false,
     leverDecisions: {},
     applied: {},

@@ -31,6 +31,7 @@ import {
   ADI_APPLIED_CALIBRATION_TITLE,
   CALIBRATION_APPLY_DECISION,
   CALIBRATION_APPLY_REASON,
+  // The 3:1 trade-off rule's reason codes (added with the ratio rule).
   MATERIAL_DAMAGE_DB,
   NO_USEFUL_CALIBRATION_IMPROVEMENT,
   buildCalibrationSettings,
@@ -282,7 +283,9 @@ check('P20 DAMAGE HELD FOR APPROVAL, NOT APPLIED', () => {
   const candidate = confirmedResult({ id: 'cal-p19-only', p19: 3.4, p19Level: 'L4', p20: 7.2, tuning: tuning({ rearMs: 1 }) });
   const decision = decisionFor(candidate);
   assert.equal(decision.decision, CALIBRATION_APPLY_DECISION.HOLD);
-  assert.equal(decision.reason, CALIBRATION_APPLY_REASON.P20_DAMAGED);
+  // The damage here (1.2 dB on P20) exceeds the improvement (0.7 dB on P19):
+  // the 3:1 trade-off rule rejects it, and it is held for approval.
+  assert.equal(decision.reason, CALIBRATION_APPLY_REASON.TRADEOFF_DAMAGE_EXCEEDS_BENEFIT);
   assert.equal(decision.damage.p20Damaged, true);
   return `held: P20 worsened by ${decision.damage.p20WorseDb} dB`;
 });

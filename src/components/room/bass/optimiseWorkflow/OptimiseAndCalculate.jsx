@@ -42,10 +42,7 @@ import {
   buildAutoApplySummary,
   hasPhysicalRecommendations,
 } from "./optimiseWorkflowOrchestrator";
-import {
-  CALIBRATION_APPLY_DECISION,
-  resolveCalibrationAutoApply,
-} from "./adiCalibrationAutoApplyAuthority.js";
+import { resolveCalibrationApplicationPlan } from "./adiCalibrationCandidateSelection.js";
 import { publishRecommendation } from "@/components/recommendationEngine";
 import { DEFAULT_SUB_AMPLIFIER_POWER_PER_SUB_W } from "@/components/utils/subwooferCapability";
 import { buildAuthoritativeRspPosition } from "../authoritativeRspPosition";
@@ -382,6 +379,22 @@ export default function OptimiseAndCalculate({
       // Persist the exact ADI decision shown for each published fingerprint.
       // Existing calibration can end this workflow before the auto-apply path;
       // a first-run auto-apply calls this again after its final recalculation.
+      // ── The calibration decision, made ONCE for this run ──
+      // Every calibration candidate the run itself confirmed (delay, gain,
+      // polarity, phase — never a physical change) is put to the decision
+      // authority. The strongest qualifying candidate is the one applied; every
+      // other one states why it was not. Recorded with the run's evidence and
+      // reused by the apply step below, so the panel and the apply path can never
+      // disagree about what ADI did.
+      const calibrationApplication = resolveCalibrationApplicationPlan({
+        baseline: result.selection?.currentResult || null,
+        selection: result.selection,
+        objectives: result.selection?.objectives || null,
+        instances: subInstancesRef.current,
+        appliedCalibration: getAppliedCalibrationAuthority(projectId, versionId),
+      });
+      const calibrationApplied = Boolean(calibrationApplication.selected);
+
       const publishCurrentAdiRecommendation = async () => {
         const fingerprint = sharedRef.current?.completedBassAuthority?.contract?.job?.resultFingerprint
           || sharedRef.current?.completedBassAuthority?.currentFingerprint
@@ -440,6 +453,8 @@ export default function OptimiseAndCalculate({
           seatingPositions,
           roomDims,
           leverDecisions: getOptimiserPlanAuthority(projectId, versionId)?.leverDecisions || {},
+          calibrationDecision: calibrationApplication,
+          decisionApplied: calibrationApplied,
         });
         // Gated save: an actionable plan only when an independently evaluated,
         // applyable change clears the 1 dB materiality gate and its destination
@@ -458,6 +473,8 @@ export default function OptimiseAndCalculate({
             baseDesignFingerprint: currentShared?.baseDesignFingerprint || null,
             engineVersion: result.selection?.winner?.algorithmVersion || null,
           },
+          calibrationDecision: calibrationApplication,
+          decisionApplied: calibrationApplied,
         });
         if (persistedPlan) {
           setOptimiserPlanAuthority(projectId, versionId, persistedPlan);
@@ -508,25 +525,19 @@ export default function OptimiseAndCalculate({
       const stageResults = autoApplySummary.stageResults;
       const hasPhysical = hasPhysicalRecommendations(autoApplySummary);
 
-      // ── The calibration decision ──
-      // ADI may apply a CALIBRATION change on its own — subwoofer delay, group
+      // ── The calibration decision (made once, above) ──
+      // ADI applies a CALIBRATION change on its own — subwoofer delay, group
       // delay, rear-sub acoustic delay offset, gain trim, polarity, all-pass
-      // phase — when the CONFIRMED canonical P19/P20 results support it: an
-      // improvement to one objective that does not materially worsen the other,
-      // or the best balanced candidate improving the overall result.
+      // phase — when the run's CONFIRMED canonical P19/P20 results support it:
+      // the improvement is material, it is at least three times any trade-off it
+      // carries (the 3:1 rule), no primary seat regresses, no level drops and no
+      // calibration a human set by hand is overwritten. The strongest qualifying
+      // candidate is the one applied; every other states why it was not.
       //
-      // It never applies a PHYSICAL change, a material P19/P20 trade-off, a
-      // primary-seat regression, an immaterial or ambiguous result, or an
+      // It never applies a PHYSICAL change, an unconfirmed result, or an
       // overwrite of calibration a human set by hand. Those are stated and left
       // to the designer. The only thing this path can write is the tuning.
-      const calibrationApplication = resolveCalibrationAutoApply({
-        baseline: selection?.currentResult || null,
-        candidate: selection?.calibrationResult || selection?.winner || null,
-        objectives: selection?.objectives || null,
-        instances: subInstancesRef.current,
-        appliedCalibration: getAppliedCalibrationAuthority(projectId, versionId),
-      });
-      const hasCal = calibrationApplication.decision === CALIBRATION_APPLY_DECISION.APPLIED;
+      const hasCal = calibrationApplied;
 
       if (calibrationApplication.tuning.length > 0) {
         const rspPosition = buildAuthoritativeRspPosition(roomDims, appState?.mlpY_m, appState?.mlpX_m, appState?.designatedRspSeatId);
@@ -546,9 +557,12 @@ export default function OptimiseAndCalculate({
         })();
 
         if (basisFp) {
-          // 1. Build recommendationValues from the optimiser tuning
-          const recommendationValues = autoApplySummary.tuning.map((t) => ({
-            id: String(t.sourceId || ""),
+          // 1. Build recommendationValues from the tuning ADI decided to apply:
+          //    the selected safe calibration candidate, or the optimiser's own
+          //    tuning when nothing was authorised for automatic application.
+          const tuningToApply = hasCal ? calibrationApplication.tuning : autoApplySummary.tuning;
+          const recommendationValues = tuningToApply.map((t) => ({
+            id: String(t.sourceId || t.id || ""),
             delayMs: Number(t.delayMs) || 0,
             gainDb: Number(t.gainDb) || 0,
             polarity: (Number(t.polarity) < 0 || Number(t.polarity) === 180) ? -1 : 1,
@@ -561,7 +575,8 @@ export default function OptimiseAndCalculate({
             intent: RECOMMENDATION_INTENT.CALIBRATION,
             recommendationValues,
             generatedBy: "Bass Optimiser V2",
-            originatingCandidateId: selection?.winner?.candidateId || "auto-optimise",
+            originatingCandidateId: calibrationApplication.selected?.candidateId
+              || selection?.winner?.candidateId || "auto-optimise",
           });
           setRecommendation(projectId, versionId, recommendation);
 

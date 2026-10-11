@@ -229,8 +229,12 @@ export function resolveCalibrationApplicationPlan({
 
   return {
     ...fallback,
-    // Only the SELECTED candidate's tuning is ever offered for application.
-    tuning: selected ? selected.tuning : [],
+    // The selected candidate's tuning is the one applied. When nothing was
+    // selected, the held candidate's own tuning is carried for the record only —
+    // the apply surface reads `selected`, never this field.
+    tuning: selected
+      ? selected.tuning
+      : (Array.isArray(fallback?.tuning) ? fallback.tuning : []),
     selected: selected
       ? {
         lever: selected.lever,

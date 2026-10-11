@@ -314,8 +314,12 @@ export default function AdiOptimisationJourney({
   // record does not evidence.
   const calibrationEvidenceState = summary.calibrationEvidenceState || null;
   const calibrationEvidenceRetained = calibrationEvidenceState?.evidenceRetained !== false;
+  // The decision ADI recorded for THIS run, or — when this session's own record
+  // is gone after a refresh — the decision saved with the run, so the section
+  // states the same thing and never falls back to a bare "not applied".
+  const calibrationApplyEvidence = appliedCalibrationEvidence || planView?.calibrationDecision || null;
   const calibrationKind = resolveCalibrationSectionKind({
-    decision: appliedCalibrationEvidence?.decision || null,
+    decision: calibrationApplyEvidence?.decision || null,
     hasPersistedValues: Array.isArray(persistedAppliedCalibration?.values)
       && persistedAppliedCalibration.values.length > 0,
     evaluated,
@@ -404,7 +408,7 @@ export default function AdiOptimisationJourney({
           ever stated here. */}
       <AdiCalibrationSection
         kind={calibrationKind}
-        appliedEvidence={appliedCalibrationEvidence}
+        appliedEvidence={calibrationApplyEvidence}
         appliedCalibration={persistedAppliedCalibration}
         recommendation={calibrationRecommendation}
         evidenceState={calibrationEvidenceState}

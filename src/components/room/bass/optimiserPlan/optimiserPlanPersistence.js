@@ -53,6 +53,11 @@ export function serializeOptimiserPlan(plan) {
     // The calibration levers' own evidence (delay, gain, polarity, phase), so
     // the panel's calibration finding survives refresh and reopen.
     calibrationEvidence: plan.calibrationEvidence || null,
+    // The calibration decision recorded with this run: what ADI applied on its
+    // own, what it held and why. Persisted with the evidence so a reopened plan
+    // states the same decision instead of re-deriving one.
+    calibrationDecision: plan.calibrationDecision || null,
+    decisionApplied: plan.decisionApplied === true,
     combined: plan.combined || null,
     levers: plan.levers || {},
     individualEffectsEvaluated: plan.individualEffectsEvaluated === true,

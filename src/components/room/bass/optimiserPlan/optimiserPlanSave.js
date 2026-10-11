@@ -188,6 +188,11 @@ export function buildOptimiserResultForSave({
   diagnostics = null,
   identity = {},
   currentDesignUnchanged = true,
+  // The run's own calibration decision, recorded with the terminal evidence so a
+  // run that produced no actionable plan still states why each calibration
+  // improvement was or was not applied.
+  calibrationDecision = null,
+  decisionApplied = false,
 } = {}) {
   const actionability = resolvePlanActionability({ plan, selection });
   const actionablePlan = actionability.actionable
@@ -206,6 +211,8 @@ export function buildOptimiserResultForSave({
       currentDesignUnchanged,
       terminalOutcome: actionability.terminalOutcome,
       failureReason: actionability.reason,
+      calibrationDecision,
+      decisionApplied,
     });
 
   return { actionability, actionablePlan, runEvidence };
