@@ -27,6 +27,15 @@ import { buildHighChannelSectionRule } from './highChannelDensityRule.js';
 export const HIGHLIGHTS_SECTION_TYPE = 'key_performance_highlights';
 
 /**
+ * The section the approved writer's own client-facing prose for the designer's
+ * seating or layout alternatives is published into. It exists only where the
+ * project states such alternatives: where it states none, the section is carried
+ * in the structure but switched off, so an ordinary project of room images never
+ * gains an empty options page.
+ */
+export const PRESENTED_OPTIONS_SECTION_TYPE = 'presented_options';
+
+/**
  * The section titles a COMPARISON report uses in place of the single-system
  * ones.
  *
@@ -67,6 +76,11 @@ export const SYSTEM_SUMMARY_SECTIONS = [
   { type: HIGHLIGHTS_SECTION_TYPE, key: HIGHLIGHTS_SECTION_TYPE, title: 'Key Performance Highlights', canEditBody: true },
   { type: 'overall_design', key: 'overall_design', title: 'Overall Design', canEditBody: true },
   { type: 'room_images', key: 'room_images', title: 'Project Images', canEditBody: true },
+  // The approved writer's own client-facing prose for the seating or layout
+  // alternatives the designer marked. The section is created only where the
+  // project states such alternatives, so a project of ordinary room images never
+  // gains an options page.
+  { type: PRESENTED_OPTIONS_SECTION_TYPE, key: PRESENTED_OPTIONS_SECTION_TYPE, title: 'Presented Options', canEditBody: true },
   // The source-only note the approved writer closes its draft with: what the
   // proposal was written from, with no performance claim. It is the report's own
   // Appendix section, so the note is published into the document rather than

@@ -108,6 +108,10 @@ export function proposalCopySelection(proposal = {}) {
  * @param {Array<Object>} [input.existingGenerations] — the proposal's stored records
  * @param {Object} input.flag — resolveGptWriterFlag output
  * @param {Function} input.readEvidence — async ({ versionIds, proposal }) => readProposalReportEvidence output
+ * @param {Function} [input.readOptionGuidance] — async ({ projectId, proposal }) =>
+ *   the designer's own seating or layout alternatives (buildOptionGuidance output),
+ *   handed to the writer as a BRIEF. Optional: a project that states none, or a
+ *   caller that supplies no reader, writes a document with no options copy.
  * @param {Function} input.invokeLLM — the server-side provider call
  * @param {Object} input.user — the authenticated user ({ full_name, email })
  * @param {string} input.now — ISO timestamp
@@ -121,6 +125,7 @@ export async function runProposalCopyGeneration({
   existingGenerations = [],
   flag = null,
   readEvidence = null,
+  readOptionGuidance = null,
   invokeLLM = null,
   user = null,
   now = null,
@@ -175,13 +180,26 @@ export async function runProposalCopyGeneration({
     );
   }
 
+  // 4a. The designer's own seating or layout alternatives. These are a BRIEF for
+  //     the writer, never published copy. Guidance is editorial, not evidence: a
+  //     brief that cannot be read leaves the options section empty rather than
+  //     failing a generation the evidence itself supports.
+  let optionGuidance = null;
+  if (typeof readOptionGuidance === 'function') {
+    try {
+      optionGuidance = await readOptionGuidance({ projectId, proposal });
+    } catch (error) {
+      optionGuidance = null;
+    }
+  }
+
   // 5. The frozen pack, the Phase 2 input, and the proof that the input carries
   //    evidence and contract only.
   let pack = null;
   let writerInput = null;
   try {
     pack = buildProposalEvidence({ versions, generatedAt: now, requestContext: proposalRequestContext(proposal) });
-    writerInput = buildWriterInput({ pack });
+    writerInput = buildWriterInput({ pack, optionGuidance });
     assertWriterInputCarriesNoLiveState(writerInput);
   } catch (error) {
     return refusal(

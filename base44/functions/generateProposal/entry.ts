@@ -12,8 +12,9 @@ import { generationEntityPayload } from '../../shared/proposalGeneration/proposa
 import { runProposalCopyGeneration } from '../../shared/proposalGeneration/proposalGenerationRunner.js';
 import { mergeHighlightRows, selectHighlightRows } from '../../shared/engineeringSnapshotEvidence.js';
 import { composeWriterSectionBodies } from '../../shared/proposalWriter/writerSectionMapping.js';
+import { readProjectOptionGuidance } from '../../shared/proposalWriter/readProjectOptionGuidance.js';
 import { GPT_WRITER_FLAG_FIELD, normaliseGptWriterConfig } from '../../shared/proposalWriter/proposalWriterFlag.js';
-import { HIGHLIGHTS_SECTION_TYPE, resolveSectionTitle } from '../../shared/systemDesignSummarySections.js';
+import { HIGHLIGHTS_SECTION_TYPE, PRESENTED_OPTIONS_SECTION_TYPE, resolveSectionTitle } from '../../shared/systemDesignSummarySections.js';
 import { comparisonSectionMetadata, verifyComparisonPersisted } from '../../shared/comparisonPersistence.js';
 import { formatInterpretationForLog } from '../../shared/adiProjectInterpretation.js';
 import { loadCacheRecord, findPublication } from '../../shared/publishedEngineeringAuthority.js';
@@ -421,6 +422,10 @@ export default async function(req) {
       now: generatedAt,
       readEvidence: async () => suppliedSnapshots,
       invokeLLM: (request) => base44.integrations.Core.InvokeLLM(request),
+      // The designer's own seating or layout alternatives, read from the images
+      // they marked as options. They are a BRIEF for the writer, never published
+      // copy: the writer's own prose is what the document prints.
+      readOptionGuidance: () => readProjectOptionGuidance(base44.entities, project_id),
     });
 
     if (!attempt.ok) {
@@ -482,7 +487,15 @@ export default async function(req) {
 
     await Promise.all(sectionRecords.map((section) => {
       const html = bodyByType.get(section.section_type);
-      if (!html) return null;
+      // A section with no validated copy is not part of the document. Presented
+      // Options exists only where the project states alternatives, so a project
+      // of ordinary room images never gains an empty options page.
+      if (!html) {
+        if (section.section_type === PRESENTED_OPTIONS_SECTION_TYPE) {
+          return base44.entities.ProposalSection.update(section.id, { is_enabled: false });
+        }
+        return null;
+      }
       return base44.entities.ProposalSection.update(section.id, {
         body: html,
         ...(summaryHighlightRows && section.section_type === HIGHLIGHTS_SECTION_TYPE

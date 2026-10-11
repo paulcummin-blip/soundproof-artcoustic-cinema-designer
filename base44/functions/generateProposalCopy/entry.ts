@@ -8,6 +8,7 @@ import {
   writerRefusalStatus,
 } from '../../shared/proposalGeneration/proposalGenerationRunner.js';
 import { GPT_WRITER_FLAG_FIELD, resolveGptWriterFlag } from '../../shared/proposalWriter/proposalWriterFlag.js';
+import { readProjectOptionGuidance } from '../../shared/proposalWriter/readProjectOptionGuidance.js';
 
 /**
  * Generate one controlled GPT proposal copy — Phase 6.
@@ -106,6 +107,10 @@ export default async function(req) {
         return readProposalReportEvidence(base44.entities, projectId, versions);
       },
       invokeLLM: (request) => base44.integrations.Core.InvokeLLM(request),
+      // The designer's own seating or layout alternatives, read from the images
+      // they marked as options. They are a BRIEF for the writer, never published
+      // copy: the writer's own prose is what the document prints.
+      readOptionGuidance: () => readProjectOptionGuidance(base44.entities, projectId),
     });
 
     if (!attempt.ok) {

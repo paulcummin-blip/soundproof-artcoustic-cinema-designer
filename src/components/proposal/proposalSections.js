@@ -36,6 +36,10 @@ export const SYSTEM_SUMMARY_SECTIONS = [
   { type: 'key_performance_highlights', key: 'key_performance_highlights', label: 'Key Performance Highlights', defaultTitle: 'Key Performance Highlights', canHide: true, canEditBody: true },
   { type: 'overall_design', key: 'overall_design', label: 'Overall Design', defaultTitle: 'Overall Design', canHide: true, canEditBody: true },
   { type: 'room_images', key: 'room_images', label: 'Project Images', defaultTitle: 'Project Images', canHide: true, canEditBody: true },
+  // Mirrors base44/shared/systemDesignSummarySections.js: the approved writer's
+  // own client-facing prose for the seating or layout alternatives the designer
+  // marked. It exists only where the project states such alternatives.
+  { type: 'presented_options', key: 'presented_options', label: 'Presented Options', defaultTitle: 'Presented Options', canHide: true, canEditBody: true },
   // Mirrors base44/shared/systemDesignSummarySections.js: the Appendix carries the
   // approved writer's closing source-only note. A test asserts the two agree.
   { type: 'appendix', key: 'appendix', label: 'Appendix', defaultTitle: 'Appendix', canHide: true, canEditBody: true },
