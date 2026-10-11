@@ -7,9 +7,9 @@
  *
  * This page is neither a gallery nor an engineering comparison. Each image is one
  * option the designer marked as part of a comparison set, captioned with what it
- * stands for, and the message above them is the one the designer supplied — the
- * page never invents it. Where no note exists, the neutral text says plainly that
- * these are two visual options for the same design.
+ * stands for, and the message above them is the validated Presented Options prose
+ * the server approved for this generation. A designer's raw instruction is never
+ * printed, and nothing is invented here.
  *
  * The options are shown at the full width of the content column and at one
  * visual scale, so they can be read against each other rather than cropped into

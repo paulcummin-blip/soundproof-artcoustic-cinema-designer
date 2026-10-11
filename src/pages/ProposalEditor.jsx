@@ -84,7 +84,15 @@ export default function ProposalEditor() {
   const [editLayerBlockReason, setEditLayerBlockReason] = useState('Checking complete proposal…');
   const [documentLayer, setDocumentLayer] = useState(null);
   const optionsCopy = validatedOptionsCopy(documentLayer);
+  // The approved options prose is printed once: on the Presented Options page
+  // when that section is part of the document, otherwise as the lead of the
+  // options image page itself.
   const documentSections = documentLayer?.document_validation?.document_sections || sections.filter(section => section.section_type !== 'presented_options');
+  const optionsImageCopy = documentSections.some(
+    (section) => section.section_type === 'presented_options'
+      && section.is_enabled !== false
+      && String(section.body || '').trim(),
+  ) ? '' : optionsCopy;
   // How long the editor has waited for a generating proposal's sections.
   const [pollCount, setPollCount] = useState(0);
   const [showNotes, setShowNotes] = useState(false);
@@ -964,7 +972,7 @@ export default function ProposalEditor() {
                       Seating Style
                     </h2>
                     <div className="rounded-xl overflow-hidden border border-[#DCDBD6] p-6">
-                      <SeatingStylePage placements={imagePlan.seatingPlacements} showHeader={false} validatedCopy={optionsCopy} />
+                      <SeatingStylePage placements={imagePlan.seatingPlacements} showHeader={false} validatedCopy={optionsImageCopy} />
                     </div>
                   </div>
                 )}
@@ -974,7 +982,7 @@ export default function ProposalEditor() {
                 {comparisonPreviewAnchored && section.section_type === imagePlan.seatingPageAnchorType && (
                   <ComparisonPagesPreview
                     groups={comparisonPreviewGroups}
-                    validatedCopy={optionsCopy}
+                    validatedCopy={optionsImageCopy}
                     roleStyle={proposalRoleStyle}
                   />
                 )}
@@ -1144,7 +1152,7 @@ export default function ProposalEditor() {
           {/* A comparison page whose anchor section was not composed still
               belongs in the document, exactly where the printed pack places it. */}
           {!comparisonPreviewAnchored && (
-            <ComparisonPagesPreview groups={comparisonPreviewGroups} roleStyle={proposalRoleStyle} validatedCopy={optionsCopy} />
+            <ComparisonPagesPreview groups={comparisonPreviewGroups} roleStyle={proposalRoleStyle} validatedCopy={optionsImageCopy} />
           )}
         </div>
       </div>
@@ -1250,7 +1258,7 @@ export default function ProposalEditor() {
         heroImageUrl={projectContext.heroImageUrl}
         logoUrl={projectContext.logoUrl}
         sections={documentSections}
-        validatedOptionsCopy={optionsCopy}
+        validatedOptionsCopy={optionsImageCopy}
         projectImages={packImages}
         recoveredComparisonTable={comparisonTableForDisplay}
       />

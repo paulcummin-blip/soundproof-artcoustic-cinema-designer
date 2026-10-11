@@ -10,14 +10,16 @@
  * system performance — what matters to the engineering is where the seating
  * positions actually are, and that is what the design already specifies.
  *
- * The copy is fixed, approved text held in proposalPackAuthority. Nothing on this
- * page is written by an LLM, and nothing here reads or states a performance
- * result.
+ * The framing copy is fixed, approved text held in proposalPackAuthority; the
+ * validated Presented Options prose the server approved for this generation is
+ * passed in separately as validatedCopy. The page never prints a raw designer
+ * note, and never states a performance result.
  */
 
 import React from 'react';
 import ProposalPageHeader from '@/components/proposal/print/ProposalPageHeader';
 import ProposalImagePlacement from '@/components/proposal/print/ProposalImagePlacement';
+import { SEATING_STYLE_PAGE } from '@/components/proposal/print/proposalPackAuthority';
 
 
 export default function SeatingStylePage({
@@ -39,9 +41,10 @@ export default function SeatingStylePage({
     <section className="proposal-print-section pp-page pp-page--seating">
       {showHeader ? <ProposalPageHeader number={number} kicker={kicker} title={title} /> : null}
 
-      {showCopy && validatedCopy ? (
+      {showCopy ? (
         <div className="pp-body pp-seating__lead">
-          <p>{validatedCopy}</p>
+          <p>{SEATING_STYLE_PAGE.lead}</p>
+          {validatedCopy ? <p>{validatedCopy}</p> : null}
         </div>
       ) : null}
 
@@ -51,7 +54,16 @@ export default function SeatingStylePage({
         ))}
       </div>
 
-
+      {showCopy ? (
+        <div className="pp-notes">
+          {SEATING_STYLE_PAGE.notes.map((note) => (
+            <div className="pp-note" key={note.title}>
+              <div className="pp-note__title">{note.title}</div>
+              <p className="pp-note__text">{note.text}</p>
+            </div>
+          ))}
+        </div>
+      ) : null}
     </section>
   );
 }
