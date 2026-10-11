@@ -77,7 +77,7 @@ export function queueBassAuthorityWrite(key, signature, record, payload) {
 
 async function flushQueuedBassAuthorityWrite(key) {
   const pending = pendingWrites.get(key);
-  if (!pending || !pending.payload) return;
+  if (!pending || !pending.payload) return writeChains.get(key) || true;
   pendingWrites.delete(key);
   if (pending.timer) clearTimeout(pending.timer);
   const { record, payload, signature, resolvers } = pending;
@@ -105,6 +105,12 @@ async function flushQueuedBassAuthorityWrite(key) {
   writeChains.set(key, chain.catch(() => false));
   const written = await chain;
   for (const resolve of resolvers.splice(0)) resolve(written);
+  return written;
+}
+
+/** Settle this version's existing queued bass write before engineering publication. */
+export function flushBassAuthorityWrite(projectId, versionId) {
+  return flushQueuedBassAuthorityWrite(`${projectId}::${versionId}`);
 }
 
 /** Write anything still queued — used on page close and on test teardown. */
