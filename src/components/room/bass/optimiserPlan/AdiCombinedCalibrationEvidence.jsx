@@ -86,6 +86,7 @@ export default function AdiCombinedCalibrationEvidence({ evidence = null, classN
                 <span className="text-[#1B1A1A]">{entry?.candidateId || "candidate id not recorded"}</span>
                 <span className="text-[#8A7B6A]"> · {entry?.lever || "result"} · {outcomeWord(entry)}</span>
                 {values ? <span className="text-[#3E4349]"> · {values}</span> : null}
+                {entry?.reason ? <span className="text-[#8A7B6A]"> · {entry.reason}</span> : null}
                 {entry?.statement ? <span className="text-[#625143]"> · {entry.statement}</span> : null}
               </div>
             );
