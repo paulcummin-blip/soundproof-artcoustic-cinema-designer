@@ -149,6 +149,9 @@ export default function ProjectCardPrototype({
   onSwitchVersion,
   onCreateVersion,
   versionsLoading,
+  // Same-slot groups that could not be resolved — passed straight through to the
+  // version menu so nothing is hidden from the designer.
+  collisions = [],
 }) {
   const prog = holdProgress[p.id] || 0;
 
@@ -354,6 +357,7 @@ export default function ProjectCardPrototype({
             loading={versionsLoading}
             buttonColor={openBtnColor}
             arrowColor={openArrowColor}
+            collisions={collisions}
           />
 
           {/* Row 2: Edit · Archive · Delete */}

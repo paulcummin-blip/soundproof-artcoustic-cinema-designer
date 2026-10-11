@@ -39,6 +39,7 @@ import {
 } from '@/components/versions/versionSwitchSafety';
 import { useVersionDocumentStatus } from '@/components/versions/useVersionDocumentStatus';
 import UnsavedVersionChangeDialog from '@/components/versions/UnsavedVersionChangeDialog';
+import VersionCollisionNotice from '@/components/versions/VersionCollisionNotice';
 
 const BRAND = {
   text: '#1B1A1A',
@@ -351,6 +352,11 @@ export default function VersionSwitcher({
               </div>
             );
           })}
+
+          <VersionCollisionNotice
+            collisions={versionApi?.collisions || []}
+            className="m-2"
+          />
 
           <DropdownMenuSeparator />
 

@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { base44 } from '@/api/base44Client';
 import { Search, ChevronRight, Loader2 } from 'lucide-react';
+import { selectCanonicalVersions } from '@/lib/canonicalVersionSelection';
 
 /**
  * Step 1 — Select Project.
@@ -28,8 +29,16 @@ export default function ProjectSelectStep({ selectedProjectId, onSelect }) {
           (p) => p.lifecycle_status !== 'Archived'
         );
         setProjects(nonArchived);
+        // Version counts use the ONE shared canonical rule, so a duplicated
+        // migration slot is never counted as a second design.
+        const canonical = selectCanonicalVersions({
+          versions: Array.isArray(versionResults) ? versionResults : [],
+          activeVersionIdByProject: new Map(
+            (projectResults || []).map((p) => [p.id, p.active_version_id || null]),
+          ),
+        });
         const counts = {};
-        (versionResults || []).forEach((v) => {
+        canonical.versions.forEach((v) => {
           const pid = v.project_id;
           if (pid) counts[pid] = (counts[pid] || 0) + 1;
         });

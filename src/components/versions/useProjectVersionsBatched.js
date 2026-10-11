@@ -23,11 +23,13 @@ import {
   sanitiseVersionName,
   resolveActiveAfterDeletion,
 } from "@/lib/versionAuthority";
+import { selectCanonicalVersions } from "@/lib/canonicalVersionSelection";
 
 const VERSION_BATCH_SIZE = 50;
 
 export function useProjectVersionsBatched() {
   const [versionsByProject, setVersionsByProject] = useState({});
+  const [collisionsByProject, setCollisionsByProject] = useState({});
   const [loading, setLoading] = useState(false);
 
   // Ref mirror so createVersion can read the latest versions without
@@ -91,7 +93,8 @@ export function useProjectVersionsBatched() {
     async (projects) => {
       if (!projects || projects.length === 0) {
         setVersionsByProject({});
-        return { updatedProjects: [], versionMap: {} };
+        setCollisionsByProject({});
+        return { updatedProjects: [], versionMap: {}, collisionsByProject: {} };
       }
 
       setLoading(true);
@@ -108,10 +111,35 @@ export function useProjectVersionsBatched() {
 
         // Step 2: Batch-load all versions for all projects
         const projectIds = updatedProjects.map((p) => p.id);
-        const versionMap = await loadVersionsForProjects(projectIds);
+        const loadedMap = await loadVersionsForProjects(projectIds);
+
+        // Step 3: ONE canonical list per project — a duplicated version slot
+        // collapses to the record the project's own active pointer names, or to
+        // the one carrying verified evidence. A slot that cannot be resolved
+        // keeps both records and is flagged rather than one being discarded.
+        const activeVersionIdByProject = new Map(
+          updatedProjects.map((project) => [project.id, project.active_version_id || null]),
+        );
+        const canonical = selectCanonicalVersions({
+          versions: Object.values(loadedMap).flat(),
+          activeVersionIdByProject,
+        });
+
+        const versionMap = {};
+        for (const version of canonical.versions) {
+          if (!versionMap[version.project_id]) versionMap[version.project_id] = [];
+          versionMap[version.project_id].push(version);
+        }
+
+        const collisionsByProject = {};
+        for (const collision of canonical.collisions) {
+          if (!collisionsByProject[collision.projectId]) collisionsByProject[collision.projectId] = [];
+          collisionsByProject[collision.projectId].push(collision);
+        }
 
         setVersionsByProject(versionMap);
-        return { updatedProjects, versionMap };
+        setCollisionsByProject(collisionsByProject);
+        return { updatedProjects, versionMap, collisionsByProject };
       } finally {
         setLoading(false);
       }
@@ -238,6 +266,7 @@ export function useProjectVersionsBatched() {
 
   return {
     versionsByProject,
+    collisionsByProject,
     loading,
     loadAllVersions,
     switchVersion,

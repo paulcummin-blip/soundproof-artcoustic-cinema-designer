@@ -135,6 +135,7 @@ export default function ProjectsPage() {
   // Replaces the per-card useProjectVersions() N+1 pattern.
   const {
     versionsByProject,
+    collisionsByProject,
     loading: versionsLoading,
     loadAllVersions,
     switchVersion,
@@ -1095,6 +1096,7 @@ export default function ProjectsPage() {
                 holdProgress={holdProgress}
                 setProjects={setProjects}
                 versions={versionsByProject[p.id]}
+                collisions={collisionsByProject[p.id]}
                 activeVersionId={p.active_version_id}
                 onSwitchVersion={switchVersion}
                 onCreateVersion={createVersion}

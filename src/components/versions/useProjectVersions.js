@@ -19,6 +19,7 @@ import {
   resolveActiveAfterDeletion,
   sanitiseVersionName,
 } from "@/lib/versionAuthority";
+import { selectCanonicalVersions } from "@/lib/canonicalVersionSelection";
 
 // Lazy-migrate a single project to V1 if it hasn't been migrated yet.
 // Returns the active version ID.
@@ -38,6 +39,7 @@ async function ensureMigrated(projectId) {
 export function useProjectVersions(projectId) {
   const [versions, setVersions] = useState([]);
   const [activeVersionId, setActiveVersionId] = useState(null);
+  const [collisions, setCollisions] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const mountedRef = useRef(true);
@@ -85,7 +87,17 @@ export function useProjectVersions(projectId) {
 
       if (!mountedRef.current) return;
 
-      setVersions(versionRecords || []);
+      // ONE canonical list: a duplicated version slot collapses to the record the
+      // project's own active pointer names, or to the one carrying verified
+      // evidence. A slot that cannot be resolved keeps both records and is
+      // flagged rather than one being silently discarded.
+      const canonical = selectCanonicalVersions({
+        versions: versionRecords || [],
+        activeVersionId: project.active_version_id || null,
+      });
+
+      setVersions(canonical.versions);
+      setCollisions(canonical.collisions);
       setActiveVersionId(project.active_version_id);
     } catch (err) {
       console.error("[useProjectVersions] Load failed:", err);
@@ -278,6 +290,7 @@ export function useProjectVersions(projectId) {
     versions,
     activeVersionId,
     activeVersion,
+    collisions,
     slotGrid,
     nextEmptySlot,
     canCreateVersion,

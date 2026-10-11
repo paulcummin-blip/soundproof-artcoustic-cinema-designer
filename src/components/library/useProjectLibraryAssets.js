@@ -30,6 +30,7 @@ import {
 } from '@/components/library/librarySourceStatus';
 import { buildVersionNameMap } from '@/components/library/libraryVersionLabels';
 import { isSnapshotRestorable } from '@/components/report/reportSnapshotAuthority';
+import { selectCanonicalVersions } from '@/lib/canonicalVersionSelection';
 
 // The ONE report a version states a current row for: the Project Report. The
 // legacy Visual and Technical Reports are retired as proposal sources — their
@@ -41,7 +42,7 @@ const ISSUED_EXPORT_LIMIT = 200;
 
 const asItems = (result) => (Array.isArray(result) ? result : (result?.items || []));
 
-export function useProjectLibraryAssets({ projectId }) {
+export function useProjectLibraryAssets({ projectId, activeVersionId = null }) {
   const [versions, setVersions] = useState([]);
   const [savedReports, setSavedReports] = useState([]);
   const [issuedExports, setIssuedExports] = useState([]);
@@ -128,6 +129,32 @@ export function useProjectLibraryAssets({ projectId }) {
     };
   }, [load]);
 
+  /**
+   * ONE canonical version list for this project — the same shared rule every
+   * other surface uses. A duplicated version slot collapses to the record the
+   * project's active pointer names, or to the one carrying verified evidence:
+   * the saved Project Report and issued documents this Library has already read.
+   * A slot that cannot be resolved keeps both records and is flagged rather than
+   * one being discarded — and an excluded migration artefact can no longer hold
+   * the whole project's proposal readiness back.
+   */
+  const canonical = useMemo(() => {
+    const evidenceByVersionId = new Map();
+    for (const version of versions) {
+      evidenceByVersionId.set(version.id, {
+        hasProjectReport: savedReports.some((report) => report.version_id === version.id),
+        hasLinkedRecords: issuedExports.some((record) => (
+          record.version_id === version.id
+          || (Array.isArray(record.selected_version_ids)
+            && record.selected_version_ids.includes(version.id))
+        )),
+      });
+    }
+    return selectCanonicalVersions({ versions, activeVersionId, evidenceByVersionId });
+  }, [versions, savedReports, issuedExports, activeVersionId]);
+
+  // Labels resolve for EVERY record, including a preserved record the canonical
+  // list excludes, so an older issued document never loses its version name.
   const versionById = useMemo(
     () => new Map(versions.map((version) => [version.id, version])),
     [versions],
@@ -191,7 +218,8 @@ export function useProjectLibraryAssets({ projectId }) {
     loading,
     error,
     reload: load,
-    versions,
+    versions: canonical.versions,
+    collisions: canonical.collisions,
     versionById,
     versionNameById,
     liveReports,

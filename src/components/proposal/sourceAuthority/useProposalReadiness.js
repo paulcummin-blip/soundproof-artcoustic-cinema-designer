@@ -40,6 +40,7 @@ import { readSeatPriorityFingerprint } from '@/components/state/designReviewHand
 import { readProjectAnalysisCacheRecord } from '@/components/state/projectReadCache';
 import { subscribeReportSourceStored } from './reportSourceSignal';
 import { selectCanonicalReportSnapshotsByKey } from '@/components/report/reportSnapshotCanonical';
+import { selectCanonicalVersions } from '@/lib/canonicalVersionSelection';
 import {
   resolveCalculationAuthority,
   resolveSavedReportCell,
@@ -89,7 +90,10 @@ export function useProposalReadiness({ projectId = null, versionIds = [] } = {})
 
     (async () => {
       try {
-        const [versionRecords, snapshotPage, durableReads, cacheRecords] = await Promise.all([
+        const [projectRecords, versionRecords, snapshotPage, durableReads, cacheRecords] = await Promise.all([
+          // The project's own active-version pointer is the first authority the
+          // shared canonical selection rule reads.
+          base44.entities.Project.filter({ id: projectId }),
           base44.entities.ProjectVersion.filter({ project_id: projectId }),
           base44.entities.ReportSnapshot.filter(
             { project_id: projectId, version_id: { $in: ids } },
@@ -105,9 +109,15 @@ export function useProposalReadiness({ projectId = null, versionIds = [] } = {})
         ]);
         if (cancelled) return;
 
-        const versionsById = new Map(
-          (Array.isArray(versionRecords) ? versionRecords : []).map((version) => [version.id, version]),
-        );
+        // The ONE shared canonical selection rule decides which version records
+        // count. byId resolves every record, including a preserved record the
+        // canonical list excludes, so a version named by an older proposal still
+        // resolves its own name and fingerprint.
+        const canonical = selectCanonicalVersions({
+          versions: Array.isArray(versionRecords) ? versionRecords : [],
+          activeVersionId: projectRecords?.[0]?.active_version_id || null,
+        });
+        const versionsById = canonical.byId;
 
         // The CANONICAL saved report per version and report type — the same rule
         // the report pages, Project Library and the server gate use. Complete

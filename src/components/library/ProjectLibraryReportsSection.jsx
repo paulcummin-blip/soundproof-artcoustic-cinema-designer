@@ -54,6 +54,7 @@ import LiveReportRow from './LiveReportRow';
 import ExportedDocumentRow from './ExportedDocumentRow';
 import LibraryProposalReadinessBanner from './LibraryProposalReadinessBanner';
 import VersionReadinessLine from './VersionReadinessLine';
+import VersionCollisionNotice from '@/components/versions/VersionCollisionNotice';
 import useLibraryProposalReadiness from './useLibraryProposalReadiness';
 import {
   EXPORT_DESIGN_CHANGED_NOTE,
@@ -95,6 +96,7 @@ export default function ProjectLibraryReportsSection({
   versionNameById = new Map(),
   liveReports = [],
   reportExports = [],
+  collisions = [],
 }) {
   const navigate = useNavigate();
 
@@ -186,6 +188,10 @@ export default function ProjectLibraryReportsSection({
         onViewReports={viewReports}
         onPrimaryAction={runReadinessAction}
       />
+
+      {/* A version slot holding two unresolvable records is stated here: both are
+          kept and listed below, and the slot is left for the designer to review. */}
+      <VersionCollisionNotice collisions={collisions} className="mt-6" />
 
       {versions.map((version) => {
         // This version's own rows only. The live report of a type is judged

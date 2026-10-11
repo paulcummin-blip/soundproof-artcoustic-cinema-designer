@@ -22,6 +22,7 @@ import {
   NEW_VERSION_DEFAULT_NAME,
   findNextEmptySlot,
 } from "@/lib/versionAuthority";
+import VersionCollisionNotice from "./VersionCollisionNotice";
 
 const BRAND = {
   text: "#1B1A1A",
@@ -50,6 +51,9 @@ export default function OpenVersionDropdown({
   // provided (backward compatibility for any caller that doesn't pass them).
   buttonColor = "#1B1A1A",
   arrowColor = "#1B1A1A",
+  // Same-slot groups that could not be resolved: both records are kept and
+  // listed, and the slot is flagged here for review.
+  collisions = [],
 }) {
   const navigate = useNavigate();
   const [open, setOpen] = useState(false);
@@ -240,6 +244,8 @@ export default function OpenVersionDropdown({
               </button>
             );
           })}
+
+          <VersionCollisionNotice collisions={collisions} className="m-2" />
 
           {/* Divider before create action */}
           <div style={{ borderTop: `1px solid ${BRAND.border}` }} />

@@ -140,7 +140,15 @@ export function libraryCellStatus({ cell } = {}) {
 export function libraryVersionReadinessLine(row) {
   if (!row || row.checking) return null;
   if (row.ready) return LIBRARY_READINESS_HEADLINE.READY;
-  if (blockedReportCell(row)) return LIBRARY_CHECKLIST_STATUS.UPDATE_NEEDED;
+  const blocked = blockedReportCell(row);
+  // A report that was never created is NOT GENERATED. Only a report that exists
+  // and has been overtaken by the design reads UPDATE NEEDED. The two are two
+  // different jobs and are never collapsed into one word.
+  if (blocked) {
+    return blocked.cell.state === READINESS_STATE.MISSING
+      ? LIBRARY_CHECKLIST_STATUS.NOT_GENERATED
+      : LIBRARY_CHECKLIST_STATUS.UPDATE_NEEDED;
+  }
   return 'Not assessed yet';
 }
 

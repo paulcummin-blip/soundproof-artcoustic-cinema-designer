@@ -41,7 +41,7 @@ export default function ProjectProposalAssets() {
       : PROJECT_LIBRARY_TAB.IMAGES,
   );
   const focusVersionId = searchParams.get('versionId');
-  const library = useProjectLibraryAssets({ projectId });
+  const library = useProjectLibraryAssets({ projectId, activeVersionId });
 
   // Bring the returned version's section into view once its rows are loaded.
   useEffect(() => {
@@ -94,6 +94,7 @@ export default function ProjectProposalAssets() {
               versionNameById={library.versionNameById}
               liveReports={library.liveReports}
               reportExports={library.reportExports}
+              collisions={library.collisions}
             />
           )
         )}
