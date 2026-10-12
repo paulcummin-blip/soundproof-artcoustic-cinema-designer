@@ -108,7 +108,17 @@ export const WRITER_CONTRACT_VERSION = 2;
 // the house style and the brief-coverage responsibility are stated, and the
 // Design Summary is given room to develop the cinema. Section identities, the
 // word limits of the other sections and every validation rule are unchanged.
-export const WRITER_PROMPT_VERSION = 'proposal-writer-prompt-14';
+// Bumped to 15 for the design-philosophy pass: the writer is given the Sound Proof
+// design philosophy (the best design satisfies the brief while balancing
+// performance, practicality, aesthetics and cost, so a result below the highest
+// available level is a legitimate design decision), the reasoning behind the
+// recommendation, the value-engineering rule, the design team's own judgement
+// written as we, and the engineering safeguards that keep an invented reason, an
+// inferred improvement, an all-seat promise and a price-as-value claim out of the
+// copy. Section identities, word limits, the claim grounding rule and every
+// validation rule are unchanged, so a draft filed under an earlier generation is
+// still read against the agreement it was written under.
+export const WRITER_PROMPT_VERSION = 'proposal-writer-prompt-15';
 
 /** The only pack generation a draft may be written from. */
 export const WRITER_ACCEPTED_PACK_SCHEMA_VERSION = 2;
@@ -258,7 +268,7 @@ export const WRITER_SECTIONS = Object.freeze([
     section: 'decision_summary',
     title: 'Decision Summary',
     title_single: 'Design Summary',
-    requirement_single: 'Introduce the cinema itself, in developed natural paragraphs: the room and its proportions, its intended use where the interpretation states one, the display and why it suits the room, the seating arrangement, the system architecture, the most important design considerations, and the experience this design is intended to deliver. Write as an experienced cinema designer would write for a homeowner or architect. Do not list equipment, do not dump specifications, and do not restate the performance claim here. Never say this proposal outlines, this design presents, this option, decision or selected option. Where the project has real design substance, develop this in three or four paragraphs: the room and the scale of the experience, then the system and how it relates to the room, then the reasoning that makes this specification right for this project, then the result. Roughly 180 to 250 words at that depth, less where the design is genuinely simple, and never padded with invented detail to reach a length. This is the one section that establishes the whole cinema, so it takes the design\'s own story rather than the highest-ranked result.',
+    requirement_single: 'Introduce the cinema itself, in developed natural paragraphs: the room and its proportions, its intended use where the interpretation states one, the display and why it suits the room, the seating arrangement, the system architecture, the most important design considerations, and the experience this design is intended to deliver. Write as an experienced cinema designer would write for a homeowner or architect. Do not list equipment, do not dump specifications, and do not restate the performance claim here. Never say this proposal outlines, this design presents, this option, decision or selected option. Where the project has real design substance, develop this in three or four paragraphs: the room and the scale of the experience, then the system and how it relates to the room, then the reasoning that makes this specification right for this project, then the result. Roughly 180 to 250 words at that depth, less where the design is genuinely simple, and never padded with invented detail to reach a length. This is the one section that establishes the whole cinema, so it takes the design\'s own story rather than the highest-ranked result. Explain the reasoning the design_philosophy block records: what the client wants to achieve, which listening positions are prioritised, how the display and the seating were balanced, the practical constraints, the coverage and bass approaches, and why the finished design suits this brief. Never invent a reason, a priority, a budget or a decision the interpretation does not record, and never present the highest available level as the objective regardless of cost or practical consequence.',
     word_limit: 250,
     requirement: 'State the decision between the options in the pack\'s own framing, and only where the pack allows a framing.',
   },
@@ -278,7 +288,7 @@ export const WRITER_SECTIONS = Object.freeze([
     title_single: 'Why This Specification',
     word_limit: 220,
     requirement: 'State only the differences the pack records, and call one a gain only where the pack allows a gain.',
-    requirement_single: 'Explain why this solution suits this project: the choices that were made, such as the loudspeaker family, the layout and the bass approach, and what each one gives the client in this room. Write from the ranked strength stories and the credibility claims the pack allows, and from the design decisions and constraints the interpretation states. Never state or imply a comparison with another option or a baseline, and never write filler such as "there are no changes to report".',
+    requirement_single: 'Explain why this solution suits this project: the choices that were made, such as the loudspeaker family, the layout and the bass approach, and what each one gives the client in this room. Write from the ranked strength stories and the credibility claims the pack allows, and from the design decisions and constraints the interpretation states. Never state or imply a comparison with another option or a baseline, and never write filler such as "there are no changes to report". This is the judgement section of the document: explain why this solution suits this particular room, how the competing priorities were balanced, which decisions carry the most value, why a compromise is reasonable where the interpretation records one, and what the client gains from the finished design. Where the design already takes an improvement without substantial additional expenditure, say what it gives the client; where an opportunity remains a design choice, say nothing about it.',
   },
   {
     section: 'key_performance_highlights',
@@ -483,6 +493,11 @@ export const WRITER_WRITING_RULES = Object.freeze([
   'Explain what each recorded result means for the room, rather than naming the number and moving on.',
   'Where the brief asks for a result the pack carries as a supporting_result claim, state it in the section it belongs to, at exactly the scope, value and prediction status that claim carries, and cite its claim ID. A supporting result answers the client\'s own request: it is never presented as a strength, a headline or a comparison, and is never moved to a wider scope.',
   'No contents sentence ("the following sections explain"), and no generic closing about the design as a whole: finish on what this particular cinema gives the client, and never repeat a benefit another section has already made.',
+  'Explain the professional judgement behind the recommendation where the design_philosophy block records it: what the client wants to achieve, the prioritised listening positions, the display and seating balance, the constraints, the coverage and bass approaches, the strongest results, the lower results that are conscious trade-offs, and why the finished design suits the brief. Never invent a reason, a priority, a budget or a decision the interpretation does not record.',
+  'The best design is the one that most effectively satisfies the brief while balancing performance, practicality, aesthetics and cost, so a result below the highest available level is a legitimate design decision rather than a failure. Never present the highest available level as the objective regardless of cost or practical consequence, and never treat a higher price as better value on its own.',
+  'Value-engineering opportunities are internal reasoning, never copy: where the design already takes one, say what it gives the client; where one remains a design choice, say nothing about it. Never write an opportunity as an instruction to change the finished design, a next step, a future correction or an upgrade path.',
+  'Where the copy expresses the design team\'s own judgement or recommendation, write we or our. The engineering facts themselves stay stated as fact, we never stands in the place of a measured result, and no conversation, a meeting, a site visit or a client instruction the brief does not state is ever implied.',
+  'Never infer that a design change improved a parameter unless the assessment supports it, never imply that every seat performs identically, and never state a benefit the evidence does not carry.',
   'Return structured JSON only, in every section this contract requires, with no extra fields and no commentary.',
 ]);
 

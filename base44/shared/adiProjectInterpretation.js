@@ -36,17 +36,16 @@ import {
   P20_USE_RULE,
   P20_OMIT_RULE,
 } from './adiReportEvidenceRules.js';
+import { deriveDesignPhilosophy, rank, usableRows } from './adiDesignPhilosophy.js';
+import { designPhilosophyLines } from './designPhilosophyAuthority.js';
 
 export const INTERPRETATION_STAGE = 'adi_project_interpretation';
-export const INTERPRETATION_VERSION = '1.0';
-
-const LEVEL_RANK = { L4: 4, L3: 3, L2: 2, L1: 1, FAIL: 0 };
-
-function rank(level) {
-  if (!level) return null;
-  const key = String(level).trim().toUpperCase();
-  return Number.isFinite(LEVEL_RANK[key]) ? LEVEL_RANK[key] : null;
-}
+// Bumped to 1.1 when the interpretation gained the design philosophy: the
+// professional judgement behind the recommended solution, derived from the same
+// project data and recorded so the copy can explain WHY the design is what it is.
+// It adds no engineering value and changes no result: the frozen evidence remains
+// the sole authority for every figure, level, product and claim.
+export const INTERPRETATION_VERSION = '1.1';
 
 function num(value) {
   const n = Number(value);
@@ -331,6 +330,51 @@ export function buildProjectInterpretation(params = {}) {
     use: 'Internal designer diagnostic only. Never mentioned, quoted, scored or expressed as a percentage in client-facing copy.',
   };
 
+  const constraintsList = deriveConstraints({
+    widthM, heightM, rowCount, overhead, subCount, screenWidthM, bed,
+    classification: text(room.classification),
+  });
+
+  // The philosophy reads only what the interpretation already derived: the room,
+  // the intent, the constraints, the strongest results, the priorities and the
+  // existing assessment. It states no figure and no level of its own.
+  const discreteChannels = num(system.configuration?.total_discrete_channels);
+  const displayText = `${
+    tv && screenSizeInches ? `${screenSizeInches}" TV` : projection && screenWidthM != null ? `${screenWidthM.toFixed(2)}m projection screen` : 'Display recorded in the design'
+  }${rowCount > 0 ? `, ${rowCount} seating row${rowCount === 1 ? '' : 's'}` : ''}${
+    totalSeats > 0 ? `, ${totalSeats} seats` : ''
+  }: the display size and the seating distance were set together, and the reported viewing result is the evidence for how they balance.`;
+  const coverageText = `${
+    config ? `${config} layout` : 'The recorded layout'
+  }${discreteChannels != null ? `, ${discreteChannels} discrete channels` : ''}${
+    overhead > 0 ? `, ${overhead} overhead channels` : ''
+  }: the coverage approach is the layout the evidence states, and no coverage result is claimed that the spatial evidence does not carry.`;
+  const bassText = `${
+    subCount > 0 ? `${subCount} subwoofer${subCount === 1 ? '' : 's'}` : 'The subwoofer arrangement'
+  }${
+    subCount === 1
+      ? ' for a position-led bass foundation'
+      : subCount === 2
+        ? ' as a practical bass foundation'
+        : subCount >= 4
+          ? ' for seat-to-seat consistency'
+          : ''
+  }: seat-to-seat consistency is claimed only where the consistency result supports it, so bass is otherwise described as output capability and physical authority.`;
+
+  const designPhilosophy = deriveDesignPhilosophy({
+    roomType,
+    intent,
+    strongest,
+    constraints: constraintsList,
+    strongestAreas,
+    priorities: prioritisedPositions({ mlpBasis, viewing, rowCount, totalSeats }),
+    displayText,
+    coverageText,
+    bassText,
+    rows: usableRows(parameterEvidence, bassEvidence),
+    emphasis,
+  });
+
   const emphasis = typeof clientBrief === 'string' && clientBrief.trim() ? clientBrief.trim() : null;
 
   const oneLineStory = [
@@ -369,10 +413,7 @@ export function buildProjectInterpretation(params = {}) {
     strongest_areas: strongestAreas,
 
     // 6. Main constraints
-    main_constraints: deriveConstraints({
-      widthM, heightM, rowCount, overhead, subCount, screenWidthM, bed,
-      classification: text(room.classification),
-    }),
+    main_constraints: constraintsList,
 
     // 7. Important design decisions
     important_design_decisions: deriveDecisions({
@@ -415,6 +456,11 @@ export function buildProjectInterpretation(params = {}) {
     designer_emphasis_rule: 'Emphasis only. It never changes an engineering result.',
 
     one_line_story: oneLineStory,
+
+    // 11. The professional judgement behind the design. Reasoning only: it
+    // carries no figure, no level, no product and no claim, and every reason it
+    // states is one the project data establishes.
+    design_philosophy: designPhilosophy,
   });
 }
 
@@ -476,8 +522,10 @@ export function formatInterpretationForPrompt(interpretation) {
     '',
     'Designer emphasis notes (emphasis only, never a change to the engineering results):',
     interpretation.designer_emphasis || 'None provided. Use a balanced professional narrative.',
+    ...designPhilosophyLines(interpretation.design_philosophy),
     '',
     'HOW TO USE THIS:',
+    '- Where the copy explains the reasoning behind the design, use the reasoning recorded above and never a reason it does not record.',
     '- Write the story first, then support it with the results that matter for this room.',
     '- Reference a parameter only where it is the clearest evidence for something the client will hear.',
     '- Do not work through the results one by one, and do not quote a level without explaining what it means.',
@@ -512,5 +560,7 @@ export function formatInterpretationForLog(interpretation) {
     `excluded=${(interpretation.excluded_or_unreliable_evidence || []).map((entry) => `P${entry.parameter_id}`).join(' ') || 'none'}`,
     `design_index=${interpretation.reliable_evidence?.design_index?.designation || 'not available'} (internal only)`,
     `emphasis=${interpretation.designer_emphasis ? 'provided' : 'none'}`,
+    `design_philosophy=${interpretation.design_philosophy?.version || 'none'}`,
+    `value_engineering=${(interpretation.design_philosophy?.reasoning?.value_engineering?.already_captured || []).map((entry) => entry.area).join('; ') || 'none'}`,
   ].join(' | ');
 }

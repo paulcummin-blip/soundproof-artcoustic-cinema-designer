@@ -150,6 +150,21 @@ export function interpretationCorrections(view, context) {
     const reason = statementReason(entry?.evidence, context) || statementReason(entry?.area, context);
     if (reason) corrections.push({ field: 'strongest_areas', statement: `${entry?.area || ''}: ${entry?.evidence || ''}`.trim(), reason });
   }
+  // The design philosophy records the reasoning behind the design, so its own
+  // statements are held to exactly the same check: a reason that contradicts the
+  // frozen evidence is removed rather than handed to the writer. No new rule is
+  // introduced and no acceptance is loosened.
+  const philosophy = view.design_philosophy;
+  if (philosophy && typeof philosophy === 'object') {
+    const reason = statementReason(philosophy.why_appropriate, context);
+    if (reason) {
+      corrections.push({
+        field: 'design_philosophy.why_appropriate',
+        statement: String(philosophy.why_appropriate),
+        reason,
+      });
+    }
+  }
   return corrections;
 }
 
@@ -190,6 +205,12 @@ export function checkInterpretationAgainstEvidence({ view = null, pack = null } 
     constraints: keepList('constraints', view.constraints),
     strongest_areas: (Array.isArray(view.strongest_areas) ? view.strongest_areas : [])
       .filter((entry) => !corrected.has(`strongest_areas::${`${entry?.area || ''}: ${entry?.evidence || ''}`.trim()}`)),
+    design_philosophy: view.design_philosophy && typeof view.design_philosophy === 'object'
+      ? {
+        ...view.design_philosophy,
+        why_appropriate: keep('design_philosophy.why_appropriate', view.design_philosophy.why_appropriate),
+      }
+      : (view.design_philosophy ?? null),
   };
 
   return { view: next, corrections, context };

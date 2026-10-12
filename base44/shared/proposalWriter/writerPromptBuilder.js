@@ -31,6 +31,7 @@
  */
 
 import { buildProposalWritingAuthority } from '../soundProofWritingAuthority.js';
+import { SOUND_PROOF_DESIGN_PHILOSOPHY } from '../designPhilosophyAuthority.js';
 import {
   WRITER_CONTRACT_VERSION,
   WRITER_OUTPUT_MODE,
@@ -199,6 +200,11 @@ export function buildWriterPrompt({ input } = {}) {
     // spread its characters, one per line.
     buildProposalWritingAuthority(),
     '',
+    // THE PROFESSIONAL JUDGEMENT the copy is allowed to explain: the Sound Proof
+    // design philosophy, carried whole as its own block. It adds no claim, changes
+    // no rule and states no figure: the frozen evidence still governs every fact.
+    SOUND_PROOF_DESIGN_PHILOSOPHY,
+    '',
     '=== THE WRITER INPUT (your only source) ===',
     'This JSON carries the frozen evidence pack, every section you must write with its own word limit and requirement, the verified design interpretation, the designer\'s brief, the writing rules, the claims you may make, the claims that are blocked, the bass contract, the grounding rule and the exact output schema. The pack is the only source of every fact, figure, Performance Level and product name.',
     '',
@@ -233,6 +239,10 @@ export function buildWriterPrompt({ input } = {}) {
     'Where the lower-priced option leads on one isolated result, state it accurately and then say what it means, so it is never left as a bare concession: give the result, the significance, and the difference that matters more to the client.',
     'HUMAN SALES POLISH: no sentence of 10 or more words may appear verbatim in two sections. Never copy a complete evidence sentence between sections or change only a few words. Its statement is evidence, not mandatory prose. Preserve every fact, scope and claim ID while writing naturally.',
     'Give each section its own job, and never carry the same three strengths through the document in the same words: Design Summary introduces the cinema; Design Overview explains how the system is arranged; Why This Specification explains why this solution suits the project; Highlights sets out the engineering evidence; Spatial Resolution explains how the layout creates the immersion; Dynamic Range explains the capability and what it buys; Timbre Matching explains the tonal benefit; Overall Design closes on what the client should expect.',
+    'DESIGN JUDGEMENT: design_interpretation carries a design_philosophy block: what the client wants to achieve, which listening positions are prioritised, how the display and the seating were balanced, the practical constraints, the coverage approach, the bass approach, the strongest results, the lower results that are conscious trade-offs, and why the finished design suits this brief. Explain that reasoning where it is recorded, and never invent a reason, a priority, a budget or a decision it does not record. The best design is the one that most effectively satisfies the brief while balancing performance, practicality, aesthetics and cost, so a result below the highest available level is a legitimate design decision rather than a failure. Never present the highest available level as the objective regardless of cost or practical consequence.',
+    'WHY THIS SPECIFICATION CARRIES THE JUDGEMENT: it is the strongest expression of professional design judgement in the document. It explains why this solution suits this particular room, how the competing priorities were balanced, which decisions carry the most value, why a compromise is reasonable where the interpretation records one, and what the client gains from the finished design. It reads as a considered recommendation from an experienced cinema designer, never as a list of products.',
+    'VALUE ENGINEERING STAYS INTERNAL Reasoning: where the interpretation records that the design already takes an improvement without substantial additional expenditure, say what it gives the client in this room. Where an opportunity remains a design choice, say nothing about it. This proposal describes the finished design, so an opportunity is never written as an instruction to change the design, a next step, a future correction or an upgrade path.',
+    'THE DESIGN TEAM\'S OWN JUDGEMENT IS WRITTEN AS WE: where the copy expresses the recommendation of the design team, write we or our, for example we have kept the front row at the distance the room allows. The engineering facts themselves stay stated as fact, and we never stands in the place of a measured result. Never imply a conversation, a meeting, a site visit or a client instruction the brief does not state.',
     '',
     '=== THE SOUND PROOF EDITORIAL STANDARD (applies to every section) ===',
     'YOUR ROLE: you are an experienced professional home cinema designer presenting a carefully developed design to a prospective client. Explain what has been designed, why the important choices were made where their reasons are established, how those decisions contribute to the experience, and what the engineering assessment demonstrates. The reader must come away understanding this cinema and why the design suits their particular room. Never write as a technical reporting application, a product catalogue, an acoustic measurement report, a generic marketing writer, or an assistant explaining its calculations.',
@@ -264,6 +274,8 @@ export function buildWriterPrompt({ input } = {}) {
     '',
     '=== FINAL EDITORIAL CHECK (applies after all examples above) ===',
     'Before returning, rewrite any section that merely reads a story statement aloud. Preserve the ranked evidence and its grounding, not its report-style phrasing. Earlier examples containing raw levels are illustrations of evidence, not text to reuse in prose.',
+    'Confirm every reason the copy gives for a decision is one the design_philosophy block records, and that no reason was invented for a result the interpretation does not explain.',
+    'Confirm the copy never states that something still needs doing, never promises a free improvement, and never treats a higher price as better value on its own.',
     'In single mode the first section is Design Summary, not Decision Summary: it introduces the cinema — the room, the display, the seating, the arrangement of the system, the considerations behind the design and the experience it is intended to deliver — in developed natural paragraphs. It does not open on a performance figure or restate the strongest result, and the ranked strengths belong in the sections that state them. Mention the seating rows only where the evidence states them.',
     'Put all dBC output figures only in Dynamic Range, not in Why This Specification or Highlights. Put viewing angles only in Spatial Resolution. Put any Hz extension proof once in Why This Specification. Highlights and Overall Design contain no measurements or channel counts. An exact display size may recur in the viewing explanation because its editorial purpose differs from the opening.',
     'Check every full sentence for duplicates of 10+ words across sections. Check no raw grades, OH abbreviation, report register or unqualified seat-equality promise survives. Final copy must explain the cinema, not the assessment.',

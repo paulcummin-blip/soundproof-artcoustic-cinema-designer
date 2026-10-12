@@ -10,15 +10,15 @@ export const VALIDATOR_SOURCE_MANIFEST = Object.freeze({
   'base44/shared/proposalWriter/writerClausePrecision.js': '0d7be2c8e2dd98c395c5bf999bd6c306cb48b9c15bc0ffae2d7f31fd31ddae94',
   'base44/shared/proposalWriter/writerViolationAudit.js': '4cc361d1c96a101fc29330d740cef2184ae5650fd3cc64e253892d004efdb0b9',
   'base44/shared/proposalWriter/writerDesignStageRules.js': 'a26d5ff98a2eaf4f6de929cc62cba7e7bc2632540f12d44ded72e8cb7f8bdbb7',
-  'base44/shared/proposalWriter/writerContractSchema.js': 'a041fd2f8b90ef1996f0f699ea7139f89fa0db02aacf4a240cb94082221cc77f',
+  'base44/shared/proposalWriter/writerContractSchema.js': 'f5d890ce61e9804f20a2ca488df277d77dccec819b42d80321e4391b7017b09a',
   'base44/shared/proposalWriter/writerMultiCabinetRules.js': '3712df21bd72353af0a9d8ab75a1efa20755856d65229887a1f8dc5bad29b172',
   'base44/shared/proposalGeneration/generationStatuses.js': '2273b2e8408a426eeb137d9ae2f34c428a8e934dc0529134e9889aae75103b28',
   'base44/shared/proposalWriter/writerCabinetLanguage.js': '18e37edb21bd8422c6293c5fde809984d185e7188d0fe4a12fa2ff352d4b72c7',
   'base44/shared/proposalWriter/writerValidationRegister.js': '634502ab07c0bf1b13cfe0879d1e2ca2e85f0419c94f377b266a977c38c07b96',
-  'base44/shared/proposalWriter/writerInputBuilder.js': '4ef300889e315373d971f5e07c59184ceb0260208e43f9a93bf64e528f6b62a6',
-  'base44/shared/proposalWriter/writerPromptBuilder.js': '283ed1f557d84e1bf3f16152bbada7c7aa98490f8e60c789a268b603f1dcf940',
+  'base44/shared/proposalWriter/writerInputBuilder.js': 'a8686e0b965fda3a67e6f81f0dc042019e6137f2644f63f85f0ae0779567f95b',
+  'base44/shared/proposalWriter/writerPromptBuilder.js': '579c8dced46828bfbd14a3d0ba5832666119c9014e4136d74319e56f604202da',
   'base44/shared/proposalWriter/writerSectionMapping.js': 'f5a6d2a5fe974fbd5c16d810d95f99da72f629a4fb8cb33793aa472778ade2f0',
-  'base44/shared/proposalWriter/writerDesignContext.js': 'b584699eb31f9e5d3db90350ecd9819e5f80191edbbf2fdaf2a31112b9ff4a1a',
+  'base44/shared/proposalWriter/writerDesignContext.js': 'ec846bfa27dfcb46397e19b1c0063370add28677ab7ffd777aea591be2a4507f',
   'base44/shared/proposalEdit/completeDocumentValidation.js': 'cff20d7146ecbeb3a9c325e3147db41cab552f7ea950dd93385ee1d478683ddd',
   'base44/shared/proposalWriter/validatorProvenance.js': 'c8e73212a0b25a5e30697b9d7fd3087f553666b06950be307966dc47ccdbdb0e',
   'base44/shared/proposalEvidence/proposalEvidenceWording.js': 'f9b5c6ceb3063240ab6ba3374c38b96f9abf95dcdb87892510f3815192ef5594',
@@ -27,4 +27,14 @@ export const VALIDATOR_SOURCE_MANIFEST = Object.freeze({
   // the client asked for it, at the scope and status the reports record.
   'base44/shared/proposalEvidence/proposalBriefRequests.js': '006dc2c68897fabaedd4c35e02f34e76fa39ab372789860f12099dfeebd18b13',
   'base44/shared/proposalEvidence/proposalSupportingResults.js': 'c59e5098bffc6d44615f75b03c435a72d4eddd0283c2aa6cdb150ab86174d504',
+  // The design philosophy: the judgement behind the recommendation, carried by
+  // Stage 1 and by the writer's editorial instructions. It states no figure and
+  // changes no acceptance; it is hashed so a draft can be traced to the exact
+  // reasoning authority it was written under.
+  'base44/shared/designPhilosophyAuthority.js': '144ea70734131f9b0b929c302510062289ef7d1c699fb37d354b8cfc550ba2f4',
+  'base44/shared/adiDesignPhilosophy.js': '741404c18354ae2ab05d1cf82780763615dea08b1e7120d7ac97680a75a0593e',
+  'base44/shared/adiProjectInterpretation.js': '6353a90fdba81cd7a5183975a68360a33a20e5f8c7fbcbe8bca091bb84541410',
+  // The check between the saved interpretation and the frozen evidence, which now
+  // also holds the design philosophy's own statements to it.
+  'base44/shared/proposalWriter/writerInterpretationEvidenceCheck.js': '23f5ffa5e6dcb6d2311365665cde650ac4b38f076812cc4f45552acf009dda65',
 });

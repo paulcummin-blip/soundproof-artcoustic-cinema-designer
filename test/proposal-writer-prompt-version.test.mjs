@@ -36,7 +36,14 @@ const VERSION_3 = 'proposal-writer-prompt-3';
 // internal editorial plan, the Design Summary structure, the distinct job of each
 // section, the house style and the brief-coverage responsibility. No validation
 // rule, section identity or claim-grounding rule changed.
-const CURRENT = 'proposal-writer-prompt-14';
+// Generation 15 is the design-philosophy pass: the writer is given the Sound
+// Proof design philosophy (the best design satisfies the brief while balancing
+// performance, practicality, aesthetics and cost, so a result below the highest
+// available level is a legitimate design decision), the reasoning behind the
+// recommendation, the value-engineering rule, the design team's own judgement
+// written as we, and the engineering safeguards. No validation rule, section
+// identity, word limit or claim-grounding rule changed.
+const CURRENT = 'proposal-writer-prompt-15';
 
 test('the writer prompt version is the current one', () => {
   assert.equal(WRITER_PROMPT_VERSION, CURRENT);

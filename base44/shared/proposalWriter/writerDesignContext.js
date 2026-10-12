@@ -114,6 +114,43 @@ function evidenceRows(list) {
 }
 
 /**
+ * The design philosophy, curated for the writer: the reasoning behind the design
+ * and nothing else. It carries no figure, no level and no product, and it states
+ * what the project data does not establish so the writer cannot assert it.
+ */
+function designPhilosophyView(philosophy) {
+  if (!philosophy || typeof philosophy !== 'object') return null;
+  const reasoning = philosophy.reasoning || {};
+  const value = reasoning.value_engineering || {};
+  const rows = (list, limit) => (Array.isArray(list) ? list : [])
+    .slice(0, limit)
+    .map((entry) => ({ area: asText(entry?.area), label: asText(entry?.label), level: asText(entry?.level) }))
+    .filter((entry) => entry.area || entry.label);
+  return {
+    principle: asText(philosophy.principle),
+    legitimate_reasons: strings(philosophy.legitimate_reasons),
+    why_appropriate: asText(philosophy.why_appropriate),
+    priorities: {
+      prioritised_positions: asText(philosophy.priorities?.prioritised),
+      display_and_seating: asText(philosophy.priorities?.display_and_seating),
+      coverage: asText(philosophy.priorities?.coverage),
+      bass: asText(philosophy.priorities?.bass),
+    },
+    strongest_results: rows(reasoning.strongest_results, 4),
+    lower_results: rows(reasoning.lower_results, 6),
+    lower_result_rule: asText(reasoning.lower_result_rule),
+    value_engineering: {
+      already_captured: rows(value.already_captured, 6),
+      remaining_design_choices: rows(value.remaining_design_choices, 6),
+      rule: asText(value.rule),
+    },
+    not_established: strings(philosophy.not_established),
+    rules: strings(philosophy.rules),
+    rule: 'this is the reasoning behind the recommended solution and never a source of figures: every figure, level, product and claim still comes from the frozen evidence pack, and a reason is stated only where this records one',
+  };
+}
+
+/**
  * The interpretation as the writer reads it.
  *
  * Deliberately a curated view rather than the saved object: the internal Design
@@ -142,6 +179,9 @@ export function interpretationView(interpretation, { pack = null } = {}) {
     strongest_areas: strongestAreas(interpretation?.strongest_areas),
     constraints: strings(interpretation?.main_constraints),
     design_decisions: strings(interpretation?.important_design_decisions),
+    // THE PROFESSIONAL JUDGEMENT behind the design: the reasoning the copy may
+    // explain. Absent where the interpretation states none.
+    design_philosophy: designPhilosophyView(interpretation?.design_philosophy),
     supporting_evidence: {
       spatial_resolution: evidenceRows(byStructure['Spatial Resolution']),
       dynamic_range: evidenceRows(byStructure['Dynamic Range']),
