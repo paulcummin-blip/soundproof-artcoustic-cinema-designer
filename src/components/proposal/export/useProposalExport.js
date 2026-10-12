@@ -55,6 +55,10 @@ import {
   settleOneFrame,
   waitForDocumentInputs,
 } from '@/components/report/printReadiness';
+import {
+  createExportDiagnostics,
+  recordExportDiagnostics,
+} from './proposalExportDiagnostics';
 
 const PRINT_TIMEOUT_MS = 60000;
 const EXPORT_BODY_CLASS = 'proposal-export-mode';
@@ -137,11 +141,14 @@ export function useProposalExport({
   const [retryable, setRetryable] = useState(false);
 
   const printingRef = useRef(false);
+  // The attempt currently in flight. Incremented as each one starts, so anything
+  // that completes late can tell whether it still belongs to the live attempt.
+  const attemptRef = useRef(0);
   const cleanupTimeoutRef = useRef(null);
   // The app-owned window the pack is printed from, when one could be opened.
   const printWindowRef = useRef(null);
 
-  const cleanup = useCallback(() => {
+  const cleanup = useCallback((win = printWindowRef.current) => {
     if (printingRef.current) {
       printingRef.current = false;
       setExporting(false);
@@ -152,8 +159,10 @@ export function useProposalExport({
       // Restores the app title and the host tab title, whichever were replaced.
       restorePrintDocumentTitle();
     }
-    closeProposalPrintWindow(printWindowRef.current);
-    printWindowRef.current = null;
+    // Only the window handed in is taken down — an attempt that finishes late
+    // never closes the preparation window a newer attempt owns.
+    if (win) closeProposalPrintWindow(win);
+    if (printWindowRef.current === win) printWindowRef.current = null;
     if (cleanupTimeoutRef.current) {
       clearTimeout(cleanupTimeoutRef.current);
       cleanupTimeoutRef.current = null;
@@ -184,6 +193,16 @@ export function useProposalExport({
       return;
     }
 
+    // One attempt, one lifecycle. Everything below belongs to THIS attempt: a
+    // continuation that arrives after it has failed, or after a newer attempt has
+    // begun, ends quietly instead of writing state, closing a newer window or
+    // printing twice. Retry is a fresh attempt with a fresh lifecycle.
+    const attemptId = attemptRef.current + 1;
+    attemptRef.current = attemptId;
+    const isCurrent = () => attemptRef.current === attemptId;
+    const diagnostics = createExportDiagnostics({ scope: 'proposal-export-attempt' });
+    diagnostics.start('attempt', { mode });
+
     setBlockedReason(null);
     setError(null);
     setRetryable(false);
@@ -209,8 +228,10 @@ export function useProposalExport({
     // host tab. So the pack is printed from a window of this app's own origin,
     // which carries the shared filename as its title. Opened synchronously,
     // while the click still counts as a user gesture.
+    diagnostics.start('print_window');
     const printWindow = openProposalPrintWindow(title);
     printWindowRef.current = printWindow;
+    diagnostics.done('print_window', { opened: Boolean(printWindow) });
 
     try {
       // The same read-only edit layer, under the same access controls, is asked
@@ -218,19 +239,32 @@ export function useProposalExport({
       // not open. An issued export must additionally pass the complete-document
       // gate; a preview deliberately does not, because inspecting the real print
       // document before it is ready to issue is what a preview is for.
+      diagnostics.start('edit_layer');
       const authorization = await base44.functions.invoke('readProposalEditLayer', { proposal_id: proposal.id, action: readLayerAction(mode), rendered_sections: sections, engineering_snapshot: proposal.engineering_snapshot });
+      if (!isCurrent()) return;
+      diagnostics.done('edit_layer');
       const validation = authorization?.data?.layer?.document_validation;
-      if (requiresIssueGate(mode) && !validation?.valid) throw new Error(authorization?.data?.error || 'The complete proposal must pass validation before export.');
+      if (requiresIssueGate(mode) && !validation?.valid) {
+        diagnostics.fail('edit_layer', { gate: 'complete_document' });
+        throw new Error(authorization?.data?.error || 'The complete proposal must pass validation before export.');
+      }
 
       // 1. The document's OWN inputs are resolved before anything is prepared:
       //    the identity and the saved version names the document prints. This is
       //    the stable snapshot of the document being exported — once it is in
       //    hand, nothing the editor finishes loading afterwards can change what
       //    is prepared. A resolver that fails or runs long stops the export here.
+      diagnostics.start('document_inputs');
       const inputs = await waitForDocumentInputs(resolveExportIdentity);
       if (!inputs.ok) {
+        // WHICH operation held preparation up is kept in the internal trace
+        // (`readLastExportDiagnostics`); the designer reads one plain sentence
+        // naming the cause, and Retry prepares the document again from scratch.
+        diagnostics.fail('document_inputs', { reason: inputs.reason });
         throw notReadyError(describePrintReadinessFailure({ reason: inputs.reason }));
       }
+      diagnostics.done('document_inputs');
+      if (!isCurrent()) return;
       const settledIdentity = inputs.value || null;
       const settledVersionNames = settledIdentity?.versionNames?.length
         ? settledIdentity.versionNames
@@ -248,10 +282,16 @@ export function useProposalExport({
         { ...settledSegments, versionNames: settledVersionNames }
       );
 
-      // 2. One settled frame, so the inputs just resolved are the ones mounted in
-      //    the document that is about to be prepared. Not a stand-in for
-      //    readiness — the authority below is what decides that.
-      await settleOneFrame();
+      // 2. One SETTLED frame, so the inputs just resolved are the ones mounted in
+      //    the document that is about to be prepared. The wait is bounded: a
+      //    suspended or throttled frame cannot hold the export open, and an
+      //    expired frame is recorded rather than mistaken for readiness — the
+      //    resource authority below is what decides that.
+      diagnostics.start('animation_frame');
+      const settledFrame = await settleOneFrame();
+      if (settledFrame.expired) diagnostics.expire('animation_frame', { elapsedMs: settledFrame.elapsedMs });
+      else diagnostics.done('animation_frame', { elapsedMs: settledFrame.elapsedMs });
+      if (!isCurrent()) return;
 
       const printNode = findPrintNode();
       let printed = false;
@@ -259,16 +299,20 @@ export function useProposalExport({
       if (printWindow && printNode) {
         // The window's own document is prepared by the shared readiness
         // authority, and the print dialogue opens only when it reports ready.
+        diagnostics.start('print_window_preparation');
         const result = await printProposalInWindow(printWindow, {
           title: settledTitle,
           node: printNode,
-          onDone: cleanup,
+          onDone: () => { if (isCurrent()) cleanup(printWindow); },
         });
+        if (!isCurrent()) return;
         if (result.printed) {
           printed = true;
+          diagnostics.done('print_window_preparation');
           // The window closes itself when the dialog finishes. Settle the button
           // state in case the dialog is left open.
           cleanupTimeoutRef.current = setTimeout(() => {
+            if (!isCurrent()) return;
             printingRef.current = false;
             setExporting(false);
             setPreviewing(false);
@@ -276,18 +320,22 @@ export function useProposalExport({
         } else if (result.reason !== 'window_unavailable') {
           // The document did not become ready: NOTHING was printed, and the
           // designer is told which resource held it up.
+          diagnostics.fail('print_window_preparation', { reason: result.reason });
           throw notReadyError(result.message || PRINT_NOT_READY_MESSAGE);
         } else {
-          closeProposalPrintWindow(printWindowRef.current);
-          printWindowRef.current = null;
+          diagnostics.done('print_window_preparation', { reason: result.reason });
+          closeProposalPrintWindow(printWindow);
+          if (printWindowRef.current === printWindow) printWindowRef.current = null;
         }
       }
 
       if (!printed) {
+        if (!isCurrent()) return;
         // Fallback — popup blocked or the pack is not mounted: print in-page, on
         // the app document and on the host tab. The SAME readiness authority runs
         // first, on this document and on the print node — never a bare
         // animation-frame delay.
+        diagnostics.start('in_page_fallback');
         applyPrintDocumentTitle(settledTitle);
 
         document.body.classList.add(EXPORT_BODY_CLASS);
@@ -295,23 +343,38 @@ export function useProposalExport({
         const readiness = await preparePrintDocument({ doc: document, root: findPrintNode() });
         if (!readiness.ready) {
           document.body.classList.remove(EXPORT_BODY_CLASS);
+          diagnostics.fail('in_page_fallback', { reason: readiness.reason });
           throw notReadyError(describePrintReadinessFailure(readiness));
         }
 
-        cleanupTimeoutRef.current = setTimeout(cleanup, PRINT_TIMEOUT_MS);
+        cleanupTimeoutRef.current = setTimeout(() => cleanup(printWindow), PRINT_TIMEOUT_MS);
 
+        diagnostics.done('in_page_fallback');
         window.print();
       }
 
       // The issued copy is taken from the SAME composition this export printed —
       // and only for an issued export. A preview never reaches this: nothing is
       // stored, no issued-export record is created and no proposal state changes.
-      if (shouldRecordIssuedExport({ mode, issuedDocument })) {
+      if (isCurrent() && shouldRecordIssuedExport({ mode, issuedDocument })) {
         const issuedSnapshot = snapshotIssuedComposition(issuedDocument.documentType);
         if (issuedSnapshot) recordIssuedExportInBackground({ identity: { ...issuedDocument, filename: settledTitle }, snapshot: issuedSnapshot });
       }
     } catch (err) {
       const notReady = err?.printNotReady === true;
+      if (!diagnostics.snapshot().blockedBy) {
+        diagnostics.fail('attempt', {
+          printNotReady: notReady,
+          blockedBy: err?.exportBlockedBy || null,
+        });
+      }
+      // The trace of this attempt is kept — which operation was outstanding, how
+      // long each stage took. It carries no project content.
+      recordExportDiagnostics(diagnostics.snapshot());
+      // A failure raised by an attempt that has already been superseded changes
+      // nothing: no error is shown for it, and the window a newer attempt owns is
+      // left alone. Its own preparation window is closed here.
+      if (!isCurrent()) return;
       setError(
         notReady
           ? err.message
@@ -321,7 +384,7 @@ export function useProposalExport({
               : 'The proposal PDF could not be prepared for printing.'))
       );
       setRetryable(notReady);
-      cleanup();
+      cleanup(printWindow);
     }
   }, [proposal, sections, comparisonBlockReason, projectName, dealerName, clientName, projectReference, versionNames, issuedDocument, resolveExportIdentity, cleanup]);
 

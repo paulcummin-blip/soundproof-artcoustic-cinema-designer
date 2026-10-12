@@ -9,49 +9,112 @@
  * The saved version names are read asynchronously, so an export that ran while
  * that read was still in flight could print a cover, an image caption and a
  * filename missing the very names it documents. `resolveExportIdentity` is
- * therefore handed to the export, which waits for it before any print
- * preparation begins — the stable snapshot the document is prepared from.
+ * therefore handed to the export, which waits for it before any print preparation
+ * begins — the stable snapshot the document is prepared from.
  *
- * Nothing here changes proposal content, the approved writer, the validator or
- * any engineering value: it only decides which names the document states.
+ * Resolution is bounded and observable (see ../editor/proposalExportIdentity):
+ * the read is shared and reused, never repeated, and it is given a deadline at the
+ * export boundary only — a read that hangs cannot hold an export open. Names that
+ * arrive are applied to the component SYNCHRONOUSLY, so the identity handed to the
+ * export is the one already mounted in the document that is about to be prepared:
+ * correctness does not rest on an animation frame, which a hidden or throttled tab
+ * may never deliver.
+ *
+ * Nothing here changes proposal content, the approved writer, the validator or any
+ * engineering value: it only decides which names the document states.
  */
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { flushSync } from 'react-dom';
 import { base44 } from '@/api/base44Client';
 import { proposalVersionIds } from '@/components/proposal/library/proposalSourceState';
 import { buildVersionNameMap } from '@/components/library/libraryVersionLabels';
 import { settleOneFrame } from '@/components/report/printReadiness';
+import {
+  createExportDiagnostics,
+  recordExportDiagnostics,
+} from '@/components/proposal/export/proposalExportDiagnostics';
+import { resolveProposalExportIdentity } from './proposalExportIdentity';
 
 export default function useProposalExportIdentity({ proposal, projectContext }) {
   const [versionNameById, setVersionNameById] = useState(new Map());
-  // The in-flight read of the saved version names. An export waits for it, so the
-  // printed document is never prepared with its display names still arriving.
-  const versionNamesPromiseRef = useRef(Promise.resolve());
+  // The EXPLICIT resolved identity state: the names resolved for this document so
+  // far. Read straight from it by an export, so its identity never depends on
+  // React having re-rendered.
+  const resolvedNamesRef = useRef(new Map());
+  // The one saved-name read for this version set, shared by the gallery labels and
+  // by the export. Never started twice for the same versions.
+  const namesReadRef = useRef(null);
+  const namesReadKeyRef = useRef('');
+  // The identity inputs as they stand, so resolution reads them fresh at the
+  // moment of the export rather than through a stale closure.
+  const contextRef = useRef({});
+  const versionIds = proposalVersionIds(proposal);
+  contextRef.current = { proposal, projectContext, versionIds };
+
+  /** The shared read of this document's saved version names. */
+  const ensureNames = useCallback(() => {
+    const ids = contextRef.current.versionIds || [];
+    const key = ids.join('|');
+    if (namesReadRef.current && namesReadKeyRef.current === key) return namesReadRef.current;
+    namesReadKeyRef.current = key;
+    namesReadRef.current = ids.length === 0
+      ? Promise.resolve(new Map())
+      : base44.entities.ProjectVersion.filter(
+        { id: { $in: ids } },
+        { fields: ['version_name'], limit: 10 },
+      )
+        .then((result) => buildVersionNameMap(Array.isArray(result) ? result : (result?.items || [])))
+        .catch((versionError) => {
+          // The name is a label only: an unreadable name leaves the document
+          // unlabelled rather than showing a wrong one. Resolution reports it.
+          console.warn('[ProposalEditor] version names unavailable:', versionError?.message || versionError);
+          return new Map();
+        });
+    return namesReadRef.current;
+  }, []);
+
+  /**
+   * Apply resolved names to the resolved identity state, and to the component
+   * synchronously, so they are in the document — not merely scheduled into it.
+   */
+  const applyNames = useCallback((names) => {
+    if (!names || typeof names.forEach !== 'function') return;
+    const merged = new Map(resolvedNamesRef.current);
+    let changed = false;
+    names.forEach((name, id) => {
+      if (name && merged.get(id) !== name) {
+        merged.set(id, name);
+        changed = true;
+      }
+    });
+    if (!changed) return;
+    resolvedNamesRef.current = merged;
+    const update = () => setVersionNameById(new Map(merged));
+    try {
+      flushSync(update);
+    } catch {
+      // Already inside a React render or lifecycle: the ordinary update applies
+      // on the next pass, and the export still uses the resolved names above.
+      update();
+    }
+  }, []);
 
   useEffect(() => {
-    const versionIds = proposalVersionIds(proposal);
-    if (versionIds.length === 0) {
+    const ids = proposalVersionIds(proposal);
+    if (ids.length === 0) {
+      resolvedNamesRef.current = new Map();
       setVersionNameById(new Map());
-      versionNamesPromiseRef.current = Promise.resolve();
       return undefined;
     }
     let cancelled = false;
-    versionNamesPromiseRef.current = (async () => {
-      try {
-        const result = await base44.entities.ProjectVersion.filter(
-          { id: { $in: versionIds } },
-          { fields: ['version_name'], limit: 10 },
-        );
-        const records = Array.isArray(result) ? result : (result?.items || []);
-        if (!cancelled) setVersionNameById(buildVersionNameMap(records));
-      } catch (versionError) {
-        // The name is a label only: an unreadable name leaves the image
-        // unlabelled rather than showing a wrong one.
-        console.warn('[ProposalEditor] version names unavailable:', versionError?.message || versionError);
-      }
-    })();
+    // Labels only: this read never gates the editor. Its result is applied when it
+    // arrives, and its lateness can never restart or alter an export attempt.
+    ensureNames().then((names) => {
+      if (!cancelled) applyNames(names);
+    });
     return () => { cancelled = true; };
-  }, [proposal?.selected_version_ids, proposal?.version_id]);
+  }, [proposal?.selected_version_ids, proposal?.version_id, ensureNames, applyNames]);
 
   // The exact saved names this document is built from, in selection order: the
   // version name for a summary, every name for a comparison.
@@ -60,25 +123,36 @@ export default function useProposalExportIdentity({ proposal, projectContext }) 
     [proposal?.selected_version_ids, proposal?.version_id, versionNameById],
   );
 
-  // The export's own inputs, kept current so the export can read the identity the
-  // printed document and its filename state once those inputs have settled.
-  const identityRef = useRef({});
-  identityRef.current = {
-    projectName: projectContext.projectName || proposal?.title || null,
-    dealerName: projectContext.filenameDealerName ?? null,
-    clientName: projectContext.filenameClientName ?? null,
-    projectReference: projectContext.projectReference ?? null,
-    versionNames,
-  };
-
-  // Resolution is awaited by the export; the settled frame afterwards lets React
-  // apply the names just read, so the identity handed over is the one mounted in
-  // the document that is about to be prepared.
+  // Resolution is awaited by the export, with its own bounded trace: the shared
+  // read, then one bounded frame. Nothing here can stay pending — a suspended
+  // frame or an unanswered read ends the wait and is reported, not swallowed.
   const resolveExportIdentity = useCallback(async () => {
-    await versionNamesPromiseRef.current;
-    await settleOneFrame();
-    return identityRef.current;
-  }, []);
+    const { proposal: currentProposal, projectContext: currentContext, versionIds: ids } = contextRef.current;
+    const diagnostics = createExportDiagnostics({ scope: 'proposal-export-identity' });
+
+    const result = await resolveProposalExportIdentity({
+      proposal: currentProposal,
+      projectContext: currentContext,
+      knownNames: resolvedNamesRef.current,
+      readVersionNames: ids.length === 0 ? null : () => ensureNames(),
+      frameWait: settleOneFrame,
+      diagnostics,
+    });
+
+    // The names just resolved are applied synchronously BEFORE the identity is
+    // handed over, so the document that is about to be prepared already states
+    // them. The identity returned carries them either way.
+    if (result.names) applyNames(result.names);
+    recordExportDiagnostics(diagnostics.snapshot());
+
+    if (!result.ok) {
+      const error = new Error('The design versions this document names could not be read.');
+      error.printIdentityUnresolved = true;
+      error.exportBlockedBy = result.blockedBy;
+      throw error;
+    }
+    return result.identity;
+  }, [applyNames, ensureNames]);
 
   return { versionNameById, versionNames, resolveExportIdentity };
 }

@@ -42,8 +42,12 @@ export {
   PRINT_READINESS_STABLE_FRAMES,
   PRINT_NOT_READY_MESSAGE,
   describePrintReadinessFailure,
+  // The bounded primitives a caller's own identity wait is built from, so no
+  // stage of preparation introduces a second, unbounded timing mechanism.
+  readinessNow,
   settleOneFrame,
   waitForDocumentInputs,
+  withDeadline,
 } from './readinessContract.js';
 
 export {
