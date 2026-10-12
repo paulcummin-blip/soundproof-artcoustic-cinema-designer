@@ -38,6 +38,12 @@ import {
   CORRECTION_RULE,
   checkInterpretationAgainstEvidence,
 } from './writerInterpretationEvidenceCheck.js';
+import { buildClarificationAnswers } from '../proposalClarification/clarificationAnswers.js';
+
+// The designer's own answers to ADI's clarification questions are clarification
+// authority, read from the proposal they were stored with. Re-exported so a caller
+// that reads the design context can build the block the writer input carries.
+export { buildClarificationAnswers };
 
 /** The stage marker the existing ADI interpretation carries. */
 export const INTERPRETATION_STAGE = 'adi_project_interpretation';

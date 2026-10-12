@@ -53,6 +53,11 @@ export default async function(req) {
     // designer's notes for this read-only review. Nothing is written: the proposal
     // and its sections are only read.
     const proposalId = body.proposal_id || null;
+    // A read-only controlled test may supply the designer's clarification answers in
+    // memory, exactly as the generation path supplies them to the writer. They are
+    // passed straight through to the writer's design context and never written to any
+    // record: this handler persists nothing.
+    const clarificationAnswers = Array.isArray(body.clarification_answers) ? body.clarification_answers : null;
     let proposal = null;
     let dealerNotes = null;
     if (proposalId) {
@@ -118,6 +123,7 @@ export default async function(req) {
       designContext: buildWriterDesignContext({
         proposal, projectId, versionIds: [versionId], pack, dealerNotes,
         savedInterpretation: derivedInterpretation,
+        clarificationAnswers,
       }),
     });
     assertWriterInputCarriesNoLiveState(input);

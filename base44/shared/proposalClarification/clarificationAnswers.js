@@ -107,4 +107,58 @@ export function passedClarifications(records = []) {
   return (Array.isArray(records) ? records : []).filter((record) => record?.status === 'passed');
 }
 
+/**
+ * The rule that governs how the writer may use an answer. Stated once, here, so the
+ * generation path and the read-only preview give the writer the same instruction.
+ */
+export const CLARIFICATION_ANSWER_RULE =
+  'Clarification answers are the designer\'s own statements of design intention for a '
+  + 'decision the frozen evidence records no reason for. Weave each answer into the section '
+  + 'it belongs to (its belongs_to), in your own words and in the document\'s professional '
+  + 'voice. Never print the question, never label the answer, never present the answer as a '
+  + 'standalone statement or as a list, and never treat it as measured engineering evidence: '
+  + 'it is intention only, it changes no figure, level, product or claim, and the frozen '
+  + 'evidence governs wherever the two differ. Where the designer passed a question there is '
+  + 'no answer at all, and no reason may be invented for it.';
+
+/**
+ * The answers as the WRITER is given them: the designer's own words, each tied to the
+ * section it belongs to, with passed questions carried as passed. Read from the proposal
+ * the answers were stored with, or from the caller when the proposal has just been created
+ * and its metadata has not been read back yet. At most three, as ADI asks at most three.
+ *
+ * @returns {{supplied: boolean, answers: Array, passed_questions: Array<string>, rule: string}}
+ */
+export function buildClarificationAnswers({ proposal = null, clarificationAnswers = null } = {}) {
+  const supplied = Array.isArray(clarificationAnswers) && clarificationAnswers.length > 0
+    ? clarificationAnswers
+    : (Array.isArray(proposal?.metadata?.clarification_answers)
+      ? proposal.metadata.clarification_answers
+      : []);
+  const records = Array.isArray(supplied) ? supplied : [];
+
+  const answers = records
+    .filter((record) => record?.status === 'answered' && String(record?.answer ?? '').trim().length > 0)
+    .slice(0, 3)
+    .map((record) => ({
+      question_id: String(record.question_id),
+      question: record.question ? String(record.question) : null,
+      area: record.area ? String(record.area) : null,
+      belongs_to: record.belongs_to ? String(record.belongs_to) : null,
+      answer: String(record.answer).trim(),
+    }));
+
+  const passed = records
+    .filter((record) => record?.status === 'passed' && record?.question_id)
+    .slice(0, 3)
+    .map((record) => String(record.question_id));
+
+  return {
+    supplied: answers.length > 0 || passed.length > 0,
+    answers,
+    passed_questions: passed,
+    rule: CLARIFICATION_ANSWER_RULE,
+  };
+}
+
 export default normaliseClarificationAnswers;
