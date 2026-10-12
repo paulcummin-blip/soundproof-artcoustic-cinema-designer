@@ -16,6 +16,7 @@ export default function CurrentSpeakerDesignButton({
   projectName = null,
   clientName = null,
   versionName = null,
+  projectReference = null,
   updatedDate = null,
   disabled = false,
 }) {
@@ -42,6 +43,7 @@ export default function CurrentSpeakerDesignButton({
         projectName={projectName}
         clientName={clientName}
         versionName={versionName}
+        projectReference={projectReference}
         updatedDate={updatedDate}
       />
     </>

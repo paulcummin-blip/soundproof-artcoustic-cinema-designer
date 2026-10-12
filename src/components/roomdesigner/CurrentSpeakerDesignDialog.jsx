@@ -9,6 +9,7 @@ import {
   DialogClose,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
+import SpeakerDesignPdfButton from "@/components/roomdesigner/SpeakerDesignPdfButton";
 
 /**
  * CurrentSpeakerDesignDialog
@@ -46,6 +47,7 @@ export default function CurrentSpeakerDesignDialog({
   projectName = null,
   clientName = null,
   versionName = null,
+  projectReference = null,
   updatedDate = null,
 }) {
   const groups = Array.isArray(speakerDesign?.groups) ? speakerDesign.groups : [];
@@ -86,19 +88,26 @@ export default function CurrentSpeakerDesignDialog({
                     <tr className="border-b border-[#DCDBD6] text-left text-[11px] uppercase tracking-[0.06em] text-[#625143]">
                       <th className="py-1.5 pr-3 font-semibold">Position</th>
                       <th className="py-1.5 pr-3 font-semibold">Model</th>
-                      <th className="py-1.5 pr-3 font-semibold text-right">Qty</th>
-                      <th className="py-1.5 font-semibold">Notes</th>
+                      <th className="py-1.5 font-semibold text-right">Qty</th>
                     </tr>
                   </thead>
                   <tbody>
                     {group.rows.map((row) => (
                       <tr key={row.key} className="border-b border-[#EFEDE8] last:border-b-0 align-top">
                         <td className="py-2 pr-3 text-[#3E4349]">{row.position}</td>
-                        <td className="py-2 pr-3 font-medium text-[#1B1A1A]">{row.model}</td>
-                        <td className="py-2 pr-3 text-right text-[#3E4349] tabular-nums">
+                        <td className="py-2 pr-3">
+                          <span className="font-medium text-[#1B1A1A]">{row.model}</span>
+                          {/* The row's own note — a dual-centre arrangement, or a
+                              position such as "Behind screen" — is folded into the
+                              model cell: the panel states Position, Model and Qty
+                              only, and never a separate Notes column. */}
+                          {row.note && (
+                            <span className="block text-xs text-[#625143] mt-0.5">{row.note}</span>
+                          )}
+                        </td>
+                        <td className="py-2 text-right text-[#3E4349] tabular-nums">
                           {row.quantityLabel}
                         </td>
-                        <td className="py-2 text-[#625143]">{row.note || "—"}</td>
                       </tr>
                     ))}
                   </tbody>
@@ -108,7 +117,18 @@ export default function CurrentSpeakerDesignDialog({
           </div>
         )}
 
-        <DialogFooter>
+        <DialogFooter className="sm:justify-between gap-3">
+          {/* Quick equipment schedule export: this panel's own list, and nothing
+              else. It creates no report record and touches no report evidence. */}
+          <SpeakerDesignPdfButton
+            groups={groups}
+            projectName={projectName}
+            clientName={clientName}
+            projectReference={projectReference}
+            versionName={versionName}
+            layout={speakerDesign?.layout || null}
+            disabled={isEmpty}
+          />
           <DialogClose asChild>
             <Button variant="outline" className="font-medium">Close</Button>
           </DialogClose>
