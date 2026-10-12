@@ -51,7 +51,14 @@ const VERSION_3 = 'proposal-writer-prompt-3';
 // dash, the stock connective, the generic phrase and the repeated opener are now
 // refused by the validator. No section identity, word limit or claim-grounding
 // rule changed.
-const CURRENT = 'proposal-writer-prompt-16';
+// Generation 17 is the Presented Options pass: the contract no longer requires
+// the writer to state that the predicted acoustic performance is unchanged when
+// seating or layout alternatives are presented, because no allowed engineering
+// claim establishes it and the validator correctly refused the ungrounded
+// statement. The section presents the options as practical and visual
+// alternatives instead. No section identity, word limit, claim-grounding rule or
+// validation rule changed.
+const CURRENT = 'proposal-writer-prompt-17';
 
 test('the writer prompt version is the current one', () => {
   assert.equal(WRITER_PROMPT_VERSION, CURRENT);

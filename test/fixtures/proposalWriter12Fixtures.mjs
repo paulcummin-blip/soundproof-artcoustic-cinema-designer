@@ -4,7 +4,7 @@ import { validateWriterOutput } from '../../base44/shared/proposalWriter/writerO
 import { composeWriterSectionBodies } from '../../base44/shared/proposalWriter/writerSectionMapping.js';
 import { option } from './proposalEvidenceFixtures.mjs';
 export const ARRANGEMENT = 'The centre uses two physical C4-1 cabinets to reproduce one logical centre channel.';
-export const PRACTICAL = 'Lounge seating offers relaxed comfort, while cinema recliners provide individual support. The predicted acoustic performance remains unchanged provided the specified listening positions and relevant room geometry are maintained.';
+export const PRACTICAL = 'Lounge seating offers relaxed comfort, while cinema recliners provide individual support, cupholders and a dedicated seat for every viewer.';
 export function writer12Fixture({ cabinets = 2, comparison = false, alternatives = false, model = 'C4-1', secondCabinets = 1, weakBass = false } = {}) {
   const versions = [option('a', { savedName: 'Genesis' })];
   if (comparison) versions.push(option('b', { savedName: 'Alternative Design' }));

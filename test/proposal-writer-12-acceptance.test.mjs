@@ -130,13 +130,19 @@ test('G. unsupported bass consistency and reference-position scope remain reject
   replace(f, 'The response at the reference position is consistent across all seats.', 'dynamic_range');
   assert.equal(validate(f).valid, false);
 });
-test('H. Presented Options stays validated, mapped and qualified for listening geometry', () => {
+test('H. Presented Options stays validated, mapped and practical, with no acoustic-performance mandate', () => {
   const f = writer12Fixture({ alternatives: true, comparison: true }); const r = validateCompleteDocument(f);
   assert.equal(validate(f).valid, true, JSON.stringify(validate(f).violations));
   assert.equal(r.valid, true, JSON.stringify(r.errors));
   assert.equal(r.options_text, PRACTICAL);
-  assert(r.document_sections.find(s => s.section_type === 'presented_options').body.includes('listening positions'));
-  assert(source('base44/shared/proposalWriter/writerContractSchema.js').includes('relevant room geometry are maintained'));
+  assert(r.document_sections.find(s => s.section_type === 'presented_options').body.includes('comfort'));
+  const contract = source('base44/shared/proposalWriter/writerContractSchema.js');
+  // The mandate is gone: no allowed claim establishes that a change of seating
+  // furniture leaves acoustic performance unchanged, so the contract never asks
+  // the writer for it, and the section presents practical alternatives instead.
+  assert(!contract.includes('acoustic performance is unchanged'));
+  assert(!contract.includes('relevant room geometry are maintained'));
+  assert(contract.includes('the options give identical, unchanged or equivalent acoustic performance'));
 });
 test('I. historical inputs gain no new rejection and existing records remain byte-identical', () => {
   const saved = JSON.parse(source('test/fixtures/marqueeLiveGeneration.json')); const before = JSON.stringify(saved);

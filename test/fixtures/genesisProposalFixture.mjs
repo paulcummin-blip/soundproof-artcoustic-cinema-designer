@@ -90,7 +90,7 @@ export const GENESIS_SECTIONS = [
   {
     section_type: 'presented_options',
     title: 'Presented Options',
-    body: '<p>Formal cinema seating brings reclining seats and cupholders; relaxed sofas create a more informal setting and allow more flexible seating. Either arrangement works within the seating positions specified for this design, so the choice comes down to comfort and personal preference; predicted acoustic performance is unchanged provided the assessed listening positions and relevant room geometry are maintained.</p>',
+    body: '<p>Formal cinema seating brings motorised reclining seats and cupholders, while relaxed sofas create an informal arrangement that lets the seating be reconfigured to suit the room. Either option works within the seating positions specified for this design, so the choice comes down to comfort, style and personal preference.</p>',
   },
   {
     section_type: 'appendix',
