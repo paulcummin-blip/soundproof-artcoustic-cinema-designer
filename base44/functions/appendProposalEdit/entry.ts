@@ -3,9 +3,11 @@ import { createEditHistory } from '../../shared/proposalEdit/proposalEditReposit
 import { editEntityPayload } from '../../shared/proposalEdit/proposalEditEntity.js';
 import {
   composeEditedSections,
+  frozenProposalMode,
   generatedSectionsOf,
   resolveEditorLayer,
 } from '../../shared/proposalEdit/proposalEditEditorModel.js';
+import { plainIssues } from '../../shared/proposalEdit/proposalEditEditorCopy.js';
 import { EDIT_SOURCE, EDIT_SOURCES, EDIT_VALIDATION_STATUS } from '../../shared/proposalEdit/editStatuses.js';
 
 /**
@@ -113,6 +115,10 @@ export default async function(req) {
       validation_status: record.validation_status,
       valid: record.validation_status === EDIT_VALIDATION_STATUS.VALID,
       validation_errors: record.validation_errors,
+      // The reasons as the designer reads them. The codes, rule IDs and section
+      // IDs the validation filed stay in validation_errors, which is the record's
+      // own evidence and is never rendered as it was filed.
+      plain_issues: plainIssues(record.validation_errors, frozenProposalMode(generation)),
       edited_at: record.edited_at,
       record: created,
     });

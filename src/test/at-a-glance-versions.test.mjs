@@ -15,13 +15,18 @@
 //   TEST 4  the single-version facts that would stand in for both are not used
 //   TEST 5  a single version (or no table) keeps the page's single-system form
 //   TEST 6  the page and the pack actually pass the comparison in
+//   TEST 7  a single-design page states no design version, the comparison names
+//           its own
 // ---------------------------------------------------------------------------
 import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 
-import { buildComparisonGlance } from '../components/proposal/print/atAGlanceVersions.js';
+import {
+  buildComparisonGlance,
+  singleDesignProjectCards,
+} from '../components/proposal/print/atAGlanceVersions.js';
 
 const ROOT = path.resolve(process.cwd());
 const read = (relative) => fs.readFileSync(path.join(ROOT, relative), 'utf8');
@@ -118,4 +123,38 @@ test('TEST 6 — the at-a-glance page and the pack pass the comparison in', () =
   assert.match(pack, /comparisonRows=\{comparisonRows\}/, 'the pack hands the comparison rows to the page');
   assert.match(pack, /comparisonVersions=\{comparisonVersions\}/, 'and the option columns');
   assert.match(pack, /\|\| hasComparisonGlance/, 'a comparison page is not skipped when the other groups are empty');
+});
+
+// ── TEST 7 — the version card follows the report type ──────────────────────
+test('TEST 7 — a single-design page states no design version, and a comparison names its own', () => {
+  // The single-design page keeps the project, the client, the reference and the
+  // date, and states no design version: the version slot, its number and the saved
+  // name are internal identity, not something a client reads.
+  const single = singleDesignProjectCards(PROJECT_CARDS);
+  assert.deepEqual(
+    single.map((card) => card.label),
+    ['Project', 'Client', 'Project reference', 'Prepared date'],
+    'the version card is not printed and every other project fact is kept',
+  );
+  const singleValues = single.map((card) => card.value);
+  assert.ok(!singleValues.includes('Level 1 version'), 'no saved version name is stated');
+  assert.ok(!singleValues.includes('Original Design') && !singleValues.includes('Version 1'),
+    'no original-design or slot wording is stated');
+  assert.deepEqual(singleDesignProjectCards([]), [], 'no cards, nothing to print');
+  assert.deepEqual(singleDesignProjectCards(null), []);
+
+  // A comparison states the designs it compares, each in its own block, so its own
+  // project cards are what the page prints.
+  const comparison = build();
+  assert.deepEqual(comparison.versionGroups.map((group) => group.name), ['Level 1 version', 'Level 4 version']);
+  assert.ok(!comparison.projectCards.map((card) => card.label).includes('Design version'),
+    'a comparison names its versions per block instead of once on the page');
+
+  // The page applies the rule by report type, from the one shared authority.
+  const page = read('src/components/proposal/print/AtAGlancePage.jsx');
+  assert.match(
+    page,
+    /isComparison \? comparison\.projectCards : singleDesignProjectCards\(base\.projectCards\)/,
+    'the single-design page prints the rule\'s cards',
+  );
 });

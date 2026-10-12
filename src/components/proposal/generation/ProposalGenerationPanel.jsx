@@ -22,6 +22,13 @@
  * is resolved by the server with the copy layer, so nothing in this panel can
  * switch it on.
  *
+ * The generation's own diagnostics are NOT here. The model and provider, the
+ * prompt version, the fingerprints, the record IDs and the report-snapshot counts
+ * are internal evidence, and reading them is an administrative task: the server
+ * sends that audit block to a master admin only, and the administrative
+ * diagnostics view is the one surface that asks for it. This panel — the editor a
+ * dealer uses — shows the copy, its status and its plain-language issues.
+ *
  * Props:
  * - proposal: the saved proposal record
  * - readOnly: the proposal is archived
@@ -30,7 +37,7 @@
  */
 
 import React, { useEffect, useState } from 'react';
-import { ChevronDown, ChevronRight, History, PenLine } from 'lucide-react';
+import { ChevronDown, ChevronRight, PenLine } from 'lucide-react';
 import { useAuth } from '@/lib/AuthContext';
 import { isMasterAdmin } from '@/lib/accountAccess';
 import {
@@ -41,7 +48,6 @@ import useProposalEditLayer from './useProposalEditLayer';
 import ProposalEditStatusBanner from './ProposalEditStatusBanner';
 import ProposalEditFields from './ProposalEditFields';
 import ProposalEditCopyPreview from './ProposalEditCopyPreview';
-import ProposalEditAuditPanel from './ProposalEditAuditPanel';
 import ProposalWriteAction from './ProposalWriteAction';
 
 const STRIP = {
@@ -91,7 +97,6 @@ export default function ProposalGenerationPanel({ proposal, readOnly = false, on
   const masterAdmin = isMasterAdmin(user);
 
   const [showCopy, setShowCopy] = useState(false);
-  const [showAudit, setShowAudit] = useState(false);
 
   const blockReason = error || (loading || layer?.proposal_id !== proposal?.id ? 'Checking complete proposal…' : (layer?.export_blocked_reason || null));
 
@@ -138,18 +143,6 @@ export default function ProposalGenerationPanel({ proposal, readOnly = false, on
               <PenLine style={{ width: 14, height: 14 }} />
               {showCopy ? 'Close copy editor' : 'Edit copy'}
             </button>
-
-            {layer.audit && (
-              <button
-                type="button"
-                onClick={() => setShowAudit((open) => !open)}
-                style={TOGGLE}
-                aria-expanded={showAudit}
-              >
-                <History style={{ width: 14, height: 14 }} />
-                {showAudit ? 'Hide audit' : 'Audit'}
-              </button>
-            )}
           </div>
         )}
       </ProposalEditStatusBanner>
@@ -185,8 +178,6 @@ export default function ProposalGenerationPanel({ proposal, readOnly = false, on
           />
         </>
       )}
-
-      {showAudit && layer.audit && <ProposalEditAuditPanel audit={layer.audit} />}
 
       {layer.mode === 'no_valid_generation' && (
         <div style={{ ...STRIP, background: '#FFFFFF' }}>

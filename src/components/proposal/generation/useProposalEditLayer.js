@@ -83,7 +83,10 @@ export default function useProposalEditLayer({ proposalId = null, draftProposalI
         ok: true,
         valid: data.valid === true,
         status: data.validation_status,
-        issues: data.validation_errors || [],
+        // The reasons as the designer reads them. The validation result itself is
+        // unchanged and stays in the record; its codes, rule IDs and section IDs
+        // are not rendered.
+        issues: data.plain_issues || [],
         editNumber: data.edit_number ?? null,
       });
       await load();

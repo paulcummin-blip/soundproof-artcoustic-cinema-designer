@@ -1,14 +1,16 @@
 /**
  * ProposalEditAuditPanel
  * ----------------------
- * The audit view of a proposal's generated copy: which generation it came from —
- * its version, status, writer, contract version and fingerprints — and every edit
- * saved against it, with its validation status, the person who saved it, when, and
- * the fingerprints the record was filed under.
+ * The administrative diagnostics of a proposal's generated copy: which generation
+ * it came from — its version, status, writer, contract version and fingerprints —
+ * and every edit saved against it, with its validation status, the person who saved
+ * it, when, and the fingerprints the record was filed under.
  *
- * It renders the audit block the server resolved, and that block is returned only
- * to an authorised editor. It is never mounted on a client-facing page: a client
- * report shows the copy, never the machinery behind it.
+ * It renders the audit block the server resolved, and that block is returned to a
+ * master admin only. The administrative diagnostics view mounts it; it is
+ * deliberately NOT part of the Proposal Editor, where a dealer reads the copy, its
+ * status and its plain-language issues instead. It is never mounted on a
+ * client-facing page either.
  *
  * Props:
  * - audit: { generation, edits }
@@ -76,10 +78,11 @@ export default function ProposalEditAuditPanel({ audit }) {
   return (
     <div style={{ background: COLORS.card, borderTop: `1px solid ${COLORS.border}`, padding: '20px 24px' }}>
       <h3 style={{ margin: 0, fontFamily: FONT_HEADING, fontSize: 15, fontWeight: 400, color: COLORS.primary }}>
-        Audit
+        Generation diagnostics
       </h3>
       <p style={{ margin: '4px 0 12px', fontFamily: FONT_BODY, fontSize: 12, color: COLORS.muted }}>
-        Visible to designers and admins only. It is never shown on a client-facing proposal.
+        Administrative diagnostics. These identifiers and counts belong to the record rather than to the document:
+        they are not part of the Proposal Editor and are never shown on a client-facing proposal.
       </p>
 
       <dl style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '10px 18px', margin: 0 }}>

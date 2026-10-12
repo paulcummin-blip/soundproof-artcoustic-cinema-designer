@@ -25,7 +25,7 @@ import ProposalPageHeader from '@/components/proposal/print/ProposalPageHeader';
 import ProposalFactCards from '@/components/proposal/print/ProposalFactCards';
 import ProposalProductTable from '@/components/proposal/print/ProposalProductTable';
 import { buildAtAGlance } from '@/components/proposal/print/proposalPackAuthority';
-import { buildComparisonGlance } from '@/components/proposal/print/atAGlanceVersions';
+import { buildComparisonGlance, singleDesignProjectCards } from '@/components/proposal/print/atAGlanceVersions';
 
 export default function AtAGlancePage({
   number,
@@ -54,7 +54,13 @@ export default function AtAGlancePage({
   // A comparison states the room once and each version in its own block: the
   // single-version screen, seating, viewing and package are not printed, because
   // they belong to one version and this page covers all of them.
-  const projectCards = isComparison ? comparison.projectCards : base.projectCards;
+  //
+  // The same distinction decides the version card. A comparison names the designs
+  // it compares in their own blocks, so its own cards are printed; a page that
+  // presents ONE design states no design version at all — the version slot, its
+  // number and its saved name are internal identity. The proposal's own report
+  // TYPE decides this, never how many versions the project happens to hold.
+  const projectCards = isComparison ? comparison.projectCards : singleDesignProjectCards(base.projectCards);
   const roomCards = isComparison ? comparison.roomCards : base.roomCards;
 
   const isEmpty = projectCards.length === 0

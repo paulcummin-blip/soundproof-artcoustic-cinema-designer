@@ -19,9 +19,11 @@ import { GPT_WRITER_FLAG_FIELD, gptWriterClientState, resolveGptWriterFlag } fro
  *
  * The audit block — the generation version, every edit, its validation status,
  * who saved it, when, and the fingerprints each record was filed under — is
- * returned only to an authorised editor (a master admin, or an account with Sound
- * Proof access). A client login receives the model without any audit detail, and
- * no client-facing page ever asks for it.
+ * returned to a MASTER ADMIN only, and it is the administrative diagnostics view
+ * that asks for it. The Proposal Editor is never given it, so the model, provider,
+ * prompt version, fingerprints, record IDs and report-snapshot counts cannot
+ * appear in a dealer's editor, and a client login receives the model without any
+ * audit detail at all. The records are untouched: the same history is read.
  *
  * The Phase 6 GPT writer flag is resolved here too, from SystemConfig and for
  * this login only, and returned as a resolved state: whether the action may be
@@ -42,8 +44,12 @@ export default async function(req) {
     }
 
     const accessContext = await resolveAccountAccess(base44, user);
-    const canViewAudit = accessContext?.allowed === true
-      && (accessContext.isMasterAdmin === true || accessContext.capabilities?.soundProof === true);
+    // Diagnostics are administrative, so only a master admin is given the audit
+    // block — not an account with Sound Proof access, and not merely because a
+    // login holds an administrator account. A dealer's editor is never sent the
+    // generation's model, provider, prompt version, fingerprints or record IDs, so
+    // it cannot show them even by accident.
+    const canViewAudit = accessContext?.allowed === true && accessContext.isMasterAdmin === true;
 
     const query = proposal_id ? { proposal_id } : { draft_proposal_id };
 

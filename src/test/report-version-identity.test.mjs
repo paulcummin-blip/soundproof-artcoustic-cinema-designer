@@ -9,7 +9,8 @@
 //   TEST 5  The first-page line is one line, and never invents a client/reference
 //   TEST 6  Neither report page can build a version-less filename or line
 //   TEST 7  Proposal Centre states the version its report status belongs to
-//   TEST 8  A System Design Summary states the exact saved version name
+//   TEST 8  A System Design Summary states no version on its cover, and still
+//           names the saved version in its filename
 //   TEST 9  A System Design Comparison names every version
 //   TEST 10 The saved version name is read on every report load route
 // ---------------------------------------------------------------------------
@@ -210,7 +211,7 @@ test('TEST 7 — Proposal Centre states which version each report status belongs
 });
 
 // ── TEST 8 — a System Design Summary ───────────────────────────────────────
-test('TEST 8 — a System Design Summary states the exact saved version name on its cover and in its filename', () => {
+test('TEST 8 — a System Design Summary states no version on its cover, and names it in its filename', () => {
   const versionNames = [LEVEL_4.name];
 
   assert.equal(buildProposalVersionSegment(versionNames), 'Level 4 version');
@@ -220,14 +221,25 @@ test('TEST 8 — a System Design Summary states the exact saved version name on 
       + ' - 34 AR - Level 4 version',
   );
 
-  // The cover says "Version" and the stored name, never a generic slot label.
+  // The DESIGN VERSION is not on a single-design cover: no version slot, no slot
+  // number and no saved name — even where the project holds several saved versions.
+  // The report TYPE decides it, never how many names are available to print.
   const block = read('src/components/proposal/cover/CoverVersionBlock.jsx');
-  assert.ok(block.includes("comparing ? 'Comparing' : 'Version'"), 'one version is labelled Version');
-  assert.ok(block.includes('{name}'), 'the saved name is printed exactly as stored');
+  assert.ok(block.includes('{name}'), 'a comparison prints each saved name exactly as stored');
+  assert.ok(block.includes("comparing ? 'Comparing' : 'Version'"), 'a comparison is labelled Comparing');
+  assert.ok(block.includes('comparing: comparingProp = null'), 'the report type is supplied by the cover');
 
   const cover = read('src/components/proposal/cover/ProposalCoverPage.jsx');
-  assert.ok(cover.includes('<CoverVersionBlock versionNames={versionNames} />'),
-    'the cover page renders the version block');
+  assert.ok(cover.includes("const isComparison = proposalType === 'comparison';"),
+    'the cover decides version identity from the report type');
+  assert.ok(cover.includes('{isComparison && versionNames.length > 0 && ('),
+    'a single-design cover renders no version block at all');
+  assert.equal(cover.includes('<CoverVersionBlock versionNames={versionNames} />'), false,
+    'no cover renders the version block for every proposal type');
+  assert.ok(read('src/components/proposal/print/ProposalPackDocument.jsx').includes('proposalType={reportType}'),
+    'the printed pack states the report type to its cover');
+  assert.ok(read('src/pages/ProposalEditor.jsx').includes('proposalType={proposal?.proposal_type}'),
+    'the on-screen editor states the same report type to its cover');
 
   // The on-screen cover, the printed pack and the exported filename are given
   // the same saved names, so they cannot state different versions.
@@ -277,10 +289,18 @@ test('TEST 9 — a System Design Comparison names every version, on the cover an
     'Sound Proof - Artcoustic Cinema Designer - System Design Comparison - Sound Proof - Marquee Home - 34 AR',
   );
 
-  // Several versions are listed one per line under a "Comparing" label.
+  // Several versions are listed one per line under a "Comparing" label, and that
+  // heading follows the report TYPE rather than the number of names available.
   const block = read('src/components/proposal/cover/CoverVersionBlock.jsx');
   assert.ok(block.includes("comparing ? 'Comparing' : 'Version'"), 'the label switches to Comparing');
   assert.ok(block.includes('names.map'), 'every selected version is listed by name');
+  assert.ok(block.includes("typeof comparingProp === 'boolean' ? comparingProp : names.length > 1"),
+    'the comparison heading is driven by the report type');
+  assert.ok(
+    read('src/components/proposal/cover/ProposalCoverPage.jsx')
+      .includes('<CoverVersionBlock versionNames={versionNames} comparing />'),
+    'a comparison cover identifies every selected version',
+  );
 });
 
 // ── TEST 10 — every load route states the saved version name ───────────────

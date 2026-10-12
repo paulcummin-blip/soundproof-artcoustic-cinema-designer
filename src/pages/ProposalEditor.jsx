@@ -886,9 +886,12 @@ export default function ProposalEditor() {
 
       {/* ── Centre: The document ── */}
       <div className="flex-1 overflow-y-auto">
-        {/* The generated copy: its status, the wording an editor may change, the
-            copy as the client reads it and the audit behind it. A proposal with
-            no generation history is stated as legacy and is never blocked. */}
+        {/* The generated copy: its status, the wording an editor may change and the
+            copy as the client reads it. The generation's own diagnostics are not
+            part of this workspace — they live in the administrative diagnostics
+            view, which is the only surface the server sends the audit block to. A
+            proposal with no generation history is stated as legacy and is never
+            blocked. */}
         <ProposalGenerationPanel
           proposal={proposal}
           readOnly={archived}

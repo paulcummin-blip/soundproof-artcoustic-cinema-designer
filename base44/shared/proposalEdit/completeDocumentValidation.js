@@ -1,4 +1,5 @@
 import { latestValidGeneration } from '../proposalGeneration/proposalGenerationHistory.js';
+import { blockedReasonSentence } from './proposalEditEditorCopy.js';
 import { proposalIssueGate, renderableProposalCopy } from './proposalEditHistory.js';
 import { contractSectionsOf } from '../proposalWriter/writerContractSchema.js';
 import { validateWriterOutput } from '../proposalWriter/writerOutputValidator.js';
@@ -138,7 +139,16 @@ export function validateCompleteDocument({ proposal, sections = [], generationRe
       if (register) errors.push({ code: 'validation_register', section: row.section, detail: register.rule });
     }
   }
+  // The reason shown for a blocked document is stated in the designer's words.
+  // The validation result itself is untouched: every rejection stays in `errors`
+  // exactly as it was filed, and this only decides which sentence is shown for the
+  // first one — so a rule ID, a section ID or a version ID cannot reach the editor,
+  // or the reason an export reports.
+  const documentMode = input?.section_structure?.proposal_mode === 'single' ? 'single' : 'comparison';
   return { valid: errors.length === 0, errors, generation_id: generation?.generation_id || null,
     edit_id: selected.edit_id, options_text: safeOptionsText, options_required: optionsRequired,
-    document_sections: published, blocked_reason: errors.length ? (errors[0].detail || 'The complete proposal did not pass its evidence checks.') : null };
+    document_sections: published,
+    blocked_reason: errors.length
+      ? (blockedReasonSentence(errors[0], documentMode) || 'The complete proposal did not pass its evidence checks.')
+      : null };
 }

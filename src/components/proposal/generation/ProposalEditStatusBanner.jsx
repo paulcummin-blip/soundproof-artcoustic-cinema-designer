@@ -102,13 +102,13 @@ export default function ProposalEditStatusBanner({ layer, children = null, maste
             </ul>
           )}
 
+          {/* The reasons a copy could not be used, each stated once. The attempt's
+              own number and record id are the record's history, not the designer's
+              status, so they are not printed here. */}
           {layer.failures?.length > 0 && (
             <ul style={{ ...TEXT, color: palette.text, margin: '8px 0 0', paddingLeft: 18 }}>
-              {layer.failures.slice(0, 3).map((failure) => (
-                <li key={failure.generation_id}>
-                  {`Attempt v${failure.generation_number ?? '—'}: ${failure.sentence}`}
-                </li>
-              ))}
+              {[...new Set(layer.failures.map((failure) => failure.sentence))].slice(0, 3)
+                .map((sentence) => <li key={sentence}>{sentence}</li>)}
             </ul>
           )}
 

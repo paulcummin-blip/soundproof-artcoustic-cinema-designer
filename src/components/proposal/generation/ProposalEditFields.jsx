@@ -150,14 +150,11 @@ export default function ProposalEditFields({
         </p>
       )}
 
+      {/* What the save needs attention on, as plain sentences: no rejection code,
+          rule ID or section ID is ever rendered here. */}
       {lastSave?.ok && !lastSave.valid && lastSave.issues?.length > 0 && (
         <ul style={{ margin: '8px 0 0', paddingLeft: 18, fontFamily: FONT_BODY, fontSize: 13, color: COLORS.review, lineHeight: 1.55 }}>
-          {lastSave.issues.map((entry) => (
-            <li key={`${entry.code}-${entry.section}-${entry.detail}`}>
-              {entry.section ? `${entry.section}: ` : ''}
-              {entry.detail || entry.code}
-            </li>
-          ))}
+          {lastSave.issues.map((line) => <li key={line}>{line}</li>)}
         </ul>
       )}
 

@@ -16,7 +16,8 @@
  *                                output — the same rule the render and the export
  *                                use, so the screen and the PDF cannot disagree
  *   what may be edited           the contract's nine sections, in the contract's
- *                                order, each with its text and word limit
+ *                                order, each with its text, its word limit and the
+ *                                heading its own mode reads under
  *   whether it may be issued     the shared Phase 3 + Phase 4 gate, unchanged
  *   how it reads to a designer   plain-language status, issues and block reason
  *   what the audit shows         the generation and every edit, for authorised
@@ -27,8 +28,8 @@
  */
 
 import {
-  WRITER_SECTIONS,
   WRITER_SECTION_IDS,
+  writerSectionsForMode,
 } from '../proposalWriter/writerContractSchema.js';
 import { GENERATION_STATUS } from '../proposalGeneration/generationStatuses.js';
 import {
@@ -73,10 +74,18 @@ const EDIT_SOURCE_LABEL = Object.freeze({
   [EDIT_SOURCE.REVERT]: 'Reverted',
 });
 
-/** The nine contract sections as editable fields, in the contract's order. */
-export function editableSectionFields(sections) {
+/**
+ * The nine contract sections as editable fields, in the contract's order.
+ *
+ * The headings are the contract's own names for the mode the copy was written
+ * under: a single-design copy reads Design Overview and Why This Specification
+ * where a comparison reads What Stays the Same and What Changes. The section IDs,
+ * their order and their word limits are identical in both modes, so the stored
+ * copy and its grounding are the same either way.
+ */
+export function editableSectionFields(sections, mode = 'comparison') {
   const list = Array.isArray(sections) ? sections : [];
-  return WRITER_SECTIONS.map((def) => {
+  return writerSectionsForMode(mode).map((def) => {
     const found = list.find((entry) => entry?.section === def.section) || null;
     return {
       section: def.section,
@@ -140,6 +149,23 @@ export function composeEditedSections({
       claim_ids: [...claimIds],
     };
   });
+}
+
+/**
+ * The mode the copy was written under, read from the FROZEN generation rather
+ * than from the proposal's present type: a copy's headings are the agreement it
+ * was written under, so re-typing a proposal can never relabel copy that has
+ * already been approved. A generation filed before the mode was recorded keeps
+ * the comparison labels it was written with.
+ *
+ * @param {Object} generation — the generation whose copy is being read
+ * @returns {'single'|'comparison'}
+ */
+export function frozenProposalMode(generation) {
+  const mode = generation?.gpt_input?.section_structure?.proposal_mode
+    || generation?.evidence_pack?.mode
+    || null;
+  return mode === 'single' ? 'single' : 'comparison';
 }
 
 /** Why a copy cannot be issued, in the designer's words. */
@@ -268,6 +294,8 @@ export function resolveEditorLayer({
     };
   }
 
+  // The headings the copy is read under are the ones it was written under.
+  const proposalMode = frozenProposalMode(generation);
   const edits = editsForGeneration(editRecords, generation.generation_id);
   const copy = renderableProposalCopy({ generation, edits });
   const gate = proposalIssueGate({
@@ -290,7 +318,7 @@ export function resolveEditorLayer({
     message: null,
     generation: { generation_id: generation.generation_id },
     generation_status: generationStatusOf(generation, generations),
-    fields: editableSectionFields(copy.copy),
+    fields: editableSectionFields(copy.copy, proposalMode),
     copy: { source: copy.source, sections: copy.copy },
     export_source: copy.source,
     export_sections: copy.copy,
@@ -313,7 +341,7 @@ export function resolveEditorLayer({
         status: blockingEdit.validation_status,
       }
       : null,
-    blocked_issues: blockingEdit ? plainIssues(blockingEdit.validation_errors) : [],
+    blocked_issues: blockingEdit ? plainIssues(blockingEdit.validation_errors, proposalMode) : [],
     failures,
     // The copies a revert may restore: the original generated copy, and every
     // edit that passed validation. An invalid copy is never offered as a target.
