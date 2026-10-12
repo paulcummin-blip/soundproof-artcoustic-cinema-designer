@@ -274,4 +274,60 @@ export function buildGenerationRecord(attempt = {}) {
   return deepFreeze(record);
 }
 
+/**
+ * The audit record for an attempt that did NOT become a valid generation.
+ *
+ * Such an attempt was made against a proposal that is rolled back — the designer
+ * is left with no proposal at all — so the attempt is filed on the DRAFT identity
+ * it was written under: its temporary proposal id, and no proposal id. Nothing is
+ * then left pointing at a proposal that no longer exists.
+ *
+ * It is built by the same builder, from the frozen fields of the completed record,
+ * so the generation ID and the record fingerprint follow the identity the record
+ * is actually stored under. The completed record is never touched: this is a
+ * second, independent record of the same attempt, made for the failed outcome,
+ * and its own ID and fingerprint stay exactly as they were.
+ *
+ * @param {Object} record — the completed attempt record (valid or not)
+ * @param {Object} input
+ * @param {string} input.draftProposalId — the temporary proposal id it was written for
+ * @returns {Object} the frozen record to store for the rejected attempt
+ */
+export function draftAttemptRecord(record, { draftProposalId = null } = {}) {
+  if (!record || typeof record !== 'object' || !record.generation_id) {
+    throw new Error('A rejected attempt is rebuilt from the completed attempt record.');
+  }
+  if (!draftProposalId) {
+    throw new Error('A rejected attempt is filed on the draft proposal it was written for.');
+  }
+  if (record.status === GENERATION_STATUS.VALID_GENERATED) {
+    throw new Error(
+      'A valid generation is filed on the proposal that carries its copy; only an attempt that produced no valid generation is filed on its draft identity.',
+    );
+  }
+
+  return buildGenerationRecord({
+    proposalId: null,
+    draftProposalId,
+    projectId: record.project_id,
+    accountId: record.account_id,
+    proposalType: record.proposal_type,
+    selectedVersionIds: record.selected_version_ids,
+    pack: record.evidence_pack,
+    writerInput: record.gpt_input,
+    output: record.gpt_output,
+    validation: record.validation_result,
+    providerError: record.provider_error,
+    provider: record.provider,
+    model: record.model,
+    promptVersion: record.prompt_version,
+    schemaVersion: record.schema_version,
+    contractVersion: record.contract_version,
+    createdBy: record.created_by,
+    createdAt: record.created_at,
+    generationNumber: record.generation_number,
+    retryOfGenerationId: record.retry_of_generation_id,
+  });
+}
+
 export default buildGenerationRecord;

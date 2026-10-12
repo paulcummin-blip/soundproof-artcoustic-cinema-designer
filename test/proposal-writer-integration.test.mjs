@@ -150,7 +150,7 @@ test('the live generation path writes with the approved writer authority', () =>
   // The approved writer: its pack, its input, its provider call, its validator
   // and its append-only record — the shared Phase 6 orchestration, unchanged.
   assert.match(live, /runProposalCopyGeneration\(/);
-  assert.match(live, /generationEntityPayload\(\{ record: attempt\.record/);
+  assert.match(live, /generationEntityPayload\(\{ record: auditRecord/);
 
   // The validated copy is published into the proposal's own sections, which is
   // what the editor and the PDF read.
@@ -173,11 +173,15 @@ test('there is no legacy generator and no fallback in the live path', () => {
   assert.match(live, /if \(!attempt\.ok\)/);
   assert.match(live, /if \(attempt\.valid !== true\)/);
   assert.match(live, /WRITER_DRAFT_REJECTED_MESSAGE/);
-  // The record is written only for a draft that passed, so no attempt record is
-  // left pointing at a proposal that was rolled back.
+  // The attempt is filed BEFORE the validity gate, so a copy that failed its
+  // evidence check leaves a record to diagnose rather than nothing at all. It is
+  // written exactly once, and a failed attempt is filed on the draft identity it
+  // was written under — never on the proposal that is rolled back.
   const recordAt = live.indexOf('ProposalGeneration.create');
   const validAt = live.indexOf('if (attempt.valid !== true)');
-  assert.ok(recordAt > validAt, 'the generation record is written before the draft has passed');
+  assert.ok(recordAt > 0 && recordAt < validAt, 'the attempt record is written after the draft has been judged');
+  assert.equal((live.match(/ProposalGeneration\.create\(/g) || []).length, 1);
+  assert.match(live, /draftAttemptRecord\(attempt\.record, \{ draftProposalId: proposal\.id \}\)/);
 });
 
 test('the writer is not gated on the controlled-test flag', () => {

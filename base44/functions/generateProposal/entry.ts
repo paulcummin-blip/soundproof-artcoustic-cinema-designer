@@ -9,6 +9,7 @@ import { resolveSections } from '../../shared/proposalGenerationPrompts.js';
 // proposal record's own sections, so the editor and the PDF read the copy the
 // validator passed rather than a second, separately written draft.
 import { generationEntityPayload } from '../../shared/proposalGeneration/proposalGenerationEntity.js';
+import { draftAttemptRecord } from '../../shared/proposalGeneration/proposalGenerationRecord.js';
 import { runProposalCopyGeneration } from '../../shared/proposalGeneration/proposalGenerationRunner.js';
 import { mergeHighlightRows, selectHighlightRows } from '../../shared/engineeringSnapshotEvidence.js';
 import { composeWriterSectionBodies } from '../../shared/proposalWriter/writerSectionMapping.js';
@@ -463,25 +464,43 @@ export default async function(req) {
       throw new Error(attempt.message);
     }
 
+    // ── The attempt's audit record, filed BEFORE the draft is judged ──
+    // A copy that arrived and broke the writer's own contract is the event a
+    // designer most needs to be able to inspect, so the record is written before
+    // the validity gate rather than after it: a record written only for a draft
+    // that passed leaves the failure with nothing stored to diagnose.
+    //
+    // A generation that passed its contract is filed on the proposal that goes on
+    // to carry its copy, and it is stored exactly once. Anything else — a rejected
+    // draft, a draft awaiting review, a provider that returned nothing — is filed
+    // on the DRAFT identity it was written under: the temporary proposal id, with
+    // no proposal id. The proposal such an attempt belongs to is rolled back
+    // below, so no record is left pointing at a proposal that no longer exists.
+    //
+    // Either way the record comes from the same builder, so its generation ID and
+    // its record fingerprint follow the identity it is actually stored under. The
+    // entity is append-only: nothing here updates or rewrites an earlier attempt,
+    // and a completed record is never mutated to say something else.
+    const auditRecord = attempt.valid === true
+      ? attempt.record
+      : draftAttemptRecord(attempt.record, { draftProposalId: proposal.id });
+    await base44.entities.ProposalGeneration.create(
+      generationEntityPayload({ record: auditRecord, accountId: effectiveAccountId }),
+    );
+
     if (attempt.valid !== true) {
       // The draft arrived and broke the writer's own contract. It is never
-      // published and never replaced by another generator.
+      // published and never replaced by another generator — but it is retained in
+      // full, under the draft identity written above, so the rejection is
+      // diagnosable after the proposal itself has gone.
       const violations = Array.isArray(attempt.validation_errors) ? attempt.validation_errors : [];
       console.error(
-        `[generateProposal] approved writer draft rejected | generation=${attempt.generation_id} `
+        `[generateProposal] approved writer draft rejected | generation=${auditRecord.generation_id} `
         + `status=${attempt.status} provider=${attempt.provider || 'none'} violations=${violations.length} `
         + `first=${violations[0]?.code || 'none'} section=${violations[0]?.section || 'none'}`,
       );
       throw new Error(WRITER_DRAFT_REJECTED_MESSAGE);
     }
-
-    // ── The one appended generation record, linked to this proposal ──
-    // Written only once the draft has passed its own contract, so the record
-    // points at a proposal that really carries the copy it was written for. The
-    // entity is append-only: nothing here updates or rewrites an earlier attempt.
-    await base44.entities.ProposalGeneration.create(
-      generationEntityPayload({ record: attempt.record, accountId: effectiveAccountId }),
-    );
 
     // What the writer was given beyond the pack, logged so a live draft can always
     // be traced to the interpretation and the brief it was written from.
