@@ -20,12 +20,15 @@ import {
   buildHighlightDisplayRows,
 } from '../components/proposal/keyPerformanceHighlightsAuthority.js';
 import {
-  PARAGRAPH_SENTENCE_LIMIT,
-  PROSE_PARAGRAPH_LIMIT,
   countSentences,
-  limitProseParagraphs,
   prepareSectionBody,
 } from '../components/proposal/sectionBodyAuthority.js';
+import {
+  PACK_ONE_PAGE_SELECTORS,
+  PACK_PAGE_BREAK_RULES,
+  PACK_TABLE_FOLLOWS_HEADING_SELECTORS,
+  proposalPackPageBreakCss,
+} from '../components/proposal/print/proposalPageBreakRules.js';
 import {
   HIGH_CHANNEL_LEGACY_CONSTRAINT_SENTENCE,
   HIGH_CHANNEL_PREFERRED_SENTENCE,
@@ -45,6 +48,10 @@ const PACK = read('src/components/proposal/print/ProposalPackStyles.jsx');
 const DOC = read('src/components/proposal/print/ProposalPackDocument.jsx');
 const EDITOR = read('src/pages/ProposalEditor.jsx');
 const WRITING_RULE = read('base44/shared/highChannelDensityRule.js');
+
+/** The one page-break rule a selector is declared in, from the shared authority. */
+const breakRuleFor = (selector) => PACK_PAGE_BREAK_RULES
+  .find((rule) => rule.selectors.includes(selector));
 
 /** The rows the Marquee System Design Summary carries, as stored calculated data. */
 const MARQUEE_ROWS = [
@@ -96,20 +103,23 @@ describe('A. page vertical rhythm and prose type scale', () => {
     expect(PACK).toMatch(/--pp-paragraph-gap: 4\.2mm/);
   });
 
-  it('holds a narrative page to three short paragraphs without touching the stored body', () => {
-    expect(PROSE_PARAGRAPH_LIMIT).toBe(3);
-    expect(PARAGRAPH_SENTENCE_LIMIT).toBe(4);
-
-    const four = '<h2>Overall Design</h2><p>One.</p><p>Two.</p><p>Three.</p><p>Four.</p>';
-    const printed = prepareSectionBody(four, { sectionType: 'overall_design', proseOnly: true });
+  it('publishes every approved paragraph, shortening none of them', () => {
+    // A narrative page carries the whole approved body: more paragraphs, and
+    // longer paragraphs, flow onto the next sheet rather than being dropped or
+    // cut short. Nothing in either preparation limits prose.
+    const body = `<h2>Overall Design</h2>${[1, 2, 3, 4, 5, 6]
+      .map((n) => `<p>Paragraph ${n}. A second sentence that belongs to paragraph ${n}.</p>`)
+      .join('')}`;
+    const printed = prepareSectionBody(body, { sectionType: 'overall_design', proseOnly: true });
     expect(printed).toContain('<h2>Overall Design</h2>');
-    expect(printed).toContain('<p>Three.</p>');
-    expect(printed).not.toContain('<p>Four.</p>');
+    for (let n = 1; n <= 6; n += 1) {
+      expect(printed).toContain(`<p>Paragraph ${n}. A second sentence that belongs to paragraph ${n}.</p>`);
+    }
 
     const longParagraph = `<p>${['One.', 'Two.', 'Three.', 'Four.', 'Five.'].join(' ')}</p>`;
-    const limited = limitProseParagraphs(longParagraph);
-    expect(countSentences(limited)).toBe(4);
-    expect(limited.endsWith('</p>')).toBe(true);
+    expect(countSentences(longParagraph)).toBe(5);
+    expect(prepareSectionBody(longParagraph, { sectionType: 'overall_design', proseOnly: true }))
+      .toContain('Five.');
   });
 });
 
@@ -118,7 +128,22 @@ describe('B. Key Performance Highlights stays on one page', () => {
     expect(PRINT).toMatch(/proposal-print-section--highlights \.pp-header[\s\S]*break-after: avoid/);
     expect(PRINT).toMatch(/proposal-print-section--highlights \.kph-table[\s\S]*break-before: avoid/);
     expect(PRINT).toMatch(/kph-table tr \{\s*break-inside: avoid/);
-    expect(PACK).toMatch(/pp-page--highlights \.kph-table/);
+    // The pack's own table-follows-heading rule lives in the ONE page-break
+    // authority (proposalPageBreakRules.js), and the pack's stylesheet injects
+    // that authority rather than restating the rule inline.
+    expect(PACK).toContain('proposalPackPageBreakCss');
+    expect(PACK_TABLE_FOLLOWS_HEADING_SELECTORS)
+      .toContain('.proposal-print-section--highlights .kph-table');
+    expect(breakRuleFor('.proposal-print-section--highlights .kph-table').declarations)
+      .toMatchObject({ breakBefore: 'avoid', breakInside: 'avoid' });
+    expect(breakRuleFor('.kph-table tr').declarations.breakInside).toBe('avoid');
+    // And the authority really ships: its CSS names both selectors and carries
+    // the declarations they depend on.
+    const authorityCss = proposalPackPageBreakCss();
+    expect(authorityCss).toContain('.proposal-print-section--highlights .kph-table');
+    expect(authorityCss).toContain('.kph-table tr');
+    expect(authorityCss).toMatch(/break-before: avoid/);
+    expect(authorityCss).toMatch(/break-inside: avoid/);
   });
 
   it('compacts the table so the trimmed rows fit, and stays readable', () => {
@@ -180,15 +205,18 @@ describe('B. Key Performance Highlights stays on one page', () => {
       .toBe('L3 · 44° to 63°');
   });
 
-  it('carries no introduction above the table', () => {
-    // The table is self-explanatory, and the introduction was what pushed the
-    // table onto the page after its own title.
+  it('carries the validated introduction once, immediately above the table', () => {
+    // The introduction is approved copy: it is published once, directly above
+    // the table it introduces, and nowhere else.
     expect(DOC).not.toMatch(/shouldPrintHighlightsIntro|showIntro/);
     const highlightsBlock = DOC.slice(
       DOC.indexOf("section.section_type === 'key_performance_highlights'"),
       DOC.indexOf('const evidence =')
     );
-    expect(highlightsBlock).not.toMatch(/pp-body|dangerouslySetInnerHTML|showIntro/);
+    expect(highlightsBlock).toContain('pp-highlights__intro');
+    expect(highlightsBlock).not.toMatch(/showIntro/);
+    expect(highlightsBlock.indexOf('pp-highlights__intro'))
+      .toBeLessThan(highlightsBlock.indexOf('KeyPerformanceHighlightsTable'));
     expect(highlightsBlock).toContain('KeyPerformanceHighlightsTable');
     expect(DOC).toContain('pp-page--highlights proposal-print-section--highlights');
   });
@@ -225,7 +253,12 @@ describe('C. Project Images is a visualisation page', () => {
     expect(PRINT).toMatch(/proposal-print-section--highlights \.pp-header \{\s*margin-bottom: 6mm/);
     // The fact-card page keeps its own one-page rule with a shorter top margin.
     expect(PRINT).toMatch(/proposal-print-section\.pp-page--glance \{\s*padding-top: 16mm/);
-    expect(PACK).toMatch(/pp-page--glance[\s\S]*break-inside: avoid/);
+    // The At a Glance page is kept to one sheet by the ONE page-break
+    // authority, which the pack's stylesheet injects.
+    expect(PACK_ONE_PAGE_SELECTORS).toContain('.pp-page--glance');
+    // Kept to one sheet by the shared authority, which the pack injects.
+    expect(breakRuleFor('.pp-page--glance').declarations.breakInside).toBe('avoid');
+    expect(proposalPackPageBreakCss()).toContain('.pp-page--glance');
   });
 
   it('gives one to eight images clean layouts, always hero first', () => {

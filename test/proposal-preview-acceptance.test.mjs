@@ -77,7 +77,7 @@ const paragraphsOf = (html) => String(html || '')
 
 const sections = genesisSections();
 const optionsCopy = validatedOptionsForGenesis(sections);
-const renderGenesis = () => renderToStaticMarkup(<ProposalPackDocument {...genesisPackProps()} />);
+const renderGenesis = () => renderToStaticMarkup(React.createElement(ProposalPackDocument, genesisPackProps()));
 
 // The Editor prepares a body with the section's own stored title and the
 // design's channel density; the pack prepares it with proseOnly as well. Both
@@ -125,9 +125,16 @@ describe('B. the Key Performance Highlights introduction', () => {
 
     expect(countOf(html, firstSentence)).toBe(1);
     expect(countOf(html, 'pp-highlights__intro')).toBe(1);
-    expect(html.indexOf('pp-highlights__intro')).toBeGreaterThan(-1);
-    // The introduction sits above the table it introduces.
-    expect(html.indexOf('pp-highlights__intro')).toBeLessThan(html.indexOf('kph-table'));
+
+    // Inside the highlights page the introduction sits above the table it
+    // introduces. The check is scoped to the page's own markup because the
+    // document's stylesheet, printed earlier, names the same classes.
+    const page = html.indexOf('class="proposal-print-section pp-page pp-page--highlights');
+    const next = html.indexOf('class="proposal-print-section', page + 10);
+    const block = html.slice(page, next > page ? next : undefined);
+    expect(page).toBeGreaterThan(-1);
+    expect(block.indexOf('pp-highlights__intro')).toBeGreaterThan(-1);
+    expect(block.indexOf('pp-highlights__intro')).toBeLessThan(block.indexOf('kph-table'));
   });
 });
 
@@ -183,8 +190,14 @@ describe('E / F. the seating alternatives and their explanation', () => {
   it('prints the validated explanation exactly once', () => {
     const html = renderGenesis();
     expect(countOf(words(html), words(optionsCopy))).toBe(1);
-    expect(countOf(html, 'Formal Cinema Seating')).toBe(1);
-    expect(countOf(html, 'Relaxed Sofas')).toBe(1);
+    // Each option is stated once, as its caption, and each image prints once:
+    // the label is also the image's alt text, so the caption itself is counted.
+    ['Formal Cinema Seating', 'Relaxed Sofas'].forEach((label) => {
+      expect(countOf(html, `pp-media__caption">${label}<`)).toBe(1);
+    });
+    GENESIS_ASSETS.filter((asset) => asset.comparison_enabled).forEach((asset) => {
+      expect(countOf(html, asset.file_url)).toBe(1);
+    });
   });
 });
 
@@ -312,16 +325,32 @@ describe('K. the read-only preview makes no database write', () => {
     expect(HOOK_SOURCE).toContain("base44.functions.invoke('readProposalEditLayer'");
   });
 
-  it('reads the document through the same read-only layer the editor already uses', () => {
-    expect(EDITOR_SOURCE).toContain("base44.functions.invoke('readProposalEditLayer'");
+  it('reads the document through the read-only layer, never a write path', () => {
+    // One read path for the whole document: the export path reads the record
+    // layer through the read-only server action, and the action it asks for is
+    // the one the mode dictates.
+    expect(HOOK_SOURCE).toContain("base44.functions.invoke('readProposalEditLayer'");
+    expect(HOOK_SOURCE).toContain('readLayerAction(mode)');
+    // The editor consumes that one path rather than opening its own.
+    expect(EDITOR_SOURCE).toContain('useProposalExport');
+    // The same read-only layer the rest of the app reads a proposal through.
+    expect(read('../src/components/proposal/generation/useProposalEditLayer.js'))
+      .toContain("base44.functions.invoke('readProposalEditLayer'");
   });
 });
 
 describe('L. preview and export compose the same document', () => {
   it('mounts the real pack once, for both modes', () => {
-    expect(ProposalPrintDocument.toString()).toContain('ProposalPackDocument');
+    // One composition for both actions: the print document portals the real
+    // pack, and the editor mounts that single composition once. There is no
+    // second preview renderer to drift from it.
+    const printDocument = read('../src/components/proposal/export/ProposalPrintDocument.jsx');
+    expect(printDocument)
+      .toContain("import ProposalPackDocument from '@/components/proposal/print/ProposalPackDocument'");
+    expect(printDocument).toContain('<ProposalPackDocument {...props} />');
     expect(countOf(EDITOR_SOURCE, '<ProposalPrintDocument')).toBe(1);
-    expect(EDITOR_SOURCE).toContain('<ProposalPrintStyles />');
+    expect(countOf(EDITOR_SOURCE, '<ProposalPrintStyles />')).toBe(1);
+    expect(typeof ProposalPrintDocument).toBe('function');
   });
 
   it('runs one preparation path, with the mode deciding only whether it issues', () => {
@@ -342,7 +371,7 @@ describe('M. saved proposals are never rewritten', () => {
   it('leaves the stored section records untouched through composition', () => {
     const stored = genesisSections();
     const before = JSON.stringify(stored);
-    renderToStaticMarkup(<ProposalPackDocument {...genesisPackProps()} sections={stored} />);
+    renderToStaticMarkup(React.createElement(ProposalPackDocument, { ...genesisPackProps(), sections: stored }));
     orderPublicationSections({ sections: stored, proposalType: 'system_summary' });
     expect(JSON.stringify(stored)).toBe(before);
   });

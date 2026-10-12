@@ -1,10 +1,9 @@
 /**
  * proposal-publication-integrity.test.mjs
  * ---------------------------------------
- * Fixtures for the proposal publication integrity correction. Plain node script
- * (no test runner), so it can be executed directly:
+ * Fixtures for the proposal publication integrity correction, run under vitest:
  *
- *   node test/proposal-publication-integrity.test.mjs
+ *   npx vitest run test/proposal-publication-integrity.test.mjs
  *
  * Covers:
  *   A  random database section order      -> canonical publication order
@@ -20,6 +19,7 @@
  */
 
 import assert from 'node:assert/strict';
+import { it } from 'vitest';
 import { validateCompleteDocument } from '../base44/shared/proposalEdit/completeDocumentValidation.js';
 import { orderPublicationSections as orderServer } from '../base44/shared/proposalEdit/publicationOrder.js';
 import {
@@ -37,15 +37,8 @@ import {
 } from '../src/components/proposal/highChannelLayoutAuthority.js';
 import { completeFixture, PRIVATE_NOTE } from './fixtures/completeDocumentFixtures.mjs';
 
-const results = [];
-function test(name, run) {
-  try {
-    run();
-    results.push({ name, ok: true });
-  } catch (error) {
-    results.push({ name, ok: false, error: error?.message || String(error) });
-  }
-}
+// Vitest is the supported runner: every fixture below is one test, and a
+// failure is reported as itself rather than as a collected row.
 
 // The exact validated sentence from the Genesis AV generation, and the stored
 // body it was published into.
@@ -53,7 +46,7 @@ const CENTRE_SENTENCE = 'At the front, Q6-3 speakers serve left and right, while
 const GENESIS_SUMMARY_BODY = '<h2>Design Summary</h2><p>Voices and effects retain their tonal character as they travel from the screen to the surrounds and overhead, helping the soundtrack feel coherent as it moves around the room. The 115" TV and 9.1.6 layout bring that sound into a dedicated cinema setting, with four subwoofers specified for physical low-frequency impact.</p><h2>Design Overview</h2><p>The room is arranged around a 115" TV and a 9.1.6 sound system, with six overhead speakers and four subwoofers supporting effects above and around the audience. ' + CENTRE_SENTENCE + '</p><h2>Why This Specification</h2><p>Sound can move above and around the audience rather than remaining at the picture; this movement is supported by the 9.1.6 layout, including six overhead speakers and four subwoofers.</p>';
 
 // ── D. The centre-channel sentence survives publication preparation ──────────
-test('D. centre-channel sentence survives high-channel publication preparation', () => {
+it('D. centre-channel sentence survives high-channel publication preparation', () => {
   const prepared = preparePublishedSectionBody(GENESIS_SUMMARY_BODY, {
     title: 'System Design Summary',
     sectionType: 'system_design_summary',
@@ -66,14 +59,14 @@ test('D. centre-channel sentence survives high-channel publication preparation',
     'the cleaner must not delete the design\'s own centre channel');
 });
 
-test('D2. a genuine middle-pair upgrade is still removed by the rule', () => {
+it('D2. a genuine middle-pair upgrade is still removed by the rule', () => {
   const upgrade = '<p>If greater overhead movement becomes a priority later, the natural upgrade would be a middle overhead pair.</p>';
   assert.equal(mentionsHighChannelUpgrade(upgrade), true, 'the rule must still catch an added middle pair');
   assert.equal(stripHighChannelUpgradeCopy(upgrade).includes('middle overhead pair'), false,
     'the upgrade sentence must not be published');
 });
 
-test('D3. required published content check passes for the Genesis body', () => {
+it('D3. required published content check passes for the Genesis body', () => {
   const prepared = preparePublishedSectionBody(GENESIS_SUMMARY_BODY, {
     title: 'System Design Summary', sectionType: 'system_design_summary', highChannel: true,
   });
@@ -86,7 +79,7 @@ test('D3. required published content check passes for the Genesis body', () => {
 });
 
 // ── E / F. The publication content check itself ─────────────────────────────
-test('E. a required paragraph missing from the published body is reported', () => {
+it('E. a required paragraph missing from the published body is reported', () => {
   const approved = '<p>The room is arranged around the display and the system.</p><p>At the front, Q6-3 speakers serve left and right, while two C4-1 cabinets reproduce the single centre channel.</p>';
   const published = '<p>The room is arranged around the display and the system.</p>';
   const missing = missingPublishedContent({ approvedHtml: approved, publishedHtml: published, title: 'Design Overview' });
@@ -94,7 +87,7 @@ test('E. a required paragraph missing from the published body is reported', () =
   assert.match(missing, /centre channel/, 'the report names the sentence that went missing');
 });
 
-test('F. harmless HTML, heading and entity differences are not false failures', () => {
+it('F. harmless HTML, heading and entity differences are not false failures', () => {
   const approved = '<p>Voices and effects keep a consistent tonal character across all seats &amp; seats.</p>';
   const published = '<p>Voices and effects keep a consistent tonal character across all seats &amp; seats.</p>\n';
   assert.equal(missingPublishedContent({ approvedHtml: approved, publishedHtml: published, title: 'Timbre Matching' }), null);
@@ -109,7 +102,7 @@ test('F. harmless HTML, heading and entity differences are not false failures', 
 });
 
 // ── G / H. Seating association ───────────────────────────────────────────────
-test('G. seating images are presented with the validated Presented Options section', () => {
+it('G. seating images are presented with the validated Presented Options section', () => {
   assert.equal(seatingPresentationTarget({
     seatingCount: 2,
     sectionTypes: ['system_design_summary', 'presented_options', 'appendix'],
@@ -117,7 +110,7 @@ test('G. seating images are presented with the validated Presented Options secti
   }), 'presented_options');
 });
 
-test('H. the seating presentation stays single-sourced', () => {
+it('H. the seating presentation stays single-sourced', () => {
   // Fewer than two seating images: no seating presentation at all.
   assert.equal(seatingPresentationTarget({ seatingCount: 1, sectionTypes: ['presented_options'], anchorType: 'overall_design' }), null);
   // No Presented Options section: the anchored seating page is kept, as before.
@@ -150,23 +143,34 @@ function runValidation(input) {
 
 const validation = runValidation(shuffledFixture());
 
-test('A. a random database section order becomes the canonical publication order', () => {
+it('A. a random database section order becomes the canonical publication order', () => {
   const types = validation.document_sections.map((section) => section.section_type);
   const expected = fixtureTypes.filter((type) => types.includes(type));
   assert.deepEqual(types, expected, `expected ${expected.join(', ')} but got ${types.join(', ')}`);
 });
 
-test('B. Presented Options and the Appendix never appear before the cover', () => {
+it('B. the cover opens the document and the Appendix closes it', () => {
   const types = validation.document_sections.map((section) => section.section_type);
-  assert.equal(types[0], 'cover', 'the document must open with the cover');
+  // The cover page is composed by the pack itself and is never one of the
+  // stored section rows: the published rows open with the first narrative
+  // section in canonical order, and no row is published ahead of the cover.
+  assert.equal(fixtureTypes[0], 'cover', 'the canonical order opens with the cover');
+  assert.equal(types.includes('cover'), false, 'no stored row is published ahead of the composed cover');
+  assert.equal(
+    types[0],
+    fixtureTypes.filter((type) => type !== 'cover' && types.includes(type))[0],
+    'the first published row is the first narrative section',
+  );
+
   const optionsAt = types.indexOf('presented_options');
   const appendixAt = types.indexOf('appendix');
-  if (optionsAt >= 0) assert.ok(optionsAt > 0, 'Presented Options must follow the cover');
-  if (appendixAt >= 0) assert.ok(appendixAt > 0, 'the Appendix must follow the cover');
-  if (optionsAt >= 0 && appendixAt >= 0) assert.ok(optionsAt < appendixAt, 'Presented Options precedes the Appendix');
+  assert.ok(optionsAt >= 0, 'Presented Options is published');
+  assert.ok(appendixAt >= 0, 'the Appendix is published');
+  assert.ok(optionsAt < appendixAt, 'Presented Options precedes the Appendix');
+  assert.equal(appendixAt, types.length - 1, 'the Appendix closes the document');
 });
 
-test('C. the Editor authority and the server authority agree, section for section', () => {
+it('C. the Editor authority and the server authority agree, section for section', () => {
   const serverTypes = orderServer({ sections: shuffledFixture().sections, proposalType: 'comparison' })
     .map((section) => section.section_type);
   const clientTypes = orderClient({ sections: shuffledFixture().sections, proposalType: 'comparison' })
@@ -176,12 +180,12 @@ test('C. the Editor authority and the server authority agree, section for sectio
     serverTypes.filter((type) => validation.document_sections.some((s) => s.section_type === type)));
 });
 
-test('I. a private dealer note is never published', () => {
+it('I. a private dealer note is never published', () => {
   const published = validation.document_sections.map((section) => String(section.body || '')).join(' ');
   assert.equal(published.includes(PRIVATE_NOTE), false, 'the designer\'s own note must not be printed');
 });
 
-test('J. the stored section records are left unchanged', () => {
+it('J. the stored section records are left unchanged', () => {
   const input = shuffledFixture();
   const before = JSON.stringify(input.sections);
   runValidation(input);
@@ -189,9 +193,4 @@ test('J. the stored section records are left unchanged', () => {
 });
 
 // ── Report ──────────────────────────────────────────────────────────────────
-const failed = results.filter((row) => !row.ok);
-for (const row of results) {
-  console.log(`${row.ok ? 'PASS' : 'FAIL'}  ${row.name}${row.ok ? '' : `\n      ${row.error}`}`);
-}
-console.log(`\n${results.length - failed.length}/${results.length} fixtures passed`);
-if (failed.length > 0) process.exitCode = 1;
+// Each fixture above is a test: vitest reports every one of them by name.
