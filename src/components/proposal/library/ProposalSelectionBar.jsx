@@ -1,9 +1,10 @@
 /**
  * ProposalSelectionBar
  * --------------------
- * The Proposal Library's multi-select actions, shown only while something is
- * selected: how many proposals are selected, Select All (the proposals currently
- * displayed, and only those), Cancel Selection, and Delete Selected.
+ * The Proposal Library's multi-select toolbar, above the proposal cards and
+ * always on screen: how many proposals are selected, Select All Visible (the
+ * proposals currently displayed, and only those), Clear Selection, and Delete
+ * Selected — which stays visible and disabled while nothing is selected.
  *
  * Presentation only — selection and deletion are owned by the library tab.
  */
@@ -14,12 +15,14 @@ import { REPORT_FONT_BODY } from '@/components/report/typography/reportTypograph
 
 export default function ProposalSelectionBar({
   count = 0,
+  visibleCount = 0,
   busy = false,
   onSelectAll,
   onCancel,
   onDelete,
 }) {
-  if (!count) return null;
+  const nothingSelected = count === 0;
+  const noun = count === 1 ? 'proposal' : 'proposals';
 
   return (
     <div
@@ -27,25 +30,31 @@ export default function ProposalSelectionBar({
       data-proposal-selection-bar="true"
     >
       <div className="flex flex-wrap items-center gap-5" style={{ fontFamily: REPORT_FONT_BODY }}>
-        <span className="text-[11px] uppercase tracking-[0.14em] text-[#213428]">
+        <span
+          className="text-[11px] uppercase tracking-[0.14em] text-[#213428]"
+          aria-live="polite"
+          data-proposal-selection-count={count}
+        >
           {count} selected
         </span>
         {onSelectAll && (
           <button
             type="button"
             onClick={onSelectAll}
-            className="text-[11px] uppercase tracking-[0.14em] text-[#625143] hover:text-[#213428] transition-colors"
+            disabled={visibleCount === 0}
+            className="text-[11px] uppercase tracking-[0.14em] text-[#625143] hover:text-[#213428] disabled:opacity-40 disabled:hover:text-[#625143] transition-colors"
           >
-            Select All
+            Select All Visible
           </button>
         )}
         {onCancel && (
           <button
             type="button"
             onClick={onCancel}
-            className="text-[11px] uppercase tracking-[0.14em] text-[#8A8477] hover:text-[#213428] transition-colors"
+            disabled={nothingSelected}
+            className="text-[11px] uppercase tracking-[0.14em] text-[#8A8477] hover:text-[#213428] disabled:opacity-40 disabled:hover:text-[#8A8477] transition-colors"
           >
-            Cancel Selection
+            Clear Selection
           </button>
         )}
       </div>
@@ -54,8 +63,9 @@ export default function ProposalSelectionBar({
         <button
           type="button"
           onClick={onDelete}
-          disabled={busy}
-          className="flex items-center gap-2 px-4 py-2 text-[11px] uppercase tracking-[0.14em] text-white disabled:opacity-40 transition-colors hover:bg-[#3E4349]"
+          disabled={busy || nothingSelected}
+          title={nothingSelected ? 'Select at least one proposal to delete.' : `Delete ${count} selected ${noun}`}
+          className="flex items-center gap-2 px-4 py-2 text-[11px] uppercase tracking-[0.14em] text-white disabled:opacity-40 disabled:hover:bg-[#213428] transition-colors hover:bg-[#3E4349]"
           style={{ backgroundColor: '#213428', fontFamily: REPORT_FONT_BODY }}
         >
           <Trash2 className="w-3.5 h-3.5" />

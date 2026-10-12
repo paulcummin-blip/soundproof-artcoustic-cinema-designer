@@ -55,7 +55,9 @@ export default function ProposalBulkDeleteDialog({
       <DialogContent className="bg-white border-[#DCDBD6] max-w-lg" data-proposal-bulk-delete-dialog="true">
         <DialogHeader>
           <DialogTitle style={{ fontFamily: REPORT_FONT_BODY }}>
-            {outcome ? 'Deletion result' : `Delete ${count} ${noun}?`}
+            {outcome
+              ? 'Deletion result'
+              : (count === 0 ? 'No proposals can be deleted' : `Delete ${count} ${noun}?`)}
           </DialogTitle>
         </DialogHeader>
 
@@ -64,7 +66,7 @@ export default function ProposalBulkDeleteDialog({
             {outcome.deleted?.length > 0 && (
               <div>
                 <div className="text-[11px] uppercase tracking-[0.12em] text-[#213428]">
-                  Deleted {outcome.deleted.length} {outcome.deleted.length === 1 ? 'proposal' : 'proposals'}
+                  {outcome.deleted.length} {outcome.deleted.length === 1 ? 'proposal' : 'proposals'} deleted
                 </div>
                 <ProposalList entries={outcome.deleted} />
               </div>
@@ -81,7 +83,7 @@ export default function ProposalBulkDeleteDialog({
         ) : (
           <div className="space-y-4">
             <div className="space-y-3 text-sm text-[#3E4349] leading-relaxed" style={{ fontFamily: REPORT_FONT_BODY }}>
-              <p>These proposals and their associated generation history will be permanently deleted.</p>
+              <p>This will permanently delete the selected proposals and their associated proposal content. This action cannot be undone.</p>
               <p>Your projects, designs and Project Reports will not be affected.</p>
             </div>
 

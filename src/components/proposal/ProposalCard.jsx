@@ -105,7 +105,8 @@ function ProposalCard({
           {selectable && (
             <Checkbox
               checked={selected === true}
-              onCheckedChange={() => onToggleSelect?.(proposal)}
+              // The selection is always keyed by the stable proposal ID.
+              onCheckedChange={() => onToggleSelect?.(proposal.id)}
               aria-label={`Select ${proposal.title || 'Untitled Proposal'}`}
               className="mt-1 mr-3 border-[#A79E8C] data-[state=checked]:bg-[#213428] data-[state=checked]:text-white"
             />

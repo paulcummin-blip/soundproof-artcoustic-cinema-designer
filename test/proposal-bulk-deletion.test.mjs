@@ -11,6 +11,15 @@ import {
   partitionProposalDeletions,
   proposalDeletionDecision,
 } from '../base44/shared/proposalDeletion/proposalDeletionAuthority.js';
+import {
+  MAX_PROPOSALS_PER_DELETION_REQUEST,
+  chunkSelection,
+  mergeDeletionPlan,
+  mergeDeletionResults,
+  retainVisibleSelection,
+  selectionIds,
+  toggleSelection,
+} from '../src/components/proposal/library/proposalSelectionAuthority.js';
 
 const read = (path) => readFileSync(new URL(`../${path}`, import.meta.url), 'utf8');
 
@@ -162,42 +171,121 @@ test('the library offers selection, confirmation and immediate removal', () => {
   const hook = read('src/components/proposal/library/useBulkProposalDeletion.js');
   const library = read('src/components/proposal/library/useProposalLibrary.js');
 
-  // A checkbox on every card, and the actions the selection needs.
+  // A checkbox on every card, keyed by the stable proposal ID — never by the
+  // record itself, which is what made a selected card read back as unselected.
   assert.match(card, /<Checkbox/);
-  assert.match(group, /onToggleSelect/);
-  assert.match(bar, /Select All/);
-  assert.match(bar, /Cancel Selection/);
+  assert.match(card, /checked=\{selected === true\}/);
+  assert.match(card, /onToggleSelect\?\.\(proposal\.id\)/);
+  assert.match(group, /selectedIds\.has\(proposal\.id\)/);
+
+  // The toolbar is always on screen, and Delete stays visible while disabled.
+  assert.match(bar, /\{count\} selected/);
+  assert.match(bar, /Select All Visible/);
+  assert.match(bar, /Clear Selection/);
   assert.match(bar, /Delete Selected/);
+  assert.equal(bar.includes('if (!count) return null'), false, 'the toolbar must never disappear');
+  assert.match(bar, /disabled=\{busy \|\| nothingSelected\}/);
 
   // One confirmation, in the agreed words, naming what is kept.
   assert.match(dialog, /Delete \$\{count\} \$\{noun\}\?/);
-  assert.match(dialog, /These proposals and their associated generation history will be permanently deleted\./);
+  assert.match(dialog, /This will permanently delete the selected proposals and their associated proposal content\. This action cannot be undone\./);
   assert.match(dialog, /Your projects, designs and Project Reports will not be affected\./);
   assert.match(dialog, /Issued proposals are kept/);
   assert.match(dialog, /Delete \$\{count\} \$\{count === 1 \? 'Proposal' : 'Proposals'\}/);
   assert.match(dialog, /\{error && \(/);
   assert.match(dialog, /Not deleted \(\{outcome\.notDeleted\.length\}\)/);
+  assert.match(dialog, /outcome\.deleted\.length === 1 \? 'proposal' : 'proposals'\} deleted/);
 
   // Select All is scoped to what is displayed, and a hidden proposal leaves it.
   assert.match(tab, /visibleProposalIds/);
-  assert.match(hook, /setSelectedIds\(new Set\(visibleProposalIds\)\)/);
-  assert.match(hook, /visible\.has\(id\)/);
+  assert.match(hook, /selectionIds\(visibleProposalIds\)/);
+  assert.match(hook, /retainVisibleSelection/);
 
-  // Selection never reaches an invisible proposal: the tab passes only the
-  // proposals its current filter and view are showing.
-  const visibleBlock = tab.slice(tab.indexOf('const visibleGroups'), tab.indexOf('const counts'));
-  assert.match(visibleBlock, /view === 'archived'/);
+  // The selection is one set of stable IDs, whatever shape a caller passes.
+  assert.match(hook, /toggleSelection\(previous, proposalOrId\)/);
+  // Any number may be selected: the bound is on one request, not on selection.
+  assert.match(hook, /chunkSelection\(proposalIds, MAX_PROPOSALS_PER_DELETION_REQUEST\)/);
 
-  // The server decides protection, the dry run is asked first, and the list is
-  // updated in place afterwards.
+  // The server decides protection, the dry run is asked first, the real outcome
+  // is always reported, and the list is updated in place afterwards.
   assert.match(hook, /base44\.functions\.invoke\('deleteProposals'/);
-  assert.match(hook, /dry_run: true/);
-  assert.match(hook, /dry_run: false/);
-  assert.ok(hook.indexOf('dry_run: true') < hook.indexOf('dry_run: false'));
+  assert.match(hook, /dry_run: dryRun/);
+  assert.ok(hook.indexOf('runDeletionBatches(proposalIds, true)')
+    < hook.indexOf('runDeletionBatches(proposalIds, false)'), 'the dry run is asked first');
   assert.match(hook, /onDeleted\(deletedIds\)/);
-  assert.match(hook, /notDeleted\.length === 0/);
+  assert.match(hook, /setOutcome\(\{ deleted, notDeleted \}\)/);
   assert.match(library, /removeProposals/);
   assert.match(tab, /library\.removeProposals/);
+});
+
+test('a selection is keyed by stable proposal IDs, whatever the checkbox hands over', () => {
+  const record = proposal({ id: 'prop-a' });
+
+  // The same proposal, handed over as a record and as an id, selects once.
+  let selection = toggleSelection(new Set(), record);
+  assert.deepEqual([...selection], ['prop-a']);
+  selection = toggleSelection(selection, 'prop-a');
+  assert.equal(selection.size, 0, 'a second click deselects');
+
+  selection = toggleSelection(new Set(), record);
+  selection = toggleSelection(selection, proposal({ id: 'prop-b' }));
+  assert.deepEqual([...selection], ['prop-a', 'prop-b']);
+  assert.equal(selection.has(record.id), true, 'the card reads its own id back');
+
+  // Nothing usable in, nothing selected.
+  assert.equal(toggleSelection(new Set(), null).size, 0);
+  assert.equal(toggleSelection(new Set(), { title: 'no id' }).size, 0);
+});
+
+test('selection survives re-renders and is only scoped to what is on screen', () => {
+  const ids = ['prop-1', 'prop-2', 'prop-3'];
+  const selected = new Set(ids);
+
+  // A re-render passes the same visible set: the very same selection returns.
+  assert.equal(retainVisibleSelection(selected, ids), selected);
+  // A proposal that leaves the list leaves the selection, and the others stay.
+  assert.deepEqual([...retainVisibleSelection(selected, ['prop-1', 'prop-3'])], ['prop-1', 'prop-3']);
+  assert.equal(selectionIds([]).length, 0);
+});
+
+test('any number of eligible proposals can be selected and issued', () => {
+  const many = Array.from({ length: 120 }, (_, index) => `prop-${index + 1}`);
+  const batches = chunkSelection(many, MAX_PROPOSALS_PER_DELETION_REQUEST);
+  assert.equal(batches.length, 3);
+  assert.equal(batches[0].length, 50);
+  assert.equal(batches[2].length, 20);
+  assert.deepEqual(batches.flat(), many);
+  assert.equal(MAX_PROPOSALS_PER_DELETION_REQUEST, MAX_PROPOSAL_DELETIONS, "the request bound is the function's own");
+
+  // Select All Visible is every visible ID, with no cap.
+  assert.equal(selectionIds(many).length, 120);
+  // A repeated ID never double-counts.
+  assert.equal(chunkSelection(['prop-1', 'prop-1', 'prop-2']).flat().length, 2);
+});
+
+test('the confirmation count comes from the server plan, not from the selection', () => {
+  const plan = mergeDeletionPlan([
+    { deletable: [{ id: 'prop-1', title: 'A' }], refused: [{ id: 'prop-2', title: 'B', reason: 'issued' }] },
+    { deletable: [{ id: 'prop-3', title: 'C' }], refused: [] },
+  ]);
+  assert.deepEqual(plan.deletable.map((entry) => entry.id), ['prop-1', 'prop-3']);
+  assert.deepEqual(plan.refused.map((entry) => entry.id), ['prop-2']);
+
+  const outcome = mergeDeletionResults([
+    { deleted: [{ id: 'prop-1', title: 'A' }], not_deleted: [{ id: 'prop-3', title: 'C' }] },
+    { deleted: [{ id: 'prop-3', title: 'C' }], not_deleted: [] },
+  ]);
+  assert.deepEqual(selectionIds(outcome.deleted), ['prop-1', 'prop-3']);
+  assert.deepEqual(selectionIds(outcome.notDeleted), ['prop-3'], 'what was not deleted stays named');
+});
+
+test('no fixture proposal is deleted to prove the selection rules', () => {
+  // Every case above is decided in memory. The one destructive path is the
+  // backend function, and it is only ever named here.
+  const hook = read('src/components/proposal/library/useBulkProposalDeletion.js');
+  assert.equal(hook.includes('entities.Proposal.delete'), false);
+  assert.equal(hook.includes('deleteMany'), false);
+  assert.match(hook, /base44\.functions\.invoke\('deleteProposals'/);
 });
 
 test('the bulk deletion is bounded', () => {

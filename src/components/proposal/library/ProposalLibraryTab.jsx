@@ -237,6 +237,7 @@ export default function ProposalLibraryTab({ onCreateProposal, onRegenerate }) {
     <div className="border-t border-[#E5E1D8] pt-8">
       <ProposalSelectionBar
         count={bulk.selectedCount}
+        visibleCount={visibleProposalIds.length}
         busy={bulk.checking}
         onSelectAll={bulk.selectAllVisible}
         onCancel={bulk.clearSelection}
