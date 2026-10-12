@@ -10,35 +10,36 @@
  *
  * Each design version lists, in two clearly separated groups:
  *
- *   Current files   the documents that represent this version NOW, stated as
- *                   primary cards. The Project Report row is always shown, in
- *                   one of its three dealer-facing states — Current, Update
- *                   needed or Not generated — read from the same readiness
- *                   authority the banner reads, so a row can never say Current
- *                   while the banner says that report needs updating. A Current
- *                   report offers Open and Export PDF and nothing else; a report
- *                   that needs updating offers Open saved report and Create
- *                   updated report. Beside it sits every issued file that still
- *                   matches the design it was issued from — the Current Speaker
- *                   Design schedule, which is created and stored with the report
- *                   export, among them. Every row's action carries the version of
- *                   the section it stands in, so a Level 4 row acts on Level 4
- *                   and never on another version.
+ *   Current files   the documents that represent this version NOW, as primary
+ *                   cards. The version's report is one of them: ONE row per
+ *                   report type, always shown in one of the three dealer-facing
+ *                   states — Current, Update needed or Not generated. The state
+ *                   comes from the same readiness authority the banner reads, so
+ *                   a row can never say Current while the banner says that report
+ *                   needs updating. A Current report offers Open and Export PDF
+ *                   and nothing else; a report that needs updating offers Open
+ *                   saved report and Create updated report. Every row's action
+ *                   carries the version of the section it stands in, so a Level 4
+ *                   row acts on Level 4 and never on another version. Beside the
+ *                   report sit the version's other current files — the Current
+ *                   Speaker Design schedule that is exported with the report —
+ *                   each offering Open and Download.
  *
- *   Archived PDFs   fixed exports kept for records: the LATEST issued PDF per
- *                   document type, stated as secondary cards so they can never
- *                   be mistaken for the current documents above. Anything older
- *                   than the design the project now holds, or superseded by a
- *                   newer export of its own, is listed here and nowhere else —
- *                   it reads "Archived issued PDF" or "Archived — older than
- *                   current design", and it is only ever opened or downloaded.
- *                   An earlier export of the same version and type stays in
- *                   storage but is not listed.
+ *   Archived        every issued PDF the design has moved past, below the current
+ *                   files and deliberately quieter: "Archived — older than
+ *                   current design" or "Archived issued PDF". An earlier export
+ *                   of the same version and type stays in storage but is not
+ *                   listed. An archived file is fixed history: it is only ever
+ *                   opened or downloaded, and it is never presented as the source
+ *                   a proposal reads.
+ *
+ * A current file is a file that still matches the version as it stands. A file of
+ * the report's own type is not listed as a second current card while the report's
+ * own row is above it — the row IS the current report, and its export produces
+ * that PDF. It appears below, as history, once the design moves past it.
  *
  * Nothing here changes a report's status: exporting, opening or listing a report
- * leaves it exactly as it was. A current Project Report PDF is represented by the
- * Project Report card above it rather than listed twice; with no live report row
- * to state it, it is listed as a current file in its own right.
+ * leaves it exactly as it was.
  */
 
 import React from 'react';
@@ -71,7 +72,6 @@ import {
   LIVE_REPORT_STATE_LABEL,
   LIBRARY_SOURCE_STATE,
   currentFileExplanation,
-  isCurrentIssuedFile,
   liveReportNote,
   resolveExportLiveState,
   resolveLiveReportState,
@@ -219,8 +219,8 @@ export default function ProjectLibraryReportsSection({
           reportExports.filter(({ record }) => (record.version_id || null) === version.id),
         );
 
-        // Every issued PDF of this version, judged once against the version as it
-        // stands now, so the two groups below can never disagree about one file.
+        // Each issued PDF judged against the version as it stands now: a file the
+        // design still matches is a CURRENT file, anything else is archived.
         const judged = issued.map(({ record, superseded }) => ({
           record,
           superseded,
@@ -231,25 +231,21 @@ export default function ProjectLibraryReportsSection({
             superseded,
           }),
         }));
+        const isCurrent = ({ state }) => (
+          state.state === LIBRARY_SOURCE_STATE.CURRENT
+          || state.state === LIBRARY_SOURCE_STATE.SAME_AS_CURRENT
+        );
 
-        // A document type the row above already states. Its current issued copy is
-        // the same document, so it is listed once — and joins the archive below
-        // once the design moves past it, rather than being listed twice now.
+        // The report types whose current state is already stated by a live row in
+        // this section. A current PDF of one of those is the report itself, so it
+        // is not listed twice — the row above IS the current report.
         const statedByLiveRow = new Set(
           REPORT_TYPES.filter((reportType) => liveByType.get(reportType)),
         );
 
-        // CURRENT FILES: what represents this version now — every issued file that
-        // still matches the design it was issued from (the Current Speaker Design
-        // schedule among them) and is not already stated above. The state
-        // vocabulary decides which files those are; nothing is re-derived here.
-        const currentFiles = judged.filter(({ record, state }) => (
-          isCurrentIssuedFile(state.state) && !statedByLiveRow.has(record.document_type)
-        ));
-
-        // ARCHIVED PDFs: fixed exports kept for records — older than the design the
-        // project now holds, or superseded by a newer export of their own.
-        const archivedFiles = judged.filter((entry) => !currentFiles.includes(entry));
+        const currentFiles = judged
+          .filter((entry) => isCurrent(entry) && !statedByLiveRow.has(entry.record.document_type));
+        const archivedFiles = judged.filter((entry) => !isCurrent(entry));
 
         return (
           <section key={version.id} data-library-version={version.id}>
@@ -265,10 +261,13 @@ export default function ProjectLibraryReportsSection({
             </div>
 
             <SectionHeading>{CURRENT_FILES_HEADING}</SectionHeading>
-            <p className="text-xs text-[#8A8477] mb-3 max-w-3xl leading-relaxed" style={{ fontFamily: REPORT_FONT_BODY }}>
+            <p
+              className="text-xs text-[#8A8477] mb-3 max-w-3xl leading-relaxed"
+              style={{ fontFamily: REPORT_FONT_BODY }}
+            >
               {CURRENT_FILES_HELPER}
             </p>
-            <div>
+            <div className="flex flex-col">
               {REPORT_TYPES.map((reportType) => {
                 const report = liveByType.get(reportType) || null;
                 // The row's state IS the version's readiness cell for this
@@ -285,8 +284,8 @@ export default function ProjectLibraryReportsSection({
                     generatedBy={report?.generatedBy}
                     statusState={state}
                     statusLabel={LIVE_REPORT_STATE_LABEL[state] || null}
-                    explanation={currentFileExplanation(reportType)}
                     note={liveReportNote({ cell, hasReport })}
+                    explanation={currentFileExplanation(reportType)}
                     hasReport={hasReport}
                     onOpen={() => openVersionReport(reportType, version.id)}
                     onOpenSaved={() => openVersionReport(reportType, version.id)}
@@ -297,10 +296,10 @@ export default function ProjectLibraryReportsSection({
                 );
               })}
 
-              {/* Every other current document of this version: fixed PDFs that
-                  still match the design — the Speaker Design schedule the report
-                  export creates, and any issued report copy the row above does
-                  not already state. */}
+              {/* The version's other current files, beside the report: the
+                  Current Speaker Design schedule that is exported with the
+                  report, and any other file the design still matches. Primary
+                  cards, on the version they belong to. */}
               {currentFiles.map(({ record, state }) => (
                 <ExportedDocumentRow
                   key={record.id}
@@ -324,7 +323,7 @@ export default function ProjectLibraryReportsSection({
               {archivedFiles.length === 0 ? (
                 <EmptyNote>{ARCHIVED_PDFS_EMPTY}</EmptyNote>
               ) : (
-                archivedFiles.map(({ record, state }) => (
+                archivedFiles.map(({ record, superseded, state }) => (
                   <ExportedDocumentRow
                     key={record.id}
                     record={record}
@@ -332,7 +331,7 @@ export default function ProjectLibraryReportsSection({
                     versionText={versionNameById.get(version.id) || null}
                     statusState={state.state}
                     statusLabel={state.label}
-                    superseded={state.state === LIBRARY_SOURCE_STATE.SUPERSEDED}
+                    superseded={superseded}
                     note={state.state === LIBRARY_SOURCE_STATE.SOURCE_CHANGED
                       ? EXPORT_DESIGN_CHANGED_NOTE
                       : null}

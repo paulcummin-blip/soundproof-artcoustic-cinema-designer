@@ -5,10 +5,9 @@
  * generated, Archived issued PDF, Archived — older than current design,
  * Superseded by newer export.
  *
- * It is stated in one of two variants, so a current file and an archived one can
- * never read alike:
- *   pill   a current file: the words in a filled, bordered badge
- *   plain  an archived file: the same words, muted and unboxed
+ * Two variants, so a current file and an archived one are never mistaken:
+ *   pill   the badge a CURRENT file carries on its card
+ *   plain  the quiet line an archived file carries (the default)
  *
  * Presentation only.
  */
@@ -43,10 +42,9 @@ export default function LibraryStatusLabel({ state = LIBRARY_SOURCE_STATE.CURREN
 
   return (
     <span
-      className={`inline-flex items-center gap-1.5${
-        pill ? ' rounded-full border border-[#DCDBD6] bg-[#F4F7F3] px-2.5 py-1' : ''
-      }`}
+      className={`inline-flex items-center gap-1.5${pill ? ' rounded-full border border-[#DCDBD6] bg-[#F4F7F4] px-2.5 py-1' : ''}`}
       data-library-status={state}
+      data-status-variant={pill ? 'pill' : 'plain'}
     >
       <Icon className="w-3.5 h-3.5 shrink-0" style={{ color: style.colour }} />
       <span

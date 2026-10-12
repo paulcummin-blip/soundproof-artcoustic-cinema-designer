@@ -5,14 +5,19 @@
  * asset. It offers Open and Download only: an issued document is never
  * overwritten and is never deleted from here.
  *
- * The row's state is stated by the caller — the same library vocabulary every
- * other row uses — so an issued file reads "Current", "Archived issued PDF",
- * "Archived — older than current design" or "Superseded by newer export". An
- * archived file also carries the caller's one-line note, so it reads as history
- * rather than as something that blocks a proposal.
+ * The row is stated in ONE of two variants, so a current file and an archived
+ * one can never be mistaken for each other:
  *
- * The row owns its own open/download state, so it can be dropped into any
- * section without prop plumbing.
+ *   current   the file still matches the design it was issued from. It is a card:
+ *             the document's own name, a Current badge, the version, its date and
+ *             the line that says what it is for.
+ *   archived  a fixed PDF kept for records, older than the current design or
+ *             superseded by a newer export. It reads as history: muted, headed by
+ *             the stored filename, and claiming nothing about the design.
+ *
+ * The row's state is stated by the caller — the same library vocabulary every
+ * other row uses. The row owns its own open/download state, so it can be dropped
+ * into any section without prop plumbing.
  */
 
 import React, { useCallback, useState } from 'react';
@@ -24,9 +29,10 @@ import { issuedDocumentLabel } from '@/components/library/issuedDocument/issuedD
 import { downloadIssuedDocument, openIssuedDocument } from '@/components/library/issuedDocument/issuedDocumentActions';
 import { formatLibraryDate } from './libraryFormat';
 
-/** The two card treatments: a current file, and a file kept for records. */
-const CURRENT_CARD = 'mb-3 rounded-lg border border-[#DCDBD6] bg-white px-4 py-3.5 shadow-sm';
-const ARCHIVED_CARD = 'mb-2 rounded-lg border border-[#EFECE4] bg-[#FAFAF9] px-4 py-3';
+/** A current file: white, bordered and lifted — the primary treatment. */
+const CARD_CURRENT = 'mb-3 rounded-lg border border-[#DCDBD6] bg-white px-4 py-3.5 shadow-sm';
+/** An archived file: muted surface and a lighter rule — deliberately secondary. */
+const CARD_ARCHIVED = 'mb-2 rounded-lg border border-[#EFECE4] bg-[#FAFAF9] px-4 py-3';
 const ACTION_CURRENT = 'flex items-center gap-1.5 text-xs uppercase tracking-[0.12em] text-[#213428] hover:text-[#3E4349] disabled:opacity-50';
 const ACTION_ARCHIVED = 'flex items-center gap-1.5 text-xs uppercase tracking-[0.12em] text-[#8A8477] hover:text-[#3E4349] disabled:opacity-50';
 
@@ -63,17 +69,17 @@ export default function ExportedDocumentRow({
 
   return (
     <div
-      className={`${current ? CURRENT_CARD : ARCHIVED_CARD} flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between sm:gap-6`}
+      className={`${current ? CARD_CURRENT : CARD_ARCHIVED} flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between sm:gap-6`}
       data-issued-document={record.id}
       data-superseded={superseded ? 'true' : 'false'}
-      data-file-variant={variant}
+      data-file-variant={current ? 'current' : 'archived'}
     >
       <div className="flex min-w-0 flex-1 items-start gap-3">
         <FileText className={`w-4 h-4 mt-0.5 shrink-0 ${current ? 'text-[#213428]' : 'text-[#8A8477]'}`} />
         <div className="min-w-0">
-          {/* A CURRENT file is stated by its document name — "Speaker Design" —
-              with the stored filename beneath it. An ARCHIVED file is stated by
-              the filename itself: the record of what was issued. */}
+          {/* A current file states what it IS — its own document name — with the
+              stored file named beneath it. An archived file is the stored file,
+              so that is what heads it. */}
           {current && (
             <div className="text-[15px] font-semibold text-[#1B1A1A]" style={{ fontFamily: REPORT_FONT_BODY }}>
               {documentLabel}

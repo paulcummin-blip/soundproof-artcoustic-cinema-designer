@@ -3,10 +3,10 @@
 // ACCEPTANCE — the Project Library's three user-facing report states and the
 // actions each one offers.
 //
-//   A  Current file        Current · Open · Export PDF, and no refresh action
+//   A  Current report      Current · Open · Export PDF, and no refresh action
 //   B  Design changed      Update needed · Open saved report · Create updated report
-//   C  Issued file current Current · Open · Download
-//   D  Issued file older   Archived — older than current design · Open · Download
+//   C  Current file        Current · Open · Download
+//   D  Archived file       Archived — older than current design · Open · Download
 //   E  Exporting a PDF never stales the report
 //   F  Opening a report never stales it
 //   G  Generating a proposal never stales it
@@ -24,6 +24,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 
 import {
+  ARCHIVED_PDF_LABEL,
   ARCHIVED_PDFS_HELPER,
   CURRENT_FILE_LABEL,
   EXPORT_DESIGN_CHANGED_NOTE,
@@ -127,6 +128,7 @@ test('A — a Current report offers Open and Export PDF, and no refresh action',
     liveReportStateLabel(LIVE_REPORT_STATE.UPDATE_NEEDED),
     liveReportStateLabel(LIVE_REPORT_STATE.MISSING),
     CURRENT_FILE_LABEL,
+    ARCHIVED_PDF_LABEL,
     EXPORT_SOURCE_CHANGED_LABEL,
     EXPORT_DESIGN_CHANGED_NOTE,
     ARCHIVED_PDFS_HELPER,
@@ -144,8 +146,8 @@ test('A — a Current report offers Open and Export PDF, and no refresh action',
   assert.doesNotMatch(vocabularySurface, /Previous report|Older export|Source changed since export/);
   assert.doesNotMatch(vocabularySurface, /stale|legacy|incomplete|evidence|fingerprint|publication/i);
 
-  // An issued PDF states what it IS, whatever state its source is in: it never
-  // borrows the report vocabulary.
+  // A file that still matches the design reads Current, whatever the shape of
+  // the record: it never borrows the report vocabulary.
   assert.equal(
     resolveExportLiveState({ record: issuedPdf(), version: VERSION }).label,
     CURRENT_FILE_LABEL,
@@ -156,7 +158,7 @@ test('A — a Current report offers Open and Export PDF, and no refresh action',
   );
   assert.equal(
     resolveExportLiveState({ record: issuedPdf(), version: null }).label,
-    CURRENT_FILE_LABEL,
+    ARCHIVED_PDF_LABEL,
   );
 });
 
@@ -201,9 +203,9 @@ test('B — a report the design moved past reads Update needed, and offers an up
   assert.match(LIVE_ROW, /\{note &&/);
 });
 
-/* ── C — an issued PDF that matches ───────────────────────────────────────── */
+/* ── C — a file that matches ──────────────────────────────────────────────── */
 
-test('C — an issued PDF that still matches the design reads Current', () => {
+test('C — a file that still matches the design reads Current', () => {
   const live = savedReport({ status: 'current' });
   const matched = resolveExportLiveState({
     record: issuedPdf(),
@@ -213,10 +215,18 @@ test('C — an issued PDF that still matches the design reads Current', () => {
   assert.equal(matched.label, CURRENT_FILE_LABEL);
   assert.equal(matched.label, 'Current');
 
-  // With no live report to compare against, the pointer decides — and the export
-  // still reads as an issued PDF, never as a live report.
+  // The version's own published pointer decides when there is no live report to
+  // compare against, and the export is never dressed as a live report.
   const withoutLive = resolveExportLiveState({ record: issuedPdf(), version: VERSION, liveReport: null });
   assert.equal(withoutLive.label, CURRENT_FILE_LABEL);
+});
+
+/* ── C2 — a file with no version to judge it against ──────────────────────── */
+
+test('C2 — a file the design cannot be compared against reads as archived', () => {
+  const orphaned = resolveExportLiveState({ record: issuedPdf(), version: null, liveReport: null });
+  assert.equal(orphaned.label, ARCHIVED_PDF_LABEL);
+  assert.equal(orphaned.label, 'Archived issued PDF');
 });
 
 /* ── D — an issued PDF after the design changed ───────────────────────────── */

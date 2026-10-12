@@ -5,8 +5,8 @@
 //   TEST 1  A report regenerated five times lists ONE current live row
 //   TEST 2  Three exports of the same report list ONE issued row: the latest
 //   TEST 3  An updated report updates the live row and the latest issued PDF is
-//           judged against it ("Current" / "Archived — older than current
-//           design") while the older copies stay in storage, unlisted
+//           judged against it ("Issued PDF" / "Issued PDF — design changed since
+//           export") while the older copies stay in storage, unlisted
 //   TEST 4  A Visual Report export and a Technical Report export never stand
 //           in for one another
 //   TEST 5  Level 4 version and Level 1 version are judged inside their own
@@ -139,9 +139,10 @@ test('TEST 2 — three exports of the same report list ONE issued row: the lates
   const superseded = resolveExportLiveState({ record: exports[1], version: VERSION_4, superseded: true });
   assert.equal(superseded.label, LIBRARY_SOURCE_LABEL.superseded, 'a newer export of the same report');
 
-  // No live report of this type: the export still reads as an issued PDF.
+  // No live report of this type: the published pointer decides, and the export
+  // still reads as the current file it is — never as a live report.
   const withoutLive = resolveExportLiveState({ record: rows[0], version: VERSION_4, liveReport: null });
-  assert.equal(withoutLive.label, CURRENT_FILE_LABEL, 'an issued PDF never reads as a live report');
+  assert.equal(withoutLive.label, CURRENT_FILE_LABEL, 'a current file never reads as a live report');
 
   // It matches the live report of its own version and type: "Same as current".
   const live = saved('snap-1', 'version-4', 'technical', '2026-10-01T09:00:00.000Z');

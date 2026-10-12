@@ -4,8 +4,9 @@
  * The Project Library's source vocabulary, and how each row's state is derived.
  *
  * The labels are the product's own words:
- *   Current files   Current · Update needed · Not generated
- *   Archived PDFs   Archived issued PDF · Archived — older than current design ·
+ *   Current files   Current · Update needed · Not generated (the report row)
+ *                   Current (a file that still matches the design)
+ *   Archived        Archived issued PDF · Archived — older than current design ·
  *                   Superseded by newer export
  *
  * A report row's state is read from the version's proposal-readiness cell — the
@@ -43,49 +44,27 @@ export const LIBRARY_SOURCE_LABEL = Object.freeze({
   [LIBRARY_SOURCE_STATE.SOURCE_CHANGED]: 'Archived — older than current design',
   [LIBRARY_SOURCE_STATE.MISSING_SOURCE]: 'Archived issued PDF',
   [LIBRARY_SOURCE_STATE.SUPERSEDED]: 'Superseded by newer export',
-  // A file whose source still matches the design is a CURRENT file, whether it
-  // was issued before or after the newest report of its type: the report was
-  // regenerated from the same evidence, so the document still states this design.
   [LIBRARY_SOURCE_STATE.SAME_AS_CURRENT]: 'Current',
-  [LIBRARY_SOURCE_STATE.OLDER_EXPORT]: 'Current',
+  [LIBRARY_SOURCE_STATE.OLDER_EXPORT]: 'Archived issued PDF',
 });
 
 /**
- * The states an issued file carries while it still matches the design it was
- * issued from. ONE authority for "is this file a current document?", so the
- * Library's two listings can never disagree about one file.
+ * A file that still matches the design it belongs to: it is one of the version's
+ * CURRENT files, and it is listed as a primary document.
  */
-const CURRENT_FILE_STATES = new Set([
-  LIBRARY_SOURCE_STATE.CURRENT,
-  LIBRARY_SOURCE_STATE.SAME_AS_CURRENT,
-  LIBRARY_SOURCE_STATE.OLDER_EXPORT,
-]);
-
-/**
- * Whether an issued file belongs to the version's CURRENT files, or to the
- * archive of PDFs kept for records.
- *
- * @param {string} state one of LIBRARY_SOURCE_STATE
- * @returns {boolean}
- */
-export function isCurrentIssuedFile(state) {
-  return CURRENT_FILE_STATES.has(state);
-}
-
-/** A file that still matches the design it was issued from: a current file. */
 export const CURRENT_FILE_LABEL = 'Current';
 
 /**
- * An issued PDF kept for records once the design has moved past it. It reads as
- * an ARCHIVE, never as the current document a proposal reads.
+ * A fixed PDF kept for records, older than the design it documents. It is listed
+ * below the current files and never as the recommended document.
  */
 export const ARCHIVED_PDF_LABEL = 'Archived issued PDF';
 
 /**
  * The wording an issued PDF carries when the design moved on after it was issued
- * — the same source-changed state, stated from the PDF's side as an archive. It
- * never implies the PDF itself needs regenerating: the PDF is history, and it is
- * simply older than the design the project now holds.
+ * — the same source-changed state, stated from the PDF's side. It never implies
+ * the PDF itself needs regenerating: the PDF is history, and it is simply older
+ * than the design the project now holds.
  */
 export const EXPORT_SOURCE_CHANGED_LABEL = 'Archived — older than current design';
 
@@ -96,50 +75,59 @@ export const EXPORT_SOURCE_CHANGED_LABEL = 'Archived — older than current desi
 export const EXPORT_DESIGN_CHANGED_NOTE =
   'This PDF is still available, but it was issued before the latest report update.';
 
+/* ── The two sections of the Generated Reports tab ────────────────────────── */
+
+/** The heading of the version's current documents. */
+export const CURRENT_FILES_HEADING = 'Current files';
+
+/** What the Current files section is: the documents a proposal reads. */
+export const CURRENT_FILES_HELPER = 'These are the current documents used for proposals.';
+
+/** The heading of the version's fixed, older PDFs. */
+export const ARCHIVED_PDFS_HEADING = 'Archived / older issued PDFs';
+
 /**
- * The one sentence that separates the archived PDFs from the current files above
- * them: proposals read the current documents, never these fixed exports.
+ * The one sentence that separates the archived files from the current ones above
+ * them: they are kept for records, and a proposal never reads them.
  */
 export const ARCHIVED_PDFS_HELPER =
-  'These files are retained for records but are older than the current design. They are never the source a proposal reads.';
+  'These files are retained for records but are older than the current design. They are never the proposal source.';
 
-/** The Library's two Generated Reports groups, in the designer's words. */
-export const CURRENT_FILES_HEADING = 'Current files';
-export const CURRENT_FILES_HELPER = 'These are the current documents used for proposals.';
-export const ARCHIVED_PDFS_HEADING = 'Archived / older issued PDFs';
+/** Shown when a version holds no older or archived PDF. */
 export const ARCHIVED_PDFS_EMPTY = 'No older or archived PDFs are held for this version.';
+
+/**
+ * What each current file is for, stated on its own card, so a designer reads why
+ * the document is there rather than inferring it. Stated by document type.
+ */
+export const CURRENT_FILE_EXPLANATION = Object.freeze({
+  project: 'This version’s report. Proposal Centre reads it as the proposal source.',
+  speaker_design: 'This version’s equipment schedule. Supporting documentation, not a proposal source.',
+});
+
+/** What a current file states when the vocabulary holds no note for its type. */
+export const CURRENT_FILE_EXPLANATION_DEFAULT = 'A current file for this design version.';
+
+/** The note one current file carries. */
+export function currentFileExplanation(documentType) {
+  return CURRENT_FILE_EXPLANATION[documentType] || CURRENT_FILE_EXPLANATION_DEFAULT;
+}
 
 export const LIVE_REPORT_LABEL = 'Current report';
 
 /**
- * What each current file is for, stated on its own card. A file whose purpose is
- * not named here is still a current document of the version, and says so.
- */
-export const CURRENT_FILE_EXPLANATION = Object.freeze({
-  project: 'The version’s report. Proposal Centre reads this as the proposal source.',
-  speaker_design: 'The version’s equipment schedule. Supporting documentation.',
-});
-
-/** The line a current file card carries when its own purpose is not named. */
-export const CURRENT_FILE_DEFAULT_EXPLANATION = 'A fixed PDF exported from this version.';
-
-/** The explanation one current file card carries, by document type. */
-export function currentFileExplanation(documentType) {
-  return CURRENT_FILE_EXPLANATION[documentType] || CURRENT_FILE_DEFAULT_EXPLANATION;
-}
-
-/**
  * An issued PDF judged inside the Library's Generated Reports states what it IS.
- * It never borrows the report vocabulary, so no export row can ever read
- * "Current" or "Older export" again.
+ * A file that still matches the design reads Current; a file the design has moved
+ * past reads as archived — it never borrows the report vocabulary, so no export
+ * row can ever read as a live report.
  */
 const ISSUED_PDF_STATE_LABEL = Object.freeze({
   [LIBRARY_SOURCE_STATE.CURRENT]: CURRENT_FILE_LABEL,
   [LIBRARY_SOURCE_STATE.SAME_AS_CURRENT]: CURRENT_FILE_LABEL,
-  [LIBRARY_SOURCE_STATE.OLDER_EXPORT]: CURRENT_FILE_LABEL,
+  [LIBRARY_SOURCE_STATE.OLDER_EXPORT]: ARCHIVED_PDF_LABEL,
   [LIBRARY_SOURCE_STATE.SOURCE_CHANGED]: EXPORT_SOURCE_CHANGED_LABEL,
   // A version that no longer resolves says nothing about the issued document:
-  // the document exists, so it reads as an archived file.
+  // the document exists, so it reads as the archived file it is.
   [LIBRARY_SOURCE_STATE.MISSING_SOURCE]: ARCHIVED_PDF_LABEL,
 });
 
@@ -405,10 +393,10 @@ export function collapseLiveReports(snapshots = [], { currentFingerprintByVersio
  * export is never judged against a Visual Report live report, and a Level 4
  * version export is never judged against a Level 1 version live report.
  *
- *   design moved on since it was issued  → "Archived — older than current design"
- *   newer live report, same source       → "Archived issued PDF"
- *   matches the live report              → "Current"
- *   no live report to compare against    → its own source state (Current / Archived)
+ *   design moved on since it was issued  → "Issued PDF — design changed since export"
+ *   newer live report, same source       → "Issued PDF"
+ *   matches the live report              → "Issued PDF"
+ *   no live report to compare against    → "Issued PDF" (or its own source state)
  *
  * @returns {{state: string, label: string}}
  */

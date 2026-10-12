@@ -26,8 +26,8 @@
 import React from 'react';
 import { ExternalLink, FileDown, FilePlus2, History, RefreshCw } from 'lucide-react';
 import { REPORT_FONT_BODY } from '@/components/report/typography/reportTypography';
-import { LIVE_REPORT_STATE, REPORT_ROW_ACTION } from './librarySourceStatus';
 import LibraryStatusLabel from './LibraryStatusLabel';
+import { LIVE_REPORT_STATE, REPORT_ROW_ACTION } from './librarySourceStatus';
 import { formatLibraryDate } from './libraryFormat';
 
 const ACTION_CLASS = 'flex items-center gap-1.5 text-xs uppercase tracking-[0.12em] text-[#213428] hover:text-[#3E4349] disabled:opacity-50';
@@ -53,12 +53,11 @@ export default function LiveReportRow({
   const current = statusState === LIVE_REPORT_STATE.CURRENT;
 
   return (
-    // A CURRENT FILE: the card states that this document is the active, primary
-    // one — white, bordered and shadowed, with its state as a filled badge.
     <div
       className="mb-3 flex flex-wrap items-start justify-between gap-4 rounded-lg border border-[#DCDBD6] bg-white px-4 py-3.5 shadow-sm"
       data-live-report={reportLabel}
       data-report-state={statusState}
+      data-file-variant="current"
     >
       <div className="min-w-0">
         <div className="flex flex-wrap items-center gap-2">
