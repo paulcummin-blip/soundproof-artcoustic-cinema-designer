@@ -157,9 +157,14 @@ export function splitOverflowingPage(page, { budgetMm, measureHeightMm = layoutH
       if (anchor.parentNode) anchor.parentNode.insertBefore(target, anchor.nextSibling || null);
       pages.push(target);
     }
-    // Read order: the earlier block is placed before the later one.
+    // Read order: the earlier block is placed before the later one, and a block's
+    // own nodes keep the order they had — each is placed before the first child,
+    // so they are walked backwards to end up forwards.
     for (let index = moved.length - 1; index >= 0; index -= 1) {
-      moved[index].nodes.forEach((node) => target.insertBefore(node, target.firstChild || null));
+      const nodes = moved[index].nodes;
+      for (let position = nodes.length - 1; position >= 0; position -= 1) {
+        target.insertBefore(nodes[position], target.firstChild || null);
+      }
     }
   }
 

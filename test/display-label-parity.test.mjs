@@ -67,11 +67,21 @@ describe('the pack states the display the snapshot was published from', () => {
     // writes carries no aspect ratio and no "screen".
     expect(PACK).toContain('canonicalDisplayType');
     expect(PACK).toMatch(/\$\{Math\.round\(diagonal\)\}" TV/);
+    // Read the branch's own code, not the prose around it (the comments name the
+    // aspect ratio and the word screen in order to ban them).
     const televisionBranch = PACK.slice(
       PACK.indexOf('if (displayType === DISPLAY_TYPE_TV)'),
       PACK.indexOf('// Where the snapshot carries no viewable width'),
-    );
-    expect(televisionBranch).not.toMatch(/aspect/);
-    expect(televisionBranch).not.toMatch(/screen/i);
+    )
+      .replace(/\/\*[\s\S]*?\*\//g, '')
+      .replace(/\/\/[^\n]*/g, '');
+    expect(televisionBranch).toMatch(/Math\.round\(diagonal\)/);
+    expect(televisionBranch).toMatch(/" TV/);
+    // The branch never reads the aspect ratio or a viewable width, and the phrase
+    // it writes carries no other word: the only "screen" in it is the parameter
+    // name the snapshot block arrives in.
+    expect(televisionBranch).not.toMatch(/aspect/i);
+    expect(televisionBranch).not.toMatch(/viewable/i);
+    expect(televisionBranch).not.toMatch(/['"`][^'"`]*screen[^'"`]*['"`]/i);
   });
 });

@@ -206,21 +206,25 @@ describe('B. the pack\u2019s own reading rules survive the split', () => {
   });
 
   it('reads the pack\u2019s heading set from the one page-break authority', () => {
-    const headingSelectors = PACK_HEADING_SELECTORS
-      .filter((selector) => selector.startsWith('.'))
-      .map((selector) => selector.slice(1));
-    // The selectors that name a block by its own class must all be known here,
-    // so a heading added to the pack is never stranded by a split.
-    headingSelectors
-      .filter((selector) => !selector.startsWith('pp-body'))
-      .filter((selector) => !selector.includes(' '))
-      .forEach((className) => {
-        expect(FLOW_HEADING_CLASSES).toContain(className);
-      });
-    // And every class it claims is a heading the pack really renders.
+    // The pack's authority lists every heading it never strands. Two of those
+    // forms are handled by position rather than by name here: the section's own
+    // header block, which is always the page's first chunk and is kept in place
+    // rather than moved as a heading, and the prose headings, which are matched
+    // by tag (so .pp-body > h1/h2/h3 are covered by the same rule).
+    const blockHeadings = PACK_HEADING_SELECTORS
+      .filter((selector) => selector.startsWith('.') && !selector.includes(' '))
+      .map((selector) => selector.slice(1))
+      .filter((className) => className !== 'pp-header');
+
+    expect(blockHeadings.length).toBeGreaterThan(0);
+    blockHeadings.forEach((className) => {
+      expect(FLOW_HEADING_CLASSES).toContain(className);
+    });
+    // And every class it claims is a heading the pack really never strands.
     FLOW_HEADING_CLASSES.forEach((className) => {
       expect(PACK_HEADING_SELECTORS).toContain(`.${className}`);
     });
+    expect(PACK_HEADING_SELECTORS).toContain('.pp-body > h2');
   });
 
   it('measures the real element when no measurement is injected', () => {
