@@ -45,7 +45,7 @@ export const BRIEF_ITEM_STATUS = Object.freeze({
 
 /** The subjects a brief is likely to ask about, and the words that name them. */
 const SUBJECT_TERMS = Object.freeze([
-  { key: 'front_wides', pattern: /\bfront\s*wides?\b/i },
+  { key: 'front_wides', pattern: /\bfront[\s-]*wides?\b/i },
   { key: 'overheads', pattern: /\boverhead|height\s+(?:channel|speaker)/i },
   { key: 'subwoofers', pattern: /\bsubwoofers?\b|\bsubs\b|front\s*\/\s*rear|front\s+and\s+rear/i },
   { key: 'bass_output', pattern: /\bbass\s+output|lfe\b|low[- ]frequency\s+output/i },
@@ -71,6 +71,105 @@ const STOPWORDS = new Set([
   'only', 'just', 'more', 'less', 'very', 'make', 'made', 'give', 'given', 'need', 'want', 'keep',
   'ensure', 'because', 'between', 'within', 'out', 'both', 'some', 'any', 'all', 'use', 'using',
 ]);
+
+/**
+ * Words that name a request's SUBJECT but can never evidence an explanation of it:
+ * they appear wherever the subject is mentioned, so a sentence carrying "front
+ * wide", "screen", "overhead" or "position" is a mention and never an answer.
+ * A request is answered only by the specific matter it asks for, which is why the
+ * generic vocabulary of the domain is excluded from the terms that can evidence
+ * coverage.
+ */
+const GENERIC_TERMS = new Set([
+  'front', 'rear', 'side', 'sides', 'left', 'right', 'back', 'screen', 'screens', 'display',
+  'tv', 'projector', 'speaker', 'speakers', 'channel', 'channels', 'subwoofer', 'subwoofers',
+  'sub', 'subs', 'position', 'positions', 'positioning', 'location', 'locations', 'placement',
+  'placements', 'zone', 'zones', 'level', 'levels', 'result', 'results', 'value', 'values',
+  'system', 'systems', 'layout', 'arrangement', 'configuration', 'geometry', 'angle', 'angles',
+  'room', 'cinema', 'sound', 'audio', 'acoustic', 'acoustics', 'design', 'area', 'areas', 'seat',
+  'seats', 'seating', 'row', 'rows', 'overhead', 'overheads', 'bass', 'range', 'output',
+  'extension', 'response', 'viewing', 'performance', 'quality', 'capability', 'content',
+  'picture', 'image', 'impact', 'depth', 'weight', 'scale', 'immersion', 'assessment',
+  'assessed', 'consideration', 'considerations', 'decision', 'decisions', 'treatment', 'panel',
+  'panels', 'tonal', 'tonally', 'timbre', 'consistency', 'consistent', 'frequency', 'frequencies',
+]);
+
+/**
+ * A request that asks for a REASON rather than for a subject to be described. A
+ * reason is answered only by the reason itself: a design that mentions the
+ * compromise without saying why has not answered such a request.
+ */
+const CAUSE_REQUEST = /\b(?:because|due to|owing to|as a result of|resulting from|caused by|limited by|restricted by|compromis\w*|outside (?:their|its|the) ideal|out of position|not ideal|why)\b/i;
+
+/** Which writer section an item's subject belongs to, so a gap is returned to the right place. */
+const SUBJECT_WRITER_SECTION = Object.freeze({
+  front_wides: 'spatial_resolution',
+  overheads: 'spatial_resolution',
+  viewing: 'spatial_resolution',
+  spatial_resolution: 'spatial_resolution',
+  bass_output: 'dynamic_range',
+  bass_extension: 'dynamic_range',
+  bass_response: 'dynamic_range',
+  dynamic_range: 'dynamic_range',
+  seat_consistency: 'timbre_matching',
+  timbre: 'timbre_matching',
+  system_layout: 'what_stays_same',
+  subwoofers: 'what_stays_same',
+  acoustic_treatment: 'what_changes',
+});
+
+/** The specific matter a request asks to be explained: its own words, minus the domain's generic vocabulary. */
+function contentTermsOf(terms) {
+  return terms.filter((term) => !GENERIC_TERMS.has(term));
+}
+
+/**
+ * The copy as plain text: markup removed and whitespace collapsed. It is never
+ * truncated here — a passage is read from the whole section, so an explanation in
+ * the last paragraph of a section is found exactly like one in the first.
+ */
+function passageText(text) {
+  return String(text || '').replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
+}
+
+/** One sentence of the copy, as it is quoted back as evidence. */
+function quotePassage(sentence) {
+  return String(sentence || '').trim().slice(0, 400);
+}
+
+/**
+ * The passages of the finished copy that actually answer ONE item: the sentences
+ * that both reach its subject and state what it asked for — a required figure, or
+ * the specific matter it names. A related word elsewhere in the document is not a
+ * passage, and is never reported as one.
+ */
+function supportingPassages({ sections, subjectPatterns, contentTerms, requirements }) {
+  const found = [];
+  for (const entry of Array.isArray(sections) ? sections : []) {
+    for (const sentence of sentences(passageText(entry?.text))) {
+      if (!subjectPatterns.some((pattern) => pattern.test(sentence))) continue;
+      const statesFigure = requirements.some((requirement) => figureStated(requirement, sentence));
+      const statesMatter = contentTerms.length === 0
+        || contentTerms.some((term) => sentence.toLowerCase().includes(term));
+      if (!statesFigure && !statesMatter) continue;
+      found.push({ section: entry?.section || null, passage: quotePassage(sentence) });
+      if (found.length >= 3) return found;
+    }
+  }
+  return found;
+}
+
+/** The sentence that reaches an item's subject without explaining it, when there is one. */
+function mentionPassage({ sections, subjectPatterns }) {
+  for (const entry of Array.isArray(sections) ? sections : []) {
+    for (const sentence of sentences(passageText(entry?.text))) {
+      if (subjectPatterns.some((pattern) => pattern.test(sentence))) {
+        return { section: entry?.section || null, passage: quotePassage(sentence) };
+      }
+    }
+  }
+  return null;
+}
 
 /* ── what an item requires of the finished prose ───────────────────────────── */
 
@@ -174,7 +273,11 @@ export function briefItems(brief) {
   const items = [];
   for (const source of sources) {
     if (typeof source !== 'string' || source.trim().length === 0) continue;
-    for (const raw of source.split(/[\n\r•·;]+/)) {
+    // A brief line may itself hold more than one request, and each request is
+    // audited on its own: a bullet, a semicolon and a sentence end all separate
+    // them, so one answered instruction can never carry an unanswered one with it.
+    // A decimal figure (9.1.6, 2.35:1) is never read as a sentence end.
+    for (const raw of source.split(/[\n\r•·;]+|\.\s+(?=[A-Z])/)) {
       const item = raw.trim().replace(/^[-*\s]+/, '').replace(/[.\s]+$/, '');
       if (item.length >= 4) items.push(item);
     }
@@ -187,7 +290,10 @@ function termsOf(item) {
   return [...new Set(
     String(item)
       .toLowerCase()
-      .replace(/[^a-z0-9./\s-]/g, ' ')
+      // A slash-joined pair ("front/rear") is two of the item's own words and not
+      // one term: it is split rather than kept, so no request can require the copy
+      // to print a slug it would never write.
+      .replace(/[^a-z0-9.\s-]/g, ' ')
       .split(/\s+/)
       .map((word) => word.replace(/^[./-]+|[./-]+$/g, ''))
       .filter((word) => word.length >= 4 && !STOPWORDS.has(word)),
@@ -275,6 +381,10 @@ export function buildClientBriefCoverage({ brief = null, pack = null, sections =
     const matchedSubjects = matchedSubjectPatterns.filter((pattern) => pattern.test(draft));
     const matchedTerms = distinctive.filter((term) => draft.includes(term));
 
+    // What the item asks to be explained, and whether it asks for a reason.
+    const contentTerms = contentTermsOf(distinctive);
+    const causeRequired = CAUSE_REQUEST.test(item);
+
     // A parameter the item names but the reports state no result for is not copy
     // that was left out: no source states it, so it can never be written.
     const codes = parameterCodes(item);
@@ -286,22 +396,59 @@ export function buildClientBriefCoverage({ brief = null, pack = null, sections =
     const supported = (supportedTerms.length > 0 || subjects.length > 0) && missingParameters.length === 0;
     const subjectReached = matchedSubjects.length > 0 || matchedTerms.length > 0;
 
+    // THE MEANING TEST. Coverage is the explanation the copy carries, read from the
+    // passages that reach the item's subject: a request for a reason is answered
+    // only where the reason is stated, and a request for a subject is answered only
+    // where the specific matter it names is explained beside that subject.
+    const evidence = supportingPassages({
+      sections, subjectPatterns: matchedSubjectPatterns, contentTerms, requirements: requires,
+    });
+    const mention = evidence.length === 0
+      ? mentionPassage({ sections, subjectPatterns: matchedSubjectPatterns })
+      : null;
+    const causeStated = !causeRequired
+      || evidence.some((entry) => contentTerms.some((term) => entry.passage.toLowerCase().includes(term)));
+    const missingTerms = contentTerms.filter((term) => !draft.includes(term));
+
+    // A request whose own FIGURE is not the figure the evidence states is not a
+    // writer omission. No revision can answer it without contradicting the frozen
+    // evidence, so it is never returned to the writer: it is flagged for the
+    // designer, and the brief stays incomplete until they settle it.
+    const figureConflict = missing.some((requirement) => requirement.figure
+      && !evidenceText.includes(String(requirement.figure).toLowerCase()));
+
     let status = BRIEF_ITEM_STATUS.UNSUPPORTED;
     let reason = missingParameters.length > 0
       ? `the_saved_reports_state_no_result_for_${missingParameters.map((id) => `P${id}`).join(',')}`
       : 'no_source_states_this_request';
     if (supported) {
-      if (!subjectReached) {
+      if (causeRequired && !causeStated) {
+        // The request is the reason, and the copy states none: the client is told
+        // the design exists but not what the brief asked to have explained.
+        status = BRIEF_ITEM_STATUS.UNADDRESSED;
+        reason = 'the_item_asks_for_the_reason_and_the_copy_states_no_reason_for_it';
+      } else if (!subjectReached) {
         status = BRIEF_ITEM_STATUS.UNADDRESSED;
         reason = 'the_evidence_supports_this_request_and_the_copy_does_not_reach_it';
       } else if (missing.length > 0) {
         status = BRIEF_ITEM_STATUS.PARTIALLY_ADDRESSED;
         reason = missing.map((requirement) => requirement.detail).join('; ');
+      } else if (evidence.length === 0) {
+        // The subject is on the page and the specific matter the item asked to be
+        // explained is not: the client is told part of it and not the rest.
+        status = BRIEF_ITEM_STATUS.PARTIALLY_ADDRESSED;
+        reason = `the_copy_reaches_the_subject_and_does_not_explain_${missingTerms.join('_') || 'the_requested_matter'}`;
       } else {
         status = BRIEF_ITEM_STATUS.ADDRESSED;
         reason = null;
       }
     }
+
+    const requiredExplanation = [
+      ...requires.map((requirement) => requirement.detail),
+      contentTerms.length > 0 ? `the item asks for ${contentTerms.join(', ')} to be explained` : null,
+      causeRequired ? 'the item asks for the reason, so the reason itself must be stated' : null,
+    ].filter(Boolean).join('; ') || 'the item asks for its subject to be explained';
 
     return {
       item,
@@ -313,6 +460,16 @@ export function buildClientBriefCoverage({ brief = null, pack = null, sections =
       required: requires.map((requirement) => requirement.key),
       missing: missing.map((requirement) => requirement.key),
       matched_terms: matchedTerms,
+      // The actual passages of the finished copy, and nothing else: an ADDRESSED
+      // verdict always carries at least one, and a gap carries the mention that
+      // shows what the client is told instead.
+      evidence,
+      mention,
+      required_explanation: requiredExplanation,
+      missing_subject: missingTerms.join(', '),
+      figure_conflict: figureConflict,
+      needs_designer_attention: supported && figureConflict,
+      revision_section: subjects.length > 0 ? (SUBJECT_WRITER_SECTION[subjects[0]] || null) : null,
       sections: sectionsCarrying(sections, {
         patterns: matchedSubjectPatterns,
         terms: matchedTerms,
@@ -321,14 +478,45 @@ export function buildClientBriefCoverage({ brief = null, pack = null, sections =
   });
 
   const count = (status) => rows.filter((row) => row.status === status).length;
+  // What a supported request the copy has not answered is returned through: the
+  // section that carries it and the explanation it is missing. An unsupported
+  // request is never returned: nothing may be written for it.
+  const outstanding = rows.filter((row) => row.supported
+    && (row.status === BRIEF_ITEM_STATUS.UNADDRESSED
+      || row.status === BRIEF_ITEM_STATUS.PARTIALLY_ADDRESSED));
   return {
     supplied: items.length > 0,
-    rule: 'a brief item is addressed only when the finished narrative communicates what it asked for: the evidence must support it, the copy must reach its subject, and every figure or named row it requires must be stated. A supported request the copy omits is unaddressed; one the copy only partly answers is partially addressed; one no source states is unsupported',
+    rule: 'a brief item is addressed only when the finished narrative explains what it asked for: the evidence must support it, the copy must reach its subject, the specific matter it names must be explained there, every figure or named row it requires must be stated, and a request that asks for a reason is answered only where the reason itself is stated. Every verdict carries the passage it was read from or the mention that stands in its place. A supported request the copy omits is unaddressed; one the copy only partly answers is partially addressed; one no source states is unsupported',
     items: rows,
     addressed_count: count(BRIEF_ITEM_STATUS.ADDRESSED),
     partially_addressed_count: count(BRIEF_ITEM_STATUS.PARTIALLY_ADDRESSED),
     unaddressed_count: count(BRIEF_ITEM_STATUS.UNADDRESSED),
     unsupported_count: count(BRIEF_ITEM_STATUS.UNSUPPORTED),
+    // EDITORIAL COMPLETENESS, kept separate from engineering validity: the brief is
+    // complete only when every supported request it makes is answered in the copy.
+    complete: items.length === 0 ? true : outstanding.length === 0,
+    outstanding,
+    outstanding_count: outstanding.length,
+    revision_requests: outstanding
+      .filter((row) => row.needs_designer_attention !== true)
+      .map((row) => ({
+        item: row.item,
+        section: row.revision_section,
+        status: row.status,
+        required_explanation: row.required_explanation,
+        missing_subject: row.missing_subject,
+      })),
+    // A request the evidence itself contradicts is the designer's to settle: it is
+    // named here, never sent to the writer, and it keeps the brief incomplete.
+    designer_attention: outstanding
+      .filter((row) => row.needs_designer_attention === true)
+      .map((row) => ({
+        item: row.item,
+        section: row.revision_section,
+        status: row.status,
+        reason: row.reason,
+        required_explanation: row.required_explanation,
+      })),
   };
 }
 

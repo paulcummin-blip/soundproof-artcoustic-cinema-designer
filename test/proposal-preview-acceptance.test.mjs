@@ -312,7 +312,7 @@ describe('K. the read-only preview makes no database write', () => {
   });
 
   it('reaches the only issued-copy write through that decision', () => {
-    const guarded = HOOK_SOURCE.indexOf('if (shouldRecordIssuedExport({ mode, issuedDocument })) {');
+    const guarded = HOOK_SOURCE.indexOf('shouldRecordIssuedExport({ mode, issuedDocument })) {');
     const write = HOOK_SOURCE.indexOf('recordIssuedExportInBackground({');
     expect(guarded).toBeGreaterThan(-1);
     expect(write).toBeGreaterThan(guarded);

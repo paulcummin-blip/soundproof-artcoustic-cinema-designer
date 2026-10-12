@@ -306,6 +306,21 @@ export async function runProposalCopyGeneration({
     editorial_brief_supplied: writerInput.editorial_brief?.supplied === true,
     // What the brief asked for and what the draft did with it, item by item.
     client_brief_coverage: clientBriefCoverage,
+    // EDITORIAL COMPLETENESS, reported separately from the engineering validation
+    // above: the brief is complete only where every supported request it makes is
+    // answered in the finished copy. A document that is valid but not complete is
+    // never presentable as ready to issue, and the unanswered requests are named
+    // with the section each one belongs to, so they can be returned to the writer
+    // through the one controlled revision.
+    editorial_completeness: {
+      complete: clientBriefCoverage.complete === true,
+      outstanding_count: clientBriefCoverage.outstanding_count,
+      outstanding: clientBriefCoverage.outstanding,
+      revision_requests: clientBriefCoverage.revision_requests,
+      rule: 'engineering validity and editorial completeness are separate checks: this one is the designer\'s brief, and it is complete only when every supported request is explained in the copy',
+    },
+    issue_ready: record.status === GENERATION_STATUS.VALID_GENERATED
+      && clientBriefCoverage.complete === true,
     prompt_version: record.prompt_version,
     schema_version: record.schema_version,
     contract_version: record.contract_version,

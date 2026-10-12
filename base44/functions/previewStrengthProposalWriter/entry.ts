@@ -2,7 +2,8 @@ import { createClientFromRequest } from 'npm:@base44/sdk@0.8.52';
 import { readProposalReportEvidence } from '../../shared/proposalReportEvidenceReader.js';
 import { buildProposalEvidence } from '../../shared/proposalEvidence/proposalEvidenceBuilder.js';
 import { buildWriterInput } from '../../shared/proposalWriter/writerInputBuilder.js';
-import { assertWriterInputCarriesNoLiveState } from '../../shared/proposalWriter/writerPromptBuilder.js';
+import { assertWriterInputCarriesNoLiveState, buildWriterProviderRequest } from '../../shared/proposalWriter/writerPromptBuilder.js';
+import { buildBriefRevision, mergeRevisedDraft } from '../../shared/proposalWriter/writerBriefRevision.js';
 import { validateWriterOutput } from '../../shared/proposalWriter/writerOutputValidator.js';
 import { buildWriterDesignContext } from '../../shared/proposalWriter/writerDesignContext.js';
 import { buildProjectInterpretation } from '../../shared/adiProjectInterpretation.js';
@@ -101,6 +102,14 @@ export default async function(req) {
         reportType: 'single',
         versions: [{ id: versionId, label: suppliedSnapshots[0]?.version_name || version.version_name || null }],
         reportLabel: suppliedSnapshots[0]?.version_name || version.version_name || null,
+        // The version's own recorded room elements: a doorway the design records is
+        // a physical fact of this design, and it is read here so the doorway
+        // constraint can be derived where the assessment also places a result below
+        // the ideal it is measured against. Nothing is written and nothing is read
+        // that the version does not already hold.
+        designElements: Array.isArray(version?.design_state?.room_elements)
+          ? version.design_state.room_elements
+          : [],
       })
       : null;
 
@@ -158,6 +167,91 @@ export default async function(req) {
 
     const raw = suppliedOutput ?? preview?.output ?? null;
     const validation = raw == null ? null : validateWriterOutput({ input, output: raw });
+
+    // What the accepted draft did with the designer's brief, read from the draft's
+    // own sections.
+    const attemptCoverage = validation ? buildClientBriefCoverage({
+      brief: input.editorial_brief,
+      pack,
+      sections: validation.output?.sections || raw?.sections || [],
+    }) : null;
+
+    // THE one controlled revision, and it is read-only. Where the accepted draft
+    // passed the contract and left a supported request of the designer's brief
+    // unanswered, the missing subject is returned to the writer for the sections
+    // that carry it: ONE pass over the same frozen input, validated by the same
+    // validator, with every other section kept exactly as it was accepted. There is
+    // no loop, no second attempt, and nothing is written.
+    let revision = null;
+    if (preview?.ok && attemptCoverage) {
+      const plan = buildBriefRevision({
+        coverage: attemptCoverage,
+        interpretationView: input.design_interpretation?.view || null,
+      });
+      if (!plan.needed) {
+        revision = {
+          attempted: false,
+          sections: [],
+          requests: [],
+          provider_error: null,
+          duration_ms: 0,
+          returned_sections: [],
+          accepted: false,
+          output: null,
+          validation: null,
+          coverage: attemptCoverage,
+        };
+      } else {
+        const request = buildWriterProviderRequest({
+          input,
+          model: modelSelection.model,
+          briefRevision: plan,
+        });
+        const revisionStartedAt = Date.now();
+        let revisedRaw = null;
+        let revisedError = null;
+        try {
+          revisedRaw = await base44.integrations.Core.InvokeLLM(request);
+        } catch (error) {
+          revisedError = String(error?.message || error || 'The revision call failed.').slice(0, 500);
+        }
+        const merged = revisedRaw == null
+          ? null
+          : mergeRevisedDraft({ output: raw, revised: revisedRaw, sections: plan.sections });
+
+        // The revision is read back as the WHOLE document it produces: the accepted
+        // draft with the rewritten sections put back, every other section unchanged.
+        // It is adopted only where that document still passes the same contract, so a
+        // revision can never degrade an accepted draft — and a writer that returns
+        // only the sections it was asked for is not mistaken for a broken document.
+        const mergedValidation = merged == null ? null : validateWriterOutput({ input, output: merged });
+        const accepted = mergedValidation?.valid === true;
+
+        revision = {
+          attempted: true,
+          sections: plan.sections,
+          requests: plan.items,
+          provider_error: revisedError,
+          duration_ms: Date.now() - revisionStartedAt,
+          returned_sections: Array.isArray(revisedRaw?.sections)
+            ? revisedRaw.sections.map((entry) => entry?.section).filter(Boolean)
+            : [],
+          accepted,
+          output: accepted ? merged : null,
+          validation: mergedValidation ? {
+            valid: mergedValidation.valid,
+            sections: mergedValidation.sections,
+            violations: mergedValidation.violations,
+          } : null,
+          coverage: accepted && merged ? buildClientBriefCoverage({
+            brief: input.editorial_brief,
+            pack,
+            sections: merged.sections || [],
+          }) : attemptCoverage,
+        };
+      }
+    }
+
     if (body.writer_output != null) {
       return Response.json({
         dry_run: true, persisted: false, editorial_review: true,
@@ -227,6 +321,34 @@ export default async function(req) {
         sections: validation.sections,
         violations: validation.violations,
       } : null,
+      // THE CONTROLLED REVISION and what the document is after it: the final draft is
+      // the accepted draft with the revised sections put back, and every other
+      // section unchanged. Editorial completeness is reported SEPARATELY from the
+      // engineering validation above, because a document can pass every engineering
+      // rule and still leave a supported request of the designer's brief unanswered,
+      // and it is never presented as ready to issue while it does.
+      revision,
+      final_output: revision?.output ?? raw ?? null,
+      final_validation: revision?.validation ?? (validation ? {
+        valid: validation.valid,
+        sections: validation.sections,
+        violations: validation.violations,
+      } : null),
+      final_coverage: revision?.coverage ?? attemptCoverage ?? null,
+      editorial_completeness: {
+        complete: (revision?.coverage ?? attemptCoverage)
+          ? (revision?.coverage ?? attemptCoverage).complete === true
+          : null,
+        outstanding_count: (revision?.coverage ?? attemptCoverage)
+          ? (revision?.coverage ?? attemptCoverage).outstanding_count
+          : null,
+        outstanding: (revision?.coverage ?? attemptCoverage)
+          ? (revision?.coverage ?? attemptCoverage).outstanding
+          : [],
+        rule: 'editorial completeness is the designer\'s brief, checked separately from engineering validity: a supported request that the finished copy does not explain leaves the brief incomplete',
+      },
+      issue_ready: validation?.valid === true
+        && (revision?.coverage ?? attemptCoverage)?.complete === true,
     });
   } catch (error) {
     return Response.json({ dry_run: true, persisted: false, error: error?.message || 'Writer preview failed; nothing was saved' }, { status: 500 });

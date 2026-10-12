@@ -185,7 +185,7 @@ export function writerOutputJsonSchema() {
  * @param {Object} input.input — buildWriterInput output
  * @returns {string}
  */
-export function buildWriterPrompt({ input } = {}) {
+export function buildWriterPrompt({ input, briefRevision = null } = {}) {
   if (!input || typeof input !== 'object' || !input.evidence_pack?.pack_fingerprint) {
     throw new Error('A writer input built from the frozen evidence pack is required: the writer is given no other source.');
   }
@@ -281,6 +281,25 @@ export function buildWriterPrompt({ input } = {}) {
     'Check every full sentence for duplicates of 10+ words across sections. Check no raw grades, OH abbreviation, report register or unqualified seat-equality promise survives. Final copy must explain the cinema, not the assessment.',
     'Do not use absolute guarantees such as perfectly matched, maximum accuracy, exactly as the director intended, without ever sounding strained or total composure. No brings movies to life boilerplate. Output capability is impact and weight, not proof of stable/controlled bass response. Keep tonal praise specific to tonal character, not dialogue intelligibility or the whole listening experience.',
     '',
+    // THE one controlled revision. It is appended only when a draft already passed
+    // this contract and left a supported request of the designer's brief unanswered:
+    // the same input, the same rules, and the missing subject returned to the writer
+    // for the sections that carry it. Nothing else about the prompt changes.
+    ...(briefRevision?.needed === true ? [
+      '=== CONTROLLED REVISION: AN INSTRUCTION IN THE DESIGNER\'S BRIEF IS NOT EXPLAINED ===',
+      briefRevision.rule,
+      `Rewrite ONLY these sections: ${(briefRevision.sections || []).join(', ')}. Every other section has already been accepted: return it unchanged and change nothing in it.`,
+      ...(briefRevision.items || []).map((entry) => [
+        `- ${entry.section}: the brief asked for ${entry.requested}. The accepted draft does not explain it.`,
+        entry.recorded
+          ? `  What this project records for it: ${entry.recorded}.`
+          : '  This project records no reason for it, so state the result and write no reason.',
+        '  Explain it in this section, once, in the same professional voice as the rest of the document, from the frozen evidence and the interpretation the input already carries.',
+      ].join('\n')),
+      'Never invent a reason, a priority, a constraint, a conversation, a meeting, a budget, a figure or a product to answer this. Where the request cannot be explained from the evidence and the interpretation, state what the evidence supports and claim nothing more.',
+      'Do not restate another section to do it, do not add a new heading, and keep this section inside its own word limit.',
+      '',
+    ] : []),
     '=== WHAT TO RETURN ===',
     `Return one JSON object only, matching the output schema in the input exactly (${WRITER_OUTPUT_MODE}).`,
     `Top-level keys: ${['contract_version', 'pack_fingerprint', 'sections'].join(', ')}.`,
@@ -299,9 +318,9 @@ export function buildWriterPrompt({ input } = {}) {
  * @param {Object} input.input — buildWriterInput output
  * @param {string} [input.model]
  */
-export function buildWriterProviderRequest({ input, model = null } = {}) {
+export function buildWriterProviderRequest({ input, model = null, briefRevision = null } = {}) {
   return {
-    prompt: buildWriterPrompt({ input }),
+    prompt: buildWriterPrompt({ input, briefRevision }),
     response_json_schema: writerOutputJsonSchema(),
     model: typeof model === 'string' && model.trim().length > 0 ? model.trim() : WRITER_DEFAULT_MODEL,
   };

@@ -38,6 +38,7 @@ import {
 } from './adiReportEvidenceRules.js';
 import { deriveDesignPhilosophy, prioritisedPositions, rank, usableRows } from './adiDesignPhilosophy.js';
 import { designPhilosophyLines } from './designPhilosophyAuthority.js';
+import { DISPLAY_TYPE_PROJECTOR, readDisplayIdentity } from './canonicalDisplayIdentity.js';
 
 export const INTERPRETATION_STAGE = 'adi_project_interpretation';
 // Bumped to 1.1 when the interpretation gained the design philosophy: the
@@ -152,8 +153,37 @@ function deriveSeatingStory({ rowCount, totalSeats, primaryRank, secondaryRank, 
   return 'Central seats are strongest';
 }
 
-function deriveConstraints({ widthM, heightM, rowCount, overhead, subCount, screenWidthM, bed, classification }) {
+/** The wall a recorded doorway sits on, when the frozen design records one. */
+function sideWallDoorway(elements) {
+  const found = (Array.isArray(elements) ? elements : []).find((element) => {
+    const type = String(element?.type || element?.element_type || '').toLowerCase();
+    const wall = String(element?.wall || element?.wall_side || '').toLowerCase();
+    return type === 'door' && (wall === 'left' || wall === 'right');
+  });
+  if (!found) return null;
+  return String(found.wall || found.wall_side || '').toLowerCase() === 'left' ? 'Left' : 'Right';
+}
+
+/**
+ * Whether the front-wide placement is recorded below the level its own evidence
+ * places it against. Read from the front-wide result itself, so the constraint is
+ * derived from the assessment and never assumed from the layout having wides.
+ */
+function frontWideBelowIdeal(rows) {
+  const row = (Array.isArray(rows) ? rows : []).find((entry) => Number(entry?.parameter_id) === 7);
+  const level = rank(row?.level);
+  return level != null && level < 4;
+}
+
+function deriveConstraints({ widthM, heightM, rowCount, overhead, subCount, screenWidthM, bed, classification, sideWallDoor = null, frontWideCompromised = false }) {
   const constraints = [];
+  // A recorded doorway on a side wall together with a front-wide result below the
+  // ideal it is placed against: the two frozen facts the compromise is made of.
+  // Stated only when both are recorded, so a room with a door and ideal front
+  // wides is never given a compromise it does not have.
+  if (sideWallDoor && frontWideCompromised) {
+    constraints.push(`${sideWallDoor} wall doorway limits the ideal front-wide position`);
+  }
   if (widthM != null && widthM < 4) constraints.push('Side wall proximity');
   if (rowCount >= 2) constraints.push('Rear row geometry');
   if (heightM != null && heightM < 2.4) constraints.push('Low ceiling');
@@ -213,7 +243,14 @@ function deriveDecisions({ config, bed, overhead, subCount, productRoles, mountM
  * @returns {Object} frozen interpretation object
  */
 export function buildProjectInterpretation(params = {}) {
-  const { snapshot, project, clientBrief, reportType = 'system_summary', versions = [], reportLabel = null } = params;
+  const {
+    snapshot, project, clientBrief, reportType = 'system_summary', versions = [], reportLabel = null,
+    // The version's own recorded room elements, when the caller holds them: a
+    // doorway the design records is part of the design story and is read here as
+    // a physical fact. Omitted by a caller that does not hold them, in which case
+    // no doorway constraint is stated.
+    designElements = [],
+  } = params;
 
   const available = snapshot?.available === true;
   const room = snapshot?.room || {};
@@ -230,11 +267,20 @@ export function buildProjectInterpretation(params = {}) {
 
   const screen = room.screen || {};
   const screenSizeInches = num(screen.size_inches);
+  const viewableWidthM = num(screen.viewable_width_cm) != null ? num(screen.viewable_width_cm) / 100 : null;
   const screenWidthM = num(screen.computed_width_m)
-    ?? (num(screen.manual_width_m) || null);
+    ?? (num(screen.manual_width_m) || viewableWidthM);
   const mountMode = screen.mount_mode || null;
-  const tv = Boolean(project?.tv_preset_key) || (screenSizeInches != null && screenSizeInches > 0 && screenSizeInches < 65 && !screen.manual_dimensions);
-  const projection = !tv && ((screenSizeInches != null && screenSizeInches >= 100) || (screenWidthM != null && screenWidthM >= 2.2));
+
+  // THE display identity, read from the frozen snapshot's own display fields
+  // (display_type, television, diagonal_inches) rather than re-derived from a
+  // size or a width. A 115" television is a television: it is never re-described
+  // as a projection screen because its viewable width happens to be large. The
+  // same authority the client-facing Project Report states the display from, so
+  // Stage 1 and the report can never describe the same display differently.
+  const displayIdentity = readDisplayIdentity(screen);
+  const tv = displayIdentity.isTv;
+  const projection = !tv && displayIdentity.displayType === DISPLAY_TYPE_PROJECTOR;
 
   const system = snapshot?.system || {};
   const config = system.configuration?.dolby_config
@@ -341,9 +387,12 @@ export function buildProjectInterpretation(params = {}) {
     use: 'Internal designer diagnostic only. Never mentioned, quoted, scored or expressed as a percentage in client-facing copy.',
   };
 
+  const rows = usableRows(parameterEvidence, bassEvidence);
   const constraintsList = deriveConstraints({
     widthM, heightM, rowCount, overhead, subCount, screenWidthM, bed,
     classification: text(room.classification),
+    sideWallDoor: sideWallDoorway(designElements),
+    frontWideCompromised: frontWideBelowIdeal(rows),
   });
 
   // The philosophy reads only what the interpretation already derived: the room,
@@ -351,7 +400,13 @@ export function buildProjectInterpretation(params = {}) {
   // existing assessment. It states no figure and no level of its own.
   const discreteChannels = num(system.configuration?.total_discrete_channels);
   const displayText = `${
-    tv && screenSizeInches ? `${screenSizeInches}" TV` : projection && screenWidthM != null ? `${screenWidthM.toFixed(2)}m projection screen` : 'Display recorded in the design'
+    tv
+      ? (displayIdentity.tvPhrase || 'TV')
+      : projection && screenWidthM != null
+        ? `${screenWidthM.toFixed(2)}m projection screen`
+        : projection && screenSizeInches != null
+          ? `${screenSizeInches}" projection screen`
+          : 'Display recorded in the design'
   }${rowCount > 0 ? `, ${rowCount} seating row${rowCount === 1 ? '' : 's'}` : ''}${
     totalSeats > 0 ? `, ${totalSeats} seats` : ''
   }: the display size and the seating distance were set together, and the reported viewing result is the evidence for how they balance.`;
@@ -384,7 +439,7 @@ export function buildProjectInterpretation(params = {}) {
     displayText,
     coverageText,
     bassText,
-    rows: usableRows(parameterEvidence, bassEvidence),
+    rows,
     emphasis,
   });
 

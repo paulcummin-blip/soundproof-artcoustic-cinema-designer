@@ -16,7 +16,7 @@ export const VALIDATOR_SOURCE_MANIFEST = Object.freeze({
   'base44/shared/proposalWriter/writerCabinetLanguage.js': '18e37edb21bd8422c6293c5fde809984d185e7188d0fe4a12fa2ff352d4b72c7',
   'base44/shared/proposalWriter/writerValidationRegister.js': '634502ab07c0bf1b13cfe0879d1e2ca2e85f0419c94f377b266a977c38c07b96',
   'base44/shared/proposalWriter/writerInputBuilder.js': 'fc796ddb2a5944e1b1f42346861028d686c1783cf329ee8dad6f501292dc2364',
-  'base44/shared/proposalWriter/writerPromptBuilder.js': '579c8dced46828bfbd14a3d0ba5832666119c9014e4136d74319e56f604202da',
+  'base44/shared/proposalWriter/writerPromptBuilder.js': '78318fc32239eb020780309af5369f1e8f30e30f099fa6868ac6cbe9cec5d667',
   'base44/shared/proposalWriter/writerSectionMapping.js': 'f5a6d2a5fe974fbd5c16d810d95f99da72f629a4fb8cb33793aa472778ade2f0',
   'base44/shared/proposalWriter/writerDesignContext.js': 'ec846bfa27dfcb46397e19b1c0063370add28677ab7ffd777aea591be2a4507f',
   'base44/shared/proposalEdit/completeDocumentValidation.js': 'cff20d7146ecbeb3a9c325e3147db41cab552f7ea950dd93385ee1d478683ddd',
@@ -33,7 +33,7 @@ export const VALIDATOR_SOURCE_MANIFEST = Object.freeze({
   // reasoning authority it was written under.
   'base44/shared/designPhilosophyAuthority.js': '1a4ba9bfd86d5bd17cabac52e6dab78359f601f92b14e0a63703d679915179fc',
   'base44/shared/adiDesignPhilosophy.js': 'cd275e6c1ba1c768378b701e5494f10042b550727e806ca1f24716d0c06103cc',
-  'base44/shared/adiProjectInterpretation.js': '9f4a914230ea4bc291e6deed38065bad065fb171868bd75175e89f313d613ab0',
+  'base44/shared/adiProjectInterpretation.js': '2a04ef1b8b19763443fd91ffaf1124c5b89ad8d9ef971ded070409cb665c38aa',
   // The check between the saved interpretation and the frozen evidence, which now
   // also holds the design philosophy's own statements to it.
   'base44/shared/proposalWriter/writerInterpretationEvidenceCheck.js': '23f5ffa5e6dcb6d2311365665cde650ac4b38f076812cc4f45552acf009dda65',
