@@ -40,8 +40,12 @@ import {
 /** The provider the writer is called on. Never named in the browser. */
 export const WRITER_PROVIDER = 'base44-ai-gateway';
 
-/** The model a controlled test starts on; the flag may override it. */
-export const WRITER_DEFAULT_MODEL = 'gpt_5_mini';
+/**
+ * THE model the Sound Proof proposal writer runs on, named explicitly so a draft
+ * never depends on the gateway's own unstated default. A master admin's flag
+ * override, where one is set, still takes precedence — see writerModelFor.
+ */
+export const WRITER_DEFAULT_MODEL = 'gpt_6_astra';
 
 /**
  * Keys that carry live design state. None of them may appear anywhere in a

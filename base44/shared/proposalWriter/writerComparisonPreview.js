@@ -40,9 +40,9 @@ import { buildClientBriefCoverage } from './writerClientBriefCoverage.js';
 
 /**
  * The only model identifiers a controlled preview may select. Both are verified
- * against the Base44 provider configuration: `gpt_5_mini` is the production
- * writer's own baseline, and `gpt_6_astra` is a supported, more capable gateway
- * model. An identifier that is not on this list is refused rather than passed
+ * against the Base44 provider configuration: `gpt_6_astra` is the production
+ * writer's own model, and `gpt_5_mini` is the lighter gateway model a comparison
+ * may still name. An identifier that is not on this list is refused rather than passed
  * through, so a typo can never become an unstated gateway default.
  */
 export const SUPPORTED_WRITER_MODELS = Object.freeze(['gpt_5_mini', 'gpt_6_astra']);

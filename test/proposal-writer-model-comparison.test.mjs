@@ -111,7 +111,7 @@ test('A — a model named in another case still resolves to its canonical identi
   assert.equal(resolveComparisonModel('gpt_5_mini').model, 'gpt_5_mini');
 });
 
-test('A — with no identifier the production baseline is stated, never implied', async () => {
+test('A — with no identifier the production model is stated, never implied', async () => {
   const seen = [];
   const preview = await runWriterModelPreview({
     input: writerInput(),
@@ -119,10 +119,10 @@ test('A — with no identifier the production baseline is stated, never implied'
     invokeLLM: async (request) => { seen.push(request); return draft(); },
   });
 
-  assert.equal(WRITER_DEFAULT_MODEL, 'gpt_5_mini');
-  assert.equal(seen[0].model, 'gpt_5_mini', 'the gateway is never reached without an identifier');
+  assert.equal(WRITER_DEFAULT_MODEL, 'gpt_6_astra');
+  assert.equal(seen[0].model, 'gpt_6_astra', 'the gateway is never reached without an identifier');
   assert.equal(preview.model_audit.requested_model, null);
-  assert.equal(preview.model_audit.resolved_model, 'gpt_5_mini');
+  assert.equal(preview.model_audit.resolved_model, 'gpt_6_astra');
   assert.equal(preview.model_audit.model_selection, MODEL_SELECTION.DEFAULT);
 
   assert.equal(resolveComparisonModel('').model, WRITER_DEFAULT_MODEL);
@@ -264,9 +264,9 @@ test('F — the preview path carries no persistence call anywhere', () => {
 // — G. PRODUCTION GENERATION IS UNCHANGED
 
 test('G — production generation keeps its own model resolution and its own switch', async () => {
-  assert.equal(WRITER_DEFAULT_MODEL, 'gpt_5_mini');
-  assert.equal(writerModelFor(null), 'gpt_5_mini');
-  assert.equal(writerModelFor(''), 'gpt_5_mini');
+  assert.equal(WRITER_DEFAULT_MODEL, 'gpt_6_astra');
+  assert.equal(writerModelFor(null), 'gpt_6_astra');
+  assert.equal(writerModelFor(''), 'gpt_6_astra');
   assert.equal(writerModelFor('gpt_6_astra'), 'gpt_6_astra', 'a flag override is still honoured');
 
   let called = 0;

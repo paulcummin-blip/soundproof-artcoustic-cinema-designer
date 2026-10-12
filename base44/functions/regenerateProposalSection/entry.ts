@@ -17,6 +17,7 @@ import {
   buildProductVocabularyRule,
   groundProductMentions,
 } from '../../shared/proposalProductGrounding.js';
+import { WRITER_DEFAULT_MODEL } from '../../shared/proposalWriter/writerPromptBuilder.js';
 
 const SECTION_TITLES: Record<string, string> = {
   executive_summary: 'Executive Summary',
@@ -275,7 +276,10 @@ export default async function(req) {
     ].join('\n');
 
     // ── Invoke LLM ──
-    const llmResult = await base44.integrations.Core.InvokeLLM({ prompt });
+    // The model is named explicitly, exactly as the writer's own provider call
+    // names it: a rewritten section must never fall back to the gateway's own
+    // unstated default.
+    const llmResult = await base44.integrations.Core.InvokeLLM({ prompt, model: WRITER_DEFAULT_MODEL });
     const rawHtml = typeof llmResult === 'string' ? llmResult : llmResult?.content || '';
     // The same narrative rules as first-draft generation: no AI-written table, no
     // predicted result described as measured, no blanket tonal guarantee where the

@@ -20,8 +20,8 @@ import {
 // and the validation. It writes NOTHING: no proposal, no section, no library
 // entry, no report or export status.
 //
-// The writer may be called with an EXPLICITLY selected model — gpt_5_mini (the
-// production baseline) or gpt_6_astra (a more capable gateway model). The
+// The writer may be called with an EXPLICITLY selected model — gpt_6_astra (the
+// production model) or gpt_5_mini (the lighter gateway model). The
 // identifier is validated against the supported set before anything is sent, so
 // two reviews can be run over ONE identical frozen input with the model as the
 // only variable, and an unsupported identifier is refused rather than silently
