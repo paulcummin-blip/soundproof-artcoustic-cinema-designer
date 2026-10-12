@@ -1,6 +1,7 @@
 /**
  * Acceptance tests for the System Design Summary pack polish:
- * one evidence table that fits one page, prose-only narrative sections, honest
+ * an evidence table whose rows continue between whole rows under a repeated
+ * column heading, prose-only narrative sections, honest
  * treatment of Level 1 / Level 2 results, consistent screen terminology, and
  * image-led project image pages.
  */
@@ -18,6 +19,11 @@ import {
   screenStatement,
 } from '../src/components/proposal/print/proposalPackAuthority.js';
 import { imagePagesFor, IMAGES_PER_PAGE } from '../src/components/proposal/print/imagePageLayout.js';
+import {
+  PACK_PAGE_BREAK_RULES,
+  PACK_TABLE_FOLLOWS_HEADING_SELECTORS,
+  proposalPackPageBreakCss,
+} from '../src/components/proposal/print/proposalPageBreakRules.js';
 
 /** The rows the Marquee System Design Summary carries, as stored calculated data. */
 const MARQUEE_ROWS = [
@@ -169,12 +175,12 @@ describe('Screen terminology', () => {
       diagonal_inches: 83,
       aspect_ratio: '16:9',
       television: true,
-    })).toEqual({ value: '83" 16:9 screen', hint: null });
+    })).toEqual({ value: '83" TV', hint: null });
   });
 
   it('states a projection screen by its viewable image alone', () => {
     const card = buildAtAGlance({ snapshot: SCREEN_SNAPSHOT, projectName: 'Marquee' })
-      .roomCards.find((entry) => entry.label === 'Screen');
+      .roomCards.find((entry) => entry.label === 'Display');
     expect(card.value).toBe('170" 2.35:1 viewable image');
     // The overall assembly the screen needs behind it is manufacturing detail:
     // it belongs in the technical data, not on the client's summary card.
@@ -231,30 +237,55 @@ describe('Project image pages are image-led', () => {
   });
 });
 
-describe('Print break rules in the pack stylesheet', () => {
-  const css = fs.readFileSync(
-    new URL('../src/components/proposal/print/ProposalPackStyles.jsx', import.meta.url),
-    'utf8'
-  );
+describe('Print break rules in the pack authority', () => {
+  const ruleFor = (id) => PACK_PAGE_BREAK_RULES.find((rule) => rule.id === id);
+  const breakCss = proposalPackPageBreakCss();
 
-  it('keeps the highlights section and its table indivisible', () => {
-    expect(css).toMatch(/pp-page--highlights[\s\S]*break-inside: avoid/);
-    expect(css).toMatch(/pp-page--highlights[\s\S]*page-break-inside: avoid/);
-    expect(css).toMatch(/pp-page--highlights \.kph-table/);
+  it('keeps the evidence heading with its table, and continues the page between whole rows', () => {
+    // The heading, its introduction and the table are one printed statement: the
+    // table may not begin a page away from the heading it belongs to…
+    expect(PACK_TABLE_FOLLOWS_HEADING_SELECTORS)
+      .toContain('.proposal-print-section--highlights .kph-table');
+    // …and the evidence page continues onto a further sheet when the saved rows
+    // need one, which is what stops a sheet printing the heading over nothing.
+    const continuation = ruleFor('designed-pages-continue-when-they-must');
+    expect(continuation.selectors).toContain('.pp-page--highlights');
+    expect(continuation.declarations.breakInside).toBe('auto');
+    // The continuation happens between WHOLE rows, under a column-heading group
+    // the print engine repeats on the sheet the rows continue onto.
+    const tableHeader = ruleFor('table-header-keeps-its-rows');
+    expect(tableHeader.selectors).toContain('.kph-table thead');
+    expect(tableHeader.declarations.headerGroup).toBe(true);
+    const tableRow = ruleFor('table-row-is-never-split');
+    expect(tableRow.selectors).toContain('.kph-table tr');
+    expect(tableRow.declarations.breakInside).toBe('avoid');
+    expect(breakCss).toContain('display: table-header-group;');
   });
 
   it('keeps headings with their first block and designed blocks whole', () => {
-    expect(css).toMatch(/pp-block__title[\s\S]*break-after: avoid/);
-    expect(css).toMatch(/pp-header[\s\S]*break-after: avoid/);
-    expect(css).toMatch(/pp-table[\s\S]*break-inside: avoid/);
+    const headings = ruleFor('heading-keeps-its-first-block');
+    expect(headings.selectors).toContain('.pp-block__title');
+    expect(headings.selectors).toContain('.pp-header');
+    expect(headings.declarations.breakAfter).toBe('avoid');
+    const blocks = ruleFor('block-is-never-split');
+    expect(blocks.selectors).toContain('.pp-table');
+    expect(blocks.declarations.breakInside).toBe('avoid');
   });
 
   it('keeps the one at a glance page whole', () => {
-    expect(css).toMatch(/pp-page--glance[\s\S]*break-inside: avoid/);
+    const onePage = ruleFor('one-page-sections-are-read-as-one-thing');
+    expect(onePage.selectors).toContain('.pp-page--glance');
+    expect(onePage.declarations.breakInside).toBe('avoid');
+    expect(breakCss).toContain('break-inside: avoid;');
   });
 
   it('gives the image pages their own page and keeps them whole', () => {
-    expect(css).toMatch(/pp-page--images[\s\S]*break-inside: avoid/);
-    expect(css).toMatch(/pp-gallery__figure[\s\S]*break-inside: avoid/);
+    const onePage = ruleFor('one-page-sections-are-read-as-one-thing');
+    expect(onePage.selectors).toContain('.pp-page--images');
+    expect(onePage.selectors).toContain('.pp-gallery__figure');
+    expect(onePage.declarations.breakInside).toBe('avoid');
+    const pageStart = ruleFor('page-starts-on-its-own-sheet');
+    expect(pageStart.selectors).toContain('.pp-page');
+    expect(pageStart.declarations.breakBefore).toBe('page');
   });
 });

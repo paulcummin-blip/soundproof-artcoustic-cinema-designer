@@ -124,15 +124,19 @@ describe('B. the Key Performance Highlights introduction', () => {
     const firstSentence = paragraphsOf(intro.body)[0].split(/(?<=\.)\s+/)[0];
 
     expect(countOf(html, firstSentence)).toBe(1);
-    expect(countOf(html, 'pp-highlights__intro')).toBe(1);
+    // Counted in the document's own markup: the print stylesheet names the
+    // introduction in its keep-with-the-table rule, and a class name in a rule is
+    // not a second copy of the copy.
+    expect(countOf(html.replace(/<style[\s\S]*?<\/style>/g, ''), 'pp-highlights__intro')).toBe(1);
 
     // Document order: the page's own headline, then the introduction, then the
-    // table it introduces. The counts above already prove the copy appears once.
-    // The table is searched for after the introduction because the document's
-    // stylesheet, printed earlier, names the same class.
-    const headingAt = html.indexOf('Key Performance Highlights');
-    const introAt = html.indexOf('pp-highlights__intro');
-    const tableAt = html.indexOf('kph-table', introAt);
+    // table it introduces. Read from the document's own markup: the print
+    // stylesheet names both classes in its break rules, and it is printed at the
+    // top of the document, above the cover.
+    const markup = html.replace(/<style[\s\S]*?<\/style>/g, '');
+    const headingAt = markup.indexOf('Key Performance Highlights');
+    const introAt = markup.indexOf('pp-highlights__intro');
+    const tableAt = markup.indexOf('kph-table', introAt);
     expect(headingAt).toBeGreaterThan(-1);
     expect(introAt).toBeGreaterThan(headingAt);
     expect(tableAt).toBeGreaterThan(introAt);
@@ -237,13 +241,18 @@ describe('H. document order', () => {
 
     const html = renderGenesis();
     const cover = html.indexOf('proposal-print-cover');
-    const appendix = html.indexOf('pp-page--appendix');
+    // The Appendix closes the document as an endnote on the last content sheet:
+    // a few closing sentences close that sheet rather than taking one of their
+    // own, so the close is the last thing printed and no page follows it.
+    const endnote = html.indexOf('class="pp-endnote"');
     expect(cover).toBeGreaterThan(-1);
-    expect(appendix).toBeGreaterThan(cover);
+    expect(endnote).toBeGreaterThan(cover);
     // No section page is printed above the cover.
     expect(html.indexOf('pp-page--system_design_summary')).toBeGreaterThan(cover);
     // The alternatives belong to the copy that explains them, before the close.
-    expect(html.indexOf('pp-page--presented_options')).toBeLessThan(appendix);
+    expect(html.indexOf('pp-page--presented_options')).toBeLessThan(endnote);
+    // Nothing but the closing note itself follows it.
+    expect(html.slice(endnote)).not.toContain('pp-header__title');
   });
 
   it('orders stored rows canonically however the database returned them', () => {
