@@ -96,7 +96,14 @@ export const WRITER_CONTRACT_VERSION = 2;
 // sections, the word limits, the grounding rule and every earlier rejection keep
 // their meaning, so a historical generation is still read against the agreement it
 // was written under.
-export const WRITER_PROMPT_VERSION = 'proposal-writer-prompt-12';
+// Bumped to 13 for the design-context pass: the writer is given the verified ADI
+// project interpretation and the designer's brief, the Design Summary introduces
+// the cinema rather than opening on the top-ranked result in 2-3 sentences, the
+// ranking decides emphasis rather than the order of the document, and no section
+// is written as a bounded fragment with nothing to say. Section IDs, order and
+// the claim grounding rule are unchanged, so a draft filed under an earlier
+// generation is still read against the agreement it was written under.
+export const WRITER_PROMPT_VERSION = 'proposal-writer-prompt-13';
 
 /** The only pack generation a draft may be written from. */
 export const WRITER_ACCEPTED_PACK_SCHEMA_VERSION = 2;
@@ -246,8 +253,8 @@ export const WRITER_SECTIONS = Object.freeze([
     section: 'decision_summary',
     title: 'Decision Summary',
     title_single: 'Design Summary',
-    requirement_single: 'Introduce the finished design in 2–3 confident, experience-led sentences. Use its frozen display, immersive architecture and seating identity naturally, not as a specification dump. Never say this proposal outlines, this design presents, this option, decision or selected option.',
-    word_limit: 140,
+    requirement_single: 'Introduce the cinema itself, in developed natural paragraphs: the room and its proportions, its intended use where the interpretation states one, the display and why it suits the room, the seating arrangement, the system architecture, the most important design considerations, and the experience this design is intended to deliver. Write as an experienced cinema designer would write for a homeowner or architect. Do not list equipment, do not dump specifications, and do not restate the performance claim here. Never say this proposal outlines, this design presents, this option, decision or selected option.',
+    word_limit: 200,
     requirement: 'State the decision between the options in the pack\'s own framing, and only where the pack allows a framing.',
   },
   {
@@ -256,29 +263,30 @@ export const WRITER_SECTIONS = Object.freeze([
     // A single-option proposal is not a comparison: the same section, the same
     // slot and the same word limit, labelled for what it actually says.
     title_single: 'Design Overview',
-    word_limit: 130,
+    word_limit: 180,
     requirement: 'State only what every option shares, from the shared-result claims the pack allows. Where the copy also contrasts the options, cite the shared-result claims for what is unchanged and the pack\'s factual-change or material-gain claims for what differs.',
-    requirement_single: 'Introduce the design the client is being offered: the room, the system and what it delivers, from the design-identity and shared-result claims the pack allows. Never mention another option or a baseline.',
+    requirement_single: 'Explain how the system is arranged: the loudspeaker layout and its channel count, where the screen channels, the surrounds and the overhead channels are placed, the seating and the display, and how those parts work together in this room. Write from the design-identity and shared-result claims the pack allows, and from the interpretation\'s account of the architecture. Never mention another option or a baseline.',
   },
   {
     section: 'what_changes',
     title: 'What Changes',
     title_single: 'Why This Specification',
-    word_limit: 180,
+    word_limit: 220,
     requirement: 'State only the differences the pack records, and call one a gain only where the pack allows a gain.',
-    requirement_single: 'Explain why this specification was chosen and what it gives the client, from the ranked strength stories and the credibility claims the pack allows. Never state or imply a comparison with another option or a baseline, and never write filler such as "there are no changes to report".',
+    requirement_single: 'Explain why this solution suits this project: the choices that were made, such as the loudspeaker family, the layout and the bass approach, and what each one gives the client in this room. Write from the ranked strength stories and the credibility claims the pack allows, and from the design decisions and constraints the interpretation states. Never state or imply a comparison with another option or a baseline, and never write filler such as "there are no changes to report".',
   },
   {
     section: 'key_performance_highlights',
     title: 'Key Performance Highlights',
-    requirement_single: 'Write 2–3 concise benefit-led sentences, following the supplied strength ranking. No dBC values, Hz values, angles, channel counts or grades here: put proof in the specialist section. Never copy complete evidence statements. No overall-seat equality claim.',
-    word_limit: 170,
+    requirement_single: 'State what engineering evidence supports this proposal: the recorded results the pack\'s claims carry, for the areas that carry a claim, in a small number of concise benefit-led sentences. Use the strength ranking to choose what is stated here, never to fix the order of the document. No dBC values, Hz values, angles, channel counts or grades: the proof belongs in the specialist sections. Never copy a complete evidence statement. No overall-seat equality claim.',
+    word_limit: 190,
     requirement: 'State the pack\'s recorded results, in the pack\'s own words, for the areas that carry a claim.',
   },
   {
     section: 'spatial_resolution',
     title: 'Spatial Resolution',
-    word_limit: 170,
+    requirement_single: 'Explain how the layout contributes to the immersion: how sound moves between the screen, the surround and the overhead channels, and what the seating arrangement, the viewing geometry and the display give the client. Stay within the claims the pack allows.',
+    word_limit: 180,
     requirement: 'Explain what the spatial results mean for the seating, within the claims the pack allows.',
   },
   {
@@ -291,8 +299,8 @@ export const WRITER_SECTIONS = Object.freeze([
   {
     section: 'timbre_matching',
     title: 'Timbre Matching',
-    requirement_single: 'Explain how voices and effects retain their tonal character as they move between screen, surround and overhead channels, across only the supported seats. Keep every seat statement explicitly limited to tonal character, not overall balance, bass or placement. No bass-extension detour and no both parameters wording.',
-    word_limit: 150,
+    requirement_single: 'Explain how tonal consistency benefits the experience: voices and effects retain their tonal character as they move between the screen, the surround and the overhead channels, across only the supported seats. Keep every seat statement explicitly limited to tonal character, not overall balance, bass or placement. No bass-extension detour and no both parameters wording.',
+    word_limit: 170,
     requirement: 'Explain the loudspeaker and coverage evidence the pack records, and claim nothing beyond it.',
   },
   {
@@ -309,8 +317,8 @@ export const WRITER_SECTIONS = Object.freeze([
   {
     section: 'overall_design',
     title: 'Overall Design',
-    requirement_single: 'Close in 2–3 natural, project-specific sentences: connect the particular picture and viewing experience to convincing movement, consistent tonal character and the supported bass/dynamic strengths. Do not repeat any numbers, specification list or earlier sentence. Never claim consistent overall experience for every viewer from tonal evidence.',
-    word_limit: 190,
+    requirement_single: 'Close on what the client should expect from the final design: connect this particular picture and viewing experience to the movement around and above the audience, the tonal character, and the supported bass and dynamic strengths, in this project\'s own terms rather than a general claim. Do not repeat any number, specification list or earlier sentence. Never claim a consistent overall experience for every viewer from tonal evidence.',
+    word_limit: 200,
     requirement: 'Close on the design as a whole, using only the credibility and recommendation claims the pack allows.',
   },
   {
@@ -334,7 +342,7 @@ export function isSingleOptionPack(mode) {
 }
 
 /**
- * The nine sections as the given proposal mode labels them. A single-option
+ * The sections as the given proposal mode labels them. A single-option
  * proposal never carries the comparison's two headings; a comparison keeps them.
  * Section IDs, order and word limits are identical in both modes, so the
  * returned draft is the same shape either way.
@@ -406,7 +414,8 @@ export function inputHasOptionGuidance(input) {
 
 /**
  * The output schema as the writer is given it: JSON only, these top-level keys,
- * these per-section keys, and these nine sections. There is no other shape.
+ * these per-section keys, and every section this contract requires. There is no
+ * other shape.
  */
 export function writerOutputSchema(mode = 'comparison') {
   return {
@@ -428,13 +437,16 @@ export function writerOutputSchema(mode = 'comparison') {
  */
 export const WRITER_WRITING_RULES = Object.freeze([
   'Write only from the evidence pack. It is the sole source of every fact, figure, level and claim.',
-  'Write the ranked strength stories you are given, in rank order. Never decide for yourself which parameters matter: the ranking is already decided, and the strongest supported story leads.',
+  'The ranked strength stories you are given decide which engineering characteristics deserve emphasis: rank 1 is the strongest result the evidence states, and never decide for yourself which parameters matter. The ranking is not a compulsory order for the document: the design\'s own story sets the editorial order, and every story you state is stated by citing its own allowed_claim_ids.',
+  'A verified ADI design interpretation is supplied in design_interpretation: the room, its intended use, the display and seating, the system architecture, the constraints, the reasons behind the design decisions, the strongest characteristics and the results that are reliable evidence. Read it and write from it. It explains the design and is never a source of figures: every figure, level, parameter and product still comes from the evidence pack and its allowed claims, the frozen evidence takes priority wherever the two differ, and where the interpretation states nothing you invent nothing.',
+  'The designer\'s own brief is supplied in editorial_brief. Treat it as instructions about what to emphasise and what needs explaining. It never overrides the evidence, it never changes a figure, a level, a product or a claim, and it is never copied: no note, instruction, filename or caption from it appears in the draft.',
   'Sell what the design delivers, not how it was analysed. This is the proposal stage: state the finished design and what the client will experience, never the design-stage work that produced it.',
   'Open each story with the experience the client will have, then why they will value it, then the engineering proof. The number is the proof, never the story, so never lead a paragraph with a parameter number, a Performance Level, a channel count or a dB value.',
   'Write the section the pack asks for under its own label: where the pack is a single-option proposal it carries no comparison headings, so write the design the client is being offered and why this specification was chosen, and never write filler such as "there are no changes to report".',
   'Name the display exactly as the frozen evidence names it. Where the display is a TV, write the TV (for example 115" TV) and use it in the viewing story with the viewing angle and the front-row seating; never write a screen size, an aspect ratio, a viewable width or any projector word. A projection screen keeps its projector-screen language.',
   'Never write in the software-report register: no "assessed for", "this parameter", "according to the report", "performance result", "this proposal details", "established configuration" or "calculated design result".',
   'In a single-option proposal, never compare the design to a baseline or another option: no increase, greater, improved, more capable, additional headroom, higher output, upgrade or compared to. Describe the capability directly.',
+  'The proposal describes the design that has been specified and what it will deliver. Never write as though its performance has already been demonstrated in this room: the engineering analysis is complete and frozen, and the design is proposed, specified, modelled and designed.',
   'This proposal is written before installation: write specified, selected, designed, modelled or proposed, never installed or installation, unless the frozen evidence says the system is installed.',
   'Every client-facing claim must cite one or more allowed claim IDs in that section\'s claim_ids.',
   'Where a section states what is shared and also contrasts the options, cite both: the shared-result claims for the unchanged facts and the factual-change or material-gain claims for the facts that differ.',
@@ -455,7 +467,7 @@ export const WRITER_WRITING_RULES = Object.freeze([
   'The proposal is not a design review: never write that something needs attention, improvement, calibration, optimisation or further design work, and never suggest a future correction, a recalibration or an upgrade path.',
   'Write to the client: benefit-led, dealer-safe language, with no internal parameter codes and no engineering jargon.',
   'No sentence of 10 or more words may appear verbatim in more than one section. Do not reuse complete evidence sentences with minor word substitutions. Facts may recur only for a genuinely different editorial purpose.',
-  'Give each section its own job: Why This Specification explains the choice; Highlights gives concise benefits without repeating figures; Dynamic Range supplies useful output figures and demanding-playback proof; Overall Design synthesises the project-specific experience without recycling numbers.',
+  'Give each section its own job, and never carry the same three strengths through the document in the same words: Design Summary introduces the cinema; Design Overview explains how the system is arranged; Why This Specification explains why this solution suits the project; Key Performance Highlights sets out the engineering evidence; Spatial Resolution explains how the layout creates the immersion; Dynamic Range explains the capability and what it buys; Timbre Matching explains the tonal benefit; Overall Design closes on what the client should expect.',
   'Use each engineering figure normally once in main prose. Keep output figures in Dynamic Range, viewing angles in Spatial Resolution and extension proof where it explains deep bass. Repeat only where it adds real value, never in Overall Design.',
   'Never write L1, L2, L3, L4, L4 result or RP22 Level 4 in narrative prose. Never write (OH); write overhead channels. Structured grading tables and pills are not narrative prose.',
   'Tonal consistency across seats supports only tonal character: never broaden it into equal seats, overall experience balance, bass consistency, placement consistency or whole-room balance.',
@@ -464,7 +476,7 @@ export const WRITER_WRITING_RULES = Object.freeze([
   'Close on this design\'s particular viewing experience, movement, tonal character and bass capability, not treats every seat as a priority, balances high-resolution spatial imaging with authoritative bass performance, high-quality experience for everyone or immersive and consistent experience for the home.',
   'Keep every paragraph to one to three sentences, and keep every section inside its word limit.',
   'Explain what each recorded result means for the room, rather than naming the number and moving on.',
-  'Return structured JSON only, in the nine sections of this contract, with no extra fields and no commentary.',
+  'Return structured JSON only, in every section this contract requires, with no extra fields and no commentary.',
 ]);
 
 /** A rejection, in the one shape every rule reports. */

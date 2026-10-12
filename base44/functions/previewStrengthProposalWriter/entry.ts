@@ -4,6 +4,7 @@ import { buildProposalEvidence } from '../../shared/proposalEvidence/proposalEvi
 import { buildWriterInput } from '../../shared/proposalWriter/writerInputBuilder.js';
 import { buildWriterProviderRequest, assertWriterInputCarriesNoLiveState } from '../../shared/proposalWriter/writerPromptBuilder.js';
 import { validateWriterOutput } from '../../shared/proposalWriter/writerOutputValidator.js';
+import { buildWriterDesignContext } from '../../shared/proposalWriter/writerDesignContext.js';
 import { WRITER_PROMPT_VERSION } from '../../shared/proposalWriter/writerContractSchema.js';
 
 // READ-ONLY dry run of the strength-led proposal writer. It reads ONE version's
@@ -30,6 +31,24 @@ export default async function(req) {
       return Response.json({ error: 'Version does not belong to this project' }, { status: 400 });
     }
 
+    // An optional saved proposal supplies the design interpretation and the
+    // designer's notes for this read-only review. Nothing is written: the proposal
+    // and its sections are only read.
+    const proposalId = body.proposal_id || null;
+    let proposal = null;
+    let dealerNotes = null;
+    if (proposalId) {
+      proposal = await base44.entities.Proposal.get(proposalId).catch(() => null);
+      if (!proposal || proposal.project_id !== projectId) {
+        return Response.json({ error: 'proposal_id must be a proposal of this project' }, { status: 400 });
+      }
+      const sectionPage = await base44.entities.ProposalSection.filter({ proposal_id: proposal.id }, { limit: 50 });
+      dealerNotes = (Array.isArray(sectionPage) ? sectionPage : (sectionPage?.items || []))
+        .map((section) => (typeof section?.dealer_notes === 'string' ? section.dealer_notes.trim() : ''))
+        .filter(Boolean)
+        .join('\n\n') || null;
+    }
+
     // The canonical Project Report evidence, read exactly as a proposal reads it.
     const suppliedSnapshots = await readProposalReportEvidence(base44.entities, projectId, [version]);
     if (!suppliedSnapshots.length) return Response.json({ error: 'No Project Report evidence for this version' }, { status: 409 });
@@ -37,8 +56,16 @@ export default async function(req) {
     // Phase 1: the frozen evidence pack, carrying the ranked strength stories.
     const pack = buildProposalEvidence({ versions: suppliedSnapshots });
 
-    // Phase 2: the one versioned writer input the writer is given.
-    const input = buildWriterInput({ pack });
+    // Phase 2: the one versioned writer input the writer is given — the frozen pack,
+    // the verified design interpretation and the designer's brief. The context is
+    // resolved by the SAME authority the live generation path uses, so a review here
+    // and a real generation can never be given different guidance.
+    const input = buildWriterInput({
+      pack,
+      designContext: buildWriterDesignContext({
+        proposal, projectId, versionIds: [versionId], pack, dealerNotes,
+      }),
+    });
     assertWriterInputCarriesNoLiveState(input);
 
     // Phase 6: the single provider call.
@@ -56,6 +83,8 @@ export default async function(req) {
         dry_run: true, persisted: false, editorial_review: true,
         prompt_version: WRITER_PROMPT_VERSION,
         pack_fingerprint: pack.pack_fingerprint, input_fingerprint: input.input_fingerprint,
+        design_interpretation: input.design_interpretation,
+        editorial_brief: input.editorial_brief,
         writer_output: raw, validation,
       });
     }
@@ -83,6 +112,8 @@ export default async function(req) {
       story_claim_ids: (pack.allowed_claims || []).filter((claim) => claim.kind === 'strength_story').map((claim) => claim.claim_id),
       blocked_claim_count: (pack.blocked_claims || []).length,
       options,
+      design_interpretation: input.design_interpretation,
+      editorial_brief: input.editorial_brief,
       writer_input: input,
       writer_output: validation.output || raw || null,
       validation: {

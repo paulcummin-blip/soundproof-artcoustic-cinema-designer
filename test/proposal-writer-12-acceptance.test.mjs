@@ -98,7 +98,7 @@ test('new rejection codes retain generation review and issue safeguards', () => 
 });
 test('F. prompt 12 gives positive, evidence-scoped Dynamic Range guidance', () => {
   const f = writer12Fixture({ comparison: true }); const prompt = buildWriterPrompt({ input: f.input });
-  assert.equal(WRITER_PROMPT_VERSION, 'proposal-writer-prompt-12');
+  assert.equal(WRITER_PROMPT_VERSION, 'proposal-writer-prompt-13');
   assert.equal(f.input.prompt_version, WRITER_PROMPT_VERSION);
   const dynamic = f.input.section_requirements.find(row => row.section === 'dynamic_range');
   const requirement = dynamic.requirement_single;

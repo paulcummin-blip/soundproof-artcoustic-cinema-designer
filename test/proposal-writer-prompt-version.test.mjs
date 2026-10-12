@@ -17,7 +17,7 @@
 import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { WRITER_PROMPT_VERSION } from '../base44/shared/proposalWriter/writerContractSchema.js';
+import { WRITER_CONTRACT_VERSION, WRITER_PROMPT_VERSION } from '../base44/shared/proposalWriter/writerContractSchema.js';
 import { buildWriterInput } from '../base44/shared/proposalWriter/writerInputBuilder.js';
 import { buildWriterPrompt } from '../base44/shared/proposalWriter/writerPromptBuilder.js';
 import { buildGenerationRecord } from '../base44/shared/proposalGeneration/proposalGenerationRecord.js';
@@ -29,7 +29,10 @@ const pack = historical.input.evidence_pack;
 
 const VERSION_1 = 'proposal-writer-prompt-1';
 const VERSION_3 = 'proposal-writer-prompt-3';
-const CURRENT = 'proposal-writer-prompt-9';
+// Generation 13 is the design-context pass: the writer is given the verified ADI
+// interpretation and the designer's brief, and the Design Summary introduces the
+// cinema instead of opening on the top-ranked result.
+const CURRENT = 'proposal-writer-prompt-13';
 
 test('the writer prompt version is the current one', () => {
   assert.equal(WRITER_PROMPT_VERSION, CURRENT);
@@ -56,7 +59,8 @@ test('a new generation records the current prompt version', () => {
 
   assert.equal(record.prompt_version, CURRENT);
   assert.equal(record.gpt_input.prompt_version, CURRENT);
-  assert.equal(record.contract_version, historical.contract_version, 'the contract generation it was written under is unchanged');
+  assert.equal(record.contract_version, WRITER_CONTRACT_VERSION, 'a new record carries the current contract generation');
+  assert.equal(historical.contract_version, 1, 'a historical record keeps the contract generation it was filed under');
 });
 
 test('a generation filed under prompt 1 keeps prompt 1', () => {
@@ -64,10 +68,11 @@ test('a generation filed under prompt 1 keeps prompt 1', () => {
   assert.equal(historical.input.prompt_version, VERSION_1);
 });
 
-test('only the prompt version moved: the same pack and contract build a different input', () => {
+test('the same pack builds the current input, and the historical input is never rewritten', () => {
   const input = buildWriterInput({ pack });
 
-  assert.equal(input.contract_version, historical.input.contract_version);
+  assert.equal(input.contract_version, WRITER_CONTRACT_VERSION);
+  assert.equal(historical.input.contract_version, 1, 'the historical input is still read against the agreement it was written under');
   assert.equal(input.evidence_pack.pack_fingerprint, historical.input.evidence_pack.pack_fingerprint);
   assert.equal(typeof historical.input.input_fingerprint, 'string');
   assert.notEqual(input.input_fingerprint, historical.input.input_fingerprint);

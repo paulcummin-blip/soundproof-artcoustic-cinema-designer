@@ -31,6 +31,7 @@
 
 import { buildProposalEvidence } from '../proposalEvidence/proposalEvidenceBuilder.js';
 import { buildWriterInput } from '../proposalWriter/writerInputBuilder.js';
+import { buildWriterDesignContext } from '../proposalWriter/writerDesignContext.js';
 import { assertWriterInputCarriesNoLiveState } from '../proposalWriter/writerPromptBuilder.js';
 import { callWriterProvider } from '../proposalWriter/writerProvider.js';
 import { validateWriterOutput } from '../proposalWriter/writerOutputValidator.js';
@@ -130,6 +131,8 @@ export async function runProposalCopyGeneration({
   user = null,
   now = null,
   retryOfGenerationId = null,
+  savedInterpretation = null,
+  dealerNotes = null,
 } = {}) {
   // 1. The flag. Nothing is read and nothing is sent while it is off.
   if (flag?.enabled !== true) {
@@ -199,7 +202,21 @@ export async function runProposalCopyGeneration({
   let writerInput = null;
   try {
     pack = buildProposalEvidence({ versions, generatedAt: now, requestContext: proposalRequestContext(proposal) });
-    writerInput = buildWriterInput({ pack, optionGuidance });
+    // The design context the writer writes FROM: the ADI interpretation Stage 1
+    // already produced for this proposal, verified against this frozen evidence,
+    // and the designer's own brief. Neither is a source of figures.
+    writerInput = buildWriterInput({
+      pack,
+      optionGuidance,
+      designContext: buildWriterDesignContext({
+        proposal,
+        projectId: projectId ?? proposal?.project_id ?? null,
+        versionIds,
+        pack,
+        savedInterpretation,
+        dealerNotes,
+      }),
+    });
     assertWriterInputCarriesNoLiveState(writerInput);
   } catch (error) {
     return refusal(
@@ -272,6 +289,10 @@ export async function runProposalCopyGeneration({
     retry_of_generation_id: record.retry_of_generation_id,
     provider: record.provider,
     model: record.model,
+    // What the writer was given beyond the pack, so a caller can log exactly what
+    // this attempt was written from.
+    design_interpretation: writerInput.design_interpretation,
+    editorial_brief_supplied: writerInput.editorial_brief?.supplied === true,
     prompt_version: record.prompt_version,
     schema_version: record.schema_version,
     contract_version: record.contract_version,

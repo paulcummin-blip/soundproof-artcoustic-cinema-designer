@@ -84,6 +84,17 @@ export default async function(req) {
     const projectId = proposal.project_id || null;
     if (!projectId) return Response.json({ error: 'That proposal is not attached to a project.' }, { status: 409 });
 
+    // The designer's approved notes, read for the writer's editorial brief. They
+    // are instructions and are never published: a proposal that states none
+    // supplies none. The design interpretation is read from the proposal itself,
+    // inside the runner, and is used only where it can be proved to belong to this
+    // project, these versions and this frozen report evidence.
+    const sectionPage = await base44.entities.ProposalSection.filter({ proposal_id: proposal.id }, { limit: 50 });
+    const dealerNotes = (Array.isArray(sectionPage) ? sectionPage : (sectionPage?.items || []))
+      .map((section) => (typeof section?.dealer_notes === 'string' ? section.dealer_notes.trim() : ''))
+      .filter(Boolean)
+      .join('\n\n');
+
     // ── One attempt ──
     const attempt = await runProposalCopyGeneration({
       proposal,
@@ -111,6 +122,8 @@ export default async function(req) {
       // they marked as options. They are a BRIEF for the writer, never published
       // copy: the writer's own prose is what the document prints.
       readOptionGuidance: () => readProjectOptionGuidance(base44.entities, projectId, proposal.selected_version_ids?.length ? proposal.selected_version_ids : [proposal.version_id].filter(Boolean)),
+      // The designer's own approved notes, handed to the writer as instructions.
+      dealerNotes,
     });
 
     if (!attempt.ok) {

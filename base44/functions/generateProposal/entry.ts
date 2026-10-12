@@ -426,6 +426,10 @@ export default async function(req) {
       // they marked as options. They are a BRIEF for the writer, never published
       // copy: the writer's own prose is what the document prints.
       readOptionGuidance: () => readProjectOptionGuidance(base44.entities, project_id, resolvedVersionIds),
+      // The ADI interpretation Stage 1 has just built for this proposal, handed to
+      // the writer as the design story it writes from. It is the same object saved
+      // with the proposal above, and the runner still verifies it before it is used.
+      savedInterpretation: primaryInterpretation,
     });
 
     if (!attempt.ok) {
@@ -453,6 +457,16 @@ export default async function(req) {
     // entity is append-only: nothing here updates or rewrites an earlier attempt.
     await base44.entities.ProposalGeneration.create(
       generationEntityPayload({ record: attempt.record, accountId: effectiveAccountId }),
+    );
+
+    // What the writer was given beyond the pack, logged so a live draft can always
+    // be traced to the interpretation and the brief it was written from.
+    const designContext = attempt.record.gpt_input?.design_interpretation || {};
+    console.log(
+      `[generateProposal] design context | interpretation=${designContext.available === true
+        ? `${designContext.source} versions=${(designContext.provenance?.version_ids || []).length}`
+        : `refused:${designContext.refusal || 'none'}`} `
+      + `| brief=${attempt.record.gpt_input?.editorial_brief?.supplied === true ? 'supplied' : 'none'}`,
     );
 
     // ── Publish the validated copy into the proposal's own sections ──

@@ -24,6 +24,7 @@
  */
 
 import { proposalEvidenceFingerprint } from '../proposalEvidence/proposalEvidenceBuilder.js';
+import { normaliseDesignContext } from './writerDesignContext.js';
 import { normaliseOptionGuidance } from './writerOptionGuidance.js';
 import { requiredMultiCabinetChannels } from './writerMultiCabinetRules.js';
 import {
@@ -113,9 +114,17 @@ const NO_OPTION_GUIDANCE_REQUIREMENT =
  *   layout notes (buildOptionGuidance output). These are INSTRUCTIONS, never
  *   copy: the writer returns its own client-facing prose for them, and no note is
  *   ever printed.
+ * @param {Object|null} [input.designContext] — buildWriterDesignContext output:
+ *   the verified ADI project interpretation and the designer's editorial brief.
+ *   With none, the writer is given the pack alone exactly as before.
  * @returns {Object} the writer input, carrying its own content fingerprint
  */
-export function buildWriterInput({ pack, promptVersion = WRITER_PROMPT_VERSION, optionGuidance = null } = {}) {
+export function buildWriterInput({
+  pack,
+  promptVersion = WRITER_PROMPT_VERSION,
+  optionGuidance = null,
+  designContext = null,
+} = {}) {
   if (!pack || typeof pack !== 'object') {
     throw new Error('A frozen proposal evidence pack is required: the writer is given no other source.');
   }
@@ -135,6 +144,9 @@ export function buildWriterInput({ pack, promptVersion = WRITER_PROMPT_VERSION, 
   // required to carry copy only where they exist.
   const guidance = normaliseOptionGuidance(optionGuidance);
   const guidanceSupplied = guidance.groups.length > 0;
+  // The design context: the interpretation the writer is to write FROM, and the
+  // designer's brief. Both are carried as instructions and neither is copy.
+  const context = normaliseDesignContext(designContext);
   const sections = writerSectionRequirements(mode).map((entry) => (
     entry.section === 'presented_options' && !guidanceSupplied
       ? { ...entry, requirement: NO_OPTION_GUIDANCE_REQUIREMENT }
@@ -145,7 +157,7 @@ export function buildWriterInput({ pack, promptVersion = WRITER_PROMPT_VERSION, 
     contract_version: WRITER_CONTRACT_VERSION,
     prompt_version: promptVersion,
     output: writerOutputSchema(mode),
-    // What the nine sections are called in THIS proposal, and what each one is
+    // What the sections are called in THIS proposal, and what each one is
     // required to say. A single-option proposal is not a comparison, so it
     // carries no comparison headings and compares the design to nothing.
     section_structure: {
@@ -163,8 +175,13 @@ export function buildWriterInput({ pack, promptVersion = WRITER_PROMPT_VERSION, 
       options,
       areas: (Array.isArray(pack.areas) ? pack.areas : []).map((entry) => ({ ...entry })),
     },
-    // The frozen pack itself: the writer's only source, carried verbatim.
+    // The frozen pack itself: the writer's only source of facts, carried verbatim.
     evidence_pack: pack,
+    // THE DESIGN CONTEXT. The interpretation explains the design; the pack
+    // supplies every figure. A refused or missing interpretation is stated as
+    // such rather than left blank, so the audit always shows what was read.
+    design_interpretation: context.design_interpretation,
+    editorial_brief: context.editorial_brief,
     multi_cabinet_channels: {
       rule: 'Explain each required frozen arrangement naturally once in the System Design Summary or specification: the physical cabinet count, the position and the ONE logical audio channel. In comparisons name the appropriate design; never assign its arrangement to another option. This is a concise design explanation, not an equipment inventory.',
       required: requiredMultiCabinetChannels(pack),
@@ -203,9 +220,10 @@ export function buildWriterInput({ pack, promptVersion = WRITER_PROMPT_VERSION, 
     },
     // The ranked strength authority the writer is handed. Each option carries its
     // own ordered `strength_stories`; each story carries the claim ID it is stated
-    // by. The writer writes these stories and nothing it decides for itself.
+    // by. The ranking decides which strengths deserve emphasis, never the order of
+    // the document: the design story sets the editorial order.
     story_grounding: {
-      rule: 'write the option\'s ranked strength_stories in rank order; each story is stated by citing its own allowed_claim_ids; never choose which parameters matter',
+      rule: 'the option\'s strength_stories, in rank order, decide which engineering characteristics deserve emphasis (rank 1 is the strongest); each story is stated by citing its own allowed_claim_ids; never choose which parameters matter; the ranking is not a compulsory order for the document',
       field: 'strength_stories',
       order: 'rank_ascending',
       claim_field: 'allowed_claim_ids',

@@ -23,6 +23,7 @@ import {
   generationGate,
 } from '../base44/shared/proposalGeneration/generationStatuses.js';
 import { GENERATION_RECORD_FIELDS } from '../base44/shared/proposalGeneration/proposalGenerationRecord.js';
+import { WRITER_CONTRACT_VERSION, WRITER_PROMPT_VERSION } from '../base44/shared/proposalWriter/writerContractSchema.js';
 import { createGenerationHistory } from '../base44/shared/proposalGeneration/proposalGenerationRepository.js';
 import {
   evidencePackForGeneration,
@@ -378,9 +379,9 @@ test('I. every record carries its permission and audit metadata, and refuses an 
   assert.equal(record.created_at, AT_FIRST);
   assert.equal(record.provider, 'base44');
   assert.equal(record.model, 'gpt-5');
-  assert.equal(record.prompt_version, 'proposal-writer-prompt-9');
+  assert.equal(record.prompt_version, WRITER_PROMPT_VERSION);
   assert.equal(record.schema_version, 1);
-  assert.equal(record.contract_version, 1);
+  assert.equal(record.contract_version, WRITER_CONTRACT_VERSION);
   assert.equal(record.account_id, ACCOUNT_ID);
 
   const payload = generationEntityPayload({ record });
