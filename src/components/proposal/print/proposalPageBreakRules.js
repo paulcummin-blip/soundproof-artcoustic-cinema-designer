@@ -124,9 +124,33 @@ export const PACK_PAGE_BREAK_RULES = Object.freeze([
   },
   {
     id: 'prose-never-strands-a-line',
-    note: 'A paragraph keeps at least three lines on either side of a break.',
+    note: 'Oversized paragraphs retain three lines on either side of an unavoidable break.',
     selectors: Object.freeze(['.pp-body', '.pp-body p']),
     declarations: Object.freeze({ orphans: 3, widows: 3 }),
+  },
+  {
+    id: 'paragraph-moves-whole-before-it-is-fragmented',
+    note: 'Move a complete paragraph to the next sheet; fragment only when it exceeds an entire printable sheet.',
+    selectors: Object.freeze(['.pp-body p', '.proposal-print-section__body p']),
+    declarations: Object.freeze({ breakInside: 'avoid' }),
+  },
+  {
+    id: 'heading-image-keeps-opening-paragraph',
+    note: 'An image between a section heading and its opening paragraph must not break that reading chain.',
+    selectors: Object.freeze(['.pp-header + .pp-media']),
+    declarations: Object.freeze({ breakAfter: 'avoid' }),
+  },
+  {
+    id: 'table-closing-note-is-one-block',
+    note: 'The complete closing note stays together, attached to the final table row.',
+    selectors: Object.freeze(['.kph-table__note']),
+    declarations: Object.freeze({ breakInside: 'avoid', breakBefore: 'avoid' }),
+  },
+  {
+    id: 'final-table-row-keeps-closing-note',
+    note: 'Move the final row with its note instead of creating a note-only continuation sheet.',
+    selectors: Object.freeze(['.kph-table tbody:last-of-type > tr:last-child']),
+    declarations: Object.freeze({ breakAfter: 'avoid' }),
   },
   {
     id: 'group-stays-with-its-heading',
@@ -154,9 +178,9 @@ export const PACK_PAGE_BREAK_RULES = Object.freeze([
   },
   {
     id: 'table-follows-its-heading',
-    note: 'A table may not begin a page while its own heading sits on the previous one.',
+    note: 'The table starts with its heading but may continue between complete rows.',
     selectors: PACK_TABLE_FOLLOWS_HEADING_SELECTORS,
-    declarations: Object.freeze({ breakBefore: 'avoid', breakInside: 'avoid' }),
+    declarations: Object.freeze({ breakBefore: 'avoid' }),
   },
   {
     id: 'one-page-sections-are-read-as-one-thing',

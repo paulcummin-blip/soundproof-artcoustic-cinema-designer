@@ -170,7 +170,7 @@ async function captureIssuedDocument({ identity, snapshot }) {
   } catch (error) {
     throw new ExportStorageError({
       stage: EXPORT_STORAGE_STAGE.CAPTURE,
-      reasonCode: 'capture_failed',
+      reasonCode: error?.captureDiagnostics?.operation || 'capture_failed',
       reason: EXPORT_STORAGE_REASON.CAPTURE_FAILED,
       detail: error?.message ? String(error.message) : null,
       cause: error,

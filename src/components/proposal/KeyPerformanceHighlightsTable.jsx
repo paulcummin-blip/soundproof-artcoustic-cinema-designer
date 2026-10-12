@@ -150,7 +150,7 @@ export default function KeyPerformanceHighlightsTable({
             ))}
           </tbody>
         </table>
-        <p className="mt-2 text-[#8A8477]" style={proposalRoleStyle('caption')}>
+        <p className="kph-table__note mt-2 text-[#8A8477]" style={proposalRoleStyle('caption')}>
           Values are read from each version’s frozen Sound Proof evidence.
         </p>
       </div>
@@ -187,7 +187,7 @@ export default function KeyPerformanceHighlightsTable({
           ))}
         </tbody>
       </table>
-      <p className="mt-2 text-[#8A8477]" style={proposalRoleStyle('caption')}>
+      <p className="kph-table__note mt-2 text-[#8A8477]" style={proposalRoleStyle('caption')}>
         Every result calculated by Sound Proof. Levels and measured results are shown as assessed, rounded to whole degrees, dB and Hz.
       </p>
     </div>

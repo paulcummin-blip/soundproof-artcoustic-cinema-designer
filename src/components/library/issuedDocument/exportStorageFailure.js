@@ -207,7 +207,7 @@ export function buildExportStorageDiagnostic({
     reason_code: identified.reasonCode,
     reason: exportStorageReason(identified),
     error_message: identified.detail || identified.cause?.message || null,
-    capture_diagnostics: captureDiagnostics || null,
+    capture_diagnostics: captureDiagnostics || identified.cause?.captureDiagnostics || null,
     partial: partial || identified.partial || 'none',
     occurred_at: (occurredAt instanceof Date ? occurredAt : new Date(occurredAt)).toISOString(),
   };

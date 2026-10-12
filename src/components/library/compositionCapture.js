@@ -23,8 +23,8 @@
  * jsPDF to assemble the pages.
  */
 
-import html2canvas from 'html2canvas';
 import { jsPDF } from 'jspdf';
+import capturePagePng, { pageCaptureFailure } from '@/components/library/capturePagePng';
 import { installCanvasGradientGuard, neutraliseDegenerateGradients } from './canvasGradientGuard';
 import { paginateFlowPages } from './flowPagination';
 
@@ -270,7 +270,7 @@ export async function captureCompositionToPdf({ nodeHtml, pageSelector, bodyClas
     const win = frame.contentWindow;
 
     for (let index = 0; index < pages.length; index += 1) {
-      const canvas = await html2canvas(pages[index], {
+      const { canvas, dataUrl, diagnostics } = await capturePagePng(pages[index], index + 1, {
         backgroundColor: '#FFFFFF',
         scale: RENDER_SCALE,
         useCORS: true,
@@ -289,16 +289,21 @@ export async function captureCompositionToPdf({ nodeHtml, pageSelector, bodyClas
       }
 
       if (index > 0) pdf.addPage();
-      pdf.addImage(
-        canvas.toDataURL('image/png'),
-        'PNG',
-        paper.marginMm + (paper.widthMm - renderWidthMm) / 2,
-        paper.marginMm,
-        renderWidthMm,
-        renderHeightMm,
-        undefined,
-        'FAST',
-      );
+      diagnostics.operation = 'pdf_png_embedding';
+      try {
+        pdf.addImage(
+          dataUrl,
+          'PNG',
+          paper.marginMm + (paper.widthMm - renderWidthMm) / 2,
+          paper.marginMm,
+          renderWidthMm,
+          renderHeightMm,
+          undefined,
+          'FAST',
+        );
+      } catch (error) {
+        throw pageCaptureFailure(error, diagnostics);
+      }
     }
 
     return {
