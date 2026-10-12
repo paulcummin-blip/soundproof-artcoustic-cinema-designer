@@ -51,6 +51,7 @@ import {
   statementValue,
 } from '@/components/proposal/print/proposalPackAuthority';
 import { getSectionsForProposalType, resolveSectionTitle } from '@/components/proposal/proposalSections';
+import { orderPublicationSections, seatingPresentationTarget } from '@/components/proposal/publicationOrder';
 import { prepareSectionBody } from '@/components/proposal/sectionBodyAuthority';
 import { isHighChannelDesign } from '@/components/proposal/highChannelLayoutAuthority';
 import { compactViewingResult } from '@/components/proposal/print/snapshotViewingRows';
@@ -94,9 +95,13 @@ export default function ProposalPackDocument({
   // printed instead.
   const viewingResult = compactViewingResult(snapshot);
 
+  // The document's own order authority, applied to the records this pack is given,
+  // so the printed sequence can never be driven by an arbitrary read order.
+  const orderedSections = orderPublicationSections({ sections: sections || [], proposalType: reportType });
+
   // One stored section per type: the first wins, so nothing prints twice.
   const byType = new Map();
-  (sections || [])
+  orderedSections
     .filter((section) => section.is_enabled !== false)
     .forEach((section) => {
       if (!byType.has(section.section_type)) byType.set(section.section_type, section);
@@ -164,6 +169,18 @@ export default function ProposalPackDocument({
   // of its own, carrying the designer's message and both options full width.
   const comparisonGroups = (imagePlan.comparisonPages || []).filter(group => group.placements?.length >= 2);
   let comparisonPagesPlaced = false;
+
+  // The validated Presented Options section is the authority for the seating
+  // explanation as well as for its prose. Where that section is part of the
+  // document, its seating images are presented WITH it, on its own page, instead
+  // of on a separate seating page that would split the explanation from the
+  // images it describes — and the copy is never printed twice.
+  const seatingWithOptions = seatingPresentationTarget({
+    seatingCount: imagePlan.seatingPlacements.length,
+    sectionTypes: canonical.map((def) => def.type),
+    anchorType: imagePlan.seatingPageAnchorType,
+  }) === 'presented_options' && byType.has('presented_options');
+  if (seatingWithOptions) seatingPagesPlaced = true;
 
   // Page order, with the numbers assigned as the pages are composed.
   let number = 1;
@@ -254,9 +271,9 @@ export default function ProposalPackDocument({
     .forEach((def) => {
       // The seating-style page and each comparison page sit immediately before
       // the section the planner anchors them to.
-      if (!seatingPagesPlaced && !comparisonPagesPlaced && def.type === imagePlan.seatingPageAnchorType) {
-        if (seatingChunks.length > 0) pushSeatingPages();
-        if (comparisonGroups.length > 0) pushComparisonPages();
+      if (def.type === imagePlan.seatingPageAnchorType) {
+        if (!seatingPagesPlaced && seatingChunks.length > 0) pushSeatingPages();
+        if (!comparisonPagesPlaced && comparisonGroups.length > 0) pushComparisonPages();
       }
       const section = byType.get(def.type);
       if (!section) return;
@@ -354,6 +371,12 @@ export default function ProposalPackDocument({
         || placement.editorial_role === EDITORIAL_ROLE.CLOSING_FEATURE) || null;
       const portrait = media.find((placement) => placement.editorial_role === EDITORIAL_ROLE.PORTRAIT_EDITORIAL) || null;
 
+      // The seating images this page carries, when the validated Presented
+      // Options section leads the seating group this document has.
+      const seatingHere = seatingWithOptions && section.section_type === 'presented_options'
+        ? seatingChunks[0]
+        : null;
+
       pages.push(
         <section
           key={section.id}
@@ -376,8 +399,33 @@ export default function ProposalPackDocument({
             body ? <div className="pp-body" dangerouslySetInnerHTML={{ __html: body }} /> : null
           )}
           {evidence.length > 0 ? <ProposalMetricCards cards={evidence} /> : null}
+          {/* The seating alternatives follow the copy that explains them, each
+              keeping its own caption. Nothing is stated twice: the page's own
+              prose is the validated seating explanation. */}
+          {seatingHere ? (
+            <div className={`pp-seating pp-seating--${seatingHere.length}`}>
+              {seatingHere.map((placement) => (
+                <ProposalImagePlacement key={placement.id} placement={placement} />
+              ))}
+            </div>
+          ) : null}
         </section>
       );
+
+      // A seating group too long for one page continues past it, every image
+      // still with its own caption and the group's explanation already stated.
+      if (seatingHere) {
+        seatingChunks.slice(1).forEach((chunk, index) => {
+          pages.push(
+            <SeatingStylePage
+              key={`seating:cont:${index}`}
+              number={takeNumber()}
+              placements={chunk}
+              showCopy={false}
+            />
+          );
+        });
+      }
     });
 
   // A seating-style page whose closing anchor was not composed still belongs in

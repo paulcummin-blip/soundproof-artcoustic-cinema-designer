@@ -35,6 +35,7 @@ import {
 } from '@/components/proposal/images/proposalImagePlanner';
 import { EDITORIAL_ROLE } from '@/components/proposal/images/proposalImagePlacementAuthority';
 import { prepareSectionBody } from '@/components/proposal/sectionBodyAuthority';
+import { orderPublicationSections, seatingPresentationTarget } from '@/components/proposal/publicationOrder';
 import { isHighChannelDesign } from '@/components/proposal/highChannelLayoutAuthority';
 import ProposalPrintDocument from '@/components/proposal/export/ProposalPrintDocument';
 import ProposalPrintStyles from '@/components/proposal/export/ProposalPrintStyles';
@@ -89,7 +90,14 @@ export default function ProposalEditor() {
   // when that section is part of the document, otherwise as the lead of the
   // options image page itself.
   const currentDocumentLayer = documentLayer?.proposal_id === proposal?.id ? documentLayer : null;
-  const documentSections = currentDocumentLayer?.document_validation?.document_sections || sections.filter(section => section.section_type !== 'presented_options');
+  // The publication assembly: the server's ordered, prepared sections. The local
+  // fallback is ordered by the SAME authority, so the continuous Editor and the
+  // printed PDF always read one document sequence.
+  const documentSections = orderPublicationSections({
+    sections: currentDocumentLayer?.document_validation?.document_sections
+      || sections.filter(section => section.section_type !== 'presented_options'),
+    proposalType: proposal?.proposal_type,
+  });
   const optionsImageCopy = documentSections.some(
     (section) => section.section_type === 'presented_options'
       && section.is_enabled !== false
@@ -195,14 +203,17 @@ export default function ProposalEditor() {
         const sectionResults = await base44.entities.ProposalSection.filter({
           proposal_id: proposalRecord.id,
         });
-        const sorted = (sectionResults || []).sort(
-          (a, b) => (a.order_index || 0) - (b.order_index || 0)
-        );
-        setSections(sorted);
-        if (sorted.length > 0 && !activeSectionKey) {
+        // The document's own order authority: the report type's section
+        // definitions decide the sequence, never the order the rows arrived in.
+        const ordered = orderPublicationSections({
+          sections: (sectionResults || []).sort((a, b) => (a.order_index || 0) - (b.order_index || 0)),
+          proposalType: proposalRecord.proposal_type,
+        });
+        setSections(ordered);
+        if (ordered.length > 0 && !activeSectionKey) {
           // Open on the first section the editor can actually show.
-          const firstReadable = sorted.find((s) => getSectionDef(s.section_type));
-          setActiveSectionKey((firstReadable || sorted[0]).section_key);
+          const firstReadable = ordered.find((s) => getSectionDef(s.section_type));
+          setActiveSectionKey((firstReadable || ordered[0]).section_key);
         }
       }
     } catch (err) {
@@ -709,6 +720,19 @@ export default function ProposalEditor() {
   const readableSections = documentSections.filter((s) => !!getSectionDef(s.section_type));
   const visibleSections = readableSections.filter((s) => s.is_enabled !== false);
 
+  // Where the seating presentation belongs. The validated Presented Options
+  // section is the authority for the seating explanation as well as for its
+  // prose, so where it is part of the document the seating images are presented
+  // WITH it: one explanation, beside the images it describes, never printed once
+  // beside them and again on a separate page.
+  const seatingPlacements = imagePlan.seatingPlacements;
+  const seatingCarrierType = seatingPresentationTarget({
+    seatingCount: seatingPlacements.length,
+    sectionTypes: visibleSections.map((section) => section.section_type),
+    anchorType: imagePlan.seatingPageAnchorType,
+  });
+  const seatingGroupedWithOptions = seatingCarrierType === 'presented_options';
+
   // The comparison group pages the plan composed: previewed from the same plan
   // the printed pack composes, so the preview and the PDF show the same page.
   const comparisonPreviewGroups = (imagePlan.comparisonPages || []).filter(group => group.placements?.length >= 2);
@@ -941,12 +965,12 @@ export default function ProposalEditor() {
 
             // The seating-style page is not a stored section: it is previewed
             // where it prints, immediately before the closing section.
-            const showSeatingPreview = imagePlan.seatingPlacements.length >= 2
-              && section.section_type === imagePlan.seatingPageAnchorType;
+            const showSeatingPreview = seatingPlacements.length >= 2
+              && section.section_type === seatingCarrierType;
 
             return (
               <React.Fragment key={section.id}>
-                {showSeatingPreview && (
+                {showSeatingPreview && !seatingGroupedWithOptions && (
                   <div className="mb-12 border-t border-dashed border-[#DCDBD6] pt-8">
                     <h2
                       className="proposal-section-title text-[#1B1A1A] mb-4"
@@ -955,7 +979,7 @@ export default function ProposalEditor() {
                       Seating Style
                     </h2>
                     <div className="rounded-xl overflow-hidden border border-[#DCDBD6] p-6">
-                      <SeatingStylePage placements={imagePlan.seatingPlacements} showHeader={false} validatedCopy={optionsImageCopy} />
+                      <SeatingStylePage placements={seatingPlacements} showHeader={false} validatedCopy={optionsImageCopy} />
                     </div>
                   </div>
                 )}
@@ -1120,6 +1144,15 @@ export default function ProposalEditor() {
                     viewingResult={compactViewingResult(proposal?.engineering_snapshot)}
                     className="mt-4"
                   />
+                )}
+
+                {/* The seating images of the validated Presented Options section:
+                    they belong to the copy that explains them, so they are
+                    presented with it, once, each keeping its own caption. */}
+                {seatingGroupedWithOptions && section.section_type === 'presented_options' && (
+                  <div className="mt-6 rounded-xl overflow-hidden border border-[#DCDBD6] p-6">
+                    <SeatingStylePage placements={seatingPlacements} showHeader={false} showCopy={false} />
+                  </div>
                 )}
 
                 {regenerating === section.id && (

@@ -7,6 +7,9 @@ import { validationRegisterPhrase } from '../proposalWriter/writerValidationRegi
 import { buildEditedDraft } from './proposalEditCopy.js';
 import { composeWriterSectionBodies } from '../proposalWriter/writerSectionMapping.js';
 import { proposalEvidenceFingerprint } from '../proposalEvidence/proposalEvidenceBuilder.js';
+import { resolveReportLayout } from '../highChannelDensityRule.js';
+import { orderPublicationSections } from './publicationOrder.js';
+import { preparePublishedSectionBody, missingPublishedContent } from './publishedSectionPreparation.js';
 
 import { containsPrivateNote, publicationText as plain } from './privateNoteAuthority.js';
 
@@ -86,12 +89,47 @@ export function validateCompleteDocument({ proposal, sections = [], generationRe
       reject('unvalidated_document_text', `This section has no approved writer copy: ${section.section_type}`);
     }
   }
+  // ── ONE ordered, prepared publication ────────────────────────────────────
+  // The order the client reads this document in is decided from the report type's
+  // own section definitions, never from the order the rows happened to be read
+  // in: the cover is first, the narrative follows it, Presented Options keeps its
+  // place and the Appendix stays last. The bodies are then prepared by the same
+  // deterministic rules the browser renders, so the Editor and the PDF publish
+  // one prepared content rather than two assemblies of the same records.
+  const highChannel = resolveReportLayout(proposal?.engineering_snapshot).highDensity;
+  const published = orderPublicationSections({ sections: safeSections, proposalType: proposal?.proposal_type })
+    .map((section) => (section.is_enabled === false ? section : {
+      ...section,
+      body: preparePublishedSectionBody(section.body, {
+        title: section.title,
+        sectionType: section.section_type,
+        highChannel,
+        proposalType: proposal?.proposal_type,
+      }),
+    }));
   for (const body of mapped.bodies) {
-    if (!safeSections.some(section => section.section_type === body.section_type && section.is_enabled !== false)) reject('document_section_missing', `Required document section is missing or hidden: ${body.section_type}`);
+    if (!published.some(section => section.section_type === body.section_type && section.is_enabled !== false)) reject('document_section_missing', `Required document section is missing or hidden: ${body.section_type}`);
+  }
+  // Required validated copy must SURVIVE that preparation. A successful writer
+  // response is not enough: the published page is what the client reads, and a
+  // validated section whose copy the page has lost is not a publishable document.
+  for (const [sectionType, approvedHtml] of bodyByType.entries()) {
+    const section = published.find(row => row.section_type === sectionType && row.is_enabled !== false);
+    if (!section) continue; // already reported as missing or hidden above
+    const missing = missingPublishedContent({
+      approvedHtml,
+      publishedHtml: section.body,
+      title: section.title,
+      sectionType,
+    });
+    if (missing) {
+      reject('published_content_missing', `Validated copy is missing from the published ${sectionType} page: "${missing}"`);
+    }
   }
   // Validate the very bodies returned to BOTH Editor and PDF, after mapping,
-  // enablement and private-note filtering, not merely the provider's response.
-  const publishedRows = safeSections.filter(section => section.is_enabled !== false)
+  // ordering, preparation, enablement and private-note filtering, not merely the
+  // provider's response.
+  const publishedRows = published.filter(section => section.is_enabled !== false)
     .map(section => ({ section: section.section_type, text: plain(section.body) }));
   errors.push(...multiCabinetChannelViolations({ input, sections: publishedRows }));
   if (input?.editorial_rules?.validation_register) {
@@ -102,5 +140,5 @@ export function validateCompleteDocument({ proposal, sections = [], generationRe
   }
   return { valid: errors.length === 0, errors, generation_id: generation?.generation_id || null,
     edit_id: selected.edit_id, options_text: safeOptionsText, options_required: optionsRequired,
-    document_sections: safeSections, blocked_reason: errors.length ? (errors[0].detail || 'The complete proposal did not pass its evidence checks.') : null };
+    document_sections: published, blocked_reason: errors.length ? (errors[0].detail || 'The complete proposal did not pass its evidence checks.') : null };
 }

@@ -88,7 +88,16 @@ export function plainText(html) {
 }
 
 const ADDED_SPEAKER_RE = /\b(?:add|adding|added|additional|more|extra|another|increase|expanding|greater number of)\b[^.]{0,50}\b(?:speakers?|loudspeakers?|channels?|overheads?|height speakers?|height channels?|surrounds?|surround positions?|front wides?|positions?)\b/i;
-const MIDDLE_PAIR_RE = /\b(?:middle|centre|center)\s+(?:overhead\s+|height\s+)?(?:pair|pairs|speakers?|channels?)\b/i;
+/**
+ * A middle / middle-overhead PAIR offered as an addition.
+ *
+ * The qualifier is REQUIRED. Without it the bare words "centre channel" — the one
+ * logical centre channel of a dual-centre screen stage — read as an added pair,
+ * and a validated sentence about that centre channel was being deleted from the
+ * published page. An addition of centre speakers is still caught by the
+ * added-speaker test above, so no upgrade copy escapes the rule.
+ */
+const MIDDLE_PAIR_RE = /\b(?:middle|centre|center)\s+(?:(?:overhead|height)\s+(?:pair|pairs|speakers?|channels?)|pairs?)\b/i;
 const GAP_CLOSING_RE = /\b(?:close|closing|closed|reduce|reducing|tighten|tightening|narrow)\w*\b[^.]{0,40}\bgaps?\b/i;
 const SPACING_SUBJECT_RE = /\b(?:horizontal spacing|side[- ]to[- ]side|p5\b|spacing between|surround channels|adjacent speakers|gaps? between)\b/i;
 const FUTURE_INTENT_RE = /\b(?:in the future|future|upgrade\w*|later|if (?:greater|more|further)|should .{0,30}be required|improv\w*|closer|greater precision|more precise)\b/i;
