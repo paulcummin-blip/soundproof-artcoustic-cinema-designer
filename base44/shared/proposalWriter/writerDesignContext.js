@@ -39,6 +39,7 @@ import {
   checkInterpretationAgainstEvidence,
 } from './writerInterpretationEvidenceCheck.js';
 import { buildClarificationAnswers } from '../proposalClarification/clarificationAnswers.js';
+import { buildRp22DesignContext } from '../rp22DesignContext.js';
 
 // The designer's own answers to ADI's clarification questions are clarification
 // authority, read from the proposal they were stored with. Re-exported so a caller
@@ -414,6 +415,8 @@ export function emptyDesignContext() {
     },
     editorial_brief: buildEditorialBrief({}),
     clarification_answers: buildClarificationAnswers({}),
+    // The RP22 professional design context. With no evidence it carries nothing.
+    rp22_design_context: buildRp22DesignContext({}),
   };
 }
 
@@ -437,6 +440,7 @@ export function normaliseDesignContext(value) {
         supplied: value.clarification_answers.supplied === true,
       }
       : empty.clarification_answers,
+    rp22_design_context: value?.rp22_design_context || empty.rp22_design_context,
   };
 }
 
@@ -464,6 +468,15 @@ export function buildWriterDesignContext({
     // proposal the answers were stored with, or from the caller when the proposal
     // has just been created and its metadata has not been read back yet.
     clarification_answers: buildClarificationAnswers({ proposal, clarificationAnswers }),
+    // THE RP22 PROFESSIONAL DESIGN CONTEXT: the established design principles that
+    // apply to the versions this proposal covers, read from the frozen pack's own
+    // facts. Context for explaining WHY a decision suits this room, never evidence,
+    // and never the reason this designer chose a configuration.
+    rp22_design_context: buildRp22DesignContext({
+      sources: (Array.isArray(pack?.options) ? pack.options : [])
+        .filter((option) => option?.facts)
+        .map((option) => ({ facts: option.facts })),
+    }),
   };
 }
 

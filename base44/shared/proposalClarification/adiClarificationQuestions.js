@@ -36,6 +36,7 @@
 
 import { toNumber } from '../adiNarrativeFacts.js';
 import { groundedReason } from '../proposalWriter/writerBriefReasoning.js';
+import { rp22QuestionDecision } from '../rp22DesignContext.js';
 
 /** The hard limit: never more than three questions in one preparation. */
 export const MAX_CLARIFICATION_QUESTIONS = 3;
@@ -213,6 +214,15 @@ export function buildClarificationQuestions({ versions = [], material = '', aske
   for (const candidate of [...QUESTION_CANDIDATES].sort((a, b) => a.priority - b.priority)) {
     if (out.length >= MAX_CLARIFICATION_QUESTIONS) break;
     if (asked.has(candidate.question_id)) continue;
+    // The RP22 design context decides two of these before any other check: an
+    // acoustic-treatment reason is not asked at the design stage at all, and a
+    // reference position the frozen evidence already declares is not asked for
+    // again. A general principle never suppresses a question about this project's
+    // own decision, so every other question stands.
+    if (!sources.every((source) => rp22QuestionDecision({
+      question_id: candidate.question_id,
+      snapshot: source.snapshot,
+    }).ask)) continue;
     if (!sources.every((source) => candidate.applies(source))) continue;
     if (candidate.sharedAcross && !candidate.sharedAcross(sources)) continue;
     if (groundedReason({

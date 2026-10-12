@@ -192,6 +192,12 @@ export function buildWriterInput({
     // such rather than left blank, so the audit always shows what was read.
     design_interpretation: context.design_interpretation,
     editorial_brief: context.editorial_brief,
+    // THE RP22 PROFESSIONAL DESIGN CONTEXT. Established design principles that
+    // apply to this project, carried as context for explaining WHY a decision suits
+    // this room. It is never evidence, it states no figure, level or product, it
+    // never establishes the reason a configuration was chosen, and the acoustics and
+    // treatment rules inside it govern how those subjects may be written about.
+    rp22_design_context: context.rp22_design_context,
     // THE DESIGNER'S OWN CLARIFICATION ANSWERS. They are INSTRUCTIONS, never copy:
     // the designer's explanation of a decision the frozen evidence records no reason
     // for, to be woven into the section each answer belongs to. They are never

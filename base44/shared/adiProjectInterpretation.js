@@ -39,6 +39,7 @@ import {
 import { deriveDesignPhilosophy, prioritisedPositions, rank, usableRows } from './adiDesignPhilosophy.js';
 import { designPhilosophyLines } from './designPhilosophyAuthority.js';
 import { DISPLAY_TYPE_PROJECTOR, readDisplayIdentity } from './canonicalDisplayIdentity.js';
+import { buildRp22DesignContext, rp22ContextLines } from './rp22DesignContext.js';
 
 export const INTERPRETATION_STAGE = 'adi_project_interpretation';
 // Bumped to 1.1 when the interpretation gained the design philosophy: the
@@ -245,6 +246,10 @@ function deriveDecisions({ config, bed, overhead, subCount, productRoles, mountM
 export function buildProjectInterpretation(params = {}) {
   const {
     snapshot, project, clientBrief, reportType = 'system_summary', versions = [], reportLabel = null,
+    // The other selected versions, where the caller holds them: for a comparison
+    // the RP22 context covers every option, so a principle relevant to any of them
+    // is carried. Omitted by a caller that holds only the one snapshot.
+    rp22Sources = null,
     // The version's own recorded room elements, when the caller holds them: a
     // doorway the design records is part of the design story and is read here as
     // a physical fact. Omitted by a caller that does not hold them, in which case
@@ -443,6 +448,15 @@ export function buildProjectInterpretation(params = {}) {
     emphasis,
   });
 
+  // THE RP22 PROFESSIONAL DESIGN CONTEXT: the established design principles that
+  // apply to this project, offered so the copy can explain WHY a decision suits
+  // this room in professional terms. It states no figure, level or product, and it
+  // never establishes the reason this designer chose a configuration.
+  const rp22Context = buildRp22DesignContext({
+    snapshot,
+    sources: Array.isArray(rp22Sources) && rp22Sources.length > 0 ? rp22Sources : null,
+  });
+
   const oneLineStory = [
     roomType,
     config ? `${config} system` : null,
@@ -527,6 +541,12 @@ export function buildProjectInterpretation(params = {}) {
     // carries no figure, no level, no product and no claim, and every reason it
     // states is one the project data establishes.
     design_philosophy: designPhilosophy,
+
+    // 12. The RP22 professional design context: the established principles that
+    // apply here, each with its safe use and what it does not establish. Context
+    // only: it carries no figure, no level, no product and no claim, and it never
+    // becomes the reason this designer chose a configuration.
+    rp22_context: rp22Context,
   });
 }
 
@@ -589,9 +609,11 @@ export function formatInterpretationForPrompt(interpretation) {
     'Designer emphasis notes (emphasis only, never a change to the engineering results):',
     interpretation.designer_emphasis || 'None provided. Use a balanced professional narrative.',
     ...designPhilosophyLines(interpretation.design_philosophy),
+    ...rp22ContextLines(interpretation.rp22_context),
     '',
     'HOW TO USE THIS:',
     '- Where the copy explains the reasoning behind the design, use the reasoning recorded above and never a reason it does not record.',
+    '- The RP22 design context above is established professional practice, not this project\'s reason: use it to explain why a principle matters for this room, and never to state why the designer chose a configuration. It never turns a channel, overhead or subwoofer count into a reason.',
     '- Write the story first, then support it with the results that matter for this room.',
     '- Reference a parameter only where it is the clearest evidence for something the client will hear.',
     '- Do not work through the results one by one, and do not quote a level without explaining what it means.',
@@ -627,6 +649,7 @@ export function formatInterpretationForLog(interpretation) {
     `design_index=${interpretation.reliable_evidence?.design_index?.designation || 'not available'} (internal only)`,
     `emphasis=${interpretation.designer_emphasis ? 'provided' : 'none'}`,
     `design_philosophy=${interpretation.design_philosophy?.version || 'none'}`,
+    `rp22_context=${interpretation.rp22_context?.version || 'none'}:${(interpretation.rp22_context?.principles || []).map((entry) => entry.principle_id).join(' ') || 'none'}`,
     `value_engineering=${(interpretation.design_philosophy?.reasoning?.value_engineering?.already_captured || []).map((entry) => entry.area).join('; ') || 'none'}`,
   ].join(' | ');
 }
