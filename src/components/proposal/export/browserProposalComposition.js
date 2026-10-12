@@ -21,6 +21,9 @@ export function composeProposalFrames(pages) {
   pages.forEach((original, frameIndex) => {
     original.dataset.paginationFrame ||= String(frameIndex);
     naturalFrame(original);
+    original.querySelectorAll('.pp-body p,.pp-endnote__body p,figcaption,.pp-comparison-option__row dd').forEach((node) => {
+      node.style.setProperty('overflow-wrap', 'anywhere', 'important');
+    });
     if (pageMeasurement(original).fits) { completed.push(original); return; }
     markCompositionOrigins(original);
     const probe = newPage(original, original, true);

@@ -373,10 +373,8 @@ export default function ProposalPackDocument({
       }
 
       if (section.section_type === 'room_images') {
-        // A dedicated gallery spread is kept ONLY when genuinely unused strong
-        // images remain. With two or three images the gallery is retired: those
-        // images already carry the document editorially, and repeating them here
-        // is exactly the gallery-first layout the editorial standard replaces.
+        // A selected photograph not already placed editorially must still print,
+        // even when only one or two sources remain.
         const spreadImages = imagePlan.galleryImages;
         if (spreadImages.length === 0) {
           // No images page: either the document places its images editorially,

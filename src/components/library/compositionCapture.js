@@ -210,11 +210,9 @@ function pageSizeMm(element) {
  * @param {{widthMm: number, heightMm: number, marginMm: number}} [params.pageFrame]
  *   the paper the composition prints on; omitted, the report content-area
  *   default is used, so a report is captured exactly as it always was
- * @param {boolean} [params.paginate] — true for a composition that is paginated
- *   by its own content rather than by a fixed page frame (the proposal pack): a
- *   page frame taller than its sheet is then continued onto further pages, whole
- *   blocks at a time, before the fit check below. A report keeps its fixed-height
- *   frames and is never re-paginated.
+ * @param {string} [params.styles] — styles frozen from the document actually printed.
+ * @param {Array} [params.compositionInventory] — completed proposal page boundaries;
+ *   capture validates them and never makes new page-allocation decisions.
  * @returns {Promise<{blob: Blob, pageCount: number}>}
  */
 export async function captureCompositionToPdf({ nodeHtml, pageSelector, bodyClass = '', pageFrame = null, styles: completedStyles = null, compositionInventory = null }) {

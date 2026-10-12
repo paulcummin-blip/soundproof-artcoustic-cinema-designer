@@ -294,9 +294,8 @@ export function planProposalImages({ assets = [], sectionSlots = [], coverAssetI
     add(pickLandscape(closingEntry.page), EDITORIAL_ROLE.CLOSING_FEATURE, closingEntry.section_id, closingEntry.page);
   }
 
-  // ── What is left. Only genuinely unused, strong images may fill a dedicated
-  // gallery spread: a spread can never repeat a source the document already
-  // placed, and with two or three images no spread is kept at all. ──
+  // Every selected source not used editorially is retained in the gallery.
+  // An image's explicit Do Not Use flag is the only exclusion, never a count threshold.
   const placedIds = new Set(placements.map((placement) => placement.source_asset_id).filter(Boolean));
   const galleryImages = usable.filter(
     (asset) => asset.id && !placedIds.has(asset.id) && asset !== coverAsset

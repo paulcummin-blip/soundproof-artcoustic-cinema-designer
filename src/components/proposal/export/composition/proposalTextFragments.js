@@ -49,7 +49,8 @@ export function fragmentTextUnit(unit, prefix, measureUnits) {
     }
     if (accepted < 0) {
       // Long unbroken words: character boundaries, with the original characters preserved.
-      choices = Array.from({ length: choices[0] - start }, (_, index) => start + index + 1);
+      let offset = start;
+      choices = Array.from(source.text.slice(start, choices[0])).map((character) => { offset += character.length; return offset; });
       low = 0; high = choices.length - 1;
       while (low <= high) {
         const mid = Math.floor((low + high) / 2);
@@ -64,6 +65,34 @@ export function fragmentTextUnit(unit, prefix, measureUnits) {
     result.push(fragment(start, end));
     start = end;
   }
-  result[result.length - 1].keepNext = unit.keepNext;
-  return result;
+  // Rebalance the unavoidable paragraph continuations by their measured height.
+  // A failed balancing attempt retains the already-fitting, complete greedy fragments.
+  let balanced = null;
+  if (result.length > 1) {
+    const targetHeight = result.reduce((sum, part, index) => sum + measureUnits(index ? [part] : [...prefix, part]).used, 0) / result.length;
+    const candidate = [];
+    let cursor = 0;
+    for (let index = 0; index < result.length; index += 1) {
+      const opening = index ? [] : prefix;
+      if (index === result.length - 1) {
+        const tail = fragment(cursor, source.length);
+        if (!measureUnits([...opening, tail]).fits) break;
+        candidate.push(tail); cursor = source.length; break;
+      }
+      const choices = boundaries.filter((end) => end > cursor && end < source.length);
+      let low = 0; let high = choices.length - 1; let accepted = -1;
+      while (low <= high) {
+        const mid = Math.floor((low + high) / 2);
+        const measured = measureUnits([...opening, fragment(cursor, choices[mid])]);
+        if (measured.fits && measured.used <= targetHeight) { accepted = mid; low = mid + 1; }
+        else high = mid - 1;
+      }
+      if (accepted < 0) break;
+      candidate.push(fragment(cursor, choices[accepted])); cursor = choices[accepted];
+    }
+    if (cursor === source.length && candidate.length === result.length) balanced = candidate;
+  }
+  const completed = balanced || result;
+  completed[completed.length - 1].keepNext = unit.keepNext;
+  return completed;
 }
