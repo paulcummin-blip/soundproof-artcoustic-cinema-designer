@@ -3,14 +3,15 @@
  * -----------------
  * The Project Images page of the printed client specification pack.
  *
- * This page is image-led: one image dominates it and the supporting images sit
- * below, rather than the images reading as thumbnails in a report. The layout is
- * decided by how many images the page carries:
+ * This page is image-led, and how many images it carries is decided by the one
+ * measured compositor rather than by a fixed count: the page presents a
+ * photograph only where the photograph actually fits on it, so a landscape pair
+ * still shares a sheet while a tall pair continues onto a further image page.
  *
- *   1 image   one near full-page image
- *   2 images  a dominant image with one supporting image below it
- *   3 images  one hero image with two supporting images side by side below it
- *   4+ images several image pages rather than shrinking every image
+ *   designer's own photographs   shown at their own proportions, one full-width
+ *                                column, each kept with its own caption
+ *   other image pages            the established rows: a dominant image with its
+ *                                supporting images below it
  *
  * Only the images the designer uploaded for this project are shown, in gallery
  * order. Nothing is generated here, and no placeholder imagery is ever used.
@@ -32,17 +33,34 @@ export default function ProjectImagesPage({
   preserveNatural = false,
 }) {
   if (!images.length) return null;
+
+  // The designer's own photographs print at their own proportions in one
+  // full-width column, so a sheet carries only the photographs that actually fit
+  // on it and each stays with its own caption.
+  if (preserveNatural) {
+    return (
+      <section className="proposal-print-section pp-page pp-page--images">
+        <ProposalPageHeader number={number} kicker={kicker} title={title} />
+        <div className={`pp-gallery pp-gallery--natural pp-gallery--${Math.min(images.length, 4)}`}>
+          {images.map((asset) => (
+            <ProposalGalleryFigure key={asset.id || asset.file_url} asset={asset} preserveNatural />
+          ))}
+        </div>
+      </section>
+    );
+  }
+
   const [hero, ...supporting] = images;
 
   return (
     <section className="proposal-print-section pp-page pp-page--images">
       <ProposalPageHeader number={number} kicker={kicker} title={title} />
       <div className={`pp-gallery pp-gallery--${images.length}`}>
-        <ProposalGalleryFigure asset={hero} className="pp-gallery__hero" preserveNatural={preserveNatural} />
+        <ProposalGalleryFigure asset={hero} className="pp-gallery__hero" />
         {supporting.length > 0 && (
           <div className="pp-gallery__support">
             {supporting.map((asset) => (
-              <ProposalGalleryFigure key={asset.id || asset.file_url} asset={asset} preserveNatural={preserveNatural} />
+              <ProposalGalleryFigure key={asset.id || asset.file_url} asset={asset} />
             ))}
           </div>
         )}

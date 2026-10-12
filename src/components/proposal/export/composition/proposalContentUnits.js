@@ -1,6 +1,11 @@
 /** Semantic units within the measured browser compositor; original DOM order is authoritative. */
 const PROSE = '.pp-body,.pp-endnote__body,.proposal-print-section__body';
 const HEADING = '.pp-header,.pp-block__title,.pp-facts-group__title,.pp-decision__title,.pp-endnote__title,h1,h2,h3,h4';
+/** Media that must never be split: a photograph stays with its own caption. */
+const MEDIA = 'figure,.pp-media,img,svg,video';
+/** The gallery and its supporting row: measured photograph by photograph. */
+const GALLERY = '.pp-gallery';
+const GALLERY_ROW = '.pp-gallery__support';
 function shell(node) {
   const copy = node.cloneNode(false);
   if (copy.nodeType === 1) copy.removeAttribute('id');
@@ -37,7 +42,13 @@ export function markCompositionOrigins(page) {
 }
 export function proposalContentUnits(page, measureUnits) {
   const units = [];
-  const atom = (source, ancestors, extra = {}) => ({ node: wrapped(source, ancestors), source, keepNext: source.matches?.(HEADING) || false, ...extra });
+  const atom = (source, ancestors, extra = {}) => ({
+    node: wrapped(source, ancestors),
+    source,
+    keepNext: source.matches?.(HEADING) || false,
+    atomic: source.matches?.(MEDIA) || false,
+    ...extra,
+  });
   const tableUnits = (table, ancestors) => {
     const entries = [...table.tBodies].flatMap((body) => [...body.rows].map((row) => ({ body, row })));
     if (!entries.length) return [atom(table, ancestors)];
@@ -60,10 +71,14 @@ export function proposalContentUnits(page, measureUnits) {
     if (node.matches('table')) return tableUnits(node, ancestors);
     const unit = atom(node, ancestors);
     const prose = node.matches(PROSE);
-    if (!force && !prose && measureUnits([unit]).fits) return [unit];
-    // Paragraphs are indivisible until the text-fragment step proves one cannot fit.
-    if (node.matches('p,li,figcaption') || !node.childNodes.length) return [unit];
-    return [...node.childNodes].flatMap((child) => collect(child, [...ancestors, node], child.matches?.(PROSE)));
+    // A gallery is measured photograph by photograph, so a sheet carries only the
+    // photographs that actually fit on it — including within a supporting row.
+    const gallery = node.matches(GALLERY) || node.matches(GALLERY_ROW);
+    if (!force && !prose && !gallery && measureUnits([unit]).fits) return [unit];
+    // A photograph is indivisible: it is fitted, or moved, as one block with its caption.
+    if (node.matches('p,li,figcaption,figure') || !node.childNodes.length) return [unit];
+    return [...node.childNodes].flatMap((child) => collect(child, [...ancestors, node],
+      child.matches?.(PROSE) || child.matches?.(GALLERY_ROW)));
   };
   for (const group of page.childNodes) {
     const whole = atom(group, []);
@@ -79,7 +94,10 @@ export function proposalContentUnits(page, measureUnits) {
     const unit = units[index];
     if (unit.source.matches?.('.kph-table__note,.pp-endnote') && index > 0) units[index - 1].keepNext = true;
     if (unit.source.matches?.('img') && units[index + 1]?.source.matches?.('figcaption')) unit.keepNext = true;
-    if (unit.source.matches?.('figure,.pp-media') && index > 0 && units[index - 1].keepNext && index + 1 < units.length) unit.keepNext = true;
+    // A heading keeps its first image with it. A gallery photograph is content in
+    // its own right, so it never drags the next photograph onto its own sheet.
+    const galleryPhotograph = Boolean(unit.source.matches?.('figure') && unit.source.closest?.(GALLERY));
+    if (unit.source.matches?.('figure,.pp-media') && !galleryPhotograph && index > 0 && units[index - 1].keepNext && index + 1 < units.length) unit.keepNext = true;
     // A tiny opening paragraph keeps a second paragraph instead of opening a section on a single sentence.
     if (unit.source.matches?.('p') && index > 0 && units[index - 1].keepNext
         && unit.source.textContent.trim().length < 160 && units[index + 1]?.source.matches?.('p')) unit.keepNext = true;

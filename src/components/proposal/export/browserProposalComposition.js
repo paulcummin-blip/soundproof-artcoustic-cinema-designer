@@ -4,6 +4,8 @@ import { proposalContentSignature, proposalPageInventory, assertSelectedImages }
 import { proposalContentUnits, markCompositionOrigins } from '@/components/proposal/export/composition/proposalContentUnits';
 import { fragmentTextUnit } from '@/components/proposal/export/composition/proposalTextFragments';
 import { measuredPartition } from '@/components/proposal/export/composition/proposalMeasuredPartition';
+import { fitMediaUnit, isMediaUnit } from '@/components/proposal/export/composition/proposalMediaFitting';
+import { normalizeGalleryPage } from '@/components/proposal/print/galleryPageComposition';
 
 /** Make the existing print typography/layout measurable before opening Print. */
 export function proposalMeasurementCss(doc) {
@@ -34,9 +36,16 @@ export function composeProposalFrames(pages) {
     let chain = [];
     for (const unit of units) {
       const candidate = [...chain, unit];
-      const fits = measureUnits(candidate).fits;
-      if (!fits && unit.tableId) throw new Error('A complete table row and its required introduction exceed printable A4 height. Export stopped without splitting the row.');
-      const fragments = fits ? [unit] : fragmentTextUnit(unit, chain, measureUnits);
+      let measured = measureUnits(candidate);
+      // A photograph and its caption are indivisible: the photograph is reduced
+      // proportionally, and only as far as its own sheet requires.
+      if (!measured.fits && isMediaUnit(unit)) {
+        fitMediaUnit(unit, chain, measureUnits);
+        measured = measureUnits(candidate);
+      }
+      if (!measured.fits && unit.tableId) throw new Error('A complete table row and its required introduction exceed printable A4 height. Export stopped without splitting the row.');
+      if (!measured.fits && unit.atomic) throw new Error('A photograph block exceeds one printable A4 page even at its smallest height. Export stopped without cropping or omitting it.');
+      const fragments = measured.fits ? [unit] : fragmentTextUnit(unit, chain, measureUnits);
       expanded.push(...fragments);
       chain = unit.keepNext ? (fragments.length === 1 ? [...chain, unit] : [fragments[fragments.length - 1]]) : [];
     }
@@ -47,6 +56,7 @@ export function composeProposalFrames(pages) {
     ranges.forEach(([start, end], index) => {
       if (index) page = newPage(original, page);
       materialize(page, units, start, end);
+      normalizeGalleryPage(page);
       if (!pageMeasurement(page).fits) throw new Error('A measured proposal page overflowed during final composition.');
       completed.push(page);
     });

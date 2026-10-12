@@ -408,6 +408,15 @@ export default function ProposalPackStyles() {
       .proposal-print-portal .pp-gallery {
         margin-top: 6mm;
       }
+      /* A gallery of the designer's own photographs reads as one full-width
+         column, and the gap between photographs is the only spacing in it. That
+         keeps the measured sheet and the printed sheet identical whatever the
+         sheet carries: one photograph, or two that genuinely fit together. */
+      .proposal-print-portal .pp-gallery--natural {
+        display: flex;
+        flex-direction: column;
+        gap: 8mm;
+      }
       .proposal-print-portal .pp-gallery__hero {
         margin: 0 0 8mm;
       }
@@ -585,6 +594,12 @@ ${proposalPackPageBreakCss()}
         /* One image: it is the page. */
         body.proposal-export-mode .proposal-print-portal .pp-gallery--1 .pp-gallery__hero img {
           height: 200mm;
+        }
+        /* The natural gallery keeps that gap whatever it carries, so a sheet that
+           carries a single photograph is composed to the same measurement the
+           compositor allocated it by. */
+        body.proposal-export-mode .proposal-print-portal .pp-gallery--natural {
+          gap: 8mm;
         }
       }
     `}</style>
