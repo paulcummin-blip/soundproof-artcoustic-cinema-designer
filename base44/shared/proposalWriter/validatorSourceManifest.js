@@ -16,7 +16,7 @@ export const VALIDATOR_SOURCE_MANIFEST = Object.freeze({
   'base44/shared/proposalWriter/writerCabinetLanguage.js': '32dd51ed8b4618356c90634827c5b1e3c90afc40c0997e75f110fb63ce85af4a',
   'base44/shared/proposalWriter/writerValidationRegister.js': '634502ab07c0bf1b13cfe0879d1e2ca2e85f0419c94f377b266a977c38c07b96',
   'base44/shared/proposalWriter/writerInputBuilder.js': '42f92a9694d7313c5baeb7012631029ff5fbfe247bb254507e50eb273f3d8a18',
-  'base44/shared/proposalWriter/writerPromptBuilder.js': '1c21015f71f59b7a17f6624e50ae19505f2ff73fc254a7b877329c08fa0dde30',
+  'base44/shared/proposalWriter/writerPromptBuilder.js': 'e227b4a3cf6b0d76150938b43929949ed2c0a6aa5598ba72339ed32af27da73e',
   'base44/shared/proposalWriter/writerSectionMapping.js': 'f5a6d2a5fe974fbd5c16d810d95f99da72f629a4fb8cb33793aa472778ade2f0',
   'base44/shared/proposalWriter/writerDesignContext.js': 'c5f0fbf01d88bdd2821253c0352e698485abb9aeb0d15794fa3a6fa3ca9559c3',
   'base44/shared/proposalEdit/completeDocumentValidation.js': 'cff20d7146ecbeb3a9c325e3147db41cab552f7ea950dd93385ee1d478683ddd',
