@@ -145,9 +145,9 @@ export function buildProjectReportSummaryOpening({
   ].filter(Boolean);
 
   const around = [];
-  // A television is a television: its phrase already names it ("115\" TV"), so
-  // the noun is not repeated after it.
-  if (screen) around.push(isTvDisplay(projectDetails) ? `a ${screen}` : `a ${screen} screen`);
+  // The display phrase already names the display: "77\" TV" for a television and
+  // "170\" 2.35:1 screen" for a projection screen, so the noun is never repeated.
+  if (screen) around.push(`a ${screen}`);
   if (rows) around.push(rows);
 
   const opening = architecture ? `This ${architecture} cinema` : 'This cinema';

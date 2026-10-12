@@ -35,7 +35,7 @@ import {
   REPORT_FONT_BODY as FONT_BODY,
 } from '@/components/report/typography/reportTypography';
 
-const DASH = '—';
+
 
 /** The report's own canonical product row for one layer, or null. */
 function productValue(productsSelected, key) {
@@ -44,27 +44,15 @@ function productValue(productsSelected, key) {
   return value || null;
 }
 
-/** How the design's display is stated: a television by its own size, a screen as before. */
-function screenFact(projectDetails, screenWidthM) {
-  // A television is stated as a television — its saved diagonal authority and
-  // nothing else: no aspect ratio, no viewable width × height.
-  if (isTvDisplay(projectDetails)) return displayPhrase(projectDetails);
-
-  const widthM = Number(screenWidthM);
-  const aspect = String(projectDetails?.aspect_ratio || '').trim();
-
-  if (projectDetails?.manual_dimensions && Number(projectDetails?.manual_width_m) > 0) {
-    const heightM = Number(projectDetails?.manual_height_m);
-    const size = `${Number(projectDetails.manual_width_m).toFixed(2)} × ${Number.isFinite(heightM) && heightM > 0 ? heightM.toFixed(2) : DASH} m viewable`;
-    return aspect ? `${size} · ${aspect}` : size;
-  }
-
-  const diagonal = Number(projectDetails?.screen_size);
-  const parts = [];
-  if (Number.isFinite(diagonal) && diagonal > 0) parts.push(`${Math.round(diagonal)}" diagonal`);
-  if (aspect) parts.push(aspect);
-  if (Number.isFinite(widthM) && widthM > 0) parts.push(`${widthM.toFixed(2)} m viewable width`);
-  return parts.join(' · ') || null;
+/**
+ * How the design's display is stated. THE screen-size display rule, read from
+ * the one display authority: a television by its nominal diagonal alone
+ * (`77" TV`), a projection screen by its viewable width and aspect ratio alone
+ * (`170" 2.35:1 screen`). A projection screen's diagonal is never printed, and
+ * a television never states an aspect ratio or a width.
+ */
+function screenFact(projectDetails) {
+  return displayPhrase(projectDetails);
 }
 
 /** The facts that describe the room, as opposed to the system built into it. */
@@ -113,7 +101,7 @@ export default function ProjectReportDesignSummary({
 
   const facts = [
     { label: 'Room', value: roomFact },
-    { label: displayFactLabel(projectDetails), value: screenFact(projectDetails, screenWidthM) },
+    { label: displayFactLabel(projectDetails), value: screenFact(projectDetails) },
     { label: 'Seating', value: seatingFact },
     { label: 'System format', value: String(projectDetails?.dolby_config || '').trim() || null },
     { label: 'Key loudspeakers', value: keyLoudspeakers },

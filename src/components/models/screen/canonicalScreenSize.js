@@ -91,11 +91,18 @@ export function resolveCanonicalScreen(project) {
   if (diagonal === null) return null;
   const width = Math.round(widthInches);
   const diagonalInches = Math.round(diagonal);
+  // THE screen-size display rule: a television is stated by its nominal
+  // diagonal alone; a projection screen by its viewable width and aspect ratio
+  // alone. The diagonal stays available as a resolved value for reference, but
+  // it is never part of the phrase a client-facing surface prints.
+  const television = isTelevisionScreen(project);
   return {
     widthInches: width,
     diagonalInches,
     aspectRatio,
-    text: `${diagonalInches}" diagonal (${width}" viewable width) ${aspectRatio}`,
+    text: television
+      ? `${diagonalInches}" TV`
+      : `${width}" ${aspectRatio} screen`,
   };
 }
 
