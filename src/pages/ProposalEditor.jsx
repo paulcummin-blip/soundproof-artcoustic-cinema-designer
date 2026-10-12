@@ -1113,6 +1113,7 @@ export default function ProposalEditor() {
                         projectName={projectContext.projectName || proposal?.title}
                         clientName={projectContext.clientName}
                         versionNames={proposalVersionNames}
+                        proposalType={proposal?.proposal_type}
                         reportTypeLabel={typeLabel}
                         dealerName={projectContext.dealerName}
                         projectReference={projectContext.projectReference}

@@ -1,16 +1,21 @@
 /**
  * CoverVersionBlock
  * -----------------
- * The design version statement on a proposal cover.
+ * The design version statement on a COMPARISON cover.
  *
- *   One version        Several versions
- *   Version            Comparing
- *   Level 4 version    Level 4 version
- *                      Level 1 version
+ *   Comparing
+ *   Level 4 version
+ *   Level 1 version
  *
  * The names are the stored ProjectVersion names, printed exactly as saved. The
  * block states nothing when no name could be read, so a cover never shows a
  * generic or invented version label.
+ *
+ * A document that presents ONE design carries no version statement at all, so
+ * the cover renders this block only for a System Design Comparison. `comparing`
+ * is supplied by the cover from the proposal's own TYPE — never inferred from
+ * how many names arrived — so the comparison's own heading is used whenever a
+ * comparison is read, and a single-design cover renders none at all.
  */
 
 import React from 'react';
@@ -41,13 +46,15 @@ function VersionLabel({ children }) {
   );
 }
 
-export default function CoverVersionBlock({ versionNames = [] }) {
+export default function CoverVersionBlock({ versionNames = [], comparing: comparingProp = null }) {
   const names = (Array.isArray(versionNames) ? versionNames : [])
     .map((name) => (typeof name === 'string' ? name.trim() : ''))
     .filter(Boolean);
   if (names.length === 0) return null;
 
-  const comparing = names.length > 1;
+  // The report type decides this, not the number of names: a comparison states
+  // its own heading even where only one name could be read.
+  const comparing = typeof comparingProp === 'boolean' ? comparingProp : names.length > 1;
 
   return (
     <div style={{ width: '100%' }} className="proposal-cover-versions">

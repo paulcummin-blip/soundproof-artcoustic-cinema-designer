@@ -483,6 +483,7 @@ export default function ProposalPackDocument({
           dealerName={dealerName}
           projectReference={projectReference}
           versionNames={versionNames}
+          proposalType={reportType}
           reportTypeLabel={reportTypeLabel}
           coverImageUrl={coverImageUrl}
           heroImageUrl={heroImageUrl}

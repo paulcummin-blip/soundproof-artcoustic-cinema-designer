@@ -19,6 +19,11 @@
  * The cover carries NO document title. The document type is metadata and lives
  * in the workspace toolbar, not in a large generic headline on the page.
  *
+ * The design version is stated for a COMPARISON only, and the proposal's own
+ * report type decides it — never the number of versions the project holds. A
+ * document that presents ONE design shows no version slot, no version number and
+ * no "original design" wording anywhere on its cover.
+ *
  * Background priority:
  *   1. the project's selected cover image (ProposalAsset cover_image)
  *   2. the Sound Proof / dealer hero image — the same image as the app header
@@ -121,6 +126,9 @@ export default function ProposalCoverPage({
   // The exact saved names of the design versions this document was built from:
   // one name for a single-version document, every name for a comparison.
   versionNames = [],
+  // The proposal's own report type. It — never the number of versions saved for
+  // the project — decides whether this cover states a design version at all.
+  proposalType = null,
   reportTypeLabel,
   coverImageUrl,
   heroImageUrl,
@@ -137,6 +145,10 @@ export default function ProposalCoverPage({
   const backgroundSrc = coverImageUrl || heroSrc;
   const dateLabel = formatCoverDate(generatedDate);
   const hasReference = !!(projectReference && String(projectReference).trim());
+  // A comparison identifies the designs it compares. A System Design Summary
+  // presents one design, so its cover states no version identity at all — even
+  // where the project holds several saved versions.
+  const isComparison = proposalType === 'comparison';
 
   return (
     <div
@@ -258,11 +270,13 @@ export default function ProposalCoverPage({
             </div>
           )}
 
-          {/* The design version this document documents — the exact saved name,
-              or every version named when two or more are being compared. */}
-          {versionNames.length > 0 && (
+          {/* A comparison names the designs it compares, under the comparison's
+              own heading. A single-design document states no version at all: the
+              version slot, its number and the saved name are internal identity
+              and never reach a client cover. */}
+          {isComparison && versionNames.length > 0 && (
             <div style={{ marginTop: 20, width: '100%' }}>
-              <CoverVersionBlock versionNames={versionNames} />
+              <CoverVersionBlock versionNames={versionNames} comparing />
             </div>
           )}
         </div>

@@ -33,6 +33,25 @@ const COMPARISON_PROJECT_CARD_LABELS = Object.freeze([
  */
 const COMPARISON_ROOM_CARD_LABELS = Object.freeze(['Room size']);
 
+/**
+ * The project cards a page that presents ONE design states. A single design is
+ * not identified by a design version: the version slot, its number and its saved
+ * name are internal identity, so the page states the project, the client, the
+ * reference and the date only. A comparison states its versions in their own
+ * blocks instead, so this applies to the single-design page alone.
+ *
+ * Decided by the proposal's own report TYPE — never by how many versions the
+ * project happens to hold.
+ */
+export const SINGLE_DESIGN_EXCLUDED_PROJECT_CARD_LABELS = Object.freeze(['Design version']);
+
+/** The project cards a single-design page prints. Pure: no React, no reads. */
+export function singleDesignProjectCards(cards = []) {
+  return (Array.isArray(cards) ? cards : []).filter(
+    (card) => !SINGLE_DESIGN_EXCLUDED_PROJECT_CARD_LABELS.includes(String(card?.label || '')),
+  );
+}
+
 /** The comparison rows that carry the facts each version block states. */
 export const GLANCE_ROW_LABELS = Object.freeze([
   { key: 'system_layout', label: 'System layout' },
