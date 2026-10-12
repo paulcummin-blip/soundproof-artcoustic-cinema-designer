@@ -3,9 +3,10 @@
  * ------------------------------------------------------------------
  * Read live from proposal 6acc7b654a1774c83cddeae4 (project
  * 6ac7a0ae9f28aaf668e20ccc, version 6ac7a189d093a8d8a68eec91 "Original Design")
- * on 2026-10-12 and captured VERBATIM: the ten saved section bodies, the five
- * gallery images with their comparison markings and the designer's own raw
- * notes, and the 15-discrete-channel facts of the 9.1.6 design.
+ * on 2026-10-12 and captured VERBATIM: the ten saved section bodies, the 14
+ * saved highlight rows the Highlights table prints, the five gallery images
+ * with their comparison markings and the designer's own raw notes, and the
+ * 15-discrete-channel facts of the 9.1.6 design.
  *
  * Captured so the publication and preview acceptance suite is exercised against
  * the real approved prose rather than a paraphrase of it: the ten validated
@@ -175,7 +176,9 @@ export function genesisSections() {
     is_enabled: true,
     order_index: index,
     dealer_notes: '',
-    metadata: {},
+    metadata: section.section_type === 'key_performance_highlights'
+      ? { highlight_rows: GENESIS_HIGHLIGHT_ROWS }
+      : {},
   }));
 }
 
@@ -209,6 +212,29 @@ export function genesisPackProps() {
     recoveredComparisonTable: null,
   };
 }
+
+/**
+ * The saved highlight rows the Highlights page's table prints, captured verbatim
+ * from the proposal's saved Key Performance Highlights section metadata (14 rows:
+ * the screen, viewing, layout and RP22 parameter results). The table is composed
+ * from these rows, exactly as on the live proposal.
+ */
+export const GENESIS_HIGHLIGHT_ROWS = [
+  { key: 'screen_size', area: 'Screen', result: '2.5458721439408083m \u00b7 1.4320530809667047m \u00b7 manual', what_you_hear: null },
+  { key: 'rp23_viewing', area: 'RP23 viewing', result: 'Viewing angles calculated for 8 seats. Horizontal viewing angle ranges from 34\u00b0 to 57\u00b0.', what_you_hear: null },
+  { key: 'system_layout', area: 'System layout', result: '9.1.6 Dolby Atmos configuration (9 bed channels, 1 subwoofer, 6 overhead channels)', what_you_hear: null },
+  { key: 'p2', area: 'Discrete channels', result: 'L4 \u00b7 15 speakers', what_you_hear: null },
+  { key: 'p4', area: 'Screen consistency', result: 'L2 \u00b7 5 dB', what_you_hear: null },
+  { key: 'p5', area: 'Horizontal spacing', result: 'L1 \u00b7 104\u00b0', what_you_hear: null },
+  { key: 'p7', area: 'Front wide position', result: 'L4 \u00b7 0', what_you_hear: null },
+  { key: 'p9', area: 'Overhead spacing', result: 'L2 \u00b7 66.5\u00b0', what_you_hear: null },
+  { key: 'p12', area: 'Screen Dynamic Range', result: 'L2 \u00b7 104 dBC', what_you_hear: null },
+  { key: 'p13', area: 'Non-screen Dynamic Range', result: 'L2 \u00b7 101 dBC (FW)', what_you_hear: null },
+  { key: 'p14', area: 'LFE and subwoofer Dynamic Range', result: 'L3 \u00b7 115 dBC', what_you_hear: null },
+  { key: 'p18', area: 'Bass extension', result: 'L2 \u00b7 24 Hz', what_you_hear: null },
+  { key: 'p19', area: 'Bass response', result: 'L4 \u00b7 \u00b10 dB', what_you_hear: null },
+  { key: 'p16', area: 'Screen timbre', result: 'L4 \u00b7 \u00b10.5 dB', what_you_hear: null },
+];
 
 /** The validated options text the section carries — the same source the Editor uses. */
 export function validatedOptionsForGenesis(sections = genesisSections()) {

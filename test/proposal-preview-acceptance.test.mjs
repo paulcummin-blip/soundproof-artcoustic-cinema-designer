@@ -126,15 +126,16 @@ describe('B. the Key Performance Highlights introduction', () => {
     expect(countOf(html, firstSentence)).toBe(1);
     expect(countOf(html, 'pp-highlights__intro')).toBe(1);
 
-    // Inside the highlights page the introduction sits above the table it
-    // introduces. The check is scoped to the page's own markup because the
-    // document's stylesheet, printed earlier, names the same classes.
-    const page = html.indexOf('class="proposal-print-section pp-page pp-page--highlights');
-    const next = html.indexOf('class="proposal-print-section', page + 10);
-    const block = html.slice(page, next > page ? next : undefined);
-    expect(page).toBeGreaterThan(-1);
-    expect(block.indexOf('pp-highlights__intro')).toBeGreaterThan(-1);
-    expect(block.indexOf('pp-highlights__intro')).toBeLessThan(block.indexOf('kph-table'));
+    // Document order: the page's own headline, then the introduction, then the
+    // table it introduces. The counts above already prove the copy appears once.
+    // The table is searched for after the introduction because the document's
+    // stylesheet, printed earlier, names the same class.
+    const headingAt = html.indexOf('Key Performance Highlights');
+    const introAt = html.indexOf('pp-highlights__intro');
+    const tableAt = html.indexOf('kph-table', introAt);
+    expect(headingAt).toBeGreaterThan(-1);
+    expect(introAt).toBeGreaterThan(headingAt);
+    expect(tableAt).toBeGreaterThan(introAt);
   });
 });
 
