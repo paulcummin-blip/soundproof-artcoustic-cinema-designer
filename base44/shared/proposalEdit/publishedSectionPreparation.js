@@ -7,9 +7,11 @@
  *
  * Why it exists: the published page is not the stored body. Headings that repeat
  * a section's own title are dropped, a highlight list inside a highlights
- * introduction is dropped, a section's prose is held to a few paragraphs, and a
- * high-channel design has added-speaker and spacing-upgrade wording cleaned off
- * the page. The writer's draft was validated BEFORE those transformations, so a
+ * introduction is dropped, and a high-channel design has added-speaker and
+ * spacing-upgrade wording cleaned off the page. NO paragraph or sentence limit is
+ * applied: the published page carries every approved paragraph, so the Editor and
+ * the PDF publish one prepared content rather than two shortenings of it. The
+ * writer's draft was validated BEFORE those transformations, so a
  * transformation that also removed validated copy would go unreported — which is
  * exactly how a validated sentence about the centre channel disappeared from a
  * published page.
@@ -63,40 +65,6 @@ export function stripListAndTableBlocks(html) {
     .replace(/<ol[\s\S]*?<\/ol>/gi, ' ')
     .replace(/\s{2,}/g, ' ')
     .trim();
-}
-
-/** Keep at most `max` sentences of prose. */
-export function limitSentences(html, max = 3) {
-  if (typeof html !== 'string' || !html.trim()) return '';
-  let sentenceEnds = 0;
-  let cut = -1;
-  for (let index = 0; index < html.length; index += 1) {
-    if (!/[.!?]/.test(html[index])) continue;
-    const next = html[index + 1];
-    if (next !== undefined && !/[\s<]/.test(next)) continue;
-    sentenceEnds += 1;
-    cut = index + 1;
-    if (sentenceEnds >= max) break;
-  }
-  if (cut === -1) return html;
-  return html.slice(0, cut).replace(/<[^>]*$/, '').trim();
-}
-
-export const PROSE_PARAGRAPH_LIMIT = 3;
-export const PARAGRAPH_SENTENCE_LIMIT = 4;
-export const COMPARISON_PROSE_PARAGRAPH_LIMIT = 6;
-
-/** Keep at most `maxParagraphs` paragraphs, and no paragraph longer than `maxSentences`. */
-export function limitProseParagraphs(html, maxParagraphs = PROSE_PARAGRAPH_LIMIT, maxSentences = PARAGRAPH_SENTENCE_LIMIT) {
-  if (typeof html !== 'string' || !html.trim()) return '';
-  let seen = 0;
-  return html.replace(/<p[^>]*>[\s\S]*?<\/p>/gi, (paragraph) => {
-    seen += 1;
-    if (seen > maxParagraphs) return '';
-    const close = /<\/p>$/i.test(paragraph) ? '</p>' : '';
-    const limited = limitSentences(paragraph, maxSentences);
-    return close && !limited.endsWith(close) ? `${limited}${close}` : limited;
-  });
 }
 
 const PROSE_ONLY_SECTIONS = new Set([
@@ -262,15 +230,15 @@ export function preparePublishedSectionBody(html, section = {}) {
   const deduped = stripDuplicateLeadingHeading(html, section.title);
   const cleaned = section.highChannel ? stripHighChannelUpgradeCopy(deduped) : deduped;
   if (section.sectionType === 'key_performance_highlights') {
-    return limitSentences(stripListAndTableBlocks(cleaned), 3);
+    // The calculated table is the only table in this section: a list or table
+    // inside the introduction would repeat it. The introduction's prose is
+    // published entire.
+    return stripListAndTableBlocks(cleaned);
   }
   if (section.proseOnly && PROSE_ONLY_SECTIONS.has(section.sectionType)) {
     const isComparisonSummary = section.proposalType === 'comparison'
       && section.sectionType === 'system_design_summary';
-    return limitProseParagraphs(
-      isComparisonSummary ? cleaned : stripListAndTableBlocks(cleaned),
-      isComparisonSummary ? COMPARISON_PROSE_PARAGRAPH_LIMIT : PROSE_PARAGRAPH_LIMIT,
-    );
+    return isComparisonSummary ? cleaned : stripListAndTableBlocks(cleaned);
   }
   return cleaned;
 }
@@ -280,11 +248,18 @@ export function preparePublishedSectionBody(html, section = {}) {
  * high-channel cleanup applied: the transformations that are deliberate page
  * rules, kept separate from the cleanup so the cleanup can never excuse a
  * validated sentence going missing.
+ *
+ * The deliberate rules are structural only — a repeated heading, a list or table
+ * that repeats a designed block. Nothing here shortens prose, so every approved
+ * paragraph is required to survive to the published page.
  */
 function permittedPreparation(html, section = {}) {
   const deduped = stripDuplicateLeadingHeading(html, section.title);
-  if (section.sectionType === 'key_performance_highlights') {
-    return limitSentences(stripListAndTableBlocks(deduped), 3);
+  if (section.sectionType === 'key_performance_highlights') return stripListAndTableBlocks(deduped);
+  if (section.proseOnly && PROSE_ONLY_SECTIONS.has(section.sectionType)) {
+    const isComparisonSummary = section.proposalType === 'comparison'
+      && section.sectionType === 'system_design_summary';
+    return isComparisonSummary ? deduped : stripListAndTableBlocks(deduped);
   }
   return deduped;
 }

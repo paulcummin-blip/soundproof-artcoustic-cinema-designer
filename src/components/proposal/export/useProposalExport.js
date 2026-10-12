@@ -13,6 +13,15 @@
  *   - activate the export body class so only the proposal document prints
  *   - wait for fonts and layout, then print
  *   - clean up on afterprint (with a timeout fallback)
+ *
+ * Two modes, ONE document. `handleExport` issues: it passes the
+ * complete-document gate and stores the composition it printed in the Project
+ * Library. `handlePreview` is genuinely read-only: the same pack, the same print
+ * window, the same readiness authority and the same A4 composition, but it
+ * creates no issued-export record, changes no proposal status or history, writes
+ * no section and regenerates no text — so the document can be inspected before
+ * the designer decides to issue or export it. The decision itself lives in
+ * ./proposalExportMode, so the non-issuing guarantee is testable on its own.
  */
 
 import { useCallback, useEffect, useRef, useState } from 'react';
@@ -32,6 +41,13 @@ import {
   recordIssuedExportInBackground,
   snapshotIssuedComposition,
 } from '@/components/library/issuedDocument/recordIssuedExport';
+import {
+  EXPORT_MODE,
+  PREVIEW_MODE,
+  readLayerAction,
+  requiresIssueGate,
+  shouldRecordIssuedExport,
+} from './proposalExportMode';
 import {
   PRINT_NOT_READY_MESSAGE,
   describePrintReadinessFailure,
@@ -111,6 +127,9 @@ export function useProposalExport({
   resolveExportIdentity = null,
 }) {
   const [exporting, setExporting] = useState(false);
+  // The read-only preview: the same preparation and printing, no issue and no
+  // storage. Kept separate only so the toolbar can say which action is running.
+  const [previewing, setPreviewing] = useState(false);
   const [error, setError] = useState(null);
   const [blockedReason, setBlockedReason] = useState(null);
   // Whether the last failure was "the document was not ready", which the designer
@@ -126,6 +145,7 @@ export function useProposalExport({
     if (printingRef.current) {
       printingRef.current = false;
       setExporting(false);
+      setPreviewing(false);
     }
     if (typeof document !== 'undefined') {
       document.body.classList.remove(EXPORT_BODY_CLASS);
@@ -153,7 +173,7 @@ export function useProposalExport({
     };
   }, [cleanup]);
 
-  const handleExport = useCallback(async () => {
+  const runPrint = useCallback(async (mode = EXPORT_MODE) => {
     if (printingRef.current) return;
 
     const reason = resolveProposalExportReadiness({ proposal, sections, comparisonBlockReason });
@@ -169,6 +189,7 @@ export function useProposalExport({
     setRetryable(false);
     printingRef.current = true;
     setExporting(true);
+    setPreviewing(mode === PREVIEW_MODE);
 
     // The shared filename helper, with the report type this proposal is —
     // System Design Summary / System Design Comparison / Proposal — and the
@@ -192,10 +213,14 @@ export function useProposalExport({
     printWindowRef.current = printWindow;
 
     try {
-      // Fresh server authorization occurs before printing OR storing an issued copy.
-      const authorization = await base44.functions.invoke('readProposalEditLayer', { proposal_id: proposal.id, action: 'export', rendered_sections: sections, engineering_snapshot: proposal.engineering_snapshot });
+      // The same read-only edit layer, under the same access controls, is asked
+      // first in BOTH modes, so a preview cannot show a document this login may
+      // not open. An issued export must additionally pass the complete-document
+      // gate; a preview deliberately does not, because inspecting the real print
+      // document before it is ready to issue is what a preview is for.
+      const authorization = await base44.functions.invoke('readProposalEditLayer', { proposal_id: proposal.id, action: readLayerAction(mode), rendered_sections: sections, engineering_snapshot: proposal.engineering_snapshot });
       const validation = authorization?.data?.layer?.document_validation;
-      if (!validation?.valid) throw new Error(authorization?.data?.error || 'The complete proposal must pass validation before export.');
+      if (requiresIssueGate(mode) && !validation?.valid) throw new Error(authorization?.data?.error || 'The complete proposal must pass validation before export.');
 
       // 1. The document's OWN inputs are resolved before anything is prepared:
       //    the identity and the saved version names the document prints. This is
@@ -246,6 +271,7 @@ export function useProposalExport({
           cleanupTimeoutRef.current = setTimeout(() => {
             printingRef.current = false;
             setExporting(false);
+            setPreviewing(false);
           }, PRINT_TIMEOUT_MS);
         } else if (result.reason !== 'window_unavailable') {
           // The document did not become ready: NOTHING was printed, and the
@@ -277,10 +303,10 @@ export function useProposalExport({
         window.print();
       }
 
-      // The issued copy is taken from the SAME composition this export printed,
-      // and only once printing was actually reached: a document that was not
-      // ready is never stored as an issued PDF.
-      if (issuedDocument?.documentType) {
+      // The issued copy is taken from the SAME composition this export printed —
+      // and only for an issued export. A preview never reaches this: nothing is
+      // stored, no issued-export record is created and no proposal state changes.
+      if (shouldRecordIssuedExport({ mode, issuedDocument })) {
         const issuedSnapshot = snapshotIssuedComposition(issuedDocument.documentType);
         if (issuedSnapshot) recordIssuedExportInBackground({ identity: { ...issuedDocument, filename: settledTitle }, snapshot: issuedSnapshot });
       }
@@ -289,12 +315,20 @@ export function useProposalExport({
       setError(
         notReady
           ? err.message
-          : (err?.response?.data?.error || err?.message || 'The proposal PDF could not be prepared for printing.')
+          : (err?.response?.data?.error || err?.message
+            || (mode === PREVIEW_MODE
+              ? 'The document preview could not be prepared for printing.'
+              : 'The proposal PDF could not be prepared for printing.'))
       );
       setRetryable(notReady);
       cleanup();
     }
   }, [proposal, sections, comparisonBlockReason, projectName, dealerName, clientName, projectReference, versionNames, issuedDocument, resolveExportIdentity, cleanup]);
 
-  return { exporting, error, blockedReason, retryable, handleExport };
+  // The two entry points. Both prepare and print the SAME document; only the
+  // issued export stores the composition it printed.
+  const handleExport = useCallback(() => runPrint(EXPORT_MODE), [runPrint]);
+  const handlePreview = useCallback(() => runPrint(PREVIEW_MODE), [runPrint]);
+
+  return { exporting, previewing, error, blockedReason, retryable, handleExport, handlePreview };
 }

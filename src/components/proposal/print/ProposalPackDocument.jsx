@@ -51,7 +51,7 @@ import {
   statementValue,
 } from '@/components/proposal/print/proposalPackAuthority';
 import { getSectionsForProposalType, resolveSectionTitle } from '@/components/proposal/proposalSections';
-import { orderPublicationSections, seatingPresentationTarget } from '@/components/proposal/publicationOrder';
+import { alternativesCarrier, orderPublicationSections } from '@/components/proposal/publicationOrder';
 import { prepareSectionBody } from '@/components/proposal/sectionBodyAuthority';
 import { isHighChannelDesign } from '@/components/proposal/highChannelLayoutAuthority';
 import { compactViewingResult } from '@/components/proposal/print/snapshotViewingRows';
@@ -170,17 +170,29 @@ export default function ProposalPackDocument({
   const comparisonGroups = (imagePlan.comparisonPages || []).filter(group => group.placements?.length >= 2);
   let comparisonPagesPlaced = false;
 
-  // The validated Presented Options section is the authority for the seating
-  // explanation as well as for its prose. Where that section is part of the
-  // document, its seating images are presented WITH it, on its own page, instead
-  // of on a separate seating page that would split the explanation from the
-  // images it describes — and the copy is never printed twice.
-  const seatingWithOptions = seatingPresentationTarget({
-    seatingCount: imagePlan.seatingPlacements.length,
+  // ── ONE carrier for the document's alternatives ──────────────────────────
+  // Whether the designer grouped them as seating styles or as a comparison set,
+  // the alternatives and the validated Presented Options prose that explains them
+  // are presented TOGETHER, on the section that carries that prose. Images on one
+  // page and their explanation two sections later is not a client presentation.
+  // Only where the document has no such section do the alternatives keep the page
+  // the planner anchored them to. The explanation is never printed twice: the
+  // carrier page carries the section's own validated copy, and no option page
+  // repeats it.
+  const alternativesWithOptions = alternativesCarrier({
+    alternativeGroups: (seatingChunks.length > 0 ? 1 : 0) + comparisonGroups.length,
     sectionTypes: canonical.map((def) => def.type),
     anchorType: imagePlan.seatingPageAnchorType,
   }) === 'presented_options' && byType.has('presented_options');
-  if (seatingWithOptions) seatingPagesPlaced = true;
+  const seatingWithOptions = alternativesWithOptions && seatingChunks.length > 0;
+  const comparisonWithOptions = alternativesWithOptions && comparisonGroups.length > 0;
+  // Every option the designer marked, each keeping the label that says what it
+  // stands for, presented on the page that explains them.
+  const alternativesOnCarrier = comparisonWithOptions ? imagePlan.comparisonPlacements : [];
+  if (seatingWithOptions || comparisonWithOptions) {
+    seatingPagesPlaced = true;
+    comparisonPagesPlaced = true;
+  }
 
   // Page order, with the numbers assigned as the pages are composed.
   let number = 1;
@@ -333,10 +345,9 @@ export default function ProposalPackDocument({
         const isComparisonKind = proposal?.proposal_type === 'comparison';
         const isComparison = isComparisonKind && hasComparisonGlance;
         // The heading, the table header, every row and the footnote are one
-        // indivisible printed block on one page. The section carries no
-        // introduction of its own: the table is self-explanatory, and an
-        // introduction is exactly what pushed the table onto the page after its
-        // own title.
+        // indivisible printed block. The section's own validated introduction
+        // prints above the table it introduces: an introduction is part of the
+        // approved copy, so it is published once, here, and nowhere else.
         pages.push(
           <section
             key={section.id}
@@ -347,6 +358,12 @@ export default function ProposalPackDocument({
               kicker={isComparisonKind ? 'Comparison' : 'Evidence'}
               title={displayTitle}
             />
+            {body ? (
+              <div
+                className="pp-body pp-highlights__intro"
+                dangerouslySetInnerHTML={{ __html: body }}
+              />
+            ) : null}
             <KeyPerformanceHighlightsTable
               rows={section.metadata?.highlight_rows}
               comparisonRows={comparisonRows}
@@ -406,6 +423,21 @@ export default function ProposalPackDocument({
             <div className={`pp-seating pp-seating--${seatingHere.length}`}>
               {seatingHere.map((placement) => (
                 <ProposalImagePlacement key={placement.id} placement={placement} />
+              ))}
+            </div>
+          ) : null}
+          {/* The alternatives the designer marked as comparison options are shown
+              on this same page, under the copy that explains them, each captioned
+              with what it stands for. If the group does not fit on one sheet it
+              flows onto the next, every caption staying with its image. */}
+          {alternativesOnCarrier.length > 0 && section.section_type === 'presented_options' ? (
+            <div className={`pp-comparison pp-comparison--${alternativesOnCarrier.length}`}>
+              {alternativesOnCarrier.map((placement) => (
+                <ProposalImagePlacement
+                  key={placement.id}
+                  placement={placement}
+                  caption={placement.comparison_option_label || placement.source_caption || null}
+                />
               ))}
             </div>
           ) : null}

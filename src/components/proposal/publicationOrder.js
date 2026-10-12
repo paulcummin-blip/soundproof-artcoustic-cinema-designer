@@ -58,22 +58,38 @@ export function orderPublicationSections({ sections = [], proposalType = null } 
 }
 
 /**
- * Where a document's seating alternatives are presented.
+ * Where a document's alternatives are presented.
  *
- * The validated Presented Options section is the authority for the seating
- * explanation as well as for its prose, so where that section is part of the
- * document the seating images belong to it — one explanation, presented with the
- * images it describes. With no such section the seating presentation keeps the
- * page the planner anchored it to.
+ * The validated Presented Options section is the authority for the alternatives
+ * as well as for their prose, so where that section is part of the document its
+ * images belong to it — one explanation, presented with the images it describes.
+ * Where the document has no such section the alternatives keep the page the
+ * planner anchored them to.
+ *
+ * @param {{ alternativeGroups?: number, sectionTypes?: Array<string>, anchorType?: string|null }} input
+ * @returns {string|null} the section type that carries the alternatives
+ */
+export function alternativesCarrier({ alternativeGroups = 0, sectionTypes = [], anchorType = null } = {}) {
+  if (Number(alternativeGroups) < 1) return null;
+  return (Array.isArray(sectionTypes) ? sectionTypes : []).includes('presented_options')
+    ? 'presented_options'
+    : anchorType;
+}
+
+/**
+ * Where a document's seating alternatives are presented. A seating group is one
+ * alternative group, and it only exists once there are two images to choose
+ * between.
  *
  * @param {{ seatingCount?: number, sectionTypes?: Array<string>, anchorType?: string|null }} input
  * @returns {string|null} the section type that carries the seating presentation
  */
 export function seatingPresentationTarget({ seatingCount = 0, sectionTypes = [], anchorType = null } = {}) {
-  if (Number(seatingCount) < 2) return null;
-  return (Array.isArray(sectionTypes) ? sectionTypes : []).includes('presented_options')
-    ? 'presented_options'
-    : anchorType;
+  return alternativesCarrier({
+    alternativeGroups: Number(seatingCount) >= 2 ? 1 : 0,
+    sectionTypes,
+    anchorType,
+  });
 }
 
 export default orderPublicationSections;

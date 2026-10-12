@@ -7,11 +7,17 @@
  * the branding.
  *
  * Left:  proposal identity (title, project, proposal type)
- * Right: Client Brief, Show Properties (secondary), Export Proposal PDF (primary)
+ * Right: Client Brief, Show Properties, Preview Document (read-only),
+ *        Export Proposal PDF (primary)
+ *
+ * Preview Document prepares the SAME print document as the export — same pack,
+ * same images, same print styles, same A4 composition — and opens it for
+ * inspection without issuing anything: no issued-export record, no stored file,
+ * no proposal status or history change.
  */
 
 import React from 'react';
-import { FileText, SlidersHorizontal, Download, Loader2, AlertCircle, RotateCw } from 'lucide-react';
+import { FileText, SlidersHorizontal, Download, Eye, Loader2, AlertCircle, RotateCw } from 'lucide-react';
 
 import { REPORT_FONT_BODY as FONT } from '@/components/report/typography/reportTypography';
 
@@ -30,6 +36,10 @@ export default function ProposalWorkspaceToolbar({
   onToggleProperties,
   exporting,
   onExport,
+  // The read-only preview: the same print document, opened for inspection
+  // without issuing or storing anything.
+  previewing = false,
+  onPreview,
   blockedReason,
   error,
   // A preparation failure the designer can simply retry: it restarts the whole
@@ -83,8 +93,23 @@ export default function ProposalWorkspaceToolbar({
 
           <button
             type="button"
+            onClick={onPreview}
+            disabled={exporting || previewing}
+            className={`${SECONDARY_IDLE} disabled:opacity-60 disabled:cursor-not-allowed`}
+            style={{ fontFamily: FONT }}
+          >
+            {previewing ? (
+              <Loader2 className="w-3.5 h-3.5 animate-spin" />
+            ) : (
+              <Eye className="w-3.5 h-3.5" />
+            )}
+            {previewing ? 'Preparing preview…' : 'Preview Document'}
+          </button>
+
+          <button
+            type="button"
             onClick={onExport}
-            disabled={exporting}
+            disabled={exporting || previewing}
             className="flex items-center gap-1.5 px-4 py-2 text-xs uppercase tracking-[0.12em] rounded-md text-white transition-colors hover:bg-[#3E4349] disabled:opacity-60 disabled:cursor-not-allowed"
             style={{ backgroundColor: '#213428', fontFamily: FONT }}
           >

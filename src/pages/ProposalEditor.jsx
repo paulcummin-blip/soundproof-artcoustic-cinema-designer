@@ -35,7 +35,7 @@ import {
 } from '@/components/proposal/images/proposalImagePlanner';
 import { EDITORIAL_ROLE } from '@/components/proposal/images/proposalImagePlacementAuthority';
 import { prepareSectionBody } from '@/components/proposal/sectionBodyAuthority';
-import { orderPublicationSections, seatingPresentationTarget } from '@/components/proposal/publicationOrder';
+import { alternativesCarrier, orderPublicationSections } from '@/components/proposal/publicationOrder';
 import { isHighChannelDesign } from '@/components/proposal/highChannelLayoutAuthority';
 import ProposalPrintDocument from '@/components/proposal/export/ProposalPrintDocument';
 import ProposalPrintStyles from '@/components/proposal/export/ProposalPrintStyles';
@@ -720,35 +720,47 @@ export default function ProposalEditor() {
   const readableSections = documentSections.filter((s) => !!getSectionDef(s.section_type));
   const visibleSections = readableSections.filter((s) => s.is_enabled !== false);
 
-  // Where the seating presentation belongs. The validated Presented Options
-  // section is the authority for the seating explanation as well as for its
-  // prose, so where it is part of the document the seating images are presented
-  // WITH it: one explanation, beside the images it describes, never printed once
-  // beside them and again on a separate page.
-  const seatingPlacements = imagePlan.seatingPlacements;
-  const seatingCarrierType = seatingPresentationTarget({
-    seatingCount: seatingPlacements.length,
-    sectionTypes: visibleSections.map((section) => section.section_type),
-    anchorType: imagePlan.seatingPageAnchorType,
-  });
-  const seatingGroupedWithOptions = seatingCarrierType === 'presented_options';
-
   // The comparison group pages the plan composed: previewed from the same plan
   // the printed pack composes, so the preview and the PDF show the same page.
   const comparisonPreviewGroups = (imagePlan.comparisonPages || []).filter(group => group.placements?.length >= 2);
-  const comparisonPreviewAnchored = comparisonPreviewGroups.length > 0
+
+  // ── ONE carrier for the document's alternatives ──────────────────────────
+  // Whether the designer grouped them as seating styles or as a comparison set,
+  // the alternatives and the validated Presented Options prose that explains them
+  // are previewed TOGETHER, on the section that carries that prose — exactly as
+  // the printed pack composes them. Images shown in one place and their
+  // explanation two sections later is not a client presentation, and the
+  // explanation is never shown twice.
+  const seatingPlacements = imagePlan.seatingPlacements;
+  const alternativesForOptions = alternativesCarrier({
+    alternativeGroups: (seatingPlacements.length >= 2 ? 1 : 0) + comparisonPreviewGroups.length,
+    sectionTypes: visibleSections.map((section) => section.section_type),
+    anchorType: imagePlan.seatingPageAnchorType,
+  }) === 'presented_options';
+  const seatingGroupedWithOptions = alternativesForOptions && seatingPlacements.length >= 2;
+  const comparisonGroupedWithOptions = alternativesForOptions && comparisonPreviewGroups.length > 0;
+  const seatingCarrierType = seatingGroupedWithOptions ? 'presented_options' : imagePlan.seatingPageAnchorType;
+  // Where a comparison group is previewed when the Presented Options section does
+  // not carry it: immediately before its anchor, or at the end of the narrative
+  // when that anchor is not part of the document.
+  const comparisonPreviewAtAnchor = !comparisonGroupedWithOptions && comparisonPreviewGroups.length > 0
     && !!imagePlan.seatingPageAnchorType
     && visibleSections.some((section) => section.section_type === imagePlan.seatingPageAnchorType);
+  const comparisonPreviewTrailing = comparisonPreviewGroups.length > 0
+    && !comparisonGroupedWithOptions && !comparisonPreviewAtAnchor;
 
   // ── Export — full proposal PDF ──
   // Exports the whole proposal (every enabled section). Section-level export is
   // not implemented, so it is deliberately not exposed.
   const {
     exporting,
+    // The read-only preview of the exact print document.
+    previewing,
     error: exportError,
     blockedReason: exportBlockedReason,
     retryable: exportRetryable,
     handleExport,
+    handlePreview,
   } = useProposalExport({
     proposal,
     sections: documentSections,
@@ -831,6 +843,8 @@ export default function ProposalEditor() {
         onToggleProperties={() => setShowProperties((prev) => !prev)}
         exporting={exporting}
         onExport={handleExport}
+        previewing={previewing}
+        onPreview={handlePreview}
         blockedReason={comparisonBlockReason || editLayerBlockReason || exportBlockedReason}
         error={exportError}
         retryable={exportRetryable}
@@ -986,7 +1000,7 @@ export default function ProposalEditor() {
 
                 {/* Each comparison group's own page, previewed where it prints:
                     the designer's message, the options full width, in order. */}
-                {comparisonPreviewAnchored && section.section_type === imagePlan.seatingPageAnchorType && (
+                {comparisonPreviewAtAnchor && section.section_type === imagePlan.seatingPageAnchorType && (
                   <ComparisonPagesPreview
                     groups={comparisonPreviewGroups}
                     validatedCopy={optionsImageCopy}
@@ -1155,6 +1169,20 @@ export default function ProposalEditor() {
                   </div>
                 )}
 
+                {/* The alternatives the designer marked as comparison options are
+                    shown on the same section, under the validated copy that
+                    explains them — the same grouping the PDF composes. Each
+                    option keeps its own label; the explanation is not repeated. */}
+                {comparisonGroupedWithOptions && section.section_type === 'presented_options' && (
+                  <div className="mt-6">
+                    <ComparisonPagesPreview
+                      groups={comparisonPreviewGroups}
+                      validatedCopy=""
+                      roleStyle={proposalRoleStyle}
+                    />
+                  </div>
+                )}
+
                 {regenerating === section.id && (
                   <div className="flex items-center gap-2 mt-2 text-xs text-[#625143]">
                     <Loader2 className="w-3 h-3 animate-spin" /> Regenerating...
@@ -1167,7 +1195,7 @@ export default function ProposalEditor() {
 
           {/* A comparison page whose anchor section was not composed still
               belongs in the document, exactly where the printed pack places it. */}
-          {!comparisonPreviewAnchored && (
+          {comparisonPreviewTrailing && (
             <ComparisonPagesPreview groups={comparisonPreviewGroups} roleStyle={proposalRoleStyle} validatedCopy={optionsImageCopy} />
           )}
         </div>
