@@ -20,6 +20,30 @@ export function screenLocationQualifier(sentence, at, term) {
     && /^(?:\s*[,.;!?]|\s+(?:and|around|overhead)\b|\s*$)/i.test(after);
 }
 
+/**
+ * A SOUND MOVING BETWEEN LOUDSPEAKERS during playback: "a moving effect ... as
+ * different speakers take over", "the voice passes from one speaker to another".
+ *
+ * This is tonal-continuity language about reproduction inside ONE design, not a
+ * claim that the design's equipment differs from another option's. It is read as
+ * such only where BOTH hold: the clause names the reproduced content (a voice, an
+ * effect, the sound, the source) AND a handover or transition carries it between
+ * loudspeakers. A comparison that says the loudspeaker package differs has neither,
+ * so it stays exactly the change claim it always was.
+ */
+const REPRODUCED_CONTENT = /\b(?:voice|voices|effect|effects|sound|sounds|dialogue|instrument|instruments|music|score|source|track|soundtrack|audio|speech|line)\b/i;
+const PLAYBACK_HANDOVER = /\b(?:takes?|taking)\s+over\b|\bhand(?:s|ing|ed)?\s+(?:over|it|them|on)\b|\bpass(?:es|ing)?\s+(?:to|between|from|into|through)\b|\bmov(?:es|ing)\s+(?:to|between|from|into|across|around)\b|\bcross(?:es|ing)\s+(?:to|between|over|from)\b|\btransition(?:s|ing)?\b|\bchanges?\s+direction\b|\bpicks?\s+up\b|\bcontinues?\s+(?:in|into|through|across|beside|above)\b|\b(?:carry|carries|carrying)\s+(?:on|over|it|them)\b|\breproduc(?:e|es|ing|ed)\b|\bhandl(?:e|es|ing|ed)\b|\b(?:drive|drives|driving|driven)\b/i;
+
+/** Whether a clause describes playback handover rather than an equipment change. */
+export function playbackHandoverClause(text) {
+  const clause = String(text || '');
+  if (clause.length === 0) return false;
+  return REPRODUCED_CONTENT.test(clause) && PLAYBACK_HANDOVER.test(clause);
+}
+
+/** The loudspeaker families whose difference is read as an equipment change. */
+const SPEAKER_FAMILY = /^(?:speakers?|loudspeakers?)$/i;
+
 /** Matches a real area change even when it is written with "different". */
 export function directAreaDifference(sentence, head) {
   const term = `\\b${head}\\w*\\b`;
@@ -30,7 +54,11 @@ export function directAreaDifference(sentence, head) {
   ];
   for (const pattern of patterns) {
     const match = pattern.exec(sentence);
-    if (match) return { at: match.index, keyword: head, phrase: false, matched: match[0] };
+    if (!match) continue;
+    // "different speakers" in a clause about a sound being handed between them is
+    // playback handover, not a difference between designs.
+    if (SPEAKER_FAMILY.test(head) && /\bdifferent\b/i.test(match[0]) && playbackHandoverClause(sentence)) continue;
+    return { at: match.index, keyword: head, phrase: false, matched: match[0] };
   }
   return null;
 }
@@ -39,7 +67,11 @@ export function directAreaDifference(sentence, head) {
 export function supportedChangeClause(clause, claims) {
   const changes = claims.filter(c => c.kind === 'factual_change' || c.kind === 'material_gain');
   const subjects = [];
-  if (/\b(?:speaker|loudspeaker)\s+package\b|\bdifferent\s+(?:speakers|loudspeakers)\b/i.test(clause)) subjects.push('speakers');
+  // A named loudspeaker package is always a change of equipment. A bare "different
+  // speakers" is only a change where the clause is NOT describing a sound handed
+  // between the loudspeakers of this one design.
+  if (/\b(?:speaker|loudspeaker)\s+package\b/i.test(clause)) subjects.push('speakers');
+  else if (/\bdifferent\s+(?:speakers|loudspeakers)\b/i.test(clause) && !playbackHandoverClause(clause)) subjects.push('speakers');
   if (/\bdifferent\s+equipment\b/i.test(clause)) subjects.push('equipment');
   if (/\bdifferent\s+(?:cinema\s+)?formats?\b|\b(?:cinema\s+)?formats?\s+(?:is|are)\s+different\b/i.test(clause)) subjects.push('system_layout');
   if (/\bdifferent\s+room\b|\broom\s+is\s+different\b/i.test(clause)) subjects.push('room');

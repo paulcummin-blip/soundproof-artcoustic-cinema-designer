@@ -197,6 +197,16 @@ function parameterRows(snapshot, policy = null) {
         level,
         value,
         text: asText(row.text) || [level, value].filter(Boolean).join(' · ') || null,
+        // The scope, the state and the authority the report states this result
+        // at, copied exactly and carried as its own fields. A supporting result
+        // states its scope and its prediction status from these, so a
+        // reference-position result can never be written as a seat-wide one.
+        // The row's own free-text context is NOT carried: it holds the grade
+        // ladder's other values, which are not this design's results.
+        scope: asText(row.scope),
+        state: asText(row.state),
+        authority_source: asText(row.source),
+        definition: asText(row.title),
       };
       // An assumed parameter carries no client-facing structure, so it can never
       // be classified, can never become a difference between options, and is

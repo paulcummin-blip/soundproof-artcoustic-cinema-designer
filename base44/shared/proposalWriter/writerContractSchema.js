@@ -304,9 +304,9 @@ export const WRITER_SECTIONS = Object.freeze([
   {
     section: 'timbre_matching',
     title: 'Timbre Matching',
-    requirement_single: 'Explain how tonal consistency benefits the experience: voices and effects retain their tonal character as they move between the screen, the surround and the overhead channels, across only the supported seats. Keep every seat statement explicitly limited to tonal character, not overall balance, bass or placement. No bass-extension detour and no both parameters wording.',
+    requirement_single: 'Explain how tonal consistency benefits the experience: voices and effects retain their tonal character as they move between the screen, the surround and the overhead channels, across only the supported seats. Keep every seat statement explicitly limited to tonal character, not overall balance, bass or placement. Natural handover wording is expected here: describe a voice or an effect keeping its character as the loudspeakers hand it on. Never imply the design\'s loudspeaker package differs from another option\'s, and never broaden tonal consistency into equal seats or an equal whole experience. No bass-extension detour and no both parameters wording.',
     word_limit: 170,
-    requirement: 'Explain the loudspeaker and coverage evidence the pack records, and claim nothing beyond it.',
+    requirement: 'Explain the loudspeaker and coverage evidence the pack records, and claim nothing beyond it. Where the copy describes a sound passing between loudspeakers, that is tonal continuity within the design, never a claim that the loudspeaker package differs between the options.',
   },
   {
     section: 'presented_options',
@@ -481,6 +481,8 @@ export const WRITER_WRITING_RULES = Object.freeze([
   'Close on this design\'s particular viewing experience, movement, tonal character and bass capability, not treats every seat as a priority, balances high-resolution spatial imaging with authoritative bass performance, high-quality experience for everyone or immersive and consistent experience for the home.',
   'Keep every paragraph to one to three sentences, and keep every section inside its word limit.',
   'Explain what each recorded result means for the room, rather than naming the number and moving on.',
+  'Where the brief asks for a result the pack carries as a supporting_result claim, state it in the section it belongs to, at exactly the scope, value and prediction status that claim carries, and cite its claim ID. A supporting result answers the client\'s own request: it is never presented as a strength, a headline or a comparison, and is never moved to a wider scope.',
+  'No contents sentence ("the following sections explain"), and no generic closing about the design as a whole: finish on what this particular cinema gives the client, and never repeat a benefit another section has already made.',
   'Return structured JSON only, in every section this contract requires, with no extra fields and no commentary.',
 ]);
 

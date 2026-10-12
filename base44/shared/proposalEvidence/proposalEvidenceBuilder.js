@@ -62,6 +62,7 @@ import {
 } from './proposalEvidenceDesignClaims.js';
 import { buildScopedSeatClaims } from './proposalEvidenceSeatScopes.js';
 import { buildProposalStrengthStories } from './proposalStrengthStories.js';
+import { buildSupportingResultClaims } from './proposalSupportingResults.js';
 import { assertBassWordingSafe } from './proposalEvidenceWording.js';
 
 /** Deterministic key order, so the same content always serialises identically. */
@@ -155,6 +156,16 @@ export function buildProposalEvidence({ versions = [], generatedAt = null, reque
     storyClaims.push(...claims);
   });
 
+  // ── THE SUPPORTING RESULTS THE BRIEF ASKED FOR ──
+  // A brief that asks for a result — the bass extension, the screen-channel
+  // output, the difference between the front and rear rows — is asking for a
+  // result the saved reports already state, which the ranked strength stories
+  // correctly leave out when it is not one of the design's strongest. Those
+  // results are minted here, from the frozen facts alone, at the exact scope and
+  // status the reports record, and they are never strengths. A request the
+  // evidence cannot answer mints nothing and is recorded as omitted.
+  const supporting = buildSupportingResultClaims({ options, requestContext });
+
   const compared = options.length >= 2;
 
   const classification = compared ? classifyAreas(options.map((option) => option.areas)) : [];
@@ -180,6 +191,9 @@ export function buildProposalEvidence({ versions = [], generatedAt = null, reque
     // sentence a writer may state for that story, and its ID is the only claim ID
     // that story carries.
     ...storyClaims,
+    // The results the brief asked for, at their own scope and status. Stated
+    // because the client asked for them, never presented as strengths.
+    ...supporting.claims,
   ];
 
   const bassClaims = compared
@@ -236,6 +250,10 @@ export function buildProposalEvidence({ versions = [], generatedAt = null, reque
       omitted_stories: (storiesByVersion.get(option.version_id) || {}).omitted_stories || [],
     })),
     classification,
+    // Which supporting results the brief asked for, which of them the frozen
+    // facts stated, and which of them the evidence could not answer, with the
+    // reason. A request that mints nothing is visible here rather than silent.
+    supporting_results: supporting.audit,
     materiality_notes: buildMaterialityNotes(allowedClaims, { p20Note: bass.note }),
     allowed_claims: allowedClaims,
     blocked_claims: policy.requested.length > 0 ? [...blockedClaims, ...assumedBlocks] : blockedClaims,

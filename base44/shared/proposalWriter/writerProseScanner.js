@@ -29,20 +29,26 @@ export function scanProse({ input, vocabulary, section, text, claims = [], claim
   const blocks = blockedChangeBlocks(input).map(block => ({ block, patterns: blockPatterns(block, input.evidence_pack) }));
   let context = { text };
   const report = (code, details) => found.push(attributeViolation(violation(code, details), context));
-  // A STRENGTH-LED draft (the single-option proposal path) cites only strength
-  // stories. There is no comparison in it, so it mints no material-gain and no
-  // recommendation claim — the ranked story IS the supported claim, and the
-  // benefit language that states it is grounded by it. The gain and
+  // A RESULT-LED draft (the single-option proposal path) cites strength stories
+  // and, where the designer's own brief asked for a result the ranked stories do
+  // not carry, the supporting result minted for that request. There is no
+  // comparison in it, so it mints no shared-result, material-gain, factual-change
+  // or recommendation claim at all: nothing in the pack could satisfy a gain, a
+  // same or a recommendation assertion, so those assertions are grounded by the
+  // ranked story and the brief's supporting results instead. A supporting result
+  // only carries that bypass in a SINGLE-option pack, where no other claim kind
+  // exists; a comparison pack keeps the ordinary kind rules for it. The gain and
   // recommendation rules below therefore apply only where the draft is not
-  // strength-led; a comparison draft (which cites material-gain claims) is
-  // unchanged, because there its cited kinds are never all strength stories.
-  const strengthLed = citedKinds.length > 0 && citedKinds.every((kind) => kind === 'strength_story');
+  // result-led.
+  const singleOptionPack = isSingleOptionProposal(
+    input?.section_structure?.proposal_mode ?? input?.evidence_pack?.mode,
+  );
+  const resultLed = citedKinds.length > 0 && citedKinds.every((kind) => kind === 'strength_story'
+    || (singleOptionPack && kind === 'supporting_result'));
   // The proposal mode and the frozen display the pack states. A single-option
   // proposal has nothing to compare against, and a TV is never written as a
   // screen, an aspect ratio or a projector.
-  const singleOption = isSingleOptionProposal(
-    input?.section_structure?.proposal_mode ?? input?.evidence_pack?.mode,
-  );
+  const singleOption = singleOptionPack;
   const displayType = displayTypeOfPack(input?.evidence_pack);
 
   // Read complete sentences before clause splitting: tonal scope can stretch in a second clause.
@@ -80,7 +86,7 @@ export function scanProse({ input, vocabulary, section, text, claims = [], claim
       const framingGrounded = kind === 'change' && framingContrastGrounded(claimed, input, citedKinds);
       if (kind && citedKinds.length === 0) {
         report(WRITER_REJECTION.MISSING_CLAIM_ID, { section, detail: `${kind}_claim_without_a_claim_id` });
-      } else if (kind && !framingGrounded && ((!kindSatisfiesAssertion(kind, citedKinds) && !strengthLed)
+      } else if (kind && !framingGrounded && ((!kindSatisfiesAssertion(kind, citedKinds) && !resultLed)
         || (kind === 'change' && !supportedChangeClause(claimed, citedClaims)))) {
         report(WRITER_REJECTION.INVENTED_BENEFIT, { section, detail: `${kind}_claim_not_supported_by_the_cited_claims` });
       }
@@ -95,7 +101,7 @@ export function scanProse({ input, vocabulary, section, text, claims = [], claim
         });
       }
       context = { text, sentence, clause };
-      if (isRecommendation(clause) && !hasRecommendationClaim(input) && !strengthLed) {
+      if (isRecommendation(clause) && !hasRecommendationClaim(input) && !resultLed) {
         report(WRITER_REJECTION.UNSUPPORTED_RECOMMENDATION, { section, detail: 'the_pack_allows_no_recommendation' });
       }
       const designStage = designStageCommentary(claimed);

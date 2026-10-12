@@ -69,8 +69,17 @@ export default async function(req) {
     const suppliedSnapshots = await readProposalReportEvidence(base44.entities, projectId, [version]);
     if (!suppliedSnapshots.length) return Response.json({ error: 'No Project Report evidence for this version' }, { status: 409 });
 
-    // Phase 1: the frozen evidence pack, carrying the ranked strength stories.
-    const pack = buildProposalEvidence({ versions: suppliedSnapshots });
+    // Phase 1: the frozen evidence pack, carrying the ranked strength stories —
+    // and the supporting results the designer's brief asked for. The brief is
+    // passed exactly as the live generation path passes it, so a read-only review
+    // is given the same pack a real generation is given.
+    const pack = buildProposalEvidence({
+      versions: suppliedSnapshots,
+      requestContext: {
+        clientBrief: [proposal?.client_brief, proposal?.narrative_brief].filter(Boolean).join('\n'),
+        dealerNotes: proposal?.metadata?.dealer_notes || '',
+      },
+    });
 
     // Phase 2: the one versioned writer input the writer is given — the frozen pack,
     // the verified design interpretation and the designer's brief. The context is

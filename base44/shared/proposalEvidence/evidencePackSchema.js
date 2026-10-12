@@ -92,6 +92,14 @@ export const CLAIM_KIND = Object.freeze({
   RECOMMENDATION: 'recommendation',
   /** A result the saved evidence states for one seating scope, not for every seat. */
   SCOPED_RESULT: 'scoped_result',
+  /**
+   * A result the CLIENT BRIEF asked for and the saved evidence states, which the
+   * ranked strength stories do not carry because it is not one of the design's
+   * strongest results. It is stated because the client asked for it, at the exact
+   * scope and status the reports record, and it is never a strength, a gain or a
+   * comparison.
+   */
+  SUPPORTING_RESULT: 'supporting_result',
 });
 
 /** Why a claim is blocked. Each reason carries its own client-safe sentence. */

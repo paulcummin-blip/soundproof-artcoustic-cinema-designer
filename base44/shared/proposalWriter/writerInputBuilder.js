@@ -82,6 +82,15 @@ function allowedClaim(claim) {
     levels: Array.isArray(claim?.basis?.levels)
       ? claim.basis.levels.map((level) => String(level))
       : [],
+    // A supporting result carries the exact scope and status the reports state
+    // it at, so a draft states the result at that scope and never as a wider or
+    // an installed one. Absent for every other claim kind.
+    prediction_status: claim?.prediction_status ?? null,
+    evidence_state: claim?.evidence_state ?? null,
+    authority_source: claim?.authority_source ?? null,
+    definition: claim?.definition ?? null,
+    rows: Array.isArray(claim?.rows) ? claim.rows.map((row) => ({ ...row })) : [],
+    requested_by: claim?.requested_by ?? null,
   };
 }
 
@@ -218,6 +227,16 @@ export function buildWriterInput({
       allowed: (Array.isArray(bass.allowed) ? bass.allowed : []).map((entry) => ({ ...entry })),
       blocked: (Array.isArray(bass.blocked) ? bass.blocked : []).map((entry) => ({ ...entry })),
     },
+    // THE SUPPORTING RESULTS THE BRIEF ASKED FOR. A result the client asked for
+    // is stated at its own scope and status, because the client asked for it —
+    // and never as a strength, a headline or a comparison.
+    supporting_results: {
+      rule: 'a claim of kind supporting_result is a frozen result the client brief asked for and the reports state: state it once in the section it belongs to, at exactly the scope, value and prediction status that claim carries, citing its claim ID. It is never presented as a strength, never moved to a wider scope, and never written as an installed or measured outcome. Where an entry in audit.omitted records a request the reports do not state, write nothing for it',
+      claims: (Array.isArray(pack.allowed_claims) ? pack.allowed_claims : [])
+        .filter((claim) => claim?.kind === 'supporting_result')
+        .map((claim) => claim.claim_id),
+      audit: pack.supporting_results || null,
+    },
     claim_grounding: {
       rule: 'every_client_facing_claim_cites_one_or_more_allowed_claim_ids',
       section_field: 'claim_ids',
@@ -251,6 +270,9 @@ export function buildWriterInput({
         ? 'single-option proposal: never compare to a baseline or another option (no increase, greater, improved, more capable, additional headroom, higher output, upgrade or compared to)'
         : 'comparison proposal: comparing the options is the point, so state the differences directly',
       installation_default: 'written before installation: specified, selected, designed, modelled or proposed, never installed or installation, unless the frozen evidence says the system is installed',
+      timbre_language: 'tonal continuity is described as a voice or an effect keeping its character as the loudspeakers hand it on: natural handover wording is welcome. Never imply the design\'s loudspeaker package differs from another option\'s unless the pack records that change, and never broaden tonal consistency into equal seats or an equal whole experience',
+      brief_completeness: 'a request the brief makes is met only where the copy states it: where the client asked for a result the pack carries as a supporting_result claim, the figure has to be on the page, and where the client asked about both seating rows, both rows are stated on their own result',
+      closing: 'no contents sentence such as "the following sections explain", and no generic closing about the design as a whole: finish on what this particular cinema gives the client, and never repeat a benefit another section has already made',
     },
   };
 
