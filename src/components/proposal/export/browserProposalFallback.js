@@ -28,6 +28,7 @@ export async function prepareBrowserProposalFallback(node, registerCleanup) {
   clone.style.position = 'static';
   clone.style.removeProperty('left');
   clone.style.removeProperty('top');
+  return clone;
 }
 
 function docForClone(doc, clone) {

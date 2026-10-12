@@ -26,7 +26,8 @@
 import { jsPDF } from 'jspdf';
 import capturePagePng, { pageCaptureFailure } from '@/components/library/capturePagePng';
 import { installCanvasGradientGuard, neutraliseDegenerateGradients } from './canvasGradientGuard';
-import { paginateFlowPages } from './flowPagination';
+import { pageMeasurement } from '@/components/proposal/export/composition/proposalPageGeometry';
+import { proposalPageInventory, sameProposalBoundaries } from '@/components/proposal/export/composition/proposalCompositionInventory';
 
 const MM_PER_INCH = 25.4;
 const CSS_PX_PER_INCH = 96;
@@ -89,9 +90,9 @@ function transformStylesForCapture(css) {
 }
 
 /** Every stylesheet the app is rendering right now, captured for the clone. */
-function captureStylesMarkup() {
-  if (typeof document === 'undefined' || !document.querySelectorAll) return '';
-  return Array.from(document.querySelectorAll('style, link[rel="stylesheet"]'))
+export function captureStylesMarkup(doc = typeof document !== 'undefined' ? document : null) {
+  if (!doc?.querySelectorAll) return '';
+  return Array.from(doc.querySelectorAll('style, link[rel="stylesheet"]'))
     .map((el) => {
       if (el.tagName === 'STYLE') return transformStylesForCapture(el.textContent || '');
       const href = el.getAttribute('href');
@@ -216,13 +217,13 @@ function pageSizeMm(element) {
  *   frames and is never re-paginated.
  * @returns {Promise<{blob: Blob, pageCount: number}>}
  */
-export async function captureCompositionToPdf({ nodeHtml, pageSelector, bodyClass = '', pageFrame = null, paginate = false }) {
+export async function captureCompositionToPdf({ nodeHtml, pageSelector, bodyClass = '', pageFrame = null, styles: completedStyles = null, compositionInventory = null }) {
   if (!nodeHtml || !pageSelector) {
     throw new Error('The print composition could not be captured.');
   }
 
   const paper = resolvePageFrame(pageFrame);
-  const styles = captureStylesMarkup();
+  const styles = completedStyles ?? captureStylesMarkup();
   // The frame is laid out at the paper width the composition prints at, so a
   // frame measures as it does on paper instead of reflowing to a narrower box.
   const frame = createCaptureFrame(captureDocumentHtml({ nodeHtml, bodyClass, styles }), paper.widthMm);
@@ -239,14 +240,17 @@ export async function captureCompositionToPdf({ nodeHtml, pageSelector, bodyClas
       throw new Error('The print composition carried no printable pages.');
     }
 
-    // A flow-paginated composition (the proposal pack) is continued onto further
-    // pages where a section's own content is taller than the sheet it prints on.
-    // The pages are measured in this capture document, where the printed layout is
-    // the live layout. A composition with fixed page frames is never re-paginated.
-    const pagination = paginate
-      ? paginateFlowPages({ pages: collected, paper })
-      : { pages: collected, continuations: 0 };
-    const pages = pagination.pages;
+    // Capture is a consumer, never an allocator: these are the actual browser-composed sheets.
+    const proposalRoot = scope.querySelector('.proposal-print-portal');
+    if (proposalRoot) {
+      if (proposalRoot.dataset.browserComposed !== 'true' || !compositionInventory) {
+        throw new Error('Project Library requires the completed browser proposal pages, not an independently paginated copy.');
+      }
+      const actual = proposalPageInventory(proposalRoot, pageMeasurement);
+      if (!sameProposalBoundaries(compositionInventory, actual)) throw new Error('Browser and Library proposal page boundaries or image inventories differ. Storage stopped.');
+      if (actual.some((page) => page.fits === false)) throw new Error('A completed browser proposal sheet overflowed during Library capture.');
+    }
+    const pages = collected;
 
     pages.forEach((page, index) => {
       const { widthMm, heightMm } = pageSizeMm(page);
@@ -314,7 +318,7 @@ export async function captureCompositionToPdf({ nodeHtml, pageSelector, bodyClas
         degenerateGradients,
         sanitisedStops: gradientGuard ? gradientGuard.sanitisedStops() : [],
         // Continuation pages created for content taller than one sheet.
-        continuations: pagination.continuations,
+        continuations: pages.filter((page) => page.classList.contains('pp-page--continuation')).length,
       },
     };
   } finally {

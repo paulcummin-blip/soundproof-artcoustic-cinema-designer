@@ -26,7 +26,7 @@
 import React from 'react';
 import { base44 } from '@/api/base44Client';
 import { toast } from '@/components/ui/use-toast';
-import { captureCompositionToPdf } from '@/components/library/compositionCapture';
+import { captureCompositionToPdf, captureStylesMarkup } from '@/components/library/compositionCapture';
 import { notifyIssuedExportStored } from '@/components/library/issuedExportSignal';
 import ExportStorageFailureActions from './ExportStorageFailureActions';
 import { ISSUED_DOCUMENT_COMPOSITION, issuedDocumentLabel } from './issuedDocumentTypes';
@@ -95,12 +95,17 @@ function failureNoticeKey(identity = {}, stage) {
  *
  * @returns {{nodeHtml: string, pageSelector: string, bodyClass: string, pageFrame: Object|null}|null}
  */
-export function snapshotIssuedComposition(documentType) {
+export function snapshotIssuedComposition(documentType, completedNode = null) {
   const composition = ISSUED_DOCUMENT_COMPOSITION[documentType];
   if (!composition || typeof document === 'undefined') return null;
-  const node = document.querySelector(composition.nodeSelector);
+  const node = completedNode || document.querySelector(composition.nodeSelector);
   if (!node) return null;
+  if (node.matches('.proposal-print-portal') && node.dataset.browserComposed !== 'true') {
+    throw new Error('Proposal storage must snapshot the completed browser print composition.');
+  }
   return {
+    styles: captureStylesMarkup(node.ownerDocument),
+    compositionInventory: node.dataset.compositionInventory ? JSON.parse(node.dataset.compositionInventory) : null,
     // A literal "</script" inside stored rich text would end the capture document early.
     nodeHtml: String(node.outerHTML || '').replace(/<\/script/gi, '<\\/script'),
     pageSelector: composition.pageSelector,
@@ -109,10 +114,8 @@ export function snapshotIssuedComposition(documentType) {
     // sheet itself; a report page frame is the printable content area inside the
     // 12mm page margin its stylesheet declares.
     pageFrame: composition.pageFrame || null,
-    // A proposal pack is paginated by its own content, so a section taller than
-    // one sheet is continued onto further pages. A report page frame is
-    // fixed-height and must fit exactly.
-    paginate: composition.paginate === true,
+    // Page allocation has already finished in the browser compositor. Capture never repaginates.
+    paginate: false,
   };
 }
 

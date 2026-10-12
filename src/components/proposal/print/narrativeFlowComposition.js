@@ -62,13 +62,11 @@ export function isFlowSection(sectionType) {
  */
 export function composeNarrativeBands(sectionTypes = []) {
   const bands = [];
+  let open = null;
   (Array.isArray(sectionTypes) ? sectionTypes : []).forEach((type) => {
-    const open = bands[bands.length - 1];
-    if (isFlowSection(type) && open) {
-      open.types.push(type);
-      return;
-    }
-    if (isFlowSection(type)) bands.push({ types: [type] });
+    if (!isFlowSection(type)) { open = null; return; }
+    if (open) open.types.push(type);
+    else { open = { types: [type] }; bands.push(open); }
   });
   return bands;
 }

@@ -113,21 +113,21 @@ export const ISSUED_DOCUMENT_COMPOSITION = Object.freeze({
     pageSelector: '.proposal-print-portal > .proposal-print-cover, .proposal-print-portal > .pp-page',
     bodyClass: 'proposal-export-mode',
     pageFrame: PROPOSAL_PAGE_FRAME,
-    paginate: true,
+    paginate: false,
   }),
   [ISSUED_DOCUMENT_TYPE.PROPOSAL]: Object.freeze({
     nodeSelector: '.proposal-print-portal',
     pageSelector: '.proposal-print-portal > .proposal-print-cover, .proposal-print-portal > .pp-page',
     bodyClass: 'proposal-export-mode',
     pageFrame: PROPOSAL_PAGE_FRAME,
-    paginate: true,
+    paginate: false,
   }),
   [ISSUED_DOCUMENT_TYPE.COMPARISON]: Object.freeze({
     nodeSelector: '.proposal-print-portal',
     pageSelector: '.proposal-print-portal > .proposal-print-cover, .proposal-print-portal > .pp-page',
     bodyClass: 'proposal-export-mode',
     pageFrame: PROPOSAL_PAGE_FRAME,
-    paginate: true,
+    paginate: false,
   }),
 });
 

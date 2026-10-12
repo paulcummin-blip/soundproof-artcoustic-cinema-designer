@@ -350,6 +350,12 @@ export function useProposalExport({
 
       const printNode = findPrintNode();
       let printed = false;
+      let issuedSnapshot = null;
+      const preserveCompletedPages = (root) => {
+        if (shouldRecordIssuedExport({ mode, issuedDocument })) {
+          issuedSnapshot = snapshotIssuedComposition(issuedDocument.documentType, root);
+        }
+      };
 
       if (printWindow && printNode) {
         // The window's own document is prepared by the shared readiness
@@ -358,6 +364,7 @@ export function useProposalExport({
         const result = await printProposalInWindow(printWindow, {
           title: settledTitle,
           node: printNode,
+          onComposed: preserveCompletedPages,
           onDone: () => { if (isCurrent()) cleanup(printWindow); },
         });
         if (!isCurrent()) return;
@@ -404,9 +411,10 @@ export function useProposalExport({
 
         document.body.classList.add(EXPORT_BODY_CLASS);
 
-        await prepareBrowserProposalFallback(fallbackNode, (dispose) => {
+        const completedRoot = await prepareBrowserProposalFallback(fallbackNode, (dispose) => {
           fallbackCleanupRef.current = dispose;
         });
+        preserveCompletedPages(completedRoot);
 
         cleanupTimeoutRef.current = setTimeout(() => cleanup(printWindow), PRINT_TIMEOUT_MS);
 
@@ -418,8 +426,8 @@ export function useProposalExport({
       // and only for an issued export. A preview never reaches this: nothing is
       // stored, no issued-export record is created and no proposal state changes.
       if (isCurrent() && shouldRecordIssuedExport({ mode, issuedDocument })) {
-        const issuedSnapshot = snapshotIssuedComposition(issuedDocument.documentType);
-        if (issuedSnapshot) recordIssuedExportInBackground({ identity: { ...issuedDocument, filename: settledTitle }, snapshot: issuedSnapshot });
+        if (!issuedSnapshot) throw new Error('The completed proposal pages were not preserved for Project Library.');
+        recordIssuedExportInBackground({ identity: { ...issuedDocument, filename: settledTitle }, snapshot: issuedSnapshot });
       }
     } catch (err) {
       const notReady = err?.printNotReady === true;
