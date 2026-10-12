@@ -361,7 +361,10 @@ function reportStorageFailure({ failure, pendingKey, identity }) {
 
   let handle = null;
   handle = toast({
-    title: STORAGE_FAILURE_MESSAGE,
+    // A document exported alongside another one names the outcome in its own
+    // words — "Project Report saved, but Speaker Design PDF could not be
+    // created." — so the designer knows exactly what did and did not land.
+    title: issued.storageFailureTitle || STORAGE_FAILURE_MESSAGE,
     description: exportStorageReason(identified),
     variant: 'destructive',
     duration: RETRY_TOAST_MS,

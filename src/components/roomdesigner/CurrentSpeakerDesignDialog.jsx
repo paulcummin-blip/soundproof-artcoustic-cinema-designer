@@ -45,8 +45,10 @@ export default function CurrentSpeakerDesignDialog({
   onOpenChange,
   speakerDesign = null,
   projectName = null,
+  dealerName = null,
   clientName = null,
   versionName = null,
+  versionNumber = null,
   projectReference = null,
   updatedDate = null,
 }) {
@@ -123,9 +125,11 @@ export default function CurrentSpeakerDesignDialog({
           <SpeakerDesignPdfButton
             groups={groups}
             projectName={projectName}
+            dealerName={dealerName}
             clientName={clientName}
             projectReference={projectReference}
             versionName={versionName}
+            versionNumber={versionNumber}
             layout={speakerDesign?.layout || null}
             disabled={isEmpty}
           />

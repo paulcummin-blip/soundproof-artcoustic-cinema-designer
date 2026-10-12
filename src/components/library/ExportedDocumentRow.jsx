@@ -6,10 +6,10 @@
  * overwritten and is never deleted from here.
  *
  * The row's state is stated by the caller — the same library vocabulary every
- * other row uses — so an issued PDF reads "Issued PDF", "Issued PDF — older than
- * current design" or "Superseded by newer export". An older-than-design PDF also
- * carries the caller's one-line note, so it reads as history rather than as
- * something that blocks a proposal.
+ * other row uses — so an issued file reads "Current", "Archived issued PDF",
+ * "Archived — older than current design" or "Superseded by newer export". An
+ * archived file also carries the caller's one-line note, so it reads as history
+ * rather than as something that blocks a proposal.
  *
  * The row owns its own open/download state, so it can be dropped into any
  * section without prop plumbing.
@@ -24,6 +24,12 @@ import { issuedDocumentLabel } from '@/components/library/issuedDocument/issuedD
 import { downloadIssuedDocument, openIssuedDocument } from '@/components/library/issuedDocument/issuedDocumentActions';
 import { formatLibraryDate } from './libraryFormat';
 
+/** The two card treatments: a current file, and a file kept for records. */
+const CURRENT_CARD = 'mb-3 rounded-lg border border-[#DCDBD6] bg-white px-4 py-3.5 shadow-sm';
+const ARCHIVED_CARD = 'mb-2 rounded-lg border border-[#EFECE4] bg-[#FAFAF9] px-4 py-3';
+const ACTION_CURRENT = 'flex items-center gap-1.5 text-xs uppercase tracking-[0.12em] text-[#213428] hover:text-[#3E4349] disabled:opacity-50';
+const ACTION_ARCHIVED = 'flex items-center gap-1.5 text-xs uppercase tracking-[0.12em] text-[#8A8477] hover:text-[#3E4349] disabled:opacity-50';
+
 export default function ExportedDocumentRow({
   record,
   versionText,
@@ -31,6 +37,8 @@ export default function ExportedDocumentRow({
   statusLabel,
   superseded = false,
   note = null,
+  variant = 'archived',
+  explanation = null,
 }) {
   const [busy, setBusy] = useState(null);
   const [failure, setFailure] = useState(null);
@@ -49,25 +57,42 @@ export default function ExportedDocumentRow({
   }, [record]);
 
   const exportedDate = formatLibraryDate(record.exported_at);
+  const current = variant === 'current';
+  const documentLabel = issuedDocumentLabel(record.document_type);
+  const actionClass = current ? ACTION_CURRENT : ACTION_ARCHIVED;
 
   return (
     <div
-      className="flex flex-col gap-3 border-t border-[#EFECE4] py-4 sm:flex-row sm:items-start sm:justify-between sm:gap-6"
+      className={`${current ? CURRENT_CARD : ARCHIVED_CARD} flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between sm:gap-6`}
       data-issued-document={record.id}
       data-superseded={superseded ? 'true' : 'false'}
+      data-file-variant={variant}
     >
       <div className="flex min-w-0 flex-1 items-start gap-3">
-        <FileText className="w-4 h-4 mt-0.5 shrink-0 text-[#8A8477]" />
+        <FileText className={`w-4 h-4 mt-0.5 shrink-0 ${current ? 'text-[#213428]' : 'text-[#8A8477]'}`} />
         <div className="min-w-0">
+          {/* A CURRENT file is stated by its document name — "Speaker Design" —
+              with the stored filename beneath it. An ARCHIVED file is stated by
+              the filename itself: the record of what was issued. */}
+          {current && (
+            <div className="text-[15px] font-semibold text-[#1B1A1A]" style={{ fontFamily: REPORT_FONT_BODY }}>
+              {documentLabel}
+            </div>
+          )}
           <div
-            className="text-sm text-[#1B1A1A] break-words"
+            className={`${current ? 'mt-0.5 text-xs text-[#8A8477]' : 'text-sm text-[#3E4349]'} break-words`}
             style={{ fontFamily: REPORT_FONT_BODY }}
             title={record.filename}
           >
             {record.filename}
           </div>
+          {current && explanation && (
+            <p className="mt-1 text-xs text-[#3E4349]" style={{ fontFamily: REPORT_FONT_BODY }}>
+              {explanation}
+            </p>
+          )}
           <div className="mt-1 text-xs text-[#8A8477] flex flex-wrap gap-x-3 gap-y-1">
-            <span>{issuedDocumentLabel(record.document_type)}</span>
+            {!current && <span>{documentLabel}</span>}
             {versionText && <span>{versionText}</span>}
             {exportedDate && <span>Exported {exportedDate}</span>}
             <span>{record.page_count ? `${record.page_count} pages` : 'PDF'}</span>
@@ -88,13 +113,14 @@ export default function ExportedDocumentRow({
           <LibraryStatusLabel
             state={statusState || (superseded ? LIBRARY_SOURCE_STATE.SUPERSEDED : LIBRARY_SOURCE_STATE.CURRENT)}
             label={statusLabel}
+            variant={current ? 'pill' : 'plain'}
           />
         </div>
         <button
           type="button"
           onClick={() => run(openIssuedDocument, 'open')}
           disabled={busy !== null}
-          className="flex items-center gap-1.5 text-xs uppercase tracking-[0.12em] text-[#213428] hover:text-[#3E4349] disabled:opacity-50"
+          className={actionClass}
           style={{ fontFamily: REPORT_FONT_BODY }}
         >
           {busy === 'open' ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <ExternalLink className="w-3.5 h-3.5" />}
@@ -104,7 +130,7 @@ export default function ExportedDocumentRow({
           type="button"
           onClick={() => run(downloadIssuedDocument, 'download')}
           disabled={busy !== null}
-          className="flex items-center gap-1.5 text-xs uppercase tracking-[0.12em] text-[#213428] hover:text-[#3E4349] disabled:opacity-50"
+          className={actionClass}
           style={{ fontFamily: REPORT_FONT_BODY }}
         >
           {busy === 'download' ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Download className="w-3.5 h-3.5" />}

@@ -23,6 +23,13 @@ export const ISSUED_DOCUMENT_TYPE = Object.freeze({
   SYSTEM_DESIGN_SUMMARY: 'system_design_summary',
   PROPOSAL: 'proposal',
   COMPARISON: 'comparison',
+  /**
+   * The Current Speaker Design schedule — the equipment schedule of one design
+   * version, exported with (and beside) the Project Report. Supporting project
+   * documentation: it is never a report, never a proposal source and never
+   * changes a report's status.
+   */
+  SPEAKER_DESIGN: 'speaker_design',
 });
 
 export const ISSUED_DOCUMENT_LABEL = Object.freeze({
@@ -32,6 +39,7 @@ export const ISSUED_DOCUMENT_LABEL = Object.freeze({
   [ISSUED_DOCUMENT_TYPE.SYSTEM_DESIGN_SUMMARY]: 'System Design Summary',
   [ISSUED_DOCUMENT_TYPE.PROPOSAL]: 'Proposal',
   [ISSUED_DOCUMENT_TYPE.COMPARISON]: 'System Design Comparison',
+  [ISSUED_DOCUMENT_TYPE.SPEAKER_DESIGN]: 'Speaker Design',
 });
 
 /** The document types that belong to the Library's Generated Reports section. */
@@ -40,6 +48,7 @@ export const REPORT_DOCUMENT_TYPES = Object.freeze([
   ISSUED_DOCUMENT_TYPE.VISUAL,
   ISSUED_DOCUMENT_TYPE.TECHNICAL,
   ISSUED_DOCUMENT_TYPE.SYSTEM_DESIGN_SUMMARY,
+  ISSUED_DOCUMENT_TYPE.SPEAKER_DESIGN,
 ]);
 
 /** The document types that belong to the Library's Proposals section. */
@@ -61,6 +70,18 @@ const PROPOSAL_PAGE_FRAME = Object.freeze({
   widthMm: 210,
   heightMm: 297,
   marginMm: 0,
+});
+
+/**
+ * The paper the Current Speaker Design schedule prints on. Its own print
+ * stylesheet declares `@page { size: A4; margin: 16mm }`, so its page frame is
+ * the printable content area of A4 inside that margin — the schedule is measured
+ * and stored exactly as it prints.
+ */
+const SPEAKER_DESIGN_PAGE_FRAME = Object.freeze({
+  widthMm: 178,
+  heightMm: 265,
+  marginMm: 16,
 });
 
 /**
@@ -107,6 +128,16 @@ export const ISSUED_DOCUMENT_COMPOSITION = Object.freeze({
       '.rp22-report .rp22-bass-graph-page',
     ].join(', '),
     bodyClass: '',
+  }),
+  // The schedule is not a mounted page of the app: its node is built from the
+  // version's own speaker design and handed to the capture explicitly, so the
+  // stored copy is produced from the same markup the panel prints.
+  [ISSUED_DOCUMENT_TYPE.SPEAKER_DESIGN]: Object.freeze({
+    nodeSelector: '.speaker-design-schedule',
+    pageSelector: '.speaker-design-schedule',
+    bodyClass: 'speaker-design-export-mode',
+    pageFrame: SPEAKER_DESIGN_PAGE_FRAME,
+    paginate: false,
   }),
   [ISSUED_DOCUMENT_TYPE.SYSTEM_DESIGN_SUMMARY]: Object.freeze({
     nodeSelector: '.proposal-print-portal',

@@ -66,7 +66,8 @@ import {
   PROJECT_REPORT_SNAPSHOT_TYPE,
   PROJECT_REPORT_DOCUMENT_TYPE,
 } from "@/components/report/projectReport/projectReportIdentity";
-import { buildProductsSelected } from "@/components/report/reportProductsSelected";
+import { buildProductsSelected, layoutVisibilityFilter } from "@/components/report/reportProductsSelected";
+import { buildSpeakerDesignRows } from "@/components/report/speakerDesign/speakerDesignRows";
 import { reportDateLabel } from "@/components/report/reportFirstPageMeta";
 
 export default function RP22ClientReport() {
@@ -493,6 +494,32 @@ export default function RP22ClientReport() {
     versionId: authority.versionId || null,
   });
 
+  // The version's Current Speaker Design, read from the SAME frozen design state
+  // this report was built from and through the same product authority the Current
+  // Speaker Design panel uses — the same visibility rule, the same model names,
+  // the same dual-centre cabinet rule and the same subwoofer derivation. Exporting
+  // this report exports this schedule with it, against this same version. Nothing
+  // here changes the design, the layout or any count.
+  const speakerDesignCompanion = useMemo(() => ({
+    layout: appState?.dolbyLayout || null,
+    groups: buildSpeakerDesignRows({
+      placedSpeakers,
+      frontSubsCfg: appState?.frontSubsCfg || null,
+      rearSubsCfg: appState?.rearSubsCfg || null,
+      subwooferInstances,
+      isVisible: appState?.getSpeakerVisibility
+        || layoutVisibilityFilter(appState?.dolbyLayout, appState?.sevenBedLayoutType),
+    }).groups,
+  }), [
+    placedSpeakers,
+    subwooferInstances,
+    appState?.frontSubsCfg,
+    appState?.rearSubsCfg,
+    appState?.getSpeakerVisibility,
+    appState?.dolbyLayout,
+    appState?.sevenBedLayoutType,
+  ]);
+
   const filenameIdentity = useReportFilenameIdentity(projectDetails);
   const { exporting, error: exportError, handleExport } = useClientReportPdfExport({
     activePageCount: readinessBase.state === REPORT_STATE.READY && filenameIdentity.ready ? orderedPages.length : 0,
@@ -523,6 +550,10 @@ export default function RP22ClientReport() {
           : 'current',
       }),
     },
+    // The report's companion document: the same version's Current Speaker Design,
+    // created and stored in the Library when this report is exported, so the
+    // designer never has to remember a second PDF button.
+    speakerDesignCompanion,
   });
 
   // A failed export resolves the report to the canonical Failed state.

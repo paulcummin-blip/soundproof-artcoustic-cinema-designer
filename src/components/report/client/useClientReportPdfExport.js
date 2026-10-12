@@ -36,6 +36,7 @@ import {
   recordIssuedExportInBackground,
   snapshotIssuedComposition,
 } from "@/components/library/issuedDocument/recordIssuedExport";
+import { storeSpeakerDesignInBackground } from "@/components/report/speakerDesign/speakerDesignIssuedDocument";
 
 // Version metadata is optional — only present when the project has a saved
 // named design version. The filename helper appends it when meaningful.
@@ -84,6 +85,10 @@ export function useClientReportPdfExport({
   // When supplied, an issued copy of the exported PDF is stored in the project
   // library in the background. The export itself is unchanged.
   issuedDocument = null,
+  // The version's Current Speaker Design, when this report carries one. Exporting
+  // the report exports the schedule with it, against the SAME version, so the
+  // Library holds both without the designer pressing a second button.
+  speakerDesignCompanion = null,
 }) {
   const [exporting, setExporting] = useState(false);
   const [error, setError] = useState(null);
@@ -153,6 +158,27 @@ export function useClientReportPdfExport({
           retryExport: () => retryExportRef.current?.(),
         },
         snapshot: snapshotIssuedComposition(issuedDocument.documentType),
+      });
+    }
+
+    // The version's Current Speaker Design travels with the report: same project,
+    // same version, same source fingerprints, its own document type. It is
+    // started after the report's own storage, so a schedule that cannot be
+    // created never costs the report its Library copy, and it names itself on
+    // failure, with a retry that re-runs it from the same version.
+    if (speakerDesignCompanion?.groups?.length > 0 && issuedDocument?.projectId) {
+      storeSpeakerDesignInBackground({
+        groups: speakerDesignCompanion.groups,
+        layout: speakerDesignCompanion.layout || null,
+        projectName,
+        clientName,
+        projectReference,
+        versionName,
+        versionNumber,
+        projectId: issuedDocument.projectId,
+        accountId: issuedDocument.accountId || null,
+        resolveSource: issuedDocument.resolveSource || null,
+        exportedBy: issuedDocument.exportedBy || null,
       });
     }
 
@@ -228,7 +254,7 @@ export function useClientReportPdfExport({
       printWindowRef.current = null;
       cleanup();
     }
-  }, [exporting, activePageCount, projectName, logoUrl, dealerName, clientName, projectReference, versionNumber, versionName, issuedDocument, cleanup]);
+  }, [exporting, activePageCount, projectName, logoUrl, dealerName, clientName, projectReference, versionNumber, versionName, issuedDocument, speakerDesignCompanion, cleanup]);
 
   retryExportRef.current = handleExport;
 

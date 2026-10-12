@@ -58,6 +58,8 @@ const FALLBACK_PROJECT = "Untitled Project";
  */
 export const REPORT_PDF_TYPE = Object.freeze({
   PROJECT_REPORT: "Project Report",
+  /** The Current Speaker Design schedule exported beside the Project Report. */
+  SPEAKER_DESIGN: "Speaker Design",
   VISUAL: "Visual",
   TECHNICAL: "Technical",
   PROPOSAL: "Proposal",

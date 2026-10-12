@@ -21,15 +21,16 @@ import {
   printReportInWindow,
   closeReportPrintWindow,
 } from '@/components/report/reportPrintWindow';
-import {
-  sanitiseFilenameSegment,
-  sanitiseProjectName,
-} from '@/components/report/reportPdfTitle';
+import { REPORT_PDF_TYPE, buildReportFilename } from '@/components/report/reportPdfTitle';
 
-/** The document token every speaker schedule filename starts with. */
-export const SPEAKER_DESIGN_DOCUMENT_TOKEN = 'Sound Proof Speaker Design';
+/**
+ * The schedule's document token. It is the SAME shared report filename authority
+ * the Project Report names itself with, so the schedule and the report it
+ * accompanies are written in one format:
+ *   Sound Proof - Artcoustic Cinema Designer - Speaker Design - …
+ */
+export const SPEAKER_DESIGN_PDF_TYPE = REPORT_PDF_TYPE.SPEAKER_DESIGN;
 
-const SEPARATOR = ' - ';
 /** Added to the print window's body — this schedule needs no app shell. */
 const PRINT_BODY_CLASS = 'speaker-design-export-mode';
 
@@ -45,21 +46,32 @@ export const SPEAKER_DESIGN_EXPORT_MESSAGES = Object.freeze({
  * names the saved file from the printed document's title and adds the extension
  * itself.
  *
- *   Sound Proof Speaker Design - <Project Name> - <Version Name>
- *   Sound Proof Speaker Design - <Project Name> - <Reference> - <Version Name>
+ * It is built by the shared report filename authority, with this document's own
+ * type token, so the schedule states the same project identity as the Project
+ * Report it accompanies:
  *
- * The reference and the version are stated only when they hold a value, and every
- * segment is sanitised by the shared report filename authority.
+ *   Sound Proof - Artcoustic Cinema Designer - Speaker Design[ - <Dealer>] - <Project Name>[ - <Client Name>][ - <Project Reference>] - <Version Name>
+ *
+ * Only segments that hold a value are written. The client name and the project
+ * reference are independent project fields — a blank one never borrows the
+ * other's value — and every segment is sanitised by that one authority.
  *
  * @returns {string}
  */
-export function buildSpeakerDesignFilename({ projectName, projectReference, versionName } = {}) {
-  const segments = [SPEAKER_DESIGN_DOCUMENT_TOKEN, sanitiseProjectName(projectName)];
-  const reference = sanitiseFilenameSegment(projectReference, '');
-  if (reference) segments.push(reference);
-  const version = sanitiseFilenameSegment(versionName, '');
-  if (version) segments.push(version);
-  return segments.join(SEPARATOR);
+export function buildSpeakerDesignFilename({
+  projectName,
+  dealerName = null,
+  clientName = null,
+  projectReference = null,
+  versionName = null,
+  versionNumber = null,
+} = {}) {
+  return buildReportFilename(
+    SPEAKER_DESIGN_PDF_TYPE,
+    projectName,
+    { number: versionNumber, name: versionName },
+    { dealerName, clientName, projectReference },
+  );
 }
 
 /** Today, as the schedule's own export date ("12 October 2026"). */
@@ -243,12 +255,21 @@ export function buildSpeakerDesignNode(data = {}) {
 export async function exportSpeakerDesignPdf({
   groups = [],
   projectName = null,
+  dealerName = null,
   clientName = null,
   projectReference = null,
   versionName = null,
+  versionNumber = null,
   layout = null,
 } = {}) {
-  const title = buildSpeakerDesignFilename({ projectName, projectReference, versionName });
+  const title = buildSpeakerDesignFilename({
+    projectName,
+    dealerName,
+    clientName,
+    projectReference,
+    versionName,
+    versionNumber,
+  });
 
   if (!Array.isArray(groups) || groups.length === 0) {
     return { printed: false, reason: 'empty', message: SPEAKER_DESIGN_EXPORT_MESSAGES.EMPTY, title };

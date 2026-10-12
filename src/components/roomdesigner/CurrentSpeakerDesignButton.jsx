@@ -14,8 +14,10 @@ import CurrentSpeakerDesignDialog from "@/components/roomdesigner/CurrentSpeaker
 export default function CurrentSpeakerDesignButton({
   speakerDesign = null,
   projectName = null,
+  dealerName = null,
   clientName = null,
   versionName = null,
+  versionNumber = null,
   projectReference = null,
   updatedDate = null,
   disabled = false,
@@ -41,8 +43,10 @@ export default function CurrentSpeakerDesignButton({
         onOpenChange={setOpen}
         speakerDesign={speakerDesign}
         projectName={projectName}
+        dealerName={dealerName}
         clientName={clientName}
         versionName={versionName}
+        versionNumber={versionNumber}
         projectReference={projectReference}
         updatedDate={updatedDate}
       />

@@ -5,8 +5,8 @@
 //   TEST 1  A report regenerated five times lists ONE current live row
 //   TEST 2  Three exports of the same report list ONE issued row: the latest
 //   TEST 3  An updated report updates the live row and the latest issued PDF is
-//           judged against it ("Issued PDF" / "Issued PDF — design changed since
-//           export") while the older copies stay in storage, unlisted
+//           judged against it ("Current" / "Archived — older than current
+//           design") while the older copies stay in storage, unlisted
 //   TEST 4  A Visual Report export and a Technical Report export never stand
 //           in for one another
 //   TEST 5  Level 4 version and Level 1 version are judged inside their own
@@ -22,7 +22,7 @@ import assert from 'node:assert/strict';
 
 import {
   EXPORT_SOURCE_CHANGED_LABEL,
-  ISSUED_PDF_LABEL,
+  CURRENT_FILE_LABEL,
   LIBRARY_SOURCE_LABEL,
   collapseLiveReports,
   liveReportKey,
@@ -141,7 +141,7 @@ test('TEST 2 — three exports of the same report list ONE issued row: the lates
 
   // No live report of this type: the export still reads as an issued PDF.
   const withoutLive = resolveExportLiveState({ record: rows[0], version: VERSION_4, liveReport: null });
-  assert.equal(withoutLive.label, ISSUED_PDF_LABEL, 'an issued PDF never reads as a live report');
+  assert.equal(withoutLive.label, CURRENT_FILE_LABEL, 'an issued PDF never reads as a live report');
 
   // It matches the live report of its own version and type: "Same as current".
   const live = saved('snap-1', 'version-4', 'technical', '2026-10-01T09:00:00.000Z');
@@ -196,11 +196,11 @@ test('TEST 3 — regenerating after exporting updates the live row and marks the
   assert.deepEqual(
     kept.map((record) => resolveExportLiveState({ record, version: VERSION_4, liveReport }).label),
     [EXPORT_SOURCE_CHANGED_LABEL],
-    'the design moved on: "Issued PDF — older than current design"',
+    'the design moved on: "Archived — older than current design"',
   );
   assert.equal(
     EXPORT_SOURCE_CHANGED_LABEL,
-    'Issued PDF — older than current design',
+    'Archived — older than current design',
     'the exact wording',
   );
 
@@ -221,7 +221,7 @@ test('TEST 3 — regenerating after exporting updates the live row and marks the
       version: VERSION_4,
       liveReport: { generatedAt: sameSource.generated_at, sourceFingerprints: sameSource.source_fingerprints },
     }).label),
-    [ISSUED_PDF_LABEL],
+    [CURRENT_FILE_LABEL],
   );
 });
 

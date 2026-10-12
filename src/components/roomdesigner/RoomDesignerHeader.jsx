@@ -156,9 +156,11 @@ export default function RoomDesignerHeader({
           <CurrentSpeakerDesignButton
             speakerDesign={speakerDesign}
             projectName={projectCadProjectName}
+            dealerName={identity?.dealerName || null}
             clientName={identity?.clientName || null}
             projectReference={identity?.projectReference || null}
             versionName={projectCadVersionName}
+            versionNumber={activeVersionRecord?.version_number || null}
             updatedDate={activeVersionRecord?.updated_date || null}
             disabled={loadState?.phase !== "loaded"}
           />

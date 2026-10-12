@@ -17,9 +17,11 @@ import { exportSpeakerDesignPdf } from "@/components/roomdesigner/speakerDesignP
 export default function SpeakerDesignPdfButton({
   groups = [],
   projectName = null,
+  dealerName = null,
   clientName = null,
   projectReference = null,
   versionName = null,
+  versionNumber = null,
   layout = null,
   disabled = false,
 }) {
@@ -37,9 +39,11 @@ export default function SpeakerDesignPdfButton({
       const outcome = await exportSpeakerDesignPdf({
         groups,
         projectName,
+        dealerName,
         clientName,
         projectReference,
         versionName,
+        versionNumber,
         layout,
       });
       if (!outcome?.printed) setError(outcome?.message || "The PDF could not be prepared.");
@@ -48,7 +52,7 @@ export default function SpeakerDesignPdfButton({
     } finally {
       setBusy(false);
     }
-  }, [busy, clientName, disabled, groups, isEmpty, layout, projectName, projectReference, versionName]);
+  }, [busy, clientName, dealerName, disabled, groups, isEmpty, layout, projectName, projectReference, versionName, versionNumber]);
 
   return (
     <div className="flex flex-col items-start sm:items-end gap-1">

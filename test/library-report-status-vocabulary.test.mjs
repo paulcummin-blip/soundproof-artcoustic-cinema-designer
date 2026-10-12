@@ -3,10 +3,10 @@
 // ACCEPTANCE — the Project Library's three user-facing report states and the
 // actions each one offers.
 //
-//   A  Current report      Current · Open · Export PDF, and no refresh action
+//   A  Current file        Current · Open · Export PDF, and no refresh action
 //   B  Design changed      Update needed · Open saved report · Create updated report
-//   C  Issued PDF current  Issued PDF · Open · Download
-//   D  Issued PDF changed  Issued PDF — older than current design · Open · Download
+//   C  Issued file current Current · Open · Download
+//   D  Issued file older   Archived — older than current design · Open · Download
 //   E  Exporting a PDF never stales the report
 //   F  Opening a report never stales it
 //   G  Generating a proposal never stales it
@@ -24,10 +24,10 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 
 import {
+  ARCHIVED_PDFS_HELPER,
+  CURRENT_FILE_LABEL,
   EXPORT_DESIGN_CHANGED_NOTE,
   EXPORT_SOURCE_CHANGED_LABEL,
-  ISSUED_PDF_LABEL,
-  ISSUED_PDFS_HELPER,
   LIVE_REPORT_DESIGN_CHANGED_NOTE,
   LIVE_REPORT_STATE,
   LIVE_REPORT_STATE_LABEL,
@@ -126,10 +126,10 @@ test('A — a Current report offers Open and Export PDF, and no refresh action',
     liveReportStateLabel(LIVE_REPORT_STATE.CURRENT),
     liveReportStateLabel(LIVE_REPORT_STATE.UPDATE_NEEDED),
     liveReportStateLabel(LIVE_REPORT_STATE.MISSING),
-    ISSUED_PDF_LABEL,
+    CURRENT_FILE_LABEL,
     EXPORT_SOURCE_CHANGED_LABEL,
     EXPORT_DESIGN_CHANGED_NOTE,
-    ISSUED_PDFS_HELPER,
+    ARCHIVED_PDFS_HELPER,
     LIVE_REPORT_DESIGN_CHANGED_NOTE,
     LIVE_REPORT_UPDATE_NEEDED_NOTE,
     ...Object.values(REPORT_ROW_ACTION),
@@ -148,7 +148,7 @@ test('A — a Current report offers Open and Export PDF, and no refresh action',
   // borrows the report vocabulary.
   assert.equal(
     resolveExportLiveState({ record: issuedPdf(), version: VERSION }).label,
-    ISSUED_PDF_LABEL,
+    CURRENT_FILE_LABEL,
   );
   assert.equal(
     resolveExportLiveState({ record: issuedPdf({ engineering: 'ENG-0' }), version: VERSION }).label,
@@ -156,7 +156,7 @@ test('A — a Current report offers Open and Export PDF, and no refresh action',
   );
   assert.equal(
     resolveExportLiveState({ record: issuedPdf(), version: null }).label,
-    ISSUED_PDF_LABEL,
+    CURRENT_FILE_LABEL,
   );
 });
 
@@ -203,20 +203,20 @@ test('B — a report the design moved past reads Update needed, and offers an up
 
 /* ── C — an issued PDF that matches ───────────────────────────────────────── */
 
-test('C — an issued PDF that still matches the design reads Issued PDF', () => {
+test('C — an issued PDF that still matches the design reads Current', () => {
   const live = savedReport({ status: 'current' });
   const matched = resolveExportLiveState({
     record: issuedPdf(),
     version: VERSION,
     liveReport: { generatedAt: live.generated_at, sourceFingerprints: live.source_fingerprints },
   });
-  assert.equal(matched.label, ISSUED_PDF_LABEL);
-  assert.equal(matched.label, 'Issued PDF');
+  assert.equal(matched.label, CURRENT_FILE_LABEL);
+  assert.equal(matched.label, 'Current');
 
   // With no live report to compare against, the pointer decides — and the export
   // still reads as an issued PDF, never as a live report.
   const withoutLive = resolveExportLiveState({ record: issuedPdf(), version: VERSION, liveReport: null });
-  assert.equal(withoutLive.label, ISSUED_PDF_LABEL);
+  assert.equal(withoutLive.label, CURRENT_FILE_LABEL);
 });
 
 /* ── D — an issued PDF after the design changed ───────────────────────────── */
@@ -229,7 +229,7 @@ test('D — an issued PDF after a design change says so, and is never regenerate
     liveReport: { generatedAt: live.generated_at, sourceFingerprints: live.source_fingerprints },
   });
   assert.equal(changed.label, EXPORT_SOURCE_CHANGED_LABEL);
-  assert.equal(changed.label, 'Issued PDF — older than current design');
+  assert.equal(changed.label, 'Archived — older than current design');
   assert.equal(
     EXPORT_DESIGN_CHANGED_NOTE,
     'This PDF is still available, but it was issued before the latest report update.',

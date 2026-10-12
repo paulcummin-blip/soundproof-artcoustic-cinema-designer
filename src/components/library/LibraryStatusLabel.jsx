@@ -1,9 +1,14 @@
 /**
  * LibraryStatusLabel
  * ------------------
- * The compact state label an asset row carries: Current live report, Exported
- * PDF, Current, Source changed, Missing source, Same as current, Older export,
+ * The compact state label an asset row carries: Current, Update needed, Not
+ * generated, Archived issued PDF, Archived — older than current design,
  * Superseded by newer export.
+ *
+ * It is stated in one of two variants, so a current file and an archived one can
+ * never read alike:
+ *   pill   a current file: the words in a filled, bordered badge
+ *   plain  an archived file: the same words, muted and unboxed
  *
  * Presentation only.
  */
@@ -31,12 +36,18 @@ const STATE_STYLE = {
   'exported-pdf': { colour: '#625143', Icon: FileDown },
 };
 
-export default function LibraryStatusLabel({ state = LIBRARY_SOURCE_STATE.CURRENT, label }) {
+export default function LibraryStatusLabel({ state = LIBRARY_SOURCE_STATE.CURRENT, label, variant = 'plain' }) {
   const style = STATE_STYLE[state] || STATE_STYLE[LIBRARY_SOURCE_STATE.CURRENT];
   const { Icon } = style;
+  const pill = variant === 'pill';
 
   return (
-    <span className="inline-flex items-center gap-1.5" data-library-status={state}>
+    <span
+      className={`inline-flex items-center gap-1.5${
+        pill ? ' rounded-full border border-[#DCDBD6] bg-[#F4F7F3] px-2.5 py-1' : ''
+      }`}
+      data-library-status={state}
+    >
       <Icon className="w-3.5 h-3.5 shrink-0" style={{ color: style.colour }} />
       <span
         className="text-[11px] uppercase tracking-[0.12em] font-semibold"
