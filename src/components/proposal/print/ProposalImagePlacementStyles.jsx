@@ -90,9 +90,16 @@ export default function ProposalImagePlacementStyles() {
         .pp-media--portrait img { height: 74mm; }
         .pp-media--seating img { height: 74mm; }
         /* The comparison page: two full-width options and their captions share
-           the sheet with the title and the message, so each image takes a
-           little under half of the usable page height. */
-        .pp-media--comparison img { height: 88mm; }
+           the sheet with the title, the message and — on the page that closes
+           the document — the closing note. The image height is therefore a page
+           budget rather than a preference: at 78mm both options, their captions
+           and the copy above them fit one sheet, and where a closing note shares
+           that sheet the options give back the height it needs (66mm), so the
+           explanation and both photographs are always presented together. */
+        .pp-media--comparison img { height: 78mm; }
+        body.proposal-export-mode .proposal-print-section.pp-page--with-endnote .pp-media--comparison img {
+          height: 66mm;
+        }
         .pp-media-row { gap: 8mm; }
         .pp-media-row,
         .pp-seating,

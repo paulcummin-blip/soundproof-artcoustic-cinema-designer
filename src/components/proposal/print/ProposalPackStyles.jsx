@@ -155,9 +155,12 @@ export default function ProposalPackStyles() {
       .proposal-print-portal .pp-body > h2,
       .proposal-print-portal .pp-body > h3 { break-after: avoid; page-break-after: avoid; }
       .proposal-print-portal .pp-body { orphans: 3; widows: 3; }
-      .proposal-print-portal .kph-table { break-inside: avoid; page-break-inside: avoid; }
+      /* The evidence table continues between whole rows when it needs a second
+         sheet — never as a heading with no rows under it. The table's own header
+         repeats on the continuation, and no row is ever cut. */
       .proposal-print-portal .kph-table thead { break-after: avoid; page-break-after: avoid; }
       .proposal-print-portal .kph-table tr { break-inside: avoid; page-break-inside: avoid; }
+      .proposal-print-portal .pp-highlights__intro { break-after: avoid; page-break-after: avoid; }
       .proposal-print-portal .pp-decision { break-inside: avoid; page-break-inside: avoid; }
       .proposal-print-portal .pp-decision__title { font-family: var(--pp-heading); font-size: 9pt; letter-spacing: .08em; text-transform: uppercase; color: var(--pp-warm); margin: 0 0 2mm; }
       .proposal-print-portal .pp-decision__choice { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6mm; margin-top: 6mm; break-inside: avoid; }
@@ -454,6 +457,57 @@ export default function ProposalPackStyles() {
         margin: 0 0 3mm !important;
         break-after: avoid;
         page-break-after: avoid;
+      }
+
+      /* ── Editorial flow: sections that share a sheet ──
+         Consecutive narrative sections are composed into one sheet frame, so a
+         short structure section continues under the section before it instead of
+         taking a sheet of its own. The section that opens the sheet carries the
+         page number; a section continuing on it keeps its own heading and
+         hierarchy without stating a second number on the same sheet. */
+      .proposal-print-portal .pp-page--flow .pp-header {
+        margin-bottom: 10mm;
+      }
+      .proposal-print-portal .pp-header--continued {
+        margin-top: 14mm;
+      }
+      .proposal-print-portal .pp-header--continued .pp-header__title {
+        font-size: 15pt !important;
+      }
+      .proposal-print-portal .pp-header--continued .pp-header__rule {
+        margin-top: 5mm;
+      }
+
+      /* ── Closing note ──
+         A short factual source note closes the page it belongs to instead of
+         taking a sheet of its own for a few sentences. */
+      .proposal-print-portal .pp-endnote {
+        margin-top: 9mm;
+        padding-top: 5mm;
+        border-top: 1px solid var(--pp-rule);
+        break-inside: avoid;
+        page-break-inside: avoid;
+      }
+      .proposal-print-portal .pp-endnote__title {
+        font-family: var(--pp-heading) !important;
+        font-size: 7.5pt !important;
+        letter-spacing: 0.2em !important;
+        text-transform: uppercase !important;
+        color: var(--pp-warm) !important;
+        margin: 0 0 2mm !important;
+      }
+      .proposal-print-portal .pp-endnote__body {
+        max-width: 148mm;
+        font-family: var(--pp-body) !important;
+        font-size: 9.5pt !important;
+        line-height: 1.5 !important;
+        color: var(--pp-slate) !important;
+      }
+      .proposal-print-portal .pp-endnote__body p {
+        margin: 0 0 2.5mm !important;
+      }
+      .proposal-print-portal .pp-endnote__body p:last-child {
+        margin-bottom: 0 !important;
       }
 
       /* ── Print page behaviour ──

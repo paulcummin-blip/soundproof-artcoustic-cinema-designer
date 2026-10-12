@@ -113,6 +113,123 @@ function createContinuation(page, view) {
   return continuation;
 }
 
+/** The continuation page a page's overflow is moved onto. */
+function continuationFor(pages, cursor, page, view) {
+  if (pages[cursor + 1]) return pages[cursor + 1];
+  const target = createContinuation(page, view);
+  const anchor = pages[cursor];
+  if (anchor.parentNode) anchor.parentNode.insertBefore(target, anchor.nextSibling || null);
+  pages.push(target);
+  return target;
+}
+
+/** True when the element is a table. */
+function isTableElement(element) {
+  return isElement(element) && String(element.tagName || '').toUpperCase() === 'TABLE';
+}
+
+/** The table a block carries, whether the block is the table or contains one. */
+function findTable(element) {
+  if (!isElement(element)) return null;
+  if (isTableElement(element)) return element;
+  return typeof element.querySelector === 'function' ? element.querySelector('table') : null;
+}
+
+/** A table's body rows, in printed order. */
+function tableRows(table) {
+  const bodies = table.tBodies ? Array.from(table.tBodies) : [];
+  if (bodies.length) return bodies.flatMap((body) => Array.from(body.rows || []));
+  return Array.from(table.rows || []);
+}
+
+/** A table's shell: its own attributes with its column headings repeated. */
+function tableShell(table) {
+  const shell = table.cloneNode(false);
+  const head = table.tHead || (typeof table.querySelector === 'function' ? table.querySelector('thead') : null);
+  if (head) shell.appendChild(head.cloneNode(true));
+  return shell;
+}
+
+/** What the block printed after its table — the note that closes it. */
+function nodesAfterTable(host, table) {
+  if (host === table) return [];
+  return Array.from(host.childNodes || []).filter((node) => node !== table && isElement(node));
+}
+
+/**
+ * Continue a table between whole rows.
+ *
+ * A table is not one indivisible statement: its rows are. Where the trailing
+ * block of an over-tall page is (or carries) a table, the rows that fit stay with
+ * the heading and the introduction above them and the rest continue onto the next
+ * sheet under the table's own repeated column headings. Every row travels whole,
+ * in reading order, and the note that closes the table continues with the rows it
+ * explains — so the heading is never left holding a sheet on its own.
+ *
+ * @returns {boolean} true when rows were moved
+ */
+function splitTrailingTable(current, budgetMm, measureHeightMm, continuation) {
+  const chunks = contentChunks(current);
+  const host = chunks.length ? chunks[chunks.length - 1].nodes[0] : null;
+  const table = findTable(host);
+  if (!table) return false;
+
+  const rows = tableRows(table);
+  // One row is one statement: a table of a single row is never divided.
+  if (rows.length < 2) return false;
+
+  const rowsHeightMm = rows.reduce((total, row) => total + measureHeightMm(row), 0);
+  // Everything the page carries apart from those rows: its chrome, its heading,
+  // its introduction and the table's own column headings.
+  const withoutRowsMm = measureHeightMm(current) - rowsHeightMm;
+  let keep = rows.length;
+  let keptMm = rowsHeightMm;
+  while (keep > 0 && withoutRowsMm + keptMm > budgetMm) {
+    keep -= 1;
+    keptMm -= measureHeightMm(rows[keep]);
+  }
+  // The table does fit on the sheet after all.
+  if (keep >= rows.length) return false;
+
+  const document_ = host.ownerDocument || null;
+  const onContinuation = host === table ? tableShell(table) : host.cloneNode(false);
+  if (host !== table) onContinuation.appendChild(tableShell(table));
+  const continuationTable = host === table ? onContinuation : onContinuation.lastChild;
+  const body = document_ && typeof document_.createElement === 'function'
+    ? document_.createElement('tbody')
+    : null;
+  if (body) continuationTable.appendChild(body);
+
+  // The rows are moved, never copied: the row prints once, in reading order.
+  rows.slice(keep).forEach((row) => (body || continuationTable).appendChild(row));
+  nodesAfterTable(host, table).forEach((node) => onContinuation.appendChild(node));
+
+  continuation().appendChild(onContinuation);
+  return true;
+}
+
+/**
+ * Open a block that cannot itself fit a sheet.
+ *
+ * A wrapper is a container, not a statement: where the only block left on an
+ * over-tall page is a container holding blocks of its own, those blocks are moved
+ * up into the page so they can flow onto the next sheet. A page whose only block
+ * is a real statement is left exactly as it is, so the capture's own fit check
+ * still reports it rather than hiding it.
+ */
+function openContainer(page, chunk) {
+  const element = chunk.nodes[0];
+  if (!isElement(element)) return false;
+  const children = Array.from(element.childNodes || []).filter(isElement);
+  if (children.length < 2) return false;
+  const parent = element.parentNode;
+  if (!parent || typeof parent.insertBefore !== 'function') return false;
+
+  Array.from(element.childNodes || []).forEach((node) => parent.insertBefore(node, element));
+  if (typeof parent.removeChild === 'function' && element.parentNode === parent) parent.removeChild(element);
+  return true;
+}
+
 /** A runaway guard only: every pass moves content forward, so this cannot bind. */
 const MAX_PASSES = 4000;
 
@@ -137,10 +254,20 @@ export function splitOverflowingPage(page, { budgetMm, measureHeightMm = layoutH
       cursor += 1;
       continue;
     }
+    // A table continues between whole rows: the heading and its introduction keep
+    // the rows that fit on this sheet and the rest print under the table's own
+    // repeated column headings. A heading is never left holding a sheet alone.
+    if (splitTrailingTable(current, budgetMm, measureHeightMm, () => continuationFor(pages, cursor, page, view))) {
+      continue;
+    }
+
     const chunks = contentChunks(current);
-    // Nothing left to move: the page is left as it is, so the capture's own fit
-    // check still reports it rather than silently clipping it.
+    // Nothing movable on the page itself. A container taller than a sheet is
+    // opened so the blocks inside it can flow; a page carrying one real block is
+    // left as it is, so the capture's own fit check still reports it rather than
+    // silently clipping it.
     if (chunks.length <= 1) {
+      if (chunks.length === 1 && openContainer(current, chunks[0])) continue;
       cursor += 1;
       continue;
     }
@@ -150,13 +277,7 @@ export function splitOverflowingPage(page, { budgetMm, measureHeightMm = layoutH
       moved.unshift(chunks.pop());
     }
 
-    let target = pages[cursor + 1] || null;
-    if (!target) {
-      target = createContinuation(page, view);
-      const anchor = pages[cursor];
-      if (anchor.parentNode) anchor.parentNode.insertBefore(target, anchor.nextSibling || null);
-      pages.push(target);
-    }
+    const target = continuationFor(pages, cursor, page, view);
     // Read order: the earlier block is placed before the later one, and a block's
     // own nodes keep the order they had — each is placed before the first child,
     // so they are walked backwards to end up forwards.

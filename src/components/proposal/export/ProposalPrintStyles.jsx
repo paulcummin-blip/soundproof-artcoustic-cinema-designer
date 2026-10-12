@@ -217,12 +217,16 @@ export default function ProposalPrintStyles() {
           display: table-header-group;
         }
 
-        /* ── Key Performance Highlights — one section, one page ──
-           The whole block is kept together: it moves to the next page rather
-           than splitting across two. */
+        /* ── Key Performance Highlights — a heading that keeps its rows ──
+           The block used to be kept whole, and that is exactly what left a sheet
+           carrying the heading and nothing else: the heading and its introduction
+           fitted on the sheet and the whole table was pushed onto the next one.
+           The heading keeps its introduction and the rows that follow it, the
+           table continues between whole rows when it genuinely needs a second
+           sheet, and the column headings repeat on the continuation. */
         body.proposal-export-mode .proposal-print-section--highlights {
-          break-inside: avoid;
-          page-break-inside: avoid;
+          break-inside: auto;
+          page-break-inside: auto;
         }
 
         body.proposal-export-mode .proposal-print-section--highlights .proposal-print-section__title,
@@ -232,14 +236,14 @@ export default function ProposalPrintStyles() {
           page-break-after: avoid;
         }
 
-        /* The table is never separated from the heading above it: it may not
-           start a new page while its own title sits on the previous one. */
+        /* The table is never separated from the heading and the introduction
+           above it: it may not start a new page while its own title sits on the
+           previous one. The table itself may continue between whole rows. */
         body.proposal-export-mode .proposal-print-section--highlights .pp-header__rule,
+        body.proposal-export-mode .proposal-print-section--highlights .pp-highlights__intro,
         body.proposal-export-mode .proposal-print-section--highlights .kph-table {
           break-before: avoid;
           page-break-before: avoid;
-          break-inside: avoid;
-          page-break-inside: avoid;
         }
 
         /* ── Project Images — imagery only, on its own page ── */

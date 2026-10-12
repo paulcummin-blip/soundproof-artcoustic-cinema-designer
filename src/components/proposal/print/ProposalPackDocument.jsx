@@ -52,6 +52,7 @@ import {
 } from '@/components/proposal/print/proposalPackAuthority';
 import { getSectionsForProposalType, resolveSectionTitle } from '@/components/proposal/proposalSections';
 import { alternativesCarrier, orderPublicationSections } from '@/components/proposal/publicationOrder';
+import { bandOpeningTypes, isFlowSection } from '@/components/proposal/print/narrativeFlowComposition';
 import { prepareSectionBody } from '@/components/proposal/sectionBodyAuthority';
 import { isHighChannelDesign } from '@/components/proposal/highChannelLayoutAuthority';
 import { compactViewingResult } from '@/components/proposal/print/snapshotViewingRows';
@@ -194,18 +195,53 @@ export default function ProposalPackDocument({
     comparisonPagesPlaced = true;
   }
 
-  // Page order, with the numbers assigned as the pages are composed.
+  // The document's editorial flow: the narrative sections that may share a sheet,
+  // in the order this document prints them. A designed page breaks the flow, and
+  // a section a designed page interrupted opens a sheet of its own again.
+  const flowOpenings = bandOpeningTypes(
+    canonical
+      .filter((def) => def.type !== 'cover')
+      .map((def) => def.type)
+      .filter((type) => byType.has(type)),
+  );
+
+  // Page order, with the numbers assigned as the sheets are composed: a sheet is
+  // numbered once, by the section that opens it.
   let number = 1;
   const takeNumber = () => String((number += 1)).padStart(2, '0');
 
+  // Every page is either a composed page of its own or a section frame whose
+  // children flow — which is what lets consecutive narrative sections share one
+  // sheet. A composed page closes the flow, so narrative copy never continues
+  // onto a sheet that already carries a designed page.
   const pages = [];
+  let openFlowFrame = null;
+  const addPage = (node, key) => {
+    pages.push({ key: key || node?.key || `page:${pages.length}`, node });
+    openFlowFrame = null;
+    return node;
+  };
+  const addSectionFrame = (sectionType, key) => {
+    const flow = isFlowSection(sectionType);
+    const frame = {
+      key,
+      flow,
+      imaged: false,
+      endnote: false,
+      className: [`pp-page--${sectionType}`],
+      children: [],
+    };
+    pages.push(frame);
+    openFlowFrame = flow ? frame : null;
+    return frame;
+  };
 
   // The seating-style page: the large lifestyle alternatives, placed immediately
   // before the closing section (the planner names that anchor) or at the end of
   // the narrative when there is no closing section.
   const pushSeatingPages = () => {
     seatingChunks.forEach((chunk, index) => {
-      pages.push(
+      addPage(
         <SeatingStylePage
           key={`seating:${index}`}
           number={takeNumber()}
@@ -223,7 +259,7 @@ export default function ProposalPackDocument({
   // underneath, each captioned with what it stands for.
   const pushComparisonPages = () => {
     comparisonGroups.forEach((group) => {
-      pages.push(
+      addPage(
         <ComparisonOptionsPage
           key={`comparison:${group.id}`}
           number={takeNumber()}
@@ -245,7 +281,7 @@ export default function ProposalPackDocument({
     || hasComparisonGlance;
 
   if (hasGlanceContent) {
-    pages.push(
+    addPage(
       <AtAGlancePage
         key="glance"
         number={takeNumber()}
@@ -260,7 +296,7 @@ export default function ProposalPackDocument({
   }
 
   if (isDesignedPack) {
-    pages.push(<MethodPage key="method" number={takeNumber()} />);
+    addPage(<MethodPage key="method" number={takeNumber()} />);
   }
 
   // A comparison opens with the decision: one page that says which option to
@@ -268,7 +304,7 @@ export default function ProposalPackDocument({
   // prints. A single-version pack has no choice to present, so it never prints
   // this page.
   if (reportType === 'comparison' && hasComparisonGlance) {
-    pages.push(
+    addPage(
       <DecisionSummaryPage
         key="decision"
         number={takeNumber()}
@@ -305,6 +341,26 @@ export default function ProposalPackDocument({
         proposalType: reportType,
       });
 
+      if (section.section_type === 'appendix') {
+        // The closing note is an endnote on the page the document already has:
+        // a short factual statement closes the last content sheet rather than
+        // taking a whole sheet of its own for a few sentences. Where there is no
+        // page to close (no composed section frame yet) it keeps its own page.
+        const carrier = pages[pages.length - 1];
+        if (carrier && Array.isArray(carrier.children)) {
+          carrier.endnote = true;
+          carrier.children.push(
+            <div className="pp-endnote" key={`endnote:${section.id}`}>
+              <div className="pp-endnote__title">{displayTitle}</div>
+              {body ? (
+                <div className="pp-endnote__body" dangerouslySetInnerHTML={{ __html: body }} />
+              ) : null}
+            </div>,
+          );
+          return;
+        }
+      }
+
       if (section.section_type === 'room_images') {
         // A dedicated gallery spread is kept ONLY when genuinely unused strong
         // images remain. With two or three images the gallery is retired: those
@@ -315,7 +371,7 @@ export default function ProposalPackDocument({
           // No images page: either the document places its images editorially,
           // or there are no images at all — which is stated, once.
           if (imagePlan.usableCount > 0) return;
-          pages.push(
+          addPage(
             <section key={section.id} className="proposal-print-section pp-page pp-page--images">
               <ProposalPageHeader number={takeNumber()} kicker="Visualisation" title={displayTitle} />
               <ProjectImagesBlock images={projectImages} />
@@ -326,7 +382,7 @@ export default function ProposalPackDocument({
         // Image-led: one image page per group of images, so four or more unused
         // images become further image pages instead of shrinking to fit.
         imagePagesFor(spreadImages).forEach((pageImages, index) => {
-          pages.push(
+          addPage(
             <ProjectImagesPage
               key={`${section.id}:${index}`}
               number={takeNumber()}
@@ -348,7 +404,7 @@ export default function ProposalPackDocument({
         // indivisible printed block. The section's own validated introduction
         // prints above the table it introduces: an introduction is part of the
         // approved copy, so it is published once, here, and nowhere else.
-        pages.push(
+        addPage(
           <section
             key={section.id}
             className="proposal-print-section pp-page pp-page--highlights proposal-print-section--highlights"
@@ -394,12 +450,26 @@ export default function ProposalPackDocument({
         ? seatingChunks[0]
         : null;
 
-      pages.push(
-        <section
-          key={section.id}
-          className={`proposal-print-section pp-page pp-page--${section.section_type}${media.length > 0 ? ' pp-page--imaged' : ''}`}
-        >
-          <ProposalPageHeader number={takeNumber()} kicker="Design" title={displayTitle} />
+      // A narrative section continues on the sheet the section before it opened,
+      // under its own heading and hierarchy; a designed page opens a sheet of its
+      // own. The section that opens a sheet carries its number, and no sheet is
+      // numbered twice.
+      const continuesOpenSheet = isFlowSection(section.section_type)
+        && Boolean(openFlowFrame)
+        && !flowOpenings.has(section.section_type);
+      const sheet = continuesOpenSheet
+        ? openFlowFrame
+        : addSectionFrame(section.section_type, section.id);
+      if (media.length > 0) sheet.imaged = true;
+
+      sheet.children.push(
+        <React.Fragment key={section.id}>
+          <ProposalPageHeader
+            number={continuesOpenSheet ? null : takeNumber()}
+            kicker="Design"
+            title={displayTitle}
+            continued={continuesOpenSheet}
+          />
           {/* The dominant treatment leads the page: full-width, image-first. */}
           {landscape ? <ProposalImagePlacement placement={landscape} /> : null}
           {/* The portrait accent sits smaller, beside the copy it illustrates. */}
@@ -441,14 +511,14 @@ export default function ProposalPackDocument({
               ))}
             </div>
           ) : null}
-        </section>
+        </React.Fragment>,
       );
 
       // A seating group too long for one page continues past it, every image
       // still with its own caption and the group's explanation already stated.
       if (seatingHere) {
         seatingChunks.slice(1).forEach((chunk, index) => {
-          pages.push(
+          addPage(
             <SeatingStylePage
               key={`seating:cont:${index}`}
               number={takeNumber()}
@@ -468,7 +538,7 @@ export default function ProposalPackDocument({
 
   const hasAppendixSection = canonical.some((def) => def.type === 'appendix');
   if (isDesignedPack && !hasAppendixSection) {
-    pages.push(<AppendixPage key="appendix" number={takeNumber()} />);
+    addPage(<AppendixPage key="appendix" number={takeNumber()} />);
   }
 
   return (
@@ -495,7 +565,23 @@ export default function ProposalPackDocument({
         />
       </div>
 
-      {pages}
+      {/* A section frame flows: consecutive narrative sections share one sheet,
+          and a frame that needs a further sheet continues onto it. */}
+      {pages.map((entry) => (entry.node ? entry.node : (
+        <section
+          key={entry.key}
+          className={[
+            'proposal-print-section',
+            'pp-page',
+            ...entry.className,
+            entry.flow ? 'pp-page--flow' : null,
+            entry.imaged ? 'pp-page--imaged' : null,
+            entry.endnote ? 'pp-page--with-endnote' : null,
+          ].filter(Boolean).join(' ')}
+        >
+          {entry.children}
+        </section>
+      )))}
     </div>
   );
 }

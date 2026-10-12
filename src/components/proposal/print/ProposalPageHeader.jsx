@@ -11,9 +11,17 @@
 import React from 'react';
 import { proposalRoleStyle } from '@/components/proposal/typography/proposalTypography';
 
-export default function ProposalPageHeader({ number, title, lead, kicker }) {
+export default function ProposalPageHeader({
+  number,
+  title,
+  lead,
+  kicker,
+  // A section that continues on a sheet another section opened: it keeps its own
+  // heading and hierarchy, and does not state a second page number on one sheet.
+  continued = false,
+}) {
   return (
-    <header className="pp-header">
+    <header className={`pp-header${continued ? ' pp-header--continued' : ''}`}>
       <div className="pp-header__meta">
         {number ? <span className="pp-header__number">{number}</span> : null}
         {kicker ? <span className="pp-header__kicker">{kicker}</span> : null}

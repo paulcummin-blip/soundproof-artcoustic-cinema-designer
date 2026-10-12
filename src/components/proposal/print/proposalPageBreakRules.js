@@ -46,6 +46,9 @@ export const PACK_KEEP_TOGETHER_SELECTORS = Object.freeze([
   '.pp-note',
   '.pp-method__row',
   '.pp-decision',
+  // The closing note is one short factual statement: it is never divided, and it
+  // shares the sheet it is placed on rather than taking a sheet of its own.
+  '.pp-endnote',
 ]);
 
 /** A group of cards or structures stays with its own heading. */
@@ -58,28 +61,43 @@ export const PACK_KEEP_WITH_HEADING_SELECTORS = Object.freeze([
 ]);
 
 /**
- * The one-page sections of the pack: the At a Glance page, the Key Performance
- * Highlights block and an imagery page are each read as one thing, and the
- * compact package table keeps the At a Glance page inside its own sheet.
+ * The one-page sections of the pack: the At a Glance page and an imagery page are
+ * each read as one thing, and the compact package table keeps the At a Glance
+ * page inside its own sheet.
+ *
+ * The Key Performance Highlights evidence page is deliberately NOT in this list.
+ * Keeping it whole was what produced a sheet carrying the section heading and
+ * nothing else: the heading and its introduction fitted, the table did not, and
+ * the whole table was pushed onto the next sheet. It continues instead — the
+ * heading keeps the rows that follow it, and only complete rows move.
  */
 export const PACK_ONE_PAGE_SELECTORS = Object.freeze([
   '.pp-page--glance',
   '.pp-page--glance .pp-facts-group',
   '.pp-page--glance .pp-table',
   '.pp-table--compact',
-  '.pp-page--highlights',
-  '.pp-page--highlights .pp-body',
-  '.proposal-print-section--highlights',
-  '.kph-table',
   '.pp-page--images',
   '.pp-gallery',
   '.pp-gallery__figure',
   '.pp-gallery__support',
 ]);
 
+/**
+ * The designed pages that may continue onto a further sheet when their content
+ * genuinely needs one: a narrative sheet filled by consecutive sections, the
+ * evidence page whose rows continue, and the Presented Options page. A heading is
+ * never left holding a sheet of its own, so these frames flow.
+ */
+export const PACK_CONTINUATION_SELECTORS = Object.freeze([
+  '.pp-page--flow',
+  '.pp-page--highlights',
+  '.proposal-print-section--highlights',
+]);
+
 /** A table never starts a page away from the header it belongs to. */
 export const PACK_TABLE_FOLLOWS_HEADING_SELECTORS = Object.freeze([
-  '.proposal-print-section--highlights .pp-header__rule',
+  '.proposal-print-section--highlights .pp-header',
+  '.proposal-print-section--highlights .pp-highlights__intro',
   '.proposal-print-section--highlights .kph-table',
   '.pp-body + .pp-table',
 ]);
@@ -142,9 +160,21 @@ export const PACK_PAGE_BREAK_RULES = Object.freeze([
   },
   {
     id: 'one-page-sections-are-read-as-one-thing',
-    note: 'At a Glance, Key Performance Highlights and an imagery page are each kept whole.',
+    note: 'At a Glance and an imagery page are each kept whole.',
     selectors: PACK_ONE_PAGE_SELECTORS,
     declarations: Object.freeze({ breakInside: 'avoid' }),
+  },
+  {
+    id: 'designed-pages-continue-when-they-must',
+    note: 'A narrative sheet filled by consecutive sections, and the evidence page whose rows continue, may run onto a further sheet — always whole blocks on it, never a heading left holding a sheet of its own.',
+    selectors: PACK_CONTINUATION_SELECTORS,
+    declarations: Object.freeze({ breakInside: 'auto' }),
+  },
+  {
+    id: 'continued-heading-keeps-its-copy',
+    note: 'A section continuing on a sheet another section opened keeps its heading with the copy that follows it.',
+    selectors: Object.freeze(['.pp-header--continued']),
+    declarations: Object.freeze({ breakAfter: 'avoid' }),
   },
   {
     id: 'compact-table-keeps-the-glance-page-whole',
