@@ -31,7 +31,9 @@ export function composeProposalFrames(pages) {
     let chain = [];
     for (const unit of units) {
       const candidate = [...chain, unit];
-      const fragments = measureUnits(candidate).fits ? [unit] : fragmentTextUnit(unit, chain, measureUnits);
+      const fits = measureUnits(candidate).fits;
+      if (!fits && unit.tableId) throw new Error('A complete table row and its required introduction exceed printable A4 height. Export stopped without splitting the row.');
+      const fragments = fits ? [unit] : fragmentTextUnit(unit, chain, measureUnits);
       expanded.push(...fragments);
       chain = unit.keepNext ? (fragments.length === 1 ? [...chain, unit] : [fragments[fragments.length - 1]]) : [];
     }

@@ -20,29 +20,16 @@
 
 import React from 'react';
 import ProposalPageHeader from '@/components/proposal/print/ProposalPageHeader';
-import { proposalRoleStyle } from '@/components/proposal/typography/proposalTypography';
+import ProposalGalleryFigure from '@/components/proposal/print/ProposalGalleryFigure';
 
 export { IMAGES_PER_PAGE, imagePagesFor } from '@/components/proposal/print/imagePageLayout';
-
-function GalleryFigure({ asset, className = '' }) {
-  if (!asset?.file_url) return null;
-  return (
-    <figure className={`pp-gallery__figure ${className}`.trim()}>
-      <img src={asset.file_url} alt={asset.caption || 'Project image'} />
-      {asset.caption ? (
-        <figcaption className="pp-gallery__caption" style={proposalRoleStyle('caption')}>
-          {asset.caption}
-        </figcaption>
-      ) : null}
-    </figure>
-  );
-}
 
 export default function ProjectImagesPage({
   number,
   title = 'Project Images',
   kicker = 'Visualisation',
   images = [],
+  preserveNatural = false,
 }) {
   if (!images.length) return null;
   const [hero, ...supporting] = images;
@@ -51,11 +38,11 @@ export default function ProjectImagesPage({
     <section className="proposal-print-section pp-page pp-page--images">
       <ProposalPageHeader number={number} kicker={kicker} title={title} />
       <div className={`pp-gallery pp-gallery--${images.length}`}>
-        <GalleryFigure asset={hero} className="pp-gallery__hero" />
+        <ProposalGalleryFigure asset={hero} className="pp-gallery__hero" preserveNatural={preserveNatural} />
         {supporting.length > 0 && (
           <div className="pp-gallery__support">
             {supporting.map((asset) => (
-              <GalleryFigure key={asset.id || asset.file_url} asset={asset} />
+              <ProposalGalleryFigure key={asset.id || asset.file_url} asset={asset} preserveNatural={preserveNatural} />
             ))}
           </div>
         )}

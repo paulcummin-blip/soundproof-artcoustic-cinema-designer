@@ -47,8 +47,8 @@ export const MIN_PAGE_GAP = 2;
 /** A source may carry the document twice: the cover and its return. */
 export const MAX_USES_PER_SOURCE = 2;
 
-/** A dedicated gallery spread is kept only when this many strong images are unused. */
-export const RETAINED_GALLERY_MIN_IMAGES = 4;
+/** Every selected source must print, even when only one unused photograph remains. */
+export const RETAINED_GALLERY_MIN_IMAGES = 1;
 
 /** Seating-style images share a page this many at a time. */
 export const SEATING_IMAGES_PER_PAGE = 2;
@@ -121,7 +121,8 @@ export function resolveCoverAssetId({ assets = [], coverImageUrl = null } = {}) 
  * @param {string} args.coverAssetId  the chosen cover image's source asset id
  */
 export function planProposalImages({ assets = [], sectionSlots = [], coverAssetId = null } = {}) {
-  const usable = (Array.isArray(assets) ? assets : []).filter(isUsableInProposal);
+  const usable = (Array.isArray(assets) ? assets : []).filter(isUsableInProposal)
+    .map((asset, index) => asset.id ? asset : { ...asset, id: `selected-image-${index}` });
   const usableCount = usable.length;
 
   const coverAsset = usable.find((asset) => asset.id && asset.id === coverAssetId)
@@ -331,6 +332,7 @@ export function planProposalImages({ assets = [], sectionSlots = [], coverAssetI
         && placement.comparison_group === group.name),
     })),
     galleryImages,
+    selectedImageUrls: usable.map((asset) => asset.file_url),
     // The images the designer marked as comparison options, so the plan can be
     // checked against where they actually landed.
     comparisonImageIds: [...comparisonIds],

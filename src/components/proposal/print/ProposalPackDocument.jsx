@@ -161,14 +161,15 @@ export default function ProposalPackDocument({
   // The seating-style page is not a stored section and carries no narrative: it
   // is composed from the images the designer grouped as seating options.
   const seatingChunks = [];
-  for (let index = 0; imagePlan.seatingPlacements.length >= 2 && index < imagePlan.seatingPlacements.length; index += SEATING_IMAGES_PER_PAGE) {
+  for (let index = 0; index < imagePlan.seatingPlacements.length; index += SEATING_IMAGES_PER_PAGE) {
     seatingChunks.push(imagePlan.seatingPlacements.slice(index, index + SEATING_IMAGES_PER_PAGE));
   }
   let seatingPagesPlaced = false;
 
   // A comparison group is not a stored section either: each group takes a page
   // of its own, carrying the designer's message and both options full width.
-  const comparisonGroups = (imagePlan.comparisonPages || []).filter(group => group.placements?.length >= 2);
+  const comparisonGroups = (imagePlan.comparisonPages || []).filter(group => group.placements?.length >= 1);
+  let galleryPagesPlaced = false;
   let comparisonPagesPlaced = false;
 
   // ── ONE carrier for the document's alternatives ──────────────────────────
@@ -272,6 +273,15 @@ export default function ProposalPackDocument({
     comparisonPagesPlaced = true;
   };
 
+  const pushUnplacedImages = (title = 'Project Images') => {
+    if (galleryPagesPlaced || !imagePlan.galleryImages.length) return;
+    imagePagesFor(imagePlan.galleryImages).forEach((images, index) => {
+      addPage(<ProjectImagesPage key={`selected-images:${index}`} number={takeNumber()}
+        title={title} images={images} preserveNatural />);
+    });
+    galleryPagesPlaced = true;
+  };
+
   // One page carries the project, the room and the brief: no second page
   // restates the same facts.
   const hasGlanceContent = glance.projectCards.length > 0
@@ -323,6 +333,7 @@ export default function ProposalPackDocument({
         if (!seatingPagesPlaced && seatingChunks.length > 0) pushSeatingPages();
         if (!comparisonPagesPlaced && comparisonGroups.length > 0) pushComparisonPages();
       }
+      if ((!hasImagesSection || !byType.has('room_images')) && ['overall_design', 'conclusion', 'appendix'].includes(def.type)) pushUnplacedImages();
       const section = byType.get(def.type);
       if (!section) return;
       const title = section.title || def.title;
@@ -366,7 +377,7 @@ export default function ProposalPackDocument({
         // images remain. With two or three images the gallery is retired: those
         // images already carry the document editorially, and repeating them here
         // is exactly the gallery-first layout the editorial standard replaces.
-        const spreadImages = imagePlan.retainedGallery ? imagePlan.galleryImages : [];
+        const spreadImages = imagePlan.galleryImages;
         if (spreadImages.length === 0) {
           // No images page: either the document places its images editorially,
           // or there are no images at all — which is stated, once.
@@ -379,18 +390,8 @@ export default function ProposalPackDocument({
           );
           return;
         }
-        // Image-led: one image page per group of images, so four or more unused
-        // images become further image pages instead of shrinking to fit.
-        imagePagesFor(spreadImages).forEach((pageImages, index) => {
-          addPage(
-            <ProjectImagesPage
-              key={`${section.id}:${index}`}
-              number={takeNumber()}
-              title={displayTitle}
-              images={pageImages}
-            />
-          );
-        });
+        // Preserve every unused selected photograph, with its caption and natural proportions.
+        pushUnplacedImages(displayTitle);
         return;
       }
 
@@ -540,13 +541,15 @@ export default function ProposalPackDocument({
     pushSeatingPages();
   }
 
+  if (!comparisonPagesPlaced && comparisonGroups.length) pushComparisonPages();
+  pushUnplacedImages();
   const hasAppendixSection = canonical.some((def) => def.type === 'appendix');
   if (isDesignedPack && !hasAppendixSection) {
     addPage(<AppendixPage key="appendix" number={takeNumber()} />);
   }
 
   return (
-    <div className="proposal-print-portal">
+    <div className="proposal-print-portal" data-selected-images={JSON.stringify(imagePlan.selectedImageUrls)}>
       <ProposalPackStyles />
       <ProposalImagePlacementStyles />
 

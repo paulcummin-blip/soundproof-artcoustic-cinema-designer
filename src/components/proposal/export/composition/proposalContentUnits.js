@@ -72,11 +72,13 @@ export function proposalContentUnits(page, measureUnits) {
     // A long prose section may use spare space; a short section stays a complete unit.
     const longProse = group.hasAttribute?.('data-editorial-section') && paragraphs.length >= 3
       && standalone.used > standalone.budget * 0.55;
-    units.push(...(standalone.fits && !longProse ? [whole] : collect(group, [], true)));
+    const evidenceTable = page.matches('.pp-page--highlights') && (group.matches?.('table') || group.querySelector?.('table'));
+    units.push(...(standalone.fits && !longProse && !evidenceTable ? [whole] : collect(group, [], true)));
   }
   for (let index = 0; index < units.length; index += 1) {
     const unit = units[index];
     if (unit.source.matches?.('.kph-table__note,.pp-endnote') && index > 0) units[index - 1].keepNext = true;
+    if (unit.source.matches?.('img') && units[index + 1]?.source.matches?.('figcaption')) unit.keepNext = true;
     if (unit.source.matches?.('figure,.pp-media') && index > 0 && units[index - 1].keepNext && index + 1 < units.length) unit.keepNext = true;
     // A tiny opening paragraph keeps a second paragraph instead of opening a section on a single sentence.
     if (unit.source.matches?.('p') && index > 0 && units[index - 1].keepNext
