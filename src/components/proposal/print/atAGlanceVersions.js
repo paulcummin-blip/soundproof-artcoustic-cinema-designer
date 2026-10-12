@@ -55,7 +55,7 @@ export function singleDesignProjectCards(cards = []) {
 /** The comparison rows that carry the facts each version block states. */
 export const GLANCE_ROW_LABELS = Object.freeze([
   { key: 'system_layout', label: 'System layout' },
-  { key: 'screen_size', label: 'Screen' },
+  { key: 'screen_size', label: 'Display' },
   { key: 'seating', label: 'Seating' },
   { key: 'rp23_viewing', label: 'Viewing geometry' },
   { key: 'lcr', label: 'LCR' },

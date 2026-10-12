@@ -87,7 +87,7 @@ export default function AtAGlancePage({
 
       {roomCards.length > 0 ? (
         <div className="pp-facts-group">
-          <h3 className="pp-facts-group__title">Room and screen</h3>
+          <h3 className="pp-facts-group__title">Room and display</h3>
           <ProposalFactCards cards={roomCards} columns={3} />
         </div>
       ) : null}

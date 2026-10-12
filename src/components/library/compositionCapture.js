@@ -26,6 +26,7 @@
 import html2canvas from 'html2canvas';
 import { jsPDF } from 'jspdf';
 import { installCanvasGradientGuard, neutraliseDegenerateGradients } from './canvasGradientGuard';
+import { paginateFlowPages } from './flowPagination';
 
 const MM_PER_INCH = 25.4;
 const CSS_PX_PER_INCH = 96;
@@ -208,9 +209,14 @@ function pageSizeMm(element) {
  * @param {{widthMm: number, heightMm: number, marginMm: number}} [params.pageFrame]
  *   the paper the composition prints on; omitted, the report content-area
  *   default is used, so a report is captured exactly as it always was
+ * @param {boolean} [params.paginate] — true for a composition that is paginated
+ *   by its own content rather than by a fixed page frame (the proposal pack): a
+ *   page frame taller than its sheet is then continued onto further pages, whole
+ *   blocks at a time, before the fit check below. A report keeps its fixed-height
+ *   frames and is never re-paginated.
  * @returns {Promise<{blob: Blob, pageCount: number}>}
  */
-export async function captureCompositionToPdf({ nodeHtml, pageSelector, bodyClass = '', pageFrame = null }) {
+export async function captureCompositionToPdf({ nodeHtml, pageSelector, bodyClass = '', pageFrame = null, paginate = false }) {
   if (!nodeHtml || !pageSelector) {
     throw new Error('The print composition could not be captured.');
   }
@@ -228,10 +234,19 @@ export async function captureCompositionToPdf({ nodeHtml, pageSelector, bodyClas
     await waitForFrameAssets(frame);
 
     const scope = frame.contentDocument;
-    const pages = collectPageFrames(scope, pageSelector);
-    if (pages.length === 0) {
+    const collected = collectPageFrames(scope, pageSelector);
+    if (collected.length === 0) {
       throw new Error('The print composition carried no printable pages.');
     }
+
+    // A flow-paginated composition (the proposal pack) is continued onto further
+    // pages where a section's own content is taller than the sheet it prints on.
+    // The pages are measured in this capture document, where the printed layout is
+    // the live layout. A composition with fixed page frames is never re-paginated.
+    const pagination = paginate
+      ? paginateFlowPages({ pages: collected, paper })
+      : { pages: collected, continuations: 0 };
+    const pages = pagination.pages;
 
     pages.forEach((page, index) => {
       const { widthMm, heightMm } = pageSizeMm(page);
@@ -293,6 +308,8 @@ export async function captureCompositionToPdf({ nodeHtml, pageSelector, bodyClas
       captureDiagnostics: {
         degenerateGradients,
         sanitisedStops: gradientGuard ? gradientGuard.sanitisedStops() : [],
+        // Continuation pages created for content taller than one sheet.
+        continuations: pagination.continuations,
       },
     };
   } finally {

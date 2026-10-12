@@ -17,6 +17,11 @@
 import { buildHighlightDisplayRows } from '../keyPerformanceHighlightsAuthority';
 import { resolveViewingRows } from './snapshotViewingRows';
 import { rp23DisplayAngleDeg } from '@/components/utils/viewingAngleUtils';
+import {
+  DISPLAY_TYPE_PROJECTOR,
+  DISPLAY_TYPE_TV,
+  canonicalDisplayType,
+} from '@/components/models/screen/displayTypeAuthority';
 
 /** Unwrap an Engineering Authority { statement, confidence, source } value. */
 export function statementValue(value) {
@@ -176,8 +181,16 @@ export function parameterReferenceList() {
  *
  * The overall screen assembly the screen needs behind it is manufacturing detail,
  * not a client-facing fact, so no client surface carries it: it lives in the
- * technical and admin data. A television is stated by its nominal size, which is
- * how a television is bought.
+ * technical and admin data.
+ *
+ * A TELEVISION is not a projection screen and is never bought by its format, so
+ * it is stated as a television and nothing else: its nominal diagonal, which is
+ * the figure a television is bought by, then the word TV.
+ *
+ *   "115" TV"
+ *
+ * No aspect ratio, no viewable width, no diagonal conversion and no "screen" is
+ * ever written for a television, and no stored dimension is changed here.
  *
  * Read from the frozen snapshot: nothing is converted here.
  *
@@ -187,9 +200,17 @@ export function screenStatement(screen = {}) {
   const viewable = Number(screen.viewable_width_inches) || null;
   const stated = Number(screen.size_inches) || null;
   const aspect = screen.aspect_ratio ? String(screen.aspect_ratio) : null;
+  // The display's own type, from the designer's saved display authority carried
+  // in the frozen snapshot: never inferred from a size or an aspect ratio. The
+  // frozen `television` flag is the identity a publication already carried.
+  const displayType = canonicalDisplayType(screen.display_type)
+    || (screen.television === true ? DISPLAY_TYPE_TV : DISPLAY_TYPE_PROJECTOR);
 
-  if (screen.television === true && stated) {
-    return { value: aspect ? `${stated}" ${aspect} screen` : `${stated}" screen`, hint: null };
+  if (displayType === DISPLAY_TYPE_TV) {
+    // THE television rule: the saved nominal diagonal, then TV. Nothing else —
+    // and no figure at all when the publication carries no diagonal.
+    const diagonal = Number(screen.diagonal_inches) || stated;
+    return { value: diagonal ? `${Math.round(diagonal)}" TV` : null, hint: null };
   }
   // Where the snapshot carries no viewable width, the stated size stands on its
   // own rather than being labelled as something it may not be.
@@ -447,7 +468,10 @@ export function buildAtAGlance({ snapshot, projectName, projectReference, genera
 
   const roomCards = [
     { label: 'Room size', value: size.value },
-    { label: 'Screen', value: screenCard.value },
+    // The room and its display: a television states itself as a TV, a projection
+    // screen keeps its own viewable-image wording, and the card is the same
+    // display card either way.
+    { label: 'Display', value: screenCard.value },
     { label: 'Seating', value: seats ? `${seats} seat${seats === 1 ? '' : 's'}` : null },
     // One line per row, each with its own RP23 level: the row count is stated
     // here rather than on the seating card.

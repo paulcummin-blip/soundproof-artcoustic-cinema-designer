@@ -77,6 +77,12 @@ const PROPOSAL_PAGE_FRAME = Object.freeze({
  * pageFrame    — the paper those frames are measured and stored on. Omitted by
  *   the reports, which use the capture's content-area default (A4 less the 12mm
  *   page margin) — the paper every stored report PDF has always used.
+ * paginate     — true for a composition that is paginated by its own content
+ *   rather than by a fixed page frame: the proposal pack, whose sections are as
+ *   tall as their copy. A section taller than one sheet is continued onto
+ *   further pages, whole blocks at a time, so the stored document holds every
+ *   page, its content and its design. A report page frame is fixed-height and
+ *   must fit exactly, so a report is never re-paginated.
  */
 export const ISSUED_DOCUMENT_COMPOSITION = Object.freeze({
   // The consolidated Project Report prints from the same mounted composition the
@@ -107,18 +113,21 @@ export const ISSUED_DOCUMENT_COMPOSITION = Object.freeze({
     pageSelector: '.proposal-print-portal > .proposal-print-cover, .proposal-print-portal > .pp-page',
     bodyClass: 'proposal-export-mode',
     pageFrame: PROPOSAL_PAGE_FRAME,
+    paginate: true,
   }),
   [ISSUED_DOCUMENT_TYPE.PROPOSAL]: Object.freeze({
     nodeSelector: '.proposal-print-portal',
     pageSelector: '.proposal-print-portal > .proposal-print-cover, .proposal-print-portal > .pp-page',
     bodyClass: 'proposal-export-mode',
     pageFrame: PROPOSAL_PAGE_FRAME,
+    paginate: true,
   }),
   [ISSUED_DOCUMENT_TYPE.COMPARISON]: Object.freeze({
     nodeSelector: '.proposal-print-portal',
     pageSelector: '.proposal-print-portal > .proposal-print-cover, .proposal-print-portal > .pp-page',
     bodyClass: 'proposal-export-mode',
     pageFrame: PROPOSAL_PAGE_FRAME,
+    paginate: true,
   }),
 });
 

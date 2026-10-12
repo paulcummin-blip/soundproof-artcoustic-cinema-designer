@@ -109,6 +109,10 @@ export function snapshotIssuedComposition(documentType) {
     // sheet itself; a report page frame is the printable content area inside the
     // 12mm page margin its stylesheet declares.
     pageFrame: composition.pageFrame || null,
+    // A proposal pack is paginated by its own content, so a section taller than
+    // one sheet is continued onto further pages. A report page frame is
+    // fixed-height and must fit exactly.
+    paginate: composition.paginate === true,
   };
 }
 
