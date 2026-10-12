@@ -59,7 +59,6 @@ import {
   PRINT_NOT_READY_MESSAGE,
   PRINT_READINESS_REASON,
   describePrintReadinessFailure,
-  preparePrintDocument,
   settleOneFrame,
   waitForDocumentInputs,
 } from '@/components/report/printReadiness';
@@ -67,6 +66,8 @@ import {
   createExportDiagnostics,
   recordExportDiagnostics,
 } from './proposalExportDiagnostics';
+
+import { prepareBrowserProposalFallback } from '@/components/proposal/export/browserProposalFallback';
 
 const PRINT_TIMEOUT_MS = 60000;
 const EXPORT_BODY_CLASS = 'proposal-export-mode';
@@ -196,8 +197,11 @@ export function useProposalExport({
   const cleanupTimeoutRef = useRef(null);
   // The app-owned window the pack is printed from, when one could be opened.
   const printWindowRef = useRef(null);
+  const fallbackCleanupRef = useRef(null);
 
   const cleanup = useCallback((win = printWindowRef.current) => {
+    fallbackCleanupRef.current?.();
+    fallbackCleanupRef.current = null;
     if (printingRef.current) {
       printingRef.current = false;
       setExporting(false);
@@ -223,6 +227,8 @@ export function useProposalExport({
     window.addEventListener('afterprint', handler);
     return () => {
       window.removeEventListener('afterprint', handler);
+      fallbackCleanupRef.current?.();
+      fallbackCleanupRef.current = null;
       if (cleanupTimeoutRef.current) clearTimeout(cleanupTimeoutRef.current);
       document.body.classList.remove(EXPORT_BODY_CLASS);
       restorePrintDocumentTitle();
@@ -398,12 +404,9 @@ export function useProposalExport({
 
         document.body.classList.add(EXPORT_BODY_CLASS);
 
-        const readiness = await preparePrintDocument({ doc: document, root: fallbackNode });
-        if (!readiness.ready) {
-          document.body.classList.remove(EXPORT_BODY_CLASS);
-          diagnostics.fail('in_page_fallback', { reason: readiness.reason });
-          throw notReadyError(describePrintReadinessFailure(readiness));
-        }
+        await prepareBrowserProposalFallback(fallbackNode, (dispose) => {
+          fallbackCleanupRef.current = dispose;
+        });
 
         cleanupTimeoutRef.current = setTimeout(() => cleanup(printWindow), PRINT_TIMEOUT_MS);
 

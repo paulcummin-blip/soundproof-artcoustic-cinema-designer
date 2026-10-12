@@ -55,9 +55,21 @@ function longSectionBlocks(section) {
   const units = [];
   for (const child of [...section.children]) {
     if (child.matches('.pp-body') && child.children.length) {
-      for (const paragraph of [...child.children]) {
-        const shell = child.cloneNode(false);
-        shell.append(paragraph);
+      let shell = null;
+      const prefix = [];
+      for (const paragraph of [...child.childNodes]) {
+        if (paragraph.nodeType === 3 && !paragraph.textContent.trim()) {
+          if (shell) shell.append(paragraph);
+          else prefix.push(paragraph);
+          continue;
+        }
+        shell = child.cloneNode(false);
+        shell.append(...prefix.splice(0), paragraph);
+        units.push(shell);
+      }
+      if (prefix.length) {
+        shell = child.cloneNode(false);
+        shell.append(...prefix);
         units.push(shell);
       }
     } else units.push(child);
@@ -117,6 +129,16 @@ function composePerformance(original) {
   const rows = [...table.tBodies].flatMap((body) => [...body.rows]);
   const leading = [...original.children].filter((child) => child !== host);
   const trailing = [...host.childNodes].filter((node) => node !== table);
+  // Measure the COMPLETE table including its closing note on a fresh sheet.
+  // A real introduction may stay on the first sheet; never strand a bare title.
+  const wholeTablePage = newPage(original, original);
+  wholeTablePage.append(host);
+  if (fits(wholeTablePage) && fits(original)
+      && leading.some((node) => node.matches('.pp-highlights__intro') && node.textContent.trim())) {
+    return;
+  }
+  original.append(host);
+  wholeTablePage.remove();
   // Freeze the existing column geometry, not the font sizes, before measuring subsets.
   const widths = [...table.tHead.rows[0].cells].map((cell) => cell.getBoundingClientRect().width);
   const total = widths.reduce((sum, width) => sum + width, 0);

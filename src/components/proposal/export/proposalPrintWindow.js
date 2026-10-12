@@ -21,6 +21,7 @@ import {
   printReportInWindow,
   closeReportPrintWindow,
 } from '@/components/report/reportPrintWindow';
+import { composeBrowserProposal, proposalMeasurementCss } from '@/components/proposal/export/browserProposalComposition';
 
 /** Added to the print window's body so the export stylesheet applies unchanged. */
 const PRINT_BODY_CLASS = 'proposal-export-mode';
@@ -67,7 +68,8 @@ export async function printProposalInWindow(win, { title, node, onDone } = {}) {
     title,
     node,
     bodyClass: PRINT_BODY_CLASS,
-    extraCss: PRINT_WINDOW_CSS,
+    extraCss: `${proposalMeasurementCss(node.ownerDocument)}\n${PRINT_WINDOW_CSS}`,
+    prepareComposition: composeBrowserProposal,
     onDone,
   });
 }
