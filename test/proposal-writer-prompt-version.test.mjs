@@ -43,7 +43,15 @@ const VERSION_3 = 'proposal-writer-prompt-3';
 // recommendation, the value-engineering rule, the design team's own judgement
 // written as we, and the engineering safeguards. No validation rule, section
 // identity, word limit or claim-grounding rule changed.
-const CURRENT = 'proposal-writer-prompt-15';
+// Generation 16 is the natural-writing pass: the editorial instructions are
+// refined to the Sound Proof Natural Writing Standard (a natural British
+// cinema-design voice, varied sentences, no stock connective, no mechanically
+// repeated paragraph opener, no generic marketing phrase and no em dash), the
+// whole document is reviewed as one document before it is returned, and the em
+// dash, the stock connective, the generic phrase and the repeated opener are now
+// refused by the validator. No section identity, word limit or claim-grounding
+// rule changed.
+const CURRENT = 'proposal-writer-prompt-16';
 
 test('the writer prompt version is the current one', () => {
   assert.equal(WRITER_PROMPT_VERSION, CURRENT);

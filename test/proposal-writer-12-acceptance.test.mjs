@@ -98,7 +98,10 @@ test('new rejection codes retain generation review and issue safeguards', () => 
 });
 test('F. prompt 12 gives positive, evidence-scoped Dynamic Range guidance', () => {
   const f = writer12Fixture({ comparison: true }); const prompt = buildWriterPrompt({ input: f.input });
-  assert.equal(WRITER_PROMPT_VERSION, 'proposal-writer-prompt-13');
+  // The generation this pass introduced, or any later one: the constant is the
+  // authority, and a superseded literal here only reported a version the
+  // contract had already moved past.
+  assert.ok(Number(WRITER_PROMPT_VERSION.split('-').pop()) >= 12, WRITER_PROMPT_VERSION);
   assert.equal(f.input.prompt_version, WRITER_PROMPT_VERSION);
   const dynamic = f.input.section_requirements.find(row => row.section === 'dynamic_range');
   const requirement = dynamic.requirement_single;
