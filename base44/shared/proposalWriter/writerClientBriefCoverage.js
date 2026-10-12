@@ -8,16 +8,26 @@
  * is not coverage: the audit reads the FINISHED NARRATIVE, item by item, and asks
  * whether the information the client asked for is on the page.
  *
- * FOUR OUTCOMES, and each one means something different:
+ * FIVE OUTCOMES, and each one means something different:
  *
- *   ADDRESSED            the copy communicates what the item asked for;
- *   PARTIALLY ADDRESSED  the copy reaches the item's subject but omits a specific
- *                        the item asked for — a figure, or one of two named rows —
- *                        so the client is told part of it and not the rest;
- *   UNADDRESSED          the evidence supports the item and the copy does not
- *                        reach it at all;
- *   UNSUPPORTED          no source states it: the frozen evidence carries no
- *                        result for the item, so it can never be written.
+ *   ADDRESSED             the copy communicates what the item asked for — including
+ *                         the reasoning, where the item asked for reasoning;
+ *   PARTIALLY ADDRESSED   the copy reaches the item's subject and states a fact or
+ *                         figure, but omits something the item asked for: a figure,
+ *                         one of two named rows, or the explanation of a decision;
+ *   UNADDRESSED           the evidence supports the item and the copy does not
+ *                         meaningfully cover it at all;
+ *   NEEDS DESIGNER INPUT  the item asks for the reasoning behind a decision and no
+ *                         source records one. Writing it would mean inventing it, so
+ *                         it is the designer's to supply and never the writer's;
+ *   UNSUPPORTED           no source states it: the frozen evidence carries no
+ *                         result for the item, so it can never be written.
+ *
+ * A RESULT IS NOT AN EXPLANATION. An item that asks WHY or HOW a decision was made
+ * is answered by the reasoning itself: "Overhead speaker spacing is 66.5°" reports
+ * the figure and does not explain the decision, so it is never a complete answer.
+ * The reasoning is read from the finished copy, and where no source records one the
+ * request is flagged for the designer rather than forced out of the writer.
  *
  * So a supported request that was silently left out is never reported as complete,
  * and an unsupported one is never reported as copy that was merely omitted.
@@ -34,12 +44,14 @@
  */
 
 import { modelTokens } from './writerVocabulary.js';
+import { asksForReasoning, statesReasoning, groundedReason, sentences } from './writerBriefReasoning.js';
 
 /** What became of one brief item. */
 export const BRIEF_ITEM_STATUS = Object.freeze({
   ADDRESSED: 'addressed',
   PARTIALLY_ADDRESSED: 'partially_addressed',
   UNADDRESSED: 'unaddressed',
+  NEEDS_DESIGNER_INPUT: 'needs_designer_input',
   UNSUPPORTED: 'unsupported',
 });
 
@@ -94,12 +106,8 @@ const GENERIC_TERMS = new Set([
   'panels', 'tonal', 'tonally', 'timbre', 'consistency', 'consistent', 'frequency', 'frequencies',
 ]);
 
-/**
- * A request that asks for a REASON rather than for a subject to be described. A
- * reason is answered only by the reason itself: a design that mentions the
- * compromise without saying why has not answered such a request.
- */
-const CAUSE_REQUEST = /\b(?:because|due to|owing to|as a result of|resulting from|caused by|limited by|restricted by|compromis\w*|outside (?:their|its|the) ideal|out of position|not ideal|why)\b/i;
+/* What a request for reasoning is, and what counts as answering it, lives in
+   writerBriefReasoning.js beside this audit. */
 
 /** Which writer section an item's subject belongs to, so a gap is returned to the right place. */
 const SUBJECT_WRITER_SECTION = Object.freeze({
@@ -248,14 +256,6 @@ function requirementsOf(item, subjects) {
   return { requires, subjects };
 }
 
-/** The sentences of the draft, so a screen-scoped figure is read in its own sentence. */
-function sentences(text) {
-  return String(text || '')
-    .split(/(?<=[.!?;])\s+|\n+/)
-    .map((sentence) => sentence.trim())
-    .filter(Boolean);
-}
-
 /** Whether a figure the item requires is stated, where the item scopes it. */
 function figureStated(requirement, prose) {
   if (requirement.screenScoped) {
@@ -357,11 +357,16 @@ function sectionsCarrying(sections, { patterns = [], terms = [] } = {}) {
  * @param {Object} [input.brief] — the writer input's editorial_brief block
  * @param {Object} [input.pack] — the frozen pack the draft was written from
  * @param {Array<{section: string, text: string}>} [input.sections] — the finished draft
+ * @param {Object} [input.interpretation] — the verified interpretation the writer was given; a rationale may be read from it and from the frozen evidence, and from nowhere else
  * @returns {Object} the coverage audit
  */
-export function buildClientBriefCoverage({ brief = null, pack = null, sections = [] } = {}) {
+export function buildClientBriefCoverage({ brief = null, pack = null, sections = [], interpretation = null } = {}) {
   const items = briefItems(brief);
   const evidenceText = packStrings(pack).toLowerCase();
+  // What a documented rationale may be read from: the frozen evidence and the
+  // interpretation the writer was given. A reason found nowhere in these has not
+  // been established, and is never written from the writer's own invention.
+  const rationaleText = `${evidenceText} \n ${packStrings(interpretation).toLowerCase()}`;
   const prose = draftText(sections);
   const draft = prose.toLowerCase();
   const models = new Set(modelTokens(evidenceText).map((token) => token.toLowerCase()));
@@ -381,9 +386,10 @@ export function buildClientBriefCoverage({ brief = null, pack = null, sections =
     const matchedSubjects = matchedSubjectPatterns.filter((pattern) => pattern.test(draft));
     const matchedTerms = distinctive.filter((term) => draft.includes(term));
 
-    // What the item asks to be explained, and whether it asks for a reason.
+    // What the item asks to be explained, and whether it asks for REASONING rather
+    // than for a result to be reported.
     const contentTerms = contentTermsOf(distinctive);
-    const causeRequired = CAUSE_REQUEST.test(item);
+    const reasoningRequired = asksForReasoning(item);
 
     // A parameter the item names but the reports state no result for is not copy
     // that was left out: no source states it, so it can never be written.
@@ -406,8 +412,15 @@ export function buildClientBriefCoverage({ brief = null, pack = null, sections =
     const mention = evidence.length === 0
       ? mentionPassage({ sections, subjectPatterns: matchedSubjectPatterns })
       : null;
-    const causeStated = !causeRequired
-      || evidence.some((entry) => contentTerms.some((term) => entry.passage.toLowerCase().includes(term)));
+    // Whether the copy itself states the reasoning, and whether any source documents
+    // a reason for this request at all. The first decides the verdict; the second
+    // decides who can act on a gap — a documented reason can be written, an
+    // undocumented one exists only in the designer's head.
+    const reasoningStated = !reasoningRequired
+      || evidence.some((entry) => statesReasoning(entry.passage));
+    const rationaleDocumented = !reasoningRequired
+      || statesReasoning(item)
+      || groundedReason({ text: rationaleText, subjectPatterns: matchedSubjectPatterns, contentTerms });
     const missingTerms = contentTerms.filter((term) => !draft.includes(term));
 
     // A request whose own FIGURE is not the figure the evidence states is not a
@@ -422,11 +435,29 @@ export function buildClientBriefCoverage({ brief = null, pack = null, sections =
       ? `the_saved_reports_state_no_result_for_${missingParameters.map((id) => `P${id}`).join(',')}`
       : 'no_source_states_this_request';
     if (supported) {
-      if (causeRequired && !causeStated) {
-        // The request is the reason, and the copy states none: the client is told
-        // the design exists but not what the brief asked to have explained.
-        status = BRIEF_ITEM_STATUS.UNADDRESSED;
-        reason = 'the_item_asks_for_the_reason_and_the_copy_states_no_reason_for_it';
+      if (missing.length > 0) {
+        status = BRIEF_ITEM_STATUS.PARTIALLY_ADDRESSED;
+        reason = missing.map((requirement) => requirement.detail).join('; ');
+      } else if (reasoningRequired) {
+        // The request is the reasoning behind a decision, so it is answered by the
+        // reasoning and by nothing less.
+        if (reasoningStated) {
+          status = BRIEF_ITEM_STATUS.ADDRESSED;
+          reason = null;
+        } else if (evidence.length === 0) {
+          // No passage reaches the subject with anything the item asked for: the
+          // requested subject is not meaningfully covered.
+          status = BRIEF_ITEM_STATUS.UNADDRESSED;
+          reason = 'the_item_asks_for_the_reason_and_the_copy_states_no_reason_for_it';
+        } else if (rationaleDocumented) {
+          // The result is reported and the decision is not explained. The reasoning
+          // is recorded, so this is a gap the writer can close.
+          status = BRIEF_ITEM_STATUS.PARTIALLY_ADDRESSED;
+          reason = 'the_copy_states_the_result_and_not_the_reasoning_the_item_asks_for';
+        } else {
+          status = BRIEF_ITEM_STATUS.NEEDS_DESIGNER_INPUT;
+          reason = 'the_requested_reasoning_is_not_established_in_the_frozen_evidence_interpretation_or_client_brief';
+        }
       } else if (!subjectReached) {
         status = BRIEF_ITEM_STATUS.UNADDRESSED;
         reason = 'the_evidence_supports_this_request_and_the_copy_does_not_reach_it';
@@ -447,7 +478,7 @@ export function buildClientBriefCoverage({ brief = null, pack = null, sections =
     const requiredExplanation = [
       ...requires.map((requirement) => requirement.detail),
       contentTerms.length > 0 ? `the item asks for ${contentTerms.join(', ')} to be explained` : null,
-      causeRequired ? 'the item asks for the reason, so the reason itself must be stated' : null,
+      reasoningRequired ? 'the item asks for the reasoning behind a decision, so the reasoning itself must be stated' : null,
     ].filter(Boolean).join('; ') || 'the item asks for its subject to be explained';
 
     return {
@@ -468,7 +499,10 @@ export function buildClientBriefCoverage({ brief = null, pack = null, sections =
       required_explanation: requiredExplanation,
       missing_subject: missingTerms.join(', '),
       figure_conflict: figureConflict,
-      needs_designer_attention: supported && figureConflict,
+      // A request the evidence contradicts, and a rationale no source records, are
+      // both the designer's to settle: neither may be written by the writer.
+      needs_designer_attention: supported
+        && (figureConflict || status === BRIEF_ITEM_STATUS.NEEDS_DESIGNER_INPUT),
       revision_section: subjects.length > 0 ? (SUBJECT_WRITER_SECTION[subjects[0]] || null) : null,
       sections: sectionsCarrying(sections, {
         patterns: matchedSubjectPatterns,
@@ -483,14 +517,16 @@ export function buildClientBriefCoverage({ brief = null, pack = null, sections =
   // request is never returned: nothing may be written for it.
   const outstanding = rows.filter((row) => row.supported
     && (row.status === BRIEF_ITEM_STATUS.UNADDRESSED
-      || row.status === BRIEF_ITEM_STATUS.PARTIALLY_ADDRESSED));
+      || row.status === BRIEF_ITEM_STATUS.PARTIALLY_ADDRESSED
+      || row.status === BRIEF_ITEM_STATUS.NEEDS_DESIGNER_INPUT));
   return {
     supplied: items.length > 0,
-    rule: 'a brief item is addressed only when the finished narrative explains what it asked for: the evidence must support it, the copy must reach its subject, the specific matter it names must be explained there, every figure or named row it requires must be stated, and a request that asks for a reason is answered only where the reason itself is stated. Every verdict carries the passage it was read from or the mention that stands in its place. A supported request the copy omits is unaddressed; one the copy only partly answers is partially addressed; one no source states is unsupported',
+    rule: 'a brief item is addressed only when the finished narrative explains what it asked for: the evidence must support it, the copy must reach its subject, the specific matter it names must be explained there, every figure or named row it requires must be stated, and an item that asks why or how a decision was made is answered by the reasoning itself and never by a figure alone — where the copy states the result and not the reasoning it is partially addressed, and where no source records the reasoning at all it is returned to the designer rather than invented. Every verdict carries the passage it was read from or the mention that stands in its place. A supported request the copy omits is unaddressed; one the copy only partly answers is partially addressed; one no source states is unsupported',
     items: rows,
     addressed_count: count(BRIEF_ITEM_STATUS.ADDRESSED),
     partially_addressed_count: count(BRIEF_ITEM_STATUS.PARTIALLY_ADDRESSED),
     unaddressed_count: count(BRIEF_ITEM_STATUS.UNADDRESSED),
+    needs_designer_input_count: count(BRIEF_ITEM_STATUS.NEEDS_DESIGNER_INPUT),
     unsupported_count: count(BRIEF_ITEM_STATUS.UNSUPPORTED),
     // EDITORIAL COMPLETENESS, kept separate from engineering validity: the brief is
     // complete only when every supported request it makes is answered in the copy.

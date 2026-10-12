@@ -8,6 +8,7 @@
 import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import { buildClientBriefCoverage } from '../base44/shared/proposalWriter/writerClientBriefCoverage.js';
+import { asksForReasoning } from '../base44/shared/proposalWriter/writerBriefReasoning.js';
 import { buildBriefRevision, mergeRevisedDraft } from '../base44/shared/proposalWriter/writerBriefRevision.js';
 import { buildWriterProviderRequest } from '../base44/shared/proposalWriter/writerPromptBuilder.js';
 import { readDisplayIdentity } from '../base44/shared/canonicalDisplayIdentity.js';
@@ -55,7 +56,7 @@ test('a request for a reason is unaddressed while the copy only mentions the sub
 
 /* ── the subject is explained as a subject, not as the specific matter ─────── */
 
-test('a subject mentioned without the matter the brief named is partially addressed', () => {
+test('a coincidental word elsewhere in the document is not an explanation', () => {
   const sections = [
     section('spatial_resolution', 'The overhead speakers sit within the recommended placement zones.'),
     section('what_stays_same', 'The seating faces the 115" TV, with 1.8m centre-to-centre spacing between rows.'),
@@ -67,7 +68,10 @@ test('a subject mentioned without the matter the brief named is partially addres
   });
   const row = coverage.items[0];
 
-  assert.equal(row.status, 'partially_addressed');
+  // The request is the reasoning, and the copy states none: the subject is mentioned
+  // and the request is not covered.
+  assert.equal(row.status, 'unaddressed');
+  assert.equal(row.reason, 'the_item_asks_for_the_reason_and_the_copy_states_no_reason_for_it');
   assert.equal(row.evidence.length, 0);
   assert.ok(row.mention.passage.includes('overhead'));
   // The word "spacing" does appear in the draft, in the seating row spacing: a
@@ -78,9 +82,9 @@ test('a subject mentioned without the matter the brief named is partially addres
   assert.equal(coverage.complete, false);
 });
 
-test('the same request is addressed once the copy explains the specific matter', () => {
+test('the same request is addressed once the copy states the reasoning it asks for', () => {
   const sections = [
-    section('spatial_resolution', 'The overhead speaker spacing follows the arrangement the room allows, with the six height loudspeakers spaced within the recommended limit.'),
+    section('spatial_resolution', 'The overhead speaker spacing is 66.5°, set to keep the height layer within the recommended vertical limit.'),
   ];
   const coverage = buildClientBriefCoverage({
     brief: briefOf('Explain the overhead speaker spacing logic'),
@@ -97,6 +101,119 @@ test('the same request is addressed once the copy explains the specific matter',
   assert.ok(row.evidence[0].passage.includes('overhead speaker spacing'));
   assert.equal(coverage.complete, true);
   assert.deepEqual(coverage.revision_requests, []);
+});
+
+/* ── reasoning is not a result ─────────────────────────────────────────────── */
+
+test('a figure alone does not explain a design decision', () => {
+  // The confirmed example: the copy reports the figure and explains nothing, and no
+  // source records the reasoning behind it, so the figure is not a complete answer.
+  const coverage = buildClientBriefCoverage({
+    brief: briefOf('Explain the overhead speaker spacing logic'),
+    pack: PACK,
+    sections: [section('spatial_resolution', 'Overhead speaker spacing is 66.5°.')],
+  });
+  const row = coverage.items[0];
+
+  assert.equal(row.status, 'needs_designer_input');
+  assert.equal(
+    row.reason,
+    'the_requested_reasoning_is_not_established_in_the_frozen_evidence_interpretation_or_client_brief',
+  );
+  // The figure that WAS stated is quoted back, so the client sees what they are told.
+  assert.match(row.evidence[0].passage, /Overhead speaker spacing is 66\.5/);
+  assert.equal(row.needs_designer_attention, true);
+  assert.equal(coverage.complete, false);
+  assert.equal(coverage.needs_designer_input_count, 1);
+  // It is never sent to the writer: writing it would mean inventing it.
+  assert.deepEqual(coverage.revision_requests, []);
+  assert.equal(coverage.designer_attention.length, 1);
+  assert.equal(buildBriefRevision({ coverage }).needed, false);
+});
+
+test('a supported explanation of the decision passes', () => {
+  // The reasoning IS recorded (the interpretation states it) and the copy states it.
+  const interpretation = {
+    constraints: ['Overhead speaker spacing was set to keep the height layer within its recommended vertical limit'],
+  };
+  const coverage = buildClientBriefCoverage({
+    brief: briefOf('Explain the overhead speaker spacing logic'),
+    pack: PACK,
+    interpretation,
+    sections: [section('spatial_resolution', 'Overhead speaker spacing is 66.5°, set to keep the height layer within the recommended vertical limit.')],
+  });
+  const row = coverage.items[0];
+
+  assert.equal(row.status, 'addressed');
+  assert.equal(row.reason, null);
+  assert.match(row.evidence[0].passage, /set to keep the height layer/);
+  assert.equal(coverage.complete, true);
+  assert.equal(coverage.needs_designer_input_count, 0);
+});
+
+test('a recorded decision about the speakers is not a rationale for the spacing', () => {
+  // Genesis's own recorded material: a design decision about the overhead SPEAKERS.
+  // It documents the speaker choice and says nothing about why the spacing is 66.5°,
+  // so it is not a rationale for this request.
+  const coverage = buildClientBriefCoverage({
+    brief: briefOf('Explain the overhead speaker spacing logic'),
+    pack: PACK,
+    interpretation: { important_design_decisions: ['Architect / Spitfire Cloud selected for dedicated overhead coverage'] },
+    sections: [section('spatial_resolution', 'Overhead speaker spacing is 66.5°.')],
+  });
+  const row = coverage.items[0];
+
+  assert.equal(row.status, 'needs_designer_input');
+  assert.equal(row.needs_designer_attention, true);
+  assert.deepEqual(coverage.revision_requests, []);
+  assert.equal(coverage.designer_attention.length, 1);
+  assert.equal(coverage.complete, false);
+});
+
+test('reasoning the sources record but the copy leaves out is returned to the writer', () => {
+  const interpretation = {
+    constraints: ['Overhead speaker spacing was set to keep the height layer within its recommended vertical limit'],
+  };
+  const coverage = buildClientBriefCoverage({
+    brief: briefOf('Explain the overhead speaker spacing logic'),
+    pack: PACK,
+    interpretation,
+    sections: [section('spatial_resolution', 'Overhead speaker spacing is 66.5°.')],
+  });
+  const row = coverage.items[0];
+
+  assert.equal(row.status, 'partially_addressed');
+  assert.equal(row.reason, 'the_copy_states_the_result_and_not_the_reasoning_the_item_asks_for');
+  assert.equal(row.needs_designer_attention, false);
+  assert.equal(coverage.needs_designer_input_count, 0);
+  assert.equal(coverage.revision_requests.length, 1);
+  assert.equal(coverage.revision_requests[0].section, 'spatial_resolution');
+  assert.deepEqual(coverage.designer_attention, []);
+});
+
+test('the Marquee doorway compromise, as written, is a supported explanation', () => {
+  const coverage = buildClientBriefCoverage({
+    brief: briefOf('Mention the level 3 viewing geometry assessment. mention the front wides are outside their ideal location due to the door position'),
+    pack: PACK,
+    interpretation: { constraints: ['Right wall doorway limits the ideal front-wide position'] },
+    sections: [section('what_stays_same', 'The right-wall doorway places the front wides outside their ideal positions, a practical constraint within the specified layout.')],
+  });
+  const row = coverage.items[0];
+
+  assert.equal(row.status, 'addressed');
+  assert.equal(row.reason, null);
+  assert.match(row.evidence[0].passage, /right-wall doorway/);
+});
+
+test('describing a configuration is not asking for reasoning', () => {
+  // The reasoning rule reads WHY and HOW a decision was made, and must not swallow a
+  // request to describe what the design is: those are answered by the description.
+  assert.equal(asksForReasoning('Explain the four-subwoofer front/rear configuration'), false);
+  assert.equal(asksForReasoning('Explain the 9.1.6 system layout'), false);
+  assert.equal(asksForReasoning('Highlight the bass extension result'), false);
+  assert.equal(asksForReasoning('Explain the overhead speaker spacing logic'), true);
+  assert.equal(asksForReasoning('Explain why the overhead spacing was chosen'), true);
+  assert.equal(asksForReasoning('Mention the front wides are outside their ideal location due to the door position'), true);
 });
 
 /* ── a request no source states ────────────────────────────────────────────── */
@@ -182,9 +299,9 @@ test('the revision instruction reaches the writer only when a revision is needed
 
 /* ── the passages are read from the whole section ──────────────────────────── */
 
-test('an explanation in the last paragraph of a section is found, not truncated away', () => {
-  // The real Genesis wording, with the spacing explanation in the section's last
-  // paragraph: a passage read from part of a section would miss it entirely.
+test('a passage in the last paragraph of a section is found, not truncated away', () => {
+  // The real Genesis wording. The passage sits beyond the first 400 characters of the
+  // section, so an audit reading part of a section would miss it entirely.
   const spatial = 'Effects have distinct positions around and above the audience, helping the soundtrack describe action beyond the picture. '
     + 'The 15 discrete channels include front wides, side and rear surrounds, and six overhead channels. '
     + 'The screen-wall speakers occupy their recommended zones, the wides meet their positioning limit, and the surround and overhead speakers sit within the recommended locations. '
@@ -195,10 +312,13 @@ test('an explanation in the last paragraph of a section is found, not truncated 
     pack: PACK,
     sections: [section('spatial_resolution', spatial)],
   });
+  const row = coverage.items[0];
 
-  assert.equal(coverage.items[0].status, 'addressed');
-  assert.match(coverage.items[0].evidence[0].passage, /Overhead spacing is 66\.5/);
-  assert.equal(coverage.complete, true);
+  assert.match(row.evidence[0].passage, /Overhead spacing is 66\.5/);
+  // And that passage states the figure only: nothing there explains the decision, and
+  // no source records the reasoning, so it is not a complete answer.
+  assert.equal(row.status, 'needs_designer_input');
+  assert.equal(coverage.complete, false);
 });
 
 test('a slash-joined pair in a request is two of its own words, not one slug', () => {
@@ -229,10 +349,16 @@ test('the Genesis brief is answered by the accepted copy, passage by passage', (
     sections,
   });
 
-  assert.deepEqual(coverage.items.map((row) => row.status), ['addressed', 'addressed', 'addressed']);
-  assert.equal(coverage.complete, true);
-  assert.deepEqual(coverage.outstanding, []);
-  for (const row of coverage.items) assert.ok(row.evidence.length >= 1, 'every ADDRESSED verdict carries its passage');
+  assert.deepEqual(coverage.items.map((row) => row.status), ['addressed', 'addressed', 'needs_designer_input']);
+  assert.equal(coverage.complete, false);
+  // The spacing request asks for the reasoning, and the copy states the figure: it is
+  // flagged for the designer, never sent to the writer to be invented.
+  assert.deepEqual(coverage.revision_requests, []);
+  assert.equal(coverage.designer_attention.length, 1);
+  assert.equal(coverage.outstanding_count, 1);
+  for (const row of coverage.items.filter((entry) => entry.status === 'addressed')) {
+    assert.ok(row.evidence.length >= 1, 'every ADDRESSED verdict carries its passage');
+  }
 });
 
 test('a figure the evidence contradicts is the designer\'s, never the writer\'s', () => {

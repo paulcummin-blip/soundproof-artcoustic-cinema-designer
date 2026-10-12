@@ -222,6 +222,7 @@ export async function runWriterModelPreview({
   const clientBriefCoverage = buildClientBriefCoverage({
     brief: input?.editorial_brief,
     pack,
+    interpretation: input?.design_interpretation?.view || null,
     sections: output?.sections || [],
   });
 

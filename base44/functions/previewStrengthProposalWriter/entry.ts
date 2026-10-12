@@ -173,6 +173,9 @@ export default async function(req) {
     const attemptCoverage = validation ? buildClientBriefCoverage({
       brief: input.editorial_brief,
       pack,
+      // A rationale may only be read from the evidence and the interpretation the
+      // writer was given.
+      interpretation: input.design_interpretation?.view || null,
       sections: validation.output?.sections || raw?.sections || [],
     }) : null;
 
@@ -246,6 +249,7 @@ export default async function(req) {
           coverage: accepted && merged ? buildClientBriefCoverage({
             brief: input.editorial_brief,
             pack,
+            interpretation: input.design_interpretation?.view || null,
             sections: merged.sections || [],
           }) : attemptCoverage,
         };
@@ -263,6 +267,7 @@ export default async function(req) {
         client_brief_coverage: buildClientBriefCoverage({
           brief: input.editorial_brief,
           pack,
+          interpretation: input.design_interpretation?.view || null,
           sections: validation?.output?.sections || raw?.sections || [],
         }),
         // Which model wrote this review, and the fingerprint it was written from.
@@ -307,6 +312,7 @@ export default async function(req) {
       client_brief_coverage: preview?.client_brief_coverage ?? buildClientBriefCoverage({
         brief: input.editorial_brief,
         pack,
+        interpretation: input.design_interpretation?.view || null,
         sections: validation?.output?.sections || null,
       }),
       writer_input: input,

@@ -252,6 +252,7 @@ export async function runProposalCopyGeneration({
   const clientBriefCoverage = buildClientBriefCoverage({
     brief: writerInput.editorial_brief,
     pack,
+    interpretation: writerInput.design_interpretation?.view || null,
     sections: validation?.output?.sections || provider.output?.sections || [],
   });
 
