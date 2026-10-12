@@ -33,7 +33,9 @@ const SUBJECT_TERMS = Object.freeze([
   { key: 'bass_extension', pattern: /\bextension\b|\bextends?\b|\bHz\b/i },
   { key: 'bass_response', pattern: /\bbass\s+response\b|\bres(?:ponse)?\s+quality\b|\bP19\b/i },
   { key: 'seat_consistency', pattern: /\bconsistent|consistency|across\s+(?:all\s+)?seats|seat[- ]to[- ]seat|even\s+bass/i },
-  { key: 'system_layout', pattern: /(?:\d\.\d(?:\.\d+)?)|architecture|layout|atmos|discrete\s+channels?|configuration/i },
+  // A channel layout reads as "x.1" or "x.1.y" — never as any decimal number, so a
+  // viewing angle such as 57.3 is never mistaken for a layout.
+  { key: 'system_layout', pattern: /\b\d{1,2}\.1(?:\.[1-6])?\b|architecture|layout|atmos|discrete\s+channels?|configuration/i },
   { key: 'dynamic_range', pattern: /\bdynamic\s+range|headroom|\bdBC\b|output\s+capability/i },
   { key: 'timbre', pattern: /\btimbre|tonal|tonally/i },
   { key: 'viewing', pattern: /\bviewing|viewing\s+angle|\brows?\b|seating\s+position|front\s+row|rear\s+row|screen\s+size|\bTV\b|display/i },
@@ -103,12 +105,14 @@ function draftText(sections) {
     .join(' \n ');
 }
 
-/** The sections a term appears in. */
-function sectionsCarrying(sections, terms) {
+/** The sections an item's own subjects or terms appear in. */
+function sectionsCarrying(sections, { patterns = [], terms = [] } = {}) {
   const found = [];
   for (const entry of Array.isArray(sections) ? sections : []) {
     const text = String(entry?.text || '').replace(/<[^>]*>/g, ' ').toLowerCase();
-    if (terms.some((term) => text.includes(term))) found.push(entry?.section || null);
+    if (patterns.some((pattern) => pattern.test(text)) || terms.some((term) => text.includes(term))) {
+      found.push(entry?.section || null);
+    }
   }
   return [...new Set(found.filter(Boolean))];
 }
@@ -136,11 +140,11 @@ export function buildClientBriefCoverage({ brief = null, pack = null, sections =
       if (evidenceText.includes(term)) return true;
       return subjects.some((subject) => (SUBJECT_TERMS.find((entry) => entry.key === subject)?.pattern || /$^/).test(evidenceText));
     });
-    const matchedSubjects = subjects.filter((subject) => {
-      const pattern = SUBJECT_TERMS.find((entry) => entry.key === subject)?.pattern;
-      return pattern ? pattern.test(draft) : false;
-    });
-    const matchedTerms = [...matchedSubjects, ...distinctive.filter((term) => draft.includes(term))];
+    const matchedSubjectPatterns = subjects
+      .map((subject) => SUBJECT_TERMS.find((entry) => entry.key === subject)?.pattern)
+      .filter(Boolean);
+    const matchedSubjects = matchedSubjectPatterns.filter((pattern) => pattern.test(draft));
+    const matchedTerms = distinctive.filter((term) => draft.includes(term));
 
     // An item the evidence states nothing about is flagged as unsupported rather
     // than reported as copy that was merely left out.
@@ -155,8 +159,11 @@ export function buildClientBriefCoverage({ brief = null, pack = null, sections =
       subjects,
       status,
       supported,
-      matched_terms: [...new Set(matchedTerms)],
-      sections: sectionsCarrying(sections, [...new Set([...matchedSubjects, ...distinctive])]),
+      matched_terms: matchedTerms,
+      sections: sectionsCarrying(sections, {
+        patterns: matchedSubjectPatterns,
+        terms: matchedTerms,
+      }),
     };
   });
 
