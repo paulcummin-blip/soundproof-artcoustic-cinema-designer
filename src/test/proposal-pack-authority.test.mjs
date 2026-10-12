@@ -277,20 +277,43 @@ describe('structure evidence cards', () => {
 });
 
 describe('approved explainer copy', () => {
+  // The Method page's own copy as it prints: the heading, the introduction, each
+  // row's heading, opening sentence and explanation, then the closing statement.
+  const methodText = [
+    METHOD_PAGE.title,
+    ...METHOD_PAGE.intro,
+    ...METHOD_PAGE.sections.flatMap((section) => [section.title, section.lede, ...section.body]),
+    METHOD_PAGE.closing.title,
+    ...METHOD_PAGE.closing.body,
+  ].join(' ');
+
   const text = [
-    METHOD_PAGE.lead,
-    ...METHOD_PAGE.blocks.flatMap((block) => [block.title, block.text]),
-    ...METHOD_PAGE.notes,
+    methodText,
     ...APPENDIX_PAGE.notes.flatMap((note) => [note.title, note.text]),
   ].join(' ');
 
   it('explains the method in plain English', () => {
-    assert.ok(/models the room first/i.test(METHOD_PAGE.lead));
+    assert.ok(/what makes great cinema sound/i.test(METHOD_PAGE.title));
     assert.deepEqual(
-      METHOD_PAGE.blocks.map((block) => block.title),
+      METHOD_PAGE.sections.map((section) => section.title),
       ['Spatial Resolution', 'Dynamic Range', 'Timbre Matching']
     );
-    assert.ok(METHOD_PAGE.notes.some((note) => /Level 4 is demanding/i.test(note)));
+    // Each quality opens with its own sentence and then says more than that one
+    // line: three headings and a sentence each would explain nothing.
+    METHOD_PAGE.sections.forEach((section) => {
+      assert.ok(section.lede.length > 0, section.title);
+      assert.ok(section.body.length > 1, section.title);
+    });
+    assert.ok(METHOD_PAGE.closing.body.length > 0);
+  });
+
+  it('explains the principles rather than reporting a result', () => {
+    // No engineering result, no parameter reference, no grading scale and no
+    // verification statement: the design's own results belong to the evidence
+    // pages, and the appendix states the prediction basis once.
+    assert.ok(!/Level [1-4]\b/i.test(methodText), 'the grading scale is not explained here');
+    assert.ok(!/calibration|commissioning|verified|confirmed/i.test(methodText));
+    assert.ok(!/P\d{1,2}\b/.test(methodText), 'no parameter is referenced on this page');
   });
 
   it('keeps the appendix factual and separate', () => {

@@ -98,6 +98,14 @@ export default function ProposalPrintStyles() {
           padding-top: 16mm;
         }
 
+        /* The method page sets the three principles as one considered spread, so
+           it takes a slightly shorter top and bottom margin and gives that height
+           to the copy. Its rows are kept whole, so it can only ever reflow. */
+        body.proposal-export-mode .proposal-print-section.pp-page--method {
+          padding-top: 18mm;
+          padding-bottom: 16mm;
+        }
+
         body.proposal-export-mode .proposal-print-section__title {
           font-size: 16pt;
           font-weight: 600;

@@ -61,28 +61,61 @@ export const STRUCTURE_PARAMETER_KEYS = Object.freeze({
   timbre_matching: Object.freeze(['p16', 'p17', 'p18', 'p19', 'p20']),
 });
 
-/** How the design was reached. Approved explainer copy, held here once. */
+/**
+ * What makes great cinema sound: the three qualities every design in this pack
+ * is balanced around, explained as professional design principles, and the
+ * considered approach that closes the page. Approved explainer copy, held here
+ * once.
+ *
+ * This page explains the approach rather than reporting the design. It states
+ * no engineering result, quotes no parameter figure and appends no verification
+ * disclaimer: the design's own results live on the evidence and highlights
+ * pages. A section carries its opening sentence (lede) and then its explanation.
+ */
 export const METHOD_PAGE = Object.freeze({
-  lead: 'Sound Proof models the room first and selects equipment second. The design is tested in the model before anything is specified.',
-  blocks: Object.freeze([
+  title: 'What makes great cinema sound?',
+  intro: Object.freeze([
+    'A great cinema should place sounds where they belong, preserve the contrast between quiet detail and powerful moments, and maintain a consistent tonal character throughout the room.',
+    "Our approach is to balance these three qualities around the room, the seating and the client's priorities.",
+  ]),
+  sections: Object.freeze([
     {
       title: 'Spatial Resolution',
-      text: 'How evenly sound is presented across the seating area, and how well it moves between the screen, the sides and above. It is set by the number of speakers and where they are placed.',
+      lede: 'Sound should come from where the filmmaker intended.',
+      body: Object.freeze([
+        'With a single loudspeaker, every sound comes from the same place. Stereo allows sounds to move from left to right. Surround sound adds movement beside and behind you, while immersive systems introduce height, allowing sounds to travel overhead.',
+        'The number of loudspeakers creates opportunities, but their positions are equally important.',
+        'The aim is for sounds to occupy convincing positions around the audience and move naturally between them.',
+      ]),
     },
     {
       title: 'Dynamic Range',
-      text: 'The headroom available above the listening level, so a demanding soundtrack keeps its impact without strain. It is set by the capability of the speakers and amplification in this room.',
+      lede: 'The difference between quiet detail and loud impact.',
+      body: Object.freeze([
+        'Think about a great picture. Deep blacks retain their shadow detail, while bright highlights remain clear without losing information.',
+        'Sound works in much the same way.',
+        'A quiet conversation should retain its subtle details, while an explosion or powerful musical passage should arrive with real impact, without strain or distortion.',
+        'That contrast is where much of the excitement of cinema lives.',
+      ]),
     },
     {
       title: 'Timbre Matching',
-      text: 'Whether voices and effects keep the same tonal character as they move around the room and above the seats. It is set by the speaker families used and how they are voiced together.',
+      lede: 'A sound should retain its character wherever it comes from.',
+      body: Object.freeze([
+        'Imagine a blue snooker ball moving across a television screen. Its colour should remain the same wherever it appears.',
+        'The same principle applies to sound.',
+        'As a voice, instrument or effect moves between loudspeakers, we want its tonal character to remain consistent.',
+        'We also want listeners in different seats to experience a similarly balanced soundtrack, with particular attention to the priority listening positions.',
+      ]),
     },
   ]),
-  notes: Object.freeze([
-    'RP22 separates performance into three structures: Spatial Resolution, Dynamic Range and Timbre Matching. Each structure is graded from Level 1 to Level 4.',
-    'Level 4 is demanding and is not always practical in a real room. The aim is a conscious, credible design rather than chasing every parameter at any cost.',
-    'Results are predicted from the room model and the published product data for the design as specified.',
-  ]),
+  closing: Object.freeze({
+    title: 'A considered approach',
+    body: Object.freeze([
+      'Every room presents different opportunities and constraints. The right design balances Spatial Resolution, Dynamic Range and Timbre Matching to deliver the best overall experience for the room and its intended use.',
+      'Achieving the highest possible score in every parameter is not always the most appropriate solution.',
+    ]),
+  }),
 });
 
 /**

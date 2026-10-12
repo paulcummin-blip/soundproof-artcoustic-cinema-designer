@@ -1,16 +1,20 @@
 /**
  * MethodPage
  * ----------
- * How the design was reached, in plain English: the room is modelled first and
- * equipment is selected second, and RP22 grades the result through three design
- * structures.
+ * What makes great cinema sound: the three qualities every design in this pack
+ * is balanced around, in plain English, and the considered approach that closes
+ * the page.
  *
- * This page is deliberately not a parameter list. The copy is fixed and held in
- * proposalPackAuthority, so it cannot drift into marketing language.
+ * An editorial page rather than a parameter list. The copy is fixed and held in
+ * proposalPackAuthority, so it cannot drift into marketing language, and it
+ * states no result and no figure: this page explains how the design was
+ * reached, while the design's own results are reported on the evidence and
+ * highlights pages.
  */
 
 import React from 'react';
 import ProposalPageHeader from '@/components/proposal/print/ProposalPageHeader';
+import MethodRow from '@/components/proposal/print/MethodRow';
 import { METHOD_PAGE } from '@/components/proposal/print/proposalPackAuthority';
 
 export default function MethodPage({ number }) {
@@ -19,25 +23,29 @@ export default function MethodPage({ number }) {
       <ProposalPageHeader
         number={number}
         kicker="Method"
-        title="How the design was reached"
-        lead={METHOD_PAGE.lead}
+        title={METHOD_PAGE.title}
       />
 
-      <div className="pp-structures">
-        {METHOD_PAGE.blocks.map((block) => (
-          <div key={block.title} className="pp-structure">
-            <div className="pp-structure__title">{block.title}</div>
-            <p className="pp-structure__text">{block.text}</p>
-          </div>
+      <div className="pp-method__intro">
+        {METHOD_PAGE.intro.map((paragraph) => (
+          <p key={paragraph}>{paragraph}</p>
         ))}
       </div>
 
-      <div className="pp-notes">
-        {METHOD_PAGE.notes.map((note) => (
-          <p key={note} className="pp-note">
-            {note}
-          </p>
+      <div className="pp-method__rows">
+        {METHOD_PAGE.sections.map((section) => (
+          <MethodRow
+            key={section.title}
+            heading={section.title}
+            lede={section.lede}
+            paragraphs={section.body}
+          />
         ))}
+        <MethodRow
+          heading={METHOD_PAGE.closing.title}
+          paragraphs={METHOD_PAGE.closing.body}
+          closing
+        />
       </div>
     </section>
   );

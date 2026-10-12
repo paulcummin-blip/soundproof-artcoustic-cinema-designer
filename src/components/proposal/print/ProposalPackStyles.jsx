@@ -313,73 +313,90 @@ export default function ProposalPackStyles() {
         color: var(--pp-slate) !important;
       }
 
-      /* ── Method: the three design structures ── */
-      .proposal-print-portal .pp-structures {
-        display: grid;
-        grid-template-columns: repeat(3, 1fr);
-        gap: 4mm;
-        margin-top: 7mm;
+      /* ── Method: what makes great cinema sound ──
+         An editorial grid rather than three narrow columns. Every row states one
+         quality: its heading and opening sentence in the left column, the
+         explanation beside it in the right, on one alignment for the whole page
+         so the eye reads down the labels and across the prose. Generous space
+         between rows and a clear three-level hierarchy: heading, opening
+         sentence, explanation. Green is spent twice only, on the row headings
+         and on the closing rule, and nothing is decorative. ── */
+      .proposal-print-portal .pp-page--method .pp-header {
+        margin-bottom: 5mm;
       }
-      .proposal-print-portal .pp-structure {
-        border-top: 2px solid var(--pp-green);
-        padding-top: 4mm;
+      .proposal-print-portal .pp-page--method .pp-header__rule {
+        margin-top: 6mm;
+      }
+      .proposal-print-portal .pp-method__intro {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 6mm;
+        margin-bottom: 5mm;
+      }
+      .proposal-print-portal .pp-method__intro p {
+        font-family: var(--pp-body) !important;
+        font-size: 11pt !important;
+        line-height: 1.5 !important;
+        color: var(--pp-slate) !important;
+        margin: 0 !important;
+      }
+      .proposal-print-portal .pp-method__row {
+        display: grid;
+        grid-template-columns: 50mm 1fr;
+        gap: 6mm;
+        border-top: 1px solid var(--pp-rule);
+        padding-top: 3mm;
+        margin-top: 3.5mm;
         break-inside: avoid;
         page-break-inside: avoid;
       }
-      .proposal-print-portal .pp-structure__title {
+      .proposal-print-portal .pp-method__row:first-child {
+        margin-top: 0;
+      }
+      .proposal-print-portal .pp-method__heading {
         font-family: var(--pp-heading) !important;
-        font-size: 10pt !important;
+        font-size: 9.5pt !important;
+        font-weight: 300 !important;
         letter-spacing: 0.12em !important;
         text-transform: uppercase !important;
-        color: var(--pp-ink) !important;
+        color: var(--pp-green) !important;
+        margin: 0 !important;
       }
-      .proposal-print-portal .pp-structure__text {
-        font-family: var(--pp-body) !important;
-        font-size: 9.5pt !important;
-        line-height: 1.5 !important;
-        color: var(--pp-slate) !important;
+      .proposal-print-portal .pp-method__lede {
+        font-family: var(--pp-heading) !important;
+        font-size: 11pt !important;
+        line-height: 1.3 !important;
+        color: var(--pp-ink) !important;
         margin: 2.5mm 0 0 !important;
       }
-
-      /* ── Method page rhythm ──
-         The method page carries fixed, approved copy, and it used to sit in the
-         top two thirds of the sheet with a large empty area beneath it. Its own
-         rhythm is stated here: a deeper header, more room between the three
-         structures and generously padded notes, so the page carries about four
-         fifths of the A4 content height instead of ending early.
-
-         Everything is scoped to .pp-page--method: no other page, and no other
-         user of the note block (Seating style, Appendix), is affected. Sizes,
-         families, colours and the three-column grid are untouched — only space
-         between and inside the blocks moves. Content pages are flow-height, so
-         nothing here can clip: if the copy ever grew, it would reflow rather
-         than overflow. ── */
-      .proposal-print-portal .pp-page--method .pp-header {
-        margin-bottom: 20mm;
+      .proposal-print-portal .pp-method__body {
+        min-width: 0;
+        font-family: var(--pp-body) !important;
+        font-size: 9pt !important;
+        line-height: 1.42 !important;
+        color: var(--pp-slate) !important;
       }
-      .proposal-print-portal .pp-page--method .pp-header__lead {
-        margin-top: 6mm !important;
+      .proposal-print-portal .pp-method__body p {
+        margin: 0 0 2.2mm !important;
       }
-      .proposal-print-portal .pp-page--method .pp-header__rule {
-        margin-top: 10mm;
+      .proposal-print-portal .pp-method__body p:last-child {
+        margin-bottom: 0 !important;
       }
-      .proposal-print-portal .pp-page--method .pp-structure {
-        padding-top: 5.5mm;
+      /* The closing statement is the page's own conclusion rather than a fourth
+         quality: a heavier green rule separates it, and it is set a size larger
+         than the explanations, in the page's own ink colour. */
+      .proposal-print-portal .pp-method__row--closing {
+        border-top: 2px solid var(--pp-green);
+        padding-top: 4.5mm;
+        margin-top: 3mm;
       }
-      .proposal-print-portal .pp-page--method .pp-structure__text {
-        margin-top: 4mm !important;
+      .proposal-print-portal .pp-method__row--closing .pp-method__body {
+        font-size: 10pt !important;
+        line-height: 1.5 !important;
+        color: var(--pp-ink) !important;
       }
-      .proposal-print-portal .pp-page--method .pp-notes {
-        margin-top: 14mm;
-      }
-      .proposal-print-portal .pp-page--method .pp-note {
-        margin-top: 7mm !important;
-        padding: 6mm 6mm !important;
-      }
-      /* The gap above the first box is the notes block's own margin, so the
-         space after the structures reads as one considered gap. */
-      .proposal-print-portal .pp-page--method .pp-note:first-child {
-        margin-top: 0 !important;
+      .proposal-print-portal .pp-method__row--closing .pp-method__body p {
+        margin-bottom: 3mm !important;
       }
 
       /* ── Image pages: the hero image leads, with deliberate space above and

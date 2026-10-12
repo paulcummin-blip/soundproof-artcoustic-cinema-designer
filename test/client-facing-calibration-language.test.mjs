@@ -181,7 +181,14 @@ describe('C. The wording is refused when it appears, and confident copy passes',
 });
 
 describe('D. The document itself no longer carries a disclaimer', () => {
-  const fixed = [...METHOD_PAGE.notes, ...APPENDIX_PAGE.notes.flatMap((note) => [note.title, note.text])].join(' ');
+  const fixed = [
+    METHOD_PAGE.title,
+    ...METHOD_PAGE.intro,
+    ...METHOD_PAGE.sections.flatMap((section) => [section.title, section.lede, ...section.body]),
+    METHOD_PAGE.closing.title,
+    ...METHOD_PAGE.closing.body,
+    ...APPENDIX_PAGE.notes.flatMap((note) => [note.title, note.text]),
+  ].join(' ');
 
   it('states the prediction basis', () => {
     expect(fixed).toMatch(/predicted from the room model and the published product data/);

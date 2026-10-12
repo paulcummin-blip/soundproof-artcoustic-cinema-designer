@@ -30,6 +30,7 @@ export const PACK_HEADING_SELECTORS = Object.freeze([
   '.pp-block__title',
   '.pp-facts-group__title',
   '.pp-decision__title',
+  '.pp-method__heading',
   '.pp-body > h1',
   '.pp-body > h2',
   '.pp-body > h3',
@@ -43,7 +44,7 @@ export const PACK_KEEP_TOGETHER_SELECTORS = Object.freeze([
   '.pp-card',
   '.pp-metric',
   '.pp-note',
-  '.pp-structure',
+  '.pp-method__row',
   '.pp-decision',
 ]);
 
@@ -52,7 +53,6 @@ export const PACK_KEEP_WITH_HEADING_SELECTORS = Object.freeze([
   '.pp-facts-group',
   '.pp-cards',
   '.pp-metrics',
-  '.pp-structures',
   '.pp-decision__choice',
   '.pp-comparison-options',
 ]);
