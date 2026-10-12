@@ -27,12 +27,14 @@ function failedAttempts(layer) {
   return Array.isArray(layer?.failures) ? layer.failures : [];
 }
 
-export function proposalWriteActionModel({ writer = null, layer = null, readOnly = false, masterAdmin = false } = {}) {
-  // Normal proposal generation IS the approved writer, so on a normally
-  // generated proposal there is nothing for a dealer to press. The action that
-  // remains is the controlled test tool, and it is offered to a master admin
-  // only — it is a diagnostic, not part of the dealer's workflow.
-  const enabled = writer?.enabled === true && masterAdmin === true;
+export function proposalWriteActionModel({ writer = null, layer = null, readOnly = false } = {}) {
+  // Who may regenerate is decided on the server: the master flag plus the accounts
+  // and emails it names are resolved into `writer` when the layer is read. This
+  // model adds no role requirement of its own, because regenerating is part of a
+  // dealer's own workflow — an authorised dealer asks for their copy again through
+  // this same validated path. The dev-facing diagnostics are the audit trail and
+  // the diagnostics page, which stay with a master admin.
+  const enabled = writer?.enabled === true;
 
   if (!enabled || readOnly) {
     return {

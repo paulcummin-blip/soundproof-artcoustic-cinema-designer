@@ -9,10 +9,12 @@
  * one secondary action, asked for by name: it states no provenance, carries no
  * test-tool marking and explains nothing about how the writer works.
  *
- * The approved writer is now the normal generation authority, so a proposal a
- * dealer generates already carries its validated copy. This action is therefore
- * the CONTROLLED TEST TOOL, and it is offered to a master admin only: a dealer's
- * workflow is generate, review, edit, export, with nothing to press here.
+ * The approved writer is the normal generation authority, and regenerating is
+ * part of a dealer's own workflow: an authorised dealer may ask for their copy
+ * again through this same validated path. Who may use the writer is decided on
+ * the server — the master flag together with the accounts and emails it names —
+ * and this component adds no role requirement of its own. The dev-facing
+ * diagnostics are the audit trail and the diagnostics page, not this action.
  *
  * The browser submits a proposal id and, on a retry, the attempt being retried.
  * Nothing else: the evidence, the pack, the writer input, the provider call, the
@@ -24,7 +26,6 @@
  * - writer: the resolved flag state from the copy layer read
  * - layer: the copy layer (which attempts exist, and which failed)
  * - readOnly: the proposal is archived
- * - masterAdmin: whether this login may see the controlled test tool
  * - onGenerated(): re-read the copy layer after an attempt
  */
 
@@ -60,10 +61,9 @@ export default function ProposalWriteAction({
   writer = null,
   layer = null,
   readOnly = false,
-  masterAdmin = false,
   onGenerated,
 }) {
-  const model = proposalWriteActionModel({ writer, layer, readOnly, masterAdmin });
+  const model = proposalWriteActionModel({ writer, layer, readOnly });
   const [busy, setBusy] = useState(false);
   const [outcome, setOutcome] = useState(null);
 

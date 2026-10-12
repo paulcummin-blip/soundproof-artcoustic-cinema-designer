@@ -131,15 +131,26 @@ export function sectionLabel(section, mode = 'comparison') {
  * its own; every other rejection is stated from the plain-language table. A code
  * that is not in the table is stated in general words rather than shown, so a
  * rule ID, a section ID, a version ID or a fingerprint cannot reach the screen.
+ *
+ * A rejection is headed with the section it belongs to, except where the sentence
+ * already names its own subject: a centre-channel rejection is about the
+ * centre-channel description and is never headed with whichever section the
+ * writer filed it against.
  */
 export function plainIssue(entry, mode = 'comparison') {
   const code = entry?.code;
-  const sentence = code === WRITER_REJECTION.MULTI_CABINET_CHANNEL
+  const centreChannel = code === WRITER_REJECTION.MULTI_CABINET_CHANNEL;
+  const sentence = centreChannel
     ? (MULTI_CABINET_SENTENCES[String(entry?.detail || '').split(':')[0]]
       || SENTENCES[code]
       || 'a rule of the copy contract was broken.')
     : (SENTENCES[code] || 'a rule of the copy contract was broken.');
-  const section = sectionLabel(entry?.section, mode);
+  // A centre-channel rejection is about the centre-channel description itself, and
+  // the sentence already says so. The section the writer happened to file it
+  // against is not the reader's subject — a centre-channel problem is not a
+  // Dynamic Range problem — so it is stated in its own right rather than under
+  // that section's name.
+  const section = centreChannel ? null : sectionLabel(entry?.section, mode);
   if (section) return `${section}: ${sentence}`;
   // Nothing precedes it, so it is read as a sentence in its own right.
   return sentence.charAt(0).toUpperCase() + sentence.slice(1);

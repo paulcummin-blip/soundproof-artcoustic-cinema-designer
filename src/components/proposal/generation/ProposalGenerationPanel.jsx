@@ -155,7 +155,6 @@ export default function ProposalGenerationPanel({ proposal, readOnly = false, on
         writer={writer}
         layer={layer}
         readOnly={readOnly}
-        masterAdmin={masterAdmin}
         onGenerated={refresh}
       />
 

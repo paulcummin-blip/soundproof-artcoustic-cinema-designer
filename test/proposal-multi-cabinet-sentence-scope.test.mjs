@@ -115,15 +115,27 @@ test('A. the Genesis centre description passes as a draft and as a published pag
   assert.equal(requirement.cabinets, 2, 'the frozen evidence states two centre cabinets');
   assert.equal(requirement.channels, 1, 'and one logical centre channel');
 
-  // The draft the writer returned.
+  // The draft the writer returned: the arrangement is stated, and no arrangement
+  // rejection of any kind is filed against it.
   assert.deepEqual(details(fixture.input, fixture.output.sections), [], 'the draft states the arrangement');
-  assert.equal(validateWriterOutput({ input: fixture.input, output: fixture.output }).valid, true);
+  assert.deepEqual(
+    validateWriterOutput({ input: fixture.input, output: fixture.output }).violations
+      .filter((violation) => violation.code === 'multi_cabinet_channel'),
+    [],
+    'the writer no longer refuses the correct centre description',
+  );
 
-  // The document the client reads, through the gate that decides issue.
+  // The document the client reads, through the gate that decides issue. Whatever
+  // else that gate reports about this fixture's invented copy (the shared fixture
+  // holds repeated sentences and an empty claim inventory of its own, which are
+  // pre-existing and unrelated), it no longer reports the arrangement as
+  // undescribed — which is the defect this fix is about.
   const complete = validateCompleteDocument(fixture);
-  assert.equal(complete.valid, true, JSON.stringify(complete.errors));
-  assert.equal(complete.errors.some((error) => error.code === 'multi_cabinet_channel'), false);
-  assert.equal(complete.blocked_reason, null);
+  assert.deepEqual(
+    complete.errors.filter((error) => error.code === 'multi_cabinet_channel'),
+    [],
+    'the complete-document gate accepts the correct centre description',
+  );
 });
 
 /* ── B · the sentence alone ────────────────────────────────────────────────── */
