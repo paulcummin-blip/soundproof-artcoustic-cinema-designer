@@ -3,6 +3,7 @@ import { Check, Lightbulb, RefreshCw } from 'lucide-react';
 import { base44 } from '@/api/base44Client';
 import log from '@/components/utils/logger';
 import { toggleChipSelection } from '@/components/proposal/wizard/clientBriefChips';
+import { SUGGESTION_TIMEOUT_MS, settleWithin } from '@/components/proposal/wizard/suggestionRequestBounding';
 
 /**
  * ADI narrative focus suggestions for the Client Brief step.
@@ -36,6 +37,12 @@ import { toggleChipSelection } from '@/components/proposal/wizard/clientBriefChi
  *
  * When no calculated result is available, generic examples are shown instead.
  *
+ * The wait for design-specific examples is bounded at 30 seconds. If the request
+ * has not settled by then, the general examples are shown with the reason and a
+ * Retry, so the suggestion area can never sit in a loading state indefinitely. A
+ * response arriving after that is discarded: it never overwrites the fallback,
+ * and nothing here ever writes to the Client Brief on its own.
+ *
  * Chips are multi-select and purely local: clicking one only marks it selected —
  * nothing is written to the Client Brief until the user presses "Add selected to
  * brief", which returns the prompts that were added and those already present.
@@ -64,6 +71,9 @@ const GENERIC_EXAMPLES = [
 
 const FALLBACK_MESSAGE = 'Calculate the project to get examples powered by Artcoustic Design Intelligence.';
 const COMPARISON_INCOMPLETE_MESSAGE = 'Examples for a comparison need a calculated engineering result for every selected version.';
+// Shown when the design-specific examples did not arrive in time. The examples
+// under it are the general ones, and the message says so.
+const TIMEOUT_MESSAGE = 'Design-specific suggestions are taking longer than expected. You can use these examples or continue with your own brief.';
 
 export default function AdiSuggestionChips({
   projectId,
@@ -87,6 +97,9 @@ export default function AdiSuggestionChips({
   const [suggestions, setSuggestions] = useState([]);
   const [loading, setLoading] = useState(false);
   const [failed, setFailed] = useState(false);
+  // The request did not settle within the bounded wait: the general examples are
+  // shown with the reason and a Retry rather than a loading line that never clears.
+  const [timedOut, setTimedOut] = useState(false);
   // Local, unconfirmed chip selection: cleared when the examples themselves
   // change, and handed to the brief only when the user confirms.
   const [selected, setSelected] = useState([]);
@@ -146,42 +159,61 @@ export default function AdiSuggestionChips({
     requestRef.current = token;
     setLoading(true);
     setFailed(false);
-    try {
-      const response = await base44.functions.invoke('generateAdiNarrativeSuggestions', {
-        project_id: projectId,
-        proposal_type: proposalType,
-        selected_version_ids: selectedVersionIds,
-        engineering_snapshot: engineeringSnapshot,
-        client_brief: clientBrief || '',
-        // A question the designer has already answered or passed is never asked
-        // again in this preparation. The answers are collected on the
-        // Clarifications step, never in the brief.
-        existing_clarifications: (Array.isArray(askedRef.current) ? askedRef.current : [])
-          .map((entry) => ({ question_id: entry?.question_id, status: entry?.status }))
-          .filter((entry) => entry.question_id),
-        // In comparison mode the function receives every selected version's own
-        // frozen snapshot and builds its examples from all of them.
-        version_snapshots: comparisonSelected ? comparisonEntriesRef.current : [],
-      });
-      if (requestRef.current !== token) return;
-      const list = response?.data?.suggestions || [];
-      // The questions ADI cannot answer itself belong to the Clarifications step,
-      // which collects a real answer: they are never offered as brief text.
-      onClarifications?.(response?.data?.clarifications || []);
-      // Per-chip diagnostics: the chip text, the source fields and values it came
-      // from, and whether it passed, was rewritten or was rejected.
-      log.debug('[AdiSuggestionChips] validated examples', response?.data?.diagnostics || []);
-      setSuggestions(list);
-      setFailed(list.length === 0);
-    } catch (error) {
-      if (requestRef.current !== token) return;
-      console.error('[AdiSuggestionChips] Suggestion generation failed:', error);
+    setTimedOut(false);
+    // The wait is bounded. A request that has not settled by then is abandoned
+    // here: once the bounding promise has resolved with a timeout it never
+    // delivers a response, so a reply arriving later can neither overwrite the
+    // general examples nor change the brief.
+    const result = await settleWithin(Promise.resolve().then(() => base44.functions.invoke('generateAdiNarrativeSuggestions', {
+      project_id: projectId,
+      proposal_type: proposalType,
+      selected_version_ids: selectedVersionIds,
+      engineering_snapshot: engineeringSnapshot,
+      client_brief: clientBrief || '',
+      // A question the designer has already answered or passed is never asked
+      // again in this preparation. The answers are collected on the
+      // Clarifications step, never in the brief.
+      existing_clarifications: (Array.isArray(askedRef.current) ? askedRef.current : [])
+        .map((entry) => ({ question_id: entry?.question_id, status: entry?.status }))
+        .filter((entry) => entry.question_id),
+      // In comparison mode the function receives every selected version's own
+      // frozen snapshot and builds its examples from all of them.
+      version_snapshots: comparisonSelected ? comparisonEntriesRef.current : [],
+    })));
+
+    // A request superseded by a newer one, or left behind by the step being
+    // closed, never writes anything.
+    if (requestRef.current !== token) return;
+
+    if (result.status === 'timeout') {
+      console.warn('[AdiSuggestionChips] suggestion generation did not settle within '
+        + `${SUGGESTION_TIMEOUT_MS / 1000}s — general examples shown.`);
+      setSuggestions([]);
+      onClarifications?.([]);
+      setTimedOut(true);
+      setLoading(false);
+      return;
+    }
+
+    if (result.status === 'failed') {
+      console.error('[AdiSuggestionChips] Suggestion generation failed:', result.error);
       setSuggestions([]);
       onClarifications?.([]);
       setFailed(true);
-    } finally {
-      if (requestRef.current === token) setLoading(false);
+      setLoading(false);
+      return;
     }
+
+    const list = result.response?.data?.suggestions || [];
+    // The questions ADI cannot answer itself belong to the Clarifications step,
+    // which collects a real answer: they are never offered as brief text.
+    onClarifications?.(result.response?.data?.clarifications || []);
+    // Per-chip diagnostics: the chip text, the source fields and values it came
+    // from, and whether it passed, was rewritten or was rejected.
+    log.debug('[AdiSuggestionChips] validated examples', result.response?.data?.diagnostics || []);
+    setSuggestions(list);
+    setFailed(list.length === 0);
+    setLoading(false);
   }, [hasResults, projectId, proposalType, selectedVersionIds, engineeringSnapshot, clientBrief, comparisonSelected, comparisonKey]);
 
   useEffect(() => {
@@ -191,8 +223,15 @@ export default function AdiSuggestionChips({
       setSuggestions([]);
       onClarifications?.([]);
       setFailed(false);
+      setTimedOut(false);
     }
   }, [hasResults, load]);
+
+  // Leaving the step abandons whatever is still in flight: a late response can
+  // never reach a suggestion area that is no longer on screen.
+  useEffect(() => () => {
+    requestRef.current += 1;
+  }, []);
 
   // New examples invalidate what was selected against the old ones.
   useEffect(() => {
@@ -202,6 +241,7 @@ export default function AdiSuggestionChips({
 
   const usingCalculatedResults = hasResults && !failed && suggestions.length > 0;
   const failedWithData = hasResults && failed;
+  const timedOutWithResults = hasResults && timedOut;
   const chips = usingCalculatedResults
     ? suggestions.map((item) => ({ label: item.label, reason: item.reason }))
     : GENERIC_EXAMPLES.map((label) => ({ label, reason: null }));
@@ -239,7 +279,7 @@ export default function AdiSuggestionChips({
             {'Examples, powered by Artcoustic Design Intelligence'}
           </span>
         </div>
-        {hasResults && !busy && (
+        {hasResults && !busy && !timedOutWithResults && (
           <button
             type="button"
             onClick={load}
@@ -259,7 +299,24 @@ export default function AdiSuggestionChips({
         </p>
       )}
 
-      {!busy && !usingCalculatedResults && (
+      {/* The design-specific examples did not arrive in time. The general examples
+          stay usable, the reason says exactly what has happened, and nothing
+          suggests these were written for this project. */}
+      {!busy && timedOutWithResults && (
+        <div className="mb-3">
+          <p className="text-[11px] text-[#8A8477]">{TIMEOUT_MESSAGE}</p>
+          <button
+            type="button"
+            onClick={load}
+            className="mt-1.5 flex items-center gap-1.5 text-[11px] text-[#625143] hover:text-[#213428] transition-colors"
+          >
+            <RefreshCw className="w-3 h-3" />
+            {'Retry'}
+          </button>
+        </div>
+      )}
+
+      {!busy && !usingCalculatedResults && !timedOutWithResults && (
         <p className="text-[11px] text-[#8A8477] mb-3">
           {comparisonIncomplete
             ? COMPARISON_INCOMPLETE_MESSAGE
