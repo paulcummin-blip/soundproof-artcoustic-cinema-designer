@@ -51,8 +51,16 @@ export default function ClientBriefStep({
         >
           Client Brief &amp; Narrative Focus
         </h3>
+        <p
+          className="text-sm font-semibold text-[#1B1A1A] mb-1"
+          style={{ fontFamily: 'Didact Gothic, sans-serif' }}
+        >
+          What matters most in this design, and why are you recommending this solution?
+        </p>
         <p className="text-xs text-[#625143] leading-relaxed">
-          What would you like this proposal to emphasise?
+          Tell us about the client&apos;s priorities, practical constraints and decisions behind your
+          recommendation. What have you prioritised, where have you made compromises, and why is this
+          the right solution?
         </p>
       </div>
 

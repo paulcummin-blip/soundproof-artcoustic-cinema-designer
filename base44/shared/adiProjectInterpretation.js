@@ -36,7 +36,7 @@ import {
   P20_USE_RULE,
   P20_OMIT_RULE,
 } from './adiReportEvidenceRules.js';
-import { deriveDesignPhilosophy, rank, usableRows } from './adiDesignPhilosophy.js';
+import { deriveDesignPhilosophy, prioritisedPositions, rank, usableRows } from './adiDesignPhilosophy.js';
 import { designPhilosophyLines } from './designPhilosophyAuthority.js';
 
 export const INTERPRETATION_STAGE = 'adi_project_interpretation';
@@ -361,6 +361,8 @@ export function buildProjectInterpretation(params = {}) {
           : ''
   }: seat-to-seat consistency is claimed only where the consistency result supports it, so bass is otherwise described as output capability and physical authority.`;
 
+  const emphasis = typeof clientBrief === 'string' && clientBrief.trim() ? clientBrief.trim() : null;
+
   const designPhilosophy = deriveDesignPhilosophy({
     roomType,
     intent,
@@ -374,8 +376,6 @@ export function buildProjectInterpretation(params = {}) {
     rows: usableRows(parameterEvidence, bassEvidence),
     emphasis,
   });
-
-  const emphasis = typeof clientBrief === 'string' && clientBrief.trim() ? clientBrief.trim() : null;
 
   const oneLineStory = [
     roomType,

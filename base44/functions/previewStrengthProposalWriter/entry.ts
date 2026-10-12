@@ -5,6 +5,7 @@ import { buildWriterInput } from '../../shared/proposalWriter/writerInputBuilder
 import { assertWriterInputCarriesNoLiveState } from '../../shared/proposalWriter/writerPromptBuilder.js';
 import { validateWriterOutput } from '../../shared/proposalWriter/writerOutputValidator.js';
 import { buildWriterDesignContext } from '../../shared/proposalWriter/writerDesignContext.js';
+import { buildProjectInterpretation } from '../../shared/adiProjectInterpretation.js';
 import { buildClientBriefCoverage } from '../../shared/proposalWriter/writerClientBriefCoverage.js';
 import { WRITER_PROMPT_VERSION } from '../../shared/proposalWriter/writerContractSchema.js';
 import {
@@ -85,10 +86,29 @@ export default async function(req) {
     // the verified design interpretation and the designer's brief. The context is
     // resolved by the SAME authority the live generation path uses, so a review here
     // and a real generation can never be given different guidance.
+    // The interpretation is normally the one the proposal already carries, read
+    // exactly as a live generation reads it. With interpretation_mode
+    // 'derive_from_frozen_evidence' the SAME Stage 1 authority builds it here, in
+    // memory, from this version's frozen Project Report evidence, so the review
+    // shows the interpretation and its design philosophy that a NEW proposal would
+    // receive. Nothing is written either way, and no proposal is created.
+    const deriveInterpretation = body.interpretation_mode === 'derive_from_frozen_evidence';
+    const derivedInterpretation = deriveInterpretation
+      ? buildProjectInterpretation({
+        snapshot: suppliedSnapshots[0]?.snapshot || null,
+        project,
+        clientBrief: [proposal?.client_brief, proposal?.narrative_brief].filter(Boolean).join('\n') || null,
+        reportType: 'single',
+        versions: [{ id: versionId, label: suppliedSnapshots[0]?.version_name || version.version_name || null }],
+        reportLabel: suppliedSnapshots[0]?.version_name || version.version_name || null,
+      })
+      : null;
+
     const input = buildWriterInput({
       pack,
       designContext: buildWriterDesignContext({
         proposal, projectId, versionIds: [versionId], pack, dealerNotes,
+        savedInterpretation: derivedInterpretation,
       }),
     });
     assertWriterInputCarriesNoLiveState(input);
@@ -182,6 +202,11 @@ export default async function(req) {
       story_claim_ids: (pack.allowed_claims || []).filter((claim) => claim.kind === 'strength_story').map((claim) => claim.claim_id),
       blocked_claim_count: (pack.blocked_claims || []).length,
       options,
+      // 'saved' = the interpretation the proposal carries; 'derive_from_frozen_evidence'
+      // = built here from this version's frozen evidence, with the complete Stage 1
+      // output returned alongside the writer's own view of it.
+      interpretation_mode: deriveInterpretation ? 'derive_from_frozen_evidence' : 'saved',
+      derived_interpretation: derivedInterpretation,
       design_interpretation: input.design_interpretation,
       editorial_brief: input.editorial_brief,
       // What the brief asked for and what the draft did with it, item by item.
