@@ -103,7 +103,12 @@ export const WRITER_CONTRACT_VERSION = 2;
 // is written as a bounded fragment with nothing to say. Section IDs, order and
 // the claim grounding rule are unchanged, so a draft filed under an earlier
 // generation is still read against the agreement it was written under.
-export const WRITER_PROMPT_VERSION = 'proposal-writer-prompt-13';
+// Bumped to 14 for the editorial-standard pass: the writer's role, the internal
+// editorial plan, the Design Summary structure, the distinct job of each section,
+// the house style and the brief-coverage responsibility are stated, and the
+// Design Summary is given room to develop the cinema. Section identities, the
+// word limits of the other sections and every validation rule are unchanged.
+export const WRITER_PROMPT_VERSION = 'proposal-writer-prompt-14';
 
 /** The only pack generation a draft may be written from. */
 export const WRITER_ACCEPTED_PACK_SCHEMA_VERSION = 2;
@@ -253,8 +258,8 @@ export const WRITER_SECTIONS = Object.freeze([
     section: 'decision_summary',
     title: 'Decision Summary',
     title_single: 'Design Summary',
-    requirement_single: 'Introduce the cinema itself, in developed natural paragraphs: the room and its proportions, its intended use where the interpretation states one, the display and why it suits the room, the seating arrangement, the system architecture, the most important design considerations, and the experience this design is intended to deliver. Write as an experienced cinema designer would write for a homeowner or architect. Do not list equipment, do not dump specifications, and do not restate the performance claim here. Never say this proposal outlines, this design presents, this option, decision or selected option.',
-    word_limit: 200,
+    requirement_single: 'Introduce the cinema itself, in developed natural paragraphs: the room and its proportions, its intended use where the interpretation states one, the display and why it suits the room, the seating arrangement, the system architecture, the most important design considerations, and the experience this design is intended to deliver. Write as an experienced cinema designer would write for a homeowner or architect. Do not list equipment, do not dump specifications, and do not restate the performance claim here. Never say this proposal outlines, this design presents, this option, decision or selected option. Where the project has real design substance, develop this in three or four paragraphs: the room and the scale of the experience, then the system and how it relates to the room, then the reasoning that makes this specification right for this project, then the result. Roughly 180 to 250 words at that depth, less where the design is genuinely simple, and never padded with invented detail to reach a length. This is the one section that establishes the whole cinema, so it takes the design\'s own story rather than the highest-ranked result.',
+    word_limit: 250,
     requirement: 'State the decision between the options in the pack\'s own framing, and only where the pack allows a framing.',
   },
   {

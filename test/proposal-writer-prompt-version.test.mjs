@@ -32,7 +32,11 @@ const VERSION_3 = 'proposal-writer-prompt-3';
 // Generation 13 is the design-context pass: the writer is given the verified ADI
 // interpretation and the designer's brief, and the Design Summary introduces the
 // cinema instead of opening on the top-ranked result.
-const CURRENT = 'proposal-writer-prompt-13';
+// Generation 14 is the editorial-standard pass: the writer is given its role, the
+// internal editorial plan, the Design Summary structure, the distinct job of each
+// section, the house style and the brief-coverage responsibility. No validation
+// rule, section identity or claim-grounding rule changed.
+const CURRENT = 'proposal-writer-prompt-14';
 
 test('the writer prompt version is the current one', () => {
   assert.equal(WRITER_PROMPT_VERSION, CURRENT);
