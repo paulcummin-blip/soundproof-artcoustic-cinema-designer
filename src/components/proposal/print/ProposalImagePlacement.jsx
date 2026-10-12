@@ -36,9 +36,12 @@ export default function ProposalImagePlacement({
   if (!placement?.source_file_url) return null;
   const treatment = TREATMENT[placement.editorial_role] || 'landscape';
   const captionText = caption ?? placement.source_caption ?? null;
+  const closingClass = placement.editorial_role === EDITORIAL_ROLE.CLOSING_FEATURE
+    ? ' pp-media--closing-feature'
+    : '';
 
   return (
-    <figure className={`pp-media pp-media--${treatment} ${className}`.trim()}>
+    <figure className={`pp-media pp-media--${treatment}${closingClass} ${className}`.trim()}>
       <img
         src={placement.source_file_url}
         alt={captionText || ''}
