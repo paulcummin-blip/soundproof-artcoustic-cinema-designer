@@ -31,7 +31,7 @@ export const VALIDATOR_SOURCE_MANIFEST = Object.freeze({
   // Stage 1 and by the writer's editorial instructions. It states no figure and
   // changes no acceptance; it is hashed so a draft can be traced to the exact
   // reasoning authority it was written under.
-  'base44/shared/designPhilosophyAuthority.js': '144ea70734131f9b0b929c302510062289ef7d1c699fb37d354b8cfc550ba2f4',
+  'base44/shared/designPhilosophyAuthority.js': '3edbd7c7b4ebe8a67b48ce97db31a201eea1998e69d836896f684779b8c97cd9',
   'base44/shared/adiDesignPhilosophy.js': '741404c18354ae2ab05d1cf82780763615dea08b1e7120d7ac97680a75a0593e',
   'base44/shared/adiProjectInterpretation.js': '6353a90fdba81cd7a5183975a68360a33a20e5f8c7fbcbe8bca091bb84541410',
   // The check between the saved interpretation and the frozen evidence, which now
