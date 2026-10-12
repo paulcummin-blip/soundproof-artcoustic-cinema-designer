@@ -25,6 +25,7 @@
 
 import { proposalEvidenceFingerprint } from '../proposalEvidence/proposalEvidenceBuilder.js';
 import { normaliseDesignContext } from './writerDesignContext.js';
+import { buildEvidenceClassification } from './writerEvidenceClasses.js';
 import { normaliseOptionGuidance } from './writerOptionGuidance.js';
 import { requiredMultiCabinetChannels } from './writerMultiCabinetRules.js';
 import {
@@ -182,6 +183,11 @@ export function buildWriterInput({
     // such rather than left blank, so the audit always shows what was read.
     design_interpretation: context.design_interpretation,
     editorial_brief: context.editorial_brief,
+    // WHAT KIND of statement each part of the pack supports. A design fact is not a
+    // result, the designer's intention is not an achievement, and a bass reading the
+    // frozen reports do not publish is provisional and supports no positive
+    // performance claim.
+    evidence_classification: buildEvidenceClassification(pack),
     multi_cabinet_channels: {
       rule: 'Explain each required frozen arrangement naturally once in the System Design Summary or specification: the physical cabinet count, the position and the ONE logical audio channel. In comparisons name the appropriate design; never assign its arrangement to another option. This is a concise design explanation, not an equipment inventory.',
       required: requiredMultiCabinetChannels(pack),

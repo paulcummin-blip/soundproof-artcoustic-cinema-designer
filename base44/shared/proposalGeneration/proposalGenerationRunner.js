@@ -35,6 +35,7 @@ import { buildWriterDesignContext } from '../proposalWriter/writerDesignContext.
 import { assertWriterInputCarriesNoLiveState } from '../proposalWriter/writerPromptBuilder.js';
 import { callWriterProvider } from '../proposalWriter/writerProvider.js';
 import { validateWriterOutput } from '../proposalWriter/writerOutputValidator.js';
+import { buildClientBriefCoverage } from '../proposalWriter/writerClientBriefCoverage.js';
 import { GENERATION_STATUS } from './generationStatuses.js';
 import { createGenerationHistory } from './proposalGenerationRepository.js';
 
@@ -244,6 +245,16 @@ export async function runProposalCopyGeneration({
     ? validateWriterOutput({ input: writerInput, output: provider.output })
     : null;
 
+  // 7b. What the draft did with the designer's own brief: every substantive
+  //     request is either addressed in the narrative or flagged here, so nothing is
+  //     silently ignored. This is an audit of coverage — it rejects nothing, and it
+  //     is never itself published.
+  const clientBriefCoverage = buildClientBriefCoverage({
+    brief: writerInput.editorial_brief,
+    pack,
+    sections: validation?.output?.sections || provider.output?.sections || [],
+  });
+
   // 8. One appended record, whatever happened.
   const history = createGenerationHistory({ records: generations });
 
@@ -293,6 +304,8 @@ export async function runProposalCopyGeneration({
     // this attempt was written from.
     design_interpretation: writerInput.design_interpretation,
     editorial_brief_supplied: writerInput.editorial_brief?.supplied === true,
+    // What the brief asked for and what the draft did with it, item by item.
+    client_brief_coverage: clientBriefCoverage,
     prompt_version: record.prompt_version,
     schema_version: record.schema_version,
     contract_version: record.contract_version,

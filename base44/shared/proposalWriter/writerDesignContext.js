@@ -34,6 +34,11 @@
  * Pure: no React, no SDK, no runtime-specific APIs.
  */
 
+import {
+  CORRECTION_RULE,
+  checkInterpretationAgainstEvidence,
+} from './writerInterpretationEvidenceCheck.js';
+
 /** The stage marker the existing ADI interpretation carries. */
 export const INTERPRETATION_STAGE = 'adi_project_interpretation';
 
@@ -119,7 +124,7 @@ function evidenceRows(list) {
  * @param {Object} interpretation — the saved ADI interpretation
  * @returns {Object} the writer-facing interpretation
  */
-export function interpretationView(interpretation) {
+export function interpretationView(interpretation, { pack = null } = {}) {
   const evidence = interpretation?.reliable_evidence || {};
   const byStructure = evidence.by_structure || {};
   const bass = Array.isArray(evidence.bass) ? evidence.bass : [];
@@ -127,7 +132,7 @@ export function interpretationView(interpretation) {
   const screen = evidence.screen || null;
   const system = evidence.system || null;
 
-  return {
+  const view = {
     source: VERIFIED_INTERPRETATION_SOURCE,
     room_type: asText(interpretation?.room_type),
     presentation: asText(interpretation?.presentation),
@@ -170,6 +175,16 @@ export function interpretationView(interpretation) {
       .filter((entry) => entry.label),
     not_stated_rule: 'these are not stated because the evidence does not support them: never write about them',
     rule: INTERPRETATION_RULE,
+  };
+
+  // Every statement the frozen evidence does not support is removed, and the
+  // removal is recorded rather than silent: the rest of the interpretation stands,
+  // and the frozen evidence itself is never rewritten.
+  const checked = checkInterpretationAgainstEvidence({ view, pack });
+  return {
+    ...checked.view,
+    correction_rule: CORRECTION_RULE,
+    corrections: checked.corrections,
   };
 }
 
@@ -306,7 +321,7 @@ export function resolveDesignInterpretation({
       version_ids: covered.length > 0 ? covered : [interpretationVersion],
       confirmed_by: confirmedBy({ proposal, versionIds: selected, pack }),
     },
-    view: interpretationView(candidate),
+    view: interpretationView(candidate, { pack }),
   };
 }
 
@@ -339,6 +354,8 @@ export function emptyDesignContext() {
       source: null,
       refusal: DESIGN_CONTEXT_REFUSAL.NOT_SUPPLIED,
       provenance: null,
+      correction_rule: CORRECTION_RULE,
+      corrections: [],
       view: null,
     },
     editorial_brief: buildEditorialBrief({}),

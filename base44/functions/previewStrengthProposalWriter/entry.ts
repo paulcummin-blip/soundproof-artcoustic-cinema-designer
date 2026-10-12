@@ -5,6 +5,7 @@ import { buildWriterInput } from '../../shared/proposalWriter/writerInputBuilder
 import { buildWriterProviderRequest, assertWriterInputCarriesNoLiveState } from '../../shared/proposalWriter/writerPromptBuilder.js';
 import { validateWriterOutput } from '../../shared/proposalWriter/writerOutputValidator.js';
 import { buildWriterDesignContext } from '../../shared/proposalWriter/writerDesignContext.js';
+import { buildClientBriefCoverage } from '../../shared/proposalWriter/writerClientBriefCoverage.js';
 import { WRITER_PROMPT_VERSION } from '../../shared/proposalWriter/writerContractSchema.js';
 
 // READ-ONLY dry run of the strength-led proposal writer. It reads ONE version's
@@ -85,6 +86,12 @@ export default async function(req) {
         pack_fingerprint: pack.pack_fingerprint, input_fingerprint: input.input_fingerprint,
         design_interpretation: input.design_interpretation,
         editorial_brief: input.editorial_brief,
+        // What the draft did with the designer's own brief, item by item.
+        client_brief_coverage: buildClientBriefCoverage({
+          brief: input.editorial_brief,
+          pack,
+          sections: validation?.output?.sections || raw?.sections || [],
+        }),
         writer_output: raw, validation,
       });
     }
@@ -114,6 +121,11 @@ export default async function(req) {
       options,
       design_interpretation: input.design_interpretation,
       editorial_brief: input.editorial_brief,
+      client_brief_coverage: buildClientBriefCoverage({
+        brief: input.editorial_brief,
+        pack,
+        sections: validation?.output?.sections || null,
+      }),
       writer_input: input,
       writer_output: validation.output || raw || null,
       validation: {
