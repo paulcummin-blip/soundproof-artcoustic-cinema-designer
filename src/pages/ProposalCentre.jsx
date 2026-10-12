@@ -3,30 +3,26 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import { base44 } from '@/api/base44Client';
 import { useAuth } from '@/lib/AuthContext';
 import BrandAssetsPanel from '@/components/proposal/BrandAssetsPanel';
-import PlaceholderTab from '@/components/proposal/PlaceholderTab';
 import CreateProposalWizard from '@/components/proposal/CreateProposalWizard';
 import ProposalLibraryTab from '@/components/proposal/library/ProposalLibraryTab';
 import { Plus, ChevronLeft } from 'lucide-react';
 
+// The Proposal Centre's navigation: find and manage proposals, then the brand
+// assets they are published with. Create Proposal is the header action.
 const TABS = [
-  { key: 'brand', label: 'Brand Assets' },
-  { key: 'templates', label: 'Templates' },
-  { key: 'products', label: 'Product Intelligence' },
   { key: 'library', label: 'Proposal Library' },
+  { key: 'brand', label: 'Brand Assets' },
 ];
 
-const PLACEHOLDER_CONTENT = {
-  templates: {
-    title: 'Templates',
-    description:
-      'Pre-designed proposal templates will live here. You will be able to create, edit, and manage reusable proposal layouts for different project types.',
-  },
-  products: {
-    title: 'Product Intelligence',
-    description:
-      'Structured manufacturer knowledge for every Artcoustic product — why each model exists, where it should be used, its strengths, honest compromises, and upgrade path. Feeds Proposal Intelligence, product comparisons, and the dealer assistant.',
-  },
-};
+const DEFAULT_TAB = 'library';
+const TAB_KEYS = new Set(TABS.map((tab) => tab.key));
+
+/**
+ * A tab that is no longer offered — Templates, Product Intelligence, or anything
+ * else an old link or a saved tab state may still ask for — resolves to the
+ * Proposal Library, so a stale request never lands on an empty page.
+ */
+const normaliseTab = (value) => (TAB_KEYS.has(value) ? value : DEFAULT_TAB);
 
 import { REPORT_FONT_HEADING, REPORT_FONT_BODY } from '@/components/report/typography/reportTypography';
 
@@ -36,11 +32,23 @@ export default function ProposalCentre() {
   // The wizard can also be opened from another page — the Project Library's
   // readiness banner links to ?create=1 — so the flag is read from the URL as
   // well as from the Create Proposal button below.
-  const [searchParams] = useSearchParams();
-  const [activeTab, setActiveTab] = useState('brand');
+  const [searchParams, setSearchParams] = useSearchParams();
+  const [activeTab, setActiveTab] = useState(() => normaliseTab(searchParams.get('tab')));
   const [showWizard, setShowWizard] = useState(searchParams.get('create') === '1');
   const [regenerateFrom, setRegenerateFrom] = useState(null);
   const accountId = user?.access_context?.account?.id || user?.account_id || null;
+
+  // A URL asking for a tab that is no longer offered is redirected to the
+  // Proposal Library, and the stale parameter is dropped so the address matches
+  // the page that is shown.
+  useEffect(() => {
+    const requestedTab = searchParams.get('tab');
+    if (requestedTab && requestedTab !== normaliseTab(requestedTab)) {
+      const nextParams = new URLSearchParams(searchParams);
+      nextParams.delete('tab');
+      setSearchParams(nextParams, { replace: true });
+    }
+  }, [searchParams, setSearchParams]);
 
   const handleCreated = (proposalId) => {
     setRegenerateFrom(null);
@@ -127,19 +135,13 @@ export default function ProposalCentre() {
           ))}
         </div>
 
-        {activeTab === 'brand' && <BrandAssetsPanel accountId={accountId} />}
         {activeTab === 'library' && (
           <ProposalLibraryTab
             onCreateProposal={() => openWizard()}
             onRegenerate={(proposal) => openWizard(proposal)}
           />
         )}
-        {activeTab !== 'brand' && activeTab !== 'library' && (
-          <PlaceholderTab
-            title={PLACEHOLDER_CONTENT[activeTab].title}
-            description={PLACEHOLDER_CONTENT[activeTab].description}
-          />
-        )}
+        {activeTab === 'brand' && <BrandAssetsPanel accountId={accountId} />}
       </div>
     </div>
   );
