@@ -390,7 +390,57 @@ export function areaAnchorTerms(pack) {
 
 const GAIN_WORDS = /\b(?:improve[sd]?|improvements?|gains?|better|greater|exceeds?|superior|boosts?|increases?|enhances?|more|advantages?|benefits?)\b/i;
 const CHANGE_WORDS = /\b(?:changes?|changed|differs?|different|instead of|rather than|replaces?|adds?|upgrad(?:e|es|ed))\b/i;
-const SAME_WORDS = /\b(?:identical|unchanged|shared|shares?|matching)\b/i;
+/**
+ * The words that state sameness or equivalence. They never assert a result on
+ * their own: WHAT is said to be the same is what decides that, which is read by
+ * equivalenceAssertion below. The word alone is never the claim.
+ */
+const SAMENESS_WORDS = 'identical|equivalen\\w*|unchanged|shared|shares?|same|equal|matching|alike';
+
+/**
+ * The engineering results an equivalence has to be said OF. Every one of them is
+ * a result the reports state; nothing here names the design itself, a piece of
+ * furniture or a room's character.
+ */
+const RESULT_SUBJECT = 'performance|acoustic\\w*|response|outputs?|consistency|extension|bass'
+  + '|low[- ]frequency|mid[- ]frequency|high[- ]frequency|frequenc(?:y|ies)|spl|sound\\s+pressure'
+  + '|headroom|capabilit\\w*|dynamic\\s+range|coverage|dispersion|distortion|decay|reverberat\\w*'
+  + '|metrics?|parameters?|rp2[23](?:\\s+\\w+)?|performance\\s+levels?|dBC|dB|Hz';
+
+/** The determiners that may sit between a sameness word and the result it qualifies. */
+const RESULT_DETERMINER = 'the|a|an|its|their|our|overall';
+
+/**
+ * Whether a sentence asserts an ENGINEERING EQUIVALENCE: a sameness word said of
+ * an engineering result, either at the head of the noun phrase it qualifies
+ * ("identical acoustic performance", "the same bass response", "unchanged RP22
+ * results") or as the verb of that result's own clause ("acoustic performance is
+ * unchanged", "outputs are identical").
+ *
+ * Everything else the same words can be said of is the design itself rather than
+ * a result — seating, comfort, appearance, arrangement, style, company, a room's
+ * character. A practical or visual description of the room therefore asserts no
+ * result and grounds nothing: "flexible shared seating", "informal shared
+ * spaces", "comfortable shared spaces" and "seating for enjoying films together"
+ * are never read as a claim that a result is shared, identical, equal or
+ * unchanged. A genuine equivalence claim remains an ungrounded claim until its
+ * own allowed claim ID is cited, exactly as before.
+ *
+ * @param {string} text — a sentence, a clause or a whole section
+ * @returns {boolean} true only where a sameness word is said of an engineering result
+ */
+export function equivalenceAssertion(text) {
+  const sentence = String(text || '');
+  if (sentence.length === 0) return false;
+  const sameness = `\\b(?:${SAMENESS_WORDS})\\b`;
+  const result = `\\b(?:${RESULT_SUBJECT})\\b`;
+  const asserted = new RegExp(
+    `(?:${sameness}(?:\\s+(?:${RESULT_DETERMINER}))?\\s+(?:${RESULT_SUBJECT})\\b)`
+    + `|(?:${result}(?:\\s+\\w+){0,2}\\s+${sameness})`,
+    'i',
+  );
+  return asserted.test(sentence);
+}
 const RESULT_WORDS = /\b(?:achieves?|reaches?|delivers?|scores?|records?|measured|shows?|performs?|remains?|states?)\b/i;
 const RECOMMEND_WORDS = /\b(?:recommend\w*|we would choose|best choice|the better option|stronger option|stronger recommendation)\b/i;
 
@@ -399,7 +449,10 @@ export function assertionKind(text) {
   if (typeof text !== 'string' || text.length === 0) return null;
   if (GAIN_WORDS.test(text)) return 'gain';
   if (CHANGE_WORDS.test(text)) return 'change';
-  if (SAME_WORDS.test(text)) return 'same';
+  // A sameness word is read as a shared-result assertion only where it is said of
+  // an engineering result: a sameness word said of the seating, the comfort or the
+  // appearance of the room describes the design and asserts nothing.
+  if (equivalenceAssertion(text)) return 'same';
   if (RESULT_WORDS.test(text)) return 'result';
   return null;
 }
