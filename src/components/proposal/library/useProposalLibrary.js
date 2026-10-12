@@ -137,6 +137,17 @@ export function useProposalLibrary({ projectFilter = null } = {}) {
     return savedName || `Version ${number}`;
   }), [versionsById]);
 
+  /**
+   * Drop proposals that have been deleted from the list on screen at once, so a
+   * confirmed deletion takes its cards with it. The next read resolves the list
+   * from the server, which remains the authority.
+   */
+  const removeProposals = useCallback((proposalIds = []) => {
+    const removed = new Set(Array.isArray(proposalIds) ? proposalIds.filter(Boolean) : []);
+    if (removed.size === 0) return;
+    setProposals((previous) => previous.filter((proposal) => !removed.has(proposal.id)));
+  }, []);
+
   /** Proposals grouped by project, most recently updated group first. */
   const groups = useMemo(
     () => groupProposalsByProject(proposals, projectsById),
@@ -154,6 +165,7 @@ export function useProposalLibrary({ projectFilter = null } = {}) {
     loading,
     error,
     reload: load,
+    removeProposals,
   };
 }
 

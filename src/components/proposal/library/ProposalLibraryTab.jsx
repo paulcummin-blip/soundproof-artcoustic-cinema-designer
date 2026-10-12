@@ -18,6 +18,9 @@ import { base44 } from '@/api/base44Client';
 import { Loader2, FileText, Plus, RefreshCw } from 'lucide-react';
 import ProposalLibraryGroup from './ProposalLibraryGroup';
 import ProposalRenameDialog from './ProposalRenameDialog';
+import ProposalSelectionBar from './ProposalSelectionBar';
+import ProposalBulkDeleteDialog from './ProposalBulkDeleteDialog';
+import { useBulkProposalDeletion } from './useBulkProposalDeletion';
 import { getProposalTypeLabel } from '@/components/proposal/proposalTypes';
 import { isArchived, getRestoreStatus } from '@/components/proposal/proposalLifecycle';
 import { useProposalLibrary } from './useProposalLibrary';
@@ -159,6 +162,17 @@ export default function ProposalLibraryTab({ onCreateProposal, onRegenerate }) {
     };
   }, { active: 0, archived: 0 }), [library.proposals]);
 
+  // Selection is offered over exactly the proposals this project filter and view
+  // are showing, so a deletion can never reach a proposal that is not on screen.
+  const visibleProposalIds = useMemo(
+    () => visibleGroups.flatMap((group) => group.proposals.map((proposal) => proposal.id)),
+    [visibleGroups],
+  );
+  const bulk = useBulkProposalDeletion({
+    visibleProposalIds,
+    onDeleted: library.removeProposals,
+  });
+
   const actions = {
     onOpen: handleOpen,
     onRename: setRenaming,
@@ -221,6 +235,20 @@ export default function ProposalLibraryTab({ onCreateProposal, onRegenerate }) {
 
   return (
     <div className="border-t border-[#E5E1D8] pt-8">
+      <ProposalSelectionBar
+        count={bulk.selectedCount}
+        busy={bulk.checking}
+        onSelectAll={bulk.selectAllVisible}
+        onCancel={bulk.clearSelection}
+        onDelete={bulk.requestDelete}
+      />
+
+      {bulk.error && !bulk.dialogOpen && (
+        <p role="alert" className="mb-6 text-sm text-[#7A2E10]" style={{ fontFamily: REPORT_FONT_BODY }}>
+          {bulk.error}
+        </p>
+      )}
+
       <div className="flex flex-wrap items-center justify-between gap-4 mb-8">
         <div className="flex flex-wrap items-center gap-4">
           <div className="flex items-center gap-1 p-1 rounded-lg bg-[#F5F4F0] border border-[#E5E1D8]">
@@ -286,6 +314,9 @@ export default function ProposalLibraryTab({ onCreateProposal, onRegenerate }) {
           <ProposalLibraryGroup
             key={group.projectId}
             group={group}
+            selectable
+            selectedIds={bulk.selectedIds}
+            onToggleSelect={bulk.toggle}
             sourceById={library.sourceById}
             versionNamesFor={library.versionNamesFor}
             sectionCounts={library.sectionCounts}
@@ -294,6 +325,16 @@ export default function ProposalLibraryTab({ onCreateProposal, onRegenerate }) {
           />
         ))
       )}
+
+      <ProposalBulkDeleteDialog
+        open={bulk.dialogOpen}
+        plan={bulk.plan}
+        outcome={bulk.outcome}
+        deleting={bulk.deleting}
+        error={bulk.error}
+        onCancel={bulk.closeDialog}
+        onConfirm={bulk.confirmDelete}
+      />
 
       <ProposalRenameDialog
         open={!!renaming}

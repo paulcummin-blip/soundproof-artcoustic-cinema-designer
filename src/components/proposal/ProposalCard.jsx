@@ -7,6 +7,7 @@ import ProposalStatusBadge from './ProposalStatusBadge';
 import ProposalLibraryActions from './library/ProposalLibraryActions';
 import ProposalSourceStateBadge from './library/ProposalSourceStateBadge';
 import RevisionBadge from './library/RevisionBadge';
+import { Checkbox } from '@/components/ui/checkbox';
 import { getProposalTypeLabel } from './proposalTypes';
 import { isArchived } from './proposalLifecycle';
 
@@ -32,6 +33,10 @@ function ProposalCard({
   sourceState = null,
   sectionCount,
   busy = false,
+  // Multi-select. Only the proposals the library is showing can be selected.
+  selectable = false,
+  selected = false,
+  onToggleSelect,
   onOpen,
   onRename,
   onDuplicate,
@@ -85,7 +90,11 @@ function ProposalCard({
   const updatedDate = proposal.updated_date ? new Date(proposal.updated_date) : null;
 
   return (
-    <Card className="bg-white border-[#DCDBD6] flex flex-col hover:border-[#A3A3A3] transition-colors duration-300 relative overflow-hidden">
+    <Card
+      className={`bg-white flex flex-col transition-colors duration-300 relative overflow-hidden ${
+        selected ? 'border-[#213428] ring-1 ring-[#213428]' : 'border-[#DCDBD6] hover:border-[#A3A3A3]'
+      }`}
+    >
       {busy && (
         <div className="absolute inset-0 z-10 flex items-center justify-center bg-white/60">
           <Loader2 className="w-5 h-5 text-[#625143] animate-spin" />
@@ -93,6 +102,14 @@ function ProposalCard({
       )}
       <CardHeader>
         <div className="flex justify-between items-start">
+          {selectable && (
+            <Checkbox
+              checked={selected === true}
+              onCheckedChange={() => onToggleSelect?.(proposal)}
+              aria-label={`Select ${proposal.title || 'Untitled Proposal'}`}
+              className="mt-1 mr-3 border-[#A79E8C] data-[state=checked]:bg-[#213428] data-[state=checked]:text-white"
+            />
+          )}
           <div className="min-w-0 flex-1">
             <CardTitle className="text-[#1B1A1A] truncate font-header" title={proposal.title || 'Untitled Proposal'}>
               {proposal.title || 'Untitled Proposal'}

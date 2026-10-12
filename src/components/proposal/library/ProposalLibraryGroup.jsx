@@ -17,6 +17,10 @@ export default function ProposalLibraryGroup({
   versionNamesFor,
   sectionCounts = {},
   actionLoading = null,
+  // Multi-select, passed straight through to the cards.
+  selectable = false,
+  selectedIds = null,
+  onToggleSelect,
   onOpen,
   onRename,
   onDuplicate,
@@ -51,6 +55,9 @@ export default function ProposalLibraryGroup({
             sourceState={sourceById[proposal.id] || null}
             sectionCount={sectionCounts[proposal.id] || 0}
             busy={!!actionLoading && actionLoading.endsWith(proposal.id)}
+            selectable={selectable}
+            selected={selectedIds ? selectedIds.has(proposal.id) : false}
+            onToggleSelect={onToggleSelect}
             onOpen={onOpen}
             onRename={onRename}
             onDuplicate={onDuplicate}
