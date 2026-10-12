@@ -195,8 +195,20 @@ test('D. a fresh attempt under the corrected contract is written, grounded and i
 
 test('E. the mandate is gone from every writing authority, and the validator keeps its rule', () => {
   const contract = readFileSync(new URL('../base44/shared/proposalWriter/writerContractSchema.js', import.meta.url), 'utf8');
-  assert.ok(!contract.includes('acoustic performance is unchanged'));
-  assert.ok(!contract.includes('relevant room geometry are maintained'));
+
+  // The instructions the writer is actually given: the Presented Options
+  // requirement in both modes, and every writing rule. This reads the instruction
+  // text, never a comment or a historical version description elsewhere in the
+  // file, so the module's own record of what it replaced cannot fail the test.
+  const instructions = [];
+  for (const mode of ['single', 'comparison']) {
+    const spec = writerSectionRequirements(mode).find((entry) => entry.section === 'presented_options');
+    instructions.push(spec.requirement, spec.requirement_single);
+  }
+  for (const text of [...instructions.filter(Boolean), ...WRITER_WRITING_RULES]) {
+    assert.ok(!/acoustic performance is unchanged/i.test(text), 'no writing instruction requires the statement');
+    assert.ok(!/room geometry are maintained/i.test(text), 'no writing instruction carries the qualification');
+  }
   for (const rule of WRITER_WRITING_RULES) {
     assert.ok(!/identical, unchanged or equivalent acoustic performance/i.test(rule) || /never/i.test(rule),
       'any reference to unchanged acoustic performance is a prohibition, never a requirement');

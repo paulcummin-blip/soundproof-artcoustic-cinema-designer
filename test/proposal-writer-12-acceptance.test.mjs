@@ -9,7 +9,7 @@ import { validateCompleteDocument } from '../base44/shared/proposalEdit/complete
 import { authorizeProposalExport } from '../base44/shared/proposalEdit/proposalExportAuthorization.js';
 import { validationRegisterPhrase } from '../base44/shared/proposalWriter/writerValidationRegister.js';
 import { buildWriterPrompt, writerOutputJsonSchema, assertWriterInputCarriesNoLiveState } from '../base44/shared/proposalWriter/writerPromptBuilder.js';
-import { WRITER_PROMPT_VERSION } from '../base44/shared/proposalWriter/writerContractSchema.js';
+import { WRITER_PROMPT_VERSION, WRITER_WRITING_RULES } from '../base44/shared/proposalWriter/writerContractSchema.js';
 import { VALIDATOR_SOURCE_MANIFEST } from '../base44/shared/proposalWriter/validatorSourceManifest.js';
 import { deriveGenerationStatus } from '../base44/shared/proposalGeneration/generationStatuses.js';
 const source = path => readFileSync(new URL(`../${path}`, import.meta.url), 'utf8');
@@ -136,13 +136,18 @@ test('H. Presented Options stays validated, mapped and practical, with no acoust
   assert.equal(r.valid, true, JSON.stringify(r.errors));
   assert.equal(r.options_text, PRACTICAL);
   assert(r.document_sections.find(s => s.section_type === 'presented_options').body.includes('comfort'));
-  const contract = source('base44/shared/proposalWriter/writerContractSchema.js');
   // The mandate is gone: no allowed claim establishes that a change of seating
-  // furniture leaves acoustic performance unchanged, so the contract never asks
-  // the writer for it, and the section presents practical alternatives instead.
-  assert(!contract.includes('acoustic performance is unchanged'));
-  assert(!contract.includes('relevant room geometry are maintained'));
-  assert(contract.includes('the options give identical, unchanged or equivalent acoustic performance'));
+  // furniture leaves acoustic performance unchanged, so no instruction the writer
+  // reads asks for it, and the section presents practical alternatives instead.
+  // Only the writer's own instructions are inspected here — the requirement in the
+  // fixture's frozen writer input, and the writing rules — never the contract
+  // source file as a whole, which also records what it replaced.
+  const optionsRequirement = f.input.section_requirements.find(row => row.section === 'presented_options').requirement;
+  for (const instruction of [optionsRequirement, ...WRITER_WRITING_RULES]) {
+    assert(!/acoustic performance is unchanged/i.test(instruction), 'no writer instruction requires the statement');
+    assert(!/room geometry are maintained/i.test(instruction), 'no writer instruction carries the qualification');
+  }
+  assert(/identical, unchanged or equivalent acoustic performance/.test(optionsRequirement));
 });
 test('I. historical inputs gain no new rejection and existing records remain byte-identical', () => {
   const saved = JSON.parse(source('test/fixtures/marqueeLiveGeneration.json')); const before = JSON.stringify(saved);
