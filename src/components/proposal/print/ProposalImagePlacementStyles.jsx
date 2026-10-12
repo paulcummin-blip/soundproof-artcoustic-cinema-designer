@@ -87,6 +87,10 @@ export default function ProposalImagePlacementStyles() {
       @media print {
         .pp-media--landscape img { height: 118mm; }
         .pp-media--landscape { margin-bottom: 8mm; }
+        /* A closing feature has more visual weight: 144mm is 22% taller than
+           the standard landscape frame. Width, focal crop and typography stay
+           unchanged; object-fit: cover preserves the source proportions. */
+        .pp-media--closing-feature img { height: 144mm; }
         .pp-media--portrait img { height: 74mm; }
         .pp-media--seating img { height: 74mm; }
         /* The comparison page: two full-width options and their captions share
