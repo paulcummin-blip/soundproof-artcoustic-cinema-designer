@@ -243,6 +243,14 @@ export const WRITER_REJECTION = Object.freeze({
    * screen, a projector, an aspect ratio, a viewable width or a screen size.
    */
   DISPLAY_TERMINOLOGY: 'display_terminology',
+  /**
+   * A seat-to-seat frequency-response result written as a match between
+   * loudspeaker groups. P16 states how consistently the screen channels hold
+   * their own tonal balance from seat to seat, and P17 the same for the wide,
+   * surround and upper speakers: neither compares one loudspeaker group with
+   * another, so their figures are never attached to a between-group match.
+   */
+  TIMBRE_INTER_GROUP_MATCH: 'timbre_inter_group_match',
   CROSS_SECTION_DUPLICATION: 'cross_section_duplication',
   TONAL_SCOPE_STRETCH: 'tonal_scope_stretch',
   INTERNAL_LEVEL_LANGUAGE: 'internal_level_language',
@@ -369,9 +377,9 @@ export const WRITER_SECTIONS = Object.freeze([
   {
     section: 'timbre_matching',
     title: 'Timbre Matching',
-    requirement_single: 'Explain how tonal consistency benefits the experience: voices and effects retain their tonal character as they move between the screen, the surround and the overhead channels, across only the supported seats. Keep every seat statement explicitly limited to tonal character, not overall balance, bass or placement. Natural handover wording is expected here: describe a voice or an effect keeping its character as the loudspeakers hand it on. Never imply the design\'s loudspeaker package differs from another option\'s, and never broaden tonal consistency into equal seats or an equal whole experience. No bass-extension detour and no both parameters wording.',
+    requirement_single: 'Explain the tonal benefit the client will hear: the tonal balance they experience from seat to seat, and why it matters as a soundtrack moves around the cinema. State the tonal aim as the design\'s own approach, and state the measured tonal consistency only for the speaker group the evidence states it for, across only the seats that result covers. These frequency-response results state how consistently ONE loudspeaker group holds its own tonal balance from seat to seat, so they are never evidence that one group of loudspeakers matches another: never write a screen-to-surround or any other between-group match, and never attach their figures to a comparison between the screen, the surround and the overhead speakers. Natural handover wording is welcome as the design\'s own aim: describe a voice or an effect keeping its character as the loudspeakers hand it on, and let that stand as intent rather than as a measured match between the groups. Keep every seat statement explicitly limited to tonal character, not overall balance, bass or placement. Never imply the design\'s loudspeaker package differs from another option\'s, and never broaden tonal consistency into equal seats or an equal whole experience. No bass-extension detour and no both parameters wording.',
     word_limit: 170,
-    requirement: 'Explain the loudspeaker and coverage evidence the pack records, and claim nothing beyond it. Where the copy describes a sound passing between loudspeakers, that is tonal continuity within the design, never a claim that the loudspeaker package differs between the options.',
+    requirement: 'Explain the loudspeaker and coverage evidence the pack records, and claim nothing beyond it. Where the copy describes a sound passing between loudspeakers, that is tonal continuity within the design and the design\'s own aim, never a claim that the loudspeaker package differs between the options and never a match measured between the speaker groups. The tonal results the pack carries are seat-to-seat frequency-response results, one speaker group each, so they are never used to claim that one group of loudspeakers matches another.',
   },
   {
     section: 'presented_options',
@@ -540,7 +548,7 @@ export const WRITER_WRITING_RULES = Object.freeze([
   'Give each section its own job, and never carry the same three strengths through the document in the same words: Design Summary introduces the cinema; Design Overview explains how the system is arranged; Why This Specification explains why this solution suits the project; Key Performance Highlights sets out the engineering evidence; Spatial Resolution explains how the layout creates the immersion; Dynamic Range explains the capability and what it buys; Timbre Matching explains the tonal benefit; Overall Design closes on what the client should expect. Review the proposal as ONE document: every section contributes something the others do not, the closing Overall Design never restates the opening summary, and a repeated idea is acceptable only where it adds a genuinely different aspect of the design.',
   'Use each engineering figure normally once in main prose. Keep output figures in Dynamic Range, viewing angles in Spatial Resolution and extension proof where it explains deep bass. Repeat only where it adds real value, never in Overall Design.',
   'Never write L1, L2, L3, L4, L4 result or RP22 Level 4 in narrative prose. Never write (OH); write overhead channels. Structured grading tables and pills are not narrative prose.',
-  'Tonal consistency across seats supports only tonal character: never broaden it into equal seats, overall experience balance, bass consistency, placement consistency or whole-room balance.',
+  'Tonal consistency across seats supports only tonal character, and it is stated for the speaker group and the seats its own result covers: never broaden it into equal seats, overall experience balance, bass consistency, placement consistency or whole-room balance, and never write it as a match between the screen, surround and overhead loudspeakers.',
   'Use the ranked story as evidence, not as a sentence to read aloud. Translate its meaning into natural client language while retaining its scope, exact facts and claim IDs.',
   'Keep Appendix Notes brief, factual and source-only: this proposal is based on the frozen Project Report for this design, with detailed RP22, RP23, product and room evidence in the accompanying report. No sales story, acoustic-treatment performance promise or engineering-model explanation.',
   'Close on this design\'s particular viewing experience, movement, tonal character and bass capability, not treats every seat as a priority, balances high-resolution spatial imaging with authoritative bass performance, high-quality experience for everyone or immersive and consistent experience for the home.',

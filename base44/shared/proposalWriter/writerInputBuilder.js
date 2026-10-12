@@ -29,6 +29,11 @@ import { buildEvidenceClassification } from './writerEvidenceClasses.js';
 import { normaliseOptionGuidance } from './writerOptionGuidance.js';
 import { requiredMultiCabinetChannels } from './writerMultiCabinetRules.js';
 import {
+  TIMBRE_METRIC_AUTHORITY,
+  TIMBRE_METRIC_AUTHORITY_VERSION,
+  TIMBRE_METRIC_RULE,
+} from './writerTimbreMetricAuthority.js';
+import {
   ALLOWED_CLAIM_PREFIX,
   BLOCKED_CLAIM_PREFIX,
   WRITER_ACCEPTED_PACK_SCHEMA_VERSION,
@@ -214,6 +219,16 @@ export function buildWriterInput({
       required: requiredMultiCabinetChannels(pack),
       source: 'evidence_pack.options[].facts.system.front_stage',
     },
+    // WHAT P16 AND P17 ACTUALLY MEASURE. The two tonal results are seat-to-seat
+    // frequency-response results, one loudspeaker group each, and neither compares
+    // one group with another. Carried as the metric authority the copy is written
+    // under, so a seat-to-seat figure can never become an inter-speaker match.
+    timbre_metric_authority: {
+      rule: TIMBRE_METRIC_RULE,
+      version: TIMBRE_METRIC_AUTHORITY_VERSION,
+      metrics: TIMBRE_METRIC_AUTHORITY.map((entry) => ({ ...entry })),
+      source: 'evidence_pack.options[].strength_stories; RP22 P16 and P17',
+    },
     // The assumed-parameter rule the pack was built under, so a draft can be
     // validated against exactly the admission it was written against: with no
     // designer request, P8, P15 and P21 may not be referenced at all.
@@ -282,7 +297,7 @@ export function buildWriterInput({
         ? 'single-option proposal: never compare to a baseline or another option (no increase, greater, improved, more capable, additional headroom, higher output, upgrade or compared to)'
         : 'comparison proposal: comparing the options is the point, so state the differences directly',
       installation_default: 'written before installation: specified, selected, designed, modelled or proposed, never installed or installation, unless the frozen evidence says the system is installed',
-      timbre_language: 'tonal continuity is described as a voice or an effect keeping its character as the loudspeakers hand it on: natural handover wording is welcome. Never imply the design\'s loudspeaker package differs from another option\'s unless the pack records that change, and never broaden tonal consistency into equal seats or an equal whole experience',
+      timbre_language: 'tonal continuity is described as a voice or an effect keeping its character as the loudspeakers hand it on: natural handover wording is welcome, and it is the design\'s own tonal aim rather than a match measured between the speaker groups. The tonal results are seat-to-seat frequency-response results, one speaker group each, so they are never written as a screen-to-surround or any other between-group match and their figures are never attached to one: see timbre_metric_authority. Never imply the design\'s loudspeaker package differs from another option\'s unless the pack records that change, and never broaden tonal consistency into equal seats or an equal whole experience',
       brief_completeness: 'a request the brief makes is met only where the copy states it: where the client asked for a result the pack carries as a supporting_result claim, the figure has to be on the page, and where the client asked about both seating rows, both rows are stated on their own result',
       closing: 'no contents sentence such as "the following sections explain", and no generic closing about the design as a whole: finish on what this particular cinema gives the client, and never repeat a benefit another section has already made',
       design_philosophy: 'explain the professional judgement the design_interpretation records: what the client wants to achieve, the prioritised listening positions, the display and seating balance, the constraints, the coverage and bass approaches, the strongest results, the lower results that are conscious trade-offs, and why the finished design suits the brief. Never invent a reason, a priority, a budget or a decision it does not record, and never present the highest available level as the objective regardless of cost. Design Summary explains the complete cinema and the reasoning behind it; Why This Specification carries the strongest expression of professional judgement. Where the interpretation records that the design already takes an improvement without substantial additional expenditure, say what it gives the client, and never write an opportunity as an instruction to change the finished design',

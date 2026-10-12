@@ -20,6 +20,7 @@ import {
 import { attributeViolation } from './writerViolationAudit.js';
 import { internalLevelLanguage, unexplainedOverhead, singleOptionFraming, tonalScopeStretch, proposalSentences } from './writerSalesPolishRules.js';
 import { emDashAt, genericClaimPhrase, stockConnective } from './writerNaturalWritingRules.js';
+import { timbreInterGroupMatchIssue } from './writerTimbreMetricAuthority.js';
 
 export function scanProse({ input, vocabulary, section, text, claims = [], claimKinds = [] }) {
   const found = [];
@@ -203,6 +204,14 @@ export function scanProse({ input, vocabulary, section, text, claims = [], claim
       if (referenceOnlyIssue) {
         context.ruleId = `reference_position_scope:${referenceOnlyIssue}`;
         report(WRITER_REJECTION.SCOPE_MISMATCH, { section, detail: referenceOnlyIssue });
+      }
+      // A seat-to-seat frequency-response result is never a match between
+      // loudspeaker groups: see writerTimbreMetricAuthority.js for what P16 and
+      // P17 measure and the boundary this reads against the cited claims.
+      const timbreIssue = timbreInterGroupMatchIssue({ text: claimed, claims: citedClaims, packProse });
+      if (timbreIssue) {
+        context.ruleId = `timbre_metric:${timbreIssue}`;
+        report(WRITER_REJECTION.TIMBRE_INTER_GROUP_MATCH, { section, detail: timbreIssue });
       }
     }
   }

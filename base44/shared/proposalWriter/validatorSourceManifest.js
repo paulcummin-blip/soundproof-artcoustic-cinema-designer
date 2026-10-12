@@ -1,7 +1,7 @@
 /** SHA-256 of the bundled validator sources; regenerated with every rules edit. */
 export const VALIDATOR_SOURCE_MANIFEST = Object.freeze({
   'base44/shared/proposalWriter/writerOutputValidator.js': '9abc142f30279dc77f186b95d430b6f13916997492e19f8b086f11bedca0284c',
-  'base44/shared/proposalWriter/writerProseScanner.js': 'cf4213f1b9b42db1d27a3b252bd4e2814821f21e7f3ae0ebdf25c445b0e8e1f9',
+  'base44/shared/proposalWriter/writerProseScanner.js': 'f7ccd507f7d61402575f3cacccb6136c6fabd6380bf2a3e6a3d34e1322baa10b',
   'base44/shared/proposalWriter/writerOutputTextRules.js': '512e2d70ff3776024dcec052a76737abb9ff3d05adf5c67e6800691db09cc6b6',
   'base44/shared/proposalWriter/writerEditorialRules.js': '08776775a8a4bdd2f2a167804809d5db51d750c4a01a1ac8ee23830761475324',
   'base44/shared/proposalWriter/writerSalesPolishRules.js': '2e8d0a0c206141d99d9af0c48b24a565002bd7f63497dedffc431b14b4ae8825',
@@ -10,13 +10,13 @@ export const VALIDATOR_SOURCE_MANIFEST = Object.freeze({
   'base44/shared/proposalWriter/writerClausePrecision.js': '0d7be2c8e2dd98c395c5bf999bd6c306cb48b9c15bc0ffae2d7f31fd31ddae94',
   'base44/shared/proposalWriter/writerViolationAudit.js': '4cc361d1c96a101fc29330d740cef2184ae5650fd3cc64e253892d004efdb0b9',
   'base44/shared/proposalWriter/writerDesignStageRules.js': 'a26d5ff98a2eaf4f6de929cc62cba7e7bc2632540f12d44ded72e8cb7f8bdbb7',
-  'base44/shared/proposalWriter/writerContractSchema.js': '766b17e55dbe9b75be820fd9200bd9c4395fd9513327e4e5d990badcd16bc017',
+  'base44/shared/proposalWriter/writerContractSchema.js': '026559b08979a1682a9876720952b3cb77858efb5f3e896d2dcc6328b729d239',
   'base44/shared/proposalWriter/writerMultiCabinetRules.js': '3712df21bd72353af0a9d8ab75a1efa20755856d65229887a1f8dc5bad29b172',
   'base44/shared/proposalGeneration/generationStatuses.js': '2273b2e8408a426eeb137d9ae2f34c428a8e934dc0529134e9889aae75103b28',
   'base44/shared/proposalWriter/writerCabinetLanguage.js': '18e37edb21bd8422c6293c5fde809984d185e7188d0fe4a12fa2ff352d4b72c7',
   'base44/shared/proposalWriter/writerValidationRegister.js': '634502ab07c0bf1b13cfe0879d1e2ca2e85f0419c94f377b266a977c38c07b96',
-  'base44/shared/proposalWriter/writerInputBuilder.js': '44dcff006531f881b9b56c88d633780894c6f8e808a447b5f06a2b0e7f892ceb',
-  'base44/shared/proposalWriter/writerPromptBuilder.js': '570dd88ea679557dbee7452a902819c33e7b1a091f4ccf3d79009530d1fa1fa8',
+  'base44/shared/proposalWriter/writerInputBuilder.js': 'acd8394a10d84fdfcda6a9017b4b27ce531f7cf9073f20bb3a9774cee2066ca9',
+  'base44/shared/proposalWriter/writerPromptBuilder.js': '4982011d9678bf15294fe6d803b5ca89d8de632bd951c52f05938e5062255ba1',
   'base44/shared/proposalWriter/writerSectionMapping.js': 'f5a6d2a5fe974fbd5c16d810d95f99da72f629a4fb8cb33793aa472778ade2f0',
   'base44/shared/proposalWriter/writerDesignContext.js': 'bd0eb1fe4ef8ab1923b77373eb0ae00dd72cd76209c6795c53364934236fd756',
   'base44/shared/proposalEdit/completeDocumentValidation.js': 'cff20d7146ecbeb3a9c325e3147db41cab552f7ea950dd93385ee1d478683ddd',
@@ -61,4 +61,9 @@ export const VALIDATOR_SOURCE_MANIFEST = Object.freeze({
   // The check between a saved interpretation and the frozen evidence, which removes
   // only the statements the evidence actually contradicts.
   'base44/shared/proposalClarification/verifiedInterpretation.js': '86d6c7038393d25b4ee9bdcfedd6202cb7e3e7072409dd070001d32b030caf34',
+  // WHAT P16 AND P17 ACTUALLY MEASURE. The two tonal results are seat-to-seat
+  // frequency-response variances, one loudspeaker group each, so a seat-to-seat
+  // figure is never written as a match between loudspeaker groups. Hashed so a
+  // draft can always be traced to the exact metric authority it was written under.
+  'base44/shared/proposalWriter/writerTimbreMetricAuthority.js': '5d2066a278b8433dd8fdd70f6e98a2dacf64b87e602164beb221bfd7c37277ff',
 });

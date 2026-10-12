@@ -176,10 +176,14 @@ export function buildCandidates(sources, { byKey, floor, connections }) {
       members: [byKey.p16, byKey.p17],
       level: levelRank(p16.level) <= levelRank(p17.level) ? p16.level : p17.level,
       evidence: [
-        evidence('P16', p16.level, p16.value ? `Screen-to-surround level match · ${p16.value}` : 'Screen-to-surround level match'),
-        evidence('P17', p17.level, p17.value ? `Across the seating area · ${p17.value}` : 'Across the seating area'),
+        // Each result is stated for its OWN speaker group. P16 and P17 are
+        // seat-to-seat frequency-response variances: they state how consistently
+        // one loudspeaker group holds its own tonal balance from seat to seat, and
+        // neither compares one loudspeaker group with another.
+        evidence('P16', p16.level, p16.value ? `Screen channels across the seats · ${p16.value}` : 'Screen channels across the assessed seats'),
+        evidence('P17', p17.level, p17.value ? `Surround and overhead across the seats · ${p17.value}` : 'Surround and overhead across the assessed seats'),
       ],
-      explanation: `both parameters hold${seats ? ` across all ${seats} assessed seating positions` : ' across the assessed seating positions'}, so the tonal character stays consistent as sound moves between the screen, surround and overhead channels.`,
+      explanation: `both parameters hold${seats ? ` across all ${seats} assessed seating positions` : ' across the assessed seating positions'}, each for its own speaker group, so the tonal balance of the screen channels and of the surround and overhead channels holds from seat to seat.`,
       sources: ['P16', 'P17'],
     }));
   }
