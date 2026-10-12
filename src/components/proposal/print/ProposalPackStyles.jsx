@@ -341,6 +341,47 @@ export default function ProposalPackStyles() {
         margin: 2.5mm 0 0 !important;
       }
 
+      /* ── Method page rhythm ──
+         The method page carries fixed, approved copy, and it used to sit in the
+         top two thirds of the sheet with a large empty area beneath it. Its own
+         rhythm is stated here: a deeper header, more room between the three
+         structures and generously padded notes, so the page carries about four
+         fifths of the A4 content height instead of ending early.
+
+         Everything is scoped to .pp-page--method: no other page, and no other
+         user of the note block (Seating style, Appendix), is affected. Sizes,
+         families, colours and the three-column grid are untouched — only space
+         between and inside the blocks moves. Content pages are flow-height, so
+         nothing here can clip: if the copy ever grew, it would reflow rather
+         than overflow. ── */
+      .proposal-print-portal .pp-page--method .pp-header {
+        margin-bottom: 20mm;
+      }
+      .proposal-print-portal .pp-page--method .pp-header__lead {
+        margin-top: 6mm !important;
+      }
+      .proposal-print-portal .pp-page--method .pp-header__rule {
+        margin-top: 10mm;
+      }
+      .proposal-print-portal .pp-page--method .pp-structure {
+        padding-top: 5.5mm;
+      }
+      .proposal-print-portal .pp-page--method .pp-structure__text {
+        margin-top: 4mm !important;
+      }
+      .proposal-print-portal .pp-page--method .pp-notes {
+        margin-top: 14mm;
+      }
+      .proposal-print-portal .pp-page--method .pp-note {
+        margin-top: 7mm !important;
+        padding: 6mm 6mm !important;
+      }
+      /* The gap above the first box is the notes block's own margin, so the
+         space after the structures reads as one considered gap. */
+      .proposal-print-portal .pp-page--method .pp-note:first-child {
+        margin-top: 0 !important;
+      }
+
       /* ── Image pages: the hero image leads, with deliberate space above and
          below it, and the supporting images sit under it rather than beside it.
          ── */
