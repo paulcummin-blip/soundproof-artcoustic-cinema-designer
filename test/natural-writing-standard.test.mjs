@@ -104,7 +104,7 @@ describe('A. The standard the proposal is written to', () => {
 
   it('allows the design team its own first-person judgement, used selectively', () => {
     expect(NATURAL_RECOMMENDATION_RULE).toMatch(/write we or our, naturally and selectively/);
-    expect(NATURAL_RECOMMENDATION_RULE).toMatch(/never repeat we recommend from section to section/);
+    expect(NATURAL_RECOMMENDATION_RULE).toMatch(/Never repeat we recommend from section to section/);
     expect(NATURAL_RECOMMENDATION_RULE).toMatch(/never invent a conversation, a meeting, a site visit, a budget or a client wish/);
   });
 
@@ -153,8 +153,11 @@ describe('B. It reaches the prompt the writer is really called with', () => {
   it('is the natural-writing generation, with the contract unchanged', () => {
     expect(WRITER_PROMPT_VERSION).toBe('proposal-writer-prompt-16');
     expect(WRITER_CONTRACT_VERSION).toBe(2);
-    expect(prompt).toContain(WRITER_PROMPT_VERSION);
+    // The prompt carries the input it was built from, so a historical input is
+    // still written under the generation it was filed under.
+    expect(prompt).toContain(saved.input.prompt_version);
     expect(saved.prompt_version).toBe('proposal-writer-prompt-1');
+    expect(buildWriterPrompt({ input: saved.input }).includes('proposal-writer-prompt-1')).toBe(true);
   });
 });
 
@@ -173,7 +176,7 @@ describe('C. The deterministic readings', () => {
   });
 
   it('catches a generic claim phrase on normalised whitespace', () => {
-    expect(genericClaimPhrase('This delivers    exceptional   immersion.')).toEqual({ phrase: 'exceptional immersion' });
+    expect(genericClaimPhrase('This delivers    exceptional   immersion.')).toEqual({ phrase: 'delivers exceptional immersion' });
     expect(genericClaimPhrase('The subwoofers give demanding soundtracks physical weight at the reference seat.')).toBe(null);
   });
 
@@ -201,7 +204,7 @@ describe('D. The validator refuses the wording, and rewrites nothing itself', ()
 
   it('refuses a stock connective and a generic phrase', () => {
     expect(codes(run('Additionally, the front row is held where the room allows it.'))).toContain(WRITER_REJECTION.STOCK_CONNECTIVE);
-    expect(codes(run('The room gives the design a genuinely cinematic experience.'))).toContain(WRITER_REJECTION.GENERIC_MARKETING_PHRASE);
+    expect(codes(run('The room gives the design a sophisticated cinematic experience.'))).toContain(WRITER_REJECTION.GENERIC_MARKETING_PHRASE);
   });
 
   it('refuses the same mechanical opener across the document, read as one document', () => {

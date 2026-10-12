@@ -20,7 +20,7 @@ export const VALIDATOR_SOURCE_MANIFEST = Object.freeze({
   'base44/shared/proposalWriter/writerSectionMapping.js': 'f5a6d2a5fe974fbd5c16d810d95f99da72f629a4fb8cb33793aa472778ade2f0',
   'base44/shared/proposalWriter/writerDesignContext.js': '04727c7b7992dd17a932d6eb78ff73833077763341b87b20d6957b8121e904d1',
   'base44/shared/proposalEdit/completeDocumentValidation.js': 'cff20d7146ecbeb3a9c325e3147db41cab552f7ea950dd93385ee1d478683ddd',
-  'base44/shared/proposalWriter/validatorProvenance.js': 'c8e73212a0b25a5e30697b9d7fd3087f553666b06950be307966dc47ccdbdb0e',
+  'base44/shared/proposalWriter/validatorProvenance.js': '9ed8e45b5803a199edf6d75ddb1c0e225b27ac6a63d1986c4607cdd93be21dd5',
   'base44/shared/proposalEvidence/proposalEvidenceWording.js': 'f9b5c6ceb3063240ab6ba3374c38b96f9abf95dcdb87892510f3815192ef5594',
   'base44/shared/proposalEvidence/evidencePackSchema.js': '2b25a3401a24a65944a441741b47e8ca5fff25271bb7d364c8b834ed04303631',
   // The supporting results the brief asked for: what the pack may state because
