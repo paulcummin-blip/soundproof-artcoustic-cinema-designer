@@ -20,9 +20,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 
-import { PROPOSAL_ID, attempt } from './fixtures/proposalGenerationFixtures.mjs';
-import { LEVELS_ONE, VALUES_ONE, option } from './fixtures/proposalEvidenceFixtures.mjs';
-import { createGenerationHistory } from '../base44/shared/proposalGeneration/proposalGenerationRepository.js';
+import { writer12Fixture } from './fixtures/proposalWriter12Fixtures.mjs';
 import {
   editableSectionFields,
   frozenProposalMode,
@@ -45,10 +43,19 @@ const read = (relative) => fs.readFileSync(path.join(ROOT, relative), 'utf8');
 /** A machine code: a snake_case token, which never belongs on a screen. */
 const MACHINE_CODE = /\b[a-z][a-z0-9]*(?:_[a-z0-9]+)+\b/;
 
-/** One design on its own: the pack the copy was written from is single-option. */
-const singleDesignGeneration = () => createGenerationHistory().append(attempt({
-  versions: [option('a', { levels: LEVELS_ONE, values: VALUES_ONE, subwoofers: 'SUB3-12 x 2' })],
-}));
+/**
+ * The two frozen generations this suite reads: one written from a single-option
+ * pack, one written as a comparison. Both are copies the writer contract accepts,
+ * which is what lets an editor copy layer exist at all.
+ *
+ * They come from the writer-12 fixture rather than the Phase 4 fixture because
+ * that fixture's copy repeats sentences across its sections and grounds its
+ * figures in no claim at all, so the contract refuses it before any copy layer can
+ * be resolved — the claim-grounding safeguard working as designed on a fixture
+ * whose wiring predates this work, and unrelated to the headings under test here.
+ */
+const singleDesignGeneration = () => writer12Fixture().generationRecords[0];
+const comparisonGeneration = () => writer12Fixture({ comparison: true }).generationRecords[0];
 
 const titleOf = (fields, section) => fields.find((field) => field.section === section)?.title;
 
@@ -57,8 +64,9 @@ const titleOf = (fields, section) => fields.find((field) => field.section === se
 test('TEST 1 — a single-design copy reads Design Overview and Why This Specification', () => {
   const generation = singleDesignGeneration();
   assert.equal(frozenProposalMode(generation), 'single', 'the mode is read from the frozen generation');
+  assert.equal(generation.status, 'valid_generated', 'the copy passed the contract, so a layer can exist');
 
-  const layer = resolveEditorLayer({ generationRecords: [generation], proposalId: PROPOSAL_ID });
+  const layer = resolveEditorLayer({ generationRecords: [generation], proposalId: generation.proposal_id });
   assert.equal(layer.mode, 'edit_layer');
   assert.equal(titleOf(layer.fields, 'what_stays_same'), 'Design Overview');
   assert.equal(titleOf(layer.fields, 'what_changes'), 'Why This Specification');
@@ -78,11 +86,11 @@ test('TEST 1 — a single-design copy reads Design Overview and Why This Specifi
 /* ── TEST 2 — comparison headings ────────────────────────────────────────── */
 
 test('TEST 2 — a comparison copy keeps What Stays the Same and What Changes', () => {
-  // The two-option fixture pack: the copy was written as a comparison.
-  const generation = createGenerationHistory().append(attempt({}));
+  // The two-option pack: the copy was written as a comparison.
+  const generation = comparisonGeneration();
   assert.equal(frozenProposalMode(generation), 'comparison');
 
-  const layer = resolveEditorLayer({ generationRecords: [generation], proposalId: PROPOSAL_ID });
+  const layer = resolveEditorLayer({ generationRecords: [generation], proposalId: generation.proposal_id });
   assert.equal(titleOf(layer.fields, 'what_stays_same'), 'What Stays the Same');
   assert.equal(titleOf(layer.fields, 'what_changes'), 'What Changes');
 
@@ -119,10 +127,13 @@ test('TEST 4 — a raw validation code is never rendered', () => {
     detail: `${MULTI_CABINET_REASONS.OMITTED}:centre:version-4`,
   };
   assert.equal(plainIssue(omission), 'The centre-channel description needs reviewing.');
+  // A centre-channel problem is stated in its own right, never headed with
+  // whichever section the writer happened to file it against: a centre-channel
+  // problem is not a Dynamic Range problem.
   assert.equal(plainIssue({ ...omission, section: 'dynamic_range' }),
-    'Dynamic Range: the centre-channel description needs reviewing.');
+    'The centre-channel description needs reviewing.');
   assert.equal(plainIssue({ ...omission, section: 'dynamic_range' }, 'single'),
-    'Dynamic Range: the centre-channel description needs reviewing.');
+    'The centre-channel description needs reviewing.');
 
   // A contradiction is stated from its own reason, not from its detail string.
   const multiplied = {
@@ -131,7 +142,7 @@ test('TEST 4 — a raw validation code is never rendered', () => {
     detail: `${MULTI_CABINET_REASONS.MULTIPLIED}:centre`,
   };
   assert.equal(plainIssue(multiplied),
-    'system overview: the centre channel is described as more channels than the design places.');
+    'The centre channel is described as more channels than the design places.');
 
   // A code the table does not know is stated in general words rather than shown.
   const unknown = { code: 'some_future_rule', section: null, detail: 'some_future_rule:centre:version-4' };

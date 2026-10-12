@@ -402,8 +402,13 @@ test('I. Export still records the composition it printed — and only with a doc
 test('J. the popup-blocked fallback is prepared by the SAME readiness authority', async () => {
   const exportSource = readFileSync(new URL('../src/components/proposal/export/useProposalExport.js', import.meta.url), 'utf8');
   const windowSource = readFileSync(new URL('../src/components/report/reportPrintWindow.js', import.meta.url), 'utf8');
-  // The in-page fallback…
-  assert.ok(/preparePrintDocument\(\{ doc: document, root: findPrintNode\(\) \}\)/.test(exportSource));
+  // The in-page fallback… resolves the pack node ONCE and refuses to prepare when
+  // there is none, so the application interface can never be printed in the pack's
+  // place. It is still the one shared authority that prepares it.
+  assert.ok(/const fallbackNode = findPrintNode\(\);/.test(exportSource));
+  assert.ok(/preparePrintDocument\(\{ doc: document, root: fallbackNode \}\)/.test(exportSource));
+  assert.ok(!/preparePrintDocument\(\{ doc: document, root: findPrintNode\(\) \}\)/.test(exportSource));
+  assert.ok(/COMPOSITION_UNAVAILABLE/.test(exportSource));
   // …and the app-owned print window run the one shared authority.
   assert.ok(/preparePrintDocument\(\{ win, root: win\.document\.body \}\)/.test(windowSource));
 
