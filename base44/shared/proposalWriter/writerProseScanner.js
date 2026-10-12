@@ -19,6 +19,7 @@ import {
 } from './writerEditorialRules.js';
 import { attributeViolation } from './writerViolationAudit.js';
 import { internalLevelLanguage, unexplainedOverhead, singleOptionFraming, tonalScopeStretch, proposalSentences } from './writerSalesPolishRules.js';
+import { emDashAt, genericClaimPhrase, stockConnective } from './writerNaturalWritingRules.js';
 
 export function scanProse({ input, vocabulary, section, text, claims = [], claimKinds = [] }) {
   const found = [];
@@ -30,6 +31,18 @@ export function scanProse({ input, vocabulary, section, text, claims = [], claim
   const blocks = blockedChangeBlocks(input).map(block => ({ block, patterns: blockPatterns(block, input.evidence_pack) }));
   let context = { text };
   const report = (code, details) => found.push(attributeViolation(violation(code, details), context));
+
+  // THE PUNCTUATION RULE, read on the section text as written, before any clause
+  // reading: client-facing copy carries no em dash (U+2014) at all. Nothing is
+  // normalised or rewritten here, and the figure, product and evidence tokens in
+  // the sentence are left exactly as the writer wrote them: the copy is refused so
+  // the sentence itself is rewritten.
+  const dashAt = emDashAt(text);
+  if (dashAt !== null) {
+    context = { text, sentence: text.slice(Math.max(0, dashAt - 40), dashAt + 40), match: text.slice(dashAt, dashAt + 1) };
+    report(WRITER_REJECTION.EM_DASH_IN_NARRATIVE, { section, detail: 'em_dash_in_client_facing_copy' });
+    context = { text };
+  }
   // A RESULT-LED draft (the single-option proposal path) cites strength stories
   // and, where the designer's own brief asked for a result the ranked stories do
   // not carry, the supporting result minted for that request. There is no
@@ -116,6 +129,18 @@ export function scanProse({ input, vocabulary, section, text, claims = [], claim
       if (verification) {
         context.ruleId = `verification_disclaimer:${verification.rule}`;
         report(WRITER_REJECTION.VERIFICATION_DISCLAIMER, { section, detail: `verification_disclaimer:${verification.rule}` });
+      }
+      // The natural-writing standard: a natural transition instead of a stock
+      // connective, and a project-specific explanation instead of a generic claim.
+      const connective = stockConnective(claimed);
+      if (connective) {
+        context.ruleId = `natural_writing:${connective.phrase.toLowerCase().split(' ').join('_')}`;
+        report(WRITER_REJECTION.STOCK_CONNECTIVE, { section, detail: `stock_connective:${connective.phrase.toLowerCase().split(' ').join('_')}` });
+      }
+      const generic = genericClaimPhrase(claimed);
+      if (generic) {
+        context.ruleId = `natural_writing:${generic.phrase.split(' ').join('_')}`;
+        report(WRITER_REJECTION.GENERIC_MARKETING_PHRASE, { section, detail: `generic_claim_phrase:${generic.phrase.split(' ').join('_')}` });
       }
       // ── the editorial rules of the proposal voice ──
       // These read HOW a supported fact is written, never whether it is

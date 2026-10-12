@@ -118,7 +118,21 @@ export const WRITER_CONTRACT_VERSION = 2;
 // copy. Section identities, word limits, the claim grounding rule and every
 // validation rule are unchanged, so a draft filed under an earlier generation is
 // still read against the agreement it was written under.
-export const WRITER_PROMPT_VERSION = 'proposal-writer-prompt-15';
+// Bumped to 16 for the natural-writing pass: the editorial instructions are
+// refined to the Sound Proof Natural Writing Standard. The copy is written as an
+// experienced British cinema designer presenting a considered recommendation,
+// with natural sentences and varied structure, no stock connective (Furthermore,
+// Moreover, Additionally, Subsequently, In conclusion, It is important to note
+// that), no paragraph opened again on the same mechanical subject, no generic
+// marketing phrase, and no em dash anywhere. The whole document is reviewed as one
+// document before it is returned, and calibration, commissioning and verification
+// are not discussed: a predicted capability is stated confidently and accurately.
+// Four rejections are added for the wording this pass forbids (the em dash, the
+// stock connective, the repeated mechanical opener and the generic claim phrase).
+// Section identities, word limits, the claim grounding rule and every existing
+// rejection keep their meaning, so a draft filed under an earlier generation is
+// still read against the agreement it was written under.
+export const WRITER_PROMPT_VERSION = 'proposal-writer-prompt-16';
 
 /** The only pack generation a draft may be written from. */
 export const WRITER_ACCEPTED_PACK_SCHEMA_VERSION = 2;
@@ -263,6 +277,35 @@ export const WRITER_REJECTION = Object.freeze({
    * the client needs is untouched.
    */
   VALIDATION_REGISTER: 'validation_register',
+  /**
+   * An em dash (U+2014) in client-facing copy. The proposal carries zero em
+   * dashes: the sentence is punctuated another way or rewritten, and it is
+   * rewritten by the writer, never silently edited here. The copy is read exactly
+   * as written, so a technical value, a product identifier and an evidence
+   * reference are left untouched.
+   */
+  EM_DASH_IN_NARRATIVE: 'em_dash_in_narrative',
+  /**
+   * A stock connective the standard refuses at the head of a sentence
+   * (Furthermore, Moreover, Additionally, Subsequently, In conclusion, It is
+   * important to note that). Natural transitions are written instead.
+   */
+  STOCK_CONNECTIVE: 'stock_connective',
+  /**
+   * The same mechanical paragraph opener repeated across the document (The system,
+   * The design, This ensures, The result). The paragraphs are re-opened on the
+   * design's own subject instead.
+   */
+  REPETITIVE_PARAGRAPH_OPENER: 'repetitive_paragraph_opener',
+  /**
+   * A generic claim phrase with no project content ("sophisticated cinematic
+   * experience", "seamless immersive sound", "unparalleled performance",
+   * "elevates the listening experience"). The standard replaces it with a
+   * project-specific explanation of what was chosen, why it suits this room, what
+   * the client gains and what the engineering supports, so the phrase is refused
+   * rather than reworded with another adjective.
+   */
+  GENERIC_MARKETING_PHRASE: 'generic_marketing_phrase',
 });
 
 /**
@@ -494,7 +537,7 @@ export const WRITER_WRITING_RULES = Object.freeze([
   'The proposal is not a design review: never write that something needs attention, improvement, calibration, optimisation or further design work, and never suggest a future correction, a recalibration or an upgrade path.',
   'Write to the client: benefit-led, dealer-safe language, with no internal parameter codes and no engineering jargon.',
   'No sentence of 10 or more words may appear verbatim in more than one section. Do not reuse complete evidence sentences with minor word substitutions. Facts may recur only for a genuinely different editorial purpose.',
-  'Give each section its own job, and never carry the same three strengths through the document in the same words: Design Summary introduces the cinema; Design Overview explains how the system is arranged; Why This Specification explains why this solution suits the project; Key Performance Highlights sets out the engineering evidence; Spatial Resolution explains how the layout creates the immersion; Dynamic Range explains the capability and what it buys; Timbre Matching explains the tonal benefit; Overall Design closes on what the client should expect.',
+  'Give each section its own job, and never carry the same three strengths through the document in the same words: Design Summary introduces the cinema; Design Overview explains how the system is arranged; Why This Specification explains why this solution suits the project; Key Performance Highlights sets out the engineering evidence; Spatial Resolution explains how the layout creates the immersion; Dynamic Range explains the capability and what it buys; Timbre Matching explains the tonal benefit; Overall Design closes on what the client should expect. Review the proposal as ONE document: every section contributes something the others do not, the closing Overall Design never restates the opening summary, and a repeated idea is acceptable only where it adds a genuinely different aspect of the design.',
   'Use each engineering figure normally once in main prose. Keep output figures in Dynamic Range, viewing angles in Spatial Resolution and extension proof where it explains deep bass. Repeat only where it adds real value, never in Overall Design.',
   'Never write L1, L2, L3, L4, L4 result or RP22 Level 4 in narrative prose. Never write (OH); write overhead channels. Structured grading tables and pills are not narrative prose.',
   'Tonal consistency across seats supports only tonal character: never broaden it into equal seats, overall experience balance, bass consistency, placement consistency or whole-room balance.',
@@ -508,8 +551,12 @@ export const WRITER_WRITING_RULES = Object.freeze([
   'Explain the professional judgement behind the recommendation where the design_philosophy block records it: what the client wants to achieve, the prioritised listening positions, the display and seating balance, the constraints, the coverage and bass approaches, the strongest results, the lower results that are conscious trade-offs, and why the finished design suits the brief. Never invent a reason, a priority, a budget or a decision the interpretation does not record.',
   'The best design is the one that most effectively satisfies the brief while balancing performance, practicality, aesthetics and cost, so a result below the highest available level is a legitimate design decision rather than a failure. Never present the highest available level as the objective regardless of cost or practical consequence, and never treat a higher price as better value on its own.',
   'Value-engineering opportunities are internal reasoning, never copy: where the design already takes one, say what it gives the client; where one remains a design choice, say nothing about it. Never write an opportunity as an instruction to change the finished design, a next step, a future correction or an upgrade path.',
-  'Where the copy expresses the design team\'s own judgement or recommendation, write we or our. The engineering facts themselves stay stated as fact, we never stands in the place of a measured result, and no conversation, a meeting, a site visit or a client instruction the brief does not state is ever implied.',
+  'Where the copy expresses the design team\'s own judgement or recommendation, write we or our. The engineering facts themselves stay stated as fact, we never stands in the place of a measured result, and no conversation, a meeting, a site visit or a client instruction the brief does not state is ever implied. Use it naturally and selectively, for example "Our recommendation is", "We have prioritised" or "Based on our understanding of the brief", and never repeat we recommend from section to section.',
   'Never infer that a design change improved a parameter unless the assessment supports it, never imply that every seat performs identically, and never state a benefit the evidence does not carry.',
+  'Never use an em dash (U+2014) anywhere in client-facing copy: punctuate the sentence another way or rewrite it naturally, and never alter a figure, a product identifier or an evidence reference while doing so. The draft carries zero em dashes.',
+  'Vary sentence structure and paragraph length, prefer direct active language, and use natural transitions. Never begin a sentence with Furthermore, Moreover, Additionally, Subsequently, In conclusion or It is important to note that, never open paragraph after paragraph on The system, The design, This ensures or The result, and never force a contraction into a formal passage.',
+  'Never use a generic marketing phrase ("sophisticated cinematic experience", "seamless immersive sound", "unparalleled performance", "delivers exceptional immersion", "elevates the listening experience", "brings everything together"): replace it with a project-specific explanation of what was chosen, why it suits this room, what the client gains and what the engineering supports, and never invent a reason to do it.',
+  'Before returning, read every section together as one document and refine the wording where it does not sound like a real cinema designer, where a sentence adds nothing, where a benefit is repeated, where a qualification is excessive or where the recommendation is unclear. Never print that review, a note about a change or any explanation of your own editing.',
   'Return structured JSON only, in every section this contract requires, with no extra fields and no commentary.',
 ]);
 
