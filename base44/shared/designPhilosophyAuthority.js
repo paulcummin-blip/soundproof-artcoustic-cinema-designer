@@ -126,6 +126,7 @@ export const SOUND_PROOF_DESIGN_PHILOSOPHY = [
   '',
   'WRITING THE RECOMMENDATION',
   'Write in a natural professional voice. Where you express the design team\'s own judgement or recommendation, write we or our: we have kept the front row at the distance the room allows, our approach places the surrounds where they carry the effect. The engineering facts themselves are still stated as fact, and we never stands in the place of a measured result.',
+  'Where the shared writing authority forbids the first person for a design decision or a recommendation, this philosophy governs the proposal: the design team\'s own judgement is written as we or our. What stays forbidden is inventing an action, an opinion, a conversation, a meeting or a site visit the brief does not state, and writing we where a measured result is the evidence.',
   'Never imply a conversation, a meeting, a site visit or a client instruction the brief does not state.',
   '',
   'ENGINEERING SAFEGUARDS',
