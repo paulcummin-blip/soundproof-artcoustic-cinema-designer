@@ -33,6 +33,7 @@ import {
   RP22_TREATMENT_GUIDANCE,
   buildRp22DesignContext,
   declaredReferencePosition,
+  readRp22Signals,
   rp22QuestionDecision,
 } from '../base44/shared/rp22DesignContext.js';
 import { buildNarrativeFacts } from '../base44/shared/adiNarrativeFacts.js';
@@ -175,7 +176,13 @@ describe('B. Only the principles that apply to the project are handed over', () 
 describe('C. No decision is inferred from an equipment count', () => {
   it('never states a reason for a configuration anywhere in the context', () => {
     const text = JSON.stringify(contextFor(marqueeSnapshot()));
-    for (const forbidden of [/chosen for/i, /selected for/i, /because the design has/i, /the reason for/i,
+    // The patterns are the invented reasons themselves: a reason attributed to THIS
+    // design's configuration. A blanket ban on the words is not used, because a
+    // principle legitimately states that a count is NOT chosen for a format label,
+    // and that statement is the opposite of an invented reason.
+    for (const forbidden of [/because the design has/i, /the reason for/i,
+      /chosen for (?:seat|three|simplicity|convenience|front wides|full surround)/i,
+      /(?:selected|chosen) for (?:seat-to-seat|consistency)/i,
       /consistency across the seats is provided/i, /four subwoofers provide/i]) {
       expect(forbidden.test(text), String(forbidden)).toBe(false);
     }
@@ -314,5 +321,84 @@ describe('G. A comparison is never misdescribed by the context', () => {
     const text = JSON.stringify(context);
     expect(/six overhead|four overhead/.test(text)).toBe(false);
     expect(assertWriterInputCarriesNoLiveState({ rp22_design_context: context })).toBeTruthy();
+  });
+});
+
+describe('H. Applicability reads the geometry, and no design intent is invented', () => {
+  it('follows the explicit channel layout even where the label says otherwise', () => {
+    // The label claims six overhead channels; the explicit layout states none. The
+    // geometry is the authority, so a label can never put an overhead layer into a
+    // design that does not have one.
+    const labelled = marqueeSnapshot({
+      system: {
+        configuration: { dolby_config: '9.1.6', text: '9.1.6 Dolby Atmos configuration' },
+        channel_layout: { bed_channels: 9, overhead_channels: 0, total_discrete: 9, subwoofer_count: 4 },
+      },
+    });
+    expect(readRp22Signals({ snapshot: labelled }).overhead_channels).toBe(0);
+    expect(idsOf(contextFor(labelled))).not.toContain('overhead_layout');
+
+    // And the other way round: an explicit overhead layer is read as it is stated,
+    // whatever the label says.
+    const fourOverheads = marqueeSnapshot({
+      system: {
+        configuration: { dolby_config: '5.1', text: '5.1 configuration' },
+        channel_layout: { bed_channels: 9, overhead_channels: 4, total_discrete: 13, subwoofer_count: 4 },
+      },
+    });
+    expect(readRp22Signals({ snapshot: fourOverheads }).overhead_channels).toBe(4);
+    expect(idsOf(contextFor(fourOverheads))).toContain('overhead_layout');
+  });
+
+  it('reads the seating from the frozen seats and rows, not from a row count alone', () => {
+    const seatsOnly = genesisSnapshot({
+      room: { ...genesisSnapshot().room, seating: { total_seats: 6 } },
+    });
+    const signals = readRp22Signals({ snapshot: seatsOnly, facts: buildNarrativeFacts(seatsOnly) });
+    expect(signals.rows).toBe(null);
+    expect(signals.seats).toBe(6);
+    expect(idsOf(contextFor(seatsOnly))).toContain('seating_and_coverage');
+  });
+
+  it('takes a count from the verified interpretation only where the frozen layout is silent', () => {
+    const noLayout = genesisSnapshot({
+      system: {
+        configuration: { dolby_config: '9.1.6', text: '9.1.6 Dolby Atmos configuration' },
+        channel_layout: undefined,
+      },
+    });
+    expect(readRp22Signals({ snapshot: noLayout }).subwoofer_count).toBe(null);
+    expect(readRp22Signals({
+      snapshot: noLayout,
+      interpretation: { supporting_evidence: { system: { subwoofer_count: 4 } } },
+    }).subwoofer_count).toBe(4);
+  });
+
+  it('states what the design contains and invents nothing from it', () => {
+    const built = buildProjectInterpretation({ snapshot: genesisSnapshot(), reportType: 'single' });
+    expect(built.design_contents.join(' | ')).toMatch(/Layout: 9\.1\.6/);
+    expect(built.design_contents.join(' | ')).toMatch(/Subwoofers: 4/);
+    expect(built.design_contents.join(' | ')).not.toMatch(/chosen for|selected for|because|so that/i);
+    // No designer explanation is on record, so no confirmed intent exists: a
+    // configuration is never turned into a reason because it is present.
+    expect(built.important_design_decisions).toEqual([]);
+    expect(built.design_contents_rule).toMatch(/never of why it was chosen/);
+    expect(built.confirmed_designer_intent_rule).toMatch(/only a recorded designer explanation/);
+    expect(built.interpretation_categories).toEqual({
+      what_the_design_contains: 'design_contents',
+      why_rp22_says_the_approach_may_be_useful: 'rp22_context',
+      what_the_engineering_predicts: 'reliable_evidence',
+      why_the_designer_actually_chose_it: 'important_design_decisions',
+    });
+  });
+
+  it('preserves a recorded designer explanation as confirmed intent', () => {
+    const recorded = 'Four subwoofers were chosen to even the response across the seats';
+    const built = buildProjectInterpretation({
+      snapshot: genesisSnapshot(),
+      reportType: 'single',
+      recordedIntent: [recorded],
+    });
+    expect(built.important_design_decisions).toEqual([recorded]);
   });
 });

@@ -71,7 +71,11 @@ export function interpretationStatements(interpretation) {
       }
     }
   }
-  for (const field of ['important_design_decisions', 'main_constraints']) {
+  // What the design contains is held to the same check as any other statement: a
+  // contents line that contradicts the frozen evidence (a screen behind a
+  // television, an unproven bass outcome) is removed, while the recorded designer
+  // intent is carried through exactly as the designer recorded it.
+  for (const field of ['design_contents', 'important_design_decisions', 'main_constraints']) {
     for (const entry of Array.isArray(interpretation[field]) ? interpretation[field] : []) {
       push(field, entry);
     }

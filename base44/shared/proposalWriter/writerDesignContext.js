@@ -193,6 +193,13 @@ export function interpretationView(interpretation, { pack = null } = {}) {
     seating_story: asText(interpretation?.primary_seating_story),
     strongest_areas: strongestAreas(interpretation?.strongest_areas),
     constraints: strings(interpretation?.main_constraints),
+    // What the design CONTAINS: the layout, the channel counts, the subwoofer
+    // count and the loudspeaker families, written for what it is. The writer may
+    // describe the system from it and may never read a reason into it.
+    design_contents: strings(interpretation?.design_contents),
+    // WHY THE DESIGNER CHOSE IT: confirmed designer intent only, which is empty
+    // unless the designer recorded an explanation. A contents list never answers a
+    // why request about the design.
     design_decisions: strings(interpretation?.important_design_decisions),
     // THE PROFESSIONAL JUDGEMENT behind the design: the reasoning the copy may
     // explain. Absent where the interpretation states none.
@@ -458,10 +465,15 @@ export function buildWriterDesignContext({
   dealerNotes = null,
   clarificationAnswers = null,
 } = {}) {
+  // The interpretation as the writer reads it, built ONCE here: the RP22 design
+  // context is then selected from the same verified reading the writer is given,
+  // so the principles offered and the interpretation the copy may explain can never
+  // disagree about the same design.
+  const designInterpretation = resolveDesignInterpretation({
+    proposal, projectId, versionIds, pack, savedInterpretation,
+  });
   return {
-    design_interpretation: resolveDesignInterpretation({
-      proposal, projectId, versionIds, pack, savedInterpretation,
-    }),
+    design_interpretation: designInterpretation,
     editorial_brief: buildEditorialBrief({ proposal, dealerNotes }),
     // The designer's own answers to ADI's clarification questions: design intent
     // for the decisions the frozen evidence records no reason for. Read from the
@@ -476,6 +488,9 @@ export function buildWriterDesignContext({
       sources: (Array.isArray(pack?.options) ? pack.options : [])
         .filter((option) => option?.facts)
         .map((option) => ({ facts: option.facts })),
+      // The verified interpretation: read only for a count the frozen layout does
+      // not state, so it can add to the selection and never override the geometry.
+      interpretation: designInterpretation?.view || null,
     }),
   };
 }

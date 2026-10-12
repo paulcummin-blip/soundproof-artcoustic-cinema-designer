@@ -18,7 +18,7 @@ export const VALIDATOR_SOURCE_MANIFEST = Object.freeze({
   'base44/shared/proposalWriter/writerInputBuilder.js': '44dcff006531f881b9b56c88d633780894c6f8e808a447b5f06a2b0e7f892ceb',
   'base44/shared/proposalWriter/writerPromptBuilder.js': '570dd88ea679557dbee7452a902819c33e7b1a091f4ccf3d79009530d1fa1fa8',
   'base44/shared/proposalWriter/writerSectionMapping.js': 'f5a6d2a5fe974fbd5c16d810d95f99da72f629a4fb8cb33793aa472778ade2f0',
-  'base44/shared/proposalWriter/writerDesignContext.js': '04727c7b7992dd17a932d6eb78ff73833077763341b87b20d6957b8121e904d1',
+  'base44/shared/proposalWriter/writerDesignContext.js': 'bd0eb1fe4ef8ab1923b77373eb0ae00dd72cd76209c6795c53364934236fd756',
   'base44/shared/proposalEdit/completeDocumentValidation.js': 'cff20d7146ecbeb3a9c325e3147db41cab552f7ea950dd93385ee1d478683ddd',
   'base44/shared/proposalWriter/validatorProvenance.js': '9ed8e45b5803a199edf6d75ddb1c0e225b27ac6a63d1986c4607cdd93be21dd5',
   'base44/shared/proposalEvidence/proposalEvidenceWording.js': 'f9b5c6ceb3063240ab6ba3374c38b96f9abf95dcdb87892510f3815192ef5594',
@@ -33,10 +33,10 @@ export const VALIDATOR_SOURCE_MANIFEST = Object.freeze({
   // reasoning authority it was written under.
   'base44/shared/designPhilosophyAuthority.js': '1a4ba9bfd86d5bd17cabac52e6dab78359f601f92b14e0a63703d679915179fc',
   'base44/shared/adiDesignPhilosophy.js': 'cd275e6c1ba1c768378b701e5494f10042b550727e806ca1f24716d0c06103cc',
-  'base44/shared/adiProjectInterpretation.js': 'e13f0a9f35d71f59817bc9add3aefc8db289320fa3e09ad3a1a6bdcfec80cbff',
+  'base44/shared/adiProjectInterpretation.js': 'f43d09f2f23fe67be86bcef75a484ee9920ebb9529090be7e7b67a3bdd630edd',
   // The check between the saved interpretation and the frozen evidence, which now
   // also holds the design philosophy's own statements to it.
-  'base44/shared/proposalWriter/writerInterpretationEvidenceCheck.js': '23f5ffa5e6dcb6d2311365665cde650ac4b38f076812cc4f45552acf009dda65',
+  'base44/shared/proposalWriter/writerInterpretationEvidenceCheck.js': '2e88d5c9c5b3bc2e9000adaf528dc98e52c073c7c92fecc02c2030199fc412a0',
   // The verification-disclaimer rule: the wording a proposal never carries. A
   // capability is stated confidently and is never made conditional on a future
   // process, while internal accuracy stays exactly where it was.
@@ -52,4 +52,13 @@ export const VALIDATOR_SOURCE_MANIFEST = Object.freeze({
   // The deterministic half of that standard: the punctuation rule, the stock
   // connectives, the mechanical repeated opener and the generic claim phrases.
   'base44/shared/proposalWriter/writerNaturalWritingRules.js': 'e1ea352c89ca451359785e853d46345c2c8b9cb3ec146a98b2946b36f9c99aa5',
+  // The RP22 professional design context: the established v1.2 principles offered to
+  // the Stage 1 interpretation and to the writer, each with the section reference it
+  // was read under, its applicability, what it does not establish and its safe use.
+  // Hashed so a draft can always be traced to the exact professional context, and the
+  // exact applicability rule, it was written against.
+  'base44/shared/rp22DesignContext.js': 'a2f9e33841802bf5743b1280081a44c26c78cdc8fc1eafa089ae8d405b3b24cf',
+  // The check between a saved interpretation and the frozen evidence, which removes
+  // only the statements the evidence actually contradicts.
+  'base44/shared/proposalClarification/verifiedInterpretation.js': '86d6c7038393d25b4ee9bdcfedd6202cb7e3e7072409dd070001d32b030caf34',
 });

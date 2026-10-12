@@ -140,7 +140,7 @@ export function interpretationCorrections(view, context) {
     const reason = statementReason(view[field], context);
     if (reason) corrections.push({ field, statement: String(view[field]), reason });
   }
-  for (const field of ['design_decisions', 'constraints']) {
+  for (const field of ['design_contents', 'design_decisions', 'constraints']) {
     for (const entry of Array.isArray(view[field]) ? view[field] : []) {
       const reason = statementReason(entry, context);
       if (reason) corrections.push({ field, statement: String(entry), reason });
@@ -201,6 +201,7 @@ export function checkInterpretationAgainstEvidence({ view = null, pack = null } 
     defining_feature: keep('defining_feature', view.defining_feature),
     seating_story: keep('seating_story', view.seating_story),
     room_type: keep('room_type', view.room_type),
+    design_contents: keepList('design_contents', view.design_contents),
     design_decisions: keepList('design_decisions', view.design_decisions),
     constraints: keepList('constraints', view.constraints),
     strongest_areas: (Array.isArray(view.strongest_areas) ? view.strongest_areas : [])

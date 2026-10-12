@@ -260,8 +260,12 @@ describe("Stage 1: the design story is identified before writing", () => {
     expect(interpretation.reliable_evidence.system.discrete_channels).toBe(5);
     expect(interpretation.reliable_evidence.system.subwoofer_count).toBe(1);
     expect(interpretation.primary_design_intent).not.toMatch(/reference|perfect|ultimate/i);
-    expect(interpretation.important_design_decisions.join(" | ")).toMatch(/5\.1 chosen for simplicity and cost/);
-    expect(interpretation.important_design_decisions.join(" | ")).toMatch(/Single subwoofer chosen/);
+    // What the design CONTAINS is stated as contents, and no reason is invented
+    // from it: a 5.1 layout is never explained as a choice the designer made.
+    expect(interpretation.design_contents.join(" | ")).toMatch(/Layout: 5\.1/);
+    expect(interpretation.design_contents.join(" | ")).toMatch(/Subwoofers: 1/);
+    expect(interpretation.important_design_decisions).toEqual([]);
+    expect(interpretation.design_contents.join(" | ")).not.toMatch(/chosen for|selected for/i);
     expect(interpretation.main_constraints).toContain("Single-sub bass compromise");
   });
 
@@ -272,8 +276,14 @@ describe("Stage 1: the design story is identified before writing", () => {
     expect(reference.defining_feature).toBe("Large projection screen");
     expect(reference.presentation).toBe("Projection");
     expect(reference.primary_seating_story).toBeTruthy();
-    expect(reference.important_design_decisions.join(" | ")).toMatch(/9\.2\.4 chosen for front wides/);
-    expect(reference.important_design_decisions.join(" | ")).toMatch(/Four subs chosen for seat-to-seat consistency/);
+    // Nine bed channels, four overheads and four subwoofers are contents of the
+    // design: each is stated as what the design contains, and none of them is
+    // turned into a reason. Confirmed intent stays empty because no designer
+    // explanation is on record.
+    expect(reference.design_contents.join(" | ")).toMatch(/Layout: 9\.2\.4/);
+    expect(reference.design_contents.join(" | ")).toMatch(/Subwoofers: 4/);
+    expect(reference.important_design_decisions).toEqual([]);
+    expect(reference.interpretation_categories.why_the_designer_actually_chose_it).toBe("important_design_decisions");
     expect(reference.main_constraints.join(" | ")).toMatch(/Rear row geometry/);
     expect(reference.strongest_areas.map((entry) => entry.area)).toEqual(
       expect.arrayContaining(["Spatial Resolution", "Viewing geometry", "Screen scale"]),

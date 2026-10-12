@@ -49,6 +49,17 @@ export const INTERPRETATION_STAGE = 'adi_project_interpretation';
 // the sole authority for every figure, level, product and claim.
 export const INTERPRETATION_VERSION = '1.1';
 
+/** What the design CONTAINS is a fact, and never a reason. */
+export const DESIGN_CONTENTS_RULE =
+  'these are the physical contents of this design, stated as facts: a layout, a channel count or a subwoofer count is '
+  + 'evidence of what the design contains and never of why it was chosen, so nothing here is a reason, a benefit or a decision';
+
+/** Designer intent exists only where the designer has RECORDED an explanation. */
+export const CONFIRMED_INTENT_RULE =
+  'what the design contains, why RP22 says the approach may be useful, what the engineering predicts and why the designer '
+  + 'actually chose it are four separate things: only a recorded designer explanation is confirmed design intent, and where '
+  + 'none is recorded the copy states the design and its result and writes no reason';
+
 function num(value) {
   const n = Number(value);
   return Number.isFinite(n) ? n : null;
@@ -132,7 +143,7 @@ function deriveIntent({ bed, overhead, subCount, rowCount, totalSeats, discreet 
 }
 
 function deriveDefiningFeature({ strongest, screenWidthM, totalSeats, volumeM3, rowCount, overhead, subCount }) {
-  if (subCount >= 4 && strongest?.structure === 'Timbre Matching') return 'Four-sub bass consistency';
+  if (subCount >= 4 && strongest?.structure === 'Timbre Matching') return 'Four-subwoofer low-frequency system';
   if (screenWidthM != null && screenWidthM >= 2.8) return 'Large projection screen';
   if (totalSeats >= 4 && volumeM3 != null && volumeM3 < 45) return 'Compact room with several seats';
   if (rowCount >= 2) return 'Multi-row layout';
@@ -192,7 +203,7 @@ function deriveConstraints({ widthM, heightM, rowCount, overhead, subCount, scre
   if (subCount === 2) constraints.push('Two-sub bass compromise');
   if (subCount === 1) constraints.push('Single-sub bass compromise');
   if (screenWidthM != null && screenWidthM >= 3.2) constraints.push('Large screen requires projector care');
-  if (bed > 0 && bed <= 5 && overhead === 0) constraints.push('Budget limits channel count');
+  if (bed > 0 && bed <= 5 && overhead === 0) constraints.push('Five-channel bed with no overhead layer');
   const proportions = String(classification || '').toLowerCase();
   if (proportions.includes('near-cubic') || proportions.includes('long tunnel')) {
     constraints.push('Room proportions shape the bass response');
@@ -200,35 +211,47 @@ function deriveConstraints({ widthM, heightM, rowCount, overhead, subCount, scre
   return constraints;
 }
 
-function deriveDecisions({ config, bed, overhead, subCount, productRoles, mountMode, screeningHidden }) {
-  const decisions = [];
+/**
+ * WHAT THE DESIGN CONTAINS. Facts only, and deliberately so: a layout, a channel
+ * count or a subwoofer count is evidence of what the system IS and never of why it
+ * was chosen. Nothing here states or implies a reason, a benefit or a decision.
+ */
+function deriveDesignContents({
+  config, discreteChannels, bed, overhead, subCount, strategyText, productRoles, mountMode, screeningHidden,
+}) {
+  const contents = [];
   if (config) {
-    if (overhead === 0 && bed > 0 && bed <= 5) decisions.push(`${config} chosen for simplicity and cost`);
-    else if (overhead >= 6) decisions.push(`${config} chosen for three overhead rows`);
-    else if (bed >= 9 && overhead >= 4) decisions.push(`${config} chosen for front wides and stronger movement`);
-    else if (overhead >= 2) decisions.push(`${config} chosen for full surround plus a height layer`);
+    contents.push(`Layout: ${config}${discreteChannels != null ? `, ${discreteChannels} discrete channels` : ''}`);
   }
-  if (hasModelMatching(productRoles, /spitfire|(^|[^a-z])q([^a-z]|$)/)) {
-    decisions.push('Spitfire Q Series selected for headroom and dialogue clarity');
+  if (bed > 0 || overhead > 0) {
+    contents.push(`Channels: ${bed} at listener level${overhead > 0 ? `, ${overhead} overhead` : ''}`);
   }
-  if (hasModelMatching(productRoles, /evolve/)) {
-    decisions.push('Evolve Series selected for strong performance with lower visual impact');
+  if (subCount > 0) {
+    contents.push(`Subwoofers: ${subCount}${strategyText ? `, ${strategyText}` : ''}`);
   }
-  if (hasModelMatching(productRoles, /mikro/)) {
-    decisions.push('Mikro models selected for very low visual impact');
+  const families = [];
+  for (const role of productRoles) {
+    const label = typeof role?.model_label === 'string' && role.model_label.trim()
+      ? role.model_label.trim()
+      : typeof role?.model_key === 'string' ? role.model_key.trim() : '';
+    if (label && !families.includes(label)) families.push(label);
   }
-  if (hasModelMatching(productRoles, /architect|cloud/)) {
-    decisions.push('Architect / Spitfire Cloud selected for dedicated overhead coverage');
-  }
-  if (subCount === 1) decisions.push('Single subwoofer chosen for a simple, position-led bass foundation');
-  if (subCount === 2) decisions.push('Two subs chosen for a practical bass foundation');
-  if (subCount >= 4) decisions.push('Four subs chosen for seat-to-seat consistency');
-  if (screeningHidden && mountMode !== 'floating') {
-    decisions.push('Acoustically transparent screen selected so the LCR can sit behind it');
-  } else if (mountMode === 'floating') {
-    decisions.push('Floating screen wall selected to keep the speakers at the correct distance');
-  }
-  return decisions;
+  if (families.length > 0) contents.push(`Loudspeakers: ${families.join(', ')}`);
+  if (mountMode === 'floating') contents.push('Screen: on a floating screen wall');
+  else if (screeningHidden) contents.push('Screen: acoustically transparent, with the screen channels behind it');
+  return contents;
+}
+
+/**
+ * WHY THE DESIGNER CHOSE IT. Designer intent exists only where the designer has
+ * RECORDED an explanation, so this returns exactly what is recorded and nothing
+ * else: a configuration is never turned into a reason because it is present, and a
+ * recorded explanation is carried through untouched.
+ */
+function deriveRecordedIntent(recordedIntent) {
+  return (Array.isArray(recordedIntent) ? recordedIntent : [])
+    .map((entry) => (typeof entry === 'string' ? entry.trim() : ''))
+    .filter(Boolean);
 }
 
 /**
@@ -255,6 +278,11 @@ export function buildProjectInterpretation(params = {}) {
     // a physical fact. Omitted by a caller that does not hold them, in which case
     // no doorway constraint is stated.
     designElements = [],
+    // The designer's own recorded explanations, where the caller holds them: the
+    // ONLY source of confirmed design intent. A recorded reason is carried through
+    // untouched, and where none is recorded the intent list stays empty and no
+    // reason is stated anywhere in the interpretation.
+    recordedIntent = [],
   } = params;
 
   const available = snapshot?.available === true;
@@ -291,10 +319,20 @@ export function buildProjectInterpretation(params = {}) {
   const config = system.configuration?.dolby_config
     ? `${system.configuration.dolby_config}`
     : null;
-  const bed = num(system.configuration?.bed_channels) ?? 0;
-  const overhead = num(system.configuration?.overhead_channels) ?? 0;
+  // THE EXPLICIT CHANNEL LAYOUT IS THE AUTHORITY for what the design physically
+  // contains, and it is where the frozen evidence states these counts. The
+  // configuration block is read first only because some snapshots carry them there;
+  // the layout label is never parsed for a physical arrangement.
+  const layout = system.channel_layout || {};
+  const bed = num(system.configuration?.bed_channels) ?? num(layout.bed_channels) ?? 0;
+  const overhead = num(system.configuration?.overhead_channels) ?? num(layout.overhead_channels) ?? 0;
   const productRoles = Array.isArray(system.product_roles) ? system.product_roles : [];
-  const subCount = num(system.subwoofer_strategy?.count) ?? 0;
+  const subCount = num(system.subwoofer_strategy?.count) ?? num(layout.subwoofer_count) ?? 0;
+  // The recorded subwoofer arrangement, where the design states one: a description
+  // of what the arrangement IS, never a reason it was chosen.
+  const strategyText = typeof system.subwoofer_strategy?.strategy_text === 'string'
+    ? system.subwoofer_strategy.strategy_text.trim() || null
+    : null;
   const discreet = hasModelMatching(productRoles, /mikro|architect|cloud/);
   const screeningHidden = productRoles.some((role) => /lcr|centre/i.test(String(role?.role || '')));
 
@@ -403,7 +441,7 @@ export function buildProjectInterpretation(params = {}) {
   // The philosophy reads only what the interpretation already derived: the room,
   // the intent, the constraints, the strongest results, the priorities and the
   // existing assessment. It states no figure and no level of its own.
-  const discreteChannels = num(system.configuration?.total_discrete_channels);
+  const discreteChannels = num(system.configuration?.total_discrete_channels) ?? num(layout.total_discrete);
   const displayText = `${
     tv
       ? (displayIdentity.tvPhrase || 'TV')
@@ -422,15 +460,7 @@ export function buildProjectInterpretation(params = {}) {
   }: the coverage approach is the layout the evidence states, and no coverage result is claimed that the spatial evidence does not carry.`;
   const bassText = `${
     subCount > 0 ? `${subCount} subwoofer${subCount === 1 ? '' : 's'}` : 'The subwoofer arrangement'
-  }${
-    subCount === 1
-      ? ' for a position-led bass foundation'
-      : subCount === 2
-        ? ' as a practical bass foundation'
-        : subCount >= 4
-          ? ' for seat-to-seat consistency'
-          : ''
-  }: seat-to-seat consistency is claimed only where the consistency result supports it, so bass is otherwise described as output capability and physical authority.`;
+  }${strategyText ? `, ${strategyText}` : ''}: seat-to-seat consistency is claimed only where the consistency result supports it, so bass is otherwise described as output capability and physical authority.`;
 
   const emphasis = typeof clientBrief === 'string' && clientBrief.trim() ? clientBrief.trim() : null;
 
@@ -495,10 +525,34 @@ export function buildProjectInterpretation(params = {}) {
     // 6. Main constraints
     main_constraints: constraintsList,
 
-    // 7. Important design decisions
-    important_design_decisions: deriveDecisions({
-      config, bed, overhead, subCount, productRoles, mountMode, screeningHidden,
+    // 7. WHAT THE DESIGN CONTAINS: the layout, the channel counts, the subwoofer
+    // count and the loudspeaker families, stated as facts. A count is never turned
+    // into a reason, so nothing here explains why anything was chosen.
+    design_contents: deriveDesignContents({
+      config,
+      discreteChannels,
+      bed,
+      overhead,
+      subCount,
+      strategyText,
+      productRoles,
+      mountMode,
+      screeningHidden,
     }),
+    design_contents_rule: DESIGN_CONTENTS_RULE,
+
+    // 7b. WHY THE DESIGNER CHOSE IT: confirmed design intent, and only where the
+    // designer has recorded an explanation. Empty where none is recorded, which is
+    // the normal result of reading frozen engineering alone, and never filled from
+    // a configuration being present.
+    important_design_decisions: deriveRecordedIntent(recordedIntent),
+    confirmed_designer_intent_rule: CONFIRMED_INTENT_RULE,
+    interpretation_categories: {
+      what_the_design_contains: 'design_contents',
+      why_rp22_says_the_approach_may_be_useful: 'rp22_context',
+      what_the_engineering_predicts: 'reliable_evidence',
+      why_the_designer_actually_chose_it: 'important_design_decisions',
+    },
 
     // 8. Reliable evidence
     reliable_evidence: {
@@ -590,7 +644,8 @@ export function formatInterpretationForPrompt(interpretation) {
     '- Primary seating story: ' + (interpretation.primary_seating_story || 'Not determined'),
     '- Strongest design areas: ' + listOrNone((interpretation.strongest_areas || []).map((entry) => `${entry.area}${entry.evidence ? ` (${entry.evidence})` : ''}`)),
     '- Main constraints: ' + listOrNone(interpretation.main_constraints),
-    '- Important design decisions: ' + listOrNone(interpretation.important_design_decisions),
+    '- What the design contains (facts, never a reason): ' + listOrNone(interpretation.design_contents),
+    '- Confirmed designer intent (recorded explanations only, otherwise none): ' + listOrNone(interpretation.important_design_decisions),
     '- Design structure floors: ' + (structures || 'Not assessed'),
     '',
     'Reliable evidence by structure:',
@@ -613,6 +668,7 @@ export function formatInterpretationForPrompt(interpretation) {
     '',
     'HOW TO USE THIS:',
     '- Where the copy explains the reasoning behind the design, use the reasoning recorded above and never a reason it does not record.',
+    '- What the design contains is a fact and never a reason: never explain a layout, a channel count, an overhead count or a subwoofer count as a choice, and where no designer reason is recorded above, state the design and its result and write no reason.',
     '- The RP22 design context above is established professional practice, not this project\'s reason: use it to explain why a principle matters for this room, and never to state why the designer chose a configuration. It never turns a channel, overhead or subwoofer count into a reason.',
     '- Write the story first, then support it with the results that matter for this room.',
     '- Reference a parameter only where it is the clearest evidence for something the client will hear.',
@@ -641,6 +697,7 @@ export function formatInterpretationForLog(interpretation) {
     `seating_story=${interpretation.primary_seating_story}`,
     `strongest=${listOrNone((interpretation.strongest_areas || []).map((entry) => entry.area))}`,
     `constraints=${listOrNone(interpretation.main_constraints)}`,
+    `contents=${listOrNone(interpretation.design_contents)}`,
     `decisions=${listOrNone(interpretation.important_design_decisions)}`,
     `structures=${(interpretation.reliable_evidence?.structures || []).map((entry) => `${entry.structure}:${entry.level}`).join(',') || 'none'}`,
     `evidence=${(interpretation.reliable_evidence?.by_structure ? Object.entries(interpretation.reliable_evidence.by_structure).map(([structure, rows]) => `${structure}[${rows.map((row) => `P${row.parameter_id}`).join(' ')}]`).join(' ') : 'none')}`,

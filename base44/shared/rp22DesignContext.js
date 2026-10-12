@@ -28,6 +28,20 @@
  * reads, and the safe explanatory use of it. Only the principles that apply to the
  * project are handed over.
  *
+ * HOW APPLICABILITY IS DECIDED, in this order and never the other way round:
+ *
+ *   1. the EXPLICIT channel layout of the frozen design (bed channels, overhead
+ *      channels, the subwoofer count), plus the frozen seating geometry, the frozen
+ *      RP22 parameter results, the recorded product roles and any recorded
+ *      treatment. This is the geometry, and it is the authority;
+ *   2. the VERIFIED design interpretation, where the caller holds it, and only where
+ *      it states a count the frozen layout does not: it states the same frozen facts,
+ *      so it can add and never override;
+ *   3. the layout LABEL ("9.1.6") as a last resort, and only where the frozen
+ *      evidence carries no explicit layout at all. A format string is not geometry,
+ *      so a physical arrangement is never inferred from a label while the geometry
+ *      is there to be read.
+ *
  * Pure: no React, no SDK, no timestamps, no runtime-specific APIs.
  */
 
@@ -247,13 +261,28 @@ export const RP22_CONTEXT_RULE =
 /**
  * The signals the principles are matched against. Read from the frozen snapshot,
  * or from the frozen pack's own facts, and never from a live project record.
+ *
+ * @param {Object} [input.interpretation] — the VERIFIED interpretation of this
+ *   version, where the caller holds it: read last, and only for a count the frozen
+ *   layout does not state.
  */
-export function readRp22Signals({ snapshot = null, facts = null } = {}) {
-  // The layout is read from the frozen snapshot, or from the frozen pack's own
-  // facts: the writer is handed the pack, and the two state the same design.
-  const channels = snapshot?.system?.channel_layout || facts?.system?.channel_layout || {};
-  const configuration = String(snapshot?.system?.configuration?.dolby_config || facts?.system?.format || '');
-  const formatParts = configuration.split('.');
+export function readRp22Signals({ snapshot = null, facts = null, interpretation = null } = {}) {
+  // THE EXPLICIT CHANNEL LAYOUT IS THE AUTHORITY for what this design physically
+  // contains. The layout is read from the frozen snapshot, or from the frozen pack's
+  // own facts: the writer is handed the pack, and the two state the same design.
+  const layout = snapshot?.system?.channel_layout || facts?.system?.channel_layout || null;
+  // A layout label is a format string, not geometry: it is read only where the
+  // frozen evidence carries no explicit layout at all.
+  const labelOnly = layout === null || layout === undefined;
+  const configuration = labelOnly
+    ? String(snapshot?.system?.configuration?.dolby_config || facts?.system?.format || '')
+    : '';
+  const formatParts = labelOnly ? configuration.split('.') : [];
+  const fromLabel = (index) => (formatParts.length > index ? toNumber(formatParts[index]) : null);
+  // The verified interpretation states the same frozen facts in its own evidence.
+  const interpretationSystem = interpretation?.supporting_evidence?.system
+    || interpretation?.reliable_evidence?.system
+    || null;
   const seatScopes = facts?.seat_scopes || {};
   const parameters = Array.isArray(facts?.parameters) ? facts.parameters : [];
   const byParameter = new Map(parameters.map((row) => [Number(row?.parameter_id), row]));
@@ -266,16 +295,25 @@ export function readRp22Signals({ snapshot = null, facts = null } = {}) {
   // Either way the level is read, and an unstated result stays absent.
   const levelOf = (id) => byParameter.get(id)?.level ?? headlineLevel(id) ?? null;
 
-  const overhead = toNumber(channels.overhead_channels)
-    ?? (formatParts.length >= 3 ? toNumber(formatParts[2]) : null);
-  const bed = toNumber(channels.bed_channels)
-    ?? (formatParts.length >= 1 ? toNumber(formatParts[0]) : null);
-  const subwoofers = toNumber(channels.subwoofer_count)
+  const overhead = toNumber(layout?.overhead_channels)
+    ?? (labelOnly ? fromLabel(2) : null);
+  const bed = toNumber(layout?.bed_channels)
+    ?? (labelOnly ? fromLabel(0) : null);
+  const subwoofers = toNumber(layout?.subwoofer_count)
     ?? toNumber(snapshot?.system?.subwoofer_strategy?.count)
     ?? toNumber(facts?.system?.subwoofer_strategy?.count)
-    ?? toNumber(snapshot?.system?.configuration?.subwoofer_count);
-  const rows = toNumber(facts?.seating?.row_count) ?? toNumber(snapshot?.room?.seating?.row_count);
-  const seats = toNumber(facts?.seating?.seat_count) ?? toNumber(snapshot?.room?.seating?.total_seats);
+    ?? toNumber(snapshot?.system?.configuration?.subwoofer_count)
+    ?? toNumber(interpretationSystem?.subwoofer_count);
+  // The seating geometry is read from the frozen seating block, in the pack's own
+  // facts or from the snapshot: the row and seat counts are what the seating and
+  // listening-area principle applies to, so a recorded seat count is read even where
+  // no row count is stated.
+  const rows = toNumber(facts?.room?.seating?.row_count)
+    ?? toNumber(facts?.seating?.rows)
+    ?? toNumber(snapshot?.room?.seating?.row_count);
+  const seats = toNumber(facts?.room?.seating?.seat_count)
+    ?? toNumber(facts?.seating?.seats)
+    ?? toNumber(snapshot?.room?.seating?.total_seats);
   const treatment = snapshot?.room?.acoustic_treatment || facts?.room?.acoustic_treatment || null;
 
   return {
@@ -286,7 +324,7 @@ export function readRp22Signals({ snapshot = null, facts = null } = {}) {
     rows,
     seats,
     front_wides: Boolean(levelOf(7)
-      || (toNumber(facts?.system?.channel_layout?.wide_channels) ?? 0) > 0),
+      || (toNumber(layout?.wide_channels) ?? 0) > 0),
     timbre_evidence: Boolean(levelOf(16) || levelOf(17)
       || (Array.isArray(facts?.system?.products) && facts.system.products.length > 0)
       || Boolean(facts?.system?.product_roles)),
@@ -301,7 +339,10 @@ export function principleApplies(principle, signals) {
   return (principle?.requires || []).every((requirement) => {
     switch (requirement) {
       case 'any_design': return true;
-      case 'seating': return (signals.seating ?? 0) > 0 || (signals.rows ?? 0) > 0;
+      // The seating geometry is read as the frozen seats and rows, so a design
+      // whose seats are recorded without a row count still carries the seating
+      // principle rather than losing it to a missing count.
+      case 'seating': return (signals.seats ?? 0) > 0 || (signals.rows ?? 0) > 0;
       case 'bed_channels>=5': return (signals.bed_channels ?? 0) >= 5;
       case 'front_wides': return signals.front_wides === true;
       case 'overheads': return (signals.overhead_channels ?? 0) > 0;
@@ -375,15 +416,22 @@ export function rp22QuestionDecision({ question_id, snapshot = null } = {}) {
  * @param {Object} [input.snapshot] — one frozen Engineering Snapshot
  * @param {Object} [input.facts] — one frozen pack facts object
  * @param {Array<Object>} [input.sources] — several { snapshot, facts } entries,
- *   for a comparison: a principle applies where it holds for any selected version
+ *   for a comparison: a principle applies where it holds for any selected version.
+ *   An entry may carry its own `interpretation`; the top-level one is used otherwise
+ * @param {Object} [input.interpretation] — the VERIFIED interpretation, read only
+ *   for a count the frozen layout does not state
  * @returns {Object} the frozen context, carrying its own version and source
  */
-export function buildRp22DesignContext({ snapshot = null, facts = null, sources = null } = {}) {
+export function buildRp22DesignContext({ snapshot = null, facts = null, sources = null, interpretation = null } = {}) {
   const entries = (Array.isArray(sources) && sources.length > 0
     ? sources
     : [{ snapshot, facts }])
     .filter((entry) => entry && (entry.snapshot || entry.facts));
-  const signals = entries.map((entry) => readRp22Signals({ snapshot: entry.snapshot, facts: entry.facts }));
+  const signals = entries.map((entry) => readRp22Signals({
+    snapshot: entry.snapshot,
+    facts: entry.facts,
+    interpretation: entry.interpretation || interpretation,
+  }));
   const present = signals.filter((entry) => entry.available);
 
   const principles = present.length === 0
