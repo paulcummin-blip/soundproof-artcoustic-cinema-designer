@@ -22,6 +22,13 @@
  * no section and regenerates no text — so the document can be inspected before
  * the designer decides to issue or export it. The decision itself lives in
  * ./proposalExportMode, so the non-issuing guarantee is testable on its own.
+ *
+ * Readiness is asked in two parts, because the two actions do not have the same
+ * permission: what a document needs to be COMPOSED at all (the proposal loaded,
+ * its written sections present, its comparison evidence in hand, its print
+ * resources ready) withholds both actions, while the copy layer's own editorial
+ * block withholds the ISSUED document alone. A genuine editorial problem is shown
+ * as a warning and never stops the designer inspecting the real A4 document.
  */
 
 import { useCallback, useEffect, useRef, useState } from 'react';
@@ -50,6 +57,7 @@ import {
 } from './proposalExportMode';
 import {
   PRINT_NOT_READY_MESSAGE,
+  PRINT_READINESS_REASON,
   describePrintReadinessFailure,
   preparePrintDocument,
   settleOneFrame,
@@ -84,10 +92,30 @@ function stripHtml(value) {
 }
 
 /**
- * Resolve whether this proposal can be exported.
- * @returns {string|null} a blocking reason, or null when export is allowed
+ * Resolve whether this proposal can reach the printer in this mode.
+ *
+ * @param {Object} options
+ * @param {string} [options.mode] — the action being prepared
+ * @param {string|null} [options.comparisonBlockReason] — a reason the document
+ *   cannot be composed at all (comparison evidence missing or still being read).
+ *   It withholds BOTH actions.
+ * @param {string|null} [options.issueBlockReason] — the copy layer's own editorial
+ *   block: the copy still needs review, so the document may not be issued. It
+ *   withholds the EXPORT only.
+ * @returns {string|null} a blocking reason, or null when this mode may proceed
  */
-export function resolveProposalExportReadiness({ proposal, sections, comparisonBlockReason = null }) {
+export function resolveProposalExportReadiness({
+  proposal,
+  sections,
+  comparisonBlockReason = null,
+  issueBlockReason = null,
+  mode = EXPORT_MODE,
+}) {
+  // The issue gate is an export requirement and nothing else: a preview exists so
+  // the designer can inspect the document before it is fit to issue, so a genuine
+  // editorial problem is a warning on that document rather than a reason to
+  // withhold it.
+  if (requiresIssueGate(mode) && issueBlockReason) return issueBlockReason;
   if (comparisonBlockReason) return comparisonBlockReason;
   if (!proposal) {
     return 'This proposal could not be loaded. Reopen it from the Proposal Centre and try again.';
@@ -108,10 +136,31 @@ export function resolveProposalExportReadiness({ proposal, sections, comparisonB
   return null;
 }
 
+/**
+ * Whether the real A4 composition can be mounted on the page.
+ *
+ * The pack is composed from the proposal's own loaded sections, and it is mounted
+ * for BOTH actions: it is the document the designer inspects and the document that
+ * is issued. The issue gate decides whether an EXPORT may print it — it never
+ * decides whether the document exists on the page, because a preview that cannot
+ * show the document is not a preview. When the composition cannot be prepared the
+ * attempt fails visibly; the application interface is never printed in its place.
+ *
+ * @param {{proposal: Object|null, sections: Array}} options
+ * @returns {boolean}
+ */
+export function canMountPrintComposition({ proposal = null, sections = [] } = {}) {
+  return Boolean(proposal?.id)
+    && (Array.isArray(sections) ? sections : []).some((section) => section?.is_enabled !== false);
+}
+
 export function useProposalExport({
   proposal,
   sections,
   comparisonBlockReason = null,
+  // The copy layer's own editorial block. It withholds the issued export, and
+  // never the read-only preview.
+  issueBlockReason = null,
   projectName,
   // Optional filename segments: the shared helper omits them when unavailable.
   dealerName = null,
@@ -185,7 +234,7 @@ export function useProposalExport({
   const runPrint = useCallback(async (mode = EXPORT_MODE) => {
     if (printingRef.current) return;
 
-    const reason = resolveProposalExportReadiness({ proposal, sections, comparisonBlockReason });
+    const reason = resolveProposalExportReadiness({ proposal, sections, comparisonBlockReason, issueBlockReason, mode });
     if (reason) {
       setBlockedReason(reason);
       setError(null);
@@ -331,16 +380,25 @@ export function useProposalExport({
 
       if (!printed) {
         if (!isCurrent()) return;
-        // Fallback — popup blocked or the pack is not mounted: print in-page, on
-        // the app document and on the host tab. The SAME readiness authority runs
-        // first, on this document and on the print node — never a bare
-        // animation-frame delay.
+        // Fallback — the print window was blocked: print in-page, on the app
+        // document and on the host tab, from the SAME mounted pack node. The SAME
+        // readiness authority runs first, on this document and on the print node —
+        // never a bare animation-frame delay. The application interface is never
+        // printed in the pack's place: with no composition mounted there is no
+        // document to print, so the attempt fails visibly and can be retried.
+        const fallbackNode = findPrintNode();
+        if (!fallbackNode) {
+          diagnostics.fail('in_page_fallback', { reason: PRINT_READINESS_REASON.COMPOSITION_UNAVAILABLE });
+          throw notReadyError(describePrintReadinessFailure({
+            reason: PRINT_READINESS_REASON.COMPOSITION_UNAVAILABLE,
+          }));
+        }
         diagnostics.start('in_page_fallback');
         applyPrintDocumentTitle(settledTitle);
 
         document.body.classList.add(EXPORT_BODY_CLASS);
 
-        const readiness = await preparePrintDocument({ doc: document, root: findPrintNode() });
+        const readiness = await preparePrintDocument({ doc: document, root: fallbackNode });
         if (!readiness.ready) {
           document.body.classList.remove(EXPORT_BODY_CLASS);
           diagnostics.fail('in_page_fallback', { reason: readiness.reason });
@@ -386,7 +444,7 @@ export function useProposalExport({
       setRetryable(notReady);
       cleanup(printWindow);
     }
-  }, [proposal, sections, comparisonBlockReason, projectName, dealerName, clientName, projectReference, versionNames, issuedDocument, resolveExportIdentity, cleanup]);
+  }, [proposal, sections, comparisonBlockReason, issueBlockReason, projectName, dealerName, clientName, projectReference, versionNames, issuedDocument, resolveExportIdentity, cleanup]);
 
   // The two entry points. Both prepare and print the SAME document; only the
   // issued export stores the composition it printed.

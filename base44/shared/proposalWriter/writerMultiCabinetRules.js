@@ -33,6 +33,13 @@
  * lenient: it looks for a positive statement of the arrangement, so a description
  * that reads naturally is never refused, and no particular sentence is required.
  *
+ * Each complete sentence is judged on its own FIRST: a sentence that states the
+ * arrangement in full is never undone by the sentence after it, and the published
+ * page is read exactly as the draft was, so mapping the draft into the document's
+ * own sections can never turn a correct description into a failure. A sentence is
+ * read together with its neighbour only where it genuinely needs one, and never
+ * where that neighbour is about another layer.
+ *
  * Exact evidence wording may satisfy the requirement when it explicitly states
  * both counts. The requirement is enforced only where the writer input carries this
  * agreement's own `multi_cabinet_channels` block: a generation filed before the
@@ -43,7 +50,12 @@
 
 import { WRITER_REJECTION } from './writerContractSchema.js';
 import { isProductToken, modelTokens, sentenceParts } from './writerVocabulary.js';
-import { cabinetCounts, logicalChannelCounts, namesCabinetPosition } from './writerCabinetLanguage.js';
+import {
+  cabinetCounts,
+  logicalChannelCounts,
+  namesCabinetPosition,
+  namesOtherCabinetPosition,
+} from './writerCabinetLanguage.js';
 
 /** The reason a requirement is reported unmet. */
 export const MULTI_CABINET_REASONS = Object.freeze({
@@ -149,16 +161,42 @@ function contradictionReason(sentence, requirement) {
   return wrong !== undefined ? `${MULTI_CABINET_REASONS.COUNT}:${requirement.position}:${wrong}` : null;
 }
 
+/** Whether ONE complete sentence states the arrangement in full, on its own. */
+function statesArrangement(text, requirement) {
+  return namesCabinetPosition(text, requirement)
+    && cabinetCounts(text, requirement).includes(requirement.cabinets)
+    && logicalChannelCounts(text, requirement).includes(requirement.channels)
+    && !contradictionReason(text, requirement);
+}
+
+/**
+ * Whether the assembled copy describes the arrangement.
+ *
+ * Sentence first: ONE complete sentence that states the position, the frozen
+ * cabinet count and the one channel is enough, and whatever the document says
+ * next — a sentence about another layer, another parameter or another design —
+ * can neither make nor break it. Only where a sentence names the position but
+ * leaves the channel statement to its neighbour is the pair read together, and
+ * only where that neighbour is about this same arrangement: a neighbour naming
+ * another cabinet position is a different subject, and reading it with this one
+ * would attribute its wording to this arrangement.
+ */
 function described(sentences, requirement) {
   const placements = new Set(['decision_summary', 'what_stays_same', 'what_changes', 'system_design_summary', 'products', 'specification', 'system_overview']);
   const eligible = sentences.filter(row => placements.has(row.section));
+
+  // One sentence that states the arrangement in full is always enough.
+  if (eligible.some(({ sentence }) => statesArrangement(sentence, requirement))) return true;
+
   return eligible.some(({ sentence, section }, index) => {
     const next = eligible[index + 1];
-    const description = next?.section === section ? `${sentence} ${next.sentence}` : sentence;
-    return namesCabinetPosition(description, requirement)
-      && cabinetCounts(description, requirement).includes(requirement.cabinets)
-      && logicalChannelCounts(description, requirement).includes(requirement.channels)
-      && !contradictionReason(description, requirement);
+    if (!next || next.section !== section) return false;
+    if (!namesCabinetPosition(sentence, requirement)) return false;
+    // The channel statement is the part a sentence genuinely needs its neighbour
+    // for; a sentence that already states one stands alone.
+    if (logicalChannelCounts(sentence, requirement).length > 0) return false;
+    if (namesOtherCabinetPosition(next.sentence, requirement)) return false;
+    return statesArrangement(`${sentence} ${next.sentence}`, requirement);
   });
 }
 

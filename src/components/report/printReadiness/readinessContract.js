@@ -39,6 +39,9 @@ export const PRINT_READINESS_REASON = Object.freeze({
   IMAGES_FAILED: 'required_image_failed',
   IMAGES_DECODE_FAILED: 'required_image_decode_failed',
   LAYOUT_UNSTABLE: 'print_layout_unstable',
+  // The composition itself was not mounted on the page: there is no document to
+  // print, so the app interface is never printed in its place.
+  COMPOSITION_UNAVAILABLE: 'print_composition_unavailable',
   // The document's own identity — the exact saved design-version names it states
   // — could not be read, and the document needs them to be correct.
   IDENTITY_UNRESOLVED: 'document_identity_unresolved',
@@ -55,6 +58,7 @@ const REASON_SUBJECT = Object.freeze({
   [PRINT_READINESS_REASON.IMAGES_FAILED]: 'an image could not be loaded',
   [PRINT_READINESS_REASON.IMAGES_DECODE_FAILED]: 'an image could not be decoded',
   [PRINT_READINESS_REASON.LAYOUT_UNSTABLE]: 'the page layout did not settle',
+  [PRINT_READINESS_REASON.COMPOSITION_UNAVAILABLE]: 'the proposal document had not finished composing',
   [PRINT_READINESS_REASON.IDENTITY_UNRESOLVED]: 'the design versions this document names could not be read',
 });
 

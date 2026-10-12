@@ -39,7 +39,7 @@ import { alternativesCarrier, orderPublicationSections } from '@/components/prop
 import { isHighChannelDesign } from '@/components/proposal/highChannelLayoutAuthority';
 import ProposalPrintDocument from '@/components/proposal/export/ProposalPrintDocument';
 import ProposalPrintStyles from '@/components/proposal/export/ProposalPrintStyles';
-import { useProposalExport } from '@/components/proposal/export/useProposalExport';
+import { canMountPrintComposition, useProposalExport } from '@/components/proposal/export/useProposalExport';
 import { proposalVersionIds } from '@/components/proposal/library/proposalSourceState';
 import useProposalExportIdentity from '@/components/proposal/editor/useProposalExportIdentity';
 import { documentTypeForProposalType } from '@/components/library/issuedDocument/issuedDocumentTypes';
@@ -763,7 +763,13 @@ export default function ProposalEditor() {
   } = useProposalExport({
     proposal,
     sections: documentSections,
-    comparisonBlockReason: comparisonBlockReason || editLayerBlockReason,
+    // Composition availability: what must be in hand before ANY document is
+    // composed, preview included — the comparison evidence and the proposal's own
+    // copy. It withholds both actions.
+    comparisonBlockReason,
+    // The copy layer's own editorial block, which is an ISSUE gate: it withholds
+    // the issued document and never the read-only preview of it.
+    issueBlockReason: editLayerBlockReason,
     projectName: projectContext.projectName,
     dealerName: projectContext.filenameDealerName,
     clientName: projectContext.filenameClientName,
@@ -842,7 +848,7 @@ export default function ProposalEditor() {
         onExport={handleExport}
         previewing={previewing}
         onPreview={handlePreview}
-        blockedReason={comparisonBlockReason || editLayerBlockReason || exportBlockedReason}
+        blockedReason={comparisonBlockReason || exportBlockedReason || editLayerBlockReason}
         error={exportError}
         retryable={exportRetryable}
       />
@@ -1255,9 +1261,13 @@ export default function ProposalEditor() {
 
       </div>
 
-      {/* The print-only document is mounted only after complete validation;
-          export rechecks the same composition on the server before printing. */}
-      {currentDocumentLayer?.document_validation?.valid && <ProposalPrintDocument
+      {/* The print-only document is mounted as soon as its own source data is
+          available, for BOTH actions: the A4 pack is the document the designer
+          inspects and the document that is issued. Withholding it until the copy
+          passed its issue gate is what made a read-only preview impossible — the
+          gate is applied to the EXPORT, on the server, before anything is printed.
+          The application interface is never printed in its place. */}
+      {canMountPrintComposition({ proposal, sections: documentSections }) && <ProposalPrintDocument
         proposal={proposal}
         projectName={projectContext.projectName || proposal?.title}
         dealerName={projectContext.dealerName}
