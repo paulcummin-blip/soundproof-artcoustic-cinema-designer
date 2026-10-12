@@ -43,6 +43,33 @@ export default function CreateProposalWizard({ onCreated, onCancel, regenerateFr
   const { user } = useAuth();
   const accountId = user?.access_context?.account?.id || user?.account_id || null;
 
+  // Regeneration starts from the proposal it revises: project, report type,
+  // versions and client brief are carried across, and the new proposal is linked
+  // back to the original, which is never modified.
+  //
+  // Declared here, above every hook, effect and dependency array that reads
+  // them, so no state is ever referenced before it is initialised.
+  const [step, setStep] = useState(regenerateFrom ? 2 : 0);
+  const [selectedProjectId, setSelectedProjectId] = useState(regenerateFrom?.project_id || null);
+  const [proposalType, setProposalType] = useState(regenerateFrom?.proposal_type || null);
+  const [selectedVersionIds, setSelectedVersionIds] = useState(() => {
+    if (!regenerateFrom) return [];
+    const selected = Array.isArray(regenerateFrom.selected_version_ids)
+      ? regenerateFrom.selected_version_ids.filter(Boolean)
+      : [];
+    return selected.length > 0 ? selected : (regenerateFrom.version_id ? [regenerateFrom.version_id] : []);
+  });
+  const [clientBrief, setClientBrief] = useState(regenerateFrom?.client_brief || '');
+  const [generating, setGenerating] = useState(false);
+  const [error, setError] = useState(null);
+  const [blockedAttempt, setBlockedAttempt] = useState(false);
+  // Which of the four generation states is on screen: preparing, writing,
+  // opening the editor, ready. Null when Step 5 has not started.
+  const [generationPhase, setGenerationPhase] = useState(null);
+  const parentProposalId = regenerateFrom?.id || null;
+  const generationInFlightRef = useRef(false);
+  const creationRequestIdRef = useRef(null);
+
   // ── The project's genuine design versions ──
   // ONE canonical read for the whole wizard: the Type step's availability rule and
   // the Versions step count the same collapsed, duplicate-free list, so they can
@@ -76,30 +103,6 @@ export default function CreateProposalWizard({ onCreated, onCancel, regenerateFr
       setSelectedVersionIds([]);
     }
   }, [step, selectedProjectId, versionsLoading, canonicalVersionCount, proposalType]);
-
-  // Regeneration starts from the proposal it revises: project, report type,
-  // versions and client brief are carried across, and the new proposal is linked
-  // back to the original, which is never modified.
-  const [step, setStep] = useState(regenerateFrom ? 2 : 0);
-  const [selectedProjectId, setSelectedProjectId] = useState(regenerateFrom?.project_id || null);
-  const [proposalType, setProposalType] = useState(regenerateFrom?.proposal_type || null);
-  const [selectedVersionIds, setSelectedVersionIds] = useState(() => {
-    if (!regenerateFrom) return [];
-    const selected = Array.isArray(regenerateFrom.selected_version_ids)
-      ? regenerateFrom.selected_version_ids.filter(Boolean)
-      : [];
-    return selected.length > 0 ? selected : (regenerateFrom.version_id ? [regenerateFrom.version_id] : []);
-  });
-  const [clientBrief, setClientBrief] = useState(regenerateFrom?.client_brief || '');
-  const [generating, setGenerating] = useState(false);
-  const [error, setError] = useState(null);
-  const [blockedAttempt, setBlockedAttempt] = useState(false);
-  // Which of the four generation states is on screen: preparing, writing,
-  // opening the editor, ready. Null when Step 5 has not started.
-  const [generationPhase, setGenerationPhase] = useState(null);
-  const parentProposalId = regenerateFrom?.id || null;
-  const generationInFlightRef = useRef(false);
-  const creationRequestIdRef = useRef(null);
 
   // ── Stage 2A: Frozen Engineering Snapshot ──
   // Assemble the snapshot from the canonical authorities for the first selected
