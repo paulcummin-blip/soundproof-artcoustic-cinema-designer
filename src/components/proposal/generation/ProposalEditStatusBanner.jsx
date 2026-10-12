@@ -2,8 +2,12 @@
  * ProposalEditStatusBanner
  * ------------------------
  * The state of a proposal's generated copy, in the designer's words: what was
- * written, what copy is being shown, whether it is ready to issue, and — when it
- * is not — every reason in plain language.
+ * written, whether it is ready to issue, and — when it is not — every reason in
+ * plain language.
+
+ * The status states whether the copy may be issued. How the copy came to exist —
+ * the original generated copy, or the designer's own edit — is editing context
+ * and is not part of the status.
  *
  * It renders the model the server resolved and decides nothing: no rule, no
  * validation and no gate is evaluated here.
@@ -39,11 +43,6 @@ const TONE = {
   ready: { bg: '#EDF3EC', border: '#C6D6C4', text: '#213428', icon: CheckCircle2 },
   review: { bg: '#F6E7E1', border: '#E4C9BC', text: '#8B4A2B', icon: AlertTriangle },
   legacy: { bg: '#F5F4F0', border: '#DCDBD6', text: '#625143', icon: Info },
-};
-
-const SOURCE_LABEL = {
-  generated: 'Original generated copy',
-  edit: 'Your edited copy',
 };
 
 const TITLE = {
@@ -89,11 +88,6 @@ export default function ProposalEditStatusBanner({ layer, children = null, maste
         <div style={{ flex: 1, minWidth: 0 }}>
           <p style={{ ...TITLE, color: palette.text }}>
             {bannerTitle}
-            {!layer.legacy && layer.copy?.source && (
-              <span style={{ ...TEXT, marginLeft: 10, color: palette.text, opacity: 0.85 }}>
-                {SOURCE_LABEL[layer.copy.source] || layer.copy.source}
-              </span>
-            )}
           </p>
 
           {bannerMessage && <p style={{ ...TEXT, color: palette.text }}>{bannerMessage}</p>}

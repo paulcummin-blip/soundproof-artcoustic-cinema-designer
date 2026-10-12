@@ -1,8 +1,8 @@
 /**
  * proposalWriteActionModel.js
  * ---------------------------
- * When the Phase 6 GPT writer action is offered, what it says, and which attempt
- * a retry would point at.
+ * When regeneration is offered, what it says, and which attempt a retry would
+ * point at.
  *
  * Pure and dependency-free, so the visibility rule is testable and is not spread
  * through the component: while the flag is off the action does not exist at all —
@@ -14,6 +14,13 @@
  * - layer: the copy layer (which attempts exist, and which failed)
  * - readOnly: the proposal is archived
  */
+
+/**
+ * The one label the regeneration action carries. Regeneration is a secondary
+ * action in the editor: it is asked for by name, and it never presents itself as
+ * a test tool or explains how the writer works.
+ */
+const REGENERATE_LABEL = 'Regenerate Copy';
 
 /** The attempts that failed and can be retried. */
 function failedAttempts(layer) {
@@ -49,12 +56,12 @@ export function proposalWriteActionModel({ writer = null, layer = null, readOnly
   return {
     visible: true,
     enabled: true,
-    label: writer.label || 'Generate design copy',
-    beta: writer.beta || 'Beta — test tool',
-    disclaimer: writer.disclaimer || null,
+    label: REGENERATE_LABEL,
+    beta: null,
+    disclaimer: null,
     message: null,
     has_valid_copy: hasValidCopy,
-    generate_label: hasValidCopy ? 'Generate a new copy' : 'Generate copy',
+    generate_label: REGENERATE_LABEL,
     // Retry points at the newest failed attempt. The server refuses a retry whose
     // evidence has moved on and says so, rather than relinking it silently.
     retry_generation_id: newestFailure?.generation_id || null,

@@ -14,10 +14,10 @@
  * as such, it is never blocked, and the editor carries on working exactly as it
  * did before.
  *
- * The Phase 6 GPT writer action is offered here only while the feature flag is on
- * for this login AND only to a master admin. It is the controlled test tool, not
- * part of the dealer's workflow: a proposal generated through Create Proposal has
- * already been written by the approved writer, and its validated copy is what the
+ * Regeneration is offered here only while the feature flag is on for this login
+ * AND only to a master admin, as a secondary action rather than part of the
+ * dealer's workflow: a proposal generated through Create Proposal has already
+ * been written by the approved writer, and its validated copy is what the
  * document below shows. Everything the action needs — whether to exist at all —
  * is resolved by the server with the copy layer, so nothing in this panel can
  * switch it on.

@@ -1,12 +1,13 @@
 /**
  * ProposalWriteAction
  * -------------------
- * The controlled Phase 6 action: ask the GPT writer for this proposal's copy.
+ * Ask the approved writer for this proposal's copy again.
  *
  * It exists only while the feature flag is on for this login — the server
  * resolves that and the action renders nothing at all when it is off, so the
- * proposal's own editing flow is unchanged and uncluttered. It is labelled as a
- * test tool, and it says what the writer may write from.
+ * proposal's own editing flow is unchanged and uncluttered. In the editor it is
+ * one secondary action, asked for by name: it states no provenance, carries no
+ * test-tool marking and explains nothing about how the writer works.
  *
  * The approved writer is now the normal generation authority, so a proposal a
  * dealer generates already carries its validated copy. This action is therefore
@@ -30,10 +31,7 @@
 import React, { useState } from 'react';
 import { Loader2, Sparkles } from 'lucide-react';
 import { base44 } from '@/api/base44Client';
-import {
-  REPORT_FONT_BODY as FONT_BODY,
-  REPORT_FONT_HEADING as FONT_HEADING,
-} from '@/components/report/typography/reportTypography';
+import { REPORT_FONT_BODY as FONT_BODY } from '@/components/report/typography/reportTypography';
 import {
   generationOutcomeSentence,
   proposalWriteActionModel,
@@ -103,7 +101,7 @@ export default function ProposalWriteAction({
       <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center' }}>
         <button
           type="button"
-          style={busy ? { ...BUTTON, opacity: 0.6, cursor: 'default' } : BUTTON}
+          style={busy ? { ...QUIET_BUTTON, opacity: 0.6, cursor: 'default' } : QUIET_BUTTON}
           disabled={busy}
           onClick={() => run(null)}
         >
@@ -122,21 +120,7 @@ export default function ProposalWriteAction({
           </button>
         )}
 
-        <span style={{
-          display: 'inline-flex', alignItems: 'center', padding: '3px 8px', borderRadius: 999,
-          border: '1px solid #DCDBD6', background: '#FFFFFF', fontSize: 10, fontWeight: 600,
-          letterSpacing: '0.04em', textTransform: 'uppercase', color: '#625143',
-        }}>
-          {model.beta}
-        </span>
       </div>
-
-      {model.disclaimer && (
-        <div style={{ marginTop: 6, maxWidth: 720, lineHeight: 1.5 }}>
-          <span style={{ fontFamily: FONT_HEADING, color: '#213428' }}>{model.label}. </span>
-          {model.disclaimer}
-        </div>
-      )}
 
       {outcome && (
         <div style={{ marginTop: 6, maxWidth: 720, lineHeight: 1.5, color: outcome.ok ? '#213428' : '#B23A3A' }}>

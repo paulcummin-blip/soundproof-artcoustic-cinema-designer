@@ -7,7 +7,7 @@
  * the branding.
  *
  * Left:  proposal identity (title, project, proposal type)
- * Right: Client Brief, Show Properties, Preview Document (read-only),
+ * Right: Client Brief, Preview Document (read-only),
  *        Export Proposal PDF (primary)
  *
  * Preview Document prepares the SAME print document as the export — same pack,
@@ -17,7 +17,7 @@
  */
 
 import React from 'react';
-import { FileText, SlidersHorizontal, Download, Eye, Loader2, AlertCircle, RotateCw } from 'lucide-react';
+import { FileText, Download, Eye, Loader2, AlertCircle, RotateCw } from 'lucide-react';
 
 import { REPORT_FONT_BODY as FONT } from '@/components/report/typography/reportTypography';
 
@@ -32,8 +32,6 @@ export default function ProposalWorkspaceToolbar({
   typeLabel,
   showClientBrief,
   onToggleClientBrief,
-  showProperties,
-  onToggleProperties,
   exporting,
   onExport,
   // The read-only preview: the same print document, opened for inspection
@@ -78,17 +76,6 @@ export default function ProposalWorkspaceToolbar({
           >
             <FileText className="w-3.5 h-3.5" />
             Client Brief
-          </button>
-
-          <button
-            type="button"
-            onClick={onToggleProperties}
-            aria-pressed={showProperties}
-            className={showProperties ? SECONDARY_ACTIVE : SECONDARY_IDLE}
-            style={{ fontFamily: FONT }}
-          >
-            <SlidersHorizontal className="w-3.5 h-3.5" />
-            Show Properties
           </button>
 
           <button

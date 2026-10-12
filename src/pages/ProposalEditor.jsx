@@ -109,7 +109,6 @@ export default function ProposalEditor() {
   const [saveStatuses, setSaveStatuses] = useState({});
   const [dirtySections, setDirtySections] = useState(new Set());
   const [regenerating, setRegenerating] = useState(null);
-  const [showProperties, setShowProperties] = useState(false);
   const [clientBrief, setClientBrief] = useState('');
   const [showClientBrief, setShowClientBrief] = useState(false);
   const [savingBrief, setSavingBrief] = useState(false);
@@ -839,8 +838,6 @@ export default function ProposalEditor() {
         typeLabel={typeLabel}
         showClientBrief={showClientBrief}
         onToggleClientBrief={() => setShowClientBrief((prev) => !prev)}
-        showProperties={showProperties}
-        onToggleProperties={() => setShowProperties((prev) => !prev)}
         exporting={exporting}
         onExport={handleExport}
         previewing={previewing}
@@ -1248,41 +1245,6 @@ export default function ProposalEditor() {
               RP22 value, Design Rating, or recommendation. Use Refine to apply the brief to a
               section.
             </p>
-          </div>
-        </div>
-      )}
-
-      {/* ── Right: Contextual properties ── */}
-      {showProperties && activeSection && (
-        <div className="w-64 border-l border-[#DCDBD6] bg-white p-4 overflow-y-auto">
-          <h3 className="text-sm font-semibold text-[#3E4349] mb-3">Properties</h3>
-          <div className="space-y-3 text-sm">
-            <div>
-              <div className="text-xs text-[#625143]">Section Type</div>
-              <div className="text-[#1B1A1A]">{getSectionLabel(activeSection.section_type, proposal?.proposal_type)}</div>
-            </div>
-            <div>
-              <div className="text-xs text-[#625143]">Status</div>
-              <div className="text-[#1B1A1A]">
-                {activeSection.locked ? '🔒 Locked' : 'Editable'}
-              </div>
-            </div>
-            <div>
-              <div className="text-xs text-[#625143]">Last Generated</div>
-              <div className="text-[#1B1A1A] text-xs">
-                {activeSection.last_gpt_generated_at
-                  ? new Date(activeSection.last_gpt_generated_at).toLocaleString()
-                  : 'Never'}
-              </div>
-            </div>
-            <div>
-              <div className="text-xs text-[#625143]">Last Edit</div>
-              <div className="text-[#1B1A1A] text-xs">
-                {activeSection.last_user_edited_at
-                  ? new Date(activeSection.last_user_edited_at).toLocaleString()
-                  : 'Never'}
-              </div>
-            </div>
           </div>
         </div>
       )}
