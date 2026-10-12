@@ -316,7 +316,9 @@ function packStrings(pack) {
     if (typeof value === 'object') Object.values(value).forEach((entry) => walk(entry, depth + 1));
   };
   walk(pack);
-  return out.join(' \n ');
+  // Paragraphs are preserved: a recorded reason is read from the sentence beside the
+  // one it justifies, and never across a break.
+  return out.join(' \n\n ');
 }
 
 /** The parameter facts the pack states, keyed by parameter number. */
@@ -417,7 +419,16 @@ export function buildClientBriefCoverage({ brief = null, pack = null, sections =
     // decides who can act on a gap — a documented reason can be written, an
     // undocumented one exists only in the designer's head.
     const reasoningStated = !reasoningRequired
-      || evidence.some((entry) => statesReasoning(entry.passage));
+      || evidence.some((entry) => statesReasoning(entry.passage))
+      // An explanation may be carried across two related sentences of one paragraph,
+      // so the justification is looked for beside the item's subject as well as
+      // inside a single sentence. Paragraph boundaries are kept: a reason two
+      // paragraphs away is reasoning about a different subject.
+      || (Array.isArray(sections) ? sections : []).some((entry) => groundedReason({
+        text: String(entry?.text || '').replace(/<[^>]*>/g, ' '),
+        subjectPatterns: matchedSubjectPatterns,
+        contentTerms: [],
+      }));
     const rationaleDocumented = !reasoningRequired
       || statesReasoning(item)
       || groundedReason({ text: rationaleText, subjectPatterns: matchedSubjectPatterns, contentTerms });
@@ -521,7 +532,7 @@ export function buildClientBriefCoverage({ brief = null, pack = null, sections =
       || row.status === BRIEF_ITEM_STATUS.NEEDS_DESIGNER_INPUT));
   return {
     supplied: items.length > 0,
-    rule: 'a brief item is addressed only when the finished narrative explains what it asked for: the evidence must support it, the copy must reach its subject, the specific matter it names must be explained there, every figure or named row it requires must be stated, and an item that asks why or how a decision was made is answered by the reasoning itself and never by a figure alone — where the copy states the result and not the reasoning it is partially addressed, and where no source records the reasoning at all it is returned to the designer rather than invented. Every verdict carries the passage it was read from or the mention that stands in its place. A supported request the copy omits is unaddressed; one the copy only partly answers is partially addressed; one no source states is unsupported',
+    rule: 'a brief item is addressed only when the finished narrative explains what it asked for: the evidence must support it, the copy must reach its subject, the specific matter it names must be explained there, every figure or named row it requires must be stated, and an item that asks why or how a decision was made is answered by the reasoning itself and never by a figure alone — where the copy states the result and not the reasoning it is partially addressed, and where no source records the reasoning at all it is returned to the designer rather than invented, and a justification carried across two related sentences of one paragraph is an explanation like any other. Every verdict carries the passage it was read from or the mention that stands in its place. A supported request the copy omits is unaddressed; one the copy only partly answers is partially addressed; one no source states is unsupported',
     items: rows,
     addressed_count: count(BRIEF_ITEM_STATUS.ADDRESSED),
     partially_addressed_count: count(BRIEF_ITEM_STATUS.PARTIALLY_ADDRESSED),

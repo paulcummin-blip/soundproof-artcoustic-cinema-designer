@@ -18,11 +18,19 @@
  *
  * Suggestions guide narrative wording and emphasis ONLY. Nothing here
  * calculates, grades or re-interprets a result.
+ *
+ * A suggestion may ask the report to explain a design DECISION only where the
+ * reasoning behind it is recorded — in the saved design interpretation, or in the
+ * designer's own brief and notes. Where only the calculated result exists, the example
+ * asks for the result and what it means for the room, and where an important decision
+ * has no recorded reasoning at all ADI offers the designer a short optional question
+ * about it instead of implying an answer.
  */
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.52';
 import { buildEngineeringEvidence } from '../../shared/engineeringSnapshotEvidence.js';
 import { buildAuthorityChips, resolveNarrativeChips } from '../../shared/adiNarrativeAuthority.js';
 import { buildComparisonAuthorityChips, resolveComparisonNarrativeChips } from '../../shared/adiComparisonNarrativeChips.js';
+import { buildClarifications } from '../../shared/adiSuggestionReasoning.js';
 import { buildDisplayLanguageRule, buildNarrativeFacts, buildNarrativeFactsBlock } from '../../shared/adiNarrativeFacts.js';
 import { resolveReportLayout } from '../../shared/highChannelDensityRule.js';
 import {
@@ -59,11 +67,67 @@ const REPORT_TYPE_LABELS = {
   system_summary: 'a System Design Summary covering one design version',
 };
 
-function buildPrompt({ evidence, factsBlock, authorityChips, proposalType, versionCount, projectName, highDensity, parameterRule, displayRule }) {
+/**
+ * The recorded design reasoning for these versions: the verified interpretation the
+ * reports were written against, read from the saved proposals for this project. A
+ * version with no saved interpretation has no documented reasoning, and ADI then
+ * suggests only what the calculated results establish — never an explanation Sound
+ * Proof does not hold.
+ */
+async function readRecordedRationale(base44, projectId, versionIds = []) {
+  if (!projectId) return '';
+  try {
+    const result = await base44.entities.Proposal.filter(
+      { project_id: projectId },
+      { sort: '-created_date', limit: 10 },
+    );
+    const proposals = Array.isArray(result) ? result : (result?.items || []);
+    const wanted = new Set((versionIds || []).filter(Boolean));
+    const parts = [];
+    for (const proposal of proposals) {
+      const ids = [
+        proposal?.version_id || null,
+        ...(Array.isArray(proposal?.selected_version_ids) ? proposal.selected_version_ids : []),
+      ].filter(Boolean);
+      if (wanted.size > 0 && ids.length > 0 && !ids.some((id) => wanted.has(id))) continue;
+      const interpretation = proposal?.metadata?.project_interpretation;
+      if (!interpretation) continue;
+      parts.push(JSON.stringify(interpretation));
+    }
+    return parts.join('\n\n').slice(0, 6000);
+  } catch (error) {
+    console.error('[generateAdiNarrativeSuggestions] recorded design reasoning unavailable:', error?.message);
+    return '';
+  }
+}
+
+/**
+ * The recorded reasoning as the suggestion writer sees it. Where none is on file that
+ * is stated plainly, so no suggestion implies a reason Sound Proof does not hold.
+ */
+function buildRationaleBlock(rationale) {
+  if (!rationale) {
+    return [
+      '=== RECORDED DESIGN REASONING ===',
+      'Nothing is recorded for this version: no decision rationale is on file. Never suggest explaining why a speaker, seat, subwoofer position or spacing was chosen.',
+      '=== END RECORDED DESIGN REASONING ===',
+    ].join('\n');
+  }
+  return [
+    '=== RECORDED DESIGN REASONING (the only decisions a suggestion may ask the report to explain) ===',
+    "This includes the designer's own Client Brief and notes: a decision they explain there is recorded reasoning. Never repeat their requests back as suggestions.",
+    rationale,
+    '=== END RECORDED DESIGN REASONING ===',
+  ].join('\n');
+}
+
+function buildPrompt({ evidence, factsBlock, rationale, authorityChips, proposalType, versionCount, projectName, highDensity, parameterRule, displayRule }) {
   return [
     evidence,
     '',
     factsBlock,
+    '',
+    rationale,
     '',
     '=== ALREADY INCLUDED (never repeat or reword these) ===',
     ...authorityChips.map((chip) => `- ${chip.label}`),
@@ -87,6 +151,8 @@ function buildPrompt({ evidence, factsBlock, authorityChips, proposalType, versi
     '- Every number is checked against the project data before the designer sees the chip: a screen size, level, channel count, subwoofer count, dB, Hz or angle figure that does not match this version is discarded.',
     '- If a fact is not in that block, write the point without a number (for example, the screen scale and viewing geometry) instead of guessing a value.',
     '- Every chip must be supported by a fact in the calculated data above. Never invent a result, value, level or seat count.',
+    '- Suggest explaining a design DECISION — why a speaker, seat, subwoofer position or spacing was chosen — only where that reasoning appears in the recorded design reasoning block above. Where it is not recorded, suggest explaining the calculated result and what it means for the room instead.',
+    '- Never imply Sound Proof knows why a decision was made when that reasoning is not on record.',
     '- Only name a level (for example Level 4) when that exact level appears in the data for that parameter. Never suggest a level the design cannot reach.',
     '- Never describe the design as state-of-the-art, reference or flawless unless the data shows the top levels across the pillars.',
     highDensity
@@ -108,7 +174,7 @@ function buildPrompt({ evidence, factsBlock, authorityChips, proposalType, versi
  * rule that a suggestion is about the versions together — never one version's
  * fact presented as though it applied to the whole comparison.
  */
-function buildComparisonPrompt({ versions, authorityChips, projectName, parameterRule, displayRule }) {
+function buildComparisonPrompt({ versions, authorityChips, rationale, projectName, parameterRule, displayRule }) {
   const names = versions.map((entry, index) => entry.version_name || entry.version_id || `Version ${index + 1}`);
   const blocks = versions.map((entry, index) => [
     `=== VERSION: ${names[index]} ===`,
@@ -123,6 +189,8 @@ function buildComparisonPrompt({ versions, authorityChips, projectName, paramete
 
   return [
     blocks.join('\n\n'),
+    '',
+    rationale,
     '',
     '=== ALREADY INCLUDED (never repeat or reword these) ===',
     ...authorityChips.map((chip) => `- ${chip.label}`),
@@ -146,6 +214,7 @@ function buildComparisonPrompt({ versions, authorityChips, projectName, paramete
     '- A value belonging to one selected version may appear only in a comparison with another version\'s value. A suggestion that states one version\'s figure as the single fact of the report is discarded.',
     '- A fact stated without comparison wording must hold in every selected version, or it is discarded.',
     '- Never invent a difference between versions. Where the versions match on an area, say that they match instead of inventing a change.',
+    '- Suggest explaining a design DECISION only where that reasoning appears in the recorded design reasoning block above: where it is not recorded, suggest explaining the calculated result and what it means instead, and never imply Sound Proof knows why it was chosen.',
     '- Never suggest a screen size, level, layout, seat count, subwoofer count, dB or Hz figure that is not in the version blocks above.',
     '- Where the data shows a weak or limiting area in one version, prefer a chip that explains it honestly as a difference between the options.',
     highDensityEverywhere
@@ -208,6 +277,25 @@ export default async function (req) {
       }))
       .filter((entry) => entry.facts.available);
 
+    // The recorded design reasoning for these versions: the decisions a suggestion may
+    // ask the report to explain. Where none is saved for a version, ADI suggests only
+    // what the calculated results establish.
+    const rationale = await readRecordedRationale(
+      base44,
+      body?.project_id,
+      versionEntries.length >= 2
+        ? versionEntries.map((entry) => entry.version_id)
+        : (Array.isArray(body?.selected_version_ids) ? body.selected_version_ids : []),
+    );
+
+    // The material a suggestion's reasoning is read from, exactly as the Client Brief
+    // audit reads it: the recorded interpretation, and the designer's own words in the
+    // brief and notes. A decision recorded nowhere here is not established, so ADI never
+    // suggests explaining it.
+    const reasoningMaterial = [rationale, body?.client_brief || '', body?.dealer_notes || '']
+      .filter((part) => String(part).trim().length > 0)
+      .join('\n\n');
+
     if (versionEntries.length >= 2) {
       const authorityChips = buildComparisonAuthorityChips(versionEntries);
 
@@ -217,6 +305,7 @@ export default async function (req) {
           prompt: buildComparisonPrompt({
             versions: versionEntries,
             authorityChips,
+            rationale: reasoningMaterial,
             projectName: versionEntries[0]?.snapshot?.project?.name || snapshot?.project?.name || null,
             parameterRule,
             // Every selected version being a television is what makes the TV
@@ -236,6 +325,7 @@ export default async function (req) {
         aiChips: comparisonAiChips,
         versions: versionEntries,
         policy: parameterPolicy,
+        material: reasoningMaterial,
       });
       if (suggestions.length === 0) return unavailable();
 
@@ -268,6 +358,7 @@ export default async function (req) {
           evidence: buildEngineeringEvidence(snapshot),
           factsBlock: buildNarrativeFactsBlock(facts),
           authorityChips,
+          rationale: reasoningMaterial,
           proposalType: body?.proposal_type,
           versionCount: Array.isArray(body?.selected_version_ids)
             ? body.selected_version_ids.length
@@ -284,9 +375,20 @@ export default async function (req) {
       console.error('[generateAdiNarrativeSuggestions] ADI suggestions unavailable, grounded examples only:', error?.message);
     }
 
-    // Validate every chip against the same snapshot before it is returned.
-    const { suggestions, diagnostics } = resolveNarrativeChips({ aiChips, facts, policy: parameterPolicy });
+    // Validate every chip against the same snapshot before it is returned. The
+    // recorded reasoning decides which decisions a suggestion may ask the report to
+    // explain.
+    const { suggestions, diagnostics } = resolveNarrativeChips({
+      aiChips,
+      facts,
+      policy: parameterPolicy,
+      material: reasoningMaterial,
+    });
     if (suggestions.length === 0) return unavailable();
+
+    // The optional questions ADI may put to the designer: an important decision whose
+    // reasoning is not recorded. They are offers, and never block generating.
+    const clarifications = buildClarifications({ facts, material: reasoningMaterial });
 
     // Diagnostics trail for every chip: text, source fields, source values and
     // whether it passed, was rewritten, or was rejected.
@@ -294,7 +396,7 @@ export default async function (req) {
       console.log('[ADI narrative chip]', JSON.stringify(entry));
     }
 
-    return Response.json({ available: true, suggestions, diagnostics });
+    return Response.json({ available: true, suggestions, diagnostics, clarifications });
   } catch (error) {
     return Response.json({ error: error.message }, { status: 500 });
   }

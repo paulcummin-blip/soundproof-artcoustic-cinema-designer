@@ -44,6 +44,10 @@ import {
   mentionsProcessorCostClaim,
   HIGH_CHANNEL_PREFERRED_SENTENCE,
 } from './highChannelDensityRule.js';
+import {
+  OVERHEAD_ARRANGEMENT_CHIP,
+  resolveReasoningSuggestion,
+} from './adiSuggestionReasoning.js';
 
 /** The generic screen example, used when this version states no screen. */
 export const SCREEN_GENERIC_CHIP = 'Emphasise the screen scale and viewing geometry';
@@ -51,8 +55,10 @@ export const SCREEN_GENERIC_CHIP = 'Emphasise the screen scale and viewing geome
 /** The generic television example, used when a version states a TV without a diagonal. */
 export const TV_GENERIC_CHIP = 'Highlight the immersive viewing experience from the TV';
 
-/** How many deterministic examples the authority builds. */
-export const AUTHORITY_CHIP_LIMIT = 8;
+/** How many deterministic examples the authority builds: the display, layout, channel
+ *  count, the calculated results, the overhead arrangement and the bass results — so
+ *  the overhead arrangement example is added without displacing another one. */
+export const AUTHORITY_CHIP_LIMIT = 9;
 
 /** How many chips are shown in total. */
 export const CHIP_LIMIT = 12;
@@ -256,6 +262,18 @@ export function buildAuthorityChips(facts) {
         : 'Subwoofer configuration read from this version.',
       ['snapshot.system.subwoofer_strategy.instances', 'snapshot.system.subwoofer_strategy.count'],
       [String(total), ...(subs.modelLabel ? [subs.modelLabel] : [])],
+    ));
+  }
+
+  // The overhead arrangement: the calculated spacing and what it means for this room.
+  // Never why the spacing was chosen — that reasoning belongs to the designer, and is
+  // offered only where a recorded interpretation states it.
+  if (parameters.p9) {
+    chips.push(chip(
+      OVERHEAD_ARRANGEMENT_CHIP,
+      `Overhead spacing result for this version: ${parameters.p9.text}.`,
+      ['snapshot.rp22.parameter_headlines.p9'],
+      [parameters.p9.text],
     ));
   }
 
@@ -466,10 +484,13 @@ function rewriteChip(label, check, facts) {
  * diagnostics record — chip text, source fields, source value and outcome — so
  * each example can be traced to the data it came from.
  *
- * @param {{ aiChips?: Array<Object>, facts: Object, policy?: Object|null }} params
+ * @param {{ aiChips?: Array<Object>, facts: Object, policy?: Object|null, material?: string }} params
+ *   `material` is the recorded design reasoning — the frozen evidence and the verified
+ *   interpretation. A suggestion asking why a design decision was made is offered only
+ *   where that material documents the decision.
  * @returns {{ suggestions: Array<Object>, diagnostics: Array<Object> }}
  */
-export function resolveNarrativeChips({ aiChips = [], facts, policy = null } = {}) {
+export function resolveNarrativeChips({ aiChips = [], facts, policy = null, material = '' } = {}) {
   const suggestions = [];
   const diagnostics = [];
   const seen = new Set();
@@ -499,25 +520,66 @@ export function resolveNarrativeChips({ aiChips = [], facts, policy = null } = {
   // Deterministic examples first: assembled in code from the calculated facts.
   for (const entry of buildAuthorityChips(facts)) {
     if (suggestions.length >= CHIP_LIMIT) break;
-    const check = validateNarrativeChip(entry.label, facts);
+    const gate = resolveReasoningSuggestion({ label: entry.label, material, facts });
+    if (gate.status === 'rejected') {
+      diagnostics.push({
+        text: entry.label,
+        source: entry.source || 'authority',
+        status: 'rejected',
+        sourceFields: entry.sourceFields || [],
+        sourceValues: entry.sourceValues || [],
+        violations: [{ rule: gate.rule }],
+        rewrittenTo: null,
+      });
+      continue;
+    }
+    const candidate = gate.status === 'rewritten' ? { ...entry, label: gate.label, reason: gate.note } : entry;
+    const check = validateNarrativeChip(candidate.label, facts);
     // A chip built here must pass its own check; one that does not is dropped
     // rather than displayed with a value that failed validation.
-    add(entry, { status: check.status, violations: check.violations });
+    add(candidate, gate.status === 'rewritten'
+      ? { text: entry.label, status: 'rewritten', violations: [{ rule: gate.rule }], rewrittenTo: candidate.label }
+      : { status: check.status, violations: check.violations });
   }
 
   for (const raw of Array.isArray(aiChips) ? aiChips : []) {
     if (suggestions.length >= CHIP_LIMIT) break;
     const label = String(raw?.label || '').trim();
     if (!label) continue;
-    const check = validateNarrativeChip(label, facts, policy);
+    // A suggestion asking WHY a decision was made is offered only where the recorded
+    // reasoning documents that decision. Where it does not, the example asks for the
+    // calculated result and what it means, or is dropped.
+    const gate = resolveReasoningSuggestion({ label, material, facts });
+    if (gate.status === 'rejected') {
+      diagnostics.push({
+        text: label,
+        source: 'adi',
+        status: 'rejected',
+        sourceFields: [],
+        sourceValues: [],
+        violations: [{ rule: gate.rule }],
+        rewrittenTo: null,
+      });
+      continue;
+    }
+    const offered = gate.status === 'rewritten' ? gate.label : label;
+    const check = validateNarrativeChip(offered, facts, policy);
     if (check.status === 'passed') {
       add(
-        { label, reason: String(raw?.reason || '').trim(), source: 'adi', sourceFields: [], sourceValues: [] },
-        { status: 'passed', violations: [] },
+        {
+          label: offered,
+          reason: gate.status === 'rewritten' ? gate.note : String(raw?.reason || '').trim(),
+          source: gate.status === 'rewritten' ? 'authority' : 'adi',
+          sourceFields: [],
+          sourceValues: [],
+        },
+        gate.status === 'rewritten'
+          ? { text: label, status: 'rewritten', violations: [{ rule: gate.rule }], rewrittenTo: offered }
+          : { status: 'passed', violations: [] },
       );
       continue;
     }
-    const rewrite = rewriteChip(label, check, facts);
+    const rewrite = rewriteChip(offered, check, facts);
     if (rewrite) {
       const recheck = validateNarrativeChip(rewrite.label, facts, policy);
       if (recheck.status === 'passed') {

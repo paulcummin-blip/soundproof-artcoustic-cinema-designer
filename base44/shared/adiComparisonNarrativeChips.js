@@ -36,6 +36,7 @@ import {
   isHighChannelDensityLayout,
   NAMED_HIGH_DENSITY_LAYOUT,
 } from './highChannelDensityRule.js';
+import { resolveReasoningSuggestion } from './adiSuggestionReasoning.js';
 
 /** How many comparison examples the authority offers. The remaining slots are
  *  reserved for examples that hold identically in every selected version. */
@@ -431,10 +432,14 @@ export function validateComparisonChip(label, versions, policy = null) {
  * examples that hold in every selected version, then the ADI suggestions that
  * pass validation against every selected version.
  *
- * @param {{ aiChips?: Array<Object>, versions: Array<{ version_name, facts }>, policy?: Object|null }} params
+ * @param {{ aiChips?: Array<Object>, versions: Array<{ version_name, facts }>, policy?: Object|null, material?: string }} params
+ *   `material` is the recorded design reasoning — the frozen evidence and the verified
+ *   interpretation. A suggestion asking why a decision was made is offered only where
+ *   that material documents the decision; a comparison has no single version to offer a
+ *   result example from, so an undocumented one is dropped rather than rewritten.
  * @returns {{ suggestions: Array<Object>, diagnostics: Array<Object> }}
  */
-export function resolveComparisonNarrativeChips({ aiChips = [], versions = [], policy = null } = {}) {
+export function resolveComparisonNarrativeChips({ aiChips = [], versions = [], policy = null, material = '' } = {}) {
   const list = (versions || []).filter((entry) => entry?.facts?.available === true);
   const suggestions = [];
   const diagnostics = [];
@@ -462,12 +467,38 @@ export function resolveComparisonNarrativeChips({ aiChips = [], versions = [], p
 
   for (const entry of buildComparisonAuthorityChips(list)) {
     if (suggestions.length >= COMPARISON_CHIP_LIMIT) break;
+    const gate = resolveReasoningSuggestion({ label: entry.label, material });
+    if (gate.status === 'rejected') {
+      diagnostics.push({
+        text: entry.label,
+        source: entry.source || 'authority',
+        status: 'rejected',
+        sourceFields: entry.sourceFields || [],
+        sourceValues: entry.sourceValues || [],
+        violations: [{ rule: gate.rule }],
+        rewrittenTo: null,
+      });
+      continue;
+    }
     const check = validateComparisonChip(entry.label, list, policy);
     add(entry, { status: check.status, violations: check.violations });
   }
 
   for (const entry of buildSharedAuthorityChips(list)) {
     if (suggestions.length >= SHARED_CHIP_LIMIT) break;
+    const gate = resolveReasoningSuggestion({ label: entry.label, material });
+    if (gate.status === 'rejected') {
+      diagnostics.push({
+        text: entry.label,
+        source: entry.source || 'authority',
+        status: 'rejected',
+        sourceFields: entry.sourceFields || [],
+        sourceValues: entry.sourceValues || [],
+        violations: [{ rule: gate.rule }],
+        rewrittenTo: null,
+      });
+      continue;
+    }
     const check = validateComparisonChip(entry.label, list, policy);
     add(entry, { status: check.status, violations: check.violations });
   }
@@ -476,6 +507,19 @@ export function resolveComparisonNarrativeChips({ aiChips = [], versions = [], p
     if (suggestions.length >= CHIP_LIMIT) break;
     const label = String(raw?.label || '').trim();
     if (!label) continue;
+    const gate = resolveReasoningSuggestion({ label, material });
+    if (gate.status === 'rejected') {
+      diagnostics.push({
+        text: label,
+        source: 'adi',
+        status: 'rejected',
+        sourceFields: [],
+        sourceValues: [],
+        violations: [{ rule: gate.rule }],
+        rewrittenTo: null,
+      });
+      continue;
+    }
     const check = validateComparisonChip(label, list, policy);
     if (check.status !== 'passed') {
       diagnostics.push({

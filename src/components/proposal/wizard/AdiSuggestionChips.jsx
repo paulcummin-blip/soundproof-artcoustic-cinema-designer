@@ -27,6 +27,12 @@ import { toggleChipSelection } from '@/components/proposal/wizard/clientBriefChi
  * when it holds in every one of them. A single-version fact is never offered as
  * though it applied to the whole comparison.
  *
+ * ADI never suggests explaining WHY a design decision was made unless the recorded
+ * interpretation documents that decision: where only the calculated result exists the
+ * example asks for the result and what it means for the room, and where an important
+ * decision has no recorded reasoning ADI offers the designer a short optional question
+ * about it — never a requirement, and never an assumed answer.
+ *
  * When no calculated result is available, generic examples are shown instead.
  *
  * Chips are multi-select and purely local: clicking one only marks it selected —
@@ -73,6 +79,9 @@ export default function AdiSuggestionChips({
   onAddSelected,
 }) {
   const [suggestions, setSuggestions] = useState([]);
+  // The optional questions ADI cannot answer itself — an important decision whose
+  // reasoning is not recorded. Shown to the designer, never required of them.
+  const [clarifications, setClarifications] = useState([]);
   const [loading, setLoading] = useState(false);
   const [failed, setFailed] = useState(false);
   // Local, unconfirmed chip selection: cleared when the examples themselves
@@ -142,6 +151,7 @@ export default function AdiSuggestionChips({
       });
       if (requestRef.current !== token) return;
       const list = response?.data?.suggestions || [];
+      setClarifications(response?.data?.clarifications || []);
       // Per-chip diagnostics: the chip text, the source fields and values it came
       // from, and whether it passed, was rewritten or was rejected.
       log.debug('[AdiSuggestionChips] validated examples', response?.data?.diagnostics || []);
@@ -151,6 +161,7 @@ export default function AdiSuggestionChips({
       if (requestRef.current !== token) return;
       console.error('[AdiSuggestionChips] Suggestion generation failed:', error);
       setSuggestions([]);
+      setClarifications([]);
       setFailed(true);
     } finally {
       if (requestRef.current === token) setLoading(false);
@@ -162,6 +173,7 @@ export default function AdiSuggestionChips({
       load();
     } else {
       setSuggestions([]);
+      setClarifications([]);
       setFailed(false);
     }
   }, [hasResults, load]);
@@ -178,6 +190,29 @@ export default function AdiSuggestionChips({
     ? suggestions.map((item) => ({ label: item.label, reason: item.reason }))
     : GENERIC_EXAMPLES.map((label) => ({ label, reason: null }));
   const busy = snapshotLoading || versionsLoading || loading;
+
+  // One chip, rendered the same way wherever it is offered: the examples, and the
+  // optional questions ADI cannot answer itself.
+  const renderChip = (chip) => {
+    const isSelected = selected.includes(chip.label);
+    return (
+      <button
+        key={chip.label}
+        type="button"
+        title={chip.reason || undefined}
+        aria-pressed={isSelected}
+        onClick={() => toggleChip(chip.label)}
+        className={`inline-flex items-center gap-1.5 px-3 py-1.5 text-xs rounded-full border transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[#213428]/40 focus-visible:ring-offset-1 ${
+          isSelected
+            ? 'bg-[#213428] text-white border-[#213428] font-semibold'
+            : 'text-[#3E4349] bg-[#F5F4F0] border-[#E5E1D8] hover:bg-[#213428] hover:text-white hover:border-[#213428]'
+        }`}
+      >
+        {isSelected && <Check className="w-3 h-3" />}
+        {chip.label}
+      </button>
+    );
+  };
 
   return (
     <div className="mt-6">
@@ -219,27 +254,24 @@ export default function AdiSuggestionChips({
       )}
 
       {!busy && (
-        <div className="flex flex-wrap gap-2">
-          {chips.map((chip) => {
-            const isSelected = selected.includes(chip.label);
-            return (
-              <button
-                key={chip.label}
-                type="button"
-                title={chip.reason || undefined}
-                aria-pressed={isSelected}
-                onClick={() => toggleChip(chip.label)}
-                className={`inline-flex items-center gap-1.5 px-3 py-1.5 text-xs rounded-full border transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[#213428]/40 focus-visible:ring-offset-1 ${
-                  isSelected
-                    ? 'bg-[#213428] text-white border-[#213428] font-semibold'
-                    : 'text-[#3E4349] bg-[#F5F4F0] border-[#E5E1D8] hover:bg-[#213428] hover:text-white hover:border-[#213428]'
-                }`}
-              >
-                {isSelected && <Check className="w-3 h-3" />}
-                {chip.label}
-              </button>
-            );
-          })}
+        <div className="flex flex-wrap gap-2">{chips.map(renderChip)}</div>
+      )}
+
+      {/* Where an important design decision has no recorded reasoning, ADI offers a
+          short question about it. Adding one is optional: nothing has to be answered
+          before a proposal can be generated, and no answer is assumed. */}
+      {!busy && clarifications.length > 0 && (
+        <div className="mt-4">
+          <p className="text-[11px] uppercase tracking-[0.12em] text-[#A79E8C] mb-2">
+            {'Optional — decisions ADI cannot explain yet'}
+          </p>
+          <div className="flex flex-wrap gap-2">
+            {clarifications.map((item) => renderChip({ label: item.question }))}
+          </div>
+          <p className="mt-2 text-[11px] text-[#8A8477]">
+            Optional, and never required to generate a proposal: add the question, answer it in the
+            brief, and the proposal can explain that decision.
+          </p>
         </div>
       )}
 

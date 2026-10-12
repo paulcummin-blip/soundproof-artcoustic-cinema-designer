@@ -17,7 +17,10 @@
  *   REASON_STATED      the justification clause of a sentence — a stated basis,
  *                      purpose or constraint. A sentence carrying one of these says
  *                      why the design is as it is; one carrying only figures and
- *                      specification words states what it is and not why.
+ *                      specification words states what it is and not why. The
+ *                      justification may be carried across two related sentences of
+ *                      one paragraph, so a reason is read from the sentence beside it
+ *                      as well as from its own.
  *
  * Pure: no React, no SDK, no writes. It reads text and answers questions about it.
  */
@@ -44,6 +47,18 @@ export function sentences(text) {
     .filter(Boolean);
 }
 
+/**
+ * A text as its paragraphs, each one its own sentences. An explanation may be carried
+ * across two related sentences of one paragraph, and a reason two paragraphs away is
+ * reasoning about a different subject.
+ */
+function paragraphs(text) {
+  return String(text || '')
+    .split(/\n{2,}/)
+    .map((paragraph) => sentences(paragraph))
+    .filter((list) => list.length > 0);
+}
+
 /** Whether a brief item asks for the reasoning behind a decision. */
 export function asksForReasoning(item) {
   return REASONING_REQUEST.test(String(item || ''));
@@ -56,18 +71,29 @@ export function statesReasoning(passage) {
 
 /**
  * Whether a source documents a reason for ONE request's own subject. The reason, the
- * subject and the matter the request itself names must stand in the SAME sentence: a
- * reason about something else never documents this request, and a recorded decision
- * about the overhead SPEAKERS does not explain the overhead SPACING. Where nothing
- * states the matter the request asks about, no rationale is established.
+ * subject and the matter the request itself names must stand together — inside one
+ * sentence, or across two related sentences of the same paragraph, because a
+ * justification is often the sentence after the one it explains. A reason about
+ * something else never documents this request, and a recorded decision about the
+ * overhead SPEAKERS does not explain the overhead SPACING. Where nothing states the
+ * matter the request asks about, no rationale is established.
  */
 export function groundedReason({ text, subjectPatterns = [], contentTerms = [] } = {}) {
-  for (const clause of sentences(text)) {
-    if (!REASON_STATED.test(clause)) continue;
-    const reachesSubject = subjectPatterns.some((pattern) => pattern.test(clause));
-    const statesMatter = contentTerms.length === 0
-      || contentTerms.some((term) => clause.toLowerCase().includes(term));
-    if (reachesSubject && statesMatter) return true;
+  const reachesSubject = (clause) => subjectPatterns.some((pattern) => pattern.test(clause));
+  const statesMatter = (clause) => contentTerms.length === 0
+    || contentTerms.some((term) => clause.toLowerCase().includes(term));
+
+  for (const paragraph of paragraphs(text)) {
+    for (let index = 0; index < paragraph.length; index += 1) {
+      const clause = paragraph[index];
+      const next = paragraph[index + 1] || '';
+      if (!REASON_STATED.test(clause) && !REASON_STATED.test(next)) continue;
+      const together = next ? `${clause} ${next}` : clause;
+      const documented = (reachesSubject(clause) && statesMatter(clause))
+        || (Boolean(next) && reachesSubject(next) && statesMatter(next))
+        || (reachesSubject(together) && statesMatter(together));
+      if (documented) return true;
+    }
   }
   return false;
 }
