@@ -193,6 +193,18 @@ export const WRITER_REJECTION = Object.freeze({
    */
   DESIGN_STAGE_COMMENTARY: 'design_stage_commentary',
   /**
+   * A verification disclaimer on a capability: the copy makes a stated capability
+   * wait for a future process ("subject to confirmation during calibration",
+   * "final performance will be confirmed on site"), or asks the client to hold a
+   * design prediction back until an eventual measurement. The proposal presents
+   * the recommended design and its expected performance confidently, so this is
+   * never written. Calibration or commissioning is still written where the
+   * client's brief raises it or where it is an important practical
+   * recommendation, and then as a plain statement of fact: internal accuracy is
+   * untouched, and a predicted result is still never described as a measured one.
+   */
+  VERIFICATION_DISCLAIMER: 'verification_disclaimer',
+  /**
    * The software-report register: the copy reports fields rather than talking to
    * a client ("assessed for", "this parameter", "performance result", "this
    * proposal details"), or writes filler such as "there are no changes to

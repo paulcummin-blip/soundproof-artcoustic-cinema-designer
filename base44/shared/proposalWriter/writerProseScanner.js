@@ -6,6 +6,7 @@ import { anchorPatternFor, assertedKind, assumedParameterIssue, claimsArea, isDe
 import { productScopeViolations } from './writerProductScope.js';
 import { frontStageScopeViolations } from './writerFrontStageRules.js';
 import { designStageCommentary } from './writerDesignStageRules.js';
+import { verificationDisclaimer } from './writerVerificationDisclaimerRules.js';
 import { validationRegisterPhrase } from './writerValidationRegister.js';
 import { framingContrastGrounded, independentClauses, supportedChangeClause } from './writerClausePrecision.js';
 import {
@@ -108,6 +109,13 @@ export function scanProse({ input, vocabulary, section, text, claims = [], claim
       if (designStage) {
         context.ruleId = `design_stage_commentary:${designStage.rule}`;
         report(WRITER_REJECTION.DESIGN_STAGE_COMMENTARY, { section, detail: `design_stage_commentary:${designStage.rule}` });
+      }
+      // A capability is never made conditional on a future process: the proposal
+      // states what the design provides, confidently, and stops there.
+      const verification = verificationDisclaimer(claimed);
+      if (verification) {
+        context.ruleId = `verification_disclaimer:${verification.rule}`;
+        report(WRITER_REJECTION.VERIFICATION_DISCLAIMER, { section, detail: `verification_disclaimer:${verification.rule}` });
       }
       // ── the editorial rules of the proposal voice ──
       // These read HOW a supported fact is written, never whether it is

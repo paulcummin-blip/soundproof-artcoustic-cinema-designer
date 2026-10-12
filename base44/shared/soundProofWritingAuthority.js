@@ -24,6 +24,8 @@
  * any backend function.
  */
 
+import { CLIENT_FACING_CALIBRATION_LANGUAGE } from './clientFacingCalibrationLanguage.js';
+
 /**
  * The purpose, audience, reasoning rules and honesty rules. Injected ahead of
  * the engineering-specific report contract so the writer approaches the project
@@ -468,6 +470,12 @@ export const PROPOSAL_SALES_WRITING_AUTHORITY = [
   'If not, remove it.',
   '',
   'The finished proposal should make the client want the better system because they understand what it will do for the experience, not because Sound Proof told them that Level 4 is better.',
+  '',
+  // The client-facing calibration language: the proposal states the recommended
+  // design and its expected performance confidently, and never appends a
+  // verification disclaimer to a capability. Internal accuracy rules are
+  // untouched, and the reports and the internal client summary are not given it.
+  ...CLIENT_FACING_CALIBRATION_LANGUAGE,
 ].join('\n');
 
 /**

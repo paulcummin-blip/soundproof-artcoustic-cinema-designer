@@ -227,7 +227,7 @@ export function buildProductAuthority(project, _version, placedSpeakers) {
       families: [...uniqueFamilies],
       text: isMatchedFamily
         ? 'The system uses a matched speaker family across all channels, ensuring timbral consistency from front to back.'
-        : 'The system uses products from multiple families; timbral consistency should be verified during calibration.',
+        : 'The system uses products from multiple families, with each channel served by the model specified for it in this design.',
       confidence: CONFIDENCE.COMPUTED_GEOMETRIC,
     },
   };

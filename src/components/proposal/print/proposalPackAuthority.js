@@ -81,7 +81,7 @@ export const METHOD_PAGE = Object.freeze({
   notes: Object.freeze([
     'RP22 separates performance into three structures: Spatial Resolution, Dynamic Range and Timbre Matching. Each structure is graded from Level 1 to Level 4.',
     'Level 4 is demanding and is not always practical in a real room. The aim is a conscious, credible design rather than chasing every parameter at any cost.',
-    'Results are predicted from the room model and the published product data. Final performance is confirmed by in-room calibration.',
+    'Results are predicted from the room model and the published product data for the design as specified.',
   ]),
 });
 
@@ -114,7 +114,7 @@ export const APPENDIX_PAGE = Object.freeze({
     },
     {
       title: 'Predicted performance',
-      text: 'Every result in this document is predicted from the room model and the published product data. Final performance is confirmed by in-room calibration.',
+      text: 'Every result in this document is predicted from the room model and the published product data for the design as specified.',
     },
     {
       title: 'Design Index',

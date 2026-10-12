@@ -182,7 +182,7 @@ export const RP22_PRINCIPLES = Object.freeze([
     applicability: 'Applies where the design has one or more subwoofers.',
     limitations: 'It is never evidence that a design has been calibrated, that a room has been measured, or that a predicted result has been achieved in the room.',
     project_evidence: 'The frozen room and seating geometry, the recorded subwoofer positions, and whether the engineering authority states an applied calibration.',
-    safe_use: 'Explain that the physical arrangement has been designed for this room, and keep design, prediction and any as-built verification clearly apart. Never describe a design-stage prediction as a measured or commissioned result.',
+    safe_use: 'Explain that the physical arrangement has been designed for this room and this geometry, and state what it provides for the design. Never describe a design-stage prediction as a measured or commissioned result, and never append a verification disclaimer to the capability it provides.',
   }),
 ]);
 
@@ -235,6 +235,7 @@ export const RP22_EVIDENCE_SAFETY_RULES = Object.freeze([
   'keep RP22 guidance, verified project engineering, designer-supplied intentions and approved master-admin knowledge separate: none of them stands in for another',
   'an applicable principle is context for explaining the design; it is never a result, a level, a score, a measurement or a performance claim',
   'where the frozen evidence records no reason for a decision, state the design and its result, and write no reason at all',
+  'the context strengthens the explanation of the recommended system and never introduces a verification disclaimer: a capability is stated confidently from the frozen evidence, and calibration or commissioning is mentioned only where the client\'s brief raises it or where it is an important practical recommendation',
 ]);
 
 /** The one rule the writer is held to over the whole context block. */
@@ -248,7 +249,9 @@ export const RP22_CONTEXT_RULE =
  * or from the frozen pack's own facts, and never from a live project record.
  */
 export function readRp22Signals({ snapshot = null, facts = null } = {}) {
-  const channels = snapshot?.system?.channel_layout || {};
+  // The layout is read from the frozen snapshot, or from the frozen pack's own
+  // facts: the writer is handed the pack, and the two state the same design.
+  const channels = snapshot?.system?.channel_layout || facts?.system?.channel_layout || {};
   const configuration = String(snapshot?.system?.configuration?.dolby_config || facts?.system?.format || '');
   const formatParts = configuration.split('.');
   const seatScopes = facts?.seat_scopes || {};
@@ -269,10 +272,11 @@ export function readRp22Signals({ snapshot = null, facts = null } = {}) {
     ?? (formatParts.length >= 1 ? toNumber(formatParts[0]) : null);
   const subwoofers = toNumber(channels.subwoofer_count)
     ?? toNumber(snapshot?.system?.subwoofer_strategy?.count)
+    ?? toNumber(facts?.system?.subwoofer_strategy?.count)
     ?? toNumber(snapshot?.system?.configuration?.subwoofer_count);
   const rows = toNumber(facts?.seating?.row_count) ?? toNumber(snapshot?.room?.seating?.row_count);
   const seats = toNumber(facts?.seating?.seat_count) ?? toNumber(snapshot?.room?.seating?.total_seats);
-  const treatment = snapshot?.room?.acoustic_treatment;
+  const treatment = snapshot?.room?.acoustic_treatment || facts?.room?.acoustic_treatment || null;
 
   return {
     available: Boolean(snapshot?.available === true || facts),

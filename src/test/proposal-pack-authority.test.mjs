@@ -294,7 +294,10 @@ describe('approved explainer copy', () => {
   });
 
   it('keeps the appendix factual and separate', () => {
-    assert.ok(APPENDIX_PAGE.notes.some((note) => /calibration/i.test(note.text)));
+    assert.ok(APPENDIX_PAGE.notes.some((note) => /predicted from the room model/i.test(note.text)), 'the appendix states the prediction basis');
+    // The proposal states the design and its expected performance confidently:
+    // no fixed copy appends a verification disclaimer to a result.
+    assert.ok(!/calibration|commissioning/i.test(text), 'the fixed copy carries no verification disclaimer');
     assert.ok(APPENDIX_PAGE.notes.some((note) => /internal design diagnostic/i.test(note.text)));
     assert.equal(parameterReferenceList().length, 15);
     assert.equal(parameterReferenceList()[0].label, 'P2 Discrete channels');
