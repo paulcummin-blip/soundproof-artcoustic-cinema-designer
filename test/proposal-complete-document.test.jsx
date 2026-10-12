@@ -114,7 +114,11 @@ test('backend/frontend section vocabulary agrees and options mapped exactly once
 test('Genesis-shaped frozen equipment keeps two cabinets on one logical centre channel', () => {
   const snapshot = { system: { product_roles: [{ role: 'front_left_right', position_label: 'Front Left / Right', model_label: 'LCR model' }, { role: 'centre', position_label: 'Centre', model_label: 'C4-1', cabinet_count: 2, channel_count: 1 }] } }; const before = JSON.stringify(snapshot); const rows = buildPackageRows(snapshot);
   expect(rows.find(row => row.role === 'Front Left').model).toBe('LCR model'); expect(rows.find(row => row.role === 'Front Right').model).toBe('LCR model');
-  expect(rows.find(row => row.role.includes('one logical centre')).model).toBe('2 × C4-1 physical cabinets'); expect(JSON.stringify(snapshot)).toBe(before);
+  // The table states what is specified — the position and its cabinets. The two
+  // cabinets behind one centre channel remain the frozen data, unstated in copy.
+  expect(rows.find(row => row.role === 'Centre').model).toBe('2 × C4-1');
+  expect(rows.some(row => /physical cabinet|logical channel|mono/i.test(`${row.role} ${row.model}`))).toBe(false);
+  expect(JSON.stringify(snapshot)).toBe(before);
 });
 test('unlabelled marked alternatives still require validated options prose', () => {
   const guidance = buildOptionGuidance([{ file_url: 'a', comparison_enabled: true }, { file_url: 'b', comparison_enabled: true }]);

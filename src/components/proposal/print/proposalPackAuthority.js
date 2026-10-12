@@ -418,8 +418,11 @@ export function buildPackageRows(snapshot) {
       const model = groups.get(label).join(' · ');
       if (label === 'Front Left / Right') return [{ role: 'Front Left', model }, { role: 'Front Right', model }];
       const centre = system.product_roles?.find(role => role.position_label === label && role.role === 'centre');
+      // The client-facing line states only what is specified for the position: the
+      // role, and the cabinets chosen for it. How the stage is counted and fed is
+      // engineering data and stays in the role's own cabinet and channel counts.
       if (centre?.cabinet_count === 2 && centre?.channel_count === 1) {
-        return [{ role: 'Centre (one logical centre channel)', model: `2 × ${centre.model_label || centre.model_key} physical cabinets` }];
+        return [{ role: label, model: `2 × ${centre.model_label || centre.model_key}` }];
       }
       return [{ role: label, model }];
     });
