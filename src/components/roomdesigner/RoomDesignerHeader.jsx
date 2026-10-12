@@ -4,8 +4,12 @@ import { Button } from "@/components/ui/button";
 import { RotateCcw, ExternalLink, FileText } from "lucide-react";
 import { useProjectVersions } from "@/components/versions/useProjectVersions";
 import { useCanonicalProject } from "@/components/state/projectHydrationStore";
+import { useAppState } from "@/components/AppStateProvider";
 import RoomDesignerVersionBar from "@/components/versions/RoomDesignerVersionBar";
 import ProjectCadExportButton from "@/components/roomdesigner/ProjectCadExportButton";
+import CurrentSpeakerDesignButton from "@/components/roomdesigner/CurrentSpeakerDesignButton";
+import { buildSpeakerDesignRows } from "@/components/report/speakerDesign/speakerDesignRows";
+import { layoutVisibilityFilter } from "@/components/report/reportProductsSelected";
 import { REPORT_ROUTE } from "@/components/report/reportLibraryContext";
 
 // External resource — Artcoustic product CAD files (Dropbox folder).
@@ -57,6 +61,39 @@ export default function RoomDesignerHeader({
   }, [activeVersionRecord]);
 
   const projectCadProjectName = identity?.name || loadState?.name || null;
+
+  // The current speaker design of the version on screen, read from the live
+  // design through the report's own product authority — the same visibility rule,
+  // registry model names, dual-centre cabinet rule and subwoofer derivation the
+  // report's equipment list uses. Read-only presentation: this view never writes
+  // to the design.
+  const appState = useAppState();
+  const dolbyLayout = appState?.dolbyLayout || "5.1";
+  const sevenBedLayoutType = appState?.sevenBedLayoutType;
+  const placedSpeakers = appState?.speakerSystem?.placedSpeakers || [];
+  const speakerDesign = React.useMemo(
+    () => ({
+      layout: dolbyLayout,
+      ...buildSpeakerDesignRows({
+        placedSpeakers,
+        frontSubsCfg: appState?.frontSubsCfg || null,
+        rearSubsCfg: appState?.rearSubsCfg || null,
+        subwooferInstances: appState?.subwooferInstances,
+        isVisible:
+          appState?.getSpeakerVisibility ||
+          layoutVisibilityFilter(dolbyLayout, sevenBedLayoutType),
+      }),
+    }),
+    [
+      placedSpeakers,
+      appState?.frontSubsCfg,
+      appState?.rearSubsCfg,
+      appState?.subwooferInstances,
+      appState?.getSpeakerVisibility,
+      dolbyLayout,
+      sevenBedLayoutType,
+    ]
+  );
 
   // The version the report area opens for: the version being edited — the same
   // version the Project CAD export names — never another version's saved report.
@@ -112,6 +149,17 @@ export default function RoomDesignerHeader({
             projectName={projectCadProjectName}
             versionName={projectCadVersionName}
             disabled={!effectiveProjectId || loadState?.phase !== "loaded"}
+          />
+
+          {/* Read-only design review: the speakers this version is specified
+              with, stated exactly as the report's equipment list states them. */}
+          <CurrentSpeakerDesignButton
+            speakerDesign={speakerDesign}
+            projectName={projectCadProjectName}
+            clientName={identity?.clientName || null}
+            versionName={projectCadVersionName}
+            updatedDate={activeVersionRecord?.updated_date || null}
+            disabled={loadState?.phase !== "loaded"}
           />
 
           {/* ONE report action: the consolidated Project Report. No dropdown,

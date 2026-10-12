@@ -92,29 +92,32 @@ function layerForRole(role) {
 }
 
 /**
- * The subwoofer rows: the version's own front and rear configuration, each
- * stating its model and its count. When a version carries no configuration but
- * does carry subwoofer instances, the instances are grouped by their own group,
- * so the front/rear layout is still stated from the version's real subwoofers.
+ * The subwoofer groups as structured entries — the version's own front and rear
+ * configuration, each stating its model and its count. When a version carries no
+ * configuration but does carry subwoofer instances, the instances are grouped by
+ * their own group, so the front/rear layout is still stated from the version's
+ * real subwoofers. Held as data as well as text, so a consumer can state the same
+ * models, counts and sides without parsing the schedule's wording.
+ *
+ * @returns {Array<{ side: 'front'|'rear'|null, models: Array<{ name: string, count: number }>, total: number }>}
  */
-function subwooferRows({ frontSubsCfg, rearSubsCfg, subwooferInstances }) {
-  const rows = [];
+export function subwooferEntries({ frontSubsCfg, rearSubsCfg, subwooferInstances }) {
+  const entries = [];
   const addGroup = (cfg, side) => {
     const count = Number(cfg?.count) || 0;
     const model = normaliseModel(cfg?.model);
     if (count <= 0 || !model) return;
     const name = productDisplayName(model) || model;
-    const base = count > 1 ? `${name} × ${count}` : name;
-    rows.push(side ? `${base} (${side})` : base);
+    entries.push({ side, models: [{ name, count }], total: count });
   };
 
   addGroup(frontSubsCfg, 'front');
   addGroup(rearSubsCfg, 'rear');
-  if (rows.length > 0) return rows;
+  if (entries.length > 0) return entries;
 
   const instances = (Array.isArray(subwooferInstances) ? subwooferInstances : [])
     .filter((instance) => instance?.enabled !== false && instance?.model);
-  if (instances.length === 0) return [NONE];
+  if (instances.length === 0) return [];
 
   const byGroup = new Map();
   for (const instance of instances) {
@@ -127,15 +130,26 @@ function subwooferRows({ frontSubsCfg, rearSubsCfg, subwooferInstances }) {
     byGroup.set(group, entry);
   }
 
-  const groupRows = [];
-  for (const [group, entry] of byGroup) {
-    const models = [...entry.models.entries()]
-      .map(([name, count]) => countLabel(name, count))
-      .sort()
-      .join(', ');
-    groupRows.push(group === 'other' ? models : `${models} (${group})`);
-  }
-  return groupRows.length > 0 ? groupRows : [NONE];
+  return [...byGroup.entries()].map(([group, entry]) => ({
+    side: group === 'other' ? null : group,
+    models: [...entry.models.entries()].map(([name, count]) => ({ name, count })),
+    total: entry.total,
+  }));
+}
+
+/** One subwoofer group, worded exactly as the equipment schedule states it. */
+function renderSubwooferEntry(entry) {
+  const models = entry.models
+    .map(({ name, count }) => countLabel(name, count))
+    .sort()
+    .join(', ');
+  return entry.side ? `${models} (${entry.side})` : models;
+}
+
+/** The subwoofer rows, in the order the equipment schedule prints them. */
+function subwooferRows(args) {
+  const entries = subwooferEntries(args);
+  return entries.length > 0 ? entries.map(renderSubwooferEntry) : [NONE];
 }
 
 /**
