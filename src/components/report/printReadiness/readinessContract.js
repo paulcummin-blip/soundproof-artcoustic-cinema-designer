@@ -16,6 +16,12 @@ export const PRINT_READINESS_BUDGET_MS = Object.freeze({
   fonts: 6000,
   images: 12000,
   layout: 2000,
+  // One rendered frame. A frame that never arrives — a hidden, background or
+  // throttled tab suspends requestAnimationFrame entirely — must not leave a
+  // caller pending, so the wait is bounded and says so when it expires. An
+  // expired frame is NOT evidence that the document is ready: readiness is
+  // decided afterwards by the resource conditions below, never by this timer.
+  frame: 1000,
   poll: 50,
 });
 
@@ -33,6 +39,9 @@ export const PRINT_READINESS_REASON = Object.freeze({
   IMAGES_FAILED: 'required_image_failed',
   IMAGES_DECODE_FAILED: 'required_image_decode_failed',
   LAYOUT_UNSTABLE: 'print_layout_unstable',
+  // The document's own identity — the exact saved design-version names it states
+  // — could not be read, and the document needs them to be correct.
+  IDENTITY_UNRESOLVED: 'document_identity_unresolved',
 });
 
 /** The plain-English subject of each failure, so the message names the cause. */
@@ -46,6 +55,7 @@ const REASON_SUBJECT = Object.freeze({
   [PRINT_READINESS_REASON.IMAGES_FAILED]: 'an image could not be loaded',
   [PRINT_READINESS_REASON.IMAGES_DECODE_FAILED]: 'an image could not be decoded',
   [PRINT_READINESS_REASON.LAYOUT_UNSTABLE]: 'the page layout did not settle',
+  [PRINT_READINESS_REASON.IDENTITY_UNRESOLVED]: 'the design versions this document names could not be read',
 });
 
 /** The failure message used when preparation did not complete. */
@@ -103,10 +113,36 @@ export function frameRunner(win) {
   return null;
 }
 
-/** Let one rendered frame pass, so React has applied the state just resolved. */
-export async function settleOneFrame(win = null) {
+/**
+ * Let one rendered frame pass, so React has applied the state just resolved.
+ *
+ * BOUNDED on purpose. A suspended or throttled frame (`document.hidden`, a
+ * background tab, an inactive window) never calls back, and a wait that depends
+ * on one would stay pending for the lifetime of the page. The wait therefore
+ * races the frame against its own deadline and always returns.
+ *
+ * The result is honest about which happened: `settled` is true only when a real
+ * frame ran. `expired` means no frame arrived inside the budget — a caller must
+ * not read that as "the document is ready"; it is only permission to carry on to
+ * a readiness check that measures the document itself.
+ *
+ * @returns {Promise<{settled: boolean, expired: boolean, elapsedMs: number}>}
+ */
+export async function settleOneFrame(win = null, {
+  budgetMs = PRINT_READINESS_BUDGET_MS.frame,
+} = {}) {
   const frame = frameRunner(win);
-  if (frame) await frame();
+  if (!frame) return { settled: true, expired: false, elapsedMs: 0 };
+  const started = readinessNow();
+  const settled = await Promise.race([
+    frame().then(() => true),
+    delay(budgetMs).then(() => false),
+  ]);
+  return {
+    settled,
+    expired: !settled,
+    elapsedMs: Math.round(readinessNow() - started),
+  };
 }
 
 /** A URL short enough to name in a message. */
@@ -149,13 +185,14 @@ export async function waitForDocumentInputs(
     const value = await withDeadline(Promise.resolve().then(() => resolveInputs()), budgetMs);
     return { ok: true, value, reason: null, error: null };
   } catch (error) {
-    return {
-      ok: false,
-      value: null,
-      reason: error?.printReadinessTimeout
+    // A resolver that reported its own unresolved identity is kept distinct from
+    // one that simply ran long: the message a designer reads must name what is
+    // actually wrong, and both are retryable.
+    const reason = error?.printIdentityUnresolved
+      ? PRINT_READINESS_REASON.IDENTITY_UNRESOLVED
+      : error?.printReadinessTimeout
         ? PRINT_READINESS_REASON.INPUTS_TIMEOUT
-        : PRINT_READINESS_REASON.INPUTS_FAILED,
-      error,
-    };
+        : PRINT_READINESS_REASON.INPUTS_FAILED;
+    return { ok: false, value: null, reason, error };
   }
 }
