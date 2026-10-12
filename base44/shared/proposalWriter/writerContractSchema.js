@@ -132,7 +132,21 @@ export const WRITER_CONTRACT_VERSION = 2;
 // Section identities, word limits, the claim grounding rule and every existing
 // rejection keep their meaning, so a draft filed under an earlier generation is
 // still read against the agreement it was written under.
-export const WRITER_PROMPT_VERSION = 'proposal-writer-prompt-16';
+// Bumped to 17 for the Presented Options pass: the contract no longer requires
+// the writer to state that the predicted acoustic performance is unchanged when
+// seating or layout alternatives are presented. No allowed engineering claim
+// establishes that a change of seating furniture leaves acoustic performance
+// unchanged, so the mandate asked for a statement the evidence cannot ground and
+// the validator refused it. The section now presents the options as practical and
+// visual alternatives — comfort, seating style, appearance and the practical
+// arrangement of the room, and the seating dimensions, sightlines and loudspeaker
+// clearance where the pack states them — says that each arrangement works within
+// the seating positions the design specifies, and states or implies nothing about
+// acoustic performance unless an allowed claim supports it. Section identities,
+// word limits, the claim grounding rule and every validation rule are unchanged:
+// a draft filed under an earlier generation is still read against the agreement it
+// was written under.
+export const WRITER_PROMPT_VERSION = 'proposal-writer-prompt-17';
 
 /** The only pack generation a draft may be written from. */
 export const WRITER_ACCEPTED_PACK_SCHEMA_VERSION = 2;
@@ -387,8 +401,8 @@ export const WRITER_SECTIONS = Object.freeze([
     // The designer's own seating or layout notes arrive as INSTRUCTIONS, never
     // as copy: this is the polished client-facing prose written from them, and
     // it is what the document's option pages carry.
-    requirement_single: 'Where the brief supplies seating or layout options, present them in 2–3 natural sentences: say what each arrangement gives the room, that both work within the seating positions this design specifies, and that the final choice is one of comfort and personal preference. State that the predicted acoustic performance is unchanged provided the assessed listening positions and the relevant room geometry are maintained. Present the options as alternatives within ONE design, never as a performance difference, and claim no performance result. Where the brief supplies no option, return an empty string for this section.',
-    requirement: 'Where the pack supplies option guidance, present the options it describes in 2–3 natural sentences as alternatives within one design, and state plainly what the choice rests on. Where the pack supplies no option guidance, return an empty string for this section.',
+    requirement_single: 'Where the brief supplies seating or layout options, present them in 2–3 natural sentences as practical alternatives within ONE design: what each arrangement gives the room, what it is like to sit in, how it looks and how it arranges the space. Describe the practical and visual differences the client is choosing between, in terms of comfort, seating style, appearance and the practical arrangement of the room, and where the pack states the seating dimensions, the sightlines or the clearance around the loudspeakers, use them to describe the arrangement rather than inventing one. State that each arrangement works within the seating positions this design specifies, and that the final choice rests on comfort and personal preference. Never state or imply that the options give identical, unchanged or equivalent acoustic performance, never introduce an acoustic-performance qualification of your own, and never present an option as a performance difference or a performance gain: where the copy states something about an area of the evidence it cites the allowed claim that supports it, and where the evidence supports nothing it is not written. Where the brief supplies no option, return an empty string for this section.',
+    requirement: 'Where the pack supplies option guidance, present the options it describes in 2–3 natural sentences as practical alternatives within one design, describing each arrangement in terms of comfort, seating style, appearance and the practical arrangement of the room, and state plainly what the choice rests on. Never state or imply that the options give identical, unchanged or equivalent acoustic performance, and never introduce an acoustic-performance qualification of your own. Where the pack supplies no option guidance, return an empty string for this section.',
     word_limit: 170,
     optional_without_guidance: true,
   },
@@ -532,10 +546,10 @@ export const WRITER_WRITING_RULES = Object.freeze([
   'Never name a product the pack does not list for the option it belongs to.',
   'Read multi_cabinet_channels: where frozen evidence specifies multiple physical cabinets reproducing one logical audio channel, explain the exact cabinet count and the one channel naturally once in the System Design Summary or specification. Attribute the arrangement to its own design in a comparison. Accept natural wording, not an equipment inventory.',
   'State supported dynamic-range benefits positively: headroom for demanding film soundtracks, controlled dynamic peaks and clear, confident presentation at the designed listening levels. Match each benefit to the frozen evidence and channel family; bass output is not bass extension, reference-position response or seat consistency.',
-  'Never publish internal claim-defence, validation, testing or scoring commentary. Practical qualifications remain necessary, including maintaining the specified listening positions and room geometry when presenting seating alternatives.',
+  'Never publish internal claim-defence, validation, testing or scoring commentary. A practical qualification the client needs is still written: when presenting seating alternatives, state that each arrangement works within the seating positions this design specifies, and never turn that into a statement about acoustic performance.',
   'Where the pack states a dual-centre screen stage, name the stage position by position: the left and right channels with their own model, and the centre with its own cabinet count and model (for example Front Left / Right: Q6-3 and Centre: 2 × C4-1 dual physical centre cabinets). Never write the three screen channels as one LCR of the left/right model, never write the centre as that model, and never write three loudspeakers of it: the centre is two physical cabinets fed from one centre channel, and the layout is unchanged.',
   'Where the pack supplies option guidance, that guidance is the designer\'s instruction and never copy: write your own polished client-facing prose from it, and never reproduce a note, an instruction or a filename in the draft. Where the pack supplies no option guidance, return the presented_options section as an empty string and write nothing into it.',
-  'Present seating and layout options as alternatives within ONE design. Say what each arrangement gives the room, that both work within the seating positions this design specifies, and that the final choice rests on comfort and personal preference. State that the predicted acoustic performance is unchanged provided the assessed listening positions and the relevant room geometry are maintained. Never present a seating style as a performance difference, and never make a performance claim from one.',
+  'Present seating and layout options as practical alternatives within ONE design. Say what each arrangement gives the room in terms of comfort, seating style, appearance and the practical arrangement of the space, that each arrangement works within the seating positions this design specifies, and that the final choice rests on comfort and personal preference. Where the pack states the seating dimensions, the sightlines or the clearance around the loudspeakers, use them; never invent one. Never say or imply that the options give identical, unchanged or equivalent acoustic performance, never write an acoustic-performance qualification of your own, and never make a performance claim or a performance difference of a seating choice: where the copy states something about an area of the evidence it cites the allowed claim that supports it.',
   'Never present a claim the pack blocks, and never describe a shared result as a change or a gain.',
   'Never recommend changing the design, and never describe the proposal as an upgrade path.',
   'Never reference an assumed or administrative check (P8 upfiring/elevation speakers, P15 background noise floor, P21 early reflections): where the pack records one as requested, state it once, label it as an assumption, and never use it as a result or a differentiator.',

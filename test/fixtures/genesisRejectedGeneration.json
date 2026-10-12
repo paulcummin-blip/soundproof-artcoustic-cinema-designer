@@ -1,0 +1,3361 @@
+{
+ "note": "The stored rejected generation gen_c35ff88e (Genesis AV / Original Design), kept verbatim: the frozen writer input the attempt was made with, the exact output the provider returned, and the validation result the live path recorded. Immutable audit evidence — never rewritten.",
+ "generation": {
+  "generation_id": "gen_c35ff88e",
+  "generation_number": 1,
+  "status": "validation_failed",
+  "proposal_id": null,
+  "draft_proposal_id": "6acd146ea1b3ecd1abf24809",
+  "project_id": "6ac7a0ae9f28aaf668e20ccc",
+  "proposal_type": "system_summary",
+  "selected_version_ids": [
+   "6ac7a189d093a8d8a68eec91"
+  ],
+  "prompt_version": "proposal-writer-prompt-16",
+  "contract_version": 2,
+  "provider": "base44-ai-gateway",
+  "model": "gpt_6_astra",
+  "evidence_pack_fingerprint": "6a709e91",
+  "gpt_input_fingerprint": "1b0e9244",
+  "gpt_output_fingerprint": "f207869d",
+  "record_fingerprint": "f003d484",
+  "created_at": "2026-10-12T17:10:06.759Z",
+  "created_by": "paulcummin7@gmail.com",
+  "validation_errors": [
+   {
+    "code": "missing_claim_id",
+    "section": "presented_options",
+    "detail": "same_claim_without_a_claim_id",
+    "claim_ids": [],
+    "sentence": "Predicted acoustic performance is unchanged provided the assessed listening positions and relevant room geometry are maintained.",
+    "clause": "Predicted acoustic performance is unchanged provided the assessed listening positions and relevant room geometry are maintained.",
+    "matched_substring": null,
+    "span": null,
+    "clause_span": {
+     "start": 265,
+     "end": 393
+    },
+    "rule_id": "missing_claim_id",
+    "block_id": null,
+    "cited_claim_ids": [],
+    "validator_version": "proposal-validator-4",
+    "validator_rules_fingerprint": "vr4-d53cb2ef"
+   }
+  ]
+ },
+ "input": {
+  "contract_version": 2,
+  "prompt_version": "proposal-writer-prompt-16",
+  "output": {
+   "mode": "json_only",
+   "schema_version": 1,
+   "top_level_keys": [
+    "contract_version",
+    "pack_fingerprint",
+    "sections"
+   ],
+   "section_keys": [
+    "section",
+    "text",
+    "claim_ids"
+   ],
+   "claim_id_prefixes": [
+    "claim_",
+    "block_"
+   ],
+   "grounding_rule": "every client-facing claim must cite one or more allowed claim IDs in that section's claim_ids",
+   "sections": [
+    {
+     "section": "decision_summary",
+     "title": "Design Summary",
+     "title_single": "Design Summary",
+     "requirement_single": "Introduce the cinema itself, in developed natural paragraphs: the room and its proportions, its intended use where the interpretation states one, the display and why it suits the room, the seating arrangement, the system architecture, the most important design considerations, and the experience this design is intended to deliver. Write as an experienced cinema designer would write for a homeowner or architect. Do not list equipment, do not dump specifications, and do not restate the performance claim here. Never say this proposal outlines, this design presents, this option, decision or selected option. Where the project has real design substance, develop this in three or four paragraphs: the room and the scale of the experience, then the system and how it relates to the room, then the reasoning that makes this specification right for this project, then the result. Roughly 180 to 250 words at that depth, less where the design is genuinely simple, and never padded with invented detail to reach a length. This is the one section that establishes the whole cinema, so it takes the design's own story rather than the top-scoring result. Explain the reasoning the design_philosophy block records: what the client wants to achieve, which listening positions are prioritised, how the display and the seating were balanced, the practical constraints, the coverage and bass approaches, and why the finished design suits this brief. Never invent a reason, a priority, a budget or a decision the interpretation does not record, and never present the highest available level as the objective regardless of cost or practical consequence.",
+     "word_limit": 250,
+     "requirement": "Introduce the cinema itself, in developed natural paragraphs: the room and its proportions, its intended use where the interpretation states one, the display and why it suits the room, the seating arrangement, the system architecture, the most important design considerations, and the experience this design is intended to deliver. Write as an experienced cinema designer would write for a homeowner or architect. Do not list equipment, do not dump specifications, and do not restate the performance claim here. Never say this proposal outlines, this design presents, this option, decision or selected option. Where the project has real design substance, develop this in three or four paragraphs: the room and the scale of the experience, then the system and how it relates to the room, then the reasoning that makes this specification right for this project, then the result. Roughly 180 to 250 words at that depth, less where the design is genuinely simple, and never padded with invented detail to reach a length. This is the one section that establishes the whole cinema, so it takes the design's own story rather than the top-scoring result. Explain the reasoning the design_philosophy block records: what the client wants to achieve, which listening positions are prioritised, how the display and the seating were balanced, the practical constraints, the coverage and bass approaches, and why the finished design suits this brief. Never invent a reason, a priority, a budget or a decision the interpretation does not record, and never present the highest available level as the objective regardless of cost or practical consequence."
+    },
+    {
+     "section": "what_stays_same",
+     "title": "Design Overview",
+     "title_single": "Design Overview",
+     "word_limit": 180,
+     "requirement": "Explain how the system is arranged: the loudspeaker layout and its channel count, where the screen channels, the surrounds and the overhead channels are placed, the seating and the display, and how those parts work together in this room. Write from the design-identity and shared-result claims the pack allows, and from the interpretation's account of the architecture. Never mention another option or a baseline.",
+     "requirement_single": "Explain how the system is arranged: the loudspeaker layout and its channel count, where the screen channels, the surrounds and the overhead channels are placed, the seating and the display, and how those parts work together in this room. Write from the design-identity and shared-result claims the pack allows, and from the interpretation's account of the architecture. Never mention another option or a baseline."
+    },
+    {
+     "section": "what_changes",
+     "title": "Why This Specification",
+     "title_single": "Why This Specification",
+     "word_limit": 220,
+     "requirement": "Explain why this solution suits this project: the choices that were made, such as the loudspeaker family, the layout and the bass approach, and what each one gives the client in this room. Write from the ranked strength stories and the credibility claims the pack allows, and from the design decisions and constraints the interpretation states. Never state or imply a comparison with another option or a baseline, and never write filler such as \"there are no changes to report\". This is the judgement section of the document: explain why this solution suits this particular room, how the competing priorities were balanced, which decisions carry the most value, why a compromise is reasonable where the interpretation records one, and what the client gains from the finished design. Where the design already takes an improvement without substantial additional expenditure, say what it gives the client; where an opportunity remains a design choice, say nothing about it.",
+     "requirement_single": "Explain why this solution suits this project: the choices that were made, such as the loudspeaker family, the layout and the bass approach, and what each one gives the client in this room. Write from the ranked strength stories and the credibility claims the pack allows, and from the design decisions and constraints the interpretation states. Never state or imply a comparison with another option or a baseline, and never write filler such as \"there are no changes to report\". This is the judgement section of the document: explain why this solution suits this particular room, how the competing priorities were balanced, which decisions carry the most value, why a compromise is reasonable where the interpretation records one, and what the client gains from the finished design. Where the design already takes an improvement without substantial additional expenditure, say what it gives the client; where an opportunity remains a design choice, say nothing about it."
+    },
+    {
+     "section": "key_performance_highlights",
+     "title": "Key Performance Highlights",
+     "requirement_single": "State what engineering evidence supports this proposal: the recorded results the pack's claims carry, for the areas that carry a claim, in a small number of concise benefit-led sentences. Use the strength ranking to choose what is stated here, never to fix the order of the document. No dBC values, Hz values, angles, channel counts or grades: the proof belongs in the specialist sections. Never copy a complete evidence statement. No overall-seat equality claim.",
+     "word_limit": 190,
+     "requirement": "State what engineering evidence supports this proposal: the recorded results the pack's claims carry, for the areas that carry a claim, in a small number of concise benefit-led sentences. Use the strength ranking to choose what is stated here, never to fix the order of the document. No dBC values, Hz values, angles, channel counts or grades: the proof belongs in the specialist sections. Never copy a complete evidence statement. No overall-seat equality claim."
+    },
+    {
+     "section": "spatial_resolution",
+     "title": "Spatial Resolution",
+     "requirement_single": "Explain how the layout contributes to the immersion: how sound moves between the screen, the surround and the overhead channels, and what the seating arrangement, the viewing geometry and the display give the client. Stay within the claims the pack allows.",
+     "word_limit": 180,
+     "requirement": "Explain how the layout contributes to the immersion: how sound moves between the screen, the surround and the overhead channels, and what the seating arrangement, the viewing geometry and the display give the client. Stay within the claims the pack allows."
+    },
+    {
+     "section": "dynamic_range",
+     "title": "Dynamic Range",
+     "requirement_single": "Open with the supported experience during demanding film soundtracks: headroom for dynamic peaks and a clear, confident presentation at the designed listening levels. Give the exact frozen output figures at the reference seating position once, as proof. Match each benefit to its frozen evidence and supported channel family. Where only bass output is a selected strength, describe the weight and impact of low-frequency effects. Keep P14 bass output, P18 extension, P19 response at the reference position and P20 consistency across seats distinct; describe each only from its own supported evidence. No absolute guarantees.",
+     "word_limit": 170,
+     "requirement": "Open with the supported experience during demanding film soundtracks: headroom for dynamic peaks and a clear, confident presentation at the designed listening levels. Give the exact frozen output figures at the reference seating position once, as proof. Match each benefit to its frozen evidence and supported channel family. Where only bass output is a selected strength, describe the weight and impact of low-frequency effects. Keep P14 bass output, P18 extension, P19 response at the reference position and P20 consistency across seats distinct; describe each only from its own supported evidence. No absolute guarantees."
+    },
+    {
+     "section": "timbre_matching",
+     "title": "Timbre Matching",
+     "requirement_single": "Explain the tonal benefit the client will hear: the tonal balance they experience from seat to seat, and why it matters as a soundtrack moves around the cinema. State the tonal aim as the design's own approach, and state the measured tonal consistency only for the speaker group the evidence states it for, across only the seats that result covers. These frequency-response results state how consistently ONE loudspeaker group holds its own tonal balance from seat to seat, so they are never evidence that one group of loudspeakers matches another: never write a screen-to-surround or any other between-group match, and never attach their figures to a comparison between the screen, the surround and the overhead speakers. Natural handover wording is welcome as the design's own aim: describe a voice or an effect keeping its character as the loudspeakers hand it on, and let that stand as intent rather than as a measured match between the groups. Keep every seat statement explicitly limited to tonal character, not overall balance, bass or placement. Never imply the design's loudspeaker package differs from another option's, and never broaden tonal consistency into equal seats or an equal whole experience. No bass-extension detour and no both parameters wording.",
+     "word_limit": 170,
+     "requirement": "Explain the tonal benefit the client will hear: the tonal balance they experience from seat to seat, and why it matters as a soundtrack moves around the cinema. State the tonal aim as the design's own approach, and state the measured tonal consistency only for the speaker group the evidence states it for, across only the seats that result covers. These frequency-response results state how consistently ONE loudspeaker group holds its own tonal balance from seat to seat, so they are never evidence that one group of loudspeakers matches another: never write a screen-to-surround or any other between-group match, and never attach their figures to a comparison between the screen, the surround and the overhead speakers. Natural handover wording is welcome as the design's own aim: describe a voice or an effect keeping its character as the loudspeakers hand it on, and let that stand as intent rather than as a measured match between the groups. Keep every seat statement explicitly limited to tonal character, not overall balance, bass or placement. Never imply the design's loudspeaker package differs from another option's, and never broaden tonal consistency into equal seats or an equal whole experience. No bass-extension detour and no both parameters wording."
+    },
+    {
+     "section": "presented_options",
+     "title": "Presented Options",
+     "requirement_single": "Where the brief supplies seating or layout options, present them in 2–3 natural sentences: say what each arrangement gives the room, that both work within the seating positions this design specifies, and that the final choice is one of comfort and personal preference. State that the predicted acoustic performance is unchanged provided the assessed listening positions and the relevant room geometry are maintained. Present the options as alternatives within ONE design, never as a performance difference, and claim no performance result. Where the brief supplies no option, return an empty string for this section.",
+     "requirement": "Where the brief supplies seating or layout options, present them in 2–3 natural sentences: say what each arrangement gives the room, that both work within the seating positions this design specifies, and that the final choice is one of comfort and personal preference. State that the predicted acoustic performance is unchanged provided the assessed listening positions and the relevant room geometry are maintained. Present the options as alternatives within ONE design, never as a performance difference, and claim no performance result. Where the brief supplies no option, return an empty string for this section.",
+     "word_limit": 170,
+     "optional_without_guidance": true
+    },
+    {
+     "section": "overall_design",
+     "title": "Overall Design",
+     "requirement_single": "Close on what the client should expect from the final design: connect this particular picture and viewing experience to the movement around and above the audience, the tonal character, and the supported bass and dynamic strengths, in this project's own terms rather than a general claim. Do not repeat any number, specification list or earlier sentence. Never claim a consistent overall experience for every viewer from tonal evidence.",
+     "word_limit": 200,
+     "requirement": "Close on what the client should expect from the final design: connect this particular picture and viewing experience to the movement around and above the audience, the tonal character, and the supported bass and dynamic strengths, in this project's own terms rather than a general claim. Do not repeat any number, specification list or earlier sentence. Never claim a consistent overall experience for every viewer from tonal evidence."
+    },
+    {
+     "section": "appendix_notes",
+     "title": "Appendix Notes",
+     "requirement_single": "Two brief source-only sentences: based on the frozen Project Report for this design; detailed RP22, RP23, product and room evidence is in the accompanying report. No performance claims or sales story.",
+     "word_limit": 200,
+     "requirement": "Two brief source-only sentences: based on the frozen Project Report for this design; detailed RP22, RP23, product and room evidence is in the accompanying report. No performance claims or sales story."
+    }
+   ]
+  },
+  "section_structure": {
+   "proposal_mode": "single",
+   "comparison": false,
+   "rule": "this is a single-option proposal: it states the design being offered and why it was chosen, and compares the design to nothing",
+   "labels": {
+    "decision_summary": "Design Summary",
+    "what_stays_same": "Design Overview",
+    "what_changes": "Why This Specification",
+    "key_performance_highlights": "Key Performance Highlights",
+    "spatial_resolution": "Spatial Resolution",
+    "dynamic_range": "Dynamic Range",
+    "timbre_matching": "Timbre Matching",
+    "presented_options": "Presented Options",
+    "overall_design": "Overall Design",
+    "appendix_notes": "Appendix Notes"
+   }
+  },
+  "evidence": {
+   "pack_schema_version": 2,
+   "pack_fingerprint": "6a709e91",
+   "mode": "single",
+   "options": [
+    {
+     "version_id": "6ac7a189d093a8d8a68eec91",
+     "version_name": "Original Design",
+     "label": "Option A",
+     "strength_stories": [
+      {
+       "story_id": "tonal-consistency",
+       "rank": 1,
+       "title": "Consistent tonal performance",
+       "category": "Timbre Matching",
+       "level": "L4",
+       "scope": "seat",
+       "statement": "Both parameters hold across all 8 assessed seating positions, each for its own speaker group, so the tonal balance of the screen channels and of the surround and overhead channels holds from seat to seat.",
+       "evidence_parameter_ids": [
+        "P16",
+        "P17"
+       ],
+       "evidence_values": [
+        {
+         "id": "P16",
+         "level": "L4",
+         "value": "Screen channels across the seats · ±0.5 dB"
+        },
+        {
+         "id": "P17",
+         "level": "L4",
+         "value": "Surround and overhead across the seats · ≤1.5 dB window"
+        }
+       ],
+       "allowed_claim_ids": [
+        "claim_story_tonal-consistency_01"
+       ],
+       "supporting_products": [
+        {
+         "layer": "lcr",
+         "models": "Q6-3 × 2, C4-1 × 2"
+        },
+        {
+         "layer": "surrounds",
+         "models": "EVOLVE 2-1 × 6"
+        }
+       ],
+       "display_context": {
+        "display_type": "tv",
+        "label": "115\" TV"
+       }
+      },
+      {
+       "story_id": "immersive-layout",
+       "rank": 2,
+       "title": "A high-resolution immersive layout",
+       "category": "System Architecture",
+       "level": "L4",
+       "scope": "room",
+       "statement": "The design is built as a 9.1.6 system with 6 overhead speakers and 4 subwoofers, so effects move above and around the audience instead of staying on the screen plane.",
+       "evidence_parameter_ids": [
+        "P2"
+       ],
+       "evidence_values": [
+        {
+         "id": "9.1.6",
+         "level": null,
+         "value": "system format"
+        },
+        {
+         "id": "P2",
+         "level": "L4",
+         "value": "15 speakers"
+        },
+        {
+         "id": "6 overheads",
+         "level": null,
+         "value": "4 subwoofers"
+        }
+       ],
+       "allowed_claim_ids": [
+        "claim_story_immersive-layout_01"
+       ],
+       "supporting_products": [
+        {
+         "layer": "overheads",
+         "models": "ARCHITECT 2-1 × 6"
+        },
+        {
+         "layer": "subwoofers",
+         "models": "SUB3-12 × 2, SUB3-12 × 2"
+        }
+       ],
+       "display_context": {
+        "display_type": "tv",
+        "label": "115\" TV"
+       }
+      },
+      {
+       "story_id": "bass-output",
+       "rank": 3,
+       "title": "Bass output capability",
+       "category": "Bass Performance",
+       "level": "L3",
+       "scope": "room",
+       "statement": "The subwoofers deliver 115 dBC of low-frequency output at the reference seating position, the output authority the bass system is specified to reach.",
+       "evidence_parameter_ids": [
+        "P14"
+       ],
+       "evidence_values": [
+        {
+         "id": "P14",
+         "level": "L3",
+         "value": "LFE output · 115 dBC"
+        }
+       ],
+       "allowed_claim_ids": [
+        "claim_story_bass-output_01"
+       ],
+       "supporting_products": [
+        {
+         "layer": "subwoofers",
+         "models": "SUB3-12 × 2, SUB3-12 × 2"
+        }
+       ],
+       "display_context": {
+        "display_type": "tv",
+        "label": "115\" TV"
+       }
+      },
+      {
+       "story_id": "spatial-resolution",
+       "rank": 4,
+       "title": "Speaker placement within the recommended zones",
+       "category": "Spatial Resolution",
+       "level": "L4",
+       "scope": "room",
+       "statement": "Wide speakers inside their deviation limit, no speakers outside the recommended positions and screen-wall speakers inside their recommended zones, each stated on its own published result.",
+       "evidence_parameter_ids": [
+        "P3",
+        "P7",
+        "P11"
+       ],
+       "evidence_values": [
+        {
+         "id": "P7",
+         "level": "L4",
+         "value": "wide speakers inside their deviation limit"
+        },
+        {
+         "id": "P11",
+         "level": "L4",
+         "value": "no speakers outside the recommended positions"
+        },
+        {
+         "id": "P3",
+         "level": "L4",
+         "value": "screen-wall speakers inside their recommended zones"
+        }
+       ],
+       "allowed_claim_ids": [
+        "claim_story_spatial-resolution_01"
+       ],
+       "supporting_products": [
+        {
+         "layer": "surrounds",
+         "models": "EVOLVE 2-1 × 6"
+        },
+        {
+         "layer": "overheads",
+         "models": "ARCHITECT 2-1 × 6"
+        }
+       ],
+       "display_context": {
+        "display_type": "tv",
+        "label": "115\" TV"
+       }
+      },
+      {
+       "story_id": "viewing-geometry",
+       "rank": 5,
+       "title": "Front row viewing immersion",
+       "category": "Viewing Experience",
+       "level": "L4",
+       "scope": "row",
+       "statement": "The front row views the TV at 57.3°, the rows that reach it are stated on their own result.",
+       "evidence_parameter_ids": [
+        "RP23"
+       ],
+       "evidence_values": [
+        {
+         "id": "RP23",
+         "level": "L4",
+         "value": "Front row · 57.3° · 4 seats"
+        }
+       ],
+       "allowed_claim_ids": [
+        "claim_story_viewing-geometry_01"
+       ],
+       "supporting_products": [],
+       "display_context": {
+        "display_type": "tv",
+        "label": "115\" TV"
+       }
+      }
+     ],
+     "omitted_stories": [
+      {
+       "story_id": "dynamic-capability",
+       "reason": "the design already carries 5 results at L3 or better, so a L2 result is not raised as a headline strength"
+      },
+      {
+       "story_id": "low-frequency-extension",
+       "reason": "the design already carries 5 results at L3 or better, so a L2 result is not raised as a headline strength"
+      },
+      {
+       "story_id": "bass-extension-and-response",
+       "reason": "the design already carries 5 results at L3 or better, so a L2 result is not raised as a headline strength"
+      },
+      {
+       "story_id": "seat-placement-consistency",
+       "reason": "the seat-scoped placement results are mixed (P5 L1, P6 L1, P10 L2) — each placement measure is stated on its own result, and no seat-by-seat placement consistency is claimed"
+      },
+      {
+       "story_id": "room-wide-bass-consistency",
+       "reason": "P20 is L1 across the assessed seats — no room-wide bass consistency is claimed"
+      },
+      {
+       "story_id": "background-noise",
+       "reason": "P15 is null and is an assumed design assumption, not a measured result"
+      },
+      {
+       "story_id": "early-reflections",
+       "reason": "P21 is an assumed performance level, not a measured result"
+      },
+      {
+       "story_id": "low-frequency-extension",
+       "reason": "P18 is L2 (24 Hz) — moderate extension, and stronger results are available to lead with"
+      },
+      {
+       "story_id": "lower-level-strengths",
+       "reason": "this design carries 5 results at L3 or better, so L2 results are not raised as headline strengths"
+      }
+     ]
+    }
+   ],
+   "areas": [
+    {
+     "area": "room",
+     "label": "Room",
+     "kind": "room",
+     "structure": null
+    },
+    {
+     "area": "screen_size",
+     "label": "Screen size",
+     "kind": "structural",
+     "structure": null
+    },
+    {
+     "area": "rp23_viewing",
+     "label": "Viewing angle / RP23",
+     "kind": "graded",
+     "structure": "Viewing"
+    },
+    {
+     "area": "system_layout",
+     "label": "System layout",
+     "kind": "structural",
+     "structure": null
+    },
+    {
+     "area": "speakers",
+     "label": "Speaker package",
+     "kind": "equipment",
+     "structure": null
+    },
+    {
+     "area": "lcr",
+     "label": "LCR",
+     "kind": "equipment",
+     "structure": null
+    },
+    {
+     "area": "surrounds",
+     "label": "Surrounds / wides",
+     "kind": "equipment",
+     "structure": null
+    },
+    {
+     "area": "overheads",
+     "label": "Overheads",
+     "kind": "equipment",
+     "structure": null
+    },
+    {
+     "area": "subwoofers",
+     "label": "Subwoofers",
+     "kind": "equipment",
+     "structure": null
+    },
+    {
+     "area": "acoustic_treatment",
+     "label": "Acoustic treatment",
+     "kind": "equipment",
+     "structure": null
+    },
+    {
+     "area": "amplification",
+     "label": "Amplification",
+     "kind": "equipment",
+     "structure": null
+    },
+    {
+     "area": "seating",
+     "label": "Seating",
+     "kind": "structural",
+     "structure": null
+    },
+    {
+     "area": "p2",
+     "label": "Discrete channels (P2)",
+     "kind": "graded",
+     "structure": "Spatial Resolution"
+    },
+    {
+     "area": "p4",
+     "label": "Screen consistency (P4)",
+     "kind": "graded",
+     "structure": "Spatial Resolution"
+    },
+    {
+     "area": "p5",
+     "label": "Horizontal spacing (P5)",
+     "kind": "graded",
+     "structure": "Spatial Resolution"
+    },
+    {
+     "area": "p7",
+     "label": "Front wide position (P7)",
+     "kind": "graded",
+     "structure": "Spatial Resolution"
+    },
+    {
+     "area": "p9",
+     "label": "Overhead spacing (P9)",
+     "kind": "graded",
+     "structure": "Spatial Resolution"
+    },
+    {
+     "area": "p10",
+     "label": "Overhead level consistency (P10)",
+     "kind": "graded",
+     "structure": "Spatial Resolution"
+    },
+    {
+     "area": "p12",
+     "label": "Screen Dynamic Range (P12)",
+     "kind": "graded",
+     "structure": "Dynamic Range"
+    },
+    {
+     "area": "p13",
+     "label": "Non-screen Dynamic Range (P13)",
+     "kind": "graded",
+     "structure": "Dynamic Range"
+    },
+    {
+     "area": "p14",
+     "label": "LFE and subwoofer Dynamic Range (P14)",
+     "kind": "graded",
+     "structure": "Dynamic Range"
+    },
+    {
+     "area": "p16",
+     "label": "Screen timbre (P16)",
+     "kind": "graded",
+     "structure": "Timbre Matching"
+    },
+    {
+     "area": "p17",
+     "label": "Surround and overhead timbre (P17)",
+     "kind": "graded",
+     "structure": "Timbre Matching"
+    },
+    {
+     "area": "p18",
+     "label": "Bass extension (P18)",
+     "kind": "graded",
+     "structure": "Timbre Matching"
+    },
+    {
+     "area": "p19",
+     "label": "Bass response (P19)",
+     "kind": "graded",
+     "structure": "Timbre Matching"
+    },
+    {
+     "area": "p20",
+     "label": "Bass consistency (P20)",
+     "kind": "graded",
+     "structure": "Timbre Matching"
+    }
+   ]
+  },
+  "evidence_pack": {
+   "schema_version": 2,
+   "generated_at": "2026-10-12T17:10:06.759Z",
+   "mode": "single",
+   "areas": [
+    {
+     "area": "room",
+     "label": "Room",
+     "kind": "room",
+     "structure": null
+    },
+    {
+     "area": "screen_size",
+     "label": "Screen size",
+     "kind": "structural",
+     "structure": null
+    },
+    {
+     "area": "rp23_viewing",
+     "label": "Viewing angle / RP23",
+     "kind": "graded",
+     "structure": "Viewing"
+    },
+    {
+     "area": "system_layout",
+     "label": "System layout",
+     "kind": "structural",
+     "structure": null
+    },
+    {
+     "area": "speakers",
+     "label": "Speaker package",
+     "kind": "equipment",
+     "structure": null
+    },
+    {
+     "area": "lcr",
+     "label": "LCR",
+     "kind": "equipment",
+     "structure": null
+    },
+    {
+     "area": "surrounds",
+     "label": "Surrounds / wides",
+     "kind": "equipment",
+     "structure": null
+    },
+    {
+     "area": "overheads",
+     "label": "Overheads",
+     "kind": "equipment",
+     "structure": null
+    },
+    {
+     "area": "subwoofers",
+     "label": "Subwoofers",
+     "kind": "equipment",
+     "structure": null
+    },
+    {
+     "area": "acoustic_treatment",
+     "label": "Acoustic treatment",
+     "kind": "equipment",
+     "structure": null
+    },
+    {
+     "area": "amplification",
+     "label": "Amplification",
+     "kind": "equipment",
+     "structure": null
+    },
+    {
+     "area": "seating",
+     "label": "Seating",
+     "kind": "structural",
+     "structure": null
+    },
+    {
+     "area": "p2",
+     "label": "Discrete channels (P2)",
+     "kind": "graded",
+     "structure": "Spatial Resolution"
+    },
+    {
+     "area": "p4",
+     "label": "Screen consistency (P4)",
+     "kind": "graded",
+     "structure": "Spatial Resolution"
+    },
+    {
+     "area": "p5",
+     "label": "Horizontal spacing (P5)",
+     "kind": "graded",
+     "structure": "Spatial Resolution"
+    },
+    {
+     "area": "p7",
+     "label": "Front wide position (P7)",
+     "kind": "graded",
+     "structure": "Spatial Resolution"
+    },
+    {
+     "area": "p9",
+     "label": "Overhead spacing (P9)",
+     "kind": "graded",
+     "structure": "Spatial Resolution"
+    },
+    {
+     "area": "p10",
+     "label": "Overhead level consistency (P10)",
+     "kind": "graded",
+     "structure": "Spatial Resolution"
+    },
+    {
+     "area": "p12",
+     "label": "Screen Dynamic Range (P12)",
+     "kind": "graded",
+     "structure": "Dynamic Range"
+    },
+    {
+     "area": "p13",
+     "label": "Non-screen Dynamic Range (P13)",
+     "kind": "graded",
+     "structure": "Dynamic Range"
+    },
+    {
+     "area": "p14",
+     "label": "LFE and subwoofer Dynamic Range (P14)",
+     "kind": "graded",
+     "structure": "Dynamic Range"
+    },
+    {
+     "area": "p16",
+     "label": "Screen timbre (P16)",
+     "kind": "graded",
+     "structure": "Timbre Matching"
+    },
+    {
+     "area": "p17",
+     "label": "Surround and overhead timbre (P17)",
+     "kind": "graded",
+     "structure": "Timbre Matching"
+    },
+    {
+     "area": "p18",
+     "label": "Bass extension (P18)",
+     "kind": "graded",
+     "structure": "Timbre Matching"
+    },
+    {
+     "area": "p19",
+     "label": "Bass response (P19)",
+     "kind": "graded",
+     "structure": "Timbre Matching"
+    },
+    {
+     "area": "p20",
+     "label": "Bass consistency (P20)",
+     "kind": "graded",
+     "structure": "Timbre Matching"
+    }
+   ],
+   "options": [
+    {
+     "version_id": "6ac7a189d093a8d8a68eec91",
+     "version_name": "Original Design",
+     "label": "Option A",
+     "version_name_source": {
+      "source": "saved-report-evidence",
+      "from": "project_report",
+      "stated_by": [
+       "project_report"
+      ],
+      "reports_agree": true
+     },
+     "facts": {
+      "version_id": "6ac7a189d093a8d8a68eec91",
+      "version_name": "Original Design",
+      "label": "Option A",
+      "report_identity": {
+       "project_name": "Genesis AV",
+       "client_name": null,
+       "project_reference": null,
+       "dealer_name": null
+      },
+      "report_snapshot_ids": {
+       "project": "6ac9040e4eb1d249ea0bc045",
+       "visual": null,
+       "technical": null
+      },
+      "fingerprints": {
+       "engineering": "eng:v1:5739e42a60819e44",
+       "visual_evidence": "re1-f5ecbadf-1e9dc",
+       "technical_evidence": "re1-f5ecbadf-1e9dc",
+       "evidence_generated_at": "2026-10-11T15:12:55.161Z"
+      },
+      "room": {
+       "length_m": 5.09,
+       "width_m": 4.64,
+       "height_m": 2.6,
+       "volume_m3": 61.4,
+       "dimensions_text": "5.1m × 4.6m × 2.6m (L × W × H)",
+       "interpretation": null,
+       "acoustic_treatment": {
+        "enabled": true,
+        "product": "Artcoustic Abfuser",
+        "quantity": 6,
+        "source": "User Input",
+        "interpretation": "6 Artcoustic Abfuser panels (designer-specified quantity). The Abfuser provides broad-band absorption and diffusion to control early reflections and room reverberation.",
+        "confidence": 0.99
+       }
+      },
+      "screen": {
+       "size_inches": 115,
+       "display_type": "tv",
+       "display_label": "115\" TV",
+       "diagonal_inches": 115,
+       "aspect_ratio": "16:9",
+       "screen_type": "Television",
+       "viewable_width_cm": 254.6,
+       "viewable_height_cm": 143.2,
+       "manual_dimensions": true,
+       "manual_width_m": 2.5458721439408083,
+       "manual_height_m": 1.4320530809667047,
+       "interpretation": "100\" 16:9, manual dimensions TV on front wall, baffle wall construction, screen bottom at 0.70m from floor."
+      },
+      "seating": {
+       "interpretation": "2 rows: 4 seats in row 1, 4 seats in row 2. 1.8m centre-to-centre row spacing. MLP positioned at the middle row centre.",
+       "seat_count": 8,
+       "row_count": 2,
+       "per_seat": [
+        {
+         "seat_id": "seat-r1-c1",
+         "label": "seat-r1-c1",
+         "row": 1,
+         "distance_m": 2.33,
+         "horizontal_angle_deg": 57.3,
+         "vertical_angle_deg": null,
+         "rp23_level": "L4"
+        },
+        {
+         "seat_id": "seat-r1-c2",
+         "label": "seat-r1-c2",
+         "row": 1,
+         "distance_m": 2.33,
+         "horizontal_angle_deg": 57.3,
+         "vertical_angle_deg": null,
+         "rp23_level": "L4"
+        },
+        {
+         "seat_id": "seat-r1-c3",
+         "label": "seat-r1-c3",
+         "row": 1,
+         "distance_m": 2.33,
+         "horizontal_angle_deg": 57.3,
+         "vertical_angle_deg": null,
+         "rp23_level": "L4"
+        },
+        {
+         "seat_id": "seat-r1-c4",
+         "label": "seat-r1-c4",
+         "row": 1,
+         "distance_m": 2.33,
+         "horizontal_angle_deg": 57.3,
+         "vertical_angle_deg": null,
+         "rp23_level": "L4"
+        },
+        {
+         "seat_id": "seat-r2-c1",
+         "label": "seat-r2-c1",
+         "row": 2,
+         "distance_m": 4.13,
+         "horizontal_angle_deg": 34.3,
+         "vertical_angle_deg": null,
+         "rp23_level": "L1"
+        },
+        {
+         "seat_id": "seat-r2-c2",
+         "label": "seat-r2-c2",
+         "row": 2,
+         "distance_m": 4.13,
+         "horizontal_angle_deg": 34.3,
+         "vertical_angle_deg": null,
+         "rp23_level": "L1"
+        },
+        {
+         "seat_id": "seat-r2-c3",
+         "label": "seat-r2-c3",
+         "row": 2,
+         "distance_m": 4.13,
+         "horizontal_angle_deg": 34.3,
+         "vertical_angle_deg": null,
+         "rp23_level": "L1"
+        },
+        {
+         "seat_id": "seat-r2-c4",
+         "label": "seat-r2-c4",
+         "row": 2,
+         "distance_m": 4.13,
+         "horizontal_angle_deg": 34.3,
+         "vertical_angle_deg": null,
+         "rp23_level": "L1"
+        }
+       ]
+      },
+      "viewing": {
+       "available": true,
+       "summary": "Viewing angles calculated for 8 seats. Horizontal viewing angle ranges from 34° to 57°.",
+       "primary_floor": "L4"
+      },
+      "system": {
+       "layout": "9.1.6 (15 discrete channels)",
+       "format": "9.1.6",
+       "channel_layout": {
+        "bed_channels": 9,
+        "overhead_channels": 6,
+        "dolby_subwoofer_channels": 1,
+        "total_discrete": 15,
+        "subwoofer_count": 4
+       },
+       "products": [
+        {
+         "key": "lcr",
+         "area": "LCR",
+         "value": "Q6-3 × 2, C4-1 × 2 centre cabinets (vertical)"
+        },
+        {
+         "key": "surrounds",
+         "area": "Surrounds / wides",
+         "value": "EVOLVE 2-1 × 6"
+        },
+        {
+         "key": "overheads",
+         "area": "Overheads",
+         "value": "ARCHITECT 2-1 × 6"
+        },
+        {
+         "key": "subwoofers",
+         "area": "Subwoofers",
+         "value": "SUB3-12 × 2 (front), SUB3-12 × 2 (rear)"
+        },
+        {
+         "key": "acoustic_treatment",
+         "area": "Acoustic treatment",
+         "value": "Artcoustic Abfuser × 6"
+        }
+       ],
+       "products_by_layer": {
+        "lcr": [
+         {
+          "role": "LCR",
+          "model": "Q6-3",
+          "quantity": 2,
+          "position": null
+         },
+         {
+          "role": "LCR",
+          "model": "C4-1",
+          "quantity": 2,
+          "position": null,
+          "structure": "dual-centre",
+          "channel_count": 1,
+          "cabinet_count": 2,
+          "orientation": "vertical"
+         }
+        ],
+        "surrounds": [
+         {
+          "role": "Surrounds / wides",
+          "model": "EVOLVE 2-1",
+          "quantity": 6,
+          "position": null
+         }
+        ],
+        "overheads": [
+         {
+          "role": "Overheads",
+          "model": "ARCHITECT 2-1",
+          "quantity": 6,
+          "position": null
+         }
+        ],
+        "subwoofers": [
+         {
+          "role": "Subwoofers",
+          "model": "SUB3-12",
+          "quantity": 2,
+          "position": "front"
+         },
+         {
+          "role": "Subwoofers",
+          "model": "SUB3-12",
+          "quantity": 2,
+          "position": "rear"
+         }
+        ],
+        "acoustic_treatment": [
+         {
+          "role": "Acoustic treatment",
+          "model": "Artcoustic Abfuser",
+          "quantity": 6,
+          "position": null
+         }
+        ]
+       },
+       "product_roles": "Front left and right channels: Q6-3 · Centre channel (two physical cabinets, one logical centre channel): 2 × C4-1 dual physical centre cabinets · Side surround: EVOLVE 2-1 · Rear surround: EVOLVE 2-1 · Front wide: EVOLVE 2-1 · Overhead/height: ARCHITECT 2-1",
+       "front_stage": {
+        "structure": "dual_centre",
+        "physical_centre_cabinets": 2,
+        "logical_centre_channels": 1,
+        "left_right": "Q6-3",
+        "centre": "2 × C4-1 dual physical centre cabinets",
+        "screen_positions": [
+         {
+          "position": "front_left_right",
+          "model": "Q6-3"
+         },
+         {
+          "position": "centre",
+          "model": "2 × C4-1 dual physical centre cabinets"
+         }
+        ],
+        "note": "2 physical centre cabinets are fed from ONE logical centre channel. The centre is not a second channel, the left and right channels keep their own model, and the layout is unchanged."
+       },
+       "subwoofer_strategy": {
+        "count": 4,
+        "models": [
+         "sub3-12"
+        ],
+        "strategy_text": "Four subwoofers (sub3-12)."
+       },
+       "amplification": null,
+       "acoustic_treatment": [
+        {
+         "model": "Artcoustic Abfuser",
+         "quantity": 6
+        }
+       ]
+      },
+      "parameters": [
+       {
+        "parameter_id": 1,
+        "key": "P1",
+        "label": "Seat-to-wall distance",
+        "structure": "Spatial Resolution",
+        "level": "L1",
+        "value": "0.71m",
+        "text": "L1 · 0.71m",
+        "scope": null,
+        "state": null,
+        "authority_source": "durable-engineering-publication",
+        "definition": "RP22 P1"
+       },
+       {
+        "parameter_id": 2,
+        "key": "P2",
+        "label": "Discrete channels",
+        "structure": "Spatial Resolution",
+        "level": "L4",
+        "value": "15 speakers",
+        "text": "L4 · 15 speakers",
+        "scope": null,
+        "state": null,
+        "authority_source": "durable-engineering-publication",
+        "definition": "Decoder/renderer capability and discretely rendered speaker configuration, excl. subwoofers"
+       },
+       {
+        "parameter_id": 3,
+        "key": "P3",
+        "label": "Screen speaker placement",
+        "structure": "Spatial Resolution",
+        "level": "L4",
+        "value": "0 speakers",
+        "text": "L4 · 0 speakers",
+        "scope": null,
+        "state": null,
+        "authority_source": "durable-engineering-publication",
+        "definition": "Number of screen wall speakers allowed outside of recommended zonal locations"
+       },
+       {
+        "parameter_id": 4,
+        "key": "P4",
+        "label": "Screen consistency",
+        "structure": "Spatial Resolution",
+        "level": "L2",
+        "value": "5 dB",
+        "text": "L2 · 5 dB",
+        "scope": null,
+        "state": null,
+        "authority_source": "durable-engineering-publication",
+        "definition": "RP22 P4"
+       },
+       {
+        "parameter_id": 5,
+        "key": "P5",
+        "label": "Horizontal spacing",
+        "structure": "Spatial Resolution",
+        "level": "L1",
+        "value": "104°",
+        "text": "L1 · 104°",
+        "scope": null,
+        "state": null,
+        "authority_source": "durable-engineering-publication",
+        "definition": "RP22 P5"
+       },
+       {
+        "parameter_id": 6,
+        "key": "P6",
+        "label": "Surround level consistency",
+        "structure": "Spatial Resolution",
+        "level": "L1",
+        "value": "9 dB",
+        "text": "L1 · 9 dB",
+        "scope": null,
+        "state": null,
+        "authority_source": "durable-engineering-publication",
+        "definition": "RP22 P6"
+       },
+       {
+        "parameter_id": 7,
+        "key": "P7",
+        "label": "Front wide position",
+        "structure": "Spatial Resolution",
+        "level": "L4",
+        "value": "0",
+        "text": "L4 · 0",
+        "scope": null,
+        "state": null,
+        "authority_source": "durable-engineering-publication",
+        "definition": "Wide speakers (If implemented) maximum allowable horizontal deviation from median angle"
+       },
+       {
+        "parameter_id": 9,
+        "key": "P9",
+        "label": "Overhead spacing",
+        "structure": "Spatial Resolution",
+        "level": "L2",
+        "value": "66.5°",
+        "text": "L2 · 66.5°",
+        "scope": null,
+        "state": null,
+        "authority_source": "durable-engineering-publication",
+        "definition": "RP22 P9"
+       },
+       {
+        "parameter_id": 10,
+        "key": "P10",
+        "label": "Overhead level consistency",
+        "structure": "Spatial Resolution",
+        "level": "L2",
+        "value": "8 dB",
+        "text": "L2 · 8 dB",
+        "scope": null,
+        "state": null,
+        "authority_source": "durable-engineering-publication",
+        "definition": "RP22 P10"
+       },
+       {
+        "parameter_id": 11,
+        "key": "P11",
+        "label": "Surround speaker placement",
+        "structure": "Spatial Resolution",
+        "level": "L4",
+        "value": "0",
+        "text": "L4 · 0",
+        "scope": null,
+        "state": null,
+        "authority_source": "durable-engineering-publication",
+        "definition": "Number of surround/wide/upper speakers allowed outside of zonal recommendation locations"
+       },
+       {
+        "parameter_id": 12,
+        "key": "P12",
+        "label": "Screen Dynamic Range",
+        "structure": "Dynamic Range",
+        "level": "L2",
+        "value": "104 dBC",
+        "text": "L2 · 104 dBC",
+        "scope": null,
+        "state": null,
+        "authority_source": "durable-engineering-publication",
+        "definition": "Screen speakers SPL capability at RSP (post calibration EQ, within assigned bandwidth) without clipping"
+       },
+       {
+        "parameter_id": 13,
+        "key": "P13",
+        "label": "Non-screen Dynamic Range",
+        "structure": "Dynamic Range",
+        "level": "L2",
+        "value": "101 dBC (FW)",
+        "text": "L2 · 101 dBC (FW)",
+        "scope": null,
+        "state": null,
+        "authority_source": "durable-engineering-publication",
+        "definition": "Non-screen speakers SPL capability at RSP (Post calibration EQ within assigned bandwidth) without clipping (includes amplifier headroom)"
+       },
+       {
+        "parameter_id": 14,
+        "key": "P14",
+        "label": "LFE and subwoofer Dynamic Range",
+        "structure": "Dynamic Range",
+        "level": "L3",
+        "value": "115 dBC",
+        "text": "L3 · 115 dBC",
+        "scope": null,
+        "state": null,
+        "authority_source": "durable-current-bass-authority",
+        "definition": "LFE frequencies total SPL capability at RSP, plus bass management if used (post calibration EQ, within bass extension spec for the level) without clipping (includes amplifier headroom)"
+       },
+       {
+        "parameter_id": 16,
+        "key": "P16",
+        "label": "Screen timbre",
+        "structure": "Timbre Matching",
+        "level": "L4",
+        "value": "±0.5 dB",
+        "text": "L4 · ±0.5 dB",
+        "scope": null,
+        "state": null,
+        "authority_source": "durable-engineering-publication",
+        "definition": "RP22 P16"
+       },
+       {
+        "parameter_id": 17,
+        "key": "P17",
+        "label": "Surround timbre",
+        "structure": "Timbre Matching",
+        "level": "L4",
+        "value": "≤1.5 dB window",
+        "text": "L4 · ≤1.5 dB window",
+        "scope": null,
+        "state": null,
+        "authority_source": "durable-engineering-publication",
+        "definition": "RP22 P17"
+       },
+       {
+        "parameter_id": 18,
+        "key": "P18",
+        "label": "Bass extension",
+        "structure": "Timbre Matching",
+        "level": "L2",
+        "value": "24 Hz",
+        "text": "L2 · 24 Hz",
+        "scope": null,
+        "state": null,
+        "authority_source": "durable-current-bass-authority",
+        "definition": "P18"
+       },
+       {
+        "parameter_id": 19,
+        "key": "P19",
+        "label": "Bass response",
+        "structure": "Timbre Matching",
+        "level": "L4",
+        "value": "±0 dB",
+        "text": "L4 · ±0 dB",
+        "scope": null,
+        "state": null,
+        "authority_source": "durable-current-bass-authority",
+        "definition": "Frequency response below the room's transition frequency at the RSP relative to target curve (1/3 octave smoothing). \"The Result\""
+       },
+       {
+        "parameter_id": 20,
+        "key": "P20",
+        "label": "Bass consistency",
+        "structure": "Timbre Matching",
+        "level": "L1",
+        "value": "±10.8 dB",
+        "text": "L1 · ±10.8 dB",
+        "scope": null,
+        "state": null,
+        "authority_source": "durable-current-bass-authority",
+        "definition": "RP22 P20"
+       }
+      ],
+      "bass": {
+       "available": true,
+       "subwoofer_strategy_summary": "Authoritative published bass result."
+      },
+      "seat_scopes": {
+       "primary": {
+        "available": true,
+        "seat_count": 2,
+        "parameters": {
+         "p1": {
+          "level": "L4",
+          "parameter_scope": "seat"
+         },
+         "p2": {
+          "level": "L4",
+          "parameter_scope": "room"
+         },
+         "p3": {
+          "level": "L4",
+          "parameter_scope": "room"
+         },
+         "p4": {
+          "level": "L3",
+          "parameter_scope": "seat"
+         },
+         "p5": {
+          "level": "L3",
+          "parameter_scope": "seat"
+         },
+         "p6": {
+          "level": "L2",
+          "parameter_scope": "seat"
+         },
+         "p7": {
+          "level": "L4",
+          "parameter_scope": "room"
+         },
+         "p8": {
+          "level": "L4",
+          "parameter_scope": "room"
+         },
+         "p9": {
+          "level": "L3",
+          "parameter_scope": "seat"
+         },
+         "p10": {
+          "level": "L3",
+          "parameter_scope": "seat"
+         },
+         "p11": {
+          "level": "L4",
+          "parameter_scope": "room"
+         },
+         "p12": {
+          "level": "L2",
+          "parameter_scope": "room"
+         },
+         "p13": {
+          "level": "L2",
+          "parameter_scope": "room"
+         },
+         "p14": {
+          "level": "L3",
+          "parameter_scope": "room"
+         },
+         "p15": {
+          "level": "L2",
+          "parameter_scope": "room"
+         },
+         "p16": {
+          "level": "L4",
+          "parameter_scope": "seat"
+         },
+         "p17": {
+          "level": "L4",
+          "parameter_scope": "seat"
+         },
+         "p18": {
+          "level": "L2",
+          "parameter_scope": "room"
+         },
+         "p19": {
+          "level": "L4",
+          "parameter_scope": "room"
+         },
+         "p20": {
+          "level": "L1",
+          "parameter_scope": "seat"
+         },
+         "p21": {
+          "level": "L2",
+          "parameter_scope": "room"
+         }
+        }
+       },
+       "secondary": {
+        "available": true,
+        "seat_count": 6,
+        "parameters": {
+         "p1": {
+          "level": "L1",
+          "parameter_scope": "seat"
+         },
+         "p2": {
+          "level": "L4",
+          "parameter_scope": "room"
+         },
+         "p3": {
+          "level": "L4",
+          "parameter_scope": "room"
+         },
+         "p4": {
+          "level": "L2",
+          "parameter_scope": "seat"
+         },
+         "p5": {
+          "level": "L1",
+          "parameter_scope": "seat"
+         },
+         "p6": {
+          "level": "L1",
+          "parameter_scope": "seat"
+         },
+         "p7": {
+          "level": "L4",
+          "parameter_scope": "room"
+         },
+         "p8": {
+          "level": "L4",
+          "parameter_scope": "room"
+         },
+         "p9": {
+          "level": "L2",
+          "parameter_scope": "seat"
+         },
+         "p10": {
+          "level": "L2",
+          "parameter_scope": "seat"
+         },
+         "p11": {
+          "level": "L4",
+          "parameter_scope": "room"
+         },
+         "p12": {
+          "level": "L2",
+          "parameter_scope": "room"
+         },
+         "p13": {
+          "level": "L2",
+          "parameter_scope": "room"
+         },
+         "p14": {
+          "level": "L3",
+          "parameter_scope": "room"
+         },
+         "p15": {
+          "level": "L2",
+          "parameter_scope": "room"
+         },
+         "p16": {
+          "level": "L4",
+          "parameter_scope": "seat"
+         },
+         "p17": {
+          "level": "L4",
+          "parameter_scope": "seat"
+         },
+         "p18": {
+          "level": "L2",
+          "parameter_scope": "room"
+         },
+         "p19": {
+          "level": "L4",
+          "parameter_scope": "room"
+         },
+         "p20": {
+          "level": "L1",
+          "parameter_scope": "seat"
+         },
+         "p21": {
+          "level": "L2",
+          "parameter_scope": "room"
+         }
+        }
+       },
+       "all": {
+        "available": true,
+        "seat_count": 8,
+        "parameters": {
+         "p1": {
+          "level": "L1",
+          "parameter_scope": "seat"
+         },
+         "p2": {
+          "level": "L4",
+          "parameter_scope": "room"
+         },
+         "p3": {
+          "level": "L4",
+          "parameter_scope": "room"
+         },
+         "p4": {
+          "level": "L2",
+          "parameter_scope": "seat"
+         },
+         "p5": {
+          "level": "L1",
+          "parameter_scope": "seat"
+         },
+         "p6": {
+          "level": "L1",
+          "parameter_scope": "seat"
+         },
+         "p7": {
+          "level": "L4",
+          "parameter_scope": "room"
+         },
+         "p8": {
+          "level": "L4",
+          "parameter_scope": "room"
+         },
+         "p9": {
+          "level": "L2",
+          "parameter_scope": "seat"
+         },
+         "p10": {
+          "level": "L2",
+          "parameter_scope": "seat"
+         },
+         "p11": {
+          "level": "L4",
+          "parameter_scope": "room"
+         },
+         "p12": {
+          "level": "L2",
+          "parameter_scope": "room"
+         },
+         "p13": {
+          "level": "L2",
+          "parameter_scope": "room"
+         },
+         "p14": {
+          "level": "L3",
+          "parameter_scope": "room"
+         },
+         "p15": {
+          "level": "L2",
+          "parameter_scope": "room"
+         },
+         "p16": {
+          "level": "L4",
+          "parameter_scope": "seat"
+         },
+         "p17": {
+          "level": "L4",
+          "parameter_scope": "seat"
+         },
+         "p18": {
+          "level": "L2",
+          "parameter_scope": "room"
+         },
+         "p19": {
+          "level": "L4",
+          "parameter_scope": "room"
+         },
+         "p20": {
+          "level": "L1",
+          "parameter_scope": "seat"
+         },
+         "p21": {
+          "level": "L2",
+          "parameter_scope": "room"
+         }
+        }
+       }
+      }
+     },
+     "strength_stories": [
+      {
+       "story_id": "tonal-consistency",
+       "rank": 1,
+       "title": "Consistent tonal performance",
+       "category": "Timbre Matching",
+       "level": "L4",
+       "scope": "seat",
+       "statement": "Both parameters hold across all 8 assessed seating positions, each for its own speaker group, so the tonal balance of the screen channels and of the surround and overhead channels holds from seat to seat.",
+       "evidence_parameter_ids": [
+        "P16",
+        "P17"
+       ],
+       "evidence_values": [
+        {
+         "id": "P16",
+         "level": "L4",
+         "value": "Screen channels across the seats · ±0.5 dB"
+        },
+        {
+         "id": "P17",
+         "level": "L4",
+         "value": "Surround and overhead across the seats · ≤1.5 dB window"
+        }
+       ],
+       "allowed_claim_ids": [
+        "claim_story_tonal-consistency_01"
+       ],
+       "supporting_products": [
+        {
+         "layer": "lcr",
+         "models": "Q6-3 × 2, C4-1 × 2"
+        },
+        {
+         "layer": "surrounds",
+         "models": "EVOLVE 2-1 × 6"
+        }
+       ],
+       "display_context": {
+        "display_type": "tv",
+        "label": "115\" TV"
+       }
+      },
+      {
+       "story_id": "immersive-layout",
+       "rank": 2,
+       "title": "A high-resolution immersive layout",
+       "category": "System Architecture",
+       "level": "L4",
+       "scope": "room",
+       "statement": "The design is built as a 9.1.6 system with 6 overhead speakers and 4 subwoofers, so effects move above and around the audience instead of staying on the screen plane.",
+       "evidence_parameter_ids": [
+        "P2"
+       ],
+       "evidence_values": [
+        {
+         "id": "9.1.6",
+         "level": null,
+         "value": "system format"
+        },
+        {
+         "id": "P2",
+         "level": "L4",
+         "value": "15 speakers"
+        },
+        {
+         "id": "6 overheads",
+         "level": null,
+         "value": "4 subwoofers"
+        }
+       ],
+       "allowed_claim_ids": [
+        "claim_story_immersive-layout_01"
+       ],
+       "supporting_products": [
+        {
+         "layer": "overheads",
+         "models": "ARCHITECT 2-1 × 6"
+        },
+        {
+         "layer": "subwoofers",
+         "models": "SUB3-12 × 2, SUB3-12 × 2"
+        }
+       ],
+       "display_context": {
+        "display_type": "tv",
+        "label": "115\" TV"
+       }
+      },
+      {
+       "story_id": "bass-output",
+       "rank": 3,
+       "title": "Bass output capability",
+       "category": "Bass Performance",
+       "level": "L3",
+       "scope": "room",
+       "statement": "The subwoofers deliver 115 dBC of low-frequency output at the reference seating position, the output authority the bass system is specified to reach.",
+       "evidence_parameter_ids": [
+        "P14"
+       ],
+       "evidence_values": [
+        {
+         "id": "P14",
+         "level": "L3",
+         "value": "LFE output · 115 dBC"
+        }
+       ],
+       "allowed_claim_ids": [
+        "claim_story_bass-output_01"
+       ],
+       "supporting_products": [
+        {
+         "layer": "subwoofers",
+         "models": "SUB3-12 × 2, SUB3-12 × 2"
+        }
+       ],
+       "display_context": {
+        "display_type": "tv",
+        "label": "115\" TV"
+       }
+      },
+      {
+       "story_id": "spatial-resolution",
+       "rank": 4,
+       "title": "Speaker placement within the recommended zones",
+       "category": "Spatial Resolution",
+       "level": "L4",
+       "scope": "room",
+       "statement": "Wide speakers inside their deviation limit, no speakers outside the recommended positions and screen-wall speakers inside their recommended zones, each stated on its own published result.",
+       "evidence_parameter_ids": [
+        "P3",
+        "P7",
+        "P11"
+       ],
+       "evidence_values": [
+        {
+         "id": "P7",
+         "level": "L4",
+         "value": "wide speakers inside their deviation limit"
+        },
+        {
+         "id": "P11",
+         "level": "L4",
+         "value": "no speakers outside the recommended positions"
+        },
+        {
+         "id": "P3",
+         "level": "L4",
+         "value": "screen-wall speakers inside their recommended zones"
+        }
+       ],
+       "allowed_claim_ids": [
+        "claim_story_spatial-resolution_01"
+       ],
+       "supporting_products": [
+        {
+         "layer": "surrounds",
+         "models": "EVOLVE 2-1 × 6"
+        },
+        {
+         "layer": "overheads",
+         "models": "ARCHITECT 2-1 × 6"
+        }
+       ],
+       "display_context": {
+        "display_type": "tv",
+        "label": "115\" TV"
+       }
+      },
+      {
+       "story_id": "viewing-geometry",
+       "rank": 5,
+       "title": "Front row viewing immersion",
+       "category": "Viewing Experience",
+       "level": "L4",
+       "scope": "row",
+       "statement": "The front row views the TV at 57.3°, the rows that reach it are stated on their own result.",
+       "evidence_parameter_ids": [
+        "RP23"
+       ],
+       "evidence_values": [
+        {
+         "id": "RP23",
+         "level": "L4",
+         "value": "Front row · 57.3° · 4 seats"
+        }
+       ],
+       "allowed_claim_ids": [
+        "claim_story_viewing-geometry_01"
+       ],
+       "supporting_products": [],
+       "display_context": {
+        "display_type": "tv",
+        "label": "115\" TV"
+       }
+      }
+     ],
+     "omitted_stories": [
+      {
+       "story_id": "dynamic-capability",
+       "reason": "the design already carries 5 results at L3 or better, so a L2 result is not raised as a headline strength"
+      },
+      {
+       "story_id": "low-frequency-extension",
+       "reason": "the design already carries 5 results at L3 or better, so a L2 result is not raised as a headline strength"
+      },
+      {
+       "story_id": "bass-extension-and-response",
+       "reason": "the design already carries 5 results at L3 or better, so a L2 result is not raised as a headline strength"
+      },
+      {
+       "story_id": "seat-placement-consistency",
+       "reason": "the seat-scoped placement results are mixed (P5 L1, P6 L1, P10 L2) — each placement measure is stated on its own result, and no seat-by-seat placement consistency is claimed"
+      },
+      {
+       "story_id": "room-wide-bass-consistency",
+       "reason": "P20 is L1 across the assessed seats — no room-wide bass consistency is claimed"
+      },
+      {
+       "story_id": "background-noise",
+       "reason": "P15 is null and is an assumed design assumption, not a measured result"
+      },
+      {
+       "story_id": "early-reflections",
+       "reason": "P21 is an assumed performance level, not a measured result"
+      },
+      {
+       "story_id": "low-frequency-extension",
+       "reason": "P18 is L2 (24 Hz) — moderate extension, and stronger results are available to lead with"
+      },
+      {
+       "story_id": "lower-level-strengths",
+       "reason": "this design carries 5 results at L3 or better, so L2 results are not raised as headline strengths"
+      }
+     ]
+    }
+   ],
+   "classification": [],
+   "supporting_results": {
+    "requested": [
+     "bass_extension",
+     "screen_dynamic_range",
+     "viewing_rows"
+    ],
+    "rule": "a supporting result is minted only where the brief asked for it and the frozen facts state it, at the exact scope and status the reports record",
+    "minted": [
+     {
+      "key": "bass_extension",
+      "version_id": "6ac7a189d093a8d8a68eec91",
+      "claim_id": "claim_p18_supporting_result_01"
+     },
+     {
+      "key": "screen_dynamic_range",
+      "version_id": "6ac7a189d093a8d8a68eec91",
+      "claim_id": "claim_p12_supporting_result_01"
+     },
+     {
+      "key": "viewing_rows",
+      "version_id": "6ac7a189d093a8d8a68eec91",
+      "claim_id": "claim_rp23_viewing_supporting_result_01"
+     }
+    ],
+    "omitted": []
+   },
+   "materiality_notes": [],
+   "allowed_claims": [
+    {
+     "claim_id": "claim_story_tonal-consistency_01",
+     "area": "Timbre Matching",
+     "label": "Consistent tonal performance",
+     "kind": "strength_story",
+     "statement": "Both parameters hold across all 8 assessed seating positions, each for its own speaker group, so the tonal balance of the screen channels and of the surround and overhead channels holds from seat to seat.",
+     "option": {
+      "version_id": "6ac7a189d093a8d8a68eec91",
+      "version_name": "Original Design",
+      "label": "Option A"
+     },
+     "favours": false,
+     "scope": "seat",
+     "seat_count": null,
+     "level": "L4",
+     "wording_class": "strength",
+     "wording": "Both parameters hold across all 8 assessed seating positions, each for its own speaker group, so the tonal balance of the screen channels and of the surround and overhead channels holds from seat to seat.",
+     "basis": {
+      "levels": [
+       "L4"
+      ]
+     }
+    },
+    {
+     "claim_id": "claim_story_immersive-layout_01",
+     "area": "System Architecture",
+     "label": "A high-resolution immersive layout",
+     "kind": "strength_story",
+     "statement": "The design is built as a 9.1.6 system with 6 overhead speakers and 4 subwoofers, so effects move above and around the audience instead of staying on the screen plane.",
+     "option": {
+      "version_id": "6ac7a189d093a8d8a68eec91",
+      "version_name": "Original Design",
+      "label": "Option A"
+     },
+     "favours": false,
+     "scope": "room",
+     "seat_count": null,
+     "level": "L4",
+     "wording_class": "strength",
+     "wording": "The design is built as a 9.1.6 system with 6 overhead speakers and 4 subwoofers, so effects move above and around the audience instead of staying on the screen plane.",
+     "basis": {
+      "levels": [
+       "L4"
+      ]
+     }
+    },
+    {
+     "claim_id": "claim_story_bass-output_01",
+     "area": "Bass Performance",
+     "label": "Bass output capability",
+     "kind": "strength_story",
+     "statement": "The subwoofers deliver 115 dBC of low-frequency output at the reference seating position, the output authority the bass system is specified to reach.",
+     "option": {
+      "version_id": "6ac7a189d093a8d8a68eec91",
+      "version_name": "Original Design",
+      "label": "Option A"
+     },
+     "favours": false,
+     "scope": "room",
+     "seat_count": null,
+     "level": "L3",
+     "wording_class": "strength",
+     "wording": "The subwoofers deliver 115 dBC of low-frequency output at the reference seating position, the output authority the bass system is specified to reach.",
+     "basis": {
+      "levels": [
+       "L3"
+      ]
+     }
+    },
+    {
+     "claim_id": "claim_story_spatial-resolution_01",
+     "area": "Spatial Resolution",
+     "label": "Speaker placement within the recommended zones",
+     "kind": "strength_story",
+     "statement": "Wide speakers inside their deviation limit, no speakers outside the recommended positions and screen-wall speakers inside their recommended zones, each stated on its own published result.",
+     "option": {
+      "version_id": "6ac7a189d093a8d8a68eec91",
+      "version_name": "Original Design",
+      "label": "Option A"
+     },
+     "favours": false,
+     "scope": "room",
+     "seat_count": null,
+     "level": "L4",
+     "wording_class": "strength",
+     "wording": "Wide speakers inside their deviation limit, no speakers outside the recommended positions and screen-wall speakers inside their recommended zones, each stated on its own published result.",
+     "basis": {
+      "levels": [
+       "L4"
+      ]
+     }
+    },
+    {
+     "claim_id": "claim_story_viewing-geometry_01",
+     "area": "Viewing Experience",
+     "label": "Front row viewing immersion",
+     "kind": "strength_story",
+     "statement": "The front row views the TV at 57.3°, the rows that reach it are stated on their own result.",
+     "option": {
+      "version_id": "6ac7a189d093a8d8a68eec91",
+      "version_name": "Original Design",
+      "label": "Option A"
+     },
+     "favours": false,
+     "scope": "row",
+     "seat_count": null,
+     "level": "L4",
+     "wording_class": "strength",
+     "wording": "The front row views the TV at 57.3°, the rows that reach it are stated on their own result.",
+     "basis": {
+      "levels": [
+       "L4"
+      ]
+     }
+    },
+    {
+     "claim_id": "claim_p18_supporting_result_01",
+     "area": "p18",
+     "label": "Bass extension",
+     "kind": "supporting_result",
+     "statement": "Bass extension: 24 Hz.",
+     "option": {
+      "version_id": "6ac7a189d093a8d8a68eec91",
+      "version_name": "Original Design",
+      "label": "Option A"
+     },
+     "favours": false,
+     "scope": null,
+     "seat_count": null,
+     "level": "L2",
+     "wording_class": "supporting",
+     "wording": "Bass extension: 24 Hz",
+     "evidence_state": null,
+     "authority_source": "durable-current-bass-authority",
+     "prediction_status": "predicted",
+     "definition": "P18",
+     "requested_by": "bass_extension",
+     "basis": {
+      "levels": [
+       "L2"
+      ],
+      "values": [
+       "24 Hz"
+      ],
+      "classification": "supporting_result",
+      "scope": null,
+      "prediction_status": "predicted"
+     }
+    },
+    {
+     "claim_id": "claim_p12_supporting_result_01",
+     "area": "p12",
+     "label": "Screen Dynamic Range",
+     "kind": "supporting_result",
+     "statement": "Screen Dynamic Range: 104 dBC.",
+     "option": {
+      "version_id": "6ac7a189d093a8d8a68eec91",
+      "version_name": "Original Design",
+      "label": "Option A"
+     },
+     "favours": false,
+     "scope": null,
+     "seat_count": null,
+     "level": "L2",
+     "wording_class": "supporting",
+     "wording": "Screen Dynamic Range: 104 dBC",
+     "evidence_state": null,
+     "authority_source": "durable-engineering-publication",
+     "prediction_status": "published",
+     "definition": "Screen speakers SPL capability at RSP (post calibration EQ, within assigned bandwidth) without clipping",
+     "requested_by": "screen_dynamic_range",
+     "basis": {
+      "levels": [
+       "L2"
+      ],
+      "values": [
+       "104 dBC"
+      ],
+      "classification": "supporting_result",
+      "scope": null,
+      "prediction_status": "published"
+     }
+    },
+    {
+     "claim_id": "claim_rp23_viewing_supporting_result_01",
+     "area": "rp23_viewing",
+     "label": "Front and rear row viewing geometry",
+     "kind": "supporting_result",
+     "statement": "The front row views the 115\" TV at 57.3°; the rear row views the 115\" TV at 34.3°.",
+     "option": {
+      "version_id": "6ac7a189d093a8d8a68eec91",
+      "version_name": "Original Design",
+      "label": "Option A"
+     },
+     "favours": false,
+     "scope": "row",
+     "seat_count": 8,
+     "level": null,
+     "wording_class": "supporting",
+     "wording": "The front row views the 115\" TV at 57.3°; the rear row views the 115\" TV at 34.3°.",
+     "rows": [
+      {
+       "row": 1,
+       "seats": 4,
+       "angle_deg": 57.3
+      },
+      {
+       "row": 2,
+       "seats": 4,
+       "angle_deg": 34.3
+      }
+     ],
+     "evidence_state": "scored",
+     "authority_source": null,
+     "prediction_status": "published",
+     "requested_by": "viewing_rows",
+     "basis": {
+      "levels": [],
+      "values": [
+       "57.3°",
+       "34.3°"
+      ],
+      "classification": "supporting_result",
+      "scope": "row",
+      "prediction_status": "published"
+     }
+    }
+   ],
+   "blocked_claims": [
+    {
+     "block_id": "block_global_no_invented_benefits_01",
+     "scope": "global",
+     "area": null,
+     "reason": "no_invented_benefits",
+     "prohibited": "Do not invent a benefit: every client-facing claim must be one of the allowed claims in this pack.",
+     "detail": null
+    },
+    {
+     "block_id": "block_global_no_changed_values_02",
+     "scope": "global",
+     "area": null,
+     "reason": "no_changed_values",
+     "prohibited": "Never change, round or restate a value: every figure is copied exactly as this pack states it.",
+     "detail": null
+    },
+    {
+     "block_id": "block_global_no_unselected_products_03",
+     "scope": "global",
+     "area": null,
+     "reason": "no_unselected_products",
+     "prohibited": "Never name a product that is not listed for the option it belongs to in this pack.",
+     "detail": null
+    },
+    {
+     "block_id": "block_global_no_recalculation_04",
+     "scope": "global",
+     "area": null,
+     "reason": "no_recalculation",
+     "prohibited": "Never calculate, estimate or infer a result: this pack is the only source of performance figures.",
+     "detail": null
+    },
+    {
+     "block_id": "block_global_no_redesign_recommendation_05",
+     "scope": "global",
+     "area": null,
+     "reason": "no_redesign_recommendation",
+     "prohibited": "Do not recommend changing the design: the proposal states the final design, it is not a set of next steps.",
+     "detail": null
+    },
+    {
+     "block_id": "block_global_no_universal_improvement_06",
+     "scope": "global",
+     "area": null,
+     "reason": "no_universal_improvement",
+     "prohibited": "Do not claim every parameter improves: claim only what this pack records as a material gain.",
+     "detail": null
+    },
+    {
+     "block_id": "block_global_no_decision_framing_07",
+     "scope": "global",
+     "area": null,
+     "reason": "no_decision_framing",
+     "prohibited": "Do not write a decision framing that sets one option above the other: this pack does not support it.",
+     "detail": "single_option"
+    }
+   ],
+   "bass_claims": {
+    "p20": null,
+    "p14": null,
+    "allowed": [],
+    "blocked": [],
+    "scope": [
+     "bass_output_authority",
+     "physical_capability",
+     "subwoofer_specification"
+    ],
+    "note": null,
+    "removed_wording": [
+     {
+      "version_id": "6ac7a189d093a8d8a68eec91",
+      "path": "facts.system.subwoofer_strategy.strategy_text",
+      "rule": "maximum_consistency"
+     }
+    ]
+   },
+   "decision_framing": {
+    "allowed": false,
+    "reason": "single_option",
+    "text": null,
+    "evidence": {}
+   },
+   "evidence_basis": {
+    "sources": [
+     "saved-report-evidence"
+    ],
+    "version_names": [
+     {
+      "version_id": "6ac7a189d093a8d8a68eec91",
+      "source": "saved-report-evidence",
+      "from": "project_report",
+      "stated_by": [
+       "project_report"
+      ],
+      "reports_agree": true
+     }
+    ],
+    "report_snapshot_ids": [
+     {
+      "version_id": "6ac7a189d093a8d8a68eec91",
+      "project_report_snapshot_id": "6ac9040e4eb1d249ea0bc045",
+      "visual_report_snapshot_id": null,
+      "technical_report_snapshot_id": null
+     }
+    ],
+    "fingerprints": [
+     {
+      "version_id": "6ac7a189d093a8d8a68eec91",
+      "engineering": "eng:v1:5739e42a60819e44",
+      "visual_evidence": "re1-f5ecbadf-1e9dc",
+      "technical_evidence": "re1-f5ecbadf-1e9dc"
+     }
+    ]
+   },
+   "pack_fingerprint": "6a709e91"
+  },
+  "design_interpretation": {
+   "rule": "the interpretation explains the design and is never a source of figures: every figure, level, parameter and product the copy states comes from the evidence pack and its allowed claims, and the frozen evidence takes priority wherever the two differ",
+   "available": true,
+   "source": "saved-adi-project-interpretation",
+   "refusal": null,
+   "provenance": {
+    "stage": "adi_project_interpretation",
+    "version": "1.1",
+    "report_type": "system_summary",
+    "report_label": "Original Design",
+    "generated_at": "2026-10-12T17:10:06.226Z",
+    "project_id": "6ac7a0ae9f28aaf668e20ccc",
+    "version_ids": [
+     "6ac7a189d093a8d8a68eec91"
+    ],
+    "confirmed_by": {
+     "project": "matched",
+     "version": "matched",
+     "version_set": "matched",
+     "proposal_type": "matched",
+     "frozen_report_evidence": "not stated beside this proposal, so not compared"
+    }
+   },
+   "correction_rule": "these statements contradicted the frozen evidence and were removed: they are never written, the rest of the interpretation stands, and the frozen evidence itself is unchanged",
+   "corrections": [],
+   "view": {
+    "source": "saved-adi-project-interpretation",
+    "room_type": "TV-based cinema room",
+    "presentation": "Television",
+    "intended_use": "Reference-style dedicated cinema",
+    "defining_feature": "Multi-row layout",
+    "seating_story": "Central seats are strongest",
+    "strongest_areas": [
+     {
+      "area": "Spatial Resolution",
+      "evidence": "project floor L2"
+     },
+     {
+      "area": "Dynamic Range",
+      "evidence": "project floor L2"
+     },
+     {
+      "area": "Timbre Matching",
+      "evidence": "project floor L1"
+     },
+     {
+      "area": "Viewing geometry",
+      "evidence": "RP23 L4"
+     },
+     {
+      "area": "Speaker discretion",
+      "evidence": "compact models in the system"
+     },
+     {
+      "area": "Bass depth and output",
+      "evidence": "reliable calculated bass result"
+     }
+    ],
+    "constraints": [
+     "Rear row geometry"
+    ],
+    "design_contents": [
+     "Layout: 9.1.6, 15 discrete channels",
+     "Channels: 9 at listener level, 6 overhead",
+     "Loudspeakers: Q6-3, C4-1, EVOLVE 2-1, ARCHITECT 2-1"
+    ],
+    "design_decisions": [],
+    "design_philosophy": {
+     "principle": "The best cinema is not necessarily the cinema with the highest possible scores: the best design is the one that most effectively satisfies the client brief while balancing performance, practicality, aesthetics and cost.",
+     "legitimate_reasons": [
+      "Practicality",
+      "Aesthetics",
+      "Price"
+     ],
+     "why_appropriate": "TV-based cinema room designed for reference-style dedicated cinema, strongest in spatial resolution, the reference position is the design's own listening position. The client priorities are stated in the designer brief.",
+     "priorities": {
+      "prioritised_positions": "The reference position is the design's own listening position.",
+      "display_and_seating": "115\" TV, 2 seating rows: the display size and the seating distance were set together, and the reported viewing result is the evidence for how they balance.",
+      "coverage": "9.1.6 layout, 15 discrete channels, 6 overhead channels: the coverage approach is the layout the evidence states, and no coverage result is claimed that the spatial evidence does not carry.",
+      "bass": "4 subwoofers, Four subwoofers (sub3-12). Distributed multi-subwoofer arrangement for maximum seat-to-seat bass consistency.: seat-to-seat consistency is claimed only where the consistency result supports it, so bass is otherwise described as output capability and physical authority."
+     },
+     "strongest_results": [
+      {
+       "area": "Spatial Resolution",
+       "label": null,
+       "level": "L2"
+      },
+      {
+       "area": "Dynamic Range",
+       "label": null,
+       "level": "L2"
+      },
+      {
+       "area": "Timbre Matching",
+       "label": null,
+       "level": "L1"
+      },
+      {
+       "area": "Viewing geometry",
+       "label": null,
+       "level": "L4"
+      }
+     ],
+     "lower_results": [
+      {
+       "area": null,
+       "label": "Seat-to-wall distance",
+       "level": "L1"
+      },
+      {
+       "area": null,
+       "label": "Screen consistency",
+       "level": "L2"
+      },
+      {
+       "area": null,
+       "label": "Horizontal spacing",
+       "level": "L1"
+      },
+      {
+       "area": null,
+       "label": "Surround level consistency",
+       "level": "L1"
+      },
+      {
+       "area": null,
+       "label": "Overhead spacing",
+       "level": "L2"
+      },
+      {
+       "area": null,
+       "label": "Overhead level consistency",
+       "level": "L2"
+      }
+     ],
+     "lower_result_rule": "a lower result is a legitimate design decision: state the result and what it means for this room, and name a reason only where the interpretation records one",
+     "value_engineering": {
+      "already_captured": [
+       {
+        "area": "Loudspeaker positions against the recommended positions",
+        "label": "Screen speaker placement",
+        "level": "L4"
+       },
+       {
+        "area": "Front-wide positioning",
+        "label": "Front wide position",
+        "level": "L4"
+       },
+       {
+        "area": "Placement geometry",
+        "label": "Surround speaker placement",
+        "level": "L4"
+       },
+       {
+        "area": "Channel count within the available processing capacity",
+        "label": "Discrete channels",
+        "level": "L4"
+       }
+      ],
+      "remaining_design_choices": [
+       {
+        "area": "Seating distance from the room boundaries",
+        "label": "Seat-to-wall distance",
+        "level": "L1"
+       }
+      ],
+      "rule": "opportunities identified from the existing assessment, never promises of a free improvement and never instructions to change the finished design"
+     },
+     "not_established": [
+      "the client budget",
+      "any conversation, meeting, site visit or instruction the brief does not state",
+      "a reason behind a loudspeaker position or a seating position the interpretation does not explain",
+      "a comparison against a design that was never assessed"
+     ],
+     "rules": [
+      "The best cinema is not necessarily the cinema with the highest possible scores: the best design is the one that most effectively satisfies the client brief while balancing performance, practicality, aesthetics and cost.",
+      "a result below the highest available level is a legitimate design decision where practicality, aesthetics or price explains it: state the result and what it means for this room rather than presenting the highest available level as the objective regardless of cost or practical consequence",
+      "every reason the copy gives must come from the design decisions, constraints, priorities and results the interpretation records: never invent a client conversation, a budget, a constraint, a priority or a design decision, and never invent the reason behind a loudspeaker or a seating position",
+      "where a lower result is stated and the interpretation records no reason for it, state the result and write no reason",
+      "value-engineering opportunities are internal reasoning: they are never written as an instruction to change the design, never as an upgrade path, and never as a promise of a free improvement",
+      "a more expensive solution is never presented as better value on price alone",
+      "the frozen engineering evidence stays authoritative: never infer that a design change improved a parameter unless the assessment supports it, and never imply every seat performs identically",
+      "a structure recorded at the lowest passing level is this project's leading structure, not a strong result: state the level it reached and claim no tonal, spatial or dynamic benefit beyond the result itself, and never present a relative rank as a strength"
+     ],
+     "rule": "this is the reasoning behind the recommended solution and never a source of figures: every figure, level, product and claim still comes from the frozen evidence pack, and a reason is stated only where this records one"
+    },
+    "supporting_evidence": {
+     "spatial_resolution": [
+      {
+       "parameter_id": 1,
+       "label": "Seat-to-wall distance",
+       "level": "L1",
+       "statement": "L1 · 0.71m"
+      },
+      {
+       "parameter_id": 2,
+       "label": "Discrete channels",
+       "level": "L4",
+       "statement": "L4 · 15 speakers"
+      },
+      {
+       "parameter_id": 3,
+       "label": "Screen speaker placement",
+       "level": "L4",
+       "statement": "L4 · 0 speakers"
+      },
+      {
+       "parameter_id": 4,
+       "label": "Screen consistency",
+       "level": "L2",
+       "statement": "L2 · 5 dB"
+      },
+      {
+       "parameter_id": 5,
+       "label": "Horizontal spacing",
+       "level": "L1",
+       "statement": "L1 · 104°"
+      },
+      {
+       "parameter_id": 6,
+       "label": "Surround level consistency",
+       "level": "L1",
+       "statement": "L1 · 9 dB"
+      },
+      {
+       "parameter_id": 7,
+       "label": "Front wide position",
+       "level": "L4",
+       "statement": "L4 · 0"
+      },
+      {
+       "parameter_id": 9,
+       "label": "Overhead spacing",
+       "level": "L2",
+       "statement": "L2 · 66.5°"
+      },
+      {
+       "parameter_id": 10,
+       "label": "Overhead level consistency",
+       "level": "L2",
+       "statement": "L2 · 8 dB"
+      },
+      {
+       "parameter_id": 11,
+       "label": "Surround speaker placement",
+       "level": "L4",
+       "statement": "L4 · 0"
+      }
+     ],
+     "dynamic_range": [
+      {
+       "parameter_id": 12,
+       "label": "Screen Dynamic Range",
+       "level": "L2",
+       "statement": "L2 · 104 dBC"
+      },
+      {
+       "parameter_id": 13,
+       "label": "Non-screen Dynamic Range",
+       "level": "L2",
+       "statement": "L2 · 101 dBC (FW)"
+      },
+      {
+       "parameter_id": 14,
+       "label": "LFE and subwoofer Dynamic Range",
+       "level": "L3",
+       "statement": "L3 · 115 dBC"
+      }
+     ],
+     "timbre_matching": [
+      {
+       "parameter_id": 16,
+       "label": "Screen timbre",
+       "level": "L4",
+       "statement": "L4 · ±0.5 dB"
+      },
+      {
+       "parameter_id": 17,
+       "label": "Surround timbre",
+       "level": "L4",
+       "statement": "L4 · ≤1.5 dB window"
+      },
+      {
+       "parameter_id": 18,
+       "label": "Bass extension",
+       "level": "L2",
+       "statement": "L2 · 24 Hz"
+      },
+      {
+       "parameter_id": 19,
+       "label": "Bass response",
+       "level": "L4",
+       "statement": "L4 · ±0 dB"
+      }
+     ],
+     "bass_output_depth_and_response": [
+      {
+       "parameter_id": 14,
+       "label": "LFE and subwoofer Dynamic Range",
+       "level": "L3",
+       "statement": "L3 · 115 dBC"
+      },
+      {
+       "parameter_id": 18,
+       "label": "Bass extension",
+       "level": "L2",
+       "statement": "L2 · 24 Hz"
+      },
+      {
+       "parameter_id": 19,
+       "label": "Bass response",
+       "level": "L4",
+       "statement": "L4 · ±0 dB"
+      }
+     ],
+     "bass_consistency_across_seats": [],
+     "viewing": {
+      "summary": "Viewing angles calculated for 8 seats. Horizontal viewing angle ranges from 34° to 57°.",
+      "primary_level": "L4",
+      "secondary_level": null
+     },
+     "display": {
+      "size_inches": 115,
+      "width_m": 2.5458721439408083,
+      "aspect_ratio": "16:9",
+      "mount_mode": null
+     },
+     "system": {
+      "format": "9.1.6 Dolby Atmos configuration (9 bed channels, 1 subwoofer, 6 overhead channels)",
+      "discrete_channels": null,
+      "subwoofer_count": 4,
+      "speaker_families": null
+     }
+    },
+    "unknown_or_unsupported": [
+     {
+      "label": "Upfiring speaker allowance",
+      "reason": "not used"
+     },
+     {
+      "label": "Background noise assumption",
+      "reason": "not used"
+     },
+     {
+      "label": "Early reflection assumption",
+      "reason": "not used"
+     },
+     {
+      "label": "RP22 P20",
+      "reason": "Not used in this report unless the result is strong."
+     }
+    ],
+    "not_stated_rule": "these are not stated because the evidence does not support them: never write about them",
+    "rule": "the interpretation explains the design and is never a source of figures: every figure, level, parameter and product the copy states comes from the evidence pack and its allowed claims, and the frozen evidence takes priority wherever the two differ",
+    "correction_rule": "these statements contradicted the frozen evidence and were removed: they are never written, the rest of the interpretation stands, and the frozen evidence itself is unchanged",
+    "corrections": [
+     {
+      "field": "design_contents",
+      "statement": "Subwoofers: 4, Four subwoofers (sub3-12). Distributed multi-subwoofer arrangement for maximum seat-to-seat bass consistency.",
+      "reason": "states_a_seat_to_seat_outcome_the_frozen_evidence_does_not_support"
+     },
+     {
+      "field": "design_contents",
+      "statement": "Screen: acoustically transparent, with the screen channels behind it",
+      "reason": "assumes_a_projection_screen_the_frozen_evidence_does_not_state"
+     }
+    ]
+   }
+  },
+  "editorial_brief": {
+   "rule": "these are the designer's own instructions and are never copy: they explain what to emphasise and what needs explaining, they never change a figure, a level, a product or a claim, and no note, instruction, filename or caption from them appears in the draft",
+   "priority": "the frozen evidence pack is the engineering authority: where a brief or the interpretation and the evidence differ, the evidence governs and the other is not followed",
+   "supplied": true,
+   "client_brief": "• Emphasise the 115\" TV\n• Explain front-row and rear-row viewing differences\n• Explain the 9.1.6 system layout\n• Show the L2 Screen Dynamic Range result\n• Explain the L4 screen timbre result\n• Highlight the 15 discrete channels\n• Highlight the bass extension result\n• Explain the 15 discrete channels for spatial accuracy\n• Emphasise the L4 timbre matching for seamless transitions",
+   "narrative_brief": null,
+   "designer_notes": null
+  },
+  "rp22_design_context": {
+   "version": "1.0",
+   "source": {
+    "document": "CEDIA/CTA-RP22 Immersive Audio Design Recommended Practice",
+    "version": "1.2",
+    "published": "September 2023",
+    "url": "https://cedia.org/site/assets/files/6057/cedia-cta_rp22_v1_2_sept_2023.pdf"
+   },
+   "available": true,
+   "rule": "this is professional design context for explaining why a design decision suits this room. It is never engineering evidence, it states no figure, level, product or performance result, and it never establishes the reason this designer chose a configuration: every figure, level, product and claim still comes from the frozen evidence pack, and the frozen evidence governs wherever the two differ",
+   "principles": [
+    {
+     "principle_id": "holistic_design",
+     "area": "holistic_design_and_compromises",
+     "title": "Holistic design and intelligent compromises",
+     "section": "3.3, 3.3.1",
+     "locator": "section_excerpt_verified",
+     "classification": "A",
+     "principle": "A cinema is designed as one system: the decisions interact and improving one objective can constrain another, so the design is revisited as a whole. The best performing systems are the ones with the most intelligent set of compromises, and the aim is performance balanced against practicality, aesthetics and cost.",
+     "applicability": "Applies to every design.",
+     "limitations": "It establishes that a trade-off may be intelligent. It never establishes that a particular lower result WAS a deliberate compromise, and never that a compromise is acceptable to the client.",
+     "project_evidence": "The interpretation record: the constraints, the priorities, the strongest results, and the lower results it states a reason for.",
+     "safe_use": "Explain the balance the design strikes and why the combination suits this room. Name a trade-off as deliberate only where the interpretation or the designer records a reason for it; otherwise state the result and stop."
+    },
+    {
+     "principle_id": "surround_placement",
+     "area": "surround_quantity_and_multi_row_positioning",
+     "title": "Surround quantity and multi-row positioning",
+     "section": "5.5, 5.6",
+     "locator": "contents_listing",
+     "classification": "B",
+     "principle": "The surround and rear speakers are placed to carry sound around the audience, and the placement has to work for the whole seating area rather than one seat. Their positions within the recommended zones are what creates continuous movement; more speakers at poorer positions do not.",
+     "applicability": "Applies where the design has a bed layout of five channels or more.",
+     "limitations": "A channel count never establishes smooth movement, and a position assessed as limited is not explained by the count.",
+     "project_evidence": "The frozen layout and bed channel count, the recorded speaker positions, and the assessed horizontal spacing and placement results.",
+     "safe_use": "Explain how the arrangement carries sound around and past the audience. Where a spacing result is limited, describe it as the practical speaker positions and the seating geometry setting the result, and claim no more than the assessed result supports."
+    },
+    {
+     "principle_id": "front_wides",
+     "area": "front_wide_loudspeaker_purpose",
+     "title": "Front-wide loudspeaker purpose",
+     "section": "5.7",
+     "locator": "section_heading_verified",
+     "classification": "B",
+     "principle": "Front wides bridge the angular gap between the screen channels and the side surrounds, so that sound travelling across the front of the room passes through the room rather than jumping from the screen to the side walls. Whether the ideal position is available depends on the room: a doorway, an opening or the furniture can constrain it.",
+     "applicability": "Applies where the design has front-wide speakers.",
+     "limitations": "It never establishes why a wide ended up where it is, and a constrained position is a geometry outcome rather than a fault in the design.",
+     "project_evidence": "The recorded front-wide positions, the assessed front-wide placement result, and any recorded room element or designer note that constrains the wall.",
+     "safe_use": "Explain what the wides contribute to movement between the screen and the sides. Where the evidence records a compromise and the designer records the reason, state it plainly; where no reason is recorded, state the outcome and write no reason."
+    },
+    {
+     "principle_id": "overhead_layout",
+     "area": "overhead_quantity_positioning_and_listening_area",
+     "title": "Overhead quantity, positioning and the listening area",
+     "section": "5.8, 5.8.1, 5.8.2, 5.8.3",
+     "locator": "section_heading_verified",
+     "classification": "B",
+     "principle": "The upper speakers are positioned to serve the shape and extent of the listening area, and the number of them is adapted to that area rather than chosen for a format label. The arrangement, not the label, is what places sound above the audience.",
+     "applicability": "Applies where the design has one or more overhead channels.",
+     "limitations": "A layout label is never evidence that every seat receives the same overhead coverage, and an overhead count is never evidence of why that count was chosen.",
+     "project_evidence": "The frozen overhead channel count and layout, the recorded overhead positions, the seating geometry and the assessed overhead spacing result.",
+     "safe_use": "Explain that the overhead arrangement is set out to cover the seating area, using the assessed spacing result where it exists. Never state a coverage outcome from the count alone, and never explain the count as a deliberate choice unless the designer records one."
+    },
+    {
+     "principle_id": "speaker_selection",
+     "area": "speaker_selection_dispersion_and_timbre",
+     "title": "Speaker selection, dispersion and timbre",
+     "section": "6.1, 6.1.1",
+     "locator": "section_heading_verified",
+     "classification": "D",
+     "principle": "Speaker performance is judged by how the loudspeaker behaves off axis as well as on it, because the audience hears the off-axis response as much as the direct sound. Similar spectral and phase behaviour across the channels is what lets a voice or an effect keep its character as it moves from one loudspeaker to another.",
+     "applicability": "Applies where the design has assessed timbre or spectral results, or recorded loudspeaker selections.",
+     "limitations": "Sharing a manufacturer or a series is not evidence of a measured timbre match, and a nominal dispersion figure is not a room-level coverage verification.",
+     "project_evidence": "The assessed timbre and spectral results, and the recorded loudspeaker selections the reports state.",
+     "safe_use": "Explain why consistent tonal character matters as sound moves around the cinema, using the assessed timbre result. Describe tonal continuity as a loudspeaker handing a voice or an effect on, and never widen it into equal seats or an equal whole experience."
+    },
+    {
+     "principle_id": "subwoofer_optimisation",
+     "area": "subwoofer_quantity_positioning_and_room_modes",
+     "title": "Subwoofer quantity, positioning and room modes",
+     "section": "7.1, 7.2, 7.3, 7.3.1, 7.3.2",
+     "locator": "section_excerpt_verified",
+     "classification": "D",
+     "principle": "The objective with low frequencies is for the level and response to be consistent across all seats with no audible resonances, which is a different aim from a flat response at one seat or a couple more decibels of output. Room modes make the response differ from seat to seat, so the subwoofer arrangement and the seating positions are chosen together, and additional subwoofers arranged and aligned deliberately can reduce that variation.",
+     "applicability": "Applies where the design has one or more subwoofers.",
+     "limitations": "A subwoofer count never establishes seat-to-seat consistency, and a multi-subwoofer arrangement is a method rather than a proven outcome.",
+     "project_evidence": "The frozen subwoofer count and the recorded arrangement, the assessed bass results the reports publish, and the scope each of those results is stated at.",
+     "safe_use": "Explain the bass approach and what the published bass result states at its own scope. Claim seat-to-seat consistency only where the consistency result itself supports it, and never explain the subwoofer count as a decision that produced it."
+    },
+    {
+     "principle_id": "physical_before_electronic",
+     "area": "physical_design_before_electronic_optimisation",
+     "title": "Physical design before electronic optimisation",
+     "section": "7.3, 7.3.3, 7.4, 11.1",
+     "locator": "section_excerpt_verified",
+     "classification": "D",
+     "principle": "Room dimensions, the seating positions and the subwoofer positions are the physical design; equalisation is applied afterwards and cannot make every physical arrangement equivalent. Room correction works with a suitable physical design rather than replacing it.",
+     "applicability": "Applies where the design has one or more subwoofers.",
+     "limitations": "It is never evidence that a design has been calibrated, that a room has been measured, or that a predicted result has been achieved in the room.",
+     "project_evidence": "The frozen room and seating geometry, the recorded subwoofer positions, and whether the engineering authority states an applied calibration.",
+     "safe_use": "Explain that the physical arrangement has been designed for this room and this geometry, and state what it provides for the design. Never describe a design-stage prediction as a measured or commissioned result, and never append a verification disclaimer to the capability it provides."
+    }
+   ],
+   "acoustics_policy": {
+    "stage": "design_stage",
+    "statement": "Sound Proof is principally a design-stage tool: the room may not yet exist, so acoustic absorption, reflection decay, background noise and sound isolation may be estimated or assumed rather than measured.",
+    "rules": [
+     "acoustic absorption, reflection decay, background noise and sound isolation are not prominent subjects in a normal client proposal: mention one only where the frozen evidence makes it relevant to a decision the design already records",
+     "never imply that specified acoustic treatment has already achieved a particular acoustic result",
+     "never describe an assumed P15 or P21 level as measured, as achieved, or as a result of anything: it is an assumption recorded by the designer",
+     "a specified treatment quantity is a design decision, never evidence of the acoustic outcome it was specified for",
+     "where the room has not been measured, the copy states the design as designed and claims no measured acoustic outcome"
+    ],
+    "treatment_specified_in_design": true
+   },
+   "treatment_guidance": {
+    "applies_when": "the frozen bass assessment identifies a problem that suitable acoustic treatment might help address",
+    "section": "7.4, 9.2.1",
+    "permitted_subjects": [
+     "Artcoustic Abfusers",
+     "purpose-designed bass traps",
+     "other suitable acoustic treatment"
+    ],
+    "rules": [
+     "suggest a potential benefit only where it is consistent with the frequencies involved and the known treatment data, and keep the suggestion restrained",
+     "never guarantee an improvement, and never promise that treatment will resolve the problem",
+     "never claim an improved P19 or P20 result from acoustic treatment unless the engineering model actually evaluates and supports that improvement",
+     "never embellish acoustic-treatment benefits, and never describe treatment as delivering a result the assessment does not state",
+     "treatment is offered as something to consider within the design, never as an instruction to change the finished design and never as a next step the client must take"
+    ]
+   },
+   "evidence_safety": [
+    "RP22 explains general design principles. It never establishes the reason a particular designer selected a configuration.",
+    "never infer a design decision from an equipment count: a channel count, an overhead count or a subwoofer count is evidence of what the design contains, never of why it was chosen",
+    "keep RP22 guidance, verified project engineering, designer-supplied intentions and approved master-admin knowledge separate: none of them stands in for another",
+    "an applicable principle is context for explaining the design; it is never a result, a level, a score, a measurement or a performance claim",
+    "where the frozen evidence records no reason for a decision, state the design and its result, and write no reason at all",
+    "the context strengthens the explanation of the recommended system and never introduces a verification disclaimer: a capability is stated confidently from the frozen evidence, and calibration or commissioning is mentioned only where the client's brief raises it or where it is an important practical recommendation"
+   ]
+  },
+  "clarification_answers": {
+   "supplied": true,
+   "answers": [
+    {
+     "question_id": "subwoofer_arrangement_reason",
+     "question": "What was the main reason for the four-subwoofer arrangement in this room?",
+     "area": "subwoofers",
+     "belongs_to": "what_stays_same",
+     "answer": "4 subs, 2 at the front, 2 at the back, help to break the room modes which create dips in the bass response for different seats, This subwoofer layout is used here to ensure we have as close as possible expereinces in as many seats as possible. The added bonus is higher output and therefore lower frequencies are possible at higher volumes, so every part of the bass expereince is improved wth the use of multiple subwoofers."
+    }
+   ],
+   "passed_questions": [],
+   "rule": "Clarification answers are the designer's own statements of design intention for a decision the frozen evidence records no reason for. Weave each answer into the section it belongs to (its belongs_to), in your own words and in the document's professional voice. Never print the question, never label the answer, never present the answer as a standalone statement or as a list, and never treat it as measured engineering evidence: it is intention only, it changes no figure, level, product or claim, and the frozen evidence governs wherever the two differ. Where the designer passed a question there is no answer at all, and no reason may be invented for it."
+  },
+  "evidence_classification": {
+   "rule": "keep these classes apart: a design fact is stated as what the design is, a supported result is the only source of a performance benefit, a designer intention is never an achievement, a prediction is never written as done, and an unknown or unsupported outcome is never written at all",
+   "classes": {
+    "confirmed_design_fact": "the design as it is built (evidence_pack.options[].facts: room, display, seating, system): state it as what the design is",
+    "supported_engineering_result": "a graded result the frozen reports state, carried as an allowed claim: the only source of a performance benefit",
+    "designer_intention": "what the designer set out to do (editorial_brief, design_interpretation.design_decisions): an intention, never an achieved outcome",
+    "prediction": "what the design is expected to do before it is built: never written as a result the design has delivered",
+    "unknown_or_unsupported": "what no source states (blocked_claims, design_interpretation.unknown_or_unsupported): never written, in any wording"
+   },
+   "counts": {
+    "confirmed_design_facts": 1,
+    "supported_results": 8,
+    "unknown_or_unsupported": 7
+   },
+   "bass": {
+    "status": "published",
+    "whole_seat_consistency_supported": false,
+    "rule": "P19 is stated at the reference seating position only; a claimed seat-to-seat bass consistency needs the pack's own whole-seat positively-graded P20 result, and weak or absent P20 evidence never supports one",
+    "options": [
+     {
+      "version_id": "6ac7a189d093a8d8a68eec91",
+      "version_name": "Original Design",
+      "status": "published",
+      "p19_permitted": true,
+      "p14_p18_permitted": true,
+      "whole_seat_consistency_permitted": false,
+      "note": "the frozen reports publish the bass result: each bass benefit cites its own allowed claim"
+     }
+    ]
+   }
+  },
+  "multi_cabinet_channels": {
+   "rule": "Explain each required frozen arrangement naturally once in the System Design Summary or specification: the physical cabinet count, the position and the ONE logical audio channel. In comparisons name the appropriate design; never assign its arrangement to another option. This is a concise design explanation, not an equipment inventory.",
+   "required": [
+    {
+     "position": "centre",
+     "label": "Centre",
+     "version_id": "6ac7a189d093a8d8a68eec91",
+     "version_name": "Original Design",
+     "option_label": "Option A",
+     "cabinets": 2,
+     "channels": 1,
+     "models": [
+      "C4-1"
+     ],
+     "statement": "2 × C4-1 dual physical centre cabinets",
+     "options": [
+      "Original Design"
+     ]
+    }
+   ],
+   "source": "evidence_pack.options[].facts.system.front_stage"
+  },
+  "timbre_metric_authority": {
+   "rule": "P16 and P17 are seat-to-seat frequency-response results: each states how consistently ONE loudspeaker group holds its own tonal balance from listening position to listening position. Neither states how closely one loudspeaker group resembles another, so a seat-to-seat figure is never written as an inter-speaker or between-group match, and is never attached to a comparison between the screen, surround and overhead speakers. The tonal aim of the design is written as the aim it is: where the copy describes a sound keeping its character as it passes between loudspeakers, that is the design's intent, never a measured match between the speaker groups and never a figure from these results.",
+   "version": 1,
+   "metrics": [
+    {
+     "parameter": "P16",
+     "group": "screen-wall speakers",
+     "metric": "seat-to-seat frequency-response variance across the screen-wall speakers, normalised to the measured response at the reference seating position (500 Hz to 16 kHz, one-octave smoothing)",
+     "establishes": "how consistently the screen channels hold the same tonal balance from seat to seat",
+     "does_not_establish": "a match between the screen channels and any other loudspeaker group"
+    },
+    {
+     "parameter": "P17",
+     "group": "wide, surround and upper speakers",
+     "metric": "seat-to-seat frequency-response variance across the wide, surround and upper speakers, normalised to the measured response at the reference seating position (500 Hz to 16 kHz, one-octave smoothing)",
+     "establishes": "how consistently the surround and overhead speakers hold the same tonal balance from seat to seat",
+     "does_not_establish": "a match between the surround or overhead speakers and any other loudspeaker group"
+    }
+   ],
+   "source": "evidence_pack.options[].strength_stories; RP22 P16 and P17"
+  },
+  "assumed_parameter_policy": null,
+  "writing_rules": [
+   "Write only from the evidence pack. It is the sole source of every fact, figure, level and claim.",
+   "The ranked strength stories you are given decide which engineering characteristics deserve emphasis: rank 1 is the strongest result the evidence states, and never decide for yourself which parameters matter. The ranking is not a compulsory order for the document: the design's own story sets the editorial order, and every story you state is stated by citing its own allowed_claim_ids.",
+   "A verified ADI design interpretation is supplied in design_interpretation: the room, its intended use, the display and seating, the system architecture, the constraints, the reasons behind the design decisions, the strongest characteristics and the results that are reliable evidence. Read it and write from it. It explains the design and is never a source of figures: every figure, level, parameter and product still comes from the evidence pack and its allowed claims, the frozen evidence takes priority wherever the two differ, and where the interpretation states nothing you invent nothing.",
+   "The designer's own brief is supplied in editorial_brief. Treat it as instructions about what to emphasise and what needs explaining. It never overrides the evidence, it never changes a figure, a level, a product or a claim, and it is never copied: no note, instruction, filename or caption from it appears in the draft.",
+   "Sell what the design delivers, not how it was analysed. This is the proposal stage: state the finished design and what the client will experience, never the design-stage work that produced it.",
+   "Open each story with the experience the client will have, then why they will value it, then the engineering proof. The number is the proof, never the story, so never lead a paragraph with a parameter number, a Performance Level, a channel count or a dB value.",
+   "Write the section the pack asks for under its own label: where the pack is a single-option proposal it carries no comparison headings, so write the design the client is being offered and why this specification was chosen, and never write filler such as \"there are no changes to report\".",
+   "Name the display exactly as the frozen evidence names it. Where the display is a TV, write the TV (for example 115\" TV) and use it in the viewing story with the viewing angle and the front-row seating; never write a screen size, an aspect ratio, a viewable width or any projector word. A projection screen keeps its projector-screen language.",
+   "Never write in the software-report register: no \"assessed for\", \"this parameter\", \"according to the report\", \"performance result\", \"this proposal details\", \"established configuration\" or \"calculated design result\".",
+   "In a single-option proposal, never compare the design to a baseline or another option: no increase, greater, improved, more capable, additional headroom, higher output, upgrade or compared to. Describe the capability directly.",
+   "The proposal describes the design that has been specified and what it will deliver. Never write as though its performance has already been demonstrated in this room: the engineering analysis is complete and frozen, and the design is proposed, specified, modelled and designed.",
+   "This proposal is written before installation: write specified, selected, designed, modelled or proposed, never installed or installation, unless the frozen evidence says the system is installed.",
+   "Every client-facing claim must cite one or more allowed claim IDs in that section's claim_ids.",
+   "Where a section states what is shared and also contrasts the options, cite both: the shared-result claims for the unchanged facts and the factual-change or material-gain claims for the facts that differ.",
+   "Copy every figure, Performance Level and product name exactly as the pack states it. Never round, convert, restate or estimate.",
+   "Never name a product the pack does not list for the option it belongs to.",
+   "Read multi_cabinet_channels: where frozen evidence specifies multiple physical cabinets reproducing one logical audio channel, explain the exact cabinet count and the one channel naturally once in the System Design Summary or specification. Attribute the arrangement to its own design in a comparison. Accept natural wording, not an equipment inventory.",
+   "State supported dynamic-range benefits positively: headroom for demanding film soundtracks, controlled dynamic peaks and clear, confident presentation at the designed listening levels. Match each benefit to the frozen evidence and channel family; bass output is not bass extension, reference-position response or seat consistency.",
+   "Never publish internal claim-defence, validation, testing or scoring commentary. Practical qualifications remain necessary, including maintaining the specified listening positions and room geometry when presenting seating alternatives.",
+   "Where the pack states a dual-centre screen stage, name the stage position by position: the left and right channels with their own model, and the centre with its own cabinet count and model (for example Front Left / Right: Q6-3 and Centre: 2 × C4-1 dual physical centre cabinets). Never write the three screen channels as one LCR of the left/right model, never write the centre as that model, and never write three loudspeakers of it: the centre is two physical cabinets fed from one centre channel, and the layout is unchanged.",
+   "Where the pack supplies option guidance, that guidance is the designer's instruction and never copy: write your own polished client-facing prose from it, and never reproduce a note, an instruction or a filename in the draft. Where the pack supplies no option guidance, return the presented_options section as an empty string and write nothing into it.",
+   "Present seating and layout options as alternatives within ONE design. Say what each arrangement gives the room, that both work within the seating positions this design specifies, and that the final choice rests on comfort and personal preference. State that the predicted acoustic performance is unchanged provided the assessed listening positions and the relevant room geometry are maintained. Never present a seating style as a performance difference, and never make a performance claim from one.",
+   "Never present a claim the pack blocks, and never describe a shared result as a change or a gain.",
+   "Never recommend changing the design, and never describe the proposal as an upgrade path.",
+   "Never reference an assumed or administrative check (P8 upfiring/elevation speakers, P15 background noise floor, P21 early reflections): where the pack records one as requested, state it once, label it as an assumption, and never use it as a result or a differentiator.",
+   "Where P20 does not support seat-to-seat bass consistency, describe bass only as output authority, physical capability and the subwoofer specification.",
+   "State a primary-seat or a secondary-seat result only where the pack states that scope's own claim, word it for that scope alone, and never present it as a result for the seating area or the room.",
+   "Sell what is strong: state a supported strength positively and stop there, and where one scope is the stronger, keep the claim to that scope rather than reporting the weaker one beside it.",
+   "The proposal is not a design review: never write that something needs attention, improvement, calibration, optimisation or further design work, and never suggest a future correction, a recalibration or an upgrade path.",
+   "Write to the client: benefit-led, dealer-safe language, with no internal parameter codes and no engineering jargon.",
+   "No sentence of 10 or more words may appear verbatim in more than one section. Do not reuse complete evidence sentences with minor word substitutions. Facts may recur only for a genuinely different editorial purpose.",
+   "Give each section its own job, and never carry the same three strengths through the document in the same words: Design Summary introduces the cinema; Design Overview explains how the system is arranged; Why This Specification explains why this solution suits the project; Key Performance Highlights sets out the engineering evidence; Spatial Resolution explains how the layout creates the immersion; Dynamic Range explains the capability and what it buys; Timbre Matching explains the tonal benefit; Overall Design closes on what the client should expect. Review the proposal as ONE document: every section contributes something the others do not, the closing Overall Design never restates the opening summary, and a repeated idea is acceptable only where it adds a genuinely different aspect of the design.",
+   "Use each engineering figure normally once in main prose. Keep output figures in Dynamic Range, viewing angles in Spatial Resolution and extension proof where it explains deep bass. Repeat only where it adds real value, never in Overall Design.",
+   "Never write L1, L2, L3, L4, L4 result or RP22 Level 4 in narrative prose. Never write (OH); write overhead channels. Structured grading tables and pills are not narrative prose.",
+   "Tonal consistency across seats supports only tonal character, and it is stated for the speaker group and the seats its own result covers: never broaden it into equal seats, overall experience balance, bass consistency, placement consistency or whole-room balance, and never write it as a match between the screen, surround and overhead loudspeakers.",
+   "Use the ranked story as evidence, not as a sentence to read aloud. Translate its meaning into natural client language while retaining its scope, exact facts and claim IDs.",
+   "Keep Appendix Notes brief, factual and source-only: this proposal is based on the frozen Project Report for this design, with detailed RP22, RP23, product and room evidence in the accompanying report. No sales story, acoustic-treatment performance promise or engineering-model explanation.",
+   "Close on this design's particular viewing experience, movement, tonal character and bass capability, not treats every seat as a priority, balances high-resolution spatial imaging with authoritative bass performance, high-quality experience for everyone or immersive and consistent experience for the home.",
+   "Keep every paragraph to one to three sentences, and keep every section inside its word limit.",
+   "Explain what each recorded result means for the room, rather than naming the number and moving on.",
+   "Where the brief asks for a result the pack carries as a supporting_result claim, state it in the section it belongs to, at exactly the scope, value and prediction status that claim carries, and cite its claim ID. A supporting result answers the client's own request: it is never presented as a strength, a headline or a comparison, and is never moved to a wider scope.",
+   "No contents sentence (\"the following sections explain\"), and no generic closing about the design as a whole: finish on what this particular cinema gives the client, and never repeat a benefit another section has already made.",
+   "Explain the professional judgement behind the recommendation where the design_philosophy block records it: what the client wants to achieve, the prioritised listening positions, the display and seating balance, the constraints, the coverage and bass approaches, the strongest results, the lower results that are conscious trade-offs, and why the finished design suits the brief. Never invent a reason, a priority, a budget or a decision the interpretation does not record.",
+   "The best design is the one that most effectively satisfies the brief while balancing performance, practicality, aesthetics and cost, so a result below the highest available level is a legitimate design decision rather than a failure. Never present the highest available level as the objective regardless of cost or practical consequence, and never treat a higher price as better value on its own.",
+   "Value-engineering opportunities are internal reasoning, never copy: where the design already takes one, say what it gives the client; where one remains a design choice, say nothing about it. Never write an opportunity as an instruction to change the finished design, a next step, a future correction or an upgrade path.",
+   "Where the copy expresses the design team's own judgement or recommendation, write we or our. The engineering facts themselves stay stated as fact, we never stands in the place of a measured result, and no conversation, a meeting, a site visit or a client instruction the brief does not state is ever implied. Use it naturally and selectively, for example \"Our recommendation is\", \"We have prioritised\" or \"Based on our understanding of the brief\", and never repeat we recommend from section to section.",
+   "Never infer that a design change improved a parameter unless the assessment supports it, never imply that every seat performs identically, and never state a benefit the evidence does not carry.",
+   "Never use an em dash (U+2014) anywhere in client-facing copy: punctuate the sentence another way or rewrite it naturally, and never alter a figure, a product identifier or an evidence reference while doing so. The draft carries zero em dashes.",
+   "Vary sentence structure and paragraph length, prefer direct active language, and use natural transitions. Never begin a sentence with Furthermore, Moreover, Additionally, Subsequently, In conclusion or It is important to note that, never open paragraph after paragraph on The system, The design, This ensures or The result, and never force a contraction into a formal passage.",
+   "Never use a generic marketing phrase (\"sophisticated cinematic experience\", \"seamless immersive sound\", \"unparalleled performance\", \"delivers exceptional immersion\", \"elevates the listening experience\", \"brings everything together\"): replace it with a project-specific explanation of what was chosen, why it suits this room, what the client gains and what the engineering supports, and never invent a reason to do it.",
+   "Before returning, read every section together as one document and refine the wording where it does not sound like a real cinema designer, where a sentence adds nothing, where a benefit is repeated, where a qualification is excessive or where the recommendation is unclear. Never print that review, a note about a change or any explanation of your own editing.",
+   "Return structured JSON only, in every section this contract requires, with no extra fields and no commentary."
+  ],
+  "option_guidance": {
+   "rule": "these entries are the designer's own instructions, never copy: write your own client-facing prose for presented_options from them, and never reproduce a note, an instruction, a filename or a caption in the draft",
+   "supplied": true,
+   "groups": [
+    {
+     "group": "Seating",
+     "options": [
+      "Relaxed Sofas",
+      "Formal Cinema Seating"
+     ],
+     "note": "The choice of seating is entirely up the the client, and two styles are shown here, one with formal cinema seating, with reclining motorised seating and cupholders. Sofas are increasingly used in high end cinema rooms and can be a more relaxed and inviting option. Sofa seating allows for a more flexible seating with it much easier to have additional people enjoy the room"
+    }
+   ]
+  },
+  "word_limits": {
+   "decision_summary": 250,
+   "what_stays_same": 180,
+   "what_changes": 220,
+   "key_performance_highlights": 190,
+   "spatial_resolution": 180,
+   "dynamic_range": 170,
+   "timbre_matching": 170,
+   "presented_options": 170,
+   "overall_design": 200,
+   "appendix_notes": 200
+  },
+  "section_requirements": [
+   {
+    "section": "decision_summary",
+    "title": "Design Summary",
+    "title_single": "Design Summary",
+    "requirement_single": "Introduce the cinema itself, in developed natural paragraphs: the room and its proportions, its intended use where the interpretation states one, the display and why it suits the room, the seating arrangement, the system architecture, the most important design considerations, and the experience this design is intended to deliver. Write as an experienced cinema designer would write for a homeowner or architect. Do not list equipment, do not dump specifications, and do not restate the performance claim here. Never say this proposal outlines, this design presents, this option, decision or selected option. Where the project has real design substance, develop this in three or four paragraphs: the room and the scale of the experience, then the system and how it relates to the room, then the reasoning that makes this specification right for this project, then the result. Roughly 180 to 250 words at that depth, less where the design is genuinely simple, and never padded with invented detail to reach a length. This is the one section that establishes the whole cinema, so it takes the design's own story rather than the top-scoring result. Explain the reasoning the design_philosophy block records: what the client wants to achieve, which listening positions are prioritised, how the display and the seating were balanced, the practical constraints, the coverage and bass approaches, and why the finished design suits this brief. Never invent a reason, a priority, a budget or a decision the interpretation does not record, and never present the highest available level as the objective regardless of cost or practical consequence.",
+    "word_limit": 250,
+    "requirement": "Introduce the cinema itself, in developed natural paragraphs: the room and its proportions, its intended use where the interpretation states one, the display and why it suits the room, the seating arrangement, the system architecture, the most important design considerations, and the experience this design is intended to deliver. Write as an experienced cinema designer would write for a homeowner or architect. Do not list equipment, do not dump specifications, and do not restate the performance claim here. Never say this proposal outlines, this design presents, this option, decision or selected option. Where the project has real design substance, develop this in three or four paragraphs: the room and the scale of the experience, then the system and how it relates to the room, then the reasoning that makes this specification right for this project, then the result. Roughly 180 to 250 words at that depth, less where the design is genuinely simple, and never padded with invented detail to reach a length. This is the one section that establishes the whole cinema, so it takes the design's own story rather than the top-scoring result. Explain the reasoning the design_philosophy block records: what the client wants to achieve, which listening positions are prioritised, how the display and the seating were balanced, the practical constraints, the coverage and bass approaches, and why the finished design suits this brief. Never invent a reason, a priority, a budget or a decision the interpretation does not record, and never present the highest available level as the objective regardless of cost or practical consequence.",
+    "requires_grounding": true
+   },
+   {
+    "section": "what_stays_same",
+    "title": "Design Overview",
+    "title_single": "Design Overview",
+    "word_limit": 180,
+    "requirement": "Explain how the system is arranged: the loudspeaker layout and its channel count, where the screen channels, the surrounds and the overhead channels are placed, the seating and the display, and how those parts work together in this room. Write from the design-identity and shared-result claims the pack allows, and from the interpretation's account of the architecture. Never mention another option or a baseline.",
+    "requirement_single": "Explain how the system is arranged: the loudspeaker layout and its channel count, where the screen channels, the surrounds and the overhead channels are placed, the seating and the display, and how those parts work together in this room. Write from the design-identity and shared-result claims the pack allows, and from the interpretation's account of the architecture. Never mention another option or a baseline.",
+    "requires_grounding": true
+   },
+   {
+    "section": "what_changes",
+    "title": "Why This Specification",
+    "title_single": "Why This Specification",
+    "word_limit": 220,
+    "requirement": "Explain why this solution suits this project: the choices that were made, such as the loudspeaker family, the layout and the bass approach, and what each one gives the client in this room. Write from the ranked strength stories and the credibility claims the pack allows, and from the design decisions and constraints the interpretation states. Never state or imply a comparison with another option or a baseline, and never write filler such as \"there are no changes to report\". This is the judgement section of the document: explain why this solution suits this particular room, how the competing priorities were balanced, which decisions carry the most value, why a compromise is reasonable where the interpretation records one, and what the client gains from the finished design. Where the design already takes an improvement without substantial additional expenditure, say what it gives the client; where an opportunity remains a design choice, say nothing about it.",
+    "requirement_single": "Explain why this solution suits this project: the choices that were made, such as the loudspeaker family, the layout and the bass approach, and what each one gives the client in this room. Write from the ranked strength stories and the credibility claims the pack allows, and from the design decisions and constraints the interpretation states. Never state or imply a comparison with another option or a baseline, and never write filler such as \"there are no changes to report\". This is the judgement section of the document: explain why this solution suits this particular room, how the competing priorities were balanced, which decisions carry the most value, why a compromise is reasonable where the interpretation records one, and what the client gains from the finished design. Where the design already takes an improvement without substantial additional expenditure, say what it gives the client; where an opportunity remains a design choice, say nothing about it.",
+    "requires_grounding": true
+   },
+   {
+    "section": "key_performance_highlights",
+    "title": "Key Performance Highlights",
+    "requirement_single": "State what engineering evidence supports this proposal: the recorded results the pack's claims carry, for the areas that carry a claim, in a small number of concise benefit-led sentences. Use the strength ranking to choose what is stated here, never to fix the order of the document. No dBC values, Hz values, angles, channel counts or grades: the proof belongs in the specialist sections. Never copy a complete evidence statement. No overall-seat equality claim.",
+    "word_limit": 190,
+    "requirement": "State what engineering evidence supports this proposal: the recorded results the pack's claims carry, for the areas that carry a claim, in a small number of concise benefit-led sentences. Use the strength ranking to choose what is stated here, never to fix the order of the document. No dBC values, Hz values, angles, channel counts or grades: the proof belongs in the specialist sections. Never copy a complete evidence statement. No overall-seat equality claim.",
+    "requires_grounding": true
+   },
+   {
+    "section": "spatial_resolution",
+    "title": "Spatial Resolution",
+    "requirement_single": "Explain how the layout contributes to the immersion: how sound moves between the screen, the surround and the overhead channels, and what the seating arrangement, the viewing geometry and the display give the client. Stay within the claims the pack allows.",
+    "word_limit": 180,
+    "requirement": "Explain how the layout contributes to the immersion: how sound moves between the screen, the surround and the overhead channels, and what the seating arrangement, the viewing geometry and the display give the client. Stay within the claims the pack allows.",
+    "requires_grounding": true
+   },
+   {
+    "section": "dynamic_range",
+    "title": "Dynamic Range",
+    "requirement_single": "Open with the supported experience during demanding film soundtracks: headroom for dynamic peaks and a clear, confident presentation at the designed listening levels. Give the exact frozen output figures at the reference seating position once, as proof. Match each benefit to its frozen evidence and supported channel family. Where only bass output is a selected strength, describe the weight and impact of low-frequency effects. Keep P14 bass output, P18 extension, P19 response at the reference position and P20 consistency across seats distinct; describe each only from its own supported evidence. No absolute guarantees.",
+    "word_limit": 170,
+    "requirement": "Open with the supported experience during demanding film soundtracks: headroom for dynamic peaks and a clear, confident presentation at the designed listening levels. Give the exact frozen output figures at the reference seating position once, as proof. Match each benefit to its frozen evidence and supported channel family. Where only bass output is a selected strength, describe the weight and impact of low-frequency effects. Keep P14 bass output, P18 extension, P19 response at the reference position and P20 consistency across seats distinct; describe each only from its own supported evidence. No absolute guarantees.",
+    "requires_grounding": true
+   },
+   {
+    "section": "timbre_matching",
+    "title": "Timbre Matching",
+    "requirement_single": "Explain the tonal benefit the client will hear: the tonal balance they experience from seat to seat, and why it matters as a soundtrack moves around the cinema. State the tonal aim as the design's own approach, and state the measured tonal consistency only for the speaker group the evidence states it for, across only the seats that result covers. These frequency-response results state how consistently ONE loudspeaker group holds its own tonal balance from seat to seat, so they are never evidence that one group of loudspeakers matches another: never write a screen-to-surround or any other between-group match, and never attach their figures to a comparison between the screen, the surround and the overhead speakers. Natural handover wording is welcome as the design's own aim: describe a voice or an effect keeping its character as the loudspeakers hand it on, and let that stand as intent rather than as a measured match between the groups. Keep every seat statement explicitly limited to tonal character, not overall balance, bass or placement. Never imply the design's loudspeaker package differs from another option's, and never broaden tonal consistency into equal seats or an equal whole experience. No bass-extension detour and no both parameters wording.",
+    "word_limit": 170,
+    "requirement": "Explain the tonal benefit the client will hear: the tonal balance they experience from seat to seat, and why it matters as a soundtrack moves around the cinema. State the tonal aim as the design's own approach, and state the measured tonal consistency only for the speaker group the evidence states it for, across only the seats that result covers. These frequency-response results state how consistently ONE loudspeaker group holds its own tonal balance from seat to seat, so they are never evidence that one group of loudspeakers matches another: never write a screen-to-surround or any other between-group match, and never attach their figures to a comparison between the screen, the surround and the overhead speakers. Natural handover wording is welcome as the design's own aim: describe a voice or an effect keeping its character as the loudspeakers hand it on, and let that stand as intent rather than as a measured match between the groups. Keep every seat statement explicitly limited to tonal character, not overall balance, bass or placement. Never imply the design's loudspeaker package differs from another option's, and never broaden tonal consistency into equal seats or an equal whole experience. No bass-extension detour and no both parameters wording.",
+    "requires_grounding": true
+   },
+   {
+    "section": "presented_options",
+    "title": "Presented Options",
+    "requirement_single": "Where the brief supplies seating or layout options, present them in 2–3 natural sentences: say what each arrangement gives the room, that both work within the seating positions this design specifies, and that the final choice is one of comfort and personal preference. State that the predicted acoustic performance is unchanged provided the assessed listening positions and the relevant room geometry are maintained. Present the options as alternatives within ONE design, never as a performance difference, and claim no performance result. Where the brief supplies no option, return an empty string for this section.",
+    "requirement": "Where the brief supplies seating or layout options, present them in 2–3 natural sentences: say what each arrangement gives the room, that both work within the seating positions this design specifies, and that the final choice is one of comfort and personal preference. State that the predicted acoustic performance is unchanged provided the assessed listening positions and the relevant room geometry are maintained. Present the options as alternatives within ONE design, never as a performance difference, and claim no performance result. Where the brief supplies no option, return an empty string for this section.",
+    "word_limit": 170,
+    "optional_without_guidance": true,
+    "requires_grounding": true
+   },
+   {
+    "section": "overall_design",
+    "title": "Overall Design",
+    "requirement_single": "Close on what the client should expect from the final design: connect this particular picture and viewing experience to the movement around and above the audience, the tonal character, and the supported bass and dynamic strengths, in this project's own terms rather than a general claim. Do not repeat any number, specification list or earlier sentence. Never claim a consistent overall experience for every viewer from tonal evidence.",
+    "word_limit": 200,
+    "requirement": "Close on what the client should expect from the final design: connect this particular picture and viewing experience to the movement around and above the audience, the tonal character, and the supported bass and dynamic strengths, in this project's own terms rather than a general claim. Do not repeat any number, specification list or earlier sentence. Never claim a consistent overall experience for every viewer from tonal evidence.",
+    "requires_grounding": true
+   },
+   {
+    "section": "appendix_notes",
+    "title": "Appendix Notes",
+    "requirement_single": "Two brief source-only sentences: based on the frozen Project Report for this design; detailed RP22, RP23, product and room evidence is in the accompanying report. No performance claims or sales story.",
+    "word_limit": 200,
+    "requirement": "Two brief source-only sentences: based on the frozen Project Report for this design; detailed RP22, RP23, product and room evidence is in the accompanying report. No performance claims or sales story.",
+    "requires_grounding": true
+   }
+  ],
+  "allowed_claims": [
+   {
+    "claim_id": "claim_story_tonal-consistency_01",
+    "area": "Timbre Matching",
+    "label": "Consistent tonal performance",
+    "kind": "strength_story",
+    "statement": "Both parameters hold across all 8 assessed seating positions, each for its own speaker group, so the tonal balance of the screen channels and of the surround and overhead channels holds from seat to seat.",
+    "option": {
+     "version_id": "6ac7a189d093a8d8a68eec91",
+     "version_name": "Original Design",
+     "label": "Option A"
+    },
+    "favours": false,
+    "scope": "seat",
+    "seat_count": null,
+    "level": "L4",
+    "wording_class": "strength",
+    "wording": "Both parameters hold across all 8 assessed seating positions, each for its own speaker group, so the tonal balance of the screen channels and of the surround and overhead channels holds from seat to seat.",
+    "authority_fingerprint": null,
+    "scope_fingerprint": null,
+    "levels": [
+     "L4"
+    ],
+    "prediction_status": null,
+    "evidence_state": null,
+    "authority_source": null,
+    "definition": null,
+    "rows": [],
+    "requested_by": null
+   },
+   {
+    "claim_id": "claim_story_immersive-layout_01",
+    "area": "System Architecture",
+    "label": "A high-resolution immersive layout",
+    "kind": "strength_story",
+    "statement": "The design is built as a 9.1.6 system with 6 overhead speakers and 4 subwoofers, so effects move above and around the audience instead of staying on the screen plane.",
+    "option": {
+     "version_id": "6ac7a189d093a8d8a68eec91",
+     "version_name": "Original Design",
+     "label": "Option A"
+    },
+    "favours": false,
+    "scope": "room",
+    "seat_count": null,
+    "level": "L4",
+    "wording_class": "strength",
+    "wording": "The design is built as a 9.1.6 system with 6 overhead speakers and 4 subwoofers, so effects move above and around the audience instead of staying on the screen plane.",
+    "authority_fingerprint": null,
+    "scope_fingerprint": null,
+    "levels": [
+     "L4"
+    ],
+    "prediction_status": null,
+    "evidence_state": null,
+    "authority_source": null,
+    "definition": null,
+    "rows": [],
+    "requested_by": null
+   },
+   {
+    "claim_id": "claim_story_bass-output_01",
+    "area": "Bass Performance",
+    "label": "Bass output capability",
+    "kind": "strength_story",
+    "statement": "The subwoofers deliver 115 dBC of low-frequency output at the reference seating position, the output authority the bass system is specified to reach.",
+    "option": {
+     "version_id": "6ac7a189d093a8d8a68eec91",
+     "version_name": "Original Design",
+     "label": "Option A"
+    },
+    "favours": false,
+    "scope": "room",
+    "seat_count": null,
+    "level": "L3",
+    "wording_class": "strength",
+    "wording": "The subwoofers deliver 115 dBC of low-frequency output at the reference seating position, the output authority the bass system is specified to reach.",
+    "authority_fingerprint": null,
+    "scope_fingerprint": null,
+    "levels": [
+     "L3"
+    ],
+    "prediction_status": null,
+    "evidence_state": null,
+    "authority_source": null,
+    "definition": null,
+    "rows": [],
+    "requested_by": null
+   },
+   {
+    "claim_id": "claim_story_spatial-resolution_01",
+    "area": "Spatial Resolution",
+    "label": "Speaker placement within the recommended zones",
+    "kind": "strength_story",
+    "statement": "Wide speakers inside their deviation limit, no speakers outside the recommended positions and screen-wall speakers inside their recommended zones, each stated on its own published result.",
+    "option": {
+     "version_id": "6ac7a189d093a8d8a68eec91",
+     "version_name": "Original Design",
+     "label": "Option A"
+    },
+    "favours": false,
+    "scope": "room",
+    "seat_count": null,
+    "level": "L4",
+    "wording_class": "strength",
+    "wording": "Wide speakers inside their deviation limit, no speakers outside the recommended positions and screen-wall speakers inside their recommended zones, each stated on its own published result.",
+    "authority_fingerprint": null,
+    "scope_fingerprint": null,
+    "levels": [
+     "L4"
+    ],
+    "prediction_status": null,
+    "evidence_state": null,
+    "authority_source": null,
+    "definition": null,
+    "rows": [],
+    "requested_by": null
+   },
+   {
+    "claim_id": "claim_story_viewing-geometry_01",
+    "area": "Viewing Experience",
+    "label": "Front row viewing immersion",
+    "kind": "strength_story",
+    "statement": "The front row views the TV at 57.3°, the rows that reach it are stated on their own result.",
+    "option": {
+     "version_id": "6ac7a189d093a8d8a68eec91",
+     "version_name": "Original Design",
+     "label": "Option A"
+    },
+    "favours": false,
+    "scope": "row",
+    "seat_count": null,
+    "level": "L4",
+    "wording_class": "strength",
+    "wording": "The front row views the TV at 57.3°, the rows that reach it are stated on their own result.",
+    "authority_fingerprint": null,
+    "scope_fingerprint": null,
+    "levels": [
+     "L4"
+    ],
+    "prediction_status": null,
+    "evidence_state": null,
+    "authority_source": null,
+    "definition": null,
+    "rows": [],
+    "requested_by": null
+   },
+   {
+    "claim_id": "claim_p18_supporting_result_01",
+    "area": "p18",
+    "label": "Bass extension",
+    "kind": "supporting_result",
+    "statement": "Bass extension: 24 Hz.",
+    "option": {
+     "version_id": "6ac7a189d093a8d8a68eec91",
+     "version_name": "Original Design",
+     "label": "Option A"
+    },
+    "favours": false,
+    "scope": null,
+    "seat_count": null,
+    "level": "L2",
+    "wording_class": "supporting",
+    "wording": "Bass extension: 24 Hz",
+    "authority_fingerprint": null,
+    "scope_fingerprint": null,
+    "levels": [
+     "L2"
+    ],
+    "prediction_status": "predicted",
+    "evidence_state": null,
+    "authority_source": "durable-current-bass-authority",
+    "definition": "P18",
+    "rows": [],
+    "requested_by": "bass_extension"
+   },
+   {
+    "claim_id": "claim_p12_supporting_result_01",
+    "area": "p12",
+    "label": "Screen Dynamic Range",
+    "kind": "supporting_result",
+    "statement": "Screen Dynamic Range: 104 dBC.",
+    "option": {
+     "version_id": "6ac7a189d093a8d8a68eec91",
+     "version_name": "Original Design",
+     "label": "Option A"
+    },
+    "favours": false,
+    "scope": null,
+    "seat_count": null,
+    "level": "L2",
+    "wording_class": "supporting",
+    "wording": "Screen Dynamic Range: 104 dBC",
+    "authority_fingerprint": null,
+    "scope_fingerprint": null,
+    "levels": [
+     "L2"
+    ],
+    "prediction_status": "published",
+    "evidence_state": null,
+    "authority_source": "durable-engineering-publication",
+    "definition": "Screen speakers SPL capability at RSP (post calibration EQ, within assigned bandwidth) without clipping",
+    "rows": [],
+    "requested_by": "screen_dynamic_range"
+   },
+   {
+    "claim_id": "claim_rp23_viewing_supporting_result_01",
+    "area": "rp23_viewing",
+    "label": "Front and rear row viewing geometry",
+    "kind": "supporting_result",
+    "statement": "The front row views the 115\" TV at 57.3°; the rear row views the 115\" TV at 34.3°.",
+    "option": {
+     "version_id": "6ac7a189d093a8d8a68eec91",
+     "version_name": "Original Design",
+     "label": "Option A"
+    },
+    "favours": false,
+    "scope": "row",
+    "seat_count": 8,
+    "level": null,
+    "wording_class": "supporting",
+    "wording": "The front row views the 115\" TV at 57.3°; the rear row views the 115\" TV at 34.3°.",
+    "authority_fingerprint": null,
+    "scope_fingerprint": null,
+    "levels": [],
+    "prediction_status": "published",
+    "evidence_state": "scored",
+    "authority_source": null,
+    "definition": null,
+    "rows": [
+     {
+      "row": 1,
+      "seats": 4,
+      "angle_deg": 57.3
+     },
+     {
+      "row": 2,
+      "seats": 4,
+      "angle_deg": 34.3
+     }
+    ],
+    "requested_by": "viewing_rows"
+   }
+  ],
+  "blocked_claims": [
+   {
+    "block_id": "block_global_no_invented_benefits_01",
+    "scope": "global",
+    "area": null,
+    "reason": "no_invented_benefits",
+    "prohibited": "Do not invent a benefit: every client-facing claim must be one of the allowed claims in this pack."
+   },
+   {
+    "block_id": "block_global_no_changed_values_02",
+    "scope": "global",
+    "area": null,
+    "reason": "no_changed_values",
+    "prohibited": "Never change, round or restate a value: every figure is copied exactly as this pack states it."
+   },
+   {
+    "block_id": "block_global_no_unselected_products_03",
+    "scope": "global",
+    "area": null,
+    "reason": "no_unselected_products",
+    "prohibited": "Never name a product that is not listed for the option it belongs to in this pack."
+   },
+   {
+    "block_id": "block_global_no_recalculation_04",
+    "scope": "global",
+    "area": null,
+    "reason": "no_recalculation",
+    "prohibited": "Never calculate, estimate or infer a result: this pack is the only source of performance figures."
+   },
+   {
+    "block_id": "block_global_no_redesign_recommendation_05",
+    "scope": "global",
+    "area": null,
+    "reason": "no_redesign_recommendation",
+    "prohibited": "Do not recommend changing the design: the proposal states the final design, it is not a set of next steps."
+   },
+   {
+    "block_id": "block_global_no_universal_improvement_06",
+    "scope": "global",
+    "area": null,
+    "reason": "no_universal_improvement",
+    "prohibited": "Do not claim every parameter improves: claim only what this pack records as a material gain."
+   },
+   {
+    "block_id": "block_global_no_decision_framing_07",
+    "scope": "global",
+    "area": null,
+    "reason": "no_decision_framing",
+    "prohibited": "Do not write a decision framing that sets one option above the other: this pack does not support it."
+   }
+  ],
+  "bass": {
+   "scope": [
+    "bass_output_authority",
+    "physical_capability",
+    "subwoofer_specification"
+   ],
+   "note": null,
+   "allowed": [],
+   "blocked": []
+  },
+  "supporting_results": {
+   "rule": "a claim of kind supporting_result is a frozen result the client brief asked for and the reports state: state it once in the section it belongs to, at exactly the scope, value and prediction status that claim carries, citing its claim ID. It is never presented as a strength, never moved to a wider scope, and never written as an installed or measured outcome. Where an entry in audit.omitted records a request the reports do not state, write nothing for it",
+   "claims": [
+    "claim_p18_supporting_result_01",
+    "claim_p12_supporting_result_01",
+    "claim_rp23_viewing_supporting_result_01"
+   ],
+   "audit": {
+    "requested": [
+     "bass_extension",
+     "screen_dynamic_range",
+     "viewing_rows"
+    ],
+    "rule": "a supporting result is minted only where the brief asked for it and the frozen facts state it, at the exact scope and status the reports record",
+    "minted": [
+     {
+      "key": "bass_extension",
+      "version_id": "6ac7a189d093a8d8a68eec91",
+      "claim_id": "claim_p18_supporting_result_01"
+     },
+     {
+      "key": "screen_dynamic_range",
+      "version_id": "6ac7a189d093a8d8a68eec91",
+      "claim_id": "claim_p12_supporting_result_01"
+     },
+     {
+      "key": "viewing_rows",
+      "version_id": "6ac7a189d093a8d8a68eec91",
+      "claim_id": "claim_rp23_viewing_supporting_result_01"
+     }
+    ],
+    "omitted": []
+   }
+  },
+  "claim_grounding": {
+   "rule": "every_client_facing_claim_cites_one_or_more_allowed_claim_ids",
+   "section_field": "claim_ids",
+   "allowed_prefix": "claim_",
+   "blocked_prefix": "block_"
+  },
+  "story_grounding": {
+   "rule": "the option's strength_stories, in rank order, decide which engineering characteristics deserve emphasis (rank 1 is the strongest); each story is stated by citing its own allowed_claim_ids; never choose which parameters matter; the ranking is not a compulsory order for the document",
+   "field": "strength_stories",
+   "order": "rank_ascending",
+   "claim_field": "allowed_claim_ids",
+   "omitted_field": "omitted_stories"
+  },
+  "editorial_rules": {
+   "validation_register": "Client prose states supported benefits, never internal claim-defence, validation, testing or scoring commentary. Retain practical qualifications about listening positions and geometry.",
+   "experience_first": "experience first, then why it matters, then the engineering proof: never open a paragraph with a parameter, a level, a channel count or a dB value",
+   "display": "name the display exactly as the frozen evidence names it; where it is a TV write the TV and never a screen size, aspect ratio, viewable width or projector word",
+   "report_voice": "never write assessed at, published result, results are derived from, technical evaluation of, engineering model, performance results, stated on its own result or according to the report in main prose; Appendix is concise source attribution only",
+   "duplication": "no sentence of ten or more words repeated across sections; no near-verbatim evidence-sentence reuse; a repeated fact must do a different editorial job",
+   "figures": "normally use each figure once: benefit-led Highlights, proof in Dynamic Range, experience-led closing without figures",
+   "tonal_scope": "all-seat tonal consistency is only tonal character, not whole-experience equality, balanced seats, bass consistency or placement consistency",
+   "plain_language": "no raw L1/L2/L3/L4 or RP22 Level language in prose; no (OH), write overhead channels",
+   "comparative": "single-option proposal: never compare to a baseline or another option (no increase, greater, improved, more capable, additional headroom, higher output, upgrade or compared to)",
+   "installation_default": "written before installation: specified, selected, designed, modelled or proposed, never installed or installation, unless the frozen evidence says the system is installed",
+   "timbre_language": "tonal continuity is described as a voice or an effect keeping its character as the loudspeakers hand it on: natural handover wording is welcome, and it is the design's own tonal aim rather than a match measured between the speaker groups. The tonal results are seat-to-seat frequency-response results, one speaker group each, so they are never written as a screen-to-surround or any other between-group match and their figures are never attached to one: see timbre_metric_authority. Never imply the design's loudspeaker package differs from another option's unless the pack records that change, and never broaden tonal consistency into equal seats or an equal whole experience",
+   "brief_completeness": "a request the brief makes is met only where the copy states it: where the client asked for a result the pack carries as a supporting_result claim, the figure has to be on the page, and where the client asked about both seating rows, both rows are stated on their own result",
+   "closing": "no contents sentence such as \"the following sections explain\", and no generic closing about the design as a whole: finish on what this particular cinema gives the client, and never repeat a benefit another section has already made",
+   "design_philosophy": "explain the professional judgement the design_interpretation records: what the client wants to achieve, the prioritised listening positions, the display and seating balance, the constraints, the coverage and bass approaches, the strongest results, the lower results that are conscious trade-offs, and why the finished design suits the brief. Never invent a reason, a priority, a budget or a decision it does not record, and never present the highest available level as the objective regardless of cost. Design Summary explains the complete cinema and the reasoning behind it; Why This Specification carries the strongest expression of professional judgement. Where the interpretation records that the design already takes an improvement without substantial additional expenditure, say what it gives the client, and never write an opportunity as an instruction to change the finished design",
+   "design_philosophy_voice": "the proposal is written from the perspective of the cinema designer presenting their considered recommendation, and impersonal third-person language is not required. A judgement the interpretation records is written in the design team's own voice, using expressions such as \"Based on our understanding of the brief\" (only where an actual Client Brief is recorded), \"Our recommendation is\", \"We believe this offers the best balance\", \"We have prioritised\", \"Our approach has been to\" and \"For this particular room, we recommend\", varied rather than repeated. Every section explains why the recommended solution suits this project rather than describing technical performance alone. No meeting, conversation, client decision or budget constraint is ever invented, and no client instruction the brief does not state is implied. This is proposal-specific and takes precedence over the shared prohibition of the first person for a recommendation; the Technical Report keeps its own style. The engineering facts themselves stay stated as fact, and we is never written where a measured result is the evidence"
+  },
+  "input_fingerprint": "1b0e9244"
+ },
+ "output": {
+  "contract_version": 2,
+  "pack_fingerprint": "6a709e91",
+  "sections": [
+   {
+    "section": "decision_summary",
+    "text": "This dedicated cinema centres on a 115\" TV, with two seating rows bringing the picture and a surrounding soundfield into a room measuring 5.1m × 4.6m × 2.6m (L × W × H). Four seats in each row provide the multi-row arrangement, with the display and seating distances designed together rather than treated as separate choices.\n\nSound extends around and above the audience through a 9.1.6 layout. The listener-level and overhead speakers give the soundtrack physical positions beyond the picture, while four subwoofers form the bass system. This is a cinema intended to surround the audience with the action, not simply reproduce it from the front wall.\n\nOur approach has been to balance the TV and seating geometry around the reference listening position. The front row provides the immersive viewing emphasis; the rear row has a different relationship to the picture because of its distance within the room.\n\nThe specification combines that viewing arrangement with loudspeakers at the front, sides, rear and overhead. Picture, directional sound and bass each have a defined role in creating the scale of a dedicated cinema within these room dimensions.",
+    "claim_ids": [
+     "claim_story_immersive-layout_01",
+     "claim_story_viewing-geometry_01",
+     "claim_rp23_viewing_supporting_result_01"
+    ]
+   },
+   {
+    "section": "what_stays_same",
+    "text": "The soundtrack is arranged around the two rows facing the 115\" TV. At the front, Q6-3 speakers reproduce the left and right channels; the centre uses two vertical C4-1 cabinets fed from one logical centre channel.\n\nEffects have positions beside, behind and above the audience. EVOLVE 2-1 speakers serve the front-wide, side-surround and rear-surround roles, with six ARCHITECT 2-1 overhead speakers completing the height layer.\n\nFor bass, our intention is to reduce the effect of room resonances that create dips at different seats. The specified arrangement places two SUB3-12 subwoofers at the front and two at the rear as the physical approach to that aim. Six Artcoustic Abfuser panels are also specified as the room's acoustic treatment.",
+    "claim_ids": [
+     "claim_story_immersive-layout_01",
+     "claim_story_bass-output_01",
+     "claim_story_spatial-resolution_01"
+    ]
+   },
+   {
+    "section": "what_changes",
+    "text": "Our recommendation brings the picture and seating together first, with the reference listening position anchoring the sound design. For this TV-based cinema, that means treating the viewing distance and loudspeaker arrangement as parts of the same room, rather than choosing the format in isolation.\n\nThe loudspeaker positions give practical substance to the immersive layout. The screen-wall speakers sit within their recommended zones, the front wides remain within their placement limit, and the surround and upper speakers occupy their recommended zones. These positions give effects places to travel around the audience.\n\nTonal character is another important part of this specification: the screen channels retain their tonal balance across the assessed seats, as does the surround and overhead group. That matters for voices, instruments and effects, whose character should not depend heavily on the listener's chair.\n\nBass depth complements the system's output capability, but is a separate quality. The design provides predicted bass extension to 24 Hz, describing how far down the specified system reaches into low-frequency soundtrack content.",
+    "claim_ids": [
+     "claim_story_viewing-geometry_01",
+     "claim_story_spatial-resolution_01",
+     "claim_story_immersive-layout_01",
+     "claim_story_tonal-consistency_01",
+     "claim_p18_supporting_result_01"
+    ]
+   },
+   {
+    "section": "key_performance_highlights",
+    "text": "Voices and music retain a consistent tonal character from the screen channels across the assessed seats. The surround and overhead group also holds its own tonal balance across those listening positions.\n\nEffects can occupy the space around and above the audience through the specified surround and height arrangement. Low-frequency effects have the output capability to carry physical weight at the reference seating position, giving major film moments their bass impact.",
+    "claim_ids": [
+     "claim_story_tonal-consistency_01",
+     "claim_story_immersive-layout_01",
+     "claim_story_bass-output_01"
+    ]
+   },
+   {
+    "section": "spatial_resolution",
+    "text": "Sound can travel beyond the picture into positions around and above the audience. The 15 discrete channels provide independently rendered loudspeaker positions, including six overhead channels, so a passing effect can be placed in the height layer rather than remaining at listener level.\n\nFront wides provide positions between the screen stage and side surrounds, supporting the transition from action at the front to activity beside the audience. Their placement falls within the recommended deviation limit.\n\nThe front row makes the picture a prominent part of the experience: its 57.3° viewing angle gives the 115\" TV a highly immersive presence. From the rear row, the viewing angle is 34.3°, so the picture occupies less of the viewer's field of vision. The two rows therefore offer distinctly different viewing perspectives within the same cinema.",
+    "claim_ids": [
+     "claim_story_immersive-layout_01",
+     "claim_story_spatial-resolution_01",
+     "claim_story_viewing-geometry_01",
+     "claim_rp23_viewing_supporting_result_01"
+    ]
+   },
+   {
+    "section": "dynamic_range",
+    "text": "Demanding low-frequency effects can have physical weight at the reference seating position. The four-subwoofer system is specified to deliver 115 dBC there, providing the bass output behind the impact of a heavy collision or a large-scale action sequence.\n\nDialogue, music and front-stage effects have a defined playback capability: the screen channels provide 104 dBC at the reference seating position without clipping within their assigned bandwidth. This describes the available output for peaks in the front soundtrack, separately from the subwoofers' low-frequency capability.",
+    "claim_ids": [
+     "claim_story_bass-output_01",
+     "claim_p12_supporting_result_01"
+    ]
+   },
+   {
+    "section": "timbre_matching",
+    "text": "Our tonal aim is for a voice or effect to keep its character as one loudspeaker hands it to the next, so movement serves the scene rather than drawing attention to the speakers.\n\nThe screen channels provide excellent seat-to-seat tonal consistency across all 8 assessed seating positions, with frequency-response variation of ±0.5 dB. This supports a stable tonal character for dialogue and music from the front stage across those seats.\n\nSurround and overhead sound also retains its own tonal character across all 8 assessed positions, within a ≤1.5 dB window. For ambience and directional effects, this means the group's tonal balance holds from one listening position to another.",
+    "claim_ids": [
+     "claim_story_tonal-consistency_01"
+    ]
+   },
+   {
+    "section": "presented_options",
+    "text": "Relaxed Sofas offer an informal, flexible seating arrangement, while Formal Cinema Seating provides motorised reclining seats and cupholders. Both work within the listening positions specified for this design, leaving the choice to comfort and personal preference. Predicted acoustic performance is unchanged provided the assessed listening positions and relevant room geometry are maintained.",
+    "claim_ids": []
+   },
+   {
+    "section": "overall_design",
+    "text": "From the front row, the picture has an enveloping presence, while the wide, surround and overhead positions allow the soundtrack to extend the scene beyond the TV. The tonal aim is continuity as sounds pass between loudspeakers, supported by strong seat-to-seat tonal consistency within the screen-channel and surround-and-overhead groups.\n\nAt the reference listening position, bass output gives large effects a physical dimension alongside the image. A scene can therefore occupy the space in front, beside and above the listener, with low-frequency weight when the action calls for it.",
+    "claim_ids": [
+     "claim_story_viewing-geometry_01",
+     "claim_story_immersive-layout_01",
+     "claim_story_spatial-resolution_01",
+     "claim_story_tonal-consistency_01",
+     "claim_story_bass-output_01"
+    ]
+   },
+   {
+    "section": "appendix_notes",
+    "text": "This proposal is based on the frozen Project Report for this design. Detailed RP22, RP23, product and room evidence is available in the accompanying report.",
+    "claim_ids": []
+   }
+  ]
+ }
+}
