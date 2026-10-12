@@ -273,28 +273,39 @@ export function buildProjectInterpretation(params = {}) {
     ? resolveBassEvidence(snapshot)
     : { p14: null, p18: null, p19: null, usable: [], omitted: [] };
 
+  // Each area carries the recorded level where the data states one, so a relative
+  // rank is never mistaken for a strength: a structure recorded at the lowest
+  // passing level leads this project's results without being a strong result.
   const strongestAreas = [];
   for (const entry of strongestStructures(floors)) {
-    strongestAreas.push({ area: entry.structure, evidence: entry.level ? `project floor ${entry.level}` : 'assessed' });
+    strongestAreas.push({
+      area: entry.structure,
+      level: entry.level || null,
+      evidence: entry.level ? `project floor ${entry.level}` : 'assessed',
+    });
   }
   const viewing = snapshot?.viewing || {};
   if (viewing.available && viewing.primary_floor && (rank(viewing.primary_floor) ?? 0) >= 3) {
-    strongestAreas.push({ area: 'Viewing geometry', evidence: `RP23 ${viewing.primary_floor}` });
+    strongestAreas.push({ area: 'Viewing geometry', level: viewing.primary_floor, evidence: `RP23 ${viewing.primary_floor}` });
   }
   if (projection && screenWidthM != null) {
-    strongestAreas.push({ area: 'Screen scale', evidence: `${screenWidthM.toFixed(2)}m wide` });
+    strongestAreas.push({ area: 'Screen scale', level: null, evidence: `${screenWidthM.toFixed(2)}m wide` });
   }
-  if (discreet) strongestAreas.push({ area: 'Speaker discretion', evidence: 'compact models in the system' });
+  if (discreet) strongestAreas.push({ area: 'Speaker discretion', level: null, evidence: 'compact models in the system' });
   if (overhead === 0 || bed < 9 || subCount < 4) {
-    strongestAreas.push({ area: 'Upgrade flexibility', evidence: 'layouts and channels remain open' });
+    strongestAreas.push({ area: 'Upgrade flexibility', level: null, evidence: 'layouts and channels remain open' });
   }
   if (bassEvidence.p14 || bassEvidence.p18 || bassEvidence.p19) {
-    strongestAreas.push({ area: 'Bass depth and output', evidence: 'reliable calculated bass result' });
+    strongestAreas.push({ area: 'Bass depth and output', level: null, evidence: 'reliable calculated bass result' });
   }
   // Bass consistency is only ever claimed from the consistency result itself,
   // and only when it passed the P20 rule: current, positive and useful.
   if (bassEvidence.p20) {
-    strongestAreas.push({ area: 'Bass consistency', evidence: `seat-to-seat consistency at ${bassEvidence.p20.level}` });
+    strongestAreas.push({
+      area: 'Bass consistency',
+      level: bassEvidence.p20.level || null,
+      evidence: `seat-to-seat consistency at ${bassEvidence.p20.level}`,
+    });
   }
 
   const assumed = rp22.assumed || {};

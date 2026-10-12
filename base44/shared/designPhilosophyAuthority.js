@@ -92,6 +92,9 @@ export const DESIGN_PHILOSOPHY_RULES = Object.freeze([
   'a more expensive solution is never presented as better value on price alone',
   'the frozen engineering evidence stays authoritative: never infer that a design change improved a '
     + 'parameter unless the assessment supports it, and never imply every seat performs identically',
+  'a structure recorded at the lowest passing level is this project\'s leading structure, not a strong '
+    + 'result: state the level it reached and claim no tonal, spatial or dynamic benefit beyond the result '
+    + 'itself, and never present a relative rank as a strength',
 ]);
 
 /**
@@ -163,7 +166,7 @@ export function designPhilosophyLines(philosophy) {
     `  Display and seating balance: ${priorities.display_and_seating || 'Not determined'}`,
     `  Coverage approach: ${priorities.coverage || 'Not determined'}`,
     `  Bass approach: ${priorities.bass || 'Not determined'}`,
-    `  Strongest results: ${list((reasoning.strongest_results || []).map((entry) => entry.area))}`,
+    `  Strongest results (with the level each reached): ${list((reasoning.strongest_results || []).map((entry) => `${entry.area}${entry.level ? ` (${entry.level})` : ''}`))}`,
     `  Lower results (conscious trade-offs): ${rows(reasoning.lower_results)}`,
     `  Value already taken without substantial cost: ${rows(value.already_captured)}`,
     `  Value-engineering opportunities that remain a design choice: ${rows(value.remaining_design_choices)}`,

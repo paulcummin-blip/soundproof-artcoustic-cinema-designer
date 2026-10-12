@@ -167,7 +167,11 @@ export function deriveDesignPhilosophy({
       bass: bassText,
     },
     reasoning: {
-      strongest_results: strongestAreas.map((entry) => ({ area: entry.area, evidence: entry.evidence })),
+      strongest_results: strongestAreas.map((entry) => ({
+        area: entry.area,
+        level: entry.level || null,
+        evidence: entry.evidence,
+      })),
       lower_results: lower,
       lower_result_rule: 'a lower result is a legitimate design decision: state the result and what it means for this room, and name a reason only where the interpretation records one',
       value_engineering: {
