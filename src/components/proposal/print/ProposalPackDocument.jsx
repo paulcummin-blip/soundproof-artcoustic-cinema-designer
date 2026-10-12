@@ -463,7 +463,7 @@ export default function ProposalPackDocument({
       if (media.length > 0) sheet.imaged = true;
 
       sheet.children.push(
-        <React.Fragment key={section.id}>
+        <div key={section.id} data-editorial-section={section.section_type} style={{ display: 'flow-root' }}>
           <ProposalPageHeader
             number={continuesOpenSheet ? null : takeNumber()}
             kicker="Design"
@@ -511,7 +511,7 @@ export default function ProposalPackDocument({
               ))}
             </div>
           ) : null}
-        </React.Fragment>,
+        </div>,
       );
 
       // A seating group too long for one page continues past it, every image

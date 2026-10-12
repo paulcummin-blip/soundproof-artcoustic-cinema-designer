@@ -145,7 +145,7 @@ function outcome(printed, reason = null, message = null) {
  * @param {{title: string, node: Element, bodyClass?: string, extraCss?: string, onDone?: Function}} options
  * @returns {Promise<{printed: boolean, reason: string|null, message: string|null}>}
  */
-export async function printReportInWindow(win, { title, node, bodyClass = '', extraCss = '', onDone } = {}) {
+export async function printReportInWindow(win, { title, node, bodyClass = '', extraCss = '', onDone, prepareComposition } = {}) {
   if (!win || win.closed || !node) return outcome(false, 'window_unavailable');
 
   // A literal "</script" inside stored rich text would end the document early.
@@ -178,6 +178,9 @@ ${content}
   if (!readiness.ready) {
     return outcome(false, readiness.reason, describePrintReadinessFailure(readiness));
   }
+
+  // Optional document-owned measured composition, never applied to other reports.
+  if (prepareComposition) await prepareComposition(win.document);
 
   try {
     win.addEventListener('afterprint', () => {
