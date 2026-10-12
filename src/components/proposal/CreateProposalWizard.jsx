@@ -1,11 +1,12 @@
-import React, { useState, useCallback, useRef } from 'react';
+import React, { useState, useCallback, useRef, useEffect } from 'react';
 import { base44 } from '@/api/base44Client';
 import { useAuth } from '@/lib/AuthContext';
-import { getProposalType } from '@/components/proposal/proposalTypes';
+import { getProposalType, availableProposalTypes } from '@/components/proposal/proposalTypes';
 import WizardStepper from '@/components/proposal/wizard/WizardStepper';
 import ProjectSelectStep from '@/components/proposal/wizard/ProjectSelectStep';
 import ProposalTypeStep from '@/components/proposal/wizard/ProposalTypeStep';
 import VersionSelectStep from '@/components/proposal/wizard/VersionSelectStep';
+import useCanonicalProjectVersions from '@/components/proposal/wizard/useCanonicalProjectVersions';
 import ClientBriefStep from '@/components/proposal/wizard/ClientBriefStep';
 import GenerateStep, { GENERATION_PHASE } from '@/components/proposal/wizard/GenerateStep';
 import { confirmProposalSectionsSaved } from '@/components/proposal/wizard/proposalHandoffAuthority';
@@ -41,6 +42,40 @@ const STEPS = [
 export default function CreateProposalWizard({ onCreated, onCancel, regenerateFrom = null }) {
   const { user } = useAuth();
   const accountId = user?.access_context?.account?.id || user?.account_id || null;
+
+  // ── The project's genuine design versions ──
+  // ONE canonical read for the whole wizard: the Type step's availability rule and
+  // the Versions step count the same collapsed, duplicate-free list, so they can
+  // never disagree. The shared selector excludes a migration artefact that
+  // duplicates a version slot; raw record counts are never used.
+  const {
+    versions: canonicalVersions,
+    collisions: versionCollisions,
+    loading: versionsLoading,
+  } = useCanonicalProjectVersions(selectedProjectId);
+  const canonicalVersionCount = canonicalVersions.length;
+
+  // ── What this project can build ──
+  // A comparison compares two design versions, so it is offered only when two or
+  // more genuine versions exist. At or before the Type step the selection follows
+  // availability: a project with only one genuine version keeps System Design
+  // Summary selected and Next continues normally, while a carried type the
+  // project cannot build is replaced by one it can.
+  useEffect(() => {
+    if (!selectedProjectId || versionsLoading || step > 1) return;
+    const available = availableProposalTypes(canonicalVersionCount).map((type) => type.value);
+    if (available.length === 1) {
+      if (proposalType !== available[0]) {
+        setProposalType(available[0]);
+        setSelectedVersionIds([]);
+      }
+      return;
+    }
+    if (proposalType && !available.includes(proposalType)) {
+      setProposalType(available[0]);
+      setSelectedVersionIds([]);
+    }
+  }, [step, selectedProjectId, versionsLoading, canonicalVersionCount, proposalType]);
 
   // Regeneration starts from the proposal it revises: project, report type,
   // versions and client brief are carried across, and the new proposal is linked
@@ -359,7 +394,11 @@ export default function CreateProposalWizard({ onCreated, onCancel, regenerateFr
 
       {/* Step 1 — Choose Proposal Type */}
       {step === 1 && (
-        <ProposalTypeStep selectedType={proposalType} onSelect={handleSelectType} />
+        <ProposalTypeStep
+          selectedType={proposalType}
+          onSelect={handleSelectType}
+          versionCount={versionsLoading ? null : canonicalVersionCount}
+        />
       )}
 
       {/* Step 2 — Select Version(s) */}
@@ -370,6 +409,9 @@ export default function CreateProposalWizard({ onCreated, onCancel, regenerateFr
           selectedVersionIds={selectedVersionIds}
           onSelect={handleSelectVersions}
           readiness={readiness}
+          versions={canonicalVersions}
+          collisions={versionCollisions}
+          loading={versionsLoading}
         />
       )}
 

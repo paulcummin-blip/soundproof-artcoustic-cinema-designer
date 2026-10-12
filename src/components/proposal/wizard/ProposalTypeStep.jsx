@@ -1,6 +1,6 @@
 import React from 'react';
 import { FileText, GitCompare, Check } from 'lucide-react';
-import { PROPOSAL_TYPES } from '@/components/proposal/proposalTypes';
+import { availableProposalTypes } from '@/components/proposal/proposalTypes';
 
 const TYPE_ICONS = {
   system_summary: FileText,
@@ -9,14 +9,19 @@ const TYPE_ICONS = {
 
 /**
  * Step 2 — Choose Report Type.
- * System Design Summary (one version) or System Design Comparison (two or
- * more versions). Both use the same report structure and writing style.
- * Renders from PROPOSAL_TYPES.
+ *
+ * Only the report types this project can actually build are offered, from the
+ * shared availability rule: System Design Summary always, and System Design
+ * Comparison only once the project is known to hold two or more genuine design
+ * versions. A type that cannot be built is not rendered at all — it is never
+ * shown greyed out. Both types use the same report structure and writing style.
+ *
+ * versionCount is the count of genuine design versions (null while unknown).
  */
-export default function ProposalTypeStep({ selectedType, onSelect }) {
+export default function ProposalTypeStep({ selectedType, onSelect, versionCount = null }) {
   return (
     <div className="space-y-3">
-      {PROPOSAL_TYPES.map((type) => {
+      {availableProposalTypes(versionCount).map((type) => {
         const Icon = TYPE_ICONS[type.value] || FileText;
         const isSelected = selectedType === type.value;
         return (

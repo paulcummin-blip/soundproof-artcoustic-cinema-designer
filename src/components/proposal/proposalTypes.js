@@ -45,3 +45,26 @@ const LEGACY_TYPE_LABELS = {
 export function getProposalTypeLabel(value) {
   return getProposalType(value)?.label || LEGACY_TYPE_LABELS[value] || 'Design Report';
 }
+
+/**
+ * Whether a report type can be built for a project holding `versionCount`
+ * genuine design versions.
+ *
+ * The count decides only whether enough DISTINCT versions EXIST to build the
+ * report — never how many the designer must then select, which is minVersions.
+ * A single-version report is always available; a comparison needs at least two
+ * genuine versions to exist before it is offered. An unknown count (still being
+ * read) never offers the comparison, so it cannot appear and then be withdrawn.
+ */
+export function isProposalTypeAvailable(type, versionCount) {
+  if (!type) return false;
+  const min = Number.isFinite(type.minVersions) ? type.minVersions : 1;
+  if (min <= 1) return true;
+  if (!Number.isFinite(versionCount)) return false;
+  return versionCount >= min;
+}
+
+/** The report types a project with this many genuine versions may build. */
+export function availableProposalTypes(versionCount) {
+  return PROPOSAL_TYPES.filter((type) => isProposalTypeAvailable(type, versionCount));
+}

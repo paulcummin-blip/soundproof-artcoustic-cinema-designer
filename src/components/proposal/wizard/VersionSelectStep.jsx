@@ -1,10 +1,8 @@
-import React, { useState, useEffect } from 'react';
-import { base44 } from '@/api/base44Client';
+import React from 'react';
 import { Loader2, Check } from 'lucide-react';
 import { getProposalType } from '@/components/proposal/proposalTypes';
 import VersionReadinessTable from '@/components/proposal/sourceAuthority/VersionReadinessTable';
 import VersionCollisionNotice from '@/components/versions/VersionCollisionNotice';
-import { selectCanonicalVersions } from '@/lib/canonicalVersionSelection';
 
 /**
  * Step 3 — Select Version(s).
@@ -15,6 +13,10 @@ import { selectCanonicalVersions } from '@/lib/canonicalVersionSelection';
  * EVERY selected version is shown here while the designer chooses — warnings
  * first, and the hard block when the step is left. The readiness result itself
  * comes from one shared authority; this step only presents it.
+ *
+ * The canonical, duplicate-free version list is read ONCE for the whole wizard
+ * (useCanonicalProjectVersions) and passed in, so this step and the Type step's
+ * availability rule always count the same genuine versions.
  */
 export default function VersionSelectStep({
   projectId,
@@ -22,44 +24,10 @@ export default function VersionSelectStep({
   selectedVersionIds,
   onSelect,
   readiness = null,
+  versions = [],
+  collisions = [],
+  loading = false,
 }) {
-  const [versions, setVersions] = useState([]);
-  const [collisions, setCollisions] = useState([]);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    if (!projectId) {
-      setLoading(false);
-      return;
-    }
-    let cancelled = false;
-    (async () => {
-      try {
-        const [versionRecords, projectRecords] = await Promise.all([
-          base44.entities.ProjectVersion.filter({ project_id: projectId }),
-          base44.entities.Project.filter({ id: projectId }),
-        ]);
-        if (cancelled) return;
-        // ONE canonical list: a duplicated version slot collapses to the record
-        // the project's active pointer names, or to the one carrying verified
-        // evidence — so an empty migration artefact is never offered as a design.
-        const canonical = selectCanonicalVersions({
-          versions: Array.isArray(versionRecords) ? versionRecords : [],
-          activeVersionId: projectRecords?.[0]?.active_version_id || null,
-        });
-        setVersions(canonical.versions);
-        setCollisions(canonical.collisions);
-      } catch (err) {
-        console.error('Failed to load versions:', err);
-      } finally {
-        if (!cancelled) setLoading(false);
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [projectId]);
-
   const typeDef = getProposalType(proposalType);
   const isComparison = proposalType === 'comparison';
 
