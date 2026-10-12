@@ -28,6 +28,10 @@ import {
   printReportInWindow,
   closeReportPrintWindow,
 } from '@/components/report/reportPrintWindow';
+import { preparePrintDocument } from '@/components/report/printReadiness';
+
+/** The status the report states when preparation did not complete. */
+export const TECHNICAL_PRINT_NOT_READY_STATUS = 'Print preparation failed — nothing was printed.';
 
 /** The mounted print-only layout — the report's entire PDF composition. */
 export const TECHNICAL_PRINT_NODE_SELECTOR = '.print-only.print-keep-layout';
@@ -71,4 +75,34 @@ export async function printTechnicalReportInWindow(win, { title, node, onDone } 
     extraCss: PRINT_WINDOW_CSS,
     onDone,
   });
+}
+
+/**
+ * Whether a print-window outcome means the report was NOT ready.
+ *
+ * Only `window_unavailable` may be fallen back from — the window could not be
+ * used at all. Any other failure means nothing was printed, so the in-place path
+ * must not be attempted either.
+ */
+export function isTechnicalPrintNotReady(result) {
+  return Boolean(result && result.printed !== true && result.reason && result.reason !== 'window_unavailable');
+}
+
+/**
+ * Print the report in place, through the SAME shared readiness authority.
+ *
+ * The report's stylesheets, fonts, images and layout are prepared before the
+ * print dialogue opens, so an in-place export cannot print an unprepared report
+ * either — the two paths cannot diverge.
+ *
+ * @param {{title: string, node: Element, applyTitle?: Function, onBeforePrint?: Function}} options
+ * @returns {Promise<boolean>} true when the print dialogue was opened
+ */
+export async function printTechnicalReportInPlace({ title, node, applyTitle, onBeforePrint } = {}) {
+  if (typeof applyTitle === 'function') applyTitle(title);
+  const readiness = await preparePrintDocument({ doc: document, root: node });
+  if (!readiness.ready) return false;
+  if (typeof onBeforePrint === 'function') onBeforePrint();
+  window.print();
+  return true;
 }

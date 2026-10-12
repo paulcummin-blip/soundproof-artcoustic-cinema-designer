@@ -28,6 +28,11 @@ import {
   closeReportPrintWindow,
 } from "@/components/report/reportPrintWindow";
 import {
+  PRINT_NOT_READY_MESSAGE,
+  describePrintReadinessFailure,
+  preparePrintDocument,
+} from "@/components/report/printReadiness";
+import {
   recordIssuedExportInBackground,
   snapshotIssuedComposition,
 } from "@/components/library/issuedDocument/recordIssuedExport";
@@ -170,37 +175,52 @@ export function useClientReportPdfExport({
       // 3. Print from the app-owned window. Nothing about the report's layout
       // changes: the same stylesheets and the same print composition are used.
       if (printWindowRef.current) {
-        const printed = await printReportInWindow(printWindowRef.current, {
+        // The window's own document is prepared by the shared readiness
+        // authority, and the print dialogue opens only when it reports ready.
+        const result = await printReportInWindow(printWindowRef.current, {
           title,
           node: findReportPrintNode(PRINT_NODE_SELECTOR),
           bodyClass: PRINT_BODY_CLASS,
           extraCss: PRINT_WINDOW_CSS,
           onDone: cleanup,
         });
-        if (printed) {
+        if (result.printed) {
           printWindowRef.current = null;
           return;
         }
         closeReportPrintWindow(printWindowRef.current);
         printWindowRef.current = null;
+        if (result.reason !== 'window_unavailable') {
+          // The report did not become ready: nothing was printed.
+          setError(result.message || PRINT_NOT_READY_MESSAGE);
+          cleanup();
+          return;
+        }
       }
 
       // 4. Fallback: print in place, with the report title applied to the app
-      // document and the host tab alike.
+      // document and the host tab alike — prepared by the SAME readiness
+      // authority, never after a bare animation-frame delay.
       document.body.classList.add(PRINT_BODY_CLASS);
       applyPrintDocumentTitle(title);
 
-      // 5. Wait two animation frames for print layout to settle
-      await new Promise((resolve) =>
-        requestAnimationFrame(() => requestAnimationFrame(resolve))
-      );
+      const readiness = await preparePrintDocument({
+        doc: document,
+        root: findReportPrintNode(PRINT_NODE_SELECTOR),
+      });
+      if (!readiness.ready) {
+        document.body.classList.remove(PRINT_BODY_CLASS);
+        setError(describePrintReadinessFailure(readiness));
+        cleanup();
+        return;
+      }
 
-      // 6. Set timeout fallback (in case afterprint doesn't fire)
+      // 5. Set timeout fallback (in case afterprint doesn't fire)
       cleanupTimeoutRef.current = setTimeout(() => {
         cleanup();
       }, PRINT_TIMEOUT_MS);
 
-      // 7. Trigger print
+      // 6. Trigger print
       window.print();
     } catch (err) {
       setError("PDF preparation failed. Please try again.");

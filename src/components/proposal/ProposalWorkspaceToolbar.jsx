@@ -11,7 +11,7 @@
  */
 
 import React from 'react';
-import { FileText, SlidersHorizontal, Download, Loader2, AlertCircle } from 'lucide-react';
+import { FileText, SlidersHorizontal, Download, Loader2, AlertCircle, RotateCw } from 'lucide-react';
 
 import { REPORT_FONT_BODY as FONT } from '@/components/report/typography/reportTypography';
 
@@ -32,6 +32,9 @@ export default function ProposalWorkspaceToolbar({
   onExport,
   blockedReason,
   error,
+  // A preparation failure the designer can simply retry: it restarts the whole
+  // print preparation from the start, without reloading the app.
+  retryable = false,
 }) {
   const message = blockedReason || error;
 
@@ -109,6 +112,22 @@ export default function ProposalWorkspaceToolbar({
           >
             <AlertCircle className="w-3.5 h-3.5 flex-shrink-0 mt-0.5" />
             <span>{message}</span>
+            {retryable && (
+              <button
+                type="button"
+                onClick={onExport}
+                disabled={exporting}
+                className="ml-auto flex items-center gap-1.5 px-3 py-1.5 rounded border border-[#B99B70] text-[11px] uppercase tracking-[0.12em] text-[#4A230F] transition-colors hover:bg-white disabled:opacity-60 disabled:cursor-not-allowed"
+                style={{ fontFamily: FONT }}
+              >
+                {exporting ? (
+                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                ) : (
+                  <RotateCw className="w-3.5 h-3.5" />
+                )}
+                {exporting ? 'Preparing…' : 'Retry Export'}
+              </button>
+            )}
           </div>
         </div>
       )}

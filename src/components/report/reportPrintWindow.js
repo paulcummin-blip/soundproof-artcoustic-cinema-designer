@@ -21,14 +21,24 @@
  *
  * Pure DOM helpers: no React, no app state, no calculations.
  *
+ * Preparation is NOT decided here: the window's document is written, then the one
+ * shared print-readiness authority (`@/components/report/printReadiness`) is
+ * satisfied. The print dialogue opens only when that authority reports the
+ * document ready — a resource that failed, or a budget that ran out, means
+ * nothing is printed and the caller is told why. There is no "print anyway"
+ * timeout, because an incomplete PDF is worse than no PDF.
+ *
  * Usage:
  *   const win = openReportPrintWindow(title);      // synchronous, on the click
- *   await printReportInWindow(win, { title, node, bodyClass });
+ *   const outcome = await printReportInWindow(win, { title, node, bodyClass });
+ *   // outcome.printed === false → nothing was printed; show outcome.message
  *   closeReportPrintWindow(win);                   // if the caller must clean up
  */
 
-/** How long to wait for the print window's images before printing regardless. */
-const IMAGE_WAIT_MS = 4000;
+import {
+  describePrintReadinessFailure,
+  preparePrintDocument,
+} from '@/components/report/printReadiness';
 
 /** The mounted print-only node inside `root`, or null when it is not rendered. */
 export function findReportPrintNode(selector, root) {
@@ -118,58 +128,25 @@ export function closeReportPrintWindow(win) {
   }
 }
 
-/** Resolve once every image in the print window has loaded, errored or timed out. */
-function waitForImages(win) {
-  return new Promise((resolve) => {
-    let images = [];
-    try {
-      images = Array.from(win.document.images || []);
-    } catch {
-      resolve();
-      return;
-    }
-    const pending = images.filter((img) => !img.complete);
-    if (pending.length === 0) {
-      resolve();
-      return;
-    }
-    let remaining = pending.length;
-    const timer = setTimeout(resolve, IMAGE_WAIT_MS);
-    const done = () => {
-      remaining -= 1;
-      if (remaining <= 0) {
-        clearTimeout(timer);
-        resolve();
-      }
-    };
-    pending.forEach((img) => {
-      img.addEventListener('load', done, { once: true });
-      img.addEventListener('error', done, { once: true });
-    });
-  });
-}
-
-async function waitForPrintWindowAssets(win) {
-  try {
-    const fonts = win.document.fonts && win.document.fonts.ready
-      ? win.document.fonts.ready.catch(() => {})
-      : Promise.resolve();
-    await Promise.all([fonts, waitForImages(win)]);
-  } catch {
-    // Print with whatever has rendered.
-  }
+/** The outcome of one attempt to print from the app-owned window. */
+function outcome(printed, reason = null, message = null) {
+  return { printed, reason, message };
 }
 
 /**
- * Write the report into the print window, print it, and close the window when
- * the print dialog finishes.
+ * Write the report into the print window, prepare it, print it, and close the
+ * window when the print dialog finishes.
+ *
+ * `window_unavailable` is the only outcome the caller may fall back from: the
+ * window could not be used at all, so the in-page path gets a chance. Every
+ * other failure means the document was not ready and nothing was printed.
  *
  * @param {Window|null} win - from openReportPrintWindow
  * @param {{title: string, node: Element, bodyClass?: string, extraCss?: string, onDone?: Function}} options
- * @returns {Promise<boolean>} true when the print dialog was opened
+ * @returns {Promise<{printed: boolean, reason: string|null, message: string|null}>}
  */
 export async function printReportInWindow(win, { title, node, bodyClass = '', extraCss = '', onDone } = {}) {
-  if (!win || win.closed || !node) return false;
+  if (!win || win.closed || !node) return outcome(false, 'window_unavailable');
 
   // A literal "</script" inside stored rich text would end the document early.
   const content = String(node.outerHTML || '').replace(/<\/script/gi, '<\\/script');
@@ -192,9 +169,15 @@ ${content}
 </body>
 </html>`;
 
-  if (!writeToWindow(win, html)) return false;
+  if (!writeToWindow(win, html)) return outcome(false, 'window_unavailable');
 
-  await waitForPrintWindowAssets(win);
+  // The one shared readiness authority, satisfied against the print window's own
+  // document: stylesheets parsed, fonts applied, every image loaded and decoded,
+  // and the layout measured the same twice in a row. Not ready means not printed.
+  const readiness = await preparePrintDocument({ win, root: win.document.body });
+  if (!readiness.ready) {
+    return outcome(false, readiness.reason, describePrintReadinessFailure(readiness));
+  }
 
   try {
     win.addEventListener('afterprint', () => {
@@ -204,8 +187,8 @@ ${content}
     }, { once: true });
     win.focus();
     win.print();
-    return true;
+    return outcome(true);
   } catch {
-    return false;
+    return outcome(false, 'print_dialogue_failed');
   }
 }

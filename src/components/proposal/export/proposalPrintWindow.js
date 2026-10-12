@@ -54,9 +54,13 @@ export function closeProposalPrintWindow(win) {
  * Write the pack into the print window, print it, and close the window when the
  * print dialog finishes.
  *
+ * Preparation is the shared print-readiness authority's decision, inside
+ * `printReportInWindow`: the window's document must satisfy it before the print
+ * dialogue opens, so nothing is printed from an unprepared document.
+ *
  * @param {Window|null} win - from openProposalPrintWindow
  * @param {{title: string, node: Element, onDone?: Function}} options
- * @returns {Promise<boolean>} true when the print dialog was opened
+ * @returns {Promise<{printed: boolean, reason: string|null, message: string|null}>}
  */
 export async function printProposalInWindow(win, { title, node, onDone } = {}) {
   return printReportInWindow(win, {

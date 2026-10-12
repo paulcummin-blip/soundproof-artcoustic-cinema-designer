@@ -96,21 +96,15 @@ import Rp22SeatCoverageSentence from '@/components/report/Rp22SeatCoverageSenten
 import { buildTechnicalReportTitle } from '@/components/report/reportPdfTitle';
 import { reportHeaderMetadata } from '@/components/report/reportPrintHeader';
 import useReportFilenameIdentity from '@/components/report/useReportFilenameIdentity';
-import { applyPrintDocumentTitle, restorePrintDocumentTitle } from '@/components/report/printDocumentTitle';
+import { restorePrintDocumentTitle } from '@/components/report/printDocumentTitle';
 import {
-    findTechnicalReportPrintNode,
     openTechnicalReportPrintWindow,
-    printTechnicalReportInWindow,
     closeTechnicalReportPrintWindow,
 } from '@/components/report/technical/technicalReportPrintWindow';
+import useTechnicalReportPrint from '@/components/report/technical/useTechnicalReportPrint';
 import TechnicalAboutSoundProofSection from '@/components/report/technical/TechnicalAboutSoundProofSection';
 import TechnicalHowToReadSection from '@/components/report/technical/TechnicalHowToReadSection';
 import TechnicalRp22ParameterReferenceSection from '@/components/report/technical/TechnicalRp22ParameterReferenceSection';
-import { ISSUED_DOCUMENT_TYPE } from '@/components/library/issuedDocument/issuedDocumentTypes';
-import {
-    recordIssuedExportInBackground,
-    snapshotIssuedComposition,
-} from '@/components/library/issuedDocument/recordIssuedExport';
 import { readDesignReviewHandoff, subscribeDesignReviewHandoff } from '@/components/state/designReviewHandoff';
 import { useVersionedEngineeringAuthority } from '@/components/engineering/useVersionedEngineeringAuthority';
 import { useCompletedBassAuthority } from '@/components/room/bass/completedBassResultStore';
@@ -397,84 +391,31 @@ function RP22ReportInner({ embed = false } = {}) {
      *
      * The export click opens the app-owned print window up front — a window
      * opened after the capture pipeline would be blocked as an unwanted pop-up.
-     * Every Technical Report print path goes through here: while that window is
-     * available the report is printed from it, so the browser names the saved PDF
-     * after the report; otherwise it prints in place, applying the report title to
-     * the app document and the host tab exactly as before.
+     * Both print paths (the window, and the in-place fallback when the browser
+     * refuses it) prepare through the ONE shared print-readiness authority, so
+     * neither can print an unprepared report. The orchestration itself lives in
+     * useTechnicalReportPrint.
      */
-    const printTechnicalReport = React.useCallback(() => {
-        const printWindow = printWindowRef.current;
-        printWindowRef.current = null;
-
-        // Exporting this report also stores the issued PDF in the project
-        // library, from the SAME print composition, in the background. The
-        // export itself is never delayed and never depends on storage.
-        // The issued copy is taken from the SAME composition this export prints
-        // and stored in the background; a failure is reported with its reason,
-        // and a retry that cannot use a held PDF re-runs this very export.
-        recordIssuedExportInBackground({
-                identity: {
-                    projectId: explicitProjectId,
-                    accountId: projectDetails?.account_id || null,
-                    documentType: ISSUED_DOCUMENT_TYPE.TECHNICAL,
-                    title: 'Technical Report',
-                    filename: technicalReportPrintTitle,
-                    versionId: reportVersionId,
-                    selectedVersionIds: reportVersionId ? [reportVersionId] : [],
-                    sourceRecordId: reportSnapshot.saved?.id || null,
-                    sourceFingerprints: snapshotFingerprints,
-                    sourceStatusAtExport: reportSnapshot.status === REPORT_SNAPSHOT_STATUS.STALE
-                        ? 'source_changed'
-                        : 'current',
-                    exportedBy: reportUser?.full_name || reportUser?.email || null,
-                },
-                snapshot: snapshotIssuedComposition(ISSUED_DOCUMENT_TYPE.TECHNICAL),
-                retryExport: printTechnicalReport,
-            });
-
-        const onDone = () => {
-            setAutoPrintDone(true);
-            setExportStatus("Done");
-            setExportDebug(d => ({ ...d, isPrinting: false, printReady: false }));
-            setIsPrinting(false);
-            setPlanImageDataUrl(null);
-            setPlanDimsImageDataUrl(null);
-            setPlanSpeakerDimsImageDataUrl(null);
-            printLockRef.current = false;
-            if (cleanupTimeoutRef.current) { clearTimeout(cleanupTimeoutRef.current); cleanupTimeoutRef.current = null; }
-            exportGuardRef.current.active = false;
-        };
-
-        const printInPlace = () => {
-            applyPrintDocumentTitle(technicalReportPrintTitle);
-            window.addEventListener("afterprint", () => setAutoPrintDone(true), { once: true });
-            window.print();
-        };
-
-        if (!printWindow) {
-            printInPlace();
-            return;
-        }
-
-        printTechnicalReportInWindow(printWindow, {
-            title: technicalReportPrintTitle,
-            node: findTechnicalReportPrintNode(),
-            onDone,
-        }).then((printed) => {
-            if (printed) return;
-            // The window could not be used: fall back to printing in place.
-            closeTechnicalReportPrintWindow(printWindow);
-            printInPlace();
-        });
-    }, [
-        technicalReportPrintTitle,
+    const printTechnicalReport = useTechnicalReportPrint({
+        title: technicalReportPrintTitle,
         explicitProjectId,
         projectDetails,
         reportVersionId,
         reportSnapshot,
         snapshotFingerprints,
         reportUser,
-    ]);
+        printWindowRef,
+        cleanupTimeoutRef,
+        exportGuardRef,
+        printLockRef,
+        setAutoPrintDone,
+        setExportStatus,
+        setExportDebug,
+        setIsPrinting,
+        setPlanImageDataUrl,
+        setPlanDimsImageDataUrl,
+        setPlanSpeakerDimsImageDataUrl,
+    });
 
     // Cleanup on afterprint
     useEffect(() => {

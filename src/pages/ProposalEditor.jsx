@@ -40,6 +40,7 @@ import ProposalPrintDocument from '@/components/proposal/export/ProposalPrintDoc
 import ProposalPrintStyles from '@/components/proposal/export/ProposalPrintStyles';
 import { useProposalExport } from '@/components/proposal/export/useProposalExport';
 import { proposalVersionIds } from '@/components/proposal/library/proposalSourceState';
+import useProposalExportIdentity from '@/components/proposal/editor/useProposalExportIdentity';
 import { documentTypeForProposalType } from '@/components/library/issuedDocument/issuedDocumentTypes';
 import { resolveProposalExportSource } from '@/components/library/issuedDocument/proposalExportSource';
 import { resolveCoverAsset, resolvePackImages } from '@/components/library/imageScopeAuthority';
@@ -669,39 +670,14 @@ export default function ProposalEditor() {
       : 'Comparison evidence requires regeneration. Create a new comparison revision from both versions; the existing report is unchanged.')
     : null;
 
-  const [versionNameById, setVersionNameById] = useState(new Map());
-  useEffect(() => {
-    const versionIds = proposalVersionIds(proposal);
-    if (versionIds.length === 0) {
-      setVersionNameById(new Map());
-      return undefined;
-    }
-    let cancelled = false;
-    (async () => {
-      try {
-        const result = await base44.entities.ProjectVersion.filter(
-          { id: { $in: versionIds } },
-          { fields: ['version_name'], limit: 10 },
-        );
-        const records = Array.isArray(result) ? result : (result?.items || []);
-        if (!cancelled) setVersionNameById(buildVersionNameMap(records));
-      } catch (versionError) {
-        // The name is a label only: an unreadable name leaves the image
-        // unlabelled rather than showing a wrong one.
-        console.warn('[ProposalEditor] version names unavailable:', versionError?.message || versionError);
-      }
-    })();
-    return () => { cancelled = true; };
-  }, [proposal?.selected_version_ids, proposal?.version_id]);
-
-  // The exact saved version names this document is built from, in selection
-  // order: the version name for a summary, every name for a comparison. Read
-  // from the same stored records the images are labelled with, so the cover, the
-  // printed pack and the exported filename all state one identity.
-  const proposalVersionNames = useMemo(
-    () => proposalVersionIds(proposal).map((versionId) => versionNameById.get(versionId)).filter(Boolean),
-    [proposal?.selected_version_ids, proposal?.version_id, versionNameById],
-  );
+  // The saved version names and the export identity, resolved here so the export
+  // can wait for them rather than printing a document whose names are still
+  // arriving (see useProposalExportIdentity).
+  const {
+    versionNameById,
+    versionNames: proposalVersionNames,
+    resolveExportIdentity,
+  } = useProposalExportIdentity({ proposal, projectContext });
 
   // The images this document composes with: the versions it covers first, then
   // the project-wide gallery for anything they leave free.
@@ -747,6 +723,7 @@ export default function ProposalEditor() {
     exporting,
     error: exportError,
     blockedReason: exportBlockedReason,
+    retryable: exportRetryable,
     handleExport,
   } = useProposalExport({
     proposal,
@@ -758,6 +735,9 @@ export default function ProposalEditor() {
     projectReference: projectContext.projectReference,
     // The exact saved version names this document was built from.
     versionNames: proposalVersionNames,
+    // The document's own inputs, resolved before anything is prepared: the export
+    // waits for a late-resolving saved version name rather than printing without it.
+    resolveExportIdentity,
     // Exporting this proposal also stores the issued PDF in the project library.
     // Drafts and editable revisions stay in the Proposal Centre; only the PDF
     // that was actually exported becomes a library asset.
@@ -829,6 +809,7 @@ export default function ProposalEditor() {
         onExport={handleExport}
         blockedReason={comparisonBlockReason || editLayerBlockReason || exportBlockedReason}
         error={exportError}
+        retryable={exportRetryable}
       />
 
       <div className="flex flex-1 min-h-0 overflow-hidden">
