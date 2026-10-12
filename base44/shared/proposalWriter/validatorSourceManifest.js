@@ -15,7 +15,7 @@ export const VALIDATOR_SOURCE_MANIFEST = Object.freeze({
   'base44/shared/proposalGeneration/generationStatuses.js': '2273b2e8408a426eeb137d9ae2f34c428a8e934dc0529134e9889aae75103b28',
   'base44/shared/proposalWriter/writerCabinetLanguage.js': '18e37edb21bd8422c6293c5fde809984d185e7188d0fe4a12fa2ff352d4b72c7',
   'base44/shared/proposalWriter/writerValidationRegister.js': '634502ab07c0bf1b13cfe0879d1e2ca2e85f0419c94f377b266a977c38c07b96',
-  'base44/shared/proposalWriter/writerInputBuilder.js': '321f5f8f5df847ae9d9b2c4f5bb5235f42acfa6a00a4899cc73526a5d38adbb8',
+  'base44/shared/proposalWriter/writerInputBuilder.js': 'fc796ddb2a5944e1b1f42346861028d686c1783cf329ee8dad6f501292dc2364',
   'base44/shared/proposalWriter/writerPromptBuilder.js': '579c8dced46828bfbd14a3d0ba5832666119c9014e4136d74319e56f604202da',
   'base44/shared/proposalWriter/writerSectionMapping.js': 'f5a6d2a5fe974fbd5c16d810d95f99da72f629a4fb8cb33793aa472778ade2f0',
   'base44/shared/proposalWriter/writerDesignContext.js': 'ec846bfa27dfcb46397e19b1c0063370add28677ab7ffd777aea591be2a4507f',
@@ -31,7 +31,7 @@ export const VALIDATOR_SOURCE_MANIFEST = Object.freeze({
   // Stage 1 and by the writer's editorial instructions. It states no figure and
   // changes no acceptance; it is hashed so a draft can be traced to the exact
   // reasoning authority it was written under.
-  'base44/shared/designPhilosophyAuthority.js': 'c8718fac6c3047da4989f3b5c1e5ff24113c16818bf185ed622734c9fee1a437',
+  'base44/shared/designPhilosophyAuthority.js': '1a4ba9bfd86d5bd17cabac52e6dab78359f601f92b14e0a63703d679915179fc',
   'base44/shared/adiDesignPhilosophy.js': 'cd275e6c1ba1c768378b701e5494f10042b550727e806ca1f24716d0c06103cc',
   'base44/shared/adiProjectInterpretation.js': '9f4a914230ea4bc291e6deed38065bad065fb171868bd75175e89f313d613ab0',
   // The check between the saved interpretation and the frozen evidence, which now

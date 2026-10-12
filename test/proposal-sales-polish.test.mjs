@@ -63,7 +63,7 @@ test('single Design Summary changes no comparison purpose, IDs or limits', () =>
   const single = writerSectionsForMode('single');
   const comparison = writerSectionsForMode('comparison');
   expect(single[0].title).toBe('Design Summary');
-  expect(single[0].requirement).toContain('2–3');
+  expect(single[0].requirement).toContain('developed natural paragraphs');
   expect(comparison[0].title).toBe('Decision Summary');
   expect(comparison[0].requirement).toContain('decision between the options');
   expect(single.map(s => [s.section, s.word_limit])).toEqual(comparison.map(s => [s.section, s.word_limit]));
