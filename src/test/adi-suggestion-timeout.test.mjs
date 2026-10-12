@@ -6,6 +6,12 @@
  * itself (settled, failed, timed out, late response, retry) and guards the
  * component contract that keeps the fallback honest and the wizard usable.
  *
+ * The examples themselves no longer come from the request: they are built
+ * synchronously from the frozen evidence, so the bounded wait can only ever ADD
+ * to what is on screen. That behaviour is covered by
+ * src/test/adi-suggestion-availability.test.mjs; here the wait is judged on its
+ * own, as an optional refinement.
+ *
  * Pure: no React render, no SDK, no database. The component contract is read
  * from source, in the same style as the other source-authority suites.
  *
@@ -23,9 +29,6 @@ const source = (path) => readFileSync(new URL(path, import.meta.url), 'utf8');
 const CHIPS = source('../components/proposal/wizard/AdiSuggestionChips.jsx');
 const BRIEF_STEP = source('../components/proposal/wizard/ClientBriefStep.jsx');
 const WIZARD = source('../components/proposal/CreateProposalWizard.jsx');
-
-const TIMEOUT_COPY =
-  'Design-specific suggestions are taking longer than expected. You can use these examples or continue with your own brief.';
 
 /** The timeout branch of load(), as it stands in the component. */
 const timeoutBranch = () => CHIPS.slice(
@@ -124,18 +127,22 @@ describe('the suggestion area can never sit in a loading state', () => {
     expect(CHIPS).not.toContain('await base44.functions.invoke');
   });
 
-  test('a timeout clears loading, shows the general examples and offers a Retry', () => {
+  test('a timeout leaves the examples on screen and offers a Retry', () => {
     const branch = timeoutBranch();
     expect(branch).not.toBe('');
-    expect(branch).toContain('setTimedOut(true)');
-    expect(branch).toContain('setLoading(false)');
-    // The general examples are what remains on screen, and the timeout copy is
-    // stated verbatim so the fallback is never presented as project-specific.
-    expect(branch).toContain('setSuggestions([])');
-    expect(CHIPS).toContain(TIMEOUT_COPY);
+    // The timeout branch records how the refinement ended and clears the flag.
+    // It cannot touch an example, so the examples stay exactly as they are.
+    expect(branch).toContain("setRefinement('timedOut')");
+    expect(branch).toContain('setRefining(false)');
+    expect(branch).not.toContain('setRefined(');
+    expect(branch).not.toContain('setSelected(');
+    // The examples come from the synchronous build, not from the request.
+    expect(CHIPS).toContain('buildEvidenceSuggestions(');
+    expect(CHIPS).toContain('evidence.evidenceBacked');
+    expect(CHIPS).toContain('generalChips.map');
+    // The status note is shown verbatim, and the retry is offered beside it.
+    expect(CHIPS).toContain('TIMEOUT_NOTE');
     expect(CHIPS).toMatch(/onClick=\{load\}[\s\S]{0,240}Retry/);
-    expect(CHIPS).toContain('const chips = usingCalculatedResults');
-    expect(CHIPS).toContain('GENERIC_EXAMPLES.map');
   });
 
   test('a timeout never retries by itself and never re-requests', () => {
@@ -153,7 +160,9 @@ describe('the suggestion area can never sit in a loading state', () => {
     expect(gates).toBe(1);
     const afterAwait = CHIPS.slice(CHIPS.indexOf('const result = await settleWithin('));
     expect(afterAwait.indexOf('if (requestRef.current !== token) return;'))
-      .toBeLessThan(afterAwait.indexOf('setSuggestions('));
+      .toBeLessThan(afterAwait.indexOf('setRefined('));
+    expect(afterAwait.indexOf('if (requestRef.current !== token) return;'))
+      .toBeLessThan(afterAwait.indexOf('setRefinement('));
   });
 
   test('a late response after the fallback is discarded structurally', () => {
@@ -168,20 +177,20 @@ describe('the suggestion area can never sit in a loading state', () => {
     expect(CHIPS).toMatch(/useEffect\(\(\) => \(\) => \{[\s\S]{0,120}requestRef\.current \+= 1;/);
   });
 
-  test('the examples are not requested again by the effect that loads them', () => {
-    // No dependency on the timeout state or the loaded examples: the wait cannot
-    // re-trigger itself, so there is no duplicate request loop.
-    const deps = '}, [hasResults, load]);';
+  test('the refinement is not requested again by the effect that starts it', () => {
+    // The effect runs once per evidence identity, and load() depends only on
+    // whether results exist and reads its payload from refs: nothing the effect
+    // or the request sets can re-trigger either of them.
+    expect(CHIPS).toContain('}, [hasResults]);');
+    const deps = '}, [evidenceKey, hasResults, load]);';
     expect(CHIPS).toContain(deps);
-    // The effect that requests the examples depends only on whether results exist
-    // and on load itself, so nothing it sets can re-trigger it.
     const loadEffect = CHIPS.slice(
-      CHIPS.indexOf('if (hasResults) {'),
+      CHIPS.indexOf('useEffect(() => {\n    requestRef.current += 1;'),
       CHIPS.indexOf(deps) + deps.length,
     );
     expect(loadEffect).toContain('load();');
     expect(loadEffect).not.toContain('timedOut');
-    expect(loadEffect).not.toContain('suggestions');
+    expect(loadEffect).not.toContain('refined');
   });
 });
 
@@ -204,9 +213,15 @@ describe('the wizard is unaffected by suggestion loading', () => {
     expect(CHIPS).not.toContain('onChange(');
   });
 
-  test('the loading line is still stated while a version read is in flight', () => {
-    expect(CHIPS).toContain('Reading the published engineering results for the selected versions…');
-    expect(CHIPS).toContain("Reading this design's results…");
-    expect(CHIPS).toContain('const busy = snapshotLoading || versionsLoading || loading;');
+  test('the examples are never hidden behind a loading state', () => {
+    // A version read may still be in flight, and it no longer matters: the general
+    // examples are on screen, and the project-specific ones replace them the
+    // instant the frozen evidence is readable. Nothing is ever blank or blocking.
+    expect(CHIPS).not.toContain('const busy =');
+    expect(CHIPS).not.toContain('setLoading');
+    expect(CHIPS).not.toMatch(/animate-spin/);
+    expect(CHIPS).toMatch(/<div className="flex flex-wrap gap-2">\{chips\.map\(renderChip\)\}/);
+    // The evidence read is logged as a measured wait, not shown as a loading line.
+    expect(CHIPS).toContain('frozen evidence readable after');
   });
 });

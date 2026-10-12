@@ -292,16 +292,6 @@ export default async function (req) {
     if (!user) return Response.json({ error: 'Unauthorized' }, { status: 401 });
 
     const body = await req.json().catch(() => ({}));
-    // Stage timings, measured separately so a slow suggestion area can be judged
-    // on numbers instead of assumed to be the model. Reported in the response and
-    // logged with the chips; measuring changes no suggestion.
-    const requestStartedAt = Date.now();
-    const timings = {
-      interpretationReadMs: null,
-      deterministicMs: null,
-      llmMs: null,
-      totalMs: null,
-    };
     const snapshot = body?.engineering_snapshot || null;
     const selectedVersionIds = (Array.isArray(body?.selected_version_ids) ? body.selected_version_ids : [])
       .filter(Boolean);
@@ -360,7 +350,6 @@ export default async function (req) {
     // version, and a statement that contradicts it is removed. A stale or foreign
     // interpretation is not read at all, and a design intention is never read as a
     // measured result.
-    const interpretationStartedAt = Date.now();
     const recordedInterpretations = await readRecordedInterpretations(
       base44,
       body?.project_id,
@@ -368,7 +357,6 @@ export default async function (req) {
         ? versionEntries.map((entry) => entry.version_id)
         : selectedVersionIds,
     );
-    timings.interpretationReadMs = Date.now() - interpretationStartedAt;
     const { rationale, dropped: droppedInterpretationStatements } = verifiedRationale({
       entries: recordedInterpretations,
       snapshotByVersionId,
@@ -391,7 +379,6 @@ export default async function (req) {
       const authorityChips = buildComparisonAuthorityChips(versionEntries);
 
       let comparisonAiChips = [];
-      const comparisonLlmStartedAt = Date.now();
       try {
         const result = await base44.integrations.Core.InvokeLLM({
           prompt: buildComparisonPrompt({
@@ -412,7 +399,6 @@ export default async function (req) {
       } catch (error) {
         console.error('[generateAdiNarrativeSuggestions] ADI comparison suggestions unavailable, grounded examples only:', error?.message);
       }
-      timings.llmMs = Date.now() - comparisonLlmStartedAt;
 
       const { suggestions, diagnostics } = resolveComparisonNarrativeChips({
         aiChips: comparisonAiChips,
@@ -465,7 +451,6 @@ export default async function (req) {
     // ADI adds to them. A failure here never costs the designer the grounded
     // examples, so the model call is isolated.
     let aiChips = [];
-    const llmStartedAt = Date.now();
     try {
       const result = await base44.integrations.Core.InvokeLLM({
         prompt: buildPrompt({
@@ -488,7 +473,6 @@ export default async function (req) {
     } catch (error) {
       console.error('[generateAdiNarrativeSuggestions] ADI suggestions unavailable, grounded examples only:', error?.message);
     }
-    timings.llmMs = Date.now() - llmStartedAt;
 
     // Validate every chip against the same snapshot before it is returned. The
     // recorded reasoning decides which decisions a suggestion may ask the report to
