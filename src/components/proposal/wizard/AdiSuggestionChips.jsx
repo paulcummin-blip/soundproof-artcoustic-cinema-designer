@@ -29,9 +29,10 @@ import { toggleChipSelection } from '@/components/proposal/wizard/clientBriefChi
  *
  * ADI never suggests explaining WHY a design decision was made unless the recorded
  * interpretation documents that decision: where only the calculated result exists the
- * example asks for the result and what it means for the room, and where an important
- * decision has no recorded reasoning ADI offers the designer a short optional question
- * about it — never a requirement, and never an assumed answer.
+ * example asks for the result and what it means for the room. Where an important
+ * decision has no recorded reasoning at all, the question belongs to the Clarifications
+ * step, which collects a real answer — a question is never added to the brief as text,
+ * and an unanswered question is never published as designer intent.
  *
  * When no calculated result is available, generic examples are shown instead.
  *
@@ -76,12 +77,14 @@ export default function AdiSuggestionChips({
   // assumed or administrative parameter (P8, P15, P21) is only ever offered as
   // an example when the designer has actually asked for it.
   clientBrief = '',
+  // The questions already answered or passed in this preparation. They are sent so
+  // ADI never asks the same question twice; the answers themselves are collected on
+  // the Clarifications step and never written into the brief.
+  existingClarifications = [],
   onAddSelected,
+  onClarifications,
 }) {
   const [suggestions, setSuggestions] = useState([]);
-  // The optional questions ADI cannot answer itself — an important decision whose
-  // reasoning is not recorded. Shown to the designer, never required of them.
-  const [clarifications, setClarifications] = useState([]);
   const [loading, setLoading] = useState(false);
   const [failed, setFailed] = useState(false);
   // Local, unconfirmed chip selection: cleared when the examples themselves
@@ -89,6 +92,11 @@ export default function AdiSuggestionChips({
   const [selected, setSelected] = useState([]);
   const [duplicateNotice, setDuplicateNotice] = useState(null);
   const requestRef = useRef(0);
+  // Held in a ref, so answering or passing a question never regenerates the
+  // examples while the designer is writing. The latest value is sent whenever the
+  // examples are next loaded.
+  const askedRef = useRef(existingClarifications);
+  askedRef.current = existingClarifications;
 
   const toggleChip = (label) => {
     setDuplicateNotice(null);
@@ -145,13 +153,21 @@ export default function AdiSuggestionChips({
         selected_version_ids: selectedVersionIds,
         engineering_snapshot: engineeringSnapshot,
         client_brief: clientBrief || '',
+        // A question the designer has already answered or passed is never asked
+        // again in this preparation. The answers are collected on the
+        // Clarifications step, never in the brief.
+        existing_clarifications: (Array.isArray(askedRef.current) ? askedRef.current : [])
+          .map((entry) => ({ question_id: entry?.question_id, status: entry?.status }))
+          .filter((entry) => entry.question_id),
         // In comparison mode the function receives every selected version's own
         // frozen snapshot and builds its examples from all of them.
         version_snapshots: comparisonSelected ? comparisonEntriesRef.current : [],
       });
       if (requestRef.current !== token) return;
       const list = response?.data?.suggestions || [];
-      setClarifications(response?.data?.clarifications || []);
+      // The questions ADI cannot answer itself belong to the Clarifications step,
+      // which collects a real answer: they are never offered as brief text.
+      onClarifications?.(response?.data?.clarifications || []);
       // Per-chip diagnostics: the chip text, the source fields and values it came
       // from, and whether it passed, was rewritten or was rejected.
       log.debug('[AdiSuggestionChips] validated examples', response?.data?.diagnostics || []);
@@ -161,7 +177,7 @@ export default function AdiSuggestionChips({
       if (requestRef.current !== token) return;
       console.error('[AdiSuggestionChips] Suggestion generation failed:', error);
       setSuggestions([]);
-      setClarifications([]);
+      onClarifications?.([]);
       setFailed(true);
     } finally {
       if (requestRef.current === token) setLoading(false);
@@ -173,7 +189,7 @@ export default function AdiSuggestionChips({
       load();
     } else {
       setSuggestions([]);
-      setClarifications([]);
+      onClarifications?.([]);
       setFailed(false);
     }
   }, [hasResults, load]);
@@ -257,23 +273,10 @@ export default function AdiSuggestionChips({
         <div className="flex flex-wrap gap-2">{chips.map(renderChip)}</div>
       )}
 
-      {/* Where an important design decision has no recorded reasoning, ADI offers a
-          short question about it. Adding one is optional: nothing has to be answered
-          before a proposal can be generated, and no answer is assumed. */}
-      {!busy && clarifications.length > 0 && (
-        <div className="mt-4">
-          <p className="text-[11px] uppercase tracking-[0.12em] text-[#A79E8C] mb-2">
-            {'Optional — decisions ADI cannot explain yet'}
-          </p>
-          <div className="flex flex-wrap gap-2">
-            {clarifications.map((item) => renderChip({ label: item.question }))}
-          </div>
-          <p className="mt-2 text-[11px] text-[#8A8477]">
-            Optional, and never required to generate a proposal: add the question, answer it in the
-            brief, and the proposal can explain that decision.
-          </p>
-        </div>
-      )}
+      {/* Where an important design decision has no recorded reasoning, ADI asks a
+          short question about it — on the Clarifications step, which collects a real
+          answer. Nothing is added to the brief here, no question is ever published as
+          designer intent, and nothing has to be answered before generating. */}
 
       {!busy && selected.length > 0 && (
         <div className="mt-3 flex flex-wrap items-center gap-3">

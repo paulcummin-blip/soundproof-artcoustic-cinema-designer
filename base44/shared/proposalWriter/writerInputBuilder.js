@@ -192,6 +192,12 @@ export function buildWriterInput({
     // such rather than left blank, so the audit always shows what was read.
     design_interpretation: context.design_interpretation,
     editorial_brief: context.editorial_brief,
+    // THE DESIGNER'S OWN CLARIFICATION ANSWERS. They are INSTRUCTIONS, never copy:
+    // the designer's explanation of a decision the frozen evidence records no reason
+    // for, to be woven into the section each answer belongs to. They are never
+    // evidence, they change no figure, level, product or claim, and a question the
+    // designer passed carries no answer at all.
+    clarification_answers: context.clarification_answers,
     // WHAT KIND of statement each part of the pack supports. A design fact is not a
     // result, the designer's intention is not an achievement, and a bass reading the
     // frozen reports do not publish is provisional and supports no positive

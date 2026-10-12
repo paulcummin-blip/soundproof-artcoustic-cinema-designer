@@ -16,6 +16,10 @@ import { appendSelectedPrompts } from '@/components/proposal/wizard/clientBriefC
  * are selected, the suggestions compare those versions and are read from each
  * selected version's own frozen snapshot.
  *
+ * Anything ADI cannot explain from the evidence — a design decision with no reason
+ * on record — is asked about on the Clarifications step that follows, where it
+ * collects a real answer or is passed. No question is ever written into the brief.
+ *
  * The brief is optional — the user can proceed without it and the report
  * will generate with a default professional narrative.
  *
@@ -32,6 +36,8 @@ export default function ClientBriefStep({
   versionSnapshots,
   versionsLoading,
   snapshotLoading,
+  existingClarifications = [],
+  onClarifications,
 }) {
   // The confirmed chip prompts are inserted together, as bullets, and a prompt
   // the brief already contains is never added again. Returns what was added and
@@ -82,6 +88,8 @@ export default function ClientBriefStep({
         versionSnapshots={versionSnapshots}
         versionsLoading={versionsLoading}
         snapshotLoading={snapshotLoading}
+        existingClarifications={existingClarifications}
+        onClarifications={onClarifications}
         onAddSelected={handleAddSelected}
       />
 

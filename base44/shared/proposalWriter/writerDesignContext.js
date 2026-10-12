@@ -62,6 +62,14 @@ export const EVIDENCE_PRIORITY_RULE =
   'the frozen evidence pack is the engineering authority: where a brief or the interpretation and the evidence differ, '
   + 'the evidence governs and the other is not followed';
 
+/** The one rule the writer is held to over the designer's clarification answers. */
+export const CLARIFICATION_ANSWERS_RULE =
+  'these are the designer\'s own answers to ADI\'s clarification questions. They are design INTENT and explanation, never copy and never '
+  + 'engineering evidence: weave each answer into the section it belongs to so it explains the decision it is about, and never print the '
+  + 'question, an answer label or the answer itself as a standalone statement. An answer never changes a figure, a level, a product or a claim: '
+  + 'the frozen evidence governs and wins wherever the two differ. A question the designer passed carries no answer, so no reason is ever '
+  + 'invented for it.';
+
 /** Why an interpretation was refused. Every one is a reason, never a silence. */
 export const DESIGN_CONTEXT_REFUSAL = Object.freeze({
   NOT_SUPPLIED: 'no_saved_design_interpretation',
@@ -399,6 +407,7 @@ export function emptyDesignContext() {
       view: null,
     },
     editorial_brief: buildEditorialBrief({}),
+    clarification_answers: buildClarificationAnswers({}),
   };
 }
 
@@ -413,6 +422,15 @@ export function normaliseDesignContext(value) {
     editorial_brief: value?.editorial_brief?.supplied === true
       ? { ...empty.editorial_brief, ...value.editorial_brief }
       : empty.editorial_brief,
+    // The designer's own clarification answers. A passed question is carried as
+    // passed even when no answer exists, so the writer can never invent one.
+    clarification_answers: value?.clarification_answers
+      ? {
+        ...empty.clarification_answers,
+        ...value.clarification_answers,
+        supplied: value.clarification_answers.supplied === true,
+      }
+      : empty.clarification_answers,
   };
 }
 
@@ -428,12 +446,18 @@ export function buildWriterDesignContext({
   pack = null,
   savedInterpretation = null,
   dealerNotes = null,
+  clarificationAnswers = null,
 } = {}) {
   return {
     design_interpretation: resolveDesignInterpretation({
       proposal, projectId, versionIds, pack, savedInterpretation,
     }),
     editorial_brief: buildEditorialBrief({ proposal, dealerNotes }),
+    // The designer's own answers to ADI's clarification questions: design intent
+    // for the decisions the frozen evidence records no reason for. Read from the
+    // proposal the answers were stored with, or from the caller when the proposal
+    // has just been created and its metadata has not been read back yet.
+    clarification_answers: buildClarificationAnswers({ proposal, clarificationAnswers }),
   };
 }
 

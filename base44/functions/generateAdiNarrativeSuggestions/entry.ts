@@ -30,7 +30,8 @@ import { createClientFromRequest } from 'npm:@base44/sdk@0.8.52';
 import { buildEngineeringEvidence } from '../../shared/engineeringSnapshotEvidence.js';
 import { buildAuthorityChips, resolveNarrativeChips } from '../../shared/adiNarrativeAuthority.js';
 import { buildComparisonAuthorityChips, resolveComparisonNarrativeChips } from '../../shared/adiComparisonNarrativeChips.js';
-import { buildClarifications } from '../../shared/adiSuggestionReasoning.js';
+import { buildClarificationQuestions } from '../../shared/proposalClarification/adiClarificationQuestions.js';
+import { verifiedInterpretation } from '../../shared/proposalClarification/verifiedInterpretation.js';
 import { buildDisplayLanguageRule, buildNarrativeFacts, buildNarrativeFactsBlock } from '../../shared/adiNarrativeFacts.js';
 import { resolveReportLayout } from '../../shared/highChannelDensityRule.js';
 import {
@@ -74,8 +75,13 @@ const REPORT_TYPE_LABELS = {
  * suggests only what the calculated results establish — never an explanation Sound
  * Proof does not hold.
  */
-async function readRecordedRationale(base44, projectId, versionIds = []) {
-  if (!projectId) return '';
+/**
+ * The recorded design interpretations for these versions, read from the saved
+ * proposals for this project. Each one is kept with the versions it was written
+ * for, so it can only ever be verified against the frozen report it describes.
+ */
+async function readRecordedInterpretations(base44, projectId, versionIds = []) {
+  if (!projectId) return [];
   try {
     const result = await base44.entities.Proposal.filter(
       { project_id: projectId },
@@ -83,22 +89,56 @@ async function readRecordedRationale(base44, projectId, versionIds = []) {
     );
     const proposals = Array.isArray(result) ? result : (result?.items || []);
     const wanted = new Set((versionIds || []).filter(Boolean));
-    const parts = [];
+    // An interpretation that cannot be attributed to a selected version is not
+    // read at all: reasoning from another version or another design never reaches
+    // a suggestion or a question.
+    if (wanted.size === 0) return [];
+    const out = [];
     for (const proposal of proposals) {
       const ids = [
         proposal?.version_id || null,
         ...(Array.isArray(proposal?.selected_version_ids) ? proposal.selected_version_ids : []),
       ].filter(Boolean);
-      if (wanted.size > 0 && ids.length > 0 && !ids.some((id) => wanted.has(id))) continue;
+      if (ids.length === 0 || !ids.some((id) => wanted.has(id))) continue;
       const interpretation = proposal?.metadata?.project_interpretation;
       if (!interpretation) continue;
-      parts.push(JSON.stringify(interpretation));
+      out.push({ proposal_id: proposal.id, version_ids: ids, interpretation });
     }
-    return parts.join('\n\n').slice(0, 6000);
+    return out;
   } catch (error) {
     console.error('[generateAdiNarrativeSuggestions] recorded design reasoning unavailable:', error?.message);
-    return '';
+    return [];
   }
+}
+
+/**
+ * The recorded reasoning as ADI may read it. Every saved interpretation is first
+ * verified against the canonical frozen report for ITS OWN version, and the
+ * statements that contradict it are removed. An interpretation that cannot be
+ * matched to a frozen report is not read at all: a stale or foreign reading never
+ * becomes a reason ADI states, and a design intention is never turned into a
+ * measured result.
+ */
+function verifiedRationale({
+  entries = [],
+  snapshotByVersionId = new Map(),
+  factsByVersionId = new Map(),
+  fallbackVersionId = null,
+} = {}) {
+  const parts = [];
+  const dropped = [];
+  for (const entry of entries) {
+    const versionId = (entry?.version_ids || []).find((id) => snapshotByVersionId.has(id))
+      || (fallbackVersionId && snapshotByVersionId.has(fallbackVersionId) ? fallbackVersionId : null);
+    if (!versionId) continue;
+    const snapshot = snapshotByVersionId.get(versionId);
+    const facts = factsByVersionId.get(versionId);
+    if (!snapshot || !facts) continue;
+    const verified = verifiedInterpretation({ snapshot, facts, interpretation: entry.interpretation });
+    if (verified.text) parts.push(verified.text);
+    for (const drop of verified.dropped) dropped.push({ proposal_id: entry.proposal_id, ...drop });
+  }
+  return { rationale: parts.join('\n\n').slice(0, 6000), dropped };
 }
 
 /**
@@ -253,6 +293,21 @@ export default async function (req) {
 
     const body = await req.json().catch(() => ({}));
     const snapshot = body?.engineering_snapshot || null;
+    const selectedVersionIds = (Array.isArray(body?.selected_version_ids) ? body.selected_version_ids : [])
+      .filter(Boolean);
+    // The version the frozen snapshot belongs to. Every saved interpretation is
+    // verified against the canonical frozen report for its OWN version, so the
+    // version this snapshot states is what makes that possible.
+    const primaryVersionId = selectedVersionIds[0]
+      || snapshot?.identity?.versionId
+      || snapshot?.version?.id
+      || null;
+    // A question already answered or passed in this preparation is never asked
+    // again. A passed question is excluded here without ever being read as an
+    // answer.
+    const askedQuestionIds = (Array.isArray(body?.existing_clarifications) ? body.existing_clarifications : [])
+      .map((entry) => entry?.question_id)
+      .filter(Boolean);
 
     // The designer's explicit requests. An assumed or administrative parameter
     // (P8, P15, P21) is only ever offered as an example when the brief asks for
@@ -277,16 +332,40 @@ export default async function (req) {
       }))
       .filter((entry) => entry.facts.available);
 
-    // The recorded design reasoning for these versions: the decisions a suggestion may
-    // ask the report to explain. Where none is saved for a version, ADI suggests only
-    // what the calculated results establish.
-    const rationale = await readRecordedRationale(
+    // ── The canonical frozen evidence, by version ──
+    // A saved interpretation is verified against the frozen report for its own
+    // version, so the two are read together and never mixed across versions.
+    const snapshotByVersionId = new Map(
+      versionEntries.map((entry) => [entry.version_id, entry.snapshot]),
+    );
+    const singleFacts = snapshot?.available === true ? buildNarrativeFacts(snapshot) : null;
+    const factsByVersionId = new Map(versionEntries.map((entry) => [entry.version_id, entry.facts]));
+    if (primaryVersionId && singleFacts) {
+      if (!snapshotByVersionId.has(primaryVersionId)) snapshotByVersionId.set(primaryVersionId, snapshot);
+      factsByVersionId.set(primaryVersionId, singleFacts);
+    }
+
+    // The recorded design reasoning for these versions, VERIFIED: every saved
+    // interpretation is read against the canonical frozen report for its own
+    // version, and a statement that contradicts it is removed. A stale or foreign
+    // interpretation is not read at all, and a design intention is never read as a
+    // measured result.
+    const recordedInterpretations = await readRecordedInterpretations(
       base44,
       body?.project_id,
       versionEntries.length >= 2
         ? versionEntries.map((entry) => entry.version_id)
-        : (Array.isArray(body?.selected_version_ids) ? body.selected_version_ids : []),
+        : selectedVersionIds,
     );
+    const { rationale, dropped: droppedInterpretationStatements } = verifiedRationale({
+      entries: recordedInterpretations,
+      snapshotByVersionId,
+      factsByVersionId,
+      fallbackVersionId: primaryVersionId,
+    });
+    for (const drop of droppedInterpretationStatements) {
+      console.log('[ADI interpretation check] unsupported statement removed', JSON.stringify(drop));
+    }
 
     // The material a suggestion's reasoning is read from, exactly as the Client Brief
     // audit reads it: the recorded interpretation, and the designer's own words in the
@@ -329,11 +408,31 @@ export default async function (req) {
       });
       if (suggestions.length === 0) return unavailable();
 
+      // The questions ADI asks about a decision the frozen evidence records no
+      // reason for. In a comparison a question is asked only where every selected
+      // version shares the same design and the same figure, so it can never
+      // misdescribe one of the options. Never more than three.
+      const clarifications = buildClarificationQuestions({
+        versions: versionEntries.map((entry) => ({
+          version_id: entry.version_id,
+          facts: entry.facts,
+          snapshot: entry.snapshot,
+        })),
+        material: reasoningMaterial,
+        askedQuestionIds,
+      });
+
       for (const entry of diagnostics) {
         console.log('[ADI narrative chip]', JSON.stringify(entry));
       }
 
-      return Response.json({ available: true, mode: 'comparison', suggestions, diagnostics });
+      return Response.json({
+        available: true,
+        mode: 'comparison',
+        suggestions,
+        diagnostics,
+        clarifications,
+      });
     }
 
     // No calculated result for the selected version — the wizard shows its
@@ -342,7 +441,7 @@ export default async function (req) {
 
     // The facts behind every example: read from the snapshot the report itself
     // is built from, for the selected version only.
-    const facts = buildNarrativeFacts(snapshot);
+    const facts = singleFacts;
     if (!facts.available) return unavailable();
 
     // The deterministic examples are assembled in code from those facts. They
@@ -387,8 +486,14 @@ export default async function (req) {
     if (suggestions.length === 0) return unavailable();
 
     // The optional questions ADI may put to the designer: an important decision whose
-    // reasoning is not recorded. They are offers, and never block generating.
-    const clarifications = buildClarifications({ facts, material: reasoningMaterial });
+    // reasoning is not recorded. They are offers, and never block generating. At most
+    // three, never one already answered or passed, and never one the design's own
+    // recorded reasoning already answers.
+    const clarifications = buildClarificationQuestions({
+      versions: [{ version_id: primaryVersionId, facts, snapshot }],
+      material: reasoningMaterial,
+      askedQuestionIds,
+    });
 
     // Diagnostics trail for every chip: text, source fields, source values and
     // whether it passed, was rewritten, or was rejected.

@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useRef, useEffect } from 'react';
+import React, { useState, useCallback, useRef, useEffect, useMemo } from 'react';
 import { base44 } from '@/api/base44Client';
 import { useAuth } from '@/lib/AuthContext';
 import { getProposalType, availableProposalTypes } from '@/components/proposal/proposalTypes';
@@ -8,6 +8,7 @@ import ProposalTypeStep from '@/components/proposal/wizard/ProposalTypeStep';
 import VersionSelectStep from '@/components/proposal/wizard/VersionSelectStep';
 import useCanonicalProjectVersions from '@/components/proposal/wizard/useCanonicalProjectVersions';
 import ClientBriefStep from '@/components/proposal/wizard/ClientBriefStep';
+import ClarificationStep from '@/components/proposal/wizard/ClarificationStep';
 import GenerateStep, { GENERATION_PHASE } from '@/components/proposal/wizard/GenerateStep';
 import { confirmProposalSectionsSaved } from '@/components/proposal/wizard/proposalHandoffAuthority';
 import { useVersionedEngineeringSnapshot } from '@/components/proposal/engineeringAuthority/useVersionedEngineeringSnapshot';
@@ -22,6 +23,7 @@ const STEPS = [
   { key: 'type', label: 'Type' },
   { key: 'versions', label: 'Versions' },
   { key: 'brief', label: 'Brief' },
+  { key: 'clarify', label: 'Clarify' },
   { key: 'generate', label: 'Generate' },
 ];
 
@@ -34,7 +36,10 @@ const STEPS = [
  * 2. Choose Report Type (System Design Summary or System Design Comparison)
  * 3. Select Version(s) — one for a summary, two or more for a comparison
  * 4. Client Brief & Narrative Focus
- * 5. Generate (creates Proposal + blocks, invokes GPT, opens editor)
+ * 5. Clarify — up to three optional questions ADI asks about decisions no reason
+ *    is recorded for. Answer, pass, or continue without answering any: a passed
+ *    question is never treated as answered, and no question is compulsory.
+ * 6. Generate (creates Proposal + blocks, invokes GPT, opens editor)
  *
  * The wizard is project-agnostic. The Proposal Editor becomes a
  * publishing tool that loads by proposal ID, not by active project.
@@ -60,6 +65,31 @@ export default function CreateProposalWizard({ onCreated, onCancel, regenerateFr
     return selected.length > 0 ? selected : (regenerateFrom.version_id ? [regenerateFrom.version_id] : []);
   });
   const [clientBrief, setClientBrief] = useState(regenerateFrom?.client_brief || '');
+  // ── ADI clarifications ──
+  // The questions ADI asks about a design decision the evidence records no reason
+  // for, and the designer's own answers to them. The answers are held SEPARATELY
+  // from the client brief: the brief is never written into, and no answer is ever
+  // published as its own text. A question the designer passes carries no answer and
+  // is never treated as answered.
+  //
+  // A regeneration carries the answers the original proposal already holds, so a
+  // question already answered or passed is not asked again.
+  const [clarifications, setClarifications] = useState([]);
+  const [clarificationAnswers, setClarificationAnswers] = useState(() => Object.fromEntries(
+    (Array.isArray(regenerateFrom?.metadata?.clarification_answers)
+      ? regenerateFrom.metadata.clarification_answers
+      : [])
+      .filter((entry) => entry?.question_id && (entry.status === 'answered' || entry.status === 'passed'))
+      .map((entry) => [entry.question_id, {
+        status: entry.status,
+        answer: entry.status === 'answered' ? (entry.answer || '') : null,
+        question: entry.question || null,
+        area: entry.area || null,
+        belongs_to: entry.belongs_to || null,
+        version_ids: Array.isArray(entry.version_ids) ? entry.version_ids : [],
+        source: 'carried_from_previous_proposal',
+      }]),
+  ));
   const [generating, setGenerating] = useState(false);
   const [error, setError] = useState(null);
   const [blockedAttempt, setBlockedAttempt] = useState(false);
@@ -196,6 +226,56 @@ export default function CreateProposalWizard({ onCreated, onCancel, regenerateFr
     creationRequestIdRef.current = null;
   }, []);
 
+  // One clarification question, answered or passed. Passing clears any answer, so a
+  // passed question can never be read as an answered one.
+  const handleClarificationAnswer = useCallback((question, patch) => {
+    const questionId = question?.question_id;
+    if (!questionId) return;
+    setClarificationAnswers((current) => {
+      if (!patch || patch.status === 'none') {
+        const next = { ...current };
+        delete next[questionId];
+        return next;
+      }
+      return {
+        ...current,
+        [questionId]: {
+          status: patch.status,
+          answer: patch.status === 'answered' ? String(patch.answer || '') : null,
+          question: question.question || current[questionId]?.question || null,
+          area: question.area || current[questionId]?.area || null,
+          belongs_to: question.belongs_to || current[questionId]?.belongs_to || null,
+          version_ids: question.version_ids || current[questionId]?.version_ids || [],
+          source: current[questionId]?.source || 'proposal_wizard',
+        },
+      };
+    });
+    creationRequestIdRef.current = null;
+  }, []);
+
+  // What the wizard sends so ADI never asks the same question twice: the questions
+  // already answered or passed in this preparation.
+  const existingClarifications = useMemo(() => Object.entries(clarificationAnswers)
+    .filter(([, entry]) => entry?.status === 'answered' || entry?.status === 'passed')
+    .map(([questionId, entry]) => ({ question_id: questionId, status: entry.status })),
+  [clarificationAnswers]);
+
+  // The answer record stored with the proposal, carrying the designer's own words,
+  // where each answer came from, and the project and version identity it belongs to.
+  const clarificationPayload = useMemo(() => Object.entries(clarificationAnswers)
+    .filter(([, entry]) => entry?.status === 'answered' || entry?.status === 'passed')
+    .map(([questionId, entry]) => ({
+      question_id: questionId,
+      question: entry.question || null,
+      area: entry.area || null,
+      belongs_to: entry.belongs_to || null,
+      version_ids: entry.version_ids || [],
+      status: entry.status,
+      answer: entry.status === 'answered' ? entry.answer : null,
+      source: entry.source || 'proposal_wizard',
+    })),
+  [clarificationAnswers]);
+
   const handleGenerate = async () => {
     if (generationInFlightRef.current || !selectedProjectId || selectedVersionIds.length === 0) return;
     // Source authority: no current Project Report, no proposal. ONE authority
@@ -256,6 +336,10 @@ export default function CreateProposalWizard({ onCreated, onCancel, regenerateFr
         account_id: accountId,
         narrative_goal: 'luxury_cinema',
         client_brief: clientBrief,
+        // The designer's own answers to ADI's clarification questions. They are
+        // stored with the proposal and handed to the writer as design intent for
+        // the sections they belong to — never printed as standalone text.
+        clarification_answers: clarificationPayload,
         // The frozen Engineering Snapshot for the primary version, plus one
         // frozen evidence entry per selected version for a comparison.
         engineering_snapshot: engineeringSnapshot || null,
@@ -318,6 +402,7 @@ export default function CreateProposalWizard({ onCreated, onCancel, regenerateFr
     // designer selects, and the hard block lands when Next is pressed.
     versionsValid, // step 2
     true, // step 3 — client brief is optional
+    true, // step 4 — clarifications are optional: answer, pass, or continue unanswered
   ];
 
   // Why Generate Proposal cannot be pressed, in words — or null when it can.
@@ -355,6 +440,18 @@ export default function CreateProposalWizard({ onCreated, onCancel, regenerateFr
         || 'This version has no calculated engineering result to freeze into the proposal. Open it in Room Designer and calculate it first.';
     }
     return null;
+  })();
+
+  // What the clarifications step collected, in the review list's own words. A
+  // passed question is shown as passed: it is never counted as an answer.
+  const clarificationSummary = (() => {
+    const answered = clarificationPayload.filter((entry) => entry.status === 'answered').length;
+    const passed = clarificationPayload.filter((entry) => entry.status === 'passed').length;
+    const parts = [
+      answered > 0 ? `${answered} answered` : null,
+      passed > 0 ? `${passed} passed` : null,
+    ].filter(Boolean);
+    return parts.length > 0 ? parts.join(', ') : 'None';
   })();
 
   const handleNext = () => {
@@ -430,11 +527,23 @@ export default function CreateProposalWizard({ onCreated, onCancel, regenerateFr
           versionSnapshots={selectedVersionSnapshots}
           versionsLoading={selectedVersionsLoading}
           snapshotLoading={snapshotLoading}
+          existingClarifications={existingClarifications}
+          onClarifications={setClarifications}
         />
       )}
 
-      {/* Step 4 — Review & Generate */}
+      {/* Step 4 — Clarifications */}
       {step === 4 && (
+        <ClarificationStep
+          questions={clarifications}
+          answers={clarificationAnswers}
+          loading={readinessLoading || snapshotLoading}
+          onAnswer={handleClarificationAnswer}
+        />
+      )}
+
+      {/* Step 5 — Review & Generate */}
+      {step === 5 && (
         <div>
           {/* The same per-version readiness result as the Versions step. */}
           <VersionReadinessTable
@@ -458,6 +567,10 @@ export default function CreateProposalWizard({ onCreated, onCancel, regenerateFr
             <ReviewRow
               label="Client Brief"
               value={clientBrief ? `${clientBrief.slice(0, 60)}${clientBrief.length > 60 ? '…' : ''}` : '—'}
+            />
+            <ReviewRow
+              label="Clarifications"
+              value={clarificationSummary}
               last
             />
           </div>

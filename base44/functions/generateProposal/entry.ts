@@ -17,6 +17,7 @@ import { GPT_WRITER_FLAG_FIELD, normaliseGptWriterConfig } from '../../shared/pr
 import { HIGHLIGHTS_SECTION_TYPE, PRESENTED_OPTIONS_SECTION_TYPE, resolveSectionTitle } from '../../shared/systemDesignSummarySections.js';
 import { comparisonSectionMetadata, verifyComparisonPersisted } from '../../shared/comparisonPersistence.js';
 import { formatInterpretationForLog } from '../../shared/adiProjectInterpretation.js';
+import { normaliseClarificationAnswers } from '../../shared/proposalClarification/clarificationAnswers.js';
 import { loadCacheRecord, findPublication } from '../../shared/publishedEngineeringAuthority.js';
 import { selectCanonicalReportSnapshotsByKey } from '../../shared/reportSnapshotCanonical.js';
 
@@ -55,7 +56,7 @@ export default async function(req) {
     if (!user) return Response.json({ error: 'Unauthorized' }, { status: 401 });
 
     const body = await req.json();
-    const { request_id, project_id, version_id, account_id, narrative_goal, proposal_type, selected_version_ids, client_brief, parent_proposal_id } = body;
+    const { request_id, project_id, version_id, account_id, narrative_goal, proposal_type, selected_version_ids, client_brief, parent_proposal_id, clarification_answers } = body;
     let engineering_snapshot = null;
 
     if (!request_id) return Response.json({ error: 'request_id required' }, { status: 400 });
@@ -330,6 +331,19 @@ export default async function(req) {
     });
     console.log(`[generateProposal] ADI stage 1 interpretation | ${formatInterpretationForLog(primaryInterpretation)}`);
 
+    // ── The designer's clarifications ──
+    // The answers to ADI's questions are project-specific context: the designer's own
+    // explanation of a decision the frozen evidence records no reason for. They are
+    // kept separately from the Client Brief — the brief is never written into — and a
+    // passed question is stored as passed, never as an answer. Nothing is inferred,
+    // nothing is shared, and no reusable design knowledge is created here.
+    const clarificationRecords = normaliseClarificationAnswers(clarification_answers, {
+      projectId: project_id,
+      versionIds: resolvedVersionIds,
+      user,
+      now: new Date().toISOString(),
+    });
+
     // ── Create Proposal record ──
     proposal = await base44.entities.Proposal.create({
       project_id,
@@ -361,6 +375,12 @@ export default async function(req) {
         // primary version and its published engineering fingerprint. Kept with
         // the proposal, so the report a draft was written from stays auditable.
         source_identity: sourceIdentity,
+        // The designer's own answers to ADI's clarification questions, kept with the
+        // proposal they were given for. Each record carries the question it answers,
+        // where it came from, and the project and version identity it belongs to; a
+        // passed question carries no answer. These answers stay inside this project
+        // and are never shared as reusable design knowledge.
+        ...(clarificationRecords.length > 0 ? { clarification_answers: clarificationRecords } : {}),
         // The evidence this proposal was generated from, per version.
         report_evidence: reportEvidenceCitations,
         ...(comparisonReading ? { comparison_reading: comparisonReading } : {}),
@@ -430,6 +450,10 @@ export default async function(req) {
       // the writer as the design story it writes from. It is the same object saved
       // with the proposal above, and the runner still verifies it before it is used.
       savedInterpretation: primaryInterpretation,
+      // The designer's own answers to ADI's clarification questions, handed to the
+      // writer as design intent for the section each one belongs to. They are never
+      // printed as standalone text and never treated as engineering evidence.
+      clarificationAnswers: clarificationRecords,
     });
 
     if (!attempt.ok) {
@@ -466,7 +490,10 @@ export default async function(req) {
       `[generateProposal] design context | interpretation=${designContext.available === true
         ? `${designContext.source} versions=${(designContext.provenance?.version_ids || []).length}`
         : `refused:${designContext.refusal || 'none'}`} `
-      + `| brief=${attempt.record.gpt_input?.editorial_brief?.supplied === true ? 'supplied' : 'none'}`,
+      + `| brief=${attempt.record.gpt_input?.editorial_brief?.supplied === true ? 'supplied' : 'none'}`
+      + `| clarifications=${attempt.clarification_answers_supplied === true
+        ? `${attempt.record.gpt_input?.clarification_answers?.answers?.length || 0} answered`
+        : 'none'}`,
     );
 
     // ── Publish the validated copy into the proposal's own sections ──

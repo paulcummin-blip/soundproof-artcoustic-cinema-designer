@@ -134,6 +134,7 @@ export async function runProposalCopyGeneration({
   retryOfGenerationId = null,
   savedInterpretation = null,
   dealerNotes = null,
+  clarificationAnswers = null,
 } = {}) {
   // 1. The flag. Nothing is read and nothing is sent while it is off.
   if (flag?.enabled !== true) {
@@ -216,6 +217,7 @@ export async function runProposalCopyGeneration({
         pack,
         savedInterpretation,
         dealerNotes,
+        clarificationAnswers,
       }),
     });
     assertWriterInputCarriesNoLiveState(writerInput);
@@ -305,6 +307,10 @@ export async function runProposalCopyGeneration({
     // this attempt was written from.
     design_interpretation: writerInput.design_interpretation,
     editorial_brief_supplied: writerInput.editorial_brief?.supplied === true,
+    // The designer's answers to ADI's clarification questions, carried as design
+    // intent for the sections they belong to. Never copy, and never evidence.
+    clarification_answers_supplied: writerInput.clarification_answers?.supplied === true,
+    clarification_questions_passed: writerInput.clarification_answers?.passed_questions || [],
     // What the brief asked for and what the draft did with it, item by item.
     client_brief_coverage: clientBriefCoverage,
     // EDITORIAL COMPLETENESS, reported separately from the engineering validation
