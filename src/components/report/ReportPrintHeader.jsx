@@ -6,6 +6,7 @@ import {
   REPORT_PROFILES,
   REPORT_TRACKING_HEADING,
   REPORT_LEADING_HEADING,
+  REPORT_MASTHEAD_TITLE_LEAD,
 } from '@/components/report/typography/reportTypography';
 
 /**
@@ -21,8 +22,26 @@ import {
  *
  * The title is the only headline here: everything after it is section content.
  */
-export default function ReportPrintHeader({ title, project, meta, className = '' }) {
+export default function ReportPrintHeader({
+  title,
+  project,
+  meta,
+  className = '',
+  // How much presence the document's title carries. The consolidated Project
+  // Report's opening page asks for 'lead': the title is set at the stronger
+  // masthead size, and the branding above it — the rule between the strapline
+  // and the title, and the space that closes the masthead — is given more room,
+  // so the branding and the document's own title read as two clearly separate
+  // statements rather than one crowded block. Every other report leaves this
+  // unset and prints the standard masthead exactly as it always has.
+  titlePresence = 'standard',
+}) {
   const header = REPORT_PRINT_HEADER;
+  const lead = titlePresence === 'lead';
+  const titleSize = lead ? REPORT_MASTHEAD_TITLE_LEAD : REPORT_PROFILES.a4.header;
+  const ruleGapMm = lead ? 5.5 : 3;
+  const titleGapMm = lead ? 3 : header.titleGapMm;
+  const mastheadGapMm = lead ? 5 : header.bottomGapMm;
   // The project's own metadata line, unless the report supplies its own.
   const metaLine = meta || reportHeaderMetadata(project);
 
@@ -32,7 +51,7 @@ export default function ReportPrintHeader({ title, project, meta, className = ''
         .sound-proof-print-header {
           text-align: center; break-inside: avoid;
           padding-bottom: ${header.dividerGapMm}mm;
-          border-bottom: 1px solid #DCDBD6; margin-bottom: ${header.bottomGapMm}mm;
+          border-bottom: 1px solid #DCDBD6; margin-bottom: ${mastheadGapMm}mm;
         }
         .sound-proof-print-header > img {
           width: ${header.logoWidthMm}mm !important;

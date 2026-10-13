@@ -53,6 +53,16 @@ export const REPORT_TRACKING_BODY = '0.05em';
 export const REPORT_LEADING_HEADING = 1.2;
 export const REPORT_LEADING_BODY = 1.4;
 
+/**
+ * The report masthead's title at the stronger of the two settings the report
+ * family uses. The consolidated Project Report's opening page takes it: that
+ * page is the document's own front door, so its title carries more presence
+ * than the same title does on another report's cover. Everything else about the
+ * masthead — its fonts, colour, tracking and the divider that closes it — is
+ * unchanged, and every other report keeps the standard masthead size.
+ */
+export const REPORT_MASTHEAD_TITLE_LEAD = '25pt';
+
 /* ── Section heading gap ───────────────────────────────────────────────── */
 
 /**
