@@ -80,7 +80,17 @@ const VERSION_3 = 'proposal-writer-prompt-3';
 // Design closes on a fresh judgement rather than restating the Design Summary. No
 // section identity, word limit, figure, level, product, claim-grounding or
 // validation rule changed.
-const CURRENT = 'proposal-writer-prompt-20';
+// Generation 21 is the professional-writing refinement: Dynamic Range opens on
+// the experience of dynamic contrast with the output figures as proof of output
+// capability alone, Timbre Matching leads with the tonal benefit the client
+// hears across the seating area while P16 and P17 keep their own speaker-group
+// scope, Spatial Resolution explains why the loudspeaker positions matter from
+// this design's own arrangement and seating, Overall Design closes on a
+// confident recommendation, and the sales authority states positively what a
+// result below the highest available level contributes. No section identity,
+// word limit, figure, level, product, claim-grounding or validation rule
+// changed.
+const CURRENT = 'proposal-writer-prompt-21';
 
 test('the writer prompt version is the current one', () => {
   assert.equal(WRITER_PROMPT_VERSION, CURRENT);

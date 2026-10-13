@@ -154,7 +154,20 @@ export const WRITER_CONTRACT_VERSION = 2;
 // judgement rather than restating the Design Summary. Section identities, word
 // limits, the claim grounding rule and every validation rule are unchanged, so a
 // draft filed under an earlier generation is still read against its own agreement.
-export const WRITER_PROMPT_VERSION = 'proposal-writer-prompt-20';
+// Bumped to 21 for the professional-writing refinement: Dynamic Range opens on
+// the experience of dynamic contrast (quiet detail through to demanding impact)
+// with the output figures as proof of output capability alone and never as a
+// list of levels, Timbre Matching leads with the tonal benefit the client hears
+// across the seating area with the primary positions the priority while P16 and
+// P17 keep their own speaker-group scope, Spatial Resolution explains why the
+// loudspeaker positions matter from this design's own arrangement and seating
+// rather than from quantities, angles or levels, Overall Design closes on a
+// confident recommendation, and the sales authority states positively what a
+// result below the highest available level contributes. Section identities, word
+// limits, the claim grounding rule and every validation rule are unchanged, so a
+// draft filed under an earlier generation is still read against its own
+// agreement.
+export const WRITER_PROMPT_VERSION = 'proposal-writer-prompt-21';
 
 /** The only pack generation a draft may be written from. */
 export const WRITER_ACCEPTED_PACK_SCHEMA_VERSION = 2;
@@ -385,21 +398,21 @@ export const WRITER_SECTIONS = Object.freeze([
   {
     section: 'spatial_resolution',
     title: 'Spatial Resolution',
-    requirement_single: 'Explain how the layout contributes to the immersion: how sound moves between the screen, the surround and the overhead channels, and what the seating arrangement, the viewing geometry and the display give the client. Stay within the claims the pack allows.',
+    requirement_single: 'Explain why the loudspeaker positions matter to the listening result: accurate placement is what turns a channel count into precise placement of effects, convincing movement and a coherent soundfield around the audience. Develop that from this design\'s own arrangement and seating, meaning where the screen, surround and overhead loudspeakers sit, how the seats relate to them, and what that gives the listener. Bring the viewing geometry, the display and the seating into the same explanation, and use a result only where it strengthens the point rather than listing quantities, angles or levels. Stay within the claims the pack allows.',
     word_limit: 180,
     requirement: 'Explain what the spatial results mean for the seating, within the claims the pack allows.',
   },
   {
     section: 'dynamic_range',
     title: 'Dynamic Range',
-    requirement_single: 'Open with the supported experience during demanding film soundtracks: headroom for dynamic peaks and a clear, confident presentation at the designed listening levels. Give the exact frozen output figures at the reference seating position once, as proof. Match each benefit to its frozen evidence and supported channel family. Where only bass output is a selected strength, describe the weight and impact of low-frequency effects. Keep P14 bass output, P18 extension, P19 response at the reference position and P20 consistency across seats distinct; describe each only from its own supported evidence. No absolute guarantees.',
+    requirement_single: 'Open with the experience of dynamic contrast: quiet dialogue and subtle detail staying intelligible and clear, and demanding soundtrack moments arriving with scale, energy and physical presence. Explain what that contrast gives the listener in this room, then give the exact frozen output figures at the reference seating position once as the proof of the output capability behind it, never as a list of calculated levels. The figures support output capability and nothing wider: they are never presented as proof of every aspect of dynamic range. Match each benefit to its frozen evidence and supported channel family. Where only bass output is a selected strength, describe the weight and impact of low-frequency effects. Keep P14 bass output, P18 extension, P19 response at the reference position and P20 consistency across seats distinct; describe each only from its own supported evidence. No absolute guarantees and no unnecessary qualifications.',
     word_limit: 170,
     requirement: 'Explain supported headroom for demanding film soundtracks, controlled reproduction of dynamic peaks and clear, confident presentation at the designed listening levels, using only the frozen dynamic-range evidence for each option and channel family. Keep bass output, extension, response at the reference position and consistency across seats distinct, each supported by its own evidence. No absolute guarantees.',
   },
   {
     section: 'timbre_matching',
     title: 'Timbre Matching',
-    requirement_single: 'Explain the tonal benefit the client will hear: the tonal balance they experience from seat to seat, and why it matters as a soundtrack moves around the cinema. State the tonal aim as the design\'s own approach, and state the measured tonal consistency only for the speaker group the evidence states it for, across only the seats that result covers. These frequency-response results state how consistently ONE loudspeaker group holds its own tonal balance from seat to seat, so they are never evidence that one group of loudspeakers matches another: never write a screen-to-surround or any other between-group match, and never attach their figures to a comparison between the screen, the surround and the overhead speakers. Natural handover wording is welcome as the design\'s own aim: describe a voice or an effect keeping its character as the loudspeakers hand it on, and let that stand as intent rather than as a measured match between the groups. Keep every seat statement explicitly limited to tonal character, not overall balance, bass or placement. Never imply the design\'s loudspeaker package differs from another option\'s, and never broaden tonal consistency into equal seats or an equal whole experience. No bass-extension detour and no both parameters wording.',
+    requirement_single: 'Explain the tonal benefit the client will hear: voices, music and effects keeping a familiar tonal character as the soundtrack develops, and a similarly balanced presentation across the seating area, with the primary listening positions the priority. State what that consistency gives them where they sit, and why it matters as a soundtrack moves around the cinema. State the tonal aim as the design\'s own approach, and state the measured tonal consistency only for the speaker group the evidence states it for, across only the seats that result covers. These frequency-response results state how consistently ONE loudspeaker group holds its own tonal balance from seat to seat, so they are never evidence that one group of loudspeakers matches another: never write a screen-to-surround or any other between-group match, and never attach their figures to a comparison between the screen, the surround and the overhead speakers. Natural handover wording is welcome as the design\'s own aim: describe a voice or an effect keeping its character as the loudspeakers hand it on, and let that stand as intent rather than as a measured match between the groups. Keep every seat statement explicitly limited to tonal character, not overall balance, bass or placement. Never imply the design\'s loudspeaker package differs from another option\'s, and never broaden tonal consistency into equal seats or an equal whole experience. No bass-extension detour and no both parameters wording.',
     word_limit: 170,
     requirement: 'Explain the loudspeaker and coverage evidence the pack records, and claim nothing beyond it. Where the copy describes a sound passing between loudspeakers, that is tonal continuity within the design and the design\'s own aim, never a claim that the loudspeaker package differs between the options and never a match measured between the speaker groups. The tonal results the pack carries are seat-to-seat frequency-response results, one speaker group each, so they are never used to claim that one group of loudspeakers matches another.',
   },
@@ -417,7 +430,7 @@ export const WRITER_SECTIONS = Object.freeze([
   {
     section: 'overall_design',
     title: 'Overall Design',
-    requirement_single: 'Close on what the client should expect from the final design: connect this particular picture and viewing experience to the movement around and above the audience, the tonal character, and the supported bass and dynamic strengths, in this project\'s own terms rather than a general claim. Do not repeat any number, specification list or earlier sentence. Never claim a consistent overall experience for every viewer from tonal evidence.',
+    requirement_single: 'Close on what the client should expect from the final design: connect this particular picture and viewing experience to the movement around and above the audience, the tonal character, and the supported bass and dynamic strengths, in this project\'s own terms rather than a general claim. Do not repeat any number, specification list or earlier sentence. Never claim a consistent overall experience for every viewer from tonal evidence. End with a confident recommendation that brings the design together: why these choices suit this particular cinema and what they give the client, written as a considered professional judgement rather than a summary of what the other sections have already said.',
     word_limit: 200,
     requirement: 'Close on the design as a whole, using only the credibility and recommendation claims the pack allows.',
   },

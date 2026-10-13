@@ -167,13 +167,17 @@ test('D. a fresh attempt under the corrected contract is written, grounded and i
   assert.match(options.requirement, /identical, unchanged or equivalent acoustic performance/);
   assert.equal(WRITER_SECTIONS.find((entry) => entry.section === 'presented_options').optional_without_guidance, true);
   assert.equal(fresh.prompt_version, WRITER_PROMPT_VERSION);
-  assert.equal(WRITER_PROMPT_VERSION, 'proposal-writer-prompt-20');
+  assert.equal(WRITER_PROMPT_VERSION, 'proposal-writer-prompt-21');
   assert.equal(fresh.contract_version, input.contract_version, 'the contract generation did not move');
 
   // The seating options the designer selected are still presented, and every other
-  // writer section is exactly as it was: only presented_options changed.
+  // writer section keeps its identity, its word limit and its grounding rule. A
+  // later editorial refinement may sharpen a section's own requirement text; what
+  // must never move is the section set, the word limits and the grounding rule.
   assert.deepEqual(fresh.option_guidance, input.option_guidance);
-  const other = (source) => source.section_requirements.filter((entry) => entry.section !== 'presented_options');
+  const other = (source) => source.section_requirements
+    .filter((entry) => entry.section !== 'presented_options')
+    .map(({ section, word_limit, requires_grounding }) => ({ section, word_limit, requires_grounding }));
   assert.deepEqual(other(fresh), other(input));
 
   // The handoff is unchanged: a valid, issuable generation.
