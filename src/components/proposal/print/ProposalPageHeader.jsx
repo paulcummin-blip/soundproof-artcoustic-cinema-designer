@@ -22,10 +22,17 @@ export default function ProposalPageHeader({
 }) {
   return (
     <header className={`pp-header${continued ? ' pp-header--continued' : ''}`}>
-      <div className="pp-header__meta">
-        {number ? <span className="pp-header__number">{number}</span> : null}
-        {kicker ? <span className="pp-header__kicker">{kicker}</span> : null}
-      </div>
+      {/* A heading that states neither a number nor a kicker prints no track line
+          at all — never an empty one. The three design structures read under the
+          shared Sound Experience heading are exactly that case: the shared
+          heading has already named this part of the document, so their own
+          headings carry the structure's name and nothing repeated above it. */}
+      {(number || kicker) ? (
+        <div className="pp-header__meta">
+          {number ? <span className="pp-header__number">{number}</span> : null}
+          {kicker ? <span className="pp-header__kicker">{kicker}</span> : null}
+        </div>
+      ) : null}
       <h2 className="pp-header__title" style={proposalRoleStyle('header')}>
         {title}
       </h2>

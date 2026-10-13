@@ -468,6 +468,30 @@ export default function ProposalPackStyles() {
         page-break-after: avoid;
       }
 
+      /* ── The Design Overview / Why This Specification page ──
+         The System Design Summary continues on its second sheet with Design
+         Overview and Why This Specification, and at the pack's default paragraph
+         gap those paragraphs grouped too tightly: each block's own heading sat
+         directly against the last line of the block above it. On THIS page the
+         paragraph rhythm is 6mm — the leading inside a paragraph, the type size
+         and the wording are untouched — and the step between the two blocks is
+         one deliberate 10mm, the same step the pack already uses between two
+         compositions, so the second heading is never crowded by the first
+         block's last paragraph.
+         Scoped to this page's own copy: every other sheet keeps the pack's single
+         paragraph rhythm, so nothing else is re-paginated. Both sections stay on
+         one A4 sheet, which measurement at the pack's own type metrics confirms
+         with room to spare. */
+      .proposal-print-portal .pp-page--system_design_summary [data-editorial-composition="continuing"] .pp-body p {
+        margin: 0 0 6mm !important;
+      }
+      .proposal-print-portal .pp-page--system_design_summary [data-editorial-composition="continuing"] .pp-body p:last-child {
+        margin-bottom: 0 !important;
+      }
+      .proposal-print-portal .pp-page--system_design_summary [data-editorial-composition="continuing"] .pp-body + .pp-body {
+        margin-top: 10mm;
+      }
+
       /* ── Editorial flow: sections that share a sheet ──
          Consecutive narrative sections are composed into one sheet frame, so a
          short structure section continues under the section before it instead of
@@ -530,16 +554,16 @@ export default function ProposalPackStyles() {
       .proposal-print-portal .pp-pillar .pp-header__rule {
         margin-top: 4mm;
       }
-      /* Each structure after the first opens with the same hairline rule, so the
-         hierarchy reads identically on the sheet the section continues onto: the
-         two pages are one explanation, not two unrelated pages. The gap is
-         padding, never a margin: it is part of the measured height of the
-         structure it introduces, so the allocation can never place a structure
-         against the rule. */
+      /* Structures after the first are separated by space alone. The structure
+         above has already finished a complete explanation and the next one opens
+         with its own heading, so a hairline across the boundary drew a line under
+         the copy rather than dividing anything. The gap is padding, never a
+         margin: it is part of the measured height of the structure it introduces,
+         so the allocation can never place a structure against the space above it,
+         and it is the same on every boundary so the group keeps one rhythm. */
       .proposal-print-portal .pp-pillar + .pp-pillar {
         margin-top: 0;
         padding-top: 11mm;
-        border-top: 1px solid var(--pp-rule);
       }
       .proposal-print-portal .pp-pillar .pp-body {
         max-width: 148mm;

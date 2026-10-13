@@ -479,10 +479,15 @@ export default function ProposalPackDocument({
       // The section's own heading, and the photograph that leads it — or, for the
       // three design structures, the photograph that supports the explanation
       // printed above it.
+      // The three structures are read as ONE section under the shared Sound
+      // Experience heading, which already names this part of the document. Their
+      // own headings carry the structure's name alone: the repeated "Design"
+      // label is printed nowhere in the group, on either of the sheets it needs.
+      const sectionKicker = isPillarSection(section.section_type) ? null : 'Design';
       const header = (
         <ProposalPageHeader
           number={continuesOpenSheet ? null : takeNumber()}
-          kicker="Design"
+          kicker={sectionKicker}
           title={displayTitle}
           continued={continuesOpenSheet}
         />

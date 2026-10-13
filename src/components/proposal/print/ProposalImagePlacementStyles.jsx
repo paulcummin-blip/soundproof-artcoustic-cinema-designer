@@ -60,7 +60,18 @@ export default function ProposalImagePlacementStyles() {
         max-width: 38%;
         margin: 0;
       }
-      .pp-media--portrait img { height: 52mm; }
+      .pp-media--portrait img { height: 62mm; }
+
+      /* ── The Spatial Resolution accent carries more vertical presence ──
+         The right-hand photograph beside the Spatial Resolution copy is about
+         20% taller than the standard portrait accent (74mm → 89mm on the sheet),
+         so it reads with the copy it supports instead of sitting beside it as a
+         small card. ONLY the height changes: the frame's width, the focal crop
+         and object-fit: cover are untouched, so the source keeps its proportions,
+         nothing is stretched, and the taller window shows more of the photograph
+         rather than cropping it further. The other structures' portraits and the
+         Timbre Matching feature are unchanged. */
+      .pp-pillar[data-editorial-section="spatial_resolution"] .pp-media--portrait img { height: 62mm; }
 
       /* ── The seating-style page ── */
       .pp-seating {
@@ -93,6 +104,9 @@ export default function ProposalImagePlacementStyles() {
         .pp-media--closing-feature img { height: 144mm; }
         .pp-media--portrait img { height: 74mm; }
         .pp-media--seating img { height: 74mm; }
+        /* The Spatial Resolution accent on the printed sheet: 89mm is about 20%
+           taller than the standard 74mm accent, on the same width. */
+        .pp-pillar[data-editorial-section="spatial_resolution"] .pp-media--portrait img { height: 89mm; }
         /* The comparison page: two full-width options and their captions share
            the sheet with the title, the message and — on the page that closes
            the document — the closing note. The image height is therefore a page
