@@ -24,8 +24,13 @@ import { subwooferGroupNoun } from "./placementPlausibilityAuthority.js";
 export const PLACEMENT_DEFINITION =
   "Placement means moving the physical subwoofer locations.";
 
-/** The placement panel's own title: the lever, and what it does. */
-export const PLACEMENT_PANEL_TITLE = "Placement — move subwoofers";
+/**
+ * The placement card's title. It names the DECISION the designer is making — a
+ * subwoofer placement — and never the lever's internal name. The lever's own
+ * wording ("Placement — move subwoofers") states no destination, so it is not
+ * the heading of a card whose job is to state one.
+ */
+export const PLACEMENT_PANEL_TITLE = "Subwoofer placement recommendation";
 
 /** Stated for a movement that leaves the practical, wall-based envelope. */
 export const PLACEMENT_THEORETICAL_NOTE =
@@ -41,12 +46,16 @@ export const PLACEMENT_APPLIED_MESSAGE = "Placement applied";
 export const PLACEMENT_UNDONE_MESSAGE = "Placement undone";
 
 /**
- * The previous-improvement copy: a possible improvement was measured, its
- * evaluated positions are not offered now, and there is exactly ONE action —
- * re-run the Optimisation Plan on the current design.
+ * The copy when the saved run measured a placement improvement but did NOT keep
+ * the exact move with it. Nothing physical can be stated, so no placement
+ * recommendation is offered at all: the card says what is missing and names the
+ * ONE action that produces the move.
+ *
+ * ONE wording for every surface that has to state it — the placement card, the
+ * tested-lever ledger and the plan's own notes all read this constant.
  */
-export const PLACEMENT_PREVIOUS_FOUND =
-  "Previous result found a possible improvement. Re-run ADI on the current design before applying any change.";
+export const PLACEMENT_MOVE_NOT_RETAINED =
+  "ADI found that subwoofer placement may improve the result, but the saved run does not contain the exact move. Re-run Bass Optimiser to generate a placement recommendation.";
 
 /** The same copy when the design itself has moved on since the evaluation. */
 export const PLACEMENT_PREVIOUS_FOUND_STALE =
@@ -146,6 +155,45 @@ function centreX(rows, roomDims) {
   return fromXs.reduce((sum, value) => sum + value, 0) / fromXs.length;
 }
 
+/** Whole millimetres — the granularity an installer works to, never a decimal. */
+function millimetres(metres) {
+  const value = num(metres);
+  return value == null ? null : Math.round(Math.abs(value) * 1000);
+}
+
+/** A subwoofer's distance from the NEARER side wall, in whole millimetres. */
+function sideWallMillimetres(x, widthM) {
+  const value = num(x);
+  const width = num(widthM);
+  if (value == null || width == null) return null;
+  return Math.round(Math.min(value, width - value) * 1000);
+}
+
+/** "700 mm and 1 700 mm from the nearest side wall" — the positions themselves. */
+function distancesText(values) {
+  const list = (Array.isArray(values) ? values : []).filter((value) => value != null);
+  if (list.length === 0) return null;
+  return `${list.join(" mm and ")} mm from the nearest side wall`;
+}
+
+/** Which way ONE wall group moves, read from the room's own centreline. */
+function groupDirection(groupRows, centre) {
+  if (centre == null) return null;
+  const outward = groupRows.every((row) => Math.abs(num(row.change.toX) - centre) > Math.abs(num(row.change.fromX) - centre));
+  if (outward) return "outward";
+  const inward = groupRows.every((row) => Math.abs(num(row.change.toX) - centre) < Math.abs(num(row.change.fromX) - centre));
+  return inward ? "inward" : null;
+}
+
+/** "Sub 3 and Sub 4" — the subwoofers that actually move, named. */
+function listText(items) {
+  const list = (Array.isArray(items) ? items : []).filter(Boolean);
+  if (list.length === 0) return null;
+  if (list.length === 1) return list[0];
+  if (list.length === 2) return `${list[0]} and ${list[1]}`;
+  return `${list.slice(0, -1).join(", ")} and ${list[list.length - 1]}`;
+}
+
 /**
  * Describe a placement change in installer language.
  *
@@ -226,10 +274,56 @@ export function describePlacementMove({ changes = [], roomDims = null, layoutCou
     ? `Move ${wallPhrase} — ${distancePhrase}${directionPhrase}.`
     : `Move the subwoofers — ${distancePhrase}${directionPhrase}.`;
 
+  // ── The move as the designer has to carry it out ──
+  // One entry per wall group: which subwoofers move, where they are now, where
+  // they go, and the movement between the two. Read from the evaluated
+  // coordinates only — a position the run did not keep is stated as absent, never
+  // guessed, and the whole block is simply omitted when nothing can be read.
+  const widthM = num(roomDims?.widthM);
+  const groups = orderedGroups(rows).map((group) => {
+    const groupRows = rows.filter((row) => row.group === group);
+    const wall = wallNoun(group);
+    const subLabels = groupRows.map((row) => row.label || row.subId).filter(Boolean);
+    const fromDistances = groupRows.map((row) => sideWallMillimetres(row.change?.fromX, widthM));
+    const toDistances = groupRows.map((row) => sideWallMillimetres(row.change?.toX, widthM));
+    const groupDistances = groupRows.map((row) => row.distanceMm).filter((value) => value != null);
+    const groupMm = groupDistances.length
+      ? roundMm(groupDistances.reduce((sum, value) => sum + value, 0) / groupDistances.length)
+      : null;
+    const direction = groupDirection(groupRows, centre);
+    const everyFrom = fromDistances.every((value) => value != null);
+    const everyTo = toDistances.every((value) => value != null);
+    const fromDistancesText = everyFrom ? distancesText(fromDistances) : null;
+    const toDistancesText = everyTo ? distancesText(toDistances) : null;
+    const movement = direction === "inward"
+      ? "inward, toward the centre of the room"
+      : direction === "outward"
+        ? "outward, toward the nearest side wall"
+        : "along the wall";
+    return {
+      group,
+      groupPhrase: groupNoun(group, layoutCounts),
+      subLabels,
+      subLabelsText: listText(subLabels),
+      // "on the rear wall, 700 mm and 1 700 mm from the nearest side wall".
+      fromText: fromDistancesText ? `on ${wall}, ${fromDistancesText}` : `on ${wall}`,
+      toText: toDistancesText ? `on ${wall}, ${toDistancesText}` : `on ${wall}`,
+      movementText: groupMm != null ? `${groupMm} mm ${movement}` : movement,
+      distanceMm: groupMm,
+    };
+  });
+  const allSubLabels = rows.map((row) => row.label || row.subId).filter(Boolean);
+
   return {
     practical,
     theoreticalReason: practical ? null : theoreticalReason(rows, roomDims),
     movementLabel,
+    // The physical move itself, per wall group: which subwoofers, from where, to
+    // where, and the movement in millimetres and direction.
+    groups,
+    subLabels: allSubLabels,
+    subLabelsText: listText(allSubLabels),
+    distanceText: movementMm != null ? `${movementMm} mm` : null,
     // Practical placement never asks for a wall change. Stated with the move.
     wallStatement: practical
       ? "Front and rear subs stay on their own wall — the movement is along the wall."
