@@ -4,6 +4,13 @@ import { buildProposalEvidence, proposalEvidenceFingerprint } from '../../shared
 import { buildProjectInterpretation, formatInterpretationForPrompt } from '../../shared/adiProjectInterpretation.js';
 import { buildEngineeringEvidence, selectHighlightRows } from '../../shared/engineeringSnapshotEvidence.js';
 import { buildProposalWritingAuthority } from '../../shared/soundProofWritingAuthority.js';
+import {
+  NATURAL_WRITING_STANDARD_VERSION,
+  NATURAL_VOICE_RULE,
+  NATURAL_SENTENCE_RULE,
+  NATURAL_RECOMMENDATION_RULE,
+  NATURAL_WRITING_REVIEW,
+} from '../../shared/proposalWriter/writerNaturalWritingStandard.js';
 
 // READ-ONLY model comparison harness for the Project Report narrative.
 //
@@ -44,6 +51,49 @@ const NARRATIVE_SCHEMA = {
 const MAX_DESIGN_INTENT_WORDS = 200;
 const MIN_DESIGN_INTENT_WORDS = 150;
 
+// THE EDITORIAL REFINEMENT (preview only, never production).
+//
+// It composes authorities that already exist: the Sound Proof natural writing
+// standard (the agreed editorial refinement of the Astra instructions), the
+// design philosophy already carried by the writing authority, and the
+// constraint carried forward from the controlled Astra/Claude comparison.
+// Nothing here is a second writing system, and nothing here changes a fact,
+// a figure, a level, a product, a highlight or the production model.
+const REFINED_SEQUENCE = Object.freeze([
+  '1. Open with the recommendation itself, stated as our own professional judgement.',
+  '2. Explain how the room, the picture, the seating and the loudspeaker system work together.',
+  '3. Communicate the experience the design is built to deliver.',
+  '4. Explain the benefit of each important design decision in the client\'s own terms.',
+  '5. Carry the engineering results as supporting evidence for that judgement, never as the narrative.',
+  '6. Stay positive and engaging.',
+  '7. Read naturally aloud, because the dealer may read this to the client.',
+  '8. Use polished British English.',
+  '9. Never restate a specification the report displays elsewhere.',
+  '10. Close on one convincing statement about the complete cinema.',
+]);
+
+/** The refinement block. The baseline blocks are unchanged, so the two runs stay comparable. */
+function buildRefinedDirection() {
+  return [
+    `=== EDITORIAL DIRECTION (Sound Proof natural writing standard v${NATURAL_WRITING_STANDARD_VERSION}, applied to the Project Report) ===`,
+    NATURAL_VOICE_RULE,
+    NATURAL_SENTENCE_RULE,
+    NATURAL_RECOMMENDATION_RULE,
+    'The Design Intent and the five highlight explanations are read as ONE document: never describe the same benefit in the same words twice, and never restate the opening as the close. A repeated idea is acceptable only where it adds a genuinely different aspect of the design.',
+    NATURAL_WRITING_REVIEW[0],
+    '',
+    'THE WRITING SEQUENCE (for the Design Intent)',
+    ...REFINED_SEQUENCE,
+    '',
+    'CARRIED FORWARD FROM THE CONTROLLED COMPARISON (absolute)',
+    '- Never state or imply that every seat receives identical sound: the tonal results are seat-to-seat consistency within one loudspeaker group.',
+    '- Never infer a measured tonal match between loudspeaker groups from the tonal results.',
+    '- Never claim amplifier or loudspeaker headroom, and never write that the system is not being pushed to its limit: no such evidence exists.',
+    '- Never state a loudspeaker or seating position that disagrees with the fixed physical arrangement above.',
+    '- A benefit is written only where the evidence supports it. Confident phrasing is never a substitute for evidence.',
+  ];
+}
+
 /** The saved physical arrangement, stated exactly as the frozen evidence holds it. */
 function geometryBlock(snapshot) {
   const layers = snapshot.system?.products_selected_by_layer || {};
@@ -75,7 +125,7 @@ function geometryBlock(snapshot) {
 }
 
 /** The one prompt both models receive, byte for byte. */
-function buildComparisonPrompt({ evidence, interpretation, geometry, stories }) {
+function buildComparisonPrompt({ evidence, interpretation, geometry, stories, style = 'baseline' }) {
   return [
     'You are the Sound Proof report writer.',
     '',
@@ -110,6 +160,8 @@ function buildComparisonPrompt({ evidence, interpretation, geometry, stories }) 
     'Write so the client appreciates the design and understands the judgement behind it. Keep the client experience as the subject.',
     'Never use an em dash.',
     'Avoid: generic marketing language; repeating a parameter description; excessive qualification; calibration, commissioning or verification commentary; a reason the evidence does not record; any performance claim the evidence does not support.',
+    '',
+    ...(style === 'refined' ? ['', ...buildRefinedDirection()] : []),
     '',
     '=== ENGINEERING SAFETY (absolute) ===',
     'Every figure, level and product must match the frozen evidence exactly: never round, convert, combine or restate one.',
@@ -210,11 +262,13 @@ export default async function (req) {
     const evidence = buildEngineeringEvidence(snapshot);
     const geometry = geometryBlock(snapshot);
     const stories = pack.options?.[0]?.strength_stories || [];
+    const style = body.style === 'refined' ? 'refined' : 'baseline';
     const prompt = buildComparisonPrompt({
       evidence,
       interpretation: formatInterpretationForPrompt(interpretation),
       geometry,
       stories,
+      style,
     });
     // The identical-input proof: one fingerprint over the exact prompt and schema.
     const inputFingerprint = proposalEvidenceFingerprint({ prompt, schema: NARRATIVE_SCHEMA });
@@ -288,6 +342,7 @@ export default async function (req) {
         pack_fingerprint: pack.pack_fingerprint,
         pack_schema_version: pack.schema_version,
         shared_input_fingerprint: inputFingerprint,
+        style,
       },
       ...(outputsOnly ? {} : {
       interpretation: {
