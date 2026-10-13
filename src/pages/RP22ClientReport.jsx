@@ -521,6 +521,14 @@ export default function RP22ClientReport() {
       frontSubsCfg: appState?.frontSubsCfg || null,
       rearSubsCfg: appState?.rearSubsCfg || null,
       subwooferInstances,
+      // The frozen version's own display identity and screen construction, with
+      // the report's canonical screen front plane, so the front stage's placement
+      // note is stated from the design's real geometry and never from a generic
+      // description of a screen.
+      screen: {
+        ...(appState?.screen || {}),
+        screenFrontPlaneM: screenFrontPlaneM ?? appState?.screen?.screenFrontPlaneM ?? null,
+      },
       isVisible: appState?.getSpeakerVisibility
         || layoutVisibilityFilter(appState?.dolbyLayout, appState?.sevenBedLayoutType),
     }).groups,
@@ -529,6 +537,8 @@ export default function RP22ClientReport() {
     subwooferInstances,
     appState?.frontSubsCfg,
     appState?.rearSubsCfg,
+    appState?.screen,
+    screenFrontPlaneM,
     appState?.getSpeakerVisibility,
     appState?.dolbyLayout,
     appState?.sevenBedLayoutType,

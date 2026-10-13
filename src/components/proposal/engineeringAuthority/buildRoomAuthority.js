@@ -90,7 +90,9 @@ function interpretScreen(project) {
   const diagonalInches = Number(canonical?.diagonalInches);
   const displayPhraseText = isTv
     ? (Number.isFinite(diagonalInches) && diagonalInches > 0 ? `${Math.round(diagonalInches)}" TV` : 'TV')
-    : (statedSize ? `${statedSize}" ${aspectRatio} screen` : 'Screen not configured');
+    : (statedSize
+      ? (aspectRatio ? `${statedSize}" wide ${aspectRatio} projection screen` : `${statedSize}" wide projection screen`)
+      : 'Screen not configured');
 
   return {
     size_inches: statedSize,

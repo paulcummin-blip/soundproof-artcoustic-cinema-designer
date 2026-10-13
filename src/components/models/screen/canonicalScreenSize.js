@@ -102,7 +102,7 @@ export function resolveCanonicalScreen(project) {
     aspectRatio,
     text: television
       ? `${diagonalInches}" TV`
-      : `${width}" ${aspectRatio} screen`,
+      : `${width}" wide ${aspectRatio} projection screen`,
   };
 }
 

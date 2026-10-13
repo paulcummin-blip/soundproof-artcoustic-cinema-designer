@@ -79,6 +79,10 @@ export default function RoomDesignerHeader({
         frontSubsCfg: appState?.frontSubsCfg || null,
         rearSubsCfg: appState?.rearSubsCfg || null,
         subwooferInstances: appState?.subwooferInstances,
+        // The version's own saved display identity and screen construction, so
+        // the front stage's placement note is stated from the design's real
+        // geometry rather than from a generic description of a screen.
+        screen: appState?.screen || null,
         isVisible:
           appState?.getSpeakerVisibility ||
           layoutVisibilityFilter(dolbyLayout, sevenBedLayoutType),
@@ -89,6 +93,7 @@ export default function RoomDesignerHeader({
       appState?.frontSubsCfg,
       appState?.rearSubsCfg,
       appState?.subwooferInstances,
+      appState?.screen,
       appState?.getSpeakerVisibility,
       dolbyLayout,
       sevenBedLayoutType,

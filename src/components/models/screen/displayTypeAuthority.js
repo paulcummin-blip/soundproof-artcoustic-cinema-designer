@@ -125,7 +125,7 @@ export function savedDiagonalInches(source) {
  * rule: a television is stated by its nominal diagonal alone, a projection
  * screen by its viewable width and aspect ratio alone.
  *   TV               → `77" TV`
- *   Projector screen → `170" 2.35:1 screen`
+ *   Projector screen → `170" wide 2.35:1 projection screen`
  *
  * A projection screen never states a diagonal, a diagonal equivalent or a
  * derived diagonal, and a television never states an aspect ratio or a width.
@@ -141,10 +141,9 @@ export function displayPhrase(source) {
   // aspect ratio, and never by a diagonal derived from them.
   const size = Number(source?.screen_size ?? source?.visibleWidthInches);
   const aspectRatio = String(source?.aspect_ratio || source?.aspectRatio || '').trim();
-  const parts = [];
-  if (Number.isFinite(size) && size > 0) parts.push(`${Math.round(size)}"`);
-  if (aspectRatio) parts.push(aspectRatio);
-  return parts.length > 0 ? `${parts.join(' ')} screen` : null;
+  if (!Number.isFinite(size) || size <= 0) return aspectRatio ? `${aspectRatio} projection screen` : null;
+  const width = `${Math.round(size)}"`;
+  return aspectRatio ? `${width} wide ${aspectRatio} projection screen` : `${width} wide projection screen`;
 }
 
 export default resolveDisplayType;

@@ -29,7 +29,7 @@
 import { getCanonicalRole } from '@/components/utils/surroundRoleMap';
 import { productDisplayName, subwooferEntries } from '@/components/report/reportProductsSelected';
 import { centreCabinetOrientation, hasInstalledModel } from '@/components/utils/frontStageModeAuthority';
-import { DISPLAY_TYPE_TV, resolveDisplayType } from '@/components/models/screen/displayTypeAuthority';
+import { frontStagePlacementNote } from '@/components/models/screen/frontStagePlacementAuthority';
 
 /** The layer headings, in the order the panel states them. */
 export const SPEAKER_DESIGN_GROUPS = Object.freeze([
@@ -115,19 +115,12 @@ const modelNamesCell = (models) => [...models.keys()].sort().join(', ');
 
 /**
  * The front stage's placement note, read from the VERSION'S OWN saved display
- * identity and screen construction, never from a generic description of a screen.
- *
- * A television has no screen for a loudspeaker to sit behind, so no placement is
- * stated at all. A baffle wall, or a floating screen with its own cavity, carries
- * the front three in the construction behind the screen surface, which is what
- * the note states. Where the saved facts are not supplied, no note is stated: an
- * unproven placement is never asserted.
+ * identity, screen construction and loudspeaker positions — see
+ * frontStagePlacementAuthority.js, the ONE authority for that statement. A
+ * placement the saved facts do not establish is never stated here.
  */
-function frontStageNote(screen) {
-  if (!screen || typeof screen !== 'object') return null;
-  if (resolveDisplayType(screen) === DISPLAY_TYPE_TV) return null;
-  const mode = String(screen.mount_mode || screen.screen_mount_mode || screen.mountMode || '').toLowerCase();
-  return mode === 'baffle' || mode === 'floating' ? 'Behind screen' : null;
+function frontStageNote({ screen, rowKey, speakers }) {
+  return frontStagePlacementNote({ screen, rowKey, speakers });
 }
 
 /**
@@ -156,6 +149,10 @@ export function buildSpeakerDesignRows({
 
   const byRow = new Map();
   const centreModels = new Map();
+  // Each row's own loudspeakers, kept so the placement note is proven from the
+  // positions of the very speakers the row states.
+  const rowSpeakers = new Map();
+  const centreSpeakers = [];
 
   for (const speaker of active) {
     if (!isInstalledModel(speaker?.model)) continue;
@@ -164,6 +161,7 @@ export function buildSpeakerDesignRows({
 
     if (isCentreRole(canon)) {
       centreModels.set(name, (centreModels.get(name) || 0) + 1);
+      centreSpeakers.push(speaker);
       continue;
     }
 
@@ -172,6 +170,9 @@ export function buildSpeakerDesignRows({
     const models = byRow.get(rowKey) || new Map();
     models.set(name, (models.get(name) || 0) + 1);
     byRow.set(rowKey, models);
+    const list = rowSpeakers.get(rowKey) || [];
+    list.push(speaker);
+    rowSpeakers.set(rowKey, list);
   }
 
   const rows = [];
@@ -196,7 +197,7 @@ export function buildSpeakerDesignRows({
       quantityLabel: String(centreTotal),
       note: dual
         ? `Dual physical centre cabinets, one logical centre channel${orientation ? ' · cabinets mounted vertically' : ''}`
-        : centreRow.note || frontStageNote(screen),
+        : centreRow.note || frontStageNote({ screen, rowKey: CENTRE_ROW_KEY, speakers: centreSpeakers }),
     });
   }
 
@@ -212,7 +213,9 @@ export function buildSpeakerDesignRows({
       modelNames: modelNamesCell(models),
       quantity: rowTotal(models),
       quantityLabel: String(rowTotal(models)),
-      note: row.note || (row.group === 'front_stage' ? frontStageNote(screen) : null),
+      note: row.note || (row.group === 'front_stage'
+        ? frontStageNote({ screen, rowKey: row.key, speakers: rowSpeakers.get(row.key) || [] })
+        : null),
     });
   }
 

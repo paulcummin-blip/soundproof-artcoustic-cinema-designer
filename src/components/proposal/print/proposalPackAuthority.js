@@ -214,14 +214,18 @@ export function screenStatement(screen = {}) {
   }
   // Where the snapshot carries no viewable width, the stated size stands on its
   // own rather than being labelled as something it may not be.
+  // THE projection-screen rule: the viewable width and the aspect ratio, and
+  // never a diagonal — `170" wide 2.35:1 projection screen`.
   if (viewable) {
     return {
-      value: aspect ? `${viewable}" ${aspect} viewable image` : `${viewable}" viewable image`,
+      value: aspect ? `${viewable}" wide ${aspect} projection screen` : `${viewable}" wide projection screen`,
       hint: null,
     };
   }
   return {
-    value: stated ? (aspect ? `${stated}" ${aspect} screen` : `${stated}" screen`) : null,
+    value: stated
+      ? (aspect ? `${stated}" wide ${aspect} projection screen` : `${stated}" wide projection screen`)
+      : null,
     hint: null,
   };
 }

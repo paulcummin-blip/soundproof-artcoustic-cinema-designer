@@ -99,11 +99,17 @@ export function canonicalStatedSizeInches(screen) {
   return Number.isFinite(widthCm) && widthCm > 0 ? Math.round(widthCm / 2.54) : null;
 }
 
-/** The canonical phrase for a projection screen: its viewable width and aspect. */
+/**
+ * The canonical phrase for a projection screen: its VIEWABLE WIDTH and aspect
+ * ratio, and those alone — `170" wide 2.35:1 projection screen`. The diagonal is
+ * never stated for a projection screen.
+ */
 function projectionPhrase(screen, widthInches) {
   const aspect = asText(screen?.format) || asText(screen?.aspect_ratio);
-  const width = Math.round(widthInches);
-  return aspect ? `${width}" ${aspect} screen` : `${width}" screen`;
+  const width = `${Math.round(widthInches)}"`;
+  return aspect
+    ? `${width} wide ${aspect} projection screen`
+    : `${width} wide projection screen`;
 }
 
 export function canonicalScreenDescription(screen) {
