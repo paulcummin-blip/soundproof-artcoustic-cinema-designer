@@ -38,14 +38,17 @@ import {
   updatePendingExport,
 } from './pendingIssuedExportStore';
 import { writeExportStorageDiagnostic } from './exportStorageDiagnosticLog';
+import { isProjectLibraryRecordFailure } from './projectLibraryStorageDiagnostics';
 import {
   EXPORT_STORAGE_REASON,
   EXPORT_STORAGE_STAGE,
   ExportStorageError,
   RETRY_UNAVAILABLE_REASON,
   asExportStorageError,
+  backendErrorCode,
+  backendErrorMessage,
+  buildAssetRecordFailure,
   buildExportStorageDiagnostic,
-  classifyRecordFailure,
   classifyUploadFailure,
   exportStorageReason,
   resolveRetryMode,
@@ -205,18 +208,25 @@ async function uploadIssuedPdf({ blob, filename }) {
     const classified = classifyUploadFailure(error);
     throw new ExportStorageError({
       stage: EXPORT_STORAGE_STAGE.STORAGE_UPLOAD,
+      operation: 'UploadPrivateFile',
       reasonCode: classified.reasonCode,
       reason: classified.reason,
+      classification: classified.classification,
       detail: error?.message ? String(error.message).slice(0, 400) : null,
+      backendCode: backendErrorCode(error),
+      backendMessage: backendErrorMessage(error),
       cause: error,
+      facts: { private_upload_succeeded: false, file_uri_returned: false, asset_record_created: false },
     });
   }
   if (!result?.file_uri) {
     throw new ExportStorageError({
       stage: EXPORT_STORAGE_STAGE.STORAGE_UPLOAD,
+      operation: 'UploadPrivateFile',
       reasonCode: 'upload_no_path',
       reason: EXPORT_STORAGE_REASON.UPLOAD_FAILED,
       detail: 'Storage accepted the upload but returned no file path.',
+      facts: { private_upload_succeeded: true, file_uri_returned: false, asset_record_created: false },
     });
   }
   return { file_uri: result.file_uri };
@@ -226,7 +236,7 @@ async function uploadIssuedPdf({ blob, filename }) {
  * @throws {ExportStorageError} stage asset_record — the file is already stored
  * at this point, so the failure records that a stored file has no Library row.
  */
-async function insertIssuedRow({ issued, filename, pageCount, fileUri }) {
+async function insertIssuedRow({ issued, filename, pageCount, fileUri, attemptKind = 'initial' }) {
   try {
     return await base44.entities.ProjectAssetExport.create({
       project_id: issued.projectId,
@@ -246,16 +256,11 @@ async function insertIssuedRow({ issued, filename, pageCount, fileUri }) {
       superseded_by_id: null,
     });
   } catch (error) {
-    const classified = classifyRecordFailure(error);
-    throw new ExportStorageError({
-      stage: EXPORT_STORAGE_STAGE.ASSET_RECORD,
-      reasonCode: classified.reasonCode,
-      reason: classified.reason,
-      detail: error?.message ? String(error.message).slice(0, 400) : null,
-      storagePath: fileUri,
-      partial: 'file_without_row',
-      cause: error,
-    });
+    // The rejection is kept exactly as it came back — its code, its message and
+    // the class of rejection — alongside what the attempt had already achieved.
+    // Nothing about the attempt changes: the file stays uploaded, no record
+    // exists, and the diagnostic is what makes the rejection readable.
+    throw buildAssetRecordFailure({ error, issued, fileUri, attemptKind });
   }
 }
 
@@ -267,7 +272,7 @@ async function insertIssuedRow({ issued, filename, pageCount, fileUri }) {
  *
  * @returns {Promise<{record: Object, pendingKey: string}>}
  */
-export async function storeIssuedDocument({ identity, snapshot }) {
+export async function storeIssuedDocument({ identity, snapshot, attemptKind = 'initial' }) {
   const pendingKey = holdPendingExport({
     identity,
     filename: normalizeFilename(identity?.filename),
@@ -278,7 +283,7 @@ export async function storeIssuedDocument({ identity, snapshot }) {
   updatePendingExport(pendingKey, { issued, filename, blob, pageCount, captureDiagnostics });
 
   const stored = await uploadIssuedPdf({ blob, filename });
-  const record = await insertIssuedRow({ issued, filename, pageCount, fileUri: stored.file_uri });
+  const record = await insertIssuedRow({ issued, filename, pageCount, fileUri: stored.file_uri, attemptKind });
 
   return { record, pendingKey };
 }
@@ -341,7 +346,11 @@ function reportStorageFailure({ failure, pendingKey, identity }) {
   if (failureNoticesShown.size > 20) failureNoticesShown.clear();
   failureNoticesShown.set(noticeKey, Date.now());
 
-  writeExportStorageDiagnostic(buildExportStorageDiagnostic({
+  // The structured record of THIS attempt is written once, and is what the
+  // technical detail reads back. It outlives the notice: the Project Library
+  // keeps it for the session, so dismissing the toast never discards the
+  // evidence of why storage failed.
+  const diagnostic = writeExportStorageDiagnostic(buildExportStorageDiagnostic({
     failure: identified,
     identity: { ...issued, filename },
     filename,
@@ -359,6 +368,10 @@ function reportStorageFailure({ failure, pendingKey, identity }) {
   // button that cannot help.
   const retryLabel = retryMode === 'none' ? null : retryLabelFor(retryMode);
 
+  // The notice carries the actions that can address the failure, and the
+  // technical detail when the Project Library record step is what failed.
+  const offerActions = !!retryLabel || isProjectLibraryRecordFailure(diagnostic);
+
   let handle = null;
   handle = toast({
     // A document exported alongside another one names the outcome in its own
@@ -368,12 +381,15 @@ function reportStorageFailure({ failure, pendingKey, identity }) {
     description: exportStorageReason(identified),
     variant: 'destructive',
     duration: RETRY_TOAST_MS,
-    ...(retryLabel
+    ...(offerActions
       ? {
           action: React.createElement(ExportStorageFailureActions, {
             pendingKey,
             retryLabel,
             projectId: issued.projectId || null,
+            // Technical detail travels with the notice for a master admin only,
+            // and only for the Project Library record step it exists to explain.
+            diagnostic: isProjectLibraryRecordFailure(diagnostic) ? diagnostic : null,
             onSuccess: () => handle?.dismiss?.(),
           }),
         }
@@ -458,6 +474,7 @@ export async function retryIssuedExportStorage(pendingKey) {
       filename: entry.filename,
       pageCount: entry.pageCount,
       fileUri: stored.file_uri,
+      attemptKind: 'retry',
     });
     clearPendingExport(pendingKey);
     announceStored(entry.issued, record);

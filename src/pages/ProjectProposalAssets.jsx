@@ -7,6 +7,7 @@ import ProjectLibraryTabs, { PROJECT_LIBRARY_TAB } from '@/components/library/Pr
 import ProjectLibraryImagesSection from '@/components/library/ProjectLibraryImagesSection';
 import ProjectLibraryReportsSection from '@/components/library/ProjectLibraryReportsSection';
 import ProjectLibraryProposalsSection from '@/components/library/ProjectLibraryProposalsSection';
+import ProjectLibraryStorageDiagnostics from '@/components/library/ProjectLibraryStorageDiagnostics';
 import useProjectLibraryAssets from '@/components/library/useProjectLibraryAssets';
 import { REPORT_FONT_BODY } from '@/components/report/typography/reportTypography';
 
@@ -68,6 +69,12 @@ export default function ProjectProposalAssets() {
           {/* Confirms which project and version these assets belong to. */}
           <ProjectVersionIdentityLine className="mt-3" />
         </div>
+
+        {/* Master admin only: this session's failed Project Library storage
+            attempts, each with the exact rejection the backend returned. It
+            renders nothing for anyone else, and nothing when the session has had
+            no failure. */}
+        <ProjectLibraryStorageDiagnostics className="mb-6" />
 
         <ProjectLibraryTabs active={activeTab} onChange={setActiveTab} />
 

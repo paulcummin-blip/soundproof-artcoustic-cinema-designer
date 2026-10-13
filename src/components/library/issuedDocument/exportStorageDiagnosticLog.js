@@ -16,6 +16,29 @@
 
 const MAX_RECORDS = 20;
 const records = [];
+const listeners = new Set();
+
+/** Tell whoever is showing the log that it has changed. Never throws. */
+function announce() {
+  listeners.forEach((listener) => {
+    try {
+      listener(records.slice());
+    } catch {
+      // A listener that fails must never fail the log it is reading.
+    }
+  });
+}
+
+/**
+ * Read the log as it is written, so a failure that happened before the panel was
+ * opened is shown, and one that happens while it is open appears with it.
+ * @returns {() => void} unsubscribe
+ */
+export function subscribeExportStorageDiagnostics(listener) {
+  if (typeof listener !== 'function') return () => {};
+  listeners.add(listener);
+  return () => listeners.delete(listener);
+}
 
 /**
  * Write one diagnostic record. Never throws: a diagnostic that broke the export
@@ -33,6 +56,7 @@ export function writeExportStorageDiagnostic(record) {
     if (typeof window !== 'undefined') {
       window.__SOUNDPROOF_EXPORT_STORAGE_LOG__ = records;
     }
+    announce();
   } catch {
     // Nothing about logging may fail the export.
   }
@@ -47,6 +71,7 @@ export function readExportStorageDiagnostics() {
 export function clearExportStorageDiagnostics() {
   records.length = 0;
   if (typeof window !== 'undefined') window.__SOUNDPROOF_EXPORT_STORAGE_LOG__ = records;
+  announce();
 }
 
 export default writeExportStorageDiagnostic;

@@ -20,8 +20,15 @@ import { Loader2, RefreshCw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { clearPendingExport } from './pendingIssuedExportStore';
 import { retryIssuedExportStorage } from './recordIssuedExport';
+import StorageFailureTechnicalDetail from './StorageFailureTechnicalDetail';
 
-export default function ExportStorageFailureActions({ pendingKey, retryLabel, projectId, onSuccess }) {
+export default function ExportStorageFailureActions({
+  pendingKey,
+  retryLabel = null,
+  projectId,
+  onSuccess,
+  diagnostic = null,
+}) {
   const [busy, setBusy] = useState(false);
   const [reason, setReason] = useState(null);
 
@@ -49,6 +56,7 @@ export default function ExportStorageFailureActions({ pendingKey, retryLabel, pr
   return (
     <div className="flex flex-col gap-2">
       <div className="flex flex-wrap items-center gap-2">
+        {retryLabel && (
         <Button
           size="sm"
           variant="outline"
@@ -61,6 +69,7 @@ export default function ExportStorageFailureActions({ pendingKey, retryLabel, pr
             : <RefreshCw className="w-3.5 h-3.5 mr-1.5" />}
           {busy ? 'Retrying…' : retryLabel}
         </Button>
+        )}
         <a
           href={libraryHref}
           className="text-xs underline underline-offset-2 text-current"
@@ -69,6 +78,10 @@ export default function ExportStorageFailureActions({ pendingKey, retryLabel, pr
         </a>
       </div>
       {reason && <div className="text-xs text-current">{reason}</div>}
+      {/* Master-admin only, and only for a Project Library record failure: the
+          exact rejection, kept available in the Project Library after this
+          notice is dismissed. */}
+      <StorageFailureTechnicalDetail diagnostic={diagnostic} className="mt-1" />
     </div>
   );
 }
