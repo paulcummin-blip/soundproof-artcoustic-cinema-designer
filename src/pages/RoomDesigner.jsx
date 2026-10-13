@@ -2307,8 +2307,8 @@ function RoomDesignerWithState() {
                     placedSpeakers={placedSpeakers}
                     frontSubs={frontSubsForRendering}
                     frontSubsCfg={frontSubsCfg}
-                    onLcrSpeakerMoved={handleLcrSpeakerMoved}
-                    onFrontSubMoved={handleFrontSubMoved}
+                    onLcrSpeakerMoved={handleLcrSpeakerMoved} onFrontSubMoved={handleFrontSubMoved}
+                    onScreenHeightFromFloorChange={(h) => setScreenGuarded(prev => ({ ...prev, heightFromFloorM: h }))}
                     isDraggingRef={isDraggingRef}
                   />
                 )}

@@ -35,7 +35,7 @@ function screenDimsM(screen) {
   return { w: dims.widthM, h: dims.heightM };
 }
 
-export default function FrontElevation({ dimensions, screen, placedSpeakers = [], frontSubs = [], frontSubsCfg, roomElements = [], onLcrSpeakerMoved, onFrontSubMoved, isDraggingRef }) {
+export default function FrontElevation({ dimensions, screen, placedSpeakers = [], frontSubs = [], frontSubsCfg, roomElements = [], onLcrSpeakerMoved, onFrontSubMoved, onScreenHeightFromFloorChange = null, isDraggingRef }) {
   const roomW = Number(dimensions?.widthM ?? dimensions?.width) || 4.5;
   const roomH = Number(dimensions?.heightM ?? dimensions?.height) || 2.8;
 
@@ -305,7 +305,19 @@ export default function FrontElevation({ dimensions, screen, placedSpeakers = []
 
   // Screen
   const screenData = useMemo(() => screenDimsM(screen), [screen]);
-  const screenFloorM = Number(screen?.heightFromFloorM) || 0.5;
+  // Screen vertical drag preview. During a drag the drawing follows this local
+  // value so the screen moves smoothly; outside a drag it always follows the
+  // stored screen field, the same one the numeric input writes. Only the height
+  // from floor is ever changed here: width, viewable height, aspect ratio and
+  // TV diagonal are untouched.
+  const screenIsDraggingRef = useRef(false);
+  const [liveScreenFloorM, setLiveScreenFloorM] = useState(() => Number(screen?.heightFromFloorM) || 0.5);
+  useEffect(() => {
+    if (!screenIsDraggingRef.current) {
+      setLiveScreenFloorM(Number(screen?.heightFromFloorM) || 0.5);
+    }
+  }, [screen?.heightFromFloorM]);
+  const screenFloorM = liveScreenFloorM;
   const screenCenterX = roomW / 2;
   // Border/frame: use persisted value, else safe visual fallback
   const hasBorderData = Number(screen?.borderThicknessM) > 0;
@@ -316,6 +328,77 @@ export default function FrontElevation({ dimensions, screen, placedSpeakers = []
   // TV vertical centre — only when displaying a TV (not a projector screen)
   const isTV = !!(screen?.tvPresetKey || Number(screen?.tvWidthMm) > 0);
   const tvVerticalCentreM = isTV ? (screenFloorM + borderM + screenData.h / 2) : null;
+
+  // ── Screen vertical drag (Front Elevation) ──────────────────────────────
+  // Vertical only, and only the height from floor: this is the same field the
+  // "Screen Height from Floor" numeric input writes. The drag previews locally
+  // and commits once on release, so no recalculation runs on a drag frame.
+  const [screenDragging, setScreenDragging] = useState(false);
+  const screenListenersRef = useRef(null);
+
+  // The drawn frame stays wholly inside the room: the border above the viewable
+  // area cannot pass the ceiling, and the border below it cannot pass the floor.
+  const screenFloorBounds = useCallback(() => {
+    const minFloor = borderM;
+    const maxFloor = Math.max(minFloor, roomH - screenData.h - borderM);
+    return { minFloor, maxFloor };
+  }, [borderM, roomH, screenData.h]);
+
+  const handleScreenMouseDown = useCallback((e) => {
+    if (!onScreenHeightFromFloorChange) return;
+    e.preventDefault();
+    e.stopPropagation();
+    const svgEl = svgRef.current;
+    if (!svgEl) return;
+    const { minFloor, maxFloor } = screenFloorBounds();
+    const startClientY = e.clientY;
+    const startFloorM = liveScreenFloorM;
+    screenIsDraggingRef.current = true;
+    if (isDraggingRef) isDraggingRef.current = true;
+    setScreenDragging(true);
+    document.body.style.cursor = 'grabbing';
+
+    const readFloorM = (clientY) => {
+      const svgRect = svgEl.getBoundingClientRect();
+      const svgScale = svgRect.height / SVG_H;
+      const deltaM = -((clientY - startClientY) / svgScale / drawH) * roomH;
+      return Math.max(minFloor, Math.min(maxFloor, startFloorM + deltaM));
+    };
+
+    const handleMove = (me) => {
+      setLiveScreenFloorM(readFloorM(me.clientY));
+    };
+    const handleUp = (me) => {
+      window.removeEventListener('mousemove', handleMove);
+      window.removeEventListener('mouseup', handleUp);
+      screenListenersRef.current = null;
+      screenIsDraggingRef.current = false;
+      if (isDraggingRef) isDraggingRef.current = false;
+      setScreenDragging(false);
+      document.body.style.cursor = '';
+      const finalFloorM = readFloorM(me.clientY);
+      setLiveScreenFloorM(finalFloorM);
+      // One commit, at the numeric input's own 1 cm step. The existing
+      // recalculation and autosave flow then runs exactly as it does for a
+      // typed value.
+      onScreenHeightFromFloorChange(Math.round(finalFloorM * 100) / 100);
+    };
+
+    screenListenersRef.current = { move: handleMove, up: handleUp };
+    window.addEventListener('mousemove', handleMove);
+    window.addEventListener('mouseup', handleUp);
+  }, [onScreenHeightFromFloorChange, liveScreenFloorM, screenFloorBounds, isDraggingRef, SVG_H, drawH, roomH]);
+
+  // A drag interrupted by unmount must never leave window listeners behind.
+  useEffect(() => () => {
+    if (screenListenersRef.current) {
+      window.removeEventListener('mousemove', screenListenersRef.current.move);
+      window.removeEventListener('mouseup', screenListenersRef.current.up);
+      screenListenersRef.current = null;
+    }
+    screenIsDraggingRef.current = false;
+    document.body.style.cursor = '';
+  }, []);
 
   // LCR speakers — always returns a plain array
   // Pass the TV preset key as `orientation` so tv_linked models (e.g. C4-1) resolve
@@ -945,9 +1028,20 @@ export default function FrontElevation({ dimensions, screen, placedSpeakers = []
           const labelOverall = `${(overallW * 100).toFixed(0)} × ${(overallH * 100).toFixed(0)} cm overall${!hasBorderData ? ' (est. frame)' : ''}`;
 
           return (
-            <g>
+            <g
+              onMouseDown={onScreenHeightFromFloorChange ? handleScreenMouseDown : undefined}
+              style={onScreenHeightFromFloorChange
+                ? { cursor: screenDragging ? 'grabbing' : 'ns-resize', userSelect: 'none' }
+                : undefined}
+            >
+              {/* Drag affordance: the frame is outlined while the screen is being
+                  dragged, so the control is visible while it is used. */}
+              {screenDragging && (
+                <rect x={ox - 3} y={oy - 3} width={oW + 6} height={oH + 6}
+                  fill="none" stroke="#213428" strokeWidth={1.6} strokeDasharray="5 3" rx={3} />
+              )}
               {/* Black frame */}
-              <rect x={ox} y={oy} width={oW} height={oH} fill={SCREEN_STROKE} stroke={SCREEN_STROKE} strokeWidth={1} rx={2} />
+              <rect x={ox} y={oy} width={oW} height={oH} fill={SCREEN_STROKE} stroke={SCREEN_STROKE} strokeWidth={screenDragging ? 1.6 : 1} rx={2} />
               {/* White viewable area */}
               <rect x={sx} y={syTop} width={sw} height={sh} fill="#fff" stroke="#555" strokeWidth={0.5} />
               {/* Screen labels: inside white area top-left if there is room, else below frame */}
@@ -972,6 +1066,19 @@ export default function FrontElevation({ dimensions, screen, placedSpeakers = []
                   </text>
                 </g>
               )}
+              {/* Live height during the drag — the same value the numeric input
+                  shows, in centimetres, kept inside the room rectangle. */}
+              {screenDragging && (() => {
+                const badgeY = Math.min(Math.max(oy - 20, offsetY + 3), offsetY + drawH - 20);
+                return (
+                  <g key="screen-drag-value" style={{ pointerEvents: 'none' }}>
+                    <rect x={rx(screenCenterX) - 49} y={badgeY} width={98} height={15} fill="#213428" rx={2} />
+                    <text x={rx(screenCenterX)} y={badgeY + 11} textAnchor="middle" fontSize={8} fill="white" fontWeight={700} letterSpacing="0.04em">
+                      {`Screen height ${Math.round(screenFloorM * 100)} cm`}
+                    </text>
+                  </g>
+                );
+              })()}
             </g>
           );
         })()}
