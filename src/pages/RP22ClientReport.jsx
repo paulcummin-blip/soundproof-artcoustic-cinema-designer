@@ -830,6 +830,9 @@ export default function RP22ClientReport() {
           onRegenerate={reportSnapshot.regenerate}
           evidenceIncomplete={reportSnapshot.evidenceIncomplete}
           evidenceMismatches={reportSnapshot.evidenceMismatches}
+          saveFailed={reportSnapshot.saveFailed}
+          blockedReason={reportSnapshot.saveBlockedReason}
+          onRetry={reportSnapshot.regenerate}
         />
         {reportSnapshot.status !== REPORT_SNAPSHOT_STATUS.CURRENT && (
           <div className="client-report-screen-only">

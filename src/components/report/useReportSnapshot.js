@@ -29,6 +29,8 @@ import { getCompletedBassAuthority } from '@/components/room/bass/completedBassR
 import { applyRestoredBassAuthority, assessRestoredBassAuthorityCurrentness } from '@/components/engineering/restoredBassOverlay';
 import { buildDurableSnapshot, fetchDurablePublication } from '@/components/engineering/versionedEngineeringAuthority';
 import { auditReportSaveAuthority } from '@/components/engineering/publicationGateAuthority';
+import { resolveIssuedDocumentAccountId } from '@/components/library/issuedDocument/issuedDocumentOwnership';
+import { readProjectOwnership } from '@/components/library/issuedDocument/projectOwnershipRead';
 import {
   REPORT_SNAPSHOT_STATUS,
   buildSavedSourceFingerprints,
@@ -70,6 +72,10 @@ export function useReportSnapshot({
   // Why a report snapshot may not be written: no durable engineering publication
   // for this version. Blocked reports say so instead of pretending to be current.
   const [publicationBlocked, setPublicationBlocked] = useState(null);
+  // Why the report record could not be written. The report on screen is not a
+  // saved report until the database has accepted the record, so a write that
+  // produced nothing is stated plainly instead of being swallowed.
+  const [saveFailure, setSaveFailure] = useState(null);
 
   useEffect(() => () => { mountedRef.current = false; }, []);
 
@@ -136,13 +142,19 @@ export function useReportSnapshot({
         versionName: version.version_name || null,
       });
       if (!saveGate.allowed) {
-        if (mountedRef.current) setPublicationBlocked(saveGate.reason);
+        if (mountedRef.current) {
+          setPublicationBlocked(saveGate.reason);
+          setSaveFailure({ reason: saveGate.reason });
+        }
         console.warn('[reportSnapshot] generation blocked:', saveGate.reason);
         return null;
       }
       const finalGate = auditFinalReportAuthority(durableRead.publication);
       if (!finalGate.allowed) {
-        if (mountedRef.current) setPublicationBlocked(finalGate.reason);
+        if (mountedRef.current) {
+          setPublicationBlocked(finalGate.reason);
+          setSaveFailure({ reason: finalGate.reason });
+        }
         return null;
       }
       const publication = durableRead.publication;
@@ -152,7 +164,10 @@ export function useReportSnapshot({
       if (publication.provenance?.bass_fingerprint !== bass?.currentFingerprint
         || pointers.length !== 1 || bass?.currentFingerprint !== pointers[0]
         || !assessRestoredBassAuthorityCurrentness(bass).current) {
-        if (mountedRef.current) setPublicationBlocked('Final report blocked: durable current bass pointer does not match the restored authority.');
+        if (mountedRef.current) {
+          setPublicationBlocked('Final report blocked: durable current bass pointer does not match the restored authority.');
+          setSaveFailure({ reason: 'The saved report does not match the published engineering assessment for this version.' });
+        }
         return null;
       }
       const frozen = buildDurableSnapshot({ projectId, versionId, publication });
@@ -198,11 +213,23 @@ export function useReportSnapshot({
         ? { ...reportEvidence, proposal_ready: parity.passed === true }
         : null;
 
+      // ── THE ACCOUNT THE REPORT IS FILED UNDER ────────────────────────────
+      // The parent PROJECT's own account, read from the project record itself.
+      // It is never taken from the report's own frozen payload — that carries no
+      // ownership — and never from the signed-in user. This is the same
+      // ownership rule the issued-document path already stores under, so a saved
+      // report is filed exactly where its project belongs.
+      const owningAccountId = await resolveIssuedDocumentAccountId({
+        projectId,
+        accountId,
+        readProject: readProjectOwnership,
+      });
+
       const refreshing = !!saved?.id && !readStoredEvidence(saved);
       const record = buildSnapshotRecord({
         projectId,
         versionId,
-        accountId,
+        accountId: owningAccountId,
         reportType,
         sourceFingerprints: savedFingerprints,
         generatedBy: user?.full_name || user?.email || null,
@@ -230,8 +257,12 @@ export function useReportSnapshot({
         // resolves the same canonical row this page is showing.
         currentFingerprint: savedFingerprints.engineeringFingerprint,
       });
+      // The write is only a save once the database has accepted the record. A
+      // write that returned no stored record is a failure, never a success.
+      if (!written?.id) throw new Error('The saved report was not confirmed by the database.');
       if (mountedRef.current) {
-        setSaved(written || { ...record, id: saved?.id || null });
+        setSaved(written);
+        setSaveFailure(null);
         // This report has just been written: the saved-report fingerprint is
         // re-resolved, so the document renders from the authority it was frozen
         // against from here on.
@@ -241,7 +272,9 @@ export function useReportSnapshot({
       }
       return written;
     } catch (error) {
-      console.warn('[reportSnapshot] save failed:', error?.message || error);
+      const reason = error?.message || String(error);
+      console.warn('[reportSnapshot] save failed:', reason);
+      if (mountedRef.current) setSaveFailure({ reason });
       return null;
     } finally {
       if (mountedRef.current) setSaving(false);
@@ -271,7 +304,13 @@ export function useReportSnapshot({
     const key = `${projectId}::${versionId}::${reportType}::${readStoredEvidence(saved) ? 'evidence' : 'save'}`;
     if (autoSaveKeyRef.current === key) return;
     autoSaveKeyRef.current = key;
-    persist();
+    persist().then((written) => {
+      // A save that produced no record leaves the one-shot gate UNCONSUMED, so a
+      // failed attempt is never mistaken for a completed one.
+      if (!written?.id && mountedRef.current && autoSaveKeyRef.current === key) {
+        autoSaveKeyRef.current = null;
+      }
+    });
   }, [loading, ready, payload, projectId, versionId, reportType, resolution.status, currentFp.engineeringFingerprint, reportSource, persist, saved]);
 
   // Evidence refresh uses the version's durable publication in persist().
@@ -305,6 +344,10 @@ export function useReportSnapshot({
     // Set when the report could not be saved because the engineering assessment
     // has not been durably published for this version.
     publicationBlocked,
+    // True when no report record was written, with the plain reason behind it.
+    // The report on screen is a draft until this is false.
+    saveFailed: !!saveFailure,
+    saveBlockedReason: saveFailure?.reason || null,
     regenerate: persist,
   };
 }

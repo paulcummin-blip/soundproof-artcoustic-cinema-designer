@@ -1127,6 +1127,9 @@ function RP22ReportInner({ embed = false } = {}) {
                     onRegenerate={reportSnapshot.regenerate}
                     evidenceIncomplete={reportSnapshot.evidenceIncomplete}
                     evidenceMismatches={reportSnapshot.evidenceMismatches}
+                    saveFailed={reportSnapshot.saveFailed}
+                    blockedReason={reportSnapshot.saveBlockedReason}
+                    onRetry={reportSnapshot.regenerate}
                 />
             </div>
 

@@ -33,6 +33,11 @@ export const UPDATE_NEEDED_HEADLINE = 'REPORT NEEDS UPDATING';
 export const UPDATE_NEEDED_BANNER_TEXT = 'This report needs updating before it can be used in a proposal.';
 export const CREATE_UPDATED_REPORT_LABEL = 'Create Updated Report';
 export const CREATING_UPDATED_REPORT_LABEL = 'Creating Updated Report…';
+// A save that produced no stored report is never presented as success.
+export const NOT_SAVED_HEADLINE = 'REPORT NOT SAVED';
+export const NOT_SAVED_TEXT = 'This report could not be saved, so it is not yet available in the Project Library. Try again.';
+export const TRY_AGAIN_LABEL = 'Try Again';
+export const TRYING_AGAIN_LABEL = 'Trying Again…';
 
 const NOTICE = {
   display: 'flex',
@@ -124,12 +129,19 @@ export default function ReportSnapshotBanner({
   // proposal may not read it. The report itself stays fully visible.
   evidenceIncomplete = false,
   evidenceMismatches = [],
+  // No report record was written, so this report exists only on screen. One
+  // plain sentence reaches the designer; the technical reason stays collapsed
+  // and internal, exactly as the other diagnostics do.
+  saveFailed = false,
+  blockedReason = null,
+  onRetry = null,
   className = '',
 }) {
   const internalAudience = useInternalReportAudience();
 
   const stale = status === REPORT_SNAPSHOT_STATUS.STALE;
-  if (!stale && !evidenceIncomplete) return null;
+  const notSaved = !stale && !evidenceIncomplete && !!saveFailed;
+  if (!stale && !evidenceIncomplete && !notSaved) return null;
 
   // Diagnostics: internal audiences only, and collapsed whenever they exist.
   const when = formatGeneratedAt(generatedAt);
@@ -143,24 +155,34 @@ export default function ReportSnapshotBanner({
     .slice(0, 6);
   const diagnosticLine = stale
     ? [buildStaleSentence(changedKeys), stamp ? `${stamp}.` : null].filter(Boolean).join(' ')
-    : [
-      `This ${reportTypeLabel(reportType)} is incomplete for proposal use.`,
-      mismatchList.length > 0 ? `Mismatched values: ${mismatchList.join(', ')}.` : null,
-      stamp ? `${stamp}.` : null,
-    ].filter(Boolean).join(' ');
+    : notSaved
+      ? [typeof blockedReason === 'string' && blockedReason.trim() ? blockedReason.trim() : 'The report record was not written.', stamp ? `${stamp}.` : null].filter(Boolean).join(' ')
+      : [
+        `This ${reportTypeLabel(reportType)} is incomplete for proposal use.`,
+        mismatchList.length > 0 ? `Mismatched values: ${mismatchList.join(', ')}.` : null,
+        stamp ? `${stamp}.` : null,
+      ].filter(Boolean).join(' ');
+
+  const headline = stale ? DESIGN_UPDATED_HEADLINE
+    : notSaved ? NOT_SAVED_HEADLINE
+      : UPDATE_NEEDED_HEADLINE;
+  const copy = stale ? DESIGN_UPDATED_TEXT
+    : notSaved ? NOT_SAVED_TEXT
+      : UPDATE_NEEDED_BANNER_TEXT;
+  const action = notSaved ? onRetry : onRegenerate;
 
   return (
     <div
       className={className}
       style={NOTICE}
-      data-report-snapshot-banner={stale ? 'stale' : 'update-needed'}
+      data-report-snapshot-banner={stale ? 'stale' : (notSaved ? 'not-saved' : 'update-needed')}
     >
       <div style={TEXT}>
         <div style={HEADLINE}>
           <AlertTriangle className="w-3.5 h-3.5 flex-shrink-0" style={{ color: '#B08A3E' }} />
-          {stale ? DESIGN_UPDATED_HEADLINE : UPDATE_NEEDED_HEADLINE}
+          {headline}
         </div>
-        <div style={COPY}>{stale ? DESIGN_UPDATED_TEXT : UPDATE_NEEDED_BANNER_TEXT}</div>
+        <div style={COPY}>{copy}</div>
         {stale ? <div style={SECONDARY}>{DESIGN_UPDATED_SECONDARY}</div> : null}
         {internalAudience && diagnosticLine ? (
           <details style={{ marginTop: 6 }}>
@@ -169,16 +191,18 @@ export default function ReportSnapshotBanner({
           </details>
         ) : null}
       </div>
-      {onRegenerate && (
+      {action && (
         <button
           type="button"
-          onClick={onRegenerate}
+          onClick={action}
           disabled={regenerating}
           aria-busy={regenerating}
           style={regenerating ? { ...BUTTON, ...BUTTON_BUSY } : BUTTON}
         >
           <RefreshCw className="w-3.5 h-3.5" style={{ color: regenerating ? '#7A6640' : '#FFFFFF' }} />
-          {regenerating ? CREATING_UPDATED_REPORT_LABEL : CREATE_UPDATED_REPORT_LABEL}
+          {notSaved
+            ? (regenerating ? TRYING_AGAIN_LABEL : TRY_AGAIN_LABEL)
+            : (regenerating ? CREATING_UPDATED_REPORT_LABEL : CREATE_UPDATED_REPORT_LABEL)}
         </button>
       )}
     </div>
