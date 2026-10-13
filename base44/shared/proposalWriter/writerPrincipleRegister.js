@@ -39,6 +39,20 @@
  * only decides whether a sentence about consistency is a result claim or design
  * reasoning.
  *
+ * WHICH FORM. The register also states WHICH form of reasoning a sentence is: the
+ * designer's recorded INTENTION ("the arrangement is intended to improve bass
+ * consistency between seating positions") or an ESTABLISHED PRINCIPLE ("distributing
+ * subwoofers between the front and rear helps manage room resonances"). Both may be
+ * written confidently whatever the project's own result is, including where P20 is
+ * L1. Neither states an achieved result, which is the third form of knowledge and is
+ * read by the result rules.
+ *
+ * FRAMING NEVER BUYS BACK A RESULT. "helps", "designed to", "intended to" and
+ * "expected to" cannot carry an achieved result past these rules: an outcome verb, an
+ * improvement in this design's performance without a stated intention, a level, a
+ * figure or an absolute guarantee about the room's own behaviour all keep the
+ * sentence out of the register, and the evidence rules then read it in full.
+ *
  * Pure: no React, no SDK, no runtime-specific APIs.
  */
 
@@ -93,6 +107,55 @@ export const IMPROVEMENT_VERBS = /\b(?:improv\w*|enhanc\w*|increas\w*|boost\w*|m
  */
 export const INTENT_FRAMING = /\b(?:intended\s+to|intends?\s+to|intend\s+to|designed\s+to|design(?:er)?\s+intent|aims?\s+to|aimed\s+at|purpose\s+is|the\s+goal\s+is|chosen\s+to|selected\s+to|so\s+that|in\s+order\s+to|with\s+the\s+aim)\b/i;
 
+/**
+ * The three forms of ADI knowledge. Only the third states what this design
+ * achieved; the first two are design reasoning and are never held to a result.
+ */
+export const KNOWLEDGE_FORM = Object.freeze({
+  ESTABLISHED_PRINCIPLE: 'established_principle',
+  DESIGNER_INTENTION: 'designer_intention',
+  ACHIEVED_PERFORMANCE: 'achieved_performance',
+});
+
+/**
+ * ABSOLUTE GUARANTEES ABOUT THE ROOM. A guarantee, an elimination, an assurance
+ * that the room is free of modes, or that a peak, a dip or a null never occurs, is
+ * never design reasoning: it asserts an outcome of this design that the frozen
+ * reports do not state, and a real room's acoustics are never absolute.
+ *
+ * The subject has to be the room's own behaviour — a mode, a resonance, a standing
+ * wave, a peak, a dip, a null, the room or the bass response — so an ordinary
+ * explanation of an approach ("helps manage the resonances that produce peaks and
+ * dips") carries no guarantee word and is untouched.
+ *
+ * It is read on the words themselves, so framing never buys it back: "is intended
+ * to eliminate room modes" is refused exactly as "guarantees the elimination of
+ * room modes" is.
+ */
+export const GUARANTEE_WORDS = /\b(?:guarantee\w*|guaranteed|ensur\w*|eliminat\w*|eradicat\w*|remov\w*|free\s+(?:of|from)|without\s+(?:any\s+)?modes?|no\s+(?:room\s+)?modes?|completely|entirely|totally|fully|always|never)\b/i;
+
+/** The room behaviour a guarantee would be making absolute. */
+export const GUARANTEE_SUBJECTS = /\b(?:mode|modes|resonance|resonances|standing\s+wave|standing\s+waves|null|nulls|peak|peaks|dip|dips|room\s+response|bass\s+response)\b/i;
+
+/** The rule id the absolute-guarantee rule reports, for an audit to assert against. */
+export const ABSOLUTE_GUARANTEE_RULE = 'absolute_room_behaviour_guarantee';
+
+/**
+ * The absolute guarantee about the room's own behaviour a sentence makes, or null.
+ *
+ * @param {string} text
+ * @returns {{ rule: string, at: number }|null}
+ */
+export function absoluteGuarantee(text) {
+  const sentence = String(text || '');
+  if (sentence.length === 0) return null;
+  const subject = GUARANTEE_SUBJECTS.exec(sentence);
+  if (!subject) return null;
+  const guarantee = GUARANTEE_WORDS.exec(sentence);
+  if (!guarantee) return null;
+  return { rule: ABSOLUTE_GUARANTEE_RULE, at: Math.min(subject.index, guarantee.index) };
+}
+
 export function principleRationale(text) {
   const sentence = String(text || '');
   if (sentence.length === 0) return null;
@@ -103,15 +166,34 @@ export function principleRationale(text) {
   // intention are result claims, and the evidence has to state them.
   if (OUTCOME_VERBS.test(sentence)) return null;
   if (IMPROVEMENT_VERBS.test(sentence) && !INTENT_FRAMING.test(sentence)) return null;
+  // A guarantee is an absolute outcome, never an explanation of an approach.
+  if (absoluteGuarantee(sentence)) return null;
   if (!PURPOSE_VERBS.test(sentence)) return null;
   if (!APPROACH_TERMS.test(sentence)) return null;
   const at = sentence.search(PURPOSE_VERBS);
-  return { rule: PRINCIPLE_REGISTER_RULE, at: at >= 0 ? at : 0 };
+  // WHICH form of reasoning this is: a sentence that states the intention behind
+  // the approach is the designer's recorded INTENTION, and one that explains the
+  // mechanism itself is an ESTABLISHED PRINCIPLE. Both are reasoning, and neither
+  // states what this design achieved.
+  const form = INTENT_FRAMING.test(sentence)
+    ? KNOWLEDGE_FORM.DESIGNER_INTENTION
+    : KNOWLEDGE_FORM.ESTABLISHED_PRINCIPLE;
+  return { rule: PRINCIPLE_REGISTER_RULE, form, at: at >= 0 ? at : 0 };
 }
 
 /** Whether the sentence is written in the established-principle register. */
 export function isPrincipleRationale(text) {
   return principleRationale(text) !== null;
+}
+
+/**
+ * The form of knowledge a sentence carries: an established principle, the
+ * designer's recorded intention, or a claim of achieved performance. A sentence
+ * that is not design reasoning is read as the third form, and the evidence rules
+ * then decide whether the frozen reports support it.
+ */
+export function knowledgeForm(text) {
+  return principleRationale(text)?.form || KNOWLEDGE_FORM.ACHIEVED_PERFORMANCE;
 }
 
 export default principleRationale;

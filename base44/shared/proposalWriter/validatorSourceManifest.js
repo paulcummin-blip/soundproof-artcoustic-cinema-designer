@@ -1,8 +1,14 @@
 /** SHA-256 of the bundled validator sources; regenerated with every rules edit. */
 export const VALIDATOR_SOURCE_MANIFEST = Object.freeze({
   'base44/shared/proposalWriter/writerOutputValidator.js': '9abc142f30279dc77f186b95d430b6f13916997492e19f8b086f11bedca0284c',
-  'base44/shared/proposalWriter/writerProseScanner.js': 'f7ccd507f7d61402575f3cacccb6136c6fabd6380bf2a3e6a3d34e1322baa10b',
-  'base44/shared/proposalWriter/writerOutputTextRules.js': '512e2d70ff3776024dcec052a76737abb9ff3d05adf5c67e6800691db09cc6b6',
+  'base44/shared/proposalWriter/writerProseScanner.js': '9e1ca6086f68f0e8405f378370b11c961578c214a47fd064b6b2dc0e317885a2',
+  'base44/shared/proposalWriter/writerOutputTextRules.js': 'ab466312229102216109229586a07a9e6401820ba3a548f726ee6c5c2618ed74',
+  // The established-principle register: which sentences are design reasoning (an
+  // established principle, or the designer's recorded intention) rather than a claim
+  // of achieved performance, and the absolute guarantees about the room's own
+  // behaviour that are never reasoning. Hashed so a draft can always be traced to the
+  // exact boundary it was read against.
+  'base44/shared/proposalWriter/writerPrincipleRegister.js': '14cd7139d5667f70843ea8a604d5282dd2df6372e901818970e4b7d7ff8a0957',
   'base44/shared/proposalWriter/writerEditorialRules.js': '08776775a8a4bdd2f2a167804809d5db51d750c4a01a1ac8ee23830761475324',
   'base44/shared/proposalWriter/writerSalesPolishRules.js': '2e8d0a0c206141d99d9af0c48b24a565002bd7f63497dedffc431b14b4ae8825',
   'base44/shared/proposalWriter/writerProductScope.js': '7b15e264a35b8f7c1694c3e5c70c3d43e2d06c4a77e195a01cb9e0ec47e11749',
@@ -10,13 +16,13 @@ export const VALIDATOR_SOURCE_MANIFEST = Object.freeze({
   'base44/shared/proposalWriter/writerClausePrecision.js': '0d7be2c8e2dd98c395c5bf999bd6c306cb48b9c15bc0ffae2d7f31fd31ddae94',
   'base44/shared/proposalWriter/writerViolationAudit.js': '4cc361d1c96a101fc29330d740cef2184ae5650fd3cc64e253892d004efdb0b9',
   'base44/shared/proposalWriter/writerDesignStageRules.js': 'a26d5ff98a2eaf4f6de929cc62cba7e7bc2632540f12d44ded72e8cb7f8bdbb7',
-  'base44/shared/proposalWriter/writerContractSchema.js': 'a483fcece8b3917295f387a76215ceadecec29c47bf470fc5dc155240551591a',
+  'base44/shared/proposalWriter/writerContractSchema.js': 'f96cde18cf2e8335160dcbd01dcc013bf4db50c993fac65bcac753f8115ca9e0',
   'base44/shared/proposalWriter/writerMultiCabinetRules.js': '3712df21bd72353af0a9d8ab75a1efa20755856d65229887a1f8dc5bad29b172',
   'base44/shared/proposalGeneration/generationStatuses.js': '2273b2e8408a426eeb137d9ae2f34c428a8e934dc0529134e9889aae75103b28',
   'base44/shared/proposalWriter/writerCabinetLanguage.js': '18e37edb21bd8422c6293c5fde809984d185e7188d0fe4a12fa2ff352d4b72c7',
   'base44/shared/proposalWriter/writerValidationRegister.js': '634502ab07c0bf1b13cfe0879d1e2ca2e85f0419c94f377b266a977c38c07b96',
   'base44/shared/proposalWriter/writerInputBuilder.js': 'acd8394a10d84fdfcda6a9017b4b27ce531f7cf9073f20bb3a9774cee2066ca9',
-  'base44/shared/proposalWriter/writerPromptBuilder.js': 'b3656793756522225b3b8cb746d31a7f9dcdac9756e236f031bcbf234f03439b',
+  'base44/shared/proposalWriter/writerPromptBuilder.js': 'a50eb04d4df88d270b7dcf287b7b8e4dd72cd3f242d7fea4dd1d020b7440513a',
   'base44/shared/proposalWriter/writerSectionMapping.js': 'f5a6d2a5fe974fbd5c16d810d95f99da72f629a4fb8cb33793aa472778ade2f0',
   'base44/shared/proposalWriter/writerDesignContext.js': '590a9f379bb28ebc54c14f97ae2b73070a8c8c6722c7be3fc548c95719f2d63b',
   'base44/shared/proposalEdit/completeDocumentValidation.js': 'cff20d7146ecbeb3a9c325e3147db41cab552f7ea950dd93385ee1d478683ddd',
@@ -57,7 +63,7 @@ export const VALIDATOR_SOURCE_MANIFEST = Object.freeze({
   // was read under, its applicability, what it does not establish and its safe use.
   // Hashed so a draft can always be traced to the exact professional context, and the
   // exact applicability rule, it was written against.
-  'base44/shared/rp22DesignContext.js': 'b46ca0a57357b1c666f03361aaa80c1e7f38d0750777cdcbbe90a7d2ef6b5af6',
+  'base44/shared/rp22DesignContext.js': 'c224a3a4010c3a019b175f504f915fa716e884927da4900a235c68051f81f21f',
   // The check between a saved interpretation and the frozen evidence, which removes
   // only the statements the evidence actually contradicts.
   'base44/shared/proposalClarification/verifiedInterpretation.js': '86d6c7038393d25b4ee9bdcfedd6202cb7e3e7072409dd070001d32b030caf34',

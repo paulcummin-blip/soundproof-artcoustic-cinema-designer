@@ -26,6 +26,12 @@
  *               result for, at the level the sentence's own adjective claims? A
  *               result the evidence states for one group is never written as a
  *               result for every seat.
+ *   CAPABILITY  is this qualitative statement of output capability — "substantial
+ *               low-frequency output capability", "ample headroom" — supported by
+ *               a capability result the section cites (P12, P13, P14, or the
+ *               pack's own capability area)? A qualitative claim of substantial
+ *               output is never written on its own authority, and never needs a
+ *               grade to be named in the copy.
  *   STAGE       is this sentence design-stage commentary — what still needs
  *               attention, improvement, calibration, optimisation or further
  *               design work, or a correction to come? The proposal states the
@@ -258,6 +264,16 @@ export function isConsistencyCaveat(sentence, at) {
     // denial in the same clause cannot mean the sentence is not making it.
     negationShaped: true,
   },
+  {
+    rule: 'stated_consistency_quality',
+    // A claim of ACHIEVED consistency quality: "achieves excellent P20
+    // consistency", "perfect bass consistency". The bass context in front of the
+    // quality word is part of the rule, so a claim about tonal consistency between
+    // loudspeaker groups is not caught here. Without a P20 result that supports a
+    // consistency claim this states what the design achieved, which is exactly
+    // what the gate above refuses.
+    pattern: /\b(?:bass|p19|p20|low[- ]frequency|subwoofer\w*)\b[^.;:!?]{0,60}?\b(?:perfect|excellent|outstanding|exceptional|superb|complete|total|great|maximum|optimum|optimal|high|strong|full)\s+(?:seat[- ]to[- ]seat\s+|bass\s+|low[- ]frequency\s+|p19\s+|p20\s+)?consistency\b/i,
+  },
 ]);
 
 /** The rule ids behind the seat-consistency claims, for an audit to assert against. */
@@ -455,6 +471,45 @@ export function scopedClaimIssue({ sentence, scope, claims }) {
   return stated
     ? null
     : `${adjective.toLowerCase()}_is_not_stated_for_${scope === 'all' ? 'every_seat' : `the_${scope}_seats`}`;
+}
+
+/**
+ * OUTPUT CAPABILITY, STATED QUALITATIVELY. "Four subwoofers provide substantial
+ * low-frequency output capability" is a claim about what this design achieves, so
+ * it is written only where the section cites the capability result that states it:
+ * P14, P12, P13, or the pack's own capability area. Without one, the claim rests on
+ * nothing and is refused like any other unsupported benefit.
+ *
+ * The rule reads the wording and the cited claims, never a grade: it does not
+ * require a Performance Level to be named and it never inserts one, so a strong
+ * capability result is described in the client's own language.
+ */
+const OUTPUT_CAPABILITY_CLAIM = /\b(?:substantial|considerable|ample|plenty\s+of|generous|significant|large|deep|serious|formidable|huge|vast|great\s+deal\s+of|high|strong|powerful|effortless)\s+(?:low[- ]frequency\s+|low[- ]end\s+|sub[- ]?bass\s+|bass\s+|subwoofer\s+)?(?:output|capability|capabilities|headroom|authority|reserve|extension|impact|dynamic\s+range|spl|pressure)\b|\b(?:low[- ]frequency|low[- ]end|sub[- ]?bass|bass|subwoofer)\s+(?:output|capability|capabilities|headroom|authority|reserve)\b/i;
+
+/** The claim areas that state a capability result the copy may rest on. */
+const CAPABILITY_CLAIM_AREAS = /(?:^|_)(?:p12|p13|p14)(?:_|$)|capab|output|headroom|dynamic|authority|reserve|impact|spl|bass/i;
+
+/**
+ * The unsupported qualitative output-capability claim a sentence makes, or null.
+ *
+ * @param {Object} params
+ * @param {string} params.sentence
+ * @param {Array<Object>} params.claims — the claims the section cites
+ * @param {Array<string>} [params.packProse] — the pack's own sentences
+ * @returns {string|null} the reason, or null when the sentence is grounded
+ */
+export function unsupportedOutputCapability({ sentence, claims, packProse = [] } = {}) {
+  const text = String(sentence || '');
+  if (text.length === 0) return null;
+  if (!OUTPUT_CAPABILITY_CLAIM.test(text)) return null;
+  if (isPackProse(text, packProse)) return null;
+  const cited = Array.isArray(claims) ? claims : [];
+  const grounded = cited.some((claim) => {
+    const area = String(claim?.area || '');
+    const id = String(claim?.claim_id || '');
+    return CAPABILITY_CLAIM_AREAS.test(area) || /(?:p12|p13|p14)/i.test(id);
+  });
+  return grounded ? null : 'qualitative_output_capability_needs_a_cited_capability_result';
 }
 
 /** The option a version ID belongs to, as the draft would name it. */

@@ -2,9 +2,9 @@
 import { isBassConsistencyClaim } from '../proposalEvidence/proposalEvidenceWording.js';
 import { WRITER_REJECTION, violation } from './writerContractSchema.js';
 import { claimLevels, hasRecommendationClaim, isPackProse, isRecommendation, kindSatisfiesAssertion, levelTokens, measurementTokens, p20BlocksConsistency, packProseSentences, parameterIds, seatScopeInText, sentenceParts, stripOptionNames, blockedChangeBlocks, blockPatterns } from './writerVocabulary.js';
-import { anchorPatternFor, assertedKind, assumedParameterIssue, claimsArea, isDenied, isConsistencyCaveat, seatConsistencyClaim, scopedClaimIssue, referencePositionScopeIssue, CHANNEL_FAMILY, CHANGE_SIGNAL, CONSISTENCY_ANCHOR, NEGATION_SHAPED_CLAIM } from './writerOutputTextRules.js';
+import { anchorPatternFor, assertedKind, assumedParameterIssue, claimsArea, isDenied, isConsistencyCaveat, seatConsistencyClaim, scopedClaimIssue, referencePositionScopeIssue, unsupportedOutputCapability, CHANNEL_FAMILY, CHANGE_SIGNAL, CONSISTENCY_ANCHOR, NEGATION_SHAPED_CLAIM } from './writerOutputTextRules.js';
 import { productScopeViolations } from './writerProductScope.js';
-import { isPrincipleRationale } from './writerPrincipleRegister.js';
+import { absoluteGuarantee, isPrincipleRationale } from './writerPrincipleRegister.js';
 import { frontStageScopeViolations } from './writerFrontStageRules.js';
 import { designStageCommentary } from './writerDesignStageRules.js';
 import { verificationDisclaimer } from './writerVerificationDisclaimerRules.js';
@@ -111,10 +111,38 @@ export function scanProse({ input, vocabulary, section, text, claims = [], claim
         const match = claimsArea(claimed, patterns);
         if (!match || isDenied(claimed, match.at)) continue;
         if (CHANNEL_FAMILY.test(match.keyword) && !CHANGE_SIGNAL.test(claimed)) continue;
+        // A clause explaining why an approach is used claims no change in any
+        // area, so it makes no blocked claim: see writerPrincipleRegister.js. This
+        // is a SEMANTIC, clause-scoped distinction, never a blanket exemption. It
+        // reads THIS clause, and only where the clause is design reasoning: a
+        // clause that attributes a delivered outcome, an improvement in this
+        // design's performance, a level, a figure or a guarantee to the design is
+        // not reasoning and is read exactly as before — and a result asserted in a
+        // second clause of the same sentence is still read on its own.
+        if (isPrincipleRationale(clause)) continue;
         context = { text, sentence, clause, match: match.matched, ruleId: `blocked_area:${block.reason}`, blockId: block.block_id };
         report(WRITER_REJECTION.UNSUPPORTED_IMPROVEMENT, {
           section, detail: `${block.reason}:${block.block_id}`, claim_ids: [block.block_id],
         });
+      }
+      // An absolute guarantee about the room's own behaviour is refused whatever
+      // framing the sentence uses: "helps", "designed to" or "intended to" ahead of
+      // an elimination claims no less than the guarantee itself. See
+      // writerPrincipleRegister.js for the rule and the room behaviour it reads.
+      const guarantee = absoluteGuarantee(clause);
+      if (guarantee) {
+        context.ruleId = `absolute_guarantee:${guarantee.rule}`;
+        report(WRITER_REJECTION.INVENTED_BENEFIT, {
+          section, detail: `absolute_guarantee_not_stated_by_the_reports:${guarantee.rule}`,
+        });
+      }
+      // A qualitative statement of output capability is written only where the
+      // section cites the capability result that states it: see
+      // writerOutputTextRules.js.
+      const capability = unsupportedOutputCapability({ sentence: clause, claims: citedClaims, packProse });
+      if (capability) {
+        context.ruleId = `output_capability:${capability}`;
+        report(WRITER_REJECTION.INVENTED_BENEFIT, { section, detail: capability });
       }
       context = { text, sentence, clause };
       if (isRecommendation(clause) && !hasRecommendationClaim(input) && !resultLed) {

@@ -28,14 +28,16 @@ import { buildProposalEvidence } from '../base44/shared/proposalEvidence/proposa
 import { WRITER_REJECTION } from '../base44/shared/proposalWriter/writerContractSchema.js';
 import { buildWriterInput } from '../base44/shared/proposalWriter/writerInputBuilder.js';
 import { validateWriterOutput } from '../base44/shared/proposalWriter/writerOutputValidator.js';
-import { seatConsistencyClaim } from '../base44/shared/proposalWriter/writerOutputTextRules.js';
+import { seatConsistencyClaim, unsupportedOutputCapability } from '../base44/shared/proposalWriter/writerOutputTextRules.js';
 import {
+  KNOWLEDGE_FORM,
   PRINCIPLE_REGISTER_RULE,
   isPrincipleRationale,
+  knowledgeForm,
   principleRationale,
 } from '../base44/shared/proposalWriter/writerPrincipleRegister.js';
 import { EVIDENCE_AT as AT, twoOptions } from './fixtures/proposalEvidenceFixtures.mjs';
-import { amend } from './fixtures/proposalWriterFixtures.mjs';
+import { amend, withoutClaimIds } from './fixtures/proposalWriterFixtures.mjs';
 
 /* ── Harness ───────────────────────────────────────────────────────────────── */
 
@@ -172,6 +174,64 @@ test('the capability statement is held to the published P14 result', () => {
     'supported by the published P14 result',
   );
 
-  const uncited = violationsFor(CAPABILITY, 'dynamic_range');
-  assert.ok(uncited.length > 0, `the same statement without its claim is refused: ${uncited.join(',')}`);
+  // WITHOUT a capability result: the same statement, in a section that cites no
+  // capability claim, is refused. It never rests on its own authority.
+  const bare = withoutClaimIds(writerInput(), 'dynamic_range');
+  const bareSection = bare.sections.find((entry) => entry.section === 'dynamic_range');
+  bareSection.text = `${bareSection.text} ${CAPABILITY}`;
+  const refused = validateWriterOutput({ input: writerInput(), output: bare }).violations
+    .filter((entry) => String(entry.sentence || '').trim() === CAPABILITY)
+    .map((entry) => entry.code);
+  assert.ok(
+    refused.includes(WRITER_REJECTION.INVENTED_BENEFIT),
+    `refused without a capability claim: ${refused.join(',')}`,
+  );
+
+  // The rule reads the cited claims, and needs no grade to be named: P14 and the
+  // other applicable capability areas ground the statement, and nothing else does.
+  assert.equal(
+    unsupportedOutputCapability({ sentence: CAPABILITY, claims: [] }),
+    'qualitative_output_capability_needs_a_cited_capability_result',
+  );
+  assert.equal(unsupportedOutputCapability({ sentence: CAPABILITY, claims: [{ area: 'p14' }] }), null);
+  assert.equal(unsupportedOutputCapability({ sentence: CAPABILITY, claims: [{ area: 'p13' }] }), null);
+  assert.equal(unsupportedOutputCapability({ sentence: 'The screen is 115 inches wide.', claims: [] }), null);
+});
+
+/* ── The three forms of knowledge, told apart ──────────────────────────────── */
+
+test('the classifier states which form of knowledge a sentence carries', () => {
+  assert.equal(knowledgeForm(REASONING[0]), KNOWLEDGE_FORM.ESTABLISHED_PRINCIPLE);
+  assert.equal(knowledgeForm(REASONING[1]), KNOWLEDGE_FORM.DESIGNER_INTENTION);
+  for (const sentence of REFUSED) {
+    assert.equal(knowledgeForm(sentence), KNOWLEDGE_FORM.ACHIEVED_PERFORMANCE, sentence);
+  }
+  assert.equal(knowledgeForm(CAPABILITY), KNOWLEDGE_FORM.ACHIEVED_PERFORMANCE);
+});
+
+/* ── Framing words never buy back an achieved result ───────────────────────── */
+
+test('helps, designed to, intended to and expected to never exempt an achieved result', () => {
+  const bypasses = [
+    'The four-subwoofer layout is intended to deliver identical bass at every seat.',
+    'Four subwoofers are designed to eliminate room modes.',
+    'The arrangement is expected to improve bass response by 6 dB compared with two subwoofers.',
+    'Distributing subwoofers between the front and rear helps achieve consistent bass across every seat.',
+  ];
+  for (const sentence of bypasses) {
+    assert.equal(knowledgeForm(sentence), KNOWLEDGE_FORM.ACHIEVED_PERFORMANCE, `not reasoning: ${sentence}`);
+    const codes = violationsFor(sentence);
+    assert.ok(codes.length > 0, `refused: ${sentence} (${codes.join(',')})`);
+    assert.ok(!codes.includes(PRINCIPLE_REGISTER_RULE), `never exempted by the register: ${sentence}`);
+  }
+});
+
+test('an achieved result asserted in a second clause is still read on its own', () => {
+  // The first clause is the designer's intention; the second attributes a
+  // delivered result. The exemption is clause-scoped, so the second clause is not
+  // covered by the first.
+  const sentence = 'The arrangement is intended to improve bass consistency, and the system delivers identical bass at every seat.';
+  const codes = violationsFor(sentence);
+  assert.ok(codes.length > 0, `refused: ${codes.join(',')}`);
+  assert.ok(!isPrincipleRationale('the system delivers identical bass at every seat.'));
 });
