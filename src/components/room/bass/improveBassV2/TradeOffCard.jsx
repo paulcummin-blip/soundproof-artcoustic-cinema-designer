@@ -20,6 +20,7 @@ import { buildWhatChanged } from "./improveBassV2WhatChanged.js";
 import { buildCalibrationSummary } from "./improveBassV2Apply.js";
 import { buildTradeOffSummary, delayToPathLengthCm } from "./tradeOffClassifier.js";
 import { resolveTradeOffVerification, VERIFICATION_VERIFIED, VERIFICATION_FAILED } from "./tradeOffVerificationAuthority.js";
+import { formatP19P20DeviationText } from "@/components/utils/rp22/resolveRp22DesignValue";
 
 function levelText(level) {
   const n = (() => {
@@ -182,7 +183,7 @@ function VerifiedAfterValues({ verifiedValues }) {
         {p20Summary && (
           <div className="text-[10px] text-[#213428]">
             <span className="font-semibold">P20 per-seat:</span>{" "}
-            {p20Summary.map((s) => `${s.seatId} ${Number(s.deviation).toFixed(1)} dB`).join(", ")}
+            {p20Summary.map((s) => `${s.seatId} ${formatP19P20DeviationText(s.deviation) ?? "—"}`).join(", ")}
           </div>
         )}
       </div>

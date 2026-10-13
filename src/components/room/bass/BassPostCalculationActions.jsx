@@ -1,5 +1,5 @@
 import React, { useMemo, useState, useSyncExternalStore } from "react";
-import { formatP19P20DeltaText } from "@/components/utils/rp22/resolveRp22DesignValue";
+import { formatP19P20DeltaText, formatP19P20DeviationText } from "@/components/utils/rp22/resolveRp22DesignValue";
 import { Button } from "@/components/ui/button";
 import { useActiveProjectId } from "@/components/state/project-session";
 import { useSharedBassResults } from "@/components/room/bass/bassResultsStore";
@@ -177,8 +177,10 @@ function buildComparisonPills(values) {
     ? [levelText(values.p18Level), values.p18Hz != null ? `${values.p18Hz.toFixed(0)} Hz` : null].filter(Boolean).join(" · ")
     : "—";
   const p19ResultText = values.p19Level != null ? levelText(values.p19Level) : "—";
+  // P20 deviation text is the canonical floored whole dB (5.8 → ±5 dB), never a
+  // nearest-integer rendering of the raw value.
   const p20ResultText = values.p20Level != null
-    ? [levelText(values.p20Level), values.p20VariationDb != null ? `${values.p20VariationDb.toFixed(0)} dB` : null].filter(Boolean).join(" · ")
+    ? [levelText(values.p20Level), values.p20VariationDb != null ? formatP19P20DeviationText(values.p20VariationDb) : null].filter(Boolean).join(" · ")
     : "—";
   return [
     { key: "p14", level: values.p14Level, resultText: p14ResultText },

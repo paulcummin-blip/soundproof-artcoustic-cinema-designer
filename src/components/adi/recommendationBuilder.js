@@ -24,6 +24,7 @@ import { RECOMMENDATION_INTENT } from '@/components/room/bass/recommendationAuth
 import { LEVER_CLASS, PROBLEM_TYPE } from '@/components/recommendationEngine/recommendationTypes';
 import { buildDiagnosisCopy } from '@/components/recommendationEngine/recommendationDiagnosisCopy';
 import { CORRECTABILITY_CLASS, ADI_OUTCOME } from './adiConstants';
+import { formatP19P20DeviationText } from '@/components/utils/rp22/resolveRp22DesignValue';
 
 function numericLevel(value) {
   if (Number.isFinite(Number(value))) return Math.max(0, Math.min(4, Number(value)));
@@ -131,7 +132,13 @@ function deriveRp22Evidence(dominant, currentResult) {
       const curRaw = Math.abs(Number(cur.variationDbRaw) || 0);
       const delta = curRaw - candRaw;
       if (delta >= 1.0) {
-        changes.push({ parameter: 'P20', from: `${curRaw.toFixed(1)} dB`, to: `${candRaw.toFixed(1)} dB` });
+        // Stated at the canonical floored whole dB — the same integer the seat
+        // results and the P20 level are read at.
+        changes.push({
+          parameter: 'P20',
+          from: formatP19P20DeviationText(curRaw),
+          to: formatP19P20DeviationText(candRaw),
+        });
       }
     }
   }
