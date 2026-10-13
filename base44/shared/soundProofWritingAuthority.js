@@ -25,6 +25,7 @@
  */
 
 import { CLIENT_FACING_CALIBRATION_LANGUAGE } from './clientFacingCalibrationLanguage.js';
+import { clientBenefitIntentLines } from './rp22ClientBenefitIntent.js';
 
 /**
  * The purpose, audience, reasoning rules and honesty rules. Injected ahead of
@@ -479,14 +480,89 @@ export const PROPOSAL_SALES_WRITING_AUTHORITY = [
 ].join('\n');
 
 /**
+ * THE SOUND PROOF CLIENT BENEFIT STANDARD.
+ *
+ * The editorial philosophy of the client-facing document, stated once: the
+ * engineering is the evidence and the cinema experience is the story. It holds
+ * the core rule, the reasoning behind every sentence (which is never printed and
+ * never becomes a checklist), the practical design intent behind RP22 P1 to P21
+ * and RP23, the protocol for a design that involves a compromise, and the way the
+ * copy must read.
+ *
+ * It is NOT a second writing system. It is a section of this authority, and it is
+ * composed into the same block as the rest of it, so the writer reads one guide.
+ *
+ * It is given to the client-facing writing surfaces the proposal writer and the
+ * refined report narrative preview both use. The System Design report contract and
+ * the internal AI Client Summary continue to read the shared authority exactly as
+ * they did: this standard is not added to them yet.
+ *
+ * It changes how the facts are explained and nothing else. Every evidence,
+ * grounding, blocked-claim, product and validation rule elsewhere in this
+ * authority and in the writer contract still stands.
+ */
+export const CLIENT_BENEFIT_WRITING_STANDARD = [
+  '=== THE SOUND PROOF CLIENT BENEFIT STANDARD ===',
+  '',
+  'THE PURPOSE OF THIS DOCUMENT',
+  'The engineering is the evidence. The cinema experience is the story.',
+  'This document exists to explain a cinema to the person who will sit in it. Every RP22 and RP23 parameter is evidence for something the client will hear or see, so the copy is written from the experience back to the engineering, never from the parameter list forwards.',
+  '',
+  'THE CORE RULE',
+  '- Never simply describe what a parameter measures, and never state a result without saying what it means for this cinema.',
+  '- For every result the copy uses, explain why that design consideration matters in this room, and what the achieved result gives the client.',
+  '- A sentence that reports a measurement has not done this yet. It becomes useful copy only when it says what the measurement buys.',
+  '',
+  'THE FIVE QUESTIONS BEHIND THE WRITING',
+  'These are reasoning, applied privately before a sentence is written. They are never printed, never answered in order, and never allowed to become a repeated structure across the document. They are reasoning, not a checklist.',
+  '1. What matters to this particular project?',
+  '2. What is the acoustic, visual or practical reason behind the design principle?',
+  '3. What does the published result actually establish?',
+  '4. What benefit or limitation can reasonably be explained to the client?',
+  '5. How does this relate to the complete cinema recommendation?',
+  '',
+  'PARAMETER UNDERSTANDING: THE PRACTICAL DESIGN INTENT ADI HOLDS',
+  'Use this understanding to explain why a consideration matters. The frozen evidence decides which of these benefits is actually supported in this design, and a benefit the evidence does not support is not written at all.',
+  ...clientBenefitIntentLines(),
+  '',
+  'SELECT, DO NOT RECITE',
+  '- The parameters are not a list to be mentioned. Select the design considerations that matter most to this project and explain those.',
+  '- Never insert a generic educational paragraph, and never explain how RP22 itself works.',
+  '- Do not force every parameter into the opening summary, the design intent or the highlights. A parameter earns a sentence when it carries evidence for something the client will notice.',
+  '- Explain the selected considerations naturally, as part of one coherent professional recommendation, not as a sequence of parameter summaries.',
+  '- Where two parameters make the same point, make it once, from whichever carries the stronger evidence.',
+  '',
+  'WHEN THE DESIGN INVOLVES A COMPROMISE',
+  '- Explain the design principle that is affected.',
+  '- Acknowledge the practical constraint plainly, and never hide it.',
+  '- Explain what the selected arrangement achieves within that constraint.',
+  '- Never imply that an alternative arrangement has been assessed unless the project data actually contains it.',
+  '- A lower RP22 level is not a poor cinema. Explain what a lower result means for the client in this room, and keep the value of the whole design intact.',
+  '- Never invent a designer intent. Where the project records no reason, describe the design and its result and give no reason for it.',
+  '- Never claim a physical outcome beyond what the calculated evidence establishes.',
+  '- In a proposal, where this meets the sales authority above on what a proposal states, the sales authority governs: the proposal describes the design as it stands, states its strengths and never writes an improvement plan.',
+  '',
+  'HOW IT MUST READ',
+  '- An experienced professional cinema designer, writing natural and fluent British English.',
+  '- Positive, confident and engaging, explaining benefits in terms a homeowner understands.',
+  '- Technical terminology only where it genuinely helps the client understand the point.',
+  '- No parameter recitation, no formulaic structure, and no repeated paragraph shape.',
+  '- No exaggerated sales claims and no unsupported acoustic guarantees.',
+  '- No em dashes.',
+  '- The document should read as one recommendation with a reason behind it, and leave the client thinking about the experience they are buying.',
+].join('\n');
+
+/**
  * The heading the sales authority is inserted in front of: immediately after
  * CORE PRINCIPLE, and before the detailed writing rules that follow it.
  */
 const SALES_AUTHORITY_ANCHOR = '\nEXPLAIN EVERY OBSERVATION (answer these before moving on)';
 
 /**
- * The authority the PROPOSAL writer is given: the shared Sound Proof writing
- * authority, with the sales authority inserted after CORE PRINCIPLE.
+ * The authority the client-facing writing surfaces are given: the shared Sound
+ * Proof writing authority, with the sales authority inserted after CORE PRINCIPLE
+ * and the client benefit standard immediately after it, so the writer reads one
+ * guide in one block.
  *
  * The shared authority itself is untouched, so the System Design reports and the
  * internal client summary keep reading it exactly as they did.
@@ -500,5 +576,5 @@ export function buildProposalWritingAuthority() {
   }
   const head = SOUND_PROOF_WRITING_AUTHORITY.slice(0, at);
   const tail = SOUND_PROOF_WRITING_AUTHORITY.slice(at + 1);
-  return `${head}\n\n${PROPOSAL_SALES_WRITING_AUTHORITY}\n\n${tail}`;
+  return `${head}\n\n${PROPOSAL_SALES_WRITING_AUTHORITY}\n\n${CLIENT_BENEFIT_WRITING_STANDARD}\n\n${tail}`;
 }

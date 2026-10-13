@@ -59,15 +59,8 @@ export const DESIGN_CONTENTS_RULE =
   'these are the physical contents of this design, stated as facts: a layout, a channel count or a subwoofer count is '
   + 'evidence of what the design contains and never of why it was chosen, so nothing here is a reason, a benefit or a decision';
 
-/**
- * PARAMETER 1's two measurements, stated once. The nearest boundary is what P1
- * assesses; the wall behind the seating is a different measurement with its own
- * acoustic meaning, and one is never read from the other.
- */
-export const SEATING_BOUNDARY_TWO_MEASUREMENTS =
-  'the distance to the nearest room boundary and the distance to the wall behind the seating are two different '
-  + 'measurements: the nearest boundary may be a side wall, the front wall or the rear wall, and neither distance '
-  + 'is ever inferred from the other';
+// PARAMETER 1's two measurements are stated once, in the seating-boundary module.
+export { SEATING_BOUNDARY_TWO_MEASUREMENTS } from './adiSeatingBoundary.js';
 
 /** Designer intent exists only where the designer has RECORDED an explanation. */
 export const CONFIRMED_INTENT_RULE =
@@ -319,46 +312,11 @@ export function buildProjectInterpretation(params = {}) {
   // The two measurements are kept apart on purpose: the distance to the NEAREST
   // boundary, which is what P1 assesses and may be a side wall, and the distance
   // to the wall BEHIND the seating, which carries its own low-frequency meaning.
-  // Nothing is graded here and no level is stated: the P1 authority keeps that.
-  const seatingBoundaryGeometry = readSeatBoundaryGeometry({
-    seats: (Array.isArray(snapshot?.seats) ? snapshot.seats : []).map((seat) => ({
-      id: seat?.id ?? null,
-      x: seat?.position?.x ?? seat?.x,
-      y: seat?.position?.y ?? seat?.y,
-      row: seat?.row,
-    })),
+  // Nothing is graded and no level is stated: the P1 authority keeps that.
+  const seatingBoundary = buildInterpretationSeatingBoundary({
+    snapshot,
     roomDims: { widthM, lengthM },
   });
-  const seatingBoundaryExplanation = buildSeatingBoundaryExplanation(seatingBoundaryGeometry);
-  const round2 = (value) => (Number.isFinite(Number(value)) ? Math.round(Number(value) * 100) / 100 : null);
-  const seatingBoundary = {
-    ...(seatingBoundaryGeometry.available === true
-      ? {
-        available: true,
-        situation: seatingBoundaryExplanation.situation,
-        trade_off: seatingBoundaryGeometry.trade_off === true,
-        seat_count: seatingBoundaryGeometry.seat_count,
-        row_count: seatingBoundaryGeometry.row_count,
-        room_width_m: round2(seatingBoundaryGeometry.room_width_m),
-        room_length_m: round2(seatingBoundaryGeometry.room_length_m),
-        nearest_boundary: seatingBoundaryGeometry.nearest_boundary,
-        nearest_boundary_label: seatingBoundaryGeometry.nearest_boundary_label,
-        nearest_boundary_m: round2(seatingBoundaryGeometry.nearest_boundary_m),
-        distance_to_rear_wall_m: round2(seatingBoundaryGeometry.rear_row_rear_wall_m),
-        rear_wall_is_the_nearest_boundary: seatingBoundaryGeometry.rear_wall_is_nearest === true,
-        room_is_the_constraint: seatingBoundaryGeometry.room_is_constraint === true,
-      }
-      : {
-        available: false,
-        reason: seatingBoundaryGeometry.reason,
-      }),
-    the_two_measurements: SEATING_BOUNDARY_TWO_MEASUREMENTS,
-    principle: SEATING_BOUNDARY_PRINCIPLE,
-    compromises: [...SEATING_BOUNDARY_COMPROMISES],
-    limits: SEATING_BOUNDARY_LIMITS,
-    balance: [...SEATING_BOUNDARY_BALANCE],
-    rules: [...SEATING_BOUNDARY_RULES],
-  };
 
   const screen = room.screen || {};
   const screenSizeInches = num(screen.size_inches);
@@ -733,6 +691,7 @@ export function formatInterpretationForPrompt(interpretation) {
     interpretation.designer_emphasis || 'None provided. Use a balanced professional narrative.',
     ...designPhilosophyLines(interpretation.design_philosophy),
     ...rp22ContextLines(interpretation.rp22_context),
+    ...seatingBoundaryLines(interpretation.seating_boundary),
     '',
     'HOW TO USE THIS:',
     '- Where the copy explains the reasoning behind the design, use the reasoning recorded above and never a reason it does not record.',
@@ -741,6 +700,7 @@ export function formatInterpretationForPrompt(interpretation) {
     '- Write the story first, then support it with the results that matter for this room.',
     '- Reference a parameter only where it is the clearest evidence for something the client will hear.',
     '- Do not work through the results one by one, and do not quote a level without explaining what it means.',
+    SEATING_BOUNDARY_PROMPT_USE,
     '- Never mention anything listed under "' + NOT_USED_HEADING + '".',
     `- ${P20_USE_RULE}`,
     `- ${P20_OMIT_RULE}`,
@@ -775,6 +735,7 @@ export function formatInterpretationForLog(interpretation) {
     `emphasis=${interpretation.designer_emphasis ? 'provided' : 'none'}`,
     `design_philosophy=${interpretation.design_philosophy?.version || 'none'}`,
     `rp22_context=${interpretation.rp22_context?.version || 'none'}:${(interpretation.rp22_context?.principles || []).map((entry) => entry.principle_id).join(' ') || 'none'}`,
+    `seating_boundary=${interpretation.seating_boundary?.available === true ? interpretation.seating_boundary.situation : 'not available'}`,
     `value_engineering=${(interpretation.design_philosophy?.reasoning?.value_engineering?.already_captured || []).map((entry) => entry.area).join('; ') || 'none'}`,
   ].join(' | ');
 }

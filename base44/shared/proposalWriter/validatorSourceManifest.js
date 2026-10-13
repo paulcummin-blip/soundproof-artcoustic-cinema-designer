@@ -6,7 +6,7 @@ export const VALIDATOR_SOURCE_MANIFEST = Object.freeze({
   'base44/shared/proposalWriter/writerEditorialRules.js': '08776775a8a4bdd2f2a167804809d5db51d750c4a01a1ac8ee23830761475324',
   'base44/shared/proposalWriter/writerSalesPolishRules.js': '2e8d0a0c206141d99d9af0c48b24a565002bd7f63497dedffc431b14b4ae8825',
   'base44/shared/proposalWriter/writerProductScope.js': '7b15e264a35b8f7c1694c3e5c70c3d43e2d06c4a77e195a01cb9e0ec47e11749',
-  'base44/shared/proposalWriter/writerVocabulary.js': 'f4d2c362cab58c2bd600b9eacab0c2d4c0fa0e5e43399bb5168deef7d62d2030',
+  'base44/shared/proposalWriter/writerVocabulary.js': '84902874116846e6ecc66574890387d2c4d7de508e6c1a861269dfaec28e1322',
   'base44/shared/proposalWriter/writerClausePrecision.js': '0d7be2c8e2dd98c395c5bf999bd6c306cb48b9c15bc0ffae2d7f31fd31ddae94',
   'base44/shared/proposalWriter/writerViolationAudit.js': '4cc361d1c96a101fc29330d740cef2184ae5650fd3cc64e253892d004efdb0b9',
   'base44/shared/proposalWriter/writerDesignStageRules.js': 'a26d5ff98a2eaf4f6de929cc62cba7e7bc2632540f12d44ded72e8cb7f8bdbb7',
@@ -33,7 +33,7 @@ export const VALIDATOR_SOURCE_MANIFEST = Object.freeze({
   // reasoning authority it was written under.
   'base44/shared/designPhilosophyAuthority.js': '1a4ba9bfd86d5bd17cabac52e6dab78359f601f92b14e0a63703d679915179fc',
   'base44/shared/adiDesignPhilosophy.js': 'cd275e6c1ba1c768378b701e5494f10042b550727e806ca1f24716d0c06103cc',
-  'base44/shared/adiProjectInterpretation.js': 'f43d09f2f23fe67be86bcef75a484ee9920ebb9529090be7e7b67a3bdd630edd',
+  'base44/shared/adiProjectInterpretation.js': '120d06a045969bc3d003eca754f6e1986f3c821e97b7afc81f87c40db7fd45e3',
   // The check between the saved interpretation and the frozen evidence, which now
   // also holds the design philosophy's own statements to it.
   'base44/shared/proposalWriter/writerInterpretationEvidenceCheck.js': '2e88d5c9c5b3bc2e9000adaf528dc98e52c073c7c92fecc02c2030199fc412a0',
@@ -57,7 +57,7 @@ export const VALIDATOR_SOURCE_MANIFEST = Object.freeze({
   // was read under, its applicability, what it does not establish and its safe use.
   // Hashed so a draft can always be traced to the exact professional context, and the
   // exact applicability rule, it was written against.
-  'base44/shared/rp22DesignContext.js': 'a2f9e33841802bf5743b1280081a44c26c78cdc8fc1eafa089ae8d405b3b24cf',
+  'base44/shared/rp22DesignContext.js': 'b46ca0a57357b1c666f03361aaa80c1e7f38d0750777cdcbbe90a7d2ef6b5af6',
   // The check between a saved interpretation and the frozen evidence, which removes
   // only the statements the evidence actually contradicts.
   'base44/shared/proposalClarification/verifiedInterpretation.js': '86d6c7038393d25b4ee9bdcfedd6202cb7e3e7072409dd070001d32b030caf34',
