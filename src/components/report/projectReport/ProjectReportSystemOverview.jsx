@@ -109,11 +109,12 @@ export default function ProjectReportSystemOverview({
     return entries.length > 0;
   });
 
-  // The viewing geometry table shares the specification schedule's own grid: the
-  // same row-name column width, the same content width and the same right edge.
-  // Every value is aligned under its own heading, so the front and rear rows read
-  // identically and each row's RP23 pill lands in one consistent column. This is
-  // alignment only — no value, level or score is touched.
+  // The viewing geometry table is a plain four-column table — Row, Seats, Viewing
+  // angle, RP23 — so every heading sits directly above its own values and each row
+  // stays together. Its row-name column is the schedule's own width and its right
+  // boundary is the schedule's right boundary; its internal columns are its own,
+  // because the two tables describe different things. Alignment only — no value,
+  // level or score is touched.
   const geometryHeading = {
     fontFamily: FONT_HEADING,
     fontSize: print ? 7 : 9,
@@ -121,7 +122,10 @@ export default function ProjectReportSystemOverview({
     textTransform: 'uppercase',
     color: '#625143',
   };
-  const geometryValue = { textAlign: 'right' };
+  // The last column is right-aligned so the table ends on the schedule's right
+  // boundary; the row name and the two measured columns read left-aligned, exactly
+  // as the schedule's cells do.
+  const geometryRight = { textAlign: 'right' };
 
   return (
     <div style={{ fontFamily: FONT_BODY, color: '#1B1A1A' }}>
@@ -175,11 +179,13 @@ export default function ProjectReportSystemOverview({
           }} />
           <div style={{
             display: 'grid',
-            // The schedule's own row-name column, then the page's full remaining
-            // content width, then the value columns sized by their own content and
-            // right-aligned — so the table ends at the schedule's right edge and
-            // each heading sits exactly over the values beneath it.
-            gridTemplateColumns: print ? '34mm 1fr auto auto auto' : '150px 1fr auto auto auto',
+            // FOUR tracks for four columns: Row, Seats, Viewing angle, RP23. The
+            // row-name column is the schedule's own width, the two measured columns
+            // share what is left, and the RP23 column is sized by its own content
+            // and right-aligned. The track count must always equal the number of
+            // cells each row contributes — one more track and every row's cells
+            // would spill into the row above it.
+            gridTemplateColumns: print ? '34mm 1fr 1fr auto' : '150px 1fr 1fr auto',
             gap: print ? '2mm 4mm' : '8px 14px',
             // Centred, so each row's level pill sits on the same line as the
             // seat count and viewing angle beside it.
@@ -188,16 +194,16 @@ export default function ProjectReportSystemOverview({
             color: '#3E4349',
           }}>
             <div style={geometryHeading}>Row</div>
-            <div style={{ ...geometryHeading, ...geometryValue }}>Seats</div>
-            <div style={{ ...geometryHeading, ...geometryValue }}>Viewing angle</div>
-            <div style={{ ...geometryHeading, ...geometryValue }}>RP23</div>
+            <div style={geometryHeading}>Seats</div>
+            <div style={geometryHeading}>Viewing angle</div>
+            <div style={{ ...geometryHeading, ...geometryRight }}>RP23</div>
             {geometry.map((row) => (
               <React.Fragment key={row.key}>
                 <div>{row.label}</div>
-                <div style={geometryValue}>{row.seats}</div>
-                <div style={geometryValue}>{row.angleText}</div>
+                <div>{row.seats}</div>
+                <div>{row.angleText}</div>
                 {/* Each row's own RP23 result, as the canonical level pill. */}
-                <div style={geometryValue}>{row.levels.length ? <ReportLevelValue levels={row.levels} /> : DASH}</div>
+                <div style={geometryRight}>{row.levels.length ? <ReportLevelValue levels={row.levels} /> : DASH}</div>
               </React.Fragment>
             ))}
           </div>
