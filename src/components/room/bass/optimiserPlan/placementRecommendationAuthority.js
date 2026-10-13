@@ -28,6 +28,7 @@ import { LEVER_APPLY_LABEL, LEVER_UNDO_LABEL } from "./optimiserPlanLeverApply.j
 import {
   deltaText,
   deviationText,
+  frequencyText,
   levelText,
   wholeDbImprovement,
 } from "./optimiserWholeNumberDb.js";
@@ -35,14 +36,15 @@ import {
   PLACEMENT_APPLIED_MESSAGE,
   PLACEMENT_BASELINE_MISMATCH,
   PLACEMENT_DEFINITION,
+  PLACEMENT_MOVE_NOT_RETAINED,
   PLACEMENT_PANEL_TITLE,
   PLACEMENT_PREVIEW_UNAVAILABLE,
-  PLACEMENT_PREVIOUS_FOUND,
   PLACEMENT_PREVIOUS_FOUND_STALE,
   PLACEMENT_THEORETICAL_NOTE,
   PLACEMENT_UNDONE_MESSAGE,
   describePlacementMove,
 } from "./placementMoveAuthority.js";
+import { formatSeatLabel } from "../../../utils/seatLabel.jsx";
 import {
   PLACEMENT_CREDIBILITY,
   assessPlacementPlausibility,
@@ -59,11 +61,43 @@ export const PLACEMENT_KIND = Object.freeze({
   NOTE: "note",
 });
 
+/**
+ * Whether the recommendation belongs to the design as it stands now, or to an
+ * earlier run — and whether carrying it out is the designer's own decision.
+ * Stated in the card so neither is ever left to be inferred.
+ */
+export const PLACEMENT_RESULT_STATUS = Object.freeze({
+  RECOMMENDED: "Current design. Requires your approval — the physical change is not applied automatically.",
+  PREVIOUS: "From a previous ADI run — not the current design state.",
+  APPLIED: "Applied to the current design.",
+  NOTE: "Current design. Stated as a note only — no move is offered.",
+});
+
 const num = (value) => {
   if (value === null || value === undefined || value === "") return null;
   const numeric = Number(value);
   return Number.isFinite(numeric) ? numeric : null;
 };
+
+/** "Row 1 - Seat 2" — the designer's own seat name, never a raw id where one exists. */
+function seatPhrase(seatId) {
+  if (typeof seatId !== "string" || !seatId.trim()) return null;
+  return formatSeatLabel(seatId.trim());
+}
+
+/**
+ * WHY the move is expected to help, from the limiting result the design measures
+ * now: the worst seat, and the frequency it is worst at. Stated only when the
+ * evidence carries them — the reason is read, never inferred, and the sentence
+ * claims nothing beyond the measurement it names.
+ */
+export function resolvePlacementReason({ currentP20 = null, baseline = null } = {}) {
+  const seatText = seatPhrase(currentP20?.seatId || baseline?.worstSeatId);
+  const frequency = frequencyText(currentP20?.frequencyHz ?? baseline?.worstFrequencyHz);
+  if (!seatText && !frequency) return null;
+  const where = seatText && frequency ? `${seatText} around ${frequency}` : (seatText || `around ${frequency}`);
+  return `This reduces the limiting seat-to-seat variation measured at ${where}.`;
+}
 
 /** "3 dB" for a change of 1 dB or more, in whole numbers. Null below that. */
 function magnitudeText(delta) {
@@ -127,7 +161,16 @@ function placementEvidenceFromRun(planView) {
   const p20DeltaDb = num(attempt.p20DeltaDb);
   const p19DeltaDb = num(attempt.p19DeltaDb);
   if (magnitudeText(p20DeltaDb) == null && magnitudeText(p19DeltaDb) == null) return null;
-  return { p20DeltaDb, p19DeltaDb };
+  // The attempt's own absolute values travel with the deltas, so the measured
+  // improvement is stated as a before → after pair whenever the run kept both.
+  return {
+    p20DeltaDb,
+    p19DeltaDb,
+    p20VariationDb: num(attempt.p20VariationDb),
+    p19VariationDb: num(attempt.p19VariationDb),
+    p20Level: num(attempt.p20Level),
+    p19Level: num(attempt.p19Level),
+  };
 }
 
 /**
@@ -149,14 +192,30 @@ function expectedRows({ baseline = null, effect = null, evidence = null, current
     return rows;
   }
 
-  // No retained change: the run's own measured delta is all there is. It is
-  // stated as a measured improvement — never as an absolute after value.
+  // No retained change: the run's own measured result is all there is. The
+  // improvement is stated as the before → after pair the run kept when both
+  // values exist, and as the measured change itself otherwise — never as an
+  // absolute figure the run did not measure.
   if (!effect && evidence) {
     const rows = [];
-    const p20 = magnitudeText(evidence.p20DeltaDb);
+    const before = deviationText(baseline?.p20VariationDb);
+    const after = deviationText(evidence.p20VariationDb);
+    if (before && after && before !== after) {
+      rows.push({
+        label: "P20",
+        value: `${before} → ${after}`,
+        before,
+        after,
+        improvementDb: wholeDbImprovement(baseline?.p20VariationDb, evidence.p20VariationDb),
+        levelBefore: levelText(baseline?.p20Level),
+        levelAfter: levelText(evidence.p20Level),
+      });
+    } else {
+      const p20 = magnitudeText(evidence.p20DeltaDb);
+      if (p20) rows.push({ label: "P20", value: `a ${p20} improvement measured in that evaluation` });
+    }
     const p19 = magnitudeText(evidence.p19DeltaDb);
-    if (p20) rows.push({ label: "P20", value: `better by ${p20} (measured in that evaluation)` });
-    if (p19) rows.push({ label: "P19", value: `better by ${p19} (measured in that evaluation)` });
+    if (p19) rows.push({ label: "P19", value: `a ${p19} improvement measured in that evaluation` });
     if (rows.length === 0) rows.push({ label: "P20", value: "a measured improvement" });
     return rows;
   }
@@ -179,7 +238,22 @@ function expectedRows({ baseline = null, effect = null, evidence = null, current
 
   const p19Delta = deltaText(effect?.p19DeltaDb);
   const p19Level = levelText(effect?.p19Level ?? baseline?.p19Level);
-  if (p19Delta && p19Delta !== "no meaningful change") rows.push({ label: "P19", value: p19Delta });
+  const p19Before = deviationText(baseline?.p19VariationDb);
+  const p19After = deviationText(effect?.p19VariationDb);
+  const p19Moves = Boolean(p19Delta) && p19Delta !== "no meaningful change";
+  if (p19Moves && p19Before && p19After && p19Before !== p19After) {
+    // A P19 change is stated as the same before → after pair P20 uses, from the
+    // values the evaluation measured — never as a delta with no frame.
+    rows.push({
+      label: "P19",
+      value: `${p19Before} → ${p19After}`,
+      before: p19Before,
+      after: p19After,
+      improvementDb: wholeDbImprovement(baseline?.p19VariationDb, effect?.p19VariationDb),
+      levelBefore: levelText(baseline?.p19Level),
+      levelAfter: levelText(effect?.p19Level),
+    });
+  } else if (p19Moves) rows.push({ label: "P19", value: p19Delta });
   else if (p19Level) rows.push({ label: "P19", value: `remains ${p19Level} / no meaningful change` });
   else rows.push({ label: "P19", value: "no meaningful change" });
 
@@ -228,15 +302,34 @@ function recommendedSummary(effect) {
   return "ADI found that moving the subwoofers improves this design.";
 }
 
-/** The summary for an improvement the saved evaluation can no longer offer. */
-function previousSummary(evidence) {
-  const p20 = magnitudeText(evidence?.p20DeltaDb);
-  if (p20) {
-    return `That evaluation measured seat-to-seat bass consistency (P20) better by ${p20}.`;
+/**
+ * The summary for an improvement the saved evaluation can no longer offer. It
+ * states what that evaluation measured — as the before → after pair whenever the
+ * run kept both values, and as the measured change itself otherwise.
+ */
+function previousSummary(evidence, baseline = null) {
+  const before = deviationText(baseline?.p20VariationDb);
+  const after = deviationText(evidence?.p20VariationDb);
+  if (before && after && before !== after) {
+    return `That evaluation measured seat-to-seat bass consistency (P20) from ${before} to ${after}.`;
   }
+  const p20 = magnitudeText(evidence?.p20DeltaDb);
+  if (p20) return `That evaluation measured a ${p20} improvement in seat-to-seat bass consistency (P20).`;
   const p19 = magnitudeText(evidence?.p19DeltaDb);
-  if (p19) return `That evaluation measured P19 consistency better by ${p19}.`;
+  if (p19) return `That evaluation measured a ${p19} improvement in P19 consistency.`;
   return "That evaluation measured an improvement in the subwoofer positions.";
+}
+
+/** A lever effect, reduced to the evidence the previous-summary sentence states. */
+function effectEvidence(effect) {
+  return {
+    p20DeltaDb: effect?.p20DeltaDb,
+    p19DeltaDb: effect?.p19DeltaDb,
+    p20VariationDb: effect?.p20VariationDb,
+    p19VariationDb: effect?.p19VariationDb,
+    p20Level: effect?.p20Level,
+    p19Level: effect?.p19Level,
+  };
 }
 
 /**
@@ -283,6 +376,13 @@ export function resolvePlacementRecommendation({
     theoreticalNote: null,
     notice: null,
     message: null,
+    // Whether the result belongs to the design as it stands now or to an earlier
+    // run, and whether carrying it out is the designer's own decision.
+    statusText: null,
+    approvalRequired: true,
+    // WHY the move is expected to help, read from the limiting seat and
+    // frequency. Null whenever that evidence is not there.
+    reason: null,
   };
 
   // ── No retained placement change ──
@@ -295,10 +395,13 @@ export function resolvePlacementRecommendation({
       ...base,
       kind: PLACEMENT_KIND.PREVIOUS,
       status: "Tested",
-      summary: previousSummary(evidence),
+      summary: previousSummary(evidence, baseline),
       expected: expectedRows({ baseline, evidence }),
+      // No evaluated move was kept, so no physical change is stated at all: the
+      // card says what is missing and names the one action that produces it.
       move: null,
-      notice: PLACEMENT_PREVIOUS_FOUND,
+      notice: PLACEMENT_MOVE_NOT_RETAINED,
+      statusText: PLACEMENT_RESULT_STATUS.PREVIOUS,
       canApply: false,
       canUndo: false,
       canRerun: true,
@@ -354,6 +457,8 @@ export function resolvePlacementRecommendation({
       summary: recommendedSummary(lever.effect),
       expected: expectedRows({ baseline, effect: lever.effect }),
       move,
+      statusText: PLACEMENT_RESULT_STATUS.APPLIED,
+      reason: resolvePlacementReason({ currentP20, baseline }),
       message: undone ? PLACEMENT_UNDONE_MESSAGE : PLACEMENT_APPLIED_MESSAGE,
       canApply: false,
       // Undo stays available while the design still holds the recommended
@@ -372,9 +477,11 @@ export function resolvePlacementRecommendation({
       ...base,
       kind: PLACEMENT_KIND.PREVIOUS,
       status: "Tested",
-      summary: previousSummary({ p20DeltaDb: lever.effect?.p20DeltaDb, p19DeltaDb: lever.effect?.p19DeltaDb }),
+      summary: previousSummary(effectEvidence(lever.effect), baseline),
       expected: expectedRows({ baseline, effect: lever.effect, currentP20 }),
       move,
+      statusText: PLACEMENT_RESULT_STATUS.PREVIOUS,
+      reason: resolvePlacementReason({ currentP20, baseline }),
       notice: PLACEMENT_BASELINE_MISMATCH,
       canApply: false,
       canUndo: false,
@@ -388,9 +495,11 @@ export function resolvePlacementRecommendation({
       ...base,
       kind: PLACEMENT_KIND.PREVIOUS,
       status: "Tested",
-      summary: previousSummary({ p20DeltaDb: lever.effect?.p20DeltaDb, p19DeltaDb: lever.effect?.p19DeltaDb }),
+      summary: previousSummary(effectEvidence(lever.effect), baseline),
       expected: expectedRows({ baseline, effect: lever.effect }),
       move,
+      statusText: PLACEMENT_RESULT_STATUS.PREVIOUS,
+      reason: resolvePlacementReason({ currentP20, baseline }),
       notice: PLACEMENT_PREVIOUS_FOUND_STALE,
       canApply: false,
       canUndo: false,
@@ -421,6 +530,7 @@ export function resolvePlacementRecommendation({
       summary: plausibility.reviewSummary,
       expected: expectedRows({ baseline, effect: lever.effect }),
       move: null,
+      statusText: PLACEMENT_RESULT_STATUS.NOTE,
       notice: plausibility.suitabilityNote,
       canApply: false,
       canUndo: false,
@@ -428,9 +538,17 @@ export function resolvePlacementRecommendation({
     };
   }
 
+  // Apply writes the evaluated positions, so it is offered only when the EXACT
+  // move is present: a named move, and the subwoofers it belongs to. A card that
+  // cannot state the move never carries an Apply.
+  const hasExactMove = Boolean(move?.movementLabel) && (move?.moves?.length || 0) > 0;
+
   // Parity first: an evaluation whose baseline was never established against the
   // published result is evidence, never an offer.
-  const canApply = parityBlocked !== true && lever.canApply === true && plausibility.applyAllowed === true;
+  const canApply = parityBlocked !== true
+    && hasExactMove
+    && lever.canApply === true
+    && plausibility.applyAllowed === true;
 
   return {
     ...base,
@@ -439,6 +557,8 @@ export function resolvePlacementRecommendation({
     summary: recommendedSummary(lever.effect),
     expected: expectedRows({ baseline, effect: lever.effect }),
     move,
+    statusText: PLACEMENT_RESULT_STATUS.RECOMMENDED,
+    reason: resolvePlacementReason({ currentP20, baseline }),
     // No on-plan preview of the proposed positions exists yet; stating nothing
     // would imply one does.
     notice: PLACEMENT_PREVIEW_UNAVAILABLE,
