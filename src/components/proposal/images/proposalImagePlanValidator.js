@@ -10,7 +10,9 @@
  *     the two uses;
  *   - the same crop is never repeated for a source;
  *   - every placement names its source image;
- *   - a dedicated gallery spread never repeats a source the document placed;
+ *   - a dedicated gallery spread never repeats a source the document placed in
+ *     the narrative (the cover page's own use does not count: a cover selection
+ *     never consumes the photograph);
  *   - a seating-style image is never presented as a performance difference;
  *   - a comparison image is placed on its group's own page and nowhere else,
  *     and is never reused as an unrelated gallery image.
@@ -101,7 +103,16 @@ export function validateProposalImagePlan(plan, { galleryImages = [], comparison
     }
   }
 
-  const placedIds = new Set(everyPlacement.map((placement) => placement.source_asset_id).filter(Boolean));
+  // The cover page's own use is not a body placement: a photograph chosen for the
+  // cover is not consumed by it, so its source may still be kept for the body.
+  // Every other placement counts, so a photograph the document placed in the
+  // narrative is still never repeated on an image page.
+  const placedIds = new Set(
+    everyPlacement
+      .filter((placement) => placement.editorial_role !== EDITORIAL_ROLE.COVER)
+      .map((placement) => placement.source_asset_id)
+      .filter(Boolean),
+  );
   (Array.isArray(galleryImages) ? galleryImages : []).forEach((image) => {
     if (image?.id && placedIds.has(image.id)) {
       flag(

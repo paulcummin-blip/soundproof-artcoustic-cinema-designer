@@ -22,6 +22,11 @@
  * page apart. Where no source satisfies the spacing rule for a page, that page
  * simply carries no image: the planner never fills a page to make a gallery.
  *
+ * A photograph chosen for the cover is not consumed by it: the cover page takes
+ * the portrait crop, and the same source still takes its own place in the body —
+ * returning as the visual break where the rhythm allows it, and otherwise kept on
+ * the image page rather than dropped from the document.
+ *
  * A source the designer marked FULL WIDTH is never composed as a smaller crop:
  * the prominent presentation that was chosen always leads, and a supporting
  * placement is taken from another source or not at all.
@@ -343,11 +348,24 @@ export function planProposalImages({ assets = [], sectionSlots = [], coverAssetI
     add(pickLandscape(closingEntry.page), EDITORIAL_ROLE.CLOSING_FEATURE, closingEntry.section_id, closingEntry.page);
   }
 
-  // Every selected source not used editorially is retained in the gallery.
-  // An image's explicit Do Not Use flag is the only exclusion, never a count threshold.
-  const placedIds = new Set(placements.map((placement) => placement.source_asset_id).filter(Boolean));
+  // Every selected source the document has not placed in the body is retained for
+  // the image page. An image's explicit Do Not Use flag is the only exclusion,
+  // never a count threshold.
+  //
+  // A photograph chosen for the cover is not consumed by that choice: the cover
+  // takes the portrait crop on page 1, and the same source still takes its own
+  // place in the body. Only the body placements are counted here — the cover
+  // page's own use is not one of them — so a cover photograph the editorial
+  // rhythm had no slot for is retained rather than silently dropped, and no
+  // source is ever listed twice.
+  const bodyPlacedIds = new Set(
+    placements
+      .filter((placement) => placement.editorial_role !== EDITORIAL_ROLE.COVER)
+      .map((placement) => placement.source_asset_id)
+      .filter(Boolean),
+  );
   const galleryImages = usable.filter(
-    (asset) => asset.id && !placedIds.has(asset.id) && asset !== coverAsset
+    (asset) => asset.id && !bodyPlacedIds.has(asset.id)
       && !seatingStyleOf(asset) && !isCompared(asset),
   );
 

@@ -5,7 +5,9 @@
  * guidance the writer is given about the design's identity.
  *
  * What it checks, and nothing else:
- *   - the cover keeps its dedicated cover-page treatment;
+ *   - the cover keeps its dedicated cover-page treatment, and the photograph chosen
+ *     for the cover is not consumed by it: the same source still takes its own
+ *     place in the body, so all four cinema photographs print;
  *   - the three photographs the designer marked FULL WIDTH each take one
  *     prominent placement, and none of them is composed as a smaller crop;
  *   - the seating plan (Layout drawing / Inline Detail) is placed with the account
@@ -152,13 +154,39 @@ test('the seating plan is placed with the seating account, whole and uncropped',
   assert.equal(drawing.source_caption, null);
 });
 
-test('no isolated technical drawing page, and no selected image is dropped', () => {
-  assert.equal(PLAN.galleryImages.length, 0, 'no image is left over for an image page');
-  assert.equal(PLAN.retainedGallery, false);
-  assert.equal(PLAN.selectedImageUrls.length, JOOCED_IMAGES.length);
+test('the photograph chosen for the cover is not consumed by it, and no image is dropped', () => {
+  // The cover page keeps its own treatment …
+  assert.equal(PLAN.coverPlacement.source_asset_id, 'cover');
+  assert.equal(PLAN.coverPlacement.editorial_role, EDITORIAL_ROLE.COVER);
 
-  const placedIds = new Set(PLAN.placements.map((placement) => placement.source_asset_id));
-  JOOCED_IMAGES.forEach((image) => assert.ok(placedIds.has(image.id), `${image.id} is placed`));
+  // … and the same photograph takes its own place in the body, so the four
+  // cinema photographs the proposal holds are all printed: each photographs once
+  // in the body, none of them omitted.
+  const bodyPhotographIds = PLAN.placements
+    .filter((placement) => placement.editorial_role !== EDITORIAL_ROLE.COVER)
+    .map((placement) => placement.source_asset_id)
+    .filter((id) => id !== DRAWING);
+  const printedPhotographs = [...new Set([...bodyPhotographIds, ...PLAN.galleryImages.map((image) => image.id)])];
+  assert.deepEqual(
+    printedPhotographs.slice().sort(),
+    ['cover', 'image-1', 'image-2', 'image-3'],
+    'four distinct photographs appear within the body',
+  );
+  bodyPhotographIds.forEach((id) => {
+    assert.equal(
+      bodyPhotographIds.filter((placed) => placed === id).length,
+      1,
+      `${id} occupies one body placement`,
+    );
+  });
+
+  // The photograph the editorial rhythm had no slot for is the one kept for the
+  // image page — the cover photograph, and only it. The drawing stays with its
+  // text and never becomes a page of its own.
+  assert.deepEqual(PLAN.galleryImages.map((image) => image.id), ['cover']);
+  assert.equal(PLAN.retainedGallery, true);
+  assert.equal(PLAN.galleryImages.some((image) => image.id === DRAWING), false);
+  assert.equal(PLAN.selectedImageUrls.length, JOOCED_IMAGES.length);
 });
 
 test('the plan stays inside the editorial rules', () => {
