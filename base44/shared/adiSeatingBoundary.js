@@ -72,6 +72,39 @@ function situationText(block) {
 const round2 = (value) => (Number.isFinite(Number(value)) ? Math.round(Number(value) * 100) / 100 : null);
 
 /**
+ * WHETHER PARAMETER 1 IS A LIVE CONSIDERATION FOR THIS DESIGN. Clearance is
+ * explained where the geometry or the room makes it a question: where the room
+ * limits it, where the rear row sits close to the wall behind it, where the
+ * seating keeps space behind itself, or where the seating comes close to any
+ * boundary. Everywhere else it is left alone, because a design whose seating
+ * already holds clearance from every boundary does not need a paragraph about
+ * clearance and the standard forbids forcing one into every narrative.
+ *
+ * Read from geometry alone: it grades nothing and states no level.
+ *
+ * @param {Object} geometry — readSeatBoundaryGeometry output
+ * @returns {{relevant:boolean, reason:string}}
+ */
+export function seatingBoundaryRelevance(geometry) {
+  if (!geometry || geometry.available !== true) {
+    return { relevant: false, reason: 'no seating or room geometry is recorded' };
+  }
+  if (geometry.trade_off === true) {
+    return { relevant: true, reason: 'the room itself is the constraint on how much clearance the seating can hold' };
+  }
+  if (geometry.rear_row_near_a_wall === true) {
+    return { relevant: true, reason: 'the rear row sits close to the wall behind it, which is the distance that matters most to the low frequencies' };
+  }
+  if (geometry.space_behind_seating === true) {
+    return { relevant: true, reason: 'the seating keeps space behind itself, taken from the floor area' };
+  }
+  if (geometry.clearance === 'limited' || geometry.clearance === 'tight') {
+    return { relevant: true, reason: 'the seating comes close to a boundary' };
+  }
+  return { relevant: false, reason: 'the seating holds clearance from every boundary and the room is not the constraint' };
+}
+
+/**
  * The seating-boundary block the interpretation carries, and the writer reads.
  *
  * @param {Object} input
@@ -91,6 +124,8 @@ export function buildInterpretationSeatingBoundary({ snapshot = null, roomDims =
   });
   const explanation = buildSeatingBoundaryExplanation(geometry);
 
+  const relevance = seatingBoundaryRelevance(geometry);
+
   return {
     ...(geometry.available === true
       ? {
@@ -105,6 +140,9 @@ export function buildInterpretationSeatingBoundary({ snapshot = null, roomDims =
         nearest_boundary_label: geometry.nearest_boundary_label,
         nearest_boundary_m: round2(geometry.nearest_boundary_m),
         distance_to_rear_wall_m: round2(geometry.rear_row_rear_wall_m),
+        row_spacing_m: round2(geometry.row_spacing_m),
+        rear_row_near_a_wall: geometry.rear_row_near_a_wall === true,
+        space_behind_seating: geometry.space_behind_seating === true,
         rear_wall_is_the_nearest_boundary: geometry.rear_wall_is_nearest === true,
         room_is_the_constraint: geometry.room_is_constraint === true,
       }
@@ -112,6 +150,8 @@ export function buildInterpretationSeatingBoundary({ snapshot = null, roomDims =
         available: false,
         reason: geometry.reason,
       }),
+    relevant: relevance.relevant,
+    relevance_reason: relevance.reason,
     the_two_measurements: SEATING_BOUNDARY_TWO_MEASUREMENTS,
     principle: SEATING_BOUNDARY_PRINCIPLE,
     compromises: [...SEATING_BOUNDARY_COMPROMISES],
@@ -127,6 +167,20 @@ export function buildInterpretationSeatingBoundary({ snapshot = null, roomDims =
  */
 export function seatingBoundaryLines(block) {
   if (!block) return [];
+
+  // Where clearance is not a live consideration for this design, the writer is
+  // told so plainly rather than being handed material it would then have to place
+  // somewhere: P1 is left out of the narrative instead of becoming a paragraph
+  // every section has to carry.
+  if (block.available === true && block.relevant !== true) {
+    return [
+      '',
+      'Seating clearance (RP22 Parameter 1): not a live consideration for this design. The seating holds clearance from '
+      + 'every boundary and the room is not the constraint, so no seating decision turns on it: do not raise it, and do '
+      + 'not write a seating-clearance paragraph.',
+    ];
+  }
+
   const lines = [
     '',
     'Seating clearance (RP22 Parameter 1: the design reason behind where the seating sits):',
@@ -136,6 +190,7 @@ export function seatingBoundaryLines(block) {
     lines.push(
       `  Where this design's seating sits: the nearest room boundary is the ${block.nearest_boundary_label || block.nearest_boundary} at ${block.nearest_boundary_m} m, and the seating keeps ${block.distance_to_rear_wall_m} m to the wall behind the rear row.`,
       `  This design's situation: ${situationText(block)}.`,
+      `  Why it is a live consideration here: ${block.relevance_reason}.`,
     );
   } else {
     lines.push('  Not stated: the frozen design records no seating coordinates or room dimensions, so no clearance is explained and none is invented.');

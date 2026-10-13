@@ -191,6 +191,13 @@ export function interpretationView(interpretation, { pack = null } = {}) {
     intended_use: asText(interpretation?.primary_design_intent),
     defining_feature: asText(interpretation?.defining_feature),
     seating_story: asText(interpretation?.primary_seating_story),
+    // WHERE THE SEATING SITS, AND WHY (RP22 Parameter 1). The clearance the saved
+    // design actually records, the principle behind it, the trade the seating
+    // makes, and whether it is a live consideration for THIS design at all. It is
+    // saved geometry and professional context, never a source of a figure or a
+    // Performance Level: it carries none, and it is used only where it marks
+    // itself relevant and only in the section that explains the seating.
+    seating_clearance: interpretation?.seating_boundary || null,
     strongest_areas: strongestAreas(interpretation?.strongest_areas),
     constraints: strings(interpretation?.main_constraints),
     // What the design CONTAINS: the layout, the channel counts, the subwoofer

@@ -132,6 +132,8 @@ const TIGHT_ROOM_LENGTH_M = 5.0;
 const TIGHT_ROOM_WIDTH_M = 3.8;
 /** Seats within this distance of one another in depth are one row. */
 const ROW_BAND_M = 0.4;
+/** Below this, no space is being kept behind the seating: the row is against the wall. */
+const SPACE_BEHIND_MIN_M = 0.5;
 
 function num(value) {
   const n = Number(value);
@@ -234,6 +236,20 @@ export function readSeatBoundaryGeometry({ seats = [], roomDims = null } = {}) {
     || widthM < TIGHT_ROOM_WIDTH_M
   ) && !FAVOURABLE_BANDS.includes(clearance);
 
+  // How far the seating spreads through the room in depth. The rear row sits
+  // where it does because the front row sits where it does.
+  const rowSpacingM = rows.length > 1
+    ? Math.abs(rows[0].y - rows[rows.length - 1].y)
+    : null;
+  // The rear row is close to the wall behind it: a live compromise for those seats.
+  const rearRowNearWall = rearClearance === 'limited' || rearClearance === 'tight';
+  // Space the seating keeps behind itself, held on purpose and taken from the
+  // floor area rather than handed over by a large room. This is the gap a client
+  // asks about when they would rather use the space, so it is read, never assumed.
+  const spaceBehindSeating = rearRowRearWallM != null
+    && rearRowRearWallM >= SPACE_BEHIND_MIN_M
+    && rearClearance !== 'generous';
+
   return {
     available: true,
     reason: null,
@@ -242,6 +258,7 @@ export function readSeatBoundaryGeometry({ seats = [], roomDims = null } = {}) {
     seat_count: measured.length,
     row_count: rows.length,
     multi_row: rows.length > 1,
+    row_spacing_m: rowSpacingM,
     seats: measured,
     nearest_boundary_m: closestSeat.nearest_boundary_m,
     nearest_boundary: closestSeat.nearest_boundary,
@@ -253,6 +270,8 @@ export function readSeatBoundaryGeometry({ seats = [], roomDims = null } = {}) {
     rear_wall_is_nearest: closestSeat.nearest_boundary === 'rear',
     clearance,
     rear_clearance: rearClearance,
+    rear_row_near_a_wall: rearRowNearWall,
+    space_behind_seating: spaceBehindSeating,
     room_is_constraint: roomIsConstraint,
     trade_off: roomIsConstraint,
   };
@@ -311,11 +330,24 @@ export function buildSeatingBoundaryExplanation(geometry) {
   }
 
   // 3. The wall behind the seating, which is a different measurement from the
-  // nearest boundary and the one that matters most for the low frequencies.
+  // nearest boundary and the one that matters most for the low frequencies. This
+  // is also the gap a client asks about when they would rather have the floor
+  // area, so where the seating keeps space behind itself the trade is stated
+  // rather than left to be discovered.
   if (rearWallM != null && (geometry.multi_row || geometry.rear_wall_is_nearest)) {
     sentences.push(geometry.multi_row
-      ? `Behind the seating the distance that matters most to the low frequencies is held at ${metres(rearWallM)} from the rear row to the wall behind it.`
+      ? `Behind the seating the distance that matters most to the low frequencies is ${metres(rearWallM)} from the rear row to the wall behind it.`
       : `Behind the seating, the distance that matters most to the low frequencies is ${metres(rearWallM)} from the row to the wall behind it.`);
+  }
+  if (rearWallM != null && geometry.row_spacing_m != null) {
+    sentences.push(`The rows are ${metres(geometry.row_spacing_m)} apart, so that distance follows from where the front row sits for the picture and from the spacing between the rows rather than from the wall.`);
+  }
+  if (rearWallM != null && geometry.rear_row_near_a_wall && geometry.space_behind_seating) {
+    sentences.push(`The rear row sits close to the wall behind it, and the ${metres(rearWallM)} it keeps there is held on purpose: it is the clearance that keeps those seats away from the wall whose low-frequency behaviour and returning reflection would otherwise reach them most strongly. Closing that gap would buy back floor area at the cost of that clearance, which is the trade this arrangement makes.`);
+  } else if (rearWallM != null && geometry.rear_row_near_a_wall) {
+    sentences.push(`The rear row sits close to the wall behind it, with only ${metres(rearWallM)} to spare. That is the arrangement this room's depth allows once the front row holds its viewing distance and the rows keep their separation, and it is the position where those seats hear most of the wall behind them.`);
+  } else if (rearWallM != null && geometry.space_behind_seating) {
+    sentences.push('That gap is held on purpose: it keeps the seating clear of the wall behind it, where the room\'s low-frequency behaviour and its returning reflection reach the seats most strongly. It is spent from the room\'s floor area rather than saved from it.');
   }
 
   // 4. The balance, where the room itself is the constraint, and the honest note

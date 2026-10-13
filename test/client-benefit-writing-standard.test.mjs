@@ -38,7 +38,11 @@ import {
   SEATING_BOUNDARY_TWO_MEASUREMENTS,
   buildInterpretationSeatingBoundary,
   seatingBoundaryLines,
+  seatingBoundaryRelevance,
 } from '../base44/shared/adiSeatingBoundary.js';
+// The saved Genesis design: the real room and the real seating coordinates, so
+// the P1 explanation is checked against the project it has to answer for.
+import { GENESIS_ROOM, GENESIS_SEATS } from '../src/test/fixtures/genesisDualCentre.mjs';
 
 const EM_DASH = '\u2014';
 
@@ -181,4 +185,104 @@ test('the shared authority still carries its own rules unchanged', () => {
   ]) {
     assert.ok(SOUND_PROOF_WRITING_AUTHORITY.includes(rule), `the shared authority must still carry: ${rule}`);
   }
+});
+
+test('A. generous seating clearance: explained as a benefit, and not forced into the narrative', () => {
+  const seats = [
+    { id: 'r1c1', x: 1.9, y: 5.4 }, { id: 'r1c2', x: 4.5, y: 5.4 },
+    { id: 'r2c1', x: 1.9, y: 7.2 }, { id: 'r2c2', x: 4.5, y: 7.2 },
+  ];
+  const roomDims = { widthM: 6.4, lengthM: 9.6 };
+  const geometry = readSeatBoundaryGeometry({ seats, roomDims });
+  const explanation = buildSeatingBoundaryExplanation(geometry);
+
+  assert.equal(explanation.situation, 'generous_clearance');
+  assert.equal(explanation.trade_off, false, 'a room with space to spare is never written as a compromise');
+  assert.equal(geometry.space_behind_seating, false, 'nothing is given up where the room is generous');
+  assert.ok(explanation.paragraph.includes('1.9m'), 'the explanation is written from the geometry it was given');
+
+  const block = buildInterpretationSeatingBoundary({
+    snapshot: { seats: seats.map((seat) => ({ id: seat.id, position: { x: seat.x, y: seat.y } })) },
+    roomDims,
+  });
+  assert.equal(block.relevant, false, 'P1 is not a live consideration where clearance is not a question');
+  const lines = seatingBoundaryLines(block).join('\n');
+  assert.match(lines, /not a live consideration for this design/);
+  assert.ok(!lines.includes('nearest room boundary is the'), 'no clearance material is handed to the writer in this case');
+});
+
+test('B. rear row near a wall: the compromise is stated constructively, from the geometry', () => {
+  const geometry = readSeatBoundaryGeometry({
+    seats: [
+      { id: 'r1c1', x: 1.4, y: 3.0 }, { id: 'r1c2', x: 4.0, y: 3.0 },
+      { id: 'r2c1', x: 1.4, y: 5.6 }, { id: 'r2c2', x: 4.0, y: 5.6 },
+    ],
+    roomDims: { widthM: 5.4, lengthM: 6.0 },
+  });
+  const explanation = buildSeatingBoundaryExplanation(geometry);
+
+  assert.equal(geometry.rear_row_near_a_wall, true);
+  assert.equal(geometry.trade_off, false, 'a room with depth is not blamed for a layout the seating itself sets');
+  assert.match(explanation.paragraph, /only 0\.4m to spare/, 'the rear-wall distance is the actual one');
+  assert.match(explanation.paragraph, /this room's depth allows/);
+  assert.match(explanation.paragraph, /hear more of the room's own low-frequency behaviour/);
+  assert.equal(seatingBoundaryRelevance(geometry).relevant, true, 'a rear row close to the wall is a live consideration');
+});
+
+test('C. space-constrained room: the room is named as the constraint, without blaming the design', () => {
+  const geometry = readSeatBoundaryGeometry({
+    seats: [
+      { id: 'r1c1', x: 0.9, y: 3.0 }, { id: 'r1c2', x: 2.5, y: 3.0 },
+      { id: 'r2c1', x: 0.9, y: 4.2 }, { id: 'r2c2', x: 2.5, y: 4.2 },
+    ],
+    roomDims: { widthM: 3.4, lengthM: 4.6 },
+  });
+  const explanation = buildSeatingBoundaryExplanation(geometry);
+
+  assert.equal(geometry.room_is_constraint, true);
+  assert.equal(explanation.trade_off, true);
+  assert.match(explanation.paragraph, /The room itself is what limits that clearance/);
+  assert.match(explanation.paragraph, /favours the space the room can give/);
+  assert.ok(!/poor|failure|fault|worse/i.test(explanation.paragraph), 'the compromise is never written as a fault');
+  assert.equal(seatingBoundaryRelevance(geometry).reason, 'the room itself is the constraint on how much clearance the seating can hold');
+});
+
+test('Genesis: the explanation answers why the rear seats sit off the back wall', () => {
+  const seats = GENESIS_SEATS.map((seat) => ({ id: seat.id, x: seat.x, y: seat.y }));
+  const roomDims = { widthM: GENESIS_ROOM.widthM, lengthM: GENESIS_ROOM.lengthM };
+  const geometry = readSeatBoundaryGeometry({ seats, roomDims });
+  const explanation = buildSeatingBoundaryExplanation(geometry);
+  const block = buildInterpretationSeatingBoundary({
+    snapshot: { seats: GENESIS_SEATS.map((seat) => ({ id: seat.id, position: { x: seat.x, y: seat.y } })) },
+    roomDims,
+  });
+
+  // The saved geometry, read rather than assumed.
+  assert.equal(block.room_width_m, 4.64);
+  assert.equal(block.room_length_m, 5.09);
+  assert.equal(block.seat_count, 8);
+  assert.equal(block.row_count, 2);
+  assert.equal(block.row_spacing_m, 1.8);
+  assert.equal(block.distance_to_rear_wall_m, 0.71);
+  assert.equal(block.nearest_boundary_m, 0.71);
+  assert.equal(block.nearest_boundary_label, 'rear wall');
+  assert.equal(block.rear_wall_is_the_nearest_boundary, true);
+  assert.equal(block.relevant, true);
+
+  // The practical trade-off, answered from the geometry: the rows are spaced and
+  // the front row holds the picture, and the gap that leaves behind the rear row
+  // is the clearance that is deliberately kept.
+  assert.match(explanation.paragraph, /0\.7m from the rear row to the wall behind it/);
+  assert.match(explanation.paragraph, /The rows are 1\.8m apart/);
+  assert.match(explanation.paragraph, /Closing that gap would buy back floor area at the cost of that clearance, which is the trade this arrangement makes/);
+
+  // No level, no guarantee, no em dash.
+  assert.ok(!/\bLevel [1-9]\b|\bL[1-4]\b|\bdB\b|%/.test(explanation.paragraph), 'the client explanation states no level or grade');
+  assert.ok(!explanation.paragraph.includes(EM_DASH), 'the client explanation carries no em dash');
+
+  // The writer is given the two measurements apart, with the reason P1 is live.
+  const lines = seatingBoundaryLines(block).join('\n');
+  assert.match(lines, /two measurements, never merged/);
+  assert.match(lines, /Why it is a live consideration here: the rear row sits close to the wall behind it/);
+  assert.ok(!/\bLevel [1-9]\b|\bdB\b/.test(lines), 'the prompt lines state no level');
 });
