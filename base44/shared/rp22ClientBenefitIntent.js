@@ -37,8 +37,8 @@ export const RP22_CLIENT_BENEFIT_INTENT = Object.freeze([
   Object.freeze({
     parameter: 'P1',
     measures: 'the distance between the listening area and the room walls',
-    matters: 'the clearance around the seating changes how bass behaves across the seats, how the walls send reflections back at the listener, and how naturally the surround speakers wrap sound around the room. Seating pushed up against a boundary sits in the strongest pressure zone in the room, where the room dominates what the client hears.',
-    establishes: 'a favourable result means the seating has been placed to work with the room. A tighter result means the room itself is the constraint on how much clearance was available, not the design intent.',
+    matters: 'the clearance around the seating changes how bass behaves across the seats, how the walls send reflections back at the listener, and how naturally the surround speakers wrap sound around the room. Seating pushed right up against a boundary sits closest to the room\'s strongest pressure region and closest to the surrounding loudspeakers, where the room and the nearest wall have the most influence over what that seat hears.',
+    establishes: 'a favourable result means the seating has been placed to work with the room. A tighter result means the room itself is the constraint on how much clearance was available, not the design intent. Clearance changes the bass response at the seating, the reflections and the geometry between the listener and the loudspeakers; it does not by itself make the bass consistent from seat to seat, and a distance alone never promises how a particular seat will sound.',
   }),
   Object.freeze({
     parameter: 'P2',
@@ -103,14 +103,14 @@ export const RP22_CLIENT_BENEFIT_INTENT = Object.freeze([
   Object.freeze({
     parameter: 'P12',
     measures: 'the sound pressure capability of the screen speakers at the reference position',
-    matters: 'capability is what lets a demanding soundtrack build without strain. Dialogue stays clear, the score grows in scale, and effects keep their weight when a mix becomes dense.',
-    establishes: 'a result here describes how much output the screen stage has at the reference position. It says nothing about bass, and nothing about the quality of the response.',
+    matters: 'capability is the reserve a demanding soundtrack asks for. Dialogue stays clear, the score grows in scale, and effects keep their weight when a mix becomes dense.',
+    establishes: 'a result here describes how much output the screen stage has at the reference position. It says nothing about bass, and nothing about the quality of the response. It is a calculated capability, not a measurement of the system staying free from compression, and it does not promise how the system behaves in any one moment of a film.',
   }),
   Object.freeze({
     parameter: 'P13',
     measures: 'the sound pressure capability of the non-screen speakers at the reference position',
     matters: 'the surrounds and overheads need their own reserve. Without it, effects around and above the audience disappear behind the front stage as soon as the soundtrack becomes busy.',
-    establishes: 'a result here describes the reserve the surround and height layers have at the reference position, independently of the screen stage and of bass.',
+    establishes: 'a result here describes the reserve the surround and height layers have at the reference position, independently of the screen stage and of bass. As with the screen stage, this is a calculated reserve rather than proof that the system stays free from compression.',
   }),
   Object.freeze({
     parameter: 'P14',
@@ -127,14 +127,14 @@ export const RP22_CLIENT_BENEFIT_INTENT = Object.freeze([
   Object.freeze({
     parameter: 'P16',
     measures: 'the seat-to-seat variation across the screen wall speakers',
-    matters: 'the front stage should sound the same whichever seat the client takes, otherwise the room has one best seat and the rest are a compromise.',
-    establishes: 'a favourable result means the front stage is consistent across the seats assessed. It is not a statement about the surrounds, the overheads or bass, and it is not a statement that the screen speakers match the surrounds in tone: that is a different question, about how the layers sound as sound crosses between them.',
+    matters: 'the screen speakers should not favour one seat over another, otherwise the room has one best seat for the front stage and the rest are a compromise.',
+    establishes: 'a favourable result means the screen speaker group is consistent across the seats assessed. It is not a statement about the surrounds, the overheads or bass, and it is not a statement that the screen speakers match the surrounds in tone: that is a different question, about how the layers sound as sound crosses between them. It describes consistency within this one speaker group, across the seats assessed, and it is not a statement that every seat in the room provides an identical experience.',
   }),
   Object.freeze({
     parameter: 'P17',
     measures: 'the seat-to-seat variation across the surround and height speakers',
     matters: 'the same reasoning applies around and above the audience: movement and height should hold their character wherever the client sits.',
-    establishes: 'a favourable result means the surround and height layers stay consistent across the seats assessed, separately from the front stage. It does not say whether those layers sound like the same system as the front stage: tonal matching between the groups is its own consideration.',
+    establishes: 'a favourable result means the surround and height layers stay consistent across the seats assessed, separately from the front stage. It does not say whether those layers sound like the same system as the front stage: tonal matching between the groups is its own consideration. The same limit applies here: this is consistency within these layers across the seats assessed, and not a statement that all seats are equal.',
   }),
   Object.freeze({
     parameter: 'P18',

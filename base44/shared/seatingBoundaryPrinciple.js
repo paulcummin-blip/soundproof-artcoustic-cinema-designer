@@ -16,7 +16,7 @@
  *   - a listener sits closer to the surrounding loudspeakers;
  *   - the difference between one seat and the next grows.
  *
- * Suitable clearance reduces those effects. It never guarantees a better bass
+ * Clearance changes the balance of those effects. It never guarantees a better bass
  * result or a better design, because the seating also has to answer to the
  * viewing geometry, the loudspeaker positions, the number of seats, comfort and
  * access, the floor space available and the client's own priorities.
@@ -316,10 +316,10 @@ export function buildSeatingBoundaryExplanation(geometry) {
   // client hears it in.
   if (favourable) {
     sentences.push(
-      'That separation gives the room\'s lowest frequencies space to settle more evenly from seat to seat, '
-      + 'and it holds the reflection returning from the nearest wall far enough back that it does not crowd '
-      + 'the direct sound. It also leaves more room between the audience and the surrounding loudspeakers, so '
-      + 'the seats hear a more similar presentation.',
+      'That separation changes how the room\'s own low frequencies behave at the seating, and it holds the '
+      + 'reflection returning from the nearest wall further back from the direct sound. It also leaves more '
+      + 'room between the audience and the surrounding loudspeakers, so the seats sit at a more even distance '
+      + 'from the speakers around them.',
     );
   } else {
     sentences.push(
@@ -396,12 +396,12 @@ export function seatingBoundaryClause(geometry) {
   const wall = geometry.nearest_boundary_label || 'nearest wall';
   const nearest = metres(geometry.nearest_boundary_m);
   if (geometry.trade_off) {
-    return `The seating is set as clear of the ${wall} as the room allows, at ${nearest}, which keeps the low frequencies and the reflections behind the seating working for the room rather than against it`;
+    return `The seating is set as clear of the ${wall} as the room allows, at ${nearest}, which keeps the seating back from that wall and its reflection`;
   }
   if (geometry.rear_row_rear_wall_m != null && geometry.multi_row) {
-    return `The seating keeps ${nearest} from the ${wall} and ${metres(geometry.rear_row_rear_wall_m)} from the wall behind the rear row, which lets the room's low frequencies settle more evenly across the rows`;
+    return `The seating keeps ${nearest} from the ${wall} and ${metres(geometry.rear_row_rear_wall_m)} from the wall behind the rear row, which holds the seating clear of the room's own low-frequency behaviour and back from the reflection off the nearest wall`;
   }
-  return `The seating keeps ${nearest} from the ${wall}, which lets the room's low frequencies settle more evenly from seat to seat`;
+  return `The seating keeps ${nearest} from the ${wall}, which holds the seating clear of the room's own low-frequency behaviour and back from the reflection off that wall`;
 }
 
 export default buildSeatingBoundaryExplanation;
