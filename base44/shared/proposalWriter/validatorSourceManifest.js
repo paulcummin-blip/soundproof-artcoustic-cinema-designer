@@ -63,7 +63,7 @@ export const VALIDATOR_SOURCE_MANIFEST = Object.freeze({
   // was read under, its applicability, what it does not establish and its safe use.
   // Hashed so a draft can always be traced to the exact professional context, and the
   // exact applicability rule, it was written against.
-  'base44/shared/rp22DesignContext.js': 'c224a3a4010c3a019b175f504f915fa716e884927da4900a235c68051f81f21f',
+  'base44/shared/rp22DesignContext.js': '5e1057e2548fcdb5c8c40f2d961b1004b2d3dd8c13ed4b64fb3b787c2d331661',
   // The check between a saved interpretation and the frozen evidence, which removes
   // only the statements the evidence actually contradicts.
   'base44/shared/proposalClarification/verifiedInterpretation.js': '86d6c7038393d25b4ee9bdcfedd6202cb7e3e7072409dd070001d32b030caf34',

@@ -522,7 +522,7 @@ export const WRITING_KNOWLEDGE_CLASSES = [
   'ADI understands this as: distributing the subwoofers around the room is intended to reduce the influence of the room\'s own resonances and to help the bass hold together across the seating area.',
   'ADI then writes it naturally and confidently for the client: the arrangement drives the room from more than one place, which reduces the influence of the room\'s own resonances and helps remove the pronounced peaks and dips a single position creates.',
   'The example shows the movement, never the wording: never reuse its sentences, and never reuse its subject or its order of ideas for a different subject.',
-  'The placement reasoning is never used as proof of the design\'s output capability, and capability never proves that the arrangement works: each is explained on its own evidence, within the same movement of prose.',
+  'The placement reasoning is never used as proof of the design\'s output capability, and capability never proves that the arrangement works: each rests on its own evidence, and the two are written together as one natural explanation of the arrangement rather than as separate statements.',
   'The principle and the intention are both stated positively, alongside what the design achieved rather than in place of it.',
   '',
   'HOW THE THREE FORMS COMBINE IN THE NARRATIVE',
