@@ -46,9 +46,13 @@
  */
 
 import { toNumber } from './adiNarrativeFacts.js';
+import {
+  SEATING_BOUNDARY_LIMITS,
+  SEATING_BOUNDARY_PRINCIPLE,
+} from './seatingBoundaryPrinciple.js';
 
 /** The context generation, recorded wherever the context is carried. */
-export const RP22_CONTEXT_VERSION = '1.0';
+export const RP22_CONTEXT_VERSION = '1.1';
 
 /** The document this context is read from. Cited, never paraphrased as authority. */
 export const RP22_SOURCE = Object.freeze({
@@ -82,7 +86,7 @@ export const RP22_CLASS = Object.freeze({
 });
 
 /**
- * THE PRINCIPLES. Eight, each covering one of the priority knowledge areas, each
+ * THE PRINCIPLES. Nine, each covering one of the priority knowledge areas, each
  * with its own applicability, limits, evidence and safe use.
  */
 export const RP22_PRINCIPLES = Object.freeze([
@@ -113,6 +117,25 @@ export const RP22_PRINCIPLES = Object.freeze([
     limitations: 'A room-level or reference-position result is never a promise for every seat, and an audience-coverage objective is never evidence of a measured outcome.',
     project_evidence: 'The frozen seating: the row and seat counts, the declared reference position, the assessed viewing and per-seat results, and the scope each result is stated at.',
     safe_use: 'Explain which position the design is assessed from and how the seating has been arranged for the audience. State a result at the scope the evidence states it at, and never widen one position\'s result into a whole-room or all-seat claim.',
+  }),
+  Object.freeze({
+    // PARAMETER 1's principle: what seating clearance from the room boundaries is
+    // FOR. The reference is the seating section the sibling seating principle
+    // cites, because the seating position is specified there; the boundary
+    // distance itself, and the level it reaches, are assessed by the P1 authority
+    // and are never stated here.
+    principle_id: 'seating_boundary_clearance',
+    area: 'seating_distance_from_room_boundaries',
+    title: 'Seating clearance from the room boundaries',
+    section: '4.1.1, 4.1.2, 4.1.3',
+    locator: RP22_LOCATOR.HEADING,
+    classification: RP22_CLASS.GEOMETRY_DEPENDENT,
+    requires: ['seating'],
+    principle: SEATING_BOUNDARY_PRINCIPLE,
+    applicability: 'Applies wherever the design assesses a seating position, which is every design that seats an audience.',
+    limitations: SEATING_BOUNDARY_LIMITS,
+    project_evidence: 'The recorded seating coordinates and room dimensions, from which the distance to the nearest boundary and the distance to the wall behind the seating are both read, together with any designer explanation the project records.',
+    safe_use: 'Explain what the clearance does for the listener, using the seating and room geometry the design records, and keep the distance to the nearest boundary and the distance to the wall behind the seating as two separate measurements. Where clearance is limited, explain the compromise constructively and acknowledge the balance between acoustic behaviour, the viewing geometry and the space the client wants to keep. Explain a favourable clearance as a benefit to the design rather than as a score. Never present a level or a distance as a guarantee of a measured result, and never state why a particular seating position was chosen.',
   }),
   Object.freeze({
     principle_id: 'surround_placement',

@@ -26,6 +26,7 @@ import { computeHaloRadiusPx, PRIMARY_STROKE_WIDTH } from "./seatMarkerGeometry"
 import { resolveRspLabelPlacement } from "./ClientSpeakerBalance";
 import { groupSeatsIntoRows } from "./seatRowGrouping";
 import P1SeatResultBlock from "./P1SeatResultBlock";
+import SeatingBoundaryExplanation from "./SeatingBoundaryExplanation";
 
 // ── Wall-distance zones (metres inward from each room wall) ──
 // Thresholds match the canonical P1 grading authority.
@@ -343,6 +344,16 @@ export default function ClientRecommendedSeatingPosition({
              row/seat arrangement as the seating plan above. This is the page's
              statement; the legend below is only a footnote for the zones. ── */}
       <P1SeatResultBlock rows={seatRows} print={print} />
+
+      {/* ── What the seating clearance does for the listener. Read from THIS
+             project's seating and room geometry by the shared P1 principle
+             authority: it measures nothing and states no level, it explains the
+             decision the drawing and the results above record. ── */}
+      <SeatingBoundaryExplanation
+        seats={plotSeats}
+        roomDims={{ widthM: W, lengthM: L }}
+        print={print}
+      />
 
       {/* ── Compact horizontal legend — a footnote beneath the result, for
              reading the boundary zones in the drawing above ── */}

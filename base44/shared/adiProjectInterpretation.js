@@ -40,6 +40,11 @@ import { deriveDesignPhilosophy, prioritisedPositions, rank, usableRows } from '
 import { designPhilosophyLines } from './designPhilosophyAuthority.js';
 import { DISPLAY_TYPE_PROJECTOR, readDisplayIdentity } from './canonicalDisplayIdentity.js';
 import { buildRp22DesignContext, rp22ContextLines } from './rp22DesignContext.js';
+import {
+  SEATING_BOUNDARY_PROMPT_USE,
+  buildInterpretationSeatingBoundary,
+  seatingBoundaryLines,
+} from './adiSeatingBoundary.js';
 
 export const INTERPRETATION_STAGE = 'adi_project_interpretation';
 // Bumped to 1.1 when the interpretation gained the design philosophy: the
@@ -53,6 +58,16 @@ export const INTERPRETATION_VERSION = '1.1';
 export const DESIGN_CONTENTS_RULE =
   'these are the physical contents of this design, stated as facts: a layout, a channel count or a subwoofer count is '
   + 'evidence of what the design contains and never of why it was chosen, so nothing here is a reason, a benefit or a decision';
+
+/**
+ * PARAMETER 1's two measurements, stated once. The nearest boundary is what P1
+ * assesses; the wall behind the seating is a different measurement with its own
+ * acoustic meaning, and one is never read from the other.
+ */
+export const SEATING_BOUNDARY_TWO_MEASUREMENTS =
+  'the distance to the nearest room boundary and the distance to the wall behind the seating are two different '
+  + 'measurements: the nearest boundary may be a side wall, the front wall or the rear wall, and neither distance '
+  + 'is ever inferred from the other';
 
 /** Designer intent exists only where the designer has RECORDED an explanation. */
 export const CONFIRMED_INTENT_RULE =
@@ -298,6 +313,53 @@ export function buildProjectInterpretation(params = {}) {
   const totalSeats = num(seating.total_seats) ?? 0;
   const mlpBasis = seating.mlp_basis || null;
 
+  // ── THE SEATING BOUNDARY (RP22 Parameter 1's design reason). Read from the
+  // frozen seating coordinates and the frozen room dimensions, so the clearance
+  // the copy explains is this room's own geometry rather than a general remark.
+  // The two measurements are kept apart on purpose: the distance to the NEAREST
+  // boundary, which is what P1 assesses and may be a side wall, and the distance
+  // to the wall BEHIND the seating, which carries its own low-frequency meaning.
+  // Nothing is graded here and no level is stated: the P1 authority keeps that.
+  const seatingBoundaryGeometry = readSeatBoundaryGeometry({
+    seats: (Array.isArray(snapshot?.seats) ? snapshot.seats : []).map((seat) => ({
+      id: seat?.id ?? null,
+      x: seat?.position?.x ?? seat?.x,
+      y: seat?.position?.y ?? seat?.y,
+      row: seat?.row,
+    })),
+    roomDims: { widthM, lengthM },
+  });
+  const seatingBoundaryExplanation = buildSeatingBoundaryExplanation(seatingBoundaryGeometry);
+  const round2 = (value) => (Number.isFinite(Number(value)) ? Math.round(Number(value) * 100) / 100 : null);
+  const seatingBoundary = {
+    ...(seatingBoundaryGeometry.available === true
+      ? {
+        available: true,
+        situation: seatingBoundaryExplanation.situation,
+        trade_off: seatingBoundaryGeometry.trade_off === true,
+        seat_count: seatingBoundaryGeometry.seat_count,
+        row_count: seatingBoundaryGeometry.row_count,
+        room_width_m: round2(seatingBoundaryGeometry.room_width_m),
+        room_length_m: round2(seatingBoundaryGeometry.room_length_m),
+        nearest_boundary: seatingBoundaryGeometry.nearest_boundary,
+        nearest_boundary_label: seatingBoundaryGeometry.nearest_boundary_label,
+        nearest_boundary_m: round2(seatingBoundaryGeometry.nearest_boundary_m),
+        distance_to_rear_wall_m: round2(seatingBoundaryGeometry.rear_row_rear_wall_m),
+        rear_wall_is_the_nearest_boundary: seatingBoundaryGeometry.rear_wall_is_nearest === true,
+        room_is_the_constraint: seatingBoundaryGeometry.room_is_constraint === true,
+      }
+      : {
+        available: false,
+        reason: seatingBoundaryGeometry.reason,
+      }),
+    the_two_measurements: SEATING_BOUNDARY_TWO_MEASUREMENTS,
+    principle: SEATING_BOUNDARY_PRINCIPLE,
+    compromises: [...SEATING_BOUNDARY_COMPROMISES],
+    limits: SEATING_BOUNDARY_LIMITS,
+    balance: [...SEATING_BOUNDARY_BALANCE],
+    rules: [...SEATING_BOUNDARY_RULES],
+  };
+
   const screen = room.screen || {};
   const screenSizeInches = num(screen.size_inches);
   const viewableWidthM = num(screen.viewable_width_cm) != null ? num(screen.viewable_width_cm) / 100 : null;
@@ -524,6 +586,12 @@ export function buildProjectInterpretation(params = {}) {
 
     // 6. Main constraints
     main_constraints: constraintsList,
+
+    // 6b. THE DESIGN REASON BEHIND THE SEATING POSITION (RP22 Parameter 1): what
+    // seating clearance from the room boundaries does for the listener, and where
+    // THIS design's seating actually sits. Reasoning only: it states no level, no
+    // measured outcome and no reason the designer did not record.
+    seating_boundary: seatingBoundary,
 
     // 7. WHAT THE DESIGN CONTAINS: the layout, the channel counts, the subwoofer
     // count and the loudspeaker families, stated as facts. A count is never turned
