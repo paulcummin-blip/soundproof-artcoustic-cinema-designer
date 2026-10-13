@@ -91,6 +91,42 @@ export default function ProposalImagePlacementStyles() {
       .pp-comparison__lead { margin: 0 0 5mm !important; }
       .pp-media--comparison img { height: 56mm; }
 
+      /* ── The designer's presentation choice ──────────────────────────────
+         Three modes, and the difference between them is the permission to
+         crop, not a style. The selectors carry two classes so they outrank the
+         role treatments above whatever the order: an image the designer has
+         marked as a detail is never cropped, even on a role that normally
+         crops to a fixed frame height.
+
+         FULL WIDTH   the prominent editorial image: the full content width and
+                      the existing landscape weight, unchanged.
+         DETAIL       smaller and whole. The frame takes the image's own aspect
+                      ratio (height: auto, object-fit: contain), so nothing is
+                      cropped, nothing is stretched and a dimensioned drawing
+                      keeps every dimension, label and annotation it carries.
+                      The caption stays attached beneath it.
+         CROPPED DETAIL  smaller and cropped, framed on the image's own focal
+                      point, which is the one mode where the focal controls
+                      apply. ── */
+      .pp-media.pp-media--presentation-full-width { width: 100%; }
+      .pp-media.pp-media--presentation-detail,
+      .pp-media.pp-media--presentation-cropped-detail {
+        width: 58%;
+        max-width: 58%;
+        margin-bottom: 6mm;
+      }
+      .pp-media.pp-media--presentation-detail img {
+        height: auto;
+        max-height: 82mm;
+        object-fit: contain;
+        background: #FFFFFF;
+        border: 0.2mm solid #E7E3DA;
+      }
+      .pp-media.pp-media--presentation-cropped-detail img {
+        height: 52mm;
+        object-fit: cover;
+      }
+
       /* ── Print: the sheet is the authority ───────────────────────────────
          Usable page height is 297mm less the 22mm / 20mm content margins, so a
          landscape feature at 118mm is about half of it: dominant, with room for
@@ -107,6 +143,18 @@ export default function ProposalImagePlacementStyles() {
         /* The Spatial Resolution accent on the printed sheet: 89mm is about 20%
            taller than the standard 74mm accent, on the same width. */
         .pp-pillar[data-editorial-section="spatial_resolution"] .pp-media--portrait img { height: 89mm; }
+        /* A detail drawing on the sheet: about 58 to 60 per cent of the content
+           column, with the frame following the drawing's own proportions and
+           room for a tall plan, and never cropped. The height is bounded rather
+           than fixed, so a dimensioned plan is reduced only as far as it stays
+           readable. */
+        .pp-media.pp-media--presentation-detail { width: 60%; max-width: 60%; }
+        .pp-media.pp-media--presentation-detail img { max-height: 104mm; }
+        /* The cropped detail on the sheet: a compact editorial crop, framed on
+           the focal point the designer chose. */
+        .pp-media.pp-media--presentation-cropped-detail { width: 60%; max-width: 60%; }
+        .pp-media.pp-media--presentation-cropped-detail img { height: 62mm; }
+        .pp-media.pp-media--presentation-full-width { width: 100%; }
         /* The comparison page: two full-width options and their captions share
            the sheet with the title, the message and — on the page that closes
            the document — the closing note. The image height is therefore a page

@@ -154,6 +154,17 @@
       "default": null,
       "description": "Optional display order of this image inside its comparison group. Lower numbers are shown first. Null = the gallery order is used, so an order is only needed when the images should not read in gallery order."
     },
+    "image_presentation": {
+      "type": "string",
+      "enum": [
+        "full_width",
+        "detail",
+        "cropped_detail"
+      ],
+      "nullable": true,
+      "default": null,
+      "description": "How this image is presented in the proposal document, chosen by the designer on the image's own card. 'full_width' = a large editorial image: the prominent, image-led treatment, for cinema photographs, interior renders and hero images. 'detail' = a smaller, UNGROUPED presentation at roughly 50 to 65 per cent of the usable page width, for dimensioned floor plans, seating arrangements, technical drawings, equipment details and supporting illustrations; a detail image is NEVER cropped, its original aspect ratio is preserved and the whole drawing stays visible, so dimension labels and annotations are never cut off. 'cropped_detail' = a smaller editorial presentation where cropping IS explicitly permitted, framed on this image's own focal point: for furniture details, interior materials, lighting details and decorative photography. Null = the designer has stated no preference, so the image keeps the behaviour it had before this choice existed and is composed exactly as the proposal always composed it. Presentation only: it never changes the stored file, never re-uploads or re-crops an image into a second file, and never changes the caption, the scope, the slot, the seating-style grouping, the comparison membership or the cover. An image is only ever cropped when the designer selected a crop-permitting mode; insufficient page space is never on its own a reason to crop."
+    },
     "focal_horizontal": {
       "type": "string",
       "enum": [
@@ -163,7 +174,7 @@
       ],
       "nullable": true,
       "default": "centre",
-      "description": "Which part of the frame a crop keeps horizontally. Null or unset reads as 'centre'. Simple focal point only \u2014 no crop coordinates are stored, and nothing here changes the stored file."
+      "description": "Which part of the frame a crop keeps horizontally. Null or unset reads as 'centre'. Simple focal point only \u2014 no crop coordinates are stored, and nothing here changes the stored file. Only read where cropping is permitted: it has no effect on an image whose presentation mode never crops."
     },
     "focal_vertical": {
       "type": "string",
@@ -174,7 +185,7 @@
       ],
       "nullable": true,
       "default": "middle",
-      "description": "Which part of the frame a crop keeps vertically. Null or unset reads as 'middle'. Used mainly by the cover and portrait crops, which are tighter than the full-width landscape."
+      "description": "Which part of the frame a crop keeps vertically. Null or unset reads as 'middle'. Used mainly by the cover and portrait crops, which are tighter than the full-width landscape. Only read where cropping is permitted: it has no effect on an image whose presentation mode never crops."
     }
   },
   "required": [

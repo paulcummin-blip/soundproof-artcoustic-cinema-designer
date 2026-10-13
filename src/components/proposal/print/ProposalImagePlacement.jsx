@@ -16,6 +16,7 @@
 import React from 'react';
 import {
   EDITORIAL_ROLE,
+  IMAGE_PRESENTATION,
   objectPositionForFocalPoint,
 } from '@/components/proposal/images/proposalImagePlacementAuthority';
 
@@ -39,15 +40,27 @@ export default function ProposalImagePlacement({
   const closingClass = placement.editorial_role === EDITORIAL_ROLE.CLOSING_FEATURE
     ? ' pp-media--closing-feature'
     : '';
+  // The designer's own presentation choice, when one is recorded. No choice
+  // recorded means the role treatment alone, exactly as before.
+  const presentation = placement.image_presentation || null;
+  const presentationClass = presentation ? ` pp-media--presentation-${presentation}` : '';
+  const detail = presentation === IMAGE_PRESENTATION.DETAIL;
 
   return (
-    <figure className={`pp-media pp-media--${treatment}${closingClass} ${className}`.trim()}>
+    <figure className={`pp-media pp-media--${treatment}${closingClass}${presentationClass} ${className}`.trim()}>
       <img
         src={placement.source_file_url}
         alt={captionText || ''}
-        // The crop keeps the part of the frame this placement is framed on:
-        // centre / middle unless the designer chose otherwise.
-        style={{ objectPosition: objectPositionForFocalPoint(placement.focal_point) }}
+        // A detail image is shown whole: the frame takes the image's own
+        // aspect ratio and nothing is cropped, so a dimensioned drawing keeps
+        // every dimension, label and annotation it carries. Where cropping is
+        // permitted the crop keeps the part of the frame this placement is
+        // framed on: centre / middle unless the designer chose otherwise.
+        style={detail
+          ? { objectFit: 'contain', objectPosition: '50% 50%' }
+          : { objectPosition: objectPositionForFocalPoint(placement.focal_point) }}
+        data-presentation={presentation || 'unstated'}
+        data-crops={detail ? 'no' : 'yes'}
       />
       {captionText ? <figcaption className="pp-media__caption">{captionText}</figcaption> : null}
     </figure>

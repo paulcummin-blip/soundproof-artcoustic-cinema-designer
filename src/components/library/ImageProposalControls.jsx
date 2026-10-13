@@ -19,11 +19,23 @@ import {
   FOCAL_HORIZONTAL,
   FOCAL_VERTICAL,
   DEFAULT_FOCAL_POINT,
+  IMAGE_PRESENTATION,
+  IMAGE_PRESENTATION_HELP,
+  IMAGE_PRESENTATION_LABELS,
   SEATING_STYLE,
   SEATING_STYLE_LABELS,
   assetFocalPoint,
+  imagePresentationOf,
+  presentationCropAllowed,
   seatingStyleOf,
 } from '@/components/proposal/images/proposalImagePlacementAuthority';
+
+/** The three presentation modes, in the order the card offers them. */
+const PRESENTATION_OPTIONS = [
+  IMAGE_PRESENTATION.FULL_WIDTH,
+  IMAGE_PRESENTATION.DETAIL,
+  IMAGE_PRESENTATION.CROPPED_DETAIL,
+];
 
 const FONT = { fontFamily: 'Didact Gothic, sans-serif' };
 
@@ -49,6 +61,7 @@ export default function ImageProposalControls({
   comparisonGroupOptions = [],
   onUsageChange,
   onSeatingChange,
+  onPresentationChange,
   onFocalChange,
   onComparisonChange,
   onUseAsCover,
@@ -60,6 +73,13 @@ export default function ImageProposalControls({
   const focal = assetFocalPoint(asset);
   const isDefaultFocal = focal.horizontal === DEFAULT_FOCAL_POINT.horizontal
     && focal.vertical === DEFAULT_FOCAL_POINT.vertical;
+  // The presentation the designer has chosen, or '' where none is recorded: an
+  // image with no preference keeps the treatment it always had.
+  const presentation = imagePresentationOf(asset) || '';
+  // The focal point only affects an image where cropping is permitted. A detail
+  // image is never cropped, so its focal controls are inert and say so rather
+  // than appearing to do something they no longer do.
+  const focalApplies = presentationCropAllowed(presentation);
 
   return (
     <div className="mt-3 border-t border-[#EFECE4] pt-3 space-y-2">
@@ -110,6 +130,33 @@ export default function ImageProposalControls({
               <option value={SEATING_STYLE.LOUNGE}>{SEATING_STYLE_LABELS[SEATING_STYLE.LOUNGE]}</option>
               <option value={SEATING_STYLE.RECLINER}>{SEATING_STYLE_LABELS[SEATING_STYLE.RECLINER]}</option>
             </select>
+          </div>
+
+          {/* IMAGE PRESENTATION — how this image is placed in the document: the
+              large editorial image, a smaller whole drawing, or a smaller
+              editorial crop. A stored choice, and a preference only: an image
+              with none recorded is composed exactly as the document always
+              composed it. */}
+          <div>
+            <label className="block text-[10px] uppercase tracking-[0.12em] text-[#A79E8C] mb-1" style={FONT}>
+              Image presentation
+            </label>
+            <select
+              value={presentation}
+              onChange={(event) => onPresentationChange(event.target.value)}
+              className={SELECT_CLASS}
+              style={FONT}
+            >
+              <option value="">No preference (as composed today)</option>
+              {PRESENTATION_OPTIONS.map((mode) => (
+                <option key={mode} value={mode}>{IMAGE_PRESENTATION_LABELS[mode]}</option>
+              ))}
+            </select>
+            <p className="mt-1 text-[10px] leading-snug text-[#8A8477]" style={FONT}>
+              {presentation
+                ? IMAGE_PRESENTATION_HELP[presentation]
+                : 'This image is composed exactly as the proposal has always composed it.'}
+            </p>
           </div>
 
           <div>

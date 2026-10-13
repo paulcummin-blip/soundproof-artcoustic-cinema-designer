@@ -238,6 +238,25 @@ export default function ProposalAssetsPanel({
     }
   };
 
+  /**
+   * How this image is presented in the proposal: the large editorial image, a
+   * smaller whole drawing that is never cropped, or a smaller editorial crop.
+   * A stored presentation preference only — the file, the caption, the scope,
+   * the slot, the seating grouping, the comparison and every engineering value
+   * stay exactly as they are.
+   */
+  const handlePresentationChange = async (asset, value) => {
+    if (!asset?.id) return;
+    const patch = { image_presentation: value || null };
+    try {
+      await base44.entities.ProposalAsset.update(asset.id, patch);
+      setAssets((prev) => prev.map((a) => (a.id === asset.id ? { ...a, ...patch } : a)));
+    } catch (err) {
+      console.error('Failed to change the image presentation:', err);
+      alert('Failed to change this image presentation. Please try again.');
+    }
+  };
+
   /** Which part of the frame this image's crops keep. */
   const handleFocalChange = async (asset, patch) => {
     if (!asset?.id) return;
@@ -400,6 +419,7 @@ export default function ProposalAssetsPanel({
                         comparisonGroupOptions={comparisonGroupOptions}
                         onUsageChange={(usage) => handleUsageChange(existing, usage)}
                         onSeatingChange={(value) => handleSeatingChange(existing, value)}
+                        onPresentationChange={(value) => handlePresentationChange(existing, value)}
                         onFocalChange={(patch) => handleFocalChange(existing, patch)}
                         onComparisonChange={(patch) => handleComparisonChange(existing, patch)}
                         onUseAsCover={() => handleUseAsCover(group, slot, existing)}

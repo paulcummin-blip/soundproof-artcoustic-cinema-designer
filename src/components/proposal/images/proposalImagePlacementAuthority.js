@@ -55,6 +55,83 @@ export const DEFAULT_FOCAL_POINT = Object.freeze({
   vertical: FOCAL_VERTICAL.MIDDLE,
 });
 
+/**
+ * ── Image presentation ──────────────────────────────────────────────────────
+ * How ONE image is presented in the proposal, chosen by the designer on the
+ * image's own card. It distinguishes the image that carries the document from
+ * the image that supports it:
+ *
+ *   FULL WIDTH      the large editorial image: cinema photographs, interior
+ *                   renders, hero images. The treatment the document has always
+ *                   given a landscape feature.
+ *   DETAIL          a smaller, UNGROUPED presentation at roughly 50 to 65 per
+ *                   cent of the usable width: dimensioned floor plans, seating
+ *                   arrangements, technical drawings, equipment details. A
+ *                   detail image is NEVER cropped, so the whole drawing stays
+ *                   visible and its dimensions, labels and annotations are
+ *                   never cut off.
+ *   CROPPED DETAIL  a smaller editorial presentation where cropping IS
+ *                   permitted, framed on the image's own focal point.
+ *
+ * An image with NOTHING recorded keeps the behaviour it had before this choice
+ * existed: the presentation is a preference, not a migration, and no stored
+ * image is re-composed because a field was added. Cropping is only ever
+ * permitted where the designer selected a crop-permitting mode.
+ */
+export const IMAGE_PRESENTATION = Object.freeze({
+  FULL_WIDTH: 'full_width',
+  DETAIL: 'detail',
+  CROPPED_DETAIL: 'cropped_detail',
+});
+
+export const IMAGE_PRESENTATION_LABELS = Object.freeze({
+  [IMAGE_PRESENTATION.FULL_WIDTH]: 'Full width',
+  [IMAGE_PRESENTATION.DETAIL]: 'Detail',
+  [IMAGE_PRESENTATION.CROPPED_DETAIL]: 'Cropped detail',
+});
+
+export const IMAGE_PRESENTATION_HELP = Object.freeze({
+  [IMAGE_PRESENTATION.FULL_WIDTH]: 'The large editorial image and the prominent place in the document. Cinema photographs, interior renders and hero images.',
+  [IMAGE_PRESENTATION.DETAIL]: 'Shown smaller and never cropped: the whole drawing stays visible, with its dimensions, labels and annotations, and the caption stays with it. Dimensioned plans, seating arrangements and technical drawings.',
+  [IMAGE_PRESENTATION.CROPPED_DETAIL]: 'Shown smaller, with cropping allowed: the focal point below decides the part of the frame that is kept. Furniture details, materials, lighting and decorative photography.',
+});
+
+const PRESENTATION_VALUES = Object.values(IMAGE_PRESENTATION);
+
+/** The share of the usable content width each presented image is composed at. */
+export const PRESENTATION_WIDTH_PERCENT = Object.freeze({
+  [IMAGE_PRESENTATION.FULL_WIDTH]: 100,
+  [IMAGE_PRESENTATION.DETAIL]: 58,
+  [IMAGE_PRESENTATION.CROPPED_DETAIL]: 58,
+});
+
+/**
+ * The presentation the designer has chosen for this image, or null where none
+ * is recorded. Only the three declared values are read: anything else is null,
+ * which composes the image exactly as it was composed before this choice
+ * existed, so a bad or unknown value can never crop or shrink an image.
+ */
+export function imagePresentationOf(asset) {
+  const value = recorded(asset?.image_presentation);
+  return PRESENTATION_VALUES.includes(value) ? value : null;
+}
+
+/**
+ * Whether the chosen presentation permits cropping at all. FULL WIDTH and
+ * CROPPED DETAIL crop; DETAIL never does, whatever the space on the page.
+ * An image with no preference recorded reads as true, because that is the
+ * behaviour it already had.
+ */
+export function presentationCropAllowed(presentation) {
+  if (presentation === null || presentation === undefined || presentation === '') return true;
+  return presentation !== IMAGE_PRESENTATION.DETAIL;
+}
+
+/** Whether the focal point controls apply to this presentation. */
+export function presentationFocalApplies(presentation) {
+  return presentationCropAllowed(presentation);
+}
+
 /** The two seating styles a Library image may be grouped as. */
 export const SEATING_STYLE = Object.freeze({
   LOUNGE: 'lounge',
@@ -265,6 +342,7 @@ export function objectPositionForFocalPoint(focalPoint) {
  * @param {number} args.order        the placement's order in the document
  */
 export function makePlacement({ source, role, sectionId, pagePosition, order, comparison_group = null, comparison_option_label = null }) {
+  const presentation = imagePresentationOf(source);
   return {
     id: `${role}:${source?.id || 'unknown'}:${order}`,
     source_asset_id: source?.id || null,
@@ -274,6 +352,14 @@ export function makePlacement({ source, role, sectionId, pagePosition, order, co
     editorial_role: role,
     crop_orientation: cropOrientationForRole(role),
     focal_point: assetFocalPoint(source),
+    // THE DESIGNER'S PRESENTATION CHOICE, carried on the placement so the
+    // composer and the renderer honour it without a second lookup. Null where
+    // none is recorded, which is composed exactly as the document always
+    // composed it. crop_allowed is the permission itself: where it is false the
+    // image is shown whole, whatever the page has room for.
+    image_presentation: presentation,
+    crop_allowed: presentationCropAllowed(presentation),
+    presentation_width_percent: presentation ? PRESENTATION_WIDTH_PERCENT[presentation] : null,
     section_id: sectionId ?? null,
     page_position: pagePosition ?? null,
     placement_order: order ?? null,
