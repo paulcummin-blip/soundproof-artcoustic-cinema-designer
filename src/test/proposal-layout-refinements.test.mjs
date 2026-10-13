@@ -248,6 +248,77 @@ describe('E. The Spatial Resolution photograph is about 20% taller', () => {
   });
 });
 
+/* ── F. The two columns start on the same line ─────────────────────────────── */
+
+describe('F. The Spatial Resolution columns share one vertical start', () => {
+  const ACCENT_RULE = '.proposal-print-portal .pp-pillar .pp-media-row .pp-media {';
+  const FOLLOWS_RULE = '.proposal-print-portal .pp-pillar .pp-media {';
+  const classes = (selector) => (selector.match(/\.[\w-]+/g) || []).length;
+
+  it('aligns the top of the photograph with the top of the first paragraph', () => {
+    // Top alignment, never centring: the row starts both columns together, at
+    // both the screen preview and the printed sheet.
+    const rowRules = allRuleDeclarations(IMAGE_STYLES, '.pp-media-row {');
+    expect(rowRules.length).toBeGreaterThanOrEqual(2);
+    expect(rowRules[0]).toMatch(/align-items:\s*flex-start/);
+    rowRules.forEach((declaration) => {
+      expect(declaration).not.toMatch(/align-items:\s*(center|flex-end|baseline)/);
+    });
+  });
+
+  it('takes the structure\'s distance-above-photograph off the accent', () => {
+    // The 10mm still belongs to the photograph that FOLLOWS the explanation.
+    expect(ruleDeclarations(PACK_STYLES, FOLLOWS_RULE)).toMatch(/padding-top:\s*10mm/);
+    // The accent beside the copy carries no offset of its own.
+    const accent = ruleDeclarations(PACK_STYLES, ACCENT_RULE);
+    expect(accent).toMatch(/padding-top:\s*0/);
+    expect(accent).toMatch(/margin-top:\s*0/);
+    // …and the rule outranks the structure rule it corrects.
+    expect(classes(ACCENT_RULE)).toBeGreaterThan(classes(FOLLOWS_RULE));
+  });
+
+  it('leaves the copy column starting where the row starts', () => {
+    // The copy's own first child carries no top margin, so the copy's top IS the
+    // row's top — and the copy column adds no padding of its own.
+    expect(PACK_STYLES).toMatch(/\.proposal-print-portal \.pp-body > \*:first-child \{ margin-top: 0; \}/);
+    const copy = ruleDeclarations(IMAGE_STYLES, '.pp-media-row__copy {');
+    expect(copy).not.toMatch(/padding-top|margin-top/);
+  });
+
+  it('applies the alignment wherever the row is drawn, never to one section', () => {
+    // The correction is scoped to the layout itself: the same treatment is had
+    // by every structure that puts a photograph beside its first paragraph.
+    expect(ACCENT_RULE).not.toContain('data-editorial-section');
+  });
+
+  it('changes nothing else about the two columns', () => {
+    const accent = ruleDeclarations(PACK_STYLES, ACCENT_RULE);
+    expect(accent).not.toMatch(/width|max-width|flex\s*:|height|object-fit|font|color|gap/);
+    // The width, height and crop are E's, untouched.
+    expect(IMAGE_STYLES).toMatch(/\.pp-media--portrait \{\s*flex: 0 0 38%;\s*max-width: 38%/);
+    expect(IMAGE_STYLES).toMatch(/\.pp-media--portrait img \{ height: 62mm; \}/);
+    // Paragraph spacing, headings and page margins are untouched: the pack-wide
+    // rhythm and the sheet frame are exactly as they were.
+    expect(PACK_STYLES).toMatch(/--pp-paragraph-gap:\s*4\.2mm/);
+    expect(PACK_STYLES).toMatch(/\.proposal-print-portal \.pp-pillar \.pp-header__title \{\s*font-size: 14pt/);
+  });
+
+  it('keeps the Genesis structure inside A4, with nothing left to add height', () => {
+    const GROUP_HEADING_MM = 9 * PT_MM * 1.2 + 6 + 3 + 0.3;
+    const HEADER_MM = 14 * PT_MM * 1.2 + 4 + 0.3;
+    const aligned = GROUP_HEADING_MM + HEADER_MM
+      + Math.max(blockMm(GENESIS_PILLARS.spatial.paragraphs, 4.2), GENESIS_PILLARS.spatial.portraitMm);
+    // The structure is no taller than its own content, and the alignment is a
+    // removal rather than a compensating margin elsewhere: the row adds no
+    // height of its own, so the structure is only ever shorter and can never
+    // crowd the Dynamic Range structure that follows it.
+    expect(aligned).toBeLessThan(SHEET_MM);
+    allRuleDeclarations(IMAGE_STYLES, '.pp-media-row {').forEach((declaration) => {
+      expect(declaration).not.toMatch(/margin-top|padding-top|margin-bottom|padding-bottom/);
+    });
+  });
+});
+
 /* ── G. The structures keep their connected two-sheet presentation ─────────── */
 
 describe('G. The three structures still travel as one group over two sheets', () => {

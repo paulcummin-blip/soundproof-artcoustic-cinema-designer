@@ -576,6 +576,19 @@ export default function ProposalPackStyles() {
         margin-top: 0;
         padding-top: 10mm;
       }
+      /* The accent that stands BESIDE the first paragraph is not a photograph
+         following an explanation, so the distance above is not its to take: it
+         shares the copy's own vertical start and the two columns begin on the
+         same line. The row is top-aligned (flex-start), the copy column's first
+         child carries no top margin, and this accent carries no margin or
+         padding of its own — so the top of the photograph and the top of the
+         first paragraph are one and the same line. Nothing about the frame is
+         touched: width, height, flex share and the focal crop are unchanged, so
+         no source is stretched or distorted. */
+      .proposal-print-portal .pp-pillar .pp-media-row .pp-media {
+        margin-top: 0;
+        padding-top: 0;
+      }
 
       /* ── Closing note ──
          A short factual source note closes the page it belongs to instead of
