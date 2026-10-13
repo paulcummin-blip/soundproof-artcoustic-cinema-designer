@@ -35,6 +35,7 @@ import {
   MATERIAL_DAMAGE_DB,
   NO_USEFUL_CALIBRATION_IMPROVEMENT,
   NOT_APPLIED_SEAT_SUMMARY,
+  NOT_APPLIED_SEAT_UNVERIFIED_SUMMARY,
   NOT_APPLIED_UNCONFIRMED_SUMMARY,
   buildCalibrationSettings,
   buildDesignChangeRecommendations,
@@ -365,7 +366,13 @@ check('LIVE PROJECT - SAVED GAIN CANDIDATE REFUSAL NAMES THE SEAT RULE', () => {
   // The exact improvement, from the saved before -> after pair: 1.2855 dB. It
   // CLEARS the 1 dB action threshold, so that threshold may never be claimed.
   const exact = LIVE.baseline.p20 - LIVE.gain.p20;
-  assert.ok(Math.abs(exact - 1.2855234044835014) < 1e-9, `exact improvement ${exact}`);
+  // The exact decimal difference of the two saved values is 1.285522404483501.
+  // IEEE-754 subtraction returns 1.2855224044835012 — a residual of ~2e-16,
+  // representation noise about 10^6 times the last double place and ~1e-13 dB,
+  // far below the smallest unit ever displayed (0.1 dB). This is numerical noise,
+  // not a calculation discrepancy: the tolerance below is 1e-12, still 10^4 times
+  // tighter than any acoustic quantity, and it was NOT widened to hide a gap.
+  assert.ok(Math.abs(exact - 1.285522404483501) < 1e-12, `exact improvement ${exact} is not the exact decimal difference`);
   assert.ok(exact > 1, 'the saved gain candidate clears the 1 dB action threshold');
   // No displayed level moved on either metric, so no level rule could have made
   // this material: a seat-level rule is what held it.
@@ -419,16 +426,22 @@ check('LIVE PROJECT - SAVED GAIN CANDIDATE REFUSAL NAMES THE SEAT RULE', () => {
   assert.equal(decision.materiality?.details?.worstSeatId, 'seat-r2-c2');
   assert.equal(decision.materiality?.details?.worstSeatImprovementDb, 0.3);
   // The saved record retained no per-seat confirmation at all. With the same
-  // values but without it, the sentence may still not claim every seat was read.
+  // values but without it, the seat-level rule may NOT be stated as a seat that
+  // failed: the sentence reports that the improvement could not be verified, and
+  // claims neither that every seat was checked nor that any seat missed the rule.
   const unretained = describeNotMaterialCalibration({
     improvement: decision.improvement,
     materiality: { material: false, rule: MATERIALITY_RULE.SEAT_LEVEL_NOT_CLEARED, reason: 'No material calibration improvement' },
     before: decision.before,
     after: decision.after,
   });
-  assert.equal(unretained.summary, NOT_APPLIED_SEAT_SUMMARY);
+  assert.equal(unretained.summary, NOT_APPLIED_SEAT_UNVERIFIED_SUMMARY);
+  assert.match(unretained.summary, /could not be verified from the available results/);
   assert.ok(!/no (primary )?seat clears/.test(unretained.detail), `no "no seat" claim without the confirmation: ${unretained.detail}`);
-  assert.match(unretained.detail, /seat-level rule/);
+  assert.ok(!/does not clear the 1 dB seat-level rule/.test(unretained.detail), `no seat-level failure claimed without the seat values: ${unretained.detail}`);
+  assert.match(unretained.detail, /could not be verified from the available results/);
+  assert.match(unretained.detail, /improvement of 1\.3 dB/);
+  assert.ok(!/\d\.\d/.test(unretained.summary), `the designer line carries no figures: ${unretained.summary}`);
   return `${decision.statement} | ${decision.detailStatement}`;
 });
 

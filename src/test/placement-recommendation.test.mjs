@@ -36,7 +36,7 @@ import {
   resolveLeverApplyState,
   LEVER_APPLY_BLOCK,
 } from "../components/room/bass/optimiserPlan/optimiserPlanLeverApply.js";
-import { resolvePlacementRecommendation } from "../components/room/bass/optimiserPlan/placementRecommendationAuthority.js";
+import { resolvePlacementRecommendation, PLACEMENT_RESULT_STATUS } from "../components/room/bass/optimiserPlan/placementRecommendationAuthority.js";
 import {
   PLACEMENT_APPLIED_MESSAGE,
   PLACEMENT_PREVIEW_UNAVAILABLE,
@@ -246,6 +246,50 @@ describe("a run that confirmed no winner still offers its placement result", () 
     const copy = JSON.stringify(panel);
     expect(copy).not.toMatch(/\d\.\d/);
     expect(copy).not.toMatch(/re-run to apply|no applicable change was kept|improvement found but not offered/i);
+  });
+
+  // ── The completed decision card ────────────────────────────────────────────
+
+  it("states why the move is expected to help, from the limiting seat", () => {
+    const withEvidence = placementPanel(planViewFor(plan), {
+      currentP20: { seatId: "seat-r2-c1", frequencyHz: 51 },
+    });
+    expect(withEvidence.reason).toMatch(/This reduces the limiting seat-to-seat variation measured at .+around 51 Hz\.$/);
+    // No limiting-seat evidence means no reason is stated at all — never a
+    // generic claim that the move will help.
+    expect(placementPanel(planViewFor(plan)).reason).toBeNull();
+    expect(JSON.stringify(withEvidence.reason)).not.toMatch(/\d\.\d/);
+  });
+
+  it("states the current position, the suggested position and the movement required", () => {
+    const panel = placementPanel(planViewFor(plan));
+    expect(panel.move.movementLabel).toContain("front subwoofers wider along the front wall");
+    expect(panel.move.movementLabel).toContain("rear subwoofers wider along the rear wall");
+    expect(panel.move.groups).toHaveLength(2);
+    for (const group of panel.move.groups) {
+      // Both ends of the decision are stated, in the designer's own distances.
+      expect(group.fromText).toMatch(/on the (front|rear) wall/);
+      expect(group.toText).toMatch(/on the (front|rear) wall/);
+      expect(group.fromText).not.toBe(group.toText);
+      expect(group.movementText).toMatch(/300 mm/);
+      expect(group.movementText).toMatch(/toward the nearest side wall/);
+      expect(group.groupPhrase).toBeTruthy();
+    }
+    // The position change is stated in millimetres, never in raw coordinates.
+    expect(JSON.stringify(panel.move)).not.toMatch(/\d\.\d/);
+  });
+
+  it("says whether the move is applied, not applied, or belongs to an earlier run", () => {
+    expect(placementPanel(planViewFor(plan)).statusText).toBe(PLACEMENT_RESULT_STATUS.RECOMMENDED);
+    const stale = resolvePlacementRecommendation({
+      planView: planViewFor(plan, "fp-changed-since-evaluation"),
+      roomDims: ROOM,
+      presentation: { state: "stale", showApply: false },
+    });
+    expect(stale.statusText).toBe(PLACEMENT_RESULT_STATUS.PREVIOUS);
+    // The status line is the designer's answer to "is this in the design yet?".
+    expect(PLACEMENT_RESULT_STATUS.RECOMMENDED).toMatch(/not applied automatically/);
+    expect(PLACEMENT_RESULT_STATUS.PREVIOUS).toMatch(/previous ADI run/);
   });
 });
 

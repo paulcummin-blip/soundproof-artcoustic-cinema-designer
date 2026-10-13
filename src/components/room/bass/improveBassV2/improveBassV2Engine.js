@@ -944,6 +944,14 @@ export async function runImproveBassV2(projectId, versionId, params, callbacks) 
             p14Db: bestGainPair.result?.p14AchievedDb ?? null,
             adjustmentDb: Number.isFinite(adjustmentDb) ? adjustmentDb : null,
             groupLabel: group?.label || null,
+            // The candidate's own per-seat rows, retained with the aggregate it was
+            // confirmed against. The seat-level criterion that decides whether this
+            // change may be applied reads exactly these rows, so a reason stated
+            // later can be checked against the values it was decided on instead of
+            // being inferred from the aggregate. Evidence only: no value here is
+            // recalculated, and no scoring, threshold or grading reads this field.
+            worstSeatId: bestGainPair.result?.worstSeatId ?? null,
+            perSeatP20: Array.isArray(bestGainPair.result?.perSeatP20) ? bestGainPair.result.perSeatP20 : null,
           };
         }
         // A searched gain sweep is a TESTED lever, whatever it found: only a

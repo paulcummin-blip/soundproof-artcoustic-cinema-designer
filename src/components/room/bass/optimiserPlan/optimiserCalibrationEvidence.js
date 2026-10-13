@@ -30,6 +30,7 @@ import {
   CALIBRATION_NO_DECISION_RECORDED_REASON,
   CALIBRATION_READY_TO_APPLY_REASON,
   describeCalibrationNotApplied,
+  describeUnverifiedSeatLevelRefusal,
 } from "../optimiseWorkflow/adiCalibrationAutoApplyAuthority.js";
 
 export const CALIBRATION_EVIDENCE_SCHEMA_VERSION = 1;
@@ -114,6 +115,43 @@ const RESULT_LABEL = Object.freeze({
 });
 
 /**
+ * The stored reason for a held change, reconciled against the record's own
+ * figures before it is shown.
+ *
+ * A sentence that names the 1 dB action threshold is repeated only when the
+ * deltas stored beside it agree. Where the record's own improvement CLEARS that
+ * threshold, the sentence contradicts the record it sits in: the change was in
+ * fact held on the seat-level criterion, and the candidate-level seat results
+ * behind that criterion were not retained. The reason shown is then the honest
+ * one — the required seat-level improvement could not be verified from the
+ * available results. Nothing is recalculated: this reads only the sentence and
+ * the before/after values the saved record already holds.
+ */
+function reconciledHeldReason(record) {
+  const stored = record?.notAppliedReason || null;
+  const storedDetail = record?.notAppliedDetailReason || null;
+  if (!stored) return { reason: stored, detail: storedDetail };
+  const namesThreshold = /1 dB action threshold|1 dB seat-level rule/i.test(stored);
+  if (!namesThreshold) return { reason: stored, detail: storedDetail };
+  const best = record?.bestCandidate || null;
+  const p20Before = num(best?.p20Before);
+  const p20After = num(best?.p20After);
+  const p19Before = num(best?.p19Before);
+  const p19After = num(best?.p19After);
+  // The record's own before → after pair decides, not the rounded delta: a real
+  // improvement of 0.96 dB must not be read as clearing the threshold.
+  const p20Clears = p20Before != null && p20After != null && (p20Before - p20After) > ACTION_THRESHOLD_DB;
+  const p19Clears = p19Before != null && p19After != null && (p19Before - p19After) > ACTION_THRESHOLD_DB;
+  if (!p20Clears && !p19Clears) return { reason: stored, detail: storedDetail };
+  const held = describeUnverifiedSeatLevelRefusal({
+    improvement: { p20DeltaDb: num(best?.p20DeltaDb), p19DeltaDb: num(best?.p19DeltaDb) },
+    before: { p20: { deviationDb: p20Before }, p19: { deviationDb: p19Before } },
+    after: { p20: { deviationDb: p20After }, p19: { deviationDb: p19After } },
+  });
+  return { reason: held.summary, detail: held.detail };
+}
+
+/**
  * The outcome text of one lever: for an improvement that was not applied, always
  * the reason it was held — never a bare "not applied".
  */
@@ -121,7 +159,7 @@ export function calibrationOutcomeLabel(record) {
   if (!record) return null;
   if (record.result === CALIBRATION_EVIDENCE_RESULT.IMPROVEMENT_NOT_APPLIED
     || record.result === CALIBRATION_EVIDENCE_RESULT.TRADE_OFF) {
-    return record.notAppliedReason
+    return reconciledHeldReason(record).reason
       || RESULT_LABEL[CALIBRATION_EVIDENCE_RESULT.IMPROVEMENT_NOT_APPLIED];
   }
   return RESULT_LABEL[record.result] || null;
@@ -456,8 +494,10 @@ function buildGainEvidence({ selection, baseline, appliedLevers }) {
           ? round2(num(attempt.p19VariationDb) - p19Of(baseline).deviationDb) : null,
         p20DeltaDb: p20Of(baseline).value != null && num(attempt.p20VariationDb) != null
           ? round2(num(attempt.p20VariationDb) - p20Of(baseline).value) : null,
-        limitingSeatId: null,
-        limitingFrequencyHz: null,
+        // The limiting seat is read from the attempt's own retained per-seat rows.
+        // A run that kept none states none — a seat is never named without it.
+        ...limitingOf({ perSeatP20: attempt?.perSeatP20 }),
+        perSeatP20: Array.isArray(attempt?.perSeatP20) ? attempt.perSeatP20 : null,
         adjustmentDb: num(attempt.adjustmentDb),
       }
       : null;
@@ -898,12 +938,15 @@ function leverLinesOf(evidence) {
   return CALIBRATION_EVIDENCE_LEVERS
     .map((key) => calibrationEvidenceFor(evidence, key))
     .filter(Boolean)
-    .map((record) => ({
-      lever: record.lever,
-      label: record.label,
-      text: describeCalibrationLever(record),
-      notAppliedReason: record.notAppliedReason || null,
-      notAppliedDetailReason: record.notAppliedDetailReason || null,
-    }))
+    .map((record) => {
+      const held = reconciledHeldReason(record);
+      return {
+        lever: record.lever,
+        label: record.label,
+        text: describeCalibrationLever(record),
+        notAppliedReason: held.reason || null,
+        notAppliedDetailReason: held.detail || null,
+      };
+    })
     .filter((line) => Boolean(line.text));
 }

@@ -28,7 +28,7 @@
 // Pure: no React, no side effects, no stores.
 // ---------------------------------------------------------------------------
 
-import { isMaterialImprovement, hasPrimarySeatRegression } from "../improveBassV2/materialityGate.js";
+import { MATERIALITY_RULE, isMaterialImprovement, hasPrimarySeatRegression } from "../improveBassV2/materialityGate.js";
 import {
   DELAY_ALIGNMENT_TOLERANCE_DB,
   OBJECTIVE_ROLE_LABELS,
@@ -169,6 +169,14 @@ export const NOT_APPLIED_FAIL_MOVED_SUMMARY =
   "Not applied. The adjustment moves the failure to a different seat rather than removing it.";
 export const NOT_APPLIED_UNCONFIRMED_SUMMARY =
   "Not applied. No material calibration improvement was confirmed.";
+/**
+ * The refusal stated when a seat-level criterion CANNOT be verified: the run kept
+ * no candidate-level seat results, so the seat's own before and after are not
+ * available. This is the honest alternative to claiming that the limiting seat
+ * failed to improve — a claim that needs the seat's own measured values.
+ */
+export const NOT_APPLIED_SEAT_UNVERIFIED_SUMMARY =
+  "Not applied. The required seat-level improvement could not be verified from the available results.";
 
 /**
  * WHY an immaterial calibration improvement was not applied, taken from the exact
@@ -240,15 +248,20 @@ export function describeNotMaterialCalibration({ improvement = null, materiality
   }
 
   // ── The seat-level criterion: the rule that actually held this change ──
-  // Only reached when the overall figure clears the action threshold, so the
-  // seat-level rule is what refused it — stated as such, with its own measurement.
+  // Only reached when the overall figure clears the action threshold, so if any
+  // rule held this change it was the seat-level one — but that may only be stated
+  // as a seat that failed to improve when the decision kept the seat measurement
+  // it read. A run that retained no candidate-level seat results is reported as
+  // unverifiable instead, with figures from the record and nothing invented.
   if (exact != null && exact > 0) {
     const seatScopeLabel = details?.seatScope === "primary" ? "primary seat" : "seat";
     const worstSeat = details?.worstSeatId ? seatPhrase(details.worstSeatId) : null;
     const seatImprovement = finite(details?.worstSeatImprovementDb);
-    const seatMeasured = seatImprovement == null
-      ? null
-      : seatImprovement > 0 && seatImprovement < 0.1 ? "under 0.1 dB" : `${round1(seatImprovement)} dB`;
+    const verified = rule === MATERIALITY_RULE.SEAT_LEVEL_NOT_CLEARED && seatImprovement != null;
+    if (!verified) {
+      return describeUnverifiedSeatLevelRefusal({ improvement, before, after });
+    }
+    const seatMeasured = seatImprovement > 0 && seatImprovement < 0.1 ? "under 0.1 dB" : `${round1(seatImprovement)} dB`;
     const seatPhraseText = [worstSeat, seatMeasured ? `improves by ${seatMeasured}` : null]
       .filter(Boolean).join(" ");
     // "No seat clears the rule" only when every seat in scope was read AND none
@@ -266,6 +279,33 @@ export function describeNotMaterialCalibration({ improvement = null, materiality
   }
 
   return { summary: NOT_APPLIED_UNCONFIRMED_SUMMARY, detail: NOT_APPLIED_UNCONFIRMED_SUMMARY };
+}
+
+/**
+ * The stated reason when a seat-level criterion cannot be verified: the run kept
+ * no candidate-level seat results, so the seat's own before and after do not
+ * exist to be read. What the record does hold is stated; no seat failure is
+ * claimed on evidence that is not there, and no figure is invented.
+ */
+export function describeUnverifiedSeatLevelRefusal({ improvement = null, before = null, after = null } = {}) {
+  const p20 = finite(improvement?.p20DeltaDb);
+  const p19 = finite(improvement?.p19DeltaDb);
+  const rawBefore = finite(before?.p20?.deviationDb);
+  const rawAfter = finite(after?.p20?.deviationDb);
+  const precise = rawBefore != null && rawAfter != null && rawBefore > rawAfter
+    ? rawBefore - rawAfter
+    : null;
+  const exact = precise != null ? precise : (p20 != null ? p20 : p19);
+  const metric = p20 != null ? "P20" : "P19";
+  const measured = exact == null
+    ? null
+    : exact > 0 && exact < 0.1 ? "under 0.1 dB" : `${round1(exact)} dB`;
+  return {
+    summary: NOT_APPLIED_SEAT_UNVERIFIED_SUMMARY,
+    detail: `Not applied because the run retained no candidate-level seat results, so the required seat-level improvement could not be verified from the available results${
+      measured ? `. The run's own ${metric} figures show an improvement of ${measured}` : ""
+    }.`,
+  };
 }
 
 /**
