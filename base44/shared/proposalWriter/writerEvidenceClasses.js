@@ -39,6 +39,7 @@ import {
 export const EVIDENCE_CLASS = Object.freeze({
   CONFIRMED_DESIGN_FACT: 'confirmed_design_fact',
   SUPPORTED_RESULT: 'supported_engineering_result',
+  ESTABLISHED_PRINCIPLE: 'established_design_principle',
   DESIGNER_INTENTION: 'designer_intention',
   PREDICTION: 'prediction',
   UNKNOWN_OR_UNSUPPORTED: 'unknown_or_unsupported',
@@ -50,8 +51,10 @@ export const EVIDENCE_CLASS_RULE = Object.freeze({
     'the design as it is built (evidence_pack.options[].facts: room, display, seating, system): state it as what the design is',
   [EVIDENCE_CLASS.SUPPORTED_RESULT]:
     'a graded result the frozen reports state, carried as an allowed claim: the only source of a performance benefit',
+  [EVIDENCE_CLASS.ESTABLISHED_PRINCIPLE]:
+    'how acoustics and system design work, and why an approach is normally used (the RP22 design context): explained confidently as the reasoning behind the design, never as a result this design has achieved, and never given a figure, a level or a project-specific guarantee',
   [EVIDENCE_CLASS.DESIGNER_INTENTION]:
-    'what the designer set out to do (editorial_brief, design_interpretation.design_decisions): an intention, never an achieved outcome',
+    'what the designer set out to do (editorial_brief, design_interpretation.design_decisions, clarification_answers): an intention, never an achieved outcome, and written as confident rationale: a lower result elsewhere never invalidates it and never forces a hedge',
   [EVIDENCE_CLASS.PREDICTION]:
     'what the design is expected to do before it is built: never written as a result the design has delivered',
   [EVIDENCE_CLASS.UNKNOWN_OR_UNSUPPORTED]:
@@ -101,6 +104,10 @@ export function buildEvidenceClassification(pack) {
       confirmed_design_facts: options.length,
       supported_results: allowed.length,
       unknown_or_unsupported: blocked.length,
+    },
+    principles: {
+      rule: 'an established design principle and a recorded designer intention are explained confidently as the reasoning behind an approach; '
+        + 'a supported result is the only statement of what this design achieved, and it is never widened, replaced or guaranteed by a principle',
     },
     bass: {
       status: bassPublished ? 'published' : 'provisional',

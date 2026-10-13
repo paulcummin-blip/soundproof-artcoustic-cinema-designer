@@ -118,7 +118,11 @@ export const CLARIFICATION_ANSWER_RULE =
   + 'voice. Never print the question, never label the answer, never present the answer as a '
   + 'standalone statement or as a list, and never treat it as measured engineering evidence: '
   + 'it is intention only, it changes no figure, level, product or claim, and the frozen '
-  + 'evidence governs wherever the two differ. Where the designer passed a question there is '
+  + 'evidence governs wherever the two differ. Understand the technical meaning of each answer '
+  + 'and develop it properly with established acoustic knowledge, so the reasoning behind the '
+  + 'decision is explained confidently and usefully rather than paraphrased: an intention is '
+  + 'never weakened, hedged or apologised for because a parameter scored low, and it is never '
+  + 'given a figure, a level or a guarantee of its own. Where the designer passed a question there is '
   + 'no answer at all, and no reason may be invented for it.';
 
 /**

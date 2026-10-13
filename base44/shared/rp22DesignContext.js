@@ -20,7 +20,10 @@
  *   - it never establishes WHY a particular designer chose a configuration. RP22
  *     describes objectives and possible methods, never this project's reason. A
  *     channel count, an overhead count or a subwoofer count is evidence of what the
- *     design CONTAINS, never of why it was chosen;
+ *     design CONTAINS. A principle explains why an APPROACH is normally used, and a
+ *     recorded designer explanation is this project's own reason. Those are two
+ *     different forms of knowledge, and neither of them is a result the design has
+ *     achieved;
  *   - it changes no calculation, no RP22 or RP23 result, no claim and no rejection.
  *
  * Each principle carries its own RP22 v1.2 section reference, the conditions under
@@ -51,8 +54,14 @@ import {
   SEATING_BOUNDARY_PRINCIPLE,
 } from './seatingBoundaryPrinciple.js';
 
-/** The context generation, recorded wherever the context is carried. */
-export const RP22_CONTEXT_VERSION = '1.1';
+/**
+ * The context generation, recorded wherever the context is carried.
+ * v1.2: a principle is explained confidently as the reasoning behind an approach,
+ * while the result this design achieved is stated only where the frozen evidence
+ * states it. The subwoofer principle is the designer-explanation class, so the
+ * reasoning behind an arrangement is written positively and never as an outcome.
+ */
+export const RP22_CONTEXT_VERSION = '1.2';
 
 /** The document this context is read from. Cited, never paraphrased as authority. */
 export const RP22_SOURCE = Object.freeze({
@@ -199,13 +208,13 @@ export const RP22_PRINCIPLES = Object.freeze([
     title: 'Subwoofer quantity, positioning and room modes',
     section: '7.1, 7.2, 7.3, 7.3.1, 7.3.2',
     locator: RP22_LOCATOR.EXCERPT,
-    classification: RP22_CLASS.COMPUTED_ONLY,
+    classification: RP22_CLASS.DESIGNER_EXPLANATION,
     requires: ['subwoofers'],
     principle: 'The objective with low frequencies is for the level and response to be consistent across all seats with no audible resonances, which is a different aim from a flat response at one seat or a couple more decibels of output. Room modes make the response differ from seat to seat, so the subwoofer arrangement and the seating positions are chosen together, and additional subwoofers arranged and aligned deliberately can reduce that variation.',
     applicability: 'Applies where the design has one or more subwoofers.',
-    limitations: 'A subwoofer count never establishes seat-to-seat consistency, and a multi-subwoofer arrangement is a method rather than a proven outcome.',
-    project_evidence: 'The frozen subwoofer count and the recorded arrangement, the assessed bass results the reports publish, and the scope each of those results is stated at.',
-    safe_use: 'Explain the bass approach and what the published bass result states at its own scope. Claim seat-to-seat consistency only where the consistency result itself supports it, and never explain the subwoofer count as a decision that produced it.',
+    limitations: 'A subwoofer count never establishes seat-to-seat consistency, and a multi-subwoofer arrangement is a method rather than a proven outcome: the reasoning behind the approach is explained positively, while the result this design achieved is stated only where the bass evidence states it.',
+    project_evidence: 'The frozen subwoofer count and the recorded arrangement, the assessed bass results the reports publish, the scope each of those results is stated at, and any designer explanation the project records for the arrangement.',
+    safe_use: 'Explain the bass approach and what the published bass result states at its own scope, and explain the reasoning behind the arrangement itself positively and confidently: spreading low-frequency sources around the room is a recognised way to reduce the influence of the room modes that make one seat differ from another, and that reasoning holds whatever the project\'s own consistency result turns out to be. Where the designer has recorded why the arrangement was chosen, develop that reasoning properly rather than paraphrasing it. Explain a principle or an intention as the reasoning behind the design, and never as a result this design has achieved: claim seat-to-seat consistency only where the consistency result itself supports it, and never present the arrangement as having produced a consistency the evidence does not state. The output the subwoofers provide is a separate benefit from the reasoning behind their placement, and each is explained on its own evidence.',
   }),
   Object.freeze({
     principle_id: 'physical_before_electronic',
@@ -267,9 +276,10 @@ export const RP22_TREATMENT_GUIDANCE = Object.freeze({
  * EVIDENCE SAFETY. The separation the writer is held to, stated once.
  */
 export const RP22_EVIDENCE_SAFETY_RULES = Object.freeze([
-  'RP22 explains general design principles. It never establishes the reason a particular designer selected a configuration.',
+  'RP22 explains general design principles. It explains why an approach is normally used, and it never establishes why a particular designer selected a configuration: a recorded designer explanation is why this design uses it.',
   'never infer a design decision from an equipment count: a channel count, an overhead count or a subwoofer count is evidence of what the design contains, never of why it was chosen',
   'keep RP22 guidance, verified project engineering, designer-supplied intentions and approved master-admin knowledge separate: none of them stands in for another',
+  'keep the three forms of knowledge apart. An established principle explains why an approach is used and is written confidently. A designer\'s recorded intention is the reasoning behind this design and is written confidently: it does not become invalid because a parameter scored low, and it is never weakened, hedged or apologised for because of one. A calculated result states what this design achieved, and it is never exaggerated, widened or replaced by a principle. Neither a principle nor an intention is ever turned into a project-specific guarantee, and none of them is repeated as a defensive qualification after every statement',
   'an applicable principle is context for explaining the design; it is never a result, a level, a score, a measurement or a performance claim',
   'where the frozen evidence records no reason for a decision, state the design and its result, and write no reason at all',
   'the context strengthens the explanation of the recommended system and never introduces a verification disclaimer: a capability is stated confidently from the frozen evidence, and calibration or commissioning is mentioned only where the client\'s brief raises it or where it is an important practical recommendation',
@@ -278,8 +288,10 @@ export const RP22_EVIDENCE_SAFETY_RULES = Object.freeze([
 /** The one rule the writer is held to over the whole context block. */
 export const RP22_CONTEXT_RULE =
   'this is professional design context for explaining why a design decision suits this room. It is never engineering evidence, '
-  + 'it states no figure, level, product or performance result, and it never establishes the reason this designer chose a configuration: '
-  + 'every figure, level, product and claim still comes from the frozen evidence pack, and the frozen evidence governs wherever the two differ';
+  + 'it states no figure, level, product or performance result, and it never establishes what this project has achieved: an established '
+  + 'principle explains why an approach is normally used, a recorded designer explanation is why this design uses it, and the result this '
+  + 'design achieved is read only from the frozen evidence. Every figure, level, product and claim still comes from the frozen evidence '
+  + 'pack, and the frozen evidence governs wherever the two differ';
 
 /**
  * The signals the principles are matched against. Read from the frozen snapshot,

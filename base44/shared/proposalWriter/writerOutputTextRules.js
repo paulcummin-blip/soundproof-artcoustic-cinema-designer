@@ -48,6 +48,7 @@
  */
 
 import { isBassConsistencyClaim } from '../proposalEvidence/proposalEvidenceWording.js';
+import { isPrincipleRationale } from './writerPrincipleRegister.js';
 import { assumedParameterUseIssue } from '../clientFacingParameterAuthority.js';
 import { WRITER_REJECTION, violation } from './writerContractSchema.js';
 import {
@@ -427,6 +428,11 @@ export function assertedKind(sentence, anchors) {
  */
 export function scopedClaimIssue({ sentence, scope, claims }) {
   if (!scope) return null;
+  // Design reasoning is not a seat-group result claim: a sentence in the
+  // established-principle register explains why an approach is used and states no
+  // result of this design, so it is never held to a seat-group claim.
+  // See writerPrincipleRegister.js.
+  if (isPrincipleRationale(sentence)) return null;
 
   const adjective = scopeAdjectiveInText(sentence);
   // Only a sentence that states a seat-group result is held to this rule.

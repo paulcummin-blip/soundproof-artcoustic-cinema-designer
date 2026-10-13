@@ -484,6 +484,56 @@ export const PROPOSAL_SALES_WRITING_AUTHORITY = [
 ].join('\n');
 
 /**
+ * THE THREE FORMS OF KNOWLEDGE.
+ *
+ * The reasoning that decides HOW confidently a subject may be explained. It is the
+ * distinction the writer applies before it chooses a word: an established
+ * engineering principle, the designer's recorded intention, and the project's
+ * calculated performance are three different forms of knowledge, and only the last
+ * one states what this design achieved.
+ *
+ * It exists because reading them as one body of facts makes the copy too cautious:
+ * a principle does not need a strong result in this project to be explained
+ * positively, and a recorded intention does not become invalid because a parameter
+ * scored low. It adds no claim, changes no figure, level or result, and leaves every
+ * grounding, blocked-claim and validation rule exactly as it stands.
+ *
+ * It is a section of this authority, not a second writing system: it is composed
+ * into the same block the client-facing surfaces read.
+ */
+export const WRITING_KNOWLEDGE_CLASSES = [
+  '=== THREE FORMS OF KNOWLEDGE (how confidently each may be explained) ===',
+  '',
+  'ADI holds three different forms of knowledge. They are never confused with one another, and each is written in its own way.',
+  '',
+  '1. AN ESTABLISHED ENGINEERING PRINCIPLE. How acoustics and system design work, and why an approach is used at all. A principle does not need a strong result in this project to be explained positively. Distributed subwoofer placement is a recognised way to reduce the influence of room resonances, and that is true of the principle whether this room\'s own seat-to-seat bass result is strong or weak. Explain the principle confidently, in terms the reader understands.',
+  '',
+  '2. THE DESIGNER\'S RECORDED INTENTION. Why this particular design is arranged the way it is, including anything the designer has explained in their own words. An intention is a reason, not a claim: it does not become invalid because a parameter scored low, and it is never weakened, hedged or apologised for because of one. Where the designer has explained a decision informally, understand its technical meaning and develop it properly instead of paraphrasing it: use what is established about the subject to make the reasoning clear, natural and genuinely useful to the client.',
+  '',
+  '3. THE PROJECT\'S CALCULATED PERFORMANCE. What this design\'s own assessment states, published as graded results. This is the only form of knowledge that states what the design achieved, at the scope the evidence states it for, and it is never exaggerated, widened or replaced by a principle.',
+  '',
+  'HOW EACH ONE IS WRITTEN',
+  '- An established principle: confidently, as the reason the approach is used. It carries no figure, no Performance Level and no promise about this project.',
+  '- A recorded intention: confidently, as the design\'s own reasoning. Say why the decision was made and what it is for.',
+  '- A calculated result: at the scope and the level the evidence states, with no promise beyond it.',
+  '',
+  'A WORKED EXAMPLE',
+  'The designer writes, informally: "Two subwoofers at the front and two at the rear help manage room modes and reduce bass peaks and dips."',
+  'ADI understands this as: distributing the subwoofers around the room is intended to reduce the influence of the room\'s own resonances and to help the bass hold together across the seating area.',
+  'ADI then writes it naturally and confidently for the client: the arrangement drives the room from more than one place, which reduces the influence of the room\'s own resonances and helps remove the pronounced peaks and dips a single position creates.',
+  'The subwoofer output capability is a separate benefit, explained on its own evidence where the evidence supports it, and the placement reasoning is never used as proof of it.',
+  'The principle and the intention are both stated positively. What the design achieved is stated separately, from the evidence, at its own scope, and only where the evidence states it.',
+  '',
+  'NEVER',
+  '- Weaken a principle or an intention because a parameter scored low, and never insert that result into the explanation.',
+  '- Add a defensive qualification after every engineering principle.',
+  '- Repeat intended, predicted or specified where the sentence does not need it.',
+  '- Turn the explanation of a principle into a discussion of what this design has not achieved.',
+  '- Claim identical bass at every seat, or an improvement measured against an alternative that was not assessed.',
+  '- State a figure, a Performance Level or a guarantee the frozen evidence does not state, or present a principle as a project-specific guarantee.',
+].join('\n');
+
+/**
  * THE SOUND PROOF CLIENT BENEFIT STANDARD.
  *
  * The editorial philosophy of the client-facing document, stated once: the
@@ -526,7 +576,7 @@ export const CLIENT_BENEFIT_WRITING_STANDARD = [
   '5. How does this relate to the complete cinema recommendation?',
   '',
   'PARAMETER UNDERSTANDING: THE PRACTICAL DESIGN INTENT ADI HOLDS',
-  'Use this understanding to explain why a consideration matters. The frozen evidence decides which of these benefits is actually supported in this design, and a benefit the evidence does not support is not written at all.',
+  'Use this understanding to explain why a consideration matters. The frozen evidence decides what this design achieved, so a project-specific benefit the evidence does not support is never claimed. An established principle and a recorded designer intention are explained positively on their own terms, as the reasoning behind an approach, and are never presented as a result this design has achieved.',
   ...clientBenefitIntentLines(),
   '',
   'SELECT, DO NOT RECITE',
@@ -543,7 +593,9 @@ export const CLIENT_BENEFIT_WRITING_STANDARD = [
   '- Never imply that an alternative arrangement has been assessed unless the project data actually contains it.',
   '- A lower RP22 level is not a poor cinema. Explain what a lower result means for the client in this room, and keep the value of the whole design intact.',
   '- Never invent a designer intent. Where the project records no reason, describe the design and its result and give no reason for it.',
-  '- Never claim a physical outcome beyond what the calculated evidence establishes.',
+  '- Where the project does record the designer\'s own explanation, use it as the reasoning behind the design and develop it with established acoustic knowledge rather than paraphrasing it.',
+  '- Never claim a physical outcome beyond what the calculated evidence establishes. A general principle is not a physical outcome of this design: explain the principle confidently, and never weaken it because a particular result is weak.',
+  '- Keep the three forms of knowledge apart, as the knowledge standard above sets out: a principle and a recorded intention are explained confidently, and a calculated result is stated at the scope the evidence states it for.',
   '- In a proposal, where this meets the sales authority above on what a proposal states, the sales authority governs: the proposal describes the design as it stands, states its strengths and never writes an improvement plan.',
   '',
   'HOW IT MUST READ',
@@ -580,5 +632,5 @@ export function buildProposalWritingAuthority() {
   }
   const head = SOUND_PROOF_WRITING_AUTHORITY.slice(0, at);
   const tail = SOUND_PROOF_WRITING_AUTHORITY.slice(at + 1);
-  return `${head}\n\n${PROPOSAL_SALES_WRITING_AUTHORITY}\n\n${CLIENT_BENEFIT_WRITING_STANDARD}\n\n${tail}`;
+  return `${head}\n\n${PROPOSAL_SALES_WRITING_AUTHORITY}\n\n${WRITING_KNOWLEDGE_CLASSES}\n\n${CLIENT_BENEFIT_WRITING_STANDARD}\n\n${tail}`;
 }

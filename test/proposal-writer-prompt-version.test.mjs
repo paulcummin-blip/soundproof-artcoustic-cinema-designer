@@ -58,7 +58,15 @@ const VERSION_3 = 'proposal-writer-prompt-3';
 // statement. The section presents the options as practical and visual
 // alternatives instead. No section identity, word limit, claim-grounding rule or
 // validation rule changed.
-const CURRENT = 'proposal-writer-prompt-17';
+// Generation 18 is the confident-reasoning pass: the writing authority states the
+// three forms of knowledge and the writer explains an established principle and a
+// recorded designer intention confidently, while the result this design achieved is
+// still read only from the frozen evidence and never weakened into an apology. The
+// principle register tells a sentence that explains WHY an approach is used apart
+// from one that claims what the design achieved, so design reasoning about bass
+// consistency is no longer refused as an unsupported consistency claim. No section
+// identity, word limit, figure, level, product or claim-grounding rule changed.
+const CURRENT = 'proposal-writer-prompt-18';
 
 test('the writer prompt version is the current one', () => {
   assert.equal(WRITER_PROMPT_VERSION, CURRENT);

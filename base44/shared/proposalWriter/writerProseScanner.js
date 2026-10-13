@@ -4,6 +4,7 @@ import { WRITER_REJECTION, violation } from './writerContractSchema.js';
 import { claimLevels, hasRecommendationClaim, isPackProse, isRecommendation, kindSatisfiesAssertion, levelTokens, measurementTokens, p20BlocksConsistency, packProseSentences, parameterIds, seatScopeInText, sentenceParts, stripOptionNames, blockedChangeBlocks, blockPatterns } from './writerVocabulary.js';
 import { anchorPatternFor, assertedKind, assumedParameterIssue, claimsArea, isDenied, isConsistencyCaveat, seatConsistencyClaim, scopedClaimIssue, referencePositionScopeIssue, CHANNEL_FAMILY, CHANGE_SIGNAL, CONSISTENCY_ANCHOR, NEGATION_SHAPED_CLAIM } from './writerOutputTextRules.js';
 import { productScopeViolations } from './writerProductScope.js';
+import { isPrincipleRationale } from './writerPrincipleRegister.js';
 import { frontStageScopeViolations } from './writerFrontStageRules.js';
 import { designStageCommentary } from './writerDesignStageRules.js';
 import { verificationDisclaimer } from './writerVerificationDisclaimerRules.js';
@@ -184,7 +185,11 @@ export function scanProse({ input, vocabulary, section, text, claims = [], claim
       }
       context = { text, sentence, clause };
       const seatScope = seatScopeInText(claimed);
-      if (p20BlocksConsistency(input) && seatScope !== 'primary' && seatScope !== 'secondary') {
+      // A sentence in the established-principle register explains why an approach
+      // is used and states no result of this design, so it is not a consistency
+      // claim: see writerPrincipleRegister.js.
+      if (p20BlocksConsistency(input) && seatScope !== 'primary' && seatScope !== 'secondary'
+        && !isPrincipleRationale(claimed)) {
         const claim = seatConsistencyClaim(claimed);
         if (claim) {
           const denied = !claim.negationShaped && isDenied(claimed, claim.at);
@@ -255,6 +260,9 @@ export function scanProse({ input, vocabulary, section, text, claims = [], claim
     for (const sentence of sentences) {
       const denied = stripOptionNames(sentence, vocabulary.optionNames);
       if (!isBassConsistencyClaim(denied)) continue;
+      // The principle register: reasoning about why an approach is used is not a
+      // claim about the consistency this design achieved.
+      if (isPrincipleRationale(denied)) continue;
       const at = Math.max(0, denied.search(CONSISTENCY_ANCHOR));
       if (!NEGATION_SHAPED_CLAIM.test(denied) && (isDenied(denied, at) || isConsistencyCaveat(denied, at))) continue;
       context = { text, sentence, ruleId: 'p20_bass_consistency' };
