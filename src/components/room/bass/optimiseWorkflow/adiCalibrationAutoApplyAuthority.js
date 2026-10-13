@@ -28,7 +28,12 @@
 // Pure: no React, no side effects, no stores.
 // ---------------------------------------------------------------------------
 
-import { MATERIALITY_RULE, isMaterialImprovement, hasPrimarySeatRegression } from "../improveBassV2/materialityGate.js";
+import {
+  MATERIALITY_DISPOSITION,
+  MATERIALITY_RULE,
+  hasPrimarySeatRegression,
+  isMaterialImprovement,
+} from "../improveBassV2/materialityGate.js";
 import {
   DELAY_ALIGNMENT_TOLERANCE_DB,
   OBJECTIVE_ROLE_LABELS,
@@ -51,6 +56,10 @@ import {
   describeTradeOffRejected,
   describeTradeOffReview,
 } from "./adiCalibrationTradeOffRule.js";
+import {
+  describeCalibrationSuggestion,
+  suggestionInputsFromSettings,
+} from "./adiCalibrationSuggestion.js";
 
 // ── Decisions ────────────────────────────────────────────────────────────
 
@@ -74,6 +83,11 @@ export const CALIBRATION_APPLY_REASON = Object.freeze({
   P20_DAMAGED: "p20-materially-worsened",
   PRIMARY_SEAT_REGRESSION: "primary-seat-regressed",
   NOT_MATERIAL: "calibration-improvement-not-material",
+  // An improvement that clears the canonical action figure, carries no
+  // meaningful regression, and was still not applied because the seat-level
+  // figure was not cleared. Stated as a SUGGESTION for the designer, never as a
+  // failed optimisation — and never applied on ADI's own authority.
+  IMPROVEMENT_WORTH_CONSIDERING: "calibration-improvement-worth-considering",
   AMBIGUOUS_EVIDENCE: "calibration-evidence-could-not-be-confirmed",
   ALREADY_APPLIED: "calibration-already-applied",
   HUMAN_CALIBRATION: "calibration-was-set-by-hand",
@@ -307,6 +321,8 @@ export function describeUnverifiedSeatLevelRefusal({ improvement = null, before 
     }.`,
   };
 }
+
+
 
 /**
  * The stated reason for an improvement the saved record held without recording a
@@ -704,9 +720,33 @@ export function resolveCalibrationAutoApply({
   }
 
   if (!materiality?.material) {
-    // The reason the designer reads is built from the exact values the rule read,
-    // so it can never name a threshold the improvement actually clears. The
-    // summary carries the rule; the detail carries the measurements.
+    // An improvement that clears the canonical action figure with no regression
+    // guard breached is a SUGGESTION: the overall result improves, so it is
+    // stated as what to change and what it buys — never as a failed
+    // optimisation. It is still not applied on ADI's own authority.
+    if (materiality?.details?.disposition === MATERIALITY_DISPOSITION.IMPROVEMENT_WORTH_CONSIDERING) {
+      const suggestion = describeCalibrationSuggestion({
+        ...suggestionInputsFromSettings(settings),
+        before,
+        after,
+        improvementDb: improvement?.p20DeltaDb != null && improvement.p20DeltaDb > 0
+          ? improvement.p20DeltaDb
+          : improvement?.p19DeltaDb,
+        seatImprovementDb: materiality?.details?.worstSeatImprovementDb ?? null,
+        seatThresholdDb: materiality?.details?.primarySeatThresholdDb ?? null,
+      });
+      return outcome(CALIBRATION_APPLY_DECISION.NONE, CALIBRATION_APPLY_REASON.IMPROVEMENT_WORTH_CONSIDERING,
+        suggestion.summary,
+        {
+          ...context,
+          materiality,
+          detailStatement: suggestion.detail,
+          suggestionNote: suggestion.note,
+        });
+    }
+    // Otherwise: the reason the designer reads is built from the exact values the
+    // rule read, so it can never name a threshold the improvement actually
+    // clears. The summary carries the rule; the detail carries the measurements.
     const held = describeNotMaterialCalibration({ improvement, materiality, before, after });
     return outcome(CALIBRATION_APPLY_DECISION.NONE, CALIBRATION_APPLY_REASON.NOT_MATERIAL,
       held.summary,

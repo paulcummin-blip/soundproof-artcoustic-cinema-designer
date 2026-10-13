@@ -32,6 +32,14 @@ import {
   describeCalibrationNotApplied,
   describeUnverifiedSeatLevelRefusal,
 } from "../optimiseWorkflow/adiCalibrationAutoApplyAuthority.js";
+import {
+  calibrationGroupWord,
+  describeCalibrationSuggestion,
+} from "../optimiseWorkflow/adiCalibrationSuggestion.js";
+import {
+  MATERIALITY_DISPOSITION,
+  classifyCalibrationDisposition,
+} from "../improveBassV2/materialityGate.js";
 
 export const CALIBRATION_EVIDENCE_SCHEMA_VERSION = 1;
 
@@ -96,11 +104,23 @@ export const CALIBRATION_EVIDENCE_STATUS = Object.freeze({
 export const CALIBRATION_EVIDENCE_RESULT = Object.freeze({
   APPLIED: "applied",
   IMPROVEMENT_NOT_APPLIED: "improvement_not_applied",
+  /**
+   * A held improvement that clears the canonical action figure with no regression
+   * guard breached: presented as worth considering. DERIVED AT READ TIME from the
+   * record's own figures — a stored record keeps the result it was saved with.
+   */
+  IMPROVEMENT_WORTH_CONSIDERING: "improvement_worth_considering",
   TRADE_OFF: "trade_off",
   NO_USEFUL_IMPROVEMENT: "no_useful_improvement",
   NOT_TESTED_IN_RUN: "not_tested_in_run",
   EVIDENCE_MISSING: "evidence_missing",
 });
+
+/**
+ * The state a USEFUL but unapplied improvement is presented in: worth the
+ * designer's attention, with the reason it was held stated beside it.
+ */
+export const CALIBRATION_SUGGESTION_STATE = "Suggested improvement — worth considering";
 
 const RESULT_LABEL = Object.freeze({
   [CALIBRATION_EVIDENCE_RESULT.APPLIED]: "Applied",
@@ -108,6 +128,9 @@ const RESULT_LABEL = Object.freeze({
   // is the rule that held it, read from the run's own calibration decision. When
   // a saved record predates that decision, the honest sentence below is used.
   [CALIBRATION_EVIDENCE_RESULT.IMPROVEMENT_NOT_APPLIED]: CALIBRATION_NO_DECISION_RECORDED_REASON,
+  // The state a useful improvement is presented in: worth the designer's
+  // attention, with the reason it was held stated beside it as a disadvantage.
+  [CALIBRATION_EVIDENCE_RESULT.IMPROVEMENT_WORTH_CONSIDERING]: CALIBRATION_SUGGESTION_STATE,
   [CALIBRATION_EVIDENCE_RESULT.TRADE_OFF]: "Trade-off — not applied automatically",
   [CALIBRATION_EVIDENCE_RESULT.NO_USEFUL_IMPROVEMENT]: "No useful improvement",
   [CALIBRATION_EVIDENCE_RESULT.NOT_TESTED_IN_RUN]: "Not tested in this run",
@@ -159,10 +182,95 @@ export function calibrationOutcomeLabel(record) {
   if (!record) return null;
   if (record.result === CALIBRATION_EVIDENCE_RESULT.IMPROVEMENT_NOT_APPLIED
     || record.result === CALIBRATION_EVIDENCE_RESULT.TRADE_OFF) {
+    // A held improvement that clears the action figure is a SUGGESTION: it is
+    // labelled as worth considering, never as the rule that refused it.
+    if (calibrationSuggestion(record)) {
+      return RESULT_LABEL[CALIBRATION_EVIDENCE_RESULT.IMPROVEMENT_WORTH_CONSIDERING];
+    }
     return reconciledHeldReason(record).reason
       || RESULT_LABEL[CALIBRATION_EVIDENCE_RESULT.IMPROVEMENT_NOT_APPLIED];
   }
   return RESULT_LABEL[record.result] || null;
+}
+
+/** A reason that means the change was held for a reason OTHER than usefulness. */
+const NOT_A_SUGGESTION_REASON =
+  /stronger calibration improvement|already applied|set by hand|regress|worsen|damage|leaves more seats|moves the failure|trade-off|design change/i;
+
+/** Whether the stored reason names a rule that makes this a refusal, not a suggestion. */
+function heldByAnotherRule(record) {
+  const text = [record?.notAppliedReason, record?.decisionReason, record?.reason]
+    .filter(Boolean).join(" ");
+  return NOT_A_SUGGESTION_REASON.test(text);
+}
+
+/**
+ * WHICH group the candidate applies to, read from the record: the one group the
+ * search ran, or the groups the candidate's own recorded target ids name. Never
+ * inferred from the lever.
+ */
+function groupWordOf(record) {
+  const groups = Array.isArray(record?.grouping?.groups) ? record.grouping.groups : [];
+  const labels = groups.map((group) => group?.label).filter(Boolean);
+  if (labels.length === 1) return calibrationGroupWord(labels[0]);
+  return calibrationGroupWord(String(record?.bestCandidate?.candidateId || ""));
+}
+
+/**
+ * WHAT a held improvement is worth, resolved from the record's own figures.
+ *
+ * A held improvement that clears the canonical action figure — with no level drop
+ * and no regression rule holding it — is a SUGGESTION: the overall result
+ * improves, so it is presented as what to change and what it buys, never as a
+ * failed optimisation. The classification lives in the acceptance authority
+ * (classifyCalibrationDisposition) and is read against the record's own
+ * before → after PAIR, never its rounded delta.
+ *
+ * Derived at read time, so a run saved before this distinction existed presents
+ * correctly without a re-run. Nothing stored is rewritten, and no figure is
+ * recalculated.
+ */
+export function calibrationSuggestion(record) {
+  if (!record || record.evidenceStatus !== CALIBRATION_EVIDENCE_STATUS.RETAINED) return null;
+  if (record.result !== CALIBRATION_EVIDENCE_RESULT.IMPROVEMENT_NOT_APPLIED) return null;
+  const best = record.bestCandidate || null;
+  if (!best) return null;
+  if (heldByAnotherRule(record)) return null;
+
+  const p20Before = num(best.p20Before);
+  const p20After = num(best.p20After);
+  const p19Before = num(best.p19Before);
+  const p19After = num(best.p19After);
+  const improvementDb = p20Before != null && p20After != null && p20After < p20Before
+    ? p20Before - p20After
+    : (p19Before != null && p19After != null && p19After < p19Before ? p19Before - p19After : null);
+  const levelDropped = (num(best.p20LevelBefore) != null && num(best.p20LevelAfter) != null
+    && num(best.p20LevelAfter) < num(best.p20LevelBefore))
+    || (num(best.p19LevelBefore) != null && num(best.p19LevelAfter) != null
+      && num(best.p19LevelAfter) < num(best.p19LevelBefore));
+
+  const classification = classifyCalibrationDisposition({ improvementDb, levelDropped });
+  if (classification.disposition !== MATERIALITY_DISPOSITION.IMPROVEMENT_WORTH_CONSIDERING) return null;
+
+  const suggestion = describeCalibrationSuggestion({
+    lever: record.lever,
+    groupWord: groupWordOf(record),
+    // The amount the run recorded for this candidate, when it recorded one.
+    gainDb: record.lever === "gain" ? num(best.adjustmentDb) : null,
+    delayMs: record.lever === "delay" ? num(best.adjustmentMs ?? best.signedOffsetMs) : null,
+    seatThresholdDb: classification.thresholdDb,
+    before: {
+      p20: { level: best.p20LevelBefore, deviationDb: p20Before },
+      p19: { level: best.p19LevelBefore, deviationDb: p19Before },
+    },
+    after: {
+      p20: { level: best.p20LevelAfter, deviationDb: p20After },
+      p19: { level: best.p19LevelAfter, deviationDb: p19After },
+    },
+    improvementDb,
+  });
+
+  return { disposition: classification.disposition, improvementDb, ...suggestion };
 }
 
 /** The fixed reason used only when the measured deltas themselves prove it. */
@@ -867,7 +975,10 @@ export function describeCalibrationLever(record) {
 
   const outcome = calibrationOutcomeLabel(record);
   if (outcome) parts.push(outcome);
-  if (!best && !record.tested && record.reason) parts.push(record.reason);
+  // A suggestion states its own exact detail: the run's internal materiality
+  // reason is never printed beside it, so the line cannot contradict the state.
+  const suggestion = calibrationSuggestion(record);
+  if (suggestion) parts.push(suggestion.detail);
   else if (record.reason) parts.push(record.reason);
 
   return parts.length ? parts.join(" · ") : null;
@@ -895,6 +1006,8 @@ export function resolveCalibrationEvidenceState(evidence) {
       tradeOffHeld: false,
       tradeOffMessage: null,
       improvementHeld: false,
+      improvementWorthConsidering: false,
+      suggestionLines: [],
       leverLines: [],
       // No lever line is claimable without the evidence behind it, so no held
       // reason is stated either — the missing-evidence sentence is.
@@ -916,6 +1029,30 @@ export function resolveCalibrationEvidenceState(evidence) {
     && tested.every((record) => record.result === CALIBRATION_EVIDENCE_RESULT.NO_USEFUL_IMPROVEMENT
       && record.bestCandidate != null);
 
+  // Every lever whose held improvement is worth considering, stated as a
+  // suggestion: what to change and what it buys. These are exactly the levers
+  // that would otherwise read as failed optimisations.
+  const suggestionLines = CALIBRATION_EVIDENCE_LEVERS
+    .map((key) => calibrationEvidenceFor(evidence, key))
+    .filter(Boolean)
+    .map((record) => {
+      const suggestion = calibrationSuggestion(record);
+      return suggestion
+        ? {
+          lever: record.lever,
+          label: record.label,
+          text: suggestion.summary,
+          detail: suggestion.detail,
+          note: suggestion.note,
+        }
+        : null;
+    })
+    .filter(Boolean);
+  const suggestedLevers = new Set(suggestionLines.map((line) => line.lever));
+  // Stated once, in its own positive register: a suggestion is never repeated in
+  // the lever list, where it would read as a held failure.
+  const leverLines = leverLinesOf(evidence).filter((line) => !suggestedLevers.has(line.lever));
+
   return {
     evidenceRetained: true,
     missingLevers: [],
@@ -925,11 +1062,13 @@ export function resolveCalibrationEvidenceState(evidence) {
     tradeOffHeld,
     tradeOffMessage: tradeOffHeld ? CALIBRATION_TRADE_OFF_MESSAGE : null,
     improvementHeld,
-    leverLines: leverLinesOf(evidence),
+    improvementWorthConsidering: suggestionLines.length > 0,
+    suggestionLines,
+    leverLines,
     // The levers whose improvement was found and NOT applied, each with the
     // reason it was held. These are shown even when another lever was applied, so
     // a held improvement is never left unexplained.
-    heldLines: leverLinesOf(evidence).filter((line) => Boolean(line.notAppliedReason)),
+    heldLines: leverLines.filter((line) => Boolean(line.notAppliedReason)),
   };
 }
 

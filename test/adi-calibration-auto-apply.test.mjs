@@ -43,7 +43,11 @@ import {
   describeRearGroupOffset,
   resolveCalibrationAutoApply,
 } from '../src/components/room/bass/optimiseWorkflow/adiCalibrationAutoApplyAuthority.js';
-import { MATERIALITY_RULE } from '../src/components/room/bass/improveBassV2/materialityGate.js';
+import {
+  MATERIALITY_DISPOSITION,
+  MATERIALITY_RULE,
+} from '../src/components/room/bass/improveBassV2/materialityGate.js';
+import { CALIBRATION_SUGGESTION_NOTE } from '../src/components/room/bass/optimiseWorkflow/adiCalibrationSuggestion.js';
 
 // ── Fixtures ─────────────────────────────────────────────────────────────
 
@@ -319,11 +323,11 @@ check('IMMATERIAL IMPROVEMENT NOT APPLIED', () => {
   return decision.statement;
 });
 
-check('AGGREGATE IMPROVEMENT ABOVE 1 dB NEVER CLAIMS THE 1 dB THRESHOLD', () => {
+check('A HELD AGGREGATE IMPROVEMENT IS A SUGGESTION, NOT A THRESHOLD FAILURE', () => {
   // The reported case: the overall P20 figure improves 2 dB (±10 dB → ±8 dB) while
   // every seat stays inside its level and no seat-level improvement clears 1 dB.
-  // The reason must state the rule that actually held it — and must NOT say the
-  // change failed a 1 dB threshold it cleared.
+  // It is presented as a SUGGESTION — what to change, what it buys, what the RP22
+  // level becomes — and the 1 dB threshold it clears is never claimed against it.
   const seatRows = (raw) => SEATS.map((seat) => ({ seatId: seat, variationDbRaw: raw, level: `L${gradeP20FromRaw(raw)}`, isPrimary: true }));
   const current = { ...confirmedResult({ id: 'current', p19: 4.1, p19Level: 'L4', p20: 10.0 }), perSeatP20: seatRows(6.6) };
   const candidate = {
@@ -331,18 +335,27 @@ check('AGGREGATE IMPROVEMENT ABOVE 1 dB NEVER CLAIMS THE 1 dB THRESHOLD', () => 
     perSeatP20: seatRows(6.4),
   };
   const decision = resolveCalibrationAutoApply({ baseline: current, candidate, objectives: objectives(), instances: instances() });
-  assert.equal(decision.reason, CALIBRATION_APPLY_REASON.NOT_MATERIAL);
+  assert.equal(decision.reason, CALIBRATION_APPLY_REASON.IMPROVEMENT_WORTH_CONSIDERING);
   assert.ok(!/below the 1 dB action threshold/.test(decision.statement),
     `the 1 dB threshold may not be claimed when the exact improvement clears it: ${decision.statement}`);
   assert.ok(!/below the 1 dB action threshold/.test(decision.detailStatement || ''),
     `the 1 dB threshold may not be claimed in the detail either: ${decision.detailStatement}`);
-  // The user-facing line states the rule that actually held it, with no figures.
-  assert.equal(decision.statement, NOT_APPLIED_SEAT_SUMMARY);
-  assert.match(decision.statement, /did not sufficiently improve the limiting seat/);
-  assert.ok(!/\d/.test(decision.statement), `the summary carries no figures: ${decision.statement}`);
-  // The detail names the seat-level criterion and the figures it read.
-  assert.match(decision.detailStatement, /seat-level rule/);
-  assert.match(decision.detailStatement, /the overall P20 figure improves by 2 dB/);
+  // The designer line leads with the suggestion and the improvement it buys, and
+  // is no longer the refusal it used to be.
+  assert.notEqual(decision.statement, NOT_APPLIED_SEAT_SUMMARY);
+  assert.match(decision.statement, /^Suggested improvement:/);
+  assert.match(decision.statement, /displayed P20 variation reducing from 10 dB to 8 dB/);
+  assert.match(decision.statement, /The RP22 level remains L1\./);
+  // Threshold arithmetic and seat talk stay out of the designer's line.
+  assert.ok(!/threshold|seat-level/i.test(decision.statement), `no threshold arithmetic in the designer line: ${decision.statement}`);
+  assert.ok(!/seat/i.test(decision.statement), `no seat talk in the designer line: ${decision.statement}`);
+  // The criterion, the seat figure and the thresholds stay in Engineer details.
+  assert.match(decision.detailStatement, /improves by 2\.00 dB/);
+  assert.match(decision.detailStatement, /seat-level figure the search applies/);
+  assert.equal(decision.materiality?.details?.disposition, MATERIALITY_DISPOSITION.IMPROVEMENT_WORTH_CONSIDERING);
+  // Protection is unchanged: the seat-level rule is still what held it.
+  assert.equal(decision.materiality?.rule, MATERIALITY_RULE.SEAT_LEVEL_NOT_CLEARED);
+  assert.equal(decision.materiality?.details?.seatsClearingThreshold, 0);
   return `${decision.statement} | ${decision.detailStatement}`;
 });
 
@@ -410,14 +423,24 @@ check('LIVE PROJECT - SAVED GAIN CANDIDATE REFUSAL NAMES THE SEAT RULE', () => {
   const decision = resolveCalibrationAutoApply({ baseline: current, candidate, instances: liveInstances });
   // The SAVED sentence for this candidate was "Not applied because it does not
   // clear the 1 dB action threshold." - a threshold the change actually clears.
-  assert.equal(decision.reason, CALIBRATION_APPLY_REASON.NOT_MATERIAL);
+  // It is now presented as a SUGGESTION: the adjustment, the improvement it buys
+  // and the RP22 level, with no threshold arithmetic in the designer's line.
+  assert.equal(decision.reason, CALIBRATION_APPLY_REASON.IMPROVEMENT_WORTH_CONSIDERING);
   assert.ok(!/1 dB action threshold/.test(decision.statement || ''), `the 1 dB overall threshold may not be claimed: ${decision.statement}`);
   assert.ok(!/1 dB action threshold/.test(decision.detailStatement || ''), `nor in the detail: ${decision.detailStatement}`);
-  // The user-facing line states the seat-level rule and carries no figures.
-  assert.equal(decision.statement, NOT_APPLIED_SEAT_SUMMARY);
-  // The detail states the exact criterion and the measurements behind it.
-  assert.match(decision.detailStatement, /seat-level rule/);
-  assert.match(decision.detailStatement, /the overall P20 figure improves by 1\.3 dB/);
+  assert.match(decision.statement, /^Suggested improvement:/);
+  assert.match(decision.statement, /reduce the .*subwoofer level by 2\.5 dB/);
+  assert.match(decision.statement, /displayed P20 variation reducing from 10 dB to 8 dB/);
+  assert.match(decision.statement, /The RP22 level remains L1\./);
+  // The measured 1.29 dB is never restated as a 2 dB improvement.
+  assert.ok(!/improves by 2 dB|2 dB improvement/.test(decision.statement), `the measured improvement may not be inflated: ${decision.statement}`);
+  assert.ok(!/threshold|seat-level/i.test(decision.statement), `no threshold arithmetic in the designer line: ${decision.statement}`);
+  // The exact measurement, the seat figure and the thresholds are the detail's job.
+  assert.match(decision.detailStatement, /improves by 1\.29 dB/);
+  assert.match(decision.detailStatement, /The limiting primary seat improves by 0\.3 dB, under the 1 dB seat-level figure\./);
+  assert.match(decision.detailStatement, /seat-level 1 dB, material damage 1 dB/);
+  assert.equal(decision.suggestionNote, CALIBRATION_SUGGESTION_NOTE);
+  assert.equal(decision.materiality?.details?.disposition, MATERIALITY_DISPOSITION.IMPROVEMENT_WORTH_CONSIDERING);
   // Every seat in the rule's scope was checked before any "no seat" claim.
   assert.equal(decision.materiality?.rule, MATERIALITY_RULE.SEAT_LEVEL_NOT_CLEARED);
   assert.equal(decision.materiality?.details?.seatScope, 'primary');

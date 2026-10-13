@@ -343,6 +343,9 @@ export default function AdiOptimisationJourney({
     designRecommended: designChangeList.length > 0
       || Boolean(summary.seatingRecommendation)
       || placement?.kind === PLACEMENT_KIND.RECOMMENDED,
+    // A calibration improvement the evidence holds that is worth considering:
+    // the finding states the suggestion rather than "no useful improvement".
+    calibrationSuggested: (calibrationEvidenceState?.suggestionLines || []).length > 0,
     evaluated,
     calibrationEvidenceRetained,
   });

@@ -37,6 +37,59 @@ export const MATERIALITY_RULE = Object.freeze({
   SEAT_LEVEL_NOT_CLEARED: "seat-level-not-cleared",
 });
 
+/**
+ * WHAT an immaterial improvement IS, so the panel can tell a change worth the
+ * designer's attention from one that genuinely is not — the distinction that
+ * stops every unapplied candidate reading as a failed optimisation.
+ *
+ *   IMPROVEMENT_WORTH_CONSIDERING  the overall result improves by the canonical
+ *                                  figure, and no regression guard is breached.
+ *                                  ADI still does not apply it on its own: it is
+ *                                  stated as a suggestion for the designer.
+ *   NO_WORTHWHILE_IMPROVEMENT      the change does not clear the action figure.
+ *   MEANINGFUL_REGRESSION          a level drop, a primary seat losing ground or
+ *                                  a new significant problem — never a
+ *                                  suggestion, whatever the aggregate improves.
+ *
+ * The figure used below is the SAME canonical 1.0 dB this gate already applies
+ * to a same-level improvement (rule B) and to the same-level raw regression. No
+ * new threshold and no new comparison is introduced, and nothing here decides
+ * materiality: it classifies a refusal the rules above have already made.
+ */
+export const MATERIALITY_DISPOSITION = Object.freeze({
+  IMPROVEMENT_WORTH_CONSIDERING: "improvement-worth-considering",
+  NO_WORTHWHILE_IMPROVEMENT: "no-worthwhile-improvement",
+  MEANINGFUL_REGRESSION: "rejected-meaningful-regression",
+});
+
+/**
+ * Classify a refused change by what it is worth, from the figures the rules
+ * already read. Pure: it changes no score, applies nothing and returns only the
+ * disposition and the figure it was compared against.
+ */
+export function classifyCalibrationDisposition({
+  improvementDb = null,
+  levelDropped = false,
+  meaningfulRegression = false,
+} = {}) {
+  const value = Number(improvementDb);
+  const measured = Number.isFinite(value) ? value : null;
+  if (meaningfulRegression === true || levelDropped === true) {
+    return {
+      disposition: MATERIALITY_DISPOSITION.MEANINGFUL_REGRESSION,
+      thresholdDb: WITHIN_LEVEL_THRESHOLD_DB,
+      improvementDb: measured,
+    };
+  }
+  return {
+    disposition: measured != null && measured >= WITHIN_LEVEL_THRESHOLD_DB
+      ? MATERIALITY_DISPOSITION.IMPROVEMENT_WORTH_CONSIDERING
+      : MATERIALITY_DISPOSITION.NO_WORTHWHILE_IMPROVEMENT,
+    thresholdDb: WITHIN_LEVEL_THRESHOLD_DB,
+    improvementDb: measured,
+  };
+}
+
 const LEVEL_IMPROVEMENT = 1;      // any level increase is material
 const WITHIN_LEVEL_THRESHOLD_DB = 1.0;  // >= 1.0 dB within same level
 const SEVERE_NULL_THRESHOLD_DB = 3.0;   // >= 3.0 dB null reduction
@@ -75,6 +128,21 @@ function worstPrimarySeatDeviation(result) {
     if (v > worst) worst = v;
   }
   return worst;
+}
+
+/**
+ * The AGGREGATE P20 deviation of a result — the figure the designer reads as the
+ * overall result. Falls back to this gate's own all-seat measure when a result
+ * does not carry the aggregate value. Read only; never recalculated.
+ */
+function aggregateDeviation(result) {
+  const value = Number(result?.achievedP20VariationDb);
+  return Number.isFinite(value) ? value : worstSeatDeviation(result);
+}
+
+/** The displayed P20 level of a result, or null when it does not carry one. */
+function aggregateLevel(result) {
+  return Number.isFinite(Number(result?.achievedP20Level)) ? numericLevel(result?.achievedP20Level) : null;
 }
 
 // Same-level raw-regression threshold: a primary seat that stays in the same
@@ -284,6 +352,29 @@ export function isMaterialImprovement(currentResult, candidateResult) {
   const currentAnyWorst = worstSeatDeviation(currentResult);
   const candidateAnyWorst = worstSeatDeviation(candidateResult);
 
+  // ── WHAT this refusal is ── reporting only ──────────────────────────────
+  // The same 1.0 dB figure the rules above apply, read against the aggregate
+  // result the designer sees, separates a change worth their attention from one
+  // that is not. It decides nothing: MATERIAL stays false, every regression
+  // guard above stays in force, and no threshold, comparison or score changes.
+  const aggregateBefore = aggregateDeviation(currentResult);
+  const aggregateAfter = aggregateDeviation(candidateResult);
+  const aggregateImprovementDb = aggregateBefore != null && aggregateAfter != null
+    ? aggregateBefore - aggregateAfter
+    : null;
+  const aggregateLevelBefore = aggregateLevel(currentResult);
+  const aggregateLevelAfter = aggregateLevel(candidateResult);
+  const levelDropped = aggregateLevelBefore != null && aggregateLevelAfter != null
+    && aggregateLevelAfter < aggregateLevelBefore;
+  const primaryRegression = hasPrimarySeatRegression(currentResult, candidateResult);
+  const meaningfulRegression = hasNewSignificantProblem(currentResult, candidateResult)
+    || primaryRegression.regressed === true;
+  const classification = classifyCalibrationDisposition({
+    improvementDb: aggregateImprovementDb,
+    levelDropped,
+    meaningfulRegression,
+  });
+
   return {
     material: false,
     rule: MATERIALITY_RULE.SEAT_LEVEL_NOT_CLEARED,
@@ -307,6 +398,17 @@ export function isMaterialImprovement(currentResult, candidateResult) {
       primarySeatThresholdDb: WITHIN_LEVEL_THRESHOLD_DB,
       severeNullThresholdDb: SEVERE_NULL_THRESHOLD_DB,
       newSignificantProblem: hasNewSignificantProblem(currentResult, candidateResult),
+      // ── What the refusal is worth, with the pair it was read from ──
+      aggregateImprovementDb: round1(aggregateImprovementDb),
+      aggregateP20BeforeDb: round1(aggregateBefore),
+      aggregateP20AfterDb: round1(aggregateAfter),
+      aggregateLevelBefore,
+      aggregateLevelAfter,
+      levelDropped,
+      primarySeatRegression: primaryRegression.regressed === true,
+      meaningfulRegression,
+      disposition: classification.disposition,
+      dispositionThresholdDb: classification.thresholdDb,
     },
   };
 }

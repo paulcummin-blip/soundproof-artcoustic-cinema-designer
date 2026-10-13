@@ -72,6 +72,10 @@ export default function AdiCalibrationSection({
   // it was held. They are stated even when another lever was applied, so a found
   // improvement is never left without its reason.
   const heldLines = Array.isArray(evidenceState?.heldLines) ? evidenceState.heldLines : [];
+  // Useful improvements that were held: stated as suggestions — what to change
+  // and what it buys — each with the one reason it was not applied automatically.
+  // They are the levers that would otherwise read as failed optimisations.
+  const suggestionLines = Array.isArray(evidenceState?.suggestionLines) ? evidenceState.suggestionLines : [];
 
   return (
     <div
@@ -100,6 +104,26 @@ export default function AdiCalibrationSection({
       ) : (
         <AdiBestCalibrationResult result={bestResult} compact={showsApplied} />
       )}
+
+      {/* A USEFUL improvement that was held: the suggestion leads, in the
+          designer's own terms, with its benefit and its one disadvantage. It is
+          never presented as a failed optimisation, and never stated twice. */}
+      {suggestionLines.map((line) => (
+        <div
+          key={line.lever}
+          className="rounded-md border border-[#D7E3D8] bg-[#F4F8F4] px-2.5 py-2"
+          data-adi-calibration-suggestion={line.lever}
+        >
+          <div className="text-[12px] font-semibold text-[#213428] leading-relaxed">
+            {line.text}
+          </div>
+          {line.note && (
+            <div className="mt-0.5 text-[11px] text-[#8A5A2B] leading-relaxed">
+              {line.note}
+            </div>
+          )}
+        </div>
+      ))}
 
       {/* The settings themselves — the one presentation the whole app uses for
           an applied calibration. Design changes are never rendered here. */}

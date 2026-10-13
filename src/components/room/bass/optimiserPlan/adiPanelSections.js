@@ -48,6 +48,13 @@ export const ADI_PANEL_FINDING = Object.freeze({
   TESTED_NO_CALIBRATION: "ADI tested calibration changes. The best improvement requires a physical design change.",
   TESTED_NO_IMPROVEMENT: "ADI tested calibration and design options. No useful improvement was found.",
   /**
+   * A calibration improvement was found that is worth the designer's attention,
+   * so "no useful improvement" may not be stated anywhere on the panel. The
+   * calibration section states the suggestion itself, with its benefit and its
+   * one disadvantage.
+   */
+  CALIBRATION_SUGGESTION: "ADI found a calibration improvement worth considering.",
+  /**
    * The run or the saved record kept no calibration evidence to read, so neither
    * of the two claims above may be made. The mandated sentence asks for the
    * re-run that produces the evidence.
@@ -108,12 +115,16 @@ export const ADI_CALIBRATION_KIND = Object.freeze({
 export function resolveAdiPanelFinding({
   isRunning = false,
   calibrationApplied = false,
+  calibrationSuggested = false,
   designRecommended = false,
   evaluated = false,
   calibrationEvidenceRetained = true,
 } = {}) {
   if (isRunning) return ADI_PANEL_FINDING.RUNNING;
   if (calibrationApplied) return ADI_PANEL_FINDING.CALIBRATION_APPLIED;
+  // A useful improvement that was held is a suggestion, never a run that found
+  // nothing — and never a claim that no improvement exists.
+  if (calibrationSuggested) return ADI_PANEL_FINDING.CALIBRATION_SUGGESTION;
   // The two findings below both state that calibration was tested and found not
   // useful. Neither may be stated without the evidence that proves it.
   if (evaluated && calibrationEvidenceRetained === false) return ADI_PANEL_FINDING.EVIDENCE_MISSING;
