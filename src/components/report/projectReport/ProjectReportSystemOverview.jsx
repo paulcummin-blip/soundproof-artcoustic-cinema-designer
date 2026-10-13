@@ -109,6 +109,20 @@ export default function ProjectReportSystemOverview({
     return entries.length > 0;
   });
 
+  // The viewing geometry table shares the specification schedule's own grid: the
+  // same row-name column width, the same content width and the same right edge.
+  // Every value is aligned under its own heading, so the front and rear rows read
+  // identically and each row's RP23 pill lands in one consistent column. This is
+  // alignment only — no value, level or score is touched.
+  const geometryHeading = {
+    fontFamily: FONT_HEADING,
+    fontSize: print ? 7 : 9,
+    letterSpacing: '0.08em',
+    textTransform: 'uppercase',
+    color: '#625143',
+  };
+  const geometryValue = { textAlign: 'right' };
+
   return (
     <div style={{ fontFamily: FONT_BODY, color: '#1B1A1A' }}>
       <div className="client-report-print-heading">
@@ -161,7 +175,11 @@ export default function ProjectReportSystemOverview({
           }} />
           <div style={{
             display: 'grid',
-            gridTemplateColumns: '1fr auto auto auto',
+            // The schedule's own row-name column, then the page's full remaining
+            // content width, then the value columns sized by their own content and
+            // right-aligned — so the table ends at the schedule's right edge and
+            // each heading sits exactly over the values beneath it.
+            gridTemplateColumns: print ? '34mm 1fr auto auto auto' : '150px 1fr auto auto auto',
             gap: print ? '2mm 4mm' : '8px 14px',
             // Centred, so each row's level pill sits on the same line as the
             // seat count and viewing angle beside it.
@@ -169,17 +187,17 @@ export default function ProjectReportSystemOverview({
             fontSize: print ? 9 : 12,
             color: '#3E4349',
           }}>
-            <div style={{ fontFamily: FONT_HEADING, fontSize: print ? 7 : 9, letterSpacing: '0.08em', textTransform: 'uppercase', color: '#625143' }}>Row</div>
-            <div style={{ fontFamily: FONT_HEADING, fontSize: print ? 7 : 9, letterSpacing: '0.08em', textTransform: 'uppercase', color: '#625143' }}>Seats</div>
-            <div style={{ fontFamily: FONT_HEADING, fontSize: print ? 7 : 9, letterSpacing: '0.08em', textTransform: 'uppercase', color: '#625143' }}>Viewing angle</div>
-            <div style={{ fontFamily: FONT_HEADING, fontSize: print ? 7 : 9, letterSpacing: '0.08em', textTransform: 'uppercase', color: '#625143' }}>RP23</div>
+            <div style={geometryHeading}>Row</div>
+            <div style={{ ...geometryHeading, ...geometryValue }}>Seats</div>
+            <div style={{ ...geometryHeading, ...geometryValue }}>Viewing angle</div>
+            <div style={{ ...geometryHeading, ...geometryValue }}>RP23</div>
             {geometry.map((row) => (
               <React.Fragment key={row.key}>
                 <div>{row.label}</div>
-                <div>{row.seats}</div>
-                <div>{row.angleText}</div>
+                <div style={geometryValue}>{row.seats}</div>
+                <div style={geometryValue}>{row.angleText}</div>
                 {/* Each row's own RP23 result, as the canonical level pill. */}
-                <div>{row.levels.length ? <ReportLevelValue levels={row.levels} /> : DASH}</div>
+                <div style={geometryValue}>{row.levels.length ? <ReportLevelValue levels={row.levels} /> : DASH}</div>
               </React.Fragment>
             ))}
           </div>

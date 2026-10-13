@@ -46,6 +46,7 @@
  */
 
 import { fitHighlightsToBudget, PROJECT_REPORT_PAGE_BUDGET_MM } from './projectReportPageBudget';
+import { statePublishedValues, statedParameterValue } from './projectReportPublishedValues';
 import { parameter } from './adiHighlightStories';
 import {
   MIN_STRENGTH_LEVEL,
@@ -114,6 +115,16 @@ export function buildSpecificationConnections({
   const p14 = parameter(engineeringSummary, 14);
   const p18 = parameter(engineeringSummary, 18);
 
+  // Each connection states its value the way the publication states it: bass
+  // extension as the RP22 whole-Hz result (16 Hz, never 16.596890802647643), and
+  // every other figure exactly as the published result already prints today.
+  const stated = {
+    12: statedParameterValue(p12, 12),
+    13: statedParameterValue(p13, 13),
+    14: statedParameterValue(p14, 14),
+    18: statedParameterValue(p18, 18),
+  };
+
   const lcrTotal = lcr.reduce((sum, entry) => sum + entry.count, 0);
   const surroundTotal = surrounds.reduce((sum, entry) => sum + entry.count, 0);
   const overheadTotal = overheads.reduce((sum, entry) => sum + entry.count, 0);
@@ -123,12 +134,12 @@ export function buildSpecificationConnections({
   return {
     lcr: lcrTotal > 0
       ? (isStrength(p12?.level)
-        ? [connectionLine('RP22 P12', p12.level, `Screen-stage output${p12.value ? ` · ${p12.value}` : ''}`)]
+        ? [connectionLine('RP22 P12', p12.level, `Screen-stage output${stated[12] ? ` · ${stated[12]}` : ''}`)]
         : [connectionLine(null, null, 'Screen stage — left, centre and right')])
       : [],
     surrounds: surroundTotal > 0
       ? (isStrength(p13?.level)
-        ? [connectionLine('RP22 P13', p13.level, `Non-screen output${p13.value ? ` · ${p13.value}` : ''}`)]
+        ? [connectionLine('RP22 P13', p13.level, `Non-screen output${stated[13] ? ` · ${stated[13]}` : ''}`)]
         : [connectionLine(null, null, 'Surround and wide coverage around the seats')])
       : [],
     overheads: overheadTotal > 0
@@ -137,9 +148,9 @@ export function buildSpecificationConnections({
     subwoofers: subTotal > 0
       ? [
           isStrength(p14?.level)
-            ? connectionLine('RP22 P14', p14.level, `Bass output authority${p14.value ? ` · ${p14.value}` : ''}`)
+            ? connectionLine('RP22 P14', p14.level, `Bass output authority${stated[14] ? ` · ${stated[14]}` : ''}`)
             : connectionLine(null, null, 'Bass output'),
-          p18 ? connectionLine('RP22 P18', p18.level, `Extension to ${p18.value || 'the published limit'}`) : null,
+          p18 ? connectionLine('RP22 P18', p18.level, `Extension to ${stated[18] || 'the published limit'}`) : null,
         ].filter(Boolean)
       : [],
     acoustic_treatment: treatmentTotal > 0
@@ -198,6 +209,11 @@ export function selectAdiHighlights(sources = {}) {
       .filter((candidate) => !highlights.some((highlight) => highlight.id === candidate.id));
     highlights = fitHighlightsToBudget([...highlights, ...filler], budgetMm);
   }
+
+  // The page states every published figure the way the report states values: a raw
+  // calculated number is never printed to a client. Display only — the story, its
+  // evidence levels, its ranking and its selection are untouched.
+  highlights = highlights.map((highlight) => statePublishedValues(highlight, sources.engineeringSummary));
 
   const selectedIds = new Set(highlights.map((highlight) => highlight.id));
   const rejected = [

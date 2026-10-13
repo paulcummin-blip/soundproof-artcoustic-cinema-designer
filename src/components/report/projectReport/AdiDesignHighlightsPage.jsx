@@ -17,7 +17,7 @@
 
 import React from 'react';
 import AdiHighlightCard from './AdiHighlightCard';
-import { COMPACT_HIGHLIGHT_THRESHOLD } from './projectReportPageBudget';
+import { COMPACT_HIGHLIGHT_THRESHOLD, resolveHighlightGapMm } from './projectReportPageBudget';
 import {
   REPORT_FONT_HEADING as FONT_HEADING,
   REPORT_FONT_BODY as FONT_BODY,
@@ -36,6 +36,12 @@ export default function AdiDesignHighlightsPage({ highlights = [], print = false
   // size and its own emphasis, so the strongest story still reads largest and a
   // supporting one still reads smaller.
   const compact = list.length > COMPACT_HIGHLIGHT_THRESHOLD;
+
+  // Editorial rhythm: the groups are separated by the room the page's own budget
+  // leaves spare, shared between them — never the fixed minimum alone, and never
+  // stretched to fill the sheet. The title and introduction keep their positions,
+  // and the budget authority guarantees the settled page still fits its A4 page.
+  const groupGapMm = resolveHighlightGapMm(list, { compact });
 
   const containerStyle = print
     ? { width: '100%', fontFamily: FONT_BODY }
@@ -82,7 +88,7 @@ export default function AdiDesignHighlightsPage({ highlights = [], print = false
       <div style={{
         display: 'flex',
         flexDirection: 'column',
-        gap: print ? (compact ? '2.2mm' : '3.4mm') : compact ? 8 : 12,
+        gap: print ? `${groupGapMm}mm` : compact ? 8 : 12,
       }}>
         {list.map((highlight) => (
           <AdiHighlightCard key={highlight.id} highlight={highlight} print={print} />

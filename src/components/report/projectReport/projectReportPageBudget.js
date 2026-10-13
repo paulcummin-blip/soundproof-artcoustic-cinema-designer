@@ -63,6 +63,23 @@ export const COMPACT_BLOCK_MM = Object.freeze({
   highlightGap: 4,
 });
 
+/**
+ * The comfortable ceiling for the space between highlight groups, in millimetres.
+ * A settled page takes the room its own budget leaves spare and stops here, so the
+ * highlights read airily without the copy being stretched down the sheet, and a
+ * fuller page stays tighter than a five-story one.
+ */
+export const HIGHLIGHT_GAP_MAX_MM = 10;
+export const COMPACT_HIGHLIGHT_GAP_MAX_MM = 7;
+
+/**
+ * The headroom the settled highlights page reserves for its canonical level
+ * pills, in millimetres: a pill stands a little taller than the plain text the
+ * estimate assumes. The spacing below spends only what is left ABOVE this, so the
+ * page never reaches the fixed A4 frame with the pills in place.
+ */
+export const HIGHLIGHT_PILL_HEADROOM_MM = 12;
+
 /** How many lines a piece of copy occupies. */
 export function estimateLines(text, charsPerLine = CHARS_PER_LINE) {
   const length = String(text ?? '').replace(/\s+/g, ' ').trim().length;
@@ -84,15 +101,49 @@ export function estimateProjectSummaryMm({ factCount = 0, paragraph = null } = {
     + estimateParagraphMm(paragraph);
 }
 
-/** One highlight card: heading block, its evidence line, its copy and the gap. */
-export function estimateHighlightMm(highlight, { compact = false } = {}) {
+/** One highlight card's own content, without the space that separates it from the next. */
+export function estimateHighlightContentMm(highlight, { compact = false } = {}) {
   const block = compact ? COMPACT_BLOCK_MM : PAGE_BLOCK_MM;
   const evidenceLines = Array.isArray(highlight?.evidence) && highlight.evidence.length > 2 ? 2 : 1;
   const copyLines = estimateLines(highlight?.explanation);
   return block.highlightFixed
     + (evidenceLines - 1) * PAGE_BLOCK_MM.line
-    + copyLines * PAGE_BLOCK_MM.line
-    + block.highlightGap;
+    + copyLines * PAGE_BLOCK_MM.line;
+}
+
+/** One highlight card: its content, its evidence line, its copy and the gap. */
+export function estimateHighlightMm(highlight, { compact = false } = {}) {
+  const block = compact ? COMPACT_BLOCK_MM : PAGE_BLOCK_MM;
+  return estimateHighlightContentMm(highlight, { compact }) + block.highlightGap;
+}
+
+/**
+ * The space between highlight groups on the settled page, in millimetres: the
+ * room the page's OWN budget leaves spare, shared between the groups — never
+ * tighter than the composition's own gap and never wider than its comfortable
+ * ceiling. Spacing therefore follows how many stories a page carries and how much
+ * copy each one holds: five groups read airily, a fuller page stays compact, and a
+ * page with little room keeps the gap it always had. The page's A4 budget, its fit
+ * protection and its pagination are unchanged — the gap only ever spends height
+ * the page already has spare, above the headroom its level pills need.
+ */
+export function resolveHighlightGapMm(highlights, { compact, budgetMm = PROJECT_REPORT_PAGE_BUDGET_MM.page } = {}) {
+  const list = (Array.isArray(highlights) ? highlights : []).filter(Boolean);
+  const useCompact = compact ?? list.length > COMPACT_HIGHLIGHT_THRESHOLD;
+  const block = useCompact ? COMPACT_BLOCK_MM : PAGE_BLOCK_MM;
+  const gaps = list.length - 1;
+  if (gaps <= 0) return block.highlightGap;
+
+  // The page's own content, plus the pill headroom, comes off the budget first:
+  // only what genuinely remains is shared between the groups.
+  const contentMm = PAGE_BLOCK_MM.heading
+    + list.reduce((total, highlight) => total + estimateHighlightContentMm(highlight, { compact: useCompact }), 0);
+  const share = (budgetMm - HIGHLIGHT_PILL_HEADROOM_MM - contentMm) / gaps;
+  const ceiling = useCompact ? COMPACT_HIGHLIGHT_GAP_MAX_MM : HIGHLIGHT_GAP_MAX_MM;
+  const gap = Math.min(ceiling, Math.max(block.highlightGap, share));
+  // Floored to a tenth of a millimetre, so the settled page can never round up
+  // past the height it was given.
+  return Math.floor(gap * 10) / 10;
 }
 
 /**
