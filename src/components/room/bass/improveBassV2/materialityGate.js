@@ -17,6 +17,26 @@ import { compareRspP19 } from "./p19Authority.js";
 // A 0.15 dB Pareto tolerance may remain internally for numerical comparisons.
 // Do NOT surface 0.2-0.5 dB cosmetic wins as a recommendation.
 
+/**
+ * WHICH rule decided an assessment. Reporting only: the rule that refused a
+ * candidate is named, so a stated reason can never claim a threshold, or a
+ * "no seat improves" verdict, that the assessment did not actually apply.
+ */
+export const MATERIALITY_RULE = Object.freeze({
+  FAIL_COUNT_REDUCED: "fail-count-reduced",
+  FAIL_COUNT_INCREASED: "fail-count-increased",
+  FAILING_SEAT_MOVED: "failing-seat-moved",
+  P19_AGGREGATE_IMPROVED: "p19-aggregate-improved",
+  SEAT_LEVEL_IMPROVED: "seat-level-improved",
+  SAME_LEVEL_SEAT_DEVIATION: "same-level-seat-deviation",
+  SEVERE_NULL_REDUCED: "severe-null-reduced",
+  // The final refusal: displayed levels did not move, and the seat-level
+  // deviation improvement did not clear the same-level rule (or the severe-null
+  // rule). The rule that held it is the seat-level rule, and `details.seatScope`
+  // states exactly which seats were read before any "no seat" claim is made.
+  SEAT_LEVEL_NOT_CLEARED: "seat-level-not-cleared",
+});
+
 const LEVEL_IMPROVEMENT = 1;      // any level increase is material
 const WITHIN_LEVEL_THRESHOLD_DB = 1.0;  // >= 1.0 dB within same level
 const SEVERE_NULL_THRESHOLD_DB = 3.0;   // >= 3.0 dB null reduction
@@ -156,16 +176,26 @@ export function isMaterialImprovement(currentResult, candidateResult) {
     const reason = candidateFails === 0
       ? `All seats now pass P19 and P20 (eliminated ${eliminated} failing seat${eliminated > 1 ? 's' : ''})`
       : `Eliminated ${eliminated} failing seat${eliminated > 1 ? 's' : ''}`;
-    return { material: true, reason, details: { currentFails, candidateFails, eliminated } };
+    return { material: true, rule: MATERIALITY_RULE.FAIL_COUNT_REDUCED, reason, details: { currentFails, candidateFails, eliminated } };
   }
   // Fail count increased -> never material
   if (candidateFails > currentFails) {
-    return { material: false, reason: `Failing seats increased from ${currentFails} to ${candidateFails}` };
+    return {
+      material: false,
+      rule: MATERIALITY_RULE.FAIL_COUNT_INCREASED,
+      reason: `Failing seats increased from ${currentFails} to ${candidateFails}`,
+      details: { currentFails, candidateFails },
+    };
   }
   // Same fail count -- if fails moved (new fail at a previously-passing seat),
   // do not treat as material improvement on the fail objective.
   if (hasNewFailingSeats(currentResult, candidateResult)) {
-    return { material: false, reason: "Failing seat moved \u2014 no net improvement" };
+    return {
+      material: false,
+      rule: MATERIALITY_RULE.FAILING_SEAT_MOVED,
+      reason: "Failing seat moved \u2014 no net improvement",
+      details: { currentFails, candidateFails },
+    };
   }
 
   // ── P19 is RSP-only: materiality reads the aggregate RSP authority ──────
@@ -178,6 +208,7 @@ export function isMaterialImprovement(currentResult, candidateResult) {
   if (rspP19?.improved) {
     return {
       material: true,
+      rule: MATERIALITY_RULE.P19_AGGREGATE_IMPROVED,
       reason: rspP19.levelImproved
         ? `P19 aggregate RSP level improved: L${rspP19.before.level} -> L${rspP19.after.level}`
         : `P19 aggregate RSP deviation improved by ${floorP19P20Deviation(rspP19.deviationDeltaDb)} dB`,
@@ -193,7 +224,7 @@ export function isMaterialImprovement(currentResult, candidateResult) {
     before:(currentResult.perSeatP20||[]).find(s=>String(s.seatId)===String(seat.seatId)),after:seat,
   }));
   const improvements=pairs.filter(p=>canonicalLevel(p.after.level)>canonicalLevel(p.before.level));
-  if(improvements.length) return {material:true,reason:"Level improvement: "+improvements.map(p=>p.seatId+" "+p.parameter+" L"+canonicalLevel(p.before.level)+" -> L"+canonicalLevel(p.after.level)).join(", "),details:{seats:improvements}};
+  if(improvements.length) return {material:true,rule:MATERIALITY_RULE.SEAT_LEVEL_IMPROVED,reason:"Level improvement: "+improvements.map(p=>p.seatId+" "+p.parameter+" L"+canonicalLevel(p.before.level)+" -> L"+canonicalLevel(p.after.level)).join(", "),details:{seats:improvements}};
   const sameLevels = pairs.every(p=>canonicalLevel(p.after.level)===canonicalLevel(p.before.level));
 
   // B. Same levels, worst-seat deviation improves by >= 1.0 dB
@@ -202,7 +233,7 @@ export function isMaterialImprovement(currentResult, candidateResult) {
     const candidateWorst = worstPrimarySeatDeviation(candidateResult);
     const improvement = currentWorst - candidateWorst;
     if (improvement >= WITHIN_LEVEL_THRESHOLD_DB) {
-      return { material: true, reason: `Worst-seat deviation improved by ${floorP19P20Deviation(improvement)} dB`, details: { currentWorst, candidateWorst, improvement } };
+      return { material: true, rule: MATERIALITY_RULE.SAME_LEVEL_SEAT_DEVIATION, reason: `Worst-seat deviation improved by ${floorP19P20Deviation(improvement)} dB`, details: { currentWorst, candidateWorst, improvement } };
     }
   }
 
@@ -211,7 +242,7 @@ export function isMaterialImprovement(currentResult, candidateResult) {
   const candidateWorstAll = worstSeatDeviation(candidateResult);
   const nullReduction = currentWorstAll - candidateWorstAll;
   if (nullReduction >= SEVERE_NULL_THRESHOLD_DB && !hasNewSignificantProblem(currentResult, candidateResult)) {
-    return { material: true, reason: `Severe null reduced by ${floorP19P20Deviation(nullReduction)} dB`, details: { currentWorstAll, candidateWorstAll, nullReduction } };
+    return { material: true, rule: MATERIALITY_RULE.SEVERE_NULL_REDUCED, reason: `Severe null reduced by ${floorP19P20Deviation(nullReduction)} dB`, details: { currentWorstAll, candidateWorstAll, nullReduction } };
   }
 
   // D. Headroom is NOT an independent user-facing materiality qualifier.
@@ -224,6 +255,29 @@ export function isMaterialImprovement(currentResult, candidateResult) {
   // so the decision can state the rule that actually held the change. No rule,
   // threshold or comparison is changed here — the numbers are simply not thrown
   // away, so a stated reason can never name a threshold this gate did not apply.
+  // EVERY seat the rule read is checked, not just the worst one, so a "no seat
+  // clears the rule" claim is only ever made when it is true of every seat in
+  // scope. Pure reporting — no threshold and no comparison is changed.
+  const seatScope = (candidateResult?.perSeatP20 || []).filter((seat) => seat?.isPrimary).length > 0
+    ? "primary"
+    : "all";
+  const scopedSeats = (candidateResult?.perSeatP20 || [])
+    .filter((seat) => (seatScope === "primary" ? seat?.isPrimary : true));
+  const beforeBySeat = new Map((currentResult?.perSeatP20 || []).map((seat) => [String(seat?.seatId), seat]));
+  const seatRows = scopedSeats.map((seat) => {
+    const before = beforeBySeat.get(String(seat?.seatId));
+    const beforeDb = before ? Math.abs(Number(before?.variationDbRaw) || 0) : null;
+    const afterDb = Math.abs(Number(seat?.variationDbRaw) || 0);
+    return {
+      seatId: seat?.seatId ?? null,
+      improvementDb: beforeDb == null ? null : round1(beforeDb - afterDb),
+    };
+  });
+  const checked = seatRows.filter((row) => row.improvementDb != null);
+  const clearing = checked.filter((row) => row.improvementDb >= WITHIN_LEVEL_THRESHOLD_DB);
+  const worstSeatRow = checked.reduce((worst, row) =>
+    !worst || row.improvementDb < worst.improvementDb ? row : worst, null);
+
   const primarySeats = (candidateResult?.perSeatP20 || []).filter((seat) => seat?.isPrimary).length;
   const currentPrimaryWorst = worstPrimarySeatDeviation(currentResult);
   const candidatePrimaryWorst = worstPrimarySeatDeviation(candidateResult);
@@ -232,9 +286,19 @@ export function isMaterialImprovement(currentResult, candidateResult) {
 
   return {
     material: false,
+    rule: MATERIALITY_RULE.SEAT_LEVEL_NOT_CLEARED,
     reason: "No material calibration improvement",
     details: {
       sameLevels,
+      // Which seats the refusal was decided on, and the confirmation that every
+      // one of them was read before any "no seat clears the rule" claim.
+      seatScope,
+      seatsInScope: scopedSeats.length,
+      seatsChecked: checked.length,
+      everySeatInScopeChecked: checked.length === scopedSeats.length,
+      seatsClearingThreshold: clearing.length,
+      worstSeatId: worstSeatRow?.seatId ?? null,
+      worstSeatImprovementDb: worstSeatRow?.improvementDb ?? null,
       primarySeatCount: primarySeats,
       // Positive = better. The seat-level figure the same-level rule reads.
       worstPrimarySeatImprovementDb: round1(currentPrimaryWorst - candidatePrimaryWorst),

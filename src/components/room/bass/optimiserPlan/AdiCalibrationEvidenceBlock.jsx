@@ -45,6 +45,9 @@ export default function AdiCalibrationEvidenceBlock({ evidence = null, className
       label: record.label || record.lever,
       text: describeCalibrationLever(record),
       scope: record.tested === true ? null : record.scope,
+      // The exact measurements behind a held calibration change, stated as its
+      // own detail line beside the figure-free summary the panel shows.
+      detail: record.notAppliedDetailReason || null,
     }))
     .filter((row) => Boolean(row.text));
 
@@ -56,7 +59,14 @@ export default function AdiCalibrationEvidenceBlock({ evidence = null, className
       {rows.length === 0 ? (
         <div className="text-[11px] text-[#8A7B6A] leading-relaxed">{CALIBRATION_EVIDENCE_MISSING_DETAIL}</div>
       ) : (
-        rows.map((row) => <Row key={row.key} label={row.label} text={row.text} scope={row.scope} />)
+        rows.flatMap((row) => [
+          <Row key={row.key} label={row.label} text={row.text} scope={row.scope} />,
+          // The exact measurement behind a held change: the panel states the rule,
+          // Engineer details states the figures it was decided on.
+          row.detail
+            ? <Row key={`${row.key}-detail`} label="Held detail" text={row.detail} />
+            : null,
+        ].filter(Boolean))
       )}
 
       {/* The combined calibration result beside the isolated levers, with every

@@ -76,12 +76,28 @@ export default function PlacementRecommendationPanel({
         <div className="text-[10px] text-[#8B7F76] leading-relaxed">{placement.definition}</div>
       )}
 
+      {/* Applied, not applied, or already matching the design — stated, so the
+          designer never has to infer whether the move is in the design yet. */}
+      {placement.statusText && (
+        <div className="text-[10px] leading-relaxed text-[#625143]" data-placement-status="true">
+          {placement.statusText}
+        </div>
+      )}
+
       {placement.message && (
         <div className="text-[12px] font-semibold text-[#213428]">{placement.message}</div>
       )}
 
       {placement.summary && (
         <div className="text-[12px] font-semibold text-[#1B1A1A] leading-relaxed">{placement.summary}</div>
+      )}
+
+      {/* WHY this move is expected to help, read from the limiting seat the design
+          measures now. Never inferred, and never a claim beyond that measurement. */}
+      {placement.reason && (
+        <div className="text-[11px] text-[#3E4349] leading-relaxed" data-placement-reason="true">
+          {placement.reason}
+        </div>
       )}
 
       {placement.move?.movementLabel && (
@@ -93,6 +109,35 @@ export default function PlacementRecommendationPanel({
           {placement.move.wallStatement && (
             <div className="text-[10px] text-[#8B7F76] leading-relaxed">{placement.move.wallStatement}</div>
           )}
+        </div>
+      )}
+
+      {/* WHERE it moves from and to, per wall group: the designer's own distances
+          from the nearest side wall. Raw coordinates stay in Engineer details. */}
+      {Array.isArray(placement.move?.groups) && placement.move.groups.length > 0 && (
+        <div className="space-y-1" data-placement-position-change="true">
+          <div className="text-[10px] font-semibold uppercase tracking-wide text-[#8A7B6A]">
+            Position change
+          </div>
+          {placement.move.groups.map((group) => (
+            <div key={group.group || group.groupPhrase} className="space-y-0.5">
+              <div className="text-[11px] leading-relaxed">
+                <span className="font-semibold text-[#1B1A1A]">{group.groupPhrase || "Subwoofers"}</span>
+                {group.subLabelsText && <span className="text-[#8B7F76]"> · {group.subLabelsText}</span>}
+              </div>
+              <div className="grid grid-cols-[auto_1fr] gap-x-2 text-[11px] leading-relaxed">
+                <span className="text-[#625143]">Current</span>
+                <span className="text-[#3E4349]">{group.fromText}</span>
+                <span className="text-[#625143]">Suggested</span>
+                <span className="font-semibold text-[#1B1A1A]">{group.toText}</span>
+              </div>
+              {group.movementText && (
+                <div className="text-[10px] text-[#8B7F76] leading-relaxed">
+                  Movement required: {group.movementText}
+                </div>
+              )}
+            </div>
+          ))}
         </div>
       )}
 

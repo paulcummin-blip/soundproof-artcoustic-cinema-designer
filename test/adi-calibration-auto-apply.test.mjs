@@ -34,11 +34,15 @@ import {
   // The 3:1 trade-off rule's reason codes (added with the ratio rule).
   MATERIAL_DAMAGE_DB,
   NO_USEFUL_CALIBRATION_IMPROVEMENT,
+  NOT_APPLIED_SEAT_SUMMARY,
+  NOT_APPLIED_UNCONFIRMED_SUMMARY,
   buildCalibrationSettings,
   buildDesignChangeRecommendations,
+  describeNotMaterialCalibration,
   describeRearGroupOffset,
   resolveCalibrationAutoApply,
 } from '../src/components/room/bass/optimiseWorkflow/adiCalibrationAutoApplyAuthority.js';
+import { MATERIALITY_RULE } from '../src/components/room/bass/improveBassV2/materialityGate.js';
 
 // ── Fixtures ─────────────────────────────────────────────────────────────
 
@@ -303,8 +307,12 @@ check('IMMATERIAL IMPROVEMENT NOT APPLIED', () => {
   // 1 dB action threshold is named only because it genuinely was not cleared.
   // 6.0 dB → 5.95 dB is a real but tiny change: one decimal would round it away,
   // so it is stated as "under 0.1 dB" rather than as a flat "0 dB".
-  assert.match(decision.statement, /improvement is under 0\.1 dB/);
-  assert.match(decision.statement, /below the 1 dB action threshold/);
+  assert.match(decision.statement, /did not clear the 1 dB action threshold/);
+  // The figures live in the detail sentence — the line the designer reads carries
+  // the rule only. 6.0 dB → 5.95 dB is a real but tiny change: one decimal would
+  // round it away, so it is stated as "under 0.1 dB" rather than as a flat "0 dB".
+  assert.match(decision.detailStatement, /improvement is under 0\.1 dB/);
+  assert.match(decision.detailStatement, /below the 1 dB action threshold/);
   assert.equal(decision.tuning.length, 2, 'the candidate is still stated, it is simply not applied');
   assert.equal(decision.materiality?.details?.primarySeatThresholdDb, 1, 'the rule it read is carried with the decision');
   return decision.statement;
@@ -325,9 +333,103 @@ check('AGGREGATE IMPROVEMENT ABOVE 1 dB NEVER CLAIMS THE 1 dB THRESHOLD', () => 
   assert.equal(decision.reason, CALIBRATION_APPLY_REASON.NOT_MATERIAL);
   assert.ok(!/below the 1 dB action threshold/.test(decision.statement),
     `the 1 dB threshold may not be claimed when the exact improvement clears it: ${decision.statement}`);
-  assert.match(decision.statement, /no seat-level improvement clears the 1 dB rule/);
-  assert.match(decision.statement, /the overall P20 figure improves by 2 dB/);
-  return decision.statement;
+  assert.ok(!/below the 1 dB action threshold/.test(decision.detailStatement || ''),
+    `the 1 dB threshold may not be claimed in the detail either: ${decision.detailStatement}`);
+  // The user-facing line states the rule that actually held it, with no figures.
+  assert.equal(decision.statement, NOT_APPLIED_SEAT_SUMMARY);
+  assert.match(decision.statement, /did not sufficiently improve the limiting seat/);
+  assert.ok(!/\d/.test(decision.statement), `the summary carries no figures: ${decision.statement}`);
+  // The detail names the seat-level criterion and the figures it read.
+  assert.match(decision.detailStatement, /seat-level rule/);
+  assert.match(decision.detailStatement, /the overall P20 figure improves by 2 dB/);
+  return `${decision.statement} | ${decision.detailStatement}`;
+});
+
+check('LIVE PROJECT - SAVED GAIN CANDIDATE REFUSAL NAMES THE SEAT RULE', () => {
+  // The ACTUAL saved run of the live project (Jooced, V1 "Original Design", plan
+  // saved 2026-10-13T16:57:01Z). Every figure below is read from that saved
+  // record: the baseline's own per-seat P20 rows, both canonical aggregates, both
+  // saved levels, the saved gain trim and the saved rear delay. Nothing is taken
+  // from the sentence the panel displayed.
+  const LIVE = {
+    baseline: { p20: 10.145817163909001, p20Level: 'L1', p19: 0.8394027885794486, p19Level: 'L4' },
+    gain: { p20: 8.8602947594255, p20Level: 'L1', p19: 0.8387303307951584, p19Level: 'L4', frontGainDb: -2.5, rearDelayMs: 1.843481188211772 },
+    seats: [
+      ['seat-r1-c1', 10.145817163909001], ['seat-r1-c2', 6.622406996559306],
+      ['seat-r1-c3', 6.622406996559306], ['seat-r1-c4', 10.145817163908973],
+      ['seat-r2-c1', 9.950279989763473], ['seat-r2-c2', 8.12949380055845],
+      ['seat-r2-c3', 8.12949380055845], ['seat-r2-c4', 9.950279989763473],
+    ],
+    primarySeatIds: ['seat-r2-c2'],
+  };
+  // The exact improvement, from the saved before -> after pair: 1.2855 dB. It
+  // CLEARS the 1 dB action threshold, so that threshold may never be claimed.
+  const exact = LIVE.baseline.p20 - LIVE.gain.p20;
+  assert.ok(Math.abs(exact - 1.2855234044835014) < 1e-9, `exact improvement ${exact}`);
+  assert.ok(exact > 1, 'the saved gain candidate clears the 1 dB action threshold');
+  // No displayed level moved on either metric, so no level rule could have made
+  // this material: a seat-level rule is what held it.
+  assert.equal(LIVE.baseline.p20Level, LIVE.gain.p20Level);
+  assert.equal(LIVE.baseline.p19Level, LIVE.gain.p19Level);
+  // The retained rows grade to the retained levels under the production grading
+  // authority: fixture and run agree on every level they report.
+  LIVE.seats.forEach(([seatId, raw]) => assert.equal(gradeP20FromRaw(raw), 1, `${seatId} must grade to the saved L1`));
+
+  const row = (seatId, raw) => ({ seatId, variationDbRaw: raw, level: `L${gradeP20FromRaw(raw)}`, isPrimary: LIVE.primarySeatIds.includes(seatId) });
+  const current = {
+    ...confirmedResult({ id: 'current', p19: LIVE.baseline.p19, p19Level: LIVE.baseline.p19Level, p20: LIVE.baseline.p20, seats: false }),
+    perSeatP20: LIVE.seats.map(([seatId, raw]) => row(seatId, raw)),
+  };
+  // The run did NOT retain the candidate's per-seat rows (a live finding in its own
+  // right). They are reconstructed to the saved structure: the same eight seats, no
+  // seat improving by 1 dB, and the saved worst-seat aggregate reproduced.
+  const candidate = {
+    ...confirmedResult({ id: 'gain:grouped-gain:["sub-front-1","sub-front-2"]:-2.5', p19: LIVE.gain.p19, p19Level: LIVE.gain.p19Level, p20: LIVE.gain.p20, seats: false }),
+    perSeatP20: LIVE.seats.map(([seatId, raw]) => row(seatId, seatId === 'seat-r1-c1' ? LIVE.gain.p20 : raw - 0.3)),
+    appliedTuning: [
+      { sourceId: 'sub-front-1', delayMs: 0, gainDb: LIVE.gain.frontGainDb, polarity: 1, phaseControlDeg: 0 },
+      { sourceId: 'sub-front-2', delayMs: 0, gainDb: LIVE.gain.frontGainDb, polarity: 1, phaseControlDeg: 0 },
+      { sourceId: 'sub-rear-1', delayMs: LIVE.gain.rearDelayMs, gainDb: 0, polarity: 1, phaseControlDeg: 0 },
+      { sourceId: 'sub-rear-2', delayMs: LIVE.gain.rearDelayMs, gainDb: 0, polarity: 1, phaseControlDeg: 0 },
+    ],
+  };
+  const liveInstances = [
+    { id: 'sub-front-1', enabled: true, model: 'SUB3-12', legacyGroup: 'front', position: { x: 0.31, y: 0.1375 }, bottomHeightM: 0.05, delayMs: 0, gainDb: 0, polarity: 1, phaseControlDeg: 0 },
+    { id: 'sub-front-2', enabled: true, model: 'SUB3-12', legacyGroup: 'front', position: { x: 4.33, y: 0.1375 }, bottomHeightM: 0.05, delayMs: 0, gainDb: 0, polarity: 1, phaseControlDeg: 0 },
+    { id: 'sub-rear-1', enabled: true, model: 'SUB3-12', legacyGroup: 'rear', position: { x: 0.31, y: 4.9525 }, bottomHeightM: 0.05, delayMs: 0, gainDb: 0, polarity: 1, phaseControlDeg: 0 },
+    { id: 'sub-rear-2', enabled: true, model: 'SUB3-12', legacyGroup: 'rear', position: { x: 4.33, y: 4.9525 }, bottomHeightM: 0.05, delayMs: 0, gainDb: 0, polarity: 1, phaseControlDeg: 0 },
+  ];
+
+  const decision = resolveCalibrationAutoApply({ baseline: current, candidate, instances: liveInstances });
+  // The SAVED sentence for this candidate was "Not applied because it does not
+  // clear the 1 dB action threshold." - a threshold the change actually clears.
+  assert.equal(decision.reason, CALIBRATION_APPLY_REASON.NOT_MATERIAL);
+  assert.ok(!/1 dB action threshold/.test(decision.statement || ''), `the 1 dB overall threshold may not be claimed: ${decision.statement}`);
+  assert.ok(!/1 dB action threshold/.test(decision.detailStatement || ''), `nor in the detail: ${decision.detailStatement}`);
+  // The user-facing line states the seat-level rule and carries no figures.
+  assert.equal(decision.statement, NOT_APPLIED_SEAT_SUMMARY);
+  // The detail states the exact criterion and the measurements behind it.
+  assert.match(decision.detailStatement, /seat-level rule/);
+  assert.match(decision.detailStatement, /the overall P20 figure improves by 1\.3 dB/);
+  // Every seat in the rule's scope was checked before any "no seat" claim.
+  assert.equal(decision.materiality?.rule, MATERIALITY_RULE.SEAT_LEVEL_NOT_CLEARED);
+  assert.equal(decision.materiality?.details?.seatScope, 'primary');
+  assert.equal(decision.materiality?.details?.everySeatInScopeChecked, true);
+  assert.equal(decision.materiality?.details?.seatsClearingThreshold, 0);
+  assert.equal(decision.materiality?.details?.worstSeatId, 'seat-r2-c2');
+  assert.equal(decision.materiality?.details?.worstSeatImprovementDb, 0.3);
+  // The saved record retained no per-seat confirmation at all. With the same
+  // values but without it, the sentence may still not claim every seat was read.
+  const unretained = describeNotMaterialCalibration({
+    improvement: decision.improvement,
+    materiality: { material: false, rule: MATERIALITY_RULE.SEAT_LEVEL_NOT_CLEARED, reason: 'No material calibration improvement' },
+    before: decision.before,
+    after: decision.after,
+  });
+  assert.equal(unretained.summary, NOT_APPLIED_SEAT_SUMMARY);
+  assert.ok(!/no (primary )?seat clears/.test(unretained.detail), `no "no seat" claim without the confirmation: ${unretained.detail}`);
+  assert.match(unretained.detail, /seat-level rule/);
+  return `${decision.statement} | ${decision.detailStatement}`;
 });
 
 check('AMBIGUOUS EVIDENCE HELD, NOT APPLIED', () => {

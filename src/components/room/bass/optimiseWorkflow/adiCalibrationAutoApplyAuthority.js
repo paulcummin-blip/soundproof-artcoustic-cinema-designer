@@ -149,21 +149,48 @@ export function describeCalibrationNotApplied(reason, { selectedLever = null } =
 }
 
 /**
- * WHY an immaterial calibration improvement was not applied, from the exact
- * evidence the materiality rule read.
+ * The user-facing line for a calibration improvement that was not applied. It
+ * states the RULE that held the change and carries no figures: the exact
+ * measurements are the detail view's job, so the summary can never imply an
+ * improvement the decision did not measure.
  *
- * The one thing this sentence may never do is name the 1 dB action threshold
- * when the improvement clears it. The panel's whole-number figures (P20 ±10 dB →
- * ±8 dB) are floored for display, so they can imply a different change from the
- * one measured: when the exact improvement really is under the threshold that is
- * stated, and when it is NOT, the rule that actually held the change — the
- * seat-level rule, with the seat-level figure it measured — is stated instead.
+ * The adjustment "improved the overall bass result but did not sufficiently
+ * improve the limiting seat" describes the seat-level criterion the materiality
+ * rule actually applies — never the 1 dB overall action threshold, which this
+ * change clears.
+ */
+export const NOT_APPLIED_SEAT_SUMMARY =
+  "Not applied. The adjustment improved the overall bass result but did not sufficiently improve the limiting seat.";
+export const NOT_APPLIED_THRESHOLD_SUMMARY =
+  "Not applied. The adjustment did not clear the 1 dB action threshold.";
+export const NOT_APPLIED_FAIL_COUNT_SUMMARY =
+  "Not applied. The adjustment leaves more seats failing P19 or P20 than the current design.";
+export const NOT_APPLIED_FAIL_MOVED_SUMMARY =
+  "Not applied. The adjustment moves the failure to a different seat rather than removing it.";
+export const NOT_APPLIED_UNCONFIRMED_SUMMARY =
+  "Not applied. No material calibration improvement was confirmed.";
+
+/**
+ * WHY an immaterial calibration improvement was not applied, taken from the exact
+ * evidence the materiality rule read, and split into the two things a designer
+ * needs separately:
+ *
+ *   summary  the rule that held the change, in one line, with no figures
+ *   detail   the same rule with the exact measurements behind it, for Engineer details
+ *
+ * The one thing neither sentence may do is name the 1 dB action threshold when
+ * the improvement clears it. When the exact improvement really is under the
+ * threshold, that is stated; when it is not, the rule that actually held the
+ * change — the seat-level criterion, named with its own measurement — is stated
+ * instead. A "no seat" claim is made only when EVERY seat the rule read was
+ * confirmed to stay inside it; otherwise the sentence states the worst seat it
+ * measured and never claims the whole seat set was checked.
  *
  * @param {object} params
  * @param {object|null} [params.improvement] - the decision's exact improvement
  *   ({ p20DeltaDb, p19DeltaDb, p20LevelGain, p19LevelGain })
  * @param {object|null} [params.materiality] - the materiality assessment that refused it
- * @returns {string} the reason, always stating a rule this decision applied
+ * @returns {{ summary: string, detail: string }}
  */
 export function describeNotMaterialCalibration({ improvement = null, materiality = null, before = null, after = null } = {}) {
   const p20 = finite(improvement?.p20DeltaDb);
@@ -184,28 +211,61 @@ export function describeNotMaterialCalibration({ improvement = null, materiality
     ? null
     : exact > 0 && exact < 0.1 ? "under 0.1 dB" : `${round1(exact)} dB`;
   const details = materiality?.details || null;
-  const seatThreshold = finite(details?.primarySeatThresholdDb) ?? 1;
-  const primarySeats = finite(details?.primarySeatCount);
-  const seatImprovement = primarySeats != null && primarySeats > 0
-    ? finite(details?.worstPrimarySeatImprovementDb)
-    : finite(details?.worstAnySeatImprovementDb);
+  const rule = materiality?.rule || null;
+  const aggregate = measured != null && exact != null && exact > 0
+    ? `, while the overall ${metric} figure improves by ${measured}`
+    : "";
 
-  // The exact improvement is genuinely under the action threshold: the only case
-  // that may say so. The value is stated, so the sentence and the figures shown
-  // beside it can be reconciled.
+  // ── The exact improvement is genuinely under the action threshold ──
+  // The only case that may say so.
   if (exact != null && exact < 1) {
-    return `Not applied because the improvement is ${measured}, below the 1 dB action threshold.`;
+    return {
+      summary: NOT_APPLIED_THRESHOLD_SUMMARY,
+      detail: `Not applied because the improvement is ${measured}, below the 1 dB action threshold.`,
+    };
   }
 
-  // The overall figure improves, but no seat-level improvement clears the rule:
-  // that is the rule that held it, and it is named with its own measurement.
-  if (seatImprovement != null && seatImprovement < seatThreshold) {
-    const seatMeasured = seatImprovement > 0 && seatImprovement < 0.1 ? "under 0.1 dB" : `${round1(seatImprovement)} dB`;
-    const aggregate = measured != null ? `, while the overall ${metric} figure improves by ${measured}` : "";
-    return `Not applied because no seat-level improvement clears the ${seatThreshold} dB rule: the limiting seat improves by ${seatMeasured}${aggregate}.`;
+  // ── The failing-seat rules: never described as a threshold or a seat-level miss ──
+  if (rule === "fail-count-increased") {
+    return {
+      summary: NOT_APPLIED_FAIL_COUNT_SUMMARY,
+      detail: `Not applied because the number of failing seats increases from ${finite(details?.currentFails) ?? "the current count"} to ${finite(details?.candidateFails) ?? "a higher count"}.`,
+    };
+  }
+  if (rule === "failing-seat-moved") {
+    return {
+      summary: NOT_APPLIED_FAIL_MOVED_SUMMARY,
+      detail: "Not applied because a seat that passed before now fails, so the failing-seat count does not improve.",
+    };
   }
 
-  return "Not applied because no material calibration improvement was confirmed.";
+  // ── The seat-level criterion: the rule that actually held this change ──
+  // Only reached when the overall figure clears the action threshold, so the
+  // seat-level rule is what refused it — stated as such, with its own measurement.
+  if (exact != null && exact > 0) {
+    const seatScopeLabel = details?.seatScope === "primary" ? "primary seat" : "seat";
+    const worstSeat = details?.worstSeatId ? seatPhrase(details.worstSeatId) : null;
+    const seatImprovement = finite(details?.worstSeatImprovementDb);
+    const seatMeasured = seatImprovement == null
+      ? null
+      : seatImprovement > 0 && seatImprovement < 0.1 ? "under 0.1 dB" : `${round1(seatImprovement)} dB`;
+    const seatPhraseText = [worstSeat, seatMeasured ? `improves by ${seatMeasured}` : null]
+      .filter(Boolean).join(" ");
+    // "No seat clears the rule" only when every seat in scope was read AND none
+    // of them clears it. Otherwise the sentence names what it measured.
+    const everyChecked = details?.everySeatInScopeChecked === true;
+    const noneClear = finite(details?.seatsClearingThreshold) === 0;
+    const detail = everyChecked && noneClear
+      ? `Not applied because no ${seatScopeLabel} clears the 1 dB seat-level rule: ${
+        seatPhraseText ? `the limiting ${seatScopeLabel} ${seatPhraseText}` : "the limiting seat does not improve enough"
+      }${aggregate}.`
+      : `Not applied because the seat-level improvement does not clear the 1 dB seat-level rule${
+        seatPhraseText ? `: the limiting ${seatScopeLabel} ${seatPhraseText}` : ""
+      }${aggregate}.`;
+    return { summary: NOT_APPLIED_SEAT_SUMMARY, detail };
+  }
+
+  return { summary: NOT_APPLIED_UNCONFIRMED_SUMMARY, detail: NOT_APPLIED_UNCONFIRMED_SUMMARY };
 }
 
 /**
@@ -242,6 +302,18 @@ function levelOf(value) {
 
 function round1(value) {
   return value == null ? null : Math.round(Number(value) * 10) / 10;
+}
+
+/**
+ * "Row 1 · Seat 2" from a seat id, so a stated limiting seat reads as the
+ * designer's own seat. An id that does not carry row/column numbers is stated
+ * exactly as it is — never guessed at, and never invented.
+ */
+function seatPhrase(seatId) {
+  const id = String(seatId || "").trim();
+  if (!id) return null;
+  const match = id.match(/^seat-r(\d+)-c(\d+)$/i);
+  return match ? `Row ${match[1]} · Seat ${match[2]}` : id;
 }
 
 function changed(from, to, tolerance) {
@@ -454,6 +526,9 @@ function outcome(decision, reason, statement, extra = {}) {
     // The materiality assessment the held reason was built from, with the exact
     // measurements it read — so the reason stated to the designer is traceable.
     materiality: extra.materiality || null,
+    // The same reason with the exact measurements behind it, for Engineer
+    // details. The summary sentence the designer reads stays figure-free.
+    detailStatement: extra.detailStatement || null,
     // The 3:1 trade-off this candidate carried, when it carried one: the ratio,
     // the improvement, the damage and the rule's decision.
     tradeOff: extra.tradeOff || null,
@@ -590,10 +665,12 @@ export function resolveCalibrationAutoApply({
 
   if (!materiality?.material) {
     // The reason the designer reads is built from the exact values the rule read,
-    // so it can never name a threshold the improvement actually clears.
+    // so it can never name a threshold the improvement actually clears. The
+    // summary carries the rule; the detail carries the measurements.
+    const held = describeNotMaterialCalibration({ improvement, materiality, before, after });
     return outcome(CALIBRATION_APPLY_DECISION.NONE, CALIBRATION_APPLY_REASON.NOT_MATERIAL,
-      describeNotMaterialCalibration({ improvement, materiality, before, after }),
-      { ...context, materiality });
+      held.summary,
+      { ...context, materiality, detailStatement: held.detail });
   }
 
   // A primary seat that regresses is a real seat losing performance: never

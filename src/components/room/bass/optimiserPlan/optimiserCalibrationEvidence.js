@@ -698,6 +698,9 @@ function applyDecisionToLever(record, lever, { decision = null, decisionApplied 
     // The reason it was held: the decision's own sentence, or — for a record that
     // predates the decision — the honest statement that none was recorded.
     notAppliedReason: entry?.statement || CALIBRATION_NO_DECISION_RECORDED_REASON,
+    // The same reason with the exact measurements behind it. Engineer details
+    // reads this; the summary line above stays figure-free.
+    notAppliedDetailReason: entry?.detailStatement || null,
   };
 }
 
@@ -900,6 +903,7 @@ function leverLinesOf(evidence) {
       label: record.label,
       text: describeCalibrationLever(record),
       notAppliedReason: record.notAppliedReason || null,
+      notAppliedDetailReason: record.notAppliedDetailReason || null,
     }))
     .filter((line) => Boolean(line.text));
 }
