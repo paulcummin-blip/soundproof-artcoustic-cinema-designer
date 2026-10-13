@@ -28,12 +28,12 @@
 import { describe, it, expect } from "vitest";
 
 import {
+  CALIBRATION_APPLY_DECISION,
   CALIBRATION_APPLY_REASON,
   NOT_APPLIED_SEAT_SUMMARY,
 } from "../components/room/bass/optimiseWorkflow/adiCalibrationAutoApplyAuthority.js";
 import {
   CALIBRATION_SUGGESTION_NOTE,
-  CALIBRATION_SUGGESTION_NOTE_UNVERIFIED,
   describeCalibrationSuggestion,
 } from "../components/room/bass/optimiseWorkflow/adiCalibrationSuggestion.js";
 import {
@@ -143,9 +143,12 @@ describe("the live held gain trim reads as a suggestion, not as a failed optimis
     expect(suggestion.summary).not.toMatch(/seat/i);
   });
 
-  it("states the one disadvantage once, after the benefit", () => {
-    expect(suggestion.note).toBe(CALIBRATION_SUGGESTION_NOTE_UNVERIFIED);
-    expect(suggestion.detail).toMatch(/seat-level figure the search applies was not cleared/);
+  it("keeps the diagnostic evidence in Engineer details, not in the designer's line", () => {
+    // The designer's line states what to do with the suggestion, and nothing else.
+    expect(suggestion.note).toBe(CALIBRATION_SUGGESTION_NOTE);
+    expect(suggestion.note).not.toMatch(/seat|threshold|dB/i);
+    // The missing seat-level confirmation is stated where the evidence belongs.
+    expect(suggestion.detail).toMatch(/seat-level confirmation this needs was not retained/);
     // No seat is claimed to have failed: this run retained no seat values.
     expect(suggestion.detail).not.toMatch(/no primary seat clears/);
     expect(suggestion.summary).not.toMatch(/Row \d|Seat \d/);
@@ -240,6 +243,21 @@ describe("the four decision states stay distinguishable", () => {
   it("records the suggestion as its own decision reason", () => {
     expect(CALIBRATION_APPLY_REASON.IMPROVEMENT_WORTH_CONSIDERING)
       .toBe("calibration-improvement-worth-considering");
+  });
+
+  it("gives each of the four decision states its own reason and its own outcome", () => {
+    // applied · worth considering · no worthwhile improvement · rejected for a regression
+    const applied = [CALIBRATION_APPLY_DECISION.APPLIED, CALIBRATION_APPLY_REASON.IMPROVES_ONE_WITHOUT_DAMAGE];
+    const suggestion = [CALIBRATION_APPLY_DECISION.NONE, CALIBRATION_APPLY_REASON.IMPROVEMENT_WORTH_CONSIDERING];
+    const notWorthwhile = [CALIBRATION_APPLY_DECISION.NONE, CALIBRATION_APPLY_REASON.NOT_MATERIAL];
+    const rejected = [CALIBRATION_APPLY_DECISION.HOLD, CALIBRATION_APPLY_REASON.PRIMARY_SEAT_REGRESSION];
+    // No two states share a reason: the reason alone identifies the state.
+    expect(new Set([applied[1], suggestion[1], notWorthwhile[1], rejected[1]]).size).toBe(4);
+    // Only the applied state claims a change ADI made on its own authority.
+    expect(applied[0]).toBe("applied");
+    expect(suggestion[0]).toBe("none");
+    expect(notWorthwhile[0]).toBe("none");
+    expect(rejected[0]).toBe("hold");
   });
 });
 

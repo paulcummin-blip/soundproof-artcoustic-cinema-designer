@@ -585,6 +585,10 @@ function outcome(decision, reason, statement, extra = {}) {
     // The same reason with the exact measurements behind it, for Engineer
     // details. The summary sentence the designer reads stays figure-free.
     detailStatement: extra.detailStatement || null,
+    // What the designer does with a held SUGGESTION — "Review before applying."
+    // Stated as its own field, so the panel shows the recommendation and the
+    // action, while every diagnostic stays in detailStatement (Engineer details).
+    suggestionNote: extra.suggestionNote || null,
     // The 3:1 trade-off this candidate carried, when it carried one: the ratio,
     // the improvement, the damage and the rule's decision.
     tradeOff: extra.tradeOff || null,

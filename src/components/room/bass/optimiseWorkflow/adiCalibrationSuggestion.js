@@ -11,7 +11,11 @@
 //   WHAT to change        "reduce the front subwoofer level by 2.5 dB"
 //   WHAT it improves      "displayed P20 variation reducing from 10 dB to 8 dB"
 //   WHAT the level is     "the RP22 level remains L1"
-//   the one disadvantage  one line, after the benefit, never as the headline
+//   WHAT to do with it    "Review before applying." — the designer's own line
+//
+// The seat-level figures, the thresholds and the missing-evidence sentence are NOT
+// part of the designer's line: they are stated in `detail`, which every surface
+// renders as Engineer details.
 //
 // The improvement is stated from the run's own before → after pair, so a change
 // of 1.29 dB is never rounded up into "2 dB", and every amount comes from a value
@@ -39,11 +43,13 @@ export const MATERIAL_DAMAGE_DB = BALANCED_DAMAGE_THRESHOLD_DB;
 /** The one wording every suggested calibration improvement starts with. */
 export const CALIBRATION_SUGGESTION_PREFIX = "Suggested improvement:";
 
-/** The disadvantage, stated once, after the benefit — never as the headline. */
-export const CALIBRATION_SUGGESTION_NOTE =
-  "Held for your review — the limiting seat does not improve enough for ADI to apply this on its own.";
-export const CALIBRATION_SUGGESTION_NOTE_UNVERIFIED =
-  "Held for your review — the seat-level figure behind that decision was not retained with this run.";
+/**
+ * The designer's own line under the benefit: what to do with the suggestion.
+ * Deliberately free of every diagnostic — no seat, no threshold, no figure — so
+ * the main panel carries the recommendation and Engineer details carries the
+ * evidence behind it.
+ */
+export const CALIBRATION_SUGGESTION_NOTE = "Review before applying.";
 
 /** "front" / "rear" from a search group's own label, or null. Never guessed. */
 export function calibrationGroupWord(label) {
@@ -187,7 +193,11 @@ export function describeCalibrationSuggestion({
   const seatThreshold = finite(seatThresholdDb) ?? MATERIAL_DAMAGE_DB;
   const seatImprovement = finite(seatImprovementDb);
   const detail = [
-    "Not applied automatically: the seat-level figure the search applies was not cleared, so this is offered for your approval.",
+    // Engineer details only. The verdict is stated for the evidence that actually
+    // exists: a seat figure that was read, or a confirmation that was not retained.
+    seatImprovement != null
+      ? "Not applied automatically: the limiting seat does not improve enough for ADI to apply this on its own."
+      : "Not applied automatically: the seat-level confirmation this needs was not retained, so it is offered for your approval.",
     exact != null && exactFrom != null && exactTo != null
       ? `Predicted overall ${metric} variation improves by ${exact.toFixed(2)} dB (${exactFrom.toFixed(2)} dB → ${exactTo.toFixed(2)} dB).`
       : (exact != null ? `Predicted overall ${metric} variation improves by ${exact.toFixed(2)} dB.` : null),
@@ -200,7 +210,7 @@ export function describeCalibrationSuggestion({
   return {
     summary,
     detail,
-    note: seatImprovement != null ? CALIBRATION_SUGGESTION_NOTE : CALIBRATION_SUGGESTION_NOTE_UNVERIFIED,
+    note: CALIBRATION_SUGGESTION_NOTE,
   };
 }
 

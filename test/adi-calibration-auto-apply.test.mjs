@@ -351,7 +351,12 @@ check('A HELD AGGREGATE IMPROVEMENT IS A SUGGESTION, NOT A THRESHOLD FAILURE', (
   assert.ok(!/seat/i.test(decision.statement), `no seat talk in the designer line: ${decision.statement}`);
   // The criterion, the seat figure and the thresholds stay in Engineer details.
   assert.match(decision.detailStatement, /improves by 2\.00 dB/);
-  assert.match(decision.detailStatement, /seat-level figure the search applies/);
+  assert.match(decision.detailStatement, /the limiting seat does not improve enough/);
+  assert.match(decision.detailStatement, /under the 1 dB seat-level figure/);
+  // The action the suggestion asks of the designer is its own field, and carries
+  // no diagnostic: the seat figures stay in Engineer details.
+  assert.equal(decision.suggestionNote, CALIBRATION_SUGGESTION_NOTE);
+  assert.ok(!/seat|threshold|dB/i.test(decision.suggestionNote), `the review note carries no diagnostic: ${decision.suggestionNote}`);
   assert.equal(decision.materiality?.details?.disposition, MATERIALITY_DISPOSITION.IMPROVEMENT_WORTH_CONSIDERING);
   // Protection is unchanged: the seat-level rule is still what held it.
   assert.equal(decision.materiality?.rule, MATERIALITY_RULE.SEAT_LEVEL_NOT_CLEARED);
