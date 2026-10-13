@@ -22,6 +22,12 @@ const WITHIN_LEVEL_THRESHOLD_DB = 1.0;  // >= 1.0 dB within same level
 const SEVERE_NULL_THRESHOLD_DB = 3.0;   // >= 3.0 dB null reduction
 const NEW_PROBLEM_THRESHOLD_DB = 1.0;    // new problem if deviation worsens > this
 
+/** One decimal, for a stated measurement. Never used in a comparison. */
+function round1(value) {
+  const number = Number(value);
+  return Number.isFinite(number) ? Math.round(number * 10) / 10 : null;
+}
+
 function numericLevel(value) {
   if (Number.isFinite(Number(value))) return Math.max(0, Math.min(4, Number(value)));
   const match = String(value || "").match(/^L([1-4])$/i);
@@ -214,5 +220,29 @@ export function isMaterialImprovement(currentResult, candidateResult) {
   // A recommendation that only improves headroom without any P19/P20 level
   // or deviation improvement is NOT a user-facing recommendation.
 
-  return { material: false, reason: "No material calibration improvement" };
+  // The exact measurements every rule above consulted, returned WITH the refusal
+  // so the decision can state the rule that actually held the change. No rule,
+  // threshold or comparison is changed here — the numbers are simply not thrown
+  // away, so a stated reason can never name a threshold this gate did not apply.
+  const primarySeats = (candidateResult?.perSeatP20 || []).filter((seat) => seat?.isPrimary).length;
+  const currentPrimaryWorst = worstPrimarySeatDeviation(currentResult);
+  const candidatePrimaryWorst = worstPrimarySeatDeviation(candidateResult);
+  const currentAnyWorst = worstSeatDeviation(currentResult);
+  const candidateAnyWorst = worstSeatDeviation(candidateResult);
+
+  return {
+    material: false,
+    reason: "No material calibration improvement",
+    details: {
+      sameLevels,
+      primarySeatCount: primarySeats,
+      // Positive = better. The seat-level figure the same-level rule reads.
+      worstPrimarySeatImprovementDb: round1(currentPrimaryWorst - candidatePrimaryWorst),
+      // Positive = better. The all-seats figure the severe-null rule reads.
+      worstAnySeatImprovementDb: round1(currentAnyWorst - candidateAnyWorst),
+      primarySeatThresholdDb: WITHIN_LEVEL_THRESHOLD_DB,
+      severeNullThresholdDb: SEVERE_NULL_THRESHOLD_DB,
+      newSignificantProblem: hasNewSignificantProblem(currentResult, candidateResult),
+    },
+  };
 }

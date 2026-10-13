@@ -138,7 +138,11 @@ export function describeCalibrationNotApplied(reason, { selectedLever = null } =
     case CALIBRATION_APPLY_REASON.ALREADY_APPLIED:
       return "Not applied because this calibration is already applied to the design.";
     case CALIBRATION_APPLY_REASON.NOT_MATERIAL:
-      return "Not applied because it does not clear the 1 dB action threshold.";
+      // Deliberately no fixed sentence: whether this was "under 1 dB" or held by
+      // the seat-level rule depends on the exact values, which only the decision
+      // has. The decision's own statement carries them, so this reason resolves
+      // to that statement rather than to a threshold it may not have applied.
+      return null;
     default:
       return null;
   }
