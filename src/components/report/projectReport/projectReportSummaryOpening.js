@@ -1,31 +1,42 @@
 /**
  * projectReportSummaryOpening.js
  * ------------------------------
- * The Project Report's Design Summary opening: ONE concise, project-specific
- * paragraph naming the cinema this report actually documents — its
- * architecture, its screen, its seating, the system that was specified, and the
- * strengths the published assessment genuinely supports.
+ * The Project Report's front-page DESIGN INTENT: the designer's own account of
+ * the cinema this report documents — what experience the room is being asked to
+ * deliver, why the principal decisions were taken, how the picture, the sound
+ * and the seating work together, and why that combination suits this particular
+ * room.
+ *
+ * IT IS NOT A SPECIFICATION. The page states the schedule in its own fact sheet
+ * directly above this paragraph, so the intent never lists equipment, counts or
+ * room dimensions. A product, a construction or a distance is named only where
+ * that detail is what explains a decision.
+ *
+ * IT MAKES NO PERFORMANCE CLAIM. The individual strengths, the results behind
+ * them and what each one gives the client are the ADI Design Highlights page's
+ * subject; this paragraph carries the vision and the reasoning instead, so the
+ * two pages read as complementary parts of one document.
  *
  * Read-only and pure. Every element comes from evidence the report already
- * carries:
- *   — the saved project, for the Dolby architecture and the screen;
- *   — the report's own product schedule, for the screen stage, surround/wide
- *     layer, overheads, subwoofers and acoustic treatment that were specified;
- *   — the seated rows, for the seating;
- *   — the published RP22 levels, for which strength may be claimed.
+ * carries: the saved project (display and its presentation, architecture, layout
+ * choices, reference position), the room's dimensions, the design's own seating,
+ * its product schedule (whether the sound has a height layer, how the bass is
+ * delivered, whether treatment is specified), and the shared seating-boundary
+ * authority for where the seating sits in the room.
  *
- * Nothing is recalculated and no capability is claimed that the published
- * assessment does not support: a strength whose parameters are not genuinely
- * strong is left out of the sentence rather than hedged. A project whose
- * evidence is missing entirely returns null, so the report falls back to its
- * existing published statement.
+ * Nothing is recalculated, graded or inferred, and no reason is invented for a
+ * decision the saved design does not record. A project whose evidence is missing
+ * entirely returns null, so the page renders nothing rather than a template line.
  *
  * Pure module: no React, no DOM, no side effects.
  */
 
 import { groupSeatsIntoRows } from '@/components/report/client/seatRowGrouping';
-import { readReportParameter } from '@/components/report/reportParameterEvidence';
 import { displayPhrase, isTvDisplay } from '@/components/models/screen/displayTypeAuthority';
+import {
+  readSeatBoundaryGeometry,
+  buildSeatingBoundaryExplanation,
+} from '@/shared/seatingBoundaryPrinciple';
 
 const NUMBER_WORDS = Object.freeze({
   1: 'one', 2: 'two', 3: 'three', 4: 'four', 5: 'five',
@@ -66,21 +77,6 @@ function totalCount(row) {
   return productParts(row).reduce((sum, part) => sum + partCount(part), 0);
 }
 
-/** The published level of one parameter as a number 1–4, or null. */
-function levelNumber(engineeringSummary, id) {
-  const level = readReportParameter(engineeringSummary, id)?.level;
-  const match = String(level ?? '').match(/^L?([1-4])$/);
-  return match ? Number(match[1]) : null;
-}
-
-/** Whether every one of these parameters is published at least at `minimum`. */
-function reached(engineeringSummary, ids, minimum) {
-  return ids.every((id) => {
-    const level = levelNumber(engineeringSummary, id);
-    return level !== null && level >= minimum;
-  });
-}
-
 /**
  * The display the cinema was designed around.
  * A television by its own size — `115" TV`; a projection screen exactly as
@@ -106,74 +102,77 @@ export function seatingRowPhrase(seatingPositions) {
  * The Design Summary's opening paragraph, or null when the report carries too
  * little project evidence for one.
  *
- * @param {Object}  [input.projectDetails]     — the saved project (architecture, screen)
+ * @param {Object}  [input.projectDetails]     — the saved project (display, architecture, layout, reference)
+ * @param {Object}  [input.roomDims]            — the room's own dimensions
  * @param {Object}  [input.productsSelected]    — the report's own product schedule
  * @param {Array}   [input.seatingPositions]    — the design's seating
- * @param {Object}  [input.engineeringSummary]  — the published engineering summary
- * @returns {string|null}
+ * @returns {string|null} the intent, its paragraphs separated by a blank line
  */
 export function buildProjectReportSummaryOpening({
   projectDetails = null,
+  roomDims = null,
   productsSelected = null,
   seatingPositions = [],
-  engineeringSummary = null,
 } = {}) {
-  const architecture = String(projectDetails?.dolby_config || '').trim() || null;
-  const screen = screenPhrase(projectDetails);
+  const mountMode = String(projectDetails?.screen_mount_mode || '').trim().toLowerCase();
+  const projection = !isTvDisplay(projectDetails);
+  const overheadCount = totalCount(productsSelected?.overheads);
+  const surroundCount = totalCount(productsSelected?.surrounds);
+
+  // Whether the bass is delivered from both ends of the room, read from the
+  // design's own schedule wording (each subwoofer group states its end).
+  const subwooferSchedule = productParts(productsSelected?.subwoofers);
+  const bassFromBothEnds = subwooferSchedule.some((part) => /\(front\)/i.test(part))
+    && subwooferSchedule.some((part) => /\(rear\)/i.test(part));
+  const treated = totalCount(productsSelected?.acoustic_treatment) > 0;
+
+  // Where this design's seating actually sits, from the shared seating-boundary
+  // authority — the same geometry the P1 highlight explains in more detail.
+  const seatingBoundary = buildSeatingBoundaryExplanation(
+    readSeatBoundaryGeometry({ seats: seatingPositions, roomDims }),
+  );
+
+  // Paragraph one: the experience this cinema is designed to deliver.
+  const vision = [];
+  if (projection) {
+    vision.push(mountMode === 'baffle'
+      ? 'This room is designed as a cinema first, with the picture projected onto a screen wall built out as a baffle wall, so the front stage and the low-frequency foundation are carried by the same wall as the picture.'
+      : 'This room is designed as a cinema first, with the picture projected onto a floating screen and the system that carries it concealed from the seating.');
+  } else {
+    vision.push('This room is designed as a cinema around a large-format display, so the picture and the sound are planned together from the seating outwards.');
+  }
+  if (overheadCount > 0) {
+    vision.push('The overhead layer is part of the original design rather than an addition to it, which is what gives the room its sense of scale.');
+  } else if (surroundCount > 0) {
+    vision.push('The sound is carried around and behind the seating as well as across the front, so the audience sits inside the mix rather than in front of it.');
+  }
+
+  // Paragraph two: why the principal decisions were taken, and how the picture,
+  // the sound and the seating work together in this particular room.
+  const reasoning = [];
   const rows = seatingRowPhrase(seatingPositions);
-
-  const lcr = firstModel(productsSelected?.lcr);
-  const surrounds = firstModel(productsSelected?.surrounds);
-  const overheads = firstModel(productsSelected?.overheads);
-
-  const subwooferCount = totalCount(productsSelected?.subwoofers);
-  const subwooferModels = [...new Set(productParts(productsSelected?.subwoofers).map(partModel).filter(Boolean))];
-  const subwoofers = subwooferCount > 0
-    ? `${word(subwooferCount)} ${subwooferModels.length === 1 ? `${subwooferModels[0]} ` : ''}subwoofer${subwooferCount === 1 ? '' : 's'}`
-    : null;
-
-  const treatmentCount = totalCount(productsSelected?.acoustic_treatment);
-  const treatmentModel = firstModel(productsSelected?.acoustic_treatment);
-  const treatment = (treatmentCount > 0 && treatmentModel)
-    ? `${word(treatmentCount)} ${treatmentModel}${treatmentCount === 1 ? '' : 's'}`
-    : null;
-
-  const stages = [
-    lcr && `a ${lcr} screen stage`,
-    surrounds && `a ${surrounds} surround and wide layer`,
-    overheads && `${overheads} overhead speakers`,
-  ].filter(Boolean);
-
-  const around = [];
-  // The display phrase already names the display: "77\" TV" for a television and
-  // "170\" 2.35:1 screen" for a projection screen, so the noun is never repeated.
-  if (screen) around.push(`a ${screen}`);
-  if (rows) around.push(rows);
-
-  const opening = architecture ? `This ${architecture} cinema` : 'This cinema';
-  const sentences = [];
-  if (around.length > 0) {
-    sentences.push(`${opening} is built around ${joinList(around)}${stages.length ? `, with ${joinList(stages)}` : ''}.`);
-  } else if (stages.length > 0) {
-    sentences.push(`${opening} is built on ${joinList(stages)}.`);
+  if (rows) {
+    const reference = String(projectDetails?.mlp_basis || '').trim() === 'middle'
+      ? ', with the reference position taken at the middle of the seating rather than at one privileged chair'
+      : '';
+    const clearance = seatingBoundary?.available === true && seatingBoundary?.favourable === true
+      ? 'well inboard of the side and rear walls'
+      : 'as far inboard of the side and rear walls as the room allows';
+    reasoning.push(
+      `${rows.charAt(0).toUpperCase()}${rows.slice(1)} sit ${clearance}${reference}, so the design answers from where the audience actually sits.`,
+    );
+  }
+  if (bassFromBothEnds) {
+    reasoning.push('The low-frequency is delivered from both ends of the room rather than from one wall, so it arrives together across the seating.');
+  } else if (subwooferSchedule.length > 0) {
+    reasoning.push('The low-frequency is delivered from the screen wall, arranged so it arrives across the seating as one source rather than from a single point.');
+  }
+  if (treated) {
+    reasoning.push('The acoustic treatment takes care of the room\'s own early reflections, so the tonal balance the audience hears belongs to the system rather than to the room.');
   }
 
-  // A strength is stated only where the published assessment supports it.
-  const strengths = [
-    reached(engineeringSummary, [12, 13, 14], 2) && 'strong dynamic capability',
-    reached(engineeringSummary, [16, 17], 2) && 'strong tonal consistency',
-    reached(engineeringSummary, [19], 3) && 'excellent primary-seat bass response',
-  ].filter(Boolean);
-
-  const completing = [subwoofers, treatment].filter(Boolean);
-  if (completing.length > 0) {
-    const completingPhrase = joinList(completing);
-    sentences.push(`${completingPhrase.charAt(0).toUpperCase()}${completingPhrase.slice(1)} complete the system${strengths.length ? `, giving the room ${joinList(strengths)}` : ''}.`);
-  } else if (strengths.length > 0) {
-    sentences.push(`The design delivers ${joinList(strengths)}.`);
-  }
-
-  return sentences.length > 0 ? sentences.join(' ') : null;
+  const paragraphs = [vision.join(' '), reasoning.join(' ')].filter(Boolean);
+  return paragraphs.length > 0 ? paragraphs.join('\n\n') : null;
 }
 
 export default buildProjectReportSummaryOpening;
