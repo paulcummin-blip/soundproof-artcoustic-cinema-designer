@@ -45,12 +45,7 @@
  * in adiHighlightImportance. Read-only and pure throughout.
  */
 
-import {
-  fitHighlightsToBudget,
-  HIGHLIGHT_PILL_HEADROOM_MM,
-  PAGE_BLOCK_MM,
-  PROJECT_REPORT_PAGE_BUDGET_MM,
-} from './projectReportPageBudget';
+import { fitHighlightsToBudget, PAGE_BLOCK_MM, PROJECT_REPORT_PAGE_BUDGET_MM } from './projectReportPageBudget';
 import { statePublishedValues, statedParameterValue } from './projectReportPublishedValues';
 import { parameter } from './adiHighlightStories';
 import {
@@ -175,11 +170,7 @@ export function buildSpecificationConnections({
  * from are returned for audit only — they are never printed.
  */
 export function selectAdiHighlights(sources = {}) {
-  // The page's own budget, less the headroom its canonical level pills stand in: a
-  // page that fits this always prints its pills inside the budget, so the fit can
-  // never spend the space the pills need.
-  const budgetMm = sources.budgetMm
-    ?? (PROJECT_REPORT_PAGE_BUDGET_MM.page - HIGHLIGHT_PILL_HEADROOM_MM);
+  const budgetMm = sources.budgetMm ?? PROJECT_REPORT_PAGE_BUDGET_MM.page;
   const evidenceMap = collectEligibleEvidence(sources.engineeringSummary);
   const distribution = evidenceMap.distribution;
   const specTier = classifySpecTier(distribution);

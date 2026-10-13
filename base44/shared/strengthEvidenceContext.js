@@ -47,7 +47,9 @@ import {
 
 import {
   buildCandidates,
+  buildSeatingClearanceStory,
   admitStrengthStories,
+  withMandatoryStories,
   rankStrengthStories,
   auditOmittedStories,
 } from './strengthStories.js';
@@ -158,8 +160,18 @@ export function selectStrengthStoriesFromReportEvidence(reportEvidence, { maxSto
     floor,
     connections: sources.connections,
   });
+  // The seating decision is a mandatory highlight (MANDATORY_STORY_IDS). It is built
+  // here exactly as the report builds it, from this saved report's own evidence, and
+  // settled in through the same mandate, so a proposal states the same stories in the
+  // same order as the report it reads.
+  const seatingClearance = buildSeatingClearanceStory(sources, { byKey: eligible.byKey });
+  if (seatingClearance) candidates.push(seatingClearance);
   const admission = admitStrengthStories(candidates, { floor });
-  const ranked = rankStrengthStories(admission.admitted, maxStories);
+  const ranked = withMandatoryStories({
+    ranked: rankStrengthStories(admission.admitted, null),
+    candidates,
+    maxStories,
+  });
   const selectedIds = new Set(ranked.map((story) => story.id));
   const rejected = auditOmittedStories({
     candidates,

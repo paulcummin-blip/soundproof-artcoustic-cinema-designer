@@ -445,12 +445,12 @@ export function seatingBoundaryHighlightSummary(geometry) {
   const explanation = buildSeatingBoundaryExplanation(geometry);
 
   if (!explanation || explanation.available !== true) {
-    return 'Where the seating sits is part of the acoustic design rather than a matter of fitting seats into the room.';
+    return 'Where the seating sits is part of the acoustic design, not a matter of fitting seats into the room.';
   }
 
   return explanation.favourable === true
-    ? 'Held clear of the room\'s boundaries rather than pushed against a wall, the seating keeps low-frequency behaviour further from the listeners and holds the surrounding speakers at a more even distance.'
-    : 'Where the seating comes nearer a boundary, those seats hear more of the room\'s low-frequency behaviour and sit closer to the speakers around them, which is the compromise this room sets.';
+    ? 'The seating is held clear of the room\'s walls, which keeps low-frequency behaviour further from the listeners.'
+    : 'The seating comes nearer a boundary here, so those seats hear more of the wall\'s low-frequency behaviour.';
 }
 
 /**

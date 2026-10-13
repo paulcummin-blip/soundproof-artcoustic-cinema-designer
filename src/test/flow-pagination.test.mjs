@@ -62,6 +62,28 @@ class FakeElement {
     this.querySelectorAll = () => [];
   }
 
+  /** A real frame carries its element children; the modelled frame states them. */
+  get children() { return this.childNodes.filter((node) => node.nodeType === 1); }
+
+  /**
+   * A real element carries a live layout box. The modelled element states its own,
+   * positioned after the blocks that precede it in its parent, so the measured
+   * height of a frame is the height of the blocks it carries.
+   */
+  getBoundingClientRect() {
+    const parent = this.parentNode;
+    let offsetMm = 0;
+    if (parent) {
+      for (const node of parent.childNodes) {
+        if (node === this) break;
+        offsetMm += node.blockHeightMm || 0;
+      }
+    }
+    const top = offsetMm * MM_TO_PX;
+    const height = (this.blockHeightMm || 0) * MM_TO_PX;
+    return { top, bottom: top + height, height, left: 0, right: 0, width: 0, x: 0, y: top };
+  }
+
   get firstChild() { return this.childNodes[0] || null; }
 
   get nextSibling() {
