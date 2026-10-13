@@ -338,7 +338,10 @@ export function buildExportStorageDiagnostic({
   identity = {},
   filename = null,
   storagePath = null,
-  partial = 'none',
+  // Left unstated, the failure's own partial state is what gets reported. The
+  // default must be empty for that fallback to work: a non-empty default here
+  // would overwrite the real state with a value that says nothing was achieved.
+  partial = null,
   exportId = null,
   // What the capture itself had to sanitise (a degenerate gradient, a
   // non-finite colour stop), when it had anything to sanitise.
