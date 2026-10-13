@@ -97,16 +97,17 @@ export function useProjectReportPages({
   projectId,
   versionId,
 }) {
-  // The Design Summary's opening: one project-specific statement of the cinema
-  // this report documents, composed from the report's own evidence. Null when
-  // the report carries too little project evidence for one. It opens the merged
-  // document's first page.
+  // The front page's DESIGN INTENT: the designer's own account of the cinema this
+  // report documents — the experience it is designed to deliver and the reasoning
+  // behind the principal decisions, read from the saved design, the room and the
+  // design's own seating geometry. Null when the report carries too little
+  // project evidence for one. It closes the merged document's first page.
   const summaryOpening = useMemo(() => buildProjectReportSummaryOpening({
     projectDetails,
+    roomDims,
     productsSelected,
     seatingPositions,
-    engineeringSummary,
-  }), [projectDetails, productsSelected, seatingPositions, engineeringSummary]);
+  }), [projectDetails, roomDims, productsSelected, seatingPositions]);
 
   // Page 1's own opening statement: the project-specific headline and the single
   // supporting line of facts beneath it, composed by the report's opening

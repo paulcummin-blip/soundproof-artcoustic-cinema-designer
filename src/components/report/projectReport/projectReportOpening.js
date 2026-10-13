@@ -81,9 +81,9 @@ export function buildProjectReportOpening({
     supportingLine,
     intent: buildProjectReportSummaryOpening({
       projectDetails,
+      roomDims,
       productsSelected,
       seatingPositions,
-      engineeringSummary,
     }),
   };
 }
