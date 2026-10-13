@@ -22,12 +22,17 @@ import {
   ISSUED_DOCUMENT_TYPE,
   ISSUED_DOCUMENT_LABEL,
   ISSUED_DOCUMENT_COMPOSITION,
+  ISSUED_DOCUMENT_PAGE_COMPOSER,
   REPORT_DOCUMENT_TYPES,
 } from '../src/components/library/issuedDocument/issuedDocumentTypes.js';
 import {
   buildSpeakerDesignFilename,
   buildSpeakerDesignMarkup,
 } from '../src/components/roomdesigner/speakerDesignPdf.js';
+import {
+  SPEAKER_DESIGN_CONTENT_HEIGHT_MM,
+  packSpeakerDesignSheets,
+} from '../src/components/report/speakerDesign/speakerDesignPaging.js';
 
 const read = (path) => readFileSync(new URL(`../${path}`, import.meta.url), 'utf8');
 
@@ -37,6 +42,8 @@ const REPORT_PAGE = read('src/pages/RP22ClientReport.jsx');
 const PANEL_BUTTON = read('src/components/roomdesigner/SpeakerDesignPdfButton.jsx');
 const PDF_MODULE = read('src/components/roomdesigner/speakerDesignPdf.js');
 const ROW_SOURCE = read('src/components/report/speakerDesign/speakerDesignRows.js');
+const PAGE_COMPOSER_REGISTRY = read('src/components/library/issuedDocument/issuedDocumentPageComposers.js');
+const COMPOSITION_CAPTURE = read('src/components/library/compositionCapture.js');
 
 /** One dual-centre schedule, as the panel states it. */
 const SCHEDULE_GROUPS = Object.freeze([
@@ -72,12 +79,19 @@ test('the schedule is its own document type, listed with the reports', () => {
     'the schedule is listed in the Library’s Generated Reports tab',
   );
 
-  // It is captured from its own print composition, on the paper it prints on.
+  // It is captured from its own print composition, on the paper it prints on:
+  // A4 less the schedule's own 16mm page margin, on both axes, so one frame is
+  // one sheet's worth of content.
   const composition = ISSUED_DOCUMENT_COMPOSITION[ISSUED_DOCUMENT_TYPE.SPEAKER_DESIGN];
   assert.equal(composition.nodeSelector, '.speaker-design-schedule');
-  assert.equal(composition.pageSelector, '.speaker-design-schedule');
   assert.equal(composition.bodyClass, 'speaker-design-export-mode');
   assert.equal(composition.pageFrame.marginMm, 16, 'the schedule’s own 16mm page margin');
+  assert.equal(composition.pageFrame.widthMm, 178);
+  assert.equal(composition.pageFrame.heightMm, 265);
+  // The composed frames become the pages; before they exist the schedule itself
+  // is the single page.
+  assert.equal(composition.pageSelector, '.speaker-design-page, .speaker-design-schedule');
+  assert.equal(composition.pageComposer, ISSUED_DOCUMENT_PAGE_COMPOSER.SPEAKER_DESIGN);
 });
 
 /* ── 2 — the filename ─────────────────────────────────────────────────────── */
@@ -221,6 +235,103 @@ test('the panel download and the Library copy are the same document', () => {
   assert.match(PDF_MODULE, /export async function exportSpeakerDesignPdf/);
   // The panel keeps its own download button.
   assert.match(PANEL_BUTTON, /Download Speaker Design PDF/);
+});
+
+/* ── 7 — the page frame, the closing note and continuation pages ───────────── */
+
+/** The Genesis AV schedule as it measures on A4 — about 247mm in a 265mm frame. */
+const GENESIS_SCHEDULE = Object.freeze({
+  leading: [{ key: 'opening', heightMm: 22 }, { key: 'facts', heightMm: 45 }],
+  groups: [
+    { key: 'group-0', headHeightMm: 8, rowHeightsMm: [12, 12, 16] },
+    { key: 'group-1', headHeightMm: 8, rowHeightsMm: [12, 12, 12] },
+    { key: 'group-2', headHeightMm: 8, rowHeightsMm: [12, 12, 12] },
+    { key: 'group-3', headHeightMm: 8, rowHeightsMm: [12, 12] },
+  ],
+  closing: { key: 'closing', heightMm: 12 },
+});
+
+/** What each sheet actually carries, recomputed from the measured blocks. */
+function sheetHeights(packed, metrics) {
+  const closingHeight = metrics.closing?.heightMm || 0;
+  return packed.sheets.map((sheet) => {
+    let height = sheet.leading.reduce(
+      (total, key) => total + (metrics.leading.find((block) => block.key === key)?.heightMm || 0),
+      0,
+    );
+    sheet.groups.forEach((portion) => {
+      const group = metrics.groups.find((candidate) => candidate.key === portion.key);
+      height += group?.headHeightMm || 0;
+      portion.rows.forEach((rowIndex) => { height += group?.rowHeightsMm[rowIndex] || 0; });
+    });
+    if (sheet.closing) height += closingHeight;
+    return height;
+  });
+}
+
+test('a schedule that fits the frame is one sheet, and the closing note is on it', () => {
+  // The composer packs at the frame height less its own 1mm clearance.
+  const packed = packSpeakerDesignSheets({ ...GENESIS_SCHEDULE, contentHeightMm: 264 });
+
+  assert.equal(packed.sheetCount, 1, 'no unnecessary second page');
+  assert.equal(packed.fits, true);
+  assert.equal(packed.sheets[0].closing, true, 'the closing note stays on the sheet with its content');
+  assert.deepEqual(packed.sheets[0].leading, ['opening', 'facts']);
+  assert.deepEqual(packed.sheets[0].groups.map((portion) => portion.rows.length), [3, 3, 3, 2], 'every row is placed');
+  assert.ok(sheetHeights(packed, GENESIS_SCHEDULE)[0] <= SPEAKER_DESIGN_CONTENT_HEIGHT_MM, 'inside the frame');
+});
+
+test('a longer schedule continues onto further sheets, inside the frame, nothing dropped', () => {
+  const metrics = {
+    ...GENESIS_SCHEDULE,
+    groups: [
+      ...GENESIS_SCHEDULE.groups,
+      { key: 'group-4', headHeightMm: 8, rowHeightsMm: Array(20).fill(12) },
+    ],
+  };
+  const packed = packSpeakerDesignSheets(metrics);
+  const heights = sheetHeights(packed, metrics);
+
+  assert.ok(packed.sheetCount > 1, 'a longer schedule needs further pages');
+  assert.equal(packed.fits, false);
+  assert.equal(
+    packed.sheets.flatMap((sheet) => sheet.groups.flatMap((portion) => portion.rows)).length,
+    3 + 3 + 3 + 2 + 20,
+    'no row is dropped or clipped',
+  );
+  assert.equal(packed.sheets[packed.sheets.length - 1].closing, true, 'the closing note is whole, on the last sheet');
+  packed.sheets.forEach((sheet, index) => {
+    sheet.groups.forEach((portion) => assert.ok(portion.rows.length > 0, 'a heading never opens a sheet with no rows'));
+    assert.ok(
+      heights[index] <= SPEAKER_DESIGN_CONTENT_HEIGHT_MM,
+      `sheet ${index + 1} stays inside the frame, so the bottom margin is kept`,
+    );
+  });
+});
+
+test('one group longer than a sheet continues, with its heading repeated', () => {
+  const metrics = { leading: [], groups: [{ key: 'group-0', headHeightMm: 8, rowHeightsMm: Array(30).fill(12) }], closing: null };
+  const packed = packSpeakerDesignSheets(metrics);
+
+  assert.equal(packed.sheetCount, 2);
+  assert.deepEqual(packed.sheets.map((sheet) => sheet.groups[0].rows.length), [21, 9], 'rows split between sheets, never inside a row');
+  assert.deepEqual(packed.sheets.map((sheet) => sheet.groups[0].key), ['group-0', 'group-0'], 'the heading is repeated on the continuation');
+});
+
+test('the schedule’s own stylesheet declares the page frame and its pagination guards', () => {
+  assert.match(PDF_MODULE, /@page \{ size: A4; margin: 16mm; \}/);
+  assert.match(PDF_MODULE, /\.speaker-design-page \{\s*width: 178mm/);
+  assert.match(PDF_MODULE, /\.speaker-design-page:not\(:last-child\) \{[\s\S]*?break-after: page/);
+  assert.match(PDF_MODULE, /\.group h2 \{[\s\S]*?break-after: avoid/);
+  assert.match(PDF_MODULE, /\.foot \{[\s\S]*?break-before: avoid/);
+  assert.match(PDF_MODULE, /\.foot \{[\s\S]*?padding-bottom: 4mm/, 'the closing note keeps its clearance from the paper edge');
+  assert.match(PDF_MODULE, /thead \{ display: table-header-group; \}/, 'column headings repeat on a continuation page');
+
+  // One composer pages both documents: the printed PDF and the stored copy.
+  assert.match(PDF_MODULE, /prepareComposition: \(doc\) => composeSpeakerDesignPages\(doc\)/);
+  assert.match(COMPOSITION_CAPTURE, /resolvePageComposer\(pageComposer\)/);
+  assert.match(PAGE_COMPOSER_REGISTRY, /composeSpeakerDesignPages/);
+  assert.match(PAGE_COMPOSER_REGISTRY, /ISSUED_DOCUMENT_PAGE_COMPOSER\.SPEAKER_DESIGN/);
 });
 
 export default null;

@@ -523,7 +523,10 @@ export default function RP22ClientReport() {
   const filenameIdentity = useReportFilenameIdentity(projectDetails);
   const { exporting, error: exportError, handleExport } = useClientReportPdfExport({
     activePageCount: readinessBase.state === REPORT_STATE.READY && filenameIdentity.ready ? orderedPages.length : 0,
-    projectName: projectDetails?.name,
+    // The project name is read from the authoritative Project record, like every
+    // other identity segment: the filename never depends on the report's frozen
+    // presentation object, which does not carry the project's identity fields.
+    projectName: filenameIdentity.projectName || projectDetails?.name,
     logoUrl: LOGO_URL,
     versionNumber,
     versionName,

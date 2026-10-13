@@ -26,6 +26,7 @@
 import { jsPDF } from 'jspdf';
 import capturePagePng, { pageCaptureFailure } from '@/components/library/capturePagePng';
 import { installCanvasGradientGuard, neutraliseDegenerateGradients } from './canvasGradientGuard';
+import { resolvePageComposer } from '@/components/library/issuedDocument/issuedDocumentPageComposers';
 import { pageMeasurement } from '@/components/proposal/export/composition/proposalPageGeometry';
 import { proposalPageInventory, sameProposalBoundaries } from '@/components/proposal/export/composition/proposalCompositionInventory';
 
@@ -215,7 +216,7 @@ function pageSizeMm(element) {
  *   capture validates them and never makes new page-allocation decisions.
  * @returns {Promise<{blob: Blob, pageCount: number}>}
  */
-export async function captureCompositionToPdf({ nodeHtml, pageSelector, bodyClass = '', pageFrame = null, styles: completedStyles = null, compositionInventory = null }) {
+export async function captureCompositionToPdf({ nodeHtml, pageSelector, bodyClass = '', pageFrame = null, pageComposer = null, styles: completedStyles = null, compositionInventory = null }) {
   if (!nodeHtml || !pageSelector) {
     throw new Error('The print composition could not be captured.');
   }
@@ -233,6 +234,13 @@ export async function captureCompositionToPdf({ nodeHtml, pageSelector, bodyClas
     await waitForFrameAssets(frame);
 
     const scope = frame.contentDocument;
+
+    // A content-driven composition pages itself with the SAME composer the
+    // printed document used, so the stored copy holds the pages that were
+    // printed — one page when the content fits, further pages when it is longer.
+    const composer = resolvePageComposer(pageComposer);
+    if (composer) composer(scope, { contentHeightMm: paper.heightMm });
+
     const collected = collectPageFrames(scope, pageSelector);
     if (collected.length === 0) {
       throw new Error('The print composition carried no printable pages.');

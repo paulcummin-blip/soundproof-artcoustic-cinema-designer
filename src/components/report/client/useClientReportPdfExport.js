@@ -171,6 +171,9 @@ export function useClientReportPdfExport({
         groups: speakerDesignCompanion.groups,
         layout: speakerDesignCompanion.layout || null,
         projectName,
+        // The dealer segment is the same one the report itself is named with, so
+        // the schedule's own download and this stored copy cannot disagree.
+        dealerName,
         clientName,
         projectReference,
         versionName,

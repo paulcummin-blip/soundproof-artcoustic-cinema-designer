@@ -22,6 +22,7 @@ import {
   closeReportPrintWindow,
 } from '@/components/report/reportPrintWindow';
 import { REPORT_PDF_TYPE, buildReportFilename } from '@/components/report/reportPdfTitle';
+import { composeSpeakerDesignPages } from '@/components/report/speakerDesign/speakerDesignPaging';
 
 /**
  * The schedule's document token. It is the SAME shared report filename authority
@@ -161,10 +162,54 @@ const SCHEDULE_CSS = `
 .speaker-design-schedule .foot {
   margin-top: 22px;
   padding-top: 10px;
+  /* The closing note keeps its own clearance from the printable edge, so it can
+     never sit flush against the paper on the last page. */
+  padding-bottom: 4mm;
   border-top: 1px solid #DCDBD6;
   font-size: 10px;
   color: #737373;
 }
+/* ── The page frame ──────────────────────────────────────────────────────────
+   One frame is one sheet's worth of content inside the 16mm page margin: A4 is
+   210 × 297mm, so the frame is 178 × 265mm. A schedule that fits is one page; a
+   longer one continues onto further frames, allocated by the schedule's own page
+   composer (speakerDesignPaging.js) — the same authority the Project Library
+   copy is paged with, so both documents carry the same sheets. */
+.speaker-design-schedule .speaker-design-page {
+  width: 178mm;
+  box-sizing: border-box;
+}
+@media print {
+  .speaker-design-schedule .speaker-design-page {
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+  .speaker-design-schedule .speaker-design-page:not(:last-child) {
+    break-after: page;
+    page-break-after: always;
+  }
+}
+/* ── Pagination safety ───────────────────────────────────────────────────────
+   Printed unpaged (a schedule shorter than one sheet, or an older window that
+   never composed), the document still never breaks badly: a heading keeps its
+   rows, a row is never split across pages, the column headings repeat on a
+   continuation page, and the closing note is never broken or orphaned. */
+.speaker-design-schedule .facts,
+.speaker-design-schedule .group,
+.speaker-design-schedule .foot,
+.speaker-design-schedule tr {
+  break-inside: avoid;
+  page-break-inside: avoid;
+}
+.speaker-design-schedule .group h2 {
+  break-after: avoid;
+  page-break-after: avoid;
+}
+.speaker-design-schedule .foot {
+  break-before: avoid;
+  page-break-before: avoid;
+}
+.speaker-design-schedule thead { display: table-header-group; }
 `;
 
 /** One fact of the header block; an absent value is omitted, never placeholdered. */
@@ -289,7 +334,16 @@ export async function exportSpeakerDesignPdf({
     return { printed: false, reason: 'window_unavailable', message: SPEAKER_DESIGN_EXPORT_MESSAGES.WINDOW_UNAVAILABLE, title };
   }
 
-  const outcome = await printReportInWindow(win, { title, node, bodyClass: PRINT_BODY_CLASS });
+  // The schedule's own pages are composed in the window from the same authority
+  // the Project Library copy uses, so the downloaded PDF and the stored copy are
+  // paged identically: one sheet when the schedule fits, further sheets when it
+  // does not, with the closing note always whole.
+  const outcome = await printReportInWindow(win, {
+    title,
+    node,
+    bodyClass: PRINT_BODY_CLASS,
+    prepareComposition: (doc) => composeSpeakerDesignPages(doc),
+  });
   if (!outcome.printed) {
     closeReportPrintWindow(win);
     return {

@@ -117,6 +117,9 @@ export function snapshotIssuedComposition(documentType, completedNode = null) {
     // sheet itself; a report page frame is the printable content area inside the
     // 12mm page margin its stylesheet declares.
     pageFrame: composition.pageFrame || null,
+    // A content-driven composition names the composer that pages it — the same
+    // one the printed PDF uses, so the stored copy is paged identically.
+    pageComposer: composition.pageComposer || null,
     // Page allocation has already finished in the browser compositor. Capture never repaginates.
     paginate: false,
   };

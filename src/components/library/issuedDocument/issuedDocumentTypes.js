@@ -42,6 +42,20 @@ export const ISSUED_DOCUMENT_LABEL = Object.freeze({
   [ISSUED_DOCUMENT_TYPE.SPEAKER_DESIGN]: 'Speaker Design',
 });
 
+/**
+ * The content-driven page composer a composition may declare.
+ *
+ * A composition whose pages are its own content — rather than a fixed page frame
+ * — names a composer here. That one composer runs over the same markup for the
+ * printed PDF and for the stored Project Library copy, so the two documents are
+ * paged identically. The token is a plain string, so it travels in a stored
+ * snapshot without ever writing a function to a record.
+ */
+export const ISSUED_DOCUMENT_PAGE_COMPOSER = Object.freeze({
+  /** The Current Speaker Design schedule: as many A4 content frames as it needs. */
+  SPEAKER_DESIGN: 'speaker_design',
+});
+
 /** The document types that belong to the Library's Generated Reports section. */
 export const REPORT_DOCUMENT_TYPES = Object.freeze([
   ISSUED_DOCUMENT_TYPE.PROJECT,
@@ -77,6 +91,11 @@ const PROPOSAL_PAGE_FRAME = Object.freeze({
  * stylesheet declares `@page { size: A4; margin: 16mm }`, so its page frame is
  * the printable content area of A4 inside that margin — the schedule is measured
  * and stored exactly as it prints.
+ *
+ * One frame is a whole sheet's worth of content: a schedule that fits the frame
+ * is one page, and a longer schedule continues onto further frames, allocated by
+ * the schedule's own composer (below). The 16mm margin is the paper margin, so
+ * the bottom clearance on every page is the frame itself.
  */
 const SPEAKER_DESIGN_PAGE_FRAME = Object.freeze({
   widthMm: 178,
@@ -132,11 +151,17 @@ export const ISSUED_DOCUMENT_COMPOSITION = Object.freeze({
   // The schedule is not a mounted page of the app: its node is built from the
   // version's own speaker design and handed to the capture explicitly, so the
   // stored copy is produced from the same markup the panel prints.
+  //
+  // Its pages are its own content, so it declares a page composer: the schedule
+  // is composed into one A4 content frame when it fits, and into further frames
+  // when it is longer. The frames become the pages; before the composer runs the
+  // schedule itself is the single frame, so a document is never left unpaged.
   [ISSUED_DOCUMENT_TYPE.SPEAKER_DESIGN]: Object.freeze({
     nodeSelector: '.speaker-design-schedule',
-    pageSelector: '.speaker-design-schedule',
+    pageSelector: '.speaker-design-page, .speaker-design-schedule',
     bodyClass: 'speaker-design-export-mode',
     pageFrame: SPEAKER_DESIGN_PAGE_FRAME,
+    pageComposer: ISSUED_DOCUMENT_PAGE_COMPOSER.SPEAKER_DESIGN,
     paginate: false,
   }),
   [ISSUED_DOCUMENT_TYPE.SYSTEM_DESIGN_SUMMARY]: Object.freeze({

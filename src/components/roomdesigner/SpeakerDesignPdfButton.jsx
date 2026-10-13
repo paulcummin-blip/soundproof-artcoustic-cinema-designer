@@ -2,6 +2,8 @@ import React, { useCallback, useState } from "react";
 import { Download } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { exportSpeakerDesignPdf } from "@/components/roomdesigner/speakerDesignPdf";
+import useReportFilenameIdentity from "@/components/report/useReportFilenameIdentity";
+import { useActiveProjectId } from "@/components/state/project-session";
 
 /**
  * SpeakerDesignPdfButton
@@ -11,8 +13,11 @@ import { exportSpeakerDesignPdf } from "@/components/roomdesigner/speakerDesignP
  * no report record is written and no report evidence is touched, so the export
  * can never change the client's report.
  *
- * Presentation only: the rows are supplied by the panel, which reads them from
- * the same product authority as the report's equipment list.
+ * The filename identity — project name, dealer, client name and project
+ * reference — is resolved from the authoritative Project record and the owning
+ * account, exactly as the Project Library copy of this same schedule is named.
+ * The two documents can therefore never carry different names. The rows and the
+ * version are supplied by the panel.
  */
 export default function SpeakerDesignPdfButton({
   groups = [],
@@ -28,6 +33,17 @@ export default function SpeakerDesignPdfButton({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState(null);
   const isEmpty = !Array.isArray(groups) || groups.length === 0;
+  const activeProjectId = useActiveProjectId();
+  const identity = useReportFilenameIdentity(activeProjectId ? { id: activeProjectId } : null);
+
+  // A field the records do not hold is omitted, never invented: the caller's own
+  // value stands in only while the authoritative read is still resolving.
+  const filename = {
+    projectName: identity.projectName || projectName,
+    dealerName: identity.dealerName || dealerName,
+    clientName: identity.clientName || clientName,
+    projectReference: identity.projectReference || projectReference,
+  };
 
   const handleClick = useCallback(async () => {
     if (disabled || busy || isEmpty) return;
@@ -38,10 +54,10 @@ export default function SpeakerDesignPdfButton({
       // the browser still sees the click as the user gesture that allowed it.
       const outcome = await exportSpeakerDesignPdf({
         groups,
-        projectName,
-        dealerName,
-        clientName,
-        projectReference,
+        projectName: filename.projectName,
+        dealerName: filename.dealerName,
+        clientName: filename.clientName,
+        projectReference: filename.projectReference,
         versionName,
         versionNumber,
         layout,
@@ -52,7 +68,10 @@ export default function SpeakerDesignPdfButton({
     } finally {
       setBusy(false);
     }
-  }, [busy, clientName, dealerName, disabled, groups, isEmpty, layout, projectName, projectReference, versionName, versionNumber]);
+  }, [
+    busy, disabled, groups, isEmpty, layout, versionName, versionNumber,
+    filename.projectName, filename.dealerName, filename.clientName, filename.projectReference,
+  ]);
 
   return (
     <div className="flex flex-col items-start sm:items-end gap-1">
