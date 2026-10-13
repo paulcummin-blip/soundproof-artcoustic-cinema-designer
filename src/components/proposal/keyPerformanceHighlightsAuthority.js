@@ -203,6 +203,14 @@ const FALLBACK_GAIN = 'Part of how this system performs as a whole in the room.'
 export const HIGHLIGHT_DISPLAY_LIMIT = 8;
 
 /**
+ * The smallest summary the table is ever trimmed to when the complete section
+ * has to fit ONE sheet: the viewing geometry, the three design structures and the
+ * bass result. A smaller table would stop being a summary of the design, so a
+ * section that still does not fit at this size is reported rather than cut.
+ */
+export const HIGHLIGHT_MIN_PRINTED_ROWS = 5;
+
+/**
  * The order rows are chosen in when a design has more results than the table
  * carries. The eight places go to the results that carry the design: the
  * viewing geometry, then the spatial results, then headroom, bass and tone.
@@ -492,6 +500,45 @@ export function buildHighlightDisplayRows(rows, options = {}) {
   return selectTableRows(display, limit).sort(
     (a, b) => (areaRank(a.area) - areaRank(b.area)) || (printRank(a.key) - printRank(b.key))
   );
+}
+
+/**
+ * Which row the curated summary withdraws next, when the complete section has to
+ * fit one sheet and its padding has already been tightened.
+ *
+ * The order is the client's own order of interest, and it is never the highest
+ * grade that decides:
+ *
+ *   1. a row that repeats a point the table already makes — a second result in
+ *      one performance area — goes before a row that states a new one;
+ *   2. then the result that says least about this design: the viewing geometry
+ *      first, then the three design structures, then bass capability, and any
+ *      row whose area is not one of those concepts before all of them.
+ *
+ * The withdrawn rows are a presentation decision only: the stored rows, the
+ * section and the Project Report that carries every result are untouched.
+ *
+ * @param {Array<{ key?: string, area?: string }>} rows — the rows currently printed
+ * @returns {string|null} the key of the row to withdraw, or null when none remains
+ */
+export function nextHighlightRowToDrop(rows = []) {
+  const list = (Array.isArray(rows) ? rows : []).filter((row) => row && (row.key || row.area));
+  if (list.length === 0) return null;
+  const counts = new Map();
+  list.forEach((row) => {
+    const area = String(row.area || '');
+    counts.set(area, (counts.get(area) || 0) + 1);
+  });
+  // Within one performance area the least valuable result goes first.
+  const worstOf = (candidates) => candidates
+    .slice()
+    .sort((a, b) => printRank(b.key) - printRank(a.key))[0] || null;
+  const repeated = list.filter((row) => counts.get(String(row.area || '')) > 1);
+  if (repeated.length > 0) return String(worstOf(repeated).key);
+  // Then the area that carries least of this design's story.
+  return String(list
+    .slice()
+    .sort((a, b) => (areaRank(b.area) - areaRank(a.area)) || (printRank(b.key) - printRank(a.key)))[0].key);
 }
 
 export default buildHighlightDisplayRows;

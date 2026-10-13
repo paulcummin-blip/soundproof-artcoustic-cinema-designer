@@ -178,7 +178,10 @@ export default function KeyPerformanceHighlightsTable({
         </thead>
         <tbody>
           {list.map((row) => (
-            <tr key={row.key}>
+            // The row's own identity travels with it, so the measured compositor
+            // can decide which rows a one-sheet summary carries without this
+            // component knowing anything about the sheet it is printed on.
+            <tr key={row.key} data-row-key={row.key} data-row-area={row.area}>
               <td className={`${CELL} text-[#1B1A1A]`} style={proposalRoleStyle('body')}>{row.area}</td>
               <td className={`${CELL} text-[#3E4349]`} style={proposalRoleStyle('body')}>{row.parameter}</td>
               <td className={`${CELL} text-[#1B1A1A]`} style={proposalRoleStyle('body')}>{row.result}</td>

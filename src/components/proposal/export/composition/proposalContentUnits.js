@@ -1,3 +1,5 @@
+import { fitMediaUnit } from '@/components/proposal/export/composition/proposalMediaFitting';
+
 /** Semantic units within the measured browser compositor; original DOM order is authoritative. */
 const PROSE = '.pp-body,.pp-endnote__body,.proposal-print-section__body';
 const HEADING = '.pp-header,.pp-block__title,.pp-facts-group__title,.pp-decision__title,.pp-endnote__title,h1,h2,h3,h4';
@@ -6,6 +8,9 @@ const MEDIA = 'figure,.pp-media,img,svg,video';
 /** The gallery and its supporting row: measured photograph by photograph. */
 const GALLERY = '.pp-gallery';
 const GALLERY_ROW = '.pp-gallery__support';
+/** The editorial compositions a client-facing pack reads its copy in. */
+const COMPOSITION = '[data-editorial-composition]';
+const COMPOSITION_BLOCK = '[data-editorial-block]';
 function shell(node) {
   const copy = node.cloneNode(false);
   if (copy.nodeType === 1) copy.removeAttribute('id');
@@ -68,6 +73,9 @@ export function proposalContentUnits(page, measureUnits) {
   };
   const collect = (node, ancestors = [], force = false) => {
     if (node.nodeType !== 1) return [atom(node, ancestors, { keepNext: !node.textContent.trim() })];
+    // A composition is read by its own rule wherever it sits, so the editorial
+    // grouping holds however deeply the pack nests it.
+    if (node.matches?.(COMPOSITION)) return compositionUnits(node);
     if (node.matches('table')) return tableUnits(node, ancestors);
     const unit = atom(node, ancestors);
     const prose = node.matches(PROSE);
@@ -80,7 +88,36 @@ export function proposalContentUnits(page, measureUnits) {
     return [...node.childNodes].flatMap((child) => collect(child, [...ancestors, node],
       child.matches?.(PROSE) || child.matches?.(GALLERY_ROW)));
   };
+  // ── Editorial compositions ───────────────────────────────────────────────
+  // A composition is one block of the document: its own heading, the photograph
+  // that leads it and the copy it carries. It is measured as ONE unit wherever
+  // it fits a sheet, so a sheet break can only fall between compositions and
+  // never inside one. Where a composition genuinely exceeds a sheet the
+  // photograph that leads it is reduced proportionally first — never cropped,
+  // never removed, never re-set in a smaller type — and only when that is not
+  // enough does the composition fall back to its own blocks, and a block, in
+  // turn, to its paragraphs: the explicit overflow for copy that cannot be
+  // presented on one sheet.
+  const blockUnits = (block) => {
+    const whole = atom(block, []);
+    if (measureUnits([whole]).fits) return [whole];
+    if (fitMediaUnit(whole, [], measureUnits)) return [whole];
+    return collect(block, [], true);
+  };
+  const compositionUnits = (composition) => {
+    const whole = atom(composition, []);
+    if (measureUnits([whole]).fits) return [whole];
+    if (fitMediaUnit(whole, [], measureUnits)) return [whole];
+    return [...composition.children].flatMap((child) => (
+      child.matches?.(COMPOSITION_BLOCK) ? blockUnits(child) : collect(child, [], true)
+    ));
+  };
+
   for (const group of page.childNodes) {
+    if (group.nodeType === 1 && group.matches(COMPOSITION)) {
+      units.push(...compositionUnits(group));
+      continue;
+    }
     const whole = atom(group, []);
     const standalone = measureUnits([whole]);
     const paragraphs = group.querySelectorAll?.('.pp-body p') || [];

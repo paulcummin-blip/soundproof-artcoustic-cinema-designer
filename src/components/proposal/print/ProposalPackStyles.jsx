@@ -487,6 +487,56 @@ export default function ProposalPackStyles() {
         margin-top: 5mm;
       }
 
+      /* ── Editorial compositions ──
+         A section's copy is composed in the blocks the document reads it in: the
+         opening composition carries the section's own heading, the photograph that
+         leads it and its first block, and the rest of the copy continues in one
+         further composition. They are measured as one unit each, so a sheet break
+         can only fall between them — never midway through a paragraph — and the
+         space between two compositions that do share a sheet reads as one
+         deliberate step. */
+      .proposal-print-portal .pp-composition {
+        display: flow-root;
+      }
+      .proposal-print-portal .pp-composition + .pp-composition {
+        margin-top: 10mm;
+      }
+
+      /* ── The three design structures: ONE connected editorial section ──
+         Spatial Resolution, Dynamic Range and Timbre Matching are read as one
+         account under one shared heading. One hierarchy and one rhythm: the shared
+         heading, then each structure's own heading and its complete explanation,
+         then the photograph that supports it. The structures are the same editorial
+         weight as each other, so none of them reads as an unrelated page. */
+      .proposal-print-portal .pp-pillars__title {
+        font-family: var(--pp-heading) !important;
+        font-size: 9pt !important;
+        font-weight: 300 !important;
+        letter-spacing: 0.24em !important;
+        text-transform: uppercase !important;
+        color: var(--pp-warm) !important;
+        margin: 0 0 6mm !important;
+        padding-bottom: 3mm;
+        border-bottom: 1px solid var(--pp-rule);
+        break-after: avoid;
+        page-break-after: avoid;
+      }
+      .proposal-print-portal .pp-pillar .pp-header--continued {
+        margin-top: 0;
+      }
+      .proposal-print-portal .pp-pillar .pp-header__title {
+        font-size: 14pt !important;
+      }
+      .proposal-print-portal .pp-pillar .pp-header__rule {
+        margin-top: 4mm;
+      }
+      .proposal-print-portal .pp-pillar + .pp-pillar {
+        margin-top: 11mm;
+      }
+      .proposal-print-portal .pp-pillar .pp-body {
+        max-width: 148mm;
+      }
+
       /* ── Closing note ──
          A short factual source note closes the page it belongs to instead of
          taking a sheet of its own for a few sentences. */

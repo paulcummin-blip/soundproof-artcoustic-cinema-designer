@@ -6,6 +6,10 @@ import { fragmentTextUnit } from '@/components/proposal/export/composition/propo
 import { measuredPartition } from '@/components/proposal/export/composition/proposalMeasuredPartition';
 import { fitMediaUnit, isMediaUnit } from '@/components/proposal/export/composition/proposalMediaFitting';
 import { normalizeGalleryPage } from '@/components/proposal/print/galleryPageComposition';
+import { fitHighlightsSection } from '@/components/proposal/export/composition/highlightsFitting';
+
+/** The one sentence a summary that cannot fit one sheet is stopped with. */
+const HIGHLIGHTS_OVERFLOW = 'The complete Key Performance Highlights section cannot fit one A4 sheet. Export stopped rather than splitting the table or setting it in a smaller type.';
 
 /** Make the existing print typography/layout measurable before opening Print. */
 export function proposalMeasurementCss(doc) {
@@ -23,6 +27,11 @@ export function composeProposalFrames(pages) {
   pages.forEach((original, frameIndex) => {
     original.dataset.paginationFrame ||= String(frameIndex);
     naturalFrame(original);
+    // The evidence summary is ONE sheet: it is curated — its own padding first,
+    // then the least valuable rows — before it is measured, and its table is
+    // never split across two. The full result set stays in the Project Report.
+    if (original.matches?.('.pp-page--highlights')
+        && !fitHighlightsSection(original, pageMeasurement)) throw new Error(HIGHLIGHTS_OVERFLOW);
     original.querySelectorAll('.pp-body p,.pp-endnote__body p,figcaption,.pp-comparison-option__row dd').forEach((node) => {
       node.style.setProperty('overflow-wrap', 'anywhere', 'important');
     });
@@ -69,6 +78,15 @@ export function composeBrowserProposal(doc) {
   if (!root) throw new Error('The proposal print composition is unavailable.');
   if (root.dataset.browserComposed === 'true') return root;
   assertSelectedImages(root);
+  // The curated one-sheet summary is settled BEFORE the content inventory is
+  // taken, so the check below still proves that composition itself changed
+  // nothing: what the document prints is what it printed, minus the rows this
+  // summary withdraws by measurement, which no other part of the pack carries.
+  [...root.children]
+    .filter((page) => page.matches('.pp-page--highlights'))
+    .forEach((page) => {
+      if (!fitHighlightsSection(page, pageMeasurement)) throw new Error(HIGHLIGHTS_OVERFLOW);
+    });
   const signature = proposalContentSignature(root);
   const originals = [...root.children].filter((page) => page.matches('.pp-page'));
   const pages = composeProposalFrames(originals);

@@ -41,7 +41,6 @@ import { EDITORIAL_ROLE } from '@/components/proposal/images/proposalImagePlacem
 import AtAGlancePage from '@/components/proposal/print/AtAGlancePage';
 import MethodPage from '@/components/proposal/print/MethodPage';
 import DecisionSummaryPage from '@/components/proposal/print/DecisionSummaryPage';
-import AppendixPage from '@/components/proposal/print/AppendixPage';
 import ProposalPageHeader from '@/components/proposal/print/ProposalPageHeader';
 import ProposalMetricCards from '@/components/proposal/print/ProposalMetricCards';
 import ProposalPackStyles from '@/components/proposal/print/ProposalPackStyles';
@@ -53,6 +52,14 @@ import {
 import { getSectionsForProposalType, resolveSectionTitle } from '@/components/proposal/proposalSections';
 import { alternativesCarrier, orderPublicationSections } from '@/components/proposal/publicationOrder';
 import { bandOpeningTypes, isFlowSection } from '@/components/proposal/print/narrativeFlowComposition';
+import {
+  PILLAR_GROUP_HEADING,
+  groupEditorialCompositions,
+  isClientVisibleSection,
+  isPillarSection,
+  mediaFollowsBody,
+  splitEditorialBlocks,
+} from '@/components/proposal/print/editorialComposition';
 import { prepareSectionBody } from '@/components/proposal/sectionBodyAuthority';
 import { isHighChannelDesign } from '@/components/proposal/highChannelLayoutAuthority';
 import { compactViewingResult } from '@/components/proposal/print/snapshotViewingRows';
@@ -237,6 +244,24 @@ export default function ProposalPackDocument({
     return frame;
   };
 
+  // The three RP22 structures are ONE connected editorial section: their groups
+  // are composed together, under one shared heading, rather than printed as three
+  // unrelated pages. They travel as one composition, so the sheets they need are
+  // decided by their complete copy — and if their copy truly needs a second
+  // sheet, that continuation still carries the group's own identity and
+  // hierarchy.
+  let pillarSection = null;
+  const flushPillarSection = () => {
+    if (!pillarSection) return;
+    pillarSection.sheet.children.push(
+      <div data-editorial-composition="sound_experience" className="pp-pillars" key="sound_experience">
+        <h2 className="pp-pillars__title">{PILLAR_GROUP_HEADING}</h2>
+        {pillarSection.groups}
+      </div>,
+    );
+    pillarSection = null;
+  };
+
   // The seating-style page: the large lifestyle alternatives, placed immediately
   // before the closing section (the planner names that anchor) or at the end of
   // the narrative when there is no closing section.
@@ -336,6 +361,12 @@ export default function ProposalPackDocument({
       if ((!hasImagesSection || !byType.has('room_images')) && ['overall_design', 'conclusion', 'appendix'].includes(def.type)) pushUnplacedImages();
       const section = byType.get(def.type);
       if (!section) return;
+      // A section a client-facing document does not print — the Appendix, whose
+      // evidence the Project Report already carries — keeps its stored record
+      // exactly as it is and simply has no page here. Nothing is left behind it:
+      // no empty sheet, no leftover rule, and no generic closing note in its
+      // place.
+      if (!isClientVisibleSection(section.section_type)) return;
       const title = section.title || def.title;
       // A comparison names its own sections — the report presents system options
       // and compares them, so no page is titled as a single system design. The
@@ -351,26 +382,6 @@ export default function ProposalPackDocument({
         highChannel,
         proposalType: reportType,
       });
-
-      if (section.section_type === 'appendix') {
-        // The closing note is an endnote on the page the document already has:
-        // a short factual statement closes the last content sheet rather than
-        // taking a whole sheet of its own for a few sentences. Where there is no
-        // page to close (no composed section frame yet) it keeps its own page.
-        const carrier = pages[pages.length - 1];
-        if (carrier && Array.isArray(carrier.children)) {
-          carrier.endnote = true;
-          carrier.children.push(
-            <div className="pp-endnote" key={`endnote:${section.id}`}>
-              <div className="pp-endnote__title">{displayTitle}</div>
-              {body ? (
-                <div className="pp-endnote__body" dangerouslySetInnerHTML={{ __html: body }} />
-              ) : null}
-            </div>,
-          );
-          return;
-        }
-      }
 
       if (section.section_type === 'room_images') {
         // A selected photograph not already placed editorially must still print,
@@ -461,61 +472,109 @@ export default function ProposalPackDocument({
         : addSectionFrame(section.section_type, section.id);
       if (media.length > 0) sheet.imaged = true;
 
-      const EditorialGroup = isFlowSection(section.section_type) ? 'div' : React.Fragment;
-      const groupProps = isFlowSection(section.section_type)
-        ? { 'data-editorial-section': section.section_type, style: { display: 'flow-root' } }
-        : {};
-      sheet.children.push(
-        <EditorialGroup key={section.id} {...groupProps}>
-          <ProposalPageHeader
-            number={continuesOpenSheet ? null : takeNumber()}
-            kicker="Design"
-            title={displayTitle}
-            continued={continuesOpenSheet}
-          />
-          {/* The dominant treatment leads the page: full-width, image-first. */}
-          {landscape ? <ProposalImagePlacement placement={landscape} /> : null}
-          {/* The portrait accent sits smaller, beside the copy it illustrates. */}
-          {portrait ? (
-            <div className="pp-media-row">
-              <div className="pp-media-row__copy">
-                {body ? (
-                  <div className="pp-body" dangerouslySetInnerHTML={{ __html: body }} />
-                ) : null}
-              </div>
-              <ProposalImagePlacement placement={portrait} />
-            </div>
-          ) : (
-            body ? <div className="pp-body" dangerouslySetInnerHTML={{ __html: body }} /> : null
-          )}
-          {evidence.length > 0 ? <ProposalMetricCards cards={evidence} /> : null}
-          {/* The seating alternatives follow the copy that explains them, each
-              keeping its own caption. Nothing is stated twice: the page's own
-              prose is the validated seating explanation. */}
-          {seatingHere ? (
-            <div className={`pp-seating pp-seating--${seatingHere.length}`}>
-              {seatingHere.map((placement) => (
-                <ProposalImagePlacement key={placement.id} placement={placement} />
-              ))}
-            </div>
-          ) : null}
-          {/* The alternatives the designer marked as comparison options are shown
-              on this same page, under the copy that explains them, each captioned
-              with what it stands for. If the group does not fit on one sheet it
-              flows onto the next, every caption staying with its image. */}
-          {alternativesOnCarrier.length > 0 && section.section_type === 'presented_options' ? (
-            <div className={`pp-comparison pp-comparison--${alternativesOnCarrier.length}`}>
-              {alternativesOnCarrier.map((placement) => (
-                <ProposalImagePlacement
-                  key={placement.id}
-                  placement={placement}
-                  caption={placement.comparison_option_label || placement.source_caption || null}
-                />
-              ))}
-            </div>
-          ) : null}
-        </EditorialGroup>,
+      // The section's own heading, and the photograph that leads it — or, for the
+      // three design structures, the photograph that supports the explanation
+      // printed above it.
+      const header = (
+        <ProposalPageHeader
+          number={continuesOpenSheet ? null : takeNumber()}
+          kicker="Design"
+          title={displayTitle}
+          continued={continuesOpenSheet}
+        />
       );
+      const leadingMedia = landscape && !mediaFollowsBody(section.section_type)
+        ? <ProposalImagePlacement placement={landscape} />
+        : null;
+      const supportingMedia = landscape && mediaFollowsBody(section.section_type)
+        ? <ProposalImagePlacement placement={landscape} />
+        : null;
+
+      // The copy, read as the compositions the document is composed in. A block is
+      // a heading and the paragraphs it introduces, and the blocks together are the
+      // stored body character for character: nothing is shortened, reordered or
+      // dropped. The opening composition carries the section's heading, its
+      // photograph and its first block; the rest of the copy continues in one
+      // further composition, so a section that needs a second sheet continues at a
+      // block boundary rather than midway through a paragraph.
+      const copyBlocks = groupEditorialCompositions(splitEditorialBlocks(body));
+      const blockCopy = (blocks) => blocks.map((block) => (
+        <div
+          key={block.id}
+          className="pp-body"
+          data-editorial-block="copy"
+          dangerouslySetInnerHTML={{ __html: block.html }}
+        />
+      ));
+      const openingCopy = blockCopy(copyBlocks[0] || []);
+      const continuingBlocks = copyBlocks.slice(1).flat();
+
+      // The seating alternatives follow the copy that explains them, each keeping
+      // its own caption. Nothing is stated twice: the page's own prose is the
+      // validated seating explanation.
+      const seatingImages = seatingHere ? (
+        <div className={`pp-seating pp-seating--${seatingHere.length}`}>
+          {seatingHere.map((placement) => (
+            <ProposalImagePlacement key={placement.id} placement={placement} />
+          ))}
+        </div>
+      ) : null;
+      // The alternatives the designer marked as comparison options are shown on
+      // this same page, under the copy that explains them, each captioned with
+      // what it stands for.
+      const alternativeImages = alternativesOnCarrier.length > 0
+        && section.section_type === 'presented_options' ? (
+          <div className={`pp-comparison pp-comparison--${alternativesOnCarrier.length}`}>
+            {alternativesOnCarrier.map((placement) => (
+              <ProposalImagePlacement
+                key={placement.id}
+                placement={placement}
+                caption={placement.comparison_option_label || placement.source_caption || null}
+              />
+            ))}
+          </div>
+        ) : null;
+
+      const groupNode = (
+        <div
+          key={section.id}
+          className={isPillarSection(section.section_type) ? 'pp-pillar' : undefined}
+          data-editorial-section={section.section_type}
+          data-editorial-block={isPillarSection(section.section_type) ? 'pillar' : 'section'}
+          style={{ display: 'flow-root' }}
+        >
+          <div className="pp-composition" data-editorial-composition="opening">
+            {header}
+            {leadingMedia}
+            {/* The portrait accent sits smaller, beside the copy it illustrates. */}
+            {portrait ? (
+              <div className="pp-media-row">
+                <div className="pp-media-row__copy">{openingCopy}</div>
+                <ProposalImagePlacement placement={portrait} />
+              </div>
+            ) : openingCopy}
+            {supportingMedia}
+            {evidence.length > 0 ? <ProposalMetricCards cards={evidence} /> : null}
+            {seatingImages}
+            {alternativeImages}
+          </div>
+          {continuingBlocks.length > 0 ? (
+            <div className="pp-composition" data-editorial-composition="continuing">
+              {blockCopy(continuingBlocks)}
+            </div>
+          ) : null}
+        </div>
+      );
+
+      // The three design structures travel as one composition; every other section
+      // takes its own place in the flow.
+      if (isPillarSection(section.section_type)) {
+        pillarSection = pillarSection || { sheet, groups: [] };
+        pillarSection.groups.push(groupNode);
+      } else {
+        flushPillarSection();
+        sheet.children.push(groupNode);
+      }
 
       // A seating group too long for one page continues past it, every image
       // still with its own caption and the group's explanation already stated.
@@ -533,6 +592,8 @@ export default function ProposalPackDocument({
       }
     });
 
+  flushPillarSection();
+
   // A seating-style page whose closing anchor was not composed still belongs in
   // the document, after the narrative it supports.
   if (seatingChunks.length > 0 && !seatingPagesPlaced) {
@@ -541,10 +602,6 @@ export default function ProposalPackDocument({
 
   if (!comparisonPagesPlaced && comparisonGroups.length) pushComparisonPages();
   pushUnplacedImages();
-  const hasAppendixSection = canonical.some((def) => def.type === 'appendix');
-  if (isDesignedPack && !hasAppendixSection) {
-    addPage(<AppendixPage key="appendix" number={takeNumber()} />);
-  }
 
   return (
     <div className="proposal-print-portal" data-selected-images={JSON.stringify(imagePlan.selectedImageUrls)}>
