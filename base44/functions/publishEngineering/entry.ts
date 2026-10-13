@@ -18,6 +18,11 @@ import {
   auditEngineeringPublication,
   isPublishableEngineeringSummary,
 } from '../../shared/publicationGateAuthority.js';
+import {
+  retainCompletedResults,
+  collectPublicationBassFingerprints,
+  loadReportCalculationFingerprints,
+} from '../../shared/cacheRetentionAuthority.js';
 
 /**
  * publishEngineering
@@ -137,6 +142,18 @@ export default async function(req) {
     // Read only until the strict producer contract passes. No defaults/backfill.
     let cacheRecord = await loadCacheRecord(service, projectId, versionId);
 
+    // The completed bass results a SAVED report still reads must survive the
+    // bounded retention below, so they are read here and protected explicitly:
+    // the fingerprint each saved report states, and the bass contract every stored
+    // publication in this row is backed by.
+    const reportCalculationFingerprints = await loadReportCalculationFingerprints(
+      service, projectId, versionId,
+    );
+    const protectedBassFingerprints = [
+      ...reportCalculationFingerprints,
+      ...collectPublicationBassFingerprints(cacheRecord),
+    ];
+
 
     // Idempotency check — if the fingerprint already exists, no duplicate.
     const existing = findPublication(cacheRecord, fingerprint);
@@ -208,17 +225,29 @@ export default async function(req) {
     // the most recent few. Anything removed is reported in the response as
     // `retention.pruned` and logged — never dropped silently.
     let retentionPruned: string[] = [];
+    let completedPruned: string[] = [];
 
     if (existing) {
       // Immutable valid new-contract idempotency hit. Never enrich old authority.
       // The map is still bounded here, so a record bloated by earlier publishes
       // heals on the next publish instead of staying too large to write.
       const { publications: retained, pruned } = retainPublications(cacheRecord, fingerprint);
-      if (pruned.length) {
+      // Superseded completed results are bounded in the SAME write, so a record
+      // bloated by earlier publishes heals instead of staying too large to write.
+      const completed = retainCompletedResults(cacheRecord, {
+        keepFingerprint: cacheRecord.current_fingerprint,
+        protectedFingerprints: protectedBassFingerprints,
+      });
+      if (pruned.length || completed.changed) {
         cacheRecord = await service.entities.ProjectAnalysisCache.update(
-          cacheRecord.id, { engineering_publications: retained },
+          cacheRecord.id,
+          {
+            engineering_publications: retained,
+            ...(completed.changed ? { completed_by_fingerprint: completed.completed } : {}),
+          },
         );
         retentionPruned = pruned;
+        completedPruned = completed.pruned;
       }
     } else {
       const { publications } = upsertPublication(cacheRecord, fingerprint, publication);
@@ -228,6 +257,18 @@ export default async function(req) {
       const updatePayload = {
         engineering_publications: retained,
       };
+      // The completed results are bounded in this same write. This is the row that
+      // grows past the entity write limit, and a publish that cannot write the row
+      // is a publish whose pointer ends up referencing a publication that was
+      // never stored — an unsaved assessment the designer cannot explain.
+      const completed = retainCompletedResults(cacheRecord, {
+        keepFingerprint: cacheRecord.current_fingerprint,
+        protectedFingerprints: protectedBassFingerprints,
+      });
+      if (completed.changed) {
+        updatePayload.completed_by_fingerprint = completed.completed;
+        completedPruned = completed.pruned;
+      }
       // Stamp account_id if missing (legacy records)
       if (!cacheRecord.account_id && projectAccountId) {
         updatePayload.account_id = projectAccountId;
@@ -240,6 +281,11 @@ export default async function(req) {
     if (retentionPruned.length) {
       console.warn(
         `[publishEngineering] pruned ${retentionPruned.length} superseded publication(s) to keep the stored publication map bounded.`,
+      );
+    }
+    if (completedPruned.length) {
+      console.warn(
+        `[publishEngineering] pruned ${completedPruned.length} superseded completed bass result(s) to keep the stored row writable. The current result and every result a saved report reads are retained.`,
       );
     }
 
@@ -283,6 +329,11 @@ export default async function(req) {
         recent_kept: PUBLICATION_RETENTION_RECENT,
         pruned: retentionPruned,
         pruned_count: retentionPruned.length,
+        // Superseded completed bass results removed from the row, reported rather
+        // than dropped silently. The current result and every result a saved
+        // report still reads are always retained.
+        pruned_completed: completedPruned,
+        pruned_completed_count: completedPruned.length,
       },
       acknowledgement: {
         status: audit.status,

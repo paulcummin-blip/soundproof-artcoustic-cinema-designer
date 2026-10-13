@@ -315,7 +315,9 @@ test('TEST 11 — regeneration creates a linked revision and never overwrites th
   expect(WIZARD).toContain('const parentProposalId = regenerateFrom?.id || null;');
   expect(WIZARD).toContain('parent_proposal_id: parentProposalId,');
   expect(WIZARD).toContain('A new revision will be created and linked to it');
-  expect(WIZARD).toContain('const [step, setStep] = useState(regenerateFrom ? 2 : 0);');
+  // A regeneration still starts at the Generate step; a fresh creation starts
+  // where the designer left off (or at the first step when nothing is carried).
+  expect(WIZARD).toContain('const [step, setStep] = useState(regenerateFrom ? 2 : (restoredDraft?.step ?? 0));');
   expect(WIZARD).toContain('regenerateFrom.selected_version_ids');
 
   // The server links the NEW record by revision number…

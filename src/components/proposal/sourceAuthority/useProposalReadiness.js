@@ -177,7 +177,7 @@ export function useProposalReadiness({ projectId = null, versionIds = [] } = {})
               || null,
           };
 
-          return resolveVersionReadinessRow({
+          const row = resolveVersionReadinessRow({
             versionId,
             versionName: versionDisplayName(version || { version_number: index + 1 }),
             versionNumber: version?.version_number ?? index + 1,
@@ -185,6 +185,15 @@ export function useProposalReadiness({ projectId = null, versionIds = [] } = {})
               project: resolveSavedReportCell({ saved: savedProjectReport, currentFingerprints }),
             },
           });
+          // Two further facts, taken from the SAME reads that decided this row: the
+          // state of the version's saved engineering publication, and whether its
+          // completed assessment exists. They choose the ONE action the preparation
+          // step offers; the designer never reads them.
+          return {
+            ...row,
+            publicationStatus: durable?.status || null,
+            hasCompletedAuthority: !!calculationAuthority,
+          };
         });
 
         setRows(nextRows);

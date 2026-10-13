@@ -4,6 +4,7 @@ import { base44 } from '@/api/base44Client';
 import { useAuth } from '@/lib/AuthContext';
 import BrandAssetsPanel from '@/components/proposal/BrandAssetsPanel';
 import CreateProposalWizard from '@/components/proposal/CreateProposalWizard';
+import { hasResumableDraft } from '@/components/proposal/wizard/proposalWizardDraft';
 import ProposalLibraryTab from '@/components/proposal/library/ProposalLibraryTab';
 import { Plus, ChevronLeft } from 'lucide-react';
 
@@ -34,7 +35,11 @@ export default function ProposalCentre() {
   // well as from the Create Proposal button below.
   const [searchParams, setSearchParams] = useSearchParams();
   const [activeTab, setActiveTab] = useState(() => normaliseTab(searchParams.get('tab')));
-  const [showWizard, setShowWizard] = useState(searchParams.get('create') === '1');
+  // A proposal the designer stepped away from — to record an assessment or to bring
+  // a Project Report up to date — reopens where they left it: their project, type,
+  // versions, brief, answers and step all return, and the Generate they had already
+  // asked for continues by itself.
+  const [showWizard, setShowWizard] = useState(() => searchParams.get('create') === '1' || hasResumableDraft());
   const [regenerateFrom, setRegenerateFrom] = useState(null);
   const accountId = user?.access_context?.account?.id || user?.account_id || null;
 

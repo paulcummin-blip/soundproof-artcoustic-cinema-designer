@@ -17,6 +17,9 @@ import { useSelectedVersionSnapshots } from '@/components/proposal/engineeringAu
 import { useProposalReadiness } from '@/components/proposal/sourceAuthority/useProposalReadiness';
 import { resolveProposalReadinessGate } from '@/components/proposal/sourceAuthority/proposalReadinessAuthority';
 import VersionReadinessTable from '@/components/proposal/sourceAuthority/VersionReadinessTable';
+import ProposalPreparationPanel from '@/components/proposal/preparation/ProposalPreparationPanel';
+import useProposalPreparation from '@/components/proposal/wizard/useProposalPreparation';
+import { clearWizardDraft, readWizardDraft } from '@/components/proposal/wizard/proposalWizardDraft';
 
 const STEPS = [
   { key: 'project', label: 'Project' },
@@ -54,17 +57,25 @@ export default function CreateProposalWizard({ onCreated, onCancel, regenerateFr
   //
   // Declared here, above every hook, effect and dependency array that reads
   // them, so no state is ever referenced before it is initialised.
-  const [step, setStep] = useState(regenerateFrom ? 2 : 0);
-  const [selectedProjectId, setSelectedProjectId] = useState(regenerateFrom?.project_id || null);
-  const [proposalType, setProposalType] = useState(regenerateFrom?.proposal_type || null);
+  // A proposal the designer stepped away from — to record an assessment, or to
+  // bring a Project Report up to date — comes back exactly as they left it, and a
+  // Generate they had already asked for continues on its own when it can.
+  const [restoredDraft] = useState(() => (regenerateFrom ? null : readWizardDraft()));
+  const [step, setStep] = useState(regenerateFrom ? 2 : (restoredDraft?.step ?? 0));
+  const [selectedProjectId, setSelectedProjectId] = useState(regenerateFrom?.project_id || restoredDraft?.projectId || null);
+  const [proposalType, setProposalType] = useState(regenerateFrom?.proposal_type || restoredDraft?.proposalType || null);
   const [selectedVersionIds, setSelectedVersionIds] = useState(() => {
-    if (!regenerateFrom) return [];
+    if (!regenerateFrom) {
+      return Array.isArray(restoredDraft?.selectedVersionIds)
+        ? restoredDraft.selectedVersionIds.filter(Boolean)
+        : [];
+    }
     const selected = Array.isArray(regenerateFrom.selected_version_ids)
       ? regenerateFrom.selected_version_ids.filter(Boolean)
       : [];
     return selected.length > 0 ? selected : (regenerateFrom.version_id ? [regenerateFrom.version_id] : []);
   });
-  const [clientBrief, setClientBrief] = useState(regenerateFrom?.client_brief || '');
+  const [clientBrief, setClientBrief] = useState(regenerateFrom?.client_brief || restoredDraft?.clientBrief || '');
   // ── ADI clarifications ──
   // The questions ADI asks about a design decision the evidence records no reason
   // for, and the designer's own answers to them. The answers are held SEPARATELY
@@ -75,21 +86,28 @@ export default function CreateProposalWizard({ onCreated, onCancel, regenerateFr
   // A regeneration carries the answers the original proposal already holds, so a
   // question already answered or passed is not asked again.
   const [clarifications, setClarifications] = useState([]);
-  const [clarificationAnswers, setClarificationAnswers] = useState(() => Object.fromEntries(
-    (Array.isArray(regenerateFrom?.metadata?.clarification_answers)
+  // The answers the original proposal already holds — or, for a fresh creation the
+  // designer stepped away from, the answers they had already given.
+  const [clarificationAnswers, setClarificationAnswers] = useState(() => {
+    const carried = Array.isArray(regenerateFrom?.metadata?.clarification_answers)
       ? regenerateFrom.metadata.clarification_answers
-      : [])
-      .filter((entry) => entry?.question_id && (entry.status === 'answered' || entry.status === 'passed'))
-      .map((entry) => [entry.question_id, {
-        status: entry.status,
-        answer: entry.status === 'answered' ? (entry.answer || '') : null,
-        question: entry.question || null,
-        area: entry.area || null,
-        belongs_to: entry.belongs_to || null,
-        version_ids: Array.isArray(entry.version_ids) ? entry.version_ids : [],
-        source: 'carried_from_previous_proposal',
-      }]),
-  ));
+      : [];
+    if (carried.length > 0) {
+      return Object.fromEntries(carried
+        .filter((entry) => entry?.question_id && (entry.status === 'answered' || entry.status === 'passed'))
+        .map((entry) => [entry.question_id, {
+          status: entry.status,
+          answer: entry.status === 'answered' ? (entry.answer || '') : null,
+          question: entry.question || null,
+          area: entry.area || null,
+          belongs_to: entry.belongs_to || null,
+          version_ids: Array.isArray(entry.version_ids) ? entry.version_ids : [],
+          source: 'carried_from_previous_proposal',
+        }]));
+    }
+    const draftAnswers = restoredDraft?.clarificationAnswers;
+    return (draftAnswers && typeof draftAnswers === 'object') ? draftAnswers : {};
+  });
   const [generating, setGenerating] = useState(false);
   const [error, setError] = useState(null);
   const [blockedAttempt, setBlockedAttempt] = useState(false);
@@ -99,6 +117,9 @@ export default function CreateProposalWizard({ onCreated, onCancel, regenerateFr
   const parentProposalId = regenerateFrom?.id || null;
   const generationInFlightRef = useRef(false);
   const creationRequestIdRef = useRef(null);
+  // The latest generate, so the preparation step can continue into the proposal on
+  // its own after the designer returns from their design.
+  const generateRef = useRef(null);
 
   // ── The project's genuine design versions ──
   // ONE canonical read for the whole wizard: the Type step's availability rule and
@@ -204,6 +225,33 @@ export default function CreateProposalWizard({ onCreated, onCancel, regenerateFr
       : baseReadiness.detail,
   };
 
+  // The preparation step, from the SAME readiness rows the table and the Generate
+  // button already use, plus the designer's own progress kept while they step away
+  // to their design. One authority decides the one action; no second system.
+  const {
+    preparing,
+    panelPreparation,
+    beginPreparation,
+    markGenerationStarted,
+  } = useProposalPreparation({
+    enabled: !regenerateFrom,
+    projectId: selectedProjectId,
+    proposalType,
+    selectedVersionIds,
+    clientBrief,
+    clarificationAnswers,
+    step,
+    finalStep: STEPS.length - 1,
+    readinessRows,
+    readinessLoading,
+    snapshotLoading,
+    readinessError,
+    readinessReady: readiness.ready,
+    proposalDataReady,
+    generating,
+    runGenerate: generateRef,
+  });
+
   const handleSelectProject = useCallback((projectId) => {
     setSelectedProjectId(projectId);
     setSelectedVersionIds([]);
@@ -281,8 +329,11 @@ export default function CreateProposalWizard({ onCreated, onCancel, regenerateFr
     // Source authority: no current Project Report, no proposal. ONE authority
     // decides this, so the button can never disagree with the panel above it.
     if (!readiness.ready) {
-      setError(readiness.message
-        || 'Every selected version needs its current Project Report before this proposal can be generated.');
+      // Sound Proof manages its own engineering records. The designer is shown one
+      // preparation line and — only when their design genuinely needs them — one
+      // action. No fingerprint, publication pointer or cache reference is shown.
+      beginPreparation();
+      setError(null);
       return;
     }
     if (!engineeringSnapshot) {
@@ -290,6 +341,9 @@ export default function CreateProposalWizard({ onCreated, onCancel, regenerateFr
       return;
     }
     generationInFlightRef.current = true;
+    // The Generate has been honoured: the designer's progress is kept, and the
+    // draft never asks for generation twice, so no duplicate can be created.
+    markGenerationStarted();
     setGenerating(true);
     setGenerationPhase(GENERATION_PHASE.PREPARING);
     setError(null);
@@ -357,6 +411,7 @@ export default function CreateProposalWizard({ onCreated, onCancel, regenerateFr
         const handoff = await confirmProposalSectionsSaved(proposalId);
         if (!handoff.ok) throw new Error(handoff.reason);
         setGenerationPhase(GENERATION_PHASE.READY);
+        clearWizardDraft();
         onCreated(proposalId);
       } else {
         throw new Error('No proposal ID returned');
@@ -374,6 +429,14 @@ export default function CreateProposalWizard({ onCreated, onCancel, regenerateFr
       generationInFlightRef.current = false;
     }
   };
+
+  // The latest generate, for the preparation step's automatic continuation.
+  generateRef.current = handleGenerate;
+
+  // ── Preparing screen — Sound Proof's own work, one line, one action ──
+  if (preparing) {
+    return <ProposalPreparationPanel preparation={panelPreparation} onRetryRead={retryReadiness} />;
+  }
 
   // ── Generating screen ──
   if (generating) {
