@@ -26,34 +26,34 @@ import {
 export const ADI_PANEL_TITLE = "Bass Optimisation — Powered by ADI";
 
 export const ADI_SECTION_TITLE = Object.freeze({
-  CALIBRATION: "Safe calibration adjustments",
-  DESIGN: "Design recommendation",
+  CALIBRATION: "Applied adjustment",
+  DESIGN: "Design opportunity",
   TESTED: "What ADI tested",
 });
 
 export const ADI_SECTION_GROUP = Object.freeze({
-  CALIBRATION: "Calibration",
+  CALIBRATION: "Adjustment",
   DESIGN: "Design",
 });
 
 /** The panel's one-line finding. Each states only what the evidence supports. */
 export const ADI_PANEL_FINDING = Object.freeze({
   RUNNING: "ADI is evaluating this design…",
-  CALIBRATION_APPLIED: "ADI applied safe calibration settings.",
+  CALIBRATION_APPLIED: "ADI applied the adjustment to this design.",
   /**
    * A design change was found, so the finding leads with what the designer has
    * to do. The calibration section states the tested levers and their outcome in
    * its own words, so the no-improvement sentence is never repeated here.
    */
-  TESTED_NO_CALIBRATION: "ADI tested calibration changes. The best improvement requires a physical design change.",
-  TESTED_NO_IMPROVEMENT: "ADI tested calibration and design options. No useful improvement was found.",
+  TESTED_NO_CALIBRATION: "ADI tested adjustments. The improvement requires a physical design change.",
+  TESTED_NO_IMPROVEMENT: "ADI tested adjustments and design options. No useful improvement was found.",
   /**
    * A calibration improvement was found that is worth the designer's attention,
    * so "no useful improvement" may not be stated anywhere on the panel. The
    * calibration section states the suggestion itself, with its benefit and its
    * one disadvantage.
    */
-  CALIBRATION_SUGGESTION: "ADI found a calibration improvement worth considering.",
+  CALIBRATION_SUGGESTION: "ADI found an adjustment worth considering.",
   /**
    * The run or the saved record kept no calibration evidence to read, so neither
    * of the two claims above may be made. The mandated sentence asks for the
@@ -65,14 +65,14 @@ export const ADI_PANEL_FINDING = Object.freeze({
 
 /** Section 1 copy — concise, and never claiming a test that did not run. */
 export const ADI_CALIBRATION_TESTED_SENTENCE = "ADI tested delay, gain and polarity.";
-export const ADI_NO_CALIBRATION_IMPROVEMENT = "No useful calibration-only improvement was found.";
+export const ADI_NO_CALIBRATION_IMPROVEMENT = "No useful adjustment-only improvement was found.";
 /**
- * The sentence the main panel states when the calibration result ADI's own
- * decision named was NOT applied and makes P20 worse. The candidate itself, its
- * before → after values and its settings belong to Engineer details.
+ * The sentence the main panel states when the adjustment ADI's own decision named
+ * was NOT applied and makes P20 worse. The candidate itself, its before → after
+ * values and its settings belong to Engineer details.
  */
-export const ADI_NO_SAFE_CALIBRATION_IMPROVEMENT = "No safe calibration improvement was found.";
-export const ADI_CALIBRATION_NOT_TESTED_SENTENCE = "Calibration has not been tested on this design yet.";
+export const ADI_NO_SAFE_CALIBRATION_IMPROVEMENT = "No safe adjustment was found.";
+export const ADI_CALIBRATION_NOT_TESTED_SENTENCE = "Adjustments have not been tested on this design yet.";
 
 /** Section 2 copy — the design change is never presented as applied. */
 export const ADI_DESIGN_NOT_APPLIED =
@@ -82,8 +82,8 @@ export const ADI_NO_DESIGN_CHANGE_APPLIED = "No physical design change was appli
 /** Section 3 copy — what is stated when nothing has been tested yet. */
 export const ADI_TESTED_NOTHING = "Nothing has been tested on this design yet.";
 
-/** Section 2's two labels — what ADI found, and the result it predicts for it. */
-export const ADI_BEST_IMPROVEMENT_LABEL = "Best improvement found";
+/** Section 2's two labels — the change ADI recommends, and its predicted result. */
+export const ADI_BEST_IMPROVEMENT_LABEL = "Recommended adjustment";
 export const ADI_PREDICTED_RESULT_LABEL = "Predicted result";
 
 /** Which kind of change a tested lever is. Calibration may be auto-applied. */

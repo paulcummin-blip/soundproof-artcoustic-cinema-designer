@@ -22,8 +22,8 @@
 import React from "react";
 import { Loader2, RefreshCw } from "lucide-react";
 
-export const CALIBRATION_APPLY_TITLE = "Safe calibration adjustments";
-export const CALIBRATION_APPLY_BUTTON_LABEL = "Re-test Calibration";
+export const CALIBRATION_APPLY_TITLE = "Applied adjustment";
+export const CALIBRATION_APPLY_BUTTON_LABEL = "Re-test adjustment";
 export const CALIBRATION_APPLY_BUSY_LABEL = "Testing calibration…";
 export const CALIBRATION_APPLY_SCOPE_SENTENCE =
   "ADI may apply safe calibration settings (delay, gain, polarity, phase) if they improve P19/P20.";

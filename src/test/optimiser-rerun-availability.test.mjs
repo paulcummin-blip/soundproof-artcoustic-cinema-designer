@@ -4,7 +4,7 @@
 //
 // Product rule verified here:
 //   • every journey state except a run in progress offers the run action
-//   • the wording is "Bass Optimiser" in every state that offers it
+//   • the wording is "OPTIMISE BASS" in every state that offers it
 //   • a completed run (plan available) still offers it — the re-run action is
 //     never hidden after a result
 //   • Apply and run remain different actions: a plan available state shows both

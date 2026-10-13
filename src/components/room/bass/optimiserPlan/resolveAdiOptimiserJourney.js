@@ -64,7 +64,7 @@ export const ADI_OPTIMISER_ACTION = Object.freeze({
  * copy, never by the button's wording: the same action always reads the same.
  * The panel title stays "Bass Optimisation — Powered by ADI".
  */
-export const ADI_BASS_OPTIMISER_LABEL = "Bass Optimiser";
+export const ADI_BASS_OPTIMISER_LABEL = "OPTIMISE BASS";
 
 export const ADI_OPTIMISER_ACTION_LABEL = Object.freeze({
   // ONE wording, everywhere: this is the same action in every state, so the

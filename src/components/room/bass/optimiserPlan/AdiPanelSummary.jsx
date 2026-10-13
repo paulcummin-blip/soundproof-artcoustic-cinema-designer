@@ -27,6 +27,9 @@ export default function AdiPanelSummary({
   adjustment = null,
   benefit = null,
   comparison = null,
+  // The design's OWN published result, stated on its own only when the decision
+  // above is not already comparing against it — the current result appears once.
+  currentResult = null,
   // A target this design cannot reach, stated in one line.
   designLimitation = null,
   // The earlier design state a saved result belongs to, with the one action.
@@ -56,6 +59,12 @@ export default function AdiPanelSummary({
       {comparison && (
         <div className="pt-0.5 text-[12.5px] font-semibold text-[#213428] leading-relaxed" data-adi-panel-comparison="true">
           {comparison}
+        </div>
+      )}
+
+      {currentResult && (
+        <div className="pt-0.5 text-[12.5px] font-semibold text-[#213428] leading-relaxed" data-adi-panel-current-result="true">
+          {currentResult}
         </div>
       )}
 

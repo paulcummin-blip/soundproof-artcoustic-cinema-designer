@@ -58,6 +58,10 @@ import {
 import { LEVER_APPLY_LABEL, LEVER_UNDO_LABEL } from "./optimiserPlanLeverApply.js";
 import { buildLiveFamilyRows } from "./optimiserLiveProgress.js";
 import { ADI_BASS_OPTIMISER_LABEL } from "./resolveAdiOptimiserJourney.js";
+import {
+  alternativeIsWorseThanCurrent,
+  RECOMMENDATION_NOT_CURRENT_SENTENCE,
+} from "./recommendationCurrency.js";
 import { OPTIMISER_PRESENTATION_STATE } from "./resolveOptimiserPresentationState.js";
 import { resolveOptimiserCurrentP20 } from "./optimiserCurrentP20.js";
 import { parityBlocksApply } from "./optimiserBaselineAuthority.js";
@@ -589,8 +593,15 @@ export function resolveApplyPermission({ planView, presentation, recommendedLeve
   const limiting = String(resolveLimitingMetric(planView?.baseline) || "");
   if (limiting.includes("20")) {
     const improvement = Number(row?.effect?.p20DeltaDb ?? NaN);
-    if (Number.isFinite(improvement) && Math.abs(improvement) < 1) {
-      return { allowed: false, reason: "The improvement is below the 1 dB action threshold, so no change is applied." };
+    if (Number.isFinite(improvement)) {
+      // A negative delta is a REGRESSION: it is never applied, and it is never
+      // described as an improvement of any size.
+      if (improvement < 0) {
+        return { allowed: false, reason: RECOMMENDATION_NOT_CURRENT_SENTENCE };
+      }
+      if (improvement < 1) {
+        return { allowed: false, reason: "The improvement is below the 1 dB action threshold, so no change is applied." };
+      }
     }
   }
 
@@ -704,7 +715,22 @@ export function buildAdiDesignerSummary({
   const recommendedLever = resolveRecommendedLever(planView, {
     suppressedLeverKeys: placementSuppressed ? [OPTIMISER_LEVER.PLACEMENT] : [],
   });
-  const apply = resolveApplyPermission({ planView, presentation, recommendedLever, currentP20, parityBlocked });
+  // ── The current design is the reference ──
+  // The evaluated row behind the recommendation is read ONCE, so the permission,
+  // the panel's headline and the placement panel all judge the SAME evaluation
+  // against the SAME current result. An evaluation that no longer improves the
+  // design as it stands keeps its evidence and loses its offer.
+  const evaluatedRow = recommendedLever ? findLeverRow(planView, recommendedLever) : null;
+  const recommendationNotCurrent = evaluatedRow
+    ? alternativeIsWorseThanCurrent({
+      effectP20VariationDb: evaluatedRow?.effect?.p20VariationDb ?? null,
+      currentP20DeviationDb: currentP20Deviation,
+      runBaselineDiffers: currentP20?.runBaselineDiffers === true,
+    })
+    : false;
+  const apply = recommendationNotCurrent
+    ? { allowed: false, reason: RECOMMENDATION_NOT_CURRENT_SENTENCE }
+    : resolveApplyPermission({ planView, presentation, recommendedLever, currentP20, parityBlocked });
   const undo = resolveUndoPermission({ planView, appliedLever });
   const liveRows = running ? buildLiveFamilyRows(liveProgress) : null;
   const leverRows = buildTestedOptionRows(planView, {
@@ -719,10 +745,12 @@ export function buildAdiDesignerSummary({
 
   const baselineDeviation = wholeNumberDeviation(planView?.baseline?.p20VariationDb ?? null);
   const baselineLevel = planView?.baseline?.p20Level ?? null;
-  const recommendedRow = recommendedLever ? findLeverRow(planView, recommendedLever) : null;
+  const recommendedRow = evaluatedRow;
   const recommendedDeviation = wholeNumberDeviation(recommendedRow?.effect?.p20VariationDb ?? null);
   const recommendedLevel = recommendedRow?.effect?.p20Level ?? null;
-  const recommendedP20 = p20Line(recommendedLevel, recommendedRow?.effect?.p20VariationDb);
+  const recommendedP20 = recommendationNotCurrent
+    ? null
+    : p20Line(recommendedLevel, recommendedRow?.effect?.p20VariationDb);
 
   // ── Low-frequency absorption ──
   // Ninth in the fixed order, after every practical lever. Advice only: it never
@@ -789,7 +817,7 @@ export function buildAdiDesignerSummary({
     // The recommendation the designer acts on. A seating change is stated as
     // the move itself — that IS what the designer has to do — and the numbers it
     // produced sit directly beneath it in the seating result block.
-    recommendation: recommendedLever
+    recommendation: recommendedLever && !recommendationNotCurrent
       ? (recommendedRow?.seating?.movementLabel
         ? `${recommendedRow.seating.movementLabel}${recommendedRow.seating.wholeBlockMoved ? " (whole seating block)" : ""}`
         : shortPhrase(recommendedRow?.reason) || describeLeverEffect(recommendedRow?.effect) || null)
@@ -798,7 +826,7 @@ export function buildAdiDesignerSummary({
     recommendedLeverLabel: recommendedLever ? displayLabel(recommendedLever) : null,
     // The seating recommendation's own evaluated detail: movement, before/after,
     // trade-offs and destination validity. Null for every other recommendation.
-    seatingRecommendation: recommendedRow?.seating
+    seatingRecommendation: recommendedRow?.seating && !recommendationNotCurrent
       ? seatingRecommendationDetail({ row: recommendedRow, baseline: planView?.baseline || null, currentP20 })
       : null,
     rows,
@@ -814,6 +842,7 @@ export function buildAdiDesignerSummary({
       currentP20,
       parityBlocked,
       layoutCounts,
+      recommendationNotCurrent,
     }),
     actions: {
       canApply: apply.allowed,

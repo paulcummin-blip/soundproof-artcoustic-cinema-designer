@@ -37,6 +37,10 @@ import {
   suggestionInputsFromSettings,
 } from "../optimiseWorkflow/adiCalibrationSuggestion.js";
 import { ADI_CALIBRATION_KIND, ADI_NO_SAFE_CALIBRATION_IMPROVEMENT } from "./adiPanelSections.js";
+import {
+  alternativeIsWorseThanCurrent,
+  RECOMMENDATION_NOT_CURRENT_SENTENCE,
+} from "./recommendationCurrency.js";
 import { deviationText, levelText, wholeDbImprovement } from "./optimiserWholeNumberDb.js";
 
 /** The ONE status the panel states when a decision has been reached. */
@@ -196,6 +200,7 @@ export function resolveAdiPanelHeadline({
   recommendedRow = null,
   baseline = null,
   currentP20 = null,
+  currentP20DeviationDb = null,
   stale = false,
   isRunning = false,
   finding = null,
@@ -242,7 +247,24 @@ export function resolveAdiPanelHeadline({
     };
   }
 
-  // ── 3. A calibration improvement ADI held for the designer ──
+  // ── 3. An adjustment ADI held for the designer ──
+  // The current design is the reference. A held improvement whose own result is
+  // no longer better than the design as it stands is a past evaluation: it keeps
+  // its evidence in Engineer details and is never offered as a current adjustment.
+  if (considering && alternativeIsWorseThanCurrent({
+    effectP20VariationDb: decision?.after?.p20?.deviationDb ?? null,
+    currentP20DeviationDb,
+    runBaselineDiffers: currentP20?.runBaselineDiffers === true,
+  })) {
+    return {
+      kind: "state",
+      statusLabel: null,
+      adjustment: null,
+      benefit: RECOMMENDATION_NOT_CURRENT_SENTENCE,
+      comparison: null,
+    };
+  }
+
   if (considering) {
     return {
       kind: "consider",

@@ -406,7 +406,7 @@ describe("a placement result from an earlier design state is not applied", () =>
     expect(panel.notice).toBe(PLACEMENT_PREVIOUS_FOUND_STALE);
     expect(panel.canApply).toBe(false);
     expect(panel.canRerun).toBe(true);
-    expect(panel.rerunLabel).toBe("Bass Optimiser");
+    expect(panel.rerunLabel).toBe("OPTIMISE BASS");
     expect(JSON.stringify(panel)).not.toMatch(/re-run to apply|no applicable change was kept/i);
   });
 

@@ -134,7 +134,7 @@ describe("the main panel stays client-readable", () => {
 
   it("states the tested levers and the no-improvement outcome in the section's own words", () => {
     expect(ADI_CALIBRATION_TESTED_SENTENCE).toBe("ADI tested delay, gain and polarity.");
-    expect(ADI_NO_CALIBRATION_IMPROVEMENT).toBe("No useful calibration-only improvement was found.");
+    expect(ADI_NO_CALIBRATION_IMPROVEMENT).toBe("No useful adjustment-only improvement was found.");
   });
 
   it("keeps the per-family outcome text out of the compact tested list", () => {
@@ -271,7 +271,7 @@ describe("a calibration result that makes P20 worse never leads the panel", () =
   it("states no safe calibration improvement instead of that candidate", () => {
     const result = resolveBestCalibrationResult({ decision: heldWorseningDecision });
     expect(ADI_NO_SAFE_CALIBRATION_IMPROVEMENT)
-      .toBe("No safe calibration improvement was found.");
+      .toBe("No safe adjustment was found.");
     expect(result.mainPanelCopy).toEqual({
       tested: ADI_CALIBRATION_TESTED_SENTENCE,
       sentence: ADI_NO_SAFE_CALIBRATION_IMPROVEMENT,

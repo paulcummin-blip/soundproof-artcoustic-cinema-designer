@@ -163,10 +163,10 @@ describe('BUTTON PROMINENT', () => {
 
   it('labels the one run control Bass Optimiser in every state', () => {
     // ONE feature name, identical in every state that offers the action.
-    expect(ADI_OPTIMISER_ACTION_LABEL[ADI_OPTIMISER_ACTION.RUN]).toBe('Bass Optimiser');
-    expect(ADI_OPTIMISER_ACTION_LABEL[ADI_OPTIMISER_ACTION.RERUN]).toBe('Bass Optimiser');
-    expect(ADI_OPTIMISER_ACTION_LABEL[ADI_OPTIMISER_ACTION.COMPLETE]).toBe('Bass Optimiser');
-    expect(noPlan().actionLabel).toBe('Bass Optimiser');
+    expect(ADI_OPTIMISER_ACTION_LABEL[ADI_OPTIMISER_ACTION.RUN]).toBe('OPTIMISE BASS');
+    expect(ADI_OPTIMISER_ACTION_LABEL[ADI_OPTIMISER_ACTION.RERUN]).toBe('OPTIMISE BASS');
+    expect(ADI_OPTIMISER_ACTION_LABEL[ADI_OPTIMISER_ACTION.COMPLETE]).toBe('OPTIMISE BASS');
+    expect(noPlan().actionLabel).toBe('OPTIMISE BASS');
   });
 });
 

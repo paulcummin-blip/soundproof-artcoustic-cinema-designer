@@ -427,10 +427,16 @@ export default function AdiOptimisationJourney({
     recommendedRow,
     baseline: planView?.baseline || null,
     currentP20,
+    currentP20DeviationDb: p20Headline?.variationDb ?? null,
     stale: summary.stale === true,
     isRunning,
     finding: panelFinding,
   });
+  // The design's own published result, stated ONCE: it stands on its own only
+  // when the decision above is not already comparing against it.
+  const currentResultLine = currentP20?.deviationText
+    ? `Current P20: ${currentP20.deviationText}${currentP20.levelText ? ` · ${currentP20.levelText}` : ""}`
+    : null;
 
   return (
     <div
@@ -468,6 +474,7 @@ export default function AdiOptimisationJourney({
         adjustment={headline.adjustment}
         benefit={headline.benefit}
         comparison={headline.comparison}
+        currentResult={headline.comparison ? null : currentResultLine}
         designLimitation={designLimitation}
         staleCopy={summary.staleCopy}
         previousBest={summary.previousBest}

@@ -23,6 +23,7 @@ import {
   OPTIMISER_PLAN_STATUS,
 } from "./optimiserPlanConstants.js";
 import { ADI_BASS_OPTIMISER_LABEL } from "./resolveAdiOptimiserJourney.js";
+import { RECOMMENDATION_NOT_CURRENT_SENTENCE } from "./recommendationCurrency.js";
 import { resolveLeverVerdict } from "./optimiserLeverVerdict.js";
 import { LEVER_APPLY_LABEL, LEVER_UNDO_LABEL } from "./optimiserPlanLeverApply.js";
 import {
@@ -360,6 +361,7 @@ export function resolvePlacementRecommendation({
   subwooferInstances = null,
   seats = null,
   baselineSeats = null,
+  recommendationNotCurrent = false,
 } = {}) {
   const lever = findPlacementLever(planView);
   const baseline = planView?.baseline || null;
@@ -472,7 +474,7 @@ export function resolvePlacementRecommendation({
   // The candidate's before/after belong to the state that run measured from. The
   // panel states both values, labelled, withholds Apply and names the one action
   // that makes the comparison current again.
-  if (currentP20?.runBaselineDiffers) {
+  if (currentP20?.runBaselineDiffers || recommendationNotCurrent === true) {
     return {
       ...base,
       kind: PLACEMENT_KIND.PREVIOUS,
@@ -482,7 +484,10 @@ export function resolvePlacementRecommendation({
       move,
       statusText: PLACEMENT_RESULT_STATUS.PREVIOUS,
       reason: resolvePlacementReason({ currentP20, baseline }),
-      notice: PLACEMENT_BASELINE_MISMATCH,
+      // The move is stated as a past evaluation, never as current advice: either
+      // it was measured against a different current result, or it no longer
+      // improves the design as it stands.
+      notice: currentP20?.runBaselineDiffers ? PLACEMENT_BASELINE_MISMATCH : RECOMMENDATION_NOT_CURRENT_SENTENCE,
       canApply: false,
       canUndo: false,
       canRerun: true,
