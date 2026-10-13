@@ -171,6 +171,10 @@ export function buildSpecificationConnections({
  */
 export function selectAdiHighlights(sources = {}) {
   const budgetMm = sources.budgetMm ?? PROJECT_REPORT_PAGE_BUDGET_MM.page;
+  // The page's own story capacity: the report's cap as standard, and the same
+  // ranked selection read at a larger capacity where a reader asks for the stories
+  // the page itself has no room to state.
+  const maxStories = Number.isFinite(sources.maxStories) ? sources.maxStories : MAX_HIGHLIGHTS;
   const evidenceMap = collectEligibleEvidence(sources.engineeringSummary);
   const distribution = evidenceMap.distribution;
   const specTier = classifySpecTier(distribution);
@@ -206,7 +210,7 @@ export function selectAdiHighlights(sources = {}) {
   const ranked = withMandatoryStories({
     ranked: admitted,
     candidates,
-    maxStories: MAX_HIGHLIGHTS,
+    maxStories,
   });
 
   let highlights = fitHighlightsToBudget(ranked, budgetMm, PAGE_BLOCK_MM.heading, MANDATORY_STORY_IDS);

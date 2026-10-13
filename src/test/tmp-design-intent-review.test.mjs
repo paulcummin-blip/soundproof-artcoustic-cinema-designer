@@ -17,6 +17,7 @@ import { test } from 'vitest';
 import fs from 'node:fs';
 
 import { buildProjectReportSummaryOpening } from '@/components/report/projectReport/projectReportSummaryOpening';
+import { buildViewingExperienceNarrative } from '@/components/report/projectReport/viewingExperienceAuthority';
 import { buildProductsSelected, layoutVisibilityFilter } from '@/components/report/reportProductsSelected';
 import { selectAdiHighlights } from '@/components/report/projectReport/adiDesignHighlights';
 
@@ -70,6 +71,16 @@ test('Jooced / Original Design: the Design Intent and the five highlights', () =
   });
 
   console.log('[JOOCED SCHEDULE]', JSON.stringify(productsSelected.rows, null, 1));
+  console.log('[JOOCED VIEWING STORY ON PAGE 2]', selection.selected.includes('viewing-geometry'));
+  console.log(
+    '[JOOCED VIEWING NARRATIVE ON PAGE 3]',
+    buildViewingExperienceNarrative({
+      projectDetails,
+      seatingPositions: design.seating_positions || [],
+      engineeringSummary,
+      statedOnHighlightsPage: selection.selected.includes('viewing-geometry'),
+    }),
+  );
   console.log('[JOOCED INTENT BEGIN]');
   console.log(intent);
   console.log('[JOOCED INTENT END]');

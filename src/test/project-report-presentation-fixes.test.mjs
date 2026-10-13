@@ -36,6 +36,7 @@ import {
   selectAdiHighlights,
 } from "../components/report/projectReport/adiDesignHighlights.js";
 import {
+  A4_CONTENT_MM,
   COMPACT_BLOCK_MM,
   COMPACT_HIGHLIGHT_GAP_MAX_MM,
   HIGHLIGHT_GAP_MAX_MM,
@@ -103,8 +104,9 @@ function geometrySection(markup) {
 
 test("the rendered pages, as composed", () => {
   // The settled composition of both real page-2 cases, in millimetres, against
-  // the fixed A4 frame (271mm) and the page budget (228mm), with the pill
-  // headroom included — the numbers the page actually lays out to.
+  // the page budget (228mm) and the fixed A4 frame (271mm) — the numbers the page
+  // actually lays out to. The budget IS the margin: the clearance the level pills
+  // need is checked against the frame, never held back inside the budget.
   const all = buildAdiDesignHighlights(sources);
   const five = all.slice(0, 5);
   const fiveGap = resolveHighlightGapMm(five);
@@ -113,8 +115,10 @@ test("the rendered pages, as composed", () => {
   const sevenContent = PAGE_BLOCK_MM.heading + all.reduce((total, h) => total + estimateHighlightContentMm(h, { compact: true }), 0);
 
   console.log(`[REPORT-PAGES] page2 five-story: gap=${fiveGap}mm, used=${(fiveContent + 4 * fiveGap).toFixed(1)}mm of ${PROJECT_REPORT_PAGE_BUDGET_MM.page}mm budget (frame ${271}mm) | page2 seven-story: gap=${sevenGap}mm, used=${(sevenContent + 6 * sevenGap).toFixed(1)}mm`);
-  assert.ok(fiveContent + 4 * fiveGap + HIGHLIGHT_PILL_HEADROOM_MM <= PROJECT_REPORT_PAGE_BUDGET_MM.page);
-  assert.ok(sevenContent + 6 * sevenGap + HIGHLIGHT_PILL_HEADROOM_MM <= PROJECT_REPORT_PAGE_BUDGET_MM.page);
+  assert.ok(fiveContent + 4 * fiveGap <= PROJECT_REPORT_PAGE_BUDGET_MM.page);
+  assert.ok(sevenContent + 6 * sevenGap <= PROJECT_REPORT_PAGE_BUDGET_MM.page);
+  assert.ok(fiveContent + 4 * fiveGap + HIGHLIGHT_PILL_HEADROOM_MM <= A4_CONTENT_MM.height);
+  assert.ok(sevenContent + 6 * sevenGap + HIGHLIGHT_PILL_HEADROOM_MM <= A4_CONTENT_MM.height);
 });
 
 /* ------------------------------------------------------------------ *
@@ -137,7 +141,10 @@ test("five highlight groups take the page's spare height, and the page stays ins
   // …and never spending height the page does not have: the settled page keeps its
   // headroom for the canonical level pills, well inside the fixed A4 frame.
   assert.ok(usedMm + (five.length - 1) * gap <= PROJECT_REPORT_PAGE_BUDGET_MM.page);
-  assert.ok(usedMm + (five.length - 1) * gap + 12 <= PROJECT_REPORT_PAGE_BUDGET_MM.page, "no clipping: pill headroom holds");
+  assert.ok(
+    usedMm + (five.length - 1) * gap + HIGHLIGHT_PILL_HEADROOM_MM <= A4_CONTENT_MM.height,
+    "no clipping: the settled page and its pills sit inside the fixed A4 frame",
+  );
 });
 
 test("a fuller page stays tighter, and the spacing is never tighter than the composition itself", () => {
@@ -152,7 +159,17 @@ test("a fuller page stays tighter, and the spacing is never tighter than the com
   // The fuller page also stays inside its budget with the pills in place.
   const sevenUsedMm = PAGE_BLOCK_MM.heading
     + seven.reduce((total, highlight) => total + estimateHighlightContentMm(highlight, { compact: true }), 0);
-  assert.ok(sevenUsedMm + (seven.length - 1) * compactGap + 12 <= PROJECT_REPORT_PAGE_BUDGET_MM.page, "no clipping: pill headroom holds");
+  // The fuller page still fits its own budget, and with its pills in place it sits
+  // inside the fixed A4 frame: the budget — not a second allowance reserved inside
+  // it — is what keeps seven worthwhile stories clear of the paper's edge.
+  assert.ok(
+    sevenUsedMm + (seven.length - 1) * compactGap <= PROJECT_REPORT_PAGE_BUDGET_MM.page,
+    "the fuller page fits its budget",
+  );
+  assert.ok(
+    sevenUsedMm + (seven.length - 1) * compactGap + HIGHLIGHT_PILL_HEADROOM_MM <= A4_CONTENT_MM.height,
+    "no clipping: the fuller page and its pills sit inside the fixed A4 frame",
+  );
 
   // A page whose own content leaves no room keeps exactly the composition's gap:
   // nothing is squeezed below it, and nothing is stretched.
@@ -196,8 +213,10 @@ test("a whole published figure is stated exactly as the shared story states it �
 test("the page budget, fit protection and page count are unchanged", () => {
   const highlights = buildAdiDesignHighlights(sources);
 
-  // The selection is exactly what it was: the gap spends spare height only, so no
-  // story is dropped and no page is added.
+  // The selection is what ADI's own rule states for this design: the strongest
+  // results it holds, with the mandatory seating-clearance explanation in the
+  // seventh slot. The page is still one page — no story is dropped for spacing and
+  // none is added, and the per-row viewing result is developed on page 3 instead.
   assert.deepEqual(selectAdiHighlights(sources).selected, [
     "dynamic-capability",
     "tonal-consistency",
@@ -205,7 +224,7 @@ test("the page budget, fit protection and page count are unchanged", () => {
     "immersive-layout",
     "low-frequency-extension",
     "spatial-resolution",
-    "viewing-geometry",
+    "seating-clearance",
   ]);
 
   // The card estimate still accounts each card's content plus the composition's

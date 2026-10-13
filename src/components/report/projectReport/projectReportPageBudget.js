@@ -73,10 +73,14 @@ export const HIGHLIGHT_GAP_MAX_MM = 10;
 export const COMPACT_HIGHLIGHT_GAP_MAX_MM = 7;
 
 /**
- * The headroom the settled highlights page reserves for its canonical level
- * pills, in millimetres: a pill stands a little taller than the plain text the
- * estimate assumes. The spacing below spends only what is left ABOVE this, so the
- * page never reaches the fixed A4 frame with the pills in place.
+ * The clearance the canonical level pills need, in millimetres: a pill stands a
+ * little taller than the plain text the estimate assumes.
+ *
+ * It is NOT subtracted from the page budget. The budget already sits well inside
+ * the fixed A4 frame (228mm of 271mm) and the estimate it holds is a conservative
+ * upper bound, so that clearance is already carried by the budget itself — holding
+ * a second allowance back inside it would cost the page a genuine strength. Kept
+ * as the reference figure for the pages, their tests and their diagnostics.
  */
 export const HIGHLIGHT_PILL_HEADROOM_MM = 12;
 
@@ -125,7 +129,14 @@ export function estimateHighlightMm(highlight, { compact = false } = {}) {
  * copy each one holds: five groups read airily, a fuller page stays compact, and a
  * page with little room keeps the gap it always had. The page's A4 budget, its fit
  * protection and its pagination are unchanged — the gap only ever spends height
- * the page already has spare, above the headroom its level pills need.
+ * the page already has spare.
+ *
+ * NOTHING FURTHER IS HELD BACK. The page budget is itself the margin: it sits
+ * well inside the fixed A4 frame, and the estimate it holds is already a
+ * conservative upper bound of what the page lays out to. No second allowance is
+ * subtracted from it, so seven worthwhile stories are never reduced to six to
+ * protect an arithmetic precaution — the spacing simply spends the spare height
+ * the budget genuinely leaves, and the copy of every story is preserved.
  */
 export function resolveHighlightGapMm(highlights, { compact, budgetMm = PROJECT_REPORT_PAGE_BUDGET_MM.page } = {}) {
   const list = (Array.isArray(highlights) ? highlights : []).filter(Boolean);
@@ -138,7 +149,7 @@ export function resolveHighlightGapMm(highlights, { compact, budgetMm = PROJECT_
   // only what genuinely remains is shared between the groups.
   const contentMm = PAGE_BLOCK_MM.heading
     + list.reduce((total, highlight) => total + estimateHighlightContentMm(highlight, { compact: useCompact }), 0);
-  const share = (budgetMm - HIGHLIGHT_PILL_HEADROOM_MM - contentMm) / gaps;
+  const share = (budgetMm - contentMm) / gaps;
   const ceiling = useCompact ? COMPACT_HIGHLIGHT_GAP_MAX_MM : HIGHLIGHT_GAP_MAX_MM;
   const gap = Math.min(ceiling, Math.max(block.highlightGap, share));
   // Floored to a tenth of a millimetre, so the settled page can never round up

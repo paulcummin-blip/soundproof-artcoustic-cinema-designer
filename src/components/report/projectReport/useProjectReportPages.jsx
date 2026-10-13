@@ -54,6 +54,7 @@ import AdiDesignHighlightsPage from "@/components/report/projectReport/AdiDesign
 import ProjectReportSystemOverview from "@/components/report/projectReport/ProjectReportSystemOverview";
 import { resolveDisplayType } from "@/components/models/screen/displayTypeAuthority";
 import { buildAdiDesignHighlights } from "@/components/report/projectReport/adiDesignHighlights";
+import { buildViewingExperienceNarrative } from "@/components/report/projectReport/viewingExperienceAuthority";
 
 export function useProjectReportPages({
   hydrating,
@@ -678,6 +679,17 @@ export function useProjectReportPages({
     // 03 SYSTEM & PRODUCTS — the equipment brought forward: the complete
     // specification schedule, each layer's own engineering job and the viewing
     // geometry of every seating row.
+    // The viewing experience, developed HERE when the Highlights page has not
+    // already stated the per-row viewing result: the viewing story then belongs
+    // with the geometry table whose figures it explains, rather than being
+    // repeated on both pages. Null whenever page 2 states it.
+    const viewingNarrative = buildViewingExperienceNarrative({
+      projectDetails,
+      seatingPositions,
+      engineeringSummary,
+      statedOnHighlightsPage: adiHighlights.some((highlight) => highlight.id === "viewing-geometry"),
+    });
+
     const systemProductsPage = {
       id: "project-report-system-overview",
       printData: {
@@ -686,6 +698,7 @@ export function useProjectReportPages({
         productsSelected,
         engineeringSummary,
         rows: screenSeating.rows,
+        viewingNarrative,
       },
       visual: (
         <ProjectReportSystemOverview
@@ -693,6 +706,7 @@ export function useProjectReportPages({
           productsSelected={productsSelected}
           engineeringSummary={engineeringSummary}
           rows={screenSeating.rows}
+          viewingNarrative={viewingNarrative}
         />
       ),
     };

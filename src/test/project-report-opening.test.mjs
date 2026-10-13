@@ -35,11 +35,14 @@ import {
   buildSpecificationConnections,
 } from "../components/report/projectReport/adiDesignHighlights.js";
 import {
+  A4_CONTENT_MM,
+  HIGHLIGHT_PILL_HEADROOM_MM,
   estimateHighlightsMm,
   estimateProjectSummaryMm,
   fitHighlightsToBudget,
   PROJECT_REPORT_PAGE_BUDGET_MM,
 } from "../components/report/projectReport/projectReportPageBudget.js";
+import { buildViewingExperienceNarrative } from "../components/report/projectReport/viewingExperienceAuthority.js";
 import { buildProjectReportSummaryOpening } from "../components/report/projectReport/projectReportSummaryOpening.js";
 import ProjectReportDesignSummary from "../components/report/projectReport/ProjectReportDesignSummary.jsx";
 import AdiDesignHighlightsPage from "../components/report/projectReport/AdiDesignHighlightsPage.jsx";
@@ -100,9 +103,12 @@ test("Marquee: ADI selects this design's strongest highlights, strongest first",
   const { highlights, selected, rejected } = selectAdiHighlights(sources);
 
   // The whole published picture: the two output capabilities lead, the timbre and
-  // architecture stories follow, then the extended bass, the placement measures
-  // that genuinely hold and the per-row viewing result. P19 is provisional in its
-  // own authority, so no bass-response story is raised at all.
+  // architecture stories follow, then the extended bass and the placement measures
+  // that genuinely hold. The seventh slot is the mandatory seating-clearance
+  // explanation, which every design states — so the per-row viewing result is
+  // developed on the System & Products page instead (see the narrative test below)
+  // rather than being said twice. P19 is provisional in its own authority, so no
+  // bass-response story is raised at all.
   assert.deepEqual(selected, [
     "dynamic-capability",
     "tonal-consistency",
@@ -110,7 +116,7 @@ test("Marquee: ADI selects this design's strongest highlights, strongest first",
     "immersive-layout",
     "low-frequency-extension",
     "spatial-resolution",
-    "viewing-geometry",
+    "seating-clearance",
   ]);
   assert.equal(highlights.length, 7);
 
@@ -188,10 +194,49 @@ test("bass is claimed from the LFE output authority — a provisional P19 and a 
   }
 });
 
-test("the viewing highlight states each row's own published RP23 result", () => {
+test("a full highlights page develops the viewing experience on the system page instead", () => {
   const highlights = buildAdiDesignHighlights(sources);
+  // A full page states its strongest results and the mandatory seating
+  // explanation: the per-row viewing story is not one of the seven, so it is
+  // developed where the geometry it explains is stated.
+  assert.ok(!highlights.some((highlight) => highlight.id === "viewing-geometry"));
+
+  const narrative = buildViewingExperienceNarrative({
+    projectDetails: fixture.project,
+    seatingPositions: sources.seatingPositions,
+    engineeringSummary,
+  });
+  assert.ok(narrative, "the viewing experience is developed on the system page");
+  // What the viewing experience offers, and why the screen and the seating work:
+  // the narrative never restates the table's own figures.
+  assert.match(narrative, /field of view/i);
+  assert.match(narrative, /\bscreen\b/i);
+  assert.match(narrative, /seating/i);
+  assert.doesNotMatch(narrative, /\d+(\.\d+)?°/, "no viewing angle is restated");
+  assert.doesNotMatch(narrative, /\bL[1-4]\b|RP2[23]/, "no level or parameter is restated");
+  for (const phrase of BANNED_GENERIC) {
+    assert.ok(!narrative.toLowerCase().includes(phrase), `the narrative must not state "${phrase}"`);
+  }
+
+  // Where the highlights page DOES state the viewing story, no narrative is built
+  // at all: the report never says the same thing twice.
+  assert.equal(buildViewingExperienceNarrative({
+    projectDetails: fixture.project,
+    seatingPositions: sources.seatingPositions,
+    engineeringSummary,
+    statedOnHighlightsPage: true,
+  }), null);
+});
+
+test("the viewing story, where a page has room for it, carries each row's own published RP23 result", () => {
+  // Read at a larger capacity, so the story's own contract — one evidence line per
+  // row, each stated at its own published result — is asserted directly rather than
+  // inferred from the seven stories this design's page happens to hold.
+  const { highlights, selected } = selectAdiHighlights({ ...sources, maxStories: 8, budgetMm: 400 });
   const viewing = highlights.find((highlight) => highlight.id === "viewing-geometry");
 
+  assert.ok(viewing, "the viewing story is stated where the page has room for it");
+  assert.ok(selected.includes("viewing-geometry"));
   assert.equal(viewing.evidence.length, 2);
   assert.match(viewing.explanation, /front row/i);
   assert.match(viewing.explanation, /64\.6°/);
@@ -203,6 +248,7 @@ test("the viewing highlight states each row's own published RP23 result", () => 
   // the sentence states the geometry rather than repeating the level as text.
   assert.equal(viewing.evidence[0].key, "RP23");
   assert.match(viewing.evidence[0].value, /front row/i);
+  assert.match(viewing.evidence[1].value, /rear row/i);
   assert.doesNotMatch(viewing.explanation, /\bL[1-4]\b/, "no level is repeated in the sentence");
 });
 
@@ -267,7 +313,11 @@ test("a genuinely strong placement picture raises the spatial highlight; a weak 
   assert.ok(spatial, "the placement measures that genuinely hold are stated");
   assert.equal(spatial.evidence.length, 3);
   assert.equal(spatial.level, "L3", "the weakest claimed measure governs the story");
-  assert.match(spatial.explanation, /each stated on its own published result/);
+  // Each claimed measure is stated with its own result in the sentence: the
+  // screen-stage level match, the overhead spacing and the position deviations.
+  assert.match(spatial.explanation, /screen wall speakers matched in level/i);
+  assert.match(spatial.explanation, /height speakers spaced within the vertical limit/i);
+  assert.match(spatial.explanation, /no speakers outside the recommended positions/i);
   for (const source of spatial.sources) {
     assert.doesNotMatch(source, /P5|P6|P7|P10/, "a mixed seat-scoped measure is never part of the claim");
   }
@@ -343,12 +393,18 @@ test("page 2 (ADI Design Highlights) fits its page, and the fit guard reduces co
   assert.ok(fitted.length >= 1 && fitted.length < oversized.length);
   assert.ok(estimateHighlightsMm(fitted) <= PROJECT_REPORT_PAGE_BUDGET_MM.page);
 
-  // The canonical level pill is a little taller than the plain text it replaces.
-  // The page keeps real headroom above its own estimate for that, so paper stays
-  // inside the fixed frame with the pills in place.
+  // The canonical level pill is a little taller than the plain text the estimate
+  // assumes. The page's own budget IS the margin — the estimate it holds is a
+  // conservative upper bound and the budget sits well inside the fixed frame — so
+  // the clearance is proved against the paper rather than reserved a second time
+  // inside the budget. Seven worthwhile stories are never reduced to six for it.
   assert.ok(
-    usedMm + 12 <= PROJECT_REPORT_PAGE_BUDGET_MM.page,
-    `page 2 keeps pill headroom: about ${usedMm}mm of ${PROJECT_REPORT_PAGE_BUDGET_MM.page}mm`,
+    usedMm <= PROJECT_REPORT_PAGE_BUDGET_MM.page,
+    `page 2 fits its ${PROJECT_REPORT_PAGE_BUDGET_MM.page}mm budget: about ${usedMm}mm used`,
+  );
+  assert.ok(
+    usedMm + HIGHLIGHT_PILL_HEADROOM_MM <= A4_CONTENT_MM.height,
+    `page 2 and its pills sit inside the ${A4_CONTENT_MM.height}mm A4 frame: about ${usedMm}mm used`,
   );
 });
 
@@ -357,8 +413,13 @@ test("pages 2 and 3 render this design's own content, with every live level as t
 
   const page2 = renderToStaticMarkup(React.createElement(AdiDesignHighlightsPage, { highlights }));
   assert.ok(page2.includes("ADI Design Highlights"));
+  // The markup escapes apostrophes, so each title is compared as the page prints it.
+  const asPlainText = (text) => String(text).replace(/&#x27;|&#39;/g, "'");
   for (const highlight of highlights) {
-    assert.ok(page2.includes(highlight.title), `${highlight.title} renders`);
+    assert.ok(
+      asPlainText(page2).includes(highlight.title),
+      `${highlight.title} renders`,
+    );
   }
   assert.ok(page2.includes("P12"));
   assert.ok(page2.includes("116 dBC"));
@@ -376,6 +437,13 @@ test("pages 2 and 3 render this design's own content, with every live level as t
     assert.ok(!page2.toLowerCase().includes(phrase), `page 2 must not state "${phrase}"`);
   }
 
+  // The viewing experience, developed on THIS page because the highlights page is
+  // full with stronger stories: the result the geometry table states, explained.
+  const viewingNarrative = buildViewingExperienceNarrative({
+    projectDetails: fixture.project,
+    seatingPositions: sources.seatingPositions,
+    engineeringSummary,
+  });
   const page3 = renderToStaticMarkup(React.createElement(ProjectReportSystemOverview, {
     projectDetails: fixture.project,
     productsSelected: PRODUCTS,
@@ -385,6 +453,7 @@ test("pages 2 and 3 render this design's own content, with every live level as t
       { rowIndex: 1, label: "Front row", seats: [{ level: "L4", angleDeg: 64.6 }, { level: "L4", angleDeg: 63.1 }] },
       { rowIndex: 2, label: "Rear row", seats: [{ level: "L1", angleDeg: 45.0 }] },
     ],
+    viewingNarrative,
   }));
   assert.ok(page3.includes("System &amp; Products") || page3.includes("System & Products"));
   assert.ok(page3.includes("Q8-5 × 3"));
@@ -398,6 +467,12 @@ test("pages 2 and 3 render this design's own content, with every live level as t
   assert.ok(page3.includes("RP22 P14"));
   assert.ok(page3.includes(RP22_GRADE_TOKENS.L4.border), "the link's L4 is the canonical pill");
   assert.ok(page3.includes("15 speakers"));
+
+  // The viewing experience is developed here, beside the geometry it explains:
+  // what the picture offers the audience, with no angle and no level restated.
+  assert.ok(viewingNarrative, "the viewing experience is stated on this page");
+  assert.ok(asPlainText(page3).includes(viewingNarrative), "the viewing experience renders");
+  assert.doesNotMatch(viewingNarrative, /\d+(\.\d+)?°|\bL[1-4]\b|RP2[23]/);
 
   // Viewing geometry by row: each row's own RP23 result is the canonical pill,
   // and the row never prints that level as ordinary text beside it.

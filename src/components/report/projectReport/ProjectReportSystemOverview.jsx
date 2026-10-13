@@ -72,6 +72,11 @@ export default function ProjectReportSystemOverview({
   productsSelected = null,
   engineeringSummary = null,
   rows = [],
+  // The viewing experience, where the Highlights page has not already stated the
+  // per-row viewing result: one paragraph saying what those figures mean for the
+  // audience, set beside the geometry table it explains. Null when the report has
+  // already made the point, so nothing is ever said twice.
+  viewingNarrative = null,
   print = false,
 }) {
   const connections = buildSpecificationConnections({ productsSelected, engineeringSummary, dolbyConfig: projectDetails?.dolby_config });
@@ -175,6 +180,16 @@ export default function ProjectReportSystemOverview({
 
       {geometry.length > 0 && (
         <div style={{ marginTop: print ? '6mm' : 22 }}>
+          {viewingNarrative && (
+            <div style={{
+              fontSize: print ? 9 : 12,
+              lineHeight: 1.5,
+              color: '#3E4349',
+              marginBottom: print ? '4mm' : 12,
+            }}>
+              {viewingNarrative}
+            </div>
+          )}
           <div style={{
             fontFamily: FONT_HEADING,
             fontSize: print ? 7.5 : 10,

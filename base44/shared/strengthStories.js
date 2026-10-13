@@ -239,7 +239,7 @@ export function buildCandidates(sources, { byKey, floor, connections }) {
         member.level,
         PLACEMENT_PHRASES[member.key],
       )),
-      explanation: `placement is held to the recommended geometry: ${joinList(strongest.map((member) => PLACEMENT_PHRASES[member.key]))}, so the front stage locks onto the picture and effects cross the room the way the film was mixed instead of smearing between channels.`,
+      explanation: `placement is held to the recommended geometry: ${joinList(strongest.map((member) => PLACEMENT_PHRASES[member.key]))}, so effects cross the room the way the film was mixed instead of smearing between channels.`,
       sources: placementMembers.map((member) => String(member.key).toUpperCase()),
     }));
   }
