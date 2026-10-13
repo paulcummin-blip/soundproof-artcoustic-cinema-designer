@@ -388,6 +388,48 @@ export function buildSeatingBoundaryExplanation(geometry) {
 }
 
 /**
+ * THE SAME PRINCIPLE AT THE LENGTH A HIGHLIGHT HAS ROOM FOR.
+ *
+ * The ADI Design Highlights page states this design's seating decision in one
+ * short paragraph, so the seating clearance is composed here — from this module's
+ * own approved material and its own clearance bands — rather than written again
+ * somewhere else. One authority, so the highlight and the P1 explanation can never
+ * describe the same decision two different ways.
+ *
+ * It restates no distance and states no level: the measured P1 result is stated by
+ * its own published result wherever a page carries one, and this copy says what
+ * the seating's position does for the listener. Where the design records no
+ * seating or room geometry, the principle is stated as it stands, with no
+ * distance, no level and no measured outcome claimed.
+ *
+ * @param {Object} geometry — readSeatBoundaryGeometry output, or null
+ * @returns {string|null} the highlight-length statement, or null where there is
+ *   nothing to explain
+ */
+export function seatingBoundaryHighlightCopy(geometry) {
+  const explanation = buildSeatingBoundaryExplanation(geometry);
+
+  if (!explanation || explanation.available !== true) {
+    return 'Where the seating sits is part of the acoustic design rather than a matter of fitting seats into the room: '
+      + 'keeping the seating clear of a boundary reduces the compromises a seat close to a wall carries, and it is a '
+      + 'design measure rather than a guarantee of a particular measured result.';
+  }
+
+  const favourable = explanation.favourable === true;
+  const opening = favourable
+    ? 'The seating is deliberately held clear of the room\'s boundaries rather than pushed against a wall, which is where a client would usually look to keep floor space.'
+    : 'The seating comes closer to the room\'s boundaries in places, which is the compromise this room sets.';
+  const benefit = favourable
+    ? 'That separation softens how the room\'s own low frequencies behave at the seats nearest a wall, keeps the reflection returning from that wall further behind the direct sound, and leaves more room between the audience and the surrounding loudspeakers.'
+    : 'Seats that close to a boundary hear more of the room\'s own low-frequency behaviour and more of the reflection coming back from that wall, and they sit closer to the surrounding loudspeakers than the rest of the seating.';
+  const balance = explanation.trade_off
+    ? 'The room itself is what limits that clearance, so the seating takes the space the room can give while keeping as much separation as its dimensions allow.'
+    : null;
+
+  return [opening, benefit, balance].filter(Boolean).join(' ');
+}
+
+/**
  * The one-line statement of where the seating sits, for a surface that has room
  * for a clause rather than a paragraph.
  */
