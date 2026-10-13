@@ -25,13 +25,16 @@
  *                   Speaker Design schedule that is exported with the report —
  *                   each offering Open and Download.
  *
- *   Archived        every issued PDF the design has moved past, below the current
- *                   files and deliberately quieter: "Archived — older than
- *                   current design" or "Archived issued PDF". An earlier export
- *                   of the same version and type stays in storage but is not
- *                   listed. An archived file is fixed history: it is only ever
- *                   opened or downloaded, and it is never presented as the source
- *                   a proposal reads.
+ *   Archived        every issued PDF the design has moved past, folded away below
+ *                   the current files behind ONE heading — "Archived reports &
+ *                   proposals (n)" — collapsed by default and stating how many
+ *                   documents it holds. Inside, each file reads as history:
+ *                   "Archived — older than current design" or "Archived issued
+ *                   PDF". An earlier export of the same version and type stays in
+ *                   storage but is not listed. An archived file is fixed history:
+ *                   it is only ever opened or downloaded, and it is never
+ *                   presented as the source a proposal reads. A version holding
+ *                   nothing archived shows no heading at all.
  *
  * A current file is a file that still matches the version as it stands. A file of
  * the report's own type is not listed as a second current card while the report's
@@ -58,13 +61,12 @@ import {
 } from '@/components/report/reportActionIntent';
 import LiveReportRow from './LiveReportRow';
 import ExportedDocumentRow from './ExportedDocumentRow';
+import LibraryArchiveSection from './LibraryArchiveSection';
 import LibraryProposalReadinessBanner from './LibraryProposalReadinessBanner';
 import VersionReadinessLine from './VersionReadinessLine';
 import VersionCollisionNotice from '@/components/versions/VersionCollisionNotice';
 import useLibraryProposalReadiness from './useLibraryProposalReadiness';
 import {
-  ARCHIVED_PDFS_EMPTY,
-  ARCHIVED_PDFS_HEADING,
   ARCHIVED_PDFS_HELPER,
   CURRENT_FILES_HEADING,
   CURRENT_FILES_HELPER,
@@ -72,6 +74,7 @@ import {
   LIVE_REPORT_STATE_LABEL,
   LIBRARY_SOURCE_STATE,
   currentFileExplanation,
+  groupArchivedDocuments,
   liveReportNote,
   resolveExportLiveState,
   resolveLiveReportState,
@@ -89,14 +92,6 @@ function SectionHeading({ children }) {
     >
       {children}
     </h3>
-  );
-}
-
-function EmptyNote({ children }) {
-  return (
-    <p className="text-sm text-[#8A8477] py-4" style={{ fontFamily: REPORT_FONT_BODY }}>
-      {children}
-    </p>
   );
 }
 
@@ -313,32 +308,27 @@ export default function ProjectLibraryReportsSection({
               ))}
             </div>
 
-            <div className="mt-8">
-              <SectionHeading>{ARCHIVED_PDFS_HEADING}</SectionHeading>
-              {archivedFiles.length > 0 && (
-                <p className="text-xs text-[#8A8477] mb-3 max-w-3xl leading-relaxed" style={{ fontFamily: REPORT_FONT_BODY }}>
-                  {ARCHIVED_PDFS_HELPER}
-                </p>
+            {/* This version's archived documents, behind one folded heading: the
+                current files above stay exactly as they are, and a version with
+                nothing archived renders no archive heading at all. */}
+            <LibraryArchiveSection
+              className="mt-8"
+              helper={ARCHIVED_PDFS_HELPER}
+              groups={groupArchivedDocuments(archivedFiles)}
+              renderEntry={({ record, superseded, state }) => (
+                <ExportedDocumentRow
+                  record={record}
+                  variant="archived"
+                  versionText={versionNameById.get(version.id) || null}
+                  statusState={state.state}
+                  statusLabel={state.label}
+                  superseded={superseded}
+                  note={state.state === LIBRARY_SOURCE_STATE.SOURCE_CHANGED
+                    ? EXPORT_DESIGN_CHANGED_NOTE
+                    : null}
+                />
               )}
-              {archivedFiles.length === 0 ? (
-                <EmptyNote>{ARCHIVED_PDFS_EMPTY}</EmptyNote>
-              ) : (
-                archivedFiles.map(({ record, superseded, state }) => (
-                  <ExportedDocumentRow
-                    key={record.id}
-                    record={record}
-                    variant="archived"
-                    versionText={versionNameById.get(version.id) || null}
-                    statusState={state.state}
-                    statusLabel={state.label}
-                    superseded={superseded}
-                    note={state.state === LIBRARY_SOURCE_STATE.SOURCE_CHANGED
-                      ? EXPORT_DESIGN_CHANGED_NOTE
-                      : null}
-                  />
-                ))
-              )}
-            </div>
+            />
           </section>
         );
       })}

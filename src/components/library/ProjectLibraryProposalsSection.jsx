@@ -7,6 +7,10 @@
  * was issued — not the editable proposal. Drafts, editable revisions and
  * comparisons still being worked on stay in the Proposal Centre, so a working
  * document is never confused with an issued one.
+ *
+ * Each issued proposal states its latest PDF on the page; the older PDFs of the
+ * same proposal are folded away below it, behind the Library's one archive
+ * heading. A proposal with nothing superseded shows no archive heading at all.
  */
 
 import React from 'react';
@@ -14,9 +18,11 @@ import { useNavigate } from 'react-router-dom';
 import { Presentation } from 'lucide-react';
 import { REPORT_FONT_BODY } from '@/components/report/typography/reportTypography';
 import ExportedDocumentRow from './ExportedDocumentRow';
+import LibraryArchiveSection from './LibraryArchiveSection';
 import { describeDocumentVersions } from './libraryVersionLabels';
 import {
   LIBRARY_SOURCE_STATE,
+  groupArchivedDocuments,
   resolveExportLiveState,
 } from './librarySourceStatus';
 
@@ -59,41 +65,62 @@ export default function ProjectLibraryProposalsSection({
     group.rows.push(entry);
   });
 
+  // One issued proposal PDF — its own version line and the state its source
+  // holds. The newest export of a proposal is stated on the page; every earlier
+  // export of the same proposal is an older issued PDF and sits in the archive.
+  const renderRow = ({ record, superseded }) => {
+    const versions = record.selected_version_ids || [];
+    const version = versions.length >= 1 ? versionById.get(versions[0]) : null;
+    // An issued proposal is an issued document: it states what it IS in
+    // the same words the report exports use, and never borrows the
+    // report vocabulary.
+    const current = superseded
+      ? { state: LIBRARY_SOURCE_STATE.SUPERSEDED, label: undefined }
+      : resolveExportLiveState({ record, version });
+
+    return (
+      <ExportedDocumentRow
+        key={record.id}
+        record={record}
+        versionText={describeDocumentVersions(record, versionNameById)}
+        statusLabel={current.label}
+        superseded={superseded}
+      />
+    );
+  };
+
   return (
     <div className="space-y-12">
-      {groups.map((group) => (
-        <section key={group.key} data-proposal-group={group.key}>
-          <div className="mb-4">
-            <div className="text-[11px] uppercase tracking-[0.22em] text-[#A79E8C] mb-2">Issued proposal</div>
-            <h2 className="text-xl text-[#1B1A1A]" style={{ fontFamily: REPORT_FONT_BODY }}>
-              {group.title}
-            </h2>
-          </div>
+      {groups.map((group) => {
+        const currentRows = group.rows.filter((entry) => !entry.superseded);
+        const archivedRows = group.rows.filter((entry) => entry.superseded);
 
-          <div className="border-t border-[#E5E1D8]">
-            {group.rows.map(({ record, superseded }) => {
-              const versions = record.selected_version_ids || [];
-              const version = versions.length >= 1 ? versionById.get(versions[0]) : null;
-              // An issued proposal is an issued document: it states what it IS in
-              // the same words the report exports use, and never borrows the
-              // report vocabulary.
-              const current = superseded
-                ? { state: LIBRARY_SOURCE_STATE.SUPERSEDED, label: undefined }
-                : resolveExportLiveState({ record, version });
+        return (
+          <section key={group.key} data-proposal-group={group.key}>
+            <div className="mb-4">
+              <div className="text-[11px] uppercase tracking-[0.22em] text-[#A79E8C] mb-2">Issued proposal</div>
+              <h2 className="text-xl text-[#1B1A1A]" style={{ fontFamily: REPORT_FONT_BODY }}>
+                {group.title}
+              </h2>
+            </div>
 
-              return (
-                <ExportedDocumentRow
-                  key={record.id}
-                  record={record}
-                  versionText={describeDocumentVersions(record, versionNameById)}
-                  statusLabel={current.label}
-                  superseded={superseded}
-                />
-              );
-            })}
-          </div>
-        </section>
-      ))}
+            {currentRows.length > 0 && (
+              <div className="border-t border-[#E5E1D8]">
+                {currentRows.map(renderRow)}
+              </div>
+            )}
+
+            {/* This proposal's older issued PDFs, behind the one archive heading.
+                The current PDF above is never hidden by it, and a proposal whose
+                earlier exports are all it has simply states them here. */}
+            <LibraryArchiveSection
+              className={currentRows.length > 0 ? 'mt-6' : 'mt-2'}
+              groups={groupArchivedDocuments(archivedRows)}
+              renderEntry={renderRow}
+            />
+          </section>
+        );
+      })}
     </div>
   );
 }

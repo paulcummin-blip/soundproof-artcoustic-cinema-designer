@@ -27,6 +27,7 @@
 import { compareSourceFingerprints } from '@/components/report/reportSnapshotAuthority';
 import { selectCanonicalReportSnapshot } from '@/components/report/reportSnapshotCanonical';
 import { READINESS_STATE } from '@/components/proposal/sourceAuthority/proposalReadinessAuthority';
+import { PROPOSAL_DOCUMENT_TYPES } from '@/components/library/issuedDocument/issuedDocumentTypes';
 
 export const LIBRARY_SOURCE_STATE = Object.freeze({
   CURRENT: 'current',
@@ -95,6 +96,55 @@ export const ARCHIVED_PDFS_HELPER =
 
 /** Shown when a version holds no older or archived PDF. */
 export const ARCHIVED_PDFS_EMPTY = 'No older or archived PDFs are held for this version.';
+
+/* ── The Library's archive section ─────────────────────────────────────────── */
+
+/**
+ * The one heading the Library's archived documents sit behind. The number of
+ * documents inside is stated beside it, so a folded section is never a mystery.
+ */
+export const ARCHIVE_SECTION_LABEL = 'Archived reports & proposals';
+
+/**
+ * The two kinds an archive states, when it holds both. A version's archived
+ * reports and a proposal's older issued PDFs are both issued documents; they are
+ * grouped only so a mixed archive reads as what it is.
+ */
+export const LIBRARY_ARCHIVE_GROUP = Object.freeze({
+  REPORTS: 'reports',
+  PROPOSALS: 'proposals',
+});
+
+const ARCHIVE_GROUP_LABEL = Object.freeze({
+  [LIBRARY_ARCHIVE_GROUP.REPORTS]: 'Project Reports',
+  [LIBRARY_ARCHIVE_GROUP.PROPOSALS]: 'Proposals',
+});
+
+/** Which kind one issued document belongs to. */
+export function archiveGroupFor(documentType) {
+  return PROPOSAL_DOCUMENT_TYPES.includes(documentType)
+    ? LIBRARY_ARCHIVE_GROUP.PROPOSALS
+    : LIBRARY_ARCHIVE_GROUP.REPORTS;
+}
+
+/**
+ * The archived documents as the archive section states them: Project Reports
+ * first, then Proposals, with a kind that holds nothing left out entirely.
+ *
+ * @param {Array<{record: Object}|Object>} entries archived issued documents
+ * @returns {Array<{key: string, label: string, entries: Array}>}
+ */
+export function groupArchivedDocuments(entries = []) {
+  const groups = [
+    { key: LIBRARY_ARCHIVE_GROUP.REPORTS, label: ARCHIVE_GROUP_LABEL[LIBRARY_ARCHIVE_GROUP.REPORTS], entries: [] },
+    { key: LIBRARY_ARCHIVE_GROUP.PROPOSALS, label: ARCHIVE_GROUP_LABEL[LIBRARY_ARCHIVE_GROUP.PROPOSALS], entries: [] },
+  ];
+  (Array.isArray(entries) ? entries : []).forEach((entry) => {
+    const key = archiveGroupFor((entry?.record || entry)?.document_type);
+    groups.find((group) => group.key === key).entries.push(entry);
+  });
+  return groups.filter((group) => group.entries.length > 0);
+}
 
 /**
  * What each current file is for, stated on its own card, so a designer reads why
