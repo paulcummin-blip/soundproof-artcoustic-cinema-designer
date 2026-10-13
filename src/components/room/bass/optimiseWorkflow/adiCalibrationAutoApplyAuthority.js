@@ -165,10 +165,18 @@ export function describeCalibrationNotApplied(reason, { selectedLever = null } =
  * @param {object|null} [params.materiality] - the materiality assessment that refused it
  * @returns {string} the reason, always stating a rule this decision applied
  */
-export function describeNotMaterialCalibration({ improvement = null, materiality = null } = {}) {
+export function describeNotMaterialCalibration({ improvement = null, materiality = null, before = null, after = null } = {}) {
   const p20 = finite(improvement?.p20DeltaDb);
   const p19 = finite(improvement?.p19DeltaDb);
-  const exact = p20 != null ? p20 : p19;
+  // The decision's own improvement is stated in tenths of a dB, which rounds a
+  // sub-0.1 dB change away. The before → after pair it was measured from is read
+  // instead when it is available, so the measurement is never flattened to zero.
+  const p20Raw = finite(before?.p20?.deviationDb);
+  const p20RawAfter = finite(after?.p20?.deviationDb);
+  const precise = p20Raw != null && p20RawAfter != null && p20Raw > p20RawAfter
+    ? p20Raw - p20RawAfter
+    : null;
+  const exact = precise != null ? precise : (p20 != null ? p20 : p19);
   const metric = p20 != null ? "P20" : "P19";
   // The exact figure, in the designer's units. A real change that one decimal
   // would round away is stated as "under 0.1 dB" — never as a flat "0 dB".
@@ -584,7 +592,7 @@ export function resolveCalibrationAutoApply({
     // The reason the designer reads is built from the exact values the rule read,
     // so it can never name a threshold the improvement actually clears.
     return outcome(CALIBRATION_APPLY_DECISION.NONE, CALIBRATION_APPLY_REASON.NOT_MATERIAL,
-      describeNotMaterialCalibration({ improvement, materiality }),
+      describeNotMaterialCalibration({ improvement, materiality, before, after }),
       { ...context, materiality });
   }
 
