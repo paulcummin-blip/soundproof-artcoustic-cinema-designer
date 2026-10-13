@@ -40,7 +40,7 @@ export default function TechnicalReportDrawings({ section, project, planImageDat
           projectorBodyWidth={projector?.body_width_m} projectorBodyHeight={projector?.body_height_m} projectorBodyDepth={projector?.body_depth_m}
           rowData={sightlineRowData} dolbyConfig={exportSystemConfiguration || ''} />
       </ReportDrawingPage>
-      <ReportDrawingPage id="pdf-screen-wall-construction" blockName="screen-wall-detail" title="Screen Wall Construction Detail" {...identity} sheetCode="SW-01" status="NOT FOR SCALING">
+      <ReportDrawingPage id="pdf-screen-wall-construction" blockName="screen-wall-detail" title="Screen Wall" {...identity} sheetCode="SW-01" status="NOT FOR SCALING">
         <ScreenWallConstructionGraphic showHeader={false} {...identity} roomWidthM={stableDimensions.width} roomHeightM={stableDimensions.height}
           screenWidthM={s.screenWidthM} screenHeightM={s.screenHeightM} screenTotalWidthM={s.screenTotalWidthM} screenTotalHeightM={s.screenTotalHeightM}
           screenBottomHeightM={s.screenBottomHeightM} screenTopHeightM={s.screenTopHeightM} screenFrontPlaneM={reportScreenFrontPlaneM}

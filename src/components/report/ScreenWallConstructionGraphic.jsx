@@ -392,7 +392,7 @@ export default function ScreenWallConstructionGraphic({
         {showHeader && (
         <g>
           <text x={PAGE.margin + 18} y={PAGE.margin + 26} fontSize="18" fill={COLORS.text} fontWeight="600" fontFamily={HEADING_FONT}>
-            SCREEN WALL CONSTRUCTION DETAIL
+            SCREEN WALL
           </text>
           <line x1={PAGE.margin + 18} y1={PAGE.margin + 36} x2={PAGE.width - PAGE.margin - 18} y2={PAGE.margin + 36} stroke={COLORS.extension} strokeWidth="0.8" />
           <text x={PAGE.margin + 18} y={PAGE.margin + 54} fontSize="10" fill={COLORS.muted} fontFamily={BODY_FONT}>Project</text>
