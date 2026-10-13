@@ -26,8 +26,10 @@
  *   2. it carries a PURPOSE or MECHANISM verb (helps, reduces, spreads, distributes,
  *      manages, minimises, addresses ...), so it explains what the approach is FOR;
  *   3. it asserts no outcome of this design: no Performance Level, no figure, no
- *      result verb attributed to the design, the room or the arrangement, and no
- *      state assertion of the bass being even, uniform or identical.
+ *      result verb (delivers, achieves, provides, ensures, guarantees) anywhere in
+ *      the sentence, no improvement in performance unless the sentence also states
+ *      the intention behind the approach, and no state assertion of the bass being
+ *      even, uniform or identical.
  *
  * A guarantee therefore never passes: "the four-subwoofer arrangement helps deliver
  * consistent bass across the seating" attributes a delivered outcome to the
@@ -75,10 +77,32 @@ export const RESULT_STATE_ASSERTION = /\b(?:L[1-4]|Level\s+[1-4])\b|\b\d+(?:\.\d
  *   is not the principle register (and so is read by the result-claim rules as
  *   before)
  */
+export const OUTCOME_VERBS = /\b(?:deliver\w*|achiev\w*|provid\w*|ensur\w*|guarantee\w*|record\w*|measur\w*|prove\w*|attain\w*|yield\w*|results?\s+in|gives?|giving|gave)\b/i;
+
+/**
+ * A stated IMPROVEMENT in performance: better, stronger, more accurate, a raised
+ * figure. A sentence carrying one of these is reasoning only when it also states
+ * the INTENT behind the approach; without that framing it reads as an improvement
+ * this design achieved, which the frozen evidence has to state.
+ */
+export const IMPROVEMENT_VERBS = /\b(?:improv\w*|enhanc\w*|increas\w*|boost\w*|maximis\w*|maximiz\w*|optimi[sz]\w*|elevat\w*|rais\w*|strengthen\w*|reinforc\w*|tighten\w*|better|greater|more\s+accurate)\b/i;
+
+/**
+ * The INTENT framing that makes an improvement a designer's intention rather than
+ * a delivered result: "is intended to improve", "aims to", "so that", "in order to".
+ */
+export const INTENT_FRAMING = /\b(?:intended\s+to|intends?\s+to|intend\s+to|designed\s+to|design(?:er)?\s+intent|aims?\s+to|aimed\s+at|purpose\s+is|the\s+goal\s+is|chosen\s+to|selected\s+to|so\s+that|in\s+order\s+to|with\s+the\s+aim)\b/i;
+
 export function principleRationale(text) {
   const sentence = String(text || '');
   if (sentence.length === 0) return null;
   if (RESULT_STATE_ASSERTION.test(sentence)) return null;
+  // An outcome or improvement attributed to the approach is a statement of what
+  // this design did, whatever purpose verb the sentence also carries: "helps
+  // deliver", "provides", "achieves", "ensures" and "improves" without a stated
+  // intention are result claims, and the evidence has to state them.
+  if (OUTCOME_VERBS.test(sentence)) return null;
+  if (IMPROVEMENT_VERBS.test(sentence) && !INTENT_FRAMING.test(sentence)) return null;
   if (!PURPOSE_VERBS.test(sentence)) return null;
   if (!APPROACH_TERMS.test(sentence)) return null;
   const at = sentence.search(PURPOSE_VERBS);
