@@ -25,6 +25,7 @@ import { hydrateOptimiserPlan } from "@/components/room/bass/optimiserPlan/optim
 import { canonicalProductId, canonicaliseRoleModelMap } from "@/components/utils/modelKeyNormaliser";
 import { manualSizeFromPersisted } from "@/components/models/screen/manualScreenConfig";
 import { resolvePresetBackupGeometry } from "@/components/models/screen/resolveEffectiveScreen";
+import { resolveDisplayType } from "@/components/models/screen/displayTypeAuthority";
 
 const parseMaybe = (val, fallback) => {
   if (val == null) return fallback;
@@ -180,6 +181,10 @@ export function hydrateProjectIntoAppState(p, appState, setters = {}) {
       manualWidthM: Number(p?.manual_width_m) || 0,
       manualHeightM: Number(p?.manual_height_m) || 0,
       mountMode: p?.screen_mount_mode || "floating",
+      // The version's display identity, from the one display authority, so a
+      // surface reading the live screen state can tell a television from a
+      // projection screen rather than infer it from a width.
+      displayType: resolveDisplayType(p),
       floatDepthM: Number(p?.float_depth_m) || 0.2,
       showScreenPlane: !!p?.show_screen_plane,
       showCavity: !!p?.show_cavity,

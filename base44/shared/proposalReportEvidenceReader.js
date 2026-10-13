@@ -27,7 +27,7 @@
 
 import { validateReportEvidence } from './reportEvidenceCompleteness.js';
 import { selectCanonicalReportSnapshot } from './reportSnapshotCanonical.js';
-import { canonicalScreenDescription } from './canonicalScreenDescription.js';
+import { canonicalScreenDescription, canonicalStatedSizeInches } from './canonicalScreenDescription.js';
 
 /** The parameters a proposal must be able to state from a Technical Report. */
 const REQUIRED_PARAMETERS = [12, 13, 14, 18, 19, 20];
@@ -353,7 +353,16 @@ function buildSnapshot({ version, projectId, technicalEvidence, visualEvidence, 
       classification: roomFacts.classification ?? null,
       interpretation: asText(roomFacts.interpretation) || null,
       screen: {
-        size_inches: geometry.screen.viewable_diagonal_in ?? null,
+        // The size a narrative may state, resolved from the canonical geometry:
+        // a projection screen by its viewable width, a television by its nominal
+        // diagonal. The diagonal is carried separately below as reference and is
+        // never handed over as the screen's size, so a writer cannot state a
+        // screen size that disagrees with the report's own display label.
+        size_inches: canonicalStatedSizeInches({
+          display_type: geometry.screen.display_type,
+          diagonal_inches: geometry.screen.viewable_diagonal_in,
+          viewable_width_cm: geometry.screen.viewable_width_cm,
+        }),
         aspect_ratio: geometry.screen.format || null,
         manual_dimensions: screenFacts.manual_dimensions === true,
         manual_width_m: screenFacts.manual_width_m ?? null,
@@ -367,6 +376,10 @@ function buildSnapshot({ version, projectId, technicalEvidence, visualEvidence, 
           ...screenFacts,
           display_type: geometry.screen.display_type,
           diagonal_inches: geometry.screen.viewable_diagonal_in,
+          // The canonical geometry the stored sentence is resolved against: a
+          // projection screen's own width authority, and the aspect it states.
+          viewable_width_cm: geometry.screen.viewable_width_cm,
+          format: geometry.screen.format,
         }),
         viewable_width_cm: geometry.screen.viewable_width_cm ?? null,
         viewable_height_cm: geometry.screen.viewable_height_cm ?? null,

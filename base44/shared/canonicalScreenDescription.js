@@ -20,9 +20,18 @@
  * never an aspect ratio), exactly as the canonical display phrase states it and
  * as the client-facing Project Report prints it. Every other fact the stored
  * sentence carries — manual dimensions, the wall, the mount, the height above
- * floor — is kept exactly as written, so the description loses no geometry. A
- * projection screen, and a display with no canonical diagonal, are returned
- * unchanged.
+ * floor — is kept exactly as written, so the description loses no geometry.
+ *
+ * A projection screen is stated by its VIEWABLE WIDTH, the size the designer set
+ * and the size every report prints. Its diagonal is recorded by the canonical
+ * geometry for reference and is never stated as the screen's size. A stored
+ * sentence that states a different width is therefore resolved from the geometry
+ * in the same way, keeping the sentence's own noun and every other clause. A
+ * display whose canonical geometry states no size is returned unchanged.
+ *
+ * canonicalStatedSizeInches() is the one place the size a narrative may state is
+ * resolved, so every narrative surface is handed the canonical number and never
+ * a historical sentence's own figure.
  *
  * Pure: no React, no SDK, no side effects.
  */
@@ -68,20 +77,52 @@ function detailAfterSize(text) {
  *   (display_type, diagonal_inches) and the stored interpretation.
  * @returns {string|null} the canonical description, or the stored one unchanged.
  */
+/**
+ * The size a narrative surface STATES for the display, resolved from the
+ * canonical geometry alone.
+ *
+ * A television is stated by its nominal diagonal, a projection screen by its
+ * viewable width — the size the designer set and the size the reports print. The
+ * diagonal is a separate fact (see readDisplayIdentity) and is never returned as
+ * the stated size, so no narrative is ever handed two competing numbers for one
+ * display.
+ *
+ * @returns {number|null} inches, or null when the geometry states no size.
+ */
+export function canonicalStatedSizeInches(screen) {
+  const identity = readDisplayIdentity(screen);
+  if (identity.isTv) {
+    const diagonal = Number(identity.diagonalInches);
+    return Number.isFinite(diagonal) && diagonal > 0 ? diagonal : null;
+  }
+  const widthCm = Number(screen?.viewable_width_cm);
+  return Number.isFinite(widthCm) && widthCm > 0 ? Math.round(widthCm / 2.54) : null;
+}
+
+/** The canonical phrase for a projection screen: its viewable width and aspect. */
+function projectionPhrase(screen, widthInches) {
+  const aspect = asText(screen?.format) || asText(screen?.aspect_ratio);
+  const width = Math.round(widthInches);
+  return aspect ? `${width}" ${aspect} screen` : `${width}" screen`;
+}
+
 export function canonicalScreenDescription(screen) {
   const stored = asText(screen?.interpretation);
   if (!stored) return stored;
 
   const identity = readDisplayIdentity(screen);
-  if (!identity.isTv || !identity.tvPhrase) return stored;
+  const canonical = canonicalStatedSizeInches(screen);
+  if (!Number.isFinite(canonical)) return stored;
 
   const inches = statedInches(stored);
   // A sentence that states no size states no contradiction: it is left alone.
   if (inches === null) return stored;
-  if (Math.round(inches) === Math.round(Number(identity.diagonalInches))) return stored;
+  if (Math.round(inches) === Math.round(canonical)) return stored;
 
   const detail = detailAfterSize(stored);
-  return detail ? `${identity.tvPhrase}, ${detail}` : identity.tvPhrase;
+  const phrase = identity.isTv ? identity.tvPhrase : projectionPhrase(screen, canonical);
+  if (!phrase) return stored;
+  return detail ? `${phrase}, ${detail}` : phrase;
 }
 
 export default canonicalScreenDescription;

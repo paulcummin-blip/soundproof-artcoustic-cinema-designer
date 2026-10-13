@@ -29,6 +29,7 @@
 import { getCanonicalRole } from '@/components/utils/surroundRoleMap';
 import { productDisplayName, subwooferEntries } from '@/components/report/reportProductsSelected';
 import { centreCabinetOrientation, hasInstalledModel } from '@/components/utils/frontStageModeAuthority';
+import { DISPLAY_TYPE_TV, resolveDisplayType } from '@/components/models/screen/displayTypeAuthority';
 
 /** The layer headings, in the order the panel states them. */
 export const SPEAKER_DESIGN_GROUPS = Object.freeze([
@@ -42,10 +43,13 @@ export const SPEAKER_DESIGN_GROUPS = Object.freeze([
  * The position rows, in the order above. `key` is the canonical role the row
  * states; left and right halves of one position share their row.
  */
+// The front stage's placement note is NOT written here. It is read from the
+// version's own saved screen construction (see frontStageNote below), so a
+// loudspeaker is never said to sit behind a screen the design does not have.
 const POSITION_ROWS = Object.freeze([
-  { key: 'FL', group: 'front_stage', position: 'Front left', note: 'Behind screen' },
-  { key: 'FR', group: 'front_stage', position: 'Front right', note: 'Behind screen' },
-  { key: 'FC', group: 'front_stage', position: 'Centre', note: 'Behind screen' },
+  { key: 'FL', group: 'front_stage', position: 'Front left' },
+  { key: 'FR', group: 'front_stage', position: 'Front right' },
+  { key: 'FC', group: 'front_stage', position: 'Centre' },
   { key: 'SL', group: 'surrounds', position: 'Side surrounds' },
   { key: 'LW', group: 'surrounds', position: 'Front wides' },
   { key: 'SBL', group: 'surrounds', position: 'Rear surrounds' },
@@ -110,6 +114,23 @@ const modelCell = (models) =>
 const modelNamesCell = (models) => [...models.keys()].sort().join(', ');
 
 /**
+ * The front stage's placement note, read from the VERSION'S OWN saved display
+ * identity and screen construction, never from a generic description of a screen.
+ *
+ * A television has no screen for a loudspeaker to sit behind, so no placement is
+ * stated at all. A baffle wall, or a floating screen with its own cavity, carries
+ * the front three in the construction behind the screen surface, which is what
+ * the note states. Where the saved facts are not supplied, no note is stated: an
+ * unproven placement is never asserted.
+ */
+function frontStageNote(screen) {
+  if (!screen || typeof screen !== 'object') return null;
+  if (resolveDisplayType(screen) === DISPLAY_TYPE_TV) return null;
+  const mode = String(screen.mount_mode || screen.screen_mount_mode || screen.mountMode || '').toLowerCase();
+  return mode === 'baffle' || mode === 'floating' ? 'Behind screen' : null;
+}
+
+/**
  * The current speaker design of ONE design version.
  *
  * @param {Object} input
@@ -117,6 +138,7 @@ const modelNamesCell = (models) => [...models.keys()].sort().join(', ');
  * @param {Object}   [input.frontSubsCfg] — its front subwoofer configuration
  * @param {Object}   [input.rearSubsCfg] — its rear subwoofer configuration
  * @param {Array}    [input.subwooferInstances] — its subwoofer instances
+ * @param {Object}   [input.screen] — the version's saved display identity and screen construction
  * @param {Function} [input.isVisible] — (role, model) => boolean, the design's own visibility rule
  * @returns {{ groups: Array<{ key, title, rows }>, rows: Array<Object>, isEmpty: boolean }}
  */
@@ -125,6 +147,7 @@ export function buildSpeakerDesignRows({
   frontSubsCfg = null,
   rearSubsCfg = null,
   subwooferInstances = [],
+  screen = null,
   isVisible = null,
 } = {}) {
   const speakers = Array.isArray(placedSpeakers) ? placedSpeakers : [];
@@ -173,7 +196,7 @@ export function buildSpeakerDesignRows({
       quantityLabel: String(centreTotal),
       note: dual
         ? `Dual physical centre cabinets, one logical centre channel${orientation ? ' · cabinets mounted vertically' : ''}`
-        : centreRow.note || null,
+        : centreRow.note || frontStageNote(screen),
     });
   }
 
@@ -189,7 +212,7 @@ export function buildSpeakerDesignRows({
       modelNames: modelNamesCell(models),
       quantity: rowTotal(models),
       quantityLabel: String(rowTotal(models)),
-      note: row.note || null,
+      note: row.note || (row.group === 'front_stage' ? frontStageNote(screen) : null),
     });
   }
 
