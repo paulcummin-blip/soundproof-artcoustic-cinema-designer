@@ -1,14 +1,14 @@
 /**
- * TEMPORARY verification (deleted after the run): the front-stage placement note
+ * TEMPORARY verification (removed after the run): the front-stage placement note
  * is stated only from the version's own saved display identity, screen
  * construction and loudspeaker positions.
  *
  * The speaker positions and screen facts below are the real saved values read
  * from the two live projects (Marquee Home, Genesis AV).
  */
-import { test } from 'node:test';
-import assert from 'node:assert/strict';
+import { describe, it, expect } from 'vitest';
 import { frontStagePlacementNote } from '../components/models/screen/frontStagePlacementAuthority.js';
+import { buildSpeakerDesignRows } from '../components/report/speakerDesign/speakerDesignRows.js';
 
 // ── Marquee Home: 170" wide 2.35:1 projection screen, baffle wall ──────────
 const marqueeScreen = {
@@ -32,88 +32,76 @@ const genesisScreen = {
   manualSize: { enabled: true, displayType: 'tv', diagonalInches: 115 },
 };
 
-const genesisFL = { role: 'FL', position: { x: 0.4906261741125374, y: 0.12529687156212657, z: 1.4611349708257664 } };
-const genesisFR = { role: 'FR', position: { x: 4.149373825887462, y: 0.12529687156212657, z: 1.4611349708257664 } };
+const genesisFL = { role: 'FL', model: 'q6-3', position: { x: 0.4906261741125374, y: 0.12529687156212657 } };
+const genesisFR = { role: 'FR', model: 'q6-3', position: { x: 4.149373825887462, y: 0.12529687156212657 } };
+const marqueeFL = { role: 'FL', model: 'q8-5', position: { x: 0.7007266030470447, y: 0.18120145938086105 } };
+const marqueeFC = { role: 'FC', model: 'q8-5', position: { x: 2.59, y: 0.2 } };
+const marqueeFR = { role: 'FR', model: 'q8-5', position: { x: 4.479273396952955, y: 0.18120145938086105 } };
 
-const marqueeFL = { role: 'FL', position: { x: 0.7007266030470447, y: 0.18120145938086105, z: 1.558723404255319 } };
-const marqueeFC = { role: 'FC', position: { x: 2.59, y: 0.2, z: 1.558723404255319 } };
-const marqueeFR = { role: 'FR', position: { x: 4.479273396952955, y: 0.18120145938086105, z: 1.558723404255319 } };
+describe('front stage placement', () => {
+  it('Genesis: front left and right are stated outside the television', () => {
+    const pair = [genesisFL, genesisFR];
+    expect(frontStagePlacementNote({ screen: genesisScreen, rowKey: 'FL', speakers: [genesisFL], pairSpeakers: pair }))
+      .toBe('Outside the TV');
+    expect(frontStagePlacementNote({ screen: genesisScreen, rowKey: 'FR', speakers: [genesisFR], pairSpeakers: pair }))
+      .toBe('Outside the TV');
+  });
 
-test('Genesis: front left and right are stated outside the television', () => {
-  assert.equal(
-    frontStagePlacementNote({ screen: genesisScreen, rowKey: 'FL', speakers: [genesisFL] }),
-    'Outside the TV',
-  );
-  assert.equal(
-    frontStagePlacementNote({ screen: genesisScreen, rowKey: 'FR', speakers: [genesisFR] }),
-    'Outside the TV',
-  );
-});
+  it('Genesis: a television is never stated as behind a screen, and a pair inside the image is not stated', () => {
+    expect(frontStagePlacementNote({
+      screen: genesisScreen,
+      rowKey: 'FL',
+      speakers: [genesisFL],
+      pairSpeakers: [genesisFL, genesisFR],
+    })).not.toBe('Behind screen');
+    expect(frontStagePlacementNote({
+      screen: genesisScreen,
+      rowKey: 'FL',
+      speakers: [{ position: { x: 2.0, y: 0.12 } }],
+      pairSpeakers: [{ position: { x: 2.0, y: 0.12 } }, { position: { x: 2.6, y: 0.12 } }],
+    })).toBeNull();
+  });
 
-test('Genesis: a television is never stated as behind a screen', () => {
-  assert.notEqual(
-    frontStagePlacementNote({ screen: genesisScreen, rowKey: 'FL', speakers: [genesisFL] }),
-    'Behind screen',
-  );
-});
+  it('Marquee: behind screen is stated from the construction and the positions', () => {
+    expect(frontStagePlacementNote({ screen: marqueeScreen, rowKey: 'FL', speakers: [marqueeFL] })).toBe('Behind screen');
+    expect(frontStagePlacementNote({ screen: marqueeScreen, rowKey: 'FC', speakers: [marqueeFC] })).toBe('Behind screen');
+    expect(frontStagePlacementNote({ screen: marqueeScreen, rowKey: 'FR', speakers: [marqueeFR] })).toBe('Behind screen');
+  });
 
-test('A left/right pair inside the television image is not stated outside it', () => {
-  const insideFL = { position: { x: 2.0, y: 0.12 } };
-  const insideFR = { position: { x: 2.6, y: 0.12 } };
-  assert.equal(
-    frontStagePlacementNote({ screen: genesisScreen, rowKey: 'FL', speakers: [insideFL, insideFR] }),
-    null,
-  );
-});
+  it('baffle-wall construction alone is not evidence', () => {
+    expect(frontStagePlacementNote({ screen: marqueeScreen, rowKey: 'FL', speakers: [] })).toBeNull();
+    expect(frontStagePlacementNote({ screen: marqueeScreen, rowKey: 'FL', speakers: [{ role: 'FL' }] })).toBeNull();
+    expect(frontStagePlacementNote({ screen: marqueeScreen, rowKey: 'SL', speakers: [marqueeFL] })).not.toBe('Behind screen');
+  });
 
-test('Marquee: behind screen is stated from the construction and the positions', () => {
-  assert.equal(
-    frontStagePlacementNote({ screen: marqueeScreen, rowKey: 'FL', speakers: [marqueeFL] }),
-    'Behind screen',
-  );
-  assert.equal(
-    frontStagePlacementNote({ screen: marqueeScreen, rowKey: 'FC', speakers: [marqueeFC] }),
-    'Behind screen',
-  );
-  assert.equal(
-    frontStagePlacementNote({ screen: marqueeScreen, rowKey: 'FR', speakers: [marqueeFR] }),
-    'Behind screen',
-  );
-});
+  it('a loudspeaker placed in front of the screen plane is not stated behind it', () => {
+    expect(frontStagePlacementNote({ screen: marqueeScreen, rowKey: 'FL', speakers: [{ position: { x: 0.7, y: 0.55 } }] })).toBeNull();
+  });
 
-test('Baffle-wall construction alone is not evidence', () => {
-  assert.equal(
-    frontStagePlacementNote({ screen: marqueeScreen, rowKey: 'FL', speakers: [] }),
-    null,
-  );
-  assert.equal(
-    frontStagePlacementNote({ screen: marqueeScreen, rowKey: 'FL', speakers: [{ role: 'FL' }] }),
-    null,
-  );
-});
+  it('a floating screen without its own cavity does not establish a placement', () => {
+    const floating = { ...marqueeScreen, screen_mount_mode: 'floating', show_cavity: false };
+    expect(frontStagePlacementNote({ screen: floating, rowKey: 'FL', speakers: [marqueeFL] })).toBeNull();
+    expect(frontStagePlacementNote({ screen: { ...floating, show_cavity: true }, rowKey: 'FL', speakers: [marqueeFL] })).toBe('Behind screen');
+  });
 
-test('A loudspeaker placed in front of the screen plane is not stated behind it', () => {
-  const inFront = { position: { x: 0.7, y: 0.55 } };
-  assert.equal(
-    frontStagePlacementNote({ screen: marqueeScreen, rowKey: 'FL', speakers: [inFront] }),
-    null,
-  );
-});
+  it('no saved display facts and no positions state nothing', () => {
+    expect(frontStagePlacementNote({ screen: null, rowKey: 'FL', speakers: [marqueeFL] })).toBeNull();
+    expect(frontStagePlacementNote({ rowKey: 'FL' })).toBeNull();
+  });
 
-test('A floating screen without its own cavity does not establish a placement', () => {
-  const floating = { ...marqueeScreen, screen_mount_mode: 'floating', show_cavity: false };
-  assert.equal(
-    frontStagePlacementNote({ screen: floating, rowKey: 'FL', speakers: [marqueeFL] }),
-    null,
-  );
-  const floatingWithCavity = { ...floating, show_cavity: true };
-  assert.equal(
-    frontStagePlacementNote({ screen: floatingWithCavity, rowKey: 'FL', speakers: [marqueeFL] }),
-    'Behind screen',
-  );
-});
-
-test('No saved display facts and no positions state nothing', () => {
-  assert.equal(frontStagePlacementNote({ screen: null, rowKey: 'FL', speakers: [marqueeFL] }), null);
-  assert.equal(frontStagePlacementNote({ rowKey: 'FL' }), null);
+  it('the whole schedule carries the notes: Marquee behind screen, Genesis outside the TV', () => {
+    const marqueeRows = buildSpeakerDesignRows({
+      placedSpeakers: [marqueeFL, marqueeFC, marqueeFR],
+      screen: marqueeScreen,
+    }).rows;
+    const genesisRows = buildSpeakerDesignRows({
+      placedSpeakers: [genesisFL, genesisFR],
+      screen: genesisScreen,
+    }).rows;
+    const noteOf = (rows, position) => rows.find((r) => r.position === position)?.note ?? null;
+    expect(noteOf(marqueeRows, 'Front left')).toBe('Behind screen');
+    expect(noteOf(marqueeRows, 'Centre')).toBe('Behind screen');
+    expect(noteOf(genesisRows, 'Front left')).toBe('Outside the TV');
+    expect(noteOf(genesisRows, 'Front right')).toBe('Outside the TV');
+  });
 });

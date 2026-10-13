@@ -55,6 +55,8 @@ export function resolveScreenFrontPlaneM(screen, fallbackM = null) {
     screen?.screen_front_plane_m,
   ];
   for (const candidate of candidates) {
+    // An absent plane is not a plane: it is never read as a zero distance.
+    if (candidate === null || candidate === undefined || candidate === '') continue;
     const value = Number(candidate);
     if (Number.isFinite(value)) return value;
   }
@@ -106,17 +108,24 @@ function allBehindFrontPlane(speakers, frontPlaneM) {
   return positions.every((p) => p.y !== null && p.y <= frontPlaneM + 1e-9);
 }
 
-/** Whether a left/right pair sits clear of the display's own image width. */
-function pairSitsOutsideDisplay(speakers, imageWidthM) {
+/**
+ * Whether the stated left/right loudspeakers sit clear of the display's own image
+ * width. The pair's own midpoint is the display's centreline: the loudspeaker's
+ * own saved coordinate decides the answer, and a single stated side is judged
+ * against the pair it belongs to.
+ */
+function pairSitsOutsideDisplay(speakers, pairSpeakers, imageWidthM) {
   if (!Number.isFinite(imageWidthM) || imageWidthM <= 0) return false;
-  const list = Array.isArray(speakers) ? speakers : [];
-  if (list.length < 2) return false;
-  const positions = list.map(speakerPositionOf).filter(Boolean);
-  if (positions.some((p) => p.x === null)) return false;
-  const xs = positions.map((p) => p.x);
+  const stated = (Array.isArray(speakers) ? speakers : []).map(speakerPositionOf).filter(Boolean);
+  if (stated.length === 0 || stated.some((p) => p.x === null)) return false;
+  const pair = (Array.isArray(pairSpeakers) && pairSpeakers.length >= 2 ? pairSpeakers : speakers)
+    .map(speakerPositionOf)
+    .filter(Boolean);
+  if (pair.length < 2 || pair.some((p) => p.x === null)) return false;
+  const xs = pair.map((p) => p.x);
   const centreX = (Math.min(...xs) + Math.max(...xs)) / 2;
   const half = imageWidthM / 2;
-  return positions.every((p) => Math.abs(p.x - centreX) > half);
+  return stated.every((p) => Math.abs(p.x - centreX) > half);
 }
 
 /**
@@ -129,7 +138,13 @@ function pairSitsOutsideDisplay(speakers, imageWidthM) {
  * @param {number}   [input.frontPlaneM] — the screen front plane, when the caller holds it
  * @returns {string|null}
  */
-export function frontStagePlacementNote({ screen = null, rowKey = null, speakers = [], frontPlaneM = null } = {}) {
+export function frontStagePlacementNote({
+  screen = null,
+  rowKey = null,
+  speakers = [],
+  pairSpeakers = null,
+  frontPlaneM = null,
+} = {}) {
   if (!screen || typeof screen !== 'object') return null;
 
   const display = resolveDisplayType(screen);
@@ -139,8 +154,15 @@ export function frontStagePlacementNote({ screen = null, rowKey = null, speakers
     // A television is flanked, never hidden: only a left/right position that the
     // design's own coordinates place clear of the image is stated.
     if (rowKey !== 'FL' && rowKey !== 'FR') return null;
-    return pairSitsOutsideDisplay(list, resolveDisplayImageWidthM(screen)) ? 'Outside the TV' : null;
+    return pairSitsOutsideDisplay(list, pairSpeakers, resolveDisplayImageWidthM(screen))
+      ? 'Outside the TV'
+      : null;
   }
+
+  // Only the front stage sits in the screen construction; a surround or overhead
+  // row is never described against the screen.
+  const FRONT_STAGE_ROWS = ['FL', 'FR', 'FC'];
+  if (!FRONT_STAGE_ROWS.includes(String(rowKey || ''))) return null;
 
   const mode = resolveScreenMountMode(screen);
   const carriesFrontStage = mode === BAFFLE_MODE

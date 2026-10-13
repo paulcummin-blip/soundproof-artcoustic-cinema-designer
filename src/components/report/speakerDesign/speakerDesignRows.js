@@ -119,8 +119,8 @@ const modelNamesCell = (models) => [...models.keys()].sort().join(', ');
  * frontStagePlacementAuthority.js, the ONE authority for that statement. A
  * placement the saved facts do not establish is never stated here.
  */
-function frontStageNote({ screen, rowKey, speakers }) {
-  return frontStagePlacementNote({ screen, rowKey, speakers });
+function frontStageNote({ screen, rowKey, speakers, pairSpeakers }) {
+  return frontStagePlacementNote({ screen, rowKey, speakers, pairSpeakers });
 }
 
 /**
@@ -214,7 +214,14 @@ export function buildSpeakerDesignRows({
       quantity: rowTotal(models),
       quantityLabel: String(rowTotal(models)),
       note: row.note || (row.group === 'front_stage'
-        ? frontStageNote({ screen, rowKey: row.key, speakers: rowSpeakers.get(row.key) || [] })
+        ? frontStageNote({
+          screen,
+          rowKey: row.key,
+          speakers: rowSpeakers.get(row.key) || [],
+          // The left/right pair, so a single stated side is judged against the
+          // pair it belongs to and the display's own centreline.
+          pairSpeakers: [...(rowSpeakers.get('FL') || []), ...(rowSpeakers.get('FR') || [])],
+        })
         : null),
     });
   }
