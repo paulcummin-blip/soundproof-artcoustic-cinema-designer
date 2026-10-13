@@ -57,6 +57,7 @@ import frozenPublicationProject from '@/components/report/frozenPublicationProje
 import TechnicalReportDrawings from '@/components/report/technical/TechnicalReportDrawings';
 import useTechnicalReportHydration from '@/components/report/technical/useTechnicalReportHydration';
 import { PROJECT_REPORT_SNAPSHOT_TYPE } from '@/components/report/projectReport/projectReportIdentity';
+import { publishPlanDrawingReadiness } from '@/components/report/projectReport/planDrawingReadiness';
 import ReportSnapshotBanner from '@/components/report/ReportSnapshotBanner';
 import {
     REPORT_SNAPSHOT_TYPE,
@@ -112,6 +113,16 @@ import { setAuthoritativeReadOnlyMode } from '@/components/state/authoritativeRe
 import { useAutoPrintReadinessInstrumentation, logAutoPrintBlock } from '@/components/report/useAutoPrintReadinessInstrumentation';
 import useReportBlockPagination from '@/components/report/useReportBlockPagination';
 import { REPORT_UPDATE_PARAM, useReportActionIntent } from '@/components/report/reportActionIntent';
+
+/**
+ * Whether a plan-drawing capture exists. A capture is either an image string or
+ * the explicit `__SKIP__` marker the capture takes when a drawing cannot be
+ * produced; both mean the capture phase has finished, so an export is never
+ * blocked forever by a drawing that could not be taken.
+ */
+function isCapturedPlan(value) {
+    return typeof value === 'string' && value.length > 0;
+}
 
 // --- Main component ---
 /**
@@ -442,8 +453,35 @@ function RP22ReportInner({ embed = false } = {}) {
         };
     }, []);
 
+    // The consolidated Project Report prints through its OWN export path, so the
+    // Technical route's export never runs inside it and isPrinting stays false —
+    // which is why its plan drawings were missing. An embedded document
+    // therefore takes the same three captures as soon as its pages are ready,
+    // so the plan sheets it prints carry the same drawings the Technical Report
+    // takes on export. Each capture stops as soon as its image exists, so this
+    // can never re-capture, re-print or open a second print window.
+    const embedPlanCaptureActive = embed && !reportHydrating && !!reportReadyProjectId;
+    const planCaptureActive = isPrinting || embedPlanCaptureActive;
+
     // Plan capture hooks
-    usePlanCapture({ isPrinting, planImageDataUrl, setPlanImageDataUrl, planDimsImageDataUrl, setPlanDimsImageDataUrl, planSpeakerDimsImageDataUrl, setPlanSpeakerDimsImageDataUrl, setExportStatus, exportTimeoutRef, exportGuardRef, setIsPrinting, debugPlanCapture, onPrintFallback: printTechnicalReport });
+    usePlanCapture({ isPrinting: planCaptureActive, planImageDataUrl, setPlanImageDataUrl, planDimsImageDataUrl, setPlanDimsImageDataUrl, planSpeakerDimsImageDataUrl, setPlanSpeakerDimsImageDataUrl, setExportStatus, exportTimeoutRef, exportGuardRef, setIsPrinting, debugPlanCapture, onPrintFallback: embed ? null : printTechnicalReport });
+
+    // Publish the plan-drawing capture state to the document this one is printed
+    // in. Only an embedded document publishes: the Technical route gates its own
+    // export on its own printReady state, which is unchanged. On unmount the
+    // signal returns to its inert value, so nothing stale can block an export.
+    useEffect(() => {
+        if (!embed) return undefined;
+        return () => publishPlanDrawingReadiness({ pending: false, ready: false });
+    }, [embed]);
+
+    useEffect(() => {
+        if (!embed) return;
+        const ready = isCapturedPlan(planImageDataUrl)
+            && isCapturedPlan(planDimsImageDataUrl)
+            && isCapturedPlan(planSpeakerDimsImageDataUrl);
+        publishPlanDrawingReadiness({ pending: !ready, ready });
+    }, [embed, planImageDataUrl, planDimsImageDataUrl, planSpeakerDimsImageDataUrl]);
 
     // autoPrint: when navigated from Design Review with ?autoPrint=1, auto-trigger
     // the print pipeline once the report is hydrated and ready.
@@ -1115,7 +1153,15 @@ function RP22ReportInner({ embed = false } = {}) {
                 The report reads already-settled recommendations from the
                 Design Review handoff published by the Room Designer. */}
 
-            <div className="screen-only">
+            {/* The three plan drawing captures — the room plan, the dimensioned
+                room plan and the speaker position plan — are taken from this
+                invisible host, exactly as the Technical Report has always taken
+                them for its own export. It is kept OUTSIDE the screen-only review
+                chrome, because the consolidated Project Report hides that chrome:
+                inside it the host would not render at all and the plan sheets
+                would print empty. The host itself is invisible, and the wrapper
+                is hidden in print with the rest of the screen-only content. */}
+            <div className="report-capture-host screen-only" aria-hidden="true">
                 <ReportHiddenCaptures
                     app={app}
                     placedSpeakers={placedSpeakers}
@@ -1124,7 +1170,9 @@ function RP22ReportInner({ embed = false } = {}) {
                     screen={screen}
                     dolbyLayout={dolbyLayout}
                 />
+            </div>
 
+            <div className="screen-only">
                 {isAutoPrintPreparing ? (
                     <div className="flex flex-col items-center justify-center" style={{ minHeight: 'calc(100vh - 200px)', gap: 24 }}>
                         <div className="w-10 h-10 border-[3px] border-[#E6E4DD] border-t-[#213428] rounded-full animate-spin" />

@@ -11,8 +11,12 @@
  * helpers only.
  */
 
-import React, { useMemo } from "react";
+import React, { useMemo, useSyncExternalStore } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
+import {
+  readPlanDrawingReadiness,
+  subscribePlanDrawingReadiness,
+} from "@/components/report/projectReport/planDrawingReadiness";
 import { useClientReportAuthority } from "@/components/report/client/useClientReportAuthority";
 import { resolveDisplayType } from "@/components/models/screen/displayTypeAuthority";
 import { selectClientP9Overhead } from "@/components/report/client/selectClientP9Overhead";
@@ -494,6 +498,16 @@ export default function RP22ClientReport() {
     versionId: authority.versionId || null,
   });
 
+  // The Technical plan drawings (room plan, dimensioned room plan, speaker
+  // position plan) are captured by the embedded Technical Report once its pages
+  // are ready. The export waits for them: a report exported before they exist
+  // would print without them.
+  const planDrawings = useSyncExternalStore(
+    subscribePlanDrawingReadiness,
+    readPlanDrawingReadiness,
+    readPlanDrawingReadiness,
+  );
+
   // The version's Current Speaker Design, read from the SAME frozen design state
   // this report was built from and through the same product authority the Current
   // Speaker Design panel uses — the same visibility rule, the same model names,
@@ -769,7 +783,7 @@ export default function RP22ClientReport() {
           <Button
             type="button"
             onClick={handleExport}
-            disabled={!reportReady || !filenameIdentity.ready || orderedPages.length === 0 || exporting}
+            disabled={!reportReady || !filenameIdentity.ready || orderedPages.length === 0 || exporting || planDrawings.pending}
             className="client-report-screen-only"
             style={{
               fontFamily: "Didact Gothic, Century Gothic, sans-serif",

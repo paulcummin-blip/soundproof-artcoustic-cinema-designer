@@ -29,8 +29,12 @@ export default function TechnicalReportDocument() {
     <div className="project-report-technical-document">
       <style>{`
         /* The Technical Report's own review chrome belongs to its route, not to
-           the consolidated document. */
-        .project-report-technical-document .technical-report-embedded > *:not(.print-only) {
+           the consolidated document. The plan-drawing capture host is excluded:
+           it is invisible, it is hidden in print, and it must stay rendered here
+           for the embedded document to capture the room plan, the dimensioned
+           room plan and the speaker position plan, exactly as the Technical
+           Report captures them for its own export. */
+        .project-report-technical-document .technical-report-embedded > *:not(.print-only):not(.report-capture-host) {
           display: none !important;
         }
         /* On screen the embedded document shows its own print layout — the same
