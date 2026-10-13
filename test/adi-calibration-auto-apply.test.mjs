@@ -298,8 +298,35 @@ check('IMMATERIAL IMPROVEMENT NOT APPLIED', () => {
   const decision = decisionFor(immaterialCandidate());
   assert.equal(decision.decision, CALIBRATION_APPLY_DECISION.NONE);
   assert.equal(decision.reason, CALIBRATION_APPLY_REASON.NOT_MATERIAL);
-  assert.equal(decision.statement, NO_USEFUL_CALIBRATION_IMPROVEMENT);
+  // The reason states the EXACT improvement the rule measured (0.1 dB here), so
+  // it can never contradict the whole-number figures shown beside it, and the
+  // 1 dB action threshold is named only because it genuinely was not cleared.
+  // 6.0 dB → 5.95 dB is a real but tiny change: one decimal would round it away,
+  // so it is stated as "under 0.1 dB" rather than as a flat "0 dB".
+  assert.match(decision.statement, /improvement is under 0\.1 dB/);
+  assert.match(decision.statement, /below the 1 dB action threshold/);
   assert.equal(decision.tuning.length, 2, 'the candidate is still stated, it is simply not applied');
+  assert.equal(decision.materiality?.details?.primarySeatThresholdDb, 1, 'the rule it read is carried with the decision');
+  return decision.statement;
+});
+
+check('AGGREGATE IMPROVEMENT ABOVE 1 dB NEVER CLAIMS THE 1 dB THRESHOLD', () => {
+  // The reported case: the overall P20 figure improves 2 dB (±10 dB → ±8 dB) while
+  // every seat stays inside its level and no seat-level improvement clears 1 dB.
+  // The reason must state the rule that actually held it — and must NOT say the
+  // change failed a 1 dB threshold it cleared.
+  const seatRows = (raw) => SEATS.map((seat) => ({ seatId: seat, variationDbRaw: raw, level: `L${gradeP20FromRaw(raw)}`, isPrimary: true }));
+  const current = { ...confirmedResult({ id: 'current', p19: 4.1, p19Level: 'L4', p20: 10.0 }), perSeatP20: seatRows(6.6) };
+  const candidate = {
+    ...confirmedResult({ id: 'cal-gain-aggregate', p19: 4.1, p19Level: 'L4', p20: 8.0, tuning: tuning({ gainDb: -1.5 }) }),
+    perSeatP20: seatRows(6.4),
+  };
+  const decision = resolveCalibrationAutoApply({ baseline: current, candidate, objectives: objectives(), instances: instances() });
+  assert.equal(decision.reason, CALIBRATION_APPLY_REASON.NOT_MATERIAL);
+  assert.ok(!/below the 1 dB action threshold/.test(decision.statement),
+    `the 1 dB threshold may not be claimed when the exact improvement clears it: ${decision.statement}`);
+  assert.match(decision.statement, /no seat-level improvement clears the 1 dB rule/);
+  assert.match(decision.statement, /the overall P20 figure improves by 2 dB/);
   return decision.statement;
 });
 

@@ -40,7 +40,7 @@ import { resolvePlacementRecommendation } from "../components/room/bass/optimise
 import {
   PLACEMENT_APPLIED_MESSAGE,
   PLACEMENT_PREVIEW_UNAVAILABLE,
-  PLACEMENT_PREVIOUS_FOUND,
+  PLACEMENT_MOVE_NOT_RETAINED,
   PLACEMENT_PREVIOUS_FOUND_STALE,
   PLACEMENT_THEORETICAL_NOTE,
   describePlacementChange,
@@ -372,9 +372,9 @@ describe("a placement result from an earlier design state is not applied", () =>
       roomDims: ROOM,
       presentation: { state: "stale", showApply: false },
     });
-    expect(panel.summary).toMatch(/better by 3 dB/);
+    expect(panel.summary).toMatch(/from ±16 dB to ±13 dB/);
     const p20 = panel.expected.find((row) => row.label === "P20");
-    expect(p20.value).toMatch(/3 dB/);
+    expect(p20.value).toMatch(/±16 dB → ±13 dB/);
   });
 });
 
@@ -403,12 +403,12 @@ describe("a placement improvement saved without its positions", () => {
       presentation: { state: "evaluation_incomplete", showApply: false },
     });
     expect(panel.kind).toBe("previous");
-    expect(panel.notice).toBe(PLACEMENT_PREVIOUS_FOUND);
-    expect(panel.notice).toBe("Previous result found a possible improvement. Re-run ADI on the current design before applying any change.");
+    expect(panel.notice).toBe(PLACEMENT_MOVE_NOT_RETAINED);
+    expect(panel.notice).toContain("the saved run does not contain the exact move");
     expect(panel.canApply).toBe(false);
     expect(panel.canRerun).toBe(true);
     const p20 = panel.expected.find((row) => row.label === "P20");
-    expect(p20.value).toMatch(/better by 3 dB/);
+    expect(p20.value).toMatch(/±18 dB → ±14 dB/);
     expect(JSON.stringify(panel)).not.toMatch(/re-run to apply|no applicable change was kept|\d\.\d/);
   });
 

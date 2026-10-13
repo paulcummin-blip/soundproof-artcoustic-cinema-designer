@@ -149,6 +149,58 @@ export function describeCalibrationNotApplied(reason, { selectedLever = null } =
 }
 
 /**
+ * WHY an immaterial calibration improvement was not applied, from the exact
+ * evidence the materiality rule read.
+ *
+ * The one thing this sentence may never do is name the 1 dB action threshold
+ * when the improvement clears it. The panel's whole-number figures (P20 ±10 dB →
+ * ±8 dB) are floored for display, so they can imply a different change from the
+ * one measured: when the exact improvement really is under the threshold that is
+ * stated, and when it is NOT, the rule that actually held the change — the
+ * seat-level rule, with the seat-level figure it measured — is stated instead.
+ *
+ * @param {object} params
+ * @param {object|null} [params.improvement] - the decision's exact improvement
+ *   ({ p20DeltaDb, p19DeltaDb, p20LevelGain, p19LevelGain })
+ * @param {object|null} [params.materiality] - the materiality assessment that refused it
+ * @returns {string} the reason, always stating a rule this decision applied
+ */
+export function describeNotMaterialCalibration({ improvement = null, materiality = null } = {}) {
+  const p20 = finite(improvement?.p20DeltaDb);
+  const p19 = finite(improvement?.p19DeltaDb);
+  const exact = p20 != null ? p20 : p19;
+  const metric = p20 != null ? "P20" : "P19";
+  // The exact figure, in the designer's units. A real change that one decimal
+  // would round away is stated as "under 0.1 dB" — never as a flat "0 dB".
+  const measured = exact == null
+    ? null
+    : exact > 0 && exact < 0.1 ? "under 0.1 dB" : `${round1(exact)} dB`;
+  const details = materiality?.details || null;
+  const seatThreshold = finite(details?.primarySeatThresholdDb) ?? 1;
+  const primarySeats = finite(details?.primarySeatCount);
+  const seatImprovement = primarySeats != null && primarySeats > 0
+    ? finite(details?.worstPrimarySeatImprovementDb)
+    : finite(details?.worstAnySeatImprovementDb);
+
+  // The exact improvement is genuinely under the action threshold: the only case
+  // that may say so. The value is stated, so the sentence and the figures shown
+  // beside it can be reconciled.
+  if (exact != null && exact < 1) {
+    return `Not applied because the improvement is ${measured}, below the 1 dB action threshold.`;
+  }
+
+  // The overall figure improves, but no seat-level improvement clears the rule:
+  // that is the rule that held it, and it is named with its own measurement.
+  if (seatImprovement != null && seatImprovement < seatThreshold) {
+    const seatMeasured = seatImprovement > 0 && seatImprovement < 0.1 ? "under 0.1 dB" : `${round1(seatImprovement)} dB`;
+    const aggregate = measured != null ? `, while the overall ${metric} figure improves by ${measured}` : "";
+    return `Not applied because no seat-level improvement clears the ${seatThreshold} dB rule: the limiting seat improves by ${seatMeasured}${aggregate}.`;
+  }
+
+  return "Not applied because no material calibration improvement was confirmed.";
+}
+
+/**
  * The stated reason for an improvement the saved record held without recording a
  * decision — the honest answer for evidence saved before a decision was recorded.
  */
@@ -391,6 +443,9 @@ function outcome(decision, reason, statement, extra = {}) {
     after: extra.after || null,
     improvement: extra.improvement || null,
     damage: extra.damage || null,
+    // The materiality assessment the held reason was built from, with the exact
+    // measurements it read — so the reason stated to the designer is traceable.
+    materiality: extra.materiality || null,
     // The 3:1 trade-off this candidate carried, when it carried one: the ratio,
     // the improvement, the damage and the rule's decision.
     tradeOff: extra.tradeOff || null,
@@ -526,8 +581,11 @@ export function resolveCalibrationAutoApply({
   }
 
   if (!materiality?.material) {
+    // The reason the designer reads is built from the exact values the rule read,
+    // so it can never name a threshold the improvement actually clears.
     return outcome(CALIBRATION_APPLY_DECISION.NONE, CALIBRATION_APPLY_REASON.NOT_MATERIAL,
-      NO_USEFUL_CALIBRATION_IMPROVEMENT, context);
+      describeNotMaterialCalibration({ improvement, materiality }),
+      { ...context, materiality });
   }
 
   // A primary seat that regresses is a real seat losing performance: never
