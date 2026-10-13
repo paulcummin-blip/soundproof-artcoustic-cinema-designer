@@ -37,7 +37,6 @@ import {
   isStrength,
   isAssumedParameterKey,
   scopeRank,
-  isStrength as _isStrengthForStories,
 } from './strengthImportance.js';
 
 import {
@@ -58,6 +57,11 @@ import {
 // One story's own shape is assembled by the shared shape helper; this module owns
 // the catalogue, the mandatory seating story and how the stories are ranked.
 import { story } from './strengthStoryShape.js';
+
+import {
+  readSeatBoundaryGeometry,
+  seatingBoundaryHighlightCopy,
+} from './seatingBoundaryPrinciple.js';
 
 /* The evidence reads are part of this module's own public surface: the report
    page and the proposal reader both take them from here. */

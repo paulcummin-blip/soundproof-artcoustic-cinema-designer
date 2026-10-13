@@ -128,11 +128,14 @@ export function useProjectReportPages({
     engineeringSummary,
     productsSelected,
     seatingPositions,
+    // The seating clearance highlight explains where this design's seating
+    // actually sits, so the room it was designed in travels with the seating plan.
+    roomDims,
     dolbyConfig: projectDetails?.dolby_config,
     // How the design's display is named in ADI's own copy: a television or a
     // projection screen, read from the saved design's own authority.
     displayType: resolveDisplayType(projectDetails),
-  }), [engineeringSummary, productsSelected, seatingPositions, projectDetails]);
+  }), [engineeringSummary, productsSelected, seatingPositions, roomDims, projectDetails]);
 
   // The Visual Report's own pages — its existing order and its existing
   // presentation, exactly as the Visual Report prints them. No parameter card is

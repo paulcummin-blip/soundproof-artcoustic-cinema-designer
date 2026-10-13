@@ -45,7 +45,7 @@
  * in adiHighlightImportance. Read-only and pure throughout.
  */
 
-import { fitHighlightsToBudget, PROJECT_REPORT_PAGE_BUDGET_MM } from './projectReportPageBudget';
+import { fitHighlightsToBudget, PAGE_BLOCK_MM, PROJECT_REPORT_PAGE_BUDGET_MM } from './projectReportPageBudget';
 import { statePublishedValues, statedParameterValue } from './projectReportPublishedValues';
 import { parameter } from './adiHighlightStories';
 import {
@@ -57,15 +57,17 @@ import {
   collectEligibleEvidence,
   classifySpecTier,
   tierFloor,
-  scopeRank,
   levelRank,
   isStrength,
   isAssumedParameterKey,
 } from './adiHighlightImportance';
 import {
   buildCandidates,
+  buildSeatingClearanceStory,
   productEntries,
   seatFloor,
+  withMandatoryStories,
+  MANDATORY_STORY_IDS,
 } from './adiHighlightStories';
 
 export {
@@ -184,6 +186,13 @@ export function selectAdiHighlights(sources = {}) {
     connections,
   });
 
+  // RP22 Parameter 1 is stated on every design whose evidence carries it, whether
+  // or not it reaches the positive floor: the seating decision answers the question
+  // a client always asks, and where the result is not a strength the card claims
+  // none and explains the seating from this design's own geometry instead.
+  const seatingClearance = buildSeatingClearanceStory(sources, { byKey: evidenceMap.byKey });
+  if (seatingClearance) candidates.push(seatingClearance);
+
   const withinFloor = candidates.filter((candidate) => levelRank(candidate.level) >= floor);
   const strong = withinFloor.filter((candidate) => levelRank(candidate.level) >= MIN_STRENGTH_LEVEL);
   // L2 is only raised where the design does not already carry enough genuine
@@ -192,22 +201,22 @@ export function selectAdiHighlights(sources = {}) {
   const fillFromLowerLevels = strong.length < MIN_STRONG_STORIES;
   const admitted = fillFromLowerLevels ? withinFloor : strong;
 
-  const ranked = [...admitted].sort((a, b) => (
-    Number(b.material) - Number(a.material)
-    || levelRank(b.level) - levelRank(a.level)
-    || b.importance - a.importance
-    || scopeRank(b.scope) - scopeRank(a.scope)
-    || a.order - b.order
-  )).slice(0, MAX_HIGHLIGHTS);
+  // Ranked by the canonical order, then settled so that a mandatory explanation is
+  // never the story a full page's own cap leaves out.
+  const ranked = withMandatoryStories({
+    ranked: admitted,
+    candidates,
+    maxStories: MAX_HIGHLIGHTS,
+  });
 
-  let highlights = fitHighlightsToBudget(ranked, budgetMm);
+  let highlights = fitHighlightsToBudget(ranked, budgetMm, PAGE_BLOCK_MM.heading, MANDATORY_STORY_IDS);
 
   // A page is never left short while genuine supporting evidence exists.
   if (highlights.length < MIN_HIGHLIGHTS) {
     const filler = [...supporting]
       .sort((a, b) => a.order - b.order)
       .filter((candidate) => !highlights.some((highlight) => highlight.id === candidate.id));
-    highlights = fitHighlightsToBudget([...highlights, ...filler], budgetMm);
+    highlights = fitHighlightsToBudget([...highlights, ...filler], budgetMm, PAGE_BLOCK_MM.heading, MANDATORY_STORY_IDS);
   }
 
   // The page states every published figure the way the report states values: a raw

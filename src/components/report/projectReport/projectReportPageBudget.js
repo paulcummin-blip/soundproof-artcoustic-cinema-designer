@@ -165,15 +165,29 @@ export function estimateHighlightsMm(highlights, { compact } = {}) {
  * weakest are the ones that go, and the page never clips. Because the compact
  * composition is used for a fuller page, a materially important story is never
  * dropped merely to preserve a four-card layout.
+ *
+ * A MANDATORY explanation is never the one dropped: where the page has to shed a
+ * story to fit, it sheds the weakest story that is not mandatory, so the
+ * highlights the page is required to state are still stated when the page is full.
  */
 export function fitHighlightsToBudget(
   highlights,
   budgetMm = PROJECT_REPORT_PAGE_BUDGET_MM.page,
   headingMm = PAGE_BLOCK_MM.heading,
+  mandatoryIds = [],
 ) {
   const kept = (Array.isArray(highlights) ? highlights : []).filter(Boolean);
+  const mandatory = new Set(mandatoryIds);
   while (kept.length > 1 && estimateHighlightsMm(kept) > budgetMm) {
-    kept.pop();
+    let weakest = -1;
+    for (let index = kept.length - 1; index >= 0; index -= 1) {
+      if (!mandatory.has(kept[index]?.id)) {
+        weakest = index;
+        break;
+      }
+    }
+    if (weakest < 0) break;
+    kept.splice(weakest, 1);
   }
   return kept;
 }
