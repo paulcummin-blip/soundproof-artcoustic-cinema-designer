@@ -12,7 +12,7 @@
  *      validated Presented Options explanation
  *   F  that explanation is printed exactly once
  *   G  no raw dealer note enters publication
- *   H  cover first, Appendix last
+ *   H  cover first, and the document closes with the design: no Appendix
  *   I  Editor and print carry identical approved text
  *   J  Ready to Issue is blocked when required published content disappears
  *   K  Preview Document makes no database write
@@ -25,6 +25,7 @@ import { renderToStaticMarkup } from 'react-dom/server';
 import { readFileSync } from 'node:fs';
 
 import { prepareSectionBody, plainTextOf } from '../src/components/proposal/sectionBodyAuthority.js';
+import { isClientVisibleSection } from '../src/components/proposal/print/editorialComposition.js';
 import {
   preparePublishedSectionBody,
   missingPublishedContent,
@@ -109,11 +110,18 @@ describe('A. the ten approved paragraphs survive both preparations', () => {
     });
   });
 
-  it('keeps all ten paragraphs in the printed document itself', () => {
+  it('keeps every paragraph of every client-facing section in the printed document', () => {
     const html = words(renderGenesis());
-    GENESIS_PARAGRAPHS.forEach((paragraph) => {
-      expect(html).toContain(words(paragraph.text));
-    });
+    // The Appendix is not a client-facing section: its evidence is carried by the
+    // Project Report, so it has no page in the pack. Every other stored paragraph
+    // prints, character for character.
+    GENESIS_SECTIONS
+      .filter((section) => section.body.trim() && isClientVisibleSection(section.section_type))
+      .forEach((section) => {
+        paragraphsOf(section.body).forEach((paragraph) => {
+          expect(html).toContain(words(paragraph));
+        });
+      });
   });
 });
 
@@ -192,16 +200,26 @@ describe('E / F. the seating alternatives and their explanation', () => {
     expect(words(optionsPage)).toContain(words(optionsCopy));
   });
 
-  it('prints the validated explanation exactly once', () => {
+  it('prints each option photograph exactly once', () => {
     const html = renderGenesis();
     expect(countOf(words(html), words(optionsCopy))).toBe(1);
-    // Each option is stated once, as its caption, and each image prints once:
-    // the label is also the image's alt text, so the caption itself is counted.
+    // Each option is stated once, as its caption, and each photograph prints
+    // once: the label is also the image's alt text, so the caption is counted.
     ['Formal Cinema Seating', 'Relaxed Sofas'].forEach((label) => {
       expect(countOf(html, `pp-media__caption">${label}<`)).toBe(1);
     });
-    GENESIS_ASSETS.filter((asset) => asset.comparison_enabled).forEach((asset) => {
-      expect(countOf(html, asset.file_url)).toBe(1);
+    const options = GENESIS_ASSETS.filter((asset) => asset.comparison_enabled);
+    // Counted in the printed document itself. The machine-readable inventory of
+    // the sources an export must preserve (`data-selected-images`) names every
+    // selected image, and an inventory entry is not a second photograph — so the
+    // count is taken with the inventory and the stylesheets set aside.
+    const printed = html
+      .replace(/<style[\s\S]*?<\/style>/g, '')
+      .replace(/data-selected-images="[^"]*"/g, '');
+    expect(countOf(printed, '<figure class="pp-media pp-media--comparison"')).toBe(options.length);
+    options.forEach((asset) => {
+      expect(countOf(printed, asset.file_url)).toBe(1);
+      expect(countOf(printed, `<img src="${asset.file_url}"`)).toBe(1);
     });
   });
 });
@@ -235,24 +253,29 @@ describe('G. raw dealer notes never reach the client document', () => {
 });
 
 describe('H. document order', () => {
-  it('opens with the cover and closes with the Appendix', () => {
+  it('opens with the cover and closes with the design, never an Appendix', () => {
     expect(canonicalSectionTypes('system_summary')[0]).toBe('cover');
+    // The stored report still carries its Appendix section: the pack simply has
+    // no page for it, because the Project Report already prints that evidence.
     expect(canonicalSectionTypes('system_summary').at(-1)).toBe('appendix');
 
     const html = renderGenesis();
     const cover = html.indexOf('proposal-print-cover');
-    // The Appendix closes the document as an endnote on the last content sheet:
-    // a few closing sentences close that sheet rather than taking one of their
-    // own, so the close is the last thing printed and no page follows it.
-    const endnote = html.indexOf('class="pp-endnote"');
     expect(cover).toBeGreaterThan(-1);
-    expect(endnote).toBeGreaterThan(cover);
+    // Not the section, not its heading, and not its copy — and nothing closes the
+    // document in its place.
+    expect(html).not.toContain('pp-page--appendix');
+    expect(html).not.toContain('class="pp-endnote"');
+    const appendix = GENESIS_SECTIONS.find((section) => section.section_type === 'appendix');
+    expect(html).not.toContain(`>${appendix.title}<`);
+    paragraphsOf(appendix.body).forEach((paragraph) => {
+      expect(words(html)).not.toContain(words(paragraph));
+    });
     // No section page is printed above the cover.
     expect(html.indexOf('pp-page--system_design_summary')).toBeGreaterThan(cover);
-    // The alternatives belong to the copy that explains them, before the close.
-    expect(html.indexOf('pp-page--presented_options')).toBeLessThan(endnote);
-    // Nothing but the closing note itself follows it.
-    expect(html.slice(endnote)).not.toContain('pp-header__title');
+    // The alternatives belong to the copy that explains them, and that page is
+    // part of the document's own order.
+    expect(html.indexOf('pp-page--presented_options')).toBeGreaterThan(cover);
   });
 
   it('orders stored rows canonically however the database returned them', () => {

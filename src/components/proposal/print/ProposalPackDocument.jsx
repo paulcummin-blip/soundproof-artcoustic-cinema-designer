@@ -253,9 +253,13 @@ export default function ProposalPackDocument({
   let pillarSection = null;
   const flushPillarSection = () => {
     if (!pillarSection) return;
+    // ONE connected editorial section. Its shared heading lives inside the first
+    // structure's own opening composition — the one place it cannot be parted
+    // from the structure it introduces, because the measured compositor reads a
+    // composition as one unit and never breaks inside one. The wrapper carries
+    // the continuity the two sheets share.
     pillarSection.sheet.children.push(
       <div data-editorial-composition="sound_experience" className="pp-pillars" key="sound_experience">
-        <h2 className="pp-pillars__title">{PILLAR_GROUP_HEADING}</h2>
         {pillarSection.groups}
       </div>,
     );
@@ -535,6 +539,11 @@ export default function ProposalPackDocument({
           </div>
         ) : null;
 
+      // The first structure of the group carries THE SOUND EXPERIENCE heading: it
+      // opens the section, so it is the one the heading must never be parted from.
+      const opensPillarGroup = isPillarSection(section.section_type)
+        && (!pillarSection || pillarSection.groups.length === 0);
+
       const groupNode = (
         <div
           key={section.id}
@@ -544,6 +553,7 @@ export default function ProposalPackDocument({
           style={{ display: 'flow-root' }}
         >
           <div className="pp-composition" data-editorial-composition="opening">
+            {opensPillarGroup ? <h2 className="pp-pillars__title">{PILLAR_GROUP_HEADING}</h2> : null}
             {header}
             {leadingMedia}
             {/* The portrait accent sits smaller, beside the copy it illustrates. */}

@@ -530,11 +530,27 @@ export default function ProposalPackStyles() {
       .proposal-print-portal .pp-pillar .pp-header__rule {
         margin-top: 4mm;
       }
+      /* Each structure after the first opens with the same hairline rule, so the
+         hierarchy reads identically on the sheet the section continues onto: the
+         two pages are one explanation, not two unrelated pages. The gap is
+         padding, never a margin: it is part of the measured height of the
+         structure it introduces, so the allocation can never place a structure
+         against the rule. */
       .proposal-print-portal .pp-pillar + .pp-pillar {
-        margin-top: 11mm;
+        margin-top: 0;
+        padding-top: 11mm;
+        border-top: 1px solid var(--pp-rule);
       }
       .proposal-print-portal .pp-pillar .pp-body {
         max-width: 148mm;
+      }
+      /* The photograph that supports a structure's explanation follows it, at a
+         deliberate distance. Padding, not a margin and never a negative offset:
+         the gap is measured with the photograph, so a sheet break can neither
+         close it up nor let the two touch. */
+      .proposal-print-portal .pp-pillar .pp-media {
+        margin-top: 0;
+        padding-top: 10mm;
       }
 
       /* ── Closing note ──

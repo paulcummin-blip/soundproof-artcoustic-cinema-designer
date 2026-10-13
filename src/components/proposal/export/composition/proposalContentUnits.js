@@ -76,7 +76,13 @@ export function proposalContentUnits(page, measureUnits) {
     // A composition is read by its own rule wherever it sits, so the editorial
     // grouping holds however deeply the pack nests it.
     if (node.matches?.(COMPOSITION)) return compositionUnits(node);
-    if (node.matches('table')) return tableUnits(node, ancestors);
+    if (node.matches('table')) {
+      // The evidence summary is never divided: its table is measured, and moved,
+      // as ONE unit, so no sheet can carry half of it. Its rows are curated by
+      // measurement before composition, so it always fits the sheet it starts on.
+      if (node.closest?.('.pp-page--highlights')) return [atom(node, ancestors)];
+      return tableUnits(node, ancestors);
+    }
     const unit = atom(node, ancestors);
     const prose = node.matches(PROSE);
     // A gallery is measured photograph by photograph, so a sheet carries only the
@@ -140,8 +146,10 @@ export function proposalContentUnits(page, measureUnits) {
         && unit.source.textContent.trim().length < 160 && units[index + 1]?.source.matches?.('p')) unit.keepNext = true;
   }
   if (page.matches('.pp-page--highlights')) {
-    const firstRow = units.findIndex((unit) => unit.tableId);
-    if (firstRow >= 0) units.slice(0, firstRow).forEach((unit) => { unit.keepNext = true; });
+    // The heading, its introduction and the table are one statement: they never
+    // open a sheet the table itself is not on.
+    const tableAt = units.findIndex((unit) => unit.tableId || unit.source.matches?.('table'));
+    if (tableAt >= 0) units.slice(0, tableAt).forEach((unit) => { unit.keepNext = true; });
   }
   return units;
 }

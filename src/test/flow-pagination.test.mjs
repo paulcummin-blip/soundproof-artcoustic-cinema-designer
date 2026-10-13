@@ -39,7 +39,17 @@ class FakeElement {
     this.nodeType = 1;
     this.tagName = tagName.toUpperCase();
     this.classList = new FakeClassList(classes);
-    this.style = {};
+    // A real element carries a live inline style: the compositor sets its own
+    // print styles (padding, break rules, origins) on the nodes it measures.
+    const inline = {};
+    this.style = {
+      setProperty: (property, value) => { inline[property] = value; },
+      getPropertyValue: (property) => (property in inline ? inline[property] : ''),
+      removeProperty: (property) => { delete inline[property]; },
+    };
+    // A real element always carries a dataset: the compositor stamps the frame,
+    // the origins and the fitted-summary flags on it.
+    this.dataset = {};
     this.childNodes = [];
     this.parentNode = null;
     this.pageChromeMm = chromeMm;

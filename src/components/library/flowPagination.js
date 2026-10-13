@@ -2,7 +2,11 @@
 import { composeProposalFrames } from '@/components/proposal/export/browserProposalComposition';
 export const CONTINUATION_CLASS = 'pp-page--continuation';
 export const FLOW_FIT_TOLERANCE_MM = 0;
-export const FLOW_HEADING_CLASSES = Object.freeze(['pp-header__title', 'pp-header__lead', 'pp-block__title', 'pp-facts-group__title', 'pp-decision__title', 'pp-method__heading']);
+// Every heading the pack renders with a keep-with-next rule, read from the ONE
+// page-break authority: the shared heading of the three design structures is a
+// heading like any other, and a heading the pack never splits must be listed
+// here too, or a flow page could break directly beneath it.
+export const FLOW_HEADING_CLASSES = Object.freeze(['pp-header__title', 'pp-header__lead', 'pp-block__title', 'pp-facts-group__title', 'pp-decision__title', 'pp-method__heading', 'pp-pillars__title']);
 export function isHeadingBlock(element) {
   return Boolean(element?.nodeType === 1 && (/^H[1-6]$/.test(element.tagName) || FLOW_HEADING_CLASSES.some((name) => element.classList.contains(name))));
 }

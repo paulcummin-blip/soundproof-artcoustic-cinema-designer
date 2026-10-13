@@ -31,6 +31,9 @@ export const PACK_HEADING_SELECTORS = Object.freeze([
   '.pp-facts-group__title',
   '.pp-decision__title',
   '.pp-method__heading',
+  // The shared heading of the three structures keeps the first structure it
+  // introduces — it is never left at the foot of the previous sheet.
+  '.pp-pillars__title',
   '.pp-body > h1',
   '.pp-body > h2',
   '.pp-body > h3',
@@ -80,18 +83,27 @@ export const PACK_ONE_PAGE_SELECTORS = Object.freeze([
   '.pp-gallery',
   '.pp-gallery__figure',
   '.pp-gallery__support',
+  // The complete Key Performance Highlights section is ONE sheet: its rows are
+  // curated by measurement before it is composed, and neither the page nor its
+  // table is ever divided. A summary that cannot be made to fit one sheet is
+  // reported rather than printed as two, and never set smaller to force a fit.
+  '.pp-page--highlights',
+  '.proposal-print-section--highlights',
+  '.proposal-print-section--highlights .kph-table',
 ]);
 
 /**
  * The designed pages that may continue onto a further sheet when their content
- * genuinely needs one: a narrative sheet filled by consecutive sections, the
- * evidence page whose rows continue, and the Presented Options page. A heading is
- * never left holding a sheet of its own, so these frames flow.
+ * genuinely needs one: a narrative sheet filled by consecutive sections, and a
+ * Designed page whose copy continues. A heading is never left holding a sheet of
+ * its own, so these frames flow.
+ *
+ * The Key Performance Highlights section is deliberately NOT here. It is ONE
+ * sheet, decided by measurement before it is composed: continuing it is what put
+ * its table on a second sheet.
  */
 export const PACK_CONTINUATION_SELECTORS = Object.freeze([
   '.pp-page--flow',
-  '.pp-page--highlights',
-  '.proposal-print-section--highlights',
 ]);
 
 /** A table never starts a page away from the header it belongs to. */
@@ -178,9 +190,9 @@ export const PACK_PAGE_BREAK_RULES = Object.freeze([
   },
   {
     id: 'table-follows-its-heading',
-    note: 'The table starts with its heading but may continue between complete rows.',
+    note: 'The evidence summary starts with the heading it belongs to and is never divided across two sheets.',
     selectors: PACK_TABLE_FOLLOWS_HEADING_SELECTORS,
-    declarations: Object.freeze({ breakBefore: 'avoid' }),
+    declarations: Object.freeze({ breakBefore: 'avoid', breakInside: 'avoid' }),
   },
   {
     id: 'one-page-sections-are-read-as-one-thing',

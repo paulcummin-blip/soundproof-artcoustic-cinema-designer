@@ -241,18 +241,23 @@ describe('Print break rules in the pack authority', () => {
   const ruleFor = (id) => PACK_PAGE_BREAK_RULES.find((rule) => rule.id === id);
   const breakCss = proposalPackPageBreakCss();
 
-  it('keeps the evidence heading with its table, and continues the page between whole rows', () => {
+  it('keeps the complete evidence summary on one sheet, and never divides its table', () => {
     // The heading, its introduction and the table are one printed statement: the
     // table may not begin a page away from the heading it belongs to…
     expect(PACK_TABLE_FOLLOWS_HEADING_SELECTORS)
       .toContain('.proposal-print-section--highlights .kph-table');
-    // …and the evidence page continues onto a further sheet when the saved rows
-    // need one, which is what stops a sheet printing the heading over nothing.
-    const continuation = ruleFor('designed-pages-continue-when-they-must');
-    expect(continuation.selectors).toContain('.pp-page--highlights');
-    expect(continuation.declarations.breakInside).toBe('auto');
-    // The continuation happens between WHOLE rows, under a column-heading group
-    // the print engine repeats on the sheet the rows continue onto.
+    // …and the complete section is ONE sheet. Its rows are curated by measurement
+    // before it is composed, so it is never continued onto a second sheet and the
+    // table is never divided; a summary that cannot fit is reported instead.
+    const onePage = ruleFor('one-page-sections-are-read-as-one-thing');
+    expect(onePage.selectors).toContain('.pp-page--highlights');
+    expect(onePage.selectors).toContain('.proposal-print-section--highlights .kph-table');
+    expect(onePage.declarations.breakInside).toBe('avoid');
+    expect(ruleFor('table-follows-its-heading').declarations.breakInside).toBe('avoid');
+    expect(ruleFor('designed-pages-continue-when-they-must').selectors)
+      .not.toContain('.pp-page--highlights');
+    // The rows themselves remain indivisible, under a column-heading group the
+    // print engine repeats on any sheet a table with many rows continues onto.
     const tableHeader = ruleFor('table-header-keeps-its-rows');
     expect(tableHeader.selectors).toContain('.kph-table thead');
     expect(tableHeader.declarations.headerGroup).toBe(true);

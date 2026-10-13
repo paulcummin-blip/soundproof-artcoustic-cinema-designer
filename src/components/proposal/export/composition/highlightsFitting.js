@@ -22,13 +22,19 @@
  */
 
 import { setPrintStyle } from '@/components/proposal/export/composition/proposalPageGeometry';
-import {
-  HIGHLIGHT_MIN_PRINTED_ROWS,
-  nextHighlightRowToDrop,
-} from '@/components/proposal/keyPerformanceHighlightsAuthority';
+import { nextHighlightRowToDrop } from '@/components/proposal/keyPerformanceHighlightsAuthority';
 
 /** The cell padding the table is tightened to before any row is withdrawn. */
 const TIGHT_CELL_PADDING_MM = 0.9;
+
+/**
+ * The fewest rows the summary is ever trimmed to. Below this the table stops
+ * being a summary of the design, so the section is reported as unable to fit
+ * instead of being cut again — the requirement is the complete section on ONE
+ * sheet, never a smaller type. Four rows carry the viewing geometry, the design
+ * structures and the bass result.
+ */
+const HIGHLIGHT_LEGIBLE_FLOOR = 4;
 
 /** Tighten the table's own padding, leaving its type exactly as it is. */
 function tightenTablePadding(table) {
@@ -65,13 +71,13 @@ export function fitHighlightsSection(page, measure) {
     if (page.dataset) page.dataset.highlightsFitted = 'true';
     return true;
   }
-  const table = page.querySelector('table');
+  const table = typeof page.querySelector === 'function' ? page.querySelector('table') : null;
   tightenTablePadding(table);
-  let guard = HIGHLIGHT_MIN_PRINTED_ROWS * 4;
+  let guard = HIGHLIGHT_LEGIBLE_FLOOR * 6;
   while (!measure(page).fits && guard > 0) {
     guard -= 1;
     const rows = printedRows(table);
-    if (!table || rows.length <= HIGHLIGHT_MIN_PRINTED_ROWS) break;
+    if (!table || rows.length <= HIGHLIGHT_LEGIBLE_FLOOR) break;
     const key = nextHighlightRowToDrop(rows);
     const target = rows.find((row) => row.key === key) || rows[rows.length - 1];
     target.node.remove();
