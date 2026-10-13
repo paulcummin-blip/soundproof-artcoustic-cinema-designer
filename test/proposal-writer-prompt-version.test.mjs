@@ -73,7 +73,14 @@ const VERSION_3 = 'proposal-writer-prompt-3';
 // supports, with that movement varying from subject to subject rather than
 // following one fixed order. No section identity, word limit, figure, level,
 // product, claim-grounding or validation rule changed.
-const CURRENT = 'proposal-writer-prompt-19';
+// Generation 20 is the presentation-and-identity pass: the guidance states that
+// the project, client and reference names identify the document and are never the
+// subject of a narrative sentence, that Dynamic Range opens on the experience in
+// the room with each output figure following it as the proof, and that Overall
+// Design closes on a fresh judgement rather than restating the Design Summary. No
+// section identity, word limit, figure, level, product, claim-grounding or
+// validation rule changed.
+const CURRENT = 'proposal-writer-prompt-20';
 
 test('the writer prompt version is the current one', () => {
   assert.equal(WRITER_PROMPT_VERSION, CURRENT);

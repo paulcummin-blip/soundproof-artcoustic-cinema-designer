@@ -146,7 +146,15 @@ export const WRITER_CONTRACT_VERSION = 2;
 // word limits, the claim grounding rule and every validation rule are unchanged:
 // a draft filed under an earlier generation is still read against the agreement it
 // was written under.
-export const WRITER_PROMPT_VERSION = 'proposal-writer-prompt-19';
+// Bumped to 20 for the presentation-and-identity pass: the guidance states that
+// the project, client and reference names identify the document and are never the
+// subject of a narrative sentence, that the opening section is written about the
+// cinema itself, that Dynamic Range opens on the experience in the room with each
+// output figure following as its proof, and that Overall Design closes on a fresh
+// judgement rather than restating the Design Summary. Section identities, word
+// limits, the claim grounding rule and every validation rule are unchanged, so a
+// draft filed under an earlier generation is still read against its own agreement.
+export const WRITER_PROMPT_VERSION = 'proposal-writer-prompt-20';
 
 /** The only pack generation a draft may be written from. */
 export const WRITER_ACCEPTED_PACK_SCHEMA_VERSION = 2;

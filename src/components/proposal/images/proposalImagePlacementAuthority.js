@@ -212,7 +212,10 @@ export function placementCropAllowed({ presentation = null, purpose = null } = {
 export const PURPOSE_SECTION_TYPES = Object.freeze({
   [IMAGE_PURPOSE.WHOLE_ROOM]: ['system_design_summary', 'executive_summary', 'design_philosophy'],
   [IMAGE_PURPOSE.SEATING_OPTION]: ['seating_style', 'presented_options'],
-  [IMAGE_PURPOSE.LAYOUT_DRAWING]: ['spatial_resolution', 'presented_options', 'seating_style'],
+  // A drawing belongs with the account it explains, and the design overview is
+  // where the room, the seating and the system arrangement are introduced: the
+  // seating discussion a plan supports is read there.
+  [IMAGE_PURPOSE.LAYOUT_DRAWING]: ['system_design_summary', 'spatial_resolution', 'presented_options', 'seating_style'],
   [IMAGE_PURPOSE.INTERIOR_DETAIL]: ['design_philosophy', 'timbre_matching'],
   [IMAGE_PURPOSE.PRODUCT_DETAIL]: ['products', 'system_design_summary'],
   [IMAGE_PURPOSE.OTHER]: [],

@@ -7,7 +7,9 @@
  * The rule it enforces, in one place:
  *   - the cover takes the strongest source, framed as a portrait cover crop;
  *   - the design overview takes a full-width landscape from another source;
- *   - the first structure section takes a portrait accent from a third source;
+ *   - the first structure section takes a portrait accent from a third source,
+ *     and a drawing the document must show whole may take that accent on the
+ *     design-overview page itself, beside the account it explains;
  *   - the last structure section is the visual break, where the COVER source
  *     returns in the landscape crop;
  *   - a seating-style page carries the large lifestyle alternatives;
@@ -19,6 +21,10 @@
  * A source may appear twice at most, in two different crops, at least one full
  * page apart. Where no source satisfies the spacing rule for a page, that page
  * simply carries no image: the planner never fills a page to make a gallery.
+ *
+ * A source the designer marked FULL WIDTH is never composed as a smaller crop:
+ * the prominent presentation that was chosen always leads, and a supporting
+ * placement is taken from another source or not at all.
  *
  * Nothing here is written by an LLM. No coordinates, no page fit and no framing
  * decision is delegated to a model, and no evidence, copy or stored image is
@@ -32,11 +38,14 @@ import {
   EDITORIAL_ROLE,
   PROPOSAL_COVER_SLOT,
   SEATING_STYLE_SECTION_ID,
+  IMAGE_PRESENTATION,
   comparisonGroupsOf,
   comparisonOptionLabelOf,
   comparisonPageTitle,
+  imagePresentationOf,
   imagePurposeOf,
   isComparisonImage,
+  isProtectedDrawing,
   isUsableInProposal,
   makePlacement,
   purposeSectionTypes,
@@ -224,6 +233,15 @@ export function planProposalImages({ assets = [], sectionSlots = [], coverAssetI
       (asset) => asset.id && eligible(asset, pagePosition, CROP_ORIENTATION.LANDSCAPE_FULL),
     );
     const coverReturn = candidates.find((asset) => asset.id === coverAsset?.id);
+    // The break normally returns the cover source. Where the designer marked a
+    // photograph FULL WIDTH and it has not been placed yet, that chosen photograph
+    // takes the prominent placement instead: the designer's own presentation
+    // choice leads, and the cover keeps its dedicated page. A document with no
+    // such source keeps the established return exactly as it was.
+    const chosenFullWidth = candidates.find(
+      (asset) => usesOf(asset) === 0 && asset.id !== coverAsset?.id && isFullWidthPreference(asset),
+    );
+    if (preferCoverReturn && chosenFullWidth) return chosenFullWidth;
     if (preferCoverReturn && coverReturn) return coverReturn;
     const fresh = candidates.filter((asset) => usesOf(asset) === 0 && asset.id !== coverAsset?.id);
     if (fresh.length > 0) return fresh[0];
@@ -232,13 +250,24 @@ export function planProposalImages({ assets = [], sectionSlots = [], coverAssetI
   };
 
   /**
+   * Whether the designer asked for the prominent treatment on this source. FULL
+   * WIDTH is the large editorial image, so it is never used for a smaller crop:
+   * the designer's own choice always leads, and the supporting placement is taken
+   * from another source rather than replacing it.
+   */
+  const isFullWidthPreference = (asset) => imagePresentationOf(asset) === IMAGE_PRESENTATION.FULL_WIDTH;
+
+  /**
    * The source for a portrait accent. It is a source of its own: returning the
    * cover source here would repeat the cover treatment rather than add an accent
-   * to it, so no portrait is placed when no such source exists.
+   * to it, so no portrait is placed when no such source exists. A source the
+   * designer marked FULL WIDTH is passed over for the same reason — a prominent
+   * photograph is never reduced to an accent.
    */
   const pickPortrait = (pagePosition) => narrativeSources.find(
     (asset) => asset.id
       && asset.id !== coverAsset?.id
+      && !isFullWidthPreference(asset)
       && usesOf(asset) === 0
       && eligible(asset, pagePosition, CROP_ORIENTATION.PORTRAIT),
   ) || null;
@@ -261,12 +290,19 @@ export function planProposalImages({ assets = [], sectionSlots = [], coverAssetI
   // the first design structure.
   const structures = entries.filter((entry) => STRUCTURE_TYPES.includes(entry.section_type));
   const fallbackEntry = structures[0] || null;
+  // The design-overview page already carries the document's leading photograph, so
+  // a supporting image normally takes another section. It may take the overview
+  // page only when it is a drawing the document must show whole: the seating
+  // account a plan supports is read there, and the page's own copy-and-image row
+  // composes the drawing beside it without a second photograph being placed.
   const purposeEntryFor = (asset) => purposeSectionTypes(imagePurposeOf(asset))
-    .map((type) => entries.find((entry) => entry.section_type === type && entry !== overviewEntry))
+    .map((type) => entries.find((entry) => entry.section_type === type
+      && (entry !== overviewEntry || isProtectedDrawing(asset))))
     .find(Boolean) || null;
   const supportingSource = pickPortrait(fallbackEntry ? fallbackEntry.page : 999);
-  const portraitEntry = (supportingSource && purposeEntryFor(supportingSource)) || fallbackEntry;
-  if (portraitEntry && portraitEntry !== overviewEntry) {
+  const purposeEntry = supportingSource ? purposeEntryFor(supportingSource) : null;
+  const portraitEntry = purposeEntry || fallbackEntry;
+  if (portraitEntry && (portraitEntry !== overviewEntry || Boolean(purposeEntry))) {
     add(supportingSource, EDITORIAL_ROLE.PORTRAIT_EDITORIAL, portraitEntry.section_id, portraitEntry.page);
   }
 
