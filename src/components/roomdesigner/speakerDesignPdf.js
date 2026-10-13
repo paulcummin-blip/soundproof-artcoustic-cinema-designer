@@ -237,7 +237,7 @@ function groupsMarkup(groups) {
         .map(
           (row) => `<tr>
           <td class="pos">${escapeHtml(row.position)}</td>
-          <td class="model"><span class="model-name">${escapeHtml(row.modelNames ?? row.model)}</span>${
+          <td class="model"><span class="model-name">${escapeHtml(row.model)}</span>${
             row.note ? `<span class="model-note">${escapeHtml(row.note)}</span>` : ''
           }</td>
           <td class="qty">${escapeHtml(row.quantityLabel)}</td>

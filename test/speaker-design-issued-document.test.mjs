@@ -54,17 +54,16 @@ const SCHEDULE_GROUPS = Object.freeze([
       {
         key: 'FC',
         position: 'Centre',
-        // The row builder states both cells: the panel keeps the count in its model
-        // cell, the document states the name alone and leaves the count to Qty.
-        model: 'C4-1 × 2',
-        modelNames: 'C4-1',
+        // The row builder states ONE model cell — the name alone — and the count
+        // lives in Qty, so the panel and the document state the same row.
+        model: 'C4-1',
         // QTY is a plain number — the physical loudspeakers at the position.
         quantityLabel: '2',
         note: 'Dual physical centre cabinets, one logical centre channel · cabinets mounted vertically',
       },
       { key: 'FL', position: 'Front left', model: 'SL4-1', quantityLabel: '1', note: 'Behind screen' },
       // A pair that shares one row: QTY is the two speakers the row states.
-      { key: 'SL', position: 'Side surrounds', model: 'EVOLVE 2-1', modelNames: 'EVOLVE 2-1', quantityLabel: '2', note: null },
+      { key: 'SL', position: 'Side surrounds', model: 'EVOLVE 2-1', quantityLabel: '2', note: null },
     ],
   },
 ]);

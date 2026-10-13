@@ -17,7 +17,8 @@
  *
  * The two cells read as:
  *
- *   MODEL — the product name alone, with no count printed beside it;
+ *   MODEL — the product name alone, with no count printed beside it, because the
+ *           panel and the document both state a Qty column beside it;
  *   QTY   — a plain number: the physical loudspeakers at that position. One each
  *           where left and right have their own rows, two for a pair that shares
  *           one row, two for two centre loudspeakers. Never a unit, never a
@@ -93,25 +94,21 @@ const isInstalledModel = (value) => {
   return !!model && model !== 'off' && model !== 'none';
 };
 
-const countLabel = (name, count) => (count > 1 ? `${name} × ${count}` : name);
-
 /** The row's QTY: the number of physical loudspeakers the position holds. */
 const rowTotal = (models) => [...models.values()].reduce((sum, count) => sum + count, 0);
 
 const sumModels = (models) => [...models.values()].reduce((sum, count) => sum + count, 0);
 
-/** The row's model cell: each model with its own count, in the schedule's style. */
-const modelCell = (models) =>
-  [...models.entries()].map(([name, count]) => countLabel(name, count)).sort().join(', ');
-
 /**
- * The row's model cell as the Speaker Design document states it: the model names
- * alone, once each. How many speakers there are belongs to the Qty column, never
- * to the name, so a name is not printed beside its own count. A number that is
- * part of the product name ("EVOLVE 2-1", "ARCHITECT 2-1", "SUB3-12") is the name
- * and is passed through untouched.
+ * THE row's model cell: the model names alone, once each, and nothing else. The
+ * panel and the Speaker Design document both state a Qty column beside it, so a
+ * name is never printed beside its own count — "Q4-3 × 2" beside a Qty of 2 says
+ * the same thing twice. How many speakers there are is the Qty column's only job.
+ *
+ * A number that is part of the product name ("EVOLVE 2-1", "ARCHITECT 2-1",
+ * "SUB3-12") is the name and is passed through untouched.
  */
-const modelNamesCell = (models) => [...models.keys()].sort().join(', ');
+const modelCell = (models) => [...models.keys()].sort().join(', ');
 
 /**
  * The front stage's placement note, read from the VERSION'S OWN saved display
@@ -192,7 +189,6 @@ export function buildSpeakerDesignRows({
       group: centreRow.group,
       position: 'Centre',
       model: modelCell(centreModels),
-      modelNames: modelNamesCell(centreModels),
       quantity: centreTotal,
       quantityLabel: String(centreTotal),
       note: dual
@@ -210,7 +206,6 @@ export function buildSpeakerDesignRows({
       group: row.group,
       position: row.position,
       model: modelCell(models),
-      modelNames: modelNamesCell(models),
       quantity: rowTotal(models),
       quantityLabel: String(rowTotal(models)),
       note: row.note || (row.group === 'front_stage'
@@ -235,7 +230,6 @@ export function buildSpeakerDesignRows({
       group: 'subwoofers',
       position: entry.side === 'front' ? 'Front subwoofers' : entry.side === 'rear' ? 'Rear subwoofers' : 'Subwoofers',
       model: modelCell(models),
-      modelNames: modelNamesCell(models),
       quantity: entry.total,
       quantityLabel: String(entry.total),
       note: null,
