@@ -156,6 +156,18 @@ export default function ProposalImagePlacementStyles() {
            the standard landscape frame. Width, focal crop and typography stay
            unchanged; object-fit: cover preserves the source proportions. */
         .pp-media--closing-feature img { height: 144mm; }
+        /* The pair that closes the design: two full-width photographs at ONE
+           visual scale, each with its own caption, sharing the sheet with the
+           conclusion above them. 78mm is the page budget the comparison page
+           already gives two full-width images, and it is what keeps the pair, the
+           copy and the heading together on one sheet. A dimensioned drawing keeps
+           its own uncropped treatment: it is never cropped to suit this scale. */
+        .pp-closing { margin-top: 6mm; }
+        .pp-closing .pp-media img { height: 78mm; }
+        .pp-closing .pp-media { margin-bottom: 6mm; }
+        .pp-closing .pp-media:last-child { margin-bottom: 0; }
+        .pp-closing .pp-media.pp-media--presentation-detail img,
+        .pp-closing .pp-media.pp-media--presentation-detail { height: auto; }
         .pp-media--portrait img { height: 74mm; }
         .pp-media--seating img { height: 74mm; }
         /* The Spatial Resolution accent on the printed sheet: 89mm is about 20%

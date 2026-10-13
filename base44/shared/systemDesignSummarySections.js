@@ -116,7 +116,7 @@ export const COMPARISON_REPORT_INSTRUCTIONS = [
 export const SYSTEM_SUMMARY_SECTION_PROMPTS = {
   system_design_summary: `Open the report by describing the design.
 
-Open with the room, the screen and the system concept: the screen size and type, the viewing distance, the RP23 viewing result where it is relevant, the system format, and the main loudspeaker families. Say why the room has been designed this way.
+Open with the design concept: what this room has been designed as, and why it takes this form. The At a Glance page already states the room dimensions, the screen size, the viewing distance, the seating numbers and the system format, so do not restate them here: refer to the room and the system by what they are for rather than by their measurements.
 
 Then cover, in this order:
 - what has been designed for this room, and what it is trying to achieve
@@ -124,6 +124,8 @@ Then cover, in this order:
 - the main loudspeaker and subwoofer package, by family or model, and why each was chosen
 - how those parts work together as one system rather than as separate components
 - what the room delivers as a result, and how that experience should feel
+
+Every statement of value must finish the thought: say what the decision does for the listener. State the benefit itself rather than announcing that a benefit exists, and never write that the value, quality or benefit of a choice "is clear" or "is evident" without saying what it is.
 
 Do not open with an equipment list, and do not describe a product in isolation unless you are explaining why that product was chosen.
 
@@ -150,7 +152,9 @@ Do not list parameters mechanically and do not include a table.
 
 Choose the results that matter most for this room from the Dynamic Range results present in the supplied Sound Proof calculated data, for example screen dynamic range, non-screen dynamic range and the subwoofer system output. Do not work through them all, and use no more than one parameter code in the section.
 
-Use the dBC values and the RP22 levels exactly as supplied, and explain in plain language how that headroom benefits dialogue, music and film effects at the listening level the design assumes.
+Use the dBC values and the RP22 levels exactly as supplied as supporting evidence, and let the listening experience carry the section: how quiet detail is resolved, how a powerful soundtrack moment arrives, and the contrast between the two in this room. Lead with what the client hears and place the figures where they explain it; the numbers support that account and are never the whole story.
+
+Explain in plain language how that headroom benefits dialogue, music and film effects at the listening level the design assumes.
 
 Screen Dynamic Range (P12) and Non-screen Dynamic Range (P13) are the main evidence. Use the LFE and subwoofer result (P14) only where the bass output is reliable and relevant. Never reference P15.
 
@@ -196,7 +200,7 @@ Where the design is strongest, say so plainly. State any clear limitation honest
 
 For a modest system, explain the benefits clearly, do not claim more than the evidence shows, and point to sensible upgrades. For a high performance system, state the quality clearly and do not undersell it.
 
-Do not repeat the previous sections. Do not end with a generic closing phrase. The final paragraphs should leave the reader confident that the design decisions are deliberate.
+End with a confident professional recommendation for this particular cinema: why these elements work together here, and what that gives the client. Do not repeat the previous sections, do not summarise the equipment again, and do not end with a generic closing phrase. The final paragraphs should leave the reader confident that the design decisions are deliberate.
 
 This section is prose only. Never repeat the Key Performance Highlights table, never list its rows, and do not write a list, a table or a second performance summary: that table is the report's one structured evidence section. Name the strongest part of the design and the main compromise in the prose instead.
 2 to 4 short paragraphs.`,

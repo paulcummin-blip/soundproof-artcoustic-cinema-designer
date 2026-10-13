@@ -92,17 +92,36 @@ function transformStylesForCapture(css) {
     .replace(/@media\s+screen/gi, '@media not all');
 }
 
+/** One @import statement, matched so it can be moved to the head of the sheet. */
+const IMPORT_STATEMENT = /@import[^;]*;/gi;
+
 /** Every stylesheet the app is rendering right now, captured for the clone. */
 export function captureStylesMarkup(doc = typeof document !== 'undefined' ? document : null) {
   if (!doc?.querySelectorAll) return '';
-  return Array.from(doc.querySelectorAll('style, link[rel="stylesheet"]'))
+  const blocks = Array.from(doc.querySelectorAll('style, link[rel="stylesheet"]'))
     .map((el) => {
       if (el.tagName === 'STYLE') return transformStylesForCapture(el.textContent || '');
       const href = el.getAttribute('href');
       return href ? `@import url("${escapeHtml(href)}");` : '';
     })
-    .filter(Boolean)
-    .join('\n');
+    .filter(Boolean);
+  // An @import rule is honoured only while it is among the FIRST rules of the
+  // stylesheet it is written in. Joined after another sheet's rules — which is
+  // what concatenating every captured stylesheet into one sheet does — the
+  // parser drops it, so the fonts and base layers the printed document actually
+  // used would never take effect in the capture document and the pack would be
+  // measured in a fallback face. The imports are therefore gathered to the head
+  // of the captured sheet, in the order they were found; every other rule keeps
+  // its own text and its own place.
+  const imports = [];
+  const rules = [];
+  for (const block of blocks) {
+    const found = block.match(IMPORT_STATEMENT) || [];
+    imports.push(...found.map((statement) => statement.trim()));
+    const remainder = block.replace(IMPORT_STATEMENT, '').trim();
+    if (remainder) rules.push(remainder);
+  }
+  return [...imports, ...rules].join('\n');
 }
 
 /**
@@ -143,6 +162,58 @@ function captureDocumentHtml({ nodeHtml, bodyClass, styles }) {
 </html>`;
 }
 
+/** A bounded wait for the frame's own fonts to be ready, whether or not any exist. */
+function waitForFrameFonts(win) {
+  return new Promise((done) => {
+    const ready = win.document?.fonts?.ready;
+    if (!ready?.then) {
+      done();
+      return;
+    }
+    const timer = setTimeout(done, 4000);
+    ready.then(() => {
+      clearTimeout(timer);
+      done();
+    }).catch(() => {
+      clearTimeout(timer);
+      done();
+    });
+  });
+}
+
+/**
+ * The faces the composed pages actually render with, requested explicitly.
+ *
+ * The capture document is WRITTEN, not navigated, and its stylesheets arrive as
+ * one captured sheet whose @import rules the parser must still fetch: the
+ * document's own font stylesheet can therefore be in flight when `fonts.ready`
+ * first resolves, so nothing is pending, readiness resolves at once, and the
+ * pack is measured in a fallback face the designer never printed — and a
+ * different face on one row is a different height. The families the pages
+ * themselves use are read from those pages and loaded before the fonts are
+ * awaited again: the same font-readiness contract the browser composition
+ * enforces before it measures. No family is invented, no layout is changed and
+ * the wait is bounded.
+ */
+function loadFrameFaces(win) {
+  const scope = win.document;
+  const fonts = scope?.fonts;
+  const view = scope?.defaultView;
+  if (!fonts?.load || !scope?.querySelectorAll || !view?.getComputedStyle) return Promise.resolve();
+  const families = new Set();
+  const nodes = [
+    scope.body,
+    ...scope.querySelectorAll('.pp-page h1, .pp-page h2, .pp-page h3, .pp-page p, .pp-page td, .pp-page th, .pp-page figcaption, .pp-page .pp-body'),
+  ];
+  for (const node of nodes) {
+    if (!node) continue;
+    const family = view.getComputedStyle(node).fontFamily;
+    if (family) families.add(family);
+  }
+  if (families.size === 0) return Promise.resolve();
+  return Promise.all(Array.from(families).map((family) => fonts.load(`16px ${family}`).catch(() => null)));
+}
+
 function waitForFrameAssets(frame) {
   return new Promise((resolve) => {
     let win = null;
@@ -157,9 +228,10 @@ function waitForFrameAssets(frame) {
     // stylesheets are still parsing, so the @font-face rules they carry do not
     // exist yet and `fonts.ready` resolves at once — measuring the pack in a
     // fallback face the designer never printed, and letting the real face swap in
-    // afterwards. The settled document is awaited first, then its fonts are read
-    // again. Both waits are bounded, so a document that never settles falls
-    // through to the measurement this capture has always taken.
+    // afterwards. The settled document is awaited first, the faces the pages use
+    // are then loaded explicitly, and the fonts are awaited again. Every wait is
+    // bounded, so a document that never settles falls through to the measurement
+    // this capture has always taken.
     const settled = win.document?.readyState === 'complete' || typeof win.addEventListener !== 'function'
       ? Promise.resolve()
       : new Promise((done) => {
@@ -171,21 +243,9 @@ function waitForFrameAssets(frame) {
       });
 
     settled
-      .then(() => new Promise((done) => {
-        const ready = win.document?.fonts?.ready;
-        if (!ready?.then) {
-          done();
-          return;
-        }
-        const timer = setTimeout(done, 4000);
-        ready.then(() => {
-          clearTimeout(timer);
-          done();
-        }).catch(() => {
-          clearTimeout(timer);
-          done();
-        });
-      }))
+      .then(() => waitForFrameFonts(win))
+      .then(() => loadFrameFaces(win))
+      .then(() => waitForFrameFonts(win))
       .then(() => {
         const images = Array.from(win.document?.images || []);
         const pending = images.filter((img) => !img.complete);

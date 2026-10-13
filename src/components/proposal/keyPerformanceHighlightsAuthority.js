@@ -370,7 +370,7 @@ const MODEST_GAIN = Object.freeze({
   p9: 'Overhead spacing is set by the ceiling height and the seating layout, so sound above the seats is even rather than ideal.',
   p10: 'The overhead channels are kept close in level as the ceiling layout allows, rather than identical at every seat.',
   p11: 'The surround speakers sit where the seating can hear them, within what the room allows.',
-  p12: 'Front-stage headroom is adequate for this room rather than generous, so the screen channels have less spare capacity at the highest levels.',
+  p12: 'Screen-channel headroom covers the playback level this room is designed for, so dialogue and effects stay clean and unforced at the listening level the design assumes.',
   p13: 'The surround channels have usable headroom, with less reserve than the screen stage.',
   p14: 'Low-frequency output supports the room, with less spare capacity than the main channels.',
   p16: 'The screen channels keep a broadly consistent tonal character, with some variation across the screen.',

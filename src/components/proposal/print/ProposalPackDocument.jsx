@@ -37,7 +37,8 @@ import {
   resolveCoverAssetId,
 } from '@/components/proposal/images/proposalImagePlanner';
 import { validateProposalImagePlan } from '@/components/proposal/images/proposalImagePlanValidator';
-import { EDITORIAL_ROLE, IMAGE_PRESENTATION } from '@/components/proposal/images/proposalImagePlacementAuthority';
+import { EDITORIAL_ROLE, IMAGE_PRESENTATION, makePlacement } from '@/components/proposal/images/proposalImagePlacementAuthority';
+import ClosingPhotographPair from '@/components/proposal/print/ClosingPhotographPair';
 import AtAGlancePage from '@/components/proposal/print/AtAGlancePage';
 import MethodPage from '@/components/proposal/print/MethodPage';
 import DecisionSummaryPage from '@/components/proposal/print/DecisionSummaryPage';
@@ -311,6 +312,21 @@ export default function ProposalPackDocument({
     galleryPagesPlaced = true;
   };
 
+  // ── The photographs that close the design ────────────────────────────────
+  // The section that concludes the design carries the last photographs IN it:
+  // the photograph the planner already gave that section, followed by every
+  // selected photograph it could not place editorially, composed as one pair
+  // under the conclusion's own copy at the existing full-width editorial scale.
+  // They are never exiled to a page of their own, and no photograph is printed
+  // twice: the pair is built from the plan's own placements, and the planner
+  // never gives one source to two body slots. Where the document has no
+  // concluding section, nothing changes: the photographs keep the Project
+  // Images page this document has always given them.
+  const closingPairTypes = new Set(['overall_design', 'conclusion']);
+  const composesClosingPair = (sectionType) => !galleryPagesPlaced
+    && imagePlan.galleryImages.length > 0
+    && closingPairTypes.has(sectionType);
+
   // One page carries the project, the room and the brief: no second page
   // restates the same facts.
   const hasGlanceContent = glance.projectCards.length > 0
@@ -362,7 +378,9 @@ export default function ProposalPackDocument({
         if (!seatingPagesPlaced && seatingChunks.length > 0) pushSeatingPages();
         if (!comparisonPagesPlaced && comparisonGroups.length > 0) pushComparisonPages();
       }
-      if ((!hasImagesSection || !byType.has('room_images')) && ['overall_design', 'conclusion', 'appendix'].includes(def.type)) pushUnplacedImages();
+      // The concluding section composes the photographs that would otherwise
+      // have had a page of their own, so they are not sent to one here.
+      if ((!hasImagesSection || !byType.has('room_images')) && ['overall_design', 'conclusion', 'appendix'].includes(def.type) && !composesClosingPair(def.type)) pushUnplacedImages();
       const section = byType.get(def.type);
       if (!section) return;
       // A section a client-facing document does not print — the Appendix, whose
@@ -458,6 +476,38 @@ export default function ProposalPackDocument({
         || placement.editorial_role === EDITORIAL_ROLE.CLOSING_FEATURE) || null;
       const portrait = media.find((placement) => placement.editorial_role === EDITORIAL_ROLE.PORTRAIT_EDITORIAL) || null;
 
+      // The pair that closes the design, when this is the concluding section: the
+      // photograph the plan already gave it, followed by the selected photographs
+      // the plan could not place editorially, in gallery order. Every image is a
+      // placement the plan's own rules produce, so its crop, focal point,
+      // presentation choice and caption are the ones the designer set.
+      const closingPlacements = composesClosingPair(section.section_type)
+        ? [
+          ...media.filter((placement) => placement.editorial_role === EDITORIAL_ROLE.CLOSING_FEATURE
+            || placement.editorial_role === EDITORIAL_ROLE.LANDSCAPE_FEATURE),
+          ...imagePlan.galleryImages.map((asset, index) => makePlacement({
+            source: asset,
+            role: EDITORIAL_ROLE.CLOSING_FEATURE,
+            sectionId: section.id,
+            pagePosition: 'closing',
+            order: index,
+          })),
+        ]
+        : [];
+      // The section's own copy for the images it closes with: the Project Images
+      // introduction, published here above the photographs it was written for, so
+      // none of the document's validated copy is lost when that section prints no
+      // page of its own.
+      const closingLead = closingPlacements.length > 0
+        ? prepareSectionBody(byType.get('room_images')?.body, {
+          title: byType.get('room_images')?.title || '',
+          sectionType: 'room_images',
+          proseOnly: true,
+          highChannel,
+          proposalType: reportType,
+        })
+        : '';
+
       // The seating images this page carries, when the validated Presented
       // Options section leads the seating group this document has.
       const seatingHere = seatingWithOptions && section.section_type === 'presented_options'
@@ -504,10 +554,14 @@ export default function ProposalPackDocument({
         && (landscape.crop_protected === true
           || landscape.image_presentation === IMAGE_PRESENTATION.DETAIL
           || landscape.image_presentation === IMAGE_PRESENTATION.CROPPED_DETAIL);
+      // Where the section's own photograph is the first of the closing pair, it is
+      // printed by the pair and never a second time here.
       const leadingMedia = landscape && !mediaFollowsBody(section.section_type) && !inlineDetail
+        && closingPlacements.length === 0
         ? <ProposalImagePlacement placement={landscape} />
         : null;
       const supportingMedia = landscape && mediaFollowsBody(section.section_type) && !inlineDetail
+        && closingPlacements.length === 0
         ? <ProposalImagePlacement placement={landscape} />
         : null;
 
@@ -586,6 +640,14 @@ export default function ProposalPackDocument({
               </div>
             ) : openingCopy}
             {supportingMedia}
+            {/* The photographs that close the design, composed as ONE unit inside
+                this section: the compositor measures the pair whole, so it stays
+                on the sheet the conclusion is read on and, where the copy is
+                longer, moves to the section's own continuation sheet rather than
+                being split across two. */}
+            {closingPlacements.length > 0 ? (
+              <ClosingPhotographPair placements={closingPlacements} lead={closingLead} />
+            ) : null}
             {evidence.length > 0 ? <ProposalMetricCards cards={evidence} /> : null}
             {seatingImages}
             {alternativeImages}
@@ -607,6 +669,10 @@ export default function ProposalPackDocument({
         flushPillarSection();
         sheet.children.push(groupNode);
       }
+
+      // The concluding section now carries the photographs that would otherwise
+      // have had a page of their own, so that page is not composed.
+      if (closingPlacements.length > 0) galleryPagesPlaced = true;
 
       // A seating group too long for one page continues past it, every image
       // still with its own caption and the group's explanation already stated.
