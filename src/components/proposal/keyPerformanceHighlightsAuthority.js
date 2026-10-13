@@ -331,6 +331,16 @@ const MAX_PRINTED_GAIN = 96;
 /** A result at RP22 Level 1 or Level 2 is stated plainly, never as a strength. */
 const LOW_GRADE = /\bL[12]\b/i;
 
+/**
+ * Whether a printed row states a Level 1 or Level 2 result — a real limitation of
+ * this design rather than one of its strengths. Read from the row as it prints,
+ * so the one-sheet summary keeps a limitation while it still has anything else to
+ * withdraw, and never trims the table down to its best grades.
+ */
+export function statesSignificantLimitation(text) {
+  return LOW_GRADE.test(String(text == null ? '' : text));
+}
+
 /** Wording that would oversell a Level 1 or Level 2 result. */
 const OVERSELL = /\b(excellent|outstanding|exceptional|superb|perfect|flawless|remarkable|impeccable|class[- ]leading|reference[- ]grade|unmatched|ideal)\b/i;
 
@@ -510,15 +520,19 @@ export function buildHighlightDisplayRows(rows, options = {}) {
  * grade that decides:
  *
  *   1. a row that repeats a point the table already makes — a second result in
- *      one performance area — goes before a row that states a new one;
- *   2. then the result that says least about this design: the viewing geometry
- *      first, then the three design structures, then bass capability, and any
- *      row whose area is not one of those concepts before all of them.
+ *      one performance area — goes before a row that states a new one,
+ *      bass capability giving way before the areas the client reads first;
+ *   2. then the result that says least about this design: bass capability, then
+ *      timbre matching, then dynamic range, then spatial resolution, with the
+ *      viewing geometry — the client's own seat geometry — going last;
+ *   3. a row that states a real limitation is kept while any other row remains
+ *      to withdraw, so the summary is never trimmed down to its best grades.
  *
  * The withdrawn rows are a presentation decision only: the stored rows, the
  * section and the Project Report that carries every result are untouched.
  *
- * @param {Array<{ key?: string, area?: string }>} rows — the rows currently printed
+ * @param {Array<{ key?: string, area?: string, limitation?: boolean }>} rows
+ *   the rows currently printed
  * @returns {string|null} the key of the row to withdraw, or null when none remains
  */
 export function nextHighlightRowToDrop(rows = []) {
@@ -529,16 +543,19 @@ export function nextHighlightRowToDrop(rows = []) {
     const area = String(row.area || '');
     counts.set(area, (counts.get(area) || 0) + 1);
   });
-  // Within one performance area the least valuable result goes first.
-  const worstOf = (candidates) => candidates
+  // A row that states a real limitation is part of the design's story, so it is
+  // only ever withdrawn when there is nothing else left to withdraw.
+  const spare = list.filter((row) => !row.limitation);
+  const pool = spare.length > 0 ? spare : list;
+  // Within one performance area the least valuable result goes first, and
+  // between areas the one the client reads last.
+  const leastValuable = (candidates) => candidates
     .slice()
-    .sort((a, b) => printRank(b.key) - printRank(a.key))[0] || null;
-  const repeated = list.filter((row) => counts.get(String(row.area || '')) > 1);
-  if (repeated.length > 0) return String(worstOf(repeated).key);
+    .sort((a, b) => (areaRank(b.area) - areaRank(a.area)) || (printRank(b.key) - printRank(a.key)))[0] || null;
+  const repeated = pool.filter((row) => counts.get(String(row.area || '')) > 1);
+  if (repeated.length > 0) return String(leastValuable(repeated).key);
   // Then the area that carries least of this design's story.
-  return String(list
-    .slice()
-    .sort((a, b) => (areaRank(b.area) - areaRank(a.area)) || (printRank(b.key) - printRank(a.key)))[0].key);
+  return String(leastValuable(pool).key);
 }
 
 export default buildHighlightDisplayRows;

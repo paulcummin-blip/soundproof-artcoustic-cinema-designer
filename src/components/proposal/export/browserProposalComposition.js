@@ -27,11 +27,19 @@ export function composeProposalFrames(pages) {
   pages.forEach((original, frameIndex) => {
     original.dataset.paginationFrame ||= String(frameIndex);
     naturalFrame(original);
-    // The evidence summary is ONE sheet: it is curated — its own padding first,
-    // then the least valuable rows — before it is measured, and its table is
-    // never split across two. The full result set stays in the Project Report.
-    if (original.matches?.('.pp-page--highlights')
-        && !fitHighlightsSection(original, pageMeasurement)) throw new Error(HIGHLIGHTS_OVERFLOW);
+    // The evidence summary is ONE sheet. It is curated by measurement here — the
+    // compositor's own frame first, then the table's own spacing, then the least
+    // valuable rows, with the closing note inside every measurement — and then
+    // KEPT WHOLE: it never enters the content-unit path below, so its table
+    // cannot be divided across two sheets and its closing note is never handed to
+    // the paragraph-fragmentation fallback. A summary that cannot be fitted
+    // legibly is reported by name instead of being printed as an accident. The
+    // full result set stays in the Project Report.
+    if (original.matches?.('.pp-page--highlights')) {
+      if (!fitHighlightsSection(original, pageMeasurement)) throw new Error(HIGHLIGHTS_OVERFLOW);
+      completed.push(original);
+      return;
+    }
     original.querySelectorAll('.pp-body p,.pp-endnote__body p,figcaption,.pp-comparison-option__row dd').forEach((node) => {
       node.style.setProperty('overflow-wrap', 'anywhere', 'important');
     });
@@ -90,6 +98,8 @@ export function composeBrowserProposal(doc) {
   // taken, so the check below still proves that composition itself changed
   // nothing: what the document prints is what it printed, minus the rows this
   // summary withdraws by measurement, which no other part of the pack carries.
+  // The fit measures the section in the compositor's own page frame, so the row
+  // selection accepted here is the selection the allocation below will see.
   [...root.children]
     .filter((page) => page.matches('.pp-page--highlights'))
     .forEach((page) => {
