@@ -31,6 +31,8 @@ function interpretScreen(project) {
   // The designer's screen is stored as a viewable width; a report states the
   // diagonal. One canonical resolution, used by every section of every report.
   const canonical = resolveCanonicalScreen(project);
+  const displayType = resolveDisplayType(project);
+  const isTv = displayType === DISPLAY_TYPE_TV;
 
   if (!screenSize && !manualDims && !canonical) {
     return {
@@ -77,9 +79,18 @@ function interpretScreen(project) {
   // is never stated as the screen size, so a report or an ADI example can never
   // quote a screen size the designer did not set.
   const statedSize = resolveStatedScreenSize(project) ?? screenSize;
-  const sizeText = statedSize
-    ? `${statedSize}" ${aspectRatio}${manualDims ? ', manual dimensions' : ''}`
-    : 'Screen not configured';
+  // The phrase the room interpretation states for the display follows the
+  // display's own identity, exactly as the display's client-facing phrase does:
+  // a television by its nominal diagonal, and never by its viewable width or an
+  // aspect ratio; a projection screen by its viewable width and aspect ratio.
+  // Without this the interpretation could state a size that contradicts the
+  // report's own display label — a 115" television read back as its 100"
+  // viewable width. Nothing stored changes: size_inches stays the viewable-width
+  // authority it already is, and only the description follows the identity.
+  const diagonalInches = Number(canonical?.diagonalInches);
+  const displayPhraseText = isTv
+    ? (Number.isFinite(diagonalInches) && diagonalInches > 0 ? `${Math.round(diagonalInches)}" TV` : 'TV')
+    : (statedSize ? `${statedSize}" ${aspectRatio} screen` : 'Screen not configured');
 
   return {
     size_inches: statedSize,
@@ -88,10 +99,10 @@ function interpretScreen(project) {
     viewable_width_inches: canonical?.widthInches ?? null,
     // A television is known by its nominal size; a projection screen by its
     // viewable image width. Reports label the two differently.
-    television: resolveDisplayType(project) === DISPLAY_TYPE_TV,
+    television: isTv,
     // The designer's own display authority, frozen into the engineering
     // publication so every consumer states the same display.
-    display_type: resolveDisplayType(project),
+    display_type: displayType,
     height_from_floor_m: heightFromFloor,
     manual_dimensions: manualDims,
     manual_width_m: manualDims ? manualWidthM : null,
@@ -102,7 +113,7 @@ function interpretScreen(project) {
     mount_mode: mountMode,
     float_depth_m: floatDepthM,
     front_plane_m: Number(project?.screen_front_plane_m ?? (mountMode === 'floating' ? floatDepthM : 0)),
-    interpretation: `${sizeText} ${resolveDisplayType(project) === DISPLAY_TYPE_TV ? 'TV' : 'screen'} on ${screenWall} wall, ${mountMode === 'floating' ? 'floating mount' : 'baffle wall'} construction${heightFromFloor != null ? `, screen bottom at ${heightFromFloor.toFixed(2)}m from floor` : ''}.`,
+    interpretation: `${displayPhraseText}${manualDims ? ', manual dimensions' : ''} on ${screenWall} wall, ${mountMode === 'floating' ? 'floating mount' : 'baffle wall'} construction${heightFromFloor != null ? `, screen bottom at ${heightFromFloor.toFixed(2)}m from floor` : ''}.`,
   };
 }
 

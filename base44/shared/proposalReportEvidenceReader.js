@@ -27,6 +27,7 @@
 
 import { validateReportEvidence } from './reportEvidenceCompleteness.js';
 import { selectCanonicalReportSnapshot } from './reportSnapshotCanonical.js';
+import { canonicalScreenDescription } from './canonicalScreenDescription.js';
 
 /** The parameters a proposal must be able to state from a Technical Report. */
 const REQUIRED_PARAMETERS = [12, 13, 14, 18, 19, 20];
@@ -357,7 +358,16 @@ function buildSnapshot({ version, projectId, technicalEvidence, visualEvidence, 
         manual_dimensions: screenFacts.manual_dimensions === true,
         manual_width_m: screenFacts.manual_width_m ?? null,
         manual_height_m: screenFacts.manual_height_m ?? null,
-        interpretation: asText(screenFacts.interpretation) || null,
+        // The one display description a narrative surface may state. A report
+        // frozen before the display identity was unified can still carry an
+        // obsolete size inside its own stored sentence, so the contradiction is
+        // resolved here, at read time, against the canonical identity. The stored
+        // evidence keeps its own wording: nothing frozen is rewritten.
+        interpretation: canonicalScreenDescription({
+          ...screenFacts,
+          display_type: geometry.screen.display_type,
+          diagonal_inches: geometry.screen.viewable_diagonal_in,
+        }),
         viewable_width_cm: geometry.screen.viewable_width_cm ?? null,
         viewable_height_cm: geometry.screen.viewable_height_cm ?? null,
         screen_type: geometry.screen.screen_type || null,

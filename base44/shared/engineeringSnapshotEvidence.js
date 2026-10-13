@@ -49,6 +49,7 @@ import {
 import { DESIGN_LED_VOICE_RULES, DESIGN_INDEX_HARD_RULES, isDesignIndexRow } from './reportWritingStyleContract.js';
 import { excludeExcludedClientParameterRows } from './clientFacingParameterAuthority.js';
 import { summariseSubwooferConfiguration } from './subwooferConfigurationSummary.js';
+import { canonicalScreenDescription } from './canonicalScreenDescription.js';
 
 function compose(...parts) {
   const clean = parts
@@ -84,7 +85,12 @@ export function buildEngineeringEvidence(snapshot) {
   if (room.dimensions_text) {
     lines.push(`Room: ${compose(room.dimensions_text, statement(room.classification), room.volume_m3 ? `${room.volume_m3} m3` : null) || room.dimensions_text}`);
   }
-  if (room.screen?.interpretation) lines.push(`Screen: ${room.screen.interpretation}`);
+  // The display description is resolved against the canonical display identity
+  // before the writer sees it: a frozen report written before that identity was
+  // unified can still state an obsolete size in its own sentence, and a writer
+  // must never be handed two descriptions of the same display.
+  const screenDescription = canonicalScreenDescription(room.screen);
+  if (screenDescription) lines.push(`Screen: ${screenDescription}`);
   if (room.seating?.interpretation) lines.push(`Seating: ${room.seating.interpretation}`);
   if (room.acoustic_treatment?.enabled) lines.push(`Acoustic treatment: ${room.acoustic_treatment.interpretation}`);
 
