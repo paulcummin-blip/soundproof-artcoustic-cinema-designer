@@ -241,6 +241,28 @@ function cellText(cell) {
 }
 
 /**
+ * The grid's column tracks, in order. Split at TOP-LEVEL spaces only, so a calc()
+ * or minmax() track counts as one — a track's own internal spaces are not separators.
+ */
+function gridTracks(template) {
+  const tracks = [];
+  let depth = 0;
+  let current = '';
+  for (const char of String(template).trim()) {
+    if (char === '(') depth += 1;
+    if (char === ')') depth -= 1;
+    if (/\s/.test(char) && depth === 0) {
+      if (current) tracks.push(current);
+      current = '';
+      continue;
+    }
+    current += char;
+  }
+  if (current) tracks.push(current);
+  return tracks;
+}
+
+/**
  * The grid's DIRECT children, in document order — the cells each row contributes.
  * A depth scan, not a pattern match, so a cell holding markup is still one cell.
  */
@@ -275,7 +297,7 @@ test("the geometry table is ONE grid of FOUR tracks, matching the cells each row
 
   const template = section.match(/grid-template-columns:([^;"]+)/);
   assert.ok(template, 'the table states its own column tracks');
-  const trackCount = template[1].trim().split(/\s+/).length;
+  const trackCount = gridTracks(template[1]).length;
 
   const cells = gridCells(section);
   const rowCount = cells.length / 4;
@@ -299,11 +321,37 @@ test("the geometry table is ONE grid of FOUR tracks, matching the cells each row
   assert.deepEqual(cells.slice(8, 12).map(cellText).slice(0, 3), ['Rear row', '1', '45.0°']);
   assert.match(cellText(cells[11]), /L1/);
 
-  // The row-name column is the schedule's own, so both tables share their left
-  // boundary, and the last column ends on the schedule's right boundary.
-  assert.match(section, /grid-template-columns:34mm 1fr 1fr auto/);
-  assert.match(geometrySection(renderPage3(false)), /grid-template-columns:150px 1fr 1fr auto/);
-  assert.match(renderPage3(true), /width:34mm/, 'the schedule itself still uses the 34mm role column');
+  // The columns are aligned to the schedule's own, and stated from it: the row name
+  // stands in the schedule's Role column at the schedule's own column gap, so SEATS
+  // begins exactly where MODEL & QUANTITY begins; the seats column then stops two
+  // gaps short of the schedule's engineering-link column, so VIEWING ANGLE begins on
+  // that column's own left edge; RP23 is sized by its content and right-aligned, so
+  // the table ends on the schedule's right boundary.
+  const [rowTrack, seatsTrack, angleTrack, rp23Track] = gridTracks(template[1]);
+  assert.equal(rowTrack, '34mm', "the row name column is the schedule's role column");
+  assert.equal(
+    seatsTrack,
+    'calc(100% - 34mm - 58mm - 24px)',
+    'seats runs from the schedule’s MODEL & QUANTITY column to its engineering-link column',
+  );
+  assert.equal(angleTrack, 'minmax(0, 1fr)', 'the angle column takes what the RP23 column leaves');
+  assert.equal(rp23Track, 'auto', 'RP23 is sized by its own content, flush with the right edge');
+  assert.match(section, /gap:2mm 12px/, "the table uses the schedule's own column gap");
+
+  const screenPage = geometrySection(renderPage3(false));
+  const screenTemplate = screenPage.match(/grid-template-columns:([^;"]+)/);
+  assert.ok(screenTemplate, 'the screen table states its own column tracks');
+  const [screenRowTrack, screenSeatsTrack, screenAngleTrack, screenRp23Track] = gridTracks(screenTemplate[1]);
+  assert.equal(screenRowTrack, '150px');
+  assert.equal(screenSeatsTrack, 'calc(100% - 150px - 240px - 24px)');
+  assert.equal(screenAngleTrack, 'minmax(0, 1fr)');
+  assert.equal(screenRp23Track, 'auto');
+  assert.match(screenPage, /gap:8px 12px/, "the screen table uses the schedule's own column gap");
+
+  // The schedule itself is untouched — the very columns the geometry table reads.
+  assert.match(renderPage3(true), /width:34mm/, 'the schedule still uses the 34mm role column');
+  assert.match(renderPage3(true), /width:58mm/, "the schedule's engineering-link column is unchanged");
+  assert.match(renderPage3(false), /width:240px/, "the schedule's screen engineering-link column is unchanged");
 });
 
 test("the RP23 column ends on the schedule's right edge, and the other columns read left-aligned", () => {

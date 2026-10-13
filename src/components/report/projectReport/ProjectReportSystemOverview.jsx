@@ -111,10 +111,11 @@ export default function ProjectReportSystemOverview({
 
   // The viewing geometry table is a plain four-column table — Row, Seats, Viewing
   // angle, RP23 — so every heading sits directly above its own values and each row
-  // stays together. Its row-name column is the schedule's own width and its right
-  // boundary is the schedule's right boundary; its internal columns are its own,
-  // because the two tables describe different things. Alignment only — no value,
-  // level or score is touched.
+  // stays together. Its columns are aligned to the specification schedule printed
+  // above it: Row stands in the schedule's Role column, Seats begins where MODEL &
+  // QUANTITY begins, Viewing angle begins where SYSTEM ROLE & ENGINEERING LINK
+  // begins, and RP23 ends on the schedule's right boundary. Alignment only — no
+  // value, level or score is touched.
   const geometryHeading = {
     fontFamily: FONT_HEADING,
     fontSize: print ? 7 : 9,
@@ -126,6 +127,17 @@ export default function ProjectReportSystemOverview({
   // boundary; the row name and the two measured columns read left-aligned, exactly
   // as the schedule's cells do.
   const geometryRight = { textAlign: 'right' };
+
+  // The schedule's own columns, taken from it so the two tables line up on screen
+  // AND in print: the same role-column width and the same column gap put SEATS
+  // exactly under MODEL & QUANTITY, the seats column then stops two gaps short of
+  // the schedule's engineering-link column so VIEWING ANGLE begins on that column's
+  // own left edge, and RP23 is sized by its own content and right-aligned, so the
+  // table ends on the schedule's right boundary. Widths and alignment only.
+  const scheduleGapPx = 12;
+  const scheduleRoleTrack = print ? '34mm' : '150px';
+  const scheduleLinkTrack = print ? '58mm' : '240px';
+  const geometrySeatsTrack = `calc(100% - ${scheduleRoleTrack} - ${scheduleLinkTrack} - ${scheduleGapPx * 2}px)`;
 
   return (
     <div style={{ fontFamily: FONT_BODY, color: '#1B1A1A' }}>
@@ -179,14 +191,13 @@ export default function ProjectReportSystemOverview({
           }} />
           <div style={{
             display: 'grid',
-            // FOUR tracks for four columns: Row, Seats, Viewing angle, RP23. The
-            // row-name column is the schedule's own width, the two measured columns
-            // share what is left, and the RP23 column is sized by its own content
-            // and right-aligned. The track count must always equal the number of
-            // cells each row contributes — one more track and every row's cells
+            // FOUR tracks for four columns: Row, Seats, Viewing angle, RP23 — each
+            // starting on the specification schedule's own column edge, at the
+            // schedule's own column gap. The track count must always equal the number
+            // of cells each row contributes: one more track and every row's cells
             // would spill into the row above it.
-            gridTemplateColumns: print ? '34mm 1fr 1fr auto' : '150px 1fr 1fr auto',
-            gap: print ? '2mm 4mm' : '8px 14px',
+            gridTemplateColumns: `${scheduleRoleTrack} ${geometrySeatsTrack} minmax(0, 1fr) auto`,
+            gap: print ? `2mm ${scheduleGapPx}px` : `8px ${scheduleGapPx}px`,
             // Centred, so each row's level pill sits on the same line as the
             // seat count and viewing angle beside it.
             alignItems: 'center',
