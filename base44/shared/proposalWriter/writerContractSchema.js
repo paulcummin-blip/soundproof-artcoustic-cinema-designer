@@ -146,7 +146,7 @@ export const WRITER_CONTRACT_VERSION = 2;
 // word limits, the claim grounding rule and every validation rule are unchanged:
 // a draft filed under an earlier generation is still read against the agreement it
 // was written under.
-export const WRITER_PROMPT_VERSION = 'proposal-writer-prompt-18';
+export const WRITER_PROMPT_VERSION = 'proposal-writer-prompt-19';
 
 /** The only pack generation a draft may be written from. */
 export const WRITER_ACCEPTED_PACK_SCHEMA_VERSION = 2;

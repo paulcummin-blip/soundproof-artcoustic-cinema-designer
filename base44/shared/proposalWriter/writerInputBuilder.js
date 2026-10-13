@@ -286,7 +286,7 @@ export function buildWriterInput({
     // that follows from the proposal mode, and the installation default.
     editorial_rules: {
       validation_register: 'Client prose states supported benefits, never internal claim-defence, validation, testing or scoring commentary. Retain practical qualifications about listening positions and geometry.',
-      experience_first: 'experience first, then why it matters, then the engineering proof: never open a paragraph with a parameter, a level, a channel count or a dB value',
+      experience_first: 'the design and the experience lead and the engineering proof follows: never open a paragraph with a parameter, a level, a channel count or a dB value. No order is imposed beyond that: move naturally between what has been specified, why the approach is appropriate, what it is intended to provide and what the frozen evidence supports, vary that progression from subject to subject, and never give each form of knowledge its own formulaic sentence',
       display: 'name the display exactly as the frozen evidence names it; where it is a TV write the TV and never a screen size, aspect ratio, viewable width or projector word',
       report_voice: 'never write assessed at, published result, results are derived from, technical evaluation of, engineering model, performance results, stated on its own result or according to the report in main prose; Appendix is concise source attribution only',
       duplication: 'no sentence of ten or more words repeated across sections; no near-verbatim evidence-sentence reuse; a repeated fact must do a different editorial job',

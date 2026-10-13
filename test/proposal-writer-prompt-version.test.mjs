@@ -66,7 +66,14 @@ const VERSION_3 = 'proposal-writer-prompt-3';
 // from one that claims what the design achieved, so design reasoning about bass
 // consistency is no longer refused as an unsupported consistency claim. No section
 // identity, word limit, figure, level, product or claim-grounding rule changed.
-const CURRENT = 'proposal-writer-prompt-18';
+// Generation 19 is the narrative-synthesis pass: the writing authority keeps the
+// three forms of knowledge distinct in ADI's own reasoning and writes them as one
+// natural account of the design, moving between what has been specified, why the
+// approach is appropriate, what it is intended to provide and what the engineering
+// supports, with that movement varying from subject to subject rather than
+// following one fixed order. No section identity, word limit, figure, level,
+// product, claim-grounding or validation rule changed.
+const CURRENT = 'proposal-writer-prompt-19';
 
 test('the writer prompt version is the current one', () => {
   assert.equal(WRITER_PROMPT_VERSION, CURRENT);
