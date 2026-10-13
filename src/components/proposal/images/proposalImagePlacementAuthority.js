@@ -85,14 +85,14 @@ export const IMAGE_PRESENTATION = Object.freeze({
 });
 
 export const IMAGE_PRESENTATION_LABELS = Object.freeze({
-  [IMAGE_PRESENTATION.FULL_WIDTH]: 'Full width',
-  [IMAGE_PRESENTATION.DETAIL]: 'Detail',
-  [IMAGE_PRESENTATION.CROPPED_DETAIL]: 'Cropped detail',
+  [IMAGE_PRESENTATION.FULL_WIDTH]: 'Full Width',
+  [IMAGE_PRESENTATION.DETAIL]: 'Inline Detail',
+  [IMAGE_PRESENTATION.CROPPED_DETAIL]: 'Cropped Detail',
 });
 
 export const IMAGE_PRESENTATION_HELP = Object.freeze({
   [IMAGE_PRESENTATION.FULL_WIDTH]: 'The large editorial image and the prominent place in the document. Cinema photographs, interior renders and hero images.',
-  [IMAGE_PRESENTATION.DETAIL]: 'Shown smaller and never cropped: the whole drawing stays visible, with its dimensions, labels and annotations, and the caption stays with it. Dimensioned plans, seating arrangements and technical drawings.',
+  [IMAGE_PRESENTATION.DETAIL]: 'Shown smaller and never cropped: the whole drawing stays visible, with its dimensions, labels and annotations, it keeps its own proportions, and it can sit beside the copy it explains. Dimensioned plans, seating arrangements and technical drawings.',
   [IMAGE_PRESENTATION.CROPPED_DETAIL]: 'Shown smaller, with cropping allowed: the focal point below decides the part of the frame that is kept. Furniture details, materials, lighting and decorative photography.',
 });
 
@@ -114,6 +114,113 @@ export const PRESENTATION_WIDTH_PERCENT = Object.freeze({
 export function imagePresentationOf(asset) {
   const value = recorded(asset?.image_presentation);
   return PRESENTATION_VALUES.includes(value) ? value : null;
+}
+
+/**
+ * ── Image purpose ───────────────────────────────────────────────────────────
+ * WHAT ONE IMAGE IS FOR, told to the composer by the designer. The purpose is
+ * the image's intended message, not a label for the file: it is the editorial
+ * context the composer reads when it keeps an image near the copy that explains
+ * it, and it decides whether the image is a drawing the document must show whole.
+ *
+ * A purpose is EDITORIAL CONTEXT ONLY. Nothing here reads a result, and a purpose
+ * never adds, changes or supports a performance claim. Nothing is inferred from a
+ * caption, a file name or the image itself, and an image with no purpose recorded
+ * keeps exactly the placement it had before this field existed.
+ */
+export const IMAGE_PURPOSE = Object.freeze({
+  /** The room as a whole: it introduces the design. */
+  WHOLE_ROOM: 'whole_room',
+  /** A seating arrangement the client is choosing between. */
+  SEATING_OPTION: 'seating_option',
+  /** A plan, elevation or other dimensioned / technical drawing. */
+  LAYOUT_DRAWING: 'layout_drawing',
+  /** A finish, material or furnishing detail. */
+  INTERIOR_DETAIL: 'interior_detail',
+  /** A close view of the equipment itself. */
+  PRODUCT_DETAIL: 'product_detail',
+  /** Nothing more specific. */
+  OTHER: 'other',
+});
+
+export const IMAGE_PURPOSE_LABELS = Object.freeze({
+  [IMAGE_PURPOSE.WHOLE_ROOM]: 'Whole room',
+  [IMAGE_PURPOSE.SEATING_OPTION]: 'Seating option',
+  [IMAGE_PURPOSE.LAYOUT_DRAWING]: 'Layout drawing',
+  [IMAGE_PURPOSE.INTERIOR_DETAIL]: 'Interior detail',
+  [IMAGE_PURPOSE.PRODUCT_DETAIL]: 'Product detail',
+  [IMAGE_PURPOSE.OTHER]: 'Other',
+});
+
+export const IMAGE_PURPOSE_HELP = Object.freeze({
+  [IMAGE_PURPOSE.WHOLE_ROOM]: 'The room as a whole. It introduces the design and can lead a section.',
+  [IMAGE_PURPOSE.SEATING_OPTION]: 'A seating arrangement the client is choosing between. It stays with its written option.',
+  [IMAGE_PURPOSE.LAYOUT_DRAWING]: 'A plan, elevation or other dimensioned drawing. It is always shown whole: no dimension, symbol or annotation is cropped away, whatever the page has room for.',
+  [IMAGE_PURPOSE.INTERIOR_DETAIL]: 'An interior finish, material or furnishing detail that supports the design story.',
+  [IMAGE_PURPOSE.PRODUCT_DETAIL]: 'A close view of the equipment itself, supporting the products schedule.',
+  [IMAGE_PURPOSE.OTHER]: 'Nothing more specific. The image is composed as the document composes images of its kind.',
+});
+
+const PURPOSE_VALUES = Object.values(IMAGE_PURPOSE);
+
+/**
+ * The purpose the designer recorded for this image, or null where none is
+ * recorded. Only the six declared values are read: anything else is null, which
+ * composes the image exactly as it was composed before this choice existed.
+ */
+export function imagePurposeOf(asset) {
+  const value = recorded(asset?.image_purpose);
+  return PURPOSE_VALUES.includes(value) ? value : null;
+}
+
+/**
+ * The purposes whose images are dimensioned or technical work. A drawing
+ * identified this way is NEVER cropped, and no page-fit decision may override
+ * that: a page that cannot hold the whole drawing gives up space elsewhere.
+ */
+export const DRAWING_PURPOSES = Object.freeze([IMAGE_PURPOSE.LAYOUT_DRAWING]);
+
+/** Whether this purpose identifies a dimensioned or technical drawing. */
+export function isDrawingPurpose(purpose) {
+  return DRAWING_PURPOSES.includes(purpose);
+}
+
+/** Whether this image is a drawing the document must show whole. */
+export function isProtectedDrawing(asset) {
+  return isDrawingPurpose(imagePurposeOf(asset));
+}
+
+/**
+ * THE ONE CROP PERMISSION for a placement.
+ *
+ * Cropping happens only where the designer selected a crop-permitting mode AND
+ * the image is not a drawing the document must show whole. A drawing is protected
+ * whatever presentation was selected, so no composition, page-fit or composer
+ * decision can ever crop a dimension, a symbol or an annotation away.
+ */
+export function placementCropAllowed({ presentation = null, purpose = null } = {}) {
+  if (isDrawingPurpose(purpose)) return false;
+  return presentationCropAllowed(presentation);
+}
+
+/**
+ * The narrative section a purpose belongs with, where the document has one. The
+ * planner uses this to keep a supporting image near the copy it explains; a
+ * purpose with no natural section, or a document with none of the listed
+ * sections, falls back to the placement the document has always used.
+ */
+export const PURPOSE_SECTION_TYPES = Object.freeze({
+  [IMAGE_PURPOSE.WHOLE_ROOM]: ['system_design_summary', 'executive_summary', 'design_philosophy'],
+  [IMAGE_PURPOSE.SEATING_OPTION]: ['seating_style', 'presented_options'],
+  [IMAGE_PURPOSE.LAYOUT_DRAWING]: ['spatial_resolution', 'presented_options', 'seating_style'],
+  [IMAGE_PURPOSE.INTERIOR_DETAIL]: ['design_philosophy', 'timbre_matching'],
+  [IMAGE_PURPOSE.PRODUCT_DETAIL]: ['products', 'system_design_summary'],
+  [IMAGE_PURPOSE.OTHER]: [],
+});
+
+/** The section types a purpose prefers, in reading order, or an empty list. */
+export function purposeSectionTypes(purpose) {
+  return PURPOSE_SECTION_TYPES[purpose] || [];
 }
 
 /**
@@ -343,6 +450,11 @@ export function objectPositionForFocalPoint(focalPoint) {
  */
 export function makePlacement({ source, role, sectionId, pagePosition, order, comparison_group = null, comparison_option_label = null }) {
   const presentation = imagePresentationOf(source);
+  // The purpose travels with the placement: the composer reads it to keep the
+  // image near the copy it explains, and the crop permission below reads it so a
+  // drawing is never cropped, whatever presentation was selected.
+  const purpose = imagePurposeOf(source);
+  const cropAllowed = placementCropAllowed({ presentation, purpose });
   return {
     id: `${role}:${source?.id || 'unknown'}:${order}`,
     source_asset_id: source?.id || null,
@@ -358,7 +470,13 @@ export function makePlacement({ source, role, sectionId, pagePosition, order, co
     // composed it. crop_allowed is the permission itself: where it is false the
     // image is shown whole, whatever the page has room for.
     image_presentation: presentation,
-    crop_allowed: presentationCropAllowed(presentation),
+    // WHAT THE IMAGE IS FOR — editorial context for the composer, carried on the
+    // placement so a page does not have to look the source up again.
+    image_purpose: purpose,
+    crop_allowed: cropAllowed,
+    // Stated so the renderer and the composer can say WHY an image is shown
+    // whole rather than appearing to ignore the presentation that was selected.
+    crop_protected: isDrawingPurpose(purpose),
     presentation_width_percent: presentation ? PRESENTATION_WIDTH_PERCENT[presentation] : null,
     section_id: sectionId ?? null,
     page_position: pagePosition ?? null,
