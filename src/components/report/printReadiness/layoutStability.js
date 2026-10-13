@@ -26,7 +26,8 @@ export async function observeLayoutStability(target, win, measure, {
     diagnostics.domStillChanging = mutations !== previousMutations;
     diagnostics.mutationBatches = mutations;
     if (previous !== null) {
-      diagnostics.dimensionsChanged = signature !== previous;
+      diagnostics.dimensionsChanged = JSON.stringify(diagnostics.lastTwoDimensions[0]) !== JSON.stringify(diagnostics.lastTwoDimensions[1]);
+      diagnostics.signatureChanged = signature !== previous;
       stable = signature === previous && !diagnostics.domStillChanging ? stable + 1 : 0;
     }
     previous = signature;
@@ -49,7 +50,8 @@ export async function observeLayoutStability(target, win, measure, {
     }
     if (stable >= frames) return true;
     diagnostics.conditionNotMet = diagnostics.domStillChanging ? 'print_dom_still_mutating'
-      : diagnostics.dimensionsChanged ? 'layout_dimensions_still_changing' : 'insufficient_stable_frames';
+      : diagnostics.dimensionsChanged ? 'layout_dimensions_still_changing'
+        : diagnostics.signatureChanged ? 'layout_signature_still_changing' : 'insufficient_stable_frames';
     return false;
   } finally { observer?.disconnect(); }
 }

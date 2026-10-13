@@ -36,6 +36,16 @@ it('D/E unresolved authorization clears Preparing PDF, closes shell, permits ret
   expect(state.closed).toHaveBeenCalled();
   expect(state.print).not.toHaveBeenCalled();
 });
+it('D rejected authorization also clears Preparing PDF without printing', async () => {
+  state.invoke.mockRejectedValue(new Error('Fixture denial'));
+  const result = hook().handleExport();
+  await vi.advanceTimersByTimeAsync(1);
+  await result;
+  expect(state.values[0]).toBe(false);
+  expect(state.values[4]).toBe(true);
+  expect(state.values[5].conditionNotMet).toBe('authorization_failed');
+  expect(state.print).not.toHaveBeenCalled();
+});
 it('D layout failure clears Preparing PDF and preserves retryable technical details', async () => {
   state.invoke.mockResolvedValue({ data: { layer: { document_validation: { valid: true } } } });
   state.print.mockResolvedValue({ printed: false, reason: 'print_layout_unstable', message: 'Retry Export',

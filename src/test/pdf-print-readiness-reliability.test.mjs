@@ -1,5 +1,4 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
-import fs from 'node:fs';
 import { waitForLayoutStable } from '../components/report/printReadiness/resourceReadiness.js';
 import { preparePrintDocument } from '../components/report/printReadiness/index.js';
 import { authorizePrint } from '../components/proposal/export/printAuthorization.js';
@@ -55,6 +54,19 @@ describe('PDF print readiness reliability', () => {
     expect(detail.conditionNotMet).toBe('animation_frame_deadline_exceeded');
     expect(detail.measurementsAttempted).toBe(1);
     expect(f.disconnect).toHaveBeenCalledOnce();
+  });
+  it('each subsequent frame uses only the remaining budget', async () => {
+    vi.useFakeTimers();
+    const f = fixture();
+    let count = 0;
+    f.win.requestAnimationFrame = (callback) => { if (++count === 1) setTimeout(callback, 30); };
+    const detail = {};
+    const result = waitForLayoutStable(f.root, f.win, { budgetMs: 40, diagnostics: detail });
+    await vi.advanceTimersByTimeAsync(41);
+    expect(await result).toBe(false);
+    expect(detail.measurementsAttempted).toBe(2);
+    expect(detail.stableFrames).toBe(1);
+    expect(detail.conditionNotMet).toBe('animation_frame_deadline_exceeded');
   });
   it('captures changing dimensions and safe resource/stage diagnostics', async () => {
     const f = fixture({ changing: true });

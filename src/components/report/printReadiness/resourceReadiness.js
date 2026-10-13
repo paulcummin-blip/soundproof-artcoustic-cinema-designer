@@ -19,10 +19,7 @@ import { observeLayoutStability } from './layoutStability.js';
 import {
   PRINT_READINESS_BUDGET_MS,
   PRINT_READINESS_REASON,
-  PRINT_READINESS_STABLE_FRAMES,
   delay,
-  frameRunner,
-  readinessNow,
   waitUntil,
   withDeadline,
 } from './readinessContract.js';

@@ -10,7 +10,7 @@ export async function authorizePrint(invoke, payload, budgetMs = PRINT_READINESS
       : 'Authorization could not be completed. Nothing was printed. Choose Retry Export to try again.');
     error.printNotReady = true;
     error.exportBlockedBy = 'edit_layer';
-    error.readinessDiagnostics = { kind: 'print_readiness', blockingStage: 'edit_layer',
+    error.readinessDiagnostics = { kind: 'print_readiness', blockingStage: 'edit_layer', budgetMs,
       conditionNotMet: cause?.printReadinessTimeout ? 'authorization_deadline_exceeded' : 'authorization_failed' };
     throw error;
   }
