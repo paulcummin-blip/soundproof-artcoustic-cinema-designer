@@ -36,9 +36,8 @@ import {
   levelRank,
   isStrength,
   isAssumedParameterKey,
-  storyImportance,
-  isMaterialStory,
   scopeRank,
+  isStrength as _isStrengthForStories,
 } from './strengthImportance.js';
 
 import {
@@ -55,6 +54,10 @@ import {
   viewingRows,
   rowLabel,
 } from './strengthStoryEvidence.js';
+
+// One story's own shape is assembled by the shared shape helper; this module owns
+// the catalogue, the mandatory seating story and how the stories are ranked.
+import { story } from './strengthStoryShape.js';
 
 /* The evidence reads are part of this module's own public surface: the report
    page and the proposal reader both take them from here. */
@@ -74,48 +77,20 @@ export {
 };
 
 /* ── Story assembly ───────────────────────────────────────────────────────── */
-
-/**
- * A story's importance and its presentation emphasis are kept apart: the ranking
- * uses the canonical weight sum, while the card's own emphasis only ever follows
- * how material the story is and what level it reaches. No weight is displayed.
- */
-function emphasise(candidate) {
-  if (candidate.material && levelRank(candidate.level) >= 4) return 3;
-  if (candidate.material || levelRank(candidate.level) >= MIN_STRENGTH_LEVEL) return 2;
-  return 1;
-}
-
-function story({ id, order, title, category, members, evidence: lines, explanation, sources, scope, level }) {
-  const list = (Array.isArray(members) ? members : []).filter(Boolean);
-  const candidate = {
-    id,
-    order,
-    title,
-    category,
-    members: list,
-    importance: storyImportance(list),
-    material: isMaterialStory(list),
-    evidence: (Array.isArray(lines) ? lines : []).filter(Boolean),
-    explanation: sentence(explanation),
-    sources: sources || list.map((member) => String(member.key).toUpperCase()),
-    scope: scope || list[0]?.scope || 'room',
-    level: level || list.reduce(
-      (acc, member) => (acc == null || levelRank(member.level) < levelRank(acc) ? member.level : acc),
-      null,
-    ),
-  };
-  candidate.weight = emphasise(candidate);
-  return candidate;
-}
+// One story's own shape is assembled by the shared shape helper
+// (strengthStoryShape.js). This module owns the catalogue of stories this design
+// offers, and how those stories are ranked and audited.
 
 /** The placement parameters, with each member's own level stated individually. */
-const PLACEMENT_KEYS = Object.freeze(['p3', 'p7', 'p11', 'p1', 'p4', 'p9', 'p10', 'p5', 'p6']);
+// P1 is deliberately NOT one of these. The seating distance to the nearest
+// boundary has its own highlight on every design (buildSeatingClearanceStory), so
+// it is never also listed among the loudspeaker placement measures and the page
+// never states the same decision twice.
+const PLACEMENT_KEYS = Object.freeze(['p3', 'p7', 'p11', 'p4', 'p9', 'p10', 'p5', 'p6']);
 export const PLACEMENT_PHRASES = Object.freeze({
   p3: 'screen-wall speakers inside their recommended zones',
   p7: 'wide speakers inside their deviation limit',
   p11: 'no speakers outside the recommended positions',
-  p1: 'the seating distance from the room walls',
   p4: 'screen wall speakers matched in level',
   p9: 'height speakers spaced within the vertical limit',
   p10: 'height speakers matched in level',
@@ -150,7 +125,7 @@ export function buildCandidates(sources, { byKey, floor, connections }) {
     candidates.push(story({
       id: 'dynamic-capability',
       order: 1,
-      title: 'Cinema-scale dynamic capability',
+      title: 'Cinema-scale dynamic range',
       category: 'Dynamic Range',
       members: [p12, p13],
       level: levelRank(p12.level) <= levelRank(p13.level) ? p12.level : p13.level,
@@ -158,7 +133,7 @@ export function buildCandidates(sources, { byKey, floor, connections }) {
         evidence('P12', p12.level, p12Row?.value ? `Screen speakers · ${p12Row.value}` : 'Screen speakers'),
         evidence('P13', p13.level, p13Row?.value ? `Surround & overhead · ${p13Row.value}` : 'Surround & overhead'),
       ],
-      explanation: `the screen stage is assessed at ${p12Row?.value || 'its published capability'} and the surround and overhead layer at ${p13Row?.value || 'its published capability'}, so the system carries the output capability that demanding film soundtracks ask for at the reference seating position.`,
+      explanation: `the screen channels reach ${p12Row?.value || 'their published capability'} and the surround and overhead layer reaches ${p13Row?.value || 'its published capability'} at the reference seating position, so a demanding soundtrack plays at the scale it was mixed for: dialogue stays clean while the fullest effects arrive without strain.`,
       sources: ['P12', 'P13'],
     }));
   }
@@ -171,7 +146,7 @@ export function buildCandidates(sources, { byKey, floor, connections }) {
     candidates.push(story({
       id: 'tonal-consistency',
       order: 2,
-      title: 'Consistent tonal performance',
+      title: 'A tonal balance that holds from seat to seat',
       category: 'Timbre Matching',
       members: [byKey.p16, byKey.p17],
       level: levelRank(p16.level) <= levelRank(p17.level) ? p16.level : p17.level,
@@ -183,7 +158,7 @@ export function buildCandidates(sources, { byKey, floor, connections }) {
         evidence('P16', p16.level, p16.value ? `Screen channels across the seats · ${p16.value}` : 'Screen channels across the assessed seats'),
         evidence('P17', p17.level, p17.value ? `Surround and overhead across the seats · ${p17.value}` : 'Surround and overhead across the assessed seats'),
       ],
-      explanation: `both parameters hold${seats ? ` across all ${seats} assessed seating positions` : ' across the assessed seating positions'}, each for its own speaker group, so the tonal balance of the screen channels and of the surround and overhead channels holds from seat to seat.`,
+      explanation: `the tonal balance holds${seats ? ` across all ${seats} assessed seating positions` : ' across the assessed seating positions'}, each result read for its own speaker group, so within the screen channels, and within the surround and overhead channels, no seat sounds noticeably thinner or brighter than the one beside it.`,
       sources: ['P16', 'P17'],
     }));
   }
@@ -194,12 +169,12 @@ export function buildCandidates(sources, { byKey, floor, connections }) {
     candidates.push(story({
       id: 'bass-output',
       order: 3,
-      title: 'Bass output capability',
+      title: 'Bass output with genuine authority',
       category: 'Bass Performance',
       members: [p14],
       scope: 'room',
       evidence: [evidence('P14', p14.level, p14.value ? `LFE output · ${p14.value}` : 'LFE output at the reference seating position')],
-      explanation: `the subwoofers deliver ${p14.value ? `${p14.value} of low-frequency output` : 'the low-frequency output'} at the reference seating position, the output authority the bass system is specified to reach.`,
+      explanation: `the subwoofers deliver ${p14.value ? `${p14.value} of low-frequency output` : 'the low-frequency output'} at the reference seating position, so the weight of an explosion or a bass line is reproduced rather than thinning out as the level rises.`,
       sources: ['P14'],
     }));
   }
@@ -210,12 +185,12 @@ export function buildCandidates(sources, { byKey, floor, connections }) {
     candidates.push(story({
       id: 'low-frequency-extension',
       order: 4,
-      title: 'Deep bass extension',
+      title: 'Extension into the lowest octaves',
       category: 'Bass Performance',
       members: [p18],
       scope: 'room',
       evidence: [evidence('P18', p18.level, p18.value ? `Extension to ${p18.value}` : 'In-room bass extension')],
-      explanation: `the system reaches ${p18.value || 'the published limit'} in the room, so the lowest octaves of a film mix are reproduced rather than rolled off.`,
+      explanation: `the system reaches ${p18.value || 'the published limit'} in the room, so the lowest octaves of a film mix are reproduced instead of rolled off: the deepest rumbles are felt in the room rather than described by the speakers.`,
       sources: ['P18'],
     }));
   }
@@ -227,7 +202,7 @@ export function buildCandidates(sources, { byKey, floor, connections }) {
     candidates.push(story({
       id: 'bass-extension-and-response',
       order: 5,
-      title: 'Bass extension and response quality',
+      title: 'Extended bass, held under control',
       category: 'Bass Performance',
       members: [p18, p19],
       scope: 'rsp',
@@ -235,7 +210,7 @@ export function buildCandidates(sources, { byKey, floor, connections }) {
         evidence('P18', p18.level, p18.value ? `Extension to ${p18.value}` : 'In-room bass extension'),
         evidence('P19', p19.level, p19.value ? `At the reference seating position · ${p19.value}` : 'At the reference seating position'),
       ],
-      explanation: `the system reaches ${p18.value || 'the published limit'} and the corrected response at the reference seating position sits ${p19.value || 'within the target window'} of the design target, so the bass is both extended and even.`,
+      explanation: `the system reaches ${p18.value || 'the published limit'} and the corrected response at the reference seating position sits ${p19.value || 'within the target window'} of the design target, so the deep end has both reach and control: it carries real weight without the boom that would smear the dialogue above it.`,
       sources: ['P18', 'P19'],
     }));
   }
@@ -251,7 +226,7 @@ export function buildCandidates(sources, { byKey, floor, connections }) {
     candidates.push(story({
       id: 'spatial-resolution',
       order: 6,
-      title: 'Speaker placement within the recommended zones',
+      title: 'Placement held to the recommended geometry',
       category: 'Spatial Resolution',
       members: placementMembers,
       scope: 'room',
@@ -260,7 +235,7 @@ export function buildCandidates(sources, { byKey, floor, connections }) {
         member.level,
         PLACEMENT_PHRASES[member.key],
       )),
-      explanation: `${joinList(strongest.map((member) => PLACEMENT_PHRASES[member.key]))}, each stated on its own published result.`,
+      explanation: `placement is held to the recommended geometry: ${joinList(strongest.map((member) => PLACEMENT_PHRASES[member.key]))}, so the front stage locks onto the picture and effects cross the room the way the film was mixed instead of smearing between channels.`,
       sources: placementMembers.map((member) => String(member.key).toUpperCase()),
     }));
   }
@@ -310,7 +285,7 @@ export function buildCandidates(sources, { byKey, floor, connections }) {
           `${row.seats} seat${row.seats === 1 ? '' : 's'}`,
         ].filter(Boolean).join(' · '),
       )),
-      explanation: `${joinList(described)}${allRows ? ', so every seating row sits inside a strong viewing position.' : ', the rows that reach it are stated on their own result.'}`,
+      explanation: `${joinList(described)}${allRows ? ', so the picture fills the field of view it was framed for from every row in the room.' : ', so those rows watch the picture at the angle it was composed for.'}`,
       sources: claimedRows.map((row) => `RP23:${row.rowNumber}:${row.level}`),
     }));
   }
@@ -336,7 +311,7 @@ export function buildCandidates(sources, { byKey, floor, connections }) {
         p2IsStrength ? evidence('P2', p2.level, p2.value || 'discrete speakers') : null,
         evidence(`${overheadCount} overheads`, null, subCount > 0 ? `${subCount} subwoofers` : null),
       ].filter(Boolean),
-      explanation: `the design is built as a ${dolbyConfig} system with ${overheadCount} overhead speakers${subCount > 0 ? ` and ${subCount} subwoofers` : ''}, so effects move above and around the audience instead of staying on the screen plane.`,
+      explanation: `the design is built as a ${dolbyConfig} system with ${overheadCount} overhead speakers${subCount > 0 ? ` and ${subCount} subwoofers` : ''}, so a score, rain or a helicopter moves above and around the audience instead of staying pinned to the picture.`,
       sources: p2IsStrength ? ['P2', 'architecture'] : ['architecture'],
     });
     if (p2IsStrength) candidates.push(layoutStory);
@@ -365,7 +340,7 @@ export function buildCandidates(sources, { byKey, floor, connections }) {
       supporting.push(story({
         id: 'product-selection',
         order: 20,
-        title: 'Purposeful product selection',
+        title: 'Specified for this room',
         category: 'Specification',
         members: [],
         evidence: [
@@ -375,7 +350,7 @@ export function buildCandidates(sources, { byKey, floor, connections }) {
           subs.length > 0 && evidence('Subwoofers', null, modelCountLabel(subs)),
           treatment.length > 0 && evidence('Treatment', null, modelCountLabel(treatment)),
         ].filter(Boolean).slice(0, 3),
-        explanation: `every part of the specification carries a job: ${joinList(jobs)}.`,
+        explanation: `every part of the specification carries a job: ${joinList(jobs)}, so the budget goes to the parts that shape what the room does.`,
         sources: ['products'],
       }));
     }
@@ -384,7 +359,108 @@ export function buildCandidates(sources, { byKey, floor, connections }) {
   return { candidates, supporting };
 }
 
+/* ── RP22 Parameter 1: the seating decision, stated on every design ────────── */
+
+/**
+ * The highlights a page states on EVERY design that carries the evidence for
+ * them, whatever the ranking decides. The seating decision is the one a client
+ * always asks about — whether the seats can be pushed against a wall to keep the
+ * floor space — so it is never left to the ranking to decide whether it is
+ * mentioned.
+ */
+export const MANDATORY_STORY_IDS = Object.freeze(['seating-clearance']);
+
+/**
+ * THE SEATING CLEARANCE HIGHLIGHT — RP22 Parameter 1, the seating distance to the
+ * room's nearest boundary.
+ *
+ * Stated on every design whose evidence carries a P1 result at all. The measured
+ * P1 result is stated as its own published result wherever it is a genuine
+ * strength; where it is not, the card explains the design decision behind the
+ * seating with no level beside it and claims no positive result, and it carries
+ * the supporting emphasis it then deserves.
+ *
+ * The words come from the approved seating-boundary authority
+ * (seatingBoundaryPrinciple), read from this design's OWN seating and room
+ * geometry, so the explanation is specific to this room. It states no distance and
+ * no level of its own: the card can never contradict the published result beside
+ * it, the distance to the nearest boundary is never confused with the distance to
+ * the wall behind the seating, and no bass or measured outcome is promised.
+ *
+ * @param {Object} sources — the story-builder sources (seatingPositions/roomDims,
+ *   or a prebuilt seatBoundaryGeometry)
+ * @param {Object} params
+ * @param {Object} params.byKey — the eligible evidence map
+ * @returns {Object|null} the story, or null where the design carries no P1 result
+ */
+export function buildSeatingClearanceStory(sources = {}, { byKey = {} } = {}) {
+  const p1 = byKey?.p1;
+  if (!p1) return null;
+
+  const geometry = sources.seatBoundaryGeometry
+    || readSeatBoundaryGeometry({ seats: sources.seatingPositions, roomDims: sources.roomDims });
+  const explanation = seatingBoundaryHighlightCopy(geometry);
+  if (!explanation) return null;
+
+  const positive = isStrength(p1.level);
+  return story({
+    id: 'seating-clearance',
+    order: 9,
+    title: 'Seating placed clear of the room\'s boundaries',
+    category: 'Seating Position',
+    members: positive ? [p1] : [],
+    level: p1.level ?? null,
+    scope: 'seat',
+    evidence: [
+      evidence(
+        'P1',
+        positive ? p1.level : null,
+        positive && p1.value ? `Nearest room boundary · ${p1.value}` : 'Nearest room boundary',
+      ),
+    ],
+    explanation,
+    sources: positive ? ['P1'] : [],
+  });
+}
+
 /* ── Admission, ranking and the omission audit ─────────────────────────────── */
+
+/** The canonical ranking order: material, then level, importance, scope, order. */
+export const rankComparator = (a, b) => (
+  Number(b.material) - Number(a.material)
+  || levelRank(b.level) - levelRank(a.level)
+  || b.importance - a.importance
+  || scopeRank(b.scope) - scopeRank(a.scope)
+  || a.order - b.order
+);
+
+/**
+ * The stories a page states, with the mandatory explanations kept in place: where
+ * the ranking or the page's own cap would leave one out, the weakest story that is
+ * not mandatory gives up its place instead, and the page still reads strongest
+ * first. Nothing is added to the page by this: the mandatory stories answer a
+ * question every client asks, and each states its own published result or explains
+ * a design decision without claiming one.
+ */
+export function withMandatoryStories({ ranked = [], candidates = [], maxStories = null } = {}) {
+  const cap = Number.isFinite(Number(maxStories)) ? Number(maxStories) : null;
+  const settled = [...ranked].sort(rankComparator);
+
+  for (const id of MANDATORY_STORY_IDS) {
+    if (!settled.some((entry) => entry.id === id)) {
+      const mandatory = (Array.isArray(candidates) ? candidates : []).find((entry) => entry.id === id);
+      if (!mandatory) continue;
+      settled.push(mandatory);
+    }
+    if (!cap || settled.length <= cap) continue;
+    for (let index = settled.length - 1; index >= 0 && settled.length > cap; index -= 1) {
+      if (MANDATORY_STORY_IDS.includes(settled[index].id)) continue;
+      settled.splice(index, 1);
+    }
+  }
+
+  return settled.sort(rankComparator);
+}
 
 /**
  * The stories that may be stated for a design of this quality: everything at or
@@ -408,13 +484,7 @@ export function admitStrengthStories(candidates = [], { floor = MIN_STRENGTH_LEV
 
 /** The ranked stories: material first, then level, importance, scope, catalogue order. */
 export function rankStrengthStories(admitted = [], maxStories = null) {
-  const ranked = [...admitted].sort((a, b) => (
-    Number(b.material) - Number(a.material)
-    || levelRank(b.level) - levelRank(a.level)
-    || b.importance - a.importance
-    || scopeRank(b.scope) - scopeRank(a.scope)
-    || a.order - b.order
-  ));
+  const ranked = [...admitted].sort(rankComparator);
   return Number.isFinite(maxStories) ? ranked.slice(0, maxStories) : ranked;
 }
 
