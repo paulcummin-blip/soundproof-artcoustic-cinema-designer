@@ -7,6 +7,7 @@ import ProductArtwork from "@/components/report/ProductArtwork";
 import { computeSpeakerAnnotation, speakerBBox } from "@/components/room/frontElevationAnnotationLayout";
 import { resolveEffectiveViewableDimsM, isManualOverrideActive } from "@/components/models/screen/resolveEffectiveScreen";
 import { detectFrontStageMode } from "@/components/roomdesigner/utils/lcrHeightAuthority";
+import { subwooferCentreZM } from "@/components/utils/subwooferDrawingHeight";
 import {
   isCentreCabinetRole,
   resolveCentreCabinetFootprintM,
@@ -470,13 +471,18 @@ export default function FrontElevation({ dimensions, screen, placedSpeakers = []
       const wM = (meta && !meta.notFound && meta.widthM) ? meta.widthM : 0.35;
       const hM = (meta && !meta.notFound && meta.heightM) ? meta.heightM : 0.35;
       const baseX = Number.isFinite(s?.position?.x) ? s.position.x : roomW / 2;
-      const baseZ = Number.isFinite(s?.position?.z) ? s.position.z : hM / 2;
+      // The installed height is the stored authority: the cabinet's own bottom
+      // height plus half its cabinet. A subwoofer installed behind the screen is
+      // therefore drawn behind the screen at its own height, and one on the floor
+      // stays on the floor. Nothing is ever elevated or lowered by default — with
+      // no stored height the cabinet simply rests on the floor.
+      const baseZ = Number.isFinite(s?.position?.z) ? s.position.z : subwooferCentreZM(s, hM, frontSubsCfg);
       const liveOverride = liveDragSubs?.[i];
       const x = liveOverride ? liveOverride.x : baseX;
       const z = liveOverride ? liveOverride.z : baseZ;
       return { x, z, wM, hM, label: "SUB", index: i, id: s?.id, model: s?.model ?? null, orientation: orientation ?? null };
     });
-  }, [frontSubs, roomW, liveDragSubs]);
+  }, [frontSubs, roomW, liveDragSubs, frontSubsCfg]);
   // Front stage mode — drives whether FL/FR z-drag syncs the paired speaker.
   // Must match the commit logic in useElevationDragHandlers.
   const frontStageMode = useMemo(() => detectFrontStageMode(placedSpeakers), [placedSpeakers]);

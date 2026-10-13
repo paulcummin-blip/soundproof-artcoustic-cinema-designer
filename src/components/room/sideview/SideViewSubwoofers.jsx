@@ -1,6 +1,7 @@
 import React from "react";
 import { getSpeakerModelMeta } from "@/components/models/speakers/registry";
 import { buildSpeakerInfo } from "@/components/room/speakerInfo/speakerInfoModel";
+import { storedSubwooferBottomM } from "@/components/utils/subwooferDrawingHeight";
 
 /**
  * Front and rear subwoofer side profiles for the Side Elevation.
@@ -46,9 +47,13 @@ export default function SideViewSubwoofers({
             const frontX = rx(subCentreY - subDepthM / 2);
             const backX  = rx(subCentreY + subDepthM / 2);
             const svgW   = Math.max(4, backX - frontX);
-            const staticBottom = Number.isFinite(sub?.bottomHeightM) ? sub.bottomHeightM
-              : Number.isFinite(sub?.position?.z) ? sub.position.z - subHeightM / 2
-              : 0;
+            // The stored cabinet-bottom height is the authority, read through the
+            // one shared derivation so this drawing can never disagree with the
+            // front elevation or the construction detail about the installation.
+            const storedBottom = storedSubwooferBottomM(sub, frontSubsCfg);
+            const staticBottom = storedBottom !== null
+              ? storedBottom
+              : Number.isFinite(sub?.position?.z) ? sub.position.z - subHeightM / 2 : 0;
             const bottomZ = isDraggingFront ? liveSubDrag.liveBottomHeightM : staticBottom;
             const topZ   = bottomZ + subHeightM;
             const svgTop = rz(topZ);
@@ -117,9 +122,11 @@ export default function SideViewSubwoofers({
             const frontX = rx(subCentreY - subDepthM / 2);
             const backX  = rx(subCentreY + subDepthM / 2);
             const svgW   = Math.max(4, backX - frontX);
-            const staticBottom = Number.isFinite(sub?.bottomHeightM) ? sub.bottomHeightM
-              : Number.isFinite(sub?.position?.z) ? sub.position.z - subHeightM / 2
-              : 0;
+            // Rear cabinets read the same stored authority as the front ones.
+            const storedRearBottom = storedSubwooferBottomM(sub, rearSubsCfg);
+            const staticBottom = storedRearBottom !== null
+              ? storedRearBottom
+              : Number.isFinite(sub?.position?.z) ? sub.position.z - subHeightM / 2 : 0;
             const bottomZ = isDraggingRear ? liveSubDrag.liveBottomHeightM : staticBottom;
             const topZ   = bottomZ + subHeightM;
             const svgTop = rz(topZ);
