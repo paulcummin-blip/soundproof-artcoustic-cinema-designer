@@ -23,10 +23,10 @@ import React from "react";
 import { Loader2, RefreshCw } from "lucide-react";
 
 export const CALIBRATION_APPLY_TITLE = "Applied adjustment";
-export const CALIBRATION_APPLY_BUTTON_LABEL = "Re-test adjustment";
-export const CALIBRATION_APPLY_BUSY_LABEL = "Testing calibration…";
+export const CALIBRATION_APPLY_BUTTON_LABEL = "Re-test Bass Optimisation";
+export const CALIBRATION_APPLY_BUSY_LABEL = "Re-testing Bass Optimisation…";
 export const CALIBRATION_APPLY_SCOPE_SENTENCE =
-  "ADI may apply safe calibration settings (delay, gain, polarity, phase) if they improve P19/P20.";
+  "ADI re-checks the design and applies a better adjustment only when one improves the result.";
 
 const PRIMARY_CLASS =
   "inline-flex items-center gap-1.5 rounded-md bg-[#213428] px-4 py-2 text-[12px] font-semibold text-white transition-colors hover:bg-[#3E4349] disabled:cursor-not-allowed disabled:opacity-45";
