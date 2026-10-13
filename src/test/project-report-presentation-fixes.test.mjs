@@ -235,34 +235,90 @@ test("the page budget, fit protection and page count are unchanged", () => {
  * 2 · SYSTEM & PRODUCTS — the geometry table shares the grid
  * ----------------------------------------------------------- */
 
-test("the viewing geometry table uses the specification schedule's own grid, width and right edge", () => {
-  const printMarkup = geometrySection(renderPage3(true));
-  const screenMarkup = geometrySection(renderPage3(false));
+/** A cell's own text, with its markup stripped: "Front row", "63.1° – 64.6°", "L4". */
+function cellText(cell) {
+  return String(cell).replace(/<[^>]+>/g, '').replace(/\s+/g, ' ').trim();
+}
 
-  // The schedule's own row-name column, then the page's remaining content width:
-  // the table ends at the same right edge as the specification above it.
-  assert.match(printMarkup, /grid-template-columns:34mm 1fr auto auto auto/);
-  assert.match(screenMarkup, /grid-template-columns:150px 1fr auto auto auto/);
-  assert.match(renderPage3(true), /width:34mm/, "the schedule itself still uses the 34mm role column");
+/**
+ * The grid's DIRECT children, in document order — the cells each row contributes.
+ * A depth scan, not a pattern match, so a cell holding markup is still one cell.
+ */
+function gridCells(section) {
+  const open = section.search(/<div style="[^"]*display:grid/);
+  assert.ok(open > -1, 'the geometry table declares its own grid');
+  const body = section.slice(open);
+  const re = /<div\b[^>]*>|<\/div>/g;
+  const cells = [];
+  let depth = 0;
+  let start = 0;
+  let match;
+  while ((match = re.exec(body))) {
+    if (match[0].startsWith('</')) {
+      if (depth === 2) cells.push(body.slice(start, re.lastIndex));
+      depth -= 1;
+      if (depth === 0) break;
+    } else {
+      depth += 1;
+      if (depth === 2) start = match.index;
+    }
+  }
+  return cells;
+}
 
-  // One grid lays out both rows, so the front and rear rows align identically.
-  assert.equal((printMarkup.match(/display:grid/g) || []).length, 1);
-  assert.ok(printMarkup.includes("Front row") && printMarkup.includes("Rear row"));
+test("the geometry table is ONE grid of FOUR tracks, matching the cells each row contributes", () => {
+  const section = geometrySection(renderPage3(true));
+
+  // One grid holds the whole table — headings and both rows — so every row is laid
+  // out by the same columns.
+  assert.equal((section.match(/display:grid/g) || []).length, 1, 'one grid lays out the whole table');
+
+  const template = section.match(/grid-template-columns:([^;"]+)/);
+  assert.ok(template, 'the table states its own column tracks');
+  const trackCount = template[1].trim().split(/\s+/).length;
+
+  const cells = gridCells(section);
+  const rowCount = cells.length / 4;
+  assert.equal(cells.length % 4, 0, 'every row contributes the same four cells');
+  assert.equal(rowCount, 3, 'one heading row and one row per seating row');
+
+  // THE INVARIANT THIS REGRESSION BROKE: a track count larger than the cells a row
+  // contributes leaves a spare track, and the next row's first cell is pulled up
+  // into the row above. The two must match exactly.
+  assert.equal(trackCount, 4, `four tracks for Row, Seats, Viewing angle, RP23 (found ${trackCount})`);
+  assert.equal(trackCount, cells.length / rowCount, 'the tracks match the cells a row contributes');
+
+  // The four headings read in column order…
+  assert.deepEqual(cells.slice(0, 4).map(cellText), ['Row', 'Seats', 'Viewing angle', 'RP23']);
+
+  // …and each row states its own four cells in that same order — label, seats,
+  // viewing angle, RP23 — so no value can sit under another column's heading and
+  // no row can be split across two lines.
+  assert.deepEqual(cells.slice(4, 8).map(cellText).slice(0, 3), ['Front row', '2', '63.1° – 64.6°']);
+  assert.match(cellText(cells[7]), /L4/);
+  assert.deepEqual(cells.slice(8, 12).map(cellText).slice(0, 3), ['Rear row', '1', '45.0°']);
+  assert.match(cellText(cells[11]), /L1/);
+
+  // The row-name column is the schedule's own, so both tables share their left
+  // boundary, and the last column ends on the schedule's right boundary.
+  assert.match(section, /grid-template-columns:34mm 1fr 1fr auto/);
+  assert.match(geometrySection(renderPage3(false)), /grid-template-columns:150px 1fr 1fr auto/);
+  assert.match(renderPage3(true), /width:34mm/, 'the schedule itself still uses the 34mm role column');
 });
 
-test("every geometry heading sits over its own right-aligned values, with the RP23 pill in one column", () => {
-  const printMarkup = geometrySection(renderPage3(true));
+test("the RP23 column ends on the schedule's right edge, and the other columns read left-aligned", () => {
+  const section = geometrySection(renderPage3(true));
 
-  // Seats, Viewing angle and RP23 are aligned under their own headings, and each
-  // row's three values share that alignment: 3 headings + 3 values × 2 rows.
-  assert.equal((printMarkup.match(/text-align:right/g) || []).length, 9);
-  assert.match(printMarkup, /<div style="[^"]*text-align:right[^"]*">Seats<\/div>/);
-  assert.match(printMarkup, /<div style="[^"]*text-align:right[^"]*">Viewing angle<\/div>/);
-  assert.match(printMarkup, /<div style="[^"]*text-align:right[^"]*">RP23<\/div>/);
+  // Only the RP23 column is right-aligned — its heading and each row's pill — so
+  // the table ends on the same right boundary as the specification above it.
+  assert.equal((section.match(/text-align:right/g) || []).length, 3);
+  assert.match(section, /<div style="[^"]*text-align:right[^"]*">RP23<\/div>/);
+  assert.doesNotMatch(section, /text-align:right[^>]*>(?:(?!<\/div>).)*Seats/s);
+  assert.doesNotMatch(section, /text-align:right[^"]*">Viewing angle/);
 
-  // Both rows' RP23 results render in that one consistent column.
-  assert.match(printMarkup, /text-align:right[^>]*>(?:(?!<\/div>).)*L4/s);
-  assert.match(printMarkup, /text-align:right[^>]*>(?:(?!<\/div>).)*L1/s);
+  // Both rows' own RP23 results render in that one column, as the canonical pill.
+  assert.match(section, /text-align:right[^>]*>(?:(?!<\/div>).)*L4/s);
+  assert.match(section, /text-align:right[^>]*>(?:(?!<\/div>).)*L1/s);
 });
 
 test("the geometry table's values and typography are unchanged", () => {
