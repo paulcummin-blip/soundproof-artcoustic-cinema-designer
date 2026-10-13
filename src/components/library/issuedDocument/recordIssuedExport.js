@@ -38,6 +38,9 @@ import {
   updatePendingExport,
 } from './pendingIssuedExportStore';
 import { writeExportStorageDiagnostic } from './exportStorageDiagnosticLog';
+import { buildIssuedDocumentRow } from './issuedDocumentRowPayload';
+import { resolveIssuedDocumentAccountId } from './issuedDocumentOwnership';
+import { readProjectOwnership } from './projectOwnershipRead';
 import { isProjectLibraryRecordFailure } from './projectLibraryStorageDiagnostics';
 import {
   EXPORT_STORAGE_REASON,
@@ -49,6 +52,7 @@ import {
   backendErrorMessage,
   buildAssetRecordFailure,
   buildExportStorageDiagnostic,
+  buildStorageNotice,
   classifyUploadFailure,
   exportStorageReason,
   resolveRetryMode,
@@ -173,6 +177,17 @@ async function captureIssuedDocument({ identity, snapshot }) {
     });
   }
 
+  // The owning account is the project's own, taken from the canonical project
+  // ownership authority when the export did not already state it. An admin-owned
+  // or internal project legitimately has none: that is reported as "none" and
+  // the record is stored without the field — an account is never invented, and
+  // the authenticated user's id is never substituted for one.
+  issued.accountId = await resolveIssuedDocumentAccountId({
+    projectId: issued.projectId,
+    accountId: issued.accountId,
+    readProject: readProjectOwnership,
+  });
+
   let captured;
   try {
     captured = await captureCompositionToPdf(snapshot);
@@ -241,23 +256,15 @@ async function uploadIssuedPdf({ blob, filename }) {
  */
 async function insertIssuedRow({ issued, filename, pageCount, fileUri, attemptKind = 'initial' }) {
   try {
-    return await base44.entities.ProjectAssetExport.create({
-      project_id: issued.projectId,
-      account_id: issued.accountId || null,
-      document_type: issued.documentType,
-      title: issued.title || '',
+    // The record is built by the one payload authority: the project's own
+    // ownership account when it has one, and the field omitted — never sent as
+    // null — when an admin-owned project has no owning account.
+    return await base44.entities.ProjectAssetExport.create(buildIssuedDocumentRow({
+      issued,
       filename,
-      version_id: issued.versionId || null,
-      selected_version_ids: Array.isArray(issued.selectedVersionIds) ? issued.selectedVersionIds : [],
-      source_record_id: issued.sourceRecordId || null,
-      file_uri: fileUri,
-      exported_at: new Date().toISOString(),
-      exported_by: issued.exportedBy || null,
-      source_fingerprints: issued.sourceFingerprints || {},
-      source_status_at_export: issued.sourceStatusAtExport || 'current',
-      page_count: pageCount,
-      superseded_by_id: null,
-    });
+      pageCount,
+      fileUri,
+    }));
   } catch (error) {
     // The rejection is kept exactly as it came back — its code, its message and
     // the class of rejection — alongside what the attempt had already achieved.
@@ -286,6 +293,10 @@ export async function storeIssuedDocument({ identity, snapshot, attemptKind = 'i
   updatePendingExport(pendingKey, { issued, filename, blob, pageCount, captureDiagnostics });
 
   const stored = await uploadIssuedPdf({ blob, filename });
+  // The uploaded file's own path is held with the attempt, so a failure at the
+  // record step is retried against THIS file instead of uploading a second copy
+  // of the same PDF.
+  updatePendingExport(pendingKey, { fileUri: stored.file_uri });
   const record = await insertIssuedRow({ issued, filename, pageCount, fileUri: stored.file_uri, attemptKind });
 
   return { record, pendingKey };
@@ -375,15 +386,21 @@ function reportStorageFailure({ failure, pendingKey, identity }) {
   // technical detail when the Project Library record step is what failed.
   const offerActions = !!retryLabel || isProjectLibraryRecordFailure(diagnostic);
 
-  let handle = null;
-  handle = toast({
+  // The notice is compact: what did not land, the plain reason, and the actions.
+  // The technical diagnostic is never in the notice body — it stays behind the
+  // collapsed disclosure inside those actions.
+  const notice = buildStorageNotice({
     // A document exported alongside another one names the outcome in its own
     // words — "Project Report saved, but Speaker Design PDF could not be
     // created." — so the designer knows exactly what did and did not land.
     title: issued.storageFailureTitle || STORAGE_FAILURE_MESSAGE,
-    description: exportStorageReason(identified),
-    variant: 'destructive',
+    reason: exportStorageReason(identified),
     duration: RETRY_TOAST_MS,
+  });
+
+  let handle = null;
+  handle = toast({
+    ...notice,
     ...(offerActions
       ? {
           action: React.createElement(ExportStorageFailureActions, {
@@ -471,12 +488,16 @@ export async function retryIssuedExportStorage(pendingKey) {
   }
 
   try {
-    const stored = await uploadIssuedPdf({ blob: entry.blob, filename: entry.filename });
+    // When only the Library record step failed, the PDF is already stored
+    // privately: that exact file is reused, so the retry records the document
+    // that was issued instead of uploading a duplicate of it.
+    const fileUri = entry.fileUri
+      || (await uploadIssuedPdf({ blob: entry.blob, filename: entry.filename })).file_uri;
     const record = await insertIssuedRow({
       issued: entry.issued,
       filename: entry.filename,
       pageCount: entry.pageCount,
-      fileUri: stored.file_uri,
+      fileUri,
       attemptKind: 'retry',
     });
     clearPendingExport(pendingKey);

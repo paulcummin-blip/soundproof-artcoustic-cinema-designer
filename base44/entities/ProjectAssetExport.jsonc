@@ -9,7 +9,8 @@
     },
     "account_id": {
       "type": "string",
-      "description": "Denormalized account_id from the parent Project, used for RLS. Must be set at creation time from the parent Project's account_id."
+      "nullable": true,
+      "description": "Denormalized account_id from the parent Project, taken from the project's own ownership identity at creation time. Optional: an admin-owned or internal project legitimately has no owning account, and a document issued for it is stored without this field rather than with a null. The field is never fabricated and is never substituted with the authenticated user's id \u2014 a document whose project has an owning account always carries that account, which is what keeps one dealer's Project Library invisible to another."
     },
     "document_type": {
       "type": "string",
@@ -97,7 +98,6 @@
   },
   "required": [
     "project_id",
-    "account_id",
     "document_type",
     "filename",
     "exported_at"
