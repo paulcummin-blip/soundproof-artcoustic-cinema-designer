@@ -226,9 +226,11 @@ test('TEST G — a repeated entry for one export is stored once and reported onc
   );
   assert.ok(record.includes('failureNoticesShown.delete(noticeKey);'), 'dismissing the notice clears it, so a retry can still report');
 
-  // The failure still names the real reason and still offers its retry.
-  assert.ok(record.includes('description: exportStorageReason(identified)'), 'the reason is still the real one');
-  assert.ok(record.includes('variant: \'destructive\''), 'and it is still a failure notice');
+  // The failure still names the real reason and still offers its retry. The
+  // notice itself is built by the one notice authority: compact on screen, with
+  // the technical diagnostic left to the actions' collapsed disclosure.
+  assert.ok(record.includes('reason: exportStorageReason(identified)'), 'the reason is still the real one');
+  assert.ok(record.includes('buildStorageNotice({'), 'the notice comes from the shared notice authority');
   assert.ok(record.includes('ExportStorageFailureActions'), 'with its retry action');
   assert.ok(record.includes('captureDiagnostics: held?.captureDiagnostics || null'), 'and the capture findings travel with it');
 });
