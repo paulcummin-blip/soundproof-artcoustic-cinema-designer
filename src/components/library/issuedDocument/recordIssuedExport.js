@@ -383,8 +383,11 @@ function reportStorageFailure({ failure, pendingKey, identity }) {
   const retryLabel = retryMode === 'none' ? null : retryLabelFor(retryMode);
 
   // The notice carries the actions that can address the failure, and the
-  // technical detail when the Project Library record step is what failed.
-  const offerActions = !!retryLabel || isProjectLibraryRecordFailure(diagnostic);
+  // technical detail when the Project Library record step is what failed — or when
+  // a PDF capture recorded WHY a sheet stopped storage, so those measurements are
+  // readable in the same disclosure instead of only in the console.
+  const captureMeasurements = diagnostic?.capture_diagnostics?.pageFit || null;
+  const offerActions = !!retryLabel || isProjectLibraryRecordFailure(diagnostic) || !!captureMeasurements;
 
   // The notice is compact: what did not land, the plain reason, and the actions.
   // The technical diagnostic is never in the notice body — it stays behind the
@@ -408,8 +411,9 @@ function reportStorageFailure({ failure, pendingKey, identity }) {
             retryLabel,
             projectId: issued.projectId || null,
             // Technical detail travels with the notice for a master admin only,
-            // and only for the Project Library record step it exists to explain.
-            diagnostic: isProjectLibraryRecordFailure(diagnostic) ? diagnostic : null,
+            // and only for the Project Library record step it exists to explain,
+            // plus a capture failure that recorded its own measurements.
+            diagnostic: (isProjectLibraryRecordFailure(diagnostic) || !!captureMeasurements) ? diagnostic : null,
             onSuccess: () => handle?.dismiss?.(),
           }),
         }

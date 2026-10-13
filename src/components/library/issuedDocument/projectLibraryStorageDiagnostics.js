@@ -161,8 +161,68 @@ export function buildStorageTechnicalDetail({ diagnostic, authAccountId = null, 
       label: 'Reported reason',
       value: record.reason || STORAGE_DIAGNOSTIC_NONE_REPORTED,
     },
+    // The capture's own measurements, when a sheet is what stopped storage.
+    ...captureFitRows(record),
     { key: 'occurred_at', label: 'Occurred at', value: record.occurred_at || STORAGE_DIAGNOSTIC_NOT_AVAILABLE },
   ];
+}
+
+/**
+ * The rows a failed PDF capture adds to the detail: which sheet overflowed, what
+ * overran it, the height the content measured, the height the sheet allowed, and
+ * how far over it went — read from the capture's own record, never re-measured
+ * here. A record that carries none of this adds no rows, so the detail of every
+ * other failure is exactly what it was.
+ */
+function captureFitRows(record) {
+  const fit = record?.capture_diagnostics?.pageFit || null;
+  if (!fit) return [];
+  const mm = (value) => (typeof value === 'number' ? `${value.toFixed(1)} mm` : STORAGE_DIAGNOSTIC_NOT_AVAILABLE);
+  const rows = [];
+  const failed = fit.failedPage || null;
+  // How many sheets the capture held, so the failed one is placed in the document.
+  const pageCount = record?.capture_diagnostics?.pageCount ?? fit.pageCount ?? null;
+
+  if (failed) {
+    const element = failed.element || null;
+    rows.push({
+      key: 'capture_failed_page',
+      label: 'Overflowing sheet',
+      value: `Page ${failed.page}${pageCount ? ` of ${pageCount}` : ''} — ${failed.kind || 'unknown sheet'}`,
+    });
+    rows.push({
+      key: 'capture_overflow_element',
+      label: 'Offending element',
+      value: element
+        ? [
+          element.label,
+          element.identifier ? `origin ${element.identifier}` : null,
+          element.section ? `section ${element.section.name || element.section.type}` : null,
+        ].filter(Boolean).join(' · ')
+        : STORAGE_DIAGNOSTIC_NONE_REPORTED,
+    });
+    rows.push({ key: 'capture_page_used', label: 'Measured content height', value: mm(failed.usedMm) });
+    rows.push({ key: 'capture_page_available', label: 'Printable height available', value: mm(failed.availableMm) });
+    rows.push({ key: 'capture_page_overflow', label: 'Overflow', value: mm(failed.overflowMm) });
+    rows.push({
+      key: 'capture_page_browser',
+      label: 'Browser composition measured the same sheet',
+      value: typeof failed.browserUsedMm === 'number'
+        ? `${mm(failed.browserUsedMm)} (capture measured ${mm(failed.measurementDifferenceMm)} more)`
+        : STORAGE_DIAGNOSTIC_NOT_AVAILABLE,
+    });
+  }
+
+  const tolerated = Array.isArray(fit.tolerated) ? fit.tolerated : [];
+  if (tolerated.length > 0) {
+    rows.push({
+      key: 'capture_page_tolerated',
+      label: `Overflow stored within the ${mm(fit.toleranceMm)} tolerance`,
+      value: tolerated.map((page) => `page ${page.page} by ${mm(page.overflowMm)}`).join(', '),
+    });
+  }
+
+  return rows;
 }
 
 /** One line naming the failure, for a list of session failures. */

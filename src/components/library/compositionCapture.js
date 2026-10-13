@@ -27,8 +27,10 @@ import { jsPDF } from 'jspdf';
 import capturePagePng, { pageCaptureFailure } from '@/components/library/capturePagePng';
 import { installCanvasGradientGuard, neutraliseDegenerateGradients } from './canvasGradientGuard';
 import { resolvePageComposer } from '@/components/library/issuedDocument/issuedDocumentPageComposers';
+import { pageFitRecords } from '@/components/library/issuedDocument/capturePageFitDiagnostics';
 import { pageMeasurement } from '@/components/proposal/export/composition/proposalPageGeometry';
 import { proposalPageInventory, sameProposalBoundaries } from '@/components/proposal/export/composition/proposalCompositionInventory';
+import { elementLabel, elementIdentifier, unitIdentityOf } from '@/components/proposal/export/composition/paginationFailureDiagnostics';
 
 const MM_PER_INCH = 25.4;
 const CSS_PX_PER_INCH = 96;
@@ -150,35 +152,69 @@ function waitForFrameAssets(frame) {
       resolve();
       return;
     }
-    const fonts = win?.document?.fonts?.ready?.catch(() => {}) || Promise.resolve();
-    const images = Array.from(win?.document?.images || []);
-    const pending = images.filter((img) => !img.complete);
-    const imagesSettled = pending.length === 0
+
+    // The capture document is WRITTEN, not navigated: when this runs, its
+    // stylesheets are still parsing, so the @font-face rules they carry do not
+    // exist yet and `fonts.ready` resolves at once — measuring the pack in a
+    // fallback face the designer never printed, and letting the real face swap in
+    // afterwards. The settled document is awaited first, then its fonts are read
+    // again. Both waits are bounded, so a document that never settles falls
+    // through to the measurement this capture has always taken.
+    const settled = win.document?.readyState === 'complete' || typeof win.addEventListener !== 'function'
       ? Promise.resolve()
       : new Promise((done) => {
-        let remaining = pending.length;
-        const timer = setTimeout(done, 6000);
-        const finish = () => {
-          remaining -= 1;
-          if (remaining <= 0) {
-            clearTimeout(timer);
-            done();
-          }
-        };
-        pending.forEach((img) => {
-          img.addEventListener('load', finish, { once: true });
-          img.addEventListener('error', finish, { once: true });
-        });
+        const timer = setTimeout(done, 4000);
+        win.addEventListener('load', () => {
+          clearTimeout(timer);
+          done();
+        }, { once: true });
       });
 
-    Promise.all([fonts, imagesSettled]).then(() => {
-      const raf = win.requestAnimationFrame?.bind(win);
-      if (!raf) {
-        resolve();
-        return;
-      }
-      raf(() => raf(() => setTimeout(resolve, 60)));
-    }).catch(() => resolve());
+    settled
+      .then(() => new Promise((done) => {
+        const ready = win.document?.fonts?.ready;
+        if (!ready?.then) {
+          done();
+          return;
+        }
+        const timer = setTimeout(done, 4000);
+        ready.then(() => {
+          clearTimeout(timer);
+          done();
+        }).catch(() => {
+          clearTimeout(timer);
+          done();
+        });
+      }))
+      .then(() => {
+        const images = Array.from(win.document?.images || []);
+        const pending = images.filter((img) => !img.complete);
+        if (pending.length === 0) return Promise.resolve();
+        return new Promise((done) => {
+          let remaining = pending.length;
+          const timer = setTimeout(done, 6000);
+          const finish = () => {
+            remaining -= 1;
+            if (remaining <= 0) {
+              clearTimeout(timer);
+              done();
+            }
+          };
+          pending.forEach((img) => {
+            img.addEventListener('load', finish, { once: true });
+            img.addEventListener('error', finish, { once: true });
+          });
+        });
+      })
+      .then(() => {
+        const raf = win.requestAnimationFrame?.bind(win);
+        if (!raf) {
+          resolve();
+          return;
+        }
+        raf(() => raf(() => setTimeout(resolve, 60)));
+      })
+      .catch(() => resolve());
   });
 }
 
@@ -199,6 +235,54 @@ function collectPageFrames(scope, pageSelector) {
 function pageSizeMm(element) {
   const rect = element.getBoundingClientRect();
   return { widthMm: rect.width / MM_TO_PX, heightMm: rect.height / MM_TO_PX };
+}
+
+function round1(value) {
+  return Number.isFinite(value) ? Math.round(value * 10) / 10 : null;
+}
+
+/**
+ * The element that overran the printable area of one sheet, named the way the
+ * export names an element: tag and classes, the origin the compositor stamped on
+ * it, and the section it belongs to. Measured here, at the moment of the stop,
+ * from the same live page the capture measures — no copy, no caption and no file
+ * URL is read into it.
+ *
+ * @param {Element} page — the sheet that overflowed
+ * @param {number} availableMm — the printable height the overflow was measured against
+ */
+function overflowElementOf(page, availableMm) {
+  if (!page?.querySelectorAll) return null;
+  const view = page.ownerDocument?.defaultView;
+  if (!view) return null;
+  const css = view.getComputedStyle(page);
+  const number = (value) => parseFloat(value) || 0;
+  const rect = page.getBoundingClientRect();
+  const contentTop = rect.top + number(css.paddingTop) + number(css.borderTopWidth);
+  const limit = contentTop + (Number(availableMm) || 0) * MM_TO_PX;
+
+  let worst = null;
+  let bottom = limit;
+  for (const node of page.querySelectorAll('*')) {
+    if (node.tagName === 'STYLE') continue;
+    const nodeBottom = node.getBoundingClientRect().bottom;
+    if (nodeBottom > bottom) {
+      bottom = nodeBottom;
+      worst = node;
+    }
+  }
+  if (!worst) return null;
+
+  const identity = unitIdentityOf(worst);
+  return {
+    label: elementLabel(worst),
+    identifier: elementIdentifier(worst),
+    section: identity.sectionType ? { type: identity.sectionType, name: identity.sectionName } : null,
+    block: identity.block,
+    // How far this element reached past the printable area, and how tall it is.
+    overMm: round1((bottom - limit) / MM_TO_PX),
+    heightMm: round1((bottom - contentTop) / MM_TO_PX),
+  };
 }
 
 /**
@@ -248,13 +332,43 @@ export async function captureCompositionToPdf({ nodeHtml, pageSelector, bodyClas
 
     // Capture is a consumer, never an allocator: these are the actual browser-composed sheets.
     const proposalRoot = scope.querySelector('.proposal-print-portal');
+    let pageFit = null;
     if (proposalRoot) {
       if (proposalRoot.dataset.browserComposed !== 'true' || !compositionInventory) {
         throw new Error('Project Library requires the completed browser proposal pages, not an independently paginated copy.');
       }
       const actual = proposalPageInventory(proposalRoot, pageMeasurement);
       if (!sameProposalBoundaries(compositionInventory, actual)) throw new Error('Browser and Library proposal page boundaries or image inventories differ. Storage stopped.');
-      if (actual.some((page) => page.fits === false)) throw new Error('A completed browser proposal sheet overflowed during Library capture.');
+      // Each sheet is measured here exactly as it was measured when it was composed,
+      // with the browser composition's own measurement of the same page read back
+      // beside it. Sub-millimetre rounding between two documents is NOT a fidelity
+      // failure — the same tolerance this capture already applies to the paper — so a
+      // sheet inside it is stored with the overflow recorded, never silently
+      // accepted. Past the tolerance, storage stops and the record names the page,
+      // the element, the content height, the printable height and the overflow.
+      pageFit = pageFitRecords(actual, {
+        toleranceMm: FIT_TOLERANCE_MM,
+        browserPages: compositionInventory,
+      });
+      const failed = pageFit.failed[0] || null;
+      if (failed) {
+        const error = new Error('A completed browser proposal sheet overflowed during Library capture.');
+        error.captureDiagnostics = {
+          operation: 'proposal_page_overflow',
+          paper: `${paper.widthMm}×${paper.heightMm}mm`,
+          pageCount: collected.length,
+          // The failed sheet first, then every other sheet that measured over, so
+          // one reading of the disclosure answers the whole question.
+          pageFit: {
+            ...pageFit,
+            failedPage: {
+              ...failed,
+              element: overflowElementOf(collected[failed.page - 1], failed.availableMm),
+            },
+          },
+        };
+        throw error;
+      }
     }
     const pages = collected;
 
@@ -325,6 +439,11 @@ export async function captureCompositionToPdf({ nodeHtml, pageSelector, bodyClas
         sanitisedStops: gradientGuard ? gradientGuard.sanitisedStops() : [],
         // Continuation pages created for content taller than one sheet.
         continuations: pages.filter((page) => page.classList.contains('pp-page--continuation')).length,
+        // A sheet that measured over its printable area by no more than the
+        // tolerance the paper itself is judged by: stored, and said so.
+        pageFit: pageFit && pageFit.tolerated.length > 0
+          ? { toleranceMm: pageFit.toleranceMm, tolerated: pageFit.tolerated }
+          : null,
       },
     };
   } finally {
