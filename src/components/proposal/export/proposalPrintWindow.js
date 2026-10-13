@@ -63,10 +63,11 @@ export function closeProposalPrintWindow(win) {
  * @param {{title: string, node: Element, onDone?: Function}} options
  * @returns {Promise<{printed: boolean, reason: string|null, message: string|null}>}
  */
-export async function printProposalInWindow(win, { title, node, onDone, onComposed } = {}) {
+export async function printProposalInWindow(win, { title, node, onDone, onComposed, trace } = {}) {
   return printReportInWindow(win, {
     title,
     node,
+    trace,
     bodyClass: PRINT_BODY_CLASS,
     extraCss: `${proposalMeasurementCss(node.ownerDocument)}\n${PRINT_WINDOW_CSS}`,
     prepareComposition: (doc) => {

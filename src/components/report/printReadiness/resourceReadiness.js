@@ -15,6 +15,7 @@
  * nothing here is allowed to treat a timeout as success.
  */
 
+import { observeLayoutStability } from './layoutStability.js';
 import {
   PRINT_READINESS_BUDGET_MS,
   PRINT_READINESS_REASON,
@@ -349,22 +350,8 @@ export function measureLayout(target) {
  *
  * @returns {Promise<boolean>} true when the layout settled
  */
-export async function waitForLayoutStable(target, win = null, {
-  frames = PRINT_READINESS_STABLE_FRAMES,
-  budgetMs = PRINT_READINESS_BUDGET_MS.layout,
-} = {}) {
-  const frame = frameRunner(win);
-  if (!frame) return true;
-  const deadline = readinessNow() + budgetMs;
-  let previous = measureLayout(target);
-  let stable = 0;
-  while (stable < frames && readinessNow() < deadline) {
-    await frame();
-    const current = measureLayout(target);
-    stable = current === previous ? stable + 1 : 0;
-    previous = current;
-  }
-  return stable >= frames;
+export async function waitForLayoutStable(target, win = null, options = {}) {
+  return observeLayoutStability(target, win, measureLayout, options);
 }
 
 /** A bounded pause, exported for callers that need one. */

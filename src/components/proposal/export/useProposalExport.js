@@ -33,6 +33,8 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { base44 } from '@/api/base44Client';
+import { authorizePrint } from './printAuthorization';
+import { printFailureDiagnostics } from './printFailureDiagnostics';
 import { buildProposalReportTitle } from '@/components/report/reportPdfTitle';
 import {
   applyPrintDocumentTitle,
@@ -300,7 +302,10 @@ export function useProposalExport({
       // gate; a preview deliberately does not, because inspecting the real print
       // document before it is ready to issue is what a preview is for.
       diagnostics.start('edit_layer');
-      const authorization = await base44.functions.invoke('readProposalEditLayer', { proposal_id: proposal.id, action: readLayerAction(mode), rendered_sections: sections, engineering_snapshot: proposal.engineering_snapshot });
+      const authorization = await authorizePrint(
+        (payload) => base44.functions.invoke('readProposalEditLayer', payload),
+        { proposal_id: proposal.id, action: readLayerAction(mode), rendered_sections: sections, engineering_snapshot: proposal.engineering_snapshot },
+      );
       if (!isCurrent()) return;
       diagnostics.done('edit_layer');
       const validation = authorization?.data?.layer?.document_validation;
@@ -370,6 +375,7 @@ export function useProposalExport({
           title: settledTitle,
           node: printNode,
           onComposed: preserveCompletedPages,
+          trace: diagnostics,
           onDone: () => { if (isCurrent()) cleanup(printWindow); },
         });
         if (!isCurrent()) return;
@@ -388,7 +394,9 @@ export function useProposalExport({
           // The document did not become ready: NOTHING was printed, and the
           // designer is told which resource held it up.
           diagnostics.fail('print_window_preparation', { reason: result.reason });
-          throw notReadyError(result.message || PRINT_NOT_READY_MESSAGE);
+          const error = notReadyError(result.message || PRINT_NOT_READY_MESSAGE);
+          error.readinessDiagnostics = result.diagnostics;
+          throw error;
         } else {
           diagnostics.done('print_window_preparation', { reason: result.reason });
           closeProposalPrintWindow(printWindow);
@@ -418,7 +426,7 @@ export function useProposalExport({
 
         const completedRoot = await prepareBrowserProposalFallback(fallbackNode, (dispose) => {
           fallbackCleanupRef.current = dispose;
-        });
+        }, diagnostics);
         preserveCompletedPages(completedRoot);
 
         cleanupTimeoutRef.current = setTimeout(() => cleanup(printWindow), PRINT_TIMEOUT_MS);
@@ -437,7 +445,7 @@ export function useProposalExport({
     } catch (err) {
       const notReady = err?.printNotReady === true;
       if (!diagnostics.snapshot().blockedBy) {
-        diagnostics.fail('attempt', {
+        diagnostics.fail(err?.exportBlockedBy || diagnostics.snapshot().marks.filter((mark) => mark.phase === 'started').at(-1)?.operation || 'attempt', {
           printNotReady: notReady,
           blockedBy: err?.exportBlockedBy || null,
         });
@@ -445,15 +453,18 @@ export function useProposalExport({
       // The trace of this attempt is kept — which operation was outstanding, how
       // long each stage took. It carries no project content, and neither does the
       // pagination record beside it: element identity and millimetres only.
+      const trace = diagnostics.snapshot();
+      const readinessDetail = printFailureDiagnostics(err, trace);
       recordExportDiagnostics({
-        ...diagnostics.snapshot(),
+        ...trace,
         paginationFailure: err?.paginationDiagnostics ?? null,
+        readinessFailure: readinessDetail,
       });
       // A failure raised by an attempt that has already been superseded changes
       // nothing: no error is shown for it, and the window a newer attempt owns is
       // left alone. Its own preparation window is closed here.
       if (!isCurrent()) return;
-      setErrorDetail(err?.paginationDiagnostics ?? null);
+      setErrorDetail(err?.paginationDiagnostics ?? readinessDetail);
       setError(
         notReady
           ? err.message

@@ -29,7 +29,8 @@ export default function PaginationFailureDetails({ diagnostics }) {
   // A dealer account is never shown a technical record of the compositor.
   if (!diagnostics || !isMasterAdmin(user)) return null;
 
-  const text = formatPaginationFailureDiagnostics(diagnostics);
+  const isReadiness = diagnostics.kind === 'print_readiness';
+  const text = isReadiness ? JSON.stringify(diagnostics, null, 2) : formatPaginationFailureDiagnostics(diagnostics);
 
   const handleCopy = async () => {
     try {
@@ -49,7 +50,7 @@ export default function PaginationFailureDetails({ diagnostics }) {
         style={{ color: '#4A230F', fontFamily: FONT }}
       >
         <AlertCircle className="w-3.5 h-3.5" />
-        Technical detail — oversized block
+        Technical detail — {isReadiness ? 'print preparation' : 'oversized block'}
       </summary>
 
       <div className="px-3 pb-3">

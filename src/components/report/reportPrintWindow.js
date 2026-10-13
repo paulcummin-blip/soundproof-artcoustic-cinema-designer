@@ -145,7 +145,7 @@ function outcome(printed, reason = null, message = null) {
  * @param {{title: string, node: Element, bodyClass?: string, extraCss?: string, onDone?: Function}} options
  * @returns {Promise<{printed: boolean, reason: string|null, message: string|null}>}
  */
-export async function printReportInWindow(win, { title, node, bodyClass = '', extraCss = '', onDone, prepareComposition } = {}) {
+export async function printReportInWindow(win, { title, node, bodyClass = '', extraCss = '', onDone, prepareComposition, trace = null } = {}) {
   if (!win || win.closed || !node) return outcome(false, 'window_unavailable');
 
   // A literal "</script" inside stored rich text would end the document early.
@@ -174,13 +174,17 @@ ${content}
   // The one shared readiness authority, satisfied against the print window's own
   // document: stylesheets parsed, fonts applied, every image loaded and decoded,
   // and the layout measured the same twice in a row. Not ready means not printed.
-  const readiness = await preparePrintDocument({ win, root: win.document.body });
+  const readiness = await preparePrintDocument({ win, root: win.document.body, trace });
   if (!readiness.ready) {
-    return outcome(false, readiness.reason, describePrintReadinessFailure(readiness));
+    return { ...outcome(false, readiness.reason, describePrintReadinessFailure(readiness)), diagnostics: readiness.diagnostics };
   }
 
   // Optional document-owned measured composition, never applied to other reports.
-  if (prepareComposition) await prepareComposition(win.document);
+  if (prepareComposition) {
+    trace?.start('composition');
+    await prepareComposition(win.document);
+    trace?.done('composition');
+  }
 
   try {
     win.addEventListener('afterprint', () => {

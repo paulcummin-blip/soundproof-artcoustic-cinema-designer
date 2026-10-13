@@ -2,7 +2,7 @@ import { preparePrintDocument, describePrintReadinessFailure } from '@/component
 import { composeBrowserProposal, proposalMeasurementCss } from '@/components/proposal/export/browserProposalComposition';
 
 /** Popup-blocked export: compose an isolated DOM copy; React's mounted pack stays intact. */
-export async function prepareBrowserProposalFallback(node, registerCleanup) {
+export async function prepareBrowserProposalFallback(node, registerCleanup, trace = null) {
   const doc = node.ownerDocument;
   const clone = node.cloneNode(true);
   const style = doc.createElement('style');
@@ -21,10 +21,17 @@ export async function prepareBrowserProposalFallback(node, registerCleanup) {
   node.style.setProperty('display', 'none', 'important');
   clone.style.cssText = 'display:block!important;position:absolute;left:-20000px;top:0;width:210mm;';
   doc.body.append(clone);
-  const readiness = await preparePrintDocument({ doc, root: clone });
-  if (!readiness.ready) throw new Error(describePrintReadinessFailure(readiness));
+  const readiness = await preparePrintDocument({ doc, root: clone, trace });
+  if (!readiness.ready) {
+    const error = new Error(describePrintReadinessFailure(readiness));
+    error.printNotReady = true;
+    error.readinessDiagnostics = readiness.diagnostics;
+    throw error;
+  }
   // The same measured authority is called before both browser print operations.
+  trace?.start('composition');
   composeBrowserProposal(docForClone(doc, clone));
+  trace?.done('composition');
   clone.style.position = 'static';
   clone.style.removeProperty('left');
   clone.style.removeProperty('top');
