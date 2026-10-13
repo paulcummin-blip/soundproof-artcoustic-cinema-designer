@@ -93,6 +93,15 @@ const modelCell = (models) =>
   [...models.entries()].map(([name, count]) => countLabel(name, count)).sort().join(', ');
 
 /**
+ * The row's model cell as the Speaker Design document states it: the model names
+ * alone, once each. How many speakers there are belongs to the Qty column, never
+ * to the name, so a name is not printed beside its own count. A number that is
+ * part of the product name ("EVOLVE 2-1", "ARCHITECT 2-1", "SUB3-12") is the name
+ * and is passed through untouched.
+ */
+const modelNamesCell = (models) => [...models.keys()].sort().join(', ');
+
+/**
  * The current speaker design of ONE design version.
  *
  * @param {Object} input
@@ -150,6 +159,7 @@ export function buildSpeakerDesignRows({
       group: centreRow.group,
       position: 'Centre',
       model: modelCell(centreModels),
+      modelNames: modelNamesCell(centreModels),
       quantity: centreTotal,
       quantityLabel: dual ? `${centreTotal} cabinets` : String(centreTotal),
       note: dual
@@ -167,6 +177,7 @@ export function buildSpeakerDesignRows({
       group: row.group,
       position: row.position,
       model: modelCell(models),
+      modelNames: modelNamesCell(models),
       quantity: rowTotal(models),
       quantityLabel: String(rowTotal(models)),
       note: row.note || null,
@@ -182,6 +193,7 @@ export function buildSpeakerDesignRows({
       group: 'subwoofers',
       position: entry.side === 'front' ? 'Front subwoofers' : entry.side === 'rear' ? 'Rear subwoofers' : 'Subwoofers',
       model: modelCell(models),
+      modelNames: modelNamesCell(models),
       quantity: entry.total,
       quantityLabel: String(entry.total),
       note: null,

@@ -46,7 +46,10 @@ const SCHEDULE_GROUPS = Object.freeze([
       {
         key: 'FC',
         position: 'Centre',
+        // The row builder states both cells: the panel keeps the count in its model
+        // cell, the document states the name alone and leaves the count to Qty.
         model: 'C4-1 × 2',
+        modelNames: 'C4-1',
         quantityLabel: '2 cabinets',
         note: 'Dual physical centre cabinets, one logical centre channel · cabinets mounted vertically',
       },
@@ -112,12 +115,18 @@ test('the schedule states Position, Model and Qty only — never a Notes column'
   assert.match(markup, /<th class="pos">Position<\/th><th class="model">Model<\/th><th class="qty">Qty<\/th>/);
   assert.doesNotMatch(markup, />\s*Notes/i, 'no Notes column');
 
-  // The dual-centre wording stays inside the Model cell.
+  // The Model cell states the product name alone; the number of speakers belongs
+  // to the Qty column. The dual-centre wording stays inside the Model cell.
   assert.match(
     markup,
-    /model-name">C4-1 × 2<\/span>\s*<span class="model-note">Dual physical centre cabinets, one logical centre channel · cabinets mounted vertically<\/span>/,
+    /model-name">C4-1<\/span>\s*<span class="model-note">Dual physical centre cabinets, one logical centre channel · cabinets mounted vertically<\/span>/,
   );
   assert.match(markup, /<td class="qty">2 cabinets<\/td>/);
+
+  // No quantity multiplier ever reaches the Model column, and a number that is
+  // part of a product name is passed through untouched.
+  assert.doesNotMatch(markup, /model-name">[^<]*×/, 'the Model column carries no multiplier');
+  assert.match(markup, /model-name">SL4-1<\/span>/, 'a number inside a product name is not stripped');
 
   // ONE logical centre channel — never a second one.
   const centreRows = markup.match(/<td class="pos">Centre<\/td>/g) || [];
