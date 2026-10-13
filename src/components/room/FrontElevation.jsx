@@ -580,6 +580,10 @@ export default function FrontElevation({ dimensions, screen, placedSpeakers = []
   const ROOM_STROKE = "#B0AEA8";  // lighter grey, less dominant
   const SCREEN_FILL = "#2C2C2C";
   const SCREEN_STROKE = "#1a1a1a";
+  // The acoustically transparent screen surface: a light translucent tint, so
+  // the LCR loudspeakers and subwoofers behind the screen stay visible through
+  // it. A TV keeps its opaque picture surface and never uses this fill.
+  const AT_SCREEN_SURFACE_FILL = "rgba(214,217,214,0.45)";
   const SPEAKER_FILL = "#213428";
   const SPEAKER_STROKE = "#152420";
   const SUB_FILL = "#4A3B30";      // darker than before for contrast
@@ -1007,10 +1011,15 @@ export default function FrontElevation({ dimensions, screen, placedSpeakers = []
           );
         })}
 
-        {/* Screen: overall frame (black), then viewable area (white).
-            Drawn AFTER the loudspeaker and subwoofer layers, so the cabinet's
-            screen frame and surface sit in front of every graphic on the front
-            wall and no speaker can cut through the screen perimeter. */}
+        {/* Screen, drawn in two layers.
+            MIDDLE LAYER: the viewable surface, drawn after the loudspeaker and
+            subwoofer layers so it sits in front of them. An acoustically
+            transparent screen is a light translucent tint, so the cabinets
+            behind it remain visible (and hoverable). A TV is opaque: its picture
+            surface is solid, so nothing is drawn through it.
+            FRONT LAYER: the frame / border, drawn last as an opaque band, so the
+            frame sits in front of every cabinet and no speaker or subwoofer
+            graphic can break through the screen perimeter. */}
         {(() => {
           // Overall frame rect (viewable + border on all sides)
           const oW = (overallW / roomW) * drawW;
@@ -1040,10 +1049,31 @@ export default function FrontElevation({ dimensions, screen, placedSpeakers = []
                 <rect x={ox - 3} y={oy - 3} width={oW + 6} height={oH + 6}
                   fill="none" stroke="#213428" strokeWidth={1.6} strokeDasharray="5 3" rx={3} />
               )}
-              {/* Black frame */}
-              <rect x={ox} y={oy} width={oW} height={oH} fill={SCREEN_STROKE} stroke={SCREEN_STROKE} strokeWidth={screenDragging ? 1.6 : 1} rx={2} />
-              {/* White viewable area */}
-              <rect x={sx} y={syTop} width={sw} height={sh} fill="#fff" stroke="#555" strokeWidth={0.5} />
+              {/* Viewable surface — middle layer. Translucent for an acoustically
+                  transparent screen, so the LCR and subwoofers behind it read
+                  through; pointer events pass through to the cabinets, so a
+                  speaker behind the screen can still be hovered or dragged. */}
+              <rect
+                x={sx}
+                y={syTop}
+                width={sw}
+                height={sh}
+                fill={isTV ? "#fff" : AT_SCREEN_SURFACE_FILL}
+                stroke="#555"
+                strokeWidth={0.5}
+                style={isTV ? undefined : { pointerEvents: 'none' }}
+              />
+              {/* Frame / border — front layer. An opaque band (the overall rect
+                  with the viewable area knocked out, even-odd fill) drawn last,
+                  so it is the last thing on the front wall and covers any
+                  cabinet graphic beneath it. It is also the screen drag surface. */}
+              <path
+                d={`M ${ox} ${oy} H ${ox + oW} V ${oy + oH} H ${ox} Z M ${sx} ${syTop} H ${sx + sw} V ${syTop + sh} H ${sx} Z`}
+                fill={SCREEN_STROKE}
+                fillRule="evenodd"
+                stroke={SCREEN_STROKE}
+                strokeWidth={screenDragging ? 1.6 : 1}
+              />
               {/* Screen labels: inside white area top-left if there is room, else below frame */}
               {sw >= 90 && sh >= 36 ? (
                 // Enough room — render inside top-left of the white viewable area
