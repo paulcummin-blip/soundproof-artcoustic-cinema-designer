@@ -2,19 +2,25 @@
 // ---------------------------------------------------------------------------
 // The ADI Bass Optimisation panel.
 //
-// The panel states FOUR layers, in this order, and nothing else in its default
+// The panel states the DECISION, in this order, and nothing else in its default
 // view:
 //
-//   1. RESULT SUMMARY        — what ADI has already done: the finding, the
-//                              current result and the best result found
-//   2. SAFE CALIBRATION      — the processor settings ADI may apply on its own
-//      (Section 1)             (delay, gain, polarity, phase) and what it did
-//   3. DESIGN RECOMMENDATION — the physical change ADI recommends but has NOT
-//      (Section 2)             applied; only the designer may approve it
-//   3b. WHAT ADI TESTED      — one compact list, split into calibration as
-//      (Section 3)             against design, so the two are never mixed
-//   4. ENGINEER DETAILS      — collapsed; every id, count, fingerprint,
-//                              frequency, seat and before/after value
+//   1. ONE STATUS           — how the change stands: applied · improvement to
+//                             consider · rejected for regression. While no
+//                             decision exists the engine's own state is shown.
+//   2. ONE ADJUSTMENT       — what to change, in installer words
+//   3. ONE BENEFIT          — what it buys, in one sentence, figure-free
+//   4. ONE COMPARISON       — where it lands: the P20 variation in whole dB with
+//                             its level, from one comparable evaluation
+//   5. THE ACTIONS          — one primary control per state, plus the physical
+//                             controls of the change being offered
+//   6. ENGINEER DETAILS     — collapsed; the settings each change touches, the
+//                             candidate evidence, the acceptance reason and every
+//                             id, count, fingerprint, frequency and seat value
+//
+// The headline is resolved by adiPanelHeadline.js (pure): this component decides
+// no wording, no number and no order of its own, and the sections that state the
+// evidence are rendered inside the disclosure rather than around it.
 //
 // ONE primary action per state, decided by the layout model in
 // adiPanelSections.js: the design recommendation when a physical change can be
@@ -79,6 +85,9 @@ import {
 } from "./adiPanelSections.js";
 import { FUTURE_CAPABILITY_TITLE } from "./optimiserLiveFamilies.js";
 import { readAuthoritativeP20Headline } from "./optimiserPlanMetrics.js";
+import { resolveAdiPanelHeadline } from "./adiPanelHeadline.js";
+import { resolveOptimiserCurrentP20 } from "./optimiserCurrentP20.js";
+import { buildRelativeGroupDelays } from "./relativeGroupDelayAuthority.js";
 
 // ONE primary control per state. Which layer owns it is decided by the layout
 // model (adiPanelSections.js); every other available action is drawn as a
@@ -375,6 +384,54 @@ export default function AdiOptimisationJourney({
     ? summary.recommendation
     : null;
 
+  // ── THE PANEL'S ONE HEADLINE ──
+  // The decision the designer has to act on, stated as one adjustment, one
+  // benefit and one comparable P20 pair. Every value is read from an authority
+  // already resolved above: nothing is recalculated, no threshold is re-applied
+  // and no saved setting is touched. The published current result is read through
+  // the same ONE authority the tooltip and result strip use, so the pair the
+  // panel compares is the designer's own result and never two different states.
+  const currentP20 = resolveOptimiserCurrentP20({
+    authorityP20: {
+      variationDb: p20Headline?.variationDb ?? null,
+      level: p20Headline?.level ?? null,
+      worstFrequencyHz: p20Headline?.worstFrequencyHz ?? null,
+    },
+    planView,
+  });
+  const recommendedRow = summary.recommendedLever && Array.isArray(planView?.levers)
+    ? planView.levers.find((row) => (row?.key ?? row?.lever) === summary.recommendedLever) || null
+    : null;
+  // The relative group offset of the change being decided — the installable fact
+  // a delay change leads with. Read here so the headline and the evidence state
+  // the same offset from the same values.
+  const relativeDelay = buildRelativeGroupDelays({
+    instances,
+    settings: Array.isArray(calibrationApplyEvidence?.settings) ? calibrationApplyEvidence.settings : [],
+    roomDims,
+  });
+  const headline = resolveAdiPanelHeadline({
+    calibrationKind,
+    calibrationDecision: calibrationApplyEvidence,
+    calibrationSuggested: (calibrationEvidenceState?.suggestionLines || []).length > 0,
+    appliedCalibration: persistedAppliedCalibration,
+    relativeDelay,
+    // A physical change ADI may never apply leads the panel as the move itself:
+    // that IS the decision in front of the designer. Its controls stay below.
+    recommendation: (summary.actions?.canApply === true || panelShowsApply === true)
+      ? (summary.seatingRecommendation?.movementLabel
+        || placement?.move?.movementLabel
+        || summary.recommendation
+        || null)
+      : null,
+    recommendedRow,
+    baseline: planView?.baseline || null,
+    currentP20,
+    stale: summary.stale === true,
+    isRunning,
+    finding: panelFinding,
+  });
+
   return (
     <div
       className={`rounded-lg border px-4 py-3 space-y-3 ${className}`}
@@ -399,57 +456,30 @@ export default function AdiOptimisationJourney({
           className="inline-flex shrink-0 items-center gap-1 whitespace-nowrap rounded-full px-2.5 py-1 text-[10px] font-semibold uppercase"
           style={theme.pill}
         >
-          {journey.statusLabel}
+          {headline.statusLabel || journey.statusLabel}
         </span>
       </div>
 
-      {/* ── LAYER 1 — RESULT SUMMARY ── what ADI has already done: the finding,
-          the current result and the best result found. */}
+      {/* ── THE DECISION ── one adjustment, one benefit and one comparable P20
+          pair, under the one status in the header. Everything the decision was
+          measured from is in Engineer details below. */}
       <AdiPanelSummary
         message={isRunning ? journey.message : null}
-        finding={panelFinding}
-        testedSentence={summary.testedSentence}
+        adjustment={headline.adjustment}
+        benefit={headline.benefit}
+        comparison={headline.comparison}
         designLimitation={designLimitation}
         staleCopy={summary.staleCopy}
         previousBest={summary.previousBest}
-        currentP20={summary.currentP20}
-        recommendedP20={summary.recommendedP20}
       />
 
-      {/* ── LAYER 2 — SAFE CALIBRATION ADJUSTMENTS (Section 1) ── processor
-          settings ADI may apply on its own when the calibration decision
-          authority confirms a safe improvement. No physical design change is
-          ever stated here. */}
-      <AdiCalibrationSection
-        kind={calibrationKind}
-        appliedEvidence={calibrationApplyEvidence}
-        appliedCalibration={persistedAppliedCalibration}
-        recommendation={calibrationRecommendation}
-        evidenceState={calibrationEvidenceState}
-        bestResult={bestCalibrationResult}
-        instances={instances}
-        roomDims={roomDims}
-      >
-        <ReoptimiseCalibrationAction
-          onReoptimise={isRunning ? null : onReoptimiseCalibration}
-          busy={reoptimiseBusy}
-          disabledReason={reoptimiseDisabledReason}
-          primary={primaryAction === ADI_PRIMARY_ACTION.CALIBRATION}
-        />
-      </AdiCalibrationSection>
-
-      {/* ── LAYER 3 — DESIGN RECOMMENDATION (Section 2) ── the physical change
-          ADI found but must not apply. Its own Apply/Undo/Re-run controls live
-          inside this section, never beside the calibration action. */}
-      <AdiDesignRecommendationSection
-        designChanges={designChangeList}
-        seatingRecommendation={summary.seatingRecommendation}
-        recommendation={designRecommendation}
-        placementStated={Boolean(placement?.kind)}
-      >
-        {/* Placement — the physical move, its expected result in whole dB, and
-            its own Apply/Undo actions. Nothing else on this panel moves a
-            subwoofer. */}
+      {/* ── THE ACTIONS ── one primary control for the state, decided by the
+          layout model, beside the controls of the change being offered. The
+          calibration action, the design Apply/Undo and the placement controls
+          are the ONLY controls on the card: every statement of what was applied,
+          held or evaluated is read in Engineer details below, so nothing here
+          explains a calculation and no control is drawn twice. */}
+      <div className="flex flex-wrap items-center gap-2">
         <PlacementRecommendationPanel
           placement={placement}
           busy={isRunning}
@@ -457,6 +487,7 @@ export default function AdiOptimisationJourney({
           onApply={handleApplyPlacement}
           onUndo={handleUndoPlacement}
           onRerun={onRunOptimisationPlan}
+          variant="actions"
         />
 
         <AdiDesignerActionBar
@@ -466,25 +497,14 @@ export default function AdiOptimisationJourney({
           onApply={panelShowsApply ? null : handleApplyRecommended}
           onUndo={panelShowsUndo ? null : handleUndoRecommended}
         />
-      </AdiDesignRecommendationSection>
 
-      {/* ── LAYER 3b — WHAT ADI TESTED (Section 3) ── ONE compact list, split
-          into the calibration levers ADI may apply and the design levers it may
-          only recommend, so the two kinds of change are never mixed in one
-          table. The per-lever detail and the delay sweep's own evidence are
-          evidence, so both live inside Engineer details. */}
-      <AdiTestedSection rows={summary.rows} />
-
-      {/* The pre-run summary. The calculation count is stated ONCE, near the
-          action, so this line never repeats it. */}
-      {showEstimate && (
-        <OptimiserCalculationEstimateLine
-          instances={instances}
-          seatCount={seatCount}
-          showSentence={!summary.testedSentence}
-          className="rounded-md border border-[#E7E5E0] bg-white px-3 py-2"
+        <ReoptimiseCalibrationAction
+          onReoptimise={isRunning ? null : onReoptimiseCalibration}
+          busy={reoptimiseBusy}
+          disabledReason={reoptimiseDisabledReason}
+          primary={primaryAction === ADI_PRIMARY_ACTION.CALIBRATION}
         />
-      )}
+      </div>
 
       {/* Primary action. Running: the same button, disabled, with the spinner
           stating the state. The wording never changes — only the pill and the
@@ -565,6 +585,50 @@ export default function AdiOptimisationJourney({
             </div>
           )}
 
+          {/* The calibration decision's own record: what ADI applied, what it held
+              and why, the settings each change touches and the canonical P19/P20
+              pair it was decided on. The panel states the decision; every
+              measurement behind it is read here. */}
+          <AdiCalibrationSection
+            kind={calibrationKind}
+            appliedEvidence={calibrationApplyEvidence}
+            appliedCalibration={persistedAppliedCalibration}
+            recommendation={calibrationRecommendation}
+            evidenceState={calibrationEvidenceState}
+            bestResult={bestCalibrationResult}
+            instances={instances}
+            roomDims={roomDims}
+            detailed
+          />
+
+          {/* What ADI tested, per lever, split into the calibration levers it may
+              apply and the design levers it may only recommend. Moved out of the
+              default panel: the designer reads the decision first, and the
+              coverage of the evaluation here. */}
+          <AdiTestedSection rows={summary.rows} />
+
+          {/* The P20 values the headline draws on, each named for what it is, so
+              two different states can never be read as one comparison. */}
+          {(summary.currentP20 || summary.recommendedP20 || currentP20.runBaselineDiffers) && (
+            <div className="space-y-0.5 text-[11px] text-[#3E4349] leading-relaxed">
+              <div className="text-[10px] font-semibold uppercase tracking-wide text-[#8A7B6A]">
+                P20 results compared
+              </div>
+              {summary.currentP20 && (
+                <div>Current design (published result): {summary.currentP20}</div>
+              )}
+              {currentP20.runBaselineDiffers && (
+                <div>
+                  Evaluation baseline: P20 {currentP20.runBaselineDeviation} — a different current
+                  state, so that evaluation&apos;s before → after values are its own.
+                </div>
+              )}
+              {summary.recommendedP20 && (
+                <div>Evaluated result with the recommended change: {summary.recommendedP20}</div>
+              )}
+            </div>
+          )}
+
           <OptimiserRunEvidenceBlock evidence={runEvidence} seatCount={seatCount} instances={instances} />
 
           {/* The limits every other number on this panel depends on, and the
@@ -587,8 +651,8 @@ export default function AdiOptimisationJourney({
 
           {/* A calibration result ADI HELD that makes P20 worse: its candidate,
               its canonical P19/P20 before → after and its settings are stated
-              here, not in the main panel — where the no-safe-improvement
-              sentence stands instead. */}
+              here, never on the main panel, which states the refusal and the
+              change it was measured on. */}
           {bestCalibrationResult?.mainPanelSuppressed === true && (
             <div className="space-y-1" data-adi-calibration-candidate-proof="true">
               <div className="text-[10px] font-semibold uppercase tracking-wide text-[#8A7B6A]">
@@ -632,6 +696,27 @@ export default function AdiOptimisationJourney({
               leverOutcome={leverOutcome}
             />
           )}
+
+          {/* The physical change ADI recommends but has NOT applied: the move, the
+              result measured for it, the reason behind it and the destination
+              checks. Only the designer may approve it, so its controls are on the
+              main panel and its reasoning is here. */}
+          <AdiDesignRecommendationSection
+            designChanges={designChangeList}
+            seatingRecommendation={summary.seatingRecommendation}
+            recommendation={designRecommendation}
+            placementStated={Boolean(placement?.kind)}
+          />
+
+          {/* The placement evidence behind the move the panel states: what
+              placement means here, the designer's own distances per wall group,
+              the expected result in whole dB and the on-plan status. Its controls
+              are on the main panel. */}
+          <PlacementRecommendationPanel
+            placement={placement}
+            busy={isRunning}
+            variant="evidence"
+          />
 
           {/* Absorption evidence — the frequency, how many seats share it, and
               which levers were evaluated without becoming the recommendation. */}
@@ -709,7 +794,19 @@ export default function AdiOptimisationJourney({
             </div>
           )}
 
-          {showEstimate && <OptimiserCalculationDetail instances={instances} seatCount={seatCount} />}
+          {/* The pre-run statement of the work: how many design options ADI will
+              evaluate and the acoustic calculations behind them. Stated ONCE, in
+              Engineer details — the main panel offers the action. */}
+          {showEstimate && (
+            <div className="space-y-1">
+              <OptimiserCalculationEstimateLine
+                instances={instances}
+                seatCount={seatCount}
+                className="rounded-md border border-[#E7E5E0] bg-white px-3 py-2"
+              />
+              <OptimiserCalculationDetail instances={instances} seatCount={seatCount} />
+            </div>
+          )}
         </div>
       </details>
 

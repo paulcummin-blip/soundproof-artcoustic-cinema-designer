@@ -13,6 +13,14 @@
 //   • that calibration was tested and no useful improvement was found
 //   • that calibration has not been tested yet
 //
+// WHERE IT RENDERS. The panel's default view states the DECISION — one
+// adjustment, one benefit, one comparison (adiPanelHeadline.js) — so this
+// section is read inside the collapsed Engineering details, beside the other
+// evidence: the settings each change touches, the canonical P19/P20 pair it was
+// decided on, the reason every other candidate was held and the candidate-level
+// proof behind them. Its own action stays on the main panel, so no control is
+// duplicated.
+//
 // The section's own action is supplied by the caller (the panel passes it in),
 // because only the panel knows whether this section owns the primary action.
 // Presentation only: no calculation, no decision, no apply.
@@ -53,6 +61,10 @@ export default function AdiCalibrationSection({
   // readable here. Presentation only — nothing is applied or recalculated.
   instances = [],
   roomDims = null,
+  // Read in Engineer details: the best calibration result is stated in full —
+  // its values, the settings it changed and why a tested result lost — rather
+  // than as the compact headline the main panel used to carry.
+  detailed = false,
   children = null,
   className = "",
 }) {
@@ -102,7 +114,7 @@ export default function AdiCalibrationSection({
           </div>
         </div>
       ) : (
-        <AdiBestCalibrationResult result={bestResult} compact={showsApplied} />
+        <AdiBestCalibrationResult result={bestResult} compact={showsApplied && !detailed} />
       )}
 
       {/* A USEFUL improvement that was held: the suggestion leads, in the

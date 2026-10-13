@@ -64,13 +64,17 @@ describe('PRE-RUN ESTIMATED COUNT SHOWN', () => {
     );
   });
 
-  it('renders the estimate on the pre-run card, and only before a run', () => {
+  it('states the count once, in the card\u2019s Engineer details disclosure', () => {
     const card = read('components/room/bass/optimiserPlan/AdiOptimisationJourney.jsx');
     expect(card).toMatch(/OptimiserCalculationEstimateLine/);
     expect(card).toMatch(/const showEstimate = isPreRun && !runEvidence;/);
-    // The count is stated ONCE, near the top of the card: the line above the
-    // button never repeats it.
-    expect(card).toMatch(/showSentence=\{!summary\.testedSentence\}/);
+    // The count is stated ONCE, inside the collapsed disclosure. The default card
+    // states the decision and offers the action; it never states the arithmetic
+    // behind it, and nothing is stated twice.
+    const detailsAt = card.indexOf('data-adi-engineer-details="true"');
+    expect(detailsAt).toBeGreaterThan(-1);
+    expect(card.indexOf('<OptimiserCalculationEstimateLine')).toBeGreaterThan(detailsAt);
+    expect(card).not.toMatch(/showSentence=\{!summary\.testedSentence\}/);
   });
 
   it('falls back to the sequence sentence when the count cannot be derived', () => {

@@ -9,6 +9,13 @@
 //   • the one action that applies when the result belongs to an earlier design
 //     state (Bass Optimiser) — never an Apply that cannot work
 //
+// `variant` decides which half of that is rendered where: the main panel takes
+// the controls, Engineer details takes the evidence. The move itself is stated by
+// the card's headline, so the main panel never repeats it.
+//
+// It is one panel drawn twice, never two panels: nothing is recomputed, and the
+// values it reads are the same object both times.
+//
 // Presentation only: every value arrives from placementRecommendationAuthority.
 // No coordinates, no decimals, no calculation.
 // ---------------------------------------------------------------------------
@@ -41,6 +48,13 @@ export default function PlacementRecommendationPanel({
   onApply = null,
   onUndo = null,
   onRerun = null,
+  // "full"     — the whole panel: its evidence and its controls (the default)
+  // "actions"  — the controls only, for the main panel's action row
+  // "evidence" — the evidence only, for Engineer details
+  // The card draws this panel twice: the decision and its controls stay on the
+  // main panel, and the reasoning behind the move stays in the details. Each mode
+  // renders exactly one of the two, so a control is never duplicated.
+  variant = "full",
   className = "",
 }) {
   if (!placement || !placement.kind) return null;
@@ -55,6 +69,36 @@ export default function PlacementRecommendationPanel({
     && placement.canRerun === true
     && typeof onRerun === "function";
   const statusStyle = STATUS_STYLE[placement.kind] || STATUS_STYLE[PLACEMENT_KIND.PREVIOUS];
+
+  const actions = (showApply || showUndo || showRerun) ? (
+    <div className="flex flex-wrap items-center gap-2">
+      {showApply && (
+        <button type="button" className={primary ? PRIMARY : SECONDARY} onClick={onApply} disabled={busy}>
+          {busy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Check className="h-3.5 w-3.5" />}
+          {placement.applyLabel || "Apply placement"}
+        </button>
+      )}
+      {showUndo && (
+        <button type="button" className={SECONDARY} onClick={onUndo} disabled={busy}>
+          <Undo2 className="h-3.5 w-3.5" />
+          {placement.undoLabel || "Undo placement"}
+        </button>
+      )}
+      {showRerun && (
+        <button type="button" className={SECONDARY} onClick={onRerun} disabled={busy}>
+          <RotateCcw className="h-3.5 w-3.5" />
+          {placement.rerunLabel || ADI_BASS_OPTIMISER_LABEL}
+          <ArrowRight className="h-3.5 w-3.5" />
+        </button>
+      )}
+    </div>
+  ) : null;
+
+  if (variant === "actions") {
+    return actions
+      ? <div className={className} data-placement-actions={placement.kind}>{actions}</div>
+      : null;
+  }
 
   return (
     <div
@@ -178,29 +222,8 @@ export default function PlacementRecommendationPanel({
         <div className="text-[11px] leading-relaxed text-[#8A5A2B]">{placement.notice}</div>
       )}
 
-      {(showApply || showUndo || showRerun) && (
-        <div className="flex flex-wrap items-center gap-2 pt-0.5">
-          {showApply && (
-            <button type="button" className={primary ? PRIMARY : SECONDARY} onClick={onApply} disabled={busy}>
-              {busy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Check className="h-3.5 w-3.5" />}
-              {placement.applyLabel || "Apply placement"}
-            </button>
-          )}
-          {showUndo && (
-            <button type="button" className={SECONDARY} onClick={onUndo} disabled={busy}>
-              <Undo2 className="h-3.5 w-3.5" />
-              {placement.undoLabel || "Undo placement"}
-            </button>
-          )}
-          {showRerun && (
-            <button type="button" className={SECONDARY} onClick={onRerun} disabled={busy}>
-              <RotateCcw className="h-3.5 w-3.5" />
-              {placement.rerunLabel || ADI_BASS_OPTIMISER_LABEL}
-              <ArrowRight className="h-3.5 w-3.5" />
-            </button>
-          )}
-        </div>
-      )}
+      {/* The controls, on the panel the designer acts on — never twice. */}
+      {variant !== "evidence" && actions && <div className="pt-0.5">{actions}</div>}
     </div>
   );
 }

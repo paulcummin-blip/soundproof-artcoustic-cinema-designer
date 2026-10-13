@@ -1,29 +1,37 @@
 // AdiPanelSummary.jsx
 // ---------------------------------------------------------------------------
-// LAYER 1 — the panel's result summary.
+// THE PANEL'S ONE HEADLINE.
 //
-// It states, in this order and nothing more:
-//   • the one-line finding: what ADI has already done
-//   • the current result and the best result found (or, for a design that has
-//     moved on, the previous best and the instruction to re-run)
-//   • what the evaluation covers, in one short line
+// It states the decision, in this order and nothing more:
+//   • the RECOMMENDED ADJUSTMENT — one line, in installer words
+//   • what it BUYS — one benefit sentence, no figure
+//   • where it LANDS — one P20 comparison, displayed whole dB, with its level
 //   • a target the design cannot reach, when the decision authority says so
+//   • for a design that has moved on, that the result belongs to an earlier
+//     design and the instruction to re-run
 //
-// Presentation only: every value arrives already resolved by the summary
-// authority. Nothing is calculated, graded or re-evaluated here.
+// Everything the decision was measured from — settings, seats, thresholds,
+// candidate counts, acceptance rules, fingerprints — is Engineer details' job
+// and is deliberately absent here.
+//
+// Presentation only: every value arrives already resolved (adiPanelHeadline.js,
+// adiDesignerSummary.js). Nothing is calculated, graded or re-evaluated here.
 // ---------------------------------------------------------------------------
 
 import React from "react";
 
 export default function AdiPanelSummary({
-  finding = null,
+  // The state's own line while a run is in progress.
   message = null,
-  testedSentence = null,
+  // THE recommendation: one adjustment, one benefit, one comparison.
+  adjustment = null,
+  benefit = null,
+  comparison = null,
+  // A target this design cannot reach, stated in one line.
   designLimitation = null,
+  // The earlier design state a saved result belongs to, with the one action.
   staleCopy = null,
   previousBest = null,
-  currentP20 = null,
-  recommendedP20 = null,
   className = "",
 }) {
   return (
@@ -32,8 +40,23 @@ export default function AdiPanelSummary({
         <div className="text-[13px] font-semibold text-[#1B1A1A] leading-relaxed">{message}</div>
       )}
 
-      {finding && (
-        <div className="text-[13px] font-semibold text-[#1B1A1A] leading-relaxed">{finding}</div>
+      {/* THE recommendation: what to do, what it buys, where it lands. */}
+      {adjustment && (
+        <div className="text-[14px] font-semibold text-[#1B1A1A] leading-snug" data-adi-panel-adjustment="true">
+          {adjustment}
+        </div>
+      )}
+
+      {benefit && (
+        <div className="text-[12.5px] text-[#3E4349] leading-relaxed" data-adi-panel-benefit="true">
+          {benefit}
+        </div>
+      )}
+
+      {comparison && (
+        <div className="pt-0.5 text-[12.5px] font-semibold text-[#213428] leading-relaxed" data-adi-panel-comparison="true">
+          {comparison}
+        </div>
       )}
 
       {/* A design that cannot meet its selected target states the remaining
@@ -50,26 +73,7 @@ export default function AdiPanelSummary({
           )}
           <div className="text-[11px] text-[#8A5A2B] leading-relaxed">{staleCopy.INSTRUCTION}</div>
         </div>
-      ) : (
-        <div className="space-y-0.5">
-          {currentP20 && (
-            <div className="text-[12px] text-[#3E4349]">
-              Current result: <span className="font-semibold text-[#1B1A1A]">{currentP20}</span>
-            </div>
-          )}
-          {recommendedP20 && (
-            <div className="text-[12px] text-[#3E4349]">
-              Best result found: <span className="font-semibold text-[#1B1A1A]">{recommendedP20}</span>
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* What the evaluation covers. One line, and only when the evidence
-          authority produced one. */}
-      {testedSentence && (
-        <div className="text-[11px] text-[#3E4349] leading-relaxed">{testedSentence}</div>
-      )}
+      ) : null}
     </div>
   );
 }

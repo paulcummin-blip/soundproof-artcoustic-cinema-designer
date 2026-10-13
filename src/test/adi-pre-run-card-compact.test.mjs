@@ -94,12 +94,16 @@ describe('CALCULATION COUNT STILL VISIBLE', () => {
     expect(estimateSentence(estimate)).toContain('over 250,000 acoustic calculations');
   });
 
-  it('is rendered in the pre-run card, before the action', () => {
+  it('is rendered on the pre-run card, inside the Engineer details disclosure', () => {
     const card = read(`${PLAN}AdiOptimisationJourney.jsx`);
     const estimateAt = card.indexOf('<OptimiserCalculationEstimateLine');
-    const actionAt = card.indexOf('{journey.actionLabel}');
+    const detailsAt = card.indexOf('data-adi-engineer-details="true"');
     expect(estimateAt).toBeGreaterThan(-1);
-    expect(estimateAt).toBeLessThan(actionAt);
+    expect(detailsAt).toBeGreaterThan(-1);
+    // The default card states the decision and offers the action. The work behind
+    // it — the design options and the acoustic calculations — is read in the
+    // disclosure, so the count never stands in the designer's way.
+    expect(estimateAt).toBeGreaterThan(detailsAt);
   });
 });
 
@@ -135,7 +139,8 @@ describe('DETAILS COLLAPSED BY DEFAULT', () => {
 
   it('is rendered only before a run, never beside real evidence', () => {
     const card = read(`${PLAN}AdiOptimisationJourney.jsx`);
-    expect(card).toMatch(/\{showEstimate && <OptimiserCalculationDetail instances=\{instances\} seatCount=\{seatCount\} \/>\}/);
+    expect(card).toMatch(/\{showEstimate && \(/);
+    expect(card).toMatch(/<OptimiserCalculationDetail instances=\{instances\} seatCount=\{seatCount\} \/>/);
     expect(card).toMatch(/const showEstimate = isPreRun && !runEvidence;/);
   });
 });
