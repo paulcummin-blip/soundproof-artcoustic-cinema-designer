@@ -430,6 +430,30 @@ export function seatingBoundaryHighlightCopy(geometry) {
 }
 
 /**
+ * THE SAME PRINCIPLE AT THE LENGTH A HIGHLIGHT CARD HAS ROOM FOR.
+ *
+ * A highlight group states its subject in one line beside its own published result,
+ * so the card's copy is composed here, from this module's own clearance bands, in
+ * the same voice as the longer forms: what the seating's position does for the
+ * listener, and no level, no distance and no promised outcome. One authority, so the
+ * card and the P1 explanation can never describe the same decision two ways.
+ *
+ * @param {Object} geometry — readSeatBoundaryGeometry output, or null
+ * @returns {string} the card-length statement
+ */
+export function seatingBoundaryHighlightSummary(geometry) {
+  const explanation = buildSeatingBoundaryExplanation(geometry);
+
+  if (!explanation || explanation.available !== true) {
+    return 'Where the seating sits is part of the acoustic design rather than a matter of fitting seats into the room.';
+  }
+
+  return explanation.favourable === true
+    ? 'Held clear of the room\'s boundaries rather than pushed against a wall, the seating keeps low-frequency behaviour further from the listeners and holds the surrounding speakers at a more even distance.'
+    : 'Where the seating comes nearer a boundary, those seats hear more of the room\'s low-frequency behaviour and sit closer to the speakers around them, which is the compromise this room sets.';
+}
+
+/**
  * The one-line statement of where the seating sits, for a surface that has room
  * for a clause rather than a paragraph.
  */

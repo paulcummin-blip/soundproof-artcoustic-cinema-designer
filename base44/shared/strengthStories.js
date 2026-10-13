@@ -60,7 +60,7 @@ import { story } from './strengthStoryShape.js';
 
 import {
   readSeatBoundaryGeometry,
-  seatingBoundaryHighlightCopy,
+  seatingBoundaryHighlightSummary,
 } from './seatingBoundaryPrinciple.js';
 
 /* The evidence reads are part of this module's own public surface: the report
@@ -403,7 +403,7 @@ export function buildSeatingClearanceStory(sources = {}, { byKey = {} } = {}) {
 
   const geometry = sources.seatBoundaryGeometry
     || readSeatBoundaryGeometry({ seats: sources.seatingPositions, roomDims: sources.roomDims });
-  const explanation = seatingBoundaryHighlightCopy(geometry);
+  const explanation = seatingBoundaryHighlightSummary(geometry);
   if (!explanation) return null;
 
   const positive = isStrength(p1.level);

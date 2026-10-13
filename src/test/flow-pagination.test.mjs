@@ -57,6 +57,9 @@ class FakeElement {
     this.computed = { paddingTop: '22mm', paddingBottom: '20mm', paddingLeft: '18mm', paddingRight: '18mm' };
     const self = this;
     this.ownerDocument = { defaultView: { getComputedStyle: (element) => element.computed || self.computed } };
+    // The compositor sets print wrap styles on the nodes it measures; a modelled
+    // frame carries no nodes, exactly as a real frame with no matching nodes would.
+    this.querySelectorAll = () => [];
   }
 
   get firstChild() { return this.childNodes[0] || null; }
