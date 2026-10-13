@@ -36,6 +36,7 @@ const COMPANION = read('src/components/report/speakerDesign/speakerDesignIssuedD
 const REPORT_PAGE = read('src/pages/RP22ClientReport.jsx');
 const PANEL_BUTTON = read('src/components/roomdesigner/SpeakerDesignPdfButton.jsx');
 const PDF_MODULE = read('src/components/roomdesigner/speakerDesignPdf.js');
+const ROW_SOURCE = read('src/components/report/speakerDesign/speakerDesignRows.js');
 
 /** One dual-centre schedule, as the panel states it. */
 const SCHEDULE_GROUPS = Object.freeze([
@@ -50,10 +51,13 @@ const SCHEDULE_GROUPS = Object.freeze([
         // cell, the document states the name alone and leaves the count to Qty.
         model: 'C4-1 × 2',
         modelNames: 'C4-1',
-        quantityLabel: '2 cabinets',
+        // QTY is a plain number — the physical loudspeakers at the position.
+        quantityLabel: '2',
         note: 'Dual physical centre cabinets, one logical centre channel · cabinets mounted vertically',
       },
       { key: 'FL', position: 'Front left', model: 'SL4-1', quantityLabel: '1', note: 'Behind screen' },
+      // A pair that shares one row: QTY is the two speakers the row states.
+      { key: 'SL', position: 'Side surrounds', model: 'EVOLVE 2-1', modelNames: 'EVOLVE 2-1', quantityLabel: '2', note: null },
     ],
   },
 ]);
@@ -121,7 +125,17 @@ test('the schedule states Position, Model and Qty only — never a Notes column'
     markup,
     /model-name">C4-1<\/span>\s*<span class="model-note">Dual physical centre cabinets, one logical centre channel · cabinets mounted vertically<\/span>/,
   );
-  assert.match(markup, /<td class="qty">2 cabinets<\/td>/);
+  // Every QTY cell is a plain number: the physical loudspeakers at that position —
+  // 1 each for separate left and right rows, 2 for a pair that shares one row, 2
+  // for two centre loudspeakers. Never a unit, never a wording.
+  assert.deepEqual(
+    [...markup.matchAll(/<td class="qty">([^<]*)<\/td>/g)].map((match) => match[1]),
+    ['2', '1', '2'],
+  );
+  assert.doesNotMatch(markup, /<td class="qty">[^<]*[A-Za-z]/, 'the QTY column carries a number only');
+  // The count is worded nowhere in the one authority both the document and the
+  // panel read.
+  assert.doesNotMatch(ROW_SOURCE, /quantityLabel:[^\n]*cabinets/);
 
   // No quantity multiplier ever reaches the Model column, and a number that is
   // part of a product name is passed through untouched.

@@ -15,6 +15,14 @@
  * client was given. Nothing is calculated, graded or inferred, and no role that
  * the design does not contain is ever invented.
  *
+ * The two cells read as:
+ *
+ *   MODEL — the product name alone, with no count printed beside it;
+ *   QTY   — a plain number: the physical loudspeakers at that position. One each
+ *           where left and right have their own rows, two for a pair that shares
+ *           one row, two for two centre loudspeakers. Never a unit, never a
+ *           wording.
+ *
  * Read-only and pure.
  */
 
@@ -83,7 +91,7 @@ const isInstalledModel = (value) => {
 
 const countLabel = (name, count) => (count > 1 ? `${name} × ${count}` : name);
 
-/** The total number of cabinets the row states. */
+/** The row's QTY: the number of physical loudspeakers the position holds. */
 const rowTotal = (models) => [...models.values()].reduce((sum, count) => sum + count, 0);
 
 const sumModels = (models) => [...models.values()].reduce((sum, count) => sum + count, 0);
@@ -148,7 +156,8 @@ export function buildSpeakerDesignRows({
   // The centre channel: one cabinet is stated as the centre channel, while two
   // physical cabinets are stated as the centre's own cabinets — the same rule the
   // equipment schedule uses. It is ONE channel either way, and it is never
-  // described as anything else.
+  // described as anything else. QTY holds the physical count (2 for two cabinets)
+  // and the dual-centre wording belongs to the model cell's note.
   const centreTotal = sumModels(centreModels);
   if (centreTotal > 0) {
     const centreRow = ROW_BY_KEY.get(CENTRE_ROW_KEY);
@@ -161,7 +170,7 @@ export function buildSpeakerDesignRows({
       model: modelCell(centreModels),
       modelNames: modelNamesCell(centreModels),
       quantity: centreTotal,
-      quantityLabel: dual ? `${centreTotal} cabinets` : String(centreTotal),
+      quantityLabel: String(centreTotal),
       note: dual
         ? `Dual physical centre cabinets, one logical centre channel${orientation ? ' · cabinets mounted vertically' : ''}`
         : centreRow.note || null,
