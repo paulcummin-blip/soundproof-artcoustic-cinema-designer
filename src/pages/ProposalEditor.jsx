@@ -758,6 +758,8 @@ export default function ProposalEditor() {
     error: exportError,
     blockedReason: exportBlockedReason,
     retryable: exportRetryable,
+    // The technical record of a pagination stop, for a master-admin login only.
+    errorDetail: exportErrorDetail,
     handleExport,
     handlePreview,
   } = useProposalExport({
@@ -851,6 +853,7 @@ export default function ProposalEditor() {
         blockedReason={comparisonBlockReason || exportBlockedReason || editLayerBlockReason}
         error={exportError}
         retryable={exportRetryable}
+        errorDetail={exportErrorDetail}
       />
 
       <div className="flex flex-1 min-h-0 overflow-hidden">

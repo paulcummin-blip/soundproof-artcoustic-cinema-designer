@@ -43,7 +43,11 @@ export function composeProposalFrames(pages) {
     // Resolve oversized paragraphs, including opening copy with heading/image overhead.
     const expanded = [];
     let chain = [];
+    // The allocation position of the block being measured, carried into the
+    // failure diagnostics: which block on which frame stopped the export.
+    let allocationIndex = 0;
     for (const unit of units) {
+      allocationIndex += 1;
       const candidate = [...chain, unit];
       let measured = measureUnits(candidate);
       // A photograph and its caption are indivisible: the photograph is reduced
@@ -54,7 +58,11 @@ export function composeProposalFrames(pages) {
       }
       if (!measured.fits && unit.tableId) throw new Error('A complete table row and its required introduction exceed printable A4 height. Export stopped without splitting the row.');
       if (!measured.fits && unit.atomic) throw new Error('A photograph block exceeds one printable A4 page even at its smallest height. Export stopped without cropping or omitting it.');
-      const fragments = measured.fits ? [unit] : fragmentTextUnit(unit, chain, measureUnits);
+      const fragments = measured.fits ? [unit] : fragmentTextUnit(unit, chain, measureUnits, {
+        index: allocationIndex,
+        total: units.length,
+        frame: original.dataset.paginationFrame,
+      });
       expanded.push(...fragments);
       chain = unit.keepNext ? (fragments.length === 1 ? [...chain, unit] : [fragments[fragments.length - 1]]) : [];
     }

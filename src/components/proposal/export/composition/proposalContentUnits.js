@@ -1,4 +1,5 @@
 import { fitMediaUnit } from '@/components/proposal/export/composition/proposalMediaFitting';
+import { unitIdentityOf } from '@/components/proposal/export/composition/paginationFailureDiagnostics';
 
 /** Semantic units within the measured browser compositor; original DOM order is authoritative. */
 const PROSE = '.pp-body,.pp-endnote__body,.proposal-print-section__body';
@@ -26,6 +27,14 @@ function wrapped(node, ancestors) {
   copy.querySelectorAll?.('[id]').forEach((element) => element.removeAttribute('id'));
   return copy;
 }
+/**
+ * Tag the units with the stage that delivered them — a whole composition, a whole
+ * block, or a block's own children. Read by the failure diagnostics, and by
+ * nothing else: it decides no allocation and measures nothing extra.
+ */
+function marked(units, via) {
+  return (units || []).map((unit) => ({ ...unit, via }));
+}
 export function markCompositionOrigins(page) {
   [...page.querySelectorAll('*')].forEach((node, index) => { node.dataset.paginationOrigin = `${page.dataset.paginationFrame}:${index}`; });
   // Keep column geometry identical for all row fragments, including five-option comparisons.
@@ -52,6 +61,10 @@ export function proposalContentUnits(page, measureUnits) {
     source,
     keepNext: source.matches?.(HEADING) || false,
     atomic: source.matches?.(MEDIA) || false,
+    // Which section, which editorial composition and which block this unit came
+    // from, read from the LIVE element: the identity therefore survives every
+    // clone and every temporary page container the unit is measured in.
+    identity: unitIdentityOf(source),
     ...extra,
   });
   const tableUnits = (table, ancestors) => {
@@ -106,16 +119,18 @@ export function proposalContentUnits(page, measureUnits) {
   // presented on one sheet.
   const blockUnits = (block) => {
     const whole = atom(block, []);
-    if (measureUnits([whole]).fits) return [whole];
-    if (fitMediaUnit(whole, [], measureUnits)) return [whole];
-    return collect(block, [], true);
+    if (measureUnits([whole]).fits) return marked([whole], 'block-whole');
+    if (fitMediaUnit(whole, [], measureUnits)) return marked([whole], 'block-media-fitted');
+    return marked(collect(block, [], true), 'block-fragments');
   };
   const compositionUnits = (composition) => {
     const whole = atom(composition, []);
-    if (measureUnits([whole]).fits) return [whole];
-    if (fitMediaUnit(whole, [], measureUnits)) return [whole];
+    if (measureUnits([whole]).fits) return marked([whole], 'composition-whole');
+    if (fitMediaUnit(whole, [], measureUnits)) return marked([whole], 'composition-media-fitted');
     return [...composition.children].flatMap((child) => (
-      child.matches?.(COMPOSITION_BLOCK) ? blockUnits(child) : collect(child, [], true)
+      child.matches?.(COMPOSITION_BLOCK)
+        ? blockUnits(child)
+        : marked(collect(child, [], true), 'composition-child-fragments')
     ));
   };
 
@@ -131,7 +146,9 @@ export function proposalContentUnits(page, measureUnits) {
     const longProse = group.hasAttribute?.('data-editorial-section') && paragraphs.length >= 3
       && standalone.used > standalone.budget * 0.55;
     const evidenceTable = page.matches('.pp-page--highlights') && (group.matches?.('table') || group.querySelector?.('table'));
-    units.push(...(standalone.fits && !longProse && !evidenceTable ? [whole] : collect(group, [], true)));
+    units.push(...(standalone.fits && !longProse && !evidenceTable
+      ? marked([whole], 'page-section-whole')
+      : marked(collect(group, [], true), 'page-section-fragments')));
   }
   for (let index = 0; index < units.length; index += 1) {
     const unit = units[index];

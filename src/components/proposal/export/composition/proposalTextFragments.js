@@ -1,3 +1,8 @@
+import {
+  FRAGMENT_REFUSAL,
+  paginationFailureError,
+} from '@/components/proposal/export/composition/paginationFailureDiagnostics';
+
 /** Fragment only a paragraph that cannot fit its available sheet, retaining inline markup. */
 function textBoundaries(node) {
   const walker = node.ownerDocument.createTreeWalker(node, 4);
@@ -14,11 +19,23 @@ function position(nodes, offset, end) {
   const entry = nodes.find((item) => end ? offset > item.start && offset <= item.end : offset >= item.start && offset < item.end) || nodes[nodes.length - 1];
   return { node: entry.node, offset: Math.max(0, Math.min(entry.node.length, offset - entry.start)) };
 }
-export function fragmentTextUnit(unit, prefix, measureUnits) {
+export function fragmentTextUnit(unit, prefix, measureUnits, allocation = null) {
   const target = unit.node.matches('p,li,figcaption') ? unit.node : unit.node.querySelector('p,li,figcaption');
-  if (!target || target.querySelector('img,video,svg,table')) throw new Error('An indivisible proposal block exceeds printable A4 height. Export stopped without removing content.');
+  // The stop itself is unchanged — the same safe failure, refusing to remove
+  // content. What is added is the record of WHICH block it was: the section, the
+  // editorial composition, the element, its measured height and the printable
+  // height it exceeded. No copy is carried in it.
+  const failure = (refusal, reached) => paginationFailureError({
+    unit, prefix, measureUnits, allocation, refusal, target: reached,
+  });
+  if (!target || target.querySelector('img,video,svg,table')) {
+    throw failure(
+      target ? FRAGMENT_REFUSAL.INDIVISIBLE_CONTENT : FRAGMENT_REFUSAL.NO_FRAGMENTABLE_PARAGRAPH,
+      target,
+    );
+  }
   const source = textBoundaries(target);
-  if (!source.length) throw new Error('An empty oversized proposal block cannot be paginated.');
+  if (!source.length) throw failure(FRAGMENT_REFUSAL.EMPTY_OVERSIZED_BLOCK, target);
   const origin = target.dataset.paginationOrigin;
   const fragment = (start, end) => {
     const node = unit.node.cloneNode(true);
@@ -58,7 +75,7 @@ export function fragmentTextUnit(unit, prefix, measureUnits) {
         else high = mid - 1;
       }
     }
-    if (accepted < 0) throw new Error('The proposal heading and its opening content cannot fit the printable A4 area without changing the design.');
+    if (accepted < 0) throw failure(FRAGMENT_REFUSAL.NO_FITTING_FRAGMENT, target);
     let end = choices[accepted];
     // Do not leave a tiny final text fragment if one earlier word boundary can balance it.
     if (end < source.length && source.length - end < 120 && accepted > 0) end = choices[accepted - 1];

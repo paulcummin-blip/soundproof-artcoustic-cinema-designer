@@ -20,6 +20,7 @@ import React from 'react';
 import { FileText, Download, Eye, Loader2, AlertCircle, RotateCw } from 'lucide-react';
 
 import { REPORT_FONT_BODY as FONT } from '@/components/report/typography/reportTypography';
+import PaginationFailureDetails from '@/components/proposal/export/PaginationFailureDetails';
 
 const SECONDARY_IDLE =
   'flex items-center gap-1.5 px-3 py-2 text-xs uppercase tracking-[0.12em] rounded-md border transition-colors border-[#DCDBD6] bg-white text-[#3E4349] hover:bg-[#F5F4F0]';
@@ -43,6 +44,10 @@ export default function ProposalWorkspaceToolbar({
   // A preparation failure the designer can simply retry: it restarts the whole
   // print preparation from the start, without reloading the app.
   retryable = false,
+  // The technical record of a pagination stop, when that is why the export
+  // failed. Rendered inside PaginationFailureDetails, which shows it to a
+  // master-admin login only.
+  errorDetail = null,
 }) {
   const message = blockedReason || error;
 
@@ -141,6 +146,10 @@ export default function ProposalWorkspaceToolbar({
               </button>
             )}
           </div>
+
+          {/* Why a composition refused to print: the block, its measured height
+              and the printable height it exceeded. Master-admin only. */}
+          <PaginationFailureDetails diagnostics={errorDetail} />
         </div>
       )}
     </div>

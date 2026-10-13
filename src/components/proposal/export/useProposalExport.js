@@ -189,6 +189,10 @@ export function useProposalExport({
   // Whether the last failure was "the document was not ready", which the designer
   // can simply retry from the toolbar.
   const [retryable, setRetryable] = useState(false);
+  // WHY a composition refused to print, when that is the failure: which block,
+  // which element, how tall it measured. Null for every other failure. Carried
+  // separately from the message because only a master-admin login is shown it.
+  const [errorDetail, setErrorDetail] = useState(null);
 
   const printingRef = useRef(false);
   // The attempt currently in flight. Incremented as each one starts, so anything
@@ -261,6 +265,7 @@ export function useProposalExport({
     setBlockedReason(null);
     setError(null);
     setRetryable(false);
+    setErrorDetail(null);
     printingRef.current = true;
     setExporting(true);
     setPreviewing(mode === PREVIEW_MODE);
@@ -438,12 +443,17 @@ export function useProposalExport({
         });
       }
       // The trace of this attempt is kept — which operation was outstanding, how
-      // long each stage took. It carries no project content.
-      recordExportDiagnostics(diagnostics.snapshot());
+      // long each stage took. It carries no project content, and neither does the
+      // pagination record beside it: element identity and millimetres only.
+      recordExportDiagnostics({
+        ...diagnostics.snapshot(),
+        paginationFailure: err?.paginationDiagnostics ?? null,
+      });
       // A failure raised by an attempt that has already been superseded changes
       // nothing: no error is shown for it, and the window a newer attempt owns is
       // left alone. Its own preparation window is closed here.
       if (!isCurrent()) return;
+      setErrorDetail(err?.paginationDiagnostics ?? null);
       setError(
         notReady
           ? err.message
@@ -462,5 +472,15 @@ export function useProposalExport({
   const handleExport = useCallback(() => runPrint(EXPORT_MODE), [runPrint]);
   const handlePreview = useCallback(() => runPrint(PREVIEW_MODE), [runPrint]);
 
-  return { exporting, previewing, error, blockedReason, retryable, handleExport, handlePreview };
+  return {
+    exporting,
+    previewing,
+    error,
+    // The technical record of a pagination stop, rendered only for a master admin.
+    errorDetail,
+    blockedReason,
+    retryable,
+    handleExport,
+    handlePreview,
+  };
 }
