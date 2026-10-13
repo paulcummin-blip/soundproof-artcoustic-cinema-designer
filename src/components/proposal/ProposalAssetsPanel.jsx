@@ -257,6 +257,25 @@ export default function ProposalAssetsPanel({
     }
   };
 
+  /**
+   * What this image is intended to communicate. The composer reads it to keep
+   * the image near the copy it explains, and to know whether it is a drawing that
+   * must be shown whole. Editorial context only: nothing about the stored file,
+   * the caption, the scope, the seating grouping, the comparison or any
+   * engineering value changes.
+   */
+  const handlePurposeChange = async (asset, value) => {
+    if (!asset?.id) return;
+    const patch = { image_purpose: value || null };
+    try {
+      await base44.entities.ProposalAsset.update(asset.id, patch);
+      setAssets((prev) => prev.map((a) => (a.id === asset.id ? { ...a, ...patch } : a)));
+    } catch (err) {
+      console.error('Failed to change the image purpose:', err);
+      alert('Failed to change this image purpose. Please try again.');
+    }
+  };
+
   /** Which part of the frame this image's crops keep. */
   const handleFocalChange = async (asset, patch) => {
     if (!asset?.id) return;
@@ -420,6 +439,7 @@ export default function ProposalAssetsPanel({
                         onUsageChange={(usage) => handleUsageChange(existing, usage)}
                         onSeatingChange={(value) => handleSeatingChange(existing, value)}
                         onPresentationChange={(value) => handlePresentationChange(existing, value)}
+                        onPurposeChange={(value) => handlePurposeChange(existing, value)}
                         onFocalChange={(patch) => handleFocalChange(existing, patch)}
                         onComparisonChange={(patch) => handleComparisonChange(existing, patch)}
                         onUseAsCover={() => handleUseAsCover(group, slot, existing)}

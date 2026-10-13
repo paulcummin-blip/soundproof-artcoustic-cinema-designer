@@ -60,9 +60,9 @@ test('the three modes are declared, labelled and explained', () => {
     assert.ok(IMAGE_PRESENTATION_LABELS[mode], `${mode} must carry a label`);
     assert.ok(IMAGE_PRESENTATION_HELP[mode], `${mode} must carry its guidance`);
   }
-  assert.equal(IMAGE_PRESENTATION_LABELS[IMAGE_PRESENTATION.DETAIL], 'Detail');
-  assert.equal(IMAGE_PRESENTATION_LABELS[IMAGE_PRESENTATION.CROPPED_DETAIL], 'Cropped detail');
-  assert.equal(IMAGE_PRESENTATION_LABELS[IMAGE_PRESENTATION.FULL_WIDTH], 'Full width');
+  assert.equal(IMAGE_PRESENTATION_LABELS[IMAGE_PRESENTATION.DETAIL], 'Inline Detail');
+  assert.equal(IMAGE_PRESENTATION_LABELS[IMAGE_PRESENTATION.CROPPED_DETAIL], 'Cropped Detail');
+  assert.equal(IMAGE_PRESENTATION_LABELS[IMAGE_PRESENTATION.FULL_WIDTH], 'Full Width');
 });
 
 test('the two smaller modes sit between half and two thirds of the width', () => {

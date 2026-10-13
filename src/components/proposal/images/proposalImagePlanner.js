@@ -35,9 +35,11 @@ import {
   comparisonGroupsOf,
   comparisonOptionLabelOf,
   comparisonPageTitle,
+  imagePurposeOf,
   isComparisonImage,
   isUsableInProposal,
   makePlacement,
+  purposeSectionTypes,
   seatingStyleOf,
 } from './proposalImagePlacementAuthority.js';
 
@@ -250,11 +252,22 @@ export function planProposalImages({ assets = [], sectionSlots = [], coverAssetI
     add(pickLandscape(overviewEntry.page), EDITORIAL_ROLE.LANDSCAPE_FEATURE, overviewEntry.section_id, overviewEntry.page);
   }
 
-  // 3. The first structure section: a portrait accent among the copy.
+  // 3. The image that supports the copy: it sits smaller, beside the paragraphs
+  // it explains, in the copy-and-image row the portrait accent already uses.
+  // Where the designer recorded what the image is for, it takes the section that
+  // purpose belongs with, so a drawing or a detail is not separated from the
+  // account it supports. Where nothing is recorded, or the document has none of
+  // the sections that purpose prefers, it keeps the treatment it has always had:
+  // the first design structure.
   const structures = entries.filter((entry) => STRUCTURE_TYPES.includes(entry.section_type));
-  const portraitEntry = structures[0] || null;
+  const fallbackEntry = structures[0] || null;
+  const purposeEntryFor = (asset) => purposeSectionTypes(imagePurposeOf(asset))
+    .map((type) => entries.find((entry) => entry.section_type === type && entry !== overviewEntry))
+    .find(Boolean) || null;
+  const supportingSource = pickPortrait(fallbackEntry ? fallbackEntry.page : 999);
+  const portraitEntry = (supportingSource && purposeEntryFor(supportingSource)) || fallbackEntry;
   if (portraitEntry && portraitEntry !== overviewEntry) {
-    add(pickPortrait(portraitEntry.page), EDITORIAL_ROLE.PORTRAIT_EDITORIAL, portraitEntry.section_id, portraitEntry.page);
+    add(supportingSource, EDITORIAL_ROLE.PORTRAIT_EDITORIAL, portraitEntry.section_id, portraitEntry.page);
   }
 
   // 4. The visual break: the cover source returns as a full-width landscape.

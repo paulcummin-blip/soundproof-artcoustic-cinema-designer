@@ -22,13 +22,28 @@ import {
   IMAGE_PRESENTATION,
   IMAGE_PRESENTATION_HELP,
   IMAGE_PRESENTATION_LABELS,
+  IMAGE_PURPOSE,
+  IMAGE_PURPOSE_HELP,
+  IMAGE_PURPOSE_LABELS,
   SEATING_STYLE,
   SEATING_STYLE_LABELS,
   assetFocalPoint,
   imagePresentationOf,
-  presentationCropAllowed,
+  imagePurposeOf,
+  isDrawingPurpose,
+  placementCropAllowed,
   seatingStyleOf,
 } from '@/components/proposal/images/proposalImagePlacementAuthority';
+
+/** The six purposes, in the order the card offers them. */
+const PURPOSE_OPTIONS = [
+  IMAGE_PURPOSE.WHOLE_ROOM,
+  IMAGE_PURPOSE.SEATING_OPTION,
+  IMAGE_PURPOSE.LAYOUT_DRAWING,
+  IMAGE_PURPOSE.INTERIOR_DETAIL,
+  IMAGE_PURPOSE.PRODUCT_DETAIL,
+  IMAGE_PURPOSE.OTHER,
+];
 
 /** The three presentation modes, in the order the card offers them. */
 const PRESENTATION_OPTIONS = [
@@ -61,6 +76,7 @@ export default function ImageProposalControls({
   comparisonGroupOptions = [],
   onUsageChange,
   onSeatingChange,
+  onPurposeChange,
   onPresentationChange,
   onFocalChange,
   onComparisonChange,
@@ -76,10 +92,18 @@ export default function ImageProposalControls({
   // The presentation the designer has chosen, or '' where none is recorded: an
   // image with no preference keeps the treatment it always had.
   const presentation = imagePresentationOf(asset) || '';
-  // The focal point only affects an image where cropping is permitted. A detail
-  // image is never cropped, so its focal controls are inert and say so rather
-  // than appearing to do something they no longer do.
-  const focalApplies = presentationCropAllowed(presentation);
+  // WHAT THIS IMAGE IS FOR, in the designer's own words, or '' where none is
+  // recorded. Editorial context only: it tells the composer which copy the image
+  // belongs with, and it decides whether the image is a drawing shown whole.
+  const purpose = imagePurposeOf(asset) || '';
+  // A drawing is never cropped, whatever presentation is selected. The permission
+  // is decided in one place, so no page-fit decision can override it here.
+  const drawingProtected = isDrawingPurpose(purpose);
+  const cropAllowed = placementCropAllowed({ presentation, purpose });
+  // The focal point only affects an image where cropping is permitted. An image
+  // shown whole is never cropped, so its focal controls are inert and say so
+  // rather than appearing to do something they no longer do.
+  const focalApplies = cropAllowed;
 
   return (
     <div className="mt-3 border-t border-[#EFECE4] pt-3 space-y-2">
@@ -132,14 +156,39 @@ export default function ImageProposalControls({
             </select>
           </div>
 
-          {/* IMAGE PRESENTATION — how this image is placed in the document: the
-              large editorial image, a smaller whole drawing, or a smaller
-              editorial crop. A stored choice, and a preference only: an image
-              with none recorded is composed exactly as the document always
-              composed it. */}
+          {/* IMAGE PURPOSE — what this image is meant to communicate. It is the
+              composer's editorial context: which narrative content the image
+              belongs with, and whether it is a drawing that must stay whole. It
+              adds no engineering claim and changes no stored value. */}
           <div>
             <label className="block text-[10px] uppercase tracking-[0.12em] text-[#A79E8C] mb-1" style={FONT}>
-              Image presentation
+              Image purpose
+            </label>
+            <select
+              value={purpose}
+              onChange={(event) => onPurposeChange(event.target.value)}
+              className={SELECT_CLASS}
+              style={FONT}
+            >
+              <option value="">Not specified</option>
+              {PURPOSE_OPTIONS.map((value) => (
+                <option key={value} value={value}>{IMAGE_PURPOSE_LABELS[value]}</option>
+              ))}
+            </select>
+            <p className="mt-1 text-[10px] leading-snug text-[#8A8477]" style={FONT}>
+              {purpose
+                ? IMAGE_PURPOSE_HELP[purpose]
+                : 'Tell the proposal what this image is for, and it is placed with the text it explains.'}
+            </p>
+          </div>
+
+          {/* PRESENTATION — how this image is placed in the document: the large
+              editorial image, a smaller whole drawing, or a smaller editorial
+              crop. A stored choice, and a preference only: an image with none
+              recorded is composed exactly as the document always composed it. */}
+          <div>
+            <label className="block text-[10px] uppercase tracking-[0.12em] text-[#A79E8C] mb-1" style={FONT}>
+              Presentation
             </label>
             <select
               value={presentation}
@@ -153,15 +202,17 @@ export default function ImageProposalControls({
               ))}
             </select>
             <p className="mt-1 text-[10px] leading-snug text-[#8A8477]" style={FONT}>
-              {presentation
-                ? IMAGE_PRESENTATION_HELP[presentation]
-                : 'This image is composed exactly as the proposal has always composed it.'}
+              {drawingProtected
+                ? IMAGE_PURPOSE_HELP[IMAGE_PURPOSE.LAYOUT_DRAWING]
+                : presentation
+                  ? IMAGE_PRESENTATION_HELP[presentation]
+                  : 'This image is composed exactly as the proposal has always composed it.'}
             </p>
           </div>
 
           <div>
             <label className="block text-[10px] uppercase tracking-[0.12em] text-[#A79E8C] mb-1" style={FONT}>
-              Focal point{isDefaultFocal ? ' (centre / middle)' : ''}
+              Focal point{isDefaultFocal ? ' (centre / middle)' : ''}{!focalApplies ? ' (not used: shown whole)' : ''}
             </label>
             <div className="flex items-center gap-2">
               <select

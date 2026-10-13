@@ -37,7 +37,7 @@ import {
   resolveCoverAssetId,
 } from '@/components/proposal/images/proposalImagePlanner';
 import { validateProposalImagePlan } from '@/components/proposal/images/proposalImagePlanValidator';
-import { EDITORIAL_ROLE } from '@/components/proposal/images/proposalImagePlacementAuthority';
+import { EDITORIAL_ROLE, IMAGE_PRESENTATION } from '@/components/proposal/images/proposalImagePlacementAuthority';
 import AtAGlancePage from '@/components/proposal/print/AtAGlancePage';
 import MethodPage from '@/components/proposal/print/MethodPage';
 import DecisionSummaryPage from '@/components/proposal/print/DecisionSummaryPage';
@@ -492,10 +492,22 @@ export default function ProposalPackDocument({
           continued={continuesOpenSheet}
         />
       );
-      const leadingMedia = landscape && !mediaFollowsBody(section.section_type)
+      // An INLINE DETAIL image is composed in the copy-and-image row the portrait
+      // accent already uses, beside the paragraphs it supports, so a drawing is
+      // not parted from the description it explains. The row is an existing
+      // layout with its own keep-together rule: nothing about measurement, page
+      // breaks or pagination changes here. Where the section already carries a
+      // portrait accent, the drawing keeps the established placement instead, so
+      // no image is ever dropped or composed twice.
+      const inlineDetail = Boolean(landscape)
+        && !portrait
+        && (landscape.crop_protected === true
+          || landscape.image_presentation === IMAGE_PRESENTATION.DETAIL
+          || landscape.image_presentation === IMAGE_PRESENTATION.CROPPED_DETAIL);
+      const leadingMedia = landscape && !mediaFollowsBody(section.section_type) && !inlineDetail
         ? <ProposalImagePlacement placement={landscape} />
         : null;
-      const supportingMedia = landscape && mediaFollowsBody(section.section_type)
+      const supportingMedia = landscape && mediaFollowsBody(section.section_type) && !inlineDetail
         ? <ProposalImagePlacement placement={landscape} />
         : null;
 
@@ -566,6 +578,11 @@ export default function ProposalPackDocument({
               <div className="pp-media-row">
                 <div className="pp-media-row__copy">{openingCopy}</div>
                 <ProposalImagePlacement placement={portrait} />
+              </div>
+            ) : inlineDetail ? (
+              <div className="pp-media-row">
+                <div className="pp-media-row__copy">{openingCopy}</div>
+                <ProposalImagePlacement placement={landscape} />
               </div>
             ) : openingCopy}
             {supportingMedia}

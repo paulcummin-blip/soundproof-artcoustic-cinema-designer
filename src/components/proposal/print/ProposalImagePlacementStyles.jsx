@@ -62,6 +62,24 @@ export default function ProposalImagePlacementStyles() {
       }
       .pp-media--portrait img { height: 62mm; }
 
+      /* ── An inline detail image beside the copy ──────────────────────────
+         The same copy-and-image row the portrait accent uses, so an inline
+         detail sits with the paragraphs it supports rather than in a card beside
+         them. The frame follows the image's own proportions and nothing is
+         cropped, so a dimensioned drawing keeps every dimension, label and
+         annotation it carries. The row keeps its established keep-together
+         rule. ── */
+      .pp-media-row .pp-media--presentation-detail,
+      .pp-media-row .pp-media--presentation-cropped-detail {
+        flex: 0 0 46%;
+        max-width: 46%;
+      }
+      .pp-media-row .pp-media--presentation-detail img {
+        height: auto;
+        max-height: 84mm;
+      }
+      .pp-media-row .pp-media--presentation-cropped-detail img { height: 52mm; }
+
       /* ── The Spatial Resolution accent carries more vertical presence ──
          The right-hand photograph beside the Spatial Resolution copy is about
          20% taller than the standard portrait accent (74mm → 89mm on the sheet),
@@ -167,6 +185,11 @@ export default function ProposalImagePlacementStyles() {
           height: 66mm;
         }
         .pp-media-row { gap: 8mm; }
+        /* An inline detail drawing on the sheet: the frame follows the drawing's
+           own proportions and its height is bounded rather than fixed, so the
+           drawing is reduced only as far as it stays readable and is never
+           cropped. */
+        .pp-media-row .pp-media--presentation-detail img { max-height: 96mm; }
         .pp-media-row,
         .pp-seating,
         .pp-seating .pp-media,

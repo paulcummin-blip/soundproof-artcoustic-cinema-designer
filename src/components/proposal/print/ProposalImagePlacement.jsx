@@ -43,8 +43,14 @@ export default function ProposalImagePlacement({
   // The designer's own presentation choice, when one is recorded. No choice
   // recorded means the role treatment alone, exactly as before.
   const presentation = placement.image_presentation || null;
-  const presentationClass = presentation ? ` pp-media--presentation-${presentation}` : '';
-  const detail = presentation === IMAGE_PRESENTATION.DETAIL;
+  const purpose = placement.image_purpose || null;
+  // A drawing identified by its purpose is shown whole whatever presentation was
+  // selected, so it takes the uncropped detail frame: the placement's own
+  // crop_protected flag is the statement, and no page-fit decision overrides it.
+  const protectedDrawing = placement.crop_protected === true;
+  const effectivePresentation = protectedDrawing ? IMAGE_PRESENTATION.DETAIL : presentation;
+  const presentationClass = effectivePresentation ? ` pp-media--presentation-${effectivePresentation}` : '';
+  const detail = effectivePresentation === IMAGE_PRESENTATION.DETAIL;
 
   return (
     <figure className={`pp-media pp-media--${treatment}${closingClass}${presentationClass} ${className}`.trim()}>
@@ -59,7 +65,9 @@ export default function ProposalImagePlacement({
         style={detail
           ? { objectFit: 'contain', objectPosition: '50% 50%' }
           : { objectPosition: objectPositionForFocalPoint(placement.focal_point) }}
-        data-presentation={presentation || 'unstated'}
+        data-presentation={effectivePresentation || 'unstated'}
+        data-selected-presentation={presentation || 'unstated'}
+        data-purpose={purpose || 'unstated'}
         data-crops={detail ? 'no' : 'yes'}
       />
       {captionText ? <figcaption className="pp-media__caption">{captionText}</figcaption> : null}
