@@ -170,8 +170,11 @@ test('the writer receives preferences, with the softness stated in the same brea
   assert.match(block.exclude_rule, /COPY|copy/);
   assert.match(block.exclude_rule, /no evidence, no reported result, no table/i);
   // A steer that is preferred and excluded at once cannot happen: exclusion wins.
+  // The wizard sends the excluded topic by name AND by key, which is the shape the
+  // generation function merges before it reads them.
   const both = normaliseNarrativeSteer({
     preferred_topics: ['Seating arrangement', 'Bass performance'],
+    excluded_topics: ['Seating arrangement'],
     excluded_topic_keys: ['seating_arrangement'],
   });
   assert.deepEqual(both.preferred_topics, ['Bass performance']);
@@ -183,7 +186,7 @@ test('seating, excluded, leaves the narrative completely — and no figure with 
   const body = [
     '<p>The front row is the primary seat, so the seating geometry puts the reference seat 4.2 m from the screen. ',
     'The boundary clearance of the outer seats is 0.8 m.</p>',
-    '<p>Bass performance reaches 25 Hz at L3 across the listening area, and the tonal consistency between the screen and surround channels is exceptional.</p>',
+    '<p>Bass performance reaches 25 Hz at L3 across the room, and the tonal consistency between the screen and surround channels is exceptional.</p>',
   ].join('');
   const cleaned = suppressExcludedNarrative(body, { excluded });
   // Every seating subject is gone: positions, geometry, the primary seat, the
