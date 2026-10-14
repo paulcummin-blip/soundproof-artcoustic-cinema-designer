@@ -12,7 +12,9 @@
  * viewable width (a 170" wide 2.35:1 screen). resolveStatedScreenSize() is that
  * number, resolved once here from the canonical effective viewable width — the
  * same width authority the Room Designer and every report already use
- * (resolveEffectiveScreen). The diagonal is derived alongside it for reference.
+ * (resolveEffectiveScreen). The diagonal is resolved alongside it for reference:
+ * a television preset states its own NOMINAL size, and a display with no preset
+ * keeps the diagonal derived from its viewable width.
  *
  * Nothing about the design is calculated here: it only resolves the screen the
  * designer set into the number a client-facing surface states, so every section
@@ -22,7 +24,7 @@
  * Pure: no React, no side effects.
  */
 
-import { resolveEffectiveVisibleWidthInches } from './resolveEffectiveScreen';
+import { resolveEffectiveVisibleWidthInches, TV_PRESET_DIAGONAL_INCHES } from './resolveEffectiveScreen';
 import { formatDisplayPhrase } from './displayPhraseFormat';
 
 /** [width, height] for an aspect string such as '16:9' or '2.35:1'. */
@@ -88,7 +90,17 @@ export function resolveCanonicalScreen(project) {
   const widthInches = canonicalViewableWidthInches(project);
   if (widthInches === null) return null;
   const aspectRatio = project?.aspect_ratio || '16:9';
-  const diagonal = diagonalInchesFromWidth(widthInches, aspectRatio);
+  const television = isTelevisionScreen(project);
+  // A television preset states its OWN nominal size — a 100" TV is 100" — so that
+  // figure is read from the preset catalogue, exactly as the display's own
+  // identity reads it, and never derived back off the panel's viewable width:
+  // 87.80" of viewable width would round to 101" and the display would be stated
+  // as a size the designer never set. A television with no preset states no
+  // nominal size, so it keeps the derived diagonal it always had, as does a
+  // projection screen.
+  const presetKey = String(project?.tv_preset_key ?? '').trim().toLowerCase();
+  const nominalDiagonal = television ? TV_PRESET_DIAGONAL_INCHES[presetKey] ?? null : null;
+  const diagonal = nominalDiagonal ?? diagonalInchesFromWidth(widthInches, aspectRatio);
   if (diagonal === null) return null;
   const width = Math.round(widthInches);
   const diagonalInches = Math.round(diagonal);
@@ -96,7 +108,6 @@ export function resolveCanonicalScreen(project) {
   // diagonal alone; a projection screen by its viewable width and aspect ratio
   // alone. The diagonal stays available as a resolved value for reference, but
   // it is never part of the phrase a client-facing surface prints.
-  const television = isTelevisionScreen(project);
   return {
     widthInches: width,
     diagonalInches,
