@@ -45,6 +45,11 @@ export const NARRATIVE_EXCLUSION_RULES = Object.freeze({
     /\brows?\s+of\s+seats?\b/i,
     /\b(?:front|rear|back|second|middle)\s+row\b/i,
     /\blistening\s+(?:position|area|zone)s?\b/i,
+    // The prioritised listening seat, by any of the names the copy may use for
+    // it: a primary or secondary seat, the reference seat, the recommended
+    // seating position. Naming one is discussing the seating.
+    /\b(?:primary|secondary|reference)\s+(?:seat|seats|listening|position|positions)\b/i,
+    /\bRSP\b/,
     /\bboundary\s+clearance\b/i,
     /\bclearance\s+(?:to|around|from)\b/i,
     /\bP1\b/,

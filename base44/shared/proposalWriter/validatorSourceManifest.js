@@ -21,7 +21,7 @@ export const VALIDATOR_SOURCE_MANIFEST = Object.freeze({
   'base44/shared/proposalGeneration/generationStatuses.js': '2273b2e8408a426eeb137d9ae2f34c428a8e934dc0529134e9889aae75103b28',
   'base44/shared/proposalWriter/writerCabinetLanguage.js': '18e37edb21bd8422c6293c5fde809984d185e7188d0fe4a12fa2ff352d4b72c7',
   'base44/shared/proposalWriter/writerValidationRegister.js': '634502ab07c0bf1b13cfe0879d1e2ca2e85f0419c94f377b266a977c38c07b96',
-  'base44/shared/proposalWriter/writerInputBuilder.js': 'd7dfeaa50c6b7ee632df47bb7aba9ee5920f4ec93ea13b67d03670dd9759e145',
+  'base44/shared/proposalWriter/writerInputBuilder.js': 'c4620182f02914be3818ff9811c4d4d4b333906998d05987822cd43c689d3ac8',
   // The client narrative register: the story the client is buying, never the
   // mechanism that produces it. It states the instruction the writer reads and the
   // phrasing the narrative sanitizer removes, so a draft can always be traced to the
@@ -32,12 +32,20 @@ export const VALIDATOR_SOURCE_MANIFEST = Object.freeze({
   // the shared strength statements are composed from and the rules the writer is
   // held to, so a draft can always be traced to the exact language authority it was
   // written under.
-  'base44/shared/performanceLanguageAuthority.js': '84a6e436db79c2b9e9b080a483fdb785e4ce95ca45bca5a2b7e9b44ee6f0414f',
+  'base44/shared/performanceLanguageAuthority.js': '8fc46f389a9f3404f44bc5052a4005fc5c5415a7f7dab5a4be49792fefcf9570',
+  // The narrative steer: the designer's three-state preference over the topics ADI
+  // offers. It carries the rule the writer reads — a preference is an ingredient,
+  // never a section plan — so a draft can always be traced to the exact steer it was
+  // written under. Beside it is the exclusion backstop: the module that removes a
+  // sentence about an excluded topic from the client-facing narrative, and touches
+  // no evidence, no result and no table while doing it.
+  'base44/shared/proposalWriter/writerNarrativeSteerRules.js': '8cc5516dd1bb99b8a3511cd449eae27e3d43f1e104d18e1a5eb0b819498202f8',
+  'base44/shared/proposalNarrativeExclusions.js': '5a16e430aa88673e48e72c8fb4ff1b68c0283e7da10eb0199f9ffe37fd035f76',
   // The Design Summary brief for a TV media room: it states the requirement and
   // the word limit the section is written and validated under, so a draft can be
   // traced to the exact brief it was read against.
   'base44/shared/proposalWriter/designSummaryBrief.js': 'c95e0ad847dd6260f01c506e6254accdc22db186c3d1af147e117fb2e12b92ce',
-  'base44/shared/proposalWriter/writerPromptBuilder.js': '9c50ae7bce9abbf641232657370d21e76c755c24af53e475327bbbb03786e676',
+  'base44/shared/proposalWriter/writerPromptBuilder.js': 'a035addd8da17614ae2d555db201e75bd6a195cfde6400d1b5bc38c95c7ba143',
   'base44/shared/proposalWriter/writerSectionMapping.js': 'f5a6d2a5fe974fbd5c16d810d95f99da72f629a4fb8cb33793aa472778ade2f0',
   'base44/shared/proposalWriter/writerDesignContext.js': '590a9f379bb28ebc54c14f97ae2b73070a8c8c6722c7be3fc548c95719f2d63b',
   'base44/shared/proposalEdit/completeDocumentValidation.js': 'cff20d7146ecbeb3a9c325e3147db41cab552f7ea950dd93385ee1d478683ddd',

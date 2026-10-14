@@ -20,6 +20,8 @@ import VersionReadinessTable from '@/components/proposal/sourceAuthority/Version
 import ProposalPreparationPanel from '@/components/proposal/preparation/ProposalPreparationPanel';
 import useProposalPreparation from '@/components/proposal/wizard/useProposalPreparation';
 import { clearWizardDraft, readWizardDraft } from '@/components/proposal/wizard/proposalWizardDraft';
+import { steerFromPayload, steerPreferences } from '@/components/proposal/wizard/narrativeSteer';
+import NarrativeSteerReview from '@/components/proposal/wizard/NarrativeSteerReview';
 
 const STEPS = [
   { key: 'project', label: 'Project' },
@@ -76,6 +78,21 @@ export default function CreateProposalWizard({ onCreated, onCancel, regenerateFr
     return selected.length > 0 ? selected : (regenerateFrom.version_id ? [regenerateFrom.version_id] : []);
   });
   const [clientBrief, setClientBrief] = useState(regenerateFrom?.client_brief || restoredDraft?.clientBrief || '');
+  // ── The narrative steer ──
+  // The designer's three-state preference over the topics ADI offers: prefer a
+  // subject, keep it out of the client-facing narrative, or leave it neutral.
+  // It is the wizard's own state, so it survives Next, Back, a step away to the
+  // design and a resume — and it travels to the writer as SOFT preferences about
+  // what the document weighs, never as required sections.
+  //
+  // A regeneration starts from the steer the original proposal was written
+  // under, so a revision is asked the same question.
+  const [steer, setSteer] = useState(() => {
+    const carried = regenerateFrom?.metadata?.narrative_steer;
+    if (carried) return steerFromPayload(carried);
+    const fromDraft = restoredDraft?.narrativeSteer;
+    return fromDraft && typeof fromDraft === 'object' ? fromDraft : {};
+  });
   // ── ADI clarifications ──
   // The questions ADI asks about a design decision the evidence records no reason
   // for, and the designer's own answers to them. The answers are held SEPARATELY
@@ -257,6 +274,9 @@ export default function CreateProposalWizard({ onCreated, onCancel, regenerateFr
     proposalType,
     selectedVersionIds,
     clientBrief,
+    // The steer is kept with the draft, so returning to the wizard finds the
+    // topics exactly as the designer steered them.
+    steer,
     clarificationAnswers,
     step,
     finalStep: STEPS.length - 1,
@@ -289,6 +309,14 @@ export default function CreateProposalWizard({ onCreated, onCancel, regenerateFr
 
   const handleClientBriefChange = useCallback((brief) => {
     setClientBrief(brief);
+    creationRequestIdRef.current = null;
+  }, []);
+
+  // One topic moved to its next state. The topics are SUBJECTS, so nothing here
+  // writes a sentence and nothing is ever appended to the brief: the state the
+  // designer chose is the whole instruction, and it stays a preference.
+  const handleSteerChange = useCallback((next) => {
+    setSteer(next && typeof next === 'object' ? next : {});
     creationRequestIdRef.current = null;
   }, []);
 
@@ -408,6 +436,11 @@ export default function CreateProposalWizard({ onCreated, onCancel, regenerateFr
         account_id: accountId,
         narrative_goal: 'luxury_cinema',
         client_brief: clientBrief,
+        // The designer's narrative steer: the subjects to give more weight to
+        // and the subjects to keep out of the client-facing narrative. Soft
+        // preferences only — they add no claim, change no evidence, and are
+        // never turned into required sections.
+        narrative_steer: steerPreferences(steer),
         // The designer's own answers to ADI's clarification questions. They are
         // stored with the proposal and handed to the writer as design intent for
         // the sections they belong to — never printed as standalone text.
@@ -601,6 +634,8 @@ export default function CreateProposalWizard({ onCreated, onCancel, regenerateFr
         <ClientBriefStep
           value={clientBrief}
           onChange={handleClientBriefChange}
+          steer={steer}
+          onSteerChange={handleSteerChange}
           projectId={selectedProjectId}
           selectedVersionIds={selectedVersionIds}
           proposalType={proposalType}
@@ -655,6 +690,10 @@ export default function CreateProposalWizard({ onCreated, onCancel, regenerateFr
               last
             />
           </div>
+          {/* The steer as the last step reads it: the subjects to weigh and the
+              subjects left out, in the designer's own topic names. Neutral topics
+              are not listed — leaving a topic alone is not an instruction. */}
+          <NarrativeSteerReview steer={steer} className="mb-10" />
           <p className="text-sm text-[#8A8477] mb-4 leading-relaxed">
             Generate to create the proposal and open the editor. A complete first draft will be
             written from the current Project Report data for the selected versions.

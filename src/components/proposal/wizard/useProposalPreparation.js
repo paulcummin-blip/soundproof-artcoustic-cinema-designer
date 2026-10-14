@@ -25,6 +25,10 @@ export function useProposalPreparation({
   proposalType = null,
   selectedVersionIds = [],
   clientBrief = '',
+  // The designer's narrative steer: the topics they prefer and the topics they
+  // have asked to keep out of the client-facing narrative. Kept with the draft
+  // exactly as the brief is, so a resume returns it unchanged.
+  steer = {},
   clarificationAnswers = {},
   step = 0,
   finalStep = 0,
@@ -59,10 +63,11 @@ export function useProposalPreparation({
     proposalType,
     selectedVersionIds,
     clientBrief,
+    narrativeSteer: steer,
     clarificationAnswers,
     step,
     pendingGenerate,
-  }), [projectId, proposalType, selectedVersionIds, clientBrief, clarificationAnswers, step]);
+  }), [projectId, proposalType, selectedVersionIds, clientBrief, steer, clarificationAnswers, step]);
 
   // The designer's progress is kept for the moment they step away to their design.
   // Never written without a project, and never for a regeneration.

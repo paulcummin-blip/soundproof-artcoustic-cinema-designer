@@ -74,9 +74,13 @@ export const STEER_TITLE = 'Narrative Steer';
 export const TOPIC_LIBRARY = Object.freeze({
   display: { label: 'Display and screen scale', area: 'display_viewing' },
   system_approach: { label: 'System approach', area: 'loudspeaker_configuration' },
-  screen_tonal: { label: 'Screen tonal consistency', area: 'timbre_matching' },
+  // Every label names the SUBJECT, never the verdict. It is the topic that is
+  // steered ("Bass performance", "Tonal consistency"), and the assessed result
+  // decides later how strongly that subject may be described — so no label ever
+  // carries a judgement of its own ("Useful bass extension").
+  screen_tonal: { label: 'Tonal consistency', area: 'timbre_matching' },
   surround_tonal: { label: 'Surround tonal consistency', area: 'timbre_matching' },
-  bass_extension: { label: 'Bass extension', area: 'bass_capability' },
+  bass_extension: { label: 'Bass performance', area: 'bass_capability' },
   bass_response: { label: 'Bass response', area: 'bass_capability' },
   bass_consistency: { label: 'Bass consistency across the seats', area: 'bass_capability' },
   rear_subwoofer: { label: 'Rear subwoofer arrangement', area: 'bass_capability' },
@@ -114,6 +118,7 @@ const LEGACY_LABEL_TOPICS = Object.freeze([
   ['screen tonal', 'screen_tonal'],
   ['surround timbre', 'surround_tonal'],
   ['surround tonal', 'surround_tonal'],
+  ['tonal consistency', 'screen_tonal'],
   ['system layout', 'system_approach'],
   ['system approach', 'system_approach'],
   ['discrete channels', 'channel_count'],
@@ -123,6 +128,7 @@ const LEGACY_LABEL_TOPICS = Object.freeze([
   ['dynamic range', 'screen_dynamic'],
   ['dynamic capability', 'screen_dynamic'],
   ['bass extension', 'bass_extension'],
+  ['bass performance', 'bass_extension'],
   ['bass consistency', 'bass_consistency'],
   ['bass response', 'bass_response'],
   ['subwoofer', 'rear_subwoofer'],
@@ -273,6 +279,11 @@ const SUGGESTED_MIN_LEVEL = Object.freeze({
   speaker_positioning: 2,
   bass_response: 2,
   bass_consistency: 2,
+  // Bass extension is assessed on the same scale as the rest of the bass family:
+  // a Level 1 result is offered as a topic the designer may prefer, and is not
+  // suggested as something to sell. What may be SAID about it is scaled by the
+  // result itself when the copy is written.
+  bass_extension: 2,
 });
 
 /** Topics ADI never promotes: they are offered so the designer can steer them. */
@@ -284,24 +295,38 @@ const NEVER_SUGGESTED = Object.freeze(new Set([
   'documented_constraint',
 ]));
 
-/** Whether ADI suggests preferring a topic, on the strength of its own evidence. */
-export function topicIsSuggested(key, evidenceLabel = '') {
+/**
+ * Whether ADI suggests preferring a topic, on the strength of its own evidence.
+ * The text read for a level is the evidence behind the topic — the example's own
+ * wording and the calculated fact it names — so a result the design has not
+ * achieved is never promoted by the topic being on screen.
+ */
+export function topicIsSuggested(key, evidenceText = '') {
   if (!isTopicKey(key) || NEVER_SUGGESTED.has(key)) return false;
   const minimum = SUGGESTED_MIN_LEVEL[key];
   if (!minimum) return true;
-  const level = levelOfTopicLabel(evidenceLabel);
+  const level = levelOfTopicLabel(evidenceText);
   return level !== null && level >= minimum;
 }
 
 /** The frozen fact a topic's own name may carry: a TV diagonal, a screen size. */
 function refineTopicLabel(key, evidenceLabel, fallback) {
-  if (key !== 'display') return fallback;
   const text = String(evidenceLabel || '');
-  const inches = /(\d+(?:\.\d+)?)\s*(?:inch(?:es)?|["”])/i.exec(text);
-  if (!inches) return fallback;
-  const size = Math.round(Number(inches[1]));
-  if (!Number.isFinite(size)) return fallback;
-  return /\bTV\b|television/i.test(text) ? `${size}" TV` : `${size} inch screen`;
+  if (key === 'display') {
+    const inches = /(\d+(?:\.\d+)?)\s*(?:inch(?:es)?|["”])/i.exec(text);
+    if (!inches) return fallback;
+    const size = Math.round(Number(inches[1]));
+    if (!Number.isFinite(size)) return fallback;
+    return /\bTV\b|television/i.test(text) ? `${size}" TV` : `${size} inch screen`;
+  }
+  // The configuration the design actually uses becomes part of the subject's own
+  // name — "5.1 system approach" — so the chip is precise about WHAT it covers
+  // while still saying nothing about how good it is.
+  if (key === 'system_approach') {
+    const configuration = /\b([579]\.\d(?:\.\d)?)\b/.exec(text);
+    return configuration ? `${configuration[1]} system approach` : fallback;
+  }
+  return fallback;
 }
 
 /**
@@ -351,7 +376,7 @@ export function presentSteerTopics({ chips = [], limit = 12 } = {}) {
       topic_key: key,
       label: refineTopicLabel(key, evidenceLabel, TOPIC_LIBRARY[key].label),
       area: chip?.area || TOPIC_LIBRARY[key].area,
-      suggested: topicIsSuggested(key, evidenceLabel),
+      suggested: topicIsSuggested(key, [evidenceLabel, chip?.reason].filter(Boolean).join(' ')),
       evidence_label: evidenceLabel,
       reason: [evidenceLabel, String(chip?.reason || '').trim()].filter(Boolean).join(' — '),
     });
