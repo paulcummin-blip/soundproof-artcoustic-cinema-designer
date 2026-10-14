@@ -221,11 +221,12 @@ test('seating do-not-discuss suppresses P1, the rationale and the seat-scope dis
   assert.equal(phraseAfterRelevance({ key: 'p1', level: p1.level, priority: p1.priority }), null);
   assert.ok(!designRationaleRows(rows).some((entry) => entry.key === 'p1'));
 
-  // No primary/secondary seat discussion survives: the consistency result may only
-  // be stated for the whole seating, which this design does not support.
+  // No primary/secondary seat discussion survives: the consistency narrative is
+  // silenced with the seating subject it belongs to, and only the whole seating
+  // scoped statement could have been made — which this design does not support.
   const p20 = rows.find((entry) => entry.key === 'p20');
   assert.equal(p20.seat_scope, SEAT_SCOPE.NONE);
-  assert.equal(p20.priority, NARRATIVE_PRIORITY.TECHNICAL_ONLY);
+  assert.equal(p20.priority, NARRATIVE_PRIORITY.DO_NOT_DISCUSS);
   assert.equal(p20.primary_seat_result, 'L3', 'the seat results are still read as evidence');
   assert.ok(!narrativeCandidateRows(rows).some((entry) => entry.key === 'p20'));
 

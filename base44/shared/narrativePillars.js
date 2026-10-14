@@ -181,12 +181,16 @@ export const BASS_PARTS = Object.freeze([
     part: 'control',
     keys: Object.freeze(['p19']),
     question: 'How closely does the response follow the target at the reference seating position?',
-    // The performance register holds no area for this result, so no clause is
-    // invented here: the part is stated from its own evidence.
-    area: null,
+    // The response at the reference position says how the bass the story already
+    // tells behaves, so its language is the register's own control scale rather than
+    // a performance area of its own.
+    area: PERFORMANCE_AREAS.BASS_CONTROL,
     vocabulary: Object.freeze(['control', 'composure']),
     notices: 'the weight arrives cleanly instead of smearing the detail above it',
     supporting: true,
+    // A qualifying part is never dropped for being lightly weighted: it qualifies the
+    // story it belongs to rather than competing with it for rank.
+    always_told: true,
   }),
   Object.freeze({
     part: 'consistency',

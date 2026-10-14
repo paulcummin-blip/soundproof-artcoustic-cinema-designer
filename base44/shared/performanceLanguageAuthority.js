@@ -52,6 +52,7 @@ export const PERFORMANCE_LEVELS = Object.freeze(['L1', 'L2', 'L3', 'L4']);
 export const PERFORMANCE_AREAS = Object.freeze({
   BASS_EXTENSION: 'bass_extension',
   BASS_OUTPUT: 'bass_output',
+  BASS_CONTROL: 'bass_control',
   DYNAMIC_RANGE: 'dynamic_range',
   TIMBRE: 'timbre',
   SPATIAL_RESOLUTION: 'spatial_resolution',
@@ -60,6 +61,7 @@ export const PERFORMANCE_AREAS = Object.freeze({
 const AREA_ORDER = Object.freeze([
   PERFORMANCE_AREAS.BASS_EXTENSION,
   PERFORMANCE_AREAS.BASS_OUTPUT,
+  PERFORMANCE_AREAS.BASS_CONTROL,
   PERFORMANCE_AREAS.DYNAMIC_RANGE,
   PERFORMANCE_AREAS.TIMBRE,
   PERFORMANCE_AREAS.SPATIAL_RESOLUTION,
@@ -69,6 +71,7 @@ const AREA_ORDER = Object.freeze([
 const AREA_LABEL = Object.freeze({
   [PERFORMANCE_AREAS.BASS_EXTENSION]: 'BASS EXTENSION',
   [PERFORMANCE_AREAS.BASS_OUTPUT]: 'BASS OUTPUT / LFE',
+  [PERFORMANCE_AREAS.BASS_CONTROL]: 'BASS CONTROL / RESPONSE',
   [PERFORMANCE_AREAS.DYNAMIC_RANGE]: 'DYNAMIC RANGE / SPL',
   [PERFORMANCE_AREAS.TIMBRE]: 'TIMBRE MATCHING',
   [PERFORMANCE_AREAS.SPATIAL_RESOLUTION]: 'SPATIAL RESOLUTION',
@@ -136,6 +139,24 @@ export const PERFORMANCE_LANGUAGE = Object.freeze({
     L4: {
       sentence: 'Exceptional low-frequency authority, with huge scale and genuine physical impact.',
       clause: 'the low end has exceptional authority, with huge scale and genuine physical impact',
+    },
+  },
+  [PERFORMANCE_AREAS.BASS_CONTROL]: {
+    L1: {
+      sentence: 'A composed bass response that never becomes loose or coloured.',
+      clause: 'the bass response stays composed',
+    },
+    L2: {
+      sentence: 'A well-controlled bass response, clean in definition.',
+      clause: 'the response is well controlled, with clean definition',
+    },
+    L3: {
+      sentence: 'Tightly controlled bass with depth but no boom.',
+      clause: 'the bass is tightly controlled, giving depth without boom',
+    },
+    L4: {
+      sentence: 'A remarkably controlled, composed bass response, so the deepest effects arrive cleanly.',
+      clause: 'the response remains remarkably controlled and composed, so the deepest effects arrive cleanly',
     },
   },
   [PERFORMANCE_AREAS.DYNAMIC_RANGE]: {
@@ -249,6 +270,7 @@ export const PERFORMANCE_LANGUAGE_CORE_RULE = 'THE ENGINEERING RESULT CONTROLS T
 const AREA_RULES = Object.freeze({
   [PERFORMANCE_AREAS.BASS_EXTENSION]: 'Avoid “useful bass extension” and any similar hedge: a moderate extension is written as the depth it gives the soundtrack, and restrained technical wording is used only where the context genuinely requires it.',
   [PERFORMANCE_AREAS.BASS_OUTPUT]: 'An L4 bass output or depth result is a flagship result and the copy may sound exciting: present it accordingly rather than holding it back.',
+  [PERFORMANCE_AREAS.BASS_CONTROL]: 'The response at the reference position is written as control and composure, never as a measurement: it states the quality of the bass the story is already telling, so it qualifies that account rather than becoming a subject of its own. Never quote the tolerance or the decibel figure in client-facing copy.',
   [PERFORMANCE_AREAS.DYNAMIC_RANGE]: 'Dynamic range is written as capability and headroom, never as loudness alone: the loud end and the quiet end are both stated at the level the result earned.',
   [PERFORMANCE_AREAS.TIMBRE]: 'Timbre matching is written as tonal consistency. Do not use impact, weight or scale language for a tonal result, at any level.',
   [PERFORMANCE_AREAS.SPATIAL_RESOLUTION]: 'Spatial resolution is written around precision and immersion: positioning, placement and movement, at the level the result earned.',

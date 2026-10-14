@@ -222,7 +222,12 @@ function partOf(part, members) {
     clause: part.area && level ? (performancePhrase(part.area, level) || null) : null,
     // Whether the result exists at all — the one question ASDR does not answer.
     available: present.length > 0 && level != null,
-    told: !excluded && present.length > 0 && emphasis !== EVIDENCE_EMPHASIS.CONTEXT,
+    // A QUALIFYING PART IS TOLD WITH THE STORY IT QUALIFIES. The response at the
+    // reference position (P19) competes with nothing for rank: it states how the bass
+    // the story already tells behaves, so it is told whenever its own result exists
+    // and the designer has not silenced the subject.
+    told: !excluded && present.length > 0
+      && (part.always_told === true || emphasis !== EVIDENCE_EMPHASIS.CONTEXT),
   };
 }
 

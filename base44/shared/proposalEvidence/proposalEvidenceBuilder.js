@@ -55,6 +55,7 @@ import { buildClientStoryPillars } from '../narrativePillarGrouping.js';
 import {
   buildProposalNarrativeContext,
   designContainmentFromFacts,
+  readDesignShape,
   resolveBriefIntent,
 } from '../proposalNarrativeContext.js';
 import { classifyAreas } from './proposalEvidenceClassification.js';
@@ -241,10 +242,13 @@ export function buildProposalEvidence({
     const reportEvidence = entry?.evidence?.project || null;
     const option = options[index];
     const stories = (storiesByVersion.get(option.version_id) || {}).strength_stories || [];
+    const shape = readDesignShape(option.facts, reportEvidence);
     const intent = resolveBriefIntent({
       declaredIntent: context.declared_intent,
       roomType: context.room_type,
+      briefText: context.brief_text,
       facts: option.facts,
+      shape,
     });
     const seatScopes = reportEvidence?.seat_scopes || null;
     const { rows, brief } = buildNarrativePriorityRows({
@@ -278,6 +282,7 @@ export function buildProposalEvidence({
       .flatMap((story) => (Array.isArray(story?.allowed_claim_ids) ? story.allowed_claim_ids : []));
     contextByVersion.set(option.version_id, {
       intent,
+      intent_basis: shape,
       room_type: context.room_type,
       intended_use: context.declared_intent,
       preferred_topics: context.preferred_topics || [],

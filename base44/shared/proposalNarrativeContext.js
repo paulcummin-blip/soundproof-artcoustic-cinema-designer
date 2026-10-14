@@ -32,8 +32,17 @@ export const STEER_STATE_VALUE = Object.freeze({
   DO_NOT_DISCUSS: 'do_not_discuss',
 });
 
-/** The intent-words that make a design a dedicated cinema rather than a media room. */
-const DEDICATED_INTENT_PATTERN = /dedicated|reference|screening room|cinema room/i;
+/**
+ * THE EXPLICIT DESIGNATION, in the project's own words. A client, dealer or designer
+ * who says the room is a dedicated cinema has decided what the project is, and the
+ * display it happens to be built around does not overrule them: a large television
+ * chosen instead of the projector is still a dedicated cinema to the client who
+ * chose it. Deliberately narrow — a bare "cinema room" is not a designation.
+ */
+const EXPLICIT_DEDICATED_CINEMA = /\bdedicated\s+(?:home\s+|screening\s+)?cinema\b|\bdedicated\s+screening\s+room\b|\breference[\s-]*(?:style|grade|level)?\s+(?:dedicated\s+)?cinema\b|\bcinema\s+bunker\b/i;
+
+/** An explicit media-room designation: the same authority, one room type down. */
+const EXPLICIT_MEDIA_ROOM = /\b(?:media|family|living|everyday)\s+(?:room|lounge)\b|\bmedia\s+den\b/i;
 
 /** One topic's recorded state, from either the stored shape or a bare string. */
 function stateOf(entry) {
@@ -90,28 +99,116 @@ export function designContainmentFromFacts(facts = null) {
   };
 }
 
+/** The first number actually stated, so a missing fact is never read as zero. */
+function numberOf(...values) {
+  for (const value of values) {
+    const number = Number(value);
+    if (Number.isFinite(number)) return number;
+  }
+  return null;
+}
+
 /**
- * The project's declared intent, as the classification reads it. The designer's own
- * stated intent governs where there is one; otherwise it is read from the display
- * the evidence states, because a television lounge and a dedicated cinema with a
- * projection screen are the two cases the brief relevance is built around.
+ * THE SHAPE OF THE DESIGN ITSELF: the display it presents on, how it is seated, how
+ * substantial its loudspeaker layout is and whether the room was treated. Every value
+ * is read from the frozen facts, falling back to the saved report evidence where the
+ * facts are silent, and none of it is inferred from a level.
+ *
+ * @param {Object|null} facts — one option's frozen facts
+ * @param {Object|null} [evidence] — the saved report evidence behind those facts
+ * @returns {Object} the shape, and whether it reads as a cinema or a media room
+ */
+export function readDesignShape(facts = null, evidence = null) {
+  const layout = facts?.system?.channel_layout || {};
+  const evidenceLayout = evidence?.system?.channel_layout || {};
+  const screen = facts?.screen || evidence?.room?.screen || evidence?.screen || null;
+  const seating = facts?.seating || evidence?.room?.seating || evidence?.seating || null;
+  const rowCount = numberOf(seating?.row_count);
+  const seatCount = numberOf(seating?.seat_count);
+  const bedChannels = numberOf(layout.bed_channels, evidenceLayout.bed_channels);
+  const overheadChannels = numberOf(layout.overhead_channels, evidenceLayout.overhead_channels);
+  const subwooferCount = numberOf(layout.subwoofer_count, evidenceLayout.subwoofer_count);
+  const treatment = [
+    facts?.room?.acoustic_treatment,
+    evidence?.room?.acoustic_treatment,
+    evidence?.system?.acoustic_treatment,
+  ].find((value) => Array.isArray(value)) || [];
+  const displayType = String(screen?.display_type || '').toLowerCase();
+
+  // The two shapes the structural context separates, each requiring its own evidence.
+  const multiRow = rowCount != null && rowCount >= 2;
+  const immersive = overheadChannels != null && overheadChannels > 0;
+  const substantialSurround = bedChannels != null && bedChannels >= 7;
+  const treated = treatment.length > 0;
+  // A single-row television system on a straightforward 5.1 or 7.1 layout with no
+  // height layer is the media-room shape: nothing about it reads as a cinema, so no
+  // structural evidence of its own can promote it.
+  const simpleSingleRowTv = displayType === 'tv'
+    && (rowCount == null || rowCount <= 1)
+    && (bedChannels == null || bedChannels <= 5)
+    && !immersive;
+
+  return {
+    display_type: displayType || null,
+    row_count: rowCount,
+    seat_count: seatCount,
+    bed_channels: bedChannels,
+    overhead_channels: overheadChannels,
+    subwoofer_count: subwooferCount,
+    treatment_count: treatment.length,
+    multi_row: multiRow,
+    immersive,
+    substantial_surround: substantialSurround,
+    treated,
+    // Cinema indicators present, and nothing that says media room.
+    dedicated_cinema: !simpleSingleRowTv && (multiRow || immersive || substantialSurround || treated),
+    media_lounge: simpleSingleRowTv && !multiRow && !immersive,
+  };
+}
+
+/**
+ * WHAT KIND OF ROOM THE PROJECT IS, resolved in the order the project's own words and
+ * structure demand:
+ *
+ *   1. THE EXPLICIT DESIGNATION FIRST. The client's brief, the dealer's brief and the
+ *      ADI interpretation are the project's own statement of what it is, and they win.
+ *      A television as the chosen display never overrides an explicit intent.
+ *   2. THE STRUCTURAL DESIGN CONTEXT. Where nothing is stated, the design's own shape
+ *      decides: two or more seating rows, an immersive multi-layer loudspeaker layout,
+ *      a substantial surround system or dedicated acoustic treatment read as a
+ *      dedicated cinema; a single-row television system on a 5.1 or 7.1 layout reads
+ *      as a media lounge.
+ *   3. THE DISPLAY, ONLY WHERE THE SHAPE IS AMBIGUOUS. A television then says media
+ *      lounge and a projection design says cinema — asked last, because a display
+ *      carries no authority over what the client says they are building.
  *
  * @param {Object} input
- * @param {string|null} [input.declaredIntent] — the interpretation's intended use
+ * @param {string|null} [input.declaredIntent] — the interpretation's stated intent
  * @param {string|null} [input.roomType] — the interpretation's room type
+ * @param {string} [input.briefText] — the designer's own client / narrative brief
  * @param {Object|null} [input.facts] — the option's frozen facts
+ * @param {Object|null} [input.evidence] — the saved report evidence behind those facts
+ * @param {Object|null} [input.shape] — a shape already read by the caller
  * @returns {string|null} one of the brief intents, or null where nothing is stated
  */
-export function resolveBriefIntent({ declaredIntent = null, roomType = null, facts = null } = {}) {
-  // The display the evidence states comes first, because it is the FACT: a design
-  // presenting on a television is a media room whatever the words around it say, and
-  // a room described as a cinema but built around a TV is exactly the case this
-  // distinction exists for.
-  const displayType = String(facts?.screen?.display_type || '').toLowerCase();
-  if (displayType === 'tv') return BRIEF_INTENT.MEDIA_LOUNGE;
-  if (displayType) return BRIEF_INTENT.DEDICATED_CINEMA;
-  const stated = [declaredIntent, roomType].filter(Boolean).join(' ').trim();
-  if (DEDICATED_INTENT_PATTERN.test(stated)) return BRIEF_INTENT.DEDICATED_CINEMA;
+export function resolveBriefIntent({
+  declaredIntent = null,
+  roomType = null,
+  briefText = '',
+  facts = null,
+  evidence = null,
+  shape = null,
+} = {}) {
+  const stated = [declaredIntent, roomType, briefText].filter(Boolean).join('\n');
+  if (EXPLICIT_DEDICATED_CINEMA.test(stated)) return BRIEF_INTENT.DEDICATED_CINEMA;
+  if (EXPLICIT_MEDIA_ROOM.test(stated)) return BRIEF_INTENT.MEDIA_LOUNGE;
+
+  const design = shape || readDesignShape(facts, evidence);
+  if (design.dedicated_cinema) return BRIEF_INTENT.DEDICATED_CINEMA;
+  if (design.media_lounge) return BRIEF_INTENT.MEDIA_LOUNGE;
+
+  if (design.display_type === 'tv') return BRIEF_INTENT.MEDIA_LOUNGE;
+  if (design.display_type) return BRIEF_INTENT.DEDICATED_CINEMA;
   return null;
 }
 

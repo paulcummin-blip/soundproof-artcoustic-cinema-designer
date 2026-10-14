@@ -422,7 +422,10 @@ export function buildNarrativePriorityRows({
         split: seats.split,
         assessed: seats.assessed,
       };
-    const areaSilenced = area ? silenced.has(area) : false;
+    // A seating topic silences the seat-consistency narrative with the rest of the
+    // seating subject: P20 speaks about which seats the bass carries across.
+    const areaSilenced = (area ? silenced.has(area) : false)
+      || (seatingSuppressed && String(key) === 'p20');
     const classified = parameterNarrativePriority({
       key,
       weight,

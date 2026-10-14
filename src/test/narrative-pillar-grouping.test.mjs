@@ -113,7 +113,8 @@ test('the bass strengthens ONE pillar: Dynamic Range, read in four parts', () =>
   assert.match(part('consistency').notices, /shared rather than concentrated/);
   assert.match(part('depth').clause, /very deep, powerful bass/);
   assert.match(part('output').clause, /powerful/);
-  assert.equal(part('control').clause, null, 'no register clause is invented for the response result');
+  assert.match(part('control').clause, /tightly controlled|well controlled|composed/, 'the response result carries the register\'s own control language');
+  assert.equal(part('control').told, true, 'the qualifying part is told with the story it qualifies, never dropped for rank');
   assert.ok(dynamic.client_clauses.some((clause) => /bass consistency/.test(clause)));
 
   // Why the client cares is carried by the pillar itself.
