@@ -26,6 +26,7 @@
 
 import { CLIENT_FACING_CALIBRATION_LANGUAGE } from './clientFacingCalibrationLanguage.js';
 import { clientBenefitIntentLines } from './rp22ClientBenefitIntent.js';
+import { absentFeatureFramingRule } from './proposalWriter/absentFeatureFraming.js';
 
 /**
  * The purpose, audience, reasoning rules and honesty rules. Injected ahead of
@@ -650,5 +651,5 @@ export function buildProposalWritingAuthority() {
   }
   const head = SOUND_PROOF_WRITING_AUTHORITY.slice(0, at);
   const tail = SOUND_PROOF_WRITING_AUTHORITY.slice(at + 1);
-  return `${head}\n\n${PROPOSAL_SALES_WRITING_AUTHORITY}\n\n${WRITING_KNOWLEDGE_CLASSES}\n\n${CLIENT_BENEFIT_WRITING_STANDARD}\n\n${tail}`;
+  return `${head}\n\n${PROPOSAL_SALES_WRITING_AUTHORITY}\n\n${WRITING_KNOWLEDGE_CLASSES}\n\n${CLIENT_BENEFIT_WRITING_STANDARD}\n\n${absentFeatureFramingRule()}\n\n${tail}`;
 }

@@ -10,6 +10,7 @@ import { formatComparisonTableForPrompt } from '../../shared/comparisonTable.js'
 import { buildEngineeringEvidence } from '../../shared/engineeringSnapshotEvidence.js';
 import { buildProjectInterpretation, formatInterpretationForPrompt, formatInterpretationForLog } from '../../shared/adiProjectInterpretation.js';
 import { sanitizeNarrativeHtml } from '../../shared/proposalNarrativeSanitizer.js';
+import { comparisonFramingRequested } from '../../shared/proposalWriter/absentFeatureFraming.js';
 import { resolveP17Tradeoff } from '../../shared/p17TradeoffAuthority.js';
 import { buildExcludedParameterPolicy, buildClientFacingParameterRule } from '../../shared/clientFacingParameterAuthority.js';
 import {
@@ -211,6 +212,11 @@ export default async function(req) {
     // An assumed or administrative parameter (P8, P15, P21) is only mentioned
     // when the designer explicitly asked for it, in the brief or the notes.
     const parameterPolicy = buildExcludedParameterPolicy({ clientBrief: briefText, dealerNotes });
+    // A proposal states what the design does. The comparison exception is the
+    // client's own explicit ask — a comparison proposal, or a brief or note that
+    // asks for a comparison, an upgrade, a downgrade explanation or a trade-off.
+    const absentFeatureFramingAllowed = proposal.proposal_type === 'comparison'
+      || comparisonFramingRequested(`${briefText}\n${dealerNotes}`);
     // The Key Performance Highlights table is built by Sound Proof from
     // calculated data. Only the introduction is written prose.
     const sectionNote = section.section_type === 'key_performance_highlights'
@@ -289,7 +295,7 @@ export default async function(req) {
     // name is replaced with safe generic wording, and a mention that survives is
     // rejected rather than saved.
     const grounded = groundProductMentions(
-      sanitizeNarrativeHtml(rawHtml, { p17Tradeoff, sectionType: section.section_type, parameterPolicy }),
+      sanitizeNarrativeHtml(rawHtml, { p17Tradeoff, sectionType: section.section_type, parameterPolicy, absentFeatureFramingAllowed }),
       grounding,
     );
     if (!grounded.grounded) {

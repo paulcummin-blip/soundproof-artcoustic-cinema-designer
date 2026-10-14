@@ -13,6 +13,7 @@ import { resolveReportLayout } from './highChannelDensityRule.js';
 import { buildSectionPrompt } from './proposalGenerationPrompts.js';
 import { buildProposalNarrativeEvidenceGuard } from './proposalNarrativeEvidenceGuard.js';
 import { sanitizeNarrativeHtml } from './proposalNarrativeSanitizer.js';
+import { comparisonFramingRequested } from './proposalWriter/absentFeatureFraming.js';
 import { resolveP17Tradeoff } from './p17TradeoffAuthority.js';
 import { buildExcludedParameterPolicy } from './clientFacingParameterAuthority.js';
 import {
@@ -55,6 +56,11 @@ export async function generateProposalDraftContent({ invokeLLM, sectionRecords, 
   // client-facing surface: prompt, comparison table, highlights rows and prose.
   // The designer can lift the exclusion for one of them, explicitly.
   const parameterPolicy = buildExcludedParameterPolicy({ clientBrief, dealerNotes });
+  // A proposal states what the design does. The comparison exception is the
+  // client's own explicit ask — a comparison proposal, or a brief or note that asks
+  // for a comparison, an upgrade, a downgrade explanation or a budget trade-off.
+  const absentFeatureFramingAllowed = resolvedType === 'comparison'
+    || comparisonFramingRequested(`${clientBrief}\n${dealerNotes}`);
   // ── PRODUCT GROUNDING (hard rule) ──
   // A section may name only the products actually selected in the version it is
   // about, and the allowed vocabulary is built from the SAME frozen
@@ -105,17 +111,17 @@ export async function generateProposalDraftContent({ invokeLLM, sectionRecords, 
     const result = generationResults[index];
     if (isComparisonHighlights(section)) {
       const payload = result.status === 'fulfilled' ? result.value : null;
-      const groundedIntro = ground(sanitizeNarrativeHtml(String(payload?.intro_html || '').trim(), { p17Tradeoff, sectionType: section.section_type, parameterPolicy }));
+      const groundedIntro = ground(sanitizeNarrativeHtml(String(payload?.intro_html || '').trim(), { p17Tradeoff, sectionType: section.section_type, parameterPolicy, absentFeatureFramingAllowed }));
       return { section, html: groundedIntro.html, metadata: comparisonSectionMetadata(comparisonTable), failed: result.status === 'rejected' || groundedIntro.html.length === 0 || !groundedIntro.grounded };
     }
     if (isHighlightsSection(section)) {
       const payload = result.status === 'fulfilled' ? result.value : null;
-      const groundedIntro = ground(sanitizeNarrativeHtml(String(payload?.intro_html || '').trim(), { p17Tradeoff, sectionType: section.section_type, parameterPolicy }));
+      const groundedIntro = ground(sanitizeNarrativeHtml(String(payload?.intro_html || '').trim(), { p17Tradeoff, sectionType: section.section_type, parameterPolicy, absentFeatureFramingAllowed }));
       const rows = mergeHighlightRows(highlightRows,payload?.rows);
       return { section, html: groundedIntro.html, metadata: {highlight_rows:rows}, failed: result.status === 'rejected' || groundedIntro.html.length === 0 || !groundedIntro.grounded || rows.every(row => !(row.what_the_room_gains || row.what_you_hear)) };
     }
     const raw = result.status === 'fulfilled' ? (typeof result.value === 'string' ? result.value : result.value?.content || '').trim() : '';
-    const grounded = ground(sanitizeNarrativeHtml(raw, { p17Tradeoff, sectionType: section.section_type, parameterPolicy }));
+    const grounded = ground(sanitizeNarrativeHtml(raw, { p17Tradeoff, sectionType: section.section_type, parameterPolicy, absentFeatureFramingAllowed }));
     return { section, html: grounded.html, metadata: null, failed: result.status === 'rejected' || grounded.html.length === 0 || !grounded.grounded };
   });
   const failedSections = generatedContent.filter(item => item.failed);

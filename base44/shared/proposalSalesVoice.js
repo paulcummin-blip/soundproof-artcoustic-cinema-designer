@@ -1,5 +1,6 @@
 /** Proposal-only narrative contract. No calculations, storage or report rendering. */
 import { CLIENT_FACING_CALIBRATION_LANGUAGE } from './clientFacingCalibrationLanguage.js';
+import { absentFeatureFramingRule } from './proposalWriter/absentFeatureFraming.js';
 const PARAMETER_EXPERIENCE = Object.freeze({
   P2: 'Discrete channel capability: physical positions for sound around and above the seats. Explain placement and the potential for smoother movement; channel count alone does not prove good spacing or coverage.',
   P5: 'Horizontal speaker spacing: adjacent gaps govern how naturally effects travel around the listener rather than jumping between speakers. Use the assessed spacing and seat scope.',
@@ -46,6 +47,10 @@ export function buildProposalSalesVoice(sectionType, proposalType = 'system_summ
     '=== PARAMETER TO EXPERIENCE GUIDE (use only supplied results) ===',
     ...Object.entries(PARAMETER_EXPERIENCE).map(([key, text]) => `${key}: ${text}`),
     SECTION_STORY[sectionType] || 'Explain the relevant engineering choice and its listening consequence without adding sections or repeating the evidence table.',
+    // The design is described as it stands: a feature the design does not have is
+    // never the subject of a client-facing sentence. Stated to the writer here, and
+    // enforced on the returned prose by the narrative sanitizer.
+    absentFeatureFramingRule({ comparison }),
     'FINAL SILENT CHECK: Is the principal advantage clear and compelling? Does each important result have an experiential meaning? Are all numbers and levels exact and attached to the right option? Are shared strengths credited to both? Is the lower option respected? Are bass depth, output, RSP balance and seat consistency kept separate? Remove hype, unsupported claims, generic filler and any invented facts. Return only the requested content.',
     // The client-facing calibration language, beside every other proposal rule.
     ...CLIENT_FACING_CALIBRATION_LANGUAGE,

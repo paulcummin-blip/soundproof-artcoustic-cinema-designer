@@ -28,6 +28,14 @@
  *      consistency, or P20 the reference-position response against target — is
  *      removed, because the two parameters answer different questions.
  *
+ *   7. a sentence that describes a feature the design does not have — a contrast
+ *      against an absent overhead, height or immersive layer, or a statement that
+ *      something is missing, lacks, or is limited to a format — is removed, or has
+ *      its contrast clause trimmed away, because a proposal states what the design
+ *      does. The one exception is the client's own explicit request for a
+ *      comparison, an upgrade, a downgrade explanation or a budget trade-off,
+ *      passed in as absentFeatureFramingAllowed.
+ *
  * It only removes or rewrites wording. It never invents, changes or reorders a
  * value, a level, a parameter or a sentence's engineering meaning.
  *
@@ -37,6 +45,7 @@
 
 import { stripExcludedParameterSentences } from './clientFacingParameterAuthority.js';
 import { p17TradeoffSentences } from './p17TradeoffAuthority.js';
+import { removeAbsentFeatureFraming } from './proposalWriter/absentFeatureFraming.js';
 
 const TABLE_BLOCK = /<table\b[\s\S]*?<\/table>/gi;
 const TABLE_TAG = /<\/?(?:table|thead|tbody|tfoot|tr|th|td|caption|colgroup|col)\b[^>]*>/gi;
@@ -295,7 +304,7 @@ export function p17DiffersAcrossVersions(comparisonTable) {
  * Apply every narrative rule to one section body.
  *
  * @param {string} html - the model's returned section body
- * @param {{ p17Tradeoff?: object, p17Differs?: boolean, sectionType?: string, parameterPolicy?: object }} [options]
+ * @param {{ p17Tradeoff?: object, p17Differs?: boolean, sectionType?: string, parameterPolicy?: object, absentFeatureFramingAllowed?: boolean }} [options]
  * @returns {string} the sanitised body
  */
 export function sanitizeNarrativeHtml(html, options = {}) {
@@ -308,7 +317,10 @@ export function sanitizeNarrativeHtml(html, options = {}) {
   const withSeparatedBass = enforceBassConceptSeparation(withTonalRule);
   const scoped = enforceSectionScope(withSeparatedBass, options.sectionType);
   const withoutAssumptions = stripExcludedParameterSentences(scoped, options.parameterPolicy);
-  return enforceApprovedVocabulary(removeStraySectionHeadings(withoutAssumptions));
+  const approved = enforceApprovedVocabulary(removeStraySectionHeadings(withoutAssumptions));
+  // The design is described as it stands: an absent feature is never the subject
+  // of a sentence unless the client asked for that comparison themselves.
+  return removeAbsentFeatureFraming(approved, { allowed: Boolean(options.absentFeatureFramingAllowed) });
 }
 
 export default sanitizeNarrativeHtml;
