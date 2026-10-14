@@ -150,28 +150,55 @@ export function useProposalReadiness({ projectId = null, versionIds = [] } = {})
 
         const liveSeatPriorityFingerprint = readSeatPriorityFingerprint(projectId);
 
-        // Whether each version's publication moved past its saved Project Report
-        // for PRESENTATION ONLY, decided from the two publications' own frozen
+        // The version's stored equipment checklist — the Speaker Design PDF
+        // Project Library already holds for it. Read from the records that exist:
+        // no second store is created and reading exports nothing.
+        const speakerDesignRecords = Array.isArray(speakerDesignPage)
+          ? speakerDesignPage
+          : (speakerDesignPage?.items || []);
+
+        // Whether each version's publication moved past a frozen document for
+        // PRESENTATION ONLY, decided from the two publications' own frozen
         // physical facts (designIdentityComparison) — the same verdict the report
         // page applies, so the Library, the readiness table and the report page
-        // can never disagree about one saved report. Asked only where a saved
-        // report's frozen authority and the version's current publication actually
-        // differ; any doubt answers false and the strict verdict stands.
-        const presentationOnlyByVersionId = new Map();
-        await Promise.all(ids.map(async (versionId, index) => {
-          const savedReport = savedByKey.get(`${versionId}::project`) || null;
-          const frozenFingerprint = savedReport?.source_fingerprints?.engineeringFingerprint || null;
-          const currentPublication = durableReads[index]?.publication || null;
-          if (!frozenFingerprint || !currentPublication) return;
-          if (frozenFingerprint === currentPublication.engineering_fingerprint) return;
-          const frozenRead = await fetchDurablePublication(projectId, versionId, {
-            engineeringFingerprint: frozenFingerprint,
-          });
-          presentationOnlyByVersionId.set(
-            versionId,
-            engineeringDifferenceIsPresentationOnly(frozenRead?.publication, currentPublication),
-          );
-        }));
+        // can never disagree about one document. Asked for BOTH documents a version
+        // states — its saved Project Report and its stored equipment checklist —
+        // and only where that document's frozen authority and the version's current
+        // publication actually differ; any doubt answers false and the strict
+        // verdict stands.
+        const frozenFingerprintFor = {
+          project: (versionId) => savedByKey.get(`${versionId}::project`)
+            ?.source_fingerprints?.engineeringFingerprint || null,
+          speaker_design: (versionId) => selectStoredSpeakerDesign(speakerDesignRecords, versionId)
+            ?.source_fingerprints?.engineeringFingerprint || null,
+        };
+        const presentationOnlyBySource = { project: new Map(), speaker_design: new Map() };
+        // One durable read per frozen document, shared by every consumer of the
+        // same fingerprint, so a checklist and a report frozen against the same
+        // publication never cost two reads.
+        const frozenPublicationReads = new Map();
+        const readFrozenPublication = (versionId, fingerprint) => {
+          const key = `${versionId}::${fingerprint}`;
+          if (!frozenPublicationReads.has(key)) {
+            frozenPublicationReads.set(key, fetchDurablePublication(projectId, versionId, {
+              engineeringFingerprint: fingerprint,
+            }));
+          }
+          return frozenPublicationReads.get(key);
+        };
+        await Promise.all(ids.flatMap((versionId, index) => (
+          Object.entries(frozenFingerprintFor).map(async ([source, frozenFingerprintOf]) => {
+            const frozenFingerprint = frozenFingerprintOf(versionId);
+            const currentPublication = durableReads[index]?.publication || null;
+            if (!frozenFingerprint || !currentPublication) return;
+            if (frozenFingerprint === currentPublication.engineering_fingerprint) return;
+            const frozenRead = await readFrozenPublication(versionId, frozenFingerprint);
+            presentationOnlyBySource[source].set(
+              versionId,
+              engineeringDifferenceIsPresentationOnly(frozenRead?.publication, currentPublication),
+            );
+          })
+        )));
         if (cancelled) return;
 
         const nextRows = ids.map((versionId, index) => {
