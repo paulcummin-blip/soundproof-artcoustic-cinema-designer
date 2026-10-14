@@ -297,7 +297,7 @@ test('TEST 6 — the wizard states one readiness verdict and clears the refused 
   );
   assert.match(
     WIZARD,
-    /if \(!readiness\.ready\) return;\s*\n\s*setError\(null\);/,
+    /if \(!readiness\.ready \|\| !error\) return;\s*\n\s*if \(!isReadinessRefusalMessage\(error\)\) return;\s*\n\s*setError\(null\);\s*\n\s*\}, \[readiness\.ready, error\]\);/,
     'a refused attempt cannot outlive the verdict that produced it',
   );
   assert.equal(

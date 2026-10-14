@@ -15,7 +15,7 @@ import { useVersionedEngineeringSnapshot } from '@/components/proposal/engineeri
 import { buildSelectedVersionSnapshots } from '@/components/proposal/engineeringAuthority/buildSelectedVersionSnapshots';
 import { useSelectedVersionSnapshots } from '@/components/proposal/engineeringAuthority/useSelectedVersionSnapshots';
 import { useProposalReadiness } from '@/components/proposal/sourceAuthority/useProposalReadiness';
-import { resolveProposalReadinessGate } from '@/components/proposal/sourceAuthority/proposalReadinessAuthority';
+import { isReadinessRefusalMessage, resolveProposalReadinessGate } from '@/components/proposal/sourceAuthority/proposalReadinessAuthority';
 import VersionReadinessTable from '@/components/proposal/sourceAuthority/VersionReadinessTable';
 import ProposalPreparationPanel from '@/components/proposal/preparation/ProposalPreparationPanel';
 import useProposalPreparation from '@/components/proposal/wizard/useProposalPreparation';
@@ -227,13 +227,21 @@ export default function CreateProposalWizard({ onCreated, onCancel, regenerateFr
 
   // A refused generation leaves its reason on screen. That reason is a readiness
   // verdict, and the readiness result above is the only thing that states one:
-  // once the version's Project Report reads Current there is no stale warning to
-  // show, so a refused attempt's message is dropped with the verdict that produced
-  // it. A failure the readiness authority does not speak about is untouched.
+  // once the selected versions' Project Reports read Current there is no stale
+  // warning to show, so a refused attempt's message is dropped with the verdict
+  // that produced it.
+  //
+  // The MESSAGE is listened to as well as the verdict, because a refusal can
+  // arrive while the verdict already reads Current (an attempt refused against
+  // evidence the gate had not yet re-read). Keyed on the verdict alone, that
+  // message could never be cleared: nothing about the verdict changed when it
+  // appeared, so it stayed on the last step for the rest of the session. A failure
+  // the readiness authority does not speak about is untouched.
   useEffect(() => {
-    if (!readiness.ready) return;
+    if (!readiness.ready || !error) return;
+    if (!isReadinessRefusalMessage(error)) return;
     setError(null);
-  }, [readiness.ready]);
+  }, [readiness.ready, error]);
 
   // The preparation step, from the SAME readiness rows the table and the Generate
   // button already use, plus the designer's own progress kept while they step away

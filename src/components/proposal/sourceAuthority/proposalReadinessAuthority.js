@@ -59,6 +59,22 @@ export const READINESS_SOURCE = Object.freeze({
 /** The report's own name, everywhere readiness states it. */
 export const READINESS_REPORT_LABEL = 'Project Report';
 
+/**
+ * Whether a message left on screen is a readiness verdict — a statement about the
+ * report a proposal is gated on, rather than a failure of the generation itself.
+ *
+ * Every verdict this authority states about that report names it, so a message
+ * that names it is this authority's to speak, and is shown only while the result
+ * above states it. A failure the generation itself produced (a provider error, an
+ * incomplete handoff) never names the report, so it is never dropped by a verdict
+ * it is not a part of.
+ */
+export function isReadinessRefusalMessage(message) {
+  const text = typeof message === 'string' ? message.trim() : '';
+  if (!text) return false;
+  return text.includes(READINESS_REPORT_LABEL);
+}
+
 /** The one table column. */
 export const READINESS_COLUMNS = Object.freeze([
   { key: READINESS_SOURCE.PROJECT, label: READINESS_REPORT_LABEL },
