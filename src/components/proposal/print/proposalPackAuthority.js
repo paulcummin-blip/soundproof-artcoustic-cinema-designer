@@ -377,6 +377,10 @@ const PACKAGE_GROUP_LABELS = Object.freeze({
 });
 
 const PACKAGE_GROUP_ORDER = Object.freeze([
+  // A stage whose two sides are different models names each side; the pair keeps
+  // its own label when the sides are the same.
+  'Front left',
+  'Front right',
   'Front Left / Right',
   'Centre',
   'LCR',

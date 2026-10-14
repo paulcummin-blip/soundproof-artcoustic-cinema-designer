@@ -12,6 +12,7 @@ import { resolveSpeakerModelsByRole } from './resolveSpeakerModelsByRole';
 import {
   frontStageProductRoles,
   frontStageStatement,
+  frontStageStatesPositions,
   isDualCentreStage,
   resolveFrontStage,
 } from './resolveFrontStageRoles';
@@ -82,14 +83,18 @@ export function buildSystemAuthority(project, _version, placedSpeakers) {
   // row, nor inferred from the Dolby channel count.
   const frontStage = resolveFrontStage(designSpeakers);
   const dualCentre = isDualCentreStage(frontStage);
+  // A mixed front stage — a centre that is not the left/right model — is stated
+  // position by position exactly as a dual-centre stage is.
+  const frontStageByPosition = frontStageStatesPositions(frontStage);
 
   // Build product roles from selected_speakers_by_role
   const productRoles = [];
-  if (dualCentre) productRoles.push(...frontStageProductRoles(frontStage));
+  if (frontStageByPosition) productRoles.push(...frontStageProductRoles(frontStage));
   for (const [role, model] of Object.entries(speakersByRole)) {
     if (!model) continue;
-    // Already stated position by position above.
-    if (dualCentre && role === 'lcr') continue;
+    // Already stated position by position above: a collapsed "lcr" row here
+    // would state the left/right model for a centre that is not that model.
+    if (frontStageByPosition && role === 'lcr') continue;
     const meta = getSpeakerModelMeta(model);
     productRoles.push({
       role,

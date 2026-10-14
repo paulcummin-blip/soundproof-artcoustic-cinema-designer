@@ -10,7 +10,7 @@
 import { CONFIDENCE, SOURCE } from './confidence';
 import { getSpeakerModelMeta } from '@/components/models/speakers/registry';
 import { resolveSpeakerModelsByRole } from './resolveSpeakerModelsByRole';
-import { isDualCentreStage, resolveFrontStage } from './resolveFrontStageRoles';
+import { isDualCentreStage, isMixedCentreStage, resolveFrontStage } from './resolveFrontStageRoles';
 
 function extractProductFacts(meta, modelKey) {
   if (!meta || meta.notFound) {
@@ -70,6 +70,7 @@ function describeEngineeringPurpose(role, meta) {
     lcr: 'Left, Centre, and Right screen-wall speakers. Responsible for dialogue intelligibility, on-screen sound localisation, and the primary front soundstage.',
     front_left_right: 'Front left and right screen-stage speakers. Responsible for the primary front soundstage and on-screen sound localisation.',
     centre_dual: 'Centre channel, built from two physical centre cabinets sharing one centre channel. Two cabinets, ONE channel: dialogue is presented from one centre position, and no second centre channel exists.',
+    centre: 'Centre channel. Responsible for dialogue intelligibility and on-screen sound localisation from the centre position.',
     centre_soundbar: 'Centre channel soundbar. Responsible for dialogue intelligibility and on-screen sound localisation.',
     surround: 'Side surround speakers. Responsible for lateral spatial envelopment and off-screen sound movement.',
     rear_surround: 'Rear surround speakers. Responsible for rear spatial envelopment and back hemisphere sound localisation.',
@@ -106,6 +107,7 @@ export function buildProductAuthority(project, _version, placedSpeakers) {
   // "LCR" product.
   const frontStage = resolveFrontStage(placedSpeakers);
   const dualCentre = isDualCentreStage(frontStage);
+  const mixedCentre = isMixedCentreStage(frontStage);
   if (dualCentre) {
     if (frontStage.leftRightModel) {
       const meta = getSpeakerModelMeta(frontStage.leftRightModel);
@@ -125,6 +127,47 @@ export function buildProductAuthority(project, _version, placedSpeakers) {
       quantity: frontStage.centreCabinets,
       channel_count: frontStage.logicalCentreChannels,
       engineering_purpose: describeEngineeringPurpose('centre_dual', centreMeta),
+    });
+  } else if (mixedCentre) {
+    // A centre of its own model: the left/right pair and the centre, each stated
+    // as the position it is, and never one collapsed "LCR" of the sides' model.
+    const pairModel = frontStage.leftModel && frontStage.leftModel === frontStage.rightModel
+      ? frontStage.leftModel
+      : null;
+    if (pairModel) {
+      const meta = getSpeakerModelMeta(pairModel);
+      products.push({
+        ...extractProductFacts(meta, pairModel),
+        role: 'front_left_right',
+        role_description: 'Front left / right (screen stage)',
+        quantity: 2,
+        engineering_purpose: describeEngineeringPurpose('front_left_right', meta),
+      });
+    } else {
+      const sides = [
+        { role: 'front_left', model: frontStage.leftModel, description: 'Front left (screen stage)' },
+        { role: 'front_right', model: frontStage.rightModel, description: 'Front right (screen stage)' },
+      ];
+      for (const side of sides) {
+        if (!side.model) continue;
+        const meta = getSpeakerModelMeta(side.model);
+        products.push({
+          ...extractProductFacts(meta, side.model),
+          role: side.role,
+          role_description: side.description,
+          quantity: 1,
+          engineering_purpose: describeEngineeringPurpose('front_left_right', meta),
+        });
+      }
+    }
+    const centreMeta = getSpeakerModelMeta(frontStage.centreModel);
+    products.push({
+      ...extractProductFacts(centreMeta, frontStage.centreModel),
+      role: 'centre',
+      role_description: 'Centre channel',
+      quantity: 1,
+      channel_count: frontStage.logicalCentreChannels,
+      engineering_purpose: describeEngineeringPurpose('centre', centreMeta),
     });
   } else if (speakersByRole.lcr) {
     const meta = getSpeakerModelMeta(speakersByRole.lcr);

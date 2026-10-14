@@ -124,6 +124,7 @@ import {
   DISPLAY_TYPE_PROJECTOR,
   DISPLAY_TYPE_TV,
   resolveDisplayType,
+  savedDiagonalInches,
 } from '@/components/models/screen/displayTypeAuthority';
 
 function buildRoom(captured) {
@@ -140,12 +141,18 @@ function buildScreen(captured, borderThicknessM) {
   const screen = captured?.room?.screen || null;
   // The display's own type, and the phrase a client-facing surface states for it:
   // a television is stated as a television and never re-derived from its size.
-  const displayType = resolveDisplayType({
-    display_type: screen?.display_type,
-    screen_manual_config: screen?.screen_manual_config,
-    television: screen?.television,
-  });
-  const viewableDiagonalIn = round(screen?.diagonal_inches ?? screen?.size_inches, 1);
+  //
+  // The display's OWN evidence is handed over whole rather than as a hand-picked
+  // key set. A television declares itself through any of its evidence — a TV
+  // preset, a saved TV width, the frozen flag — and reading one spelling alone
+  // froze a 100" television as a projection screen, which a proposal then stated
+  // as the television's 88" viewable width. resolveDisplayType reads every form.
+  const displayType = resolveDisplayType(screen || {});
+  // A television states its NOMINAL diagonal: the figure comes from THE display
+  // authority, never from the diagonal its viewable width happens to imply.
+  const viewableDiagonalIn = displayType === DISPLAY_TYPE_TV
+    ? round(savedDiagonalInches(screen), 1)
+    : round(screen?.diagonal_inches ?? screen?.size_inches, 1);
   const displayLabel = displayType === DISPLAY_TYPE_TV
     && Number.isFinite(Number(viewableDiagonalIn))
     && Number(viewableDiagonalIn) > 0

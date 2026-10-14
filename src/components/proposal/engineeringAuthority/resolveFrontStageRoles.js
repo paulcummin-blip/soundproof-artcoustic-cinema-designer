@@ -37,6 +37,9 @@ import {
 
 /** The roles the left and right screen channels are placed as. */
 const LEFT_RIGHT_CODES = Object.freeze(['FL', 'FR', 'L', 'R']);
+/** The roles each screen-channel side is placed as, read on its own. */
+const LEFT_CODES = Object.freeze(['FL', 'L']);
+const RIGHT_CODES = Object.freeze(['FR', 'R']);
 /** The roles a SINGLE centre cabinet is placed as. */
 const SINGLE_CENTRE_CODES = Object.freeze(['FC', 'C']);
 
@@ -86,14 +89,30 @@ export function resolveFrontStage(placedSpeakers = []) {
     ? canonicalProductId(cabinets[0]?.model)
     : modelAt(list, SINGLE_CENTRE_CODES);
   const leftRightModel = modelAt(list, LEFT_RIGHT_CODES);
+  // Each side on its own, so a stage whose sides differ is still stated for the
+  // side each model is actually placed at.
+  const leftModel = modelAt(list, LEFT_CODES);
+  const rightModel = modelAt(list, RIGHT_CODES);
   const hasCentre = !!centreModel && isInstalled(centreModel);
 
   if (!hasCentre && !leftRightModel) return null;
 
+  // The stage is ONE model across its screen channels only when the centre really
+  // is the model the sides are built from. A centre of its own model — the normal
+  // mixed front stage — is a second position and is never described as the
+  // left/right model, which is how the centre used to disappear from a proposal.
+  const mixedCentre = hasCentre && !dual
+    && (centreModel !== leftModel || centreModel !== rightModel);
+
   return {
-    structure: dual && hasCentre ? 'dual_centre' : 'single_centre',
+    structure: dual && hasCentre ? 'dual_centre'
+      : (mixedCentre ? 'mixed_centre' : 'single_centre'),
     leftRightModel,
     leftRightLabel: leftRightModel ? metaFor(leftRightModel).label : null,
+    leftModel,
+    rightModel,
+    leftLabel: leftModel ? metaFor(leftModel).label : null,
+    rightLabel: rightModel ? metaFor(rightModel).label : null,
     centreModel: hasCentre ? centreModel : null,
     centreLabel: hasCentre ? metaFor(centreModel).label : null,
     // Physical cabinets, counted from the design's own speakers.
@@ -109,6 +128,23 @@ export function resolveFrontStage(placedSpeakers = []) {
 /** Whether the stage is the dual-centre arrangement, with a model to state. */
 export function isDualCentreStage(frontStage) {
   return frontStage?.structure === 'dual_centre' && !!frontStage.centreModel;
+}
+
+/**
+ * Whether the stage carries a centre of its own model, built from one cabinet.
+ * The centre and the left/right sides are then two positions, never one "LCR".
+ */
+export function isMixedCentreStage(frontStage) {
+  return frontStage?.structure === 'mixed_centre' && !!frontStage.centreModel;
+}
+
+/**
+ * Whether the stage is stated POSITION BY POSITION rather than as the single
+ * grouped "LCR" row: true for a dual-centre stage and for a mixed stage. Only a
+ * stage whose centre really is the left/right model collapses into one row.
+ */
+export function frontStageStatesPositions(frontStage) {
+  return isDualCentreStage(frontStage) || isMixedCentreStage(frontStage);
 }
 
 /** "2 × C4-1 dual physical centre cabinets" — the equipment wording of the centre row. */
@@ -153,28 +189,74 @@ function productRole({
  * package keeps exactly the row it has always had.
  */
 export function frontStageProductRoles(frontStage) {
-  if (!isDualCentreStage(frontStage)) return [];
+  if (!frontStageStatesPositions(frontStage)) return [];
   const roles = [];
-  if (frontStage.leftRightModel) {
+
+  if (isDualCentreStage(frontStage)) {
+    if (frontStage.leftRightModel) {
+      roles.push(productRole({
+        role: 'front_left_right',
+        role_description: 'Front left and right channels',
+        position_label: 'Front Left / Right',
+        model: frontStage.leftRightModel,
+        // Two screen channels, one cabinet each.
+        channel_count: 2,
+      }));
+    }
+    roles.push(productRole({
+      role: 'centre',
+      role_description: 'Centre channel (two physical cabinets, one logical centre channel)',
+      position_label: 'Centre',
+      model: frontStage.centreModel,
+      channel_count: frontStage.logicalCentreChannels,
+      cabinet_count: frontStage.centreCabinets,
+      structure: 'dual-centre',
+      orientation: frontStage.orientation || null,
+      model_statement: centreCabinetsStatement(frontStage),
+    }));
+    return roles;
+  }
+
+  // The mixed front stage: the two screen-channel sides and the centre of its own
+  // model, stated exactly as the Speaker Design states them. The sides share one
+  // row when they are the same model, and are named for the side they serve when
+  // they are not: no model is ever stated for a position it is not placed at.
+  if (frontStage.leftModel && frontStage.leftModel === frontStage.rightModel) {
     roles.push(productRole({
       role: 'front_left_right',
       role_description: 'Front left and right channels',
       position_label: 'Front Left / Right',
-      model: frontStage.leftRightModel,
-      // Two screen channels, one cabinet each.
+      model: frontStage.leftModel,
       channel_count: 2,
     }));
+  } else {
+    if (frontStage.leftModel) {
+      roles.push(productRole({
+        role: 'front_left',
+        role_description: 'Front left channel',
+        position_label: 'Front left',
+        model: frontStage.leftModel,
+        channel_count: 1,
+      }));
+    }
+    if (frontStage.rightModel) {
+      roles.push(productRole({
+        role: 'front_right',
+        role_description: 'Front right channel',
+        position_label: 'Front right',
+        model: frontStage.rightModel,
+        channel_count: 1,
+      }));
+    }
   }
   roles.push(productRole({
     role: 'centre',
-    role_description: 'Centre channel (two physical cabinets, one logical centre channel)',
+    role_description: 'Centre channel',
     position_label: 'Centre',
     model: frontStage.centreModel,
-    channel_count: frontStage.logicalCentreChannels,
-    cabinet_count: frontStage.centreCabinets,
-    structure: 'dual-centre',
-    orientation: frontStage.orientation || null,
-    model_statement: centreCabinetsStatement(frontStage),
+    channel_count: 1,
+    cabinet_count: 1,
+    structure: 'mixed-centre',
   }));
   return roles;
 }
