@@ -199,7 +199,7 @@ test('TEST 3 — no comparison, no exemption', async () => {
     'a version with no publication history keeps the strict verdict',
   );
   assert.equal(
-    engineeringMoveIsPresentationOnly(null, { frozenFingerprint: ENGINEERING_FP, currentFingerprint: MOVED_FP }),
+    proposalEvidenceMoveIsSafe(null, { frozenFingerprint: ENGINEERING_FP, currentFingerprint: MOVED_FP }),
     false,
     'an absent comparison answers false',
   );
@@ -250,12 +250,17 @@ test('TEST 5 — the server mirror answers exactly as the browser does', () => {
   assert.deepEqual([...SERVER_KEYS], [...DERIVED_DISPLAY_IDENTITY_KEYS], 'one derived-identity key list');
 
   const frozen = publication(frozenProject('projector_screen', 4.6));
-  const moved = publication(frozenProject('tv', 4.6));
-  const changed = publication(frozenProject('tv', 5.4));
-  assert.equal(serverVerdict(frozen, moved), engineeringDifferenceIsPresentationOnly(frozen, moved));
-  assert.equal(serverVerdict(frozen, moved), true, 'presentation only, on both sides');
-  assert.equal(serverVerdict(frozen, changed), engineeringDifferenceIsPresentationOnly(frozen, changed));
-  assert.equal(serverVerdict(frozen, changed), false, 'a physical change, on both sides');
+  const wordingOnly = publication(frozenProject('projector_screen', 4.6));
+  const displayChanged = publication(frozenProject('tv', 4.6));
+  const physicallyChanged = publication(frozenProject('tv', 5.4));
+  assert.equal(serverVerdict(frozen, displayChanged), engineeringDifferenceIsPresentationOnly(frozen, displayChanged));
+  assert.equal(serverVerdict(frozen, displayChanged), true, 'the physical-design comparison remains presentation-only');
+  assert.equal(serverProposalVerdict(frozen, wordingOnly), proposalEvidenceDifferenceIsSafe(frozen, wordingOnly));
+  assert.equal(serverProposalVerdict(frozen, wordingOnly), true, 'wording-only evidence reuse is safe');
+  assert.equal(serverProposalVerdict(frozen, displayChanged), proposalEvidenceDifferenceIsSafe(frozen, displayChanged));
+  assert.equal(serverProposalVerdict(frozen, displayChanged), false, 'changed Display authority needs refreshed evidence');
+  assert.equal(serverVerdict(frozen, physicallyChanged), engineeringDifferenceIsPresentationOnly(frozen, physicallyChanged));
+  assert.equal(serverVerdict(frozen, physicallyChanged), false, 'a physical change stays blocked on both sides');
 
   const server = serverReadiness({
     version: VERSION,
@@ -320,8 +325,8 @@ test('TEST 6 — the wizard states one readiness verdict and clears the refused 
   );
 
   // The evidence gate asks the one rule, and the server gate applies it too.
-  assert.match(READER, /engineeringMoveIsPresentationOnly\(record, \{ frozenFingerprint, currentFingerprint \}\)/);
+  assert.match(READER, /proposalEvidenceMoveIsSafe\(record, \{ frozenFingerprint, currentFingerprint \}\)/);
   assert.match(READER, /presentationOnlyMove = reportSourceMovedPastVersion\(projectRow, version\)/);
-  assert.match(SERVER_GATE, /engineeringMoveIsPresentationOnly\(/);
+  assert.match(SERVER_GATE, /proposalEvidenceMoveIsSafe\(/);
   assert.match(SERVER_GATE, /presentationOnlyMove,/);
 });
