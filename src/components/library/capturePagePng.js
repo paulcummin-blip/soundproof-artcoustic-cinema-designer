@@ -64,9 +64,26 @@ export default async function capturePagePng(element, pageNumber, options) {
   let canvas;
   let dataUrl;
   try {
+    // A page that measures nothing produces a 0 × 0 canvas, and toDataURL on that
+    // canvas returns "data:," — an error with no measurement in it. It is named
+    // here instead, so a capture can tell "nothing to draw" from "failed to draw".
+    const rect = element?.getBoundingClientRect?.();
+    diagnostics.pageWidth = Math.round((Number(rect?.width) || 0) * 100) / 100;
+    diagnostics.pageHeight = Math.round((Number(rect?.height) || 0) * 100) / 100;
+    if (diagnostics.pageWidth <= 0 || diagnostics.pageHeight <= 0) {
+      diagnostics.operation = 'page_dimensions';
+      diagnostics.zeroSize = true;
+      throw new Error(`The page measures nothing (${diagnostics.pageWidth} × ${diagnostics.pageHeight} px).`);
+    }
     canvas = await html2canvas(element, options);
     diagnostics.canvasWidth = canvas.width;
     diagnostics.canvasHeight = canvas.height;
+    diagnostics.operation = 'canvas_dimensions';
+    // The raster itself is checked before it is encoded: an empty canvas is
+    // reported as an empty canvas, not as a mysterious missing PNG.
+    if (!(canvas.width > 0) || !(canvas.height > 0)) {
+      throw new Error(`The page raster came back as a ${canvas.width} × ${canvas.height} canvas.`);
+    }
     diagnostics.operation = 'png_encoding';
     dataUrl = canvas.toDataURL('image/png');
     diagnostics.operation = 'png_validation';

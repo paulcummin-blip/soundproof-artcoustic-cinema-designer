@@ -24,7 +24,15 @@
  */
 
 import { jsPDF } from 'jspdf';
-import capturePagePng, { pageCaptureFailure } from '@/components/library/capturePagePng';
+import { pageCaptureFailure } from '@/components/library/capturePagePng';
+import {
+  captureViewport,
+  pagePixelSize,
+  rasteriseCompositionPages,
+  rasterisePage,
+  resolveCaptureScale,
+} from './compositionPageRaster';
+import { collectPageRasters } from './libraryCaptureResilience';
 import { installCanvasGradientGuard, neutraliseDegenerateGradients } from './canvasGradientGuard';
 import { resolvePageComposer } from '@/components/library/issuedDocument/issuedDocumentPageComposers';
 import { pageFitRecords } from '@/components/library/issuedDocument/capturePageFitDiagnostics';
@@ -451,32 +459,60 @@ export async function captureCompositionToPdf({ nodeHtml, pageSelector, bodyClas
     gradientGuard = installCanvasGradientGuard();
 
     const pdf = new jsPDF({ unit: 'mm', format: 'a4', orientation: 'portrait' });
-    const win = frame.contentWindow;
 
-    for (let index = 0; index < pages.length; index += 1) {
-      const { canvas, dataUrl, diagnostics } = await capturePagePng(pages[index], index + 1, {
-        backgroundColor: '#FFFFFF',
-        scale: RENDER_SCALE,
-        useCORS: true,
-        logging: false,
-        windowWidth: win?.innerWidth,
-        windowHeight: win?.innerHeight,
-        scrollX: 0,
-        scrollY: 0,
-      });
+    // Rasterising the pages, with the three rules that keep a page from costing
+    // the designer their Library copy (see compositionPageRaster.js):
+    //   - the viewport handed to html2canvas covers the WHOLE composition, never
+    //     the hidden capture frame's fixed height, so a page is never cloned into
+    //     a viewport shorter than itself;
+    //   - each page's render scale is clamped to a pixel budget, so an unusually
+    //     tall or wide page is rasterised at a lower but still legible scale
+    //     instead of a canvas the browser silently refuses to allocate;
+    //   - a page whose own capture still returns no PNG data (`data:,`) is
+    //     recovered from ONE raster of the whole composition, cut out at that
+    //     page's own measured rectangle — the stored copy stays page-for-page.
+    // A page that measures nothing paints nothing, so it is left out.
+    const pageContainer = proposalRoot || pages[0]?.parentElement || scope.body || null;
+    const viewport = captureViewport(frame, pages);
+    const scaleOf = (element) => resolveCaptureScale({
+      ...pagePixelSize(element),
+      preferredScale: RENDER_SCALE,
+    });
+    const { rasters: pageRasters, diagnostics: resilience } = await collectPageRasters({
+      pages,
+      rasterPage: async (page, index) => {
+        const scale = scaleOf(page);
+        const { canvas, dataUrl } = await rasterisePage(page, {
+          pageNumber: index + 1,
+          scale,
+          windowWidth: viewport.width,
+          windowHeight: viewport.height,
+        });
+        return { dataUrl, width: canvas.width, height: canvas.height, scale };
+      },
+      rasterAll: () => rasteriseCompositionPages(pageContainer, pages, {
+        scale: scaleOf(pageContainer || pages[0]),
+        windowWidth: viewport.width,
+        windowHeight: viewport.height,
+      }),
+    });
+
+    let pageCount = 0;
+    for (let index = 0; index < pageRasters.length; index += 1) {
+      const raster = pageRasters[index];
+      if (!raster) continue;
 
       let renderWidthMm = paper.widthMm;
-      let renderHeightMm = (canvas.height / canvas.width) * paper.widthMm;
+      let renderHeightMm = (raster.height / raster.width) * paper.widthMm;
       if (renderHeightMm > paper.heightMm) {
         renderHeightMm = paper.heightMm;
-        renderWidthMm = (canvas.width / canvas.height) * paper.heightMm;
+        renderWidthMm = (raster.width / raster.height) * paper.heightMm;
       }
 
-      if (index > 0) pdf.addPage();
-      diagnostics.operation = 'pdf_png_embedding';
+      if (pageCount > 0) pdf.addPage();
       try {
         pdf.addImage(
-          dataUrl,
+          raster.dataUrl,
           'PNG',
           paper.marginMm + (paper.widthMm - renderWidthMm) / 2,
           paper.marginMm,
@@ -486,16 +522,24 @@ export async function captureCompositionToPdf({ nodeHtml, pageSelector, bodyClas
           'FAST',
         );
       } catch (error) {
-        throw pageCaptureFailure(error, diagnostics);
+        throw pageCaptureFailure(error, {
+          pageNumber: index + 1,
+          operation: 'pdf_png_embedding',
+          heading: null,
+        });
       }
+      pageCount += 1;
     }
 
     return {
       blob: pdf.output('blob'),
-      pageCount: pages.length,
+      pageCount,
       // What the capture had to sanitise, so a storage failure can name it.
       captureDiagnostics: {
         degenerateGradients,
+        // How the pages were rasterised: what was recovered from the whole-
+        // composition fallback, what measured nothing, the scale each page used.
+        resilience,
         sanitisedStops: gradientGuard ? gradientGuard.sanitisedStops() : [],
         // Continuation pages created for content taller than one sheet.
         continuations: pages.filter((page) => page.classList.contains('pp-page--continuation')).length,

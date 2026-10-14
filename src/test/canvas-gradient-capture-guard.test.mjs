@@ -187,10 +187,18 @@ test('TEST E — a gradient on a box that measures nothing is neutralised', () =
 test('TEST F — the capture neutralises the degenerate gradient and guards the canvas', () => {
   const capture = read('src/components/library/compositionCapture.js');
 
+  // The pages are rasterised through the capture's own raster orchestration
+  // (compositionPageRaster.js), so the guard must be in place before THAT call
+  // begins — the same ordering guarantee, against the call that now rasterises.
   assert.ok(
-    capture.indexOf('neutraliseDegenerateGradients(scope)') < capture.indexOf('html2canvas(pages[index]'),
+    capture.indexOf('neutraliseDegenerateGradients(scope)') < capture.indexOf('collectPageRasters('),
     'the degenerate gradient is removed before any page is rasterised',
   );
+  assert.ok(
+    capture.indexOf('gradientGuard = installCanvasGradientGuard();') < capture.indexOf('collectPageRasters('),
+    'and the canvas is guarded before any page is rasterised',
+  );
+  assert.ok(capture.includes('rasterisePage(page,'), 'each page is rasterised by the capture raster module');
   assert.ok(capture.includes('gradientGuard = installCanvasGradientGuard();'), 'the canvas is guarded for the capture');
   assert.ok(capture.includes('gradientGuard.restore();'), 'and the canvas API is restored in the finally');
   assert.ok(
