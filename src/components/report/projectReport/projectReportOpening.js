@@ -22,10 +22,10 @@
 
 import {
   buildProjectReportSummaryOpening,
+  isCompactRoom,
   screenPhrase,
   seatingRowPhrase,
 } from './projectReportSummaryOpening';
-import { buildSpecificationConnections } from './adiDesignHighlights';
 
 /** The room, stated as its three dimensions in metres. */
 function roomPhrase(roomDims) {
@@ -56,19 +56,20 @@ export function buildProjectReportOpening({
 } = {}) {
   const architecture = String(projectDetails?.dolby_config || '').trim() || null;
 
-  const connections = buildSpecificationConnections({
-    productsSelected,
-    engineeringSummary,
-    dolbyConfig: architecture,
-  });
-  const counts = connections?.counts || {};
-  const speakers = (counts.lcr || 0) + (counts.surrounds || 0) + (counts.overheads || 0);
+  // The headline leads with the design's intent — the cinema this room is and
+  // the display it is built around — rather than with a channel count. The
+  // speaker count is a fact the fact sheet already states; it is not the story.
+  // The display comes from the report's one display authority, so a television
+  // is named as a television, and 'compact' is read from the room's own floor
+  // area and simply absent from a larger room.
+  const display = screenPhrase(projectDetails);
+  const compact = isCompactRoom(roomDims) ? 'compact ' : '';
 
   const headline = architecture
-    ? (speakers > 0
-      ? `A ${architecture} cinema with ${speakers} discrete speakers`
-      : `A ${architecture} cinema`)
-    : (speakers > 0 ? `A cinema with ${speakers} discrete speakers` : null);
+    ? (display
+      ? `A ${compact}${architecture} cinema designed around ${display}`
+      : `A ${compact}${architecture} cinema`)
+    : (display ? `A ${compact}cinema designed around ${display}` : null);
 
   const supportingLine = [
     screenPhrase(projectDetails),

@@ -48,6 +48,43 @@ const word = (count) => NUMBER_WORDS[count] || String(count);
 
 const NONE_SPECIFIED = /^none specified$/i;
 
+/**
+ * Whether this is a compact room — a design descriptor read from the room's own
+ * floor area, never a performance statement. At or below 30 m² the cinema is
+ * stated as compact; above it the word is simply not used, and a design whose
+ * room dimensions are unknown is never called compact. Shared with the report's
+ * opening authority, so the headline and the intent can never disagree.
+ */
+const COMPACT_FLOOR_AREA_M2 = 30;
+
+export function isCompactRoom(roomDims) {
+  const width = Number(roomDims?.widthM);
+  const length = Number(roomDims?.lengthM);
+  if (![width, length].every((value) => Number.isFinite(value) && value > 0)) return false;
+  return width * length <= COMPACT_FLOOR_AREA_M2;
+}
+
+/** A count as the sentence's opening word: "Six Abfuser panels…". */
+function countWord(count) {
+  const text = word(count);
+  return `${text.charAt(0).toUpperCase()}${text.slice(1)}`;
+}
+
+/**
+ * Where the low-frequency support is stated to come from, read from the design's
+ * own subwoofer schedule — the rear, the screen wall, both ends, or the
+ * subwoofers alone where the schedule records no side. The intent never claims a
+ * position the design does not state.
+ */
+function bassSupportPhrase(subwooferSchedule) {
+  const hasRear = subwooferSchedule.some((part) => /\(rear\)/i.test(part));
+  const hasFront = subwooferSchedule.some((part) => /\(front\)/i.test(part));
+  if (hasRear && hasFront) return 'from both ends of the room';
+  if (hasRear) return 'from the rear subwoofers';
+  if (hasFront) return 'from the screen wall';
+  return 'from the subwoofers';
+}
+
 /** "A, B and C" — the sentence's own list style. */
 function joinList(items) {
   const list = (Array.isArray(items) ? items : []).filter(Boolean);
@@ -87,13 +124,18 @@ export function screenPhrase(projectDetails) {
   return displayPhrase(projectDetails);
 }
 
-/** The seating, as the report's own row grouping sees it. */
-export function seatingRowPhrase(seatingPositions) {
+/** How many seating rows the report's own row grouping sees. */
+export function seatingRowCount(seatingPositions) {
   const seats = (Array.isArray(seatingPositions) ? seatingPositions : []).map((seat) => ({
     x: Number(seat?.x ?? seat?.position?.x),
     y: Number(seat?.y ?? seat?.position?.y),
   }));
-  const rows = groupSeatsIntoRows(seats).length;
+  return groupSeatsIntoRows(seats).length;
+}
+
+/** The seating, as the report's own row grouping sees it. */
+export function seatingRowPhrase(seatingPositions) {
+  const rows = seatingRowCount(seatingPositions);
   if (rows === 0) return null;
   return rows === 1 ? 'a single seating row' : `${word(rows)} seating rows`;
 }
@@ -132,43 +174,63 @@ export function buildProjectReportSummaryOpening({
     readSeatBoundaryGeometry({ seats: seatingPositions, roomDims }),
   );
 
-  // Paragraph one: the experience this cinema is designed to deliver.
+  // Paragraph one: the design as it is intended, in the designer's own voice —
+  // the display and the seating the room is built around, and what carries the
+  // sound. A layer the design does not have is never described: a 5.1 system is
+  // a deliberate 5.1 system, not an immersive one with something missing.
+  const architecture = String(projectDetails?.dolby_config || '').trim() || null;
   const vision = [];
-  if (projection) {
+  const rowPhrase = seatingRowPhrase(seatingPositions);
+  const builtAround = [displayPhrase(projectDetails), rowPhrase].filter(Boolean);
+  const compact = isCompactRoom(roomDims) ? 'compact ' : '';
+  if (builtAround.length > 0) {
+    vision.push(`This room is designed as a ${compact}dedicated cinema around ${joinList(builtAround)}, with the picture, the front stage, the sound around the seating and the low-frequency support planned together around the way the room will actually be used.`);
+  } else if (projection) {
     vision.push(mountMode === 'baffle'
       ? 'This room is designed as a cinema first, with the picture projected onto a screen wall built out as a baffle wall, so the front stage and the low-frequency foundation are carried by the same wall as the picture.'
       : 'This room is designed as a cinema first, with the picture projected onto a floating screen and the system that carries it concealed from the seating.');
   } else {
-    vision.push('This room is designed as a cinema around a large-format display, so the picture and the sound are planned together from the seating outwards.');
+    vision.push('This room is designed as a cinema, with the picture and the sound planned together from the seating outwards.');
   }
   if (overheadCount > 0) {
     vision.push('The overhead layer is part of the original design rather than an addition to it, which is what gives the room its sense of scale.');
   } else if (surroundCount > 0) {
-    vision.push('The sound is carried around and behind the seating as well as across the front, so the audience sits inside the mix rather than in front of it.');
+    vision.push('The sound is carried around and behind the seating as well as across the front, so the audience sits inside the surround field rather than in front of it.');
   }
 
   // Paragraph two: why the principal decisions were taken, and how the picture,
   // the sound and the seating work together in this particular room.
   const reasoning = [];
-  const rows = seatingRowPhrase(seatingPositions);
-  if (rows) {
+  const rowCount = seatingRowCount(seatingPositions);
+  if (rowCount > 0) {
     const reference = String(projectDetails?.mlp_basis || '').trim() === 'middle'
       ? ', with the reference position taken at the middle of the seating rather than at one privileged chair'
       : '';
     const clearance = seatingBoundary?.available === true && seatingBoundary?.favourable === true
       ? 'well inboard of the side and rear walls'
       : 'as far inboard of the side and rear walls as the room allows';
-    reasoning.push(
-      `${rows.charAt(0).toUpperCase()}${rows.slice(1)} sit ${clearance}${reference}, so the design answers from where the audience actually sits.`,
-    );
+    const subject = rowCount === 1
+      ? 'The single seating row sits'
+      : `The ${word(rowCount)} seating rows sit`;
+    reasoning.push(`${subject} ${clearance}${reference}, so the design answers from where the audience actually sits.`);
   }
-  if (bassFromBothEnds) {
-    reasoning.push('The low-frequency is delivered from both ends of the room rather than from one wall, so it arrives together across the seating.');
-  } else if (subwooferSchedule.length > 0) {
-    reasoning.push('The low-frequency is delivered from the screen wall, arranged so it arrives across the seating as one source rather than from a single point.');
+  // What the system is there to do, stated only for the layers this design
+  // actually has, and saying which end the bass is delivered from.
+  const focus = [
+    productParts(productsSelected?.lcr).length > 0 && 'clear dialogue and effects from the screen',
+    surroundCount > 0 && 'convincing surround movement around the seating',
+    subwooferSchedule.length > 0 && `controlled low-frequency support ${bassSupportPhrase(subwooferSchedule)}`,
+  ].filter(Boolean);
+  if (focus.length > 0) {
+    const layerLabel = architecture ? `The ${architecture} system` : 'The system';
+    reasoning.push(`${layerLabel} concentrates on ${joinList(focus)}.`);
   }
   if (treated) {
-    reasoning.push('The acoustic treatment takes care of the room\'s own early reflections, so the tonal balance the audience hears belongs to the system rather than to the room.');
+    const treatmentParts = productParts(productsSelected?.acoustic_treatment);
+    const treatmentModel = partModel(treatmentParts[0]) || 'acoustic treatment';
+    const treatmentQty = totalCount(productsSelected?.acoustic_treatment);
+    const panels = `${countWord(treatmentQty)} ${treatmentModel} panel${treatmentQty === 1 ? '' : 's'}`;
+    reasoning.push(`${panels} ${treatmentQty === 1 ? 'is' : 'are'} included to manage the strongest early reflections, so the room stays clear and comfortable rather than overly live.`);
   }
 
   const paragraphs = [vision.join(' '), reasoning.join(' ')].filter(Boolean);
