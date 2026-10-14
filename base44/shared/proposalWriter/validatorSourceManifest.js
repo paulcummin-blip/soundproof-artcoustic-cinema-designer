@@ -26,11 +26,11 @@ export const VALIDATOR_SOURCE_MANIFEST = Object.freeze({
   // mechanism that produces it. It states the instruction the writer reads and the
   // phrasing the narrative sanitizer removes, so a draft can always be traced to the
   // exact register it was written and read under.
-  'base44/shared/clientNarrativeRegister.js': '2237b16b2ea5f20852a3b2c5c3a7aff8aecb35985259506d9434947753494301',
+  'base44/shared/clientNarrativeRegister.js': 'f80e55c41e0089c85c6dfd256fc09dd0a41f32bb09278e1b7b57ffec8747c700',
   // The Design Summary brief for a TV media room: it states the requirement and
   // the word limit the section is written and validated under, so a draft can be
   // traced to the exact brief it was read against.
-  'base44/shared/proposalWriter/designSummaryBrief.js': 'd90d03ca447668ae0617a07ea3c4bd6fc8e5bc22b9b331faae04dfdf1a4ccd23',
+  'base44/shared/proposalWriter/designSummaryBrief.js': 'c95e0ad847dd6260f01c506e6254accdc22db186c3d1af147e117fb2e12b92ce',
   'base44/shared/proposalWriter/writerPromptBuilder.js': '9c50ae7bce9abbf641232657370d21e76c755c24af53e475327bbbb03786e676',
   'base44/shared/proposalWriter/writerSectionMapping.js': 'f5a6d2a5fe974fbd5c16d810d95f99da72f629a4fb8cb33793aa472778ade2f0',
   'base44/shared/proposalWriter/writerDesignContext.js': '590a9f379bb28ebc54c14f97ae2b73070a8c8c6722c7be3fc548c95719f2d63b',

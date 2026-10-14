@@ -163,10 +163,13 @@ function countWords(text) {
  * sentence is evidence, whatever else it happens to say.
  */
 function withoutTrailingHollowClause(sentence) {
-  if (STATED_FIGURE.test(sentence)) return sentence;
   const pattern = TRAILING_HOLLOW_CLAUSES.find((candidate) => candidate.test(sentence));
   if (!pattern) return sentence;
   const kept = sentence.replace(pattern, '').trim();
+  // A sentence that states an assessed figure is evidence: its hollow trailing
+  // clause is trimmed away, but the sentence itself is never dropped with it. The
+  // figures come before the clause, so trimming the clause can never take one.
+  if (STATED_FIGURE.test(sentence)) return countWords(kept) > 0 ? kept : sentence;
   return countWords(kept) >= 4 ? kept : null;
 }
 
