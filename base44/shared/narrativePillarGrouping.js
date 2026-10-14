@@ -69,6 +69,9 @@ import {
   BASS_STORY_RULE,
   BRIEF_CONTEXT_RULE,
   CORE_STORY_RULE,
+  CROSS_PILLAR_BASS_RULE,
+  DYNAMIC_RANGE_SYSTEM_PARTS,
+  DYNAMIC_RANGE_SYSTEM_RULE,
   EVIDENCE_EMPHASIS,
   EVIDENCE_EMPHASIS_RULE,
   EVIDENCE_NOT_HEADLINE_RULE,
@@ -90,6 +93,7 @@ import {
   SEATING_RATIONALE_RULE,
   SEAT_SCOPE_WORDING,
   STORY_HIERARCHY_RULE,
+  SYSTEM_PART_ORDER,
   WIDENED_SCOPE_WORDING,
   infrasonicAllowance,
   pillarMemberKeys,
@@ -366,12 +370,19 @@ export function buildClientStoryPillars({
     // THE PILLAR'S OWN LEAD: the strongest result that may be told beneath this
     // pillar, with the language its own achieved result has earned. Read separately
     // from the global rank, so a pillar's evidence can shine without taking over the story.
-    const leads = pillarLeadEvidence(ordered);
+    // Only a CARRYING result leads a pillar: a qualifier (the bass control and
+    // consistency readings) never becomes the headline of the system's story.
+    const leads = pillarLeadEvidence(ordered, PILLAR_EVIDENCE[pillarKey].primary);
     const leadKeys = new Set(leads.ids);
-    // The bass is read as parts of the one Dynamic Range story; the other pillars
-    // are one story each, with no part list of their own.
+    // Dynamic Range is read across the WHOLE system: the four bass parts, plus the
+    // readings its screen channels and surrounds give the same story. The other
+    // pillars are one story each, with no part list of their own.
+    const systemParts = pillarKey === PILLAR.DYNAMIC_RANGE
+      ? DYNAMIC_RANGE_SYSTEM_PARTS.map((part) => partOf(part, members))
+      : [];
     const parts = pillarKey === PILLAR.DYNAMIC_RANGE ? BASS_PARTS.map((part) => partOf(part, members)) : [];
     const clauses = [...new Set([
+      ...systemParts.map((part) => part.clause).filter(Boolean),
       ...parts.map((part) => part.clause).filter(Boolean),
       consistencyClauseFor(pillarKey, members),
       // The language each of this pillar's own lead results has earned.
@@ -419,7 +430,11 @@ export function buildClientStoryPillars({
       } : null,
       parameter_ids: members.map((member) => String(member.key).toUpperCase()),
       members: ordered.map((member) => evidenceMember(member, leadKeys)),
-      // The parts of the one story (the bass, inside Dynamic Range).
+      // The whole system's readings of this story (the screen channels and surrounds,
+      // inside Dynamic Range): without them the pillar would read as bass alone.
+      system_parts: systemParts,
+      system_part_order: systemParts.length > 0 ? [...SYSTEM_PART_ORDER] : [],
+      // The parts of the one story (the bass, one layer of Dynamic Range).
       parts,
       part_order: parts.length > 0 ? [...BASS_PART_ORDER] : [],
       seat_scope: scope.seat_scope,
@@ -554,6 +569,10 @@ export function clientStoryPillarRules() {
     structure_rule: PILLAR_STRUCTURE_RULE,
     evidence_rule: EVIDENCE_NOT_HEADLINE_RULE,
     bass_rule: BASS_STORY_RULE,
+    // Dynamic Range is the whole system's story: this is the rule that keeps it from
+    // collapsing into a bass story, and the rule that lets one result serve two pillars.
+    dynamic_range_rule: DYNAMIC_RANGE_SYSTEM_RULE,
+    cross_pillar_rule: CROSS_PILLAR_BASS_RULE,
     brief_rule: BRIEF_CONTEXT_RULE,
     seat_scope_rule: PRIMARY_SEAT_SCOPE_RULE,
     infrasonic_rule: INFRASONIC_RULE,
@@ -582,6 +601,13 @@ export function clientStoryPillarRules() {
       parameter_ids: part.keys.map((key) => key.toUpperCase()),
       notices: part.notices,
       supporting: Boolean(part.supporting),
+    })),
+    // The whole-system readings that sit beside the bass parts inside Dynamic Range.
+    system_parts: DYNAMIC_RANGE_SYSTEM_PARTS.map((part) => ({
+      part: part.part,
+      question: part.question,
+      parameter_ids: part.keys.map((key) => key.toUpperCase()),
+      notices: part.notices,
     })),
     // Where the option's own pillar stories are carried, so the rules and the
     // evidence they govern are always read together.
@@ -622,13 +648,15 @@ export function clientStoryPillarLines() {
     PILLAR_STRUCTURE_RULE,
     EVIDENCE_NOT_HEADLINE_RULE,
     BASS_STORY_RULE,
+    DYNAMIC_RANGE_SYSTEM_RULE,
+    CROSS_PILLAR_BASS_RULE,
     ...pillarReferenceLines(),
     INFRASONIC_RULE,
     PRIMARY_SEAT_SCOPE_RULE,
     BRIEF_CONTEXT_RULE,
     SEATING_RATIONALE_NOTE,
     SEATING_RATIONALE_RULE,
-    'The pillar stories for each option are carried in evidence.options[].client_story_pillars, with each result\'s emphasis, the parts of the bass story, the clause each result has earned, the claims to cite and the seats each claim holds for: write all three pillars, and let each one\'s emphasis decide how much of its evidence the story tells.',
+    'The pillar stories for each option are carried in evidence.options[].client_story_pillars, with each result\'s emphasis, the whole-system readings of Dynamic Range (system_parts), the readings of the bass beneath it (parts), the clause each result has earned, the claims to cite and the seats each claim holds for: write all three pillars, read Dynamic Range across the screen channels, the surrounds and the bass together, and let each one\'s emphasis decide how much of its evidence the story tells.',
     'The seating rationale for each option is carried in evidence.options[].design_rationale: where it is available, explain why the seating sits where it does, in the section that already explains the seating, and never as a performance claim.',
     '',
   ];

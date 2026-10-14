@@ -76,12 +76,25 @@ function sentenceOf(member) {
 /**
  * ONE PILLAR'S LEAD EVIDENCE, read from the pillar's own ordered members.
  *
+ * ONLY A CARRYING RESULT LEADS A PILLAR. Where the pillar names its carrying
+ * parameters, the lead is read from those alone: the bass control and consistency
+ * readings qualify the story the system's own capability tells, so they are told
+ * inside it and never become its headline. Dynamic Range therefore stays the whole
+ * system's story — the front stage, the surrounds and the bass output and depth —
+ * instead of collapsing into a story about the subwoofers.
+ *
  * @param {Array<Object>} ordered — the pillar's members, strongest first
+ * @param {Array<string>} [carryingKeys] — the pillar's carrying parameters; when
+ *   given, only these may lead it (a qualifier still tells, it never leads)
  * @returns {{ids: Array<string>, level: string|null, clauses: Array<string>,
  *   sentences: Array<string>, members: Array<Object>, rule: string}}
  */
-export function pillarLeadEvidence(ordered = []) {
-  const eligible = (Array.isArray(ordered) ? ordered : []).filter((member) => (
+export function pillarLeadEvidence(ordered = [], carryingKeys = null) {
+  const list = Array.isArray(ordered) ? ordered : [];
+  const carrying = Array.isArray(carryingKeys) && carryingKeys.length > 0
+    ? list.filter((member) => carryingKeys.includes(String(member?.key)))
+    : list;
+  const eligible = carrying.filter((member) => (
     member?.level != null && TELLABLE.includes(member.emphasis)
   ));
   if (eligible.length === 0) {

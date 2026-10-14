@@ -87,11 +87,17 @@ export const PILLARS = Object.freeze({
     ]),
     vocabulary: Object.freeze(['contrast', 'scale', 'impact', 'headroom', 'excitement', 'weight', 'effortlessness']),
     register_examples: Object.freeze([
-      'Bass is one of the strengths of this design. The system has the output and depth to give films and music real scale and impact, so the largest moments feel substantially different from the quiet ones.',
+      // The whole system told as one: the front stage, the surrounds and the bass together.
+      'This system has exceptional dynamic headroom across the front stage, surrounds and bass system. Quiet dialogue and fine detail can remain clear and relaxed, while major musical peaks and effects arrive with the scale, immediacy and physical impact expected from a serious cinema.',
+      // The same pillar where the system is modest: honest, positive for the room it is in, and never an apology.
+      'For a room like this, the system has the dynamic capability to keep everyday viewing clear and engaging while still giving films and music real impact when required. The bass adds depth and scale without asking the room to behave like a dedicated reference cinema.',
+      // Where the bass is the strongest part of the SYSTEM story, it is added as a layer, never as the story itself.
+      'The low-frequency system adds another layer of authority, reaching deep enough to give the biggest effects genuine physical weight.',
+      // Deep extension only: the infrasonic register, earned by the depth result itself.
       'This system has exceptional low-frequency capability, combining very high output with infrasonic depth. The biggest effects have genuine physical scale and authority, creating the contrast between quiet detail and explosive moments that makes a cinema soundtrack exciting.',
     ]),
     success_note: 'A dynamic result is a success when it is right for the intended use: the same figures that are ample in a television lounge may be a limitation in a reference cinema, and the brief decides which this is.',
-    rule: 'Dynamic Range is not simply maximum SPL. It is the system\'s ability to preserve the contrast between quiet dialogue and detail, normal listening levels, powerful musical passages, major film effects and deep low-frequency impact, and it is told as ONE story across the screen channels, the surrounds and the bass.',
+    rule: 'Dynamic Range is not simply maximum SPL, and it is never the bass system\'s story. It is the WHOLE system\'s ability to preserve the contrast between quiet dialogue and detail, normal listening levels, powerful musical passages, major film effects and deep low-frequency impact, and it is told as ONE story across the screen channels, the surrounds and the bass: a Dynamic Range story that describes only the subwoofers is wrong, however strong that bass is.',
   }),
   [PILLAR.SPATIAL_RESOLUTION]: Object.freeze({
     key: PILLAR.SPATIAL_RESOLUTION,
@@ -205,6 +211,37 @@ export const BASS_PARTS = Object.freeze([
 
 export const BASS_PART_ORDER = Object.freeze(BASS_PARTS.map((part) => part.part));
 
+/* ── The whole system: the readings that sit beside the bass parts ─────────── */
+
+/**
+ * DYNAMIC RANGE IS THE WHOLE SYSTEM'S STORY, NEVER A BASS STORY. These are the
+ * readings that sit BESIDE the four bass parts: what the screen channels and the
+ * surrounds do with the same soundtrack. Together with the bass they are the
+ * system the client is buying — the front stage taking the peaks, the surrounds
+ * keeping up as the mix becomes demanding, and the bass giving those moments
+ * their scale and weight. The subwoofers are one layer of that story.
+ */
+export const DYNAMIC_RANGE_SYSTEM_PARTS = Object.freeze([
+  Object.freeze({
+    part: 'screen_channels',
+    keys: Object.freeze(['p12']),
+    question: 'Can dialogue and quiet detail remain clear, and can the front stage produce the major peaks cleanly?',
+    area: PERFORMANCE_AREAS.DYNAMIC_RANGE,
+    vocabulary: Object.freeze(['clarity', 'headroom', 'front stage']),
+    notices: 'dialogue and fine detail stay clear while the front stage takes the biggest peaks in its stride',
+  }),
+  Object.freeze({
+    part: 'surround_channels',
+    keys: Object.freeze(['p13']),
+    question: 'Can the surrounds keep up when the soundtrack becomes busy?',
+    area: PERFORMANCE_AREAS.DYNAMIC_RANGE,
+    vocabulary: Object.freeze(['energy', 'the surrounds keeping up']),
+    notices: 'the whole soundtrack keeps its energy as the mix becomes demanding',
+  }),
+]);
+
+export const SYSTEM_PART_ORDER = Object.freeze(DYNAMIC_RANGE_SYSTEM_PARTS.map((part) => part.part));
+
 /* ── The seat scope a consistency claim may be made for ───────────────────── */
 
 /** The wording each seat scope allows. */
@@ -289,11 +326,15 @@ export const STORY_HIERARCHY_RULE = `THE STORY RUNS: brief, then ASDR importance
 
 export const NARRATIVE_METHOD_RULE = `FOR EVERY IMPORTANT RESULT OR GROUP OF RELATED RESULTS, ANSWER THREE QUESTIONS BEFORE WRITING: (1) which of the three pillars does this strengthen? (2) what does that change in the listening experience? (3) why should the client care? Write from answers 2 and 3. The parameter numbers remain evidence.`;
 
-export const PILLAR_STRUCTURE_RULE = `THE THREE PILLARS ORGANISE THE CLIENT STORY: Dynamic Range, Spatial Resolution and Timbre Matching. They are the performance characteristics Sound Proof says make a system good, and they are the structure the client story is written through. RP22 parameters are the evidence underneath them, never the structure: do not make individual parameters the shape of the client story, do not give a parameter its own section, heading or paragraph, and never produce "Bass Output / Bass Extension / Bass Response / Bass Consistency" as four stories. Produce Dynamic Range as one fluent story about power, depth, scale and impact, with the control and consistency of that experience supporting it where the evidence holds.`;
+export const PILLAR_STRUCTURE_RULE = `THE THREE PILLARS ORGANISE THE CLIENT STORY: Dynamic Range, Spatial Resolution and Timbre Matching. They are the performance characteristics Sound Proof says make a system good, and they are the structure the client story is written through. RP22 parameters are the evidence underneath them, never the structure: do not make individual parameters the shape of the client story, do not give a parameter its own section, heading or paragraph, and never produce "Bass Output / Bass Extension / Bass Response / Bass Consistency" as four stories. Produce Dynamic Range as one fluent story about the WHOLE system — the front stage and dialogue staying clear, the surrounds keeping up as the mix becomes demanding, and the bass giving those moments their scale and weight — with the control and consistency of that experience supporting it where the evidence holds.`;
 
 export const EVIDENCE_NOT_HEADLINE_RULE = `NEVER MERELY REPORT THE EVIDENCE. Do not write "99 dBC", "26 Hz" or "Level 3" as the point of a sentence. Explain what those results collectively allow the system to do: the contrast it preserves, the scale it gives the biggest moments, the space it places effects in, the character it keeps as sound moves. A figure earns its place only where it states a key result the client asked about.`;
 
-export const BASS_STORY_RULE = `THE BASS NORMALLY STRENGTHENS DYNAMIC RANGE, NOT A SUBJECT OF ITS OWN. Bass output, bass depth, the response at the reference position and the consistency across the seating are four readings of one thing the client experiences as a single subject, so they are combined into the Dynamic Range story rather than discussed independently. A strong bass system is not "26 Hz" or "P14 L3": it is a greater contrast between quiet material and the largest effects, with the deepest moments having scale and physical weight. P19 supports the control and quality of that experience at the reference position and P20 how well it carries across the seating: name neither as a parameter, and tell both inside the same bass account.`;
+export const BASS_STORY_RULE = `THE BASS IS ONE LAYER OF THE DYNAMIC RANGE STORY, NEVER THE SUBJECT OF ITS OWN. Bass output, bass depth, the response at the reference position and the consistency across the seating are readings of one thing the client experiences as a single subject, so they are combined into the Dynamic Range story rather than discussed independently — and they are never the whole of that story. A strong bass system is not "26 Hz" or "P14 L3": it is a greater contrast between quiet material and the largest effects, with the deepest moments having scale and physical weight. P19 supports the control and quality of that experience at the reference position and P20 how well it carries across the seating: name neither as a parameter, and tell both inside the same bass account.`;
+
+export const DYNAMIC_RANGE_SYSTEM_RULE = `DYNAMIC RANGE IS A WHOLE-SYSTEM STORY, NEVER A BASS STORY. It describes the contrast between quiet detail and the largest moments the COMPLETE system can reproduce cleanly. Before writing it, read the whole system and answer these for THIS project: can dialogue and quiet detail remain clear? can the front stage produce major peaks cleanly? can the surrounds keep up when the soundtrack becomes busy? does the bass system provide the scale and physical weight underneath those peaks? and how impressive is that contrast for this project's brief? Then write ONE Dynamic Range story from those answers, covering the front stage, the surrounds and the bass together: a Dynamic Range story that describes only the subwoofers is wrong, however strong that bass is. Inside the pillar, high-weight results carry the emphasis and low-weight results never dominate it, and the bass may lead where it is genuinely the strongest and most relevant part of the design — the pillar still describes the performance of the SYSTEM. Where the system is modest for its brief, write it honestly and positively for the room it is in: never pretend reference cinema output, and never apologise for it either.`;
+
+export const CROSS_PILLAR_BASS_RULE = `ONE RESULT MAY STRENGTHEN MORE THAN ONE CLIENT EXPERIENCE. Bass output and physical scale reinforce Dynamic Range, while the quality of the bass response and its seat-to-seat consistency reinforce the consistency the client hears in the low-frequency character, so the bass is told where the experience it changes belongs and is never forced into a single narrative box. Technical RP22 categorisation is unchanged by this: a parameter's engineering classification stays exactly what the evidence states, and only the CLIENT story is written across the pillars.`;
 
 export const BRIEF_CONTEXT_RULE = `THE BRIEF DECIDES WHETHER A RESULT IS A SUCCESS. Never judge success from an RP22 Performance Level alone: a single-row 5.1 television lounge may achieve L1 or L2 in high-weight parameters and still be a highly successful design, because that performance is right for the intended use. The same results in a reference-quality twelve-seat dedicated cinema may be a limitation. Read the brief and the intended use first, describe a result that suits the project positively as the achievement it is, and never present a result as strong, weak, generous or limited without that context.`;
 

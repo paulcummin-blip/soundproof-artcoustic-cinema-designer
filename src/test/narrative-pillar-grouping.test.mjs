@@ -45,6 +45,7 @@ const {
   PILLAR_ORDER,
   PILLARS,
   PILLAR_STRUCTURE_RULE,
+  SYSTEM_PART_ORDER,
   clientStoryTextIsSafe,
   extensionHz,
   infrasonicAllowance,
@@ -210,8 +211,9 @@ test('infrasonic language only where the extension genuinely supports it', () =>
   assert.deepEqual(moderate.pillars[0].infrasonic.phrases, []);
 
   // The register example may claim infrasonic depth; the pillar decides when.
-  const example = PILLARS[PILLAR.DYNAMIC_RANGE].register_examples[1];
-  assert.match(example, /infrasonic depth/);
+  const example = PILLARS[PILLAR.DYNAMIC_RANGE].register_examples
+    .find((entry) => /infrasonic depth/.test(entry));
+  assert.ok(example, 'the infrasonic register example is still carried');
   assert.equal(clientStoryTextIsSafe(example).safe, true);
 });
 
@@ -399,4 +401,80 @@ test('with the seating ruled out, a pillar still leads with its own evidence, wi
   assert.deepEqual(timbre.members.map((member) => `${member.key.toUpperCase()} ${member.level}`).sort(), ['P16 L4', 'P17 L4']);
   assert.equal(rationale.available, false);
   assert.equal(rationale.suppressed, true);
+});
+
+/* ── 11 · Dynamic Range is the whole system, never the subwoofers ─────────── */
+
+/** A strong cinema: the front stage, the surrounds and the bass all reach L4. */
+const cinemaRows = () => rowsOf([
+  row(12, 'L4'), row(13, 'L4'), row(14, 'L4', { value: '119 dB' }), row(18, 'L4', { value: '18 Hz' }),
+  row(19, 'L4', { value: '±1 dB' }),
+]);
+
+test('Dynamic Range is read across the whole system, never as the subwoofers alone', () => {
+  const dynamic = buildClientStoryPillars({ rows: cinemaRows() }).byPillar[PILLAR.DYNAMIC_RANGE];
+
+  // The system's own readings sit BESIDE the bass parts, so the story is not bass-only.
+  assert.deepEqual(dynamic.system_parts.map((part) => part.part), [...SYSTEM_PART_ORDER]);
+  assert.deepEqual([...SYSTEM_PART_ORDER], ['screen_channels', 'surround_channels']);
+  const screen = dynamic.system_parts.find((part) => part.part === 'screen_channels');
+  assert.deepEqual(screen.parameter_ids, ['P12']);
+  assert.match(screen.question, /Can dialogue and quiet detail remain clear/);
+  assert.match(screen.notices, /front stage takes the biggest peaks/);
+  assert.equal(screen.level, 'L4');
+  assert.match(screen.clause, /exceptional dynamic headroom/, 'the screen channel result is told in the system register');
+  assert.deepEqual(dynamic.system_parts.find((part) => part.part === 'surround_channels').parameter_ids, ['P13']);
+
+  // Every capability the client is buying leads the pillar together.
+  assert.deepEqual([...dynamic.lead_evidence.ids].sort(), ['P12', 'P13', 'P14', 'P18']);
+  assert.ok(dynamic.client_clauses.some((clause) => /exceptional dynamic headroom/.test(clause)));
+
+  // The other pillars carry no system readings: their story is one story each.
+  const others = buildClientStoryPillars({ rows: rowsOf([row(12, 'L4'), row(4, 'L3'), row(16, 'L3')]) });
+  assert.equal(others.byPillar[PILLAR.SPATIAL_RESOLUTION].system_parts.length, 0);
+  assert.equal(others.byPillar[PILLAR.TIMBRE_MATCHING].system_parts.length, 0);
+});
+
+test('a bass qualifier never leads Dynamic Range on its own', () => {
+  // The response at the reference position is L4 while the system's carrying
+  // results are L2: the qualifier is told inside the story, never as its headline.
+  const dynamic = buildClientStoryPillars({
+    rows: rowsOf([row(12, 'L2'), row(13, 'L2'), row(14, 'L2'), row(19, 'L4', { value: '±1 dB' })]),
+  }).byPillar[PILLAR.DYNAMIC_RANGE];
+
+  assert.deepEqual([...dynamic.lead_evidence.ids].sort(), ['P12', 'P13', 'P14'], `read ${dynamic.lead_evidence.ids.join(', ')}`);
+  assert.equal(dynamic.lead_evidence.level, 'L2');
+  assert.ok(!dynamic.lead_evidence.ids.includes('P19'), 'the qualifier is never the pillar\'s headline');
+  assert.equal(dynamic.parts.find((part) => part.part === 'control').told, true, 'the qualifier is still told inside the story');
+});
+
+test('a modest system is written honestly for its brief, never as bass alone and never as an apology', () => {
+  // The media-lounge brief: P12 L1, P13 L1, P14 L1 and bass depth L2.
+  const dynamic = buildClientStoryPillars({ rows: mediaLoungeRows() }).byPillar[PILLAR.DYNAMIC_RANGE];
+
+  assert.ok(!dynamic.lead_evidence.ids.includes('P19'), `read ${dynamic.lead_evidence.ids.join(', ')}`);
+  assert.equal(dynamic.lead_evidence.level, 'L2', 'the strongest carrying result leads, and the pillar is read as the system');
+  assert.match(dynamic.system_parts.find((part) => part.part === 'screen_channels').clause, /clean, engaging playback/);
+  assert.match(dynamic.system_parts.find((part) => part.part === 'surround_channels').clause, /clean, engaging playback/);
+  assert.equal(dynamic.infrasonic.allowed, false, 'an L2 depth result earns no deepest-octave claim');
+
+  const prose = [...dynamic.client_clauses].join(' ');
+  assert.equal(clientStoryTextIsSafe(prose).safe, true);
+  assert.ok(!/limited|weak|disappoint|compromis|merely|only just/i.test(prose), `the modest result is never written as an apology: ${prose}`);
+
+  // The rule that holds the writer to all of this travels with the evidence.
+  const block = buildClientStoryPillarBlock({ rows: mediaLoungeRows() });
+  assert.match(block.dynamic_range_rule, /DYNAMIC RANGE IS A WHOLE-SYSTEM STORY, NEVER A BASS STORY/);
+  assert.match(block.dynamic_range_rule, /can dialogue and quiet detail remain clear/);
+  assert.match(block.dynamic_range_rule, /describes only the subwoofers is wrong/);
+  assert.match(block.dynamic_range_rule, /never pretend reference cinema output, and never apologise for it either/);
+  assert.match(block.cross_pillar_rule, /ONE RESULT MAY STRENGTHEN MORE THAN ONE CLIENT EXPERIENCE/);
+  assert.match(block.cross_pillar_rule, /Technical RP22 categorisation is unchanged/);
+  assert.match(block.bass_rule, /ONE LAYER OF THE DYNAMIC RANGE STORY/);
+  assert.deepEqual(block.system_parts.map((part) => part.part), ['screen_channels', 'surround_channels']);
+  assert.equal(
+    block.pillars.find((pillar) => pillar.pillar === PILLAR.DYNAMIC_RANGE).rule.includes('never the bass system\'s story'),
+    true,
+    'the pillar rule itself refuses the bass-only reading',
+  );
 });

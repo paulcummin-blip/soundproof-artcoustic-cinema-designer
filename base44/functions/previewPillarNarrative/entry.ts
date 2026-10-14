@@ -122,6 +122,17 @@ export default async function (req) {
           primary_seat_result: member.primary_seat_result,
           secondary_seat_result: member.secondary_seat_result,
         })),
+        // The whole-system readings of Dynamic Range, beside the bass parts.
+        system_parts: (pillar.system_parts || []).map((part: any) => ({
+          part: part.part,
+          question: part.question,
+          parameter_ids: part.parameter_ids,
+          level: part.level,
+          emphasis: part.emphasis,
+          available: part.available,
+          told: part.told,
+          clause: part.clause,
+        })),
         parts: (pillar.parts || []).map((part: any) => ({
           part: part.part,
           parameter_ids: part.parameter_ids,
