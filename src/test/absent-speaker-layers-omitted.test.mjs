@@ -51,8 +51,8 @@ describe('the product statement states the system that exists', () => {
     expect(JSON.stringify(products).includes('None specified')).toBe(false);
     expect(products.overheads).toEqual([]);
     expect(products.acoustic_treatment).toEqual([]);
-    // A real layer is stated exactly as before.
-    expect(products.surrounds).toEqual(['Evolve 3-1 × 2']);
+    // A real layer is stated exactly as before, in the registry's own casing.
+    expect(products.surrounds).toEqual(['EVOLVE 3-1 × 2']);
     expect(products.subwoofers).toEqual(['SUB2-12 × 2 (front)']);
   });
 
@@ -67,7 +67,7 @@ describe('the product statement states the system that exists', () => {
       isVisible: () => true,
     });
     expect(products.rows.some((row) => row.key === 'overheads')).toBe(true);
-    expect(products.overheads).toEqual(['Evolve 3-1 × 2']);
+    expect(products.overheads).toEqual(['EVOLVE 3-1 × 2']);
   });
 
   it('reads a blank or placeholder entry as absent', () => {
