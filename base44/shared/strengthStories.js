@@ -68,6 +68,19 @@ import {
 // result at the same strength (see performanceLanguageAuthority.js).
 import { performancePhrase, PERFORMANCE_AREAS } from './performanceLanguageAuthority.js';
 
+// WHICH story may be told at all, and how strongly. Importance (the canonical ASDR
+// weight), the achieved result and the project's own brief decide that, in that
+// order — see narrativePriorityAuthority.js. A story carries the class of its
+// weakest member, because a story may claim only what every one of its members
+// supports.
+import {
+  NARRATIVE_PRIORITY,
+  PARAMETER_NARRATIVE_AREA,
+  PRIORITY_RANK,
+  parameterNarrativePriority,
+} from './narrativePriorityAuthority.js';
+import { BRIEF_RELEVANCE } from './briefRelevance.js';
+
 /* The evidence reads are part of this module's own public surface: the report
    page and the proposal reader both take them from here. */
 export {
@@ -112,7 +125,7 @@ export const PLACEMENT_PHRASES = Object.freeze({
  * Returns the evidence-backed candidates in their own catalogue order plus the
  * supporting stories that may only fill a page the evidence has not filled.
  */
-export function buildCandidates(sources, { byKey, floor, connections }) {
+export function buildCandidates(sources, { byKey, floor, connections, brief = null, excludedKeys = [] }) {
   const {
     engineeringSummary,
     productsSelected,
@@ -387,7 +400,46 @@ export function buildCandidates(sources, { byKey, floor, connections }) {
     }
   }
 
-  return { candidates, supporting };
+  // Every story is classified ONCE, from the canonical weight of its own members,
+  // their achieved levels and the relevance of their subjects to this brief. Where
+  // no brief is supplied the class is still stated (from weight and result alone),
+  // and the selection below keeps the behaviour it had before this existed.
+  const excluded = new Set((excludedKeys || []).map((key) => String(key)));
+  const briefByArea = brief?.byArea || null;
+  const classify = (entry) => {
+    const members = (Array.isArray(entry?.members) ? entry.members : []).filter(Boolean);
+    if (members.length === 0) {
+      return {
+        ...entry,
+        narrative_priority: NARRATIVE_PRIORITY.SUPPORTING_EVIDENCE,
+        narrative_reason: 'this story carries the specification rather than a result of its own',
+        brief_relevance: null,
+      };
+    }
+    const rated = members.map((member) => {
+      const key = String(member.key || '').toUpperCase() === 'RP23' ? 'screen' : String(member.key || '');
+      const area = PARAMETER_NARRATIVE_AREA[key] || null;
+      const relevance = (area && briefByArea?.[area]) || BRIEF_RELEVANCE.STANDARD;
+      const classified = parameterNarrativePriority({
+        key,
+        weight: member.weight,
+        level: member.level,
+        relevance,
+        excluded: excluded.has(key),
+      });
+      return { key, area, relevance, ...classified };
+    }).sort((a, b) => PRIORITY_RANK[a.priority] - PRIORITY_RANK[b.priority]);
+    const weakest = rated[0];
+    return {
+      ...entry,
+      narrative_priority: weakest.priority,
+      narrative_reason: weakest.reason,
+      brief_relevance: weakest.relevance,
+      member_priorities: rated,
+    };
+  };
+
+  return { candidates: candidates.map(classify), supporting: supporting.map(classify) };
 }
 
 /* ── RP22 Parameter 1: the seating decision, stated on every design ────────── */
@@ -456,11 +508,17 @@ export function buildSeatingClearanceStory(sources = {}, { byKey = {} } = {}) {
 
 /* ── Admission, ranking and the omission audit ─────────────────────────────── */
 
-/** The canonical ranking order: material, then level, importance, scope, order. */
+/**
+ * The canonical ranking order: material, then level, importance, narrative class,
+ * scope, then catalogue order. The class never outranks a stronger result — the
+ * page still reads strongest first — but between two results of equal importance it
+ * states the one this brief is actually about before the one it is not.
+ */
 export const rankComparator = (a, b) => (
   Number(b.material) - Number(a.material)
   || levelRank(b.level) - levelRank(a.level)
   || b.importance - a.importance
+  || (PRIORITY_RANK[b.narrative_priority] ?? 0) - (PRIORITY_RANK[a.narrative_priority] ?? 0)
   || scopeRank(b.scope) - scopeRank(a.scope)
   || a.order - b.order
 );
@@ -500,16 +558,34 @@ export function withMandatoryStories({ ranked = [], candidates = [], maxStories 
  * therefore told a real story about its strongest results, and a strong one is
  * never padded with a modest result.
  */
-export function admitStrengthStories(candidates = [], { floor = MIN_STRENGTH_LEVEL } = {}) {
-  const withinFloor = candidates.filter((candidate) => levelRank(candidate.level) >= floor);
+export function admitStrengthStories(candidates = [], { floor = MIN_STRENGTH_LEVEL, brief = null } = {}) {
+  const list = Array.isArray(candidates) ? candidates : [];
+  // WHERE A BRIEF IS READ, importance and relevance decide admission as well as
+  // level: a subject this brief is built around is stated at whatever level it
+  // reached, and a lightly weighted off-brief result is left as technical evidence
+  // however high its level — so an L4 no longer promotes itself.
+  const onBrief = brief
+    ? list.filter((candidate) => (PRIORITY_RANK[candidate?.narrative_priority] ?? 0) >= PRIORITY_RANK[NARRATIVE_PRIORITY.WORTH_MENTIONING])
+    : [];
+  const gated = brief
+    ? list.filter((candidate) => (PRIORITY_RANK[candidate?.narrative_priority] ?? PRIORITY_RANK[NARRATIVE_PRIORITY.TECHNICAL_ONLY]) > PRIORITY_RANK[NARRATIVE_PRIORITY.TECHNICAL_ONLY])
+    : list;
+
+  const withinFloor = gated.filter((candidate) => levelRank(candidate.level) >= floor);
   const strong = withinFloor.filter((candidate) => levelRank(candidate.level) >= MIN_STRENGTH_LEVEL);
   const fillFromLowerLevels = strong.length < Number(MIN_STRONG_STORIES);
+  const base = fillFromLowerLevels ? withinFloor : strong;
+  const admitted = brief
+    ? [...base, ...onBrief.filter((entry) => !base.includes(entry))]
+    : base;
+
   return {
     withinFloor,
     strong,
     strongCount: strong.length,
     fillFromLowerLevels,
-    admitted: fillFromLowerLevels ? withinFloor : strong,
+    onBriefCount: onBrief.length,
+    admitted,
   };
 }
 

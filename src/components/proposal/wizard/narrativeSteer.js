@@ -30,6 +30,21 @@
  * Pure: no React, no SDK, no storage.
  */
 
+/**
+ * The topic's OWN narrative class — importance first, then the result, then this
+ * brief's relevance — read from the ONE narrative priority authority. It decides
+ * which topics ADI suggests, so a lightly weighted result is never suggested merely
+ * because it reached a high level.
+ */
+import {
+  NARRATIVE_PRIORITY,
+  PRIORITY_RANK,
+  isNarrativeCandidate,
+  topicNarrativePriority,
+  TOPIC_NARRATIVE_SUBJECT,
+} from '../../../../shared/narrativePriorityAuthority.js';
+import { BRIEF_RELEVANCE } from '../../../../shared/briefRelevance.js';
+
 /** The three states a topic can be in. The value is what the writer is sent. */
 export const STEER_STATE = Object.freeze({
   NEUTRAL: 'neutral',
@@ -301,12 +316,19 @@ const NEVER_SUGGESTED = Object.freeze(new Set([
  * wording and the calculated fact it names — so a result the design has not
  * achieved is never promoted by the topic being on screen.
  */
-export function topicIsSuggested(key, evidenceText = '') {
+export function topicIsSuggested(key, evidenceText = '', { relevance = BRIEF_RELEVANCE.STANDARD } = {}) {
   if (!isTopicKey(key) || NEVER_SUGGESTED.has(key)) return false;
   const minimum = SUGGESTED_MIN_LEVEL[key];
-  if (!minimum) return true;
   const level = levelOfTopicLabel(evidenceText);
-  return level !== null && level >= minimum;
+  if (minimum && (level === null || level < minimum)) return false;
+  // A subject with no result of its own on screen (the display scale, the system
+  // approach) is offered exactly as before: it is being offered as a subject, not
+  // as a claim about a result.
+  if (level === null) return true;
+  // Where a result IS stated, the topic must earn its place: importance and brief
+  // relevance decide first, and only then does the level matter — so a trivial L4
+  // on a lightly weighted parameter is never suggested.
+  return isNarrativeCandidate(topicNarrativePriority(key, { level, relevance }).priority);
 }
 
 /** The frozen fact a topic's own name may carry: a TV diagonal, a screen size. */
@@ -359,9 +381,13 @@ export const ALWAYS_OFFERED_TOPICS = Object.freeze([
  * @param {number} [input.limit]
  * @returns {Array<Object>} one entry per topic
  */
-export function presentSteerTopics({ chips = [], limit = 12 } = {}) {
+export function presentSteerTopics({ chips = [], limit = 12, brief = null } = {}) {
   const out = [];
   const seen = new Set();
+  const relevanceOf = (key) => {
+    const area = TOPIC_NARRATIVE_SUBJECT[key]?.area || TOPIC_LIBRARY[key]?.area || null;
+    return (area && brief?.byArea?.[area]) || BRIEF_RELEVANCE.STANDARD;
+  };
   const push = (entry) => {
     if (out.length >= limit || seen.has(entry.topic_key)) return;
     seen.add(entry.topic_key);
@@ -372,11 +398,14 @@ export function presentSteerTopics({ chips = [], limit = 12 } = {}) {
     const evidenceLabel = String(chip?.label || '').trim();
     const key = topicKeyForLabel(evidenceLabel);
     if (!key || !isTopicKey(key)) continue;
+    const evidenceText = [evidenceLabel, chip?.reason].filter(Boolean).join(' ');
+    const relevance = relevanceOf(key);
     push({
       topic_key: key,
       label: refineTopicLabel(key, evidenceLabel, TOPIC_LIBRARY[key].label),
       area: chip?.area || TOPIC_LIBRARY[key].area,
-      suggested: topicIsSuggested(key, [evidenceLabel, chip?.reason].filter(Boolean).join(' ')),
+      suggested: topicIsSuggested(key, evidenceText, { relevance }),
+      narrative_priority: topicNarrativePriority(key, { level: levelOfTopicLabel(evidenceText), relevance }).priority,
       evidence_label: evidenceLabel,
       reason: [evidenceLabel, String(chip?.reason || '').trim()].filter(Boolean).join(' — '),
     });

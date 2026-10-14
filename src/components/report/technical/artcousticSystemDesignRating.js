@@ -36,29 +36,21 @@ import { isAuthoritativeBassContract } from "@/components/room/bass/completedBas
 import { assessP18Extension } from "@/components/utils/p18ExtensionAuthority";
 import { getEffectiveAssumedLevel, normalizeAssumedLevel } from "@/components/utils/assumedParameterAuthority";
 import { resolveSeatPriority } from "@/components/utils/seatPriorityAuthority";
+// THE ONE canonical ASDR table — the same bytes the reports, the highlights and the
+// proposal writer rank by. Imported and re-exported, never copied.
+import { PARAM_WEIGHTS, LEVEL_MULTIPLIERS, TOTAL_WEIGHT } from '../../../../shared/canonicalParameterWeights.js';
 
 // ═══════════════════════════════════════════════════════════════
 // Fixed V1 constants
 // ═══════════════════════════════════════════════════════════════
 
-/** Fixed V1 importance weights per parameter. */
-export const PARAM_WEIGHTS = Object.freeze({
-  p1: 6, p2: 8, p3: 3, p4: 5, p5: 6, p6: 5, p7: 4,
-  p8: 2, p9: 5, p10: 5, p11: 4, p12: 8, p13: 7, p14: 9,
-  p15: 3, p16: 5, p17: 5, p18: 12, p19: 9, p20: 9, p21: 3,
-  screen: 7,
-});
-
-/** Sum of all configured importance weights (derived from PARAM_WEIGHTS). */
-export const TOTAL_WEIGHT = Object.values(PARAM_WEIGHTS).reduce((a, b) => a + b, 0);
+/* The fixed V1 importance weights per parameter, their total and the level
+   multipliers are re-exported from the ONE canonical table above, so this module
+   scores and ranks by exactly the table the rest of the app reads. */
+export { PARAM_WEIGHTS, LEVEL_MULTIPLIERS, TOTAL_WEIGHT };
 
 /** Configured reference maximum (TOTAL_WEIGHT × 12). Not used as a fixed denominator. */
 export const MAX_REFERENCE_POINTS = TOTAL_WEIGHT * 12;
-
-/** Performance multipliers per level. */
-export const LEVEL_MULTIPLIERS = Object.freeze({
-  L4: 12, L3: 8, L2: 4, L1: 2, FAIL: -5,
-});
 
 /** V1 excluded assumption metrics — applicable but unscoreable, always provisional. */
 export const V1_EXCLUDED_PARAMS = Object.freeze(new Set(["p8"]));

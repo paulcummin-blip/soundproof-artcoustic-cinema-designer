@@ -35,6 +35,17 @@ export const PARAM_WEIGHTS = Object.freeze({
 export const TOTAL_WEIGHT = Object.values(PARAM_WEIGHTS).reduce((a, b) => a + b, 0);
 
 /**
+ * The ASDR performance multipliers per level — the scoring half of the SAME
+ * authority as the weight table above, defined once here so the rating engine, the
+ * narrative priority authority and every derived contribution read one table.
+ * A parameter's contribution is its multiplier times its weight, and its maximum
+ * is the L4 multiplier times that weight. Nothing else is a contribution.
+ */
+export const LEVEL_MULTIPLIERS = Object.freeze({
+  L4: 12, L3: 8, L2: 4, L1: 2, FAIL: -5,
+});
+
+/**
  * The parameters that are permanent design assumptions, never a measured result:
  * P8 (design/administrative), P15 (background noise) and P21 (early reflections).
  * They are excluded from every strength selection and from every client-facing
