@@ -20,6 +20,10 @@ import { comparisonSectionMetadata, verifyComparisonPersisted } from '../../shar
 import { formatInterpretationForLog } from '../../shared/adiProjectInterpretation.js';
 import { normaliseClarificationAnswers } from '../../shared/proposalClarification/clarificationAnswers.js';
 import { loadCacheRecord, findPublication } from '../../shared/publishedEngineeringAuthority.js';
+// The one presentation-only verdict, shared with the report-evidence reader: a
+// publication that moved past a saved report without changing the physical design
+// is not a design change, and must not read as one on any path of this gate.
+import { engineeringMoveIsPresentationOnly } from '../../shared/designIdentityComparison.js';
 import { selectCanonicalReportSnapshotsByKey } from '../../shared/reportSnapshotCanonical.js';
 
 // ── ONE proposal readiness authority ──
@@ -279,9 +283,22 @@ export default async function(req) {
         cacheRecord: cacheRecordByVersionId.get(versionId) || null,
         savedProjectReport,
       });
+      // The SAME presentation-only verdict the report-evidence reader applies,
+      // from the two publications' own frozen physical facts: one rule, asked
+      // once, so this gate's rows and the reader that supplies the evidence can
+      // never state two verdicts about one saved report. A bass or seating change
+      // is never excused, and an absent comparison leaves the strict verdict.
+      const presentationOnlyMove = engineeringMoveIsPresentationOnly(
+        cacheRecordByVersionId.get(versionId) || null,
+        {
+          frozenFingerprint: savedProjectReport?.source_fingerprints?.engineeringFingerprint || null,
+          currentFingerprint: publication?.engineering_fingerprint || null,
+        },
+      );
       return resolveVersionReadiness({
         version: versionRecord,
         savedProjectReport,
+        presentationOnlyMove,
         currentFingerprints: {
           engineeringFingerprint: publication?.engineering_fingerprint || null,
           // When the version has no publication to speak for it, the completed

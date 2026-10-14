@@ -380,13 +380,17 @@ export function resolveVersionReadiness({
   version = null,
   savedProjectReport = null,
   currentFingerprints = null,
+  // Stated by the caller from the two publications' own frozen physical facts:
+  // the version's publication moved past this saved report WITHOUT the design
+  // changing. Never inferred here.
+  presentationOnlyMove = false,
 } = {}) {
   return resolveVersionReadinessRow({
     versionId: version?.id || null,
     versionName: versionDisplayName(version || {}),
     versionNumber: version?.version_number ?? null,
     cells: {
-      project: resolveSavedReportCell({ saved: savedProjectReport, currentFingerprints }),
+      project: resolveSavedReportCell({ saved: savedProjectReport, currentFingerprints, presentationOnlyMove }),
     },
   });
 }

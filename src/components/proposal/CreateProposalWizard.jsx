@@ -225,6 +225,16 @@ export default function CreateProposalWizard({ onCreated, onCancel, regenerateFr
       : baseReadiness.detail,
   };
 
+  // A refused generation leaves its reason on screen. That reason is a readiness
+  // verdict, and the readiness result above is the only thing that states one:
+  // once the version's Project Report reads Current there is no stale warning to
+  // show, so a refused attempt's message is dropped with the verdict that produced
+  // it. A failure the readiness authority does not speak about is untouched.
+  useEffect(() => {
+    if (!readiness.ready) return;
+    setError(null);
+  }, [readiness.ready]);
+
   // The preparation step, from the SAME readiness rows the table and the Generate
   // button already use, plus the designer's own progress kept while they step away
   // to their design. One authority decides the one action; no second system.

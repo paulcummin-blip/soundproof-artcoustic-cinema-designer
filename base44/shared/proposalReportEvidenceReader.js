@@ -28,6 +28,7 @@
 import { validateReportEvidence } from './reportEvidenceCompleteness.js';
 import { selectCanonicalReportSnapshot } from './reportSnapshotCanonical.js';
 import { canonicalScreenDescription, canonicalStatedSizeInches } from './canonicalScreenDescription.js';
+import { engineeringMoveIsPresentationOnly } from './designIdentityComparison.js';
 
 /** The parameters a proposal must be able to state from a Technical Report. */
 const REQUIRED_PARAMETERS = [12, 13, 14, 18, 19, 20];
@@ -65,10 +66,35 @@ function readEvidence(row) {
 }
 
 /**
+ * The design a saved report states it was generated from: the fingerprint its
+ * stored evidence froze, or the one recorded on the report itself.
+ */
+export function statedReportFingerprint({ row = null, evidence = null } = {}) {
+  return evidence?.identity?.source_fingerprint
+    || row?.source_fingerprints?.engineeringFingerprint
+    || null;
+}
+
+/**
+ * Whether the version's published engineering has moved past this report's stated
+ * design. THE one comparison a report's freshness is judged by, stated once, so
+ * the evidence check below and the presentation-only question asked around it can
+ * never test two different things.
+ */
+export function reportSourceMovedPastVersion(row, version) {
+  const stated = statedReportFingerprint({ row });
+  const published = version?.published_fingerprint || null;
+  return !!(stated && published && stated !== published);
+}
+
+/**
  * The one version's evidence for one report type, or the exact reason it cannot
  * be used. Every message names the version and the report.
+ *
+ * `presentationOnlyMove` is stated by the caller from the two publications' own
+ * frozen physical facts (designIdentityComparison). It is never inferred here.
  */
-function requireEvidence(row, version, type) {
+function requireEvidence(row, version, type, { presentationOnlyMove = false } = {}) {
   const name = version.version_name || version.id;
 
   if (!row) throw new Error(`${name}: missing ${type} Report. Generate it before creating a proposal.`);
@@ -97,20 +123,28 @@ function requireEvidence(row, version, type) {
   // modified time is never consulted: opening a project, exporting a PDF or
   // storing a library asset all touch it without changing the design. When
   // either side is unreadable, no staleness is manufactured.
-  const evidenceFingerprint = evidence.identity?.source_fingerprint || null;
-  const savedFingerprint = row.source_fingerprints?.engineeringFingerprint || null;
-  const publishedFingerprint = version.published_fingerprint || null;
-  const stated = evidenceFingerprint || savedFingerprint;
-  if (stated && publishedFingerprint && stated !== publishedFingerprint) {
-    throw new Error(
-      `${name}: stale ${type} Report. The design changed after it was generated. `
-      + `Regenerate it before creating a proposal.`,
-    );
+  const stated = statedReportFingerprint({ row, evidence });
+  if (reportSourceMovedPastVersion(row, version) && stated) {
+    // ONE verdict, the same one the readiness table and the report page apply: a
+    // publication that moved past this report for PRESENTATION ONLY — a display
+    // or wording authority revision — leaves the physical design unchanged, so the
+    // report still states the design it was generated from and is not stale. A
+    // bass or seating change is never excused, and where either publication cannot
+    // be compared the strict verdict stands.
+    if (!presentationOnlyMove) {
+      throw new Error(
+        `${name}: stale ${type} Report. The design changed after it was generated. `
+        + `Regenerate it before creating a proposal.`,
+      );
+    }
   }
 
   const completeness = validateReportEvidence(evidence, type.toLowerCase(), {
     projectId: version.project_id || row.project_id, versionId: version.id,
-    sourceFingerprint: version.published_fingerprint,
+    // While the move was presentation only, the report's own frozen authority IS
+    // the design it states, so its evidence is judged against that. Everywhere
+    // else it is judged against the version's current publication.
+    sourceFingerprint: presentationOnlyMove ? stated : version.published_fingerprint,
     snapshotFingerprint: row.source_fingerprints?.engineeringFingerprint,
   });
   if (!completeness.complete) throw incompleteFact({ version, type, field: completeness.missing[0] });
@@ -458,6 +492,26 @@ function buildSnapshot({ version, projectId, technicalEvidence, visualEvidence, 
 // resolved in favour of the evidence rather than blocking on the older copy.
 
 /**
+ * Whether the version's publication moved past this saved report for presentation
+ * only, read from the version's own publication history. False whenever the
+ * record states either publication is missing, or cannot read it at all: an
+ * absent comparison never excuses a report.
+ */
+async function versionMoveIsPresentationOnly(entities, projectId, version, row) {
+  const frozenFingerprint = row?.source_fingerprints?.engineeringFingerprint || null;
+  const currentFingerprint = version?.published_fingerprint || null;
+  if (!frozenFingerprint || !currentFingerprint || frozenFingerprint === currentFingerprint) return false;
+  const records = await entities.ProjectAnalysisCache.filter(
+    { project_id: projectId, version_id: version.id },
+    '-updated_date',
+    1,
+  );
+  const record = Array.isArray(records) ? records[0] : null;
+  if (!record) return false;
+  return engineeringMoveIsPresentationOnly(record, { frozenFingerprint, currentFingerprint });
+}
+
+/**
  * Every selected version's report evidence.
  *
  * @returns {Promise<Array<{version_id, version_name, source, engineeringState,
@@ -483,9 +537,20 @@ export async function readProposalReportEvidence(entities, projectId, versions) 
     const technicalRow = projectRow;
     const visualRow = projectRow;
 
+    // Whether this version's publication moved past its saved report for
+    // PRESENTATION ONLY, from the two publications' own frozen physical facts —
+    // the same verdict the readiness table and the report page apply, so the gate
+    // that reads this evidence can never contradict the readiness card above it.
+    // Asked only where the publication has actually moved past the report: a
+    // version that states no cache record, or whose publications cannot be
+    // compared, answers false and the strict verdict stands.
+    const presentationOnlyMove = reportSourceMovedPastVersion(projectRow, version)
+      ? await versionMoveIsPresentationOnly(entities, projectId, version, projectRow)
+      : false;
+
     // Evidence only: each report's own machine-readable snapshot, or a block
     // that names this version and this report.
-    const technicalEvidence = requireEvidence(projectRow, version, 'Project');
+    const technicalEvidence = requireEvidence(projectRow, version, 'Project', { presentationOnlyMove });
     const visualEvidence = technicalEvidence;
 
     for (const id of REQUIRED_PARAMETERS) {
