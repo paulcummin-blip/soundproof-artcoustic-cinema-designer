@@ -76,7 +76,8 @@ export async function resolvePartnerPortalDealerIdentity({ url, accessToken }) {
       'cache-control': 'no-store',
     },
     cache: 'no-store',
-    redirect: 'error',
+    // The Edge runtime supports 'manual'; redirects remain rejected below.
+    redirect: 'manual',
     signal: AbortSignal.timeout(15000),
   });
 
