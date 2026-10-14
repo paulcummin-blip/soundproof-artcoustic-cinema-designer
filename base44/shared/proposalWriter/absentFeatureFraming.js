@@ -37,16 +37,28 @@ const TRAILING_CONTRAST_CLAUSE = new RegExp(
   'i',
 );
 
-/** A sentence about something the design does not have. */
+/**
+ * A layer noun that LEADS its own statement, so the noun and the absence verb
+ * travel together: "the overhead speakers are missing", "the height layer is
+ * absent". A bare `upper` or `top` is read as a layer only where it is named as
+ * one, so "the top row of seats" is furniture and is never removed by this rule.
+ */
+const ABSENT_LAYER_NOUN_FIRST = `overheads?|heights?|ceiling|immersive|atmos|(?:upper|top)\\s+layer`;
+
+/**
+ * A sentence about something the design does not have. A qualifier such as "only
+ * listener-level" or "limited to 5.1" is NOT one of these: the design is real and
+ * the statement is true, so it is rewritten by FRAMING_REWRITES and kept.
+ */
 const ABSENCE_STATEMENTS = Object.freeze([
   new RegExp(`\\b(?:no|not any|zero)\\s+(?:${ABSENT_LAYER})\\b`, 'i'),
   new RegExp(`\\b(?:free of|without|absent)\\s+(?:any\\s+|the\\s+)?(?:${ABSENT_LAYER})\\b`, 'i'),
   new RegExp(`\\b(?:lacks?|lacking|missing|devoid of)\\b[^.!?<>]{0,60}?(?:${ABSENT_LAYER}|layer\\b)`, 'i'),
+  new RegExp(`\\b(?:${ABSENT_LAYER_NOUN_FIRST})\\b[^.!?<>]{0,40}?\\b(?:missing|absent|omitted|left out|not (?:present|included|used|part of))\\b`, 'i'),
   new RegExp(`\\b(?:is|are|isn['’]t|aren['’]t)\\s+not\\s+an?\\s+(?:atmos|immersive|dolby atmos)\\b`, 'i'),
   new RegExp(`\\bisn['’]t\\s+an?\\s+(?:atmos|immersive|dolby atmos)\\b`, 'i'),
   new RegExp(`\\bnot\\s+(?:an?\\s+)?(?:atmos|immersive)\\s+(?:system|design|cinema|layout|room)\\b`, 'i'),
   new RegExp(`\\bdoes\\s+not\\s+(?:include|have|use|feature|add|offer)\\b[^.!?<>]{0,40}?(?:${ABSENT_LAYER})\\b`, 'i'),
-  new RegExp(`\\b(?:it|this|the (?:system|design|cinema|layout|room))\\s+is\\s+(?:only|merely|just)\\s+(?:a\\s+)?(?:5\\.1|7\\.1|listener-level|surround)\\b`, 'i'),
   /\bmiss(?:es|ing|ed)?\s+out\s+on\b/i,
   new RegExp(`\\b(?:not|never)\\s+(?:get|gets|getting|receive|receives|receiving)\\b[^.!?<>]{0,40}?(?:${ABSENT_LAYER})\\b`, 'i'),
 ]);
