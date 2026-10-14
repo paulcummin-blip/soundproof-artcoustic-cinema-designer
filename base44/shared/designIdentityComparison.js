@@ -106,6 +106,31 @@ export function engineeringDifferenceIsPresentationOnly(savedPublication, curren
   return samePhysicalDesign(savedPublication, currentPublication);
 }
 
+/** The client-facing display identity one publication actually stated. */
+export function frozenDisplayAuthority(publication) {
+  const screen = publication?.report_snapshot?.report_project?.report_screen;
+  if (!screen || typeof screen !== 'object' || Array.isArray(screen)) return null;
+  const value = (camel, snake) => {
+    const raw = screen[camel] ?? screen[snake];
+    return raw == null ? null : String(raw).trim().toLowerCase();
+  };
+  const identity = {
+    type: value('displayType', 'display_type'),
+    label: value('displayLabel', 'display_label'),
+    phrase: value('displayPhrase', 'display_phrase'),
+  };
+  return Object.values(identity).some(Boolean) ? identity : null;
+}
+
+/** A wording-only move may reuse proposal evidence; a changed Display authority may not. */
+export function proposalEvidenceDifferenceIsSafe(savedPublication, currentPublication) {
+  if (!engineeringDifferenceIsPresentationOnly(savedPublication, currentPublication)) return false;
+  const savedDisplay = frozenDisplayAuthority(savedPublication);
+  const currentDisplay = frozenDisplayAuthority(currentPublication);
+  if (!savedDisplay || !currentDisplay) return false;
+  return stableStringify(savedDisplay) === stableStringify(currentDisplay);
+}
+
 /**
  * The verdict for one version, from its own publication history: did the move
  * from `frozenFingerprint` to `currentFingerprint` change only presentation?
@@ -124,6 +149,23 @@ export function engineeringMoveIsPresentationOnly(cacheRecord, {
   if (!frozenFingerprint || !currentFingerprint) return false;
   if (frozenFingerprint === currentFingerprint) return false;
   return engineeringDifferenceIsPresentationOnly(
+    findPublication(cacheRecord, frozenFingerprint),
+    findPublication(cacheRecord, currentFingerprint),
+  );
+}
+
+/**
+ * Proposal-specific reuse verdict. It is stricter than report restoration:
+ * client-facing display identity must also agree, otherwise the saved evidence
+ * would let old Screen copy survive into a proposal whose authority now says TV.
+ */
+export function proposalEvidenceMoveIsSafe(cacheRecord, {
+  frozenFingerprint = null,
+  currentFingerprint = null,
+} = {}) {
+  if (!frozenFingerprint || !currentFingerprint) return false;
+  if (frozenFingerprint === currentFingerprint) return false;
+  return proposalEvidenceDifferenceIsSafe(
     findPublication(cacheRecord, frozenFingerprint),
     findPublication(cacheRecord, currentFingerprint),
   );
