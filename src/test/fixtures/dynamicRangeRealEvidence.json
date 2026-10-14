@@ -1,0 +1,119 @@
+{
+  "note": "REAL published engineering results, read from ProjectAnalysisCache.engineering_publications. Evidence only.",
+  "projects": [
+    {
+      "key": "marquee_original",
+      "name": "Marquee Home / Original Design",
+      "project_id": "6acf56c1cb75c7029f7267f4",
+      "version_id": "6acf56cbea718acc159bca03",
+      "version_name": "Original Design",
+      "published_fingerprint": "eng:v1:0b1b493deaffb68f",
+      "brief": "Emphasise the 100\" TV. Explain the 5.1 system layout. Show the L1 Screen Dynamic Range result.",
+      "intent_expected": "MEDIA_LOUNGE",
+      "parameters": [
+        {
+          "id": 12,
+          "level": "L1",
+          "value": "99 dB"
+        },
+        {
+          "id": 13,
+          "level": "L2",
+          "value": "101 dB"
+        },
+        {
+          "id": 14,
+          "level": "L1",
+          "value": "109 dB"
+        },
+        {
+          "id": 18,
+          "level": "L2",
+          "value": "26.24 Hz"
+        },
+        {
+          "id": 19,
+          "level": "L4",
+          "value": "±1.62 dB",
+          "state": "complete"
+        }
+      ]
+    },
+    {
+      "key": "marquee_level4",
+      "name": "Marquee Home / Level 4 version",
+      "project_id": "6abbca668e0245f45b27f164",
+      "version_id": "6abbca6e199f13dc4d74ec4a",
+      "version_name": "Level 4 version",
+      "published_fingerprint": "eng:v1:bcd7564a7c3136f8",
+      "brief": "Emphasise the 100\" TV. Explain the 5.1 system layout.",
+      "intent_expected": "MEDIA_LOUNGE",
+      "parameters": [
+        {
+          "id": 12,
+          "level": "L4",
+          "value": "116 dB"
+        },
+        {
+          "id": 13,
+          "level": "L4",
+          "value": "108 dB"
+        },
+        {
+          "id": 14,
+          "level": "L4",
+          "value": "118 dB"
+        },
+        {
+          "id": 18,
+          "level": "L3",
+          "value": "16.6 Hz"
+        },
+        {
+          "id": 19,
+          "level": "L4",
+          "value": "±0.93 dB",
+          "state": "complete"
+        }
+      ]
+    },
+    {
+      "key": "genesis",
+      "name": "Genesis AV / Original Design",
+      "project_id": "6ac7a0ae9f28aaf668e20ccc",
+      "version_id": "6ac7a189d093a8d8a68eec91",
+      "version_name": "Original Design",
+      "published_fingerprint": null,
+      "brief": "Emphasise the 115\" TV. Show the L2 Screen Dynamic Range result. Highlight the bass extension result. Highlight the 15 discrete channels.",
+      "intent_expected": "DEDICATED_CINEMA",
+      "parameters": [
+        {
+          "id": 12,
+          "level": "L2",
+          "value": "104 dB"
+        },
+        {
+          "id": 13,
+          "level": "L2",
+          "value": "101 dB"
+        },
+        {
+          "id": 14,
+          "level": "L3",
+          "value": "115 dB"
+        },
+        {
+          "id": 18,
+          "level": "L2",
+          "value": "24.39 Hz"
+        },
+        {
+          "id": 19,
+          "level": "L4",
+          "value": "±0.59 dB",
+          "state": "complete"
+        }
+      ]
+    }
+  ]
+}
