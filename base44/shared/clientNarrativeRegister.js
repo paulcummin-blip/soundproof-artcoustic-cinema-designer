@@ -61,7 +61,7 @@ export const PROPOSAL_PARAMETER_RESTRAINT_RULE = 'EVIDENCE SUPPORTS THE STORY, I
 const COMMENTARY_REWRITES = Object.freeze([
   [/\bpicture[- ]related\s+sound\b/gi, 'screen sound'],
   [/\bis\s+arranged\s+around\s+the\s+audience\s+through\b/gi, 'is delivered through'],
-  [/\b(\d+)\s+discrete\s+channels\b/gi, '$1 channels'],
+  [/\b\d+\s+discrete\s+(?=channels\b)/gi, ''],
 ]);
 
 /**
@@ -133,16 +133,20 @@ function explainsBoundaries(sentence) {
  * all it said. A sentence nothing matched is returned exactly as it arrived.
  */
 function withoutCommentaryClauses(sentence) {
-  let out = COMMENTARY_REWRITES.reduce(
-    (text, [pattern, replacement]) => text.replace(pattern, replacement),
-    sentence,
-  );
+  // The clauses go first, so a clause the register removes outright is never left
+  // standing in a softened form by a rewrite: "a 5.1 layout with 5 discrete
+  // channels" loses the count rather than becoming "with 5 channels".
+  let out = sentence;
   let removed = false;
   for (const pattern of COMMENTARY_CLAUSES) {
     if (!pattern.test(out)) continue;
     out = out.replace(pattern, '');
     removed = true;
   }
+  out = COMMENTARY_REWRITES.reduce(
+    (text, [pattern, replacement]) => text.replace(pattern, replacement),
+    out,
+  );
   if (!removed) return out;
   const kept = out.replace(/[ \t]{2,}/g, ' ').replace(/[ \t]+([.!?,;:])/g, '$1').trim();
   // What is left has to still read as a sentence of its own: enough words, and its

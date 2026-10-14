@@ -13,6 +13,15 @@ import { draftAttemptRecord } from '../../shared/proposalGeneration/proposalGene
 import { runProposalCopyGeneration } from '../../shared/proposalGeneration/proposalGenerationRunner.js';
 import { mergeHighlightRows, selectHighlightRows } from '../../shared/engineeringSnapshotEvidence.js';
 import { composeWriterSectionBodies } from '../../shared/proposalWriter/writerSectionMapping.js';
+// ── THE CLIENT NARRATIVE REGISTER'S DETERMINISTIC HALF ──
+// The writer's contract refuses the phrasing that makes a proposal read like a
+// machine; these two rules make the published copy agree by removing it, so a
+// channel count used as a selling point, a layer the design does not have, a
+// mechanism explained, a boundary distance quoted in the main narrative or the
+// seating explained in acoustic terms can never reach a client even when the model
+// writes it. Wording only: no figure, level, product or claim is touched.
+import { removeAbsentFeatureFraming } from '../../shared/proposalWriter/absentFeatureFraming.js';
+import { removeParameterCommentary } from '../../shared/clientNarrativeRegister.js';
 import { readProjectOptionGuidance } from '../../shared/proposalWriter/readProjectOptionGuidance.js';
 import { GPT_WRITER_FLAG_FIELD, normaliseGptWriterConfig } from '../../shared/proposalWriter/proposalWriterFlag.js';
 import { HIGHLIGHTS_SECTION_TYPE, PRESENTED_OPTIONS_SECTION_TYPE, resolveSectionTitle } from '../../shared/systemDesignSummarySections.js';
@@ -558,7 +567,16 @@ export default async function(req) {
       );
     }
 
-    const bodyByType = new Map(bodies.map((body) => [body.section_type, body.html]));
+    // The composed copy is the copy a client reads, so it is put through the client
+    // narrative register's two wording rules before it is published: parameter
+    // commentary and an absent-feature framing are removed here. Nothing else is
+    // changed — the sentence that states an assessed result stays exactly where it
+    // is — and the attempt's own stored output is untouched, so the audit record
+    // still shows precisely what the writer returned.
+    const bodyByType = new Map(bodies.map((body) => [
+      body.section_type,
+      removeParameterCommentary(removeAbsentFeatureFraming(body.html, {})),
+    ]));
     // The calculated highlights rows are frozen engineering evidence, not copy:
     // they are read from the same frozen snapshot the report was generated from,
     // so the table the highlights page prints is unchanged by this pass. A

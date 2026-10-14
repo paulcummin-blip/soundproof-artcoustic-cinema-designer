@@ -55,6 +55,10 @@ const TRAILING_CONTRAST_CLAUSE = new RegExp(
 const TRAILING_HOLLOW_CLAUSES = Object.freeze([
   new RegExp(`[\\s,;:]*(?:,\\s*)?(?:centred|centered)\\s+on\\s+the\\s+relationship\\s+between\\b[^.!?<>]*${END_OF_SENTENCE}`, 'i'),
   new RegExp(`[\\s,;:]*(?:,\\s*)?(?:which\\s+)?(?:forms?|is|sets?|provides?)\\s+the\\s+basis\\s+of\\s+the\\s+viewing\\s+experience\\b[^.!?<>]*${END_OF_SENTENCE}`, 'i'),
+  // The same clause in any other construction: "the display and seating distance
+  // have been considered together as the basis of the viewing experience". It is
+  // hollow however it is introduced, so the verb is not required.
+  new RegExp(`[\\s,;:]*(?:,\\s*)?(?:together\\s+)?(?:as|to\\s+be)\\s+the\\s+basis\\s+of\\s+the\\s+viewing\\s+experience\\b[^.!?<>]*${END_OF_SENTENCE}`, 'i'),
 ]);
 
 /**
