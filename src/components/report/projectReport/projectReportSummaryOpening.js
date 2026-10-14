@@ -32,7 +32,7 @@
  */
 
 import { groupSeatsIntoRows } from '@/components/report/client/seatRowGrouping';
-import { displayPhrase, isTvDisplay } from '@/components/models/screen/displayTypeAuthority';
+import { displayPhrase, isTvDisplay, savedDiagonalInches } from '@/components/models/screen/displayTypeAuthority';
 import {
   readSeatBoundaryGeometry,
   buildSeatingBoundaryExplanation,
@@ -142,6 +142,30 @@ export function screenPhrase(projectDetails) {
   return displayPhrase(projectDetails);
 }
 
+/**
+ * THE large-display wording rule: a television is described as large only from
+ * 77" upwards, so a smaller set is stated as the television it is — `65" TV`,
+ * never a large 65" TV — and a television whose own size is not recorded is
+ * never called large either. The rule concerns televisions only: a projection
+ * screen's scale is not re-worded here, and the size is read from the display's
+ * one saved diagonal authority, never measured or inferred.
+ */
+const LARGE_TV_DIAGONAL_INCHES = 77;
+
+/** Whether this design's display may be described as large. */
+export function isLargeDisplay(projectDetails) {
+  if (!isTvDisplay(projectDetails)) return true;
+  const diagonal = Number(savedDiagonalInches(projectDetails));
+  return Number.isFinite(diagonal) && diagonal >= LARGE_TV_DIAGONAL_INCHES;
+}
+
+/** The display with its size descriptor, where one is warranted. */
+export function scaledScreenPhrase(projectDetails) {
+  const phrase = screenPhrase(projectDetails);
+  if (!phrase) return null;
+  return isLargeDisplay(projectDetails) ? `large ${phrase}` : phrase;
+}
+
 /** How many seating rows the report's own row grouping sees. */
 export function seatingRowCount(seatingPositions) {
   const seats = (Array.isArray(seatingPositions) ? seatingPositions : []).map((seat) => ({
@@ -211,7 +235,8 @@ export function buildProjectReportSummaryOpening({
   const mediaRoom = classifyProjectIntent({ projectDetails }).isMediaLounge && !!display;
   if (mediaRoom) {
     const system = architecture ? `${architecture} system` : 'surround system';
-    vision.push(`This is a relaxed high-performance media room built around a large ${display}. It is designed for sport, box sets, films and music, with a sensible ${system} that keeps the room comfortable while still delivering impact when needed.`);
+    const displayScale = isLargeDisplay(projectDetails) ? 'large ' : '';
+    vision.push(`This is a relaxed high-performance media room built around a ${displayScale}${display}. It is designed for sport, box sets, films and music, with a sensible ${system} that keeps the room comfortable while still delivering impact when needed.`);
   } else if (builtAround.length > 0) {
     vision.push(`This room is designed as a ${compact}dedicated cinema around ${joinList(builtAround)}, with the picture, the front stage, the sound around the seating and the low-frequency support planned together around the way the room will actually be used.`);
   } else if (projection) {

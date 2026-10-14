@@ -24,6 +24,7 @@ import { classifyProjectIntent } from '@/components/report/projectReport/project
 import {
   buildProjectReportSummaryOpening,
   isCompactRoom,
+  scaledScreenPhrase,
   screenPhrase,
   seatingRowPhrase,
 } from './projectReportSummaryOpening';
@@ -70,8 +71,11 @@ export function buildProjectReportOpening({
   // cinema, read from the one project-intent authority; a projection design, and a
   // television design the designer has explicitly marked as a dedicated cinema,
   // keep the cinema headline.
+  // The size descriptor is the shared large-display rule: a television is
+  // described as large only from 77" upwards, so a media room built around a
+  // smaller set names the television itself.
   const headline = classifyProjectIntent({ projectDetails }).isMediaLounge && display
-    ? `A relaxed high-performance media room built around a large ${display}`
+    ? `A relaxed high-performance media room built around a ${scaledScreenPhrase(projectDetails)}`
     : architecture
       ? (display
         ? `A ${compact}${architecture} cinema designed around a ${display}`
