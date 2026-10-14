@@ -178,7 +178,10 @@ test('the writer receives preferences, with the softness stated in the same brea
     excluded_topic_keys: ['seating_arrangement'],
   });
   assert.deepEqual(both.preferred_topics, ['Bass performance']);
-  assert.deepEqual(both.excluded_topics, ['seating_arrangement']);
+  // The exclusion is carried under both names: the subject the designer sees,
+  // and the key the writer's exclusion rule reads.
+  assert.deepEqual(both.excluded_topics, ['Seating arrangement']);
+  assert.deepEqual(both.excluded_topic_keys, ['seating_arrangement']);
 });
 
 test('seating, excluded, leaves the narrative completely — and no figure with it', () => {
