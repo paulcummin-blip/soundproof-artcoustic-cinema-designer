@@ -55,4 +55,34 @@ export function engineeringDifferenceIsPresentationOnly(savedPublication, curren
   return samePhysicalDesign(savedPublication, currentPublication);
 }
 
+/** The client-facing display identity one publication actually stated. */
+export function frozenDisplayAuthority(publication) {
+  const screen = publication?.report_snapshot?.report_project?.report_screen;
+  if (!screen || typeof screen !== 'object' || Array.isArray(screen)) return null;
+  const value = (camel, snake) => {
+    const raw = screen[camel] ?? screen[snake];
+    return raw == null ? null : String(raw).trim().toLowerCase();
+  };
+  const identity = {
+    type: value('displayType', 'display_type'),
+    label: value('displayLabel', 'display_label'),
+    phrase: value('displayPhrase', 'display_phrase'),
+  };
+  return Object.values(identity).some(Boolean) ? identity : null;
+}
+
+/**
+ * Proposal evidence may survive a wording-only publication move, but not a move
+ * that changes what the client is told the display is. In that case the saved
+ * Project Report must be regenerated so its frozen evidence states the current
+ * Display authority before the proposal writer can consume it.
+ */
+export function proposalEvidenceDifferenceIsSafe(savedPublication, currentPublication) {
+  if (!engineeringDifferenceIsPresentationOnly(savedPublication, currentPublication)) return false;
+  const savedDisplay = frozenDisplayAuthority(savedPublication);
+  const currentDisplay = frozenDisplayAuthority(currentPublication);
+  if (!savedDisplay || !currentDisplay) return false;
+  return stableStringify(savedDisplay) === stableStringify(currentDisplay);
+}
+
 export default engineeringDifferenceIsPresentationOnly;
