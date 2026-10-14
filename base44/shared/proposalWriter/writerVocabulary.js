@@ -173,6 +173,14 @@ export function packVocabulary(pack) {
     for (const token of numberVariants(facts.screen?.viewable_width_cm, 'cm')) measurements.add(token);
     for (const token of numberVariants(facts.screen?.viewable_height_cm, 'cm')) measurements.add(token);
 
+    // RP23 seating distances are first-class Project Report evidence. They are
+    // stored as numeric fields rather than prose, so stringsOf(pack) cannot see
+    // them. Admit only each exact report-stated value (plus the existing
+    // one-decimal presentation form); a different distance remains unsupported.
+    for (const seat of Array.isArray(facts.seating?.per_seat) ? facts.seating.per_seat : []) {
+      for (const token of numberVariants(seat?.distance_m, 'm')) measurements.add(token);
+    }
+
     for (const [id, set] of parameterLevels(facts)) parameters.set(id, set);
 
     const owned = [];
