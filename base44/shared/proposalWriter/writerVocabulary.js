@@ -456,7 +456,7 @@ const RECOMMEND_WORDS = /\b(?:recommend\w*|we would choose|best choice|the bette
 // geometry/positions/zones. That adjective reports a measured result; it is not a
 // new instruction to the client. Keep the exemption deliberately narrow so
 // imperative copy such as "we recommend..." remains guarded.
-const DESCRIPTIVE_RECOMMENDED_PLACEMENT = /\brecommended\s+(?:geometry|positions?|zones?|locations?|placement)\b/gi;
+const DESCRIPTIVE_RECOMMENDED_PLACEMENT = /\brecommended\s+(?:geometry|positions?|zones?|locations?|placement|angular\s+limits?)\b/gi;
 
 /** What a sentence asserts, or null when it asserts nothing. */
 export function assertionKind(text) {
