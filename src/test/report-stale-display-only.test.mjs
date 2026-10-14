@@ -11,6 +11,7 @@
  *      change, or a bass change, still marks the report stale.
  */
 import { describe, it, expect } from 'vitest';
+import { readFileSync } from 'node:fs';
 
 import { computeEngineeringFingerprint } from '../components/proposal/engineeringAuthority/engineeringFingerprint.js';
 import {
@@ -181,6 +182,27 @@ describe('C. the saved report is not marked out of date', () => {
     });
     expect(status.status).toBe(REPORT_SNAPSHOT_STATUS.CURRENT);
     expect(status.changedKeys).toEqual([]);
+  });
+});
+
+describe('E. both report pages take the same verdict from the same authority', () => {
+  const source = (path) => readFileSync(new URL(path, import.meta.url), 'utf8');
+
+  it('the consolidated Project Report passes the presentation-only verdict', () => {
+    expect(source('../pages/RP22ClientReport.jsx'))
+      .toContain('samePhysicalDesign: savedReport.presentationOnlyMove === true');
+  });
+
+  it('the legacy Visual Report page passes the same verdict', () => {
+    expect(source('../pages/RP22Report.jsx'))
+      .toContain('samePhysicalDesign: savedReport.presentationOnlyMove === true');
+  });
+
+  it('the saved-report authority is the only source of that verdict', () => {
+    const hook = source('../components/report/useSavedReportFingerprint.js');
+    expect(hook).toContain('presentationOnlyMove');
+    // The verdict is a comparison of two publications, never a page's own guess.
+    expect(hook).toContain('engineeringDifferenceIsPresentationOnly');
   });
 });
 

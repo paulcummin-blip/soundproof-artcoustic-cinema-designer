@@ -330,6 +330,11 @@ function RP22ReportInner({ embed = false } = {}) {
         reportType: REPORT_SNAPSHOT_TYPE.TECHNICAL,
         currentFingerprints: { ...snapshotFingerprints,
             engineeringFingerprint: savedReport.currentFingerprint || snapshotFingerprints.engineeringFingerprint },
+        // The version's publication moved past this saved report for presentation
+        // only, so the design itself is unchanged and this report is not out of
+        // date. Read from the same saved-report authority the consolidated Project
+        // Report reads, so the two pages never disagree about one saved report.
+        samePhysicalDesign: savedReport.presentationOnlyMove === true,
         payload: snapshotPayload,
         reportSource: { project: projectDetails, engineeringSummary, app },
         // An embedded document is not this report's own generation: the Technical
