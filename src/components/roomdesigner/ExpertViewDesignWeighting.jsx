@@ -33,6 +33,7 @@ const FILTERS = Object.freeze([
   { id: 'all', label: 'All' },
   { id: 'high_weight', label: 'High-weight' },
   { id: 'narrative', label: 'Narrative candidates' },
+  { id: 'rationale', label: 'Design rationale' },
 ]);
 
 const RELEVANCE_LABEL = Object.freeze({
@@ -44,9 +45,16 @@ const RELEVANCE_LABEL = Object.freeze({
 const PRIORITY_TONE = Object.freeze({
   [NARRATIVE_PRIORITY.LEAD_STORY]: '#213428',
   [NARRATIVE_PRIORITY.WORTH_MENTIONING]: '#3E4349',
+  [NARRATIVE_PRIORITY.DESIGN_RATIONALE]: '#4A5A4A',
   [NARRATIVE_PRIORITY.SUPPORTING_EVIDENCE]: '#625143',
   [NARRATIVE_PRIORITY.TECHNICAL_ONLY]: '#8B7F76',
   [NARRATIVE_PRIORITY.DO_NOT_DISCUSS]: '#8A5A2B',
+});
+
+/** The seats a claim may name, stated beside the result it was read from. */
+const SEAT_SCOPE_LABEL = Object.freeze({
+  primary: 'primary seats',
+  all: 'all assessed seats',
 });
 
 /** What this design actually contains, read from its own published summary. */
@@ -82,6 +90,7 @@ export default function ExpertViewDesignWeighting({
   engineeringSummary = null,
   screen = null,
   briefText = '',
+  excludedTopics = [],
 }) {
   const [filter, setFilter] = useState('all');
 
@@ -96,8 +105,9 @@ export default function ExpertViewDesignWeighting({
       subjects: areasForBriefText(briefText),
       briefText,
       design: readContainment(engineeringSummary),
+      excludedTopics,
     });
-  }, [engineeringSummary, screen, briefText]);
+  }, [engineeringSummary, screen, briefText, excludedTopics]);
 
   if (!engineeringSummary || rows.length === 0) {
     return (
@@ -110,7 +120,8 @@ export default function ExpertViewDesignWeighting({
   const visible = rows
     .filter((row) => (filter === 'high_weight'
       ? row.tier === 'high'
-      : filter === 'narrative' ? isNarrativeCandidate(row.priority) : true))
+      : filter === 'narrative' ? isNarrativeCandidate(row.priority)
+        : filter === 'rationale' ? row.priority === NARRATIVE_PRIORITY.DESIGN_RATIONALE : true))
     .sort((a, b) => (PRIORITY_RANK[b.priority] - PRIORITY_RANK[a.priority]) || (b.weight - a.weight));
   const intentLabel = brief?.intent === BRIEF_INTENT.MEDIA_LOUNGE ? 'Media lounge' : 'Dedicated cinema';
 
@@ -141,10 +152,10 @@ export default function ExpertViewDesignWeighting({
       </div>
 
       <div className="overflow-x-auto border border-[#EEEDEA] rounded-md">
-        <table className="min-w-[660px] w-full border-collapse">
+        <table className="min-w-[980px] w-full border-collapse">
           <thead>
             <tr className="bg-[#F8F8F7]">
-              {['Parameter', 'Performance area', 'ASDR weight', 'Achieved result', 'ASDR contribution', 'Brief relevance', 'Narrative priority'].map((heading) => (
+              {['Parameter', 'Area', 'ASDR weight', 'Result', 'Primary-seat result', 'Secondary-seat result', 'ASDR contribution', 'Brief relevance', 'Narrative role'].map((heading) => (
                 <th
                   key={heading}
                   className="px-2 py-2 text-left text-[9px] font-semibold tracking-[0.04em] uppercase text-[#625143] whitespace-nowrap"
@@ -160,20 +171,35 @@ export default function ExpertViewDesignWeighting({
                 <Cell>{row.parameter_label}</Cell>
                 <Cell>{row.performance_area}</Cell>
                 <Cell align="right">{row.weight} · {row.tier}</Cell>
-                <Cell>{row.level ? `${row.level}${row.value ? ` · ${row.value}` : ''}` : '—'}</Cell>
+                <Cell>
+                  {row.level ? `${row.level}${row.value ? ` · ${row.value}` : ''}` : '—'}
+                  {SEAT_SCOPE_LABEL[row.seat_scope] && (
+                    <span className="block text-[9px] text-[#8B7F76]">
+                      stated for {SEAT_SCOPE_LABEL[row.seat_scope]}
+                    </span>
+                  )}
+                </Cell>
+                <Cell>{row.primary_seat_result || '—'}</Cell>
+                <Cell>{row.secondary_seat_result || '—'}</Cell>
                 <Cell align="right">
                   {Math.round(row.contribution * 10) / 10} / {row.maximum} pts
                   <span className="block text-[9px] text-[#8B7F76]">{Math.round(row.contribution_share * 100)}% of maximum</span>
                 </Cell>
                 <Cell>{RELEVANCE_LABEL[row.brief_relevance] || '—'}</Cell>
                 <Cell tone={PRIORITY_TONE[row.priority]}>
-                  {row.priority_label}
+                  {row.narrative_role || row.priority_label}
                   <span className="block text-[9px] text-[#8B7F76]">{row.reason}</span>
                 </Cell>
               </tr>
             ))}
           </tbody>
         </table>
+      </div>
+
+      <div className="text-[10px] text-[#8B7F76]">
+        Narrative role reads: Lead story, Worth mentioning, Design rationale, Supporting evidence, Technical only,
+        Do not discuss. A design rationale explains a deliberate physical decision and is never a performance
+        headline; a consistency result names only the seats it was read from.
       </div>
 
       <div className="text-[10px] text-[#8B7F76]">

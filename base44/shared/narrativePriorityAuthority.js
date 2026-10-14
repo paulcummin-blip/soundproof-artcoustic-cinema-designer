@@ -44,33 +44,53 @@ import {
 } from './strengthImportance.js';
 import { BRIEF_RELEVANCE, readBriefRelevance } from './briefRelevance.js';
 import { PERFORMANCE_AREAS, performancePhrase } from './performanceLanguageAuthority.js';
+// The role vocabulary is shared (narrativeRoles.js) and so are the rules for the
+// two parameters a level cannot describe on its own (seatScopeNarrativeAuthority.js).
+import {
+  NARRATIVE_PRIORITY,
+  PRIORITY_LABEL,
+  PRIORITY_RANK,
+  isNarrativeCandidate,
+  mayAppearInNarrative,
+  mayUseFlagshipLanguage,
+} from './narrativeRoles.js';
+import {
+  SEAT_SCOPE,
+  p1NarrativePriority,
+  p1RationalePhrase,
+  p20ConsistencyPhrase,
+  p20NarrativePriority,
+  readSeatScope,
+} from './seatScopeNarrativeAuthority.js';
 
-/** The five narrative classes. Nothing else is introduced. */
-export const NARRATIVE_PRIORITY = Object.freeze({
-  LEAD_STORY: 'lead_story',
-  WORTH_MENTIONING: 'worth_mentioning',
-  SUPPORTING_EVIDENCE: 'supporting_evidence',
-  TECHNICAL_ONLY: 'technical_only',
-  DO_NOT_DISCUSS: 'do_not_discuss',
-});
+export {
+  NARRATIVE_PRIORITY,
+  PRIORITY_LABEL,
+  PRIORITY_RANK,
+  isNarrativeCandidate,
+  mayAppearInNarrative,
+  mayUseFlagshipLanguage,
+};
+export {
+  P1_RATIONALE_BANNED_TERMS,
+  P1_RATIONALE_LANGUAGE,
+  P20_CONSISTENCY_LANGUAGE,
+  SEATING_SUBJECT_TOPIC_KEYS,
+  SEAT_SCOPE,
+  p1NarrativePriority,
+  p1RationaleIsClientSafe,
+  p1RationalePhrase,
+  p20ConsistencyPhrase,
+  p20NarrativePriority,
+  p20SeatScopeLabel,
+  p20WordingIsScopeSafe,
+  readSeatScope,
+  seatingNarrativeSuppressed,
+} from './seatScopeNarrativeAuthority.js';
 
-/** Where each class sits, strongest first. */
-export const PRIORITY_RANK = Object.freeze({
-  [NARRATIVE_PRIORITY.DO_NOT_DISCUSS]: 0,
-  [NARRATIVE_PRIORITY.TECHNICAL_ONLY]: 1,
-  [NARRATIVE_PRIORITY.SUPPORTING_EVIDENCE]: 2,
-  [NARRATIVE_PRIORITY.WORTH_MENTIONING]: 3,
-  [NARRATIVE_PRIORITY.LEAD_STORY]: 4,
-});
-
-/** What each class is called on the designer-facing Expert View. */
-export const PRIORITY_LABEL = Object.freeze({
-  [NARRATIVE_PRIORITY.LEAD_STORY]: 'Lead story',
-  [NARRATIVE_PRIORITY.WORTH_MENTIONING]: 'Worth mentioning',
-  [NARRATIVE_PRIORITY.SUPPORTING_EVIDENCE]: 'Supporting evidence',
-  [NARRATIVE_PRIORITY.TECHNICAL_ONLY]: 'Technical only',
-  [NARRATIVE_PRIORITY.DO_NOT_DISCUSS]: 'Do not discuss',
-});
+/* The six narrative roles — lead story, worth mentioning, design rationale,
+   supporting evidence, technical only, do not discuss — and where each sits are
+   defined ONCE in narrativeRoles.js and re-exported above. */
 
 /** The importance tiers, read from the existing authority's own thresholds. */
 export const WEIGHT_TIER = Object.freeze({ HIGH: 'high', MID: 'mid', LOW: 'low' });
@@ -87,15 +107,6 @@ export function weightTier(weight) {
   return WEIGHT_TIER.LOW;
 }
 
-/** Whether a class belongs in a client-facing narrative at all. */
-export const isNarrativeCandidate = (priority) => (PRIORITY_RANK[priority] ?? 0) >= PRIORITY_RANK[NARRATIVE_PRIORITY.WORTH_MENTIONING];
-
-/** Whether a class may carry flagship language. Only a lead story may. */
-export const mayUseFlagshipLanguage = (priority) => priority === NARRATIVE_PRIORITY.LEAD_STORY;
-
-/** Whether a class may appear in the narrative at all. */
-export const mayAppearInNarrative = (priority) => (PRIORITY_RANK[priority] ?? 0) > PRIORITY_RANK[NARRATIVE_PRIORITY.TECHNICAL_ONLY];
-
 /**
  * The narrative class of one parameter.
  *
@@ -111,15 +122,49 @@ export const mayAppearInNarrative = (priority) => (PRIORITY_RANK[priority] ?? 0)
  * @param {string|null} input.level — the achieved, terminal level
  * @param {string} [input.relevance] — brief relevance of the parameter's area
  * @param {boolean} [input.excluded] — the designer marked this subject do not discuss
+ * @param {boolean} [input.designRationale] — this design states a deliberate
+ *   seating clearance (P1): a physical decision to explain, not a score to celebrate
+ * @param {Object} [input.seats] — the seat readings of a seat-scoped parameter:
+ *   { all, primary, secondary, split, scopeAllowed } (see readSeatScope)
+ * @param {boolean} [input.comparison] — the client is explicitly choosing between
+ *   options, so a weak consistency result may be stated as a trade-off
  * @returns {{priority: string, reason: string, tier: string}}
  */
-export function parameterNarrativePriority({ key, weight, level, relevance = BRIEF_RELEVANCE.STANDARD, excluded = false } = {}) {
+export function parameterNarrativePriority({
+  key,
+  weight,
+  level,
+  relevance = BRIEF_RELEVANCE.STANDARD,
+  excluded = false,
+  designRationale = false,
+  seats = null,
+  comparison = false,
+} = {}) {
   const tier = weightTier(weight);
   if (excluded) {
     return { priority: NARRATIVE_PRIORITY.DO_NOT_DISCUSS, tier, reason: 'the designer marked this subject do not discuss, which overrides every other consideration' };
   }
   if (isAssumedParameterKey(key)) {
     return { priority: NARRATIVE_PRIORITY.TECHNICAL_ONLY, tier, reason: 'a permanent design assumption is technical evidence, never a client-facing result' };
+  }
+  // P1 and P20 carry their own rules, because their meaning is not read from a
+  // level alone: P1 is the seating decision the client asks about, and P20 is the
+  // one bass result whose meaning depends on WHICH seats it holds for.
+  if (String(key) === 'p1') {
+    return { ...p1NarrativePriority({ level, relevance, deliberate: designRationale }), tier };
+  }
+  if (String(key) === 'p20') {
+    return {
+      ...p20NarrativePriority({
+        allLevel: seats?.all ?? level,
+        primaryLevel: seats?.primary ?? null,
+        split: seats?.split !== false,
+        seatScopeAllowed: seats?.scopeAllowed !== false,
+        relevance,
+        comparison,
+      }),
+      tier,
+    };
   }
   const label = levelLabel(level);
   if (label == null) {
@@ -158,6 +203,14 @@ export function parameterNarrativePriority({ key, weight, level, relevance = BRI
   }
   return { priority: NARRATIVE_PRIORITY.TECHNICAL_ONLY, tier, reason: `a ${label} result on a lightly weighted parameter is not a client-facing story` };
 }
+
+/* ── P20 · BASS SEAT-TO-SEAT CONSISTENCY, AND P1 · THE SEATING DECISION ─────
+   Both carry rules of their own, because neither is read from a level alone: P20
+   depends on WHICH SEATS its result holds for, and P1 is the seating decision the
+   client asks about rather than a score. They are defined in
+   seatScopeNarrativeAuthority.js (re-exported above) so this authority stays one
+   reading of importance + result + brief, and so the writer and the
+   designer-facing view read the identical rules. */
 
 /* ── The narrative area each parameter belongs to ─────────────────────────── */
 
@@ -243,11 +296,18 @@ export const PARAMETER_PHRASE_AREA = Object.freeze({
  * @param {Object} input
  * @param {string} input.key — the parameter key
  * @param {string|null} input.level — the achieved level
- * @param {string} input.priority — the narrative class of the topic
+ * @param {string} input.priority — the narrative role of the topic
+ * @param {string} [input.seatScope] — the seats a P20 consistency claim is made
+ *   for. A consistency sentence is stated only for the seats its own result
+ *   supports, so an unscoped consistency claim is refused rather than widened.
  * @returns {string|null} the approved sentence, or null
  */
-export function phraseAfterRelevance({ key, level, priority } = {}) {
+export function phraseAfterRelevance({ key, level, priority, seatScope = SEAT_SCOPE.NONE } = {}) {
   if (!mayAppearInNarrative(priority)) return null;
+  // The seating decision is explained as rationale and the consistency result is
+  // stated at its own seat scope: neither is read from the performance register.
+  if (String(key) === 'p1') return p1RationalePhrase(priority);
+  if (String(key) === 'p20') return p20ConsistencyPhrase({ level, scope: seatScope });
   const area = PARAMETER_PHRASE_AREA[key];
   if (!area) return null;
   const label = levelLabel(level);
@@ -306,6 +366,14 @@ export function buildNarrativePriorityRows({
   const evidence = collectEligibleEvidence(summary);
   const brief = readBriefRelevance({ intent, subjects, briefText, design });
   const excluded = new Set((excludedKeys || []).map((key) => String(key)));
+  // What the designer's own steering has silenced. A seating topic silences the
+  // client-experience area, which suppresses the seating decision, its rationale,
+  // the clearance explanation and every seat-scope claim together.
+  const silenced = new Set([
+    ...(Array.isArray(suppressedAreas) ? suppressedAreas : []),
+    ...suppressedAreasFromTopics(excludedTopics),
+  ].map((area) => String(area)));
+  const seatingSuppressed = silenced.has('client_experience');
   const rows = [];
   const byKey = {};
 
@@ -316,7 +384,26 @@ export function buildNarrativePriorityRows({
     const area = PARAMETER_NARRATIVE_AREA[key] || null;
     const relevance = area ? (brief.byArea[area] || BRIEF_RELEVANCE.STANDARD) : BRIEF_RELEVANCE.STANDARD;
     const level = entry.eligible ? entry.level : null;
-    const classified = parameterNarrativePriority({ key, weight, level, relevance, excluded: excluded.has(key) });
+    // The seat results are read for every seat-scoped parameter, so the designer's
+    // view can state the primary and secondary results beside the governed one.
+    const seats = readSeatScope(summary, key);
+    const areaSilenced = area ? silenced.has(area) : false;
+    const classified = parameterNarrativePriority({
+      key,
+      weight,
+      level,
+      relevance,
+      excluded: excluded.has(key) || areaSilenced,
+      // P1 is the deliberate seating decision: it is explained as rationale, from
+      // the decision itself and not from the level it reached.
+      designRationale: key === 'p1',
+      seats: {
+        all: seats.all ?? level,
+        primary: seats.primary,
+        split: seats.split,
+        scopeAllowed: !seatingSuppressed,
+      },
+    });
     const score = contributionOf(summary?.parameterAuthority?.[key], level, weight);
     const id = key === 'screen' ? 'screen' : Number(String(key).replace('p', ''));
     const row = {
@@ -332,6 +419,10 @@ export function buildNarrativePriorityRows({
       scope: entry.scope,
       value: entry.value ?? null,
       eligible: entry.eligible,
+      primary_seat_result: seats.primary,
+      secondary_seat_result: seats.secondary,
+      seat_results_assessed: seats.assessed,
+      seat_scope: classified.seat_scope ?? SEAT_SCOPE.NONE,
       multiplier: score.multiplier,
       contribution: score.contribution,
       maximum: score.maximum,
@@ -339,13 +430,15 @@ export function buildNarrativePriorityRows({
       brief_relevance: relevance,
       priority: classified.priority,
       priority_label: PRIORITY_LABEL[classified.priority],
+      narrative_role: PRIORITY_LABEL[classified.priority],
+      silenced: areaSilenced,
       reason: classified.reason,
     };
     rows.push(row);
     byKey[key] = row;
   }
 
-  return { rows, byKey, brief };
+  return { rows, byKey, brief, suppressedAreas: [...silenced] };
 }
 
 /** The rows a client-facing narrative may draw on, strongest class first. */
@@ -353,6 +446,19 @@ export function narrativeCandidateRows(rows = []) {
   return (Array.isArray(rows) ? rows : [])
     .filter((row) => row?.eligible && isNarrativeCandidate(row.priority))
     .sort((a, b) => (PRIORITY_RANK[b.priority] - PRIORITY_RANK[a.priority]) || (b.weight - a.weight));
+}
+
+/**
+ * The design-rationale subjects: the deliberate physical decisions the narrative
+ * explains. They are available to the proposal story whether or not they reached a
+ * performance level, and they are never a performance headline — which is exactly
+ * what their rank enforces: they read in the narrative and never among the
+ * candidates a highlights selection draws from.
+ */
+export function designRationaleRows(rows = []) {
+  return (Array.isArray(rows) ? rows : [])
+    .filter((row) => row?.priority === NARRATIVE_PRIORITY.DESIGN_RATIONALE)
+    .sort((a, b) => b.weight - a.weight);
 }
 
 /* ── The narrative steer's topics, classified the same way ────────────────── */

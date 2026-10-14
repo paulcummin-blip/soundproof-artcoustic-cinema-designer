@@ -305,12 +305,12 @@ test('the narrative steer suggests by importance and brief, never by level alone
 
 test('the Expert View is designer-facing only, and no client document imports it', () => {
   const component = source('src/components/roomdesigner/ExpertViewDesignWeighting.jsx');
-  for (const heading of ['ASDR weight', 'Achieved result', 'ASDR contribution', 'Brief relevance', 'Narrative priority']) {
+  for (const heading of ['ASDR weight', 'Result', 'Primary-seat result', 'Secondary-seat result', 'ASDR contribution', 'Brief relevance', 'Narrative role']) {
     assert.match(component, new RegExp(heading.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
   }
   assert.match(component, /buildNarrativePriorityRows/);
   assert.match(component, /never included in a client proposal or report/);
-  for (const filter of ['All', 'High-weight', 'Narrative candidates']) {
+  for (const filter of ['All', 'High-weight', 'Narrative candidates', 'Design rationale']) {
     assert.match(component, new RegExp(`label: '${filter}'`));
   }
   // It is opened from the Room Designer's Options panel and nowhere else.
