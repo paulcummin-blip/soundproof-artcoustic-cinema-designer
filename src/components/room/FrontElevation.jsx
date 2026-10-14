@@ -1039,9 +1039,6 @@ export default function FrontElevation({ dimensions, screen, placedSpeakers = []
           const sx = rx(screenCenterX) - sw / 2;
           const syTop = ry(screenFloorM + screenData.h);
 
-          const labelViewable = `${(screenData.w * 100).toFixed(0)} × ${(screenData.h * 100).toFixed(0)} cm (viewable)`;
-          const labelOverall = `${(overallW * 100).toFixed(0)} × ${(overallH * 100).toFixed(0)} cm overall${!hasBorderData ? ' (est. frame)' : ''}`;
-
           return (
             <g
               onMouseDown={onScreenHeightFromFloorChange ? handleScreenMouseDown : undefined}
@@ -1080,28 +1077,10 @@ export default function FrontElevation({ dimensions, screen, placedSpeakers = []
                 stroke={SCREEN_STROKE}
                 strokeWidth={screenDragging ? 1.6 : 1}
               />
-              {/* Screen labels: inside white area top-left if there is room, else below frame */}
-              {sw >= 90 && sh >= 36 ? (
-                // Enough room — render inside top-left of the white viewable area
-                <g>
-                  <text x={sx + 5} y={syTop + 11} textAnchor="start" fontSize={7} fill="#888">
-                    {labelOverall}
-                  </text>
-                  <text x={sx + 5} y={syTop + 21} textAnchor="start" fontSize={7} fill="#444" fontWeight={600}>
-                    {labelViewable}
-                  </text>
-                </g>
-              ) : (
-                // Too small — render below the frame, centred
-                <g>
-                  <text x={rx(screenCenterX)} y={oy + oH + 12} textAnchor="middle" fontSize={7} fill={DIM_COLOR}>
-                    {labelOverall}
-                  </text>
-                  <text x={rx(screenCenterX)} y={oy + oH + 22} textAnchor="middle" fontSize={7} fill={LABEL_COLOR} fontWeight={600}>
-                    {labelViewable}
-                  </text>
-                </g>
-              )}
+              {/* The screen's own size is stated in the Screen Size panel's live
+                  metrics, so the drawing carries no overall or viewable
+                  dimension text. The outline, frame and drag surface above are
+                  unchanged. */}
               {/* Live height during the drag — the same value the numeric input
                   shows, in centimetres, kept inside the room rectangle. */}
               {screenDragging && (() => {
