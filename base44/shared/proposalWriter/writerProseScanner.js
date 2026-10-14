@@ -59,8 +59,17 @@ export function scanProse({ input, vocabulary, section, text, claims = [], claim
   const singleOptionPack = isSingleOptionProposal(
     input?.section_structure?.proposal_mode ?? input?.evidence_pack?.mode,
   );
-  const resultLed = citedKinds.length > 0 && citedKinds.every((kind) => kind === 'strength_story'
-    || (singleOptionPack && kind === 'supporting_result'));
+  // A result-led single-option section may cite its ranked strength story AND the
+  // scoped result that states exactly which seats that story applies to. The scoped
+  // ID narrows the authority; it does not turn the section into comparison copy.
+  // Require at least one story/supporting result so a bare scoped result never gains
+  // the broader result-led allowance by itself.
+  const resultLed = citedKinds.length > 0
+    && citedKinds.some((kind) => kind === 'strength_story'
+      || (singleOptionPack && kind === 'supporting_result'))
+    && citedKinds.every((kind) => kind === 'strength_story'
+      || kind === 'scoped_result'
+      || (singleOptionPack && kind === 'supporting_result'));
   // The proposal mode and the frozen display the pack states. A single-option
   // proposal has nothing to compare against, and a TV is never written as a
   // screen, an aspect ratio or a projector.
@@ -145,7 +154,7 @@ export function scanProse({ input, vocabulary, section, text, claims = [], claim
         report(WRITER_REJECTION.INVENTED_BENEFIT, { section, detail: capability });
       }
       context = { text, sentence, clause };
-      if (isRecommendation(clause) && !hasRecommendationClaim(input) && !resultLed) {
+      if (isRecommendation(clause) && !hasRecommendationClaim(input)) {
         report(WRITER_REJECTION.UNSUPPORTED_RECOMMENDATION, { section, detail: 'the_pack_allows_no_recommendation' });
       }
       const designStage = designStageCommentary(claimed);
