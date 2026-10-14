@@ -139,10 +139,37 @@ export function Evolve21FaceIcon({ x, y, width, height }) {
   );
 }
 
+/**
+ * EVOLVE 3-1 — portrait cabinet (270 × 370 mm face), 751 × 1024 px artwork.
+ *
+ * The viewBox states the ARTWORK'S OWN box, and the image fills that box. The
+ * drawing is portrait (aspect 0.73) while the square viewBox used by the other
+ * PNG icons is not: the portrait drawing was letterboxed inside the square and
+ * the square was letterboxed again inside the portrait cabinet box, so the
+ * speaker was drawn short (0.845 of the cabinet box) and a band of white canvas
+ * showed above and below it, reading as a white rectangle around the speaker.
+ * Stating the artwork's own box maps the drawing straight onto the box it is
+ * given, so the drawing fills the cabinet box exactly as every other face icon
+ * does and no white canvas is introduced.
+ *
+ * The drawing is never stretched: it keeps its own proportions and is fitted
+ * (never cropped) inside the box the caller supplies.
+ *
+ * Presentation only. Nothing about the cabinet's size, position, orientation or
+ * acoustic centre is stated, inferred or changed here.
+ */
 export function Evolve31FaceIcon({ x, y, width, height }) {
   return (
-    <svg x={x} y={y} width={width} height={height} viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
-      <image x="0" y="0" width="100" height="100" href="https://media.base44.com/images/public/6a1166c68ddc81e5ea2cdf6b/053510389_Evolve3-1front.png" preserveAspectRatio="xMidYMid meet" />
+    <svg
+      x={x}
+      y={y}
+      width={width}
+      height={height}
+      viewBox="0 0 751 1024"
+      xmlns="http://www.w3.org/2000/svg"
+      preserveAspectRatio="xMidYMid meet"
+    >
+      <image x="0" y="0" width="751" height="1024" href="https://media.base44.com/images/public/6a1166c68ddc81e5ea2cdf6b/053510389_Evolve3-1front.png" preserveAspectRatio="xMidYMid meet" />
     </svg>
   );
 }
