@@ -242,7 +242,12 @@ export default function AdiOptimisationJourney({
       notes: presentation.notes.length ? presentation.notes : resolved.notes,
       action: presentation.action || resolved.action,
       actionLabel: presentation.actionLabel || resolved.actionLabel,
-      canRun: presentation.runBlocked ? false : resolved.canRun,
+      // The presentation authority owns whether its ONE action can be offered: a
+      // failure the bass calculation fixes offers that calculation even while the
+      // optimiser run itself is still blocked.
+      canRun: presentation.canRun === true ? true : (presentation.runBlocked ? false : resolved.canRun),
+      // The mapped reason's own next step, stated with it in the main panel.
+      nextAction: presentation.nextAction || null,
       showPlan: presentation.showPlan,
     }
     : resolved;
@@ -510,9 +515,11 @@ export default function AdiOptimisationJourney({
 
       {/* ── THE DECISION ── one adjustment, one benefit and one comparable P20
           pair, under the one status in the header. Everything the decision was
-          measured from is in Engineer details below. */}
+          measured from is in Engineer details below. A failure states its own
+          next step here, so Engineer details are never required to understand it. */}
       <AdiPanelSummary
         message={journey.message}
+        nextAction={presentation?.nextAction || null}
         adjustment={headline.adjustment}
         benefit={headline.benefit}
         comparison={headline.comparison}

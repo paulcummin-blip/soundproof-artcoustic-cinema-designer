@@ -17,7 +17,8 @@
 // ---------------------------------------------------------------------------
 
 import { OPTIMISER_PLAN_STATUS } from "./optimiserPlanConstants.js";
-import { ADI_BASS_OPTIMISER_LABEL } from "./resolveAdiOptimiserJourney.js";
+import { ADI_BASS_OPTIMISER_LABEL, ADI_OPTIMISER_ACTION } from "./resolveAdiOptimiserJourney.js";
+import { OPTIMISER_FAILURE_FIX, resolveOptimiserFailure } from "./optimiserFailureReason.js";
 
 /** The complete set of optimiser presentation states. */
 export const OPTIMISER_PRESENTATION_STATE = Object.freeze({
@@ -129,6 +130,7 @@ export function hasApplicableEvaluatedLever(planView) {
  * @param {object|null} [params.actionable] - the evaluated ADI action, when one
  *   genuinely exists: { available, currentText, proposedText, reason }
  * @param {boolean} [params.runBlocked]
+ * @param {object|string|null} [params.runBlockReason] - why the run is blocked
  * @param {boolean} [params.planPersisted] - false when saving the result failed
  * @returns {object} one resolved presentation state
  */
@@ -138,10 +140,42 @@ export function resolveOptimiserPresentationState({
   runError = null,
   actionable = null,
   runBlocked = false,
+  runBlockReason = null,
   planPersisted = true,
 } = {}) {
   const status = planView?.status || OPTIMISER_PLAN_STATUS.ABSENT;
   const evidence = planView?.run || null;
+
+  // WHY the run could not complete, in the designer's words: one mapped reason,
+  // the next step beside it and the one button that fixes that state. The
+  // engine's own recorded words are left untouched in the run evidence, which is
+  // what Engineer details reads.
+  const failure = resolveOptimiserFailure({
+    runStatus,
+    terminalOutcome: planView?.terminalOutcome || null,
+    runBlockCode: runBlockReason?.code
+      || (typeof runBlockReason === "string" ? runBlockReason : null),
+    baselineInvalid: evidence?.baselineValidation?.valid === false,
+    recordedReasons: Array.isArray(evidence?.rejectionReasons) ? evidence.rejectionReasons : [],
+  });
+  // The button names the flow that fixes THIS state — the bass calculation when
+  // the bass result is what is missing, stale or unvalidated, otherwise the
+  // optimiser run itself. Nothing here sends the designer to a control that
+  // cannot fix the failure.
+  const failureExtras = failure
+    ? {
+      message: failure.reason,
+      nextAction: failure.nextAction,
+      failureCode: failure.code,
+      action: failure.fix === OPTIMISER_FAILURE_FIX.BASS_CALCULATION
+        ? ADI_OPTIMISER_ACTION.CALCULATE
+        : OPTIMISER_PRESENTATION_ACTION.RETEST,
+      actionLabel: failure.actionLabel,
+      // The bass calculation is offered even while the optimiser run itself is
+      // blocked: it is the action that lifts the block.
+      canRun: failure.fix === OPTIMISER_FAILURE_FIX.BASS_CALCULATION ? true : null,
+    }
+    : {};
 
   const build = (state, extra = {}) => {
     const outcome = OPTIMISER_OUTCOME_BY_STATE[state] || null;
@@ -165,11 +199,18 @@ export function resolveOptimiserPresentationState({
       showApply: state === OPTIMISER_PRESENTATION_STATE.PLAN_AVAILABLE,
       action: null,
       actionLabel: null,
+      // The reason's own next step, stated beside it in the main panel, and the
+      // mapped reason behind it — never a pointer to Engineer details.
+      nextAction: null,
+      failureCode: null,
+      canRun: null,
       runBlocked,
       runError,
       ...extra,
     };
-    if (retest) {
+    // A re-test outcome offers the run action worded as its own next step — but
+    // a mapped failure names the action that fixes it, and that one wins.
+    if (retest && !extra.failureCode) {
       resolved.action = OPTIMISER_PRESENTATION_ACTION.RETEST;
       resolved.actionLabel = OPTIMISER_RETEST_LABEL;
     }
@@ -184,13 +225,16 @@ export function resolveOptimiserPresentationState({
     });
   }
 
-  // ── FAILED ── a technical execution failure, never a design statement.
+  // ── FAILED ── a technical execution failure, never a design statement. The
+  // panel states why it failed and what to do next; the engine's own error text
+  // stays in the state and in Engineer details.
   if (runStatus === "failed") {
     return build(OPTIMISER_PRESENTATION_STATE.FAILED, {
       message: (runError || OPTIMISER_PRESENTATION_COPY.FAILED),
       action: OPTIMISER_PRESENTATION_ACTION.RERUN,
       actionLabel: OPTIMISER_PRESENTATION_ACTION.RERUN,
       showApply: false,
+      ...failureExtras,
     });
   }
 
@@ -221,10 +265,9 @@ export function resolveOptimiserPresentationState({
   // comparison. The saved reason is stated as recorded, never re-worded into a
   // design conclusion, and the evidence the run produced is shown with a re-run.
   if (status === OPTIMISER_PLAN_STATUS.INCOMPLETE) {
-    // The outcome states its own sentence, never the engine's recorded reason:
-    // the reason is a diagnosis of the run, and it is read in Engineer details
-    // beside the evidence that carries it — so the main panel can no longer lead
-    // with a line the designer cannot act on.
+    // The main panel states WHY in the designer's words and the next step beside
+    // it, with the one button that fixes that state. The run's own recorded
+    // diagnosis is not replaced: it stays in the evidence Engineer details reads.
     return build(OPTIMISER_PRESENTATION_STATE.EVALUATION_INCOMPLETE, {
       message: OPTIMISER_PRESENTATION_COPY.INCOMPLETE,
       explanation: "Nothing is offered for application. The evidence below is what the run evaluated.",
@@ -232,6 +275,7 @@ export function resolveOptimiserPresentationState({
       action: OPTIMISER_PRESENTATION_ACTION.RERUN,
       actionLabel: OPTIMISER_PRESENTATION_ACTION.RERUN,
       showApply: false,
+      ...failureExtras,
     });
   }
 
@@ -271,6 +315,7 @@ export function resolveOptimiserPresentationState({
       action: OPTIMISER_PRESENTATION_ACTION.RERUN,
       actionLabel: OPTIMISER_PRESENTATION_ACTION.RERUN,
       showApply: false,
+      ...failureExtras,
     });
   }
 
@@ -281,6 +326,7 @@ export function resolveOptimiserPresentationState({
       action: OPTIMISER_PRESENTATION_ACTION.RERUN,
       actionLabel: OPTIMISER_PRESENTATION_ACTION.RERUN,
       showApply: false,
+      ...failureExtras,
     });
   }
 
@@ -292,6 +338,7 @@ export function resolveOptimiserPresentationState({
       action: OPTIMISER_PRESENTATION_ACTION.COMPLETE,
       actionLabel: OPTIMISER_PRESENTATION_ACTION.COMPLETE,
       showApply: false,
+      ...failureExtras,
     });
   }
 
@@ -303,6 +350,7 @@ export function resolveOptimiserPresentationState({
       action: OPTIMISER_PRESENTATION_ACTION.RERUN,
       actionLabel: OPTIMISER_PRESENTATION_ACTION.RERUN,
       showApply: false,
+      ...failureExtras,
     });
   }
 

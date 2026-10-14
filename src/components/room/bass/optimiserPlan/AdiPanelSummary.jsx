@@ -32,6 +32,9 @@ export default function AdiPanelSummary({
   currentResult = null,
   // A target this design cannot reach, stated in one line.
   designLimitation = null,
+  // The ONE next step for a failure the designer has to act on. It belongs here,
+  // beside the reason: a failure is never explained only in Engineer details.
+  nextAction = null,
   // The earlier design state a saved result belongs to, with the one action.
   staleCopy = null,
   previousBest = null,
@@ -41,6 +44,12 @@ export default function AdiPanelSummary({
     <div className={`space-y-1 ${className}`} data-adi-panel-summary="true">
       {message && (
         <div className="text-[13px] font-semibold text-[#1B1A1A] leading-relaxed">{message}</div>
+      )}
+
+      {nextAction && (
+        <div className="text-[11.5px] text-[#8A5A2B] leading-relaxed" data-adi-panel-next-action="true">
+          {nextAction}
+        </div>
       )}
 
       {/* THE recommendation: what to do, what it buys, where it lands. */}

@@ -315,6 +315,7 @@ export default function AdiRecommendation({
     runError: optimisationRunError || null,
     actionable: actionableEvaluation,
     runBlocked: !!optimisationRunBlockReason,
+    runBlockReason: optimisationRunBlockReason || null,
   });
 
   // A design that cannot meet its selected target states the remaining

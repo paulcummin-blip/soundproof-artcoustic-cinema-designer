@@ -244,9 +244,11 @@ describe('TEST 3: incomplete or unsaved run', () => {
     });
     expect(unsaved.state).toBe(OPTIMISER_PRESENTATION_STATE.EVALUATION_INCOMPLETE);
     expect(unsaved.statusLabel).toBe('Evaluation Could Not Complete');
-    // The outcome speaks for itself; the engine's own reason for this run is a
-    // diagnosis and is read in Engineer details beside the evidence.
-    expect(unsaved.message).toMatch(/could not complete the bass optimisation/);
+    // The main panel states the reason in the designer's words, with the next
+    // step beside it — never the engine's own diagnosis and never a pointer to
+    // Engineer details as the only guidance.
+    expect(unsaved.message).toMatch(/did not retain enough evidence/);
+    expect(unsaved.nextAction).toMatch(/Re-test Bass Optimisation/);
     expect(unsaved.actionLabel).toBe('Re-test Bass Optimisation');
     expect(unsaved.showApply).toBe(false);
 
@@ -331,7 +333,11 @@ describe('TEST 3B: baseline failure and unavailable metrics', () => {
     const state = resolveOptimiserPresentationState({ planView, actionable: { available: true } });
     expect(state.state).toBe(OPTIMISER_PRESENTATION_STATE.EVALUATION_INCOMPLETE);
     expect(state.statusLabel).toBe('Evaluation Could Not Complete');
-    expect(state.message).toMatch(/could not complete the bass optimisation/);
+    // The panel says WHY — the baseline could not be validated — and gives the
+    // one action that fixes it, both without opening Engineer details.
+    expect(state.message).toMatch(/current bass result could not be validated/);
+    expect(state.nextAction).toMatch(/Recalculate Bass Performance, then run Bass Optimiser again\./);
+    expect(state.actionLabel).toBe('Recalculate Bass Performance');
     // The run's own diagnosis is not lost: it travels with the evidence, which
     // Engineer details reads.
     expect(state.evidence.rejectionReasons.join(' ')).toMatch(/baseline could not be validated/);
