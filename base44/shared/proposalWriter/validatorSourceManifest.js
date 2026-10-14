@@ -12,7 +12,7 @@ export const VALIDATOR_SOURCE_MANIFEST = Object.freeze({
   'base44/shared/proposalWriter/writerEditorialRules.js': '08776775a8a4bdd2f2a167804809d5db51d750c4a01a1ac8ee23830761475324',
   'base44/shared/proposalWriter/writerSalesPolishRules.js': '2e8d0a0c206141d99d9af0c48b24a565002bd7f63497dedffc431b14b4ae8825',
   'base44/shared/proposalWriter/writerProductScope.js': '7b15e264a35b8f7c1694c3e5c70c3d43e2d06c4a77e195a01cb9e0ec47e11749',
-  'base44/shared/proposalWriter/writerVocabulary.js': '51f82fe39d8b90faebdc0331419de74f630f6438f8125069db90360e9fc6e624',
+  'base44/shared/proposalWriter/writerVocabulary.js': '53b036a5ffa43d63c12fdebac504562345ce40852869fc365f0321db46e792b5',
   'base44/shared/proposalWriter/writerClausePrecision.js': '0d7be2c8e2dd98c395c5bf999bd6c306cb48b9c15bc0ffae2d7f31fd31ddae94',
   'base44/shared/proposalWriter/writerViolationAudit.js': '4cc361d1c96a101fc29330d740cef2184ae5650fd3cc64e253892d004efdb0b9',
   'base44/shared/proposalWriter/writerDesignStageRules.js': 'a26d5ff98a2eaf4f6de929cc62cba7e7bc2632540f12d44ded72e8cb7f8bdbb7',
