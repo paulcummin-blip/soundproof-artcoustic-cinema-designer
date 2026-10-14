@@ -125,6 +125,48 @@ export const PLACEMENT_PHRASES = Object.freeze({
  * Returns the evidence-backed candidates in their own catalogue order plus the
  * supporting stories that may only fill a page the evidence has not filled.
  */
+/**
+ * ONE story's narrative class, from the canonical weight of its own members, their
+ * achieved levels and the relevance of their subjects to this project's brief. The
+ * story carries the class of its WEAKEST member, because a story may claim only what
+ * every one of its members supports. Exported so this classification can be read and
+ * tested without rebuilding the whole catalogue.
+ */
+export function attachStoryNarrativePriority(entry, { brief = null, excludedKeys = [] } = {}) {
+  const excluded = new Set((excludedKeys || []).map((key) => String(key)));
+  const briefByArea = brief?.byArea || null;
+  const members = (Array.isArray(entry?.members) ? entry.members : []).filter(Boolean);
+  if (members.length === 0) {
+    return {
+      ...entry,
+      narrative_priority: NARRATIVE_PRIORITY.SUPPORTING_EVIDENCE,
+      narrative_reason: 'this story carries the specification rather than a result of its own',
+      brief_relevance: null,
+    };
+  }
+  const rated = members.map((member) => {
+    const key = String(member.key || '').toUpperCase() === 'RP23' ? 'screen' : String(member.key || '');
+    const area = PARAMETER_NARRATIVE_AREA[key] || null;
+    const relevance = (area && briefByArea?.[area]) || BRIEF_RELEVANCE.STANDARD;
+    const classified = parameterNarrativePriority({
+      key,
+      weight: member.weight,
+      level: member.level,
+      relevance,
+      excluded: excluded.has(key),
+    });
+    return { key, area, relevance, ...classified };
+  }).sort((a, b) => PRIORITY_RANK[a.priority] - PRIORITY_RANK[b.priority]);
+  const weakest = rated[0];
+  return {
+    ...entry,
+    narrative_priority: weakest.priority,
+    narrative_reason: weakest.reason,
+    brief_relevance: weakest.relevance,
+    member_priorities: rated,
+  };
+}
+
 export function buildCandidates(sources, { byKey, floor, connections, brief = null, excludedKeys = [] }) {
   const {
     engineeringSummary,
@@ -403,43 +445,12 @@ export function buildCandidates(sources, { byKey, floor, connections, brief = nu
   // Every story is classified ONCE, from the canonical weight of its own members,
   // their achieved levels and the relevance of their subjects to this brief. Where
   // no brief is supplied the class is still stated (from weight and result alone),
-  // and the selection below keeps the behaviour it had before this existed.
-  const excluded = new Set((excludedKeys || []).map((key) => String(key)));
-  const briefByArea = brief?.byArea || null;
-  const classify = (entry) => {
-    const members = (Array.isArray(entry?.members) ? entry.members : []).filter(Boolean);
-    if (members.length === 0) {
-      return {
-        ...entry,
-        narrative_priority: NARRATIVE_PRIORITY.SUPPORTING_EVIDENCE,
-        narrative_reason: 'this story carries the specification rather than a result of its own',
-        brief_relevance: null,
-      };
-    }
-    const rated = members.map((member) => {
-      const key = String(member.key || '').toUpperCase() === 'RP23' ? 'screen' : String(member.key || '');
-      const area = PARAMETER_NARRATIVE_AREA[key] || null;
-      const relevance = (area && briefByArea?.[area]) || BRIEF_RELEVANCE.STANDARD;
-      const classified = parameterNarrativePriority({
-        key,
-        weight: member.weight,
-        level: member.level,
-        relevance,
-        excluded: excluded.has(key),
-      });
-      return { key, area, relevance, ...classified };
-    }).sort((a, b) => PRIORITY_RANK[a.priority] - PRIORITY_RANK[b.priority]);
-    const weakest = rated[0];
-    return {
-      ...entry,
-      narrative_priority: weakest.priority,
-      narrative_reason: weakest.reason,
-      brief_relevance: weakest.relevance,
-      member_priorities: rated,
-    };
+  // and the selection keeps the behaviour it had before this existed.
+  const options = { brief, excludedKeys };
+  return {
+    candidates: candidates.map((entry) => attachStoryNarrativePriority(entry, options)),
+    supporting: supporting.map((entry) => attachStoryNarrativePriority(entry, options)),
   };
-
-  return { candidates: candidates.map(classify), supporting: supporting.map(classify) };
 }
 
 /* ── RP22 Parameter 1: the seating decision, stated on every design ────────── */

@@ -397,6 +397,8 @@ export default function RoomDesignerControlsPanel({
             selectedAbfuserQty={selectedAbfuserQty}
             setSelectedAbfuserQty={setSelectedAbfuserQty}
             abfuserRecommendation={abfuserRecommendation}
+            engineeringSummary={engineeringSummary}
+            screen={_screen}
           />
         </CollapsiblePanel>
       </div>

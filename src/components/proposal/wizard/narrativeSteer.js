@@ -418,12 +418,20 @@ export function presentSteerTopics({ chips = [], limit = 12, brief = null } = {}
       label: TOPIC_LIBRARY[key].label,
       area: TOPIC_LIBRARY[key].area,
       suggested: false,
+      narrative_priority: topicNarrativePriority(key, { relevance: relevanceOf(key) }).priority,
       evidence_label: null,
       reason: '',
     });
   }
 
-  return out;
+  // The topics ADI would actually suggest are ranked first — the subjects this brief
+  // is built around and the heaviest evidence it holds — so the designer meets the
+  // meaningful ones before the merely available ones. Everything is still offered and
+  // nothing is removed: only the order changes.
+  return [...out].sort((a, b) => (
+    Number(b.suggested) - Number(a.suggested)
+    || (PRIORITY_RANK[b.narrative_priority] ?? 0) - (PRIORITY_RANK[a.narrative_priority] ?? 0)
+  ));
 }
 
 /** A one-line summary for the review step, or null when nothing is steered. */

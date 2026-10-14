@@ -5,6 +5,7 @@ import { useAppState } from "@/components/AppStateProvider";
 import { useEngineeringMode } from "@/components/state/useEngineeringMode";
 import { describeAbfuserInclusion, ABFUSER_STATUS } from "@/components/utils/adiAbfuserRecommendation";
 import { isManualAbfuserOverride } from "@/components/utils/abfuserInclusionAuthority";
+import ExpertViewDesignWeighting from "@/components/roomdesigner/ExpertViewDesignWeighting";
 
 const formatPrice = (value) =>
   new Intl.NumberFormat('en-GB', { style: 'currency', currency: 'GBP', minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(Math.round(value || 0));
@@ -55,6 +56,9 @@ export default function OptionsPanel({
   selectedAbfuserQty = 0,
   setSelectedAbfuserQty = () => {},
   abfuserRecommendation = null,
+  engineeringSummary = null,
+  screen = null,
+  briefText = '',
 }) {
   const [showDifficultyRating, setShowDifficultyRating] = React.useState(false);
   const [showInactiveItems, setShowInactiveItems] = React.useState(false);
@@ -436,20 +440,29 @@ export default function OptionsPanel({
         </SectionCard>
       )}
 
-      {/* EXPERT VIEW — off by default. Reveals the technical evidence behind
-          ADI's recommendations; never the default dealer workflow. */}
+      {/* EXPERT VIEW — off by default. Opens the design weighting and performance
+          ADI already calculates: importance weight, achieved result, contribution,
+          brief relevance and the narrative class the three produce. Designer-facing
+          only; never the default dealer workflow and never a client document. */}
       <SectionCard title="Expert View">
         <div className="divide-y divide-[#EEEDEA]">
           <ToggleRow
             id="expert-view"
-            label="Technical Evidence"
+            label="Design Weighting & Performance"
             checked={engineeringMode}
             onChange={setEngineeringMode}
           />
         </div>
         <div className="mt-2 text-xs text-[#8B7F76]">
-          Show technical evidence behind ADI recommendations. View the calculations, tested options and constraints used by ADI.
+          The design intelligence behind ADI's narrative: each parameter's ASDR importance weight, its achieved result, the contribution the two produce, how relevant the subject is to this brief, and whether the result is a lead story, worth mentioning, supporting evidence, technical only or excluded.
         </div>
+        {engineeringMode && (
+          <ExpertViewDesignWeighting
+            engineeringSummary={engineeringSummary}
+            screen={screen}
+            briefText={briefText}
+          />
+        )}
       </SectionCard>
     </div>
   );
