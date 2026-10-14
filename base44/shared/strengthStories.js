@@ -114,6 +114,12 @@ export function buildCandidates(sources, { byKey, floor, connections }) {
     seatingPositions = [],
     dolbyConfig = null,
   } = sources;
+  // The layers this design actually specifies. The wording follows the system: a
+  // design with no height layer has surround channels, not an overhead layer, so
+  // a 5.1 system is never described as an immersive one with something missing.
+  const { overheads: overheadCount = 0, subwoofers: subCount = 0 } = connections?.counts || {};
+  const hasOverheadLayer = overheadCount > 0;
+  const nonScreenLayer = hasOverheadLayer ? 'surround and overhead' : 'surround';
   const candidates = [];
   const supporting = [];
   const eligible = (key) => byKey?.[key]?.eligible === true && byKey[key].level != null;
@@ -135,9 +141,11 @@ export function buildCandidates(sources, { byKey, floor, connections }) {
       level: levelRank(p12.level) <= levelRank(p13.level) ? p12.level : p13.level,
       evidence: [
         evidence('P12', p12.level, p12Row?.value ? `Screen speakers · ${p12Row.value}` : 'Screen speakers'),
-        evidence('P13', p13.level, p13Row?.value ? `Surround & overhead · ${p13Row.value}` : 'Surround & overhead'),
+        evidence('P13', p13.level, p13Row?.value
+          ? `${hasOverheadLayer ? 'Surround & overhead' : 'Surround'} · ${p13Row.value}`
+          : (hasOverheadLayer ? 'Surround & overhead' : 'Surround')),
       ],
-      explanation: `the screen channels reach ${p12Row?.value || 'their published capability'} and the surround and overhead layer reaches ${p13Row?.value || 'its published capability'} at the reference seating position, so a demanding soundtrack plays at the scale it was mixed for: dialogue stays clean while the fullest effects arrive without strain.`,
+      explanation: `the screen channels reach ${p12Row?.value || 'their published capability'} and the ${nonScreenLayer} layer reaches ${p13Row?.value || 'its published capability'} at the reference seating position, so a demanding soundtrack plays at the scale it was mixed for: dialogue stays clean while the fullest effects arrive without strain.`,
       sources: ['P12', 'P13'],
     }));
   }
@@ -160,9 +168,11 @@ export function buildCandidates(sources, { byKey, floor, connections }) {
         // one loudspeaker group holds its own tonal balance from seat to seat, and
         // neither compares one loudspeaker group with another.
         evidence('P16', p16.level, p16.value ? `Screen channels across the seats · ${p16.value}` : 'Screen channels across the assessed seats'),
-        evidence('P17', p17.level, p17.value ? `Surround and overhead across the seats · ${p17.value}` : 'Surround and overhead across the assessed seats'),
+        evidence('P17', p17.level, p17.value
+          ? `${hasOverheadLayer ? 'Surround and overhead' : 'Surround channels'} across the seats · ${p17.value}`
+          : `${hasOverheadLayer ? 'Surround and overhead' : 'Surround channels'} across the assessed seats`),
       ],
-      explanation: `the tonal balance holds${seats ? ` across all ${seats} assessed seating positions` : ' across the assessed seating positions'}, each result read for its own speaker group, so within the screen channels, and within the surround and overhead channels, no seat sounds noticeably thinner or brighter than the one beside it.`,
+      explanation: `the tonal balance holds${seats ? ` across all ${seats} assessed seating positions` : ' across the assessed seating positions'}, each result read for its own speaker group: within the screen channels, and within the ${nonScreenLayer} channels, the model predicts strong tonal consistency across the assessed seats.`,
       sources: ['P16', 'P17'],
     }));
   }
@@ -194,7 +204,12 @@ export function buildCandidates(sources, { byKey, floor, connections }) {
       members: [p18],
       scope: 'room',
       evidence: [evidence('P18', p18.level, p18.value ? `Extension to ${p18.value}` : 'In-room bass extension')],
-      explanation: `the system reaches ${p18.value || 'the published limit'} in the room, so the lowest octaves of a film mix are reproduced instead of rolled off: the deepest rumbles are felt in the room rather than described by the speakers.`,
+      // Extension is stated for the result this design actually achieved: a
+      // deepest-octave claim belongs to a genuinely deep result, and a moderate
+      // one is stated as useful film-effect extension without overreaching.
+      explanation: levelRank(p18.level) >= MIN_STRENGTH_LEVEL
+        ? `the system reaches ${p18.value || 'the published limit'} in the room, so the lowest octaves of a film mix are reproduced rather than rolled off.`
+        : `the system reaches ${p18.value || 'its published extension'} in the model, giving useful low-frequency extension for film effects without claiming the deepest infrasonic performance.`,
       sources: ['P18'],
     }));
   }
@@ -298,7 +313,6 @@ export function buildCandidates(sources, { byKey, floor, connections }) {
   // is a genuine strength this is an evidence-backed story in its own right;
   // otherwise it supports the page without claiming a result it does not have.
   const p2 = byKey?.p2;
-  const { overheads: overheadCount = 0, subwoofers: subCount = 0 } = connections?.counts || {};
   // P2 is only stated as an engineering strength where it actually reaches the
   // positive floor; below it the layout is described from the system alone and
   // no parameter result is claimed.

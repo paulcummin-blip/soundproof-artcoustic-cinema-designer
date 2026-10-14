@@ -59,6 +59,13 @@ function screenFact(projectDetails) {
  *  design actually specifies that layer, so an absent one is never stated. */
 const PRODUCT_FACT_LABELS = new Set(['Key loudspeakers', 'Subwoofers', 'Acoustic treatment']);
 
+/** The role each loudspeaker layer is stated under in the fact sheet. */
+const LOUDSPEAKER_LAYER_LABELS = {
+  lcr: 'Screen channels',
+  surrounds: 'Surrounds',
+  overheads: 'Overheads',
+};
+
 /** The facts that describe the room, as opposed to the system built into it. */
 // 'TV' is the display fact's label when the design's display is a television, so
 // it sits with the room facts exactly as 'Screen' does.
@@ -97,9 +104,22 @@ export default function ProjectReportDesignSummary({
     ? `${seatRows.length} row${seatRows.length === 1 ? '' : 's'} · ${seatCount} seat${seatCount === 1 ? '' : 's'}`
     : null;
 
-  // The loudspeaker families the design is built on, each with its own count.
+  // The loudspeaker families the design is built on, stated by the ROLE each is
+  // specified for: "Screen channels: C4-1 and Evolve 3-1 × 2 · Surrounds: …". A
+  // layer the design does not specify states nothing, and a front stage built on
+  // more than one model reads as a role rather than as one identical package.
   const keyLoudspeakers = ['lcr', 'surrounds', 'overheads']
-    .map((key) => productValue(productsSelected, key))
+    .map((key) => {
+      const models = String(productValue(productsSelected, key) || '')
+        .split(',')
+        .map((part) => part.trim())
+        .filter(Boolean);
+      if (models.length === 0) return null;
+      const phrase = models.length === 1
+        ? models[0]
+        : `${models.slice(0, -1).join(', ')} and ${models[models.length - 1]}`;
+      return `${LOUDSPEAKER_LAYER_LABELS[key]}: ${phrase}`;
+    })
     .filter(Boolean)
     .join(' · ') || null;
 

@@ -31,6 +31,8 @@
  *   }
  */
 
+import { hasUpperChannelRole, p13CapabilityExplanation } from "./nonScreenChannelWording";
+
 const RESULT_HEADINGS = {
   L4: "Level 4",
   L3: "Level 3",
@@ -39,8 +41,7 @@ const RESULT_HEADINGS = {
   FAIL: "Does not achieve Level 1",
 };
 
-const RESULT_EXPLANATION =
-  "Minimum SPL capability of the surround and overhead speakers at the reference seating position.";
+
 
 function ceilDb(v) {
   const n = Number(v);
@@ -118,7 +119,9 @@ export function selectClientNonScreenDynamicRange({
     targetBasis,
     targetBasisLabel,
     resultHeading,
-    resultExplanation: RESULT_EXPLANATION,
+    // The layer this design actually has: the overhead layer is named only where
+    // its channels were assessed, so a 5.1 system states its surround speakers.
+    resultExplanation: p13CapabilityExplanation(hasUpperChannelRole(speakerSplValues)),
     hasAny,
   };
 }

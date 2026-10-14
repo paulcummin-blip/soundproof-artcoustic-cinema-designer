@@ -81,7 +81,17 @@ test("P13 resultHeading is neutral for every achieved level", () => {
       p13Mode: c.mode,
     });
     assert.equal(r.resultHeading, c.want, `P13 value=${c.value} mode=${c.mode}`);
-    assert.equal(r.resultExplanation, "Minimum SPL capability of the surround and overhead speakers at the reference seating position.");
+    // This fixture carries no height channels, so the page states the surround
+    // layer alone — and names the overhead layer as soon as one is assessed.
+    assert.equal(r.resultExplanation, "Minimum SPL capability of the surround speakers at the reference seating position.");
+    const withHeights = selectClientNonScreenDynamicRange({
+      analysisResult: makeAnalysisResult(c.value, null),
+      allSeatSplMetrics: new Map([["mlp", { spl: { surrounds: { SL: { value: 99 } }, uppers: { TFL: { value: 101 } } } }]]),
+      seatingPositions: SEATS,
+      rsp: RSP,
+      p13Mode: c.mode,
+    });
+    assert.equal(withHeights.resultExplanation, "Minimum SPL capability of the surround and overhead speakers at the reference seating position.");
     assert.ok(r.minimum && r.minimum.formatted, "P13 measured value remains visible");
   }
 });

@@ -181,7 +181,8 @@ export function buildProjectReportSummaryOpening({
   const architecture = String(projectDetails?.dolby_config || '').trim() || null;
   const vision = [];
   const rowPhrase = seatingRowPhrase(seatingPositions);
-  const builtAround = [displayPhrase(projectDetails), rowPhrase].filter(Boolean);
+  const display = displayPhrase(projectDetails);
+  const builtAround = [display ? `a ${display}` : null, rowPhrase].filter(Boolean);
   const compact = isCompactRoom(roomDims) ? 'compact ' : '';
   if (builtAround.length > 0) {
     vision.push(`This room is designed as a ${compact}dedicated cinema around ${joinList(builtAround)}, with the picture, the front stage, the sound around the seating and the low-frequency support planned together around the way the room will actually be used.`);

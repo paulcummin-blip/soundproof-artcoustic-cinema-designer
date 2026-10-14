@@ -53,7 +53,7 @@ import ProjectReportDesignSummary from "@/components/report/projectReport/Projec
 import AdiDesignHighlightsPage from "@/components/report/projectReport/AdiDesignHighlightsPage";
 import ProjectReportSystemOverview from "@/components/report/projectReport/ProjectReportSystemOverview";
 import { resolveDisplayType } from "@/components/models/screen/displayTypeAuthority";
-import { buildAdiDesignHighlights } from "@/components/report/projectReport/adiDesignHighlights";
+import { buildAdiDesignHighlights, productEntries } from "@/components/report/projectReport/adiDesignHighlights";
 import { buildViewingExperienceNarrative } from "@/components/report/projectReport/viewingExperienceAuthority";
 
 export function useProjectReportPages({
@@ -120,6 +120,11 @@ export function useProjectReportPages({
     seatingPositions,
     engineeringSummary,
   }), [projectDetails, roomDims, productsSelected, seatingPositions, engineeringSummary]);
+
+  // Whether this design actually specifies a height / overhead layer, read from
+  // its own product schedule. The P17 page names the overhead layer only where it
+  // exists: a 5.1 system is a deliberate 5.1 system, not a missing immersive one.
+  const overheadLayerInstalled = productEntries(productsSelected, 'overheads').length > 0;
 
   // The ADI Design Highlights page's content: the highlights ADI selects from
   // this design's own frozen evidence — the published RP22 and RP23 results and
@@ -345,6 +350,7 @@ export function useProjectReportPages({
             screenFrontPlaneM={screenFrontPlaneM}
             screenWidthM={screenWidthM}
             counts={timbreConsistency.counts}
+            hasOverheadLayer={overheadLayerInstalled}
           />
         ),
         printData: {
@@ -355,6 +361,7 @@ export function useProjectReportPages({
           screenFrontPlaneM,
           screenWidthM,
           counts: timbreConsistency.counts,
+          hasOverheadLayer: overheadLayerInstalled,
         },
       });
     }
@@ -622,7 +629,7 @@ export function useProjectReportPages({
       ...summaryPages,
       ...closingPages,
     ];
-  }, [p5Snapshot, p5SeatResults, p9Snapshot, p9Overhead, bestListeningArea, timbreConsistency, frontSoundstage, nonScreenSoundstage, highlights, screenSeating, hasSeatingPosition, recommendedSeatingPosition, bassPerformance, roomDims, rsp, rspSourceLabel, screenFrontPlaneM, screenWidthM, screen, placedSpeakers, appState?.acousticTreatmentEnabled, appState?.selectedAbfuserQty, appState?.abfuserQtySource, coverageSentence, reportGeometry, reportSystem, perSeatPerformance, projectId]);
+  }, [p5Snapshot, p5SeatResults, p9Snapshot, p9Overhead, bestListeningArea, timbreConsistency, frontSoundstage, nonScreenSoundstage, highlights, screenSeating, hasSeatingPosition, recommendedSeatingPosition, bassPerformance, roomDims, rsp, rspSourceLabel, screenFrontPlaneM, screenWidthM, screen, placedSpeakers, appState?.acousticTreatmentEnabled, appState?.selectedAbfuserQty, appState?.abfuserQtySource, coverageSentence, reportGeometry, reportSystem, perSeatPerformance, projectId, overheadLayerInstalled]);
 
   // ── The Project Report's composition ────────────────────────────────────
   // The document is an EDIT of the two reports, not a third one: the merged

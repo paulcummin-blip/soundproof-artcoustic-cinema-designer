@@ -24,16 +24,25 @@ import { resolveRspLabelPlacement } from "./ClientSpeakerBalance";
 import { getSeatGradeColors, PRIORITY_LEGEND } from "./visualReportSeatStyle";
 import SeatMarker from "./SeatMarker";
 import { computeHaloRadiusPx, TWO_SEGMENT_LAYOUT, TWO_SEGMENT_LEGEND, PRIMARY_STROKE_WIDTH, buildRingSegmentPath } from "./seatMarkerGeometry";
+import { nonScreenSegmentLabel, timbreChannelsCaption } from "./nonScreenChannelWording";
 
 // RSP marker geometry — same as ClientSpeakerBalance
 const RSP_RING_R = 8;
 const RSP_DOT_R = 3;
 
 // ── Seat matrix helpers ──
-const MATRIX_PARAMS = [
-  { key: "p16", label: "P16 Screen" },
-  { key: "p17", label: "P17 Surround & Overhead" },
-];
+
+/**
+ * The matrix's own rows. P17 states the layer this design actually has: the
+ * overhead layer is named only where height channels are installed, so a 5.1
+ * system reads "P17 Surround" and never claims a layer it does not have.
+ */
+function matrixParams(hasOverheadLayer) {
+  return [
+    { key: "p16", label: "P16 Screen" },
+    { key: "p17", label: nonScreenSegmentLabel("P17 Surround & Overhead", hasOverheadLayer) },
+  ];
+}
 
 // Best-category rank: highly_consistent is strongest, not_assessed is weakest
 const CATEGORY_BEST_RANK = {
@@ -120,6 +129,9 @@ export default function ClientTimbreConsistency({
   screenFrontPlaneM,
   screenWidthM,
   counts,
+  // Whether this design has a height / overhead layer. The page states the layer
+  // it has, and never one the system was not specified with.
+  hasOverheadLayer = false,
   print,
   printPart,
 }) {
@@ -384,7 +396,7 @@ export default function ClientTimbreConsistency({
                    )}
                  </svg>
                 <span style={{ fontSize: 11, color: "#3E4349", letterSpacing: "0.02em" }}>
-                  {entry.label}
+                  {nonScreenSegmentLabel(entry.label, hasOverheadLayer)}
                 </span>
               </div>
             );
@@ -466,7 +478,7 @@ export default function ClientTimbreConsistency({
                   </tr>
                 </thead>
                 <tbody>
-                  {MATRIX_PARAMS.map((mr) => (
+                  {matrixParams(hasOverheadLayer).map((mr) => (
                     <tr key={mr.key}>
                       <td
                         style={{
@@ -526,7 +538,7 @@ export default function ClientTimbreConsistency({
               Tonal Consistency Across Seats
             </div>
             <div style={{ fontSize: 13, color: "#3E4349", lineHeight: 1.5 }}>
-              Tonal balance consistency between screen and surround/overhead channels at each seating position.
+              {timbreChannelsCaption(hasOverheadLayer)}
             </div>
           </div>
         </div>

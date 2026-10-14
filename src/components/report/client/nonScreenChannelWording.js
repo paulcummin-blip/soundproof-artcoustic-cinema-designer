@@ -56,4 +56,13 @@ export function hasUpperChannelRole(speakerSplValues) {
     .some((value) => UPPER_ROLE_PREFIXES.some((prefix) => String(value?.role || '').toUpperCase().startsWith(prefix)));
 }
 
+/**
+ * The P13 page's fallback sentence, used only where no published explanation was
+ * carried: it states the same measure for the layer this design has, and is
+ * never an overhead claim for a system with no height speakers.
+ */
+export function p13ResultFallback(hasOverheadLayer) {
+  return `The ${nonScreenLayerNoun(hasOverheadLayer)} speakers maintain consistent impact and clarity across the listening area, preserving the immersion of demanding movie soundtracks at the reference seating position.`;
+}
+
 export default p13CapabilityExplanation;

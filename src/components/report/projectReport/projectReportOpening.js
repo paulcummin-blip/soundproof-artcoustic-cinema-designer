@@ -67,9 +67,9 @@ export function buildProjectReportOpening({
 
   const headline = architecture
     ? (display
-      ? `A ${compact}${architecture} cinema designed around ${display}`
+      ? `A ${compact}${architecture} cinema designed around a ${display}`
       : `A ${compact}${architecture} cinema`)
-    : (display ? `A ${compact}cinema designed around ${display}` : null);
+    : (display ? `A ${compact}cinema designed around a ${display}` : null);
 
   const supportingLine = [
     screenPhrase(projectDetails),

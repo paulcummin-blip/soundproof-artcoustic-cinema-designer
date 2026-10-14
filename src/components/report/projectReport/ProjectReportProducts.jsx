@@ -29,6 +29,21 @@ function modelLines(value) {
     .filter(Boolean);
 }
 
+/**
+ * The role a schedule row is stated under. The row's own canonical label is used
+ * as it stands, except where 'LCR' would imply one identical package across left,
+ * centre and right: where the screen channels are mixed models or role-specific
+ * cabinets, the row states the role instead — "Screen channels" — and the model
+ * column names each product it is specified for.
+ */
+function roleLabel(row) {
+  const area = String(row?.area || '');
+  const isScreenChannelRow = String(row?.key || '').toLowerCase() === 'lcr'
+    || area.toUpperCase() === 'LCR';
+  if (!isScreenChannelRow) return area;
+  return modelLines(row?.value).length > 1 ? 'Screen channels' : area;
+}
+
 export default function ProjectReportProducts({ rows = [], connections = {}, print = false }) {
   if (!Array.isArray(rows) || rows.length === 0) return null;
 
@@ -100,7 +115,7 @@ export default function ProjectReportProducts({ rows = [], connections = {}, pri
                 color: '#213428',
                 lineHeight: 1.4,
               }}>
-                {String(row.area || '').toUpperCase()}
+                {roleLabel(row).toUpperCase()}
               </div>
               <div style={{ flex: 1, minWidth: 0, ...cellStyle }}>
                 {models.length > 0

@@ -24,6 +24,7 @@ import PrintAcousticTreatmentContent from "@/components/report/client/print/Prin
 import ClientRecommendedSeatingPosition from "@/components/report/client/ClientRecommendedSeatingPosition";
 import ClientBestListeningArea from "@/components/report/client/ClientBestListeningArea";
 import ClientTimbreConsistency from "@/components/report/client/ClientTimbreConsistency";
+import { hasUpperChannelRole, p13ResultFallback, timbreChannelsCaption } from "@/components/report/client/nonScreenChannelWording";
 import ClientFrontSoundstageDynamicRange from "@/components/report/client/ClientFrontSoundstageDynamicRange";
 import ClientNonScreenDynamicRange from "@/components/report/client/ClientNonScreenDynamicRange";
 import ClientScreenSeating from "@/components/report/client/ClientScreenSeating";
@@ -245,6 +246,7 @@ export default function ClientReportPage({
                 screenFrontPlaneM={printData.screenFrontPlaneM}
                 screenWidthM={printData.screenWidthM}
                 counts={printData.counts}
+                hasOverheadLayer={printData.hasOverheadLayer === true}
                 print
                 printPart="drawing"
               />
@@ -257,6 +259,7 @@ export default function ClientReportPage({
                 screenFrontPlaneM={printData.screenFrontPlaneM}
                 screenWidthM={printData.screenWidthM}
                 counts={printData.counts}
+                hasOverheadLayer={printData.hasOverheadLayer === true}
                 print
                 printPart="support"
               />
@@ -265,7 +268,7 @@ export default function ClientReportPage({
               <div className="client-report-print-result__content">
                 <div className="client-report-print-result__label">Consistent Sound Across the Seats</div>
                 <div className="client-report-print-result__explanation">
-                  Tonal balance consistency between screen and surround/overhead channels at each seating position.
+                  {timbreChannelsCaption(printData.hasOverheadLayer)}
                 </div>
               </div>
             </div>
@@ -351,7 +354,7 @@ export default function ClientReportPage({
                 <div className="client-report-print-result__content">
                   <div className="client-report-print-result__label">{printData.resultHeading || "Surround Capability"}</div>
                   <div className="client-report-print-result__explanation">
-                    {printData.resultExplanation || "The surround and overhead speakers maintain consistent impact and clarity across the listening area, preserving the immersion of demanding movie soundtracks at the reference seating position."}
+                    {printData.resultExplanation || p13ResultFallback(hasUpperChannelRole(printData.speakerSplValues))}
                   </div>
                   <div className="client-report-print-result__supporting">
                     {printData.minimum?.formatted ?? "—"} minimum capability — RP22 Parameter 13
