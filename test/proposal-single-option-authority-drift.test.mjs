@@ -4,6 +4,7 @@ import assert from 'node:assert/strict';
 import { buildProposalEvidence } from '../base44/shared/proposalEvidence/proposalEvidenceBuilder.js';
 import { buildWriterInput } from '../base44/shared/proposalWriter/writerInputBuilder.js';
 import { validateWriterOutput } from '../base44/shared/proposalWriter/writerOutputValidator.js';
+import { buildWriterPrompt } from '../base44/shared/proposalWriter/writerPromptBuilder.js';
 import { WRITER_REJECTION } from '../base44/shared/proposalWriter/writerContractSchema.js';
 import { option, seatScopes } from './fixtures/proposalEvidenceFixtures.mjs';
 import { validDraft } from './fixtures/proposalWriterFixtures.mjs';
@@ -146,6 +147,17 @@ test('the six Marquee sentences are grounded by a strength story plus its precis
       `${example.section}: ${JSON.stringify(result.violations)}`,
     );
   }
+});
+
+test('a pack without a recommendation claim tells the writer to use judgement, not recommendation wording', () => {
+  const input = marqueeSingleOptionInput();
+  assert.equal(input.allowed_claims.some((entry) => entry.kind === 'recommendation'), false);
+  assert.match(input.editorial_rules.recommendation_authority, /pack carries no recommendation claim/i);
+  assert.match(input.editorial_rules.recommendation_authority, /Do not write recommend/i);
+
+  const prompt = buildWriterPrompt({ input });
+  assert.match(prompt, /RECOMMENDATION AUTHORITY: the pack carries no recommendation claim/);
+  assert.match(prompt, /Express professional judgement by explaining why the specified design suits the brief/);
 });
 
 test('descriptive recommended placement passes, but a real unsupported recommendation still fails', () => {
