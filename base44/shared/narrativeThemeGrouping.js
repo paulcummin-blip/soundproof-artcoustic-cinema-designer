@@ -291,7 +291,8 @@ export function themeClientTextIsSafe(text) {
 
 /* ── Building the themes from the classified evidence ────────────────────── */
 
-/** The public member shape: the evidence, with nothing internal but the role. */
+/** One member as the grouping reads it: the evidence, plus the role and weight the
+ *  classification already decided (used to choose a theme's role, never emitted). */
 function memberOf(row) {
   return {
     key: String(row.key),
@@ -299,11 +300,27 @@ function memberOf(row) {
     level: row.level ?? null,
     value: row.value ?? null,
     priority: row.priority,
-    role_label: PRIORITY_LABEL[row.priority] || null,
     weight: row.weight ?? null,
     seat_scope: row.seat_scope ?? SEAT_SCOPE.NONE,
     primary_seat_result: row.primary_seat_result ?? null,
     secondary_seat_result: row.secondary_seat_result ?? null,
+  };
+}
+
+/**
+ * The member as the writer reads it: THE EVIDENCE ONLY. No weight, no tier and no
+ * score travels to the writer — the ranking has already been applied — and the
+ * internal role vocabulary stays internal.
+ */
+function evidenceMember(member) {
+  return {
+    key: member.key,
+    parameter: member.parameter,
+    level: member.level,
+    value: member.value,
+    seat_scope: member.seat_scope,
+    primary_seat_result: member.primary_seat_result,
+    secondary_seat_result: member.secondary_seat_result,
   };
 }
 
@@ -482,8 +499,7 @@ export function buildClientStoryThemes({ rows = [], stories = [] } = {}) {
  * themes themselves per option. It states no figure of its own — every figure the
  * writer uses still comes from the frozen evidence and its own claims.
  */
-export function buildClientStoryThemeBlock({ rows = [], stories = [] } = {}) {
-  const { themes, silenced } = buildClientStoryThemes({ rows, stories });
+export function clientStoryThemeRules() {
   return {
     version: NARRATIVE_THEME_VERSION,
     rule: ONE_STORY_PER_THEME_RULE,
@@ -500,9 +516,24 @@ export function buildClientStoryThemeBlock({ rows = [], stories = [] } = {}) {
       vocabulary: [...facet.vocabulary],
     })),
     vocabulary: [...EXPERIENCE_THEMES[EXPERIENCE_THEME.BASS].vocabulary],
+    // Where the option's own themes are carried, so the rules and the evidence
+    // they govern are always read together.
+    field: 'evidence.options[].client_story_themes',
+    source: 'the canonical narrative theme grouping, over the same classified evidence as strength_stories',
+  };
+}
+
+/**
+ * The block the writer input carries: the rules the copy is held to and the
+ * themes of one evidence set. It states no figure of its own — every figure the
+ * writer uses still comes from the frozen evidence and its own claims.
+ */
+export function buildClientStoryThemeBlock({ rows = [], stories = [] } = {}) {
+  const { themes, silenced } = buildClientStoryThemes({ rows, stories });
+  return {
+    ...clientStoryThemeRules(),
     themes: themes.map((theme) => ({ ...theme })),
     silenced,
-    source: 'the canonical narrative theme grouping, over the same classified evidence as strength_stories',
   };
 }
 
