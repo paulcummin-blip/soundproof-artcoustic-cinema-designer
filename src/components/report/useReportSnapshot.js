@@ -54,6 +54,9 @@ export function useReportSnapshot({
   accountId = null,
   reportType = null,
   currentFingerprints = null,
+  // The version's publication moved past the saved report for presentation only
+  // (designIdentityComparison), so the design itself is unchanged.
+  samePhysicalDesign = null,
   payload = null,
   reportSource = null,
   ready = false,
@@ -120,8 +123,12 @@ export function useReportSnapshot({
   }, [projectId, versionId, reportType, currentFp.engineeringFingerprint]);
 
   const resolution = useMemo(
-    () => resolveSnapshotStatus({ saved, currentFingerprints: currentFp }),
-    [saved, currentFp],
+    () => resolveSnapshotStatus({
+      saved,
+      currentFingerprints: currentFp,
+      presentationOnlyMove: samePhysicalDesign === true,
+    }),
+    [saved, currentFp, samePhysicalDesign],
   );
 
   const persist = useCallback(async () => {

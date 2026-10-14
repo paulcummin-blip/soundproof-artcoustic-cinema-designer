@@ -56,6 +56,11 @@ import { readRequestedVersionId } from "@/components/report/reportVersionRequest
 import { deriveReportReadiness, REPORT_STATE } from "@/components/report/reportReadinessAuthority";
 import { useReportSnapshot } from "@/components/report/useReportSnapshot";
 import { useSavedReportFingerprint } from "@/components/report/useSavedReportFingerprint";
+import {
+  preparingKey,
+  preparingElapsedSeconds,
+  clearPreparingWindow,
+} from "@/components/report/reportPreparingClock";
 import useFrozenReportBass from '@/components/report/useFrozenReportBass';
 import ReportSnapshotBanner from "@/components/report/ReportSnapshotBanner";
 import ReportGateDiagnosticsPanel from "@/components/report/ReportGateDiagnosticsPanel";
@@ -330,12 +335,19 @@ export default function RP22ClientReport() {
   // or Failed. PDF export is enabled only in the Ready state, and Preparing is
   // bounded: it always resolves to a definite state instead of waiting
   // indefinitely.
+  // The wait is measured on the session's preparing clock for this project
+  // version, not on a counter that a re-render or a remount would restart. A
+  // report that cannot be prepared therefore always reaches Not Ready instead of
+  // waiting indefinitely.
+  const preparingWindowKey = preparingKey(projectId, requestedVersionId);
   const [stateSeconds, setStateSeconds] = React.useState(0);
 
   React.useEffect(() => {
-    const interval = setInterval(() => setStateSeconds((seconds) => seconds + 1), 1000);
+    const tick = () => setStateSeconds(preparingElapsedSeconds(preparingWindowKey));
+    tick();
+    const interval = setInterval(tick, 1000);
     return () => clearInterval(interval);
-  }, []);
+  }, [preparingWindowKey]);
 
   const priceSummary = authority.authoritySnapshot?.priceData || null;
 
@@ -605,6 +617,11 @@ export default function RP22ClientReport() {
 
   const reportReady = readiness.state === REPORT_STATE.READY;
 
+  // Leaving Preparing closes the window, so a later attempt measures its own wait.
+  React.useEffect(() => {
+    if (readiness.state !== REPORT_STATE.PREPARING) clearPreparingWindow(preparingWindowKey);
+  }, [readiness.state, preparingWindowKey]);
+
   // ── Saved report snapshot (Visual Report) ────────────────────────────────
   // Once this report is generated it is saved against the project version. A
   // later design change marks it as generated before the latest changes instead
@@ -643,6 +660,9 @@ export default function RP22ClientReport() {
     reportType: PROJECT_REPORT_SNAPSHOT_TYPE,
     currentFingerprints: { ...snapshotFingerprints,
       engineeringFingerprint: savedReport.currentFingerprint || snapshotFingerprints.engineeringFingerprint },
+    // The version's publication moved past this saved report for presentation
+    // only, so the design itself is unchanged and the report is not out of date.
+    samePhysicalDesign: savedReport.presentationOnlyMove === true,
     payload: snapshotPayload,
     reportSource: { project: projectDetails, engineeringSummary, app: appState,
       presentation: { seatingPositions, placedSpeakers, priceData: authority.authoritySnapshot?.priceData } },

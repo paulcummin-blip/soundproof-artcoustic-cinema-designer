@@ -195,4 +195,36 @@ export function displayPhrase(source) {
   return formatDisplayPhrase({ widthInches: size, aspectRatio });
 }
 
+/**
+ * THE derived display identity of a screen: which display it is PRESENTED as.
+ *
+ * It is resolved from the design's own physical facts — a TV preset, a saved TV
+ * width, a declared manual display type — every time a design is hydrated, and it
+ * is presentation only. It is therefore never part of an engineering fingerprint
+ * and never part of a design-identity comparison: a wording change, or a revision
+ * of this authority, can never make an unchanged design read as changed.
+ */
+export const DERIVED_DISPLAY_IDENTITY_KEYS = Object.freeze([
+  'displayType',
+  'display_type',
+  'displayLabel',
+  'display_label',
+  'displayPhrase',
+  'display_phrase',
+]);
+
+/**
+ * A screen's facts with its derived display identity removed, at the screen's own
+ * top level only. A declared manual display type (`manualSize.displayType`) is the
+ * designer's own choice about a physical display and is left exactly as it stands.
+ */
+export function withoutDerivedDisplayIdentity(screen) {
+  if (!screen || typeof screen !== 'object') return screen ?? null;
+  const facts = { ...screen };
+  for (const key of DERIVED_DISPLAY_IDENTITY_KEYS) {
+    if (key in facts) delete facts[key];
+  }
+  return facts;
+}
+
 export default resolveDisplayType;

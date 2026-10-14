@@ -175,12 +175,20 @@ export function shouldRefreshEvidence({ saved = null, status = null, hasEvidence
   return status === REPORT_SNAPSHOT_STATUS.CURRENT;
 }
 
-export function resolveSnapshotStatus({ saved = null, currentFingerprints = null } = {}) {
+export function resolveSnapshotStatus({
+  saved = null,
+  currentFingerprints = null,
+  // Stated by the caller from the two publications' own frozen physical facts
+  // (designIdentityComparison): the version's engineering publication moved past
+  // this saved report WITHOUT the design changing.
+  presentationOnlyMove = false,
+} = {}) {
   if (!isSnapshotRestorable(saved)) {
     return {
       restorable: false,
       status: REPORT_SNAPSHOT_STATUS.NONE,
       changedKeys: [],
+      presentationOnlyMove: false,
       generatedAt: null,
       generatedBy: null,
     };
@@ -188,10 +196,21 @@ export function resolveSnapshotStatus({ saved = null, currentFingerprints = null
 
   const { changed } = compareSourceFingerprints(saved.source_fingerprints, currentFingerprints);
 
+  // A move of the engineering publication ALONE, with the version's physical
+  // design stated identically on both sides, is a presentation move: a display
+  // or wording authority revision, not a design change. The saved report states
+  // the design it always stated, so it is not out of date and nothing is asked
+  // of the designer. A bass or seating-priority change is never excused this way.
+  const excused = presentationOnlyMove === true
+    && changed.length > 0
+    && changed.every((key) => key === 'engineeringFingerprint');
+  const effectiveChange = excused ? [] : changed;
+
   return {
     restorable: true,
-    status: changed.length > 0 ? REPORT_SNAPSHOT_STATUS.STALE : REPORT_SNAPSHOT_STATUS.CURRENT,
-    changedKeys: changed,
+    status: effectiveChange.length > 0 ? REPORT_SNAPSHOT_STATUS.STALE : REPORT_SNAPSHOT_STATUS.CURRENT,
+    changedKeys: effectiveChange,
+    presentationOnlyMove: excused,
     generatedAt: saved.generated_at || null,
     generatedBy: saved.generated_by || null,
   };

@@ -36,6 +36,7 @@
  */
 
 import { screenEngineeringFacts } from '@/components/models/screen/resolveEffectiveScreen';
+import { withoutDerivedDisplayIdentity } from '@/components/models/screen/displayTypeAuthority';
 
 export const ENGINEERING_FINGERPRINT_VERSION = 1;
 
@@ -50,7 +51,9 @@ function num(v, decimals = 6) {
   return Math.round(n * factor) / factor;
 }
 
-function stableStringify(value) {
+/** THE canonical serialization of a design-identity fact set. Exported so every
+ *  design-identity comparison serializes facts exactly as the hash does. */
+export function stableStringify(value) {
   if (value === null || value === undefined) return "null";
   if (typeof value === "boolean") return value ? "true" : "false";
   if (typeof value === "number") return Number.isFinite(value) ? String(value) : "null";
@@ -240,10 +243,17 @@ export function computeEngineeringFingerprint(designState, versions = {}) {
     ...(v.publicationContractVersion ? {
       publicationContractVersion: v.publicationContractVersion,
       publicationBassFingerprint: v.bassFingerprint,
-      // Frozen report facts, with the screen's inactive branch stated canonically.
-      // The rest of the design state is hashed exactly as it stands, and the
-      // screen key is only replaced when the design actually states a screen.
-      frozenReportFacts: screenFacts ? { ...ds, screen: screenFacts } : ds,
+      // Frozen report facts, with the screen's inactive branch stated canonically
+      // and the screen's DERIVED display identity removed. Which display a screen
+      // is presented as is presentation, not physical design — it is re-resolved
+      // from the screen's own physical facts on every hydration, and hashing it
+      // is what let a display-authority revision move the identity of a design
+      // the designer had not touched. The rest of the design state is hashed
+      // exactly as it stands, and the screen key is only replaced when the design
+      // actually states a screen.
+      frozenReportFacts: screenFacts
+        ? { ...ds, screen: withoutDerivedDisplayIdentity(screenFacts) }
+        : ds,
     } : {}),
 
     // Room geometry
