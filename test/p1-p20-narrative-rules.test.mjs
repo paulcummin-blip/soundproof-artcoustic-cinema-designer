@@ -136,9 +136,9 @@ test('P20 primary L3 with weaker secondary seats: promoted for the PRIMARY seati
   const l2 = p20NarrativePriority({ allLevel: 'L1', primaryLevel: 'L2', split: true });
   assert.equal(l2.priority, NARRATIVE_PRIORITY.WORTH_MENTIONING);
   assert.equal(l2.seat_scope, SEAT_SCOPE.PRIMARY);
-  assert.match(
+  assert.equal(
     p20ConsistencyPhrase({ level: 'L2', scope: SEAT_SCOPE.PRIMARY }),
-    /^The primary seats achieve good bass consistency, helping the low-frequency balance remain much more even across the main listening positions\.$/,
+    'The primary seats achieve good bass consistency, helping the low-frequency balance remain much more even across the main listening positions.',
   );
 });
 
@@ -156,9 +156,9 @@ test('P20 all assessed seats at L2 or better: a strong candidate, worded at its 
     const p20 = rows.find((entry) => entry.key === 'p20');
     assert.equal(p20.seat_scope, SEAT_SCOPE.ALL, level);
     assert.equal(p20.priority, priority, level);
+    assert.equal(p20.level, level, level);
     assert.equal(phraseAfterRelevance({ key: 'p20', level, priority, seatScope: p20.seat_scope }), sentence, level);
     assert.equal(p20WordingIsScopeSafe(sentence, SEAT_SCOPE.ALL), true, level);
-    assert.equal(p20.seat_scope === SEAT_SCOPE.ALL && p20.level, level);
   }
   // L3 and above read as a lead; the whole seating is stated, not a single seat.
   assert.ok(narrativeCandidateRows(rowsFor(p20Summary(['L3'], ['L3'])).rows).some((entry) => entry.key === 'p20'));
@@ -183,8 +183,7 @@ test('P1 in a dedicated cinema: available as DESIGN RATIONALE, in plain client l
   assert.ok(!narrativeCandidateRows(rows).some((entry) => entry.key === 'p1'));
   assert.deepEqual(designRationaleRows(rows).map((entry) => entry.key), ['p1']);
 
-  // The rationale is available as evidence-backed explanation too: the row still
-  // states its own published result beside it.
+  // Its own published result is still stated beside the explanation.
   assert.equal(p1.level, 'L3');
   assert.equal(p1.value, '1.4 m');
 });
@@ -195,13 +194,12 @@ test('P1 relevance comes from the design decision, not from its level', () => {
     const p1 = rows.find((entry) => entry.key === 'p1');
     assert.equal(p1.priority, NARRATIVE_PRIORITY.DESIGN_RATIONALE, level);
     assert.equal(phraseAfterRelevance({ key: 'p1', level, priority: p1.priority }), p1RationalePhrase(p1.priority), level);
-    // No level-specific celebration creeps in: the same rationale, at every level.
+    // No level-specific celebration creeps in: the same rationale at every level.
     assert.ok(!/exceptional|flagship|outstanding/i.test(phraseAfterRelevance({ key: 'p1', level, priority: p1.priority })), level);
   }
   // A design that states no seating arrangement has nothing to explain.
   const { rows } = rowsFor(summaryOf([row(1, 'L3')]), { design: { ...CINEMA.design, seats: 0 } });
-  const p1 = rows.find((entry) => entry.key === 'p1');
-  assert.equal(p1.priority, NARRATIVE_PRIORITY.TECHNICAL_ONLY);
+  assert.equal(rows.find((entry) => entry.key === 'p1').priority, NARRATIVE_PRIORITY.TECHNICAL_ONLY);
 });
 
 /* ── 6 · the seating steer silences the whole seating narrative ───────────── */
@@ -240,30 +238,30 @@ test('seating do-not-discuss suppresses P1, the rationale and the seat-scope dis
 /* ── 7 · technical evidence is untouched, always ─────────────────────────── */
 
 test('no rule above changes a published result, a weight or a contribution', () => {
-  const parameters = [
+  const summary = summaryOf([
     row(1, 'L2', { value: '1.2 m' }),
+    row(14, 'L3', { value: '118 dBC' }),
     row(18, 'L3', { value: '30 Hz' }),
     row(19, 'L4', { value: '±1 dB' }),
     row(20, null, { scope: 'seat', seats: [['r1c1', 'L2', 'primary'], ['r2c1', 'L1', 'secondary']] }),
-    row(14, 'L3', { value: '118 dBC' }),
-  ];
-  const summary = summaryOf(parameters);
+  ]);
   const before = JSON.stringify(summary);
   const { rows } = rowsFor(summary);
 
-  for (const [parameter_id, level] of [[1, 'L2'], [18, 'L3'], [19, 'L4'], [14, 'L3']]) {
+  for (const [parameter_id, level] of [[1, 'L2'], [14, 'L3'], [18, 'L3'], [19, 'L4']]) {
     const entry = rows.find((item) => item.key === `p${parameter_id}`);
     assert.equal(entry.level, level, `P${parameter_id}`);
     assert.equal(entry.weight, PARAM_WEIGHTS[`p${parameter_id}`], `P${parameter_id}`);
     assert.ok(entry.contribution > 0, `P${parameter_id}`);
   }
+
   // P20's governed result is the weakest assessed seat, and both seat results are
-  // still reported beside it.
+  // still reported beside it: the primary seats are the only place it may be claimed.
   const p20 = rows.find((item) => item.key === 'p20');
   assert.equal(p20.level, 'L1');
   assert.equal(p20.primary_seat_result, 'L2');
   assert.equal(p20.secondary_seat_result, 'L1');
-  assert.equal(p20.seat_scope, SEAT_SCOPE.ALL === p20.seat_scope ? p20.seat_scope : p20.seat_scope);
+  assert.equal(p20.seat_scope, SEAT_SCOPE.PRIMARY);
   assert.equal(JSON.stringify(summary), before, 'the classification must not touch the evidence');
 });
 

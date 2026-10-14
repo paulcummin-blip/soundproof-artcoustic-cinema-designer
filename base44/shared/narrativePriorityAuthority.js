@@ -353,7 +353,10 @@ function titleOf(summary, id) {
  * @param {string} [input.briefText] — the designer's own brief
  * @param {Object} [input.design] — what the design contains
  * @param {Array<string>} [input.excludedKeys] — parameters the designer excluded
- * @returns {{rows: Array<Object>, byKey: Object, brief: Object}}
+ * @param {Array<string>} [input.excludedTopics] — the steering topics the designer
+ *   marked do-not-discuss; a seating topic silences the whole seating narrative
+ * @param {Array<string>} [input.suppressedAreas] — areas the steering silences
+ * @returns {{rows: Array<Object>, byKey: Object, brief: Object, suppressedAreas: Array<string>}}
  */
 export function buildNarrativePriorityRows({
   summary = null,
@@ -362,6 +365,8 @@ export function buildNarrativePriorityRows({
   briefText = '',
   design = {},
   excludedKeys = [],
+  excludedTopics = [],
+  suppressedAreas = [],
 } = {}) {
   const evidence = collectEligibleEvidence(summary);
   const brief = readBriefRelevance({ intent, subjects, briefText, design });
@@ -482,6 +487,22 @@ export const TOPIC_NARRATIVE_SUBJECT = Object.freeze({
   channel_count: { area: 'loudspeaker_configuration', keys: [] },
   documented_constraint: { area: 'documented_constraint', keys: [] },
 });
+
+/**
+ * The narrative areas a set of steering topics silences. A seating topic silences
+ * the client-experience area, which is what suppresses the P1 seating narrative,
+ * the seating-position rationale, the clearance explanation, the primary/secondary
+ * seat discussion and the seating geometry together — the case the steer exists
+ * for, where the Sound Proof seat model does not describe the client's seating.
+ */
+export function suppressedAreasFromTopics(topicKeys = []) {
+  const areas = new Set();
+  for (const topicKey of (Array.isArray(topicKeys) ? topicKeys : [])) {
+    const subject = TOPIC_NARRATIVE_SUBJECT[String(topicKey)] || null;
+    if (subject?.area) areas.add(subject.area);
+  }
+  return [...areas];
+}
 
 /**
  * The narrative class of a steer topic, from the evidence behind it and this
