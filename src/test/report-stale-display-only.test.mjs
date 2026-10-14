@@ -185,6 +185,34 @@ describe('C. the saved report is not marked out of date', () => {
   });
 });
 
+describe('G. proposal readiness and the report page judge a presentation-only move the same way', () => {
+  it('the readiness table states the verdict it applied', () => {
+    const hook = readFileSync(
+      new URL('../components/proposal/sourceAuthority/useProposalReadiness.js', import.meta.url),
+      'utf8',
+    );
+    expect(hook).toContain('presentationOnlyMove: presentationOnlyByVersionId.get(versionId) === true');
+    expect(hook).toContain('engineeringDifferenceIsPresentationOnly');
+  });
+
+  it('the readiness authority judges the evidence against the frozen authority only when excused', () => {
+    const authority = readFileSync(
+      new URL('../components/proposal/sourceAuthority/proposalReadinessAuthority.js', import.meta.url),
+      'utf8',
+    );
+    expect(authority).toContain('const excused = presentationOnlyMove === true && engineeringMoveOnly');
+    expect(authority).toContain('sourceFingerprint: excused');
+  });
+
+  it('the report page judges stored evidence against its own frozen authority only when excused', () => {
+    const hook = readFileSync(new URL('../components/report/useReportSnapshot.js', import.meta.url), 'utf8');
+    expect(hook).toContain(
+      'const evidenceBasisFingerprint = samePhysicalDesign === true && frozenAuthorityFingerprint',
+    );
+    expect(hook).toContain('sourceFingerprint: evidenceBasisFingerprint');
+  });
+});
+
 describe('E. both report pages take the same verdict from the same authority', () => {
   const source = (path) => readFileSync(new URL(path, import.meta.url), 'utf8');
 

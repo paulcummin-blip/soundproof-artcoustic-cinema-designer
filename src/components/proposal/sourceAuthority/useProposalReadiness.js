@@ -41,6 +41,7 @@ import { readProjectAnalysisCacheRecord } from '@/components/state/projectReadCa
 import { subscribeReportSourceStored } from './reportSourceSignal';
 import { selectCanonicalReportSnapshotsByKey } from '@/components/report/reportSnapshotCanonical';
 import { selectCanonicalVersions } from '@/lib/canonicalVersionSelection';
+import { engineeringDifferenceIsPresentationOnly } from '@/components/report/designIdentityComparison';
 import {
   resolveCalculationAuthority,
   resolveSavedReportCell,
@@ -136,6 +137,31 @@ export function useProposalReadiness({ projectId = null, versionIds = [] } = {})
         });
 
         const liveSeatPriorityFingerprint = readSeatPriorityFingerprint(projectId);
+
+        // Whether each version's publication moved past its saved Project Report
+        // for PRESENTATION ONLY, decided from the two publications' own frozen
+        // physical facts (designIdentityComparison) — the same verdict the report
+        // page applies, so the Library, the readiness table and the report page
+        // can never disagree about one saved report. Asked only where a saved
+        // report's frozen authority and the version's current publication actually
+        // differ; any doubt answers false and the strict verdict stands.
+        const presentationOnlyByVersionId = new Map();
+        await Promise.all(ids.map(async (versionId, index) => {
+          const savedReport = savedByKey.get(`${versionId}::project`) || null;
+          const frozenFingerprint = savedReport?.source_fingerprints?.engineeringFingerprint || null;
+          const currentPublication = durableReads[index]?.publication || null;
+          if (!frozenFingerprint || !currentPublication) return;
+          if (frozenFingerprint === currentPublication.engineering_fingerprint) return;
+          const frozenRead = await fetchDurablePublication(projectId, versionId, {
+            engineeringFingerprint: frozenFingerprint,
+          });
+          presentationOnlyByVersionId.set(
+            versionId,
+            engineeringDifferenceIsPresentationOnly(frozenRead?.publication, currentPublication),
+          );
+        }));
+        if (cancelled) return;
+
         const nextRows = ids.map((versionId, index) => {
           const version = versionsById.get(versionId) || null;
           const durable = durableReads[index] || null;
@@ -182,7 +208,11 @@ export function useProposalReadiness({ projectId = null, versionIds = [] } = {})
             versionName: versionDisplayName(version || { version_number: index + 1 }),
             versionNumber: version?.version_number ?? index + 1,
             cells: {
-              project: resolveSavedReportCell({ saved: savedProjectReport, currentFingerprints }),
+              project: resolveSavedReportCell({
+                saved: savedProjectReport,
+                currentFingerprints,
+                presentationOnlyMove: presentationOnlyByVersionId.get(versionId) === true,
+              }),
             },
           });
           // Two further facts, taken from the SAME reads that decided this row: the

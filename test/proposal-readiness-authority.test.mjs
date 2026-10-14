@@ -613,6 +613,66 @@ test('16. the calculation authority takes the Project Report, and both sides agr
   assert.equal(buildReadinessCell({ state: READINESS_STATE.CURRENT }).status, 'Current');
 });
 
+// ── 12. A presentation-only publication move ────────────────────────────────
+// The version's publication moved past the saved Project Report, and the two
+// publications state the same physical design — only the way it is presented
+// moved. The report is not out of date and asks nothing of the designer. The
+// verdict is stated by the caller, which is the only party that holds both
+// publications; every other answer keeps the strict verdict.
+
+test('12. a presentation-only move clears the cell, and only a presentation-only move', () => {
+  const movedForPresentation = {
+    ...CURRENT_FINGERPRINTS,
+    engineeringFingerprint: 'eng:v1:display-identity-only-move',
+  };
+
+  for (const cell of [sharedSavedReportCell, clientSavedReportCell]) {
+    // Stated: the design is unchanged, so the report is Current.
+    assert.equal(cell({
+      saved: CURRENT_REPORT,
+      currentFingerprints: movedForPresentation,
+      presentationOnlyMove: true,
+    }).state, READINESS_STATE.CURRENT);
+
+    // Not stated: the strict verdict stands, exactly as before this input existed.
+    assert.equal(cell({
+      saved: CURRENT_REPORT,
+      currentFingerprints: movedForPresentation,
+    }).state, READINESS_STATE.STALE);
+
+    // A bass assessment that moved beside it is never excused.
+    assert.equal(cell({
+      saved: CURRENT_REPORT,
+      currentFingerprints: { ...movedForPresentation, calculationFingerprint: 'cal:v8:moved-on' },
+      presentationOnlyMove: true,
+    }).state, READINESS_STATE.STALE);
+
+    // A seating-priority change beside it is never excused either.
+    assert.equal(cell({
+      saved: CURRENT_REPORT,
+      currentFingerprints: { ...movedForPresentation, seatPriorityFingerprint: 'seat:changed' },
+      presentationOnlyMove: true,
+    }).state, READINESS_STATE.STALE);
+
+    // A report already marked out of date is not made current by the verdict.
+    assert.equal(cell({
+      saved: savedProjectReport({ evidence: projectEvidence(), status: 'stale' }),
+      currentFingerprints: movedForPresentation,
+      presentationOnlyMove: true,
+    }).state, READINESS_STATE.STALE);
+  }
+
+  // The evidence still has to be complete: the verdict excuses the publication
+  // move, never a missing fact.
+  for (const cell of [sharedSavedReportCell, clientSavedReportCell]) {
+    assert.equal(cell({
+      saved: savedProjectReport({ evidence: null }),
+      currentFingerprints: movedForPresentation,
+      presentationOnlyMove: true,
+    }).state, READINESS_STATE.INCOMPLETE);
+  }
+});
+
 // ── Report ─────────────────────────────────────────────────────────────────
 
 const failures = results.filter((line) => line.startsWith('FAIL'));

@@ -327,9 +327,17 @@ export function useReportSnapshot({
   // from the SAVED report itself, so a report whose parity check failed shows as
   // incomplete the moment it is opened — not only after a save in this session.
   const storedEvidence = readStoredEvidence(saved);
+  // The evidence states the design it was frozen against. While the version's
+  // publication has moved past this report for presentation only
+  // (designIdentityComparison), its own frozen authority IS the design, so the
+  // evidence is judged against it rather than against a wording revision.
+  const frozenAuthorityFingerprint = saved?.source_fingerprints?.engineeringFingerprint || null;
+  const evidenceBasisFingerprint = samePhysicalDesign === true && frozenAuthorityFingerprint
+    ? frozenAuthorityFingerprint
+    : currentFp.engineeringFingerprint;
   const storedValidation = validateReportEvidence(storedEvidence, reportType, {
-    projectId, versionId, snapshotFingerprint: saved?.source_fingerprints?.engineeringFingerprint,
-    sourceFingerprint: currentFp.engineeringFingerprint,
+    projectId, versionId, snapshotFingerprint: frozenAuthorityFingerprint,
+    sourceFingerprint: evidenceBasisFingerprint,
   });
   const evidenceIncompleteNow = saved ? !storedValidation.complete : evidenceIncomplete;
 

@@ -281,7 +281,14 @@ export function isSavedReportRestorable(snapshot) {
 }
 
 /** One saved Project Report → its readiness cell. */
-export function resolveSavedReportCell({ saved = null, currentFingerprints = null } = {}) {
+export function resolveSavedReportCell({
+  saved = null,
+  currentFingerprints = null,
+  // Stated by the caller from the two publications' own frozen physical facts
+  // (designIdentityComparison): the version's engineering publication moved past
+  // this saved report WITHOUT the design changing.
+  presentationOnlyMove = false,
+} = {}) {
   // No saved Project Report for this version: genuinely Not generated.
   if (!isSavedReportRestorable(saved)) {
     return buildReadinessCell({ state: READINESS_STATE.MISSING });
@@ -291,7 +298,15 @@ export function resolveSavedReportCell({ saved = null, currentFingerprints = nul
     return buildReadinessCell({ state: READINESS_STATE.STALE, generatedAt: saved.generated_at || null });
   }
   const { changed } = compareSourceFingerprints(saved.source_fingerprints, currentFingerprints);
-  if (changed.length > 0) {
+  // A move of the engineering publication ALONE, with the version's physical
+  // design stated identically on both sides, is a presentation move: a display or
+  // wording authority revision, not a design change. The report states the design
+  // it always stated, so it is not out of date. A bass or seating-priority change
+  // is never excused this way.
+  const engineeringMoveOnly = changed.length > 0
+    && changed.every((key) => key === 'engineeringFingerprint');
+  const excused = presentationOnlyMove === true && engineeringMoveOnly;
+  if (changed.length > 0 && !excused) {
     return buildReadinessCell({ state: READINESS_STATE.STALE, generatedAt: saved.generated_at || null });
   }
   // The evidence is stored, but it does not agree with what the report shows —
@@ -301,7 +316,12 @@ export function resolveSavedReportCell({ saved = null, currentFingerprints = nul
   const completeness = validateReportEvidence(evidence, saved.report_type, {
     projectId: saved.project_id, versionId: saved.version_id,
     snapshotFingerprint: saved.source_fingerprints?.engineeringFingerprint,
-    sourceFingerprint: currentFingerprints?.engineeringFingerprint,
+    // The evidence states the design it was frozen against. While the version's
+    // publication has moved past that report for presentation only, its own
+    // frozen authority IS the design, so the evidence is judged against it.
+    sourceFingerprint: excused
+      ? saved.source_fingerprints?.engineeringFingerprint
+      : currentFingerprints?.engineeringFingerprint,
   });
   if (completeness.complete && evidence?.proposal_ready === true && saved.payload?.evidence_parity?.proposal_ready !== false) {
     return buildReadinessCell({ state: READINESS_STATE.CURRENT, generatedAt: saved.generated_at || null });

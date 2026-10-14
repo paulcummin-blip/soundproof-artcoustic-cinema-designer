@@ -156,8 +156,9 @@ test('staleness is the published fingerprint, never a version record modified ti
 test('the readiness table judges a report by fingerprints, never by a modified time', () => {
   assert.match(
     READINESS_HOOK,
-    /resolveSavedReportCell\(\{ saved: savedProjectReport, currentFingerprints \}\)/,
-    'the table delegates the fingerprint verdict to the shared Project Report authority',
+    /resolveSavedReportCell\(\{\s*saved: savedProjectReport,\s*currentFingerprints,\s*presentationOnlyMove: presentationOnlyByVersionId\.get\(versionId\)/,
+    'the table delegates the fingerprint verdict to the shared Project Report authority, '
+    + 'stating the presentation-only move it applied',
   );
   assert.doesNotMatch(READINESS_HOOK, /updated_date/, 'a record modified time never decides readiness');
 });
