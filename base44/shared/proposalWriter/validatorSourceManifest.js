@@ -26,7 +26,7 @@ export const VALIDATOR_SOURCE_MANIFEST = Object.freeze({
   // mechanism that produces it. It states the instruction the writer reads and the
   // phrasing the narrative sanitizer removes, so a draft can always be traced to the
   // exact register it was written and read under.
-  'base44/shared/clientNarrativeRegister.js': '426c3ea7aa6f0132e65277eda500d8eae404ed389cfdeca623546ca3cecc4ccd',
+  'base44/shared/clientNarrativeRegister.js': '2237b16b2ea5f20852a3b2c5c3a7aff8aecb35985259506d9434947753494301',
   // The Design Summary brief for a TV media room: it states the requirement and
   // the word limit the section is written and validated under, so a draft can be
   // traced to the exact brief it was read against.

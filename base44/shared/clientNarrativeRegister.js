@@ -145,7 +145,10 @@ function withoutCommentaryClauses(sentence) {
   }
   if (!removed) return out;
   const kept = out.replace(/[ \t]{2,}/g, ' ').replace(/[ \t]+([.!?,;:])/g, '$1').trim();
-  return countWords(kept) >= 5 ? kept : null;
+  // What is left has to still read as a sentence of its own: enough words, and its
+  // own subject rather than a verb phrase left behind when a clause that opened the
+  // sentence was removed.
+  return countWords(kept) >= 5 && /^[A-Z0-9"'(]/.test(kept) ? kept : null;
 }
 
 /** Rewrite one text run (never crossing a tag): every sentence is read on its own. */
