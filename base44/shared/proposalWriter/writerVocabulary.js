@@ -452,13 +452,6 @@ export function equivalenceAssertion(text) {
 const RESULT_WORDS = /\b(?:achieves?|reaches?|delivers?|scores?|records?|measured|shows?|performs?|remains?|states?)\b/i;
 const RECOMMEND_WORDS = /\b(?:recommend\w*|we would choose|best choice|the better option|stronger option|stronger recommendation)\b/i;
 
-// Canonical placement evidence describes speakers as being within recommended
-// geometry/positions/zones. That adjective reports a measured result; it is not a
-// new instruction to the client. Keep the exemption deliberately narrow so
-// imperative copy such as "we recommend..." remains guarded.
-const DESCRIPTIVE_RECOMMENDED_PLACEMENT = /\brecommended\s+(?:geometry|positions?|zones?|locations?|placement|(?:angular|deviation)\s+limits?)\b/gi;
-const DESCRIPTIVE_PROJECT_RECOMMENDATION = /\bour\s+recommendation\s+(?:(?:centres|focuses|rests)\s+on|brings)\b/gi;
-
 /** What a sentence asserts, or null when it asserts nothing. */
 export function assertionKind(text) {
   if (typeof text !== 'string' || text.length === 0) return null;
@@ -474,10 +467,7 @@ export function assertionKind(text) {
 
 /** Whether a sentence offers a recommendation. */
 export function isRecommendation(text) {
-  const instruction = String(text || '')
-    .replace(DESCRIPTIVE_RECOMMENDED_PLACEMENT, ' ')
-    .replace(DESCRIPTIVE_PROJECT_RECOMMENDATION, ' ');
-  return RECOMMEND_WORDS.test(instruction);
+  return RECOMMEND_WORDS.test(String(text || ''));
 }
 
 /* ── Scoped seat-group claims ──────────────────────────────────────────────── */

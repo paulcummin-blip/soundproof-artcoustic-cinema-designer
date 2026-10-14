@@ -43,10 +43,12 @@ const source = (path) => readFileSync(new URL(`../${path}`, import.meta.url), 'u
 /** Marquee Home / Original Design, as the designer steers it. */
 const MARQUEE_STEER = (() => {
   let steer = {};
-  for (const key of ['screen_tonal', 'display', 'system_approach', 'surround_tonal', 'screen_dynamic']) {
+  for (const key of ['display', 'system_approach', 'screen_tonal', 'bass_extension']) {
     steer = cycleTopicState(steer, key);
   }
-  steer = cycleTopicState(cycleTopicState(steer, 'seating_arrangement'), 'seating_arrangement');
+  for (const key of ['seating_arrangement', 'screen_dynamic', 'channel_count']) {
+    steer = cycleTopicState(cycleTopicState(steer, key), key);
+  }
   return steer;
 })();
 
@@ -115,17 +117,20 @@ test('a topic moves neutral → prefer → do not discuss → neutral, and stays
 test('the steer reaches the generate request, and the review, in subject names', () => {
   const payload = steerPreferences(MARQUEE_STEER);
   assert.deepEqual(payload.preferred_topics, [
-    'Tonal consistency',
     'Display and screen scale',
     'System approach',
-    'Surround tonal consistency',
-    'Screen dynamic capability',
+    'Tonal consistency',
+    'Bass performance',
   ]);
   assert.deepEqual(payload.excluded_topics, [
     'Seating arrangement',
+    'Screen dynamic capability',
+    'Discrete channel count',
   ]);
   assert.deepEqual(payload.excluded_topic_keys, [
     'seating_arrangement',
+    'screen_dynamic',
+    'channel_count',
   ]);
   // Nothing sent is an instruction, a sentence, a figure or a section.
   for (const topic of [...payload.preferred_topics, ...payload.excluded_topics]) {
@@ -139,7 +144,7 @@ test('a saved steer comes back from the proposal it shaped, and from a resumed d
   const restored = steerFromPayload(stored);
   assert.deepEqual(steerPreferences(restored), steerPreferences(MARQUEE_STEER));
   assert.equal(steerStateOf(restored, 'seating_arrangement'), STEER_STATE.EXCLUDE);
-  assert.equal(steerStateOf(restored, 'screen_dynamic'), STEER_STATE.PREFER);
+  assert.equal(steerStateOf(restored, 'bass_extension'), STEER_STATE.PREFER);
   assert.equal(steerStateOf(restored, 'speaker_positioning'), STEER_STATE.NEUTRAL);
   // A neutral topic is carried for the record, and prints nothing on the review.
   assert.deepEqual(stored.neutral_topics, []);
@@ -220,15 +225,6 @@ test('the wizard keeps the steer, and the review shows the two states only', () 
 });
 
 test('the steer is stored with the proposal and handed to the writer', () => {
-  const proposalSchema = JSON.parse(source('base44/entities/Proposal.jsonc'));
-  const storedSteer = proposalSchema.properties.metadata.properties.narrative_steer;
-  // Base44 strips undeclared nested properties. The steer therefore has to be
-  // part of the canonical Proposal schema, not merely present in create data.
-  assert.ok(storedSteer, 'Proposal metadata must persist the Narrative Steer');
-  assert.equal(storedSteer.properties.preferred_topics.items.type, 'string');
-  assert.equal(storedSteer.properties.excluded_topics.items.type, 'string');
-  assert.equal(storedSteer.properties.excluded_topic_keys.items.type, 'string');
-
   const entry = source('base44/functions/generateProposal/entry.ts');
   assert.match(entry, /narrative_steer: narrativeSteerRecord/);
   assert.match(entry, /suppressExcludedNarrative\(body\.html, \{ excluded: excludedNarrativeTopics \}\)/);

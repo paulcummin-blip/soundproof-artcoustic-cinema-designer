@@ -78,7 +78,6 @@ Deno.serve(async (req: Request) => {
       return json(403, { ok: false, reason: 'PORTAL_TARGET_MISMATCH' });
     }
 
-    // Re-sync this function with the verified Partner Portal binding adapter.
     const result = await consumePilotPortalLaunch(base44, user, launchPass, {
       associateDealerIdentity: () => associateDealerIdentityCore(base44, user.id),
     });

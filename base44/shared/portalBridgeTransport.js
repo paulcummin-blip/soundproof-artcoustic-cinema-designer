@@ -97,20 +97,6 @@ function configuredBridgeUrl(override) {
   return endpoint.toString();
 }
 
-// The Partner Portal emits canonical external_* contract names. Map only those
-// verified fields into the names used by Sound Proof's existing binding gates.
-// Missing values remain undefined and are rejected by those gates.
-export function normalisePortalBinding(binding) {
-  return {
-    target: binding?.target,
-    user_id: binding?.external_subject,
-    session_id: binding?.portal_session_id,
-    profile_id: binding?.partner_profile_id,
-    account_name: binding?.account_name,
-    expires_at: binding?.binding_expires_at,
-  };
-}
-
 export async function callBridge(base44, base44UserId, body, bridgeUrl) {
   const token = await providerIdToken(base44, base44UserId);
   const response = await fetch(configuredBridgeUrl(bridgeUrl), {
@@ -125,5 +111,5 @@ export async function callBridge(base44, base44UserId, body, bridgeUrl) {
   if (!response.ok || payload?.ok !== true || !payload?.binding) {
     throw new Error('PORTAL_SESSION_REJECTED');
   }
-  return normalisePortalBinding(payload.binding);
+  return payload.binding;
 }
