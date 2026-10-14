@@ -20,10 +20,10 @@ import { comparisonSectionMetadata, verifyComparisonPersisted } from '../../shar
 import { formatInterpretationForLog } from '../../shared/adiProjectInterpretation.js';
 import { normaliseClarificationAnswers } from '../../shared/proposalClarification/clarificationAnswers.js';
 import { loadCacheRecord, findPublication } from '../../shared/publishedEngineeringAuthority.js';
-// The one presentation-only verdict, shared with the report-evidence reader: a
-// publication that moved past a saved report without changing the physical design
-// is not a design change, and must not read as one on any path of this gate.
-import { engineeringMoveIsPresentationOnly } from '../../shared/designIdentityComparison.js';
+// The proposal-specific reuse verdict, shared with the report-evidence reader:
+// wording-only publication moves are safe, but a changed client-facing Display
+// authority requires refreshed Project Report evidence before generation.
+import { proposalEvidenceMoveIsSafe } from '../../shared/designIdentityComparison.js';
 import { selectCanonicalReportSnapshotsByKey } from '../../shared/reportSnapshotCanonical.js';
 
 // ── ONE proposal readiness authority ──
@@ -294,7 +294,7 @@ export default async function(req) {
       // once, so this gate's rows and the reader that supplies the evidence can
       // never state two verdicts about one saved report. A bass or seating change
       // is never excused, and an absent comparison leaves the strict verdict.
-      const presentationOnlyMove = engineeringMoveIsPresentationOnly(
+      const presentationOnlyMove = proposalEvidenceMoveIsSafe(
         cacheRecordByVersionId.get(versionId) || null,
         {
           frozenFingerprint: savedProjectReport?.source_fingerprints?.engineeringFingerprint || null,
