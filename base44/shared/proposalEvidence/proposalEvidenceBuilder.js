@@ -50,7 +50,7 @@ import {
 import { buildOptionFacts } from './proposalEvidenceFacts.js';
 import { buildNarrativePriorityRows } from '../narrativePriorityAuthority.js';
 import { summaryFromReportEvidence } from '../strengthImportance.js';
-import { buildClientStoryThemes } from '../narrativeThemeGrouping.js';
+import { buildClientStoryPillars } from '../narrativePillarGrouping.js';
 import { classifyAreas } from './proposalEvidenceClassification.js';
 import {
   buildAllowedClaims,
@@ -159,21 +159,22 @@ export function buildProposalEvidence({ versions = [], generatedAt = null, reque
     storyClaims.push(...claims);
   });
 
-  // ── ONE STORY PER EXPERIENCE THEME (the ONE shared grouping) ──
+  // ── ONE STORY PER PILLAR, FROM THE EVIDENCE BENEATH IT (the ONE shared grouping) ──
   // The ranked stories above are evidence FRAGMENTS: several of them describe the
-  // same subject the client experiences as one thing. They are grouped here into
-  // the themes a proposal is told through — the bass as ONE story read through
-  // output, depth, control and consistency — so the writer never writes a
-  // paragraph per parameter. This reads the same classified evidence as the
-  // ranking, and it changes no figure, level, scope or claim: the stories' own
-  // claim IDs travel with the theme they belong to.
-  const themesByVersion = new Map();
+  // same experience the client is choosing, and the three pillars — Dynamic Range,
+  // Spatial Resolution and Timbre Matching — are what that evidence is told
+  // through. The bass is the clearest case: output, depth, control and consistency
+  // are ONE Dynamic Range story, so the writer never writes a paragraph per
+  // parameter. This reads the same classified evidence as the ranking, and it
+  // changes no figure, level, scope or claim: the stories' own claim IDs travel
+  // with the pillar they belong to.
+  const pillarsByVersion = new Map();
   list.forEach((entry, index) => {
     const reportEvidence = entry?.evidence?.project || null;
     const option = options[index];
     const stories = (storiesByVersion.get(option.version_id) || {}).strength_stories || [];
     const { rows } = buildNarrativePriorityRows({ summary: summaryFromReportEvidence(reportEvidence) });
-    themesByVersion.set(option.version_id, buildClientStoryThemes({ rows, stories }).themes);
+    pillarsByVersion.set(option.version_id, buildClientStoryPillars({ rows, stories }).pillars);
   });
 
   // ── THE SUPPORTING RESULTS THE BRIEF ASKED FOR ──
@@ -268,10 +269,10 @@ export function buildProposalEvidence({ versions = [], generatedAt = null, reque
       // did not state, each with its reason. No weight, tier or score travels.
       strength_stories: (storiesByVersion.get(option.version_id) || {}).strength_stories || [],
       omitted_stories: (storiesByVersion.get(option.version_id) || {}).omitted_stories || [],
-      // The experience themes this version's evidence tells: one entry per theme,
-      // the same results the ranked stories rest on, read together. The ranking
-      // still decides emphasis; this decides only what is told as one story.
-      client_story_themes: themesByVersion.get(option.version_id) || [],
+      // The pillar stories this version's evidence tells: one entry per pillar, the
+      // same results the ranked stories rest on, read together. The ranking still
+      // decides emphasis; this decides only what is told as one story.
+      client_story_pillars: pillarsByVersion.get(option.version_id) || [],
     })),
     classification,
     // Which supporting results the brief asked for, which of them the frozen

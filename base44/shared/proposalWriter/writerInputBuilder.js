@@ -52,7 +52,7 @@ import {
   CLIENT_NARRATIVE_REGISTER_RULE,
   PROPOSAL_PARAMETER_RESTRAINT_RULE,
 } from '../clientNarrativeRegister.js';
-import { clientStoryThemeRules } from '../narrativeThemeGrouping.js';
+import { clientStoryPillarRules } from '../narrativePillarGrouping.js';
 
 /** One option as the writer may name it: internal identifiers only. */
 function optionRef(option) {
@@ -66,12 +66,12 @@ function optionRef(option) {
       .map((story) => ({ ...story })),
     omitted_stories: (Array.isArray(option?.omitted_stories) ? option.omitted_stories : [])
       .map((story) => ({ ...story })),
-    // The experience themes this version's evidence tells: ONE entry per theme,
-    // with the results that tell it, the facets of the bass story, the clause each
-    // result has earned, the claims to cite and the seats each claim holds for.
-    // The writer is given the themes so related results are told as one story.
-    client_story_themes: (Array.isArray(option?.client_story_themes) ? option.client_story_themes : [])
-      .map((theme) => ({ ...theme })),
+    // The pillar stories this version's evidence tells: ONE entry per pillar, with
+    // the results beneath it, the parts of the bass story, the clause each result
+    // has earned, the claims to cite and the seats each claim holds for. The writer
+    // is given the pillars so related results are told as one story.
+    client_story_pillars: (Array.isArray(option?.client_story_pillars) ? option.client_story_pillars : [])
+      .map((pillar) => ({ ...pillar })),
   };
 }
 
@@ -264,14 +264,14 @@ export function buildWriterInput({
       metrics: TIMBRE_METRIC_AUTHORITY.map((entry) => ({ ...entry })),
       source: 'evidence_pack.options[].strength_stories; RP22 P16 and P17',
     },
-    // ONE STORY PER EXPERIENCE THEME. Related high-weight results describe one
-    // subject the client experiences as a single thing, so they are told as ONE
+    // THE THREE PILLARS ORGANISE THE CLIENT STORY. Related high-weight results
+    // describe one experience the client is choosing, so they are told as ONE
     // story rather than a paragraph each: the bass is read through output, depth,
-    // control and consistency, and its consistency claim is stated only for the
-    // seats the result supports. The theme rules are stated here, where the writer
-    // reads its contract; each option's own themes travel in
-    // evidence.options[].client_story_themes.
-    client_story_themes: clientStoryThemeRules(),
+    // control and consistency inside Dynamic Range, and its consistency claim is
+    // stated only for the seats the result supports. The pillar rules are stated
+    // here, where the writer reads its contract; each option's own pillar stories
+    // travel in evidence.options[].client_story_pillars.
+    client_story_pillars: clientStoryPillarRules(),
     // The assumed-parameter rule the pack was built under, so a draft can be
     // validated against exactly the admission it was written against: with no
     // designer request, P8, P15 and P21 may not be referenced at all.

@@ -32,7 +32,7 @@
 
 import { buildProposalWritingAuthority } from '../soundProofWritingAuthority.js';
 import { SOUND_PROOF_DESIGN_PHILOSOPHY } from '../designPhilosophyAuthority.js';
-import { clientStoryThemeLines } from '../narrativeThemeGrouping.js';
+import { clientStoryPillarLines } from '../narrativePillarGrouping.js';
 // The Sound Proof Natural Writing Standard: the editorial instructions this
 // prompt is held to. The house style, the sentence craft, the recommendation
 // language, the repetition rule and the whole-document review come from that one
@@ -249,7 +249,7 @@ export function buildWriterPrompt({ input, briefRevision = null } = {}) {
     'Copy every figure, Performance Level and product name exactly as the pack states it. Never round, convert, combine, restate or estimate one.',
     'Ground every client-facing claim by citing one or more allowed claim IDs in that section\'s claim_ids. Use only claim IDs that appear in allowed_claims.',
     'The ranked strength stories are already decided and given to you per option in strength_stories, in rank order: rank 1 is the strongest result the evidence states. Never decide for yourself which parameters matter. The ranking decides what is emphasised, never the order of the document: the design\'s own story sets the editorial order. State each story by citing its own allowed_claim_ids.',
-    ...clientStoryThemeLines(),
+    ...clientStoryPillarLines(),
     'Build every story as one natural account of the design, combining what has been specified, why the approach is appropriate, what it is intended to provide and what the engineering supports (the three forms of knowledge, in the writing authority). Move between those points naturally, vary the order from subject to subject, and never give each form its own formulaic sentence. The number is the proof, never the story: never open a paragraph with a parameter number or a parameter code.',
     'Name the client\'s experience in plain words (weight, movement, depth, scale, immersion, consistency) before any figure. Where a figure follows, it confirms the experience rather than replacing it.',
     'A paragraph that opens with a parameter, a Performance Level, a channel count or a dB value is written the wrong way round: rewrite it so the design and its experience lead and the figure follows. Beyond that no order is imposed: do not let paragraph after paragraph follow the same shape, and never let a subject read as a principle sentence, then an intention sentence, then a result sentence.',
