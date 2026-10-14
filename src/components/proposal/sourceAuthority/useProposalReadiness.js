@@ -41,7 +41,10 @@ import { readProjectAnalysisCacheRecord } from '@/components/state/projectReadCa
 import { subscribeReportSourceStored } from './reportSourceSignal';
 import { selectCanonicalReportSnapshotsByKey } from '@/components/report/reportSnapshotCanonical';
 import { selectCanonicalVersions } from '@/lib/canonicalVersionSelection';
-import { engineeringDifferenceIsPresentationOnly } from '@/components/report/designIdentityComparison';
+import {
+  engineeringDifferenceIsPresentationOnly,
+  proposalEvidenceDifferenceIsSafe,
+} from '@/components/report/designIdentityComparison';
 import {
   resolveCalculationAuthority,
   resolveSavedReportCell,
@@ -195,7 +198,9 @@ export function useProposalReadiness({ projectId = null, versionIds = [] } = {})
             const frozenRead = await readFrozenPublication(versionId, frozenFingerprint);
             presentationOnlyBySource[source].set(
               versionId,
-              engineeringDifferenceIsPresentationOnly(frozenRead?.publication, currentPublication),
+              source === 'project'
+                ? proposalEvidenceDifferenceIsSafe(frozenRead?.publication, currentPublication)
+                : engineeringDifferenceIsPresentationOnly(frozenRead?.publication, currentPublication),
             );
           })
         )));
