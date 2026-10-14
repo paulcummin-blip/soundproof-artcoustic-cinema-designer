@@ -36,6 +36,12 @@ import { resolveRp22DesignValue } from "@/components/utils/rp22/resolveRp22Desig
 import { formatSplDisplay } from "@/components/utils/splDisplayFormatter";
 import { gradeP1Distance } from "@/components/utils/rp22/p1LevelAuthority";
 import { computeP11Compliance } from "@/components/utils/rp22/computeP11Compliance";
+import {
+  NO_ZONAL_SPEAKER_LAYER_REASON,
+  buildOverheadNotApplicableMetric,
+  hasOverheadLayer,
+  hasZonalSpeakerLayer,
+} from "@/components/utils/rp22/overheadLayerAuthority";
 import { clampLcrZoneDepth, computeLcrZones, isCentreInZone } from "@/components/utils/rp22/lcrZoneAuthority";
 import { resolveBassAssessmentBand } from "@/components/utils/bassAssessmentBandAuthority";
 import { logRp22EngineDiagnostic } from "@/components/utils/rp22RuntimeDiagnostic";
@@ -1131,6 +1137,12 @@ export const useRP22AnalysisEngine = ({ placedSpeakers, seatingPositions, dimens
       return speaker;
     });
 
+    // Does this design have an overhead / height speaker layer at all? One
+    // authority answers that (overheadLayerAuthority). Without a height layer
+    // there is no vertical spread and no upper-level spread to assess, so the
+    // overhead-only parameters P9 and P10 are N/A — never a missing assessment.
+    const overheadLayerPresent = hasOverheadLayer(speakersWithResolvedOverheads);
+
     // RP22 Parameter 11 — Speaker Zone Compliance (canonical zonal geometry)
     // Uses the SAME zone authority as the Room Designer overlays:
     //   computeOverheadZones (computeRp22OverheadZoneExtents) for overheads,
@@ -1149,7 +1161,20 @@ export const useRP22AnalysisEngine = ({ placedSpeakers, seatingPositions, dimens
       mlpPoint: p11Mlp,
       getSpeakerModelMeta,
     });
-    gradedParameters.primary[11] = {
+    // P11 assesses surround / wide / upper speaker placement. With none of those
+    // speakers installed there is no placement to judge, so P11 is N/A instead of
+    // a false "0 outside zones". When bed surrounds or wides ARE present, P11 is
+    // assessed on exactly those speakers and never waits on an overhead layer.
+    const p11ZonalLayerPresent = hasZonalSpeakerLayer(speakersWithResolvedOverheads);
+    gradedParameters.primary[11] = !p11ZonalLayerPresent ? {
+      title: p11CatalogEntry?.title || "Speaker zone compliance",
+      level: "N/A",
+      value: null,
+      unit: p11CatalogEntry?.unit || "speakers",
+      status: "not_applicable",
+      note: NO_ZONAL_SPEAKER_LAYER_REASON,
+      outsideSpeakers: [],
+    } : {
       title: p11CatalogEntry?.title || "Speaker zone compliance",
       level: p11Result.level,
       value: p11Result.indeterminate ? null : p11Result.outsideCount,
@@ -1544,7 +1569,12 @@ export const useRP22AnalysisEngine = ({ placedSpeakers, seatingPositions, dimens
       }
       // ── END TEMP DIAG ──
 
-      if (upperSpeakers.length >= 2) {
+      if (!overheadLayerPresent) {
+        // No overhead / height speakers: P9 does not apply. Published as N/A so it
+        // is excluded from the design rating, from the compliance counts and from
+        // report readiness instead of reading as a missing assessment.
+        metrics.p9 = buildOverheadNotApplicableMetric();
+      } else if (upperSpeakers.length >= 2) {
         const result = computeUpperVerticalAnglesForSeat(seat, upperSpeakers, roomCenterX);
         const { maxVerticalGapDeg, gaps, worstGap, rowElevations } = result;
         
@@ -1602,7 +1632,12 @@ export const useRP22AnalysisEngine = ({ placedSpeakers, seatingPositions, dimens
           _diagRspUppers = rspSpl?.uppers || null;
         }
 
-        if (p10Result) {
+        if (!overheadLayerPresent) {
+          // No overhead / height speakers: P10 does not apply. This is N/A by
+          // design, not "insufficient data" — the distinction matters, because an
+          // absent layer must never read as an incomplete assessment.
+          metrics.p10 = buildOverheadNotApplicableMetric();
+        } else if (p10Result) {
           metrics.p10 = {
             value: p10Result.deltaRounded,
             formatted: p10Result.formatted,

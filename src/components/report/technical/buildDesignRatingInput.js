@@ -21,30 +21,18 @@ import {
   resolveAssumedP15Level,
   resolveAssumedP21Level,
 } from "@/components/utils/assumedParameterAuthority";
+import {
+  OVERHEAD_ONLY_PARAMETER_NUMBERS,
+  hasOverheadLayer,
+  hasZonalSpeakerLayer,
+} from "@/components/utils/rp22/overheadLayerAuthority";
 
 const isNum = (v) => typeof v === "number" && Number.isFinite(v);
 
-/**
- * Count the number of distinct zonal speaker categories that have at least
- * one placed speaker. P11 is only meaningful when 2+ categories are present.
- *
- * Categories: side-surround, rear-surround, front-wide,
- *             overhead-front, overhead-mid, overhead-rear
- */
-function countP11ApplicableCategories(placedSpeakers) {
-  if (!Array.isArray(placedSpeakers)) return 0;
-  const cats = new Set();
-  for (const s of placedSpeakers) {
-    const r = String(s?.role || "").toUpperCase();
-    if (r === "SL" || r === "SR") cats.add("side-surround");
-    else if (r === "SBL" || r === "SBR") cats.add("rear-surround");
-    else if (r === "LW" || r === "RW") cats.add("front-wide");
-    else if (r === "TFL" || r === "TFR") cats.add("overhead-front");
-    else if (r === "TML" || r === "TMR") cats.add("overhead-mid");
-    else if (r === "TBL" || r === "TBR" || r === "TRL" || r === "TRR") cats.add("overhead-rear");
-  }
-  return cats.size;
-}
+/** RP22 seat-scope parameters that only exist with a height / overhead layer. */
+const OVERHEAD_ONLY_SEAT_KEYS = new Set(
+  OVERHEAD_ONLY_PARAMETER_NUMBERS.map((number) => `p${number}`),
+);
 
 /**
  * Extract a numeric raw value from a seat HUD metric, checking common field names.
@@ -138,6 +126,11 @@ export function buildDesignRatingInput({
   const seatIds = (Array.isArray(seats) ? seats : []).map((s) => s?.id).filter(Boolean);
   const room = analysisResult?.gradedParameters?.primary || {};
 
+  // Does this design have an overhead / height speaker layer at all? One
+  // authority answers that (overheadLayerAuthority). Without a height layer the
+  // overhead-only parameters are N/A, not unassessed.
+  const overheadLayerPresent = hasOverheadLayer(placedSpeakers);
+
   // ── Room-scope parameters ──────────────────────────────────────────
 
   // P2: Number of screen wall speakers (bed count from canonical layout)
@@ -156,17 +149,24 @@ export function buildDesignRatingInput({
     p7 = null; // provisional (front wides exist but no data yet)
   }
 
-  // P11: Speaker zone compliance — only applicable when 2+ zonal speaker
-  // categories are present (meaningful zonal comparison). The canonical P11
-  // authority itself is preserved — this is a topology applicability gate only.
-  const p11Applicable = countP11ApplicableCategories(placedSpeakers) >= 2;
-  const p11 = (!p11Applicable || !room[11])
-    ? null
-    : {
-        outsideCount: room[11].value,
-        level: room[11].level,
-        indeterminate: room[11].status === "indeterminate",
-      };
+  // P11: Speaker zone compliance — assessed on the speakers that are actually
+  // installed (side/rear surrounds, front wides and any uppers). An absent
+  // overhead layer never leaves it waiting, and with no such speaker at all —
+  // or a published N/A from the canonical P11 authority — it is genuinely N/A.
+  const p11RoomResult = room[11] || null;
+  const p11Applicable = hasZonalSpeakerLayer(placedSpeakers);
+  const p11NotApplicable = !p11Applicable
+    || p11RoomResult?.status === "not_applicable"
+    || String(p11RoomResult?.level || "").toUpperCase() === "N/A";
+  const p11 = p11NotApplicable
+    ? { na: true }
+    : (!p11RoomResult
+        ? null
+        : {
+            outsideCount: p11RoomResult.value,
+            level: p11RoomResult.level,
+            indeterminate: p11RoomResult.status === "indeterminate",
+          });
 
   // P12: Screen speakers SPL capability at RSP
   const p12 = isNum(room[12]?.value)
@@ -239,6 +239,16 @@ export function buildDesignRatingInput({
     // If the room-level evaluation for this seat-scope parameter is null
     // (Not calculated), exclude ALL per-seat values.
     if (roomLevelNullSeatKeys.has(key)) {
+      for (const seatId of seatIds) {
+        seatScope[key][seatId] = "na";
+      }
+      continue;
+    }
+
+    // Overhead-only parameters (P9, P10) do not exist for a design with no
+    // overhead / height speakers: the answer is N/A for every seat, so they are
+    // excluded from the rating and from report readiness rather than blocking it.
+    if (OVERHEAD_ONLY_SEAT_KEYS.has(key) && !overheadLayerPresent) {
       for (const seatId of seatIds) {
         seatScope[key][seatId] = "na";
       }

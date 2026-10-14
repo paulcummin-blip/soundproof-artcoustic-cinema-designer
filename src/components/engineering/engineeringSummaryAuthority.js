@@ -123,7 +123,7 @@ function buildParameterScopeSummary(parameters, seatIds) {
 }
 
 function buildComplianceSummary(parameters) {
-  const counts = { L4: 0, L3: 0, L2: 0, L1: 0, fail: 0, notVerified: 0 };
+  const counts = { L4: 0, L3: 0, L2: 0, L1: 0, fail: 0, notVerified: 0, notApplicable: 0 };
   let lowestRank = null;
   let active = 0;
   let unavailable = 0;
@@ -164,6 +164,7 @@ function buildComplianceSummary(parameters) {
     else if (level === "L2") { counts.L2 += 1; active += 1; }
     else if (level === "L1") { counts.L1 += 1; active += 1; }
     else if (level === "FAIL") { counts.fail += 1; active += 1; }
+    else if (state === "na") { counts.notApplicable += 1; }
     else { counts.notVerified += 1; unavailable += 1; }
 
     if (level) {
@@ -184,7 +185,7 @@ function buildComplianceSummary(parameters) {
 }
 
 function buildReportCounts(parameters, seats, seatHudById) {
-  const roomLevelCounts = { L4: 0, L3: 0, L2: 0, L1: 0, fail: 0, unassessed: 0 };
+  const roomLevelCounts = { L4: 0, L3: 0, L2: 0, L1: 0, fail: 0, unassessed: 0, notApplicable: 0 };
   // Seat counting follows the canonical RP22 catalogue scope. P19 is RSP-scoped
   // there, so it enters neither group: it is not a seat parameter, and its one
   // RSP result is presented on its own authority rather than as an aggregate of
@@ -198,6 +199,9 @@ function buildReportCounts(parameters, seats, seatHudById) {
     const level = parameterAggregateLevel(parameter);
     if (level === "L4" || level === "L3" || level === "L2" || level === "L1") roomLevelCounts[level] += 1;
     else if (level === "FAIL") roomLevelCounts.fail += 1;
+    // A genuinely not-applicable room parameter is complete for this design, so
+    // it is never reported as unassessed.
+    else if (parameter?.state === "na") roomLevelCounts.notApplicable += 1;
     else roomLevelCounts.unassessed += 1;
   }
 
@@ -292,7 +296,11 @@ function buildReportCounts(parameters, seats, seatHudById) {
         valueFormatted: isBassDeviation
           ? `±${Number(rawValue).toFixed(1)} dB`
           : firstStatedPrimitive([metric?.formatted, metric?.hudLabel, rawValue], "—"),
-        level: seatAuthority?.state === "scored" ? (normalizeLevel(seatAuthority.level) || "—") : "—",
+        // A not-applicable seat states N/A — never a blank dash, and never a
+        // missing result. It is excluded from the level counts above.
+        level: seatAuthority?.state === "scored"
+          ? (normalizeLevel(seatAuthority.level) || "—")
+          : (seatAuthority?.state === "na" ? "N/A" : "—"),
         status: seatAuthority?.state || metric?.status || null,
         value: rawValue,
         worstFrequencyHz: metric?.worstFrequencyHz ?? null,

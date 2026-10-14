@@ -12,6 +12,10 @@ import P17SeatEvidencePanel from "@/components/rp22/P17SeatEvidencePanel";
 import P17SpeakerBreakdownTable from "@/components/rp22/P17SpeakerBreakdownTable";
 import { getOfficialRp22Title } from "@/components/utils/rp22OfficialTitles";
 import P15P21AssumptionControl from "@/components/report/P15P21AssumptionControl";
+import {
+  NO_OVERHEAD_LAYER_REASON,
+  isOverheadOnlyParameter,
+} from "@/components/utils/rp22/overheadLayerAuthority";
 
 /* ---------- Helpers */
 
@@ -349,6 +353,13 @@ export default function RP22CompliancePanel({
       : null;
     const debugText = getMetricDebugText(p.id, debugMetric);
 
+    // An overhead-only parameter (P9/P10) that this design does not have reads
+    // N/A with its reason stated here — the designer never has to infer why.
+    const presentationStatus =
+      engineeringSummary?.project?.compliance?.byParameter?.[`p${p.id}`]?.presentationStatus || null;
+    const showNotApplicableReason =
+      presentationStatus === "not_applicable" && isOverheadOnlyParameter(p.id);
+
     return (
       <div key={p.id} style={card}>
         <div style={head}>
@@ -423,6 +434,11 @@ export default function RP22CompliancePanel({
               <>{(p.id === 15 || p.id === 21) ? "Assumed: " : "Achieved: "}<span style={{ color: "#213428" }}>{achievedValue}</span></>
             )}
           </div>
+          {showNotApplicableReason && (
+            <div style={{ fontSize: 11, color: "#8B7F76", marginTop: 4, fontStyle: "italic" }}>
+              {NO_OVERHEAD_LAYER_REASON}
+            </div>
+          )}
           {targetBasisNote && (
             <div style={{ fontSize: 10, color: "#9B8E82", marginTop: 4, fontStyle: "italic" }}>
               {targetBasisNote}

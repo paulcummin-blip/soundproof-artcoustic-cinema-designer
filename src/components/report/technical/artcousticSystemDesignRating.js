@@ -392,6 +392,12 @@ function scoreRoomParam(key, input) {
 
   // P11 has a special input format (computeP11Compliance result)
   if (key === "p11") {
+    // A genuine N/A — no surround, wide or upper speaker to assess — is complete
+    // for this design, so it is excluded from the rating rather than treated as
+    // a missing or unrecognised assessment.
+    if (typeof input === "object" && input?.na === true) {
+      return { state: "na", level: null, multiplier: null, reason: null };
+    }
     const result = scoreP11(input);
     if (result.provisional) {
       return { state: "provisional", level: null, multiplier: null, reason: result.reason };
