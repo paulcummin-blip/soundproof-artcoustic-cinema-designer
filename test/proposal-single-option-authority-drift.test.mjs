@@ -27,14 +27,59 @@ function marqueeSingleOptionInput() {
         14: '115 dB', 18: '26 Hz', 19: '+/-1 dB', 20: '+/-3 dB',
       },
       seatScopes: seatScopes({
-        primary: { p4: 'L4', p6: 'L4', p20: 'L4' },
-        secondary: { p4: 'L4', p6: 'L2', p20: 'L1' },
+        primary: { p4: 'L4', p6: 'L4', p19: 'L4', p20: 'L4' },
+        secondary: { p4: 'L4', p6: 'L2', p19: 'L1', p20: 'L1' },
         primarySeats: 2,
         secondarySeats: 2,
       }),
     })],
     generatedAt: AT,
   });
+
+  // These are the canonical stories carried by the failed Marquee generation.
+  // The generic report fixture above provides the exact parameter and scoped
+  // claims; these story claims reproduce the writer's real mixed authority.
+  pack.allowed_claims.push(
+    {
+      claim_id: 'claim_story_spatial-resolution_01',
+      area: 'spatial_resolution',
+      label: 'Spatial resolution',
+      kind: 'strength_story',
+      statement: 'The loudspeakers hold their recommended geometry, supporting exceptionally precise placement and seamless movement around the room.',
+      option: { version_id: 'a', version_name: 'Original Design', label: 'Option A' },
+      favours: false,
+      scope: null,
+      level: 'L4',
+      wording_class: 'strength',
+      wording: 'Exceptionally precise placement',
+    },
+    {
+      claim_id: 'claim_story_bass-extension-and-response_01',
+      area: 'bass_extension_and_response',
+      label: 'Bass extension and response',
+      kind: 'strength_story',
+      statement: 'Bass reaches 26 Hz and the modelled response at the reference position is within +/-1 dB, adding scale while remaining remarkably composed.',
+      option: { version_id: 'a', version_name: 'Original Design', label: 'Option A' },
+      favours: false,
+      scope: null,
+      level: 'L4',
+      wording_class: 'strength',
+      wording: 'Remarkably composed bass',
+    },
+    {
+      claim_id: 'claim_story_tonal-consistency_01',
+      area: 'tonal_consistency',
+      label: 'Tonal consistency',
+      kind: 'strength_story',
+      statement: 'Screen and surround tonal consistency is excellent across the assessed seats.',
+      option: { version_id: 'a', version_name: 'Original Design', label: 'Option A' },
+      favours: false,
+      scope: null,
+      level: 'L4',
+      wording_class: 'strength',
+      wording: 'Excellent tonal consistency',
+    },
+  );
   return buildWriterInput({ pack });
 }
 
