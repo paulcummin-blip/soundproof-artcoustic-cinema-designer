@@ -28,7 +28,7 @@
 import { validateReportEvidence } from './reportEvidenceCompleteness.js';
 import { selectCanonicalReportSnapshot } from './reportSnapshotCanonical.js';
 import { canonicalScreenDescription, canonicalStatedSizeInches } from './canonicalScreenDescription.js';
-import { engineeringMoveIsPresentationOnly } from './designIdentityComparison.js';
+import { proposalEvidenceMoveIsSafe } from './designIdentityComparison.js';
 import { loadCacheRecord } from './publishedEngineeringAuthority.js';
 
 /** The parameters a proposal must be able to state from a Technical Report. */
@@ -511,7 +511,7 @@ async function versionMoveIsPresentationOnly(authority, projectId, version, row)
   // card above it read Current.
   const record = await loadCacheRecord(authority, projectId, version.id);
   if (!record) return false;
-  return engineeringMoveIsPresentationOnly(record, { frozenFingerprint, currentFingerprint });
+  return proposalEvidenceMoveIsSafe(record, { frozenFingerprint, currentFingerprint });
 }
 
 /**
