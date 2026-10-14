@@ -183,7 +183,19 @@ export const WRITER_CONTRACT_VERSION = 2;
 // identities, word limits, the claim grounding rule and every validation rule
 // are unchanged, so a draft filed under an earlier generation is still read
 // against its own agreement.
-export const WRITER_PROMPT_VERSION = 'proposal-writer-prompt-22';
+// Bumped to 23 for the story-not-mechanism pass: the single-option Design Overview
+// is no longer asked for the layout's channel count or for where the overhead
+// channels are placed (which produced a reckoning of channels and a statement about
+// the layer the design does not have), and it now explains the arrangement in terms
+// of what the client hears, naming no feature the design lacks and no measurement.
+// The writer is given the client narrative register: no channel count as a selling
+// point, no absent feature, no explanation of a mechanism, no boundary distance or
+// parameter number in the main narrative, and the plain words for a room like this
+// instead. A TV media room's Design Overview is briefed short and plain by its own
+// authority. Section identities, the claim grounding rule, the word limits of every
+// other section and every validation rule are unchanged, so a draft filed under an
+// earlier generation is still read against the agreement it was written under.
+export const WRITER_PROMPT_VERSION = 'proposal-writer-prompt-23';
 
 /** The only pack generation a draft may be written from. */
 export const WRITER_ACCEPTED_PACK_SCHEMA_VERSION = 2;
@@ -394,7 +406,7 @@ export const WRITER_SECTIONS = Object.freeze([
     title_single: 'Design Overview',
     word_limit: 180,
     requirement: 'State only what every option shares, from the shared-result claims the pack allows. Where the copy also contrasts the options, cite the shared-result claims for what is unchanged and the pack\'s factual-change or material-gain claims for what differs.',
-    requirement_single: 'Explain how the system is arranged: the loudspeaker layout and its channel count, where the screen channels, the surrounds and the overhead channels are placed, the seating and the display, and how those parts work together in this room. Write from the design-identity and shared-result claims the pack allows, and from the interpretation\'s account of the architecture. Never mention another option or a baseline.',
+    requirement_single: 'Explain how the system is arranged, in terms of what the client hears from each part: the loudspeaker layout, where the screen channels, the surrounds and any overhead loudspeakers the design actually has are placed, the seating and the display, and how those parts work together in this room. Describe the layout this design HAS: never state a channel count, never name a layer, a format or a loudspeaker the design does not include, and never explain how a mechanism works or why a measurement matters. Write from the design-identity and shared-result claims the pack allows, and from the interpretation\'s account of the architecture. Never mention another option or a baseline.',
   },
   {
     section: 'what_changes',
@@ -603,6 +615,7 @@ export const WRITER_WRITING_RULES = Object.freeze([
   'Use the ranked story as evidence, not as a sentence to read aloud. Translate its meaning into natural client language while retaining its scope, exact facts and claim IDs.',
   'Keep Appendix Notes brief, factual and source-only: this proposal is based on the frozen Project Report for this design, with detailed RP22, RP23, product and room evidence in the accompanying report. No sales story, acoustic-treatment performance promise or engineering-model explanation.',
   'Close on this design\'s particular viewing experience, movement, tonal character and bass capability, not treats every seat as a priority, balances high-resolution spatial imaging with authoritative bass performance, high-quality experience for everyone or immersive and consistent experience for the home.',
+  'Tell the story, never the mechanism. Never use a channel count as a selling point ("5 discrete channels"), never name a feature or a layer the design does not include ("no overhead channels are specified"), and never explain how a mechanism works: no "reproduce the system\'s low-frequency content", and no account of what nearby walls, reflections or room modes do. Keep an exact boundary distance, a spacing, an angle and any other parameter number out of the Design Summary, the Design Overview, Key Performance Highlights and the closing narrative, where the client is reading a recommendation rather than a measurement. Say what the client hears, and let the evidence support that account rather than become it.',
   'Keep every paragraph to one to three sentences, and keep every section inside its word limit.',
   'Explain what each recorded result means for the room, rather than naming the number and moving on.',
   'Where the brief asks for a result the pack carries as a supporting_result claim, state it in the section it belongs to, at exactly the scope, value and prediction status that claim carries, and cite its claim ID. A supporting result answers the client\'s own request: it is never presented as a strength, a headline or a comparison, and is never moved to a wider scope.',

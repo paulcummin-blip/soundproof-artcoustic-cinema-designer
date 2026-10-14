@@ -13,12 +13,17 @@
  * justification make that sound smaller than it is, and it reads as an essay
  * rather than a recommendation.
  *
- * So this module holds ONE instruction and ONE word limit for that case, and
- * applies them to the Design Summary section (decision_summary, labelled Design
- * Summary in a single-option proposal) where the frozen evidence describes a TV,
- * a listener-level layout and one row of seating. Every other design keeps the
- * contract's own requirement and limit unchanged, and nothing here is decided by
- * a judgement about whether copy reads as too long: the evidence decides.
+ * So this module holds ONE instruction and ONE word limit for each of the two
+ * summary sections of that case, and applies them to the Design Summary
+ * (decision_summary) and the Design Overview (what_stays_same, labelled Design
+ * Overview in a single-option proposal) where the frozen evidence describes a TV,
+ * a listener-level layout and one row of seating. The Design Overview is the
+ * section the client reads straight after the summary, and it is briefed the same
+ * way: the arrangement and what it gives the client, never a count of channels, a
+ * layer the design does not have, a measurement or an explanation of a mechanism.
+ * Every other design keeps the contract's own requirement and limit unchanged, and
+ * nothing here is decided by a judgement about whether copy reads as too long: the
+ * evidence decides.
  *
  * The limit is a ceiling with headroom above the target, not the target itself:
  * copy written to 80 to 120 words passes it, and a draft that runs long is
@@ -55,6 +60,36 @@ const SHORT_FORM_REQUIREMENT = [
   'Second paragraph: what that arrangement gives the room day to day, with the display anchoring it and the front speakers, the side surrounds and the subwoofers working together around the main seating area: clear dialogue, proper surround movement and strong bass support when the content calls for it, and relaxed everyday use for sport, box sets, films and music.',
   'Write it as a designer or salesperson explaining the recommendation in person in plain, confident language, with no repetition and no padding.',
   'Do not explain the seating arrangement, the prioritised listening positions or the theory behind the layout, and do not justify the design against anything it does not have. Never write "the basis of the viewing experience", "listener-level surround arrangement", "the relationship between the TV, the front stage and the seating" or "tonal assessment". The engineering evidence belongs in the sections that carry it, so keep this one to the recommendation itself.',
+].join(' ');
+
+/**
+ * The second section of the same case: the Design Overview. It says how the system
+ * is arranged and what that gives the client, and it is where parameter commentary
+ * used to creep in: a channel count, the layer the design does not have, what the
+ * room's boundaries do, and a boundary measurement. Same treatment, same ceiling.
+ */
+export const DESIGN_OVERVIEW_SHORT_FORM = Object.freeze({
+  section: 'what_stays_same',
+  label: 'Design Overview',
+  /** The written target the writer is given. */
+  target_words: '80 to 130',
+  /** The ceiling the draft is validated against: headroom above the target. */
+  word_limit: 150,
+});
+
+/**
+ * The instruction for the Design Overview of this design. It states the two short
+ * paragraphs, what each one carries, and the commentary the copy must never carry,
+ * naming the phrases the writer is refused so the refusal is unambiguous.
+ */
+const OVERVIEW_SHORT_FORM_REQUIREMENT = [
+  'This is a TV-based media room, so write the arrangement and what it gives the client, and stop there: two short paragraphs, 80 to 130 words in total and no more than five sentences.',
+  'First paragraph: the system as the client will experience it. A relaxed high-performance TV room built around the display, named exactly as the frozen evidence names it, and a simple, well-executed 5.1 system: the front speakers keeping dialogue and screen sound locked to the picture, and the side surrounds adding movement and space around the seating.',
+  'Second paragraph: the bass support the subwoofers give the soundtrack, and the acoustic treatment the frozen evidence states, keeping the room clear and controlled without making it feel over-treated.',
+  'Write it as the designer explaining the room in person, plain and confident, and do not repeat the Design Summary.',
+  'Never list a channel count and never write "5 discrete channels": say what the system is and what it does for the room. Never name a layer, a format or a loudspeaker the design does not include, and never write "no overhead channels are specified".',
+  'Never explain a mechanism: no "reproduce the system\'s low-frequency content", and no account of what nearby walls, reflections or room modes do. Never bring a boundary distance or a spacing figure into this section, and never write "the seating is part of the acoustic arrangement" or "the relationship between listeners and surround loudspeakers".',
+  'Where the frozen evidence states a stage position built from more than one physical cabinet on one channel, explain that arrangement once as the multi_cabinet_channels rule requires: that is a design fact, not a channel count.',
 ].join(' ');
 
 /**
@@ -96,14 +131,23 @@ export function isTvListenerLevelDesign(pack, mode) {
 export function applyDesignSummaryBrief(sections, { pack, mode } = {}) {
   const listed = Array.isArray(sections) ? sections : [];
   if (!isTvListenerLevelDesign(pack, mode)) return listed;
-  return listed.map((entry) => (entry?.section === DESIGN_SUMMARY_SHORT_FORM.section
-    ? { ...entry, requirement: SHORT_FORM_REQUIREMENT, word_limit: DESIGN_SUMMARY_SHORT_FORM.word_limit }
+  const briefs = new Map([
+    [DESIGN_SUMMARY_SHORT_FORM.section, { requirement: SHORT_FORM_REQUIREMENT, word_limit: DESIGN_SUMMARY_SHORT_FORM.word_limit }],
+    [DESIGN_OVERVIEW_SHORT_FORM.section, { requirement: OVERVIEW_SHORT_FORM_REQUIREMENT, word_limit: DESIGN_OVERVIEW_SHORT_FORM.word_limit }],
+  ]);
+  return listed.map((entry) => (briefs.has(entry?.section)
+    ? { ...entry, ...briefs.get(entry.section) }
     : entry));
 }
 
 /** The instruction itself, for the writer's contract and for audit. */
 export function designSummaryShortFormRequirement() {
   return SHORT_FORM_REQUIREMENT;
+}
+
+/** The Design Overview instruction, for the writer's contract and for audit. */
+export function designOverviewShortFormRequirement() {
+  return OVERVIEW_SHORT_FORM_REQUIREMENT;
 }
 
 export default applyDesignSummaryBrief;
