@@ -63,6 +63,11 @@ import {
   seatingBoundaryHighlightSummary,
 } from './seatingBoundaryPrinciple.js';
 
+// The language each result has earned. A story's own sentence is stated at the
+// level its evidence reached, so the report and the proposal always speak about a
+// result at the same strength (see performanceLanguageAuthority.js).
+import { performancePhrase, PERFORMANCE_AREAS } from './performanceLanguageAuthority.js';
+
 /* The evidence reads are part of this module's own public surface: the report
    page and the proposal reader both take them from here. */
 export {
@@ -132,20 +137,23 @@ export function buildCandidates(sources, { byKey, floor, connections }) {
     const p13 = byKey.p13;
     const p12Row = parameter(engineeringSummary, 12);
     const p13Row = parameter(engineeringSummary, 13);
+    // The story is stated at the weaker of the two capability results, and its
+    // language is the language that level has earned.
+    const dynamicLevel = levelRank(p12.level) <= levelRank(p13.level) ? p12.level : p13.level;
     candidates.push(story({
       id: 'dynamic-capability',
       order: 1,
       title: 'Cinema-scale dynamic range',
       category: 'Dynamic Range',
       members: [p12, p13],
-      level: levelRank(p12.level) <= levelRank(p13.level) ? p12.level : p13.level,
+      level: dynamicLevel,
       evidence: [
         evidence('P12', p12.level, p12Row?.value ? `Screen speakers · ${p12Row.value}` : 'Screen speakers'),
         evidence('P13', p13.level, p13Row?.value
           ? `${hasOverheadLayer ? 'Surround & overhead' : 'Surround'} · ${p13Row.value}`
           : (hasOverheadLayer ? 'Surround & overhead' : 'Surround')),
       ],
-      explanation: `the screen channels reach ${p12Row?.value || 'their published capability'} and the ${nonScreenLayer} layer reaches ${p13Row?.value || 'its published capability'} at the reference seating position, so a demanding soundtrack plays at the scale it was mixed for: dialogue stays clean while the fullest effects arrive without strain.`,
+      explanation: `the screen channels reach ${p12Row?.value || 'their published capability'} and the ${nonScreenLayer} layer reaches ${p13Row?.value || 'its published capability'} at the reference seating position, so ${performancePhrase(PERFORMANCE_AREAS.DYNAMIC_RANGE, dynamicLevel) || 'a demanding soundtrack plays at the scale it was mixed for: dialogue stays clean while the fullest effects arrive without strain'}.`,
       sources: ['P12', 'P13'],
     }));
   }
@@ -172,7 +180,7 @@ export function buildCandidates(sources, { byKey, floor, connections }) {
           ? `${hasOverheadLayer ? 'Surround and overhead' : 'Surround channels'} across the seats · ${p17.value}`
           : `${hasOverheadLayer ? 'Surround and overhead' : 'Surround channels'} across the assessed seats`),
       ],
-      explanation: `the tonal balance holds${seats ? ` across all ${seats} assessed seating positions` : ' across the assessed seating positions'}, each result read for its own speaker group: within the screen channels, and within the ${nonScreenLayer} channels, the model predicts strong tonal consistency across the assessed seats.`,
+      explanation: `the tonal balance holds${seats ? ` across all ${seats} assessed seating positions` : ' across the assessed seating positions'}, each result read for its own speaker group: within the screen channels, and within the ${nonScreenLayer} channels, the model predicts ${performancePhrase(PERFORMANCE_AREAS.TIMBRE, levelRank(p16.level) <= levelRank(p17.level) ? p16.level : p17.level) || 'a stable tonal character'} across the assessed seats.`,
       sources: ['P16', 'P17'],
     }));
   }
@@ -188,7 +196,7 @@ export function buildCandidates(sources, { byKey, floor, connections }) {
       members: [p14],
       scope: 'room',
       evidence: [evidence('P14', p14.level, p14.value ? `LFE output · ${p14.value}` : 'LFE output at the reference seating position')],
-      explanation: `the subwoofers deliver ${p14.value ? `${p14.value} of low-frequency output` : 'the low-frequency output'} at the reference seating position, so the weight of an explosion or a bass line is reproduced rather than thinning out as the level rises.`,
+      explanation: `the subwoofers deliver ${p14.value ? `${p14.value} of low-frequency output` : 'the low-frequency output'} at the reference seating position, so ${performancePhrase(PERFORMANCE_AREAS.BASS_OUTPUT, p14.level) || 'the weight of an explosion or a bass line is reproduced rather than thinning out as the level rises'}.`,
       sources: ['P14'],
     }));
   }
@@ -204,12 +212,11 @@ export function buildCandidates(sources, { byKey, floor, connections }) {
       members: [p18],
       scope: 'room',
       evidence: [evidence('P18', p18.level, p18.value ? `Extension to ${p18.value}` : 'In-room bass extension')],
-      // Extension is stated for the result this design actually achieved: a
-      // deepest-octave claim belongs to a genuinely deep result, and a moderate
-      // one is stated as useful film-effect extension without overreaching.
-      explanation: levelRank(p18.level) >= MIN_STRENGTH_LEVEL
-        ? `the system reaches ${p18.value || 'the published limit'} in the room, so the lowest octaves of a film mix are reproduced rather than rolled off.`
-        : `the system reaches ${p18.value || 'its published extension'} in the model, giving useful low-frequency extension for film effects without claiming the deepest infrasonic performance.`,
+      // Extension is stated for the result this design actually achieved, in the
+      // language that result has earned: a deepest-octave claim belongs to a
+      // genuinely deep result, a moderate one is stated as the depth it gives the
+      // soundtrack, and neither is ever flattened into "useful".
+      explanation: `the system reaches ${p18.value || 'the published limit'} in the room: ${performancePhrase(PERFORMANCE_AREAS.BASS_EXTENSION, p18.level) || 'low-frequency extension for film effects'}.`,
       sources: ['P18'],
     }));
   }
@@ -229,7 +236,7 @@ export function buildCandidates(sources, { byKey, floor, connections }) {
         evidence('P18', p18.level, p18.value ? `Extension to ${p18.value}` : 'In-room bass extension'),
         evidence('P19', p19.level, p19.value ? `At the reference seating position · ${p19.value}` : 'At the reference seating position'),
       ],
-      explanation: `the system reaches ${p18.value || 'the published limit'} and the corrected response at the reference seating position sits ${p19.value || 'within the target window'} of the design target, so the deep end has both reach and control: it carries real weight without the boom that would smear the dialogue above it.`,
+      explanation: `the system reaches ${p18.value || 'the published limit'} and the corrected response at the reference seating position sits ${p19.value || 'within the target window'} of the design target, so the deep end has both reach and control: ${performancePhrase(PERFORMANCE_AREAS.BASS_EXTENSION, p18.level) || 'real weight'}, without the boom that would smear the dialogue above it.`,
       sources: ['P18', 'P19'],
     }));
   }
@@ -242,6 +249,12 @@ export function buildCandidates(sources, { byKey, floor, connections }) {
     .filter((member) => member && member.eligible && levelRank(member.level) >= required);
   if (placementMembers.length >= 2) {
     const strongest = [...placementMembers].sort((a, b) => b.weight - a.weight).slice(0, 3);
+    // The placement story is stated at the weakest placement measure it rests on,
+    // and its language is the language that level has earned.
+    const placementLevel = placementMembers.reduce(
+      (acc, member) => (levelRank(member.level) < levelRank(acc) ? member.level : acc),
+      placementMembers[0].level,
+    );
     candidates.push(story({
       id: 'spatial-resolution',
       order: 6,
@@ -254,7 +267,7 @@ export function buildCandidates(sources, { byKey, floor, connections }) {
         member.level,
         PLACEMENT_PHRASES[member.key],
       )),
-      explanation: `placement is held to the recommended geometry: ${joinList(strongest.map((member) => PLACEMENT_PHRASES[member.key]))}, so effects cross the room the way the film was mixed instead of smearing between channels.`,
+      explanation: `placement is held to the recommended geometry: ${joinList(strongest.map((member) => PLACEMENT_PHRASES[member.key]))}, giving ${performancePhrase(PERFORMANCE_AREAS.SPATIAL_RESOLUTION, placementLevel) || 'convincing positioning and movement'}, so effects cross the room the way the film was mixed instead of smearing between channels.`,
       sources: placementMembers.map((member) => String(member.key).toUpperCase()),
     }));
   }

@@ -108,7 +108,7 @@ const VERSION_3 = 'proposal-writer-prompt-3';
 // in the main narrative). A TV media room's Design Summary and Design Overview are
 // briefed short and plain by their own authority. No section identity, word limit,
 // claim-grounding or validation rule changed.
-const CURRENT = 'proposal-writer-prompt-23';
+const CURRENT = 'proposal-writer-prompt-24';
 
 test('the writer prompt version is the current one', () => {
   assert.equal(WRITER_PROMPT_VERSION, CURRENT);

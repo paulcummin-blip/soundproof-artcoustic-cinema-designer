@@ -151,7 +151,7 @@ describe('B. It reaches the prompt the writer is really called with', () => {
   });
 
   it('is the natural-writing generation, with the contract unchanged', () => {
-    expect(WRITER_PROMPT_VERSION).toBe('proposal-writer-prompt-23');
+    expect(WRITER_PROMPT_VERSION).toBe('proposal-writer-prompt-24');
     expect(WRITER_CONTRACT_VERSION).toBe(2);
     // The prompt carries the input it was built from, so a historical input is
     // still written under the generation it was filed under.

@@ -28,6 +28,11 @@ import { CLIENT_FACING_CALIBRATION_LANGUAGE } from './clientFacingCalibrationLan
 import { clientBenefitIntentLines } from './rp22ClientBenefitIntent.js';
 import { absentFeatureFramingRule } from './proposalWriter/absentFeatureFraming.js';
 
+// The performance language register: how strong the copy may be, decided by the
+// result the evidence states. The proposal carries it so the writer's own prose
+// scales with the level exactly as the shared strength statements do.
+import { performanceLanguageScaleLines } from './performanceLanguageAuthority.js';
+
 /**
  * The purpose, audience, reasoning rules and honesty rules. Injected ahead of
  * the engineering-specific report contract so the writer approaches the project
@@ -231,8 +236,13 @@ export const PROPOSAL_SALES_WRITING_AUTHORITY = [
   'Keep every claim inside the scope the evidence states it for. Never widen a scoped result into a result for the seating area or the room, and never invent a benefit.',
   '',
   'A RESULT BELOW THE HIGHEST AVAILABLE LEVEL IS STATED BY WHAT IT CONTRIBUTES',
-  'Where the design achieves a useful result that is not the highest available level, explain what that capability gives the intended listening experience, and stop there. Never write “adequate rather than generous”, “modest”, “limited”, “disappointing”, “only” or anything else that makes a competent professional design sound like a compromise, and never describe a level as the reason a design falls short. Never exaggerate the achievement, and never invent headroom to compensate: state the capability the design provides and the demanding material it is there for.',
+  'Where the design achieves a passing result that is not the highest available level, explain what that capability gives the intended listening experience, and stop there. Never write “adequate rather than generous”, “modest”, “limited”, “disappointing”, “only” or anything else that makes a competent professional design sound like a compromise, and never describe a level as the reason a design falls short. Never exaggerate the achievement, and never invent headroom to compensate: state the capability the design provides and the demanding material it is there for.',
   '',
+  // PERFORMANCE LANGUAGE: the strength of the copy follows the Performance Level
+  // the evidence states, from the one shared register, so an L4 result reads as
+  // exceptional and a passing result is never flattened into cautious words.
+  ...performanceLanguageScaleLines(),
+
   'WORK FROM THE DESIGN\'S OWN DETAILS',
   'Make the writing specific to this cinema by developing the details that are actually this design\'s: the screen and the viewing experience, the seating arrangement, where the loudspeakers and overhead channels sit, the bass arrangement, and the practical constraints of the room. Those details are what distinguish this proposal from any other. The specification itself already appears elsewhere in the document, so it is never restated here, and the reasoning is developed rather than the designer\'s own note paraphrased.',
   '',

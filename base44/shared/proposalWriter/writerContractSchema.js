@@ -195,7 +195,16 @@ export const WRITER_CONTRACT_VERSION = 2;
 // authority. Section identities, the claim grounding rule, the word limits of every
 // other section and every validation rule are unchanged, so a draft filed under an
 // earlier generation is still read against the agreement it was written under.
-export const WRITER_PROMPT_VERSION = 'proposal-writer-prompt-23';
+// Bumped to 24 for the performance-language pass: the strength of the copy now
+// follows the Performance Level the evidence states, from the one shared register
+// (performanceLanguageAuthority.js). A higher level has earned stronger language,
+// a passing result is never flattened into cautious words such as "useful",
+// "adequate", "acceptable" or "reasonable", an L4 result is presented as the
+// flagship result it is, and the language is never written stronger than the
+// result in front of it. Section identities, word limits, the claim grounding rule
+// and every validation rule are unchanged, so a draft filed under an earlier
+// generation is still read against the agreement it was written under.
+export const WRITER_PROMPT_VERSION = 'proposal-writer-prompt-24';
 
 /** The only pack generation a draft may be written from. */
 export const WRITER_ACCEPTED_PACK_SCHEMA_VERSION = 2;
