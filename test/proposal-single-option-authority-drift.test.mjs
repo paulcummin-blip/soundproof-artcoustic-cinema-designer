@@ -133,7 +133,7 @@ test('the six Marquee sentences are grounded by a strength story plus its precis
     {
       section: 'dynamic_range',
       sentence: 'Deep bass adds scale to the score, while the modelled response at the reference position keeps that depth remarkably composed.',
-      claims: ['claim_story_bass-extension-and-response_01', 'claim_p19_primary_performance_01'],
+      claims: ['claim_story_bass-extension-and-response_01', 'claim_p20_primary_consistency_01'],
     },
   ];
 
