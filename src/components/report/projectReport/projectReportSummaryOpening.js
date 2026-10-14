@@ -85,6 +85,23 @@ function bassSupportPhrase(subwooferSchedule) {
   return 'from the subwoofers';
 }
 
+/**
+ * The same question for a lounge / media room, stated with the product itself
+ * where the schedule records a single subwoofer group — "from two rear SUB2-12
+ * subwoofers". A schedule carrying more than one group keeps the side alone, so
+ * a mixed arrangement is never summarised as one product.
+ */
+function statedBassPhrase(subwooferSchedule) {
+  const parts = productParts(subwooferSchedule);
+  if (parts.length === 1) {
+    const model = partModel(parts[0]);
+    const count = partCount(parts[0]);
+    const side = /\(rear\)/i.test(parts[0]) ? 'rear ' : /\(front\)/i.test(parts[0]) ? 'front ' : '';
+    if (model) return `from ${word(count)} ${side}${model} subwoofer${count === 1 ? '' : 's'}`;
+  }
+  return bassSupportPhrase(subwooferSchedule);
+}
+
 /** "A, B and C" — the sentence's own list style. */
 function joinList(items) {
   const list = (Array.isArray(items) ? items : []).filter(Boolean);
@@ -184,7 +201,15 @@ export function buildProjectReportSummaryOpening({
   const display = displayPhrase(projectDetails);
   const builtAround = [display ? `a ${display}` : null, rowPhrase].filter(Boolean);
   const compact = isCompactRoom(roomDims) ? 'compact ' : '';
-  if (builtAround.length > 0) {
+  // A television design is the lounge / media room it is used as, not a dedicated
+  // cinema: the room is stated with the everyday uses it serves and the system is
+  // described as the deliberate choice it is. A projection design keeps its
+  // dedicated-cinema language unchanged.
+  const mediaRoom = !projection && !!display;
+  if (mediaRoom) {
+    const system = architecture ? `${architecture} system` : 'surround system';
+    vision.push(`This is a relaxed high-performance media room built around a large ${display}. It is designed for sport, box sets, films and music, with a sensible ${system} that keeps the room comfortable while still delivering impact when needed.`);
+  } else if (builtAround.length > 0) {
     vision.push(`This room is designed as a ${compact}dedicated cinema around ${joinList(builtAround)}, with the picture, the front stage, the sound around the seating and the low-frequency support planned together around the way the room will actually be used.`);
   } else if (projection) {
     vision.push(mountMode === 'baffle'
@@ -195,7 +220,7 @@ export function buildProjectReportSummaryOpening({
   }
   if (overheadCount > 0) {
     vision.push('The overhead layer is part of the original design rather than an addition to it, which is what gives the room its sense of scale.');
-  } else if (surroundCount > 0) {
+  } else if (surroundCount > 0 && !mediaRoom) {
     vision.push('The sound is carried around and behind the seating as well as across the front, so the audience sits inside the surround field rather than in front of it.');
   }
 
@@ -203,35 +228,49 @@ export function buildProjectReportSummaryOpening({
   // the sound and the seating work together in this particular room.
   const reasoning = [];
   const rowCount = seatingRowCount(seatingPositions);
-  if (rowCount > 0) {
-    const reference = String(projectDetails?.mlp_basis || '').trim() === 'middle'
-      ? ', with the reference position taken at the middle of the seating rather than at one privileged chair'
-      : '';
-    const clearance = seatingBoundary?.available === true && seatingBoundary?.favourable === true
-      ? 'well inboard of the side and rear walls'
-      : 'as far inboard of the side and rear walls as the room allows';
-    const subject = rowCount === 1
-      ? 'The single seating row sits'
-      : `The ${word(rowCount)} seating rows sit`;
-    reasoning.push(`${subject} ${clearance}${reference}, so the design answers from where the audience actually sits.`);
-  }
-  // What the system is there to do, stated only for the layers this design
-  // actually has, and saying which end the bass is delivered from.
-  const focus = [
-    productParts(productsSelected?.lcr).length > 0 && 'clear dialogue and effects from the screen',
-    surroundCount > 0 && 'convincing surround movement around the seating',
-    subwooferSchedule.length > 0 && `controlled low-frequency support ${bassSupportPhrase(subwooferSchedule)}`,
-  ].filter(Boolean);
-  if (focus.length > 0) {
-    const layerLabel = architecture ? `The ${architecture} system` : 'The system';
-    reasoning.push(`${layerLabel} concentrates on ${joinList(focus)}.`);
+  if (mediaRoom) {
+    // The everyday account, for the room this system is actually used in. The
+    // seating is a fact the page's own fact sheet states; it is not the story
+    // here, so the arrangement is not argued a second time in the paragraph.
+    const focus = [
+      productParts(productsSelected?.lcr).length > 0 && 'clear dialogue from the screen',
+      surroundCount > 0 && 'surround movement around the seating',
+      subwooferSchedule.length > 0 && `useful bass support ${statedBassPhrase(subwooferSchedule)}`,
+    ].filter(Boolean);
+    if (focus.length > 0) reasoning.push(`The system gives ${joinList(focus)}.`);
+  } else {
+    if (rowCount > 0) {
+      const reference = String(projectDetails?.mlp_basis || '').trim() === 'middle'
+        ? ', with the reference position taken at the middle of the seating rather than at one privileged chair'
+        : '';
+      const clearance = seatingBoundary?.available === true && seatingBoundary?.favourable === true
+        ? 'well inboard of the side and rear walls'
+        : 'as far inboard of the side and rear walls as the room allows';
+      const subject = rowCount === 1
+        ? 'The single seating row sits'
+        : `The ${word(rowCount)} seating rows sit`;
+      reasoning.push(`${subject} ${clearance}${reference}, so the design answers from where the audience actually sits.`);
+    }
+    // What the system is there to do, stated only for the layers this design
+    // actually has, and saying which end the bass is delivered from.
+    const focus = [
+      productParts(productsSelected?.lcr).length > 0 && 'clear dialogue and effects from the screen',
+      surroundCount > 0 && 'convincing surround movement around the seating',
+      subwooferSchedule.length > 0 && `controlled low-frequency support ${bassSupportPhrase(subwooferSchedule)}`,
+    ].filter(Boolean);
+    if (focus.length > 0) {
+      const layerLabel = architecture ? `The ${architecture} system` : 'The system';
+      reasoning.push(`${layerLabel} concentrates on ${joinList(focus)}.`);
+    }
   }
   if (treated) {
     const treatmentParts = productParts(productsSelected?.acoustic_treatment);
     const treatmentModel = partModel(treatmentParts[0]) || 'acoustic treatment';
     const treatmentQty = totalCount(productsSelected?.acoustic_treatment);
     const panels = `${countWord(treatmentQty)} ${treatmentModel} panel${treatmentQty === 1 ? '' : 's'}`;
-    reasoning.push(`${panels} ${treatmentQty === 1 ? 'is' : 'are'} included to manage the strongest early reflections, so the room stays clear and comfortable rather than overly live.`);
+    reasoning.push(mediaRoom
+      ? `${panels} help control the strongest reflections, keeping the room clear, natural and inviting.`
+      : `${panels} ${treatmentQty === 1 ? 'is' : 'are'} included to manage the strongest early reflections, so the room stays clear and comfortable rather than overly live.`);
   }
 
   const paragraphs = [vision.join(' '), reasoning.join(' ')].filter(Boolean);

@@ -20,6 +20,7 @@
  * Pure module: no React, no DOM, no side effects.
  */
 
+import { isTvDisplay } from '@/components/models/screen/displayTypeAuthority';
 import {
   buildProjectReportSummaryOpening,
   isCompactRoom,
@@ -65,11 +66,15 @@ export function buildProjectReportOpening({
   const display = screenPhrase(projectDetails);
   const compact = isCompactRoom(roomDims) ? 'compact ' : '';
 
-  const headline = architecture
-    ? (display
-      ? `A ${compact}${architecture} cinema designed around a ${display}`
-      : `A ${compact}${architecture} cinema`)
-    : (display ? `A ${compact}cinema designed around a ${display}` : null);
+  // A lounge / media-room television design leads as the room it is rather than as
+  // a cinema; a projection design keeps its cinema headline unchanged.
+  const headline = isTvDisplay(projectDetails) && display
+    ? `A relaxed high-performance media room built around a large ${display}`
+    : architecture
+      ? (display
+        ? `A ${compact}${architecture} cinema designed around a ${display}`
+        : `A ${compact}${architecture} cinema`)
+      : (display ? `A ${compact}cinema designed around a ${display}` : null);
 
   const supportingLine = [
     screenPhrase(projectDetails),
