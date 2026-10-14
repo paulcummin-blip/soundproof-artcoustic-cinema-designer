@@ -33,7 +33,7 @@ import { levelRank } from './strengthImportance.js';
 import { SEAT_SCOPE, p20ConsistencyPhrase } from './seatScopeNarrativeAuthority.js';
 
 /** The pillar generation, so a draft can be traced to the story structure it was written under. */
-export const NARRATIVE_PILLAR_VERSION = 2;
+export const NARRATIVE_PILLAR_VERSION = 3;
 
 export const PILLAR = Object.freeze({
   DYNAMIC_RANGE: 'dynamic_range',
@@ -168,6 +168,7 @@ export function pillarMemberKeys(pillarKey) {
 export const BASS_PARTS = Object.freeze([
   Object.freeze({
     part: 'output',
+    label: 'the low-frequency output',
     keys: Object.freeze(['p14']),
     question: 'How much output is available for the largest moments?',
     area: PERFORMANCE_AREAS.BASS_OUTPUT,
@@ -176,6 +177,7 @@ export const BASS_PARTS = Object.freeze([
   }),
   Object.freeze({
     part: 'depth',
+    label: 'bass depth',
     keys: Object.freeze(['p18']),
     question: 'How low does the system reach, and how much scale does that give the deepest moments?',
     area: PERFORMANCE_AREAS.BASS_EXTENSION,
@@ -224,6 +226,7 @@ export const BASS_PART_ORDER = Object.freeze(BASS_PARTS.map((part) => part.part)
 export const DYNAMIC_RANGE_SYSTEM_PARTS = Object.freeze([
   Object.freeze({
     part: 'screen_channels',
+    label: 'the screen channels',
     keys: Object.freeze(['p12']),
     question: 'Can dialogue and quiet detail remain clear, and can the front stage produce the major peaks cleanly?',
     area: PERFORMANCE_AREAS.DYNAMIC_RANGE,
@@ -232,6 +235,7 @@ export const DYNAMIC_RANGE_SYSTEM_PARTS = Object.freeze([
   }),
   Object.freeze({
     part: 'surround_channels',
+    label: 'the surrounds',
     keys: Object.freeze(['p13']),
     question: 'Can the surrounds keep up when the soundtrack becomes busy?',
     area: PERFORMANCE_AREAS.DYNAMIC_RANGE,

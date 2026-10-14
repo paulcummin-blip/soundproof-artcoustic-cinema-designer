@@ -102,6 +102,19 @@ export default async function (req) {
         // much space the pillar gets, the lead evidence decides which result leads it.
         lead_note: pillar.lead_note,
         lead_evidence: pillar.lead_evidence || null,
+        // HOW THE PILLAR OPENS: Dynamic Range opens on the client experience, at the
+        // strength its carrying results earned, with the layer to emphasise inside the
+        // story. The level ranking never decides the sentence order.
+        opening: pillar.opening
+          ? {
+            tier: pillar.opening.tier,
+            claim: pillar.opening.claim,
+            strongest_level: pillar.opening.strongest_level,
+            read_from: pillar.opening.read_from,
+            emphasis: pillar.opening.emphasis,
+            evidence_order: pillar.opening.evidence_order,
+          }
+          : null,
         seat_narration: pillar.seat_narration || null,
         seat_narration_rule: pillar.seat_narration_rule || null,
         brief_relevance: pillar.brief_relevance,

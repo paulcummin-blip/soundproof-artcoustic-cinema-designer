@@ -52,6 +52,13 @@ import { performancePhrase } from './performanceLanguageAuthority.js';
 // authority (what leads this pillar), while the pillar's role stays the global
 // narrative priority (how much space it gets).
 import { leadNoteOf, partLevel, pillarLeadEvidence, withoutSeatNarration } from './narrativePillarLeadAuthority.js';
+// Dynamic Range OPENS ON THE CLIENT EXPERIENCE, never on a result: its opening claim,
+// its emphasis and the rule that keeps the sentence order off the level ranking.
+import {
+  DYNAMIC_RANGE_EVIDENCE_WEAVE_RULE,
+  DYNAMIC_RANGE_OPENING_RULE,
+  dynamicRangeOpening,
+} from './narrativeDynamicRangeOpening.js';
 import {
   NARRATIVE_PRIORITY,
   PRIORITY_LABEL,
@@ -219,6 +226,7 @@ function partOf(part, members) {
   const excluded = rows.length > 0 && rows.every((member) => member.emphasis === EVIDENCE_EMPHASIS.EXCLUDED);
   return {
     part: part.part,
+    label: part.label ?? null,
     question: part.question,
     parameter_ids: part.keys.map((key) => key.toUpperCase()),
     vocabulary: [...part.vocabulary],
@@ -381,6 +389,24 @@ export function buildClientStoryPillars({
       ? DYNAMIC_RANGE_SYSTEM_PARTS.map((part) => partOf(part, members))
       : [];
     const parts = pillarKey === PILLAR.DYNAMIC_RANGE ? BASS_PARTS.map((part) => partOf(part, members)) : [];
+    // HOW THE PILLAR OPENS. Dynamic Range opens on the client experience, at the
+    // strength its CARRYING results have earned: the screen channels, the surrounds,
+    // the low-frequency output and the bass depth. The levels scale the opening claim
+    // and decide which layer is emphasised — they never decide the sentence order, so
+    // the strongest result is never the opening line by right. A qualifier (the bass
+    // control) carries no claim of its own and is never read into the opening.
+    const opening = pillarKey === PILLAR.DYNAMIC_RANGE
+      ? dynamicRangeOpening({
+        carryingParts: [
+          ...systemParts
+            .filter((part) => part.available)
+            .map((part) => ({ part: part.part, label: part.label, level: part.level })),
+          ...parts
+            .filter((part) => !part.supporting && part.available)
+            .map((part) => ({ part: part.part, label: part.label, level: part.level })),
+        ],
+      })
+      : null;
     const clauses = [...new Set([
       ...systemParts.map((part) => part.clause).filter(Boolean),
       ...parts.map((part) => part.clause).filter(Boolean),
@@ -418,7 +444,16 @@ export function buildClientStoryPillars({
         vocabulary: seatingSuppressed ? [] : leads.sentences,
         rule: leads.rule,
       },
-      lead_note: leadNoteOf(leads, PRIORITY_LABEL[role] || null),
+      lead_note: [
+        leadNoteOf(leads, PRIORITY_LABEL[role] || null),
+        opening?.tier
+          ? ` DYNAMIC RANGE OPENS ON ITS OPENING CLAIM (${opening.tier}), at the strength the system's carrying results have earned: the lead result is written as the strongest SUPPORTING evidence inside that story, never as the opening sentence.`
+          : null,
+      ].filter(Boolean).join(''),
+      // HOW THE PILLAR OPENS: the client experience first, then the system's own
+      // evidence. The level ranking scales the claim and decides which layer is
+      // emphasised; it never decides the sentence order.
+      opening,
       seat_narration: seatingSuppressed ? 'banned' : 'allowed',
       seat_narration_rule: seatingSuppressed ? SEAT_FREE_PILLAR_EVIDENCE_RULE : null,
       rank: ranks.length > 0 ? Math.min(...ranks) : null,
@@ -572,6 +607,11 @@ export function clientStoryPillarRules() {
     // Dynamic Range is the whole system's story: this is the rule that keeps it from
     // collapsing into a bass story, and the rule that lets one result serve two pillars.
     dynamic_range_rule: DYNAMIC_RANGE_SYSTEM_RULE,
+    // THE OPENING IS AN EXPERIENCE, NOT A RESULT: the claim comes first, its evidence
+    // second, and the level ranking never decides the sentence order.
+    opening_rule: DYNAMIC_RANGE_OPENING_RULE,
+    opening_weave_rule: DYNAMIC_RANGE_EVIDENCE_WEAVE_RULE,
+    opening_field: 'pillars[].opening — the opening claim, the strength it was read from, the layer to emphasise and the evidence to support it with',
     cross_pillar_rule: CROSS_PILLAR_BASS_RULE,
     brief_rule: BRIEF_CONTEXT_RULE,
     seat_scope_rule: PRIMARY_SEAT_SCOPE_RULE,
@@ -649,6 +689,8 @@ export function clientStoryPillarLines() {
     EVIDENCE_NOT_HEADLINE_RULE,
     BASS_STORY_RULE,
     DYNAMIC_RANGE_SYSTEM_RULE,
+    DYNAMIC_RANGE_OPENING_RULE,
+    DYNAMIC_RANGE_EVIDENCE_WEAVE_RULE,
     CROSS_PILLAR_BASS_RULE,
     ...pillarReferenceLines(),
     INFRASONIC_RULE,
@@ -656,7 +698,7 @@ export function clientStoryPillarLines() {
     BRIEF_CONTEXT_RULE,
     SEATING_RATIONALE_NOTE,
     SEATING_RATIONALE_RULE,
-    'The pillar stories for each option are carried in evidence.options[].client_story_pillars, with each result\'s emphasis, the whole-system readings of Dynamic Range (system_parts), the readings of the bass beneath it (parts), the clause each result has earned, the claims to cite and the seats each claim holds for: write all three pillars, read Dynamic Range across the screen channels, the surrounds and the bass together, and let each one\'s emphasis decide how much of its evidence the story tells.',
+    'The pillar stories for each option are carried in evidence.options[].client_story_pillars, with each result\'s emphasis, the whole-system readings of Dynamic Range (system_parts), the readings of the bass beneath it (parts), the clause each result has earned, the claims to cite and the seats each claim holds for: write all three pillars, read Dynamic Range across the screen channels, the surrounds and the bass together, and let each one\'s emphasis decide how much of its evidence the story tells. Dynamic Range also carries its OPENING CLAIM in pillars[].opening: begin that pillar with the claim at the strength it was read from, then support it with the system\'s evidence — the strongest carrying layer is given the emphasis inside the story and never the opening sentence by right.',
     'The seating rationale for each option is carried in evidence.options[].design_rationale: where it is available, explain why the seating sits where it does, in the section that already explains the seating, and never as a performance claim.',
     '',
   ];
