@@ -219,6 +219,11 @@ export async function runProposalCopyGeneration({
         dealerNotes,
         clarificationAnswers,
       }),
+      // The designer's narrative steer: soft preferences about what this proposal
+      // weighs and what it leaves out, read from the proposal record. They are
+      // never required sections, they add no claim, and the designer's own brief
+      // outranks them.
+      narrativeSteer: proposal?.metadata?.narrative_steer || null,
     });
     assertWriterInputCarriesNoLiveState(writerInput);
   } catch (error) {

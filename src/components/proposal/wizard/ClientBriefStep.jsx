@@ -1,34 +1,41 @@
 import React from 'react';
 import AdiSuggestionChips from '@/components/proposal/wizard/AdiSuggestionChips';
 import ComparisonMessagePrompt from '@/components/proposal/wizard/ComparisonMessagePrompt';
-import { appendSelectedPrompts } from '@/components/proposal/wizard/clientBriefChips';
 
 /**
- * Step 4 — Client Brief & Narrative Focus.
+ * Step 4 — Client Brief & Narrative Steer.
  *
- * Replaces the legacy Narrative Goal selector with a free-text briefing
- * area. The brief guides the narrative emphasis, wording, and structure
- * of the generated proposal. It NEVER alters engineering results, RP22
- * values, Design Ratings, or recommendations.
+ * Two separate things live here, and they carry different authority:
  *
- * Suggestions under the brief are ADI-generated from this project's
- * calculated design results (see AdiSuggestionChips). When two or more versions
- * are selected, the suggestions compare those versions and are read from each
- * selected version's own frozen snapshot.
+ *   THE BRIEF — the designer's own words about what matters in this design and
+ *   why they are recommending it. It is the strongest narrative authority in the
+ *   document, it guides wording and emphasis, and it NEVER alters engineering
+ *   results, RP22 values, Design Ratings or recommendations.
+ *
+ *   THE NARRATIVE STEER — the topics ADI should weigh, each in one of three
+ *   states: neutral, prefer, or do not discuss. A preference is an ingredient,
+ *   not a section plan: it can appear briefly, in passing, combined with another
+ *   point, or not at all where forcing it would damage the writing. "Do not
+ *   discuss" keeps a topic out of the client-facing narrative and touches no
+ *   evidence, no reported result and no technical table.
+ *
+ * The topics under the brief are ADI's own suggestions, derived from this
+ * project's strongest published evidence (see AdiSuggestionChips). Selecting one
+ * never writes anything into the brief.
  *
  * Anything ADI cannot explain from the evidence — a design decision with no reason
  * on record — is asked about on the Clarifications step that follows, where it
  * collects a real answer or is passed. No question is ever written into the brief.
  *
- * The brief is optional — the user can proceed without it and the report
- * will generate with a default professional narrative.
- *
- * Example chips are multi-select: the user marks several, then adds them all at
- * once. Until then the brief is untouched.
+ * The brief is optional — the user can proceed without either and the proposal
+ * will generate intelligently from the project intent, the strongest design
+ * highlights and the published evidence.
  */
 export default function ClientBriefStep({
   value,
   onChange,
+  steer = {},
+  onSteerChange,
   projectId,
   selectedVersionIds,
   proposalType,
@@ -39,15 +46,6 @@ export default function ClientBriefStep({
   existingClarifications = [],
   onClarifications,
 }) {
-  // The confirmed chip prompts are inserted together, as bullets, and a prompt
-  // the brief already contains is never added again. Returns what was added and
-  // what was already there so the chips can say so.
-  const handleAddSelected = (examples) => {
-    const result = appendSelectedPrompts(value, examples);
-    if (result.added.length > 0) onChange(result.next);
-    return result;
-  };
-
   return (
     <div>
       <div className="mb-6">
@@ -55,7 +53,7 @@ export default function ClientBriefStep({
           className="text-lg font-semibold text-[#1B1A1A] mb-2"
           style={{ fontFamily: 'Didact Gothic, sans-serif' }}
         >
-          Client Brief &amp; Narrative Focus
+          Client Brief &amp; Narrative Steer
         </h3>
         <p
           className="text-sm font-semibold text-[#1B1A1A] mb-1"
@@ -66,7 +64,7 @@ export default function ClientBriefStep({
         <p className="text-xs text-[#625143] leading-relaxed">
           Tell us about the client&apos;s priorities, practical constraints and decisions behind your
           recommendation. What have you prioritised, where have you made compromises, and why is this
-          the right solution?
+          the right solution? Your words here carry more weight than any topic you steer below.
         </p>
       </div>
 
@@ -89,8 +87,9 @@ export default function ClientBriefStep({
         versionsLoading={versionsLoading}
         snapshotLoading={snapshotLoading}
         existingClarifications={existingClarifications}
+        steer={steer}
+        onSteerChange={onSteerChange}
         onClarifications={onClarifications}
-        onAddSelected={handleAddSelected}
       />
 
       {/* Asked only when the project's Library holds comparison images that

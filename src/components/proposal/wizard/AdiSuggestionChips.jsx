@@ -1,13 +1,23 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Check, Lightbulb, RefreshCw } from 'lucide-react';
+import { Lightbulb, RefreshCw } from 'lucide-react';
 import { base44 } from '@/api/base44Client';
 import log from '@/components/utils/logger';
-import { toggleChipSelection } from '@/components/proposal/wizard/clientBriefChips';
+import NarrativeSteerChip from '@/components/proposal/wizard/NarrativeSteerChip';
 import { SUGGESTION_TIMEOUT_MS, settleWithin } from '@/components/proposal/wizard/suggestionRequestBounding';
+import {
+  STEER_HELPER,
+  STEER_STATE,
+  STEER_STATE_LABEL,
+  STEER_STATE_MEANING,
+  STEER_STATE_ORDER,
+  STEER_TITLE,
+  cycleTopicState,
+  presentSteerTopics,
+  steerStateOf,
+} from '@/components/proposal/wizard/narrativeSteer';
 import {
   buildEvidenceSuggestions,
   mergeSuggestions,
-  pruneSelection,
   COMPARISON_GENERAL_EXAMPLES,
   FAILED_NOTE,
   GENERAL_EXAMPLES,
@@ -17,34 +27,32 @@ import {
 } from '@/components/proposal/wizard/adiEvidenceSuggestions';
 
 /**
- * ADI narrative focus suggestions for the Client Brief step.
+ * NARRATIVE STEER — the topics the designer wants ADI to weigh, in three states.
  *
- * The examples are ALWAYS on screen. Two sets are shown, in this order of value:
+ * The evidence examples are ALWAYS on screen, in this order of value:
  *
  *   1. Project-specific examples, built in code from this project's frozen
  *      Engineering Snapshot by adiEvidenceSuggestions.js — no request, no model,
- *      no waiting. They appear the moment the snapshot is readable, and they say
- *      "Explain the 9.1.6 system layout" rather than a generic prompt.
+ *      no waiting. They appear the moment the snapshot is readable.
  *   2. General examples, shown from the instant the step opens and for as long as
  *      project-specific ones are not yet readable. They are labelled as general,
  *      so they are never read as this design's facts.
  *
  * The ADI function then REFINES the list in the background. It can only add
  * examples: a refinement that fails, times out or returns nothing leaves the
- * examples already on screen exactly as they are. Nothing about the suggestion
- * area — its visibility, its usability or the examples it shows — depends on
- * that request, and there is no loading state that can hide the examples.
+ * examples already on screen exactly as they are.
  *
- * The examples guide the wording and emphasis of the client report only. They
- * never change an engineering result, RP22 value, Design Index, table value or
- * recommendation.
+ * WHAT THE DESIGNER SEES, though, is not an example and not an instruction: it is
+ * the TOPIC each example belongs to, as a neutral subject ("Bass extension",
+ * '100" TV', "Seating arrangement"), with three states — neutral, prefer, do not
+ * discuss. The example's own wording and figure stay in the chip's description,
+ * so nothing is lost, and the state supplies the instruction. A selected topic is
+ * never written into the Client Brief: the brief carries the designer's own words,
+ * and the steer travels beside it as a preference.
  *
- * Chips are multi-select and purely local: clicking one only marks it selected —
- * nothing is written to the Client Brief until the user presses "Add selected to
- * brief". A late refinement never clears a selection the designer has made: only
- * a chip that is no longer offered is dropped. Leaving the step, or changing the
- * project or version, abandons whatever is in flight, so a stale response can
- * never update another version.
+ * Presentation only: none of this changes an engineering result, an RP22 value, a
+ * Design Index, a table value or a recommendation. "Do not discuss" steers the
+ * client-facing narrative alone.
  */
 export default function AdiSuggestionChips({
   projectId,
@@ -62,19 +70,18 @@ export default function AdiSuggestionChips({
   // ADI never asks the same question twice; the answers themselves are collected on
   // the Clarifications step and never written into the brief.
   existingClarifications = [],
-  onAddSelected,
+  // The narrative steer: { topic_key: { state, label } }. Read here and written
+  // through onSteerChange — never into the brief.
+  steer = {},
+  onSteerChange,
   onClarifications,
 }) {
-  // The refined examples ADI adds. Never the reason an example is on screen.
+  // The refined examples ADI adds. Never the reason a topic is on screen.
   const [refined, setRefined] = useState([]);
   const [refining, setRefining] = useState(false);
   // 'idle' | 'refining' | 'timedOut' | 'failed' — how the refinement ended. The
-  // examples on screen are unaffected by every one of these.
+  // topics on screen are unaffected by every one of these.
   const [refinement, setRefinement] = useState('idle');
-  // Local, unconfirmed chip selection: cleared when the examples themselves
-  // change, and handed to the brief only when the user confirms.
-  const [selected, setSelected] = useState([]);
-  const [duplicateNotice, setDuplicateNotice] = useState(null);
   const requestRef = useRef(0);
   const stepOpenedAtRef = useRef(Date.now());
   const evidenceReadLoggedRef = useRef(false);
@@ -91,7 +98,7 @@ export default function AdiSuggestionChips({
 
   // ── The identity of the frozen evidence behind these examples ────────────
   // A different version, a different selection, or a publication that has moved
-  // on is a different set of evidence, and so a different set of examples.
+  // on is a different set of evidence, and so a different set of topics.
   const selectedCount = Math.max(
     (selectedVersionIds || []).length,
     (versionSnapshots || []).length,
@@ -102,8 +109,7 @@ export default function AdiSuggestionChips({
   const comparisonReady = availableVersionEntries.length > 1
     && availableVersionEntries.length >= selectedCount;
   // A refinement is only worth asking for once a calculated result exists for
-  // every selected version: without one there is nothing for ADI to read, and the
-  // examples already on screen cover the step.
+  // every selected version: without one there is nothing for ADI to read.
   const hasResults = comparisonSelected
     ? comparisonReady
     : engineeringSnapshot?.available === true;
@@ -120,9 +126,8 @@ export default function AdiSuggestionChips({
 
   // ── The project-specific examples, built here and now ────────────────────
   // Synchronous: read from the frozen snapshot already in hand. Nothing is
-  // calculated and nothing is fetched, so the examples are on screen in the same
-  // render that the evidence becomes readable. Keyed on the evidence identity, so
-  // this runs once per selection rather than once per re-render.
+  // calculated and nothing is fetched, so the topics are on screen in the same
+  // render that the evidence becomes readable.
   const evidence = useMemo(() => {
     const startedAt = Date.now();
     const built = buildEvidenceSuggestions({
@@ -152,6 +157,22 @@ export default function AdiSuggestionChips({
   );
   const chipsKey = chips.map((entry) => entry.label).join('|');
   shownCountRef.current = chips.length;
+
+  // ── The topics the designer actually steers ──────────────────────────────
+  // Each example is mapped to the topic it belongs to, so the chip reads as a
+  // subject and the example's own wording moves into its description. Topics ADI
+  // suggests are suggested because their own result is strong: a weak result is
+  // offered without being promoted.
+  const topics = useMemo(
+    () => presentSteerTopics({ chips }),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [chipsKey],
+  );
+
+  const cycleTopic = useCallback((topic) => {
+    onSteerChange?.(cycleTopicState(steer, topic.topic_key, topic.label));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [steer, onSteerChange]);
 
   // The request reads its payload from refs, so it is never re-created (and never
   // re-fired) merely because a parent re-rendered with a new object.
@@ -185,8 +206,8 @@ export default function AdiSuggestionChips({
     const startedAt = Date.now();
     // The wait is bounded, so a slow refinement can never leave the area waiting
     // on it. A response arriving after the wait is discarded by the bounding
-    // promise: it is never delivered, so it can neither remove an example nor
-    // touch the brief.
+    // promise: it is never delivered, so it can neither remove a topic nor touch
+    // a steer the designer has already set.
     const result = await settleWithin(Promise.resolve().then(() => base44.functions.invoke('generateAdiNarrativeSuggestions', payloadRef.current)));
 
     // A request superseded by a newer one, or left behind by the step being
@@ -195,13 +216,13 @@ export default function AdiSuggestionChips({
 
     const elapsed = Date.now() - startedAt;
     if (result.status === 'timeout') {
-      console.warn(`[AdiSuggestionChips] refinement did not settle within ${SUGGESTION_TIMEOUT_MS / 1000}s; examples retained.`);
+      console.warn(`[AdiSuggestionChips] refinement did not settle within ${SUGGESTION_TIMEOUT_MS / 1000}s; topics retained.`);
       setRefinement('timedOut');
       setRefining(false);
       return;
     }
     if (result.status === 'failed') {
-      console.error('[AdiSuggestionChips] refinement failed; examples retained:', result.error);
+      console.error('[AdiSuggestionChips] refinement failed; topics retained:', result.error);
       setRefinement('failed');
       setRefining(false);
       return;
@@ -216,14 +237,9 @@ export default function AdiSuggestionChips({
     // The questions ADI cannot answer itself belong to the Clarifications step,
     // which collects a real answer: they are never offered as brief text.
     onClarificationsRef.current?.(data.clarifications || []);
-    // The measured stages, so the request can be judged on numbers rather than
-    // assumed to be the slow part: the frozen evidence wait, the deterministic
-    // build and the refinement are reported separately, and the server reports
-    // its own stages alongside them.
     log.debug('[AdiSuggestionChips] refinement stages', {
       refinementMs: elapsed,
       refinementStatus: 'settled',
-      serverTimings: data.timings || null,
       added: list.length,
       shown: shownCountRef.current,
     });
@@ -243,13 +259,13 @@ export default function AdiSuggestionChips({
   }, [evidenceKey, hasResults, load]);
 
   // Leaving the step abandons whatever is still in flight: a late response can
-  // never reach a suggestion area that is no longer on screen.
+  // never reach a steer area that is no longer on screen.
   useEffect(() => () => {
     requestRef.current += 1;
   }, []);
 
   // The frozen evidence became readable: record how long that took, once, so the
-  // wait for project-specific examples is a measured number rather than a guess.
+  // wait for project-specific topics is a measured number rather than a guess.
   useEffect(() => {
     if (!hasResults || evidenceReadLoggedRef.current) return;
     evidenceReadLoggedRef.current = true;
@@ -260,64 +276,8 @@ export default function AdiSuggestionChips({
     });
   }, [hasResults, evidence.evidenceBacked, snapshotLoading, versionsLoading]);
 
-  // A selection survives a refinement: only a chip that is no longer offered is
-  // dropped, so a late response never resets what the designer has chosen.
-  useEffect(() => {
-    setSelected((current) => {
-      const next = pruneSelection(current, chips);
-      return next.length === current.length ? current : next;
-    });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [chipsKey]);
-
-  const toggleChip = (label) => {
-    setDuplicateNotice(null);
-    setSelected((current) => toggleChipSelection(current, label));
-  };
-
-  const clearSelection = () => {
-    setSelected([]);
-    setDuplicateNotice(null);
-  };
-
-  const confirmSelection = () => {
-    if (selected.length === 0) return;
-    const result = onAddSelected?.(selected) || {};
-    const duplicates = result.duplicates || [];
-    setDuplicateNotice(
-      duplicates.length === 0
-        ? null
-        : duplicates.length === 1
-          ? `Already in the brief: ${duplicates[0]}`
-          : `Already in the brief: ${duplicates.slice(0, 2).join(', ')}${duplicates.length > 2 ? ` and ${duplicates.length - 2} more` : ''}`,
-    );
-    setSelected([]);
-  };
-
-  // One chip, rendered the same way wherever it is offered.
-  const renderChip = (entry) => {
-    const isSelected = selected.includes(entry.label);
-    return (
-      <button
-        key={entry.label}
-        type="button"
-        title={entry.reason || undefined}
-        aria-pressed={isSelected}
-        onClick={() => toggleChip(entry.label)}
-        className={`inline-flex items-center gap-1.5 px-3 py-1.5 text-xs rounded-full border transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[#213428]/40 focus-visible:ring-offset-1 ${
-          isSelected
-            ? 'bg-[#213428] text-white border-[#213428] font-semibold'
-            : 'text-[#3E4349] bg-[#F5F4F0] border-[#E5E1D8] hover:bg-[#213428] hover:text-white hover:border-[#213428]'
-        }`}
-      >
-        {isSelected && <Check className="w-3 h-3" />}
-        {entry.label}
-      </button>
-    );
-  };
-
-  // The only status text this area ever shows: quiet, below the examples, and
-  // never a reason for the examples to be missing.
+  // The only status text this area ever shows: quiet, below the topics, and never
+  // a reason for the topics to be missing.
   const statusNote = refining && refinement === 'refining'
     ? REFINING_NOTE
     : refinement === 'timedOut'
@@ -326,6 +286,11 @@ export default function AdiSuggestionChips({
         ? FAILED_NOTE
         : null;
   const showGeneralNotice = !evidence.evidenceBacked && refined.length === 0;
+  const steeredCount = STEER_STATE_ORDER
+    .filter((state) => state !== STEER_STATE.NEUTRAL)
+    .reduce((total, state) => (
+      total + topics.filter((topic) => steerStateOf(steer, topic.topic_key) === state).length
+    ), 0);
 
   return (
     <div className="mt-6">
@@ -333,7 +298,7 @@ export default function AdiSuggestionChips({
         <div className="flex items-center gap-2">
           <Lightbulb className="w-3.5 h-3.5 text-[#A79E8C]" />
           <span className="text-[11px] uppercase tracking-[0.12em] text-[#A79E8C]">
-            {'Examples, powered by Artcoustic Design Intelligence'}
+            {`${STEER_TITLE}, powered by Artcoustic Design Intelligence`}
           </span>
         </div>
         {hasResults && !refining && (
@@ -343,17 +308,47 @@ export default function AdiSuggestionChips({
             className="flex items-center gap-1.5 text-[11px] text-[#625143] hover:text-[#213428] transition-colors"
           >
             <RefreshCw className="w-3 h-3" />
-            {'Refresh examples'}
+            {'Refresh suggestions'}
           </button>
         )}
       </div>
+
+      <p className="text-[11px] text-[#625143] leading-relaxed mb-3">{STEER_HELPER}</p>
 
       {showGeneralNotice && (
         <p className="text-[11px] text-[#8A8477] mb-3">{GENERAL_NOTICE}</p>
       )}
 
-      {/* The examples are always here: never hidden, never empty, never waiting. */}
-      <div className="flex flex-wrap gap-2">{chips.map(renderChip)}</div>
+      {/* The topics are always here: never hidden, never empty, never waiting.
+          One click moves a topic to its next state, so the state carries the
+          instruction and the topic name stays a subject. */}
+      <div className="flex flex-wrap gap-2">
+        {topics.map((topic) => (
+          <NarrativeSteerChip
+            key={topic.topic_key}
+            label={topic.label}
+            state={steerStateOf(steer, topic.topic_key)}
+            reason={topic.reason}
+            suggested={topic.suggested}
+            onCycle={() => cycleTopic(topic)}
+          />
+        ))}
+      </div>
+
+      <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1">
+        {STEER_STATE_ORDER.map((state) => (
+          <span key={state} className="text-[11px] text-[#8A8477]">
+            <span className="font-semibold text-[#625143]">{STEER_STATE_LABEL[state]}</span>
+            {` — ${STEER_STATE_MEANING[state]}`}
+          </span>
+        ))}
+      </div>
+
+      {steeredCount > 0 && (
+        <p className="mt-2 text-[11px] text-[#625143]">
+          {`${steeredCount} topic${steeredCount === 1 ? '' : 's'} steered. These guide the wording; they are not required sections.`}
+        </p>
+      )}
 
       {statusNote && (
         <p className="mt-2 text-[11px] text-[#8A8477]">
@@ -369,37 +364,6 @@ export default function AdiSuggestionChips({
             </button>
           )}
         </p>
-      )}
-
-      {/* Where an important design decision has no recorded reasoning, ADI asks a
-          short question about it — on the Clarifications step, which collects a real
-          answer. Nothing is added to the brief here, no question is ever published as
-          designer intent, and nothing has to be answered before generating. */}
-
-      {selected.length > 0 && (
-        <div className="mt-3 flex flex-wrap items-center gap-3">
-          <span className="text-[11px] font-semibold text-[#625143]">
-            {selected.length} selected
-          </span>
-          <button
-            type="button"
-            onClick={confirmSelection}
-            className="px-3 py-1.5 text-xs font-semibold text-white bg-[#213428] rounded-md hover:bg-[#2C4436] transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[#213428]/40 focus-visible:ring-offset-1"
-          >
-            Add selected to brief
-          </button>
-          <button
-            type="button"
-            onClick={clearSelection}
-            className="text-[11px] text-[#625143] underline underline-offset-2 hover:text-[#213428] transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[#213428]/40 rounded"
-          >
-            Clear selection
-          </button>
-        </div>
-      )}
-
-      {duplicateNotice && (
-        <p className="mt-2 text-[11px] text-[#8A5A2B]">{duplicateNotice}</p>
       )}
     </div>
   );

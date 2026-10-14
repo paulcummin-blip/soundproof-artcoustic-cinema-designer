@@ -22,6 +22,8 @@ import { composeWriterSectionBodies } from '../../shared/proposalWriter/writerSe
 // writes it. Wording only: no figure, level, product or claim is touched.
 import { removeAbsentFeatureFraming } from '../../shared/proposalWriter/absentFeatureFraming.js';
 import { removeParameterCommentary } from '../../shared/clientNarrativeRegister.js';
+import { suppressExcludedNarrative } from '../../shared/proposalNarrativeExclusions.js';
+import { normaliseNarrativeSteer } from '../../shared/proposalWriter/writerNarrativeSteerRules.js';
 import { readProjectOptionGuidance } from '../../shared/proposalWriter/readProjectOptionGuidance.js';
 import { GPT_WRITER_FLAG_FIELD, normaliseGptWriterConfig } from '../../shared/proposalWriter/proposalWriterFlag.js';
 import { HIGHLIGHTS_SECTION_TYPE, PRESENTED_OPTIONS_SECTION_TYPE, resolveSectionTitle } from '../../shared/systemDesignSummarySections.js';
@@ -70,7 +72,25 @@ export default async function(req) {
     if (!user) return Response.json({ error: 'Unauthorized' }, { status: 401 });
 
     const body = await req.json();
-    const { request_id, project_id, version_id, account_id, narrative_goal, proposal_type, selected_version_ids, client_brief, parent_proposal_id, clarification_answers } = body;
+    const { request_id, project_id, version_id, account_id, narrative_goal, proposal_type, selected_version_ids, client_brief, parent_proposal_id, clarification_answers, narrative_steer } = body;
+    // The designer's narrative steer: the subjects they want weighed and the
+    // subjects kept out of the client-facing narrative. Soft preferences only:
+    // they change no evidence, no result and no table, and they are never turned
+    // into required sections.
+    const narrativeSteerRecord = normaliseNarrativeSteer(
+      narrative_steer && typeof narrative_steer === 'object'
+        ? {
+          ...narrative_steer,
+          // A steer that names only keys is still a steer: its exclusions must
+          // reach the narrative suppression below.
+          excluded_topics: [
+            ...(Array.isArray(narrative_steer.excluded_topics) ? narrative_steer.excluded_topics : []),
+            ...(Array.isArray(narrative_steer.excluded_topic_keys) ? narrative_steer.excluded_topic_keys : []),
+          ],
+        }
+        : null,
+    );
+    const excludedNarrativeTopics = narrativeSteerRecord.excluded_topics;
     let engineering_snapshot = null;
 
     if (!request_id) return Response.json({ error: 'request_id required' }, { status: 400 });
@@ -404,6 +424,10 @@ export default async function(req) {
       // design story a report was written from can be audited later.
       metadata: {
         project_interpretation: primaryInterpretation,
+        // The designer's narrative steer, kept with the proposal it shaped: the
+        // subjects to weigh and the subjects kept out of the client-facing
+        // narrative. Stored so a regeneration is written under the same steer.
+        narrative_steer: narrativeSteerRecord,
         // The report identity every project fact in this proposal came from: the
         // primary version and its published engineering fingerprint. Kept with
         // the proposal, so the report a draft was written from stays auditable.
@@ -575,7 +599,10 @@ export default async function(req) {
     // still shows precisely what the writer returned.
     const bodyByType = new Map(bodies.map((body) => [
       body.section_type,
-      removeParameterCommentary(removeAbsentFeatureFraming(body.html, {})),
+      removeParameterCommentary(removeAbsentFeatureFraming(
+        suppressExcludedNarrative(body.html, { excluded: excludedNarrativeTopics }),
+        {},
+      )),
     ]));
     // The calculated highlights rows are frozen engineering evidence, not copy:
     // they are read from the same frozen snapshot the report was generated from,

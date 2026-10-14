@@ -46,6 +46,9 @@ import {
 } from './writerContractSchema.js';
 import { applyDesignSummaryBrief } from './designSummaryBrief.js';
 import {
+  buildNarrativeSteerBlock,
+} from './writerNarrativeSteerRules.js';
+import {
   CLIENT_NARRATIVE_REGISTER_RULE,
   PROPOSAL_PARAMETER_RESTRAINT_RULE,
 } from '../clientNarrativeRegister.js';
@@ -136,6 +139,11 @@ const NO_OPTION_GUIDANCE_REQUIREMENT =
  * @param {Object|null} [input.designContext] — buildWriterDesignContext output:
  *   the verified ADI project interpretation and the designer's editorial brief.
  *   With none, the writer is given the pack alone exactly as before.
+ * @param {Object|null} [input.narrativeSteer] — the designer's narrative steer:
+ *   the subjects they want weighed (preferred_topics) and the subjects kept out
+ *   of the client-facing narrative (excluded_topics). Carried as SOFT PREFERENCES,
+ *   never as requirements: a preferred topic is never turned into a section, a
+ *   paragraph, a heading or a claim.
  * @returns {Object} the writer input, carrying its own content fingerprint
  */
 export function buildWriterInput({
@@ -143,6 +151,7 @@ export function buildWriterInput({
   promptVersion = WRITER_PROMPT_VERSION,
   optionGuidance = null,
   designContext = null,
+  narrativeSteer = null,
 } = {}) {
   if (!pack || typeof pack !== 'object') {
     throw new Error('A frozen proposal evidence pack is required: the writer is given no other source.');
@@ -208,6 +217,14 @@ export function buildWriterInput({
     // such rather than left blank, so the audit always shows what was read.
     design_interpretation: context.design_interpretation,
     editorial_brief: context.editorial_brief,
+    // THE DESIGNER'S NARRATIVE STEER. What this proposal should weigh more
+    // heavily, and what it should leave out of the client-facing narrative,
+    // carried as SOFT PREFERENCES: subjects, never instructions and never a
+    // section plan. A preferred topic adds no claim, forces no paragraph and may
+    // legitimately go unwritten where the better story does not need it; the
+    // designer's own brief always outranks it. An excluded topic is kept out of
+    // the narrative and changes no evidence, no reported result and no table.
+    narrative_steer: buildNarrativeSteerBlock(narrativeSteer),
     // THE RP22 PROFESSIONAL DESIGN CONTEXT. Established design principles that
     // apply to this project, carried as context for explaining WHY a decision suits
     // this room. It is never evidence, it states no figure, level or product, it
