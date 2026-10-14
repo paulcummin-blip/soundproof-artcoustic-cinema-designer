@@ -169,6 +169,11 @@ export function buildProposalEvidence({
   // keeps out. Without one the context is empty and the classification falls back to
   // its own defaults — a pack built with no context is never given an invented one.
   const context = narrativeContext ? { ...narrativeContext } : buildProposalNarrativeContext({});
+  // The seating subject the designer steered away, where they did. It silences the
+  // seating rationale and the seat-consistency claim together, and it silences
+  // nothing else: the bass output, depth and control results are untouched.
+  const seatingSubjectSuppressed = (Array.isArray(context.suppressed_areas) ? context.suppressed_areas : [])
+    .includes('client_experience');
 
   // The ONE assumed-parameter admission rule for this proposal. With no request
   // context every assumed parameter stays excluded, exactly as before.
@@ -310,14 +315,21 @@ export function buildProposalEvidence({
     ...(compared
       ? [
         ...buildAllowedClaims(classification, options),
-        // The scoped seat-group claims: a result the saved evidence states for the
-        // primary or the secondary seats, at a level that carries a positive
-        // adjective. Minted per option, and only where that option's evidence
-        // states the scope's own level and the scope holds at least two seats.
-        ...options.flatMap((option, index) => buildScopedSeatClaims(option, index)),
         ...buildDesignClaims(classification, options, decisionFraming),
       ]
       : []),
+    // The scoped seat-group claims: a result the saved evidence states for the
+    // primary or the secondary seats, at a level that carries a positive
+    // adjective. Minted per option for EVERY proposal, single or compared: the seats
+    // the client actually uses are stated whichever way the design was chosen, and a
+    // scope is only ever claimed where the evidence states that scope's own level
+    // and the scope holds at least two seats. An all-seat result mints nothing here,
+    // so a whole-room consistency claim can never be written from a seat-group one.
+    // A scoped claim for the subject the designer steered away is dropped with the
+    // rest of that subject's narrative: the seat-consistency claim belongs to the
+    // seating subject, so a seating do-not-discuss states it nowhere.
+    ...options.flatMap((option, index) => buildScopedSeatClaims(option, index))
+      .filter((claim) => !(claim.area === 'p20' && seatingSubjectSuppressed)),
     // One claim per ranked strength story, for every option. A story claim is the
     // sentence a writer may state for that story, and its ID is the only claim ID
     // that story carries.

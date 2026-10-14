@@ -72,6 +72,12 @@ function optionRef(option) {
     // is given the pillars so related results are told as one story.
     client_story_pillars: (Array.isArray(option?.client_story_pillars) ? option.client_story_pillars : [])
       .map((pillar) => ({ ...pillar })),
+    // The seating design rationale (RP22 P1): WHY the seating sits where it does,
+    // in client language, with the claims that ground it. It is a design reason
+    // stated whatever the seating result is, so it is carried as evidence the
+    // writer may state rather than as a strength. Null when the designer steered
+    // the seating subject away, in which case nothing about it reaches the copy.
+    design_rationale: option?.design_rationale ? { ...option.design_rationale } : null,
   };
 }
 

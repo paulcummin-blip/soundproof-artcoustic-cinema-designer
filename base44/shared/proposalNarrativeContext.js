@@ -103,11 +103,15 @@ export function designContainmentFromFacts(facts = null) {
  * @returns {string|null} one of the brief intents, or null where nothing is stated
  */
 export function resolveBriefIntent({ declaredIntent = null, roomType = null, facts = null } = {}) {
-  const stated = [declaredIntent, roomType].filter(Boolean).join(' ').trim();
-  if (DEDICATED_INTENT_PATTERN.test(stated)) return BRIEF_INTENT.DEDICATED_CINEMA;
+  // The display the evidence states comes first, because it is the FACT: a design
+  // presenting on a television is a media room whatever the words around it say, and
+  // a room described as a cinema but built around a TV is exactly the case this
+  // distinction exists for.
   const displayType = String(facts?.screen?.display_type || '').toLowerCase();
   if (displayType === 'tv') return BRIEF_INTENT.MEDIA_LOUNGE;
-  if (displayType || facts?.screen != null) return BRIEF_INTENT.DEDICATED_CINEMA;
+  if (displayType) return BRIEF_INTENT.DEDICATED_CINEMA;
+  const stated = [declaredIntent, roomType].filter(Boolean).join(' ').trim();
+  if (DEDICATED_INTENT_PATTERN.test(stated)) return BRIEF_INTENT.DEDICATED_CINEMA;
   return null;
 }
 

@@ -408,7 +408,11 @@ export function buildNarrativePriorityRows({
         all: scoped.all ?? level,
         primary: scoped.primary,
         secondary: scoped.secondary,
-        split: scoped.primary != null && scoped.secondary != null,
+        // A scope that states its OWN result is stated for that scope. The primary
+        // seats reaching a positive result is what allows a primary-seat claim: it is
+        // never conditional on the secondary seats reaching one as well, because the
+        // client sits in the primary seats whether or not the occasional ones match.
+        split: scoped.primary != null,
         assessed: scoped.seat_count?.all ?? seats.assessed,
       }
       : {

@@ -30,6 +30,7 @@
  */
 
 import { buildProposalEvidence } from '../proposalEvidence/proposalEvidenceBuilder.js';
+import { buildProposalNarrativeContext } from '../proposalNarrativeContext.js';
 import { buildWriterInput } from '../proposalWriter/writerInputBuilder.js';
 import { buildWriterDesignContext } from '../proposalWriter/writerDesignContext.js';
 import { assertWriterInputCarriesNoLiveState } from '../proposalWriter/writerPromptBuilder.js';
@@ -203,7 +204,17 @@ export async function runProposalCopyGeneration({
   let pack = null;
   let writerInput = null;
   try {
-    pack = buildProposalEvidence({ versions, generatedAt: now, requestContext: proposalRequestContext(proposal) });
+    pack = buildProposalEvidence({
+      versions,
+      generatedAt: now,
+      requestContext: proposalRequestContext(proposal),
+      // THE PROJECT'S OWN CONTEXT, read from the proposal record and its verified
+      // interpretation: the intent, the room type, the designer's brief, the subjects
+      // their narrative steer keeps out, the seat scopes and the achieved results the
+      // reports state. It decides how much of each pillar is told and what is left
+      // out — never a figure, a level or a claim, and never live design state.
+      narrativeContext: buildProposalNarrativeContext({ proposal, interpretation: savedInterpretation }),
+    });
     // The design context the writer writes FROM: the ADI interpretation Stage 1
     // already produced for this proposal, verified against this frozen evidence,
     // and the designer's own brief. Neither is a source of figures.
