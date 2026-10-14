@@ -23,6 +23,7 @@
 
 import { UPGRADE_PATH_RULE, PROPOSAL_STAGE_RULE } from './proposalStageBoundary.js';
 import { buildHighChannelSectionRule } from './highChannelDensityRule.js';
+import { CLIENT_NARRATIVE_REGISTER_RULE } from './clientNarrativeRegister.js';
 
 export const HIGHLIGHTS_SECTION_TYPE = 'key_performance_highlights';
 
@@ -254,6 +255,10 @@ export function getSystemSummarySectionPrompt(sectionType, sectionTitle, layout 
     PROPOSAL_STAGE_RULE,
     '',
     UPGRADE_PATH_RULE,
+    // Every section is client-facing copy: the story the client is buying, never
+    // the mechanism that produces it, a count of channels, or a layer the design
+    // does not have.
+    CLIENT_NARRATIVE_REGISTER_RULE,
     buildHighChannelSectionRule(layout),
   ].filter(Boolean).join('\n');
 }

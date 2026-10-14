@@ -36,6 +36,13 @@
  *      comparison, an upgrade, a downgrade explanation or a budget trade-off,
  *      passed in as absentFeatureFramingAllowed.
  *
+ *   8. the parameter commentary that makes generated copy read like a machine: a
+ *      channel count used as a selling point, an explanation of how a mechanism
+ *      works, an account of what the room's boundaries or reflections do, and a
+ *      boundary distance stated in the main narrative. The register the writer is
+ *      given holds the same rule, and this is the deterministic half of it
+ *      (clientNarrativeRegister.js).
+ *
  * It only removes or rewrites wording. It never invents, changes or reorders a
  * value, a level, a parameter or a sentence's engineering meaning.
  *
@@ -46,6 +53,7 @@
 import { stripExcludedParameterSentences } from './clientFacingParameterAuthority.js';
 import { p17TradeoffSentences } from './p17TradeoffAuthority.js';
 import { removeAbsentFeatureFraming } from './proposalWriter/absentFeatureFraming.js';
+import { removeParameterCommentary } from './clientNarrativeRegister.js';
 
 const TABLE_BLOCK = /<table\b[\s\S]*?<\/table>/gi;
 const TABLE_TAG = /<\/?(?:table|thead|tbody|tfoot|tr|th|td|caption|colgroup|col)\b[^>]*>/gi;
@@ -320,7 +328,12 @@ export function sanitizeNarrativeHtml(html, options = {}) {
   const approved = enforceApprovedVocabulary(removeStraySectionHeadings(withoutAssumptions));
   // The design is described as it stands: an absent feature is never the subject
   // of a sentence unless the client asked for that comparison themselves.
-  return removeAbsentFeatureFraming(approved, { allowed: Boolean(options.absentFeatureFramingAllowed) });
+  const withoutAbsentFeatures = removeAbsentFeatureFraming(approved, { allowed: Boolean(options.absentFeatureFramingAllowed) });
+  // And it is described as the client experiences it: a channel count used as a
+  // selling point, a mechanism explained, a boundary distance quoted or a seating
+  // arrangement lectured is parameter commentary, and this copy is a
+  // recommendation to a client rather than a measurement.
+  return removeParameterCommentary(withoutAbsentFeatures);
 }
 
 export default sanitizeNarrativeHtml;

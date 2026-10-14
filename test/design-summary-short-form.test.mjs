@@ -15,6 +15,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 
 import {
+  DESIGN_OVERVIEW_SHORT_FORM,
   DESIGN_SUMMARY_SHORT_FORM,
   applyDesignSummaryBrief,
   isTvListenerLevelDesign,
@@ -82,6 +83,8 @@ test('TEST 3 — every other section keeps the contract\'s own brief', () => {
   for (const entry of contract) {
     const same = briefed.find((row) => row.section === entry.section);
     if (entry.section === DESIGN_SUMMARY_SHORT_FORM.section) continue;
+    // The Design Overview is briefed by the same authority, for the same case.
+    if (entry.section === DESIGN_OVERVIEW_SHORT_FORM.section) continue;
     assert.equal(same.requirement, entry.requirement, `${entry.section} is unchanged`);
     assert.equal(same.word_limit, entry.word_limit, `${entry.section} keeps its limit`);
   }

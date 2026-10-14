@@ -99,7 +99,16 @@ const VERSION_3 = 'proposal-writer-prompt-3';
 // never as proof of low-level resolution. Timbre Matching and Overall Design
 // are untouched, and no section identity, word limit, figure, level, product,
 // claim-grounding or validation rule changed.
-const CURRENT = 'proposal-writer-prompt-22';
+// Generation 23 is the story-not-mechanism pass: the single-option Design Overview
+// is no longer asked for the layout's channel count or for where the overhead
+// channels are placed, its requirement now explains the arrangement in terms of
+// what the client hears and names no feature the design lacks, and the writer is
+// given the client narrative register (no channel count as a selling point, no
+// absent feature, no mechanism explained, no boundary distance or parameter number
+// in the main narrative). A TV media room's Design Summary and Design Overview are
+// briefed short and plain by their own authority. No section identity, word limit,
+// claim-grounding or validation rule changed.
+const CURRENT = 'proposal-writer-prompt-23';
 
 test('the writer prompt version is the current one', () => {
   assert.equal(WRITER_PROMPT_VERSION, CURRENT);
