@@ -64,6 +64,7 @@ const read = (relative) => fs.readFileSync(path.join(ROOT, relative), 'utf8');
 const WIZARD = read('src/components/proposal/CreateProposalWizard.jsx');
 const READER = read('base44/shared/proposalReportEvidenceReader.js');
 const SERVER_GATE = read('base44/functions/generateProposal/entry.ts');
+const READ_EVIDENCE_FUNCTION = read('base44/functions/readProposalReportEvidence/entry.ts');
 
 /** The fingerprint the version's pointer has moved to — the move is presentation only. */
 const MOVED_FP = 'eng:v1:0f4c1b7a2d9e6531';
@@ -252,6 +253,39 @@ test('TEST 5 — the server mirror answers exactly as the browser does', () => {
   assert.equal(server.project.state, SERVER_STATE.CURRENT, 'the server gate reads Current too');
   assert.equal(server.ready, true);
   assert.equal(server.blockingSentence, null);
+});
+
+// ── TEST 7 — the verdict is read through the durable authority door ──────────
+test('TEST 7 — the two publications are read exactly as the readiness card reads them', async () => {
+  // The production divergence, reproduced: the caller's own read sees no cache
+  // row (its access scope does not cover it) while the authority door sees it —
+  // which is what made the comparison answer "false" for an unchanged design, so
+  // the card read Current and this gate refused the same report as stale.
+  const callerEntities = {
+    ReportSnapshot: { filter: async () => ({ items: [saved] }) },
+    ProjectAnalysisCache: { filter: async () => [] },
+  };
+  const authority = { ProjectAnalysisCache: { filter: async () => [cacheRecord()] } };
+
+  const snapshots = await readProposalReportEvidence(callerEntities, PROJECT_ID, [VERSION], {
+    authorityEntities: authority,
+  });
+  assert.equal(snapshots.length, 1, 'an unchanged design is never refused for a row the caller cannot see');
+  assert.equal(snapshots[0].engineeringState, 'current');
+
+  // Without an authority client the strict verdict stands: an absent comparison
+  // never excuses a report.
+  await assert.rejects(
+    () => readProposalReportEvidence(callerEntities, PROJECT_ID, [VERSION]),
+    /stale Project Report/,
+  );
+
+  // Both callers pass the authority door, and the reader uses the one shared cache
+  // read the published-engineering authority itself uses.
+  assert.match(READ_EVIDENCE_FUNCTION, /authorityEntities: client\.asServiceRole\.entities/);
+  assert.match(SERVER_GATE, /authorityEntities: base44\.asServiceRole\.entities/);
+  assert.match(SERVER_GATE, /loadCacheRecord\(base44\.asServiceRole, project_id, versionId\)/);
+  assert.match(READER, /loadCacheRecord\(authority, projectId, version\.id\)/);
 });
 
 // ── TEST 6 — no second status path is left on the screen ─────────────────────
