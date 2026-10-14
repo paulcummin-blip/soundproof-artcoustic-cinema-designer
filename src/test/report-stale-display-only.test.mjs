@@ -191,7 +191,8 @@ describe('G. proposal readiness and the report page judge a presentation-only mo
       new URL('../components/proposal/sourceAuthority/useProposalReadiness.js', import.meta.url),
       'utf8',
     );
-    expect(hook).toContain('presentationOnlyMove: presentationOnlyByVersionId.get(versionId) === true');
+    expect(hook).toContain('presentationOnlyMove: presentationOnlyBySource.project.get(versionId) === true');
+    expect(hook).toContain('proposalEvidenceDifferenceIsSafe');
     expect(hook).toContain('engineeringDifferenceIsPresentationOnly');
   });
 
