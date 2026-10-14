@@ -87,11 +87,13 @@ export function selectStoredSpeakerDesign(records = [], versionId = null) {
  * One version's checklist cell.
  *
  * Current — a stored Speaker Design PDF exists for this version and nothing shows
- *           the design has moved past it.
- * Stale   — one exists, but the engineering publication it was issued against is
- *           no longer this version's. A fingerprint stated on only one side is
- *           never compared, so an unreadable fingerprint cannot manufacture
- *           staleness.
+ *           the equipment has moved past it. A publication move that only changed
+ *           how the design is PRESENTED (a display or wording authority revision,
+ *           judged from the two publications' own frozen physical facts) states
+ *           the same equipment and keeps the checklist Current.
+ * Stale   — one exists, but the design it states is no longer this version's. A
+ *           fingerprint stated on only one side is never compared, so an
+ *           unreadable fingerprint cannot manufacture staleness.
  * Missing — nothing is stored for this version.
  *
  * @returns {{ state, status, current, checking, generatedAt, reason, action }}
@@ -99,6 +101,7 @@ export function selectStoredSpeakerDesign(records = [], versionId = null) {
 export function resolveSpeakerDesignCell({
   stored = null,
   currentEngineeringFingerprint = null,
+  presentationOnlyMove = false,
   checking = false,
 } = {}) {
   if (checking) {
@@ -125,7 +128,8 @@ export function resolveSpeakerDesignCell({
 
   const storedFingerprint = asFingerprint(stored.source_fingerprints?.engineeringFingerprint);
   const currentFingerprint = asFingerprint(currentEngineeringFingerprint);
-  if (storedFingerprint && currentFingerprint && storedFingerprint !== currentFingerprint) {
+  const movedOn = storedFingerprint && currentFingerprint && storedFingerprint !== currentFingerprint;
+  if (movedOn && presentationOnlyMove !== true) {
     return {
       state: READINESS_STATE.STALE,
       status: SPEAKER_DESIGN_STATUS_TEXT[READINESS_STATE.STALE],

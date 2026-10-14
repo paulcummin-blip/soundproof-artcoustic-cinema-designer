@@ -23,6 +23,7 @@ import {
   canonicalDisplayType,
   formatDisplayPhrase,
 } from '@/components/models/screen/displayTypeAuthority';
+import { productDisplayName, subwooferEntries } from '@/components/report/reportProductsSelected';
 
 /** Unwrap an Engineering Authority { statement, confidence, source } value. */
 export function statementValue(value) {
@@ -370,9 +371,12 @@ const PACKAGE_GROUP_LABELS = Object.freeze({
   centre: 'Centre',
   lcr: 'LCR',
   centre_soundbar: 'Centre',
-  surround: 'Surrounds / wides',
-  rear_surround: 'Surrounds / wides',
-  front_wide: 'Surrounds / wides',
+  // The position vocabulary is the Current Speaker Design schedule's own (see
+  // speakerDesignRows.js): the proposal's package table and the version's
+  // equipment checklist name the same positions in the same words.
+  surround: 'Side surrounds',
+  rear_surround: 'Rear surrounds',
+  front_wide: 'Front wides',
   overhead: 'Overheads',
 });
 
@@ -384,7 +388,9 @@ const PACKAGE_GROUP_ORDER = Object.freeze([
   'Front Left / Right',
   'Centre',
   'LCR',
-  'Surrounds / wides',
+  'Side surrounds',
+  'Rear surrounds',
+  'Front wides',
   'Overheads',
 ]);
 
@@ -409,9 +415,12 @@ export function buildPackageRows(snapshot) {
     // dual-centre stage) prints as stated; every other role prints its model.
     const model = role?.model_statement || role?.model_label || role?.model_key || null;
     if (!label || !model) continue;
-    const models = groups.get(label) || [];
-    if (!models.includes(model)) models.push(model);
-    groups.set(label, models);
+    const entry = groups.get(label) || { models: [], quantity: 0 };
+    if (!entry.models.includes(model)) entry.models.push(model);
+    // The physical loudspeakers the position holds, so the Qty column states the
+    // same count the version's own equipment checklist states.
+    entry.quantity += Number(role?.quantity) || 0;
+    groups.set(label, entry);
   }
 
   const rank = (label) => {
@@ -422,21 +431,73 @@ export function buildPackageRows(snapshot) {
   const rows = [...groups.keys()]
     .sort((a, b) => rank(a) - rank(b))
     .flatMap((label) => {
-      const model = groups.get(label).join(' · ');
-      if (label === 'Front Left / Right') return [{ role: 'Front Left', model }, { role: 'Front Right', model }];
+      const entry = groups.get(label);
+      const model = entry.models.join(' · ');
+      const qty = entry.quantity > 0 ? entry.quantity : null;
+      // The left/right pair is stated as the two positions it is, one cabinet
+      // each — the rows the version's equipment checklist prints.
+      if (label === 'Front Left / Right') {
+        const each = qty === null ? null : Math.max(1, Math.round(qty / 2));
+        return [
+          { role: 'Front left', model, qty: each },
+          { role: 'Front right', model, qty: each },
+        ];
+      }
       const centre = system.product_roles?.find(role => role.position_label === label && role.role === 'centre');
       // The client-facing line states only what is specified for the position: the
       // role, and the cabinets chosen for it. How the stage is counted and fed is
       // engineering data and stays in the role's own cabinet and channel counts.
       if (centre?.cabinet_count === 2 && centre?.channel_count === 1) {
-        return [{ role: label, model: `2 × ${centre.model_label || centre.model_key}` }];
+        return [{ role: label, model: `2 × ${centre.model_label || centre.model_key}`, qty: qty ?? 2 }];
       }
-      return [{ role: label, model }];
+      return [{ role: label, model, qty }];
     });
 
-  const subwoofers = subwooferGlanceStatement(system);
-  if (subwoofers.value) rows.push({ role: 'Subwoofers', model: subwoofers.value });
-  return rows;
+  return [...rows, ...subwooferPackageRows(system)];
+}
+
+/**
+ * The subwoofer rows of the package, one per side, stated as the version's own
+ * equipment checklist states them:
+ *
+ *   Rear subwoofers  SUB2-12  2
+ *
+ * The model cell is the model name alone: how many there are is the Qty column's
+ * own job. The sides come from the version's own subwoofer instances, grouped
+ * exactly as the checklist groups them; a version with no instances states its
+ * count and models with no side to claim.
+ */
+function subwooferPackageRows(system) {
+  const strategy = system?.subwoofer_strategy || {};
+  const layout = system?.channel_layout || {};
+  const entries = subwooferEntries({ subwooferInstances: strategy.instances || [] });
+
+  if (entries.length > 0) {
+    return entries
+      .map((entry) => ({
+        role: entry.side === 'front' ? 'Front subwoofers'
+          : entry.side === 'rear' ? 'Rear subwoofers' : 'Subwoofers',
+        model: [...new Set(entry.models.map(({ name }) => name))].join(' · '),
+        qty: entry.total,
+      }))
+      .filter((row) => row.model);
+  }
+
+  const count = Number(strategy.count) || Number(layout.subwoofer_count) || 0;
+  if (!count) return [];
+
+  const labels = [];
+  for (const role of Array.isArray(system.product_roles) ? system.product_roles : []) {
+    if (!isSubwooferRole(role)) continue;
+    const stated = role?.model_label || role?.model_key;
+    if (stated && !labels.includes(stated)) labels.push(stated);
+  }
+  for (const model of Array.isArray(strategy.models) ? strategy.models : []) {
+    const stated = model ? (productDisplayName(model) || String(model)) : null;
+    if (stated && !labels.includes(stated)) labels.push(stated);
+  }
+  if (labels.length === 0) return [];
+  return [{ role: 'Subwoofers', model: labels.join(' · '), qty: count }];
 }
 
 /**

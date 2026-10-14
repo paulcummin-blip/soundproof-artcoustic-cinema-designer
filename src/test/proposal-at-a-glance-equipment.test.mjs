@@ -5,23 +5,29 @@
  * saved with, read from the frozen snapshot's own values:
  *
  *   Display             100" TV
- *   Front Left          EVOLVE 3-1
- *   Front Right         EVOLVE 3-1
- *   Centre              C4-1
- *   Surrounds / wides   EVOLVE 2-1
- *   Subwoofers          2 × SUB2-12
+ *   Front left          EVOLVE 3-1          1
+ *   Front right         EVOLVE 3-1          1
+ *   Centre              C4-1                1
+ *   Side surrounds      EVOLVE 2-1          2
+ *   Rear subwoofers     SUB2-12             2
  *
- * and never `88" 16:9 projection screen`, and never `LCR | EVOLVE 3-1`.
+ * Every row states Position | Model | Qty, as the version's own equipment
+ * checklist does, and never `88" 16:9 projection screen`, and never
+ * `LCR | EVOLVE 3-1`.
  */
 
 import assert from 'node:assert/strict';
 import { test } from 'vitest';
 
 import { buildPackageRows, screenStatement } from '../components/proposal/print/proposalPackAuthority.js';
+import { productDisplayName } from '../components/report/reportProductsSelected.js';
 import {
   frontStageProductRoles,
   resolveFrontStage,
 } from '../components/proposal/engineeringAuthority/resolveFrontStageRoles.js';
+
+/** The name the app states a model by, without ever guessing it in this test. */
+const displayName = (model) => productDisplayName(model) || model;
 
 // The version's placed speakers, verbatim: EVOLVE 3-1 left/right, C4-1 centre.
 const MARQUEE_STAGE = [
@@ -67,7 +73,7 @@ test('a projection screen keeps the projection rule', () => {
   );
 });
 
-test('the package states the centre channel in its own row', () => {
+test('the package states the centre channel in its own row, with its own Qty', () => {
   const rows = buildPackageRows({
     system: {
       product_roles: [
@@ -77,21 +83,32 @@ test('the package states the centre channel in its own row', () => {
           role_description: 'Side surround',
           model_key: 'evolve-2-1',
           model_label: 'EVOLVE 2-1',
+          quantity: 2,
         },
       ],
-      subwoofer_strategy: { count: 2, models: ['sub2-12'] },
+      // The version's own rear subwoofers, as Marquee Home holds them.
+      subwoofer_strategy: {
+        count: 2,
+        models: ['sub2-12'],
+        instances: [
+          { model: 'sub2-12', group: 'rear' },
+          { model: 'sub2-12', group: 'rear' },
+        ],
+      },
     },
   });
 
   assert.deepEqual(rows, [
-    { role: 'Front Left', model: 'EVOLVE 3-1' },
-    { role: 'Front Right', model: 'EVOLVE 3-1' },
-    { role: 'Centre', model: 'C4-1' },
-    { role: 'Surrounds / wides', model: 'EVOLVE 2-1' },
-    { role: 'Subwoofers', model: '2 × SUB2-12' },
+    { role: 'Front left', model: 'EVOLVE 3-1', qty: 1 },
+    { role: 'Front right', model: 'EVOLVE 3-1', qty: 1 },
+    { role: 'Centre', model: 'C4-1', qty: 1 },
+    { role: 'Side surrounds', model: 'EVOLVE 2-1', qty: 2 },
+    { role: 'Rear subwoofers', model: displayName('sub2-12'), qty: 2 },
   ]);
   // The mixed front stage is never collapsed into one LCR row.
   assert.equal(rows.some((row) => row.role === 'LCR'), false);
+  // The count is the Qty column's job: no model cell repeats it.
+  rows.forEach((row) => assert.doesNotMatch(row.model, /×/));
 });
 
 test('a genuinely identical LCR stage is still one row', () => {
@@ -107,5 +124,5 @@ test('a genuinely identical LCR stage is still one row', () => {
       ],
     },
   });
-  assert.deepEqual(rows, [{ role: 'LCR', model: 'Q6-3' }]);
+  assert.deepEqual(rows, [{ role: 'LCR', model: 'Q6-3', qty: null }]);
 });

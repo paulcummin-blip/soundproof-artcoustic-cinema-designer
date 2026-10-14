@@ -48,6 +48,10 @@ import {
   resolveVersionReadinessRow,
   versionDisplayName,
 } from './proposalReadinessAuthority';
+import {
+  resolveSpeakerDesignCell,
+  selectStoredSpeakerDesign,
+} from './speakerDesignChecklistReadiness';
 
 export function useProposalReadiness({ projectId = null, versionIds = [] } = {}) {
   const ids = useMemo(
@@ -91,7 +95,7 @@ export function useProposalReadiness({ projectId = null, versionIds = [] } = {})
 
     (async () => {
       try {
-        const [projectRecords, versionRecords, snapshotPage, durableReads, cacheRecords] = await Promise.all([
+        const [projectRecords, versionRecords, snapshotPage, durableReads, cacheRecords, speakerDesignPage] = await Promise.all([
           // The project's own active-version pointer is the first authority the
           // shared canonical selection rule reads.
           base44.entities.Project.filter({ id: projectId }),
@@ -107,6 +111,14 @@ export function useProposalReadiness({ projectId = null, versionIds = [] } = {})
           // engineering result a Technical Report is generated from. Read
           // through the same session-cached project read the report path uses.
           Promise.all(ids.map((versionId) => readProjectAnalysisCacheRecord(projectId, versionId))),
+          // The version's stored Speaker Design PDF — the equipment checklist the
+          // Project Report export already writes to Project Library beside the
+          // report. Read from the records that exist: no second store is created
+          // and reading exports nothing.
+          base44.entities.ProjectAssetExport.filter(
+            { project_id: projectId, document_type: 'speaker_design', version_id: { $in: ids } },
+            { sort: '-exported_at', limit: 200 },
+          ),
         ]);
         if (cancelled) return;
 
@@ -211,7 +223,16 @@ export function useProposalReadiness({ projectId = null, versionIds = [] } = {})
               project: resolveSavedReportCell({
                 saved: savedProjectReport,
                 currentFingerprints,
-                presentationOnlyMove: presentationOnlyByVersionId.get(versionId) === true,
+                presentationOnlyMove: presentationOnlyBySource.project.get(versionId) === true,
+              }),
+              // The equipment checklist this version has stored, stated beside
+              // the report. It never blocks: a proposal is gated on the Project
+              // Report, and the checklist's own row offers that same report
+              // action, which stores the schedule with the report.
+              speaker_design: resolveSpeakerDesignCell({
+                stored: selectStoredSpeakerDesign(speakerDesignRecords, versionId),
+                currentEngineeringFingerprint: currentFingerprints.engineeringFingerprint,
+                presentationOnlyMove: presentationOnlyBySource.speaker_design.get(versionId) === true,
               }),
             },
           });

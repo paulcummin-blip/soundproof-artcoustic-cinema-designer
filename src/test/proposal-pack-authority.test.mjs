@@ -150,11 +150,15 @@ describe('at a glance page', () => {
     assert.equal(byLabel.get('System layout').hint, undefined);
   });
 
-  it('states the selected package once, grouped by channel role', () => {
+  it('states the selected package once, grouped by channel role, with its Qty', () => {
+    // Position | Model | Qty. The model cell carries no count of its own: how
+    // many there are belongs to the Qty column, exactly as the version's own
+    // equipment checklist states it. A position whose count cannot be read
+    // states none rather than an invented figure.
     assert.deepEqual(GLANCE.packageRows, [
-      { role: 'LCR', model: 'EVOLVE 2-1' },
-      { role: 'Surrounds / wides', model: 'SL-EVOLVE 1-1' },
-      { role: 'Subwoofers', model: '4 × SUB2-12' },
+      { role: 'LCR', model: 'EVOLVE 2-1', qty: null },
+      { role: 'Side surrounds', model: 'SL-EVOLVE 1-1', qty: null },
+      { role: 'Subwoofers', model: 'SUB2-12', qty: 4 },
     ]);
   });
 

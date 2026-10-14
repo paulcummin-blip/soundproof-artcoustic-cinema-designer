@@ -10,9 +10,11 @@
  * fixes it (Create Project Report, or Create Updated Report).
  *
  * No other report has a column, a button or a requirement here: the Project
- * Report is the only report a proposal is gated on.
+ * Report is the only report a proposal is gated on. Each version also states its
+ * equipment checklist — the Speaker Design PDF Project Library already holds —
+ * read from the stored records and never gating.
  *
- * Presentation only: every value comes from proposalReadinessAuthority.
+ * Presentation only: every value comes from the readiness authorities.
  */
 
 import React from 'react';
@@ -26,6 +28,10 @@ import {
   PROPOSAL_READINESS_TITLE,
   buildProjectReportAction,
 } from '@/components/proposal/sourceAuthority/proposalReadinessAuthority';
+import {
+  SPEAKER_DESIGN_LABEL,
+  buildSpeakerDesignAction,
+} from '@/components/proposal/sourceAuthority/speakerDesignChecklistReadiness';
 
 const STATE_COLOUR = {
   [READINESS_STATE.CURRENT]: '#213428',
@@ -77,6 +83,16 @@ function VersionRow({ row, projectId }) {
     ? buildProjectReportAction({ state: cell.state, projectId, versionId: row.versionId })
     : null;
 
+  // The version's equipment checklist — its stored Speaker Design PDF. Stated
+  // beside the report; it never blocks generation.
+  const checklist = row.speakerDesign || row.cells?.speaker_design || null;
+  const checklistBlocked = !!checklist && !checklist.current && !checklist.checking;
+  // While the report row is blocked its own action already produces the
+  // checklist, so the checklist offers a button only when the report is Current.
+  const checklistAction = checklistBlocked && cell?.current
+    ? buildSpeakerDesignAction({ state: checklist.state, projectId, versionId: row.versionId })
+    : null;
+
   return (
     <div className="py-4 border-b border-[#EAE8E3]" data-readiness-version={row.versionId}>
       <div
@@ -101,6 +117,34 @@ function VersionRow({ row, projectId }) {
         <p className="text-[12px] text-[#7A2E10] mt-2" style={{ fontFamily: REPORT_FONT_BODY }}>
           {row.blockingSentence}
         </p>
+      )}
+
+      {checklist && (
+        <div className="mt-2 flex items-center gap-3">
+          <span
+            className="text-[11px] uppercase tracking-[0.12em] text-[#A79E8C]"
+            style={{ fontFamily: REPORT_FONT_BODY }}
+          >
+            {SPEAKER_DESIGN_LABEL}
+          </span>
+          <ReadinessCell cell={checklist} />
+        </div>
+      )}
+
+      {checklistBlocked && checklist.reason && (
+        <p className="text-[12px] text-[#7A5A10] mt-1.5" style={{ fontFamily: REPORT_FONT_BODY }}>
+          {checklist.reason}
+        </p>
+      )}
+
+      {checklistAction && (
+        <a
+          href={withProposalContext(checklistAction.url)}
+          className="inline-block mt-2 mr-2 px-3.5 py-1.5 text-[11px] uppercase tracking-[0.14em] text-white transition-colors hover:bg-[#3E4349]"
+          style={{ backgroundColor: '#213428', fontFamily: REPORT_FONT_BODY }}
+        >
+          {checklistAction.label}
+        </a>
       )}
 
       {action && (
