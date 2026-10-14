@@ -20,7 +20,7 @@
  * Pure module: no React, no DOM, no side effects.
  */
 
-import { isTvDisplay } from '@/components/models/screen/displayTypeAuthority';
+import { classifyProjectIntent } from '@/components/report/projectReport/projectIntentClassification';
 import {
   buildProjectReportSummaryOpening,
   isCompactRoom,
@@ -66,9 +66,11 @@ export function buildProjectReportOpening({
   const display = screenPhrase(projectDetails);
   const compact = isCompactRoom(roomDims) ? 'compact ' : '';
 
-  // A lounge / media-room television design leads as the room it is rather than as
-  // a cinema; a projection design keeps its cinema headline unchanged.
-  const headline = isTvDisplay(projectDetails) && display
+  // A media-lounge television design leads as the room it is rather than as a
+  // cinema, read from the one project-intent authority; a projection design, and a
+  // television design the designer has explicitly marked as a dedicated cinema,
+  // keep the cinema headline.
+  const headline = classifyProjectIntent({ projectDetails }).isMediaLounge && display
     ? `A relaxed high-performance media room built around a large ${display}`
     : architecture
       ? (display

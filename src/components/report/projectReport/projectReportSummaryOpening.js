@@ -37,6 +37,7 @@ import {
   readSeatBoundaryGeometry,
   buildSeatingBoundaryExplanation,
 } from '@/shared/seatingBoundaryPrinciple';
+import { classifyProjectIntent } from '@/components/report/projectReport/projectIntentClassification';
 
 const NUMBER_WORDS = Object.freeze({
   1: 'one', 2: 'two', 3: 'three', 4: 'four', 5: 'five',
@@ -201,11 +202,13 @@ export function buildProjectReportSummaryOpening({
   const display = displayPhrase(projectDetails);
   const builtAround = [display ? `a ${display}` : null, rowPhrase].filter(Boolean);
   const compact = isCompactRoom(roomDims) ? 'compact ' : '';
-  // A television design is the lounge / media room it is used as, not a dedicated
-  // cinema: the room is stated with the everyday uses it serves and the system is
-  // described as the deliberate choice it is. A projection design keeps its
-  // dedicated-cinema language unchanged.
-  const mediaRoom = !projection && !!display;
+  // THE PROJECT INTENT RULE, read from the one classification authority: a
+  // television system is a media lounge — a relaxed, high-performance media room —
+  // not a dedicated cinema, and a projection room built as a cinema keeps its
+  // dedicated-cinema language. The intent reads as a lounge only where the display
+  // the room is built around can actually be named, so no copy ever states a
+  // television or a cinema it cannot name.
+  const mediaRoom = classifyProjectIntent({ projectDetails }).isMediaLounge && !!display;
   if (mediaRoom) {
     const system = architecture ? `${architecture} system` : 'surround system';
     vision.push(`This is a relaxed high-performance media room built around a large ${display}. It is designed for sport, box sets, films and music, with a sensible ${system} that keeps the room comfortable while still delivering impact when needed.`);

@@ -141,7 +141,22 @@ function deriveRoomType({ volumeM3, rowCount, totalSeats, projection, tv }) {
   return projection ? 'Dedicated cinema' : 'Media room';
 }
 
-function deriveIntent({ bed, overhead, subCount, rowCount, totalSeats, discreet }) {
+/**
+ * The explicit dedicated-cinema wording a brief has to contain before a
+ * single-row television design is read as a cinema. Deliberately narrow: a bare
+ * "cinema" or "cinema room" is not explicit intent.
+ */
+const EXPLICIT_DEDICATED_CINEMA_INTENT = /\b(?:dedicated\s+(?:home\s+|screening\s+)?cinema|reference\s+cinema|cinema\s+bunker|dedicated\s+screening\s+room)\b/i;
+
+function deriveIntent({ bed, overhead, subCount, rowCount, totalSeats, discreet, tv, explicitCinemaIntent }) {
+  // A single-row television system is a media room, never a dedicated cinema:
+  // a television is a lounge whatever its format, so the intent is never derived
+  // from a channel count, an overhead count or a subwoofer count. Dedicated-cinema
+  // intent is stated for a projection design, or where the brief itself asks for
+  // dedicated-cinema language.
+  if (tv && rowCount <= 1 && !explicitCinemaIntent) {
+    return overhead > 0 ? 'High-performance media room' : 'Clean, simple surround system';
+  }
   if (overhead > 0 && bed >= 9 && subCount >= 2) return 'Reference-style dedicated cinema';
   if (overhead > 0 && rowCount >= 2 && totalSeats >= 6) return 'High impact family cinema';
   if (overhead > 0 && bed <= 7) return 'Compact high-performance media room';
@@ -364,7 +379,11 @@ export function buildProjectInterpretation(params = {}) {
   const allSeatStrength = seatsFloors.find((entry) => entry.structure === strongest?.structure) || null;
 
   const roomType = deriveRoomType({ volumeM3, rowCount, totalSeats, projection, tv });
-  const intent = deriveIntent({ bed, overhead, subCount, rowCount, totalSeats, discreet });
+  // The brief counts only where it is explicit: a brief that says "cinema room"
+  // does not turn a single-row television lounge into a dedicated cinema.
+  const explicitCinemaIntent = typeof clientBrief === 'string'
+    && EXPLICIT_DEDICATED_CINEMA_INTENT.test(clientBrief);
+  const intent = deriveIntent({ bed, overhead, subCount, rowCount, totalSeats, discreet, tv, explicitCinemaIntent });
   const definingFeature = deriveDefiningFeature({
     strongest, screenWidthM, totalSeats, volumeM3, rowCount, overhead, subCount,
   });
