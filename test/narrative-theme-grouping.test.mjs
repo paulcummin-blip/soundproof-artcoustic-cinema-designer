@@ -91,7 +91,7 @@ test('the four bass results become ONE theme, read as output, depth, control and
 
   // Each facet answers its own question, in the client's language.
   assert.match(facet('output').question, /authority and headroom/);
-  assert.match(facet('depth').question, /how low/);
+  assert.match(facet('depth').question, /how low does the system reach/i);
   assert.match(facet('control').question, /follow the target/);
   assert.match(facet('consistency').question, /primary seats/);
   assert.deepEqual(bass.vocabulary, ['power', 'depth', 'scale', 'impact', 'physicality', 'control', 'consistency']);
@@ -138,10 +138,18 @@ test('every parameter sits in exactly one theme: no paragraph per parameter', ()
   assert.equal(experienceThemeOf('p20'), EXPERIENCE_THEME.BASS);
   assert.equal(experienceThemeOf('p1'), EXPERIENCE_THEME.SEATING_RATIONALE);
 
-  // A small number of themes is told: only the strongest are told through.
-  const told = themes.filter((theme) => theme.told);
-  assert.ok(told.length <= 4, `expected a small number of told themes, read ${told.length}`);
-  assert.ok(told.length >= 1);
+  // Thirteen results are told through five themes, and the bass's four results are
+  // ONE of them: that is the whole point of the grouping.
+  const bassStories = themes.filter((theme) => theme.parameter_ids.every((id) => ['P14', 'P18', 'P19', 'P20'].includes(id)));
+  assert.equal(bassStories.length, 1, 'the four bass results are one story, never four');
+  assert.ok(themes.length <= 5);
+  assert.equal(new Set(themes.map((theme) => theme.theme)).size, themes.length, 'a theme is told once');
+
+  // The rules the writer is given say so: a small number of themes, told through.
+  const block = buildClientStoryThemeBlock({ rows });
+  assert.match(block.telling_rule, /SMALL NUMBER OF THEMES/);
+  assert.match(block.telling_rule, /never give every theme its own section/);
+  assert.ok(themes.some((theme) => theme.told));
 });
 
 /* ── 3 · infrasonic language must be earned ──────────────────────────────── */
@@ -270,7 +278,7 @@ test('the themes travel to the writer beside the ranked evidence', () => {
 
   const inputBuilder = source('base44/shared/proposalWriter/writerInputBuilder.js');
   assert.match(inputBuilder, /client_story_themes/);
-  assert.match(inputBuilder, /ONE_STORY_PER_THEME_RULE/);
+  assert.match(inputBuilder, /clientStoryThemeRules/);
 
   const promptBuilder = source('base44/shared/proposalWriter/writerPromptBuilder.js');
   assert.match(promptBuilder, /clientStoryThemeLines/);

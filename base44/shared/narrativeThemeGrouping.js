@@ -338,12 +338,22 @@ function facetRows(facet, members) {
   return members.filter((row) => facet.keys.includes(String(row.key)));
 }
 
+/**
+ * The result a facet states for one member. A consistency result scoped to the
+ * primary seats states the PRIMARY seats' own result, never the weakest seat in
+ * the room: the scope of the claim decides which result is read.
+ */
+function facetLevel(row) {
+  if (row.seat_scope === SEAT_SCOPE.PRIMARY && row.primary_seat_result) return row.primary_seat_result;
+  return row.level;
+}
+
 /** One bass facet, read at its own member's published result. */
 function facetOf(facet, members) {
   const rows = facetRows(facet, members);
   const spoken = rows.filter((row) => mayAppearInNarrative(row.priority) && !row.silenced);
   const level = spoken.reduce(
-    (acc, row) => (acc == null || levelRank(row.level) < levelRank(acc) ? row.level : acc),
+    (acc, row) => (acc == null || levelRank(facetLevel(row)) < levelRank(acc) ? facetLevel(row) : acc),
     null,
   );
   const source = spoken.length > 0 ? spoken : rows;
