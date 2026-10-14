@@ -29,6 +29,7 @@ import { validateReportEvidence } from './reportEvidenceCompleteness.js';
 import { selectCanonicalReportSnapshot } from './reportSnapshotCanonical.js';
 import { canonicalScreenDescription, canonicalStatedSizeInches } from './canonicalScreenDescription.js';
 import { engineeringMoveIsPresentationOnly } from './designIdentityComparison.js';
+import { loadCacheRecord } from './publishedEngineeringAuthority.js';
 
 /** The parameters a proposal must be able to state from a Technical Report. */
 const REQUIRED_PARAMETERS = [12, 13, 14, 18, 19, 20];
@@ -497,16 +498,18 @@ function buildSnapshot({ version, projectId, technicalEvidence, visualEvidence, 
  * record states either publication is missing, or cannot read it at all: an
  * absent comparison never excuses a report.
  */
-async function versionMoveIsPresentationOnly(entities, projectId, version, row) {
+async function versionMoveIsPresentationOnly(authority, projectId, version, row) {
   const frozenFingerprint = row?.source_fingerprints?.engineeringFingerprint || null;
   const currentFingerprint = version?.published_fingerprint || null;
   if (!frozenFingerprint || !currentFingerprint || frozenFingerprint === currentFingerprint) return false;
-  const records = await entities.ProjectAnalysisCache.filter(
-    { project_id: projectId, version_id: version.id },
-    '-updated_date',
-    1,
-  );
-  const record = Array.isArray(records) ? records[0] : null;
+  // Read through the SAME door the version's own published-engineering read uses
+  // (readPublishedEngineering: loadCacheRecord + findPublication), so the two
+  // publications compared here are the two the readiness card compares. Read as
+  // the caller instead, the record was invisible whenever the row's own access
+  // scope did not cover it — the comparison then answered "false" for a design
+  // that had not changed at all, and this reader called the report stale while the
+  // card above it read Current.
+  const record = await loadCacheRecord(authority, projectId, version.id);
   if (!record) return false;
   return engineeringMoveIsPresentationOnly(record, { frozenFingerprint, currentFingerprint });
 }
@@ -517,7 +520,13 @@ async function versionMoveIsPresentationOnly(entities, projectId, version, row) 
  * @returns {Promise<Array<{version_id, version_name, source, engineeringState,
  *   evidence, snapshot}>>}
  */
-export async function readProposalReportEvidence(entities, projectId, versions) {
+export async function readProposalReportEvidence(entities, projectId, versions, { authorityEntities = null } = {}) {
+  // The engineering-authority door: the version's publication history is read
+  // through the same client the version's own published-engineering read uses, so
+  // both sides of the presentation-only comparison are the two publications the
+  // readiness card compares. A caller holding no authority client keeps its own
+  // entities and the strict verdict.
+  const authority = { entities: authorityEntities || entities };
   return Promise.all(versions.map(async (version) => {
     if (!version?.id) throw new Error('A selected version could not be read. Reopen the project and try again.');
 
@@ -545,7 +554,7 @@ export async function readProposalReportEvidence(entities, projectId, versions) 
     // version that states no cache record, or whose publications cannot be
     // compared, answers false and the strict verdict stands.
     const presentationOnlyMove = reportSourceMovedPastVersion(projectRow, version)
-      ? await versionMoveIsPresentationOnly(entities, projectId, version, projectRow)
+      ? await versionMoveIsPresentationOnly(authority, projectId, version, projectRow)
       : false;
 
     // Evidence only: each report's own machine-readable snapshot, or a block

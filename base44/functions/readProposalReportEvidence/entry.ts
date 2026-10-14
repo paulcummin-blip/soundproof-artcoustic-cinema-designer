@@ -11,7 +11,12 @@ export default async function(req) {
     const page = await client.entities.ProjectVersion.filter({ project_id, id: { $in: version_ids } }, { limit: 50 });
     const versions = version_ids.map((id) => page.items.find((v) => v.id === id));
     if (versions.some((v) => !v)) return Response.json({ error: 'Selected version not found in this project.' }, { status: 404 });
-    const snapshots = await readProposalReportEvidence(client.entities, project_id, versions);
+    // The version's publication history is read through the service role — the
+    // same door the version's own published-engineering read uses — so this gate
+    // compares the two publications the readiness card compares.
+    const snapshots = await readProposalReportEvidence(client.entities, project_id, versions, {
+      authorityEntities: client.asServiceRole.entities,
+    });
     return Response.json({ snapshots });
   } catch (error) {
     return Response.json({ error: error.message }, { status: 409 });

@@ -176,7 +176,10 @@ export default async function(req) {
     let suppliedSnapshots;
     try {
       suppliedSnapshots = await readProposalReportEvidence(base44.entities, project_id,
-        resolvedVersionIds.map((id) => projectVersions.find((version) => version.id === id)));
+        resolvedVersionIds.map((id) => projectVersions.find((version) => version.id === id)),
+        // The version's publication history is read through the service role, the
+        // same door the version's own published-engineering read uses.
+        { authorityEntities: base44.asServiceRole.entities });
     } catch (error) {
       return Response.json({ error: error.message }, { status: 409 });
     }
@@ -264,7 +267,10 @@ export default async function(req) {
       // The cache row is read for EVERY selected version, not only for one that
       // has a publication pointer: it holds the version's completed calculation
       // authority, the calculated engineering result its Project Report renders.
-      const cacheRecord = await loadCacheRecord(base44, project_id, versionId);
+      // Read through the service role, exactly as the version's own
+      // published-engineering read reads it: the verdict below is then taken from
+      // the same two publications the readiness card compares.
+      const cacheRecord = await loadCacheRecord(base44.asServiceRole, project_id, versionId);
       if (cacheRecord) cacheRecordByVersionId.set(versionId, cacheRecord);
       const publication = pointer && cacheRecord ? findPublication(cacheRecord, pointer) : null;
       if (publication) versionPublicationById.set(versionId, publication);
