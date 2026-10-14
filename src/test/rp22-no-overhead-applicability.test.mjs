@@ -217,9 +217,14 @@ describe("the published summary reads N/A, never a dash or a not-verified count"
   it("does not count N/A parameters as not verified or unavailable", () => {
     const notApplicable = summaryFor("na").project.compliance;
     const unassessed = summaryFor(null).project.compliance;
+    // P9 and P10 (the overhead-only pair) plus P11 leave the not-verified count.
+    // The two overhead-only parameters leave the not-verified count; P11 is
+    // N/A in both readings, so it is not part of the difference.
     expect(unassessed.counts.notVerified - notApplicable.counts.notVerified).toBe(2);
-    expect(notApplicable.counts.notApplicable).toBe(2);
-    expect(unassessed.counts.notApplicable).toBe(0);
+    expect(notApplicable.counts.notApplicable).toBe(3);
+    // P11 is N/A in both readings, so it is the one not-applicable parameter the
+    // unassessed control still reports.
+    expect(unassessed.counts.notApplicable).toBe(1);
   });
 });
 

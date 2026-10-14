@@ -66,7 +66,9 @@ test('the pack states its source and carries the reports own facts', () => {
   assert.deepEqual(facts.report_snapshot_ids, { visual: 'a-visual', technical: 'a-technical' });
   assert.equal(facts.fingerprints.engineering, 'eng:v1:design');
   assert.equal(facts.fingerprints.technical_evidence, 're-a-technical');
-  assert.deepEqual(facts.system.products.map((row) => row.value), ['Q8-5 x 3', 'Q8-3 x 6', 'Q8-2 x 6', 'SUB3-12 x 2', 'None specified']);
+  // The design's own layers only: the fixture's absent acoustic treatment row is
+  // omitted rather than carried into the pack as "None specified".
+  assert.deepEqual(facts.system.products.map((row) => row.value), ['Q8-5 x 3', 'Q8-3 x 6', 'Q8-2 x 6', 'SUB3-12 x 2']);
   assert.equal(facts.system.amplification, '500 W');
   assert.equal(facts.system.layout, '9.1.6 (15 discrete channels)');
   assert.equal(facts.room.dimensions_text, '6.0 x 4.5 x 2.4 m');
@@ -296,7 +298,8 @@ test('a single version is not a comparison: no classification and no claims are 
   assert.equal(built.decision_framing.allowed, false);
   assert.equal(built.decision_framing.reason, 'single_option');
   assert.ok(built.blocked_claims.length > 0, 'the global rules still apply');
-  assert.equal(built.options[0].facts.system.products.length, 5);
+  // Only the layers this design actually has are carried into the pack.
+  assert.equal(built.options[0].facts.system.products.length, 4);
 });
 
 /* ── A. The version-name source ────────────────────────────────────────────

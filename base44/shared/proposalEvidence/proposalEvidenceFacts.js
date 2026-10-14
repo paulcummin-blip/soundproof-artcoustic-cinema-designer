@@ -162,14 +162,19 @@ function frontStageFact(system) {
   };
 }
 
-/** The printed Products Selected rows, exactly as the Technical Report states them. */
+/** The printed Products Selected rows, exactly as the Technical Report states them.
+ *  A layer the design does not have states no product, so its row is omitted
+ *  entirely: the proposal is never told to describe a category the system was
+ *  never specified with, and never states "None specified". */
 function productRows(snapshot) {
   const rows = snapshot?.system?.products_selected?.rows;
-  return (Array.isArray(rows) ? rows : []).map((row) => ({
-    key: row?.key || null,
-    area: asText(row?.area) || asText(row?.key) || null,
-    value: asText(row?.value) || NONE,
-  }));
+  return (Array.isArray(rows) ? rows : [])
+    .map((row) => ({
+      key: row?.key || null,
+      area: asText(row?.area) || asText(row?.key) || null,
+      value: asText(row?.value) || null,
+    }))
+    .filter((row) => row.value && row.value !== NONE);
 }
 
 /**

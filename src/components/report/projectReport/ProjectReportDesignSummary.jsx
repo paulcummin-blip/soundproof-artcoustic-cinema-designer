@@ -55,6 +55,10 @@ function screenFact(projectDetails) {
   return displayPhrase(projectDetails);
 }
 
+/** The facts that state the system's own products: each is shown only when the
+ *  design actually specifies that layer, so an absent one is never stated. */
+const PRODUCT_FACT_LABELS = new Set(['Key loudspeakers', 'Subwoofers', 'Acoustic treatment']);
+
 /** The facts that describe the room, as opposed to the system built into it. */
 // 'TV' is the display fact's label when the design's display is a television, so
 // it sits with the room facts exactly as 'Screen' does.
@@ -107,7 +111,10 @@ export default function ProjectReportDesignSummary({
     { label: 'Key loudspeakers', value: keyLoudspeakers },
     { label: 'Subwoofers', value: productValue(productsSelected, 'subwoofers') },
     { label: 'Acoustic treatment', value: productValue(productsSelected, 'acoustic_treatment') },
-  ];
+  ]
+    // A product fact the design does not have is left out altogether: the page
+    // never states an absent speaker layer, not even as a dash.
+    .filter((fact) => !PRODUCT_FACT_LABELS.has(fact.label) || Boolean(fact.value));
 
   // The fact sheet's own two columns — every fact stays on the page.
   const columns = factColumns(facts);

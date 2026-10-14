@@ -211,7 +211,8 @@ function deriveConstraints({ widthM, heightM, rowCount, overhead, subCount, scre
   if (subCount === 2) constraints.push('Two-sub bass compromise');
   if (subCount === 1) constraints.push('Single-sub bass compromise');
   if (screenWidthM != null && screenWidthM >= 3.2) constraints.push('Large screen requires projector care');
-  if (bed > 0 && bed <= 5 && overhead === 0) constraints.push('Five-channel bed with no overhead layer');
+  // A five-channel bed is never recorded as a constraint: the format the design
+  // specifies is the system that exists, not an absence to be explained.
   const proportions = String(classification || '').toLowerCase();
   if (proportions.includes('near-cubic') || proportions.includes('long tunnel')) {
     constraints.push('Room proportions shape the bass response');

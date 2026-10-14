@@ -136,11 +136,11 @@ test('D: Products Selected are read from the report evidence, unchanged', () => 
   const products = entries[0].snapshot.system.products_selected;
   assert.deepEqual(products.lcr, ['Q8-5 × 3'], 'the loudspeaker row is the evidence row');
   assert.deepEqual(products.subwoofers, ['SUB4-12 × 2 (front)'], 'a positioned sub keeps its position');
-  assert.deepEqual(products.surrounds, ['None specified'], 'an absent layer is stated, never invented');
+  assert.deepEqual(products.surrounds, [], 'an absent layer states nothing, never "None specified"');
   assert.deepEqual(
     products.rows.map((row) => row.key),
-    ['lcr', 'surrounds', 'overheads', 'subwoofers', 'acoustic_treatment'],
-    'every layer the report prints is present, in report order',
+    ['lcr', 'subwoofers'],
+    'only the layers the design actually has are stated, in report order',
   );
   assert.deepEqual(table.rows.find((r) => r.key === 'lcr').values, ['Q8-5 × 3', 'Q8-5 × 3']);
 });

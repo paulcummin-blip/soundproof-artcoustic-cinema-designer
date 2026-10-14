@@ -50,8 +50,6 @@ const PRODUCT_ROWS = Object.freeze([
   { key: 'acoustic_treatment', area: 'Acoustic treatment' },
 ]);
 
-const NONE = 'None specified';
-
 function asText(value) {
   if (typeof value !== 'string') return null;
   const trimmed = value.trim();
@@ -175,11 +173,16 @@ function productsFromEvidence(evidence) {
       if (entry.structure === 'dual-centre') return `${base} centre cabinets${entry.orientation ? ` (${entry.orientation})` : ''}`;
       return entry.position ? `${base} (${entry.position})` : base;
     });
-    rendered[key] = values.length > 0 ? values : [NONE];
+    rendered[key] = values;
   }
   return {
     ...rendered,
-    rows: PRODUCT_ROWS.map(({ key, area }) => ({ key, area, value: rendered[key].join(', ') })),
+    // Only the layers the design actually has are stated: an absent layer is
+    // omitted from the proposal's evidence rather than written as "None
+    // specified", so the proposal copy can never fill that template either.
+    rows: PRODUCT_ROWS
+      .map(({ key, area }) => ({ key, area, value: rendered[key].join(', ') }))
+      .filter((row) => row.value.length > 0),
   };
 }
 

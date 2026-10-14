@@ -88,7 +88,9 @@ export function evidenceProductsByLayer(evidence) {
   for (const { key } of PRODUCTS_SELECTED_ROWS) {
     const entries = Array.isArray(byLayer?.[key]) ? byLayer[key] : [];
     const values = entries.map(renderReportProduct);
-    rendered[key] = values.length > 0 ? values : ['None specified'];
+    // A layer the design does not have renders nothing at all — the evidence
+    // never states a category the system was never specified with.
+    rendered[key] = values;
   }
   return rendered;
 }
@@ -98,8 +100,17 @@ function productMismatches(evidence, captured) {
   const rendered = evidenceProductsByLayer(evidence);
   const mismatches = [];
   for (const { key, area } of PRODUCTS_SELECTED_ROWS) {
-    const stated = Array.isArray(visible[key]) ? visible[key] : null;
-    if (!stated) continue;
+    const list = Array.isArray(visible[key]) ? visible[key] : null;
+    // A layer the design does not have states no products at all, so it is not
+    // compared: the legacy "None specified" placeholder is read as absent, never
+    // as a mismatch between the evidence and the report.
+    const stated = list
+      ? list.filter((value) => {
+        const text = String(value ?? '').trim();
+        return text.length > 0 && text !== 'None specified';
+      })
+      : null;
+    if (!stated || stated.length === 0) continue;
     // Layer order inside a loudspeaker row is a presentation detail; the stated
     // set of models and quantities is the fact, so it is compared as a set.
     const left = [...rendered[key]].map(normaliseValue).sort();

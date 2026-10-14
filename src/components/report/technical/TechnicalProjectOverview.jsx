@@ -15,6 +15,7 @@
 
 import React from "react";
 import TechnicalLevelBadge from "./TechnicalLevelBadge";
+import { statedProducts } from "@/components/report/reportProductsSelected";
 import { rp23DisplayAngleDeg, rp23LevelForAngleDeg } from "@/components/utils/viewingAngleUtils";
 
 import {
@@ -338,7 +339,11 @@ export default function TechnicalProjectOverview({
             { label: "OVERHEADS", models: systemSummary?.overheads },
             { label: "SUBWOOFERS", models: systemSummary?.subs },
             { label: "ACOUSTIC TREATMENT", models: systemSummary?.acousticTreatment },
-          ].map(({ label, models }, i, arr) => (
+          ]
+            // Only layers the design actually has are stated: a 5.1 system is not
+            // missing its overheads, so the row is omitted, never filled in.
+            .filter(({ models }) => statedProducts(models).length > 0)
+            .map(({ label, models }, i, arr) => (
             <div
               key={label}
               style={{
@@ -369,7 +374,7 @@ export default function TechnicalProjectOverview({
                   lineHeight: 1.3,
                 }}
               >
-                {(models || ["None specified"]).join(", ")}
+                {statedProducts(models).join(", ")}
               </div>
             </div>
           ))}

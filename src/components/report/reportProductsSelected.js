@@ -49,6 +49,20 @@ export function layoutVisibilityFilter(dolbyConfig, sevenBedLayoutType) {
 
 const NONE = 'None specified';
 
+/**
+ * The real products a layer states. A layer the design does not have states
+ * nothing at all: its row is omitted rather than filled with "None specified",
+ * because a 5.1 system is not missing its overheads — it is a 5.1 system. Only a
+ * genuinely stated product counts, so an empty list, a blank entry and the old
+ * "None specified" placeholder are all read as absent.
+ */
+export function statedProducts(list) {
+  return (Array.isArray(list) ? list : []).filter((value) => {
+    const text = String(value ?? '').trim();
+    return text.length > 0 && text !== NONE;
+  });
+}
+
 /** The layer keys this authority states, in the order the report prints them. */
 export const PRODUCTS_SELECTED_ROWS = Object.freeze([
   { key: 'lcr', area: 'LCR' },
@@ -148,8 +162,7 @@ function renderSubwooferEntry(entry) {
 
 /** The subwoofer rows, in the order the equipment schedule prints them. */
 function subwooferRows(args) {
-  const entries = subwooferEntries(args);
-  return entries.length > 0 ? entries.map(renderSubwooferEntry) : [NONE];
+  return subwooferEntries(args).map(renderSubwooferEntry);
 }
 
 /**
@@ -199,8 +212,7 @@ export function buildProductsSelected({
   }
 
   const layerList = (layer) => {
-    const models = [...byLayer[layer].entries()].map(([name, count]) => countLabel(name, count)).sort();
-    return models.length > 0 ? models : [NONE];
+    return [...byLayer[layer].entries()].map(([name, count]) => countLabel(name, count)).sort();
   };
 
   /**
@@ -225,13 +237,13 @@ export function buildProductsSelected({
         .map(([name, count]) => `${countLabel(name, count)} centre cabinets${orientationLabel}`)
         .sort(),
     ];
-    return rows.length > 0 ? rows : [NONE];
+    return rows.sort();
   };
 
   const treatmentQty = Math.floor(Number(selectedAbfuserQty) || 0);
   const acousticTreatment = (acousticTreatmentEnabled && treatmentQty > 0)
     ? [`Artcoustic Abfuser × ${treatmentQty}`]
-    : [NONE];
+    : [];
 
   const products = {
     lcr: lcrList(),
@@ -243,7 +255,12 @@ export function buildProductsSelected({
 
   return {
     ...products,
-    rows: PRODUCTS_SELECTED_ROWS.map(({ key, area }) => ({ key, area, value: products[key].join(', ') })),
+    // Conditional rows: a layer the design does not have is omitted, never
+    // stated as "None specified", so no report or proposal fills a template with
+    // a category the system was never specified with.
+    rows: PRODUCTS_SELECTED_ROWS
+      .map(({ key, area }) => ({ key, area, value: products[key].join(', ') }))
+      .filter((row) => statedProducts([row.value]).length > 0),
   };
 }
 
