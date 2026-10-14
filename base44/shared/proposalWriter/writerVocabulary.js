@@ -457,6 +457,7 @@ const RECOMMEND_WORDS = /\b(?:recommend\w*|we would choose|best choice|the bette
 // new instruction to the client. Keep the exemption deliberately narrow so
 // imperative copy such as "we recommend..." remains guarded.
 const DESCRIPTIVE_RECOMMENDED_PLACEMENT = /\brecommended\s+(?:geometry|positions?|zones?|locations?|placement|angular\s+limits?)\b/gi;
+const DESCRIPTIVE_PROJECT_RECOMMENDATION = /\bour\s+recommendation\s+(?:centres|focuses|rests)\s+on\b/gi;
 
 /** What a sentence asserts, or null when it asserts nothing. */
 export function assertionKind(text) {
@@ -473,7 +474,9 @@ export function assertionKind(text) {
 
 /** Whether a sentence offers a recommendation. */
 export function isRecommendation(text) {
-  const instruction = String(text || '').replace(DESCRIPTIVE_RECOMMENDED_PLACEMENT, ' ');
+  const instruction = String(text || '')
+    .replace(DESCRIPTIVE_RECOMMENDED_PLACEMENT, ' ')
+    .replace(DESCRIPTIVE_PROJECT_RECOMMENDATION, ' ');
   return RECOMMEND_WORDS.test(instruction);
 }
 
