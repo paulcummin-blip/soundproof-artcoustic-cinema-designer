@@ -162,6 +162,7 @@ function productRole({
   model,
   channel_count,
   cabinet_count = null,
+  quantity = null,
   structure = null,
   orientation = null,
   model_statement = null,
@@ -177,6 +178,10 @@ function productRole({
     found_in_registry: meta.found,
     channel_count,
     cabinet_count,
+    // The physical loudspeakers this position holds, for the package's own Qty
+    // column: one each where the sides have their own row, two for a pair that
+    // shares one, and the centre's own cabinet count for a dual centre.
+    quantity,
     structure,
     orientation,
     model_statement: model_statement || meta.label,
@@ -201,6 +206,7 @@ export function frontStageProductRoles(frontStage) {
         model: frontStage.leftRightModel,
         // Two screen channels, one cabinet each.
         channel_count: 2,
+        quantity: 2,
       }));
     }
     roles.push(productRole({
@@ -210,6 +216,7 @@ export function frontStageProductRoles(frontStage) {
       model: frontStage.centreModel,
       channel_count: frontStage.logicalCentreChannels,
       cabinet_count: frontStage.centreCabinets,
+      quantity: frontStage.centreCabinets,
       structure: 'dual-centre',
       orientation: frontStage.orientation || null,
       model_statement: centreCabinetsStatement(frontStage),
@@ -228,6 +235,7 @@ export function frontStageProductRoles(frontStage) {
       position_label: 'Front Left / Right',
       model: frontStage.leftModel,
       channel_count: 2,
+      quantity: 2,
     }));
   } else {
     if (frontStage.leftModel) {
@@ -237,6 +245,7 @@ export function frontStageProductRoles(frontStage) {
         position_label: 'Front left',
         model: frontStage.leftModel,
         channel_count: 1,
+        quantity: 1,
       }));
     }
     if (frontStage.rightModel) {
@@ -246,6 +255,7 @@ export function frontStageProductRoles(frontStage) {
         position_label: 'Front right',
         model: frontStage.rightModel,
         channel_count: 1,
+        quantity: 1,
       }));
     }
   }
@@ -256,6 +266,7 @@ export function frontStageProductRoles(frontStage) {
     model: frontStage.centreModel,
     channel_count: 1,
     cabinet_count: 1,
+    quantity: 1,
     structure: 'mixed-centre',
   }));
   return roles;

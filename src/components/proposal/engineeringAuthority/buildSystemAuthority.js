@@ -17,6 +17,7 @@ import {
   resolveFrontStage,
 } from './resolveFrontStageRoles';
 import { buildProductsSelected, layoutVisibilityFilter } from '@/components/report/reportProductsSelected';
+import { speakerRoleQuantities } from './speakerRoleQuantities';
 
 function parseDolbyConfig(config) {
   if (!config || typeof config !== 'string') return { bed: 0, sub: 0, overhead: 0, text: 'Not configured' };
@@ -89,6 +90,11 @@ export function buildSystemAuthority(project, _version, placedSpeakers) {
 
   // Build product roles from selected_speakers_by_role
   const productRoles = [];
+  // The physical loudspeaker count behind each remaining role, read from the
+  // version's own placed speakers with the Current Speaker Design schedule's own
+  // rule — the equipment checklist the proposal states. The front stage states its
+  // own counts above, position by position.
+  const roleQuantities = speakerRoleQuantities(placedSpeakers);
   if (frontStageByPosition) productRoles.push(...frontStageProductRoles(frontStage));
   for (const [role, model] of Object.entries(speakersByRole)) {
     if (!model) continue;
