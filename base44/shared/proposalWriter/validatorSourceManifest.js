@@ -39,7 +39,7 @@ export const VALIDATOR_SOURCE_MANIFEST = Object.freeze({
   // reasoning authority it was written under.
   'base44/shared/designPhilosophyAuthority.js': '1a4ba9bfd86d5bd17cabac52e6dab78359f601f92b14e0a63703d679915179fc',
   'base44/shared/adiDesignPhilosophy.js': 'cd275e6c1ba1c768378b701e5494f10042b550727e806ca1f24716d0c06103cc',
-  'base44/shared/adiProjectInterpretation.js': '120d06a045969bc3d003eca754f6e1986f3c821e97b7afc81f87c40db7fd45e3',
+  'base44/shared/adiProjectInterpretation.js': 'eab0626ec08674ce7127104c92c9846f1cd8ab536c9e53e6730ce962e282ae7e',
   // The check between the saved interpretation and the frozen evidence, which now
   // also holds the design philosophy's own statements to it.
   'base44/shared/proposalWriter/writerInterpretationEvidenceCheck.js': '2e88d5c9c5b3bc2e9000adaf528dc98e52c073c7c92fecc02c2030199fc412a0',
