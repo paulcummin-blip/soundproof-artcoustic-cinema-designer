@@ -275,8 +275,8 @@ describe("the panel renders the decision first and the evidence in the disclosur
   const detailsAt = journey.indexOf('data-adi-engineer-details="true"');
   const mainPanel = journey.slice(0, detailsAt);
 
-  it("keeps one status: the decision's own, or the engine state", () => {
-    expect(mainPanel).toContain("{headline.statusLabel || journey.statusLabel}");
+  it("keeps one status: the resolved outcome, the decision's own, or the engine state", () => {
+    expect(mainPanel).toContain("{outcomeLabel || headline.statusLabel || journey.statusLabel}");
     // No second APPLIED badge beside it.
     expect(mainPanel).not.toContain(">Applied<");
   });

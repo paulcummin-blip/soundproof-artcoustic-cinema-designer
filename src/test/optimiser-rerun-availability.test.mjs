@@ -103,7 +103,9 @@ describe("the presentation state offers the run action after a result", () => {
 
   it("offers it after a failed run too", () => {
     const failed = resolveOptimiserPresentationState({ planView: null, runStatus: "failed" });
-    expect(failed.action).toBe(OPTIMISER_PRESENTATION_ACTION.RERUN);
+    // One control, worded as the outcome's own next step.
+    expect(failed.action).toBe(OPTIMISER_PRESENTATION_ACTION.RETEST);
+    expect(failed.statusLabel).toBe("Evaluation Could Not Complete");
   });
 });
 
@@ -126,7 +128,7 @@ describe("the card renders one run control", () => {
   });
 
   it("keeps Apply and run as separate actions", () => {
-    expect(card).toMatch(/onApply=\{panelShowsApply \? null : handleApplyRecommended\}/);
+    expect(card).toMatch(/onApply=\{recommendationIgnored[\s\S]*?panelShowsApply \? null : handleApplyRecommended\)\}/);
     expect(card).toMatch(/onClick=\{journey\.action === ADI_OPTIMISER_ACTION\.CALCULATE/);
   });
 });

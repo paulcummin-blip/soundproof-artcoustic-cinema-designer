@@ -169,13 +169,13 @@ describe('TEST 1: generic advice with no saved plan', () => {
 });
 
 describe('TEST 2: completed run with no credible winner', () => {
-  it('resolves to No useful improvement found with the run evidence and no Apply', () => {
+  it('resolves to No Improvements Found with the run evidence and no Apply', () => {
     const planView = marqueePlanView();
     const state = resolveOptimiserPresentationState({ planView, actionable: { available: false } });
 
     expect(planView.status).toBe(OPTIMISER_PLAN_STATUS.NO_USEFUL_IMPROVEMENT);
     expect(state.state).toBe(OPTIMISER_PRESENTATION_STATE.NO_USEFUL_IMPROVEMENT);
-    expect(state.statusLabel).toBe('No useful improvement found');
+    expect(state.statusLabel).toBe('No Improvements Found');
     expect(state.showApply).toBe(false);
 
     const evidence = state.evidence;
@@ -236,16 +236,18 @@ describe('TEST 2: completed run with no credible winner', () => {
 });
 
 describe('TEST 3: incomplete or unsaved run', () => {
-  it('resolves to Evaluation incomplete with a precise reason and a re-run', () => {
+  it('resolves to Evaluation Could Not Complete with its own sentence and the one re-test control', () => {
     const unsaved = resolveOptimiserPresentationState({
       planView: planViewFor(null),
       actionable: { available: false },
       planPersisted: false,
     });
     expect(unsaved.state).toBe(OPTIMISER_PRESENTATION_STATE.EVALUATION_INCOMPLETE);
-    expect(unsaved.statusLabel).toBe('Evaluation incomplete');
-    expect(unsaved.message).toMatch(/could not be saved/);
-    expect(unsaved.actionLabel).toBe('OPTIMISE BASS');
+    expect(unsaved.statusLabel).toBe('Evaluation Could Not Complete');
+    // The outcome speaks for itself; the engine's own reason for this run is a
+    // diagnosis and is read in Engineer details beside the evidence.
+    expect(unsaved.message).toMatch(/could not complete the bass optimisation/);
+    expect(unsaved.actionLabel).toBe('Re-test Bass Optimisation');
     expect(unsaved.showApply).toBe(false);
 
     const unreadable = resolveOptimiserPresentationState({
@@ -256,7 +258,7 @@ describe('TEST 3: incomplete or unsaved run', () => {
       actionable: { available: false },
     });
     expect(unreadable.state).toBe(OPTIMISER_PRESENTATION_STATE.EVALUATION_INCOMPLETE);
-    expect(unreadable.statusLabel).toBe('Evaluation incomplete');
+    expect(unreadable.statusLabel).toBe('Evaluation Could Not Complete');
     expect(unreadable.statusLabel).not.toBe('Recommendation available');
   });
 
@@ -328,8 +330,11 @@ describe('TEST 3B: baseline failure and unavailable metrics', () => {
 
     const state = resolveOptimiserPresentationState({ planView, actionable: { available: true } });
     expect(state.state).toBe(OPTIMISER_PRESENTATION_STATE.EVALUATION_INCOMPLETE);
-    expect(state.statusLabel).toBe('Evaluation incomplete');
-    expect(state.message).toMatch(/baseline could not be validated/);
+    expect(state.statusLabel).toBe('Evaluation Could Not Complete');
+    expect(state.message).toMatch(/could not complete the bass optimisation/);
+    // The run's own diagnosis is not lost: it travels with the evidence, which
+    // Engineer details reads.
+    expect(state.evidence.rejectionReasons.join(' ')).toMatch(/baseline could not be validated/);
     expect(state.showApply).toBe(false);
     expect(state.evidence.candidatesEvaluated).toBe(3);
     expect(state.evidence.families.find((family) => family.family === 'placement').bestAttempt.p20VariationDb).toBe(9.9);
@@ -454,7 +459,7 @@ describe('TEST 5: combined-only lever', () => {
 });
 
 describe('TEST 6: stale plan', () => {
-  it('resolves to Re-evaluation required with Apply disabled', () => {
+  it('resolves to Re-test Needed with Apply disabled', () => {
     const planView = resolveOptimiserPlanStatus({
       plan: planWithEvaluatedDelay(),
       currentDesignFingerprint: 'a-different-design-fingerprint',
@@ -464,9 +469,9 @@ describe('TEST 6: stale plan', () => {
 
     expect(planView.status).toBe(OPTIMISER_PLAN_STATUS.STALE);
     expect(state.state).toBe(OPTIMISER_PRESENTATION_STATE.STALE);
-    expect(state.statusLabel).toBe('Re-evaluation required');
+    expect(state.statusLabel).toBe('Re-test Needed');
     expect(state.showApply).toBe(false);
-    expect(state.actionLabel).toBe('OPTIMISE BASS');
+    expect(state.actionLabel).toBe('Re-test Bass Optimisation');
   });
 
   it('reads the plan without ever writing the design', () => {

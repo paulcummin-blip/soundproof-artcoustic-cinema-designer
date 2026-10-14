@@ -38,8 +38,8 @@
 // kinds of change from the calibration decision authority.
 // ---------------------------------------------------------------------------
 
-import React from "react";
-import { Activity, AlertTriangle, ArrowRight, CheckCircle2, Loader2, Sparkles } from "lucide-react";
+import React, { useSyncExternalStore } from "react";
+import { Activity, AlertTriangle, ArrowRight, CheckCircle2, Loader2, Sparkles, X } from "lucide-react";
 import { useOptimiserPlanView } from "./useOptimiserPlanView.js";
 import { useImproveBassV2State } from "../improveBassV2/improveBassV2Store.js";
 import {
@@ -48,7 +48,14 @@ import {
   ADI_OPTIMISER_JOURNEY_STATE,
   resolveAdiOptimiserJourney,
 } from "./resolveAdiOptimiserJourney.js";
-import { OPTIMISER_PRESENTATION_STATE } from "./resolveOptimiserPresentationState.js";
+import { OPTIMISER_OUTCOME, OPTIMISER_PRESENTATION_STATE } from "./resolveOptimiserPresentationState.js";
+import AdiEngineerDetailsPanel from "./AdiEngineerDetailsPanel.jsx";
+import {
+  ignoreOptimiserRecommendation,
+  optimiserIgnoreKey,
+  readOptimiserIgnored,
+  subscribeOptimiserIgnored,
+} from "./optimiserIgnoreStore.js";
 import OptimisationPlanStatus from "./OptimisationPlanStatus.jsx";
 import OptimiserRunEvidenceBlock from "./OptimiserRunEvidenceBlock.jsx";
 import OptimiserCalculationEstimateLine from "./OptimiserCalculationEstimateLine.jsx";
@@ -247,6 +254,38 @@ export default function AdiOptimisationJourney({
   const runEvidence = presentation?.evidence || null;
   const journeyStateKey = presentation?.state || resolved.state;
 
+  // ── THE ONE OUTCOME ──
+  // When the presentation authority resolved an outcome, the panel states THAT
+  // — No Improvements Found · Improvements Found · Re-test Needed · Evaluation
+  // Could Not Complete — rather than the engine state behind it.
+  const outcome = journey.outcome || null;
+  const outcomeLabel = journey.outcomeLabel || null;
+  const improvementsFound = outcome === OPTIMISER_OUTCOME.IMPROVEMENTS_FOUND;
+
+  // The designer's Ignore is session-scoped and belongs to this run: the key
+  // carries the design's own fingerprint, so a re-test offers the recommendation
+  // again. Nothing about the result or the evidence is written.
+  const ignoreKey = optimiserIgnoreKey({
+    projectId,
+    versionId,
+    fingerprint: currentDesignFingerprint,
+  });
+  const recommendationIgnored = useSyncExternalStore(
+    subscribeOptimiserIgnored,
+    () => readOptimiserIgnored(ignoreKey),
+  );
+
+  // ONE short reason for an outcome that found nothing, or could not finish: the
+  // run's own recorded reason when it kept one. The full diagnostics stay below.
+  const recordedReasons = Array.isArray(runEvidence?.rejectionReasons)
+    ? runEvidence.rejectionReasons
+    : [];
+  const whyNoImprovement = improvementsFound
+    ? null
+    : (recordedReasons.find((reason) => typeof reason === "string" && reason)
+      || journey.explanation
+      || null);
+
   // ── The designer view ──
   // The default panel is the design decision: what was tested, what it found,
   // what is recommended and whether it can be applied. Every technical detail —
@@ -430,7 +469,10 @@ export default function AdiOptimisationJourney({
     currentP20DeviationDb: p20Headline?.variationDb ?? null,
     stale: summary.stale === true,
     isRunning,
-    finding: panelFinding,
+    // A run that could not complete states no "no improvement" finding: the
+    // outcome and its own sentence already say what happened, and the recorded
+    // reason is read in Engineer details.
+    finding: outcome === OPTIMISER_OUTCOME.COULD_NOT_COMPLETE ? null : panelFinding,
   });
   // The design's own published result, stated ONCE: it stands on its own only
   // when the decision above is not already comparing against it.
@@ -462,7 +504,7 @@ export default function AdiOptimisationJourney({
           className="inline-flex shrink-0 items-center gap-1 whitespace-nowrap rounded-full px-2.5 py-1 text-[10px] font-semibold uppercase"
           style={theme.pill}
         >
-          {headline.statusLabel || journey.statusLabel}
+          {outcomeLabel || headline.statusLabel || journey.statusLabel}
         </span>
       </div>
 
@@ -470,7 +512,7 @@ export default function AdiOptimisationJourney({
           pair, under the one status in the header. Everything the decision was
           measured from is in Engineer details below. */}
       <AdiPanelSummary
-        message={isRunning ? journey.message : null}
+        message={journey.message}
         adjustment={headline.adjustment}
         benefit={headline.benefit}
         comparison={headline.comparison}
@@ -501,9 +543,27 @@ export default function AdiOptimisationJourney({
           summary={summary}
           busy={isRunning}
           primary={primaryAction === ADI_PRIMARY_ACTION.DESIGN}
-          onApply={panelShowsApply ? null : handleApplyRecommended}
+          // An ignored recommendation stops being offered for this session, so
+          // its Apply stands down; re-testing offers it again.
+          onApply={recommendationIgnored
+            ? null
+            : (panelShowsApply ? null : handleApplyRecommended)}
           onUndo={panelShowsUndo ? null : handleUndoRecommended}
         />
+
+        {/* The designer's own "no" — offered only while a genuine improvement is
+            on the table, session-scoped, and never a change to the design. */}
+        {improvementsFound && !recommendationIgnored && !isRunning
+          && (summary.actions?.canApply === true || panelShowsApply === true) && (
+            <button
+              type="button"
+              onClick={() => ignoreOptimiserRecommendation(ignoreKey)}
+              className="inline-flex items-center gap-1.5 rounded-md px-3 py-2 text-[12px] font-medium text-[#625143] transition-colors hover:text-[#213428]"
+            >
+              <X className="h-3.5 w-3.5" />
+              Ignore
+            </button>
+          )}
 
         <ReoptimiseCalibrationAction
           onReoptimise={isRunning ? null : onReoptimiseCalibration}
@@ -512,6 +572,14 @@ export default function AdiOptimisationJourney({
           primary={primaryAction === ADI_PRIMARY_ACTION.CALIBRATION}
         />
       </div>
+
+      {/* An ignored recommendation is stated once, calmly, and is not asked again
+          for this run: re-testing is always available. */}
+      {recommendationIgnored && improvementsFound && (
+        <div className="text-[11px] text-[#625143] leading-relaxed" data-adi-recommendation-ignored="true">
+          Recommendation ignored for this session. Re-test bass optimisation at any time to review it again.
+        </div>
+      )}
 
       {/* Primary action. Running: the same button, disabled, with the spinner
           stating the state. The wording never changes — only the pill and the
@@ -558,6 +626,18 @@ export default function AdiOptimisationJourney({
           {ADI_ENGINEER_DETAILS_TITLE}
         </summary>
         <div className="mt-2 space-y-3">
+          {/* FOUR SHORT GROUPS — what was tested, the best calibration result, the
+              best design change and, when nothing was found, why. Every raw block
+              below lives behind the panel's own second disclosure. */}
+          <AdiEngineerDetailsPanel
+            rows={summary.rows}
+            bestCalibrationResult={bestCalibrationResult}
+            seatingRecommendation={summary.seatingRecommendation}
+            whyNoImprovement={whyNoImprovement}
+            whyTitle={outcome === OPTIMISER_OUTCOME.NO_IMPROVEMENTS
+              ? "Why no improvement"
+              : "Why the evaluation stopped"}
+          >
           {(assessment || why) && (
             <div className="space-y-0.5">
               <div className="text-[10px] font-semibold uppercase tracking-wide text-[#8A7B6A]">Diagnosis</div>
@@ -814,6 +894,7 @@ export default function AdiOptimisationJourney({
               <OptimiserCalculationDetail instances={instances} seatCount={seatCount} />
             </div>
           )}
+          </AdiEngineerDetailsPanel>
         </div>
       </details>
 

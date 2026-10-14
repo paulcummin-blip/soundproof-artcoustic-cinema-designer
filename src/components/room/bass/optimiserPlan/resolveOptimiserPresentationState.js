@@ -30,15 +30,49 @@ export const OPTIMISER_PRESENTATION_STATE = Object.freeze({
   FAILED: "failed",
 });
 
+/**
+ * THE FOUR OUTCOMES the designer acts on. Every finished evaluation resolves to
+ * exactly one of them, so the panel always states an outcome rather than an
+ * engine state, and the four are the only result words the designer ever reads.
+ */
+export const OPTIMISER_OUTCOME = Object.freeze({
+  NO_IMPROVEMENTS: "no_improvements",
+  IMPROVEMENTS_FOUND: "improvements_found",
+  RETEST_NEEDED: "retest_needed",
+  COULD_NOT_COMPLETE: "could_not_complete",
+});
+
+/** The one visible label per outcome. */
+export const OPTIMISER_OUTCOME_LABEL = Object.freeze({
+  [OPTIMISER_OUTCOME.NO_IMPROVEMENTS]: "No Improvements Found",
+  [OPTIMISER_OUTCOME.IMPROVEMENTS_FOUND]: "Improvements Found",
+  [OPTIMISER_OUTCOME.RETEST_NEEDED]: "Re-test Needed",
+  [OPTIMISER_OUTCOME.COULD_NOT_COMPLETE]: "Evaluation Could Not Complete",
+});
+
+/** Which outcome each presentation state presents (null = no outcome yet). */
+export const OPTIMISER_OUTCOME_BY_STATE = Object.freeze({
+  [OPTIMISER_PRESENTATION_STATE.NO_RUN]: null,
+  [OPTIMISER_PRESENTATION_STATE.RUNNING]: null,
+  [OPTIMISER_PRESENTATION_STATE.PLAN_AVAILABLE]: OPTIMISER_OUTCOME.IMPROVEMENTS_FOUND,
+  [OPTIMISER_PRESENTATION_STATE.NO_USEFUL_IMPROVEMENT]: OPTIMISER_OUTCOME.NO_IMPROVEMENTS,
+  [OPTIMISER_PRESENTATION_STATE.EVALUATION_INCOMPLETE]: OPTIMISER_OUTCOME.COULD_NOT_COMPLETE,
+  [OPTIMISER_PRESENTATION_STATE.STALE]: OPTIMISER_OUTCOME.RETEST_NEEDED,
+  [OPTIMISER_PRESENTATION_STATE.FAILED]: OPTIMISER_OUTCOME.COULD_NOT_COMPLETE,
+});
+
+/** The one control the re-test outcomes offer, worded as the next step. */
+export const OPTIMISER_RETEST_LABEL = "Re-test Bass Optimisation";
+
 /** Status pill label for every state — exactly one label per state. */
 export const OPTIMISER_PRESENTATION_LABEL = Object.freeze({
   [OPTIMISER_PRESENTATION_STATE.NO_RUN]: "Optimisation required",
   [OPTIMISER_PRESENTATION_STATE.RUNNING]: "Optimisation running",
-  [OPTIMISER_PRESENTATION_STATE.PLAN_AVAILABLE]: "Optimisation plan available",
-  [OPTIMISER_PRESENTATION_STATE.NO_USEFUL_IMPROVEMENT]: "No useful improvement found",
-  [OPTIMISER_PRESENTATION_STATE.EVALUATION_INCOMPLETE]: "Evaluation incomplete",
-  [OPTIMISER_PRESENTATION_STATE.STALE]: "Re-evaluation required",
-  [OPTIMISER_PRESENTATION_STATE.FAILED]: "Optimisation failed",
+  [OPTIMISER_PRESENTATION_STATE.PLAN_AVAILABLE]: OPTIMISER_OUTCOME_LABEL[OPTIMISER_OUTCOME.IMPROVEMENTS_FOUND],
+  [OPTIMISER_PRESENTATION_STATE.NO_USEFUL_IMPROVEMENT]: OPTIMISER_OUTCOME_LABEL[OPTIMISER_OUTCOME.NO_IMPROVEMENTS],
+  [OPTIMISER_PRESENTATION_STATE.EVALUATION_INCOMPLETE]: OPTIMISER_OUTCOME_LABEL[OPTIMISER_OUTCOME.COULD_NOT_COMPLETE],
+  [OPTIMISER_PRESENTATION_STATE.STALE]: OPTIMISER_OUTCOME_LABEL[OPTIMISER_OUTCOME.RETEST_NEEDED],
+  [OPTIMISER_PRESENTATION_STATE.FAILED]: OPTIMISER_OUTCOME_LABEL[OPTIMISER_OUTCOME.COULD_NOT_COMPLETE],
 });
 
 /** Action offered by each state. */
@@ -50,6 +84,9 @@ export const OPTIMISER_PRESENTATION_ACTION = Object.freeze({
   RUN: ADI_BASS_OPTIMISER_LABEL,
   RERUN: ADI_BASS_OPTIMISER_LABEL,
   COMPLETE: ADI_BASS_OPTIMISER_LABEL,
+  // The re-test outcomes offer no other control, so their one button names the
+  // step itself: re-test the bass optimisation.
+  RETEST: OPTIMISER_RETEST_LABEL,
 });
 
 export const OPTIMISER_PRESENTATION_COPY = Object.freeze({
@@ -57,14 +94,15 @@ export const OPTIMISER_PRESENTATION_COPY = Object.freeze({
     "No evaluated optimiser run or saved plan exists for this design. Run the optimiser to evaluate what can be improved.",
   RUNNING: "Evaluation is in progress. Nothing can be applied until it finishes.",
   STALE:
-    "The saved optimiser plan belongs to an earlier design state. Re-run the optimiser before applying any change.",
+    "The design has changed since this optimisation was run. Re-test bass optimisation to update the result.",
   INCOMPLETE:
-    "The optimiser did not confirm a final winner for this design, so no change can be applied yet.",
+    "ADI could not complete the bass optimisation. Re-run the optimiser or check Engineer Details.",
   INCOMPLETE_MISSING:
-    "The optimiser evidence saved for this design cannot be read, so no change can be applied from it.",
+    "ADI could not complete the bass optimisation. Re-run the optimiser or check Engineer Details.",
   INCOMPLETE_UNSAVED:
-    "The optimiser result could not be saved for this design, so it cannot be trusted — re-run the optimiser.",
-  FAILED: "The optimiser run did not complete.",
+    "ADI could not complete the bass optimisation. Re-run the optimiser or check Engineer Details.",
+  FAILED:
+    "ADI could not complete the bass optimisation. Re-run the optimiser or check Engineer Details.",
 });
 
 /**
@@ -105,22 +143,38 @@ export function resolveOptimiserPresentationState({
   const status = planView?.status || OPTIMISER_PLAN_STATUS.ABSENT;
   const evidence = planView?.run || null;
 
-  const build = (state, extra = {}) => ({
-    state,
-    statusLabel: OPTIMISER_PRESENTATION_LABEL[state],
-    message: OPTIMISER_PRESENTATION_COPY.NO_RUN,
-    explanation: null,
-    notes: [],
-    evidence: null,
-    showPlan: false,
-    // A state is only ever actionable from this one authority.
-    showApply: state === OPTIMISER_PRESENTATION_STATE.PLAN_AVAILABLE,
-    action: null,
-    actionLabel: null,
-    runBlocked,
-    runError,
-    ...extra,
-  });
+  const build = (state, extra = {}) => {
+    const outcome = OPTIMISER_OUTCOME_BY_STATE[state] || null;
+    // "Re-test Needed" and "Evaluation Could Not Complete" offer exactly one
+    // control, and it is the run action worded as the outcome's own next step.
+    const retest = outcome === OPTIMISER_OUTCOME.RETEST_NEEDED
+      || outcome === OPTIMISER_OUTCOME.COULD_NOT_COMPLETE;
+    const resolved = {
+      state,
+      // The outcome is what the designer reads; the state behind it stays
+      // available for the surfaces that need the finer distinction.
+      outcome,
+      outcomeLabel: outcome ? OPTIMISER_OUTCOME_LABEL[outcome] : null,
+      statusLabel: OPTIMISER_PRESENTATION_LABEL[state],
+      message: OPTIMISER_PRESENTATION_COPY.NO_RUN,
+      explanation: null,
+      notes: [],
+      evidence: null,
+      showPlan: false,
+      // A state is only ever actionable from this one authority.
+      showApply: state === OPTIMISER_PRESENTATION_STATE.PLAN_AVAILABLE,
+      action: null,
+      actionLabel: null,
+      runBlocked,
+      runError,
+      ...extra,
+    };
+    if (retest) {
+      resolved.action = OPTIMISER_PRESENTATION_ACTION.RETEST;
+      resolved.actionLabel = OPTIMISER_RETEST_LABEL;
+    }
+    return resolved;
+  };
 
   // ── RUNNING ── never an Apply action while evaluation is in progress.
   if (runStatus === "running") {
@@ -167,19 +221,12 @@ export function resolveOptimiserPresentationState({
   // comparison. The saved reason is stated as recorded, never re-worded into a
   // design conclusion, and the evidence the run produced is shown with a re-run.
   if (status === OPTIMISER_PLAN_STATUS.INCOMPLETE) {
-    const recorded = Array.isArray(evidence?.rejectionReasons)
-      ? evidence.rejectionReasons.find((reason) => typeof reason === "string" && reason)
-      : null;
-    // A run-level statement about the baseline is never the headline while the
-    // card itself displays a current P20 result: if P20 is visible, ADI had a
-    // baseline, and the levers below are what the run actually evaluated. The
-    // recorded baseline detail stays in Engineer details, unchanged.
-    const p20Visible = Number.isFinite(Number(evidence?.current?.p20VariationDb));
-    const baselineStatement = /baseline|could not be validated/i.test(String(recorded || ""));
+    // The outcome states its own sentence, never the engine's recorded reason:
+    // the reason is a diagnosis of the run, and it is read in Engineer details
+    // beside the evidence that carries it — so the main panel can no longer lead
+    // with a line the designer cannot act on.
     return build(OPTIMISER_PRESENTATION_STATE.EVALUATION_INCOMPLETE, {
-      message: (recorded && !(baselineStatement && p20Visible))
-        ? recorded
-        : OPTIMISER_PRESENTATION_COPY.INCOMPLETE,
+      message: OPTIMISER_PRESENTATION_COPY.INCOMPLETE,
       explanation: "Nothing is offered for application. The evidence below is what the run evaluated.",
       evidence,
       action: OPTIMISER_PRESENTATION_ACTION.RERUN,
