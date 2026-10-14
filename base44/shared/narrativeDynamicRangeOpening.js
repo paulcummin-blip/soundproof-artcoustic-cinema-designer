@@ -76,8 +76,11 @@ export const DYNAMIC_RANGE_EVIDENCE_WEAVE_RULE = `THE EVIDENCE SUPPORTS THE OPEN
 
 /** The tier one strength opens the pillar at, or null where no carrying result exists. */
 export function dynamicRangeOpeningTier(level) {
-  const rank = levelRank(level) ?? null;
-  if (rank == null) return null;
+  const rank = levelRank(level);
+  // NO CARRYING RESULT: an absent, unassessed or failed level is not a weak result, it is
+  // no result at all, so no whole-system claim is opened — the pillar is opened from the
+  // evidence it genuinely holds. This is the guard the module's own contract states.
+  if (rank < (levelRank('L1') ?? 1)) return null;
   if (rank >= (levelRank('L4') ?? 4)) return DYNAMIC_RANGE_OPENING_TIERS.exceptional;
   if (rank >= (levelRank('L3') ?? 3)) return DYNAMIC_RANGE_OPENING_TIERS.strong;
   return DYNAMIC_RANGE_OPENING_TIERS.standard;
