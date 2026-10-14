@@ -21,7 +21,7 @@ export const VALIDATOR_SOURCE_MANIFEST = Object.freeze({
   'base44/shared/proposalGeneration/generationStatuses.js': '2273b2e8408a426eeb137d9ae2f34c428a8e934dc0529134e9889aae75103b28',
   'base44/shared/proposalWriter/writerCabinetLanguage.js': '18e37edb21bd8422c6293c5fde809984d185e7188d0fe4a12fa2ff352d4b72c7',
   'base44/shared/proposalWriter/writerValidationRegister.js': '634502ab07c0bf1b13cfe0879d1e2ca2e85f0419c94f377b266a977c38c07b96',
-  'base44/shared/proposalWriter/writerInputBuilder.js': 'c4620182f02914be3818ff9811c4d4d4b333906998d05987822cd43c689d3ac8',
+  'base44/shared/proposalWriter/writerInputBuilder.js': '1473beee4cf24dbde1926defbe3f2d2e2cf4fa3d8116b47020b053d6439b65f3',
   // The client narrative register: the story the client is buying, never the
   // mechanism that produces it. It states the instruction the writer reads and the
   // phrasing the narrative sanitizer removes, so a draft can always be traced to the
@@ -45,7 +45,7 @@ export const VALIDATOR_SOURCE_MANIFEST = Object.freeze({
   // the word limit the section is written and validated under, so a draft can be
   // traced to the exact brief it was read against.
   'base44/shared/proposalWriter/designSummaryBrief.js': 'c95e0ad847dd6260f01c506e6254accdc22db186c3d1af147e117fb2e12b92ce',
-  'base44/shared/proposalWriter/writerPromptBuilder.js': 'a035addd8da17614ae2d555db201e75bd6a195cfde6400d1b5bc38c95c7ba143',
+  'base44/shared/proposalWriter/writerPromptBuilder.js': '06451e76ca85e4f53f197de4d539ffba863d839e8d14f9694a4f0e0dd2ab8a05',
   'base44/shared/proposalWriter/writerSectionMapping.js': 'f5a6d2a5fe974fbd5c16d810d95f99da72f629a4fb8cb33793aa472778ade2f0',
   'base44/shared/proposalWriter/writerDesignContext.js': '590a9f379bb28ebc54c14f97ae2b73070a8c8c6722c7be3fc548c95719f2d63b',
   'base44/shared/proposalEdit/completeDocumentValidation.js': 'cff20d7146ecbeb3a9c325e3147db41cab552f7ea950dd93385ee1d478683ddd',
