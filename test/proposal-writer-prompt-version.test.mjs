@@ -90,7 +90,16 @@ const VERSION_3 = 'proposal-writer-prompt-3';
 // result below the highest available level contributes. No section identity,
 // word limit, figure, level, product, claim-grounding or validation rule
 // changed.
-const CURRENT = 'proposal-writer-prompt-21';
+// Generation 22 is the final Spatial Resolution and Dynamic Range refinement.
+// Spatial Resolution opens on the listening experience and explains the
+// arrangement as what produces it, never opening on a position that falls
+// within a recommended limit. Dynamic Range explains both ends of the range,
+// quiet detail as well as loud impact, why the contrast matters, and keeps the
+// frozen output figures as supporting evidence of output capability alone,
+// never as proof of low-level resolution. Timbre Matching and Overall Design
+// are untouched, and no section identity, word limit, figure, level, product,
+// claim-grounding or validation rule changed.
+const CURRENT = 'proposal-writer-prompt-22';
 
 test('the writer prompt version is the current one', () => {
   assert.equal(WRITER_PROMPT_VERSION, CURRENT);

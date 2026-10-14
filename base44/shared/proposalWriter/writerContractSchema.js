@@ -167,7 +167,23 @@ export const WRITER_CONTRACT_VERSION = 2;
 // limits, the claim grounding rule and every validation rule are unchanged, so a
 // draft filed under an earlier generation is still read against its own
 // agreement.
-export const WRITER_PROMPT_VERSION = 'proposal-writer-prompt-21';
+// Bumped to 22 for the final Spatial Resolution and Dynamic Range refinement.
+// Spatial Resolution opens on the listening experience — sound placed where the
+// action is, natural and continuous movement between loudspeakers, a soundfield
+// extending beyond the picture and reaching around and above the audience, and
+// an immersion that holds — and then explains the arrangement as what produces
+// those benefits, never opening on a position that falls within a recommended
+// limit or a placement zone. Dynamic Range explains BOTH ends of the range, the
+// quiet end (subtle atmosphere, fine detail, delicate musical passages,
+// dialogue) alongside the loud end (sudden impact, dynamic peaks, scale and
+// physical presence), explains why the contrast between them matters, and gives
+// the frozen P12/P13/P14 output figures once as supporting evidence of output
+// capability alone: never as a list of levels, and never as proof of low-level
+// resolution. Timbre Matching and Overall Design are untouched. Section
+// identities, word limits, the claim grounding rule and every validation rule
+// are unchanged, so a draft filed under an earlier generation is still read
+// against its own agreement.
+export const WRITER_PROMPT_VERSION = 'proposal-writer-prompt-22';
 
 /** The only pack generation a draft may be written from. */
 export const WRITER_ACCEPTED_PACK_SCHEMA_VERSION = 2;
@@ -398,14 +414,14 @@ export const WRITER_SECTIONS = Object.freeze([
   {
     section: 'spatial_resolution',
     title: 'Spatial Resolution',
-    requirement_single: 'Explain why the loudspeaker positions matter to the listening result: accurate placement is what turns a channel count into precise placement of effects, convincing movement and a coherent soundfield around the audience. Develop that from this design\'s own arrangement and seating, meaning where the screen, surround and overhead loudspeakers sit, how the seats relate to them, and what that gives the listener. Bring the viewing geometry, the display and the seating into the same explanation, and use a result only where it strengthens the point rather than listing quantities, angles or levels. Stay within the claims the pack allows.',
+    requirement_single: 'Open on the listening experience itself: sound placed precisely where the action is, so an effect comes from the point on screen it belongs to; movement between loudspeakers that sounds natural and continuous rather than handed from one speaker to the next; a soundfield that extends beyond the picture into the room and reaches around and above the audience; and an immersion that holds as a scene builds. Then explain how this design\'s loudspeaker arrangement produces those benefits: where the screen, surround, front-wide and overhead loudspeakers sit, how the seating relates to them, and what that placement is doing for the listener. Never open by confirming that positions fall within a recommended limit or a placement zone, and never let the section read as a compliance or placement check: state the arrangement as the reason the experience works. Bring the viewing geometry, the display and the seating into the same explanation, and use a result only where it strengthens the point rather than listing quantities, angles or levels. Stay within the claims the pack allows.',
     word_limit: 180,
     requirement: 'Explain what the spatial results mean for the seating, within the claims the pack allows.',
   },
   {
     section: 'dynamic_range',
     title: 'Dynamic Range',
-    requirement_single: 'Open with the experience of dynamic contrast: quiet dialogue and subtle detail staying intelligible and clear, and demanding soundtrack moments arriving with scale, energy and physical presence. Explain what that contrast gives the listener in this room, then give the exact frozen output figures at the reference seating position once as the proof of the output capability behind it, never as a list of calculated levels. The figures support output capability and nothing wider: they are never presented as proof of every aspect of dynamic range. Match each benefit to its frozen evidence and supported channel family. Where only bass output is a selected strength, describe the weight and impact of low-frequency effects. Keep P14 bass output, P18 extension, P19 response at the reference position and P20 consistency across seats distinct; describe each only from its own supported evidence. No absolute guarantees and no unnecessary qualifications.',
+    requirement_single: 'Explain both ends of dynamic range and why the contrast between them matters. The quiet end: subtle atmosphere, fine detail, delicate musical passages and dialogue that stay clear and intelligible without being pushed. The loud end: sudden impact, dynamic peaks, and the scale and physical presence of demanding soundtrack moments. The contrast is the point: a system that resolves low-level detail and then delivers real impact is what carries a soundtrack\'s emotional range, so explain what each end gives the listener in this room and why moving between them is what makes the moment land. Then give the exact frozen output figures at the reference seating position once, as supporting evidence of the output capability behind the loud moments, never as a list of calculated levels and never as proof of low-level resolution: output capability alone says nothing about how quietly detail is resolved, so any statement about the quiet end rests on the design and the evidence that actually supports it. Match each benefit to its frozen evidence and supported channel family. Where only bass output is a selected strength, describe the weight and impact of low-frequency effects. Keep P14 bass output, P18 extension, P19 response at the reference position and P20 consistency across seats distinct; describe each only from its own supported evidence. No absolute guarantees and no unnecessary qualifications.',
     word_limit: 170,
     requirement: 'Explain supported headroom for demanding film soundtracks, controlled reproduction of dynamic peaks and clear, confident presentation at the designed listening levels, using only the frozen dynamic-range evidence for each option and channel family. Keep bass output, extension, response at the reference position and consistency across seats distinct, each supported by its own evidence. No absolute guarantees.',
   },
