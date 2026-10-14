@@ -98,6 +98,12 @@ export default async function (req) {
         role_label: pillar.role_label,
         rank: pillar.rank,
         emphasis_note: pillar.emphasis_note,
+        // THE TWO LEVELS OF IMPORTANCE ARE BOTH RETURNED: the global role decides how
+        // much space the pillar gets, the lead evidence decides which result leads it.
+        lead_note: pillar.lead_note,
+        lead_evidence: pillar.lead_evidence || null,
+        seat_narration: pillar.seat_narration || null,
+        seat_narration_rule: pillar.seat_narration_rule || null,
         brief_relevance: pillar.brief_relevance,
         seat_scope: pillar.seat_scope,
         scope_wording: pillar.scope_wording,
@@ -109,6 +115,7 @@ export default async function (req) {
           level: member.level,
           value: member.value,
           emphasis: member.emphasis,
+          pillar_lead: Boolean(member.pillar_lead),
           priority: member.priority,
           brief_relevance: member.brief_relevance,
           seat_scope: member.seat_scope,

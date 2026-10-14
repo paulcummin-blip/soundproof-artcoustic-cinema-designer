@@ -317,3 +317,86 @@ test('a steering exclusion silences a pillar without touching its results', () =
   assert.deepEqual(dynamic.parameter_ids, ['P14', 'P18', 'P19', 'P20']);
   assert.equal(dynamic.parts.find((part) => part.part === 'depth').level, 'L3');
 });
+
+/* ── 9 · global importance and a pillar's own lead are two ranks ─────────── */
+
+/**
+ * Marquee Home's Original Design evidence, against its own media-lounge brief:
+ * the bass carries the weight, and the two tonal results are both L4.
+ */
+const mediaLoungeRows = (extra = {}) => buildNarrativePriorityRows({
+  summary: summaryFromReportEvidence({
+    parameters: [
+      row(1, 'L1', { value: '1.29 m' }),
+      row(12, 'L1'), row(13, 'L1'),
+      row(14, 'L1', { value: '112 dB' }), row(18, 'L2', { value: '25 Hz' }), row(19, 'L4', { value: '±1 dB' }),
+      row(20, null, { scope: 'seat', seats: [['r1c1', 'L1', 'primary'], ['r1c2', 'L1', 'primary']] }),
+      row(3, 'L4'), row(4, 'L4'), row(5, 'L1'), row(11, 'L4'),
+      row(16, 'L4'), row(17, 'L4'),
+    ],
+  }),
+  intent: BRIEF_INTENT.MEDIA_LOUNGE,
+  design: { display: true, speakers: true, seats: 5, bass: true, spatial: true, timbre: true, screenChannels: true },
+  ...extra,
+}).rows;
+
+const suppressedContext = { suppressedAreas: ['client_experience'], intent: BRIEF_INTENT.MEDIA_LOUNGE };
+
+test('global importance and a pillar\'s own lead evidence are two separate ranks', () => {
+  const rows = mediaLoungeRows();
+  const { byPillar } = buildClientStoryPillars({ rows });
+  const dynamic = byPillar[PILLAR.DYNAMIC_RANGE];
+  const timbre = byPillar[PILLAR.TIMBRE_MATCHING];
+
+  // GLOBAL: the high-weight bass evidence keeps Dynamic Range the dominant story.
+  assert.equal(dynamic.role, NARRATIVE_PRIORITY.LEAD_STORY);
+  assert.notEqual(timbre.role, NARRATIVE_PRIORITY.LEAD_STORY, 'a quieter pillar is never promoted to follow the global story');
+
+  // PILLAR: Timbre Matching still leads with the strongest evidence BENEATH IT.
+  assert.deepEqual(timbre.lead_evidence.ids, ['P16', 'P17'], 'both equally strong tonal results lead the pillar');
+  assert.equal(timbre.lead_evidence.level, 'L4');
+  assert.ok(timbre.client_clauses.some((clause) => /exceptional tonal consistency/.test(clause)), 'the language its own result earned reaches the writer');
+  assert.deepEqual(timbre.members.filter((member) => member.pillar_lead).map((member) => member.key.toUpperCase()), ['P16', 'P17']);
+  assert.ok(timbre.lead_evidence.clauses.every((clause) => clientStoryTextIsSafe(clause).safe), 'the lead language carries no measurement');
+
+  // The two instructions are stated separately, and neither overrides the other.
+  assert.match(timbre.lead_note, /THIS PILLAR'S LEAD EVIDENCE IS P16, P17 at L4/);
+  assert.match(timbre.lead_note, /never demoted because another pillar's evidence is heavier/);
+  assert.match(timbre.emphasis_note, /not the design's overall headline/, 'the space instruction stays the global one');
+  assert.match(timbre.lead_evidence.rule, /scale the space from the global narrative priority/i);
+
+  // Spatially, the pillar leads with the strongest spatial evidence it holds.
+  const spatial = byPillar[PILLAR.SPATIAL_RESOLUTION];
+  assert.equal(spatial.lead_evidence.level, 'L4');
+  assert.ok(spatial.lead_evidence.ids.includes('P4'), `read ${spatial.lead_evidence.ids.join(', ')}`);
+
+  // Both instructions travel in the block the writer is held to, so the rule and the
+  // evidence it governs always arrive together.
+  const block = buildClientStoryPillarBlock({ rows });
+  assert.match(block.lead_rule, /TWO LEVELS OF IMPORTANCE/);
+  assert.match(block.seat_narration_rule, /WHERE THE SEATING IS NOT NARRATED/);
+  assert.ok(block.pillars.every((pillar) => pillar.lead_evidence && pillar.lead_note));
+});
+
+/* ── 10 · with the seating ruled out, the pillar's own lead still stands ─── */
+
+test('with the seating ruled out, a pillar still leads with its own evidence, without narrating the seating', () => {
+  const rows = mediaLoungeRows({ suppressedAreas: ['client_experience'] });
+  const { byPillar, design_rationale: rationale } = buildClientStoryPillars({ rows, context: suppressedContext });
+  const timbre = byPillar[PILLAR.TIMBRE_MATCHING];
+
+  assert.equal(timbre.seat_narration, 'banned');
+  assert.match(timbre.seat_narration_rule, /never invent a non-seating claim/);
+  assert.deepEqual(timbre.lead_evidence.ids, ['P16', 'P17'], 'the tonal evidence still leads the pillar');
+  assert.deepEqual(timbre.lead_evidence.vocabulary, [], 'the register sentence that names the seating is withheld');
+  assert.ok(timbre.client_clauses.length > 0, 'a claim survives: it is stated without the seating');
+  for (const clause of timbre.client_clauses) {
+    assert.equal(/\bseats?\b|\bseating\b|\brows?\b|listening position/i.test(clause), false, `seating narration in "${clause}"`);
+  }
+  assert.ok(!timbre.translation.some((line) => /seating/i.test(line)), 'the seating translation line is withheld');
+
+  // Only the seating narration is dropped: the evidence itself is untouched.
+  assert.deepEqual(timbre.members.map((member) => `${member.key.toUpperCase()} ${member.level}`).sort(), ['P16 L4', 'P17 L4']);
+  assert.equal(rationale.available, false);
+  assert.equal(rationale.suppressed, true);
+});

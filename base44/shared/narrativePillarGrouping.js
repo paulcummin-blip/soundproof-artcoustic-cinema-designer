@@ -31,6 +31,13 @@
  * support that same story, so they never become two more. The seating rationale
  * (P1) is not a pillar at all: it is explained as a design decision of its own.
  *
+ * TWO LEVELS OF IMPORTANCE. The pillar's ROLE (and its emphasis_note) is the GLOBAL
+ * narrative priority: how much space the pillar gets in the proposal overall. Its
+ * LEAD EVIDENCE (and its lead_note) is the PILLAR evidence priority: the strongest
+ * result beneath that pillar, with the language its own achieved result has earned —
+ * read by narrativePillarLeadAuthority.js. A pillar therefore keeps a strong, well
+ * written lead without becoming the dominant story of the proposal.
+ *
  * WHAT IT NEVER DOES. No figure, level, scope or claim is changed, averaged,
  * widened or inferred. The ranking still decides emphasis: the pillar carries the
  * best rank of the stories it rests on, and the writer is told the story, not a
@@ -41,6 +48,10 @@
 
 import { levelRank } from './strengthImportance.js';
 import { performancePhrase } from './performanceLanguageAuthority.js';
+// TWO LEVELS OF IMPORTANCE: the pillar's own lead evidence is read by its own
+// authority (what leads this pillar), while the pillar's role stays the global
+// narrative priority (how much space it gets).
+import { leadNoteOf, partLevel, pillarLeadEvidence, withoutSeatNarration } from './narrativePillarLeadAuthority.js';
 import {
   NARRATIVE_PRIORITY,
   PRIORITY_LABEL,
@@ -69,10 +80,12 @@ import {
   PILLAR,
   PILLAR_ALWAYS_AVAILABLE_RULE,
   PILLAR_EVIDENCE,
+  PILLAR_LEAD_RULE,
   PILLAR_ORDER,
   PILLAR_STRUCTURE_RULE,
   PILLARS,
   PRIMARY_SEAT_SCOPE_RULE,
+  SEAT_FREE_PILLAR_EVIDENCE_RULE,
   SEATING_RATIONALE_NOTE,
   SEATING_RATIONALE_RULE,
   SEAT_SCOPE_WORDING,
@@ -149,27 +162,20 @@ function memberOf(row, parameterEvidence = null) {
  * emphasis is what the ranking decided, stated as an instruction about length and
  * prominence.
  */
-function evidenceMember(member) {
+function evidenceMember(member, leadKeys = null) {
   return {
     key: member.key,
     parameter: member.parameter,
     level: member.level,
     value: member.value,
     emphasis: member.emphasis,
+    // THIS PILLAR'S LEAD, not the proposal's: the strongest result beneath the pillar
+    // that may be told at all. The global rank travels separately, as the pillar's role.
+    pillar_lead: Boolean(leadKeys?.has(String(member.key).toUpperCase())),
     seat_scope: member.seat_scope,
     primary_seat_result: member.primary_seat_result,
     secondary_seat_result: member.secondary_seat_result,
   };
-}
-
-/**
- * The result a part states for one member. A consistency result scoped to the
- * primary seats states the PRIMARY seats' own result, never the weakest seat in
- * the room: the scope of the claim decides which result is read.
- */
-function partLevel(row) {
-  if (row.seat_scope === SEAT_SCOPE.PRIMARY && row.primary_seat_result) return row.primary_seat_result;
-  return row.level;
 }
 
 /** The stories that rest on any of one pillar's parameters. */
@@ -285,7 +291,7 @@ function emphasisNoteOf(pillarKey, ordered) {
     return `This pillar carries a lead result (${lead.map((member) => String(member.key).toUpperCase()).join(', ')}): tell it as the story's main point, with anything supporting it woven around it.`;
   }
   if (told.length > 0) {
-    return `No result beneath this pillar is this design's headline, so keep the pillar brief and state what the evidence genuinely supports — the results ${told.map((member) => String(member.key).toUpperCase()).join(', ')} may be written positively at their own level.`;
+    return `This pillar is not the design's overall headline, so keep it brief and proportionate to its place in the story — the results ${told.map((member) => String(member.key).toUpperCase()).join(', ')} are still written in the strongest language their own achieved results have earned, never flattened because another pillar carries more of the proposal.`;
   }
   return `Nothing beneath this pillar is worth more than a brief, honest sentence: say what the evidence supports, keep it short, and do not pad it or promote it.`;
 }
@@ -357,20 +363,27 @@ export function buildClientStoryPillars({
       Array.isArray(story?.allowed_claim_ids) ? story.allowed_claim_ids : []
     )))];
     const scope = seatScopeOf(members);
+    // THE PILLAR'S OWN LEAD: the strongest result that may be told beneath this
+    // pillar, with the language its own achieved result has earned. Read separately
+    // from the global rank, so a pillar's evidence can shine without taking over the story.
+    const leads = pillarLeadEvidence(ordered);
+    const leadKeys = new Set(leads.ids);
     // The bass is read as parts of the one Dynamic Range story; the other pillars
     // are one story each, with no part list of their own.
     const parts = pillarKey === PILLAR.DYNAMIC_RANGE ? BASS_PARTS.map((part) => partOf(part, members)) : [];
-    const clauses = [
+    const clauses = [...new Set([
       ...parts.map((part) => part.clause).filter(Boolean),
       consistencyClauseFor(pillarKey, members),
-    ].filter(Boolean);
+      // The language each of this pillar's own lead results has earned.
+      ...leads.clauses,
+    ].filter(Boolean))];
 
     pillars.push({
       pillar: pillarKey,
       label: definition.label,
       question: definition.question,
       why_care: definition.why_care,
-      translation: [...definition.translation],
+      translation: seatingSuppressed ? withoutSeatNarration(definition.translation) : [...definition.translation],
       vocabulary: [...definition.vocabulary],
       register_examples: [...definition.register_examples],
       success_note: definition.success_note,
@@ -379,8 +392,24 @@ export function buildClientStoryPillars({
       emphasis_note: emphasisNoteOf(pillarKey, ordered),
       emphasis_order: ordered.map((member) => String(member.key).toUpperCase()),
       selected_ids: selected.map((member) => String(member.key).toUpperCase()),
+      // THE GLOBAL NARRATIVE PRIORITY: how much space this pillar gets in the proposal.
       role,
       role_label: PRIORITY_LABEL[role] || null,
+      // THE PILLAR EVIDENCE PRIORITY: which result leads this pillar, and the language
+      // that result has earned. The two are decided separately and never override
+      // one another — the space follows the role, the language follows the lead.
+      lead_evidence: {
+        ids: leads.ids,
+        level: leads.level,
+        clauses: leads.clauses,
+        // The register's sentence form, which names the seating: handed over only
+        // where the seating may be named at all.
+        vocabulary: seatingSuppressed ? [] : leads.sentences,
+        rule: leads.rule,
+      },
+      lead_note: leadNoteOf(leads, PRIORITY_LABEL[role] || null),
+      seat_narration: seatingSuppressed ? 'banned' : 'allowed',
+      seat_narration_rule: seatingSuppressed ? SEAT_FREE_PILLAR_EVIDENCE_RULE : null,
       rank: ranks.length > 0 ? Math.min(...ranks) : null,
       brief_relevance: ordered[0]?.brief_relevance ?? null,
       context: context ? {
@@ -389,7 +418,7 @@ export function buildClientStoryPillars({
         intended_use: context.intended_use ?? null,
       } : null,
       parameter_ids: members.map((member) => String(member.key).toUpperCase()),
-      members: ordered.map(evidenceMember),
+      members: ordered.map((member) => evidenceMember(member, leadKeys)),
       // The parts of the one story (the bass, inside Dynamic Range).
       parts,
       part_order: parts.length > 0 ? [...BASS_PART_ORDER] : [],
@@ -534,6 +563,9 @@ export function clientStoryPillarRules() {
     seating_rationale_rule: SEATING_RATIONALE_RULE,
     always_available_rule: PILLAR_ALWAYS_AVAILABLE_RULE,
     emphasis_rule: EVIDENCE_EMPHASIS_RULE,
+    lead_rule: PILLAR_LEAD_RULE,
+    seat_narration_rule: SEAT_FREE_PILLAR_EVIDENCE_RULE,
+    seat_narration_applies_when: 'a pillar carries seat_narration: "banned" — the designer has ruled the seating out of the narrative',
     emphasis_values: Object.values(EVIDENCE_EMPHASIS).filter((value) => value !== EVIDENCE_EMPHASIS.EXCLUDED),
     pillars: PILLAR_ORDER.map((pillarKey) => ({
       pillar: pillarKey,
@@ -585,6 +617,8 @@ export function clientStoryPillarLines() {
     STORY_HIERARCHY_RULE,
     NARRATIVE_METHOD_RULE,
     EVIDENCE_EMPHASIS_RULE,
+    PILLAR_LEAD_RULE,
+    SEAT_FREE_PILLAR_EVIDENCE_RULE,
     PILLAR_STRUCTURE_RULE,
     EVIDENCE_NOT_HEADLINE_RULE,
     BASS_STORY_RULE,
