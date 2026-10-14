@@ -72,6 +72,18 @@ export const TV_PRESET_KEY_TO_INCHES = Object.freeze({
   tv100: 87.80,
 });
 
+/** Preset key → the television's own NOMINAL diagonal, exactly as the Room
+ * Designer names the preset ("TV 100""). A television is stated by this figure
+ * and never by its viewable width, so the preset states its own size instead of
+ * one being derived from the width. Display catalogue only — no geometry reads
+ * this. */
+export const TV_PRESET_DIAGONAL_INCHES = Object.freeze({
+  tv65: 65,
+  tv77: 77,
+  tv83: 83,
+  tv100: 100,
+});
+
 /** The aspect a screen is read with when the design itself states none. */
 const DEFAULT_SCREEN_ASPECT = "16:9";
 

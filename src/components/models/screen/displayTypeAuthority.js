@@ -9,12 +9,17 @@
  *
  * The type is never inferred from dimensions, and never from an aspect ratio or
  * an image format. It is decided by, in order:
- *   1. an explicit `display_type` the designer has saved (manual size section);
- *   2. an explicit television authority the project already carries — a TV preset
- *      or a saved TV width in mm. A preset is a named television, not a
- *      dimension, so this preserves the wording every existing TV project
- *      already uses;
- *   3. otherwise 'projector_screen' — the conservative answer, which is the
+ *   1. a television authority the design actually carries — a TV preset key, a
+ *      saved TV width in mm, or the frozen `television` flag. The Screen Setup
+ *      control IS a television selector ("TV 100""), so this evidence is a
+ *      named television and settles the question on its own: a leftover
+ *      `projector_screen` value left behind by an earlier manual entry can never
+ *      re-describe a television as a projection screen (and so can never print
+ *      its 88" viewable width as an 88" screen);
+ *   2. the type the designer typed in the ENABLED manual size section — a stale
+ *      disabled manual record is not an authority for anything;
+ *   3. any other explicit `display_type` the design carries;
+ *   4. otherwise 'projector_screen' — the conservative answer, which is the
  *      wording every legacy manual project already produces. A legacy project is
  *      never silently reinterpreted as a TV.
  *
@@ -27,7 +32,8 @@
  * design: the physical geometry keeps using the underlying dimensions.
  */
 
-import { diagonalInchesFromWidth, isTelevisionScreen } from './canonicalScreenSize';
+import { diagonalInchesFromWidth } from './canonicalScreenSize';
+import { TV_PRESET_DIAGONAL_INCHES } from './resolveEffectiveScreen';
 
 export const DISPLAY_TYPE_TV = 'tv';
 export const DISPLAY_TYPE_PROJECTOR = 'projector_screen';
@@ -56,17 +62,53 @@ export function canonicalDisplayType(value) {
  * The display type of a saved project, a design_state, or a live screen object.
  * Never inferred from width, height, aspect ratio or image format.
  */
+/** The TV preset key a design or live screen object carries, or null. */
+function tvPresetKey(source) {
+  const key = String(source?.tvPresetKey ?? source?.tv_preset_key ?? '').trim().toLowerCase();
+  return key || null;
+}
+
+/** A saved television width in mm, or null. */
+function tvWidthMm(source) {
+  const mm = Number(source?.tvWidthMm ?? source?.tv_width_mm);
+  return Number.isFinite(mm) && mm > 0 ? mm : null;
+}
+
+/** The manual size record the designer is actually using, if any. A disabled
+ *  record is history, not an authority. */
+function activeManualSize(source) {
+  const manualFlagOn = source?.manual_dimensions === true;
+  const records = [source?.manualSize, source?.screen_manual_config];
+  return records.find((record) => record && (record.enabled === true || manualFlagOn)) || null;
+}
+
+/**
+ * Whether the design carries a television authority of its own: a TV preset, a
+ * saved TV width in mm, or the frozen `television` flag a publication stamps.
+ */
+export function hasTelevisionEvidence(source) {
+  if (!source || typeof source !== 'object') return false;
+  if (source.television === true) return true;
+  if (tvPresetKey(source)) return true;
+  return tvWidthMm(source) !== null;
+}
+
 export function resolveDisplayType(source) {
   if (!source || typeof source !== 'object') return DISPLAY_TYPE_PROJECTOR;
 
+  // A television the design states by its own TV evidence, before any stored
+  // description: a preset or a saved TV width IS a television.
+  if (hasTelevisionEvidence(source)) return DISPLAY_TYPE_TV;
+
+  const manual = canonicalDisplayType(activeManualSize(source)?.displayType
+    ?? activeManualSize(source)?.display_type);
+  if (manual) return manual;
+
   const explicit = canonicalDisplayType(source.display_type)
-    || canonicalDisplayType(source.displayType)
-    || canonicalDisplayType(source.screen_manual_config?.displayType)
-    || canonicalDisplayType(source.screen_manual_config?.display_type)
-    || canonicalDisplayType(source.manualSize?.displayType);
+    || canonicalDisplayType(source.displayType);
   if (explicit) return explicit;
 
-  return isTelevisionScreen(source) ? DISPLAY_TYPE_TV : DISPLAY_TYPE_PROJECTOR;
+  return DISPLAY_TYPE_PROJECTOR;
 }
 
 /** True when the display is a television. */
@@ -96,22 +138,31 @@ export function projectorPresentationApplies(source) {
  * derived from the viewable width when no diagonal was ever saved.
  */
 export function savedDiagonalInches(source) {
-  const live = source?.manualSize;
-  if (live?.mode === 'diagonal') {
-    const saved = Number(live.diagonalInches);
-    if (Number.isFinite(saved) && saved > 0) return saved;
-  }
-
-  const config = source?.screen_manual_config;
-  if (config?.mode === 'diagonal') {
-    const saved = Number(config.diagonalInches);
-    if (Number.isFinite(saved) && saved > 0) return saved;
-  }
-
   const aspectRatio = source?.aspect_ratio || source?.aspectRatio || '16:9';
-  const tvWidthMm = Number(source?.tv_width_mm ?? source?.tvWidthMm);
-  if (Number.isFinite(tvWidthMm) && tvWidthMm > 0) {
-    return diagonalInchesFromWidth(tvWidthMm / 25.4, aspectRatio);
+
+  // The size the designer typed in the manual size section, when it is the
+  // section in use: a typed diagonal is the display's own size.
+  const manual = activeManualSize(source);
+  if (manual?.mode === 'diagonal') {
+    const saved = Number(manual.diagonalInches);
+    if (Number.isFinite(saved) && saved > 0) return saved;
+  }
+  if (manual?.mode === 'wh') {
+    const widthM = Number(manual.widthM);
+    const heightM = Number(manual.heightM);
+    if (Number.isFinite(widthM) && widthM > 0 && Number.isFinite(heightM) && heightM > 0) {
+      return Math.hypot(widthM, heightM) / 0.0254;
+    }
+  }
+
+  // A television preset states its own nominal size — 100" is 100", never the
+  // 87.8" viewable width of a 100" 16:9 panel derived back up.
+  const preset = TV_PRESET_DIAGONAL_INCHES[tvPresetKey(source)];
+  if (preset) return preset;
+
+  const savedTvWidthMm = tvWidthMm(source);
+  if (savedTvWidthMm !== null) {
+    return diagonalInchesFromWidth(savedTvWidthMm / 25.4, aspectRatio);
   }
 
   const widthInches = Number(source?.screen_size ?? source?.visibleWidthInches);
