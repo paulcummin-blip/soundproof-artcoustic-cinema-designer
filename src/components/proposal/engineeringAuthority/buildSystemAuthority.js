@@ -109,6 +109,10 @@ export function buildSystemAuthority(project, _version, placedSpeakers) {
       model_label: meta?.label || model,
       category: meta?.category || 'Unknown',
       found_in_registry: !meta?.notFound,
+      // The physical loudspeakers this role holds, for the package's own Qty
+      // column. Null when the count cannot be read, so a row states no figure
+      // rather than an invented one.
+      quantity: roleQuantities[role] ?? null,
     });
   }
 

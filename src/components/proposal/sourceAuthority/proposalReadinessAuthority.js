@@ -386,13 +386,19 @@ export function buildVersionBlockers({ versionName, project }) {
 }
 
 /**
- * One version's readiness row: ONE source, the Project Report.
+ * One version's readiness row: ONE gating source, the Project Report.
+ *
+ * The row also carries the version's equipment checklist (its stored Speaker
+ * Design PDF), stated BESIDE the report. It is never one of the blockers and
+ * never changes `ready`: the Project Report alone decides whether a proposal may
+ * be generated.
  *
  * @returns {Object} row — the saved version name, the Project Report cell, the
- *   blocking reason and the sentence.
+ *   checklist cell, the blocking reason and the sentence.
  */
 export function resolveVersionReadinessRow({ versionId, versionName, versionNumber = null, cells = {} }) {
   const project = cells.project || buildReadinessCell({ state: READINESS_STATE.MISSING });
+  const speakerDesign = cells.speaker_design || null;
   const blockers = buildVersionBlockers({ versionName, project });
   const checking = project.checking;
 
@@ -401,7 +407,8 @@ export function resolveVersionReadinessRow({ versionId, versionName, versionNumb
     versionName,
     versionNumber,
     project,
-    cells: { project },
+    speakerDesign,
+    cells: speakerDesign ? { project, speaker_design: speakerDesign } : { project },
     project_report_status: project.status,
     blockers,
     blockingSentence: buildBlockingSentence({ versionName, project }),
