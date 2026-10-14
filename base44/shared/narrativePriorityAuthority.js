@@ -60,6 +60,7 @@ import {
   p1RationalePhrase,
   p20ConsistencyPhrase,
   p20NarrativePriority,
+  readScopedSeatLevels,
   readSeatScope,
 } from './seatScopeNarrativeAuthority.js';
 
@@ -367,6 +368,7 @@ export function buildNarrativePriorityRows({
   excludedKeys = [],
   excludedTopics = [],
   suppressedAreas = [],
+  seatScopes = null,
 } = {}) {
   const evidence = collectEligibleEvidence(summary);
   const brief = readBriefRelevance({ intent, subjects, briefText, design });
@@ -379,6 +381,10 @@ export function buildNarrativePriorityRows({
     ...suppressedAreasFromTopics(excludedTopics),
   ].map((area) => String(area)));
   const seatingSuppressed = silenced.has('client_experience');
+  // The frozen scoped summary, read once: where it states a parameter's own result
+  // for the primary, secondary or assessed seats, that reading governs the seat
+  // scope of its narrative class.
+  const scopedSeatLevels = readScopedSeatLevels(seatScopes);
   const rows = [];
   const byKey = {};
 
@@ -391,7 +397,27 @@ export function buildNarrativePriorityRows({
     const level = entry.eligible ? entry.level : null;
     // The seat results are read for every seat-scoped parameter, so the designer's
     // view can state the primary and secondary results beside the governed one.
+    // WHERE THE SAVED REPORTS STATE A RESULT FOR EACH SCOPE, THAT READING IS THE
+    // AUTHORITY: the per-seat rows can be silent about which seats the client
+    // actually uses, and a scope level the reports state is never re-derived from a
+    // weaker row. The per-seat reading is the fallback, not the other way round.
     const seats = readSeatScope(summary, key);
+    const scoped = scopedSeatLevels[key] || null;
+    const reading = scoped
+      ? {
+        all: scoped.all ?? level,
+        primary: scoped.primary,
+        secondary: scoped.secondary,
+        split: scoped.primary != null && scoped.secondary != null,
+        assessed: scoped.seat_count?.all ?? seats.assessed,
+      }
+      : {
+        all: seats.all ?? level,
+        primary: seats.primary,
+        secondary: seats.secondary,
+        split: seats.split,
+        assessed: seats.assessed,
+      };
     const areaSilenced = area ? silenced.has(area) : false;
     const classified = parameterNarrativePriority({
       key,
@@ -403,9 +429,9 @@ export function buildNarrativePriorityRows({
       // the decision itself and not from the level it reached.
       designRationale: key === 'p1',
       seats: {
-        all: seats.all ?? level,
-        primary: seats.primary,
-        split: seats.split,
+        all: reading.all,
+        primary: reading.primary,
+        split: reading.split,
         scopeAllowed: !seatingSuppressed,
       },
     });
@@ -424,9 +450,12 @@ export function buildNarrativePriorityRows({
       scope: entry.scope,
       value: entry.value ?? null,
       eligible: entry.eligible,
-      primary_seat_result: seats.primary,
-      secondary_seat_result: seats.secondary,
-      seat_results_assessed: seats.assessed,
+      primary_seat_result: reading.primary,
+      secondary_seat_result: reading.secondary,
+      seat_results_assessed: reading.assessed,
+      // The scoped summary the reports themselves state, where they state one. It
+      // travels so a reader never has to re-derive a scope from a weaker row.
+      scoped_seat_results: scoped ? { ...scoped } : null,
       seat_scope: classified.seat_scope ?? SEAT_SCOPE.NONE,
       multiplier: score.multiplier,
       contribution: score.contribution,

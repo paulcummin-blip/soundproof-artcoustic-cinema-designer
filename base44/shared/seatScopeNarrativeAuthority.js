@@ -97,6 +97,39 @@ export function readSeatScope(summary, key) {
   };
 }
 
+/**
+ * The per-parameter scoped levels the FROZEN scoped summary states, keyed by
+ * parameter ('p20' → { all, primary, secondary, seat_count }).
+ *
+ * This is the authoritative seat reading wherever the saved reports state a result
+ * for each scope: the per-seat assessment rows can be silent about which seats the
+ * client actually uses, and a scope level the reports state is never re-derived
+ * from a weaker row. A scope with no stated level is absent rather than guessed, and
+ * a scope holding fewer than the minimum seats is left to the claim authority that
+ * already guards it.
+ *
+ * @param {Object|null} scopes — the saved evidence's own `seat_scopes` block
+ * @returns {Object} map of parameter key → { all, primary, secondary, seat_count }
+ */
+export function readScopedSeatLevels(scopes = null) {
+  const out = {};
+  if (!scopes || typeof scopes !== 'object') return out;
+  for (const scope of [SEAT_SCOPE.ALL, SEAT_SCOPE.PRIMARY, SEAT_SCOPE.SECONDARY]) {
+    const block = scopes[scope] || null;
+    if (block?.available !== true) continue;
+    const seatCount = Number(block.seat_count);
+    for (const [key, parameter] of Object.entries(block.parameters || {})) {
+      const level = /^L[1-4]$/.test(String(parameter?.level ?? '')) ? String(parameter.level) : null;
+      if (!level) continue;
+      const entry = out[key] || { all: null, primary: null, secondary: null, seat_count: {} };
+      entry[scope] = level;
+      if (Number.isFinite(seatCount)) entry.seat_count[scope] = seatCount;
+      out[key] = entry;
+    }
+  }
+  return out;
+}
+
 /* ── P20 · bass seat-to-seat consistency ──────────────────────────────────── */
 
 /**

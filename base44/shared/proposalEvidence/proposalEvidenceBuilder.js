@@ -49,8 +49,14 @@ import {
 } from '../clientFacingParameterAuthority.js';
 import { buildOptionFacts } from './proposalEvidenceFacts.js';
 import { buildNarrativePriorityRows } from '../narrativePriorityAuthority.js';
+import { readScopedSeatLevels } from '../seatScopeNarrativeAuthority.js';
 import { summaryFromReportEvidence } from '../strengthImportance.js';
 import { buildClientStoryPillars } from '../narrativePillarGrouping.js';
+import {
+  buildProposalNarrativeContext,
+  designContainmentFromFacts,
+  resolveBriefIntent,
+} from '../proposalNarrativeContext.js';
 import { classifyAreas } from './proposalEvidenceClassification.js';
 import {
   buildAllowedClaims,
@@ -87,6 +93,43 @@ function fnv1a(text) {
 }
 
 /**
+ * The DIRECT published evidence of one version, keyed by parameter: the result each
+ * parameter states, with the seat scopes the saved reports themselves state.
+ *
+ * This is what the narrative grouping reads to decide whether a result EXISTS. It
+ * creates nothing: a parameter whose row states no level and whose scope states none
+ * is absent rather than filled in, and a level is copied exactly as the report
+ * published it.
+ *
+ * @param {Object|null} reportEvidence — one version's frozen Project Report evidence
+ * @param {Object|null} seatScopes — that evidence's own `seat_scopes` block
+ * @returns {Object} map of parameter key → { level, value, seat results }
+ */
+function parameterEvidenceFrom(reportEvidence = null, seatScopes = null) {
+  const out = {};
+  for (const row of (Array.isArray(reportEvidence?.parameters) ? reportEvidence.parameters : [])) {
+    const id = Number(row?.parameter_id);
+    if (!Number.isFinite(id)) continue;
+    out[`p${id}`] = {
+      key: `p${id}`,
+      level: /^L[1-4]$/.test(String(row?.level ?? '')) ? String(row.level) : null,
+      value: row?.value ?? null,
+    };
+  }
+  for (const [key, scoped] of Object.entries(readScopedSeatLevels(seatScopes))) {
+    const entry = out[key] || (out[key] = { key, level: null, value: null });
+    entry.primary_seat_result = scoped.primary ?? null;
+    entry.secondary_seat_result = scoped.secondary ?? null;
+    entry.all_seat_result = scoped.all ?? null;
+    entry.seat_count = scoped.seat_count || null;
+    // A parameter the reports assess at the seats has a published result even where
+    // its own row states the narrower one.
+    if (entry.level == null && scoped.all) entry.level = scoped.all;
+  }
+  return out;
+}
+
+/**
  * The pack's content fingerprint. It covers the evidence and the reading of it,
  * never the time the pack was minted, so the same evidence always produces the
  * same fingerprint and any change to the evidence changes it.
@@ -110,11 +153,22 @@ export function proposalEvidenceFingerprint(pack) {
  *   (P8, P15, P21), and only as a labelled assumption.
  * @returns {Object} the frozen pack
  */
-export function buildProposalEvidence({ versions = [], generatedAt = null, requestContext = null } = {}) {
+export function buildProposalEvidence({
+  versions = [],
+  generatedAt = null,
+  requestContext = null,
+  narrativeContext = null,
+} = {}) {
   const list = (Array.isArray(versions) ? versions : []).filter(Boolean);
   if (list.length === 0) {
     throw new Error('No version report evidence was supplied. Select at least one version with a current Project Report.');
   }
+
+  // THE PROJECT'S OWN CONTEXT, read once for the whole pack: the declared intent, the
+  // room type, the subjects the brief and the steer name, and the subjects the steer
+  // keeps out. Without one the context is empty and the classification falls back to
+  // its own defaults — a pack built with no context is never given an invented one.
+  const context = narrativeContext ? { ...narrativeContext } : buildProposalNarrativeContext({});
 
   // The ONE assumed-parameter admission rule for this proposal. With no request
   // context every assumed parameter stays excluded, exactly as before.
@@ -168,13 +222,69 @@ export function buildProposalEvidence({ versions = [], generatedAt = null, reque
   // parameter. This reads the same classified evidence as the ranking, and it
   // changes no figure, level, scope or claim: the stories' own claim IDs travel
   // with the pillar they belong to.
+  //
+  // TWO SOURCES, EACH THE AUTHORITY FOR ITS OWN HALF. The classified rows decide
+  // emphasis, relevance and role, read under THIS project's intent, room type and
+  // steer. The direct parameter evidence — the published result of each parameter,
+  // with the seat scopes the reports themselves state — decides whether a result
+  // exists and what it states. A priority can therefore say "say little about this";
+  // it can never say "this published result does not exist".
   const pillarsByVersion = new Map();
+  const contextByVersion = new Map();
+  let narrativeReading = null;
   list.forEach((entry, index) => {
     const reportEvidence = entry?.evidence?.project || null;
     const option = options[index];
     const stories = (storiesByVersion.get(option.version_id) || {}).strength_stories || [];
-    const { rows } = buildNarrativePriorityRows({ summary: summaryFromReportEvidence(reportEvidence) });
-    pillarsByVersion.set(option.version_id, buildClientStoryPillars({ rows, stories }).pillars);
+    const intent = resolveBriefIntent({
+      declaredIntent: context.declared_intent,
+      roomType: context.room_type,
+      facts: option.facts,
+    });
+    const seatScopes = reportEvidence?.seat_scopes || null;
+    const { rows, brief } = buildNarrativePriorityRows({
+      summary: summaryFromReportEvidence(reportEvidence),
+      intent,
+      subjects: context.subjects,
+      briefText: context.brief_text,
+      design: designContainmentFromFacts(option.facts),
+      excludedTopics: context.excluded_topics,
+      suppressedAreas: context.suppressed_areas,
+      seatScopes,
+    });
+    const parameterEvidence = parameterEvidenceFrom(reportEvidence, seatScopes);
+    const reading = buildClientStoryPillars({
+      rows,
+      stories,
+      parameterEvidence,
+      context: {
+        intent,
+        room_type: context.room_type,
+        intended_use: context.declared_intent,
+        suppressedAreas: context.suppressed_areas || [],
+      },
+    });
+    pillarsByVersion.set(option.version_id, reading.pillars);
+    // The seating design rationale (RP22 P1): the reason the seating sits where it
+    // does, grounded by the seating story's own claim where the pack mints one, and
+    // suppressed entirely when the designer steered the seating subject away.
+    const seatingClaimIds = stories
+      .filter((story) => /seating|clearance/i.test(`${story?.story_id || ''} ${story?.title || ''}`))
+      .flatMap((story) => (Array.isArray(story?.allowed_claim_ids) ? story.allowed_claim_ids : []));
+    contextByVersion.set(option.version_id, {
+      intent,
+      room_type: context.room_type,
+      intended_use: context.declared_intent,
+      preferred_topics: context.preferred_topics || [],
+      excluded_topics: context.excluded_topics || [],
+      suppressed_areas: context.suppressed_areas || [],
+      brief_relevance: brief?.byArea || null,
+      brief_reasons: brief?.reasons || null,
+      source: context.source || null,
+    });
+    const rationale = reading.design_rationale || null;
+    option.design_rationale = rationale ? { ...rationale, claim_ids: seatingClaimIds } : null;
+    if (!narrativeReading) narrativeReading = contextByVersion.get(option.version_id);
   });
 
   // ── THE SUPPORTING RESULTS THE BRIEF ASKED FOR ──
@@ -273,6 +383,15 @@ export function buildProposalEvidence({ versions = [], generatedAt = null, reque
       // same results the ranked stories rest on, read together. The ranking still
       // decides emphasis; this decides only what is told as one story.
       client_story_pillars: pillarsByVersion.get(option.version_id) || [],
+      // The seating design rationale (RP22 P1): why the seating sits where it does,
+      // available whether its result is high or low, and suppressed entirely when the
+      // designer steered the seating subject away. It is a design reason, never a
+      // performance result.
+      design_rationale: option.design_rationale || null,
+      // The context this version's evidence was classified under, so a reader can see
+      // WHY a result was weighted as it was: the intent, the room type, the brief
+      // relevance of each area and the subjects the steer kept out.
+      narrative_context: contextByVersion.get(option.version_id) || null,
     })),
     classification,
     // Which supporting results the brief asked for, which of them the frozen

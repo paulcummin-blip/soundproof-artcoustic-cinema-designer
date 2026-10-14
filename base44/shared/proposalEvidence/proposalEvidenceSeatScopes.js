@@ -78,6 +78,14 @@ const WORDING_BY_PARAMETER = Object.freeze({
  */
 export const REFERENCE_POSITION_PARAMETERS = Object.freeze(['p19']);
 
+/**
+ * The parameters that never mint a scoped seat claim, whatever their scope states.
+ * P19 is assessed at the reference position only, so no seat-group result exists for
+ * it. P1 is the seating DECISION: it is explained in the narrative as design
+ * rationale, and its distance is never stated as a scoped score.
+ */
+export const NO_SCOPED_CLAIM_PARAMETERS = Object.freeze(['p19', 'p1']);
+
 /** The fewest seats a scope holds before it can carry a group claim. */
 export const MIN_SCOPE_SEATS = 2;
 
@@ -121,9 +129,9 @@ export function buildScopedSeatClaims(option, optionIndex = 0) {
     if (!Number.isFinite(seatCount) || seatCount < MIN_SCOPE_SEATS) continue;
 
     for (const [key, parameter] of Object.entries(block.parameters || {})) {
-      // P19 is RSP-only: it has no seat-group result, so it never mints a
-      // scoped seat claim.
-      if (REFERENCE_POSITION_PARAMETERS.includes(key)) continue;
+      // P19 is RSP-only and P1 is the seating decision: neither mints a scoped
+      // seat claim, whatever the scope's stated level is.
+      if (NO_SCOPED_CLAIM_PARAMETERS.includes(key)) continue;
 
       const level = /^L[1-4]$/.test(String(parameter?.level ?? '')) ? String(parameter.level) : null;
       if (!level || !POSITIVE_LEVELS.includes(level)) continue;

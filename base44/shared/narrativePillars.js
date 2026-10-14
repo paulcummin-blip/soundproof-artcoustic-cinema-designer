@@ -295,6 +295,27 @@ export const BRIEF_CONTEXT_RULE = `THE BRIEF DECIDES WHETHER A RESULT IS A SUCCE
 
 export const SEATING_RATIONALE_NOTE = `THE SEATING IS A DESIGN DECISION, NOT A FOURTH PILLAR. Where the seating arrangement is explained, explain in plain terms what the placement does for the listener: the room working with the seating, the viewing position, and the balance the layout strikes. It is never presented as a performance result, never given a Performance Level, and never turned into a pillar of its own.`;
 
+/* ── How much of a pillar's evidence is discussed ─────────────────────────── */
+
+/**
+ * HOW MUCH of a pillar's evidence is told. It is decided for each result, never for
+ * the pillar: ASDR importance and the brief decide which results lead, which
+ * support and which stay in the engineering evidence.
+ */
+export const EVIDENCE_EMPHASIS = Object.freeze({
+  LEAD: 'lead',
+  SUPPORTING: 'supporting',
+  CONTRIBUTING: 'contributing',
+  CONTEXT: 'context',
+  EXCLUDED: 'excluded',
+});
+
+export const PILLAR_ALWAYS_AVAILABLE_RULE = `A PILLAR IS NEVER SILENCED BY ITS OWN EVIDENCE. Dynamic Range, Spatial Resolution and Timbre Matching are the three ways Sound Proof explains performance, and every proposal tells all three. ASDR importance decides how much of the EVIDENCE beneath a pillar is discussed — which results lead, which support and which stay in the engineering evidence — and never whether the pillar itself is there. Where little beneath a pillar is worth telling, that pillar is simply shorter: write it briefly and honestly from the evidence it does hold, without leaving it out, apologising for it or padding it.`;
+
+export const EVIDENCE_EMPHASIS_RULE = `THE EMPHASIS INSIDE A PILLAR IS ALREADY DECIDED. Each result beneath a pillar carries an emphasis: a lead result is written out; a supporting or contributing result is woven into the same story; a context result strengthens the pillar but belongs in the engineering evidence, so it is mentioned only in passing where the story genuinely needs it. A lightly weighted result that happens to score highly is never a headline, and a heavily weighted result is discussed even where its level is modest. Never re-rank the evidence and never invent an emphasis.`;
+
+export const SEATING_RATIONALE_RULE = `THE SEATING DECISION IS EXPLAINED AS A DESIGN REASON, NEVER AS A RESULT. Where the evidence carries a seating rationale, explain WHY the seating sits where it does: the space behind the seating is deliberate, the seats are kept clear of the rear wall because a seat close to it is one of the most difficult places in a room for bass and it affects how evenly the system behaves at the listening positions, and the clearance also leaves a better relationship between the audience and the surrounding loudspeakers. It is a deliberate design decision rather than wasted floor space. State no parameter, no Performance Level and no equation, never quote the distance as if it were the benefit, and never promise a particular measured bass outcome. Where the room takes a compromise, explain the balance constructively. Where the seating subject is steered do-not-discuss, the rationale is not written at all.`;
+
 /* ── Reading client-facing text ───────────────────────────────────────────── */
 
 const PARAMETER_NAME_PATTERN = /\bP(?:[1-9]|1\d|2[0-3])\b/g;
