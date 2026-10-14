@@ -21,6 +21,7 @@ import {
   DISPLAY_TYPE_PROJECTOR,
   DISPLAY_TYPE_TV,
   canonicalDisplayType,
+  formatDisplayPhrase,
 } from '@/components/models/screen/displayTypeAuthority';
 
 /** Unwrap an Engineering Authority { statement, confidence, source } value. */
@@ -206,26 +207,24 @@ export function screenStatement(screen = {}) {
   const displayType = canonicalDisplayType(screen.display_type)
     || (screen.television === true ? DISPLAY_TYPE_TV : DISPLAY_TYPE_PROJECTOR);
 
+  // THE display-wording formatter builds the phrase from the frozen figures, so
+  // a proposal page and a report state the same display in the same words.
   if (displayType === DISPLAY_TYPE_TV) {
     // THE television rule: the saved nominal diagonal, then TV. Nothing else —
     // and no figure at all when the publication carries no diagonal.
     const diagonal = Number(screen.diagonal_inches) || stated;
-    return { value: diagonal ? `${Math.round(diagonal)}" TV` : null, hint: null };
+    return {
+      value: diagonal ? formatDisplayPhrase({ television: true, diagonalInches: diagonal }) : null,
+      hint: null,
+    };
   }
   // Where the snapshot carries no viewable width, the stated size stands on its
   // own rather than being labelled as something it may not be.
   // THE projection-screen rule: the viewable width and the aspect ratio, and
-  // never a diagonal — `170" wide 2.35:1 projection screen`.
-  if (viewable) {
-    return {
-      value: aspect ? `${viewable}" wide ${aspect} projection screen` : `${viewable}" wide projection screen`,
-      hint: null,
-    };
-  }
+  // never a diagonal — `150" 2.35:1 projection screen`.
+  const width = viewable || stated;
   return {
-    value: stated
-      ? (aspect ? `${stated}" wide ${aspect} projection screen` : `${stated}" wide projection screen`)
-      : null,
+    value: width ? formatDisplayPhrase({ widthInches: width, aspectRatio: aspect }) : null,
     hint: null,
   };
 }

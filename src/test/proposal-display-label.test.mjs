@@ -74,11 +74,11 @@ describe('A. a television is stated by its diagonal and the word TV', () => {
 });
 
 describe('B. a projection screen keeps its own wording, aspect ratio included', () => {
-  it('keeps the viewable image statement unchanged', () => {
-    expect(screenStatement(projectionScreen(185, '2.35:1')).value).toBe('185" 2.35:1 viewable image');
-    expect(screenStatement(projectionScreen(170, '16:9')).value).toBe('170" 16:9 viewable image');
+  it('states the viewable width and the aspect ratio, and never a diagonal', () => {
+    expect(screenStatement(projectionScreen(185, '2.35:1')).value).toBe('185" 2.35:1 projection screen');
+    expect(screenStatement(projectionScreen(170, '16:9')).value).toBe('170" 16:9 projection screen');
     expect(screenStatement({ aspect_ratio: '2.35:1', viewable_width_inches: 185 }).value)
-      .toBe('185" 2.35:1 viewable image');
+      .toBe('185" 2.35:1 projection screen');
   });
 
   it('is never called a television', () => {

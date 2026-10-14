@@ -23,6 +23,7 @@
  */
 
 import { resolveEffectiveVisibleWidthInches } from './resolveEffectiveScreen';
+import { formatDisplayPhrase } from './displayPhraseFormat';
 
 /** [width, height] for an aspect string such as '16:9' or '2.35:1'. */
 function aspectPair(aspectRatio) {
@@ -100,9 +101,14 @@ export function resolveCanonicalScreen(project) {
     widthInches: width,
     diagonalInches,
     aspectRatio,
-    text: television
-      ? `${diagonalInches}" TV`
-      : `${width}" wide ${aspectRatio} projection screen`,
+    // THE display-wording formatter builds the phrase; the numbers above stay
+    // exactly as they were.
+    text: formatDisplayPhrase({
+      television,
+      diagonalInches,
+      widthInches: width,
+      aspectRatio,
+    }),
   };
 }
 

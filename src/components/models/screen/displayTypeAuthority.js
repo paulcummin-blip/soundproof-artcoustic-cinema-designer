@@ -34,9 +34,14 @@
 
 import { diagonalInchesFromWidth } from './canonicalScreenSize';
 import { TV_PRESET_DIAGONAL_INCHES } from './resolveEffectiveScreen';
+import { formatDisplayPhrase } from './displayPhraseFormat';
 
 export const DISPLAY_TYPE_TV = 'tv';
 export const DISPLAY_TYPE_PROJECTOR = 'projector_screen';
+
+// THE display-wording formatter, re-exported as this authority's own wording
+// rule so a consumer can take the type and its wording from one place.
+export { formatDisplayPhrase };
 
 /** The manual size section's two options, in display order. */
 export const DISPLAY_TYPE_OPTIONS = Object.freeze([
@@ -172,19 +177,14 @@ export function savedDiagonalInches(source) {
 }
 
 /**
- * The client-facing phrase for this design's display. THE screen-size display
- * rule: a television is stated by its nominal diagonal alone, a projection
- * screen by its viewable width and aspect ratio alone.
- *   TV               → `77" TV`
- *   Projector screen → `170" wide 2.35:1 projection screen`
- *
- * A projection screen never states a diagonal, a diagonal equivalent or a
- * derived diagonal, and a television never states an aspect ratio or a width.
+ * The client-facing phrase for this design's display, from the design itself.
+ * THE screen-size display rule: a television is stated by its nominal diagonal
+ * alone, a projection screen by its viewable width and aspect ratio alone.
+ * The wording is assembled by formatDisplayPhrase.
  */
 export function displayPhrase(source) {
   if (isTvDisplay(source)) {
-    const diagonal = savedDiagonalInches(source);
-    return Number.isFinite(diagonal) && diagonal > 0 ? `${Math.round(diagonal)}" TV` : 'TV';
+    return formatDisplayPhrase({ television: true, diagonalInches: savedDiagonalInches(source) });
   }
 
   // The stored screen size IS the viewable width (design_state screen_size =
@@ -192,9 +192,7 @@ export function displayPhrase(source) {
   // aspect ratio, and never by a diagonal derived from them.
   const size = Number(source?.screen_size ?? source?.visibleWidthInches);
   const aspectRatio = String(source?.aspect_ratio || source?.aspectRatio || '').trim();
-  if (!Number.isFinite(size) || size <= 0) return aspectRatio ? `${aspectRatio} projection screen` : null;
-  const width = `${Math.round(size)}"`;
-  return aspectRatio ? `${width} wide ${aspectRatio} projection screen` : `${width} wide projection screen`;
+  return formatDisplayPhrase({ widthInches: size, aspectRatio });
 }
 
 export default resolveDisplayType;

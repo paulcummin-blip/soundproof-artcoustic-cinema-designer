@@ -26,7 +26,7 @@ function packPhrase(screen) {
   }
   const viewable = Number(screen?.viewable_width_inches) || Number(screen?.size_inches) || null;
   const aspect = screen?.aspect_ratio ? String(screen.aspect_ratio) : null;
-  return viewable ? `${viewable}" ${aspect} viewable image` : null;
+  return viewable ? `${viewable}" ${aspect} projection screen` : null;
 }
 
 const television = (diagonal) => ({
@@ -59,14 +59,16 @@ describe('the pack states the display the snapshot was published from', () => {
     const screen = projectionScreen(185, '2.35:1');
     expect(readDisplayIdentity(screen).isTv).toBe(false);
     expect(readDisplayIdentity(screen).tvPhrase).toBeNull();
-    expect(packPhrase(screen)).toBe('185" 2.35:1 viewable image');
+    expect(packPhrase(screen)).toBe('185" 2.35:1 projection screen');
   });
 
   it('reads the television rule and the aspect-ratio ban from the pack source', () => {
     // The pack states a television from its own type authority, and the phrase it
     // writes carries no aspect ratio and no "screen".
     expect(PACK).toContain('canonicalDisplayType');
-    expect(PACK).toMatch(/\$\{Math\.round\(diagonal\)\}" TV/);
+    // The wording itself is built by THE display-wording formatter, so the pack
+    // cannot word a display differently from a report.
+    expect(PACK).toContain('formatDisplayPhrase');
     // Read the branch's own code, not the prose around it (the comments name the
     // aspect ratio and the word screen in order to ban them).
     const televisionBranch = PACK.slice(
@@ -75,8 +77,8 @@ describe('the pack states the display the snapshot was published from', () => {
     )
       .replace(/\/\*[\s\S]*?\*\//g, '')
       .replace(/\/\/[^\n]*/g, '');
-    expect(televisionBranch).toMatch(/Math\.round\(diagonal\)/);
-    expect(televisionBranch).toMatch(/" TV/);
+    expect(televisionBranch).toMatch(/formatDisplayPhrase\(\{\s*television: true/);
+    expect(televisionBranch).toMatch(/diagonalInches: diagonal/);
     // The branch never reads the aspect ratio or a viewable width, and the phrase
     // it writes carries no other word: the only "screen" in it is the parameter
     // name the snapshot block arrives in.

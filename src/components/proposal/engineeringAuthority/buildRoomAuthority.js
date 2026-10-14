@@ -15,6 +15,7 @@ import {
 import {
   DISPLAY_TYPE_PROJECTOR,
   DISPLAY_TYPE_TV,
+  formatDisplayPhrase,
   resolveDisplayType,
 } from '@/components/models/screen/displayTypeAuthority';
 
@@ -88,10 +89,12 @@ function interpretScreen(project) {
   // viewable width. Nothing stored changes: size_inches stays the viewable-width
   // authority it already is, and only the description follows the identity.
   const diagonalInches = Number(canonical?.diagonalInches);
+  // The wording itself comes from THE display-wording formatter, so a report, a
+  // proposal and the Room Designer can never state the display differently.
   const displayPhraseText = isTv
-    ? (Number.isFinite(diagonalInches) && diagonalInches > 0 ? `${Math.round(diagonalInches)}" TV` : 'TV')
+    ? formatDisplayPhrase({ television: true, diagonalInches })
     : (statedSize
-      ? (aspectRatio ? `${statedSize}" wide ${aspectRatio} projection screen` : `${statedSize}" wide projection screen`)
+      ? formatDisplayPhrase({ widthInches: statedSize, aspectRatio })
       : 'Screen not configured');
 
   return {

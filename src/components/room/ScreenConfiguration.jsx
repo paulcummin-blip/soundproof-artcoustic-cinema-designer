@@ -15,7 +15,7 @@ import { rp23DisplayAngleDeg, rp23LevelForAngleDeg } from "@/components/utils/vi
 import { getSpeakerModelMeta } from "@/components/models/speakers/registry";
 import ManualSizeInput from "./ManualSizeInput";
 import DisplayTypeSelector from "./DisplayTypeSelector";
-import { DISPLAY_TYPE_PROJECTOR } from "@/components/models/screen/displayTypeAuthority";
+import { DISPLAY_TYPE_PROJECTOR, isTvDisplay } from "@/components/models/screen/displayTypeAuthority";
 import RP22GradingPill from "@/components/ui/RP22GradingPill";
 
 export default function ScreenConfiguration(props) {
@@ -54,6 +54,13 @@ export default function ScreenConfiguration(props) {
       heightM: 0
     };
   }, [screenData.manualSize]);
+
+  // The display's own identity names this field: a television is chosen and
+  // stated by its nominal size, a projection screen by its viewable width.
+  const displayIsTv = useMemo(
+    () => isTvDisplay({ ...screenData, manualSize }),
+    [screenData, manualSize]
+  );
 
   const borderThicknessM = Number(screenData.borderThicknessM) || 0.08;
 
@@ -331,7 +338,9 @@ export default function ScreenConfiguration(props) {
           <div style={groupTitleStyle}>Screen Setup</div>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
             <div>
-              <Label className={fieldLabelStyle}>Viewing Width (inches)</Label>
+              <Label className={fieldLabelStyle}>
+                {displayIsTv ? 'TV Size (inches)' : 'Viewing Width (inches)'}
+              </Label>
               <Select
                 value={(() => {
                   const TV_KEY_TO_VAL = { tv65: "55.55", tv77: "67.36", tv83: "72.52", tv100: "87.80" };
