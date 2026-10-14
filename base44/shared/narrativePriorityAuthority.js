@@ -398,8 +398,12 @@ export function topicNarrativePriority(topicKey, { level = null, weight = null, 
     const classified = parameterNarrativePriority({ key: null, weight: 0, level: null, relevance, excluded });
     return { ...classified, area: subject?.area || null };
   }
-  const resolvedWeight = Number.isFinite(Number(weight))
-    ? Number(weight)
+  // A supplied weight is honoured only when it is a real, positive one: an absent
+  // weight (null/undefined) must fall through to the topic's own family weight in
+  // the canonical table, never read as zero.
+  const supplied = Number(weight);
+  const resolvedWeight = Number.isFinite(supplied) && supplied > 0
+    ? supplied
     : Math.max(...subject.keys.map((key) => parameterWeight(key)));
   const classified = parameterNarrativePriority({
     key: subject.keys[0],

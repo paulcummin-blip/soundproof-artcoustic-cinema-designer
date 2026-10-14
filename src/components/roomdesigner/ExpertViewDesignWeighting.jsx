@@ -21,13 +21,13 @@ import {
   BRIEF_INTENT,
   BRIEF_RELEVANCE,
   areasForBriefText,
-} from "../../../../shared/briefRelevance.js";
+} from "../../../shared/briefRelevance.js";
 import {
   NARRATIVE_PRIORITY,
   PRIORITY_RANK,
   buildNarrativePriorityRows,
   isNarrativeCandidate,
-} from "../../../../shared/narrativePriorityAuthority.js";
+} from "../../../shared/narrativePriorityAuthority.js";
 
 const FILTERS = Object.freeze([
   { id: 'all', label: 'All' },

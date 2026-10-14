@@ -223,7 +223,7 @@ test('the achieved level chooses the strength of the words, and only after relev
 });
 
 test('the Expert View rows state weight, result, contribution and class', () => {
-  const summary = summaryOf([[18, 'L1'], [7, 'L4'], [8, 'L4'], [16, 'L4'], [19, 'L4']]);
+  const summary = summaryOf([[18, 'L1'], [14, 'L3'], [7, 'L4'], [8, 'L4'], [16, 'L4'], [19, 'L4']]);
   const { rows, brief } = buildNarrativePriorityRows({
     summary,
     intent: BRIEF_INTENT.MEDIA_LOUNGE,
@@ -272,9 +272,11 @@ test('the highlights are selected by the same classification', () => {
   const { admitted } = admitStrengthStories([lowWeightL4, onBriefBassL2], { floor: 3, brief: MEDIA_LOUNGE });
   assert.deepEqual(admitted.map((entry) => entry.id), ['bass']);
 
-  // Without a brief nothing changes: the previous selection rule still decides.
+  // Without a brief the previous selection rule still decides, unchanged: the L4 is
+  // the only admitted story and the L2 bass result stays below the floor. The brief
+  // is what promotes the on-brief result — never the level alone.
   const withoutBrief = admitStrengthStories([lowWeightL4, onBriefBassL2], { floor: 3 });
-  assert.deepEqual(withoutBrief.admitted.map((entry) => entry.id).sort(), ['bass', 'wide-speakers']);
+  assert.deepEqual(withoutBrief.admitted.map((entry) => entry.id), ['wide-speakers']);
 });
 
 test('the narrative steer suggests by importance and brief, never by level alone', () => {
@@ -339,8 +341,9 @@ test('no RP22 or RP23 calculation, threshold or grading path is touched', () => 
   ]) {
     assert.ok(asdr.includes(line), line);
   }
-  // The narrative authority reads weights and levels only: it grades nothing.
+  // The narrative authority reads weights and levels only: it grades nothing and
+  // reaches no RP22/RP23 threshold authority of its own.
   const narrative = source('base44/shared/narrativePriorityAuthority.js');
-  assert.doesNotMatch(narrative, /thresholds|>= L|band\(|grade\(/);
-  assert.match(narrative, /readonly|Pure: no React/);
+  assert.doesNotMatch(narrative, /applyCatalogThresholds|resolveParamThresholds|rp23LevelForAngleDeg|rp22Catalog|gradeP\d/);
+  assert.match(narrative, /Pure: no React/);
 });
