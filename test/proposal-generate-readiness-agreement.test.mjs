@@ -42,12 +42,16 @@ import {
   READINESS_STATE as SERVER_STATE,
   resolveVersionReadiness as serverReadiness,
 } from '../base44/shared/proposalReadinessAuthority.js';
-import { engineeringDifferenceIsPresentationOnly } from '../src/components/report/designIdentityComparison.js';
+import {
+  engineeringDifferenceIsPresentationOnly,
+  proposalEvidenceDifferenceIsSafe,
+} from '../src/components/report/designIdentityComparison.js';
 import { DERIVED_DISPLAY_IDENTITY_KEYS } from '../src/components/models/screen/displayTypeAuthority.js';
 import {
   DERIVED_DISPLAY_IDENTITY_KEYS as SERVER_KEYS,
   engineeringDifferenceIsPresentationOnly as serverVerdict,
-  engineeringMoveIsPresentationOnly,
+  proposalEvidenceDifferenceIsSafe as serverProposalVerdict,
+  proposalEvidenceMoveIsSafe,
 } from '../base44/shared/designIdentityComparison.js';
 import { readProposalReportEvidence } from '../base44/shared/proposalReportEvidenceReader.js';
 import {
@@ -141,12 +145,12 @@ const frozenProject = (displayType, roomWidthM) => ({
 const publication = (facts) => ({ report_snapshot: { report_project: facts } });
 
 /** The version's analysis cache: the report's frozen publication, and the moved one. */
-const cacheRecord = ({ designChanged = false } = {}) => ({
+const cacheRecord = ({ designChanged = false, displayChanged = false } = {}) => ({
   project_id: PROJECT_ID,
   version_id: LEVEL_4_VERSION.id,
   engineering_publications: {
     [ENGINEERING_FP]: publication(frozenProject('projector_screen', 4.6)),
-    [MOVED_FP]: publication(frozenProject('tv', designChanged ? 5.4 : 4.6)),
+    [MOVED_FP]: publication(frozenProject(displayChanged ? 'tv' : 'projector_screen', designChanged ? 5.4 : 4.6)),
   },
 });
 
@@ -155,8 +159,8 @@ const entities = (record) => ({
   ProjectAnalysisCache: { filter: async () => (record ? [record] : []) },
 });
 
-// ── TEST 1 — a presentation-only move passes the gate that supplies evidence ──
-test('TEST 1 — a version whose publication moved for presentation only is not refused', async () => {
+// ── TEST 1 — a wording-only move passes the gate that supplies evidence ──────
+test('TEST 1 — a wording-only publication move is not refused', async () => {
   const snapshots = await readProposalReportEvidence(entities(cacheRecord()), PROJECT_ID, [VERSION]);
   assert.equal(snapshots.length, 1, 'the version supply is passed to generation unchanged');
   assert.equal(snapshots[0].version_id, LEVEL_4_VERSION.id);
@@ -164,8 +168,17 @@ test('TEST 1 — a version whose publication moved for presentation only is not 
   assert.equal(!!snapshots[0].evidence.citation, true);
 });
 
-// ── TEST 2 — a real physical change is still refused ─────────────────────────
-test('TEST 2 — a real physical change is still refused, in the same sentence', async () => {
+// ── TEST 2 — a changed Display authority requires refreshed report evidence ──
+test('TEST 2 — a projector-to-TV authority change is refused until the Project Report is updated', async () => {
+  await assert.rejects(
+    () => readProposalReportEvidence(entities(cacheRecord({ displayChanged: true })), PROJECT_ID, [VERSION]),
+    /stale Project Report/,
+    'old Screen evidence must not survive into a proposal whose current authority says TV',
+  );
+});
+
+// ── TEST 3 — a real physical change is still refused ─────────────────────────
+test('TEST 3 — a real physical change is still refused, in the same sentence', async () => {
   await assert.rejects(
     () => readProposalReportEvidence(entities(cacheRecord({ designChanged: true })), PROJECT_ID, [VERSION]),
     (error) => {
