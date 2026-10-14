@@ -18,6 +18,7 @@
 
 import { test } from 'vitest';
 import assert from 'node:assert/strict';
+import { packVocabulary } from '../base44/shared/proposalWriter/writerVocabulary.js';
 
 import {
   cabinetCounts,
@@ -170,6 +171,21 @@ test('the Genesis centre wording is accepted rather than falsely rejected', () =
     false,
     'the numeral inside a model name is never read as a cabinet count',
   );
+});
+
+// 1B — NUMERIC SEATING EVIDENCE IS READ WITHOUT WEAKENING THE GUARD
+
+test('a report-stated seating distance is allowed and a different distance is still unsupported', () => {
+  const vocabulary = packVocabulary({
+    options: [{
+      version_id: 'v1',
+      facts: { seating: { per_seat: [{ seat_id: 'seat-r1-c1', distance_m: 3.86 }] } },
+    }],
+  });
+
+  assert.equal(vocabulary.measurements.has('3.86 m'), true, 'the exact RP23 distance is evidence');
+  assert.equal(vocabulary.measurements.has('3.9 m'), true, 'the approved one-decimal report form is evidence');
+  assert.equal(vocabulary.measurements.has('3.87 m'), false, 'an unsupported distance is still rejected');
 });
 
 // 2 — THE SAVED INTERPRETATION IS CHECKED AGAINST THE FROZEN EVIDENCE
