@@ -43,8 +43,8 @@ import {
   isSingleOptionPack,
   writerOutputSchema,
   writerSectionRequirements,
-  writerWordLimits,
 } from './writerContractSchema.js';
+import { applyDesignSummaryBrief } from './designSummaryBrief.js';
 
 /** One option as the writer may name it: internal identifiers only. */
 function optionRef(option) {
@@ -162,11 +162,18 @@ export function buildWriterInput({
   // The design context: the interpretation the writer is to write FROM, and the
   // designer's brief. Both are carried as instructions and neither is copy.
   const context = normaliseDesignContext(designContext);
-  const sections = writerSectionRequirements(mode).map((entry) => (
-    entry.section === 'presented_options' && !guidanceSupplied
-      ? { ...entry, requirement: NO_OPTION_GUIDANCE_REQUIREMENT }
-      : { ...entry }
-  ));
+  // The sections the writer is given. Where the frozen evidence describes a TV
+  // media room, the Design Summary is briefed short and plain by its own
+  // authority: the requirement and the limit both come from there, and every
+  // other design keeps the contract's own.
+  const sections = applyDesignSummaryBrief(
+    writerSectionRequirements(mode).map((entry) => (
+      entry.section === 'presented_options' && !guidanceSupplied
+        ? { ...entry, requirement: NO_OPTION_GUIDANCE_REQUIREMENT }
+        : { ...entry }
+    )),
+    { pack, mode },
+  );
 
   const core = {
     contract_version: WRITER_CONTRACT_VERSION,
@@ -244,7 +251,10 @@ export function buildWriterInput({
       supplied: guidanceSupplied,
       groups: guidance.groups,
     },
-    word_limits: writerWordLimits(),
+    // The writer's own limits, read from the sections it is actually given, so a
+    // section briefed with its own limit carries that limit into the validation
+    // the returned draft is read against.
+    word_limits: Object.fromEntries(sections.map((entry) => [entry.section, entry.word_limit])),
     section_requirements: sections.map((entry) => ({ ...entry, requires_grounding: true })),
     allowed_claims: (Array.isArray(pack.allowed_claims) ? pack.allowed_claims : []).map(allowedClaim),
     blocked_claims: (Array.isArray(pack.blocked_claims) ? pack.blocked_claims : []).map(blockedClaim),

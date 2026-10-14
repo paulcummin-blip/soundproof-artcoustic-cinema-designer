@@ -31,11 +31,31 @@
 /** The layer nouns whose absence an absent-feature comparison is built from. */
 const ABSENT_LAYER = 'overhead|overheads|height|heights|upper|top|ceiling|immersive|atmos';
 
+/**
+ * Every clause below runs to the end of its sentence, so the pattern ends where
+ * the sentence does. The full stop is punctuation of the SENTENCE and not part of
+ * the clause: it is looked past and never consumed, so a sentence that loses a
+ * clause keeps the punctuation it had.
+ */
+const END_OF_SENTENCE = '\\s*(?=[.!?]*$)';
+
 /** A contrast clause that runs to the end of its sentence: ", rather than an overhead sound layer". */
 const TRAILING_CONTRAST_CLAUSE = new RegExp(
-  `[\\s,;:]*(?:rather than|instead of|as opposed to)\\s+(?:an?\\s+|the\\s+|any\\s+)?(?:${ABSENT_LAYER})\\b[\\w-]*(?:\\s+[\\w-]+){0,3}\\s*$`,
+  `[\\s,;:]*(?:rather than|instead of|as opposed to)\\s+(?:an?\\s+|the\\s+|any\\s+)?(?:${ABSENT_LAYER})\\b[\\w-]*(?:\\s+[\\w-]+){0,3}${END_OF_SENTENCE}`,
   'i',
 );
+
+/**
+ * A hollow trailing clause: it names a relationship between things, or calls
+ * something the basis of the viewing experience, and says nothing a client can
+ * hold on to. The clause goes, and where so little of the sentence would be left
+ * that it no longer reads as one, the whole sentence goes with it: it was only
+ * ever that clause.
+ */
+const TRAILING_HOLLOW_CLAUSES = Object.freeze([
+  new RegExp(`[\\s,;:]*(?:,\\s*)?(?:centred|centered)\\s+on\\s+the\\s+relationship\\s+between\\b[^.!?<>]*${END_OF_SENTENCE}`, 'i'),
+  new RegExp(`[\\s,;:]*(?:,\\s*)?(?:which\\s+)?(?:forms?|is|sets?|provides?)\\s+the\\s+basis\\s+of\\s+the\\s+viewing\\s+experience\\b[^.!?<>]*${END_OF_SENTENCE}`, 'i'),
+]);
 
 /**
  * A layer noun that LEADS its own statement, so the noun and the absence verb
@@ -71,6 +91,10 @@ const ABSENCE_STATEMENTS = Object.freeze([
 const FRAMING_REWRITES = Object.freeze([
   [/[ \t]*\b(?:only|merely|just|simply|purely)\s+((?:a\s+)?(?:listener-level|bed-layer|5\.1|7\.1|5-channel|five-channel|surround-only))\b/gi, '$1'],
   [/[ \t]*\blimited to\s+((?:a\s+)?(?:5\.1|7\.1|five-channel|5-channel))\b/gi, '$1'],
+  // The client-facing qualifier itself: the arrangement the design has is named
+  // plainly instead. "listener-level" is the house term for the bed layer, so
+  // "listener-level surround arrangement" reads as "surround arrangement".
+  [/\blistener-level\s+(?=(?:surround|bed|arrangement|speakers|loudspeakers)\b)/gi, ''],
 ]);
 
 /** A stated figure: the sentence carrying it is evidence, and is never removed. */
@@ -124,17 +148,59 @@ function withoutTrailingContrast(sentence) {
   return words.length >= 4 ? kept : null;
 }
 
+/** Words that carry content, used to tell a real sentence from what is left of one. */
+function countWords(text) {
+  return String(text || '').split(/\s+/).filter((word) => /[a-z0-9]/i.test(word)).length;
+}
+
+/**
+ * The sentence with a hollow trailing clause removed, or null when the clause was
+ * all it said. A sentence that states an assessed figure is never touched: that
+ * sentence is evidence, whatever else it happens to say.
+ */
+function withoutTrailingHollowClause(sentence) {
+  if (STATED_FIGURE.test(sentence)) return sentence;
+  const pattern = TRAILING_HOLLOW_CLAUSES.find((candidate) => candidate.test(sentence));
+  if (!pattern) return sentence;
+  const kept = sentence.replace(pattern, '').trim();
+  return countWords(kept) >= 4 ? kept : null;
+}
+
+/**
+ * Split a text run into sentences. A full stop ends a sentence only where it is
+ * followed by a space or the end of the run, so a decimal figure keeps its own
+ * digits together: "limited to 5.1 channels" is one sentence and never becomes
+ * "5" and "1 channels". Whitespace stays with the sentence it follows, so joining
+ * the pieces returns the run exactly as it arrived.
+ */
+function splitSentences(text) {
+  const pieces = [];
+  const boundary = /[.!?]+(?=\s|$)/g;
+  let start = 0;
+  let match = boundary.exec(text);
+  while (match) {
+    const end = match.index + match[0].length;
+    pieces.push(text.slice(start, end));
+    start = end;
+    match = boundary.exec(text);
+  }
+  if (start < text.length) pieces.push(text.slice(start));
+  return pieces.length > 0 ? pieces : [text];
+}
+
 /** Rewrite one text run (never crossing a tag): every sentence is read on its own. */
 function rewriteRun(run, allowed) {
   if (!run.trim()) return run;
   const leading = (run.match(/^\s*/) || [''])[0];
-  const pieces = run.match(/[^.!?]+[.!?]*/g) || [run];
+  const pieces = splitSentences(run);
   const kept = pieces.map((piece) => {
     if (allowed) return piece;
     if (statesAbsence(piece)) return '';
     const withoutContrast = withoutTrailingContrast(piece);
     if (withoutContrast === null) return '';
-    return rewriteFraming(withoutContrast);
+    const withoutHollow = withoutTrailingHollowClause(withoutContrast);
+    if (withoutHollow === null) return '';
+    return rewriteFraming(withoutHollow);
   });
   const body = kept.join('').replace(/[ \t]{2,}/g, ' ').replace(/[ \t]+([.!?,;:])/g, '$1').trim();
   return body ? `${leading}${body}` : '';

@@ -32,8 +32,12 @@ test('TEST 1 — the reported contrast clause is trimmed away and the design sen
   const cleaned = removeAbsentFeatureFraming(body);
   assert.doesNotMatch(cleaned, /rather than an overhead sound layer/i);
   assert.doesNotMatch(cleaned, /overhead/i);
-  // The design itself is still described.
-  assert.match(cleaned, /centred on the relationship between the TV, the front stage and the seating/i);
+  // The hollow clause goes with it: a relationship between three things says
+  // nothing a client can use, and the Design Summary briefing refuses it.
+  assert.doesNotMatch(cleaned, /relationship between/i);
+  // The qualifier goes too. What the design HAS is still stated.
+  assert.doesNotMatch(cleaned, /listener-level/i);
+  assert.match(cleaned, /This is a surround arrangement/);
 });
 
 // ── TEST 2 — every banned absent-feature statement is removed ────────────────
