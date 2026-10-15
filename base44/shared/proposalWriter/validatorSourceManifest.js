@@ -32,7 +32,7 @@ export const VALIDATOR_SOURCE_MANIFEST = Object.freeze({
   // the shared strength statements are composed from and the rules the writer is
   // held to, so a draft can always be traced to the exact language authority it was
   // written under.
-  'base44/shared/performanceLanguageAuthority.js': '8fc46f389a9f3404f44bc5052a4005fc5c5415a7f7dab5a4be49792fefcf9570',
+  'base44/shared/performanceLanguageAuthority.js': 'b0370951251abd4180610d94f3eff10ca71b5bed32fee51436b12e3ec44e54ea',
   // The narrative steer: the designer's three-state preference over the topics ADI
   // offers. It carries the rule the writer reads — a preference is an ingredient,
   // never a section plan — so a draft can always be traced to the exact steer it was
