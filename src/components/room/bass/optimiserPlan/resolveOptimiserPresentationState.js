@@ -265,6 +265,12 @@ export function resolveOptimiserPresentationState({
       ...(runStatus === "failed" && typeof runError === "string" && runError ? [runError] : []),
       ...(Array.isArray(evidence?.rejectionReasons) ? evidence.rejectionReasons : []),
     ],
+    // A terminal record carrying the id and evidence contract minted at click
+    // time is THIS fresh run's own result. Missing/incomplete evidence on that
+    // record is a technical failure, never another legacy re-test prompt.
+    currentRunRecord: !!evidence?.runId
+      && evidence?.terminal === true
+      && evidence?.evidenceContractVersion === planView?.planVersion,
   });
   // The button names the flow that fixes THIS state — the bass calculation when
   // the bass result is what is missing, stale or unvalidated, otherwise the
@@ -355,8 +361,9 @@ export function resolveOptimiserPresentationState({
 
   // ── FAILED ── a technical execution failure, never a design statement. The
   // panel states why it failed and what to do next; the engine's own error text
-  // stays in the state and in Engineer details.
-  if (runStatus === "failed") {
+  // stays in the state and in Engineer details. Persisted failure status owns the
+  // same outcome after refresh/reopen even though transient runStatus is idle.
+  if (runStatus === "failed" || status === OPTIMISER_PLAN_STATUS.FAILED) {
     return build(OPTIMISER_PRESENTATION_STATE.FAILED, {
       // The mapped reason names the REAL cause. The engine's own error text is
       // never the main panel's sentence: it stays in the state (runError) and in
