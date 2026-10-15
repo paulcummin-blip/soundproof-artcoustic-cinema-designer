@@ -263,7 +263,11 @@ test("the seat-regression evidence is recorded on the decision the run saves", (
   // no rule, threshold or statement changed.
   const recordings = authority.match(/\{ \.\.\.(?:context|tradeOffContext), regression \}/g) || [];
   assert.equal(recordings.length, 2, "both held-regression branches record the seat evidence");
-  assert.match(authority, /PRIMARY_RAW_REGRESSION_THRESHOLD_DB = 1\.0/);
+  // The protection rule itself is untouched: the same single tolerance, in the
+  // one place it has always lived.
+  const protection = read("components/room/bass/best-layout/authoritativeFinalistSelection.js");
+  assert.match(protection, /export function hasPrimarySeatRegression/);
+  assert.match(protection, /PRIMARY_RAW_REGRESSION_THRESHOLD_DB = 1\.0/);
 });
 
 test("a saved decision alone recreates the same trade-off after refresh or reopen", () => {
@@ -271,14 +275,24 @@ test("a saved decision alone recreates the same trade-off after refresh or reope
   const saved = JSON.parse(JSON.stringify(REAL_CASE));
   const afterReopen = resolveTradeOffState({ decision: saved });
   const live = resolveRealCase();
+  assert.ok(afterReopen, "the reopened decision must resolve as the same trade-off");
+  assert.equal(afterReopen.candidateId, live.candidateId);
+  assert.equal(afterReopen.seat.seatId, live.seat.seatId);
+  assert.equal(afterReopen.seat.label, live.seat.label);
+  assert.equal(afterReopen.seat.before, live.seat.before);
+  assert.equal(afterReopen.seat.after, live.seat.after);
+  assert.equal(afterReopen.seat.deltaText, live.seat.deltaText);
+  assert.equal(afterReopen.impact, live.impact);
+  assert.equal(afterReopen.adjustment, live.adjustment);
   assert.deepEqual(
-    { seat: afterReopen.seat, impact: afterReopen.impact, rows: afterReopen.rows, candidateId: afterReopen.candidateId },
-    { seat: live.seat, impact: live.impact, rows: live.rows, candidateId: live.candidateId },
+    afterReopen.rows.map((row) => [row.key, row.group, row.direction, row.before, row.after, row.delta]),
+    live.rows.map((row) => [row.key, row.group, row.direction, row.before, row.after, row.delta]),
   );
-  // The kept decision is remembered per project version and candidate.
+});
+
+test("the kept decision is remembered for the project version and candidate only", () => {
   const store = read(`${PLAN_DIR}/optimiserKeepTradeOffStore.js`);
   assert.match(store, /b44_adi_tradeoff_kept_v1/);
-  // The record is scoped to the project AND the design version, never global.
   assert.match(store, /STORAGE_PREFIX\}\}::\$\{projectId/);
   assert.match(store, /candidateId/);
 });
