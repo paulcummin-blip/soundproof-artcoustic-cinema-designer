@@ -281,7 +281,9 @@ describe("ACCEPTANCE 7: one primary action per state", () => {
     expect(journey).toMatch(/runControlIsRetest = journey\.action === OPTIMISER_PRESENTATION_ACTION\.RETEST/);
     expect(journey).toMatch(/\|\| journey\.actionLabel === OPTIMISER_RETEST_LABEL/);
     expect(journey).toMatch(/const retestOwnsPrimary = runControlIsRetest[\s\S]*?showAction[\s\S]*?!panelShowsRerun/);
-    expect(journey).toMatch(/onReoptimise=\{isRunning \|\| retestOwnsPrimary \? null : onReoptimiseCalibration\}/);
+    // The re-test STATE stands the calibration control down as well: one control,
+    // one wording, one helper line.
+    expect(journey).toMatch(/onReoptimise=\{retestNeeded \|\| isRunning \|\| retestOwnsPrimary[\s\S]*?onReoptimiseCalibration\}/);
   });
 
   it("keeps the re-test helper line directly under that one control", () => {

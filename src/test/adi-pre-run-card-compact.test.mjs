@@ -117,8 +117,8 @@ describe('DETAILS COLLAPSED BY DEFAULT', () => {
 
   it('sits below the button, as the optional detail', () => {
     const card = read(`${PLAN}AdiOptimisationJourney.jsx`);
-    const actionAt = card.indexOf('{journey.actionLabel}');
-    const detailAt = card.indexOf('<OptimiserCalculationDetail instances={instances} seatCount={seatCount} />');
+    const actionAt = card.indexOf('data-adi-optimiser-button="idle"');
+    const detailAt = card.indexOf('<OptimiserCalculationDetail instances={instances} seatCount={seatCount} roomDims={roomDims} />');
     expect(actionAt).toBeGreaterThan(-1);
     expect(detailAt).toBeGreaterThan(actionAt);
   });
@@ -140,7 +140,7 @@ describe('DETAILS COLLAPSED BY DEFAULT', () => {
   it('is rendered only before a run, never beside real evidence', () => {
     const card = read(`${PLAN}AdiOptimisationJourney.jsx`);
     expect(card).toMatch(/\{showEstimate && \(/);
-    expect(card).toMatch(/<OptimiserCalculationDetail instances=\{instances\} seatCount=\{seatCount\} \/>/);
+    expect(card).toMatch(/<OptimiserCalculationDetail instances=\{instances\} seatCount=\{seatCount\} roomDims=\{roomDims\} \/>/);
     expect(card).toMatch(/const showEstimate = isPreRun && !runEvidence;/);
   });
 });

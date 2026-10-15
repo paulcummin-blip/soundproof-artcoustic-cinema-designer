@@ -130,7 +130,10 @@ describe("the card renders one run control", () => {
   });
 
   it("keeps Apply and run as separate actions", () => {
-    expect(card).toMatch(/onApply=\{recommendationIgnored[\s\S]*?panelShowsApply \? null : handleApplyRecommended\)\}/);
+    // Apply stands down for an ignored recommendation, and — in the re-test state
+    // — for an old candidate that is not a recommendation yet. The run control
+    // stays the one action either way.
+    expect(card).toMatch(/onApply=\{retestNeeded \|\| recommendationIgnored[\s\S]*?panelShowsApply \? null : handleApplyRecommended\)\}/);
     expect(card).toMatch(/onClick=\{journey\.action === ADI_OPTIMISER_ACTION\.CALCULATE/);
   });
 });

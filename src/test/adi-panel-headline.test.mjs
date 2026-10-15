@@ -283,9 +283,12 @@ describe("the panel renders the decision first and the evidence in the disclosur
 
   it("renders the headline on the main panel", () => {
     expect(mainPanel).toContain("<AdiPanelSummary");
-    expect(mainPanel).toContain("adjustment={headline.adjustment}");
-    expect(mainPanel).toContain("benefit={headline.benefit}");
-    expect(mainPanel).toContain("comparison={headline.comparison}");
+    // The decision leads the main panel — EXCEPT in the re-test state, where the
+    // old candidate is not a recommendation at all and is read in Engineer
+    // details instead (see optimiser-retest-one-next-action.test.mjs).
+    expect(mainPanel).toContain("adjustment={previousCandidate ? null : headline.adjustment}");
+    expect(mainPanel).toContain("benefit={previousCandidate ? null : headline.benefit}");
+    expect(mainPanel).toContain("comparison={previousCandidate ? null : headline.comparison}");
     // The finding sentence, the current/best pair and the calculation count are
     // no longer props of the main panel.
     expect(mainPanel).not.toContain("finding={panelFinding}");
