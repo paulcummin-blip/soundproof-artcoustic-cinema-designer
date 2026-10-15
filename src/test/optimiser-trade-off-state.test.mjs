@@ -35,6 +35,7 @@ import {
   resolveOptimiserPresentationState,
 } from "../components/room/bass/optimiserPlan/resolveOptimiserPresentationState.js";
 import { CALIBRATION_APPLY_DECISION, CALIBRATION_APPLY_REASON } from "../components/room/bass/optimiseWorkflow/adiCalibrationAutoApplyAuthority.js";
+import { optimiserTradeOffKeptKey } from "../components/room/bass/optimiserPlan/optimiserKeepTradeOffStore.js";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const read = (path) => readFileSync(resolve(HERE, "..", path), "utf8");
@@ -290,11 +291,39 @@ test("a saved decision alone recreates the same trade-off after refresh or reope
   );
 });
 
-test("the kept decision is remembered for the project version and candidate only", () => {
+test("the kept decision is remembered for the exact run and design it was decided on", () => {
+  const decision = {
+    projectId: "project-1",
+    versionId: "version-1",
+    runId: "optimiser-run-a",
+    designFingerprint: "fp-design-a",
+    candidateId: "cand-combined-7",
+  };
+  const kept = optimiserTradeOffKeptKey(decision);
+  // The same project, design, run and candidate is the same decision: a refresh
+  // or a project reopen restores it and does not offer the trade-off again.
+  assert.equal(optimiserTradeOffKeptKey({ ...decision }), kept);
+  // Every part of the scope is real — a different decision can never be mistaken
+  // for this one, which is what stops an old dismissal hiding a new result.
+  assert.notEqual(optimiserTradeOffKeptKey({ ...decision, candidateId: "cand-combined-8" }), kept);
+  assert.notEqual(optimiserTradeOffKeptKey({ ...decision, runId: "optimiser-run-b" }), kept);
+  assert.notEqual(optimiserTradeOffKeptKey({ ...decision, designFingerprint: "fp-design-b" }), kept);
+  assert.notEqual(optimiserTradeOffKeptKey({ ...decision, versionId: "version-2" }), kept);
+  assert.notEqual(optimiserTradeOffKeptKey({ ...decision, projectId: "project-2" }), kept);
+  // The store's own record stays separated per project version.
   const store = read(`${PLAN_DIR}/optimiserKeepTradeOffStore.js`);
-  assert.match(store, /b44_adi_tradeoff_kept_v1/);
-  assert.match(store, /STORAGE_PREFIX\}\}::\$\{projectId/);
-  assert.match(store, /candidateId/);
+  assert.match(store, /STORAGE_PREFIX\}::\$\{projectId/);
+  assert.match(store, /localStorage/);
+});
+
+test("Keep records the dismissal against the run and the design result, never the candidate alone", () => {
+  const recommendation = read(`${WORKFLOW_DIR}/AdiRecommendation.jsx`);
+  assert.match(recommendation, /optimiserTradeOffKeptKey\(\{[\s\S]{0,400}?runId: optimiserPlanView\?\.run\?\.runId/);
+  assert.match(recommendation, /designFingerprint: shared\?\.cacheKey/);
+  // The panel settles into its terminal state from the stored decision alone, so
+  // keeping does not restart anything and does not re-offer the trade-off.
+  const journey = read(`${PLAN_DIR}/AdiOptimisationJourney.jsx`);
+  assert.match(journey, /const tradeOffSettled = !!tradeOff\?\.isTradeOff && tradeOffKept;/);
 });
 
 // ── 6. Evidence reads ──
@@ -326,4 +355,64 @@ test("the presentation actions constant names the review and the keep", () => {
   assert.equal(TRADE_OFF_ACTIONS.REVIEW, "Review Trade-off");
   assert.equal(TRADE_OFF_ACTIONS.KEEP, "Keep Current Design");
   assert.equal(TRADE_OFF_ACTIONS.APPLY, "Apply Change");
+});
+
+// ── 7. The live saved record — Barton Solutions, V1, run 19:46:28Z ──
+// Verbatim from the saved plan (saved 2026-10-15T19:46:34Z). This run predates the
+// seat evidence being recorded with the decision, so it carries the seat in its own
+// statement and retained no per-seat rows: the state must still be stated exactly.
+const LIVE_SAVED = {
+  decision: CALIBRATION_APPLY_DECISION.HOLD,
+  reason: CALIBRATION_APPLY_REASON.PRIMARY_SEAT_REGRESSION,
+  statement: "The Practical intervention ordering candidate regresses P20 at seat-r1-c2 by 1.2 dB. This is a trade-off, so it has not been applied — your approval is required.",
+  offsetStatement: "Rear subwoofer group delay offset +5.4 ms — rear group later than the front group.",
+  objective: "practical",
+  objectiveLabel: "Practical intervention ordering",
+  candidateId: 'grouped-delay:["sub-rear-1","sub-rear-2"]:1',
+  before: { p19: { deviationDb: 0.7913641929311979, level: 4 }, p20: { deviationDb: 15.116028778061988, level: 1 } },
+  after: { p19: { deviationDb: 0.8370847314354677, level: 4 }, p20: { deviationDb: 12.806331710223475, level: 1 } },
+  improvement: { p19DeltaDb: 0, p20DeltaDb: 2.3, p19LevelGain: false, p20LevelGain: false, p19Improved: false, p20Improved: true },
+  damage: { p19WorseDb: 0, p20WorseDb: -2.3, p19LevelDrop: false, p20LevelDrop: false, p19Damaged: false, p20Damaged: false, any: false },
+  regression: null,
+};
+
+test("the live saved Barton record states Trade-off Found with its own seat and amount", () => {
+  const tradeOff = resolveTradeOffState({ decision: LIVE_SAVED });
+  console.log("LIVE-BARTON-DIAG", JSON.stringify({
+    resolved: !!tradeOff,
+    seat: tradeOff?.seat || null,
+    impact: tradeOff?.impact || null,
+    adjustment: tradeOff?.adjustment || null,
+    overall: tradeOff?.overall || null,
+    rows: (tradeOff?.rows || []).map((row) => [row.key, row.group, row.before, row.after, row.direction, row.delta]),
+  }));
+  assert.ok(tradeOff, "the live saved decision must resolve as a trade-off");
+  assert.equal(tradeOff.isTradeOff, true);
+  assert.equal(tradeOff.headline, TRADE_OFF_HEADLINE);
+  assert.equal(tradeOff.seat.seatId, "seat-r1-c2");
+  assert.equal(tradeOff.seat.direction, TRADE_OFF_DIRECTION.WORSENS);
+  // The seat and the amount it loses are stated even though this run retained no
+  // per-seat rows: the run's own statement is the evidence.
+  assert.match(tradeOff.impact, /Row 1 - Seat 2|seat-r1-c2/);
+  assert.match(tradeOff.impact, /1 dB worse/);
+  // The run's own recorded adjustment, and the overall pair it bought.
+  assert.match(tradeOff.adjustment, /\+5\.4 ms/);
+  const p20 = tradeOff.overall.find((row) => row.key === "p20");
+  assert.equal(p20.before, "±15 dB · L1");
+  assert.equal(p20.after, "±13 dB · L1");
+  assert.equal(p20.direction, TRADE_OFF_DIRECTION.IMPROVES);
+  assert.equal(tradeOff.overall.find((row) => row.key === "p19").before, "±1 dB · L4");
+
+  // Presented through the same authority the panel uses: Trade-off Found, with no
+  // Apply on the card and the two designer controls.
+  const state = resolveOptimiserPresentationState({
+    planView: { status: "current", run: { runId: "optimiser-run-2026-10-15T19:46:28.706Z-1" } },
+    runStatus: "idle",
+    tradeOff,
+  });
+  assert.equal(state.state, OPTIMISER_PRESENTATION_STATE.TRADE_OFF);
+  assert.equal(state.outcomeLabel, "Trade-off Found");
+  assert.equal(state.showApply, false);
+  assert.equal(state.action, null);
+  assert.equal(state.canRun, false);
 });

@@ -203,9 +203,15 @@ export default function AdiRecommendation({
   // session DID apply is no longer a trade-off to decide.
   const savedDecision = savedCalibrationDecision(optimiserPlanView);
   const tradeOffDecision = autoApplied?.calibration || savedDecision || null;
+  // The dismissal belongs to THIS decision and nothing else: the run that found
+  // the candidate (the plan's own run) and the design/bass result it was measured
+  // against. A moved design or a new run is a new decision, so an earlier
+  // dismissal can never hide a later find.
   const tradeOffKeptKey = optimiserTradeOffKeptKey({
     projectId,
     versionId,
+    runId: optimiserPlanView?.run?.runId || null,
+    designFingerprint: shared?.cacheKey || null,
     candidateId: tradeOffDecision?.candidateId || null,
   });
   const tradeOffKept = useSyncExternalStore(

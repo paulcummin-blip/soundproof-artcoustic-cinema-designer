@@ -10,13 +10,22 @@
 //
 // It survives a refresh and a project reopen, because the decision was the
 // designer's: the trade-off must not be offered again as if it were new. The
-// record is scoped to the project, the design version and the candidate the run
-// found, so:
+// record is scoped to the EXACT decision it was made on — the project, the
+// design version, the run that found the candidate, the design/bass result the
+// candidate was measured against, and the candidate itself:
 //
-//   • reopening the same project restores the same terminal state
-//   • a re-test that finds a DIFFERENT candidate offers it again, because that
-//     is a new decision
+//   • reopening the same project, on the same design, restores the same
+//     terminal state and does not re-offer the trade-off
+//   • moving the seating, changing a subwoofer position or tuning, or
+//     recalculating Bass Performance changes the design result, so the old
+//     dismissal no longer applies
+//   • a new optimiser run is a new run id, so its own find is offered as the
+//     new decision it is — even when it names the same candidate
 //   • a different project or version can never read this one's decision
+//
+// Nothing here is a permanent "never show this candidate again": the record is
+// evidence of one decision about one evaluated candidate, not a suppression
+// list.
 //
 // Presentation only: no thresholds, no eligibility and no engineering value is
 // touched by reading or writing this store.
@@ -32,9 +41,25 @@ function storageKey({ projectId = null, versionId = null } = {}) {
   return `${STORAGE_PREFIX}::${projectId || "none"}::${versionId || "none"}`;
 }
 
-/** The one identity a kept trade-off is recorded against. */
-export function optimiserTradeOffKeptKey({ projectId = null, versionId = null, candidateId = null } = {}) {
-  return `${projectId || "none"}:${versionId || "none"}:${candidateId || "none"}`;
+/**
+ * The one identity a kept trade-off is recorded against: the project and design
+ * version, the run that found the candidate, the design/bass result the decision
+ * was measured against, and the candidate itself.
+ *
+ * Any of these moving on makes a NEW key, so an earlier dismissal cannot
+ * suppress a later result — while the same project, design, run and candidate
+ * still resolve to the same key, so a refresh or a reopen restores the decision.
+ */
+export function optimiserTradeOffKeptKey({
+  projectId = null,
+  versionId = null,
+  runId = null,
+  designFingerprint = null,
+  candidateId = null,
+} = {}) {
+  return [projectId, versionId, runId, designFingerprint, candidateId]
+    .map((part) => (part ? String(part) : "none"))
+    .join(":");
 }
 
 function readAll({ projectId = null, versionId = null } = {}) {
