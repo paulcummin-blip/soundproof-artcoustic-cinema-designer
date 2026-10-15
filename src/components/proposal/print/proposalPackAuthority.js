@@ -24,6 +24,7 @@ import {
   formatDisplayPhrase,
 } from '@/components/models/screen/displayTypeAuthority';
 import { productDisplayName, subwooferEntries } from '@/components/report/reportProductsSelected';
+import { unresolvedQuantities } from './equipmentQuantityAuthority';
 
 /** Unwrap an Engineering Authority { statement, confidence, source } value. */
 export function statementValue(value) {
@@ -454,6 +455,19 @@ export function buildPackageRows(snapshot) {
     });
 
   return [...rows, ...subwooferPackageRows(system)];
+}
+
+/**
+ * THE EQUIPMENT QUANTITY INVARIANT, read from the package this snapshot's system
+ * authority produces: the positions whose loudspeaker count could not be resolved.
+ *
+ * An empty list means every client-facing equipment row states a positive whole
+ * number of loudspeakers. A non-empty list is an equipment-authority failure: the
+ * document is refused before it is issued, and the positions are named (see
+ * equipmentQuantityAuthority.js for the rule and the message).
+ */
+export function unresolvedPackageQuantities(snapshot) {
+  return unresolvedQuantities(buildPackageRows(snapshot));
 }
 
 /**

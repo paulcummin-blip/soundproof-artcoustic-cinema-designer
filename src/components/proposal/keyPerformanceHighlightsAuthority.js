@@ -175,7 +175,10 @@ const ROW_PRESENTATION = Object.freeze({
     area: HIGHLIGHT_AREA.BASS,
     parameter: 'P18 bass extension',
     unit: DISPLAY_UNIT.HZ,
-    gain: 'Bass reaches low enough to support large-scale film effects.',
+    // NO GAIN LINE OF ITS OWN. Bass extension has ONE wording ladder — the shared
+    // performance-language authority's — read at the level the result states. A
+    // second ladder here is exactly what let the highlights table and the comparison
+    // table state the same achieved result two different ways.
   },
   p19: {
     area: HIGHLIGHT_AREA.BASS,
@@ -424,16 +427,18 @@ export function comparisonClientMeaning(row) {
   if (key === 'p19') return 'Deviation from the bass target at the reference seating position.';
   const approved = ROW_PRESENTATION[key]?.gain || FALLBACK_GAIN;
   const stated = (Array.isArray(row?.values) ? row.values : []).map((value) => String(value)).join(' ');
+  // BASS EXTENSION HAS ONE LADDER: the shared performance-language authority's, read at
+  // the level the result states. It is resolved before the level rules below, because
+  // those rules change how strongly an area is described, never this wording — so a
+  // Level 3 or Level 4 result is stated in the authority's own strong sentence and a
+  // moderate one in its own approved sentence, whichever path the row takes.
+  if (key === 'p18') return bassExtensionSentence(stated);
   const low = LOW_GRADE.test(stated);
   // The same rule as the single-report table: a Level 1 or Level 2 result is
   // never described as a strength, and an evenness claim needs a stated level
   // that supports it.
   const unsupportedClaim = CONSISTENCY_ROW_KEYS.includes(key) && !SUPPORTED_GRADE.test(stated);
   if (!(low || unsupportedClaim)) return approved;
-  // BASS EXTENSION COMES FROM THE SHARED REGISTER, at the level the result states:
-  // Level 1 and Level 2 keep their own approved wording rather than a hedge, and
-  // nothing is said about the depth the system does not reach.
-  if (key === 'p18') return bassExtensionSentence(stated);
   return MODEST_GAIN[key] || approved;
 }
 
@@ -510,11 +515,14 @@ export function buildHighlightDisplayRows(rows, options = {}) {
         result,
         // The column is never blank: the approved line for the parameter stands
         // in whenever the generated sentence is missing or too thin to use.
-        gain: (consistencyClaimUnsupported || (lowGrade && (!short || oversold)))
-          // The same rule as the comparison column: a bass-extension row is stated in
-          // the shared register at its own level, never in a hedge.
-          ? (key === 'p18' ? bassExtensionSentence(stated) : (MODEST_GAIN[key] || proposed))
-          : proposed,
+        // A bass-extension row is the exception that has no approved line of its own:
+        // it is stated in the shared register at the level its own result states, so
+        // the table never carries a second wording for the same achieved result.
+        gain: key === 'p18'
+          ? bassExtensionSentence(stated)
+          : (consistencyClaimUnsupported || (lowGrade && (!short || oversold)))
+            ? (MODEST_GAIN[key] || proposed)
+            : proposed,
       };
     })
     .filter((row) => Boolean(row.area && (row.result || row.parameter)));

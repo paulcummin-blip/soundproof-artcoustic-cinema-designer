@@ -34,6 +34,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { base44 } from '@/api/base44Client';
 import { authorizePrint } from './printAuthorization';
+import { unresolvedPackageQuantities } from '@/components/proposal/print/proposalPackAuthority';
+import { equipmentQuantityMessage } from '@/components/proposal/print/equipmentQuantityAuthority';
 import { printFailureDiagnostics } from './printFailureDiagnostics';
 import { buildProposalReportTitle } from '@/components/report/reportPdfTitle';
 import {
@@ -312,6 +314,20 @@ export function useProposalExport({
       if (requiresIssueGate(mode) && !validation?.valid) {
         diagnostics.fail('edit_layer', { gate: 'complete_document' });
         throw new Error(authorization?.data?.error || 'The complete proposal must pass validation before export.');
+      }
+
+      // EQUIPMENT QUANTITY IS AN INVARIANT, NOT A PREFERENCE (equipmentQuantityAuthority.js).
+      // A package row whose count cannot be resolved is an equipment-authority failure,
+      // so no document is issued with it: the positions are named and nothing is printed.
+      // A PREVIEW deliberately is not held to it, exactly as it is not held to the
+      // complete-document gate — inspecting the document before it is fit to issue is
+      // what a preview is for.
+      if (requiresIssueGate(mode)) {
+        const unresolved = unresolvedPackageQuantities(proposal?.engineering_snapshot);
+        if (unresolved.length > 0) {
+          diagnostics.fail('edit_layer', { gate: 'equipment_quantity', positions: unresolved });
+          throw new Error(equipmentQuantityMessage(unresolved));
+        }
       }
 
       // 1. The document's OWN inputs are resolved before anything is prepared:

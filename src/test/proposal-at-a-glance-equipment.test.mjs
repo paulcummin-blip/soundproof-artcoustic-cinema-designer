@@ -19,7 +19,8 @@
 import assert from 'node:assert/strict';
 import { test } from 'vitest';
 
-import { buildPackageRows, screenStatement } from '../components/proposal/print/proposalPackAuthority.js';
+import { buildPackageRows, screenStatement, unresolvedPackageQuantities } from '../components/proposal/print/proposalPackAuthority.js';
+import { unresolvedQuantities } from '../components/proposal/print/equipmentQuantityAuthority.js';
 import { productDisplayName } from '../components/report/reportProductsSelected.js';
 import {
   frontStageProductRoles,
@@ -109,6 +110,10 @@ test('the package states the centre channel in its own row, with its own Qty', (
   assert.equal(rows.some((row) => row.role === 'LCR'), false);
   // The count is the Qty column's job: no model cell repeats it.
   rows.forEach((row) => assert.doesNotMatch(row.model, /×/));
+  // EQUIPMENT QUANTITY IS AN INVARIANT: every row states a positive whole number of
+  // loudspeakers, and the package has no unresolved quantity to report.
+  rows.forEach((row) => assert.equal(Number.isInteger(row.qty) && row.qty >= 1, true, `${row.role} qty ${row.qty}`));
+  assert.deepEqual(unresolvedQuantities(rows), []);
 });
 
 test('a genuinely identical LCR stage is still one row', () => {
@@ -125,4 +130,10 @@ test('a genuinely identical LCR stage is still one row', () => {
     },
   });
   assert.deepEqual(rows, [{ role: 'LCR', model: 'Q6-3', qty: null }]);
+  // The row's own shape is unchanged — the blank cell stays the renderer's last-resort
+  // safeguard — but a missing count is an EQUIPMENT-AUTHORITY FAILURE, and it is named
+  // as one so the document is never issued with it.
+  assert.deepEqual(unresolvedQuantities(rows), [{ role: 'LCR', model: 'Q6-3' }]);
+  assert.deepEqual(unresolvedPackageQuantities({ system: { product_roles: [{ role: 'lcr', model_key: 'q6-3', model_label: 'Q6-3' }] } }),
+    [{ role: 'LCR', model: 'Q6-3' }]);
 });

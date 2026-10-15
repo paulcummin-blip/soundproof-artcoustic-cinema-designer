@@ -29,7 +29,9 @@ const GAIN = Object.freeze({
   p14: 'More bass authority and physical impact, supporting the scale of film soundtracks.',
   p16: 'Tonal consistency across the screen channels, so voices and effects stay consistent from left to right.',
   p17: 'Tonal consistency around and above the seats as effects move through the room.',
-  p18: 'Bass depth: how far down the system reaches for the lowest film effects.',
+  // P18 is deliberately absent: bass extension has ONE ladder, the shared performance
+  // language authority's, read at the level the result states. A second line here is
+  // what let the comparison table state a result the highlights table stated differently.
   p19: 'Bass balance at the reference seat, which is the response the calibration is measured against.',
   p20: 'Consistent bass from seat to seat, so the low-frequency balance holds more evenly across the listening positions.',
   room: 'The room these designs are built around, on its own stated dimensions.',
@@ -117,11 +119,15 @@ export default function comparisonClientMeaning(row) {
   // A shared result says what both options keep, once, in the area's own words.
   if (row?.identical === true) return SHARED[key] || gain;
 
+  // BASS EXTENSION IS RESOLVED FIRST, from the shared register, before any level or
+  // difference rule: those rules decide how strongly an area is described, never this
+  // wording. One ladder, at the level the values state — no second L3/L4 line and no
+  // hedge for L1/L2.
+  if (key === 'p18') return bassExtensionLine(stated);
+
   // A difference the evidence states at Level 1 or Level 2 is described as the
   // real capability it is, with what limits it. It is never sold as a strength.
-  // P18 takes its line from the shared register rather than from a hedge: the depth
-  // the system reached is stated, and nothing is said about what it does not reach.
-  if (LOW_GRADE.test(stated)) return (key === 'p18' ? bassExtensionLine(stated) : MODEST[key]) || gain;
+  if (LOW_GRADE.test(stated)) return MODEST[key] || gain;
 
   return gain;
 }
