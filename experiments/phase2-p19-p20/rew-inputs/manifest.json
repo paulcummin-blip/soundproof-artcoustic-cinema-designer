@@ -1,6 +1,6 @@
 {
   "packageVersion": "sound-proof-rew-golden-inputs-v1",
-  "generatedAt": "2026-09-04T16:44:02.430Z",
+  "generatedAt": "2026-10-15T07:17:11.351Z",
   "authority": "Exact unsmoothed production authoritative arrays; no resampling before REW text import",
   "inputFrequencyGrid": {
     "nominalPointsPerOctave": 96,
