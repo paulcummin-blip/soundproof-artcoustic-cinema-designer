@@ -41,6 +41,31 @@ const isTerminal = entry => isTerminalAssessment(entry, { requireLevel: false })
 const hasScoredLevel = entry => isExplicitNotApplicable(entry) || hasTerminalLevel(entry);
 
 /**
+ * The designer-ASSUMED design values: P15 background noise floor and P21 early
+ * reflections.
+ *
+ * These are assumptions the designer states for the project, not calculations
+ * the app performs. They are terminal as soon as the assumption exists, so they
+ * are never a missing calculation, never a waiting item, and never a blocker to
+ * a report or to the overall assessment. Asking the designer to "calculate"
+ * them was wrong, and this rule is what makes that impossible.
+ */
+export const ASSUMED_DESIGN_PARAMETER_KEYS = Object.freeze(["p15", "p21"]);
+
+/**
+ * Is this required parameter an assumed design value that already carries its
+ * assumption? True as soon as the assumption exists in any recorded form: the
+ * entry is flagged assumed, states an assumed state, or carries a stated level.
+ */
+export function isAssumedDesignParameter(key, entry) {
+  const parameterKey = String(key || "").toLowerCase();
+  if (!ASSUMED_DESIGN_PARAMETER_KEYS.includes(parameterKey)) return false;
+  if (!entry) return false;
+  const state = normalizedAssessmentState(entry.state ?? entry.status);
+  return entry.assumed === true || state === "assumed" || hasTerminalLevel(entry);
+}
+
+/**
  * Parameters whose terminality is carried by ONE published result instead of by
  * per-seat rows.
  *
@@ -92,6 +117,10 @@ export function assessEngineeringReportCompleteness(summary) {
 
   for (const key of REQUIRED_RP22_PARAMETER_KEYS) {
     const parameter = parameters[key];
+    // An assumed design value (P15, P21) is terminal by authority: it carries
+    // the assumption the designer stated, so it is never counted as an
+    // outstanding calculation and never named in the reason.
+    if (isAssumedDesignParameter(key, parameter)) continue;
     if (!isTerminal(parameter)) {
       // A single-result parameter (P19) is complete when the summary's own
       // published result is finished — a legacy per-seat label left behind by an

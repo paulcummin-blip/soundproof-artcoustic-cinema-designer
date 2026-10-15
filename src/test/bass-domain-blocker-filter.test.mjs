@@ -65,10 +65,18 @@ test('A / F — a non-bass blocker never names a parameter inside the bass band'
   });
 
   expect(p4.label).toBe('Performance Current');
-  expect(p4.note).toBe('Overall design assessment is not yet complete.');
   expect(p4.message).toBeNull();
   expect(p4.attention).not.toBe(true);
-  expect(JSON.stringify(p4)).not.toMatch(/\bP\d+\b/);
+  expect(p4.actionLabel).toBeNull();
+  // The real items are named from the attempt's own gate verdicts and recorded
+  // items — never a generic "not complete"…
+  expect(p4.waitingHeading).toBe('Overall project waiting for:');
+  expect(p4.waitingItems).toEqual([
+    'P4 Maximum SPL difference between screen wall speakers',
+    'P16 Seat-to-seat frequency response variance across all screen wall speakers',
+  ]);
+  // …and a non-bass item is never presented as a bass problem the band can fix.
+  expect(JSON.stringify(p4)).not.toMatch(/assessment needs updating/i);
 });
 
 test('F — every non-bass parameter is filtered out of the named blocker', () => {
@@ -152,5 +160,37 @@ test('a not-ready attempt is filtered by the same domain rule', () => {
     },
   });
   expect(state.label).toBe('Performance Current');
-  expect(state.note).toBe('Overall design assessment is not yet complete.');
+  expect(state.note).toBe('Waiting for P4 Maximum SPL difference between screen wall speakers.');
+});
+
+test('P15 and P21 are assumed design values: never named, never outstanding', () => {
+  // An attempt that refused the save only because the assumed parameters were
+  // present states nothing outstanding: the assumption IS the terminal value.
+  const state = blockedBy({
+    missing: [{ key: 'engineering_summary.p15' }, { key: 'parameter_index.P21.level' }],
+    gates: [gate('rp22_terminal', 'RP22 P1–P21 terminal (verified bass or explicit N/A)', 'p15, p21')],
+  });
+  expect(state.label).toBe('Performance Current');
+  expect(state.note).toBe('Overall project assessment complete.');
+  expect(state.waitingItems).toBeUndefined();
+  expect(state.message).toBeNull();
+  expect(state.actionLabel).toBeNull();
+});
+
+test('the canonical completeness authority never counts an assumed P15/P21 as missing', async () => {
+  const { assessEngineeringReportCompleteness } = await import('../../shared/assessmentTerminal.js');
+  // The same entry in both recorded forms: scored from the assumption, and the
+  // presentation state the summary carries for an assumed parameter.
+  for (const state of ['scored', 'assumed']) {
+    const verdict = assessEngineeringReportCompleteness({
+      parameterAuthority: {
+        p15: { state, level: 'L2', scope: 'room' },
+        p21: { state, level: 'L2', scope: 'room' },
+      },
+      project: { seatIds: [] },
+    });
+    expect(verdict.missingParameterKeys).not.toContain('p15');
+    expect(verdict.missingParameterKeys).not.toContain('p21');
+    expect(verdict.reason || '').not.toMatch(/\bP15\b|\bP21\b/);
+  }
 });
