@@ -36,6 +36,7 @@ import {
   getOptimiserPlanAuthority,
   setOptimiserPlanAuthority,
 } from "@/components/room/bass/optimiserPlan/optimiserPlanStore.js";
+import { beginOptimiserRun } from "@/components/room/bass/optimiserPlan/optimiserRunAuthority.js";
 
 export default function useRunOptimisationPlan({
   projectId,
@@ -62,6 +63,13 @@ export default function useRunOptimisationPlan({
     runningRef.current = true;
     setStatus("running");
     setError(null);
+
+    // STARTING THIS RUN SUPERSEDES THE PREVIOUS ONE. The run gets its own id, and
+    // the record already saved for this design becomes history: from here the
+    // panel states this run — what it is doing, and then what IT found — and
+    // nothing of the earlier result. The earlier record is neither cleared nor
+    // rewritten, so it stays readable for history, diagnostics and audit.
+    beginOptimiserRun(projectId, versionId);
 
     try {
       const live = sharedRef.current;

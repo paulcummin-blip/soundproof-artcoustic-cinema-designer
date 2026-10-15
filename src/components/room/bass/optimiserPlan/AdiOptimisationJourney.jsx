@@ -623,7 +623,10 @@ export default function AdiOptimisationJourney({
           primary={primaryAction === ADI_PRIMARY_ACTION.DESIGN}
           onApply={retestNeeded ? null : handleApplyPlacement}
           onUndo={retestNeeded ? null : handleUndoPlacement}
-          onRerun={retestNeeded ? null : onRunOptimisationPlan}
+          // While a run is in flight this panel offers no run control of its own:
+          // the run in progress is the panel's single control, so a second
+          // overlapping run cannot be launched from here either.
+          onRerun={isRunning || retestNeeded ? null : onRunOptimisationPlan}
           variant="actions"
         />
 

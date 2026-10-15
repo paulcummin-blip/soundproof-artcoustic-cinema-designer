@@ -194,7 +194,10 @@ export const OPTIMISER_PRESENTATION_ACTION = Object.freeze({
 export const OPTIMISER_PRESENTATION_COPY = Object.freeze({
   NO_RUN:
     "No evaluated optimiser run or saved plan exists for this design. Run the optimiser to evaluate what can be improved.",
-  RUNNING: "Evaluation is in progress. Nothing can be applied until it finishes.",
+  // While the newest run works, the panel states THAT RUN ONLY: what it is doing
+  // and that nothing can be applied until it finishes. No earlier run's result,
+  // candidate, comparison or warning is stated beside it.
+  RUNNING: "ADI is evaluating the current design.",
   STALE:
     "The design has changed since this optimisation was run. Re-test bass optimisation to update the result.",
   // A saved result that cannot support a recommendation is one to check again —
@@ -255,7 +258,13 @@ export function resolveOptimiserPresentationState({
     runBlockCode: runBlockReason?.code
       || (typeof runBlockReason === "string" ? runBlockReason : null),
     baselineInvalid: evidence?.baselineValidation?.valid === false,
-    recordedReasons: Array.isArray(evidence?.rejectionReasons) ? evidence.rejectionReasons : [],
+    // THE FAILING RUN'S OWN REASON COMES FIRST. When a run fails, why THIS run
+    // failed is what the panel states — the newest run's real reason — never an
+    // earlier run's evidence, which may no longer describe anything current.
+    recordedReasons: [
+      ...(runStatus === "failed" && typeof runError === "string" && runError ? [runError] : []),
+      ...(Array.isArray(evidence?.rejectionReasons) ? evidence.rejectionReasons : []),
+    ],
   });
   // The button names the flow that fixes THIS state — the bass calculation when
   // the bass result is what is missing, stale or unvalidated, otherwise the
