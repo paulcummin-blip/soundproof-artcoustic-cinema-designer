@@ -225,6 +225,15 @@ test('the wizard keeps the steer, and the review shows the two states only', () 
 });
 
 test('the steer is stored with the proposal and handed to the writer', () => {
+  const proposalSchema = JSON.parse(source('base44/entities/Proposal.jsonc'));
+  const storedSteer = proposalSchema.properties.metadata.properties.narrative_steer;
+  // Base44 strips undeclared nested properties. The steer therefore has to be
+  // part of the canonical Proposal schema, not merely present in create data.
+  assert.ok(storedSteer, 'Proposal metadata must persist the Narrative Steer');
+  assert.equal(storedSteer.properties.preferred_topics.items.type, 'string');
+  assert.equal(storedSteer.properties.excluded_topics.items.type, 'string');
+  assert.equal(storedSteer.properties.excluded_topic_keys.items.type, 'string');
+
   const entry = source('base44/functions/generateProposal/entry.ts');
   assert.match(entry, /narrative_steer: narrativeSteerRecord/);
   assert.match(entry, /suppressExcludedNarrative\(body\.html, \{ excluded: excludedNarrativeTopics \}\)/);
