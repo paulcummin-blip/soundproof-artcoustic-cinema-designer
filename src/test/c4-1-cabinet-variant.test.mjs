@@ -485,7 +485,18 @@ const authorityGeometry = (mm) => {
   const box = entry.match(/box: \{ x: (\d+), y: (\d+), width: (\d+), height: (\d+) \}/);
   const native = entry.match(/native: \{ width: (\d+), height: (\d+) \}/);
   assert.ok(box && native, `${mm} mm: the crop and the native asset size are recorded`);
-  return { imageW: Number(native[1]), imageH: Number(native[2]), fit: 'xMidYMid meet' };
+  // The crop IS the box the drawing is placed from, and the source is drawn at
+  // its own pixel size inside it, so the geometry the checks below read is: the
+  // crop as the box, the native file size as the image, both fitted with one
+  // scale for the two axes.
+  return {
+    imageW: Number(native[1]),
+    imageH: Number(native[2]),
+    fit: 'xMidYMid meet',
+    mapping: 'xMidYMid meet',
+    vbW: Number(box[3]),
+    vbH: Number(box[4]),
+  };
 };
 
 test('TEST 22 The artwork is cropped and fitted proportionally — never stretched', () => {
