@@ -80,12 +80,14 @@ export const ADI_OPTIMISER_ACTION_LABEL = Object.freeze({
 export const ADI_OPTIMISER_STATUS_LABEL = Object.freeze({
   [ADI_OPTIMISER_JOURNEY_STATE.OPTIMISATION_REQUIRED]: "Optimisation required",
   [ADI_OPTIMISER_JOURNEY_STATE.REEVALUATION_REQUIRED]: "Re-evaluation required",
-  [ADI_OPTIMISER_JOURNEY_STATE.EVALUATION_INCOMPLETE]: "Evaluation incomplete",
+  // The same vocabulary the resolved outcome badges use, so a state reads the
+  // same wherever it is stated.
+  [ADI_OPTIMISER_JOURNEY_STATE.EVALUATION_INCOMPLETE]: "Re-test Needed",
   [ADI_OPTIMISER_JOURNEY_STATE.PLAN_AVAILABLE]: "Optimisation plan available",
-  [ADI_OPTIMISER_JOURNEY_STATE.NO_USEFUL_IMPROVEMENT]: "No useful improvement found",
+  [ADI_OPTIMISER_JOURNEY_STATE.NO_USEFUL_IMPROVEMENT]: "No Improvement Found",
   [ADI_OPTIMISER_JOURNEY_STATE.BASELINE_REQUIRED]: BASELINE_PARITY_COPY.MISSING_STATUS,
   [ADI_OPTIMISER_JOURNEY_STATE.BASELINE_MISMATCH]: BASELINE_PARITY_COPY.MISMATCH_STATUS,
-  [ADI_OPTIMISER_JOURNEY_STATE.FAILED]: "Optimisation failed",
+  [ADI_OPTIMISER_JOURNEY_STATE.FAILED]: "Unable To Evaluate",
 });
 
 /** Canonical journey copy. Plain professional language, every line actionable. */

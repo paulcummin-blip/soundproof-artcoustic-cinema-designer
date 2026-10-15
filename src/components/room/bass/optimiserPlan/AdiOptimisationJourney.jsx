@@ -254,6 +254,11 @@ export default function AdiOptimisationJourney({
       // The mapped reason's own next step, stated with it in the main panel.
       nextAction: presentation.nextAction || null,
       showPlan: presentation.showPlan,
+      // THE OUTCOME travels with the state: the badge, the finding and the
+      // conditions that offer the designer's own "ignore" all read this one
+      // value, so the panel can never state two different results at once.
+      outcome: presentation.outcome || null,
+      outcomeLabel: presentation.outcomeLabel || null,
     }
     : resolved;
 
@@ -266,11 +271,21 @@ export default function AdiOptimisationJourney({
 
   // ── THE ONE OUTCOME ──
   // When the presentation authority resolved an outcome, the panel states THAT
-  // — No Improvements Found · Improvements Found · Re-test Needed · Evaluation
-  // Could Not Complete — rather than the engine state behind it.
+  // — No Improvement Found · Improvement Found · Physical Change Recommended ·
+  // Re-test Needed · Bass Performance Needs Updating · Unable To Evaluate —
+  // rather than the engine state behind it.
   const outcome = journey.outcome || null;
   const outcomeLabel = journey.outcomeLabel || null;
-  const improvementsFound = outcome === OPTIMISER_OUTCOME.IMPROVEMENTS_FOUND;
+  // A physical change is an improvement too: the panel offers Apply for both,
+  // and only the badge distinguishes them.
+  const improvementsFound = outcome === OPTIMISER_OUTCOME.IMPROVEMENTS_FOUND
+    || outcome === OPTIMISER_OUTCOME.PHYSICAL_CHANGE;
+  // "No useful improvement was found" may be stated ONLY for a completed search
+  // that confirmed nothing — the outcome that proves it, or the journey's own
+  // completed no-winner state when no presentation authority was supplied.
+  const noImprovementConfirmed = presentation
+    ? outcome === OPTIMISER_OUTCOME.NO_IMPROVEMENTS
+    : resolved.state === ADI_OPTIMISER_JOURNEY_STATE.NO_USEFUL_IMPROVEMENT;
 
   // The designer's Ignore is session-scoped and belongs to this run: the key
   // carries the design's own fingerprint, so a re-test offers the recommendation
@@ -360,7 +375,12 @@ export default function AdiOptimisationJourney({
   // itself. While that control is drawn it IS the re-test: it owns the primary
   // action, and the calibration control beside it draws no second copy of the
   // same button or its helper line.
-  const retestOwnsPrimary = journey.action === OPTIMISER_PRESENTATION_ACTION.RETEST
+  // The run control IS the re-test whenever it carries the re-test action or the
+  // re-test wording: the calibration control below then draws no second copy of
+  // it, so two "Re-test Bass Optimisation" buttons can never appear together.
+  const runControlIsRetest = journey.action === OPTIMISER_PRESENTATION_ACTION.RETEST
+    || journey.actionLabel === OPTIMISER_RETEST_LABEL;
+  const retestOwnsPrimary = runControlIsRetest
     && showAction
     && !panelShowsRerun
     && !reoptimiseBusy;
@@ -492,17 +512,11 @@ export default function AdiOptimisationJourney({
     currentP20DeviationDb: p20Headline?.variationDb ?? null,
     stale: summary.stale === true,
     isRunning,
-    // A run that could not complete states no "no improvement" finding: the
-    // outcome and its own sentence already say what happened, and the recorded
-    // reason is read in Engineer details.
-    finding: outcome === OPTIMISER_OUTCOME.COULD_NOT_COMPLETE ? null : panelFinding,
+    // A run that has to be checked again, a bass update and a technical failure
+    // state no "no improvement" finding: each has its own sentence, and the
+    // recorded reason is read in Engineer details.
+    finding: noImprovementConfirmed ? panelFinding : null,
   });
-  // The design's own published result, stated ONCE: it stands on its own only
-  // when the decision above is not already comparing against it.
-  const currentResultLine = currentP20?.deviationText
-    ? `Current P20: ${currentP20.deviationText}${currentP20.levelText ? ` · ${currentP20.levelText}` : ""}`
-    : null;
-
   return (
     <div
       className={`rounded-lg border px-4 py-3 space-y-3 ${className}`}
@@ -541,7 +555,6 @@ export default function AdiOptimisationJourney({
         adjustment={headline.adjustment}
         benefit={headline.benefit}
         comparison={headline.comparison}
-        currentResult={headline.comparison ? null : currentResultLine}
         designLimitation={designLimitation}
         staleCopy={summary.staleCopy}
         previousBest={summary.previousBest}

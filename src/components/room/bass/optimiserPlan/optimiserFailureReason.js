@@ -42,39 +42,90 @@ export const OPTIMISER_FAILURE_FIX = Object.freeze({
   OPTIMISER_RUN: "optimiser_run",
 });
 
+/**
+ * THE RE-TEST STATEMENT, in the designer's words: the main line, and the
+ * sentence stated beside it. One source, so the panel states the same pair
+ * whether the incomplete result came from a saved record, an unsupported record
+ * or a run that kept no usable evidence.
+ */
+export const OPTIMISER_RETEST_MESSAGE =
+  "This optimiser result needs to be checked again against the current design.";
+export const OPTIMISER_RETEST_DETAIL =
+  "The previous run did not retain enough evidence to confirm its recommendation.";
+
+/**
+ * THE REAL REASON an evaluation could not run, read from the facts the run
+ * itself recorded. The engine's own words stay in the run evidence, where
+ * Engineer details reads them; the panel names the missing input in the
+ * designer's language. Nothing is invented: an unrecognised failure states the
+ * honest fallback rather than a guessed cause.
+ */
+export const OPTIMISER_UNEVALUABLE_REASON =
+  "The optimisation did not finish, so no result could be confirmed.";
+
+const UNEVALUABLE_REASONS = Object.freeze([
+  { test: /seat|listening position|response curve|per-seat/i, reason: "Required seat-response data is missing." },
+  { test: /subwoofer configuration|subwoofer|instance/i, reason: "The current subwoofer configuration could not be evaluated." },
+  { test: /band|response|spectrum|spl|frequency/i, reason: "Bass response data is incomplete." },
+]);
+
 /** One entry per reason: the panel's reason, its next step and its one button. */
 export const OPTIMISER_FAILURE_COPY = Object.freeze({
+  /**
+   * The bass result itself is the missing or stale input. The reason names it,
+   * and the ONE button is the recalculation — recalculating is what lifts the
+   * block, so the designer is never sent to a control that cannot fix it.
+   */
   [OPTIMISER_FAILURE_CODE.BASELINE_NOT_VALIDATED]: {
-    reason: "ADI could not complete the optimisation because the current bass result could not be validated.",
-    nextAction: "Recalculate Bass Performance, then run Bass Optimiser again.",
+    reason: "The current bass result could not be validated, so the optimiser has no baseline to compare against.",
+    nextAction: "Recalculate Bass Performance before running the optimiser.",
     actionLabel: "Recalculate Bass Performance",
     fix: OPTIMISER_FAILURE_FIX.BASS_CALCULATION,
   },
   [OPTIMISER_FAILURE_CODE.BASS_NOT_CALCULATED]: {
-    reason: "ADI could not complete the optimisation because current bass performance has not been calculated.",
-    nextAction: "Calculate Bass Performance.",
-    actionLabel: "Calculate Bass Performance",
+    reason: "Bass Performance has not been calculated for this design, so there is no current result to optimise.",
+    nextAction: "Recalculate Bass Performance before running the optimiser.",
+    actionLabel: "Recalculate Bass Performance",
     fix: OPTIMISER_FAILURE_FIX.BASS_CALCULATION,
   },
   [OPTIMISER_FAILURE_CODE.BASS_STALE]: {
-    reason: "ADI could not complete the optimisation because the room or subwoofer setup has changed since bass performance was calculated.",
-    nextAction: "Update Bass Performance.",
-    actionLabel: "Update Bass Performance",
+    reason: "The room or subwoofer setup has changed since Bass Performance was calculated.",
+    nextAction: "Recalculate Bass Performance before running the optimiser.",
+    actionLabel: "Recalculate Bass Performance",
     fix: OPTIMISER_FAILURE_FIX.BASS_CALCULATION,
   },
+  /**
+   * A genuine technical failure. The reason is replaced with the real one the
+   * run recorded (resolveUnevaluableReason) — never a bare "could not complete".
+   */
   [OPTIMISER_FAILURE_CODE.WORKER_FAILED]: {
-    reason: "ADI could not complete the optimisation run.",
-    nextAction: "Try again. If it repeats, check Engineer Details.",
+    reason: OPTIMISER_UNEVALUABLE_REASON,
+    nextAction: "Try again. If it repeats, check Engineer details.",
     actionLabel: "Re-test Bass Optimisation",
     fix: OPTIMISER_FAILURE_FIX.OPTIMISER_RUN,
   },
+  /**
+   * The saved result kept no evidence that can confirm its own recommendation.
+   * This is NOT a design conclusion: the panel asks for the re-test that checks
+   * the result against the current design.
+   */
   [OPTIMISER_FAILURE_CODE.EVIDENCE_MISSING]: {
-    reason: "ADI could not complete the optimisation because the previous run did not retain enough evidence to explain the result.",
-    nextAction: "Re-test Bass Optimisation.",
+    reason: OPTIMISER_RETEST_MESSAGE,
+    nextAction: OPTIMISER_RETEST_DETAIL,
     actionLabel: "Re-test Bass Optimisation",
     fix: OPTIMISER_FAILURE_FIX.OPTIMISER_RUN,
   },
 });
+
+/**
+ * The real reason a technical failure could not name itself from the recorded
+ * facts: an honest statement, never a cause that was guessed.
+ */
+export function resolveUnevaluableReason(recordedReasons = []) {
+  const words = (Array.isArray(recordedReasons) ? recordedReasons : []).join(" ");
+  const match = UNEVALUABLE_REASONS.find((entry) => entry.test.test(words));
+  return match ? match.reason : OPTIMISER_UNEVALUABLE_REASON;
+}
 
 /** The run-block codes that stop a run on the bass result itself. */
 const BLOCK_REASON = Object.freeze({
@@ -129,5 +180,11 @@ export function resolveOptimiserFailureCode({
 export function resolveOptimiserFailure(input = {}) {
   const code = resolveOptimiserFailureCode(input);
   if (!code) return null;
-  return { code, ...OPTIMISER_FAILURE_COPY[code] };
+  const copy = OPTIMISER_FAILURE_COPY[code];
+  // A technical failure states the REAL reason the run recorded, so the panel
+  // never shows a bare "could not complete".
+  if (code === OPTIMISER_FAILURE_CODE.WORKER_FAILED) {
+    return { code, ...copy, reason: resolveUnevaluableReason(input.recordedReasons) };
+  }
+  return { code, ...copy };
 }

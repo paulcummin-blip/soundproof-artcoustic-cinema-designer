@@ -18,7 +18,15 @@
 
 import { OPTIMISER_PLAN_STATUS } from "./optimiserPlanConstants.js";
 import { ADI_BASS_OPTIMISER_LABEL, ADI_OPTIMISER_ACTION } from "./resolveAdiOptimiserJourney.js";
-import { OPTIMISER_FAILURE_FIX, resolveOptimiserFailure } from "./optimiserFailureReason.js";
+import {
+  OPTIMISER_FAILURE_CODE,
+  OPTIMISER_FAILURE_FIX,
+  OPTIMISER_RETEST_DETAIL,
+  OPTIMISER_RETEST_MESSAGE,
+  OPTIMISER_UNEVALUABLE_REASON,
+  resolveOptimiserFailure,
+} from "./optimiserFailureReason.js";
+import { CALIBRATION_LEVER_KEYS } from "./adiPanelSections.js";
 
 /** The complete set of optimiser presentation states. */
 export const OPTIMISER_PRESENTATION_STATE = Object.freeze({
@@ -32,35 +40,115 @@ export const OPTIMISER_PRESENTATION_STATE = Object.freeze({
 });
 
 /**
- * THE FOUR OUTCOMES the designer acts on. Every finished evaluation resolves to
- * exactly one of them, so the panel always states an outcome rather than an
- * engine state, and the four are the only result words the designer ever reads.
+ * THE OUTCOMES the designer acts on. Every finished evaluation resolves to
+ * exactly one of them, so the panel states what happened and what to do about it
+ * rather than an engine state.
+ *
+ * The outcomes are mutually exclusive BY CONSTRUCTION, because the badge, the
+ * sentence and the action are all read from one resolved outcome:
+ *
+ *   NO_IMPROVEMENTS      the search ran to completion and confirmed nothing
+ *   IMPROVEMENTS_FOUND   a confirmed, applicable adjustment exists
+ *   PHYSICAL_CHANGE      the confirmed improvement needs seats/subwoofers moved
+ *   RETEST_NEEDED        the saved result cannot support a recommendation until
+ *                        it is checked again against the current design
+ *   BASS_UPDATE_REQUIRED the current Bass Performance authority is missing/stale
+ *   UNABLE_TO_EVALUATE   a genuine technical failure, with its real reason named
+ *
+ * A re-test outcome is therefore never also reported as a search that found
+ * nothing: "no improvement found" is stated only for NO_IMPROVEMENTS.
  */
 export const OPTIMISER_OUTCOME = Object.freeze({
   NO_IMPROVEMENTS: "no_improvements",
   IMPROVEMENTS_FOUND: "improvements_found",
+  PHYSICAL_CHANGE: "physical_change",
   RETEST_NEEDED: "retest_needed",
-  COULD_NOT_COMPLETE: "could_not_complete",
+  BASS_UPDATE_REQUIRED: "bass_update_required",
+  UNABLE_TO_EVALUATE: "unable_to_evaluate",
 });
 
-/** The one visible label per outcome. */
+/**
+ * THE ONE LABEL PER OUTCOME — the badge the designer reads, and nothing else.
+ * The badge is read from the outcome itself, so a badge can never disagree with
+ * the sentence or the action beneath it.
+ */
 export const OPTIMISER_OUTCOME_LABEL = Object.freeze({
-  [OPTIMISER_OUTCOME.NO_IMPROVEMENTS]: "No Improvements Found",
-  [OPTIMISER_OUTCOME.IMPROVEMENTS_FOUND]: "Improvements Found",
+  [OPTIMISER_OUTCOME.NO_IMPROVEMENTS]: "No Improvement Found",
+  [OPTIMISER_OUTCOME.IMPROVEMENTS_FOUND]: "Improvement Found",
+  [OPTIMISER_OUTCOME.PHYSICAL_CHANGE]: "Physical Change Recommended",
   [OPTIMISER_OUTCOME.RETEST_NEEDED]: "Re-test Needed",
-  [OPTIMISER_OUTCOME.COULD_NOT_COMPLETE]: "Evaluation Could Not Complete",
+  [OPTIMISER_OUTCOME.BASS_UPDATE_REQUIRED]: "Bass Performance Needs Updating",
+  [OPTIMISER_OUTCOME.UNABLE_TO_EVALUATE]: "Unable To Evaluate",
 });
 
-/** Which outcome each presentation state presents (null = no outcome yet). */
+/**
+ * Which outcome each presentation state presents (null = no outcome yet).
+ *
+ * Two states are refined by the facts the resolver already holds: an incomplete
+ * evaluation presents BASS_UPDATE_REQUIRED when the bass result is what is
+ * missing or stale and UNABLE_TO_EVALUATE when the run itself failed, and an
+ * available plan presents PHYSICAL_CHANGE when the change it offers is a move of
+ * seats, subwoofers or layout rather than an electronic adjustment.
+ */
 export const OPTIMISER_OUTCOME_BY_STATE = Object.freeze({
   [OPTIMISER_PRESENTATION_STATE.NO_RUN]: null,
   [OPTIMISER_PRESENTATION_STATE.RUNNING]: null,
   [OPTIMISER_PRESENTATION_STATE.PLAN_AVAILABLE]: OPTIMISER_OUTCOME.IMPROVEMENTS_FOUND,
   [OPTIMISER_PRESENTATION_STATE.NO_USEFUL_IMPROVEMENT]: OPTIMISER_OUTCOME.NO_IMPROVEMENTS,
-  [OPTIMISER_PRESENTATION_STATE.EVALUATION_INCOMPLETE]: OPTIMISER_OUTCOME.COULD_NOT_COMPLETE,
+  [OPTIMISER_PRESENTATION_STATE.EVALUATION_INCOMPLETE]: OPTIMISER_OUTCOME.RETEST_NEEDED,
   [OPTIMISER_PRESENTATION_STATE.STALE]: OPTIMISER_OUTCOME.RETEST_NEEDED,
-  [OPTIMISER_PRESENTATION_STATE.FAILED]: OPTIMISER_OUTCOME.COULD_NOT_COMPLETE,
+  [OPTIMISER_PRESENTATION_STATE.FAILED]: OPTIMISER_OUTCOME.UNABLE_TO_EVALUATE,
 });
+
+/**
+ * THE ONE SENTENCE PER OUTCOME that no failure reason overrides: what the panel
+ * says, and the line beside it. A bass or technical failure states its own
+ * reason and its own next step (optimiserFailureReason.js), so those two outcomes
+ * are not worded again here.
+ */
+export const OPTIMISER_OUTCOME_COPY = Object.freeze({
+  [OPTIMISER_OUTCOME.NO_IMPROVEMENTS]: {
+    message: "ADI checked the current design and did not find a worthwhile improvement.",
+    detail: null,
+  },
+  [OPTIMISER_OUTCOME.IMPROVEMENTS_FOUND]: {
+    message: "ADI found an adjustment that improves the result.",
+    detail: null,
+  },
+  [OPTIMISER_OUTCOME.PHYSICAL_CHANGE]: {
+    message: "ADI found an improvement that requires a physical change.",
+    // The change itself is stated with its own Apply/Undo controls below, and it
+    // is never applied by ADI.
+    detail: "The change is stated below. ADI has not applied it.",
+  },
+  [OPTIMISER_OUTCOME.RETEST_NEEDED]: {
+    message: OPTIMISER_RETEST_MESSAGE,
+    detail: OPTIMISER_RETEST_DETAIL,
+  },
+});
+
+/**
+ * Is the change this plan offers a PHYSICAL one — a move of seats, subwoofers or
+ * layout — rather than an electronic adjustment?
+ *
+ * Read from the plan's own lever records: the offered change is physical when
+ * every applicable, evaluated change is a non-calibration lever. When a
+ * calibration change is also applicable the panel presents the adjustment first
+ * (least intrusive first), so that is not this outcome.
+ *
+ * Presentation only: no lever is ranked, scored or re-evaluated here.
+ */
+export function offersPhysicalChangeOnly(planView) {
+  if (!planView || planView.status !== OPTIMISER_PLAN_STATUS.CURRENT) return false;
+  const levers = Array.isArray(planView.levers) ? planView.levers : [];
+  const offered = levers.filter((lever) => lever.canApply === true
+    && lever.evaluated === true
+    && lever.effect != null
+    && Array.isArray(lever.changes)
+    && lever.changes.length > 0);
+  if (!offered.length) return false;
+  return offered.every((lever) => !CALIBRATION_LEVER_KEYS.includes(String(lever?.key ?? lever?.lever ?? "")));
+}
 
 /** The one control the re-test outcomes offer, worded as the next step. */
 export const OPTIMISER_RETEST_LABEL = "Re-test Bass Optimisation";
@@ -75,9 +163,9 @@ export const OPTIMISER_PRESENTATION_LABEL = Object.freeze({
   [OPTIMISER_PRESENTATION_STATE.RUNNING]: "Optimisation running",
   [OPTIMISER_PRESENTATION_STATE.PLAN_AVAILABLE]: OPTIMISER_OUTCOME_LABEL[OPTIMISER_OUTCOME.IMPROVEMENTS_FOUND],
   [OPTIMISER_PRESENTATION_STATE.NO_USEFUL_IMPROVEMENT]: OPTIMISER_OUTCOME_LABEL[OPTIMISER_OUTCOME.NO_IMPROVEMENTS],
-  [OPTIMISER_PRESENTATION_STATE.EVALUATION_INCOMPLETE]: OPTIMISER_OUTCOME_LABEL[OPTIMISER_OUTCOME.COULD_NOT_COMPLETE],
+  [OPTIMISER_PRESENTATION_STATE.EVALUATION_INCOMPLETE]: OPTIMISER_OUTCOME_LABEL[OPTIMISER_OUTCOME.RETEST_NEEDED],
   [OPTIMISER_PRESENTATION_STATE.STALE]: OPTIMISER_OUTCOME_LABEL[OPTIMISER_OUTCOME.RETEST_NEEDED],
-  [OPTIMISER_PRESENTATION_STATE.FAILED]: OPTIMISER_OUTCOME_LABEL[OPTIMISER_OUTCOME.COULD_NOT_COMPLETE],
+  [OPTIMISER_PRESENTATION_STATE.FAILED]: OPTIMISER_OUTCOME_LABEL[OPTIMISER_OUTCOME.UNABLE_TO_EVALUATE],
 });
 
 /** Action offered by each state. */
@@ -100,14 +188,12 @@ export const OPTIMISER_PRESENTATION_COPY = Object.freeze({
   RUNNING: "Evaluation is in progress. Nothing can be applied until it finishes.",
   STALE:
     "The design has changed since this optimisation was run. Re-test bass optimisation to update the result.",
-  INCOMPLETE:
-    "ADI could not complete the bass optimisation. Re-run the optimiser or check Engineer Details.",
-  INCOMPLETE_MISSING:
-    "ADI could not complete the bass optimisation. Re-run the optimiser or check Engineer Details.",
-  INCOMPLETE_UNSAVED:
-    "ADI could not complete the bass optimisation. Re-run the optimiser or check Engineer Details.",
-  FAILED:
-    "ADI could not complete the bass optimisation. Re-run the optimiser or check Engineer Details.",
+  // A saved result that cannot support a recommendation is one to check again —
+  // never a design conclusion, and never "no improvement found".
+  INCOMPLETE: OPTIMISER_RETEST_MESSAGE,
+  // A technical failure always names its real reason (optimiserFailureReason.js).
+  // This is the honest fallback when nothing was recorded to name.
+  FAILED: OPTIMISER_UNEVALUABLE_REASON,
 });
 
 /**
@@ -166,11 +252,25 @@ export function resolveOptimiserPresentationState({
   // the bass result is what is missing, stale or unvalidated, otherwise the
   // optimiser run itself. Nothing here sends the designer to a control that
   // cannot fix the failure.
+  // THE FAILURE'S OWN OUTCOME: a bass result that is missing or stale is a
+  // BASS UPDATE, a genuine technical failure is UNABLE TO EVALUATE, and any other
+  // result that cannot support a recommendation is one to RE-TEST. Nothing else
+  // decides the badge.
+  const failureOutcome = !failure
+    ? null
+    : (failure.fix === OPTIMISER_FAILURE_FIX.BASS_CALCULATION
+      ? OPTIMISER_OUTCOME.BASS_UPDATE_REQUIRED
+      : (failure.code === OPTIMISER_FAILURE_CODE.WORKER_FAILED
+        ? OPTIMISER_OUTCOME.UNABLE_TO_EVALUATE
+        : OPTIMISER_OUTCOME.RETEST_NEEDED));
   const failureExtras = failure
     ? {
       message: failure.reason,
       nextAction: failure.nextAction,
       failureCode: failure.code,
+      // Carried with the failure, so every branch that states it states the
+      // matching badge: the outcome, its label and the action can never disagree.
+      outcome: failureOutcome,
       action: failure.fix === OPTIMISER_FAILURE_FIX.BASS_CALCULATION
         ? ADI_OPTIMISER_ACTION.CALCULATE
         : OPTIMISER_PRESENTATION_ACTION.RETEST,
@@ -182,18 +282,23 @@ export function resolveOptimiserPresentationState({
     : {};
 
   const build = (state, extra = {}) => {
-    const outcome = OPTIMISER_OUTCOME_BY_STATE[state] || null;
-    // "Re-test Needed" and "Evaluation Could Not Complete" offer exactly one
-    // control, and it is the run action worded as the outcome's own next step.
+    const outcome = extra.outcome || OPTIMISER_OUTCOME_BY_STATE[state] || null;
+    // THE BADGE IS THE OUTCOME: one label read from one value, so the pill can
+    // never state something the panel's own sentence contradicts.
+    const outcomeLabel = outcome ? OPTIMISER_OUTCOME_LABEL[outcome] : null;
+    // Every outcome with no control of its own offers the ONE run action, worded
+    // as the outcome's own next step. A mapped failure names the action that
+    // actually fixes it, and that one wins.
     const retest = outcome === OPTIMISER_OUTCOME.RETEST_NEEDED
-      || outcome === OPTIMISER_OUTCOME.COULD_NOT_COMPLETE;
+      || outcome === OPTIMISER_OUTCOME.UNABLE_TO_EVALUATE
+      || outcome === OPTIMISER_OUTCOME.BASS_UPDATE_REQUIRED;
     const resolved = {
       state,
       // The outcome is what the designer reads; the state behind it stays
       // available for the surfaces that need the finer distinction.
       outcome,
-      outcomeLabel: outcome ? OPTIMISER_OUTCOME_LABEL[outcome] : null,
-      statusLabel: OPTIMISER_PRESENTATION_LABEL[state],
+      outcomeLabel,
+      statusLabel: outcomeLabel || OPTIMISER_PRESENTATION_LABEL[state],
       message: OPTIMISER_PRESENTATION_COPY.NO_RUN,
       explanation: null,
       notes: [],
@@ -213,7 +318,8 @@ export function resolveOptimiserPresentationState({
       ...extra,
     };
     // A re-test outcome offers the run action worded as its own next step — but
-    // a mapped failure names the action that fixes it, and that one wins.
+    // a mapped failure names the action that fixes it, and that one wins, so the
+    // designer is never sent to a control that cannot resolve the state.
     if (retest && !extra.failureCode) {
       resolved.action = OPTIMISER_PRESENTATION_ACTION.RETEST;
       resolved.actionLabel = OPTIMISER_RETEST_LABEL;
@@ -234,7 +340,10 @@ export function resolveOptimiserPresentationState({
   // stays in the state and in Engineer details.
   if (runStatus === "failed") {
     return build(OPTIMISER_PRESENTATION_STATE.FAILED, {
-      message: (runError || OPTIMISER_PRESENTATION_COPY.FAILED),
+      // The mapped reason names the REAL cause. The engine's own error text is
+      // never the main panel's sentence: it stays in the state (runError) and in
+      // the run evidence, where Engineer details reads it.
+      message: OPTIMISER_PRESENTATION_COPY.FAILED,
       action: OPTIMISER_PRESENTATION_ACTION.RERUN,
       actionLabel: OPTIMISER_PRESENTATION_ACTION.RERUN,
       showApply: false,
@@ -255,8 +364,10 @@ export function resolveOptimiserPresentationState({
 
   // ── NO_USEFUL_IMPROVEMENT ── complete evidence, every credible candidate rejected.
   if (status === OPTIMISER_PLAN_STATUS.NO_USEFUL_IMPROVEMENT) {
+    // A COMPLETED search that confirmed nothing. This is the only outcome in
+    // which the panel may state that no worthwhile improvement was found.
     return build(OPTIMISER_PRESENTATION_STATE.NO_USEFUL_IMPROVEMENT, {
-      message: "The optimiser completed its search without confirming a candidate worth applying.",
+      message: OPTIMISER_OUTCOME_COPY[OPTIMISER_OUTCOME.NO_IMPROVEMENTS].message,
       explanation: "Nothing is offered for application. The evidence below is what the run evaluated.",
       evidence,
       action: OPTIMISER_PRESENTATION_ACTION.RERUN,
@@ -273,7 +384,9 @@ export function resolveOptimiserPresentationState({
     // it, with the one button that fixes that state. The run's own recorded
     // diagnosis is not replaced: it stays in the evidence Engineer details reads.
     return build(OPTIMISER_PRESENTATION_STATE.EVALUATION_INCOMPLETE, {
-      message: OPTIMISER_PRESENTATION_COPY.INCOMPLETE,
+      // A result that has to be checked again — never "no improvement found".
+      message: OPTIMISER_RETEST_MESSAGE,
+      nextAction: OPTIMISER_RETEST_DETAIL,
       explanation: "Nothing is offered for application. The evidence below is what the run evaluated.",
       evidence,
       action: OPTIMISER_PRESENTATION_ACTION.RERUN,
@@ -285,8 +398,16 @@ export function resolveOptimiserPresentationState({
 
   // ── PLAN_AVAILABLE ── only a genuinely evaluated, visible, applicable change.
   if (hasApplicableEvaluatedLever(planView)) {
+    // WHICH improvement: an electronic adjustment, or a physical change of seats,
+    // subwoofers or layout. The badge names it; the Apply controls are the same
+    // either way, and neither is ever applied by ADI on its own.
+    const planOutcome = offersPhysicalChangeOnly(planView)
+      ? OPTIMISER_OUTCOME.PHYSICAL_CHANGE
+      : OPTIMISER_OUTCOME.IMPROVEMENTS_FOUND;
     return build(OPTIMISER_PRESENTATION_STATE.PLAN_AVAILABLE, {
-      message: "Sound Proof has evaluated the available improvement options for this design.",
+      message: OPTIMISER_OUTCOME_COPY[planOutcome].message,
+      nextAction: OPTIMISER_OUTCOME_COPY[planOutcome].detail,
+      outcome: planOutcome,
       // A winning plan must carry the same completed-run evidence as terminal
       // outcomes. The plan card owns Apply; this read-only block owns the
       // calculation count and the tested-family audit trail.
@@ -314,7 +435,8 @@ export function resolveOptimiserPresentationState({
   // ── EVALUATION_INCOMPLETE ── evidence missing, unreadable, or unsaved.
   if (planPersisted === false) {
     return build(OPTIMISER_PRESENTATION_STATE.EVALUATION_INCOMPLETE, {
-      message: OPTIMISER_PRESENTATION_COPY.INCOMPLETE_UNSAVED,
+      message: OPTIMISER_RETEST_MESSAGE,
+      nextAction: "The evaluated result was not saved for this design, so nothing can be applied from it.",
       evidence,
       action: OPTIMISER_PRESENTATION_ACTION.RERUN,
       actionLabel: OPTIMISER_PRESENTATION_ACTION.RERUN,
@@ -325,7 +447,8 @@ export function resolveOptimiserPresentationState({
 
   if (status === OPTIMISER_PLAN_STATUS.UNSUPPORTED) {
     return build(OPTIMISER_PRESENTATION_STATE.EVALUATION_INCOMPLETE, {
-      message: OPTIMISER_PRESENTATION_COPY.INCOMPLETE_MISSING,
+      message: OPTIMISER_RETEST_MESSAGE,
+      nextAction: "The saved result predates the current evidence, so it cannot support a recommendation until it is checked again.",
       evidence,
       action: OPTIMISER_PRESENTATION_ACTION.RERUN,
       actionLabel: OPTIMISER_PRESENTATION_ACTION.RERUN,
@@ -337,10 +460,12 @@ export function resolveOptimiserPresentationState({
   if (status === OPTIMISER_PLAN_STATUS.CURRENT) {
     // A current plan whose lever-level evidence is not complete enough to apply.
     return build(OPTIMISER_PRESENTATION_STATE.EVALUATION_INCOMPLETE, {
-      message: OPTIMISER_PRESENTATION_COPY.INCOMPLETE,
+      message: OPTIMISER_RETEST_MESSAGE,
+      nextAction: "The saved result does not hold enough lever-level evidence to apply safely.",
       showPlan: true,
-      action: OPTIMISER_PRESENTATION_ACTION.COMPLETE,
-      actionLabel: OPTIMISER_PRESENTATION_ACTION.COMPLETE,
+      // The one action that resolves this state is the re-test itself.
+      action: OPTIMISER_PRESENTATION_ACTION.RETEST,
+      actionLabel: OPTIMISER_RETEST_LABEL,
       showApply: false,
       ...failureExtras,
     });
@@ -349,7 +474,8 @@ export function resolveOptimiserPresentationState({
   // A terminal run record that is not a completed no-winner result.
   if (evidence) {
     return build(OPTIMISER_PRESENTATION_STATE.EVALUATION_INCOMPLETE, {
-      message: OPTIMISER_PRESENTATION_COPY.INCOMPLETE,
+      message: OPTIMISER_RETEST_MESSAGE,
+      nextAction: OPTIMISER_RETEST_DETAIL,
       evidence,
       action: OPTIMISER_PRESENTATION_ACTION.RERUN,
       actionLabel: OPTIMISER_PRESENTATION_ACTION.RERUN,
@@ -358,10 +484,14 @@ export function resolveOptimiserPresentationState({
     });
   }
 
-  // ── NO_RUN ── nothing evaluated and saved for this design.
+  // ── NO_RUN ── nothing evaluated and saved for this design. When the bass
+  // result itself is what is missing or stale the panel states that, with the
+  // recalculation as its ONE action, rather than inviting a run that cannot
+  // start until that result exists.
   return build(OPTIMISER_PRESENTATION_STATE.NO_RUN, {
     action: OPTIMISER_PRESENTATION_ACTION.RUN,
     actionLabel: OPTIMISER_PRESENTATION_ACTION.RUN,
     showApply: false,
+    ...failureExtras,
   });
 }
