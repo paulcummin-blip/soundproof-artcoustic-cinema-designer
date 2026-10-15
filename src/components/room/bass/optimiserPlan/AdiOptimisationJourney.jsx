@@ -102,6 +102,7 @@ import useOptimiserRunProgress from "./useOptimiserRunProgress.js";
 import { buildOptimiserRunWorkload } from "./optimiserRunWorkload.js";
 import AdiJourneyRunningPanel from "./AdiJourneyRunningPanel.jsx";
 import AdiJourneyEngineerDetailsSections from "./AdiJourneyEngineerDetailsSections.jsx";
+import { buildElectronicTimingRows } from "@/components/room/bass/electronicSafety/electronicTimingLedger.js";
 import AdiOtherOptions from "./AdiOtherOptions.jsx";
 import AdiSubwooferGroupingBlock from "./AdiSubwooferGroupingBlock.jsx";
 import AdiDesignRecommendationSection from "./AdiDesignRecommendationSection.jsx";
@@ -699,6 +700,10 @@ export default function AdiOptimisationJourney({
     absorption: summary.absorption,
     attemptsWithoutGain: summary.attemptsWithoutGain,
     workload: runWorkload,
+    // The saved run's own measured runtime cost, as developer rows. Built from the
+    // breakdown SAVED WITH THE RUN; empty when no breakdown was recorded, so the
+    // block is simply not drawn and no missing stage is ever shown as zero.
+    runtimeCost: buildElectronicTimingRows(planView?.runtimeBreakdown || null),
   };
 
   return (

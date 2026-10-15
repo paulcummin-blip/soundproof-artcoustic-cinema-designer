@@ -39,7 +39,6 @@ import { fileURLToPath } from "node:url";
 import {
   ELECTRONIC_COMPARISON_TOLERANCE_DB,
   ELECTRONIC_COMPARISON_TOLERANCE_JUSTIFICATION,
-  SECONDARY_MATERIAL_REGRESSION_DB,
 } from "../components/room/bass/electronicSafety/electronicComparisonTolerance.js";
 import {
   ELECTRONIC_SAFETY_REASON,
@@ -99,7 +98,6 @@ const BARTON_BASELINE = result({ candidateId: "current" });
 describe("THE ONE CANONICAL TOLERANCE", () => {
   it("is a single named figure, in its own authority", () => {
     assert.equal(ELECTRONIC_COMPARISON_TOLERANCE_DB, 0.05);
-    assert.equal(SECONDARY_MATERIAL_REGRESSION_DB, 1.0);
   });
 
   it("states what it is, and what it is deliberately not", () => {
@@ -202,7 +200,7 @@ describe("TEST 3 — a Secondary seat worsens materially", () => {
     assert.equal(decision.reasons[0].seats[0].seatId, "seat-r2-c1");
   });
 
-  it("accepts a Secondary worsening inside materiality when the result improves", () => {
+  it("refuses a Secondary worsening that is small but real, with no materiality allowance", () => {
     const inside = result({
       candidateId: "delay",
       p20Db: 12.2,
@@ -213,7 +211,8 @@ describe("TEST 3 — a Secondary seat worsens materially", () => {
       ],
     });
     const decision = classifyElectronicCandidate({ baseline: BARTON_BASELINE, candidate: inside });
-    assert.equal(decision.verdict, ELECTRONIC_SAFETY_VERDICT.AUTO_SAFE);
+    assert.equal(decision.verdict, ELECTRONIC_SAFETY_VERDICT.REJECTED);
+    assert.equal(decision.reasonCode, ELECTRONIC_SAFETY_REASON.SECONDARY_SEAT_REGRESSION);
   });
 });
 
@@ -449,12 +448,49 @@ describe("TIMING — the aggregator over the engine's existing telemetry", () =>
   it("reads the existing records into the budget's own named stages", () => {
     const breakdown = summariseElectronicStageBreakdown({ runtimeMetrics });
     assert.equal(breakdown.totalWallClockMs, 36800);
-    assert.equal(breakdown.stages[ELECTRONIC_TIMING_STAGE.TRANSFER_ACQUISITION], 4200);
     assert.equal(breakdown.stages[ELECTRONIC_TIMING_STAGE.PHASE_POLARITY_SCREENING], 900);
     assert.equal(breakdown.stages[ELECTRONIC_TIMING_STAGE.DELAY_SCREENING], 700);
     assert.equal(breakdown.stages[ELECTRONIC_TIMING_STAGE.GAIN_SCREENING], 600);
     assert.equal(breakdown.stages[ELECTRONIC_TIMING_STAGE.COMBINED_SCREENING], 500);
     assert.equal(breakdown.stages[ELECTRONIC_TIMING_STAGE.CANONICAL_CONFIRMATIONS], 6000);
+    assert.equal(breakdown.stages[ELECTRONIC_TIMING_STAGE.PHYSICAL_PLACEMENT], 4200);
+  });
+
+  it("separates the electronic cost from the physical and seating advisory work", () => {
+    const breakdown = summariseElectronicStageBreakdown({ runtimeMetrics });
+    // delay + gain + phase/polarity + the combined retune = the electronic search
+    assert.equal(breakdown.cost.electronicSearchMs, 2700);
+    assert.equal(breakdown.cost.canonicalConfirmationMs, 6000);
+    // THE ONLY FIGURE THAT BELONGS INSIDE CALCULATE BASS
+    assert.equal(breakdown.cost.electronicTotalMs, 8700);
+    // the physical placement search is recommendation work, measured beside it
+    assert.equal(breakdown.cost.physicalPlacementMs, 4200);
+    // the seating advisory duration is not published by the engine at all
+    assert.equal(breakdown.cost.seatingAdvisoryMs, null);
+    assert.ok(breakdown.unmeasuredStages.includes(ELECTRONIC_TIMING_STAGE.SEATING_ADVISORY));
+    assert.ok(breakdown.unmeasuredStages.includes(ELECTRONIC_TIMING_STAGE.TRANSFER_ACQUISITION));
+  });
+
+  it("counts the seating advisory probes, and never as a time", () => {
+    const withSeating = {
+      ...runtimeMetrics,
+      workerCalls: [...runtimeMetrics.workerCalls, { phase: "confirmation", candidateId: "seating-0", durationMs: 1200 }],
+    };
+    const breakdown = summariseElectronicStageBreakdown({ runtimeMetrics: withSeating });
+    assert.equal(breakdown.cost.seatingAdvisoryProbes, 1);
+    assert.equal(breakdown.cost.electronicTotalMs, 8700 + 1200);
+    assert.equal(breakdown.cost.seatingAdvisoryMs, null, "a probe count is not a measured time");
+  });
+
+  it("takes the persistence and publication figure from the run's timing ledger when one exists", () => {
+    const withLedger = summariseElectronicStageBreakdown({
+      runtimeMetrics,
+      runTimings: { durationsMs: { save: 900, publication: 1400, saveAndPublish: 2300 } },
+    });
+    assert.equal(withLedger.stages[ELECTRONIC_TIMING_STAGE.PERSISTENCE_PUBLICATION], 2300);
+    const withoutLedger = summariseElectronicStageBreakdown({ runtimeMetrics });
+    assert.equal(withoutLedger.stages[ELECTRONIC_TIMING_STAGE.PERSISTENCE_PUBLICATION], null);
+    assert.ok(withoutLedger.unmeasuredStages.includes(ELECTRONIC_TIMING_STAGE.PERSISTENCE_PUBLICATION));
   });
 
   it("counts worker calls, confirmations and transfer-cache hits and misses", () => {
@@ -472,9 +508,114 @@ describe("TIMING — the aggregator over the engine's existing telemetry", () =>
     const rows = buildElectronicTimingRows(breakdown);
     assert.ok(rows.some((row) => row.label === "Total wall time" && row.value === "36.80 s"));
     assert.ok(!rows.some((row) => row.label === "Final candidate selection"));
+    assert.ok(rows.some((row) => row.label === "Electronic blocking total" && row.value === "8.70 s"));
+    assert.ok(rows.some((row) => row.label === "Physical placement work" && row.value === "4.20 s"));
+    assert.ok(!rows.some((row) => row.label === "Seating advisory work"), "an unmeasured stage is never a row");
+    assert.ok(rows.some((row) => row.label === "Seating advisory probes" && row.value === "0"));
   });
 
   it("returns nothing rather than a fabricated breakdown when there is no telemetry", () => {
     assert.equal(summariseElectronicStageBreakdown({ runtimeMetrics: null }), null);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// THE FIVE MANDATED CASES. A Primary gain is never a licence to make another
+// seat worse: every seat is protected at the SAME canonical tolerance, so
+// automatic adoption is Pareto-safe.
+// ---------------------------------------------------------------------------
+
+describe("MANDATED CASES A-E", () => {
+  const baselineWith = (secondaryRaw) => result({
+    candidateId: "current",
+    seats: [
+      seat("seat-r1-c1", { variationDbRaw: 10.0 }),
+      seat("seat-r1-c2", { variationDbRaw: 10.0 }),
+      seat("seat-r2-c1", { isPrimary: false, level: 2, variationDbRaw: secondaryRaw }),
+    ],
+  });
+
+  const candidateWith = ({
+    primaryRaw = 9.0,
+    secondaryRaw = 8.0,
+    p19Db = 3.4,
+    p20Db = 15.4,
+    requestedP14Pass = true,
+  } = {}) => result({
+    candidateId: "delay",
+    p19Db,
+    p20Db,
+    requestedP14Pass,
+    seats: [
+      seat("seat-r1-c1", { variationDbRaw: primaryRaw }),
+      seat("seat-r1-c2", { variationDbRaw: primaryRaw }),
+      seat("seat-r2-c1", { isPrimary: false, level: 2, variationDbRaw: secondaryRaw }),
+    ],
+  });
+
+  it("CASE A — Primary improves 1.0 dB, Secondary worsens 0.10 dB: REJECT", () => {
+    const decision = classifyElectronicCandidate({
+      baseline: baselineWith(8.0),
+      candidate: candidateWith({ primaryRaw: 9.0, secondaryRaw: 8.1 }),
+    });
+    assert.equal(decision.verdict, ELECTRONIC_SAFETY_VERDICT.REJECTED);
+    assert.equal(decision.reasonCode, ELECTRONIC_SAFETY_REASON.SECONDARY_SEAT_REGRESSION);
+    assert.equal(decision.reasons[0].seats[0].rawDeltaDb, 0.1);
+    assert.ok(decision.improvements.length > 0, "the Primary seat genuinely improved");
+  });
+
+  it("CASE B — Primary improves 1.0 dB, Secondary worsens 0.04 dB: ALLOW (equivalent)", () => {
+    const decision = classifyElectronicCandidate({
+      baseline: baselineWith(8.0),
+      candidate: candidateWith({ primaryRaw: 9.0, secondaryRaw: 8.04 }),
+    });
+    assert.equal(decision.verdict, ELECTRONIC_SAFETY_VERDICT.AUTO_SAFE);
+    assert.deepEqual(decision.reasons, []);
+  });
+
+  it("CASE C — Primary unchanged, Secondary improves 0.4 dB, overall improves: ALLOW", () => {
+    const decision = classifyElectronicCandidate({
+      baseline: baselineWith(8.4),
+      candidate: candidateWith({ primaryRaw: 10.0, secondaryRaw: 8.0, p20Db: 12.2 }),
+    });
+    assert.equal(decision.verdict, ELECTRONIC_SAFETY_VERDICT.AUTO_SAFE);
+  });
+
+  it("CASE D — Primary improves, Secondary unchanged, P20 improves: ALLOW", () => {
+    const decision = classifyElectronicCandidate({
+      baseline: baselineWith(8.0),
+      candidate: candidateWith({ primaryRaw: 9.0, secondaryRaw: 8.0, p20Db: 12.2 }),
+    });
+    assert.equal(decision.verdict, ELECTRONIC_SAFETY_VERDICT.AUTO_SAFE);
+  });
+
+  it("CASE E — Primary and P19/P20 improve but a protected output metric worsens: REJECT", () => {
+    const decision = classifyElectronicCandidate({
+      baseline: baselineWith(8.0),
+      candidate: candidateWith({ primaryRaw: 9.0, secondaryRaw: 8.0, p19Db: 1.2, p20Db: 12.2, requestedP14Pass: false }),
+    });
+    assert.equal(decision.verdict, ELECTRONIC_SAFETY_VERDICT.REJECTED);
+    assert.equal(decision.reasonCode, ELECTRONIC_SAFETY_REASON.PROTECTED_METRIC_REGRESSION);
+    assert.equal(decision.reasons[0].metrics[0].parameter, "output");
+  });
+
+  it("treats the tolerance as a boundary: 0.05 dB is equivalent, 0.06 dB is a regression", () => {
+    const equivalent = classifyElectronicCandidate({
+      baseline: baselineWith(8.0),
+      candidate: candidateWith({ primaryRaw: 10.05, secondaryRaw: 8.05, p20Db: 12.2 }),
+    });
+    assert.equal(equivalent.verdict, ELECTRONIC_SAFETY_VERDICT.AUTO_SAFE);
+
+    const primaryWorse = classifyElectronicCandidate({
+      baseline: baselineWith(8.0),
+      candidate: candidateWith({ primaryRaw: 10.06 }),
+    });
+    assert.equal(primaryWorse.reasonCode, ELECTRONIC_SAFETY_REASON.PRIMARY_SEAT_REGRESSION);
+
+    const secondaryWorse = classifyElectronicCandidate({
+      baseline: baselineWith(8.0),
+      candidate: candidateWith({ primaryRaw: 9.0, secondaryRaw: 8.06 }),
+    });
+    assert.equal(secondaryWorse.reasonCode, ELECTRONIC_SAFETY_REASON.SECONDARY_SEAT_REGRESSION);
   });
 });

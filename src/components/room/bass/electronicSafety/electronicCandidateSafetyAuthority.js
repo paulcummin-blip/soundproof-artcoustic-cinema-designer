@@ -13,7 +13,9 @@
 //
 //   1. NO Primary seat gets worse.
 //   2. NO required protected aggregate metric gets worse.
-//   3. NO Secondary seat gets MATERIALLY worse.
+//   3. NO Secondary seat gets worse either. Automatic adoption is PARETO-SAFE:
+//      the same canonical tolerance protects every seat, and a Secondary seat is
+//      never traded for a Primary gain. There is no materiality allowance here.
 //   4. At least one useful result improves.
 //
 // Nothing has to clear 1 dB to be adopted: a continuous improvement inside the
@@ -39,7 +41,6 @@
 
 import {
   ELECTRONIC_COMPARISON_TOLERANCE_DB,
-  SECONDARY_MATERIAL_REGRESSION_DB,
   finiteNumber,
   improvedBy,
   levelValue,
@@ -118,12 +119,13 @@ function hasComparableSeatEvidence(result) {
  * Seat regressions between two scoped seat sets.
  *
  * A grade drop is always a regression. When the grade HOLDS, the raw deviation is
- * compared at the caller's tolerance — strict for a Primary seat, material for a
- * Secondary one. A seat whose grade IMPROVED is never reported as a regression:
- * the grade is the stronger statement about that seat.
+ * compared at the SAME canonical tolerance for every seat — a Secondary seat is
+ * protected exactly as a Primary one, because automatic adoption may not trade
+ * one seat for another. A seat whose grade IMPROVED is never reported as a
+ * regression: the grade is the stronger statement about that seat.
  */
-function seatRegressions(beforeRows, afterRows, { tolerance, material }) {
-  const threshold = material ? SECONDARY_MATERIAL_REGRESSION_DB : tolerance;
+function seatRegressions(beforeRows, afterRows, tolerance) {
+  const threshold = tolerance;
   const beforeById = new Map(beforeRows.map((row) => [String(row.seatId), row]));
   const findings = [];
   for (const row of afterRows) {
@@ -284,13 +286,13 @@ export function classifyElectronicCandidate({
   const primaryRegressions = seatRegressions(
     beforeRows.filter(isPrimarySeat),
     afterRows.filter(isPrimarySeat),
-    { tolerance: t, material: false },
+    t,
   );
   const protectedRegressions = protectedMetricRegressions(baseline, candidate, t);
   const secondaryRegressions = seatRegressions(
     beforeRows.filter((row) => !isPrimarySeat(row)),
     afterRows.filter((row) => !isPrimarySeat(row)),
-    { tolerance: t, material: true },
+    t,
   );
   const improvements = improvementFindings(baseline, candidate, beforeRows, afterRows, t);
 
@@ -324,6 +326,10 @@ export function classifyElectronicCandidate({
  *   2. best overall P19/P20       level first, then the continuous figure
  *   3. best Secondary-seat result worst Secondary-seat deviation, then floor grade
  *   4. existing safety/output tie-breakers  capability, extension, then grades
+ *
+ * Every candidate that reaches this comparison has ALREADY worsened nothing, so
+ * this order is a preference among safe results — never a licence to trade one
+ * seat for another.
  *
  * Deterministic lexicographic comparison. No weights, no arbitrary scoring.
  */

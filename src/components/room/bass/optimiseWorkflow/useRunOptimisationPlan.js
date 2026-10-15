@@ -43,6 +43,7 @@ import {
   getRunTimings,
   recordRunTiming,
 } from "@/components/room/bass/optimiserPlan/optimiserRunTimings.js";
+import { summariseElectronicStageBreakdown } from "@/components/room/bass/electronicSafety/electronicTimingLedger.js";
 import { publishOptimiserRecommendation } from "@/components/room/bass/optimiserPlan/optimiserRecommendationPublication.js";
 
 export default function useRunOptimisationPlan({
@@ -268,9 +269,17 @@ export default function useRunOptimisationPlan({
       // it, and is completed once the publication has finished.
       recordRunTiming(projectId, versionId, RUN_TIMING.SAVE_STARTED);
       const runRecord = persistedPlan || runEvidence;
+      // The engine's own existing runtime telemetry, in the budget's named stages,
+      // is saved WITH the run so the split between electronic work and physical or
+      // seating advisory work can be read back long after the console log is gone.
+      // It is measurement only: nothing here affects a decision or a value.
+      const runtimeBreakdown = summariseElectronicStageBreakdown({
+        runtimeMetrics: result.runtimeMetrics || null,
+      });
       setOptimiserPlanAuthority(projectId, versionId, {
         ...runRecord,
         timings: buildPersistedRunTimings(getRunTimings(projectId, versionId)),
+        runtimeBreakdown,
       });
       recordRunTiming(projectId, versionId, RUN_TIMING.SAVE_COMPLETED);
 
@@ -295,6 +304,7 @@ export default function useRunOptimisationPlan({
       setOptimiserPlanAuthority(projectId, versionId, {
         ...runRecord,
         timings: buildPersistedRunTimings(getRunTimings(projectId, versionId)),
+        runtimeBreakdown,
       });
 
       setStatus("complete");

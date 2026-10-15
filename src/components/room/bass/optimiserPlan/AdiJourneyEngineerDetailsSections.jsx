@@ -38,6 +38,7 @@ import OptimisationPlanStatus from "./OptimisationPlanStatus.jsx";
 import PlacementRecommendationPanel from "./PlacementRecommendationPanel.jsx";
 import AdiRecommendationEvidenceGroups from "./AdiRecommendationEvidenceGroups.jsx";
 import AdiJourneyRunWorkloadBlock from "./AdiJourneyRunWorkloadBlock.jsx";
+import AdiJourneyRuntimeCostBlock from "./AdiJourneyRuntimeCostBlock.jsx";
 import { FUTURE_CAPABILITY_TITLE } from "./optimiserLiveFamilies.js";
 import { PLACEMENT_PREVIEW_UNAVAILABLE } from "./placementMoveAuthority.js";
 
@@ -88,6 +89,7 @@ export default function AdiJourneyEngineerDetailsSections({ view = {} }) {
     absorption = null,
     attemptsWithoutGain = null,
     workload = null,
+    runtimeCost = [],
   } = view;
 
   return (
@@ -283,6 +285,11 @@ export default function AdiJourneyEngineerDetailsSections({ view = {} }) {
           never stated in the normal view (a run in progress states its useful
           live progress on the card itself). */}
       {workload && <AdiJourneyRunWorkloadBlock workload={workload} />}
+
+      {/* THE RUN'S RUNTIME COST, SPLIT — DEVELOPER DIAGNOSTICS ONLY. What the
+          electronic search and its canonical confirmations cost, beside the
+          physical placement work that must never sit inside Calculate Bass. */}
+      <AdiJourneyRuntimeCostBlock rows={runtimeCost} />
     </>
   );
 }

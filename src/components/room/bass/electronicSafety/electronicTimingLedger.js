@@ -29,7 +29,12 @@
 // PURE. No React, no stores, no worker.
 // ---------------------------------------------------------------------------
 
-/** The named stages of the calculation and of the electronic pass. */
+/**
+ * The named stages of the calculation, of the electronic pass, and of the two
+ * kinds of work that must be measured SEPARATELY from it: the physical placement
+ * search and the seating advisory. Only delay, gain, phase/polarity, combined
+ * screening and the canonical confirmations belong inside Calculate Bass.
+ */
 export const ELECTRONIC_TIMING_STAGE = Object.freeze({
   // Calculate Bass — the calculation-owned stages.
   TRANSFER_PREPARATION: "transfer-preparation",
@@ -46,6 +51,10 @@ export const ELECTRONIC_TIMING_STAGE = Object.freeze({
   COMBINED_SCREENING: "electronic-combined-screening",
   CANONICAL_CONFIRMATIONS: "electronic-canonical-confirmations",
   FINAL_SELECTION: "electronic-final-selection",
+  // The run's NON-electronic work, measured in the same table so the portion that
+  // belongs inside Calculate Bass can be read on its own.
+  PHYSICAL_PLACEMENT: "physical-placement",
+  SEATING_ADVISORY: "seating-advisory",
 });
 
 /** The stage labels, in the order the work happens. */
@@ -63,6 +72,8 @@ export const ELECTRONIC_TIMING_STAGE_LABEL = Object.freeze({
   [ELECTRONIC_TIMING_STAGE.COMBINED_SCREENING]: "Combined screening",
   [ELECTRONIC_TIMING_STAGE.CANONICAL_CONFIRMATIONS]: "Canonical confirmations",
   [ELECTRONIC_TIMING_STAGE.FINAL_SELECTION]: "Final candidate selection",
+  [ELECTRONIC_TIMING_STAGE.PHYSICAL_PLACEMENT]: "Physical placement work",
+  [ELECTRONIC_TIMING_STAGE.SEATING_ADVISORY]: "Seating advisory work",
 });
 
 /** The counters kept alongside the stages. */
@@ -182,6 +193,13 @@ export function createElectronicTimingLedger({ clock = defaultClock } = {}) {
 // The aggregator: the engine's EXISTING telemetry, in the budget's own terms.
 // ---------------------------------------------------------------------------
 
+/** A finite, non-negative number, or null. Never coerces null/undefined/"" to 0. */
+function finiteOrNull(value) {
+  if (value === null || value === undefined || value === "") return null;
+  const number = Number(value);
+  return Number.isFinite(number) && number >= 0 ? number : null;
+}
+
 /**
  * The named stage breakdown of an EXISTING engine run, read from the telemetry
  * the engine already publishes. Nothing is recomputed and nothing is invented:
@@ -189,9 +207,12 @@ export function createElectronicTimingLedger({ clock = defaultClock } = {}) {
  *
  * @param {object} params
  * @param {object|null} params.runtimeMetrics - V2RuntimeMetrics.toReport()
+ * @param {object|null} [params.runTimings] - the run's persisted timing ledger when
+ *   one exists. Its save/publication durations are the only published figure for
+ *   the persistence stage; without it that stage is NOT MEASURED.
  * @returns {object|null} the breakdown, or null when there is no telemetry
  */
-export function summariseElectronicStageBreakdown({ runtimeMetrics = null } = {}) {
+export function summariseElectronicStageBreakdown({ runtimeMetrics = null, runTimings = null } = {}) {
   if (!runtimeMetrics || typeof runtimeMetrics !== "object") return null;
 
   const calls = Array.isArray(runtimeMetrics.workerCalls) ? runtimeMetrics.workerCalls : [];
@@ -212,17 +233,35 @@ export function summariseElectronicStageBreakdown({ runtimeMetrics = null } = {}
   const hits = operations.filter((operation) => operation?.lookup === "hit").length + stage2Reused;
   const misses = operations.filter((operation) => operation?.lookup === "miss").length;
 
+  const confirmationMs = confirmations.reduce((total, call) => total + (Number(call?.durationMs) || 0), 0);
+  const seatingConfirmations = confirmations.filter((call) => String(call?.candidateId || "").startsWith("seating-"));
+  // THE ELECTRONIC SEARCH: delay, gain, phase/polarity and the combined retune.
+  // These, plus the canonical confirmations, are the work that belongs INSIDE
+  // Calculate Bass.
+  const electronicSearchMs = byPhase("grouped-phase") + byPhase("grouped-delay")
+    + byPhase("grouped-gain") + combinedScreeningMs;
+  // The physical placement search is recommendation work, measured beside it.
+  const physicalPlacementMs = byPhase("placement");
+
+  const persistedDurations = runTimings?.durationsMs || null;
+  const saveMs = finiteOrNull(persistedDurations?.save);
+  const publishMs = finiteOrNull(persistedDurations?.publication);
+  const persistenceMs = finiteOrNull(persistedDurations?.saveAndPublish)
+    ?? (saveMs !== null || publishMs !== null ? (saveMs || 0) + (publishMs || 0) : null);
+
   const stages = {
-    [ELECTRONIC_TIMING_STAGE.TRANSFER_ACQUISITION]: byPhase("placement"),
-    [ELECTRONIC_TIMING_STAGE.DELAY_SCREENING]: byPhase("grouped-delay"),
-    [ELECTRONIC_TIMING_STAGE.GAIN_SCREENING]: byPhase("grouped-gain"),
-    [ELECTRONIC_TIMING_STAGE.PHASE_POLARITY_SCREENING]: byPhase("grouped-phase"),
-    [ELECTRONIC_TIMING_STAGE.COMBINED_SCREENING]: combinedScreeningMs,
-    [ELECTRONIC_TIMING_STAGE.CANONICAL_CONFIRMATIONS]: confirmations
-      .reduce((total, call) => total + (Number(call?.durationMs) || 0), 0),
     // Not published by the engine's telemetry today — stated as unmeasured rather
     // than reported as zero.
+    [ELECTRONIC_TIMING_STAGE.TRANSFER_ACQUISITION]: null,
     [ELECTRONIC_TIMING_STAGE.BASELINE_EVALUATION]: null,
+    [ELECTRONIC_TIMING_STAGE.PERSISTENCE_PUBLICATION]: persistenceMs,
+    [ELECTRONIC_TIMING_STAGE.PHASE_POLARITY_SCREENING]: byPhase("grouped-phase"),
+    [ELECTRONIC_TIMING_STAGE.DELAY_SCREENING]: byPhase("grouped-delay"),
+    [ELECTRONIC_TIMING_STAGE.GAIN_SCREENING]: byPhase("grouped-gain"),
+    [ELECTRONIC_TIMING_STAGE.COMBINED_SCREENING]: combinedScreeningMs,
+    [ELECTRONIC_TIMING_STAGE.CANONICAL_CONFIRMATIONS]: confirmationMs,
+    [ELECTRONIC_TIMING_STAGE.PHYSICAL_PLACEMENT]: physicalPlacementMs,
+    [ELECTRONIC_TIMING_STAGE.SEATING_ADVISORY]: null,
     [ELECTRONIC_TIMING_STAGE.FINAL_SELECTION]: null,
   };
 
@@ -239,6 +278,18 @@ export function summariseElectronicStageBreakdown({ runtimeMetrics = null } = {}
       fullTransferReuseHits: Number(runtimeMetrics.fullTransferReuseHits) || 0,
     },
     currentReused: runtimeMetrics.currentReused === true,
+    // THE COST SPLIT the runtime budget is judged on. electronicTotalMs is the
+    // only figure that belongs inside Calculate Bass; the physical placement
+    // search and the seating advisory are recommendation work, measured here so
+    // the blocking cost can be seen without them.
+    cost: {
+      electronicSearchMs,
+      canonicalConfirmationMs: confirmationMs,
+      electronicTotalMs: electronicSearchMs + confirmationMs,
+      physicalPlacementMs,
+      seatingAdvisoryMs: null,
+      seatingAdvisoryProbes: seatingConfirmations.length,
+    },
   };
 }
 
@@ -256,10 +307,24 @@ export function buildElectronicTimingRows(breakdown) {
     })
     .filter(Boolean);
 
+  // The cost split: what the electronic pass costs, beside the physical placement
+  // work. A subtotal that was never measured is not a row.
+  const cost = breakdown.cost || {};
+  const costRows = [
+    ["electronic-search", "Electronic search subtotal", cost.electronicSearchMs],
+    ["electronic-total", "Electronic blocking total", cost.electronicTotalMs],
+  ]
+    .map(([key, label, value]) => {
+      const formatted = value === null || value === undefined ? null : formatTimingDuration(value);
+      return formatted ? { key: `cost:${key}`, label, value: formatted } : null;
+    })
+    .filter(Boolean);
+
   const cache = breakdown.transferCache || {};
   const counts = [
     ["Worker calls", breakdown.workerCallCount],
     ["Canonical confirmations", breakdown.canonicalConfirmationCount],
+    ["Seating advisory probes", cost.seatingAdvisoryProbes],
     ["Transfer-cache hits", cache.hits],
     ["Transfer-cache misses", cache.misses],
   ]
@@ -269,6 +334,7 @@ export function buildElectronicTimingRows(breakdown) {
   const total = formatTimingDuration(breakdown.totalWallClockMs);
   return [
     ...rows,
+    ...costRows,
     ...counts,
     ...(total ? [{ key: "total", label: "Total wall time", value: total }] : []),
   ];

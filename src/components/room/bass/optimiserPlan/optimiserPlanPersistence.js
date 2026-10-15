@@ -73,6 +73,13 @@ export function serializeOptimiserPlan(plan) {
     // kept so a slow run can be diagnosed later instead of guessed at. Absent on
     // records saved before this existed — those are never reinterpreted.
     timings: plan.timings || null,
+    // The run's own measured runtime cost, in the budget's named stages: what the
+    // electronic search and its canonical confirmations cost, split from the
+    // physical placement and seating advisory work that does not belong inside
+    // Calculate Bass. Measurement only — read inside the developer diagnostics
+    // level, and it decides nothing. Absent on records saved before this existed;
+    // those are never reinterpreted.
+    runtimeBreakdown: plan.runtimeBreakdown || null,
     notes: Array.isArray(plan.notes) ? plan.notes : [],
   };
 }

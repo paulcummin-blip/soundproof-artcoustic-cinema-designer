@@ -349,6 +349,10 @@ export function resolveOptimiserPlanStatus({
     // The calibration evidence this run retained, read by the panel's
     // calibration section and its tested-ledger rows.
     calibrationEvidence: plan.calibrationEvidence || null,
+    // The run's own measured runtime cost, in the budget's named stages.
+    // Measurement only: it is read inside the developer diagnostics level and no
+    // value in it decides anything.
+    runtimeBreakdown: plan.runtimeBreakdown || null,
     // What ADI did with the calibration levers, and why: the decision saved with
     // the run, so the panel states it after a refresh instead of guessing.
     calibrationDecision: plan.calibrationDecision || null,

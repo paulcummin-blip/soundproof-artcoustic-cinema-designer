@@ -33,23 +33,13 @@
  *   • It blocks nothing genuine. A 0.2-0.5 dB continuous improvement clears it by
  *     4x to 10x — exactly the band the old 1 dB action threshold was wrongly
  *     discarding.
- *   • It permits no meaningful deterioration. A Primary seat may not drift by even
- *     0.1 dB undetected, so "no Primary seat gets worse" is enforced strictly
- *     rather than at a materiality figure.
+ *   • It permits no meaningful deterioration. NO seat — Primary or Secondary — may
+ *     drift by even 0.1 dB undetected, so "no seat gets worse" is enforced
+ *     strictly rather than at a materiality figure. Automatic adoption is
+ *     PARETO-SAFE: the same tolerance protects every seat, so a Secondary seat is
+ *     never traded for a Primary gain.
  */
 export const ELECTRONIC_COMPARISON_TOLERANCE_DB = 0.05;
-
-/**
- * How much a SECONDARY seat may worsen before the change is refused automatic
- * adoption. A Primary seat is protected strictly (at the tolerance above); a
- * Secondary seat is protected against a MATERIAL worsening only — a displayed
- * grade drop, or more than this figure of raw deviation while the grade holds.
- *
- * This is the same 1.0 dB figure the engine already uses as its within-level
- * material measure, named here in this authority's own terms. It is NOT an
- * improvement requirement: nothing has to clear 1 dB to be adopted.
- */
-export const SECONDARY_MATERIAL_REGRESSION_DB = 1.0;
 
 /** The justification, in one paragraph, for whoever reads this figure next. */
 export const ELECTRONIC_COMPARISON_TOLERANCE_JUSTIFICATION = [
@@ -59,7 +49,19 @@ export const ELECTRONIC_COMPARISON_TOLERANCE_JUSTIFICATION = [
   "It does not block genuine improvements (a 0.2-0.5 dB continuous gain clears it several times over) and it does",
   "not permit meaningful deterioration (a Primary seat cannot drift by even 0.1 dB unnoticed). It is deliberately",
   "not the RP22 display floor, not the Stage-2 physical-placement tolerance, and not the 1 dB materiality figure.",
+  "It protects every seat equally: a Primary or Secondary seat worsening beyond it rejects the candidate, so no seat is ever traded for another.",
 ].join(" ");
+
+/**
+ * The arithmetic slack used when a difference is compared against the tolerance.
+ *
+ * A change of EXACTLY the tolerance must count as equivalent, but decimal dB
+ * arithmetic cannot represent it exactly: 10.05 - 10.0 is 0.05000000000000071. The
+ * comparison therefore allows this slack, which is orders of magnitude below any
+ * figure the engine can produce or a designer can act on. Without it, a change of
+ * exactly the tolerance would be read as a regression by rounding error alone.
+ */
+const TOLERANCE_ARITHMETIC_SLACK = 1e-9;
 
 /** A finite number, or null. Never coerces null/undefined/"" to 0. */
 export function finiteNumber(value) {
@@ -86,7 +88,7 @@ export function beyondTolerance(a, b, tolerance = ELECTRONIC_COMPARISON_TOLERANC
   const left = finiteNumber(a);
   const right = finiteNumber(b);
   if (left == null || right == null) return false;
-  return Math.abs(right - left) > tolerance;
+  return Math.abs(right - left) > tolerance + TOLERANCE_ARITHMETIC_SLACK;
 }
 
 /**
@@ -98,7 +100,7 @@ export function worsenedBy(before, after, tolerance = ELECTRONIC_COMPARISON_TOLE
   const right = finiteNumber(after);
   if (left == null || right == null) return 0;
   const worse = Math.abs(right) - Math.abs(left);
-  return worse > tolerance ? worse : 0;
+  return worse > tolerance + TOLERANCE_ARITHMETIC_SLACK ? worse : 0;
 }
 
 /**
@@ -110,5 +112,5 @@ export function improvedBy(before, after, tolerance = ELECTRONIC_COMPARISON_TOLE
   const right = finiteNumber(after);
   if (left == null || right == null) return 0;
   const better = Math.abs(left) - Math.abs(right);
-  return better > tolerance ? better : 0;
+  return better > tolerance + TOLERANCE_ARITHMETIC_SLACK ? better : 0;
 }
