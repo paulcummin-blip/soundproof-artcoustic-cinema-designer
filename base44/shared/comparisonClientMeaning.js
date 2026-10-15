@@ -58,7 +58,7 @@ const GAIN = Object.freeze({
 const MODEST = Object.freeze({
   p12: 'Screen-channel headroom covers the playback level this room is designed for, so dialogue and effects stay clean and unforced at the listening level the design assumes.',
   p13: 'The surround and height layers have usable headroom, with less reserve than the screen stage.',
-  p14: 'Low-frequency output supports the room, with less spare capacity than the main channels.',
+  p14: 'The subwoofer system gives the room its low-frequency output, sized to the soundtrack and to the level this design assumes.',
   p16: 'The screen channels keep a broadly consistent tonal character, with some variation across the screen.',
   p17: 'Surround and overhead tone stays reasonably consistent, with some variation as effects move around the room.',
   // P18 is deliberately absent: bass extension is never stated from a hedge, and never

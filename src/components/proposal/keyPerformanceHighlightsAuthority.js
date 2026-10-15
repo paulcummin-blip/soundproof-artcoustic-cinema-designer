@@ -55,7 +55,12 @@ const ROW_PRESENTATION = Object.freeze({
     area: HIGHLIGHT_AREA.VIEWING,
     parameter: 'RP23 viewing',
     unit: DISPLAY_UNIT.DEGREES,
-    gain: 'Shows how the screen scale works across both seating rows.',
+    // NO ROW COUNT IS EVER CLAIMED HERE. The row's own result states the seats
+    // and the angles it was calculated for; a second line asserting how many
+    // rows the design has could contradict a one-row room, and did. The line
+    // states the relationship between screen scale and seating distance, which
+    // is true of any number of rows.
+    gain: 'Shows how the screen scale works with the seating distance in this room.',
   },
   system_layout: {
     area: HIGHLIGHT_AREA.SPATIAL,
@@ -377,8 +382,11 @@ const MODEST_GAIN = Object.freeze({
   p10: 'The overhead channels are kept close in level as the ceiling layout allows, rather than identical at every seat.',
   p11: 'The surround speakers sit where the seating can hear them, within what the room allows.',
   p12: 'Screen-channel headroom covers the playback level this room is designed for, so dialogue and effects stay clean and unforced at the listening level the design assumes.',
-  p13: 'The surround channels have usable headroom, with less reserve than the screen stage.',
-  p14: 'Low-frequency output supports the room, with less spare capacity than the main channels.',
+  // A modest result is stated as what it gives the room. It is never stated as
+  // what the design lacks, and never by measuring it against another layer: a
+  // highlight that explains a shortfall is not a highlight.
+  p13: 'The surround channels bring the effects around the audience their own working headroom.',
+  p14: 'The subwoofer system gives the room its low-frequency output, sized to the soundtrack and to the level this design assumes.',
   p16: 'The screen channels keep a broadly consistent tonal character, with some variation across the screen.',
   p17: 'Surround and overhead tone stays reasonably consistent, with some variation as effects move around the room.',
   // P18 is deliberately absent: bass extension is never stated from a hedge. It is
