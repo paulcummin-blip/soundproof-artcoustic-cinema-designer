@@ -113,7 +113,7 @@ describe("RE-TEST NEEDED HAS ONE CTA", () => {
     // The calibration re-test, the placement re-run and the placement Apply/Undo
     // are the controls that start the same or an overlapping flow.
     expect(journey).toMatch(/onReoptimise=\{retestNeeded \|\| isRunning \|\| retestOwnsPrimary/);
-    expect(journey).toMatch(/onRerun=\{retestNeeded \? null : onRunOptimisationPlan\}/);
+    expect(journey).toMatch(/onRerun=\{isRunning \|\| retestNeeded \? null : onRunOptimisationPlan\}/);
     expect(journey).toMatch(/onApply=\{retestNeeded \? null : handleApplyPlacement\}/);
     expect(journey).toMatch(/onUndo=\{retestNeeded \? null : handleUndoPlacement\}/);
     // Nothing is applied from an unconfirmed candidate.
