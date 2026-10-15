@@ -102,6 +102,11 @@ import useOptimiserRunProgress from "./useOptimiserRunProgress.js";
 import { buildOptimiserRunWorkload } from "./optimiserRunWorkload.js";
 import AdiJourneyRunningPanel from "./AdiJourneyRunningPanel.jsx";
 import AdiJourneyEngineerDetailsSections from "./AdiJourneyEngineerDetailsSections.jsx";
+import AdiOtherOptions from "./AdiOtherOptions.jsx";
+import AdiSubwooferGroupingBlock from "./AdiSubwooferGroupingBlock.jsx";
+import AdiDesignRecommendationSection from "./AdiDesignRecommendationSection.jsx";
+import { buildOptimiserPanelHierarchy } from "./optimiserPanelHierarchy.js";
+import { useOptimiserDeveloperDiagnostics } from "./useOptimiserDeveloperDiagnostics.js";
 import { presentationThemeState, resolveAdiJourneyTheme } from "./adiJourneyTheme.js";
 
 // ONE primary control per state. Which layer owns it is decided by the layout
@@ -604,6 +609,43 @@ export default function AdiOptimisationJourney({
     })
     : null;
 
+  // ── LEVEL 1 — OTHER OPTIONS, AND LEVEL 2 — THE LOW-FREQUENCY RESULT ──
+  // Both are pure reads of authorities already resolved above: the few options
+  // genuinely worth reviewing (the option that IS the current decision is never
+  // repeated, and no candidate list is shown), and the three facts the decision
+  // rests on, in the display authority's whole numbers only. No raw value, id or
+  // fingerprint is stated in the normal experience.
+  const { otherOptions, lowFrequency: lowFrequencyResult } = buildOptimiserPanelHierarchy({
+    planView,
+    summary,
+    calibrationDecision: calibrationApplyEvidence,
+    p20Headline,
+    recommendedRow,
+    running: isRunning,
+  });
+
+  // ── LEVEL 3 — THE DEVELOPER GATE ──
+  // Every internal diagnostic on this card is rendered only for a Sound Proof
+  // admin with the internal debug mode switched on. A dealer never sees one, and
+  // nothing is deleted: the evidence is still saved and still readable here.
+  const showDeveloperDiagnostics = useOptimiserDeveloperDiagnostics();
+
+  // THE DESIGN OPPORTUNITY — stated only when ADI really has an actionable
+  // physical option to consider. No "no design change was applied" box is ever
+  // drawn.
+  const designOpportunity = (designChangeList.length > 0
+    || Boolean(summary.seatingRecommendation)
+    || placement?.kind === PLACEMENT_KIND.RECOMMENDED)
+    ? (
+      <AdiDesignRecommendationSection
+        designChanges={designChangeList}
+        seatingRecommendation={summary.seatingRecommendation}
+        recommendation={designRecommendation}
+        placementStated={Boolean(placement?.kind)}
+      />
+    )
+    : null;
+
   // Everything the disclosure renders, resolved ONCE here and handed over as one
   // object: the extracted sections resolve nothing of their own, so the evidence
   // they state can only be what the authorities above resolved.
@@ -905,26 +947,39 @@ export default function AdiOptimisationJourney({
         </div>
       )}
 
-      {/* ── LAYER 4 — ENGINEER DETAILS ── collapsed by default, and below the
-          primary action. Every technical detail — lever order, per-family
-          counts, candidate ledger, fingerprints, limits, comparison and method —
-          lives here, never in the default panel. */}
+      {/* ── LEVEL 1 (continued) — OTHER OPTIONS ── the few genuinely useful
+          alternatives beside the ONE decision. Each is reviewed on its own, no
+          Apply is offered per candidate, and the option that is already the
+          decision is never repeated here. */}
+      {!isRunning && <AdiOtherOptions options={otherOptions} />}
+
+      {/* ── LEVEL 2 — TECHNICAL DETAILS ── collapsed, and below the primary
+          action. The concise professional summary: what ADI checked, the
+          low-frequency result, the grouping it searched on and any actionable
+          design option. Every raw diagnostic — fingerprints, ids, per-candidate
+          detail, cache and job internals, search-space totals, run workload —
+          is one level further down, behind the developer gate. */}
       <details className="rounded-md border border-[#E7E5E0] bg-white px-3 py-2" data-adi-engineer-details="true">
         <summary className="cursor-pointer text-[11px] font-semibold text-[#625143]">
           {ADI_ENGINEER_DETAILS_TITLE}
         </summary>
         <div className="mt-2 space-y-3">
-          {/* FOUR SHORT GROUPS — what was tested, the best calibration result, the
-              best design change and, when nothing was found, why. Every raw block
-              below lives behind the panel's own second disclosure. */}
+          {/* LEVEL 2'S CONCISE GROUPS — what ADI checked, the low-frequency
+              result, the grouping it searched on and any actionable design option
+              — with LEVEL 3 (developer diagnostics) nested in the panel's own
+              second disclosure, drawn ONLY under the internal debug gate. */}
           <AdiEngineerDetailsPanel
             rows={summary.rows}
-            bestCalibrationResult={bestCalibrationResult}
-            seatingRecommendation={summary.seatingRecommendation}
+            lowFrequency={lowFrequencyResult}
+            groups={<AdiSubwooferGroupingBlock instances={instances} roomDims={roomDims} />}
+            treatment={summary.absorption}
+            design={designOpportunity}
             whyNoImprovement={whyNoImprovement}
             whyTitle={outcome === OPTIMISER_OUTCOME.NO_IMPROVEMENTS
               ? "Why no improvement"
               : "Why the evaluation stopped"}
+            // LEVEL 3 is drawn only under the internal debug gate.
+            showDiagnostics={showDeveloperDiagnostics}
           >
           {/* The old candidate the re-test state keeps off the main panel: what it
               changes, what it was measured on, the reason it was not applied and
@@ -939,16 +994,16 @@ export default function AdiOptimisationJourney({
             />
           )}
 
-          {/* Every evidence group behind the decision, in the order it was
-              stated, extracted to AdiJourneyEngineerDetailsSections so this
-              component stays the orchestration layer. The two blocks the
-              disclosure's own ordering is anchored on — the previous candidate
-              above, the pre-run estimate below — remain here. */}
+          {/* LEVEL 3 — every raw evidence group behind the decision, extracted to
+              AdiJourneyEngineerDetailsSections so this component stays the
+              orchestration layer. Developer diagnostics only: fingerprints, ids,
+              per-candidate detail, cache and job internals. */}
           <AdiJourneyEngineerDetailsSections view={engineerDetailsView} />
 
-          {/* The pre-run statement of the work: how many design options ADI will
-              evaluate and the acoustic calculations behind them. Stated ONCE, in
-              Engineer details — the main panel offers the action. */}
+          {/* LEVEL 3 — the pre-run search-space totals (how many design options
+              ADI will evaluate and the acoustic calculations behind them). Search
+              totals are engineering detail, never part of the normal result: the
+              main panel offers the action and the run states its live progress. */}
           {showEstimate && (
             <div className="space-y-1">
               <OptimiserCalculationEstimateLine

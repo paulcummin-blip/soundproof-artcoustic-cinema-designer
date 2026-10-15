@@ -1,10 +1,17 @@
 // AdiJourneyEngineerDetailsSections.jsx
 // ---------------------------------------------------------------------------
-// THE ENGINEER DETAILS SECTIONS of the Bass Optimisation card.
+// LEVEL 3 — THE DEVELOPER DIAGNOSTICS SECTIONS of the Bass Optimisation card.
 //
-// Extracted verbatim from AdiOptimisationJourney.jsx so the journey stays the
-// orchestration layer: this renders the evidence groups that live inside the
-// card's collapsed disclosure, in exactly the order they were stated in.
+// Fingerprints, candidate ids, per-candidate counts, grouped-delay arrays, the
+// absolute saved processor delays, cache and canonical-job internals, the run's
+// own workload and its recorded rejection reasons. Rendered ONLY when the
+// internal debug gate is on (useOptimiserDeveloperDiagnostics) — a dealer never
+// sees one. Nothing here is deleted or suppressed anywhere else: the evidence is
+// still saved, and every report and proposal still consumes it.
+//
+// Extracted from AdiOptimisationJourney.jsx so the journey stays the
+// orchestration layer: this renders the evidence groups in exactly the order they
+// were stated in.
 //
 // It resolves NOTHING. Every value arrives already resolved by the authorities
 // the journey read — the designer summary, the calibration decision, the saved
@@ -28,10 +35,8 @@ import AdiTestedOptionsTable from "./AdiTestedOptionsTable.jsx";
 import AdiAbsoluteGroupDelays from "./AdiAbsoluteGroupDelays.jsx";
 import AcousticDelayAlignmentCard from "@/components/room/bass/improveBassV2/AcousticDelayAlignmentCard.jsx";
 import OptimisationPlanStatus from "./OptimisationPlanStatus.jsx";
-import AdiDesignRecommendationSection from "./AdiDesignRecommendationSection.jsx";
 import PlacementRecommendationPanel from "./PlacementRecommendationPanel.jsx";
 import AdiRecommendationEvidenceGroups from "./AdiRecommendationEvidenceGroups.jsx";
-import AdiSubwooferGroupingBlock from "./AdiSubwooferGroupingBlock.jsx";
 import AdiJourneyRunWorkloadBlock from "./AdiJourneyRunWorkloadBlock.jsx";
 import { FUTURE_CAPABILITY_TITLE } from "./optimiserLiveFamilies.js";
 import { PLACEMENT_PREVIEW_UNAVAILABLE } from "./placementMoveAuthority.js";
@@ -77,9 +82,7 @@ export default function AdiJourneyEngineerDetailsSections({ view = {} }) {
     onUndoLever = null,
     leverApplyBusy = null,
     leverOutcome = null,
-    designChanges = [],
     seatingRecommendation = null,
-    designRecommendation = null,
     placement = null,
     isRunning = false,
     absorption = null,
@@ -247,17 +250,6 @@ export default function AdiJourneyEngineerDetailsSections({ view = {} }) {
         />
       )}
 
-      {/* The physical change ADI recommends but has NOT applied: the move, the
-          result measured for it, the reason behind it and the destination
-          checks. Only the designer may approve it, so its controls are on the
-          main panel and its reasoning is here. */}
-      <AdiDesignRecommendationSection
-        designChanges={designChanges}
-        seatingRecommendation={seatingRecommendation}
-        recommendation={designRecommendation}
-        placementStated={Boolean(placement?.kind)}
-      />
-
       {/* The placement evidence behind the move the panel states: what
           placement means here, the designer's own distances per wall group,
           the expected result in whole dB and the on-plan status. Its controls
@@ -286,16 +278,10 @@ export default function AdiJourneyEngineerDetailsSections({ view = {} }) {
         </div>
       )}
 
-      {/* How the physical subwoofer layout was grouped for the electronic
-          searches — one, two, three or four active sources, grouped from
-          where each source actually sits. Stated here, in Engineer details,
-          because the grouped results below are read against it. */}
-      <AdiSubwooferGroupingBlock instances={instances} roomDims={roomDims} />
-
-      {/* THE RUN'S OWN WORKLOAD — measurement only: what the declared search
-          space defines per stage for this design, the live job count the
-          engine has published, the time each has taken and the candidates it
-          confirmed canonically. */}
+      {/* THE RUN'S OWN WORKLOAD — DEVELOPER DIAGNOSTICS ONLY. It is measurement,
+          not a result: after a run the designer no longer needs it, so it is
+          never stated in the normal view (a run in progress states its useful
+          live progress on the card itself). */}
       {workload && <AdiJourneyRunWorkloadBlock workload={workload} />}
     </>
   );

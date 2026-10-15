@@ -30,6 +30,7 @@
 // ---------------------------------------------------------------------------
 
 import { CALIBRATION_APPLY_DECISION } from "@/components/room/bass/optimiseWorkflow/adiCalibrationAutoApplyAuthority.js";
+import { deviationText } from "./optimiserWholeNumberDb.js";
 
 /** Which case the completed improvement is. */
 export const IMPROVEMENT_CASE = Object.freeze({
@@ -74,18 +75,17 @@ const FAMILY_LABEL = Object.freeze({
   allpass: "Phase / crossover region",
 });
 
-const finite = (value) => {
-  const numeric = Number(value);
-  return Number.isFinite(numeric) ? numeric : null;
-};
-
-/** "±15 dB · L2" — the whole-dB deviation with its level, or null. */
+/**
+ * "±15 dB · L2" — the whole-dB deviation with its level, or null.
+ *
+ * The deviation goes through the ONE display authority (floored whole dB), so a
+ * before → after pair on this card states exactly the values every other surface
+ * shows and no decimal ever reaches the designer.
+ */
 function variationText(side) {
-  const deviation = finite(side?.p20?.deviationDb);
+  const text = deviationText(side?.p20?.deviationDb);
   const level = side?.p20?.level || null;
-  if (deviation == null) return level || null;
-  const magnitude = Math.abs(deviation);
-  const text = `\u00b1${Number.isInteger(magnitude) ? magnitude : magnitude.toFixed(1)} dB`;
+  if (!text) return level || null;
   return level ? `${text} \u00b7 ${level}` : text;
 }
 

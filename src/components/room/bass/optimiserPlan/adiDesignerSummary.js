@@ -77,7 +77,10 @@ import {
 } from "./optimiserCalibrationEvidence.js";
 
 export const ADI_TESTED_TITLE = "What ADI tested";
-export const ADI_ENGINEER_DETAILS_TITLE = "Engineer details";
+// LEVEL 2 of the card's information hierarchy: the concise professional summary
+// a cinema designer or calibrator reads. Developer diagnostics live one level
+// further down, behind the internal debug gate.
+export const ADI_ENGINEER_DETAILS_TITLE = "Technical details";
 export const ADI_ACTION_NONE = "—";
 
 export const ADI_STALE_COPY = Object.freeze({

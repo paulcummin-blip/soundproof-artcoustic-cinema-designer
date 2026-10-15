@@ -22,7 +22,6 @@ import AdiBeforeAfterResult from "./AdiBeforeAfterResult.jsx";
 import {
   ADI_BEST_IMPROVEMENT_LABEL,
   ADI_DESIGN_NOT_APPLIED,
-  ADI_NO_DESIGN_CHANGE_APPLIED,
   ADI_PREDICTED_RESULT_LABEL,
   ADI_SECTION_TITLE,
 } from "./adiPanelSections.js";
@@ -44,6 +43,11 @@ export default function AdiDesignRecommendationSection({
     || Boolean(seatingRecommendation)
     || Boolean(recommendation)
     || placementStated === true;
+
+  // A DESIGN OPPORTUNITY is stated only when there is one to consider. An empty
+  // box reading "No physical design change was applied." tells the designer
+  // nothing and is never drawn.
+  if (!hasDesignContent) return null;
 
   return (
     <div
@@ -111,7 +115,7 @@ export default function AdiDesignRecommendationSection({
       {children}
 
       <div className="text-[11px] font-medium text-[#8A5A2B] leading-relaxed">
-        {hasDesignContent ? ADI_DESIGN_NOT_APPLIED : ADI_NO_DESIGN_CHANGE_APPLIED}
+        {ADI_DESIGN_NOT_APPLIED}
       </div>
     </div>
   );

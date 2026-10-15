@@ -8,7 +8,11 @@
 //   YOU GAIN                        YOU GIVE UP
 //   Overall bass consistency        Row 1 - Seat 2
 //   ±15 dB → ±12 dB                 Worsens by 1.2 dB
-//   Approximately 2 dB better
+//   3 dB better
+//
+// The gain is the DISPLAYED delta of the pair above it (the two displayed whole
+// dB endpoints), so it always adds up with them. The give-up amount is the
+// run's own retained regression evidence and stays exactly as recorded.
 //
 //   P19 response quality — Unchanged · L4
 //

@@ -1,19 +1,25 @@
 // AdiEngineerDetailsPanel.jsx
 // ---------------------------------------------------------------------------
-// ENGINEER DETAILS — the concise, grouped summary behind the panel's outcome.
+// LEVEL 2 — TECHNICAL DETAILS: the concise professional summary behind the
+// panel's result, for a cinema designer or calibrator.
 //
-// Collapsed by default by its parent, and four short groups only:
+// It states three things, and nothing more:
 //
-//   1. Test summary             what ADI evaluated, and what it did not
-//   2. Best calibration result  the result ADI's own decision named, with its
-//                               P19/P20 before → after and how it stands
-//   3. Best design change       the physical change only the designer may approve
-//   4. Why no improvement       one short reason, when nothing was found
+//   1. WHAT ADI CHECKED     one line per family — tested, and its own outcome
+//   2. LOW-FREQUENCY RESULT P19, the P20 pair and the limiting region
+//   3. SUBWOOFER GROUPS     the optimisation groups the searches acted on
 //
-// Everything else the card can prove — per-candidate counts, raw fingerprints,
-// ids, the full tested table, the per-lever detail and the run's own diagnostics
-// — arrives as children and is rendered inside the second, developer-only
-// disclosure. A designer therefore reads four short groups, and never a log.
+// …plus, only when they genuinely exist: an actionable design option, the
+// concise low-frequency treatment advice, and one short reason when nothing was
+// found.
+//
+// Everything raw — fingerprints, candidate ids, per-candidate counts, the full
+// tested table, absolute delay arrays, cache and job internals, search-space
+// totals, persistence diagnostics — belongs to LEVEL 3 (developer diagnostics),
+// rendered inside the second disclosure and ONLY when the internal debug gate is
+// on (useOptimiserDeveloperDiagnostics). A dealer therefore never reads a log,
+// and nothing is deleted: the evidence is still saved and still readable under
+// the gate.
 //
 // Presentation only: every value arrives already resolved by the authorities. No
 // figure is calculated here, no claim is re-worded and nothing is re-evaluated.
@@ -37,8 +43,24 @@ const EVALUATED_STATUS = new Set([
 ]);
 
 /**
+ * An outcome that is GUIDANCE rather than a result ("Re-run the Bass Optimiser
+ * to evaluate this lever"). The checked list states what the evaluation found;
+ * the action belongs to the panel's own control, not beside a family name.
+ */
+const GUIDANCE_OUTCOME = /^(re-run|run the bass optimiser|previous result found|tried only|compare subwoofer models)/i;
+
+/** One short outcome phrase, or null when the row carries none to state. */
+function checkedOutcome(row) {
+  const text = typeof row?.outcome === "string" ? row.outcome.trim() : "";
+  if (!text || GUIDANCE_OUTCOME.test(text)) return null;
+  const first = text.split(/(?<=\.)\s/)[0].trim();
+  return first.length <= 64 ? first : `${first.slice(0, 63).trimEnd()}…`;
+}
+
+/**
  * One line per evaluated family: tested / not tested, and — for the advice row,
  * which is a consideration rather than a search — considered / not considered.
+ * A family the evaluation reached also states its own outcome.
  */
 export function adiTestedSummaryLines(rows = []) {
   return (Array.isArray(rows) ? rows : [])
@@ -48,83 +70,85 @@ export function adiTestedSummaryLines(rows = []) {
       const state = row.advice
         ? (evaluated ? "considered" : "not considered")
         : (evaluated ? "tested" : "not tested");
-      return { key: row.key, label: row.label || row.key, state };
+      return { key: row.key, label: row.label || row.key, state, outcome: checkedOutcome(row) };
     })
     .filter(Boolean);
+}
+
+/** "±15 dB → ±12 dB" — the low-frequency pair, or whichever side exists. */
+function p20PairText(beforeText, afterText) {
+  if (beforeText && afterText) return `${beforeText} → ${afterText}`;
+  return afterText || beforeText || null;
 }
 
 export default function AdiEngineerDetailsPanel({
   // The evaluated families, already resolved by the summary authority.
   rows = [],
-  // The best calibration result the run's own decision named.
-  bestCalibrationResult = null,
-  // The physical change ADI recommends and may never apply.
-  seatingRecommendation = null,
+  // LEVEL 2's low-frequency result, already resolved: { p19, p20Before, p20After,
+  // limiting } — every value whole-number formatted by the display authority.
+  lowFrequency = null,
+  // The optimisation groups the searches acted on (subwoofer grouping block).
+  groups = null,
+  // The concise low-frequency treatment advice, when the evidence warrants it.
+  treatment = null,
+  // An ACTIONABLE design option only — never an empty "no change was applied" box.
+  design = null,
   // One short reason when nothing useful was found, or the run did not finish.
   whyNoImprovement = null,
   whyTitle = "Why no improvement",
+  // LEVEL 3 — the internal debug gate (useOptimiserDeveloperDiagnostics).
+  showDiagnostics = false,
   className = "",
   children = null,
 }) {
-  const tested = adiTestedSummaryLines(rows);
-  const calibration = bestCalibrationResult || null;
-  const calibrationHeldReason = calibration?.heldLevers?.[0]?.statement || null;
-  const design = seatingRecommendation || null;
+  const checked = adiTestedSummaryLines(rows);
+  const p19 = lowFrequency?.p19 || null;
+  const p20Pair = p20PairText(lowFrequency?.p20Before, lowFrequency?.p20After);
+  const limiting = lowFrequency?.limiting || null;
+  const hasLowFrequency = Boolean(p19 || p20Pair || limiting);
 
   return (
     <div className={`space-y-3 ${className}`} data-adi-engineer-summary="true">
-      {/* 1. TEST SUMMARY — what was evaluated, in the designer's words. */}
-      {tested.length > 0 && (
+      {/* 1. WHAT ADI CHECKED — what was evaluated, in the designer's words. */}
+      {checked.length > 0 && (
         <div className="space-y-0.5" data-adi-test-summary="true">
-          <div className={GROUP_TITLE_CLASS}>Test summary</div>
-          {tested.map((line) => (
+          <div className={GROUP_TITLE_CLASS}>What ADI checked</div>
+          {checked.map((line) => (
             <div key={line.key} className={LINE_CLASS}>
               {line.label}: {line.state}
+              {line.outcome ? ` · ${line.outcome}` : ""}
             </div>
           ))}
         </div>
       )}
 
-      {/* 2. BEST CALIBRATION RESULT — what it was, its before → after, and how
-          it stands. The settings it touches and its candidate detail stay in the
-          diagnostics below. */}
-      {calibration && (
-        <div className="space-y-0.5" data-adi-best-calibration="true">
-          <div className={GROUP_TITLE_CLASS}>Best calibration result</div>
-          {calibration.headline && <div className={LINE_CLASS}>{calibration.headline}</div>}
-          {calibration.valuesStatement && (
-            <div className={LINE_CLASS}>{calibration.valuesStatement}</div>
-          )}
-          <div className={LINE_CLASS}>
-            {calibration.stateLabel}
-            {calibration.applied ? " — applied to this design." : " — not applied."}
-          </div>
-          {!calibration.applied && calibrationHeldReason && (
-            <div className={LINE_CLASS}>{calibrationHeldReason}</div>
-          )}
+      {/* 2. THE ACTIONABLE DESIGN OPTION — only when there is one to consider. */}
+      {design}
+
+      {/* 3. LOW-FREQUENCY RESULT — the three facts the decision rests on. */}
+      {hasLowFrequency && (
+        <div className="space-y-0.5" data-adi-low-frequency-result="true">
+          <div className={GROUP_TITLE_CLASS}>Low-frequency result</div>
+          {p19 && <div className={LINE_CLASS}>P19: {p19}</div>}
+          {p20Pair && <div className={LINE_CLASS}>P20: {p20Pair}</div>}
+          {limiting && <div className={LINE_CLASS}>Limiting region: Approximately {limiting}</div>}
         </div>
       )}
 
-      {/* 3. BEST DESIGN CHANGE — the move itself, its result, and the one thing
-          the designer has to do about it. */}
-      {design && (
-        <div className="space-y-0.5" data-adi-best-design="true">
-          <div className={GROUP_TITLE_CLASS}>Best design recommendation</div>
-          {design.movementLabel && <div className={LINE_CLASS}>{design.movementLabel}</div>}
-          <div className={LINE_CLASS}>
-            Requires your approval — ADI never applies a physical design change.
-          </div>
-          {(design.p20Before || design.p20After) && (
-            <div className={LINE_CLASS}>
-              P20: {design.p20Before || "—"} → {design.p20After || "—"}
-              {design.p20LevelAfter ? ` · ${design.p20LevelAfter}` : ""}
-            </div>
-          )}
-          {design.p19Delta && <div className={LINE_CLASS}>P19: {design.p19Delta}</div>}
+      {/* 4. LOW-FREQUENCY TREATMENT — concise advice, never a claim about an
+          exact treatment location the evidence does not support. */}
+      {treatment?.reason && (
+        <div className="space-y-0.5" data-adi-treatment-advice="true">
+          <div className={GROUP_TITLE_CLASS}>Low-frequency treatment</div>
+          <div className={LINE_CLASS}>{treatment.reason}</div>
+          {treatment.location && <div className={LINE_CLASS}>{treatment.location}</div>}
         </div>
       )}
 
-      {/* 4. WHY NO IMPROVEMENT — one short reason, never a paragraph. */}
+      {/* 5. SUBWOOFER GROUPS — the layout the grouped searches acted on. */}
+      {groups}
+
+      {/* 6. WHY NO IMPROVEMENT — one short reason, never a paragraph. */}
       {whyNoImprovement && (
         <div className="space-y-0.5" data-adi-why-no-improvement="true">
           <div className={GROUP_TITLE_CLASS}>{whyTitle}</div>
@@ -132,10 +156,10 @@ export default function AdiEngineerDetailsPanel({
         </div>
       )}
 
-      {/* DEVELOPER DIAGNOSTICS — everything raw, behind its own second
-          disclosure: fingerprints, ids, per-candidate counts, the full tested
-          table, the absolute delays and the run's own rejection reasons. */}
-      {children && (
+      {/* LEVEL 3 — DEVELOPER DIAGNOSTICS. Rendered only under the internal debug
+          gate: fingerprints, ids, per-candidate detail, cache and job internals,
+          run workload and the run's own rejection reasons. */}
+      {showDiagnostics && children && (
         <details
           className="rounded-md border border-[#E7E5E0] bg-[#FAF9F6] px-3 py-2"
           data-adi-developer-diagnostics="true"

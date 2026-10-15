@@ -33,8 +33,13 @@ import {
   CALIBRATION_APPLY_REASON,
 } from "../optimiseWorkflow/adiCalibrationAutoApplyAuthority.js";
 import { formatSeatLabel } from "@/components/utils/seatLabel";
-import { floorP19P20Delta, floorP19P20Deviation } from "@/components/utils/rp22/resolveRp22DesignValue";
+import { floorP19P20Deviation } from "@/components/utils/rp22/resolveRp22DesignValue";
 import { deltaText, deviationText, levelText, wholeDbImprovement } from "./optimiserWholeNumberDb.js";
+import {
+  displayDeltaDb,
+  displayDeltaPhrase,
+  displayImprovementText,
+} from "./optimiserDisplayDelta.js";
 
 /** The one headline a trade-off states. */
 export const TRADE_OFF_HEADLINE =
@@ -103,16 +108,6 @@ export function tradeOffApplySentence(seatLabel, amountText = null) {
   return amountText
     ? `This change improves overall bass consistency, but makes ${seatLabel} worse by ${amountText}.`
     : `This change improves overall bass consistency, but makes ${seatLabel} worse.`;
-}
-
-/**
- * "Approximately 2 dB better" — the improvement the run recorded, in whole dB.
- * The magnitude is floored, so a gain is never overstated; a gain of under a
- * whole decibel states no figure at all.
- */
-function approximateGainText(deltaDb) {
-  const whole = floorP19P20Delta(deltaDb);
-  return whole != null && whole > 0 ? `Approximately ${whole} dB better` : null;
 }
 
 /**
@@ -204,6 +199,16 @@ function directionFor(beforeDb, afterDb) {
     : TRADE_OFF_DIRECTION.WORSENS;
 }
 
+/**
+ * The displayed whole-dB value inside a formatted P19/P20 string
+ * ("±15 dB · L1" → 15). Produced by this module's own display authority, so the
+ * read is exact rather than guessed.
+ */
+function displayedDbOf(text) {
+  const match = /\u00b1(\d+)\s*dB/.exec(String(text ?? ""));
+  return match ? Number(match[1]) : null;
+}
+
 /** "1 dB worse" / "1 dB better" / "no meaningful change". */
 function deltaPhrase(direction, delta) {
   const text = deltaText(delta);
@@ -214,9 +219,19 @@ function deltaPhrase(direction, delta) {
   return text;
 }
 
-/** One comparison row of the review. */
+/**
+ * One comparison row of the review.
+ *
+ * THE DISPLAYED DELTA: the change stated beside a before → after pair is the
+ * difference between the two DISPLAYED endpoints, so the two always add up
+ * (±15 dB → ±12 dB reads "3 dB better"). A row that carries its own recorded
+ * amount — an affected seat's retained regression evidence ("1.2 dB") — keeps
+ * that figure exactly as recorded.
+ */
 function row({ key, group, label, before, after, pair = null, levelBefore = null, levelAfter = null, direction, delta, deltaLabel, force = false, pairKnown = true }) {
   if (!before && !after && !force) return null;
+  const displayedDelta = displayDeltaPhrase(displayedDbOf(before), displayedDbOf(after));
+  const resolvedDelta = deltaLabel != null ? deltaLabel : (displayedDelta || deltaPhrase(direction, delta));
   return {
     key,
     group,
@@ -233,7 +248,7 @@ function row({ key, group, label, before, after, pair = null, levelBefore = null
     after: pairKnown ? (after || "—") : null,
     pairKnown,
     direction: direction || TRADE_OFF_DIRECTION.UNCHANGED,
-    delta: deltaLabel != null ? deltaLabel : deltaPhrase(direction, delta),
+    delta: resolvedDelta,
   };
 }
 
@@ -262,7 +277,12 @@ function overallRows(decision) {
       levelBefore: levelText(before?.p20?.level),
       levelAfter: levelText(after?.p20?.level),
       direction: directionFor(before?.p20?.deviationDb, after?.p20?.deviationDb),
-      delta: finite(improvement?.p20DeltaDb) ?? finite(damage?.p20WorseDb),
+      // THE DISPLAYED DELTA: the two displayed endpoints themselves, so the
+      // change stated beside the pair always equals A − B (±15 dB → ±12 dB reads
+      // "3 dB better"). The full-precision delta behind them is never printed
+      // beside rounded endpoints.
+      delta: displayDeltaDb(before?.p20?.deviationDb, after?.p20?.deviationDb),
+      deltaLabel: displayDeltaPhrase(before?.p20?.deviationDb, after?.p20?.deviationDb),
     }),
     row({
       key: "p19",
@@ -358,7 +378,11 @@ function seatRows(decision, regression) {
     // still states the seat and the exact amount it loses: the row is never
     // dropped, and no absolute value is ever invented to fill the pair.
     const pairKnown = Boolean(beforeText || afterText);
-    const recordedAmount = isAffected && !pairKnown && regression.rawDeltaDb != null
+    // THE RECORDED REGRESSION AMOUNT IS RETAINED EVIDENCE. Where the run kept the
+    // exact amount a protected seat loses ("1.2 dB"), that figure labels the row
+    // beside its own values, exactly as recorded — it is never converted to the
+    // whole-number display rule the ordinary before → after rows follow.
+    const recordedAmount = isAffected && regression.rawDeltaDb != null
       ? recordedAmountText(regression.rawDeltaDb)
       : null;
 
@@ -477,20 +501,15 @@ export function resolveTradeOffState({ decision = null, kept = false } = {}) {
     ? `Overall bass consistency improves, but ${seat.label} gets worse.`
     : "Overall bass consistency improves, but one protected measure gets worse.";
 
-  // The recorded improvement in whole dB, floored so a gain is never overstated.
-  // The run's own recorded delta is preferred; a record that kept only the two
-  // deviations states the difference between them.
-  const p20GainDb = finite(improvement?.p20DeltaDb)
-    ?? (finite(record.before?.p20?.deviationDb) != null && finite(record.after?.p20?.deviationDb) != null
-      ? Number(record.after.p20.deviationDb) - Number(record.before.p20.deviationDb)
-      : null);
-
+  // THE DISPLAYED IMPROVEMENT, derived from the two displayed endpoints of the
+  // pair stated directly above it — see optimiserDisplayDelta.js. It therefore
+  // always adds up with that pair.
   const gain = p20Row && p20Row.direction === TRADE_OFF_DIRECTION.IMPROVES
     ? {
       title: "Overall bass consistency",
       metric: TRADE_OFF_METRIC.P20_LABEL,
       pair: p20Row.pair,
-      delta: approximateGainText(p20GainDb),
+      delta: displayImprovementText(record.before?.p20?.deviationDb, record.after?.p20?.deviationDb),
     }
     : null;
 
