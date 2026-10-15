@@ -63,7 +63,11 @@ const PHASE_SOURCE = readSource("../components/room/bass/improveBassV2/groupedPh
 const GAIN_SOURCE = readSource("../components/room/bass/improveBassV2/groupedGainSearch.js");
 const AUTHORITY_SOURCE = readSource("../components/room/bass/improveBassV2/subwooferGroupAuthority.js");
 const PRESENTATION_SOURCE = readSource("../components/room/bass/optimiserPlan/resolveOptimiserPresentationState.js");
-const JOURNEY_SOURCE = readSource("../components/room/bass/optimiserPlan/AdiOptimisationJourney.jsx");
+// The card is read as ONE unit: the journey composes the disclosure's evidence
+// groups (including the subwoofer grouping block) from
+// AdiJourneyEngineerDetailsSections in place.
+const JOURNEY_SOURCE = readSource("../components/room/bass/optimiserPlan/AdiOptimisationJourney.jsx")
+  + readSource("../components/room/bass/optimiserPlan/AdiJourneyEngineerDetailsSections.jsx");
 
 const ROOM = { widthM: 6, lengthM: 7, heightM: 2.7 };
 

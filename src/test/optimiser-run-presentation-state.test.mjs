@@ -629,7 +629,10 @@ describe('TEST 9: the card receives the run evidence', () => {
   });
 
   it('reaches the card through the journey and the terminal branches', () => {
-    const journey = read('components/room/bass/optimiserPlan/AdiOptimisationJourney.jsx');
+    // The card is read as ONE unit: the journey composes the disclosure's
+    // evidence groups from AdiJourneyEngineerDetailsSections in place.
+    const journey = read('components/room/bass/optimiserPlan/AdiOptimisationJourney.jsx')
+      + read('components/room/bass/optimiserPlan/AdiJourneyEngineerDetailsSections.jsx');
     expect(journey).toMatch(/presentation\?\.evidence/);
     expect(journey).toMatch(/<OptimiserRunEvidenceBlock evidence=\{runEvidence\} seatCount=\{seatCount\} instances=\{instances\} \/>/);
 

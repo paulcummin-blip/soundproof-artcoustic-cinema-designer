@@ -974,6 +974,11 @@ export default function OptimiseAndCalculate({
             onReoptimiseCalibration={hasResults && !isStale ? runCalibrationAutoApply : null}
             reoptimiseBusy={isCalculating}
             reoptimiseDisabledReason={reoptimiseDisabledReason}
+            // The journey card's stall notice states the ONE cancel path, whose
+            // availability is owned solely by bassCalculationLifecycle. No
+            // second cancel action is created here.
+            canCancelRun={canCancel}
+            onCancelRun={handleCancel}
           />
         </div>
       )}

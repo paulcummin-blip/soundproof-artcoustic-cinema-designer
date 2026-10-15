@@ -42,7 +42,10 @@ import { OPTIMISER_PLAN_STATUS } from "../components/room/bass/optimiserPlan/opt
 
 const read = (relative) => fs.readFileSync(path.join(process.cwd(), relative), "utf8");
 
-const journey = read("src/components/room/bass/optimiserPlan/AdiOptimisationJourney.jsx");
+// The card is read as ONE unit: the journey composes the disclosure's evidence
+// groups from AdiJourneyEngineerDetailsSections in place.
+const journey = read("src/components/room/bass/optimiserPlan/AdiOptimisationJourney.jsx")
+  + read("src/components/room/bass/optimiserPlan/AdiJourneyEngineerDetailsSections.jsx");
 const summaryPanel = read("src/components/room/bass/optimiserPlan/AdiPanelSummary.jsx");
 const candidateDetails = read("src/components/room/bass/optimiserPlan/AdiPreviousCandidateDetails.jsx");
 const retestAuthority = read("src/components/room/bass/optimiserPlan/resolveRetestPresentation.js");
@@ -222,7 +225,10 @@ describe("MAIN PANEL EXPLAINS WHY RE-TEST IS NEEDED", () => {
     // WHY this one has to be checked again is not lost: the resolution states it,
     // and the panel renders the explanation inside Engineer details.
     expect(state.explanation).toContain(staleReason);
-    expect(journey).toMatch(/\{journey\.explanation && \(/);
+    // The stale reason is stated inside the disclosure, not on the main panel:
+    // the journey hands its own explanation to the extracted sections.
+    expect(journey).toMatch(/explanation: journey\.explanation,/);
+    expect(journey).toMatch(/\{explanation && \(/);
   });
 
   it("states what the previous run found without offering it as a recommendation", () => {

@@ -153,8 +153,13 @@ describe("the main panel stays client-readable", () => {
 
 describe("the calibration claim is evidence-backed", () => {
   it("keeps the detailed proof inside a collapsed Engineer details block", () => {
+    // The card is read as ONE unit: the journey composes the disclosure's
+    // evidence groups from AdiJourneyEngineerDetailsSections in place.
     const journey = fs.readFileSync(
       new URL("../components/room/bass/optimiserPlan/AdiOptimisationJourney.jsx", import.meta.url),
+      "utf8",
+    ) + fs.readFileSync(
+      new URL("../components/room/bass/optimiserPlan/AdiJourneyEngineerDetailsSections.jsx", import.meta.url),
       "utf8",
     );
     const openTag = journey.match(/<details[^>]*data-adi-engineer-details="true"[^>]*>/)?.[0] || "";
@@ -288,8 +293,13 @@ describe("a calibration result that makes P20 worse never leads the panel", () =
   });
 
   it("keeps the held candidate and its values in the collapsed Engineer details block", () => {
+    // The card is read as ONE unit: the journey composes the disclosure's
+    // evidence groups from AdiJourneyEngineerDetailsSections in place.
     const journey = fs.readFileSync(
       new URL("../components/room/bass/optimiserPlan/AdiOptimisationJourney.jsx", import.meta.url),
+      "utf8",
+    ) + fs.readFileSync(
+      new URL("../components/room/bass/optimiserPlan/AdiJourneyEngineerDetailsSections.jsx", import.meta.url),
       "utf8",
     );
     const openTag = journey.match(/<details[^>]*data-adi-engineer-details="true"[^>]*>/)?.[0] || "";

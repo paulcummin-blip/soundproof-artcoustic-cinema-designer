@@ -32,6 +32,10 @@ import { ADI_CALIBRATION_KIND } from "../components/room/bass/optimiserPlan/adiP
 const read = (path) => fs.readFileSync(new URL(`../${path}`, import.meta.url), "utf8");
 
 const JOURNEY = "components/room/bass/optimiserPlan/AdiOptimisationJourney.jsx";
+// The evidence groups inside the card's collapsed disclosure are rendered by
+// AdiJourneyEngineerDetailsSections, which the journey composes in place. The
+// two files are read as ONE card so every ordering assertion below still holds.
+const DETAILS_SECTIONS = "components/room/bass/optimiserPlan/AdiJourneyEngineerDetailsSections.jsx";
 const SUMMARY = "components/room/bass/optimiserPlan/AdiPanelSummary.jsx";
 
 /** The canonical before → after of the live applied-calibration case. */
@@ -270,7 +274,7 @@ describe("the copy removed from the main view reaches no headline", () => {
 });
 
 describe("the panel renders the decision first and the evidence in the disclosure", () => {
-  const journey = read(JOURNEY);
+  const journey = read(JOURNEY) + read(DETAILS_SECTIONS);
   const summary = read(SUMMARY);
   const detailsAt = journey.indexOf('data-adi-engineer-details="true"');
   const mainPanel = journey.slice(0, detailsAt);

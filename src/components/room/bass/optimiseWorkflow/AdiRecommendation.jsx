@@ -104,6 +104,11 @@ export default function AdiRecommendation({
   onReoptimiseCalibration = null,
   reoptimiseBusy = false,
   reoptimiseDisabledReason = null,
+  // THE ONE CANCEL PATH, for the journey card's stall notice. It is not a
+  // second cancel implementation: the workflow panel owns the action and the
+  // authority that decides its availability, and this forwards both unchanged.
+  canCancelRun = false,
+  onCancelRun = null,
 }) {
   // The design's own seat count, so the acoustic estimate spans this design's
   // seats rather than an assumed number.
@@ -403,6 +408,8 @@ export default function AdiRecommendation({
       // before/after) and the physical changes that remain the designer's call.
       appliedCalibrationEvidence={autoApplied?.calibration || null}
       designChanges={designChanges}
+      canCancelRun={canCancelRun}
+      onCancelRun={onCancelRun}
     />
   );
 }

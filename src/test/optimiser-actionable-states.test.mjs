@@ -275,7 +275,10 @@ describe("ACCEPTANCE 7: one primary action per state", () => {
   });
 
   it("draws the re-test control twice never: the calibration control stands down", () => {
-    const journey = read("components/room/bass/optimiserPlan/AdiOptimisationJourney.jsx");
+    // The disclosure's evidence groups are rendered by the extracted sections
+    // component; both are read as one card so nothing below changes meaning.
+    const journey = read("components/room/bass/optimiserPlan/AdiOptimisationJourney.jsx")
+      + read("components/room/bass/optimiserPlan/AdiJourneyEngineerDetailsSections.jsx");
     // The rule reads the re-test WORDING as well as the action, so a run control
     // worded as the re-test always owns it.
     expect(journey).toMatch(/runControlIsRetest = journey\.action === OPTIMISER_PRESENTATION_ACTION\.RETEST/);
@@ -287,7 +290,10 @@ describe("ACCEPTANCE 7: one primary action per state", () => {
   });
 
   it("keeps the re-test helper line directly under that one control", () => {
-    const journey = read("components/room/bass/optimiserPlan/AdiOptimisationJourney.jsx");
+    // The disclosure's evidence groups are rendered by the extracted sections
+    // component; both are read as one card so nothing below changes meaning.
+    const journey = read("components/room/bass/optimiserPlan/AdiOptimisationJourney.jsx")
+      + read("components/room/bass/optimiserPlan/AdiJourneyEngineerDetailsSections.jsx");
     const controlAt = journey.indexOf("{showAction && !panelShowsRerun && (");
     const helperAt = journey.indexOf("{OPTIMISER_RETEST_HELPER_SENTENCE}");
     const detailsAt = journey.indexOf("data-adi-engineer-details");
@@ -305,12 +311,18 @@ describe("ACCEPTANCE 8: Engineer details retain the diagnostics", () => {
   });
 
   it("renders the engine's own error text inside the Engineer details disclosure", () => {
+    // The disclosure is a <details> element in the journey that COMPOSES the
+    // extracted evidence sections in place, so the ordering that matters is:
+    // the sections sit inside the disclosure, and the engine's own error text
+    // is stated there.
     const journey = read("components/room/bass/optimiserPlan/AdiOptimisationJourney.jsx");
-    const technicalAt = journey.indexOf('data-adi-run-error="true"');
+    const sections = read("components/room/bass/optimiserPlan/AdiJourneyEngineerDetailsSections.jsx");
     const detailsAt = journey.indexOf("data-adi-engineer-details");
     const detailsCloseAt = journey.indexOf("</details>");
-    expect(technicalAt).toBeGreaterThan(detailsAt);
-    expect(technicalAt).toBeLessThan(detailsCloseAt);
+    const sectionsAt = journey.indexOf("<AdiJourneyEngineerDetailsSections");
+    expect(sectionsAt).toBeGreaterThan(detailsAt);
+    expect(sectionsAt).toBeLessThan(detailsCloseAt);
+    expect(sections.indexOf('data-adi-run-error="true"')).toBeGreaterThan(-1);
     // The main panel no longer prints the raw error at all.
     expect(journey).not.toMatch(/\{runStatus === "failed" && runError && \(/);
   });

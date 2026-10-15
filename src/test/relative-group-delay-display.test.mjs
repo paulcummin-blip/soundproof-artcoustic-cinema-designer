@@ -166,7 +166,10 @@ describe('A group that is not recorded is never guessed at', () => {
 describe('The panel wiring that carries the rule', () => {
   const pack = read('src/components/room/bass/optimiserPlan/AdiAppliedBassCalibration.jsx');
   const section = read('src/components/room/bass/optimiserPlan/AdiCalibrationSection.jsx');
-  const journey = read('src/components/room/bass/optimiserPlan/AdiOptimisationJourney.jsx');
+  // The card is read as ONE unit: the journey composes the disclosure's evidence
+  // groups from AdiJourneyEngineerDetailsSections in place.
+  const journey = read('src/components/room/bass/optimiserPlan/AdiOptimisationJourney.jsx')
+    + read('src/components/room/bass/optimiserPlan/AdiJourneyEngineerDetailsSections.jsx');
 
   it('leads the main panel with the relative statement', () => {
     expect(pack).toContain('<AdiRelativeGroupDelay display={relativeDelay} />');

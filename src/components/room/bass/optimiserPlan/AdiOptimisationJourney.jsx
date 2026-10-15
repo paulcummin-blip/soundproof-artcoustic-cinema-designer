@@ -39,7 +39,7 @@
 // ---------------------------------------------------------------------------
 
 import React, { useSyncExternalStore } from "react";
-import { Activity, AlertTriangle, ArrowRight, CheckCircle2, Loader2, Sparkles, X } from "lucide-react";
+import { AlertTriangle, ArrowRight, Loader2, Sparkles, X } from "lucide-react";
 import { useOptimiserPlanView } from "./useOptimiserPlanView.js";
 import { useImproveBassV2State } from "../improveBassV2/improveBassV2Store.js";
 import {
@@ -63,18 +63,10 @@ import {
   readOptimiserIgnored,
   subscribeOptimiserIgnored,
 } from "./optimiserIgnoreStore.js";
-import OptimisationPlanStatus from "./OptimisationPlanStatus.jsx";
-import OptimiserRunEvidenceBlock from "./OptimiserRunEvidenceBlock.jsx";
 import OptimiserCalculationEstimateLine from "./OptimiserCalculationEstimateLine.jsx";
 import OptimiserCalculationDetail from "./OptimiserCalculationDetail.jsx";
-import AdiSubwooferGroupingBlock from "./AdiSubwooferGroupingBlock.jsx";
-import AdiTestedOptionsTable from "./AdiTestedOptionsTable.jsx";
-import AdiTestedSection from "./AdiTestedSection.jsx";
-import AdiCalibrationSection from "./AdiCalibrationSection.jsx";
 import savedCalibrationDecision from "./savedCalibrationDecision.js";
 import { resolveBestCalibrationResult } from "./bestCalibrationResult.js";
-import AdiBestCalibrationResult from "./AdiBestCalibrationResult.jsx";
-import AdiDesignRecommendationSection from "./AdiDesignRecommendationSection.jsx";
 import AdiPanelSummary from "./AdiPanelSummary.jsx";
 import AdiImprovementResult from "./AdiImprovementResult.jsx";
 import AdiImprovementActions from "./AdiImprovementActions.jsx";
@@ -82,20 +74,13 @@ import { IMPROVEMENT_CASE, resolveImprovementResult } from "./improvementResultA
 import AdiTradeOffActions from "./AdiTradeOffActions.jsx";
 import { TRADE_OFF_KEPT_LABEL, TRADE_OFF_KEPT_SENTENCE } from "./optimiserTradeOffState.js";
 import AdiPreviousCandidateDetails from "./AdiPreviousCandidateDetails.jsx";
-import AdiRecommendationEvidenceGroups from "./AdiRecommendationEvidenceGroups.jsx";
 import { resolvePreviousCandidate, resolveRetestNeeded } from "./resolveRetestPresentation.js";
-import AdiEngineerEvidenceBlock from "./AdiEngineerEvidenceBlock.jsx";
-import AdiCalibrationEvidenceBlock from "./AdiCalibrationEvidenceBlock.jsx";
 import AdiDesignerActionBar from "./AdiDesignerActionBar.jsx";
 import PlacementRecommendationPanel from "./PlacementRecommendationPanel.jsx";
 import AdiBeforeAfterResult from "./AdiBeforeAfterResult.jsx";
-import AdiAppliedBassCalibration from "./AdiAppliedBassCalibration.jsx";
-import AdiAbsoluteGroupDelays from "./AdiAbsoluteGroupDelays.jsx";
 import ReoptimiseCalibrationAction from "./ReoptimiseCalibrationAction.jsx";
 import { useAppliedCalibrationAuthority } from "../appliedCalibrationAuthority/appliedCalibrationAuthorityStore.js";
 import { OPTIMISER_LEVER } from "./optimiserPlanConstants.js";
-import AcousticDelayAlignmentCard from "@/components/room/bass/improveBassV2/AcousticDelayAlignmentCard.jsx";
-import { PLACEMENT_PREVIEW_UNAVAILABLE } from "./placementMoveAuthority.js";
 import { PLACEMENT_KIND } from "./placementRecommendationAuthority.js";
 import { ADI_ENGINEER_DETAILS_TITLE, buildAdiDesignerSummary } from "./adiDesignerSummary.js";
 import {
@@ -106,11 +91,18 @@ import {
   resolveAdiPrimaryAction,
   resolveCalibrationSectionKind,
 } from "./adiPanelSections.js";
-import { FUTURE_CAPABILITY_TITLE } from "./optimiserLiveFamilies.js";
 import { readAuthoritativeP20Headline } from "./optimiserPlanMetrics.js";
 import { resolveAdiPanelHeadline } from "./adiPanelHeadline.js";
 import { resolveOptimiserCurrentP20 } from "./optimiserCurrentP20.js";
 import { buildRelativeGroupDelays } from "./relativeGroupDelayAuthority.js";
+import {
+  ADI_OPTIMISER_RUNNING_LABEL,
+} from "./optimiserRunProgressAuthority.js";
+import useOptimiserRunProgress from "./useOptimiserRunProgress.js";
+import { buildOptimiserRunWorkload } from "./optimiserRunWorkload.js";
+import AdiJourneyRunningPanel from "./AdiJourneyRunningPanel.jsx";
+import AdiJourneyEngineerDetailsSections from "./AdiJourneyEngineerDetailsSections.jsx";
+import { presentationThemeState, resolveAdiJourneyTheme } from "./adiJourneyTheme.js";
 
 // ONE primary control per state. Which layer owns it is decided by the layout
 // model (adiPanelSections.js); every other available action is drawn as a
@@ -118,67 +110,9 @@ import { buildRelativeGroupDelays } from "./relativeGroupDelayAuthority.js";
 const ADI_RUN_PRIMARY_CLASS = "inline-flex items-center gap-1.5 rounded-md bg-[#213428] px-5 py-2.5 text-[13px] font-semibold text-white transition-colors hover:bg-[#3E4349]";
 const ADI_RUN_SECONDARY_CLASS = "inline-flex items-center gap-1.5 rounded-md border border-[#D9D5CE] bg-white px-5 py-2.5 text-[13px] font-semibold text-[#213428] transition-colors hover:border-[#213428]";
 
-const STATE_THEME = {
-  [ADI_OPTIMISER_JOURNEY_STATE.OPTIMISATION_REQUIRED]: {
-    pill: { background: "#625143", color: "#FFFFFF" },
-    border: "#E0DCD5",
-    background: "#F4F1EC",
-    icon: Activity,
-    iconColor: "#625143",
-  },
-  [ADI_OPTIMISER_JOURNEY_STATE.REEVALUATION_REQUIRED]: {
-    pill: { background: "#B45309", color: "#FFFFFF" },
-    border: "#E8D5AE",
-    background: "#FDF6E9",
-    icon: AlertTriangle,
-    iconColor: "#B45309",
-  },
-  [ADI_OPTIMISER_JOURNEY_STATE.EVALUATION_INCOMPLETE]: {
-    pill: { background: "#625143", color: "#FFFFFF" },
-    border: "#E0DCD5",
-    background: "#F4F1EC",
-    icon: Activity,
-    iconColor: "#625143",
-  },
-  [ADI_OPTIMISER_JOURNEY_STATE.PLAN_AVAILABLE]: {
-    pill: { background: "#213428", color: "#FFFFFF" },
-    border: "#CFDCCF",
-    background: "#F4F7F4",
-    icon: Activity,
-    iconColor: "#213428",
-  },
-  [ADI_OPTIMISER_JOURNEY_STATE.NO_USEFUL_IMPROVEMENT]: {
-    pill: { background: "#625143", color: "#FFFFFF" },
-    border: "#E0DCD5",
-    background: "#F4F1EC",
-    icon: CheckCircle2,
-    iconColor: "#625143",
-  },
-  [ADI_OPTIMISER_JOURNEY_STATE.FAILED]: {
-    pill: { background: "#B91C1C", color: "#FFFFFF" },
-    border: "#F0C9C9",
-    background: "#FDF2F2",
-    icon: AlertTriangle,
-    iconColor: "#B91C1C",
-  },
-};
-
-/**
- * The canonical presentation state and the journey state share one theme: the
- * theme is a presentation concern, the copy comes from the resolver.
- */
-const PRESENTATION_THEME_KEY = Object.freeze({
-  [OPTIMISER_PRESENTATION_STATE.NO_RUN]: ADI_OPTIMISER_JOURNEY_STATE.OPTIMISATION_REQUIRED,
-  [OPTIMISER_PRESENTATION_STATE.RUNNING]: ADI_OPTIMISER_JOURNEY_STATE.OPTIMISATION_REQUIRED,
-  [OPTIMISER_PRESENTATION_STATE.STALE]: ADI_OPTIMISER_JOURNEY_STATE.REEVALUATION_REQUIRED,
-  // A trade-off is a decision waiting on the designer: the same attention tone a
-  // re-evaluation uses, never the "improvement" tone.
-  [OPTIMISER_PRESENTATION_STATE.TRADE_OFF]: ADI_OPTIMISER_JOURNEY_STATE.REEVALUATION_REQUIRED,
-  [OPTIMISER_PRESENTATION_STATE.PLAN_AVAILABLE]: ADI_OPTIMISER_JOURNEY_STATE.PLAN_AVAILABLE,
-  [OPTIMISER_PRESENTATION_STATE.EVALUATION_INCOMPLETE]: ADI_OPTIMISER_JOURNEY_STATE.EVALUATION_INCOMPLETE,
-  [OPTIMISER_PRESENTATION_STATE.NO_USEFUL_IMPROVEMENT]: ADI_OPTIMISER_JOURNEY_STATE.NO_USEFUL_IMPROVEMENT,
-  [OPTIMISER_PRESENTATION_STATE.FAILED]: ADI_OPTIMISER_JOURNEY_STATE.FAILED,
-});
+// The card's theme — the tone, icon, border and fill of each state — lives in
+// adiJourneyTheme.js. This component states the decision; the theme states how
+// the tone reads.
 
 export default function AdiOptimisationJourney({
   projectId = null,
@@ -220,6 +154,12 @@ export default function AdiOptimisationJourney({
   // but must not apply. Both are stated on the panel, in two separate layers.
   appliedCalibrationEvidence = null,
   designChanges = [],
+  // THE RUN'S OWN CANCEL — the one canonical cancel path and the authority that
+  // decides whether it is available (bassCalculationLifecycle, through the
+  // workflow panel that owns it). The running card states it in the stall
+  // notice and nothing else here cancels, applies or restarts a run.
+  canCancelRun = false,
+  onCancelRun = null,
   // One short line for a design that cannot meet its selected target.
   designLimitation = null,
   className = "",
@@ -260,7 +200,7 @@ export default function AdiOptimisationJourney({
   const journey = presentation && !parityBlocked
     ? {
       ...resolved,
-      state: PRESENTATION_THEME_KEY[presentation.state] || resolved.state,
+      state: presentationThemeState(presentation.state) || resolved.state,
       statusLabel: presentation.statusLabel,
       message: presentation.message,
       explanation: presentation.explanation || resolved.explanation,
@@ -282,9 +222,10 @@ export default function AdiOptimisationJourney({
     }
     : resolved;
 
-  const theme = STATE_THEME[journey.state]
-    || STATE_THEME[resolved.state]
-    || STATE_THEME[ADI_OPTIMISER_JOURNEY_STATE.OPTIMISATION_REQUIRED];
+  const theme = resolveAdiJourneyTheme({
+    journeyState: journey.state,
+    fallbackState: resolved.state,
+  });
   const Icon = theme.icon;
   const runEvidence = presentation?.evidence || null;
   const journeyStateKey = presentation?.state || resolved.state;
@@ -363,6 +304,16 @@ export default function AdiOptimisationJourney({
   // phase label and stage verdicts — so nothing here is inferred.
   const isRunning = runStatus === "running";
   const liveState = useImproveBassV2State(projectId, versionId);
+  // THE RUN'S LIVE PROGRESS — read from the engine's own published progress
+  // store and the run's identity. The hook adds no count, no stage and no
+  // percentage of its own: it ticks a clock while the run is in flight and
+  // re-reads the authorities for a status check.
+  const {
+    progress: runProgress,
+    stageElapsedSeconds: runStageElapsedSeconds,
+    checkStatus: checkRunStatus,
+    checkResult: runCheckResult,
+  } = useOptimiserRunProgress({ projectId, versionId, runStatus });
   const p20Headline = readAuthoritativeP20Headline(completedBassAuthority);
   const summary = buildAdiDesignerSummary({
     planView,
@@ -639,6 +590,75 @@ export default function AdiOptimisationJourney({
     summary,
   });
 
+  // ── THE RUN'S OWN WORKLOAD ──
+  // Measurement only, and stated in Engineer details: what the optimiser's
+  // declared search space defines per stage for THIS design, the job count the
+  // engine has published live, the time each has taken and the candidates it
+  // confirmed canonically. It changes no search, no range and no ranking.
+  const runWorkload = isRunning || runProgress.runId
+    ? buildOptimiserRunWorkload({
+      instances,
+      roomDims,
+      progress: runProgress,
+      stageElapsedSeconds: runStageElapsedSeconds,
+    })
+    : null;
+
+  // Everything the disclosure renders, resolved ONCE here and handed over as one
+  // object: the extracted sections resolve nothing of their own, so the evidence
+  // they state can only be what the authorities above resolved.
+  const engineerDetailsView = {
+    assessment,
+    why,
+    explanation: journey.explanation,
+    runError,
+    notes: journey.notes,
+    futureCapability: summary.futureCapability,
+    calibrationKind,
+    appliedEvidence: calibrationApplyEvidence,
+    appliedCalibration: persistedAppliedCalibration,
+    recommendation: calibrationRecommendation,
+    evidenceState: calibrationEvidenceState,
+    bestResult: bestCalibrationResult,
+    instances,
+    roomDims,
+    testedRows: summary.rows,
+    currentP20Text: summary.currentP20,
+    recommendedP20Text: summary.recommendedP20,
+    runBaselineDiffers: currentP20.runBaselineDiffers,
+    runBaselineDeviation: currentP20.runBaselineDeviation,
+    runEvidence,
+    seatCount,
+    limitingFrequencyHz: p20Headline?.worstFrequencyHz ?? null,
+    limitingSeatId: p20Headline?.worstSeatId ?? null,
+    designFingerprint: currentDesignFingerprint,
+    resultFingerprint: p20Headline?.fingerprint ?? null,
+    parityStatus: planView?.baselineParity?.status ?? null,
+    calibrationEvidence: summary.calibrationEvidence,
+    summary,
+    delayLever,
+    absoluteDelaySettings: Array.isArray(calibrationApplyEvidence?.settings)
+      ? calibrationApplyEvidence.settings
+      : [],
+    showPlan: journey.showPlan,
+    projectId,
+    versionId,
+    completedBassAuthority,
+    seatingPositions,
+    onApplyLever,
+    onUndoLever,
+    leverApplyBusy,
+    leverOutcome,
+    designChanges: designChangeList,
+    seatingRecommendation: summary.seatingRecommendation,
+    designRecommendation,
+    placement,
+    isRunning,
+    absorption: summary.absorption,
+    attemptsWithoutGain: summary.attemptsWithoutGain,
+    workload: runWorkload,
+  };
+
   return (
     <div
       className={`rounded-lg border px-4 py-3 space-y-3 ${className}`}
@@ -818,13 +838,30 @@ export default function AdiOptimisationJourney({
           stating the state. The wording never changes — only the pill and the
           spinner change. */}
       {isRunning && (
-        <div
-          className="inline-flex items-center gap-2 rounded-md bg-[#213428] px-5 py-2.5 text-[13px] font-semibold text-white opacity-70"
-          data-adi-optimiser-button="running"
-          aria-busy="true"
-        >
-          <Loader2 className="h-3.5 w-3.5 animate-spin" />
-          {ADI_BASS_OPTIMISER_LABEL}
+        <div className="space-y-2">
+          <div
+            className="inline-flex items-center gap-2 rounded-md bg-[#213428] px-5 py-2.5 text-[13px] font-semibold text-white opacity-70"
+            data-adi-optimiser-button="running"
+            aria-busy="true"
+          >
+            <Loader2 className="h-3.5 w-3.5 animate-spin" />
+            {ADI_OPTIMISER_RUNNING_LABEL}
+          </div>
+
+          {/* WHAT THE RUN IS ACTUALLY DOING — the engine's own published stage,
+              the job count it has published for that search, the elapsed time
+              and, when the engine stops reporting, the stall notice with its
+              status check and the one cancel path. Presentation only: every
+              value is resolved by useOptimiserRunProgress, and a terminal run
+              renders its final state with no timer and no spinner left. */}
+          <AdiJourneyRunningPanel
+            progress={runProgress}
+            stageElapsedSeconds={runStageElapsedSeconds}
+            onCheckStatus={checkRunStatus}
+            onCancel={onCancelRun}
+            canCancel={canCancelRun}
+            checkResult={runCheckResult}
+          />
         </div>
       )}
 
@@ -902,208 +939,12 @@ export default function AdiOptimisationJourney({
             />
           )}
 
-          {(assessment || why) && (
-            <div className="space-y-0.5">
-              <div className="text-[10px] font-semibold uppercase tracking-wide text-[#8A7B6A]">Diagnosis</div>
-              {why && <div className="text-[11px] text-[#3E4349] leading-relaxed">{why}</div>}
-              {assessment && <div className="text-[11px] text-[#3E4349] leading-relaxed">{assessment}</div>}
-            </div>
-          )}
-
-          {journey.explanation && (
-            <div className="text-[11px] text-[#3E4349] leading-relaxed">{journey.explanation}</div>
-          )}
-
-          {/* The fresh run's exact engine reason is diagnostic evidence. Keep it
-              out of the default panel, but retain it here so a repeated failure
-              can be diagnosed without reconstructing the run. */}
-          {runError && (
-            <div
-              className="rounded-md border border-[#E7E5E0] bg-[#F8F7F4] px-3 py-2 text-[11px] text-[#3E4349] leading-relaxed"
-              data-adi-run-error="true"
-            >
-              <span className="font-semibold">Run detail: </span>{runError}
-            </div>
-          )}
-
-          {journey.notes.length > 0 && (
-            <div className="space-y-0.5 text-[11px] text-[#625143] leading-relaxed">
-              {journey.notes.map((note) => <div key={note}>{note}</div>)}
-            </div>
-          )}
-
-          {/* Capabilities ADI does not evaluate yet. They are stated HERE, once,
-              and never as a row of the tested list: a designer must never read a
-              lever as something ADI tested for them when the model cannot. */}
-          {summary.futureCapability?.length > 0 && (
-            <div className="space-y-0.5 text-[11px] text-[#3E4349] leading-relaxed">
-              <div className="text-[10px] font-semibold uppercase tracking-wide text-[#8A7B6A]">
-                {FUTURE_CAPABILITY_TITLE}
-              </div>
-              {summary.futureCapability.map((note) => (
-                <div key={note.key} data-adi-future-capability={note.key}>
-                  {note.label}: {note.statement}
-                </div>
-              ))}
-            </div>
-          )}
-
-          {/* The calibration decision's own record: what ADI applied, what it held
-              and why, the settings each change touches and the canonical P19/P20
-              pair it was decided on. The panel states the decision; every
-              measurement behind it is read here. */}
-          <AdiCalibrationSection
-            kind={calibrationKind}
-            appliedEvidence={calibrationApplyEvidence}
-            appliedCalibration={persistedAppliedCalibration}
-            recommendation={calibrationRecommendation}
-            evidenceState={calibrationEvidenceState}
-            bestResult={bestCalibrationResult}
-            instances={instances}
-            roomDims={roomDims}
-            detailed
-          />
-
-          {/* What ADI tested, per lever, split into the calibration levers it may
-              apply and the design levers it may only recommend. Moved out of the
-              default panel: the designer reads the decision first, and the
-              coverage of the evaluation here. */}
-          <AdiTestedSection rows={summary.rows} />
-
-          {/* The P20 values the headline draws on, each named for what it is, so
-              two different states can never be read as one comparison. */}
-          {(summary.currentP20 || summary.recommendedP20 || currentP20.runBaselineDiffers) && (
-            <div className="space-y-0.5 text-[11px] text-[#3E4349] leading-relaxed">
-              <div className="text-[10px] font-semibold uppercase tracking-wide text-[#8A7B6A]">
-                P20 results compared
-              </div>
-              {summary.currentP20 && (
-                <div>Current design (published result): {summary.currentP20}</div>
-              )}
-              {currentP20.runBaselineDiffers && (
-                <div>
-                  Evaluation baseline: P20 {currentP20.runBaselineDeviation} — a different current
-                  state, so that evaluation&apos;s before → after values are its own.
-                </div>
-              )}
-              {summary.recommendedP20 && (
-                <div>Evaluated result with the recommended change: {summary.recommendedP20}</div>
-              )}
-            </div>
-          )}
-
-          <OptimiserRunEvidenceBlock evidence={runEvidence} seatCount={seatCount} instances={instances} />
-
-          {/* The limits every other number on this panel depends on, and the
-              fingerprints that identify exactly which design, which published
-              bass result and which applied calibration it is describing. */}
-          <AdiEngineerEvidenceBlock
-            limitingFrequencyHz={p20Headline?.worstFrequencyHz ?? null}
-            limitingSeatId={p20Headline?.worstSeatId ?? null}
-            designFingerprint={currentDesignFingerprint}
-            resultFingerprint={p20Headline?.fingerprint ?? null}
-            parityStatus={planView?.baselineParity?.status ?? null}
-            appliedCalibration={persistedAppliedCalibration}
-          />
-
-          {/* The calibration evidence the saved run kept: per lever, the candidate
-              count, the best confirmed candidate with its canonical P19/P20
-              before → after, and the run's own reason for accepting nothing.
-              Without it the panel never claims a lever was tested. */}
-          <AdiCalibrationEvidenceBlock evidence={summary.calibrationEvidence} />
-
-          {/* A calibration result ADI HELD that makes P20 worse: its candidate,
-              its canonical P19/P20 before → after and its settings are stated
-              here, never on the main panel, which states the refusal and the
-              change it was measured on. */}
-          {bestCalibrationResult?.mainPanelSuppressed === true && (
-            <div className="space-y-1" data-adi-calibration-candidate-proof="true">
-              <div className="text-[10px] font-semibold uppercase tracking-wide text-[#8A7B6A]">
-                Calibration candidate evaluated — not a safe improvement
-              </div>
-              <AdiBestCalibrationResult result={bestCalibrationResult} />
-              <AdiAppliedBassCalibration
-                evidence={calibrationApplyEvidence}
-                appliedCalibration={null}
-                designChanges={[]}
-                instances={instances}
-                roomDims={roomDims}
-              />
-            </div>
-          )}
-
-          {/* The per-lever detail, and the best acoustic delay the grouped
-              front/rear sweep confirmed — a detail of the delay lever ADI
-              already tested, never a second recommendation surface. */}
-          <AdiTestedOptionsTable summary={summary} />
-          {/* The absolute saved processor delays behind the relative group
-              offset the panel states — traceability only, read never written. */}
-          <AdiAbsoluteGroupDelays
-            instances={instances}
-            settings={calibrationApplyEvidence?.settings || []}
-            roomDims={roomDims}
-          />
-          <AcousticDelayAlignmentCard lever={delayLever} />
-
-          {journey.showPlan && (
-            <OptimisationPlanStatus
-              projectId={projectId}
-              versionId={versionId}
-              completedBassAuthority={completedBassAuthority}
-              currentDesignFingerprint={currentDesignFingerprint}
-              instances={instances}
-              seatingPositions={seatingPositions}
-              onApplyLever={onApplyLever}
-              onUndoLever={onUndoLever}
-              leverApplyBusy={leverApplyBusy}
-              leverOutcome={leverOutcome}
-            />
-          )}
-
-          {/* The physical change ADI recommends but has NOT applied: the move, the
-              result measured for it, the reason behind it and the destination
-              checks. Only the designer may approve it, so its controls are on the
-              main panel and its reasoning is here. */}
-          <AdiDesignRecommendationSection
-            designChanges={designChangeList}
-            seatingRecommendation={summary.seatingRecommendation}
-            recommendation={designRecommendation}
-            placementStated={Boolean(placement?.kind)}
-          />
-
-          {/* The placement evidence behind the move the panel states: what
-              placement means here, the designer's own distances per wall group,
-              the expected result in whole dB and the on-plan status. Its controls
-              are on the main panel. */}
-          <PlacementRecommendationPanel
-            placement={placement}
-            busy={isRunning}
-            variant="evidence"
-          />
-
-          {/* The two evidence groups behind the recommendation — the absorption
-              the measurement points at, and the seating recommendation's own
-              evaluation. They render only when their evidence exists, and are
-              kept out of the default panel. */}
-          <AdiRecommendationEvidenceGroups
-            absorption={summary.absorption}
-            attemptsWithoutGain={summary.attemptsWithoutGain}
-            seatingRecommendation={summary.seatingRecommendation}
-          />
-
-          {/* The missing on-plan preview is a limitation of the evidence, not a
-              warning about the recommendation, so it is stated here. */}
-          {placement?.notice === PLACEMENT_PREVIEW_UNAVAILABLE && (
-            <div className="text-[11px] text-[#625143] leading-relaxed">
-              On-plan preview: not yet available for this change.
-            </div>
-          )}
-
-          {/* How the physical subwoofer layout was grouped for the electronic
-              searches — one, two, three or four active sources, grouped from
-              where each source actually sits. Stated here, in Engineer details,
-              because the grouped results below are read against it. */}
-          <AdiSubwooferGroupingBlock instances={instances} roomDims={roomDims} />
+          {/* Every evidence group behind the decision, in the order it was
+              stated, extracted to AdiJourneyEngineerDetailsSections so this
+              component stays the orchestration layer. The two blocks the
+              disclosure's own ordering is anchored on — the previous candidate
+              above, the pre-run estimate below — remain here. */}
+          <AdiJourneyEngineerDetailsSections view={engineerDetailsView} />
 
           {/* The pre-run statement of the work: how many design options ADI will
               evaluate and the acoustic calculations behind them. Stated ONCE, in

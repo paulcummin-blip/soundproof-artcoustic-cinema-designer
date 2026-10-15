@@ -117,10 +117,14 @@ describe("the card renders one run control", () => {
     "utf8",
   );
 
-  it("keeps the running control disabled with a spinner, wording unchanged", () => {
+  it("keeps the running control disabled with a spinner, stating the work in progress", () => {
     expect(card).toMatch(/data-adi-optimiser-button="running"/);
     expect(card).toMatch(/animate-spin/);
-    expect(card).toMatch(/\{ADI_BASS_OPTIMISER_LABEL\}/);
+    // While the run is in flight the control states the work: "OPTIMISING BASS…",
+    // taken from the one running-label authority rather than written here. The
+    // idle control keeps "OPTIMISE BASS".
+    expect(card).toMatch(/\{ADI_OPTIMISER_RUNNING_LABEL\}/);
+    expect(card).toMatch(/from "\.\/optimiserRunProgressAuthority\.js"/);
   });
 
   it("stands its own button down when the placement panel already offers it", () => {
