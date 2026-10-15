@@ -11,6 +11,9 @@ import CurrentSpeakerDesignButton from "@/components/roomdesigner/CurrentSpeaker
 import { buildSpeakerDesignRows } from "@/components/report/speakerDesign/speakerDesignRows";
 import { layoutVisibilityFilter } from "@/components/report/reportProductsSelected";
 import { REPORT_ROUTE } from "@/components/report/reportLibraryContext";
+import { REPORT_UPDATE_PARAM } from "@/components/report/reportActionIntent";
+import ProjectReportButton from "@/components/roomdesigner/reportReadiness/ProjectReportButton";
+import { useProjectReportReadiness } from "@/components/roomdesigner/reportReadiness/useProjectReportReadiness";
 
 // External resource — Artcoustic product CAD files (Dropbox folder).
 // Opens in a new tab; not a primary project action.
@@ -108,11 +111,14 @@ export default function RoomDesignerHeader({
   // path-only transition could update that outer route while leaving the Room
   // Designer tree mounted. Load the same explicit project/version URL used by a
   // direct report open so the router and ProjectGate start from one identity.
-  const openReport = (pathname) => {
+  const openReport = (pathname, options = {}) => {
     if (!effectiveProjectId) return;
     const params = new URLSearchParams();
     params.set("projectId", effectiveProjectId);
     if (reportVersionId) params.set("versionId", reportVersionId);
+    // The report page's own update intent: rebuild the report from the design as
+    // it stands. This is what a report that has moved on offers.
+    if (options.updateReport) params.set(REPORT_UPDATE_PARAM, "1");
     const url = `${pathname}?${params.toString()}`;
     if (typeof window !== "undefined") {
       window.location.assign(url);
@@ -122,9 +128,16 @@ export default function RoomDesignerHeader({
   };
 
   // ONE direct report action: the consolidated Project Report for the active
-  // project and the version on screen. The report page owns its readiness, so a
-  // report that is missing or out of date is handled there — no new flow.
+  // project and the version on screen. Its verdict is composed from the same
+  // canonical readiness and saved-report authorities the report page reads, so
+  // the button can never disagree with the report it opens.
+  const reportReadiness = useProjectReportReadiness({
+    projectId: effectiveProjectId,
+    versionId: reportVersionId,
+    hydrating: loadState?.phase !== "loaded",
+  });
   const handleProjectReportClick = () => openReport(REPORT_ROUTE.VISUAL);
+  const handleProjectReportUpdate = () => openReport(REPORT_ROUTE.VISUAL, { updateReport: true });
 
   const handleProductCadFilesClick = () => {
     window.open(PRODUCT_CAD_FILES_URL, "_blank", "noopener,noreferrer");
@@ -170,19 +183,15 @@ export default function RoomDesignerHeader({
             disabled={loadState?.phase !== "loaded"}
           />
 
-          {/* ONE report action: the consolidated Project Report. No dropdown,
-              no separate report choices. */}
-          <Button
-            size="sm"
-            variant="secondary"
-            className="font-semibold border-[#213428] text-[#213428] whitespace-nowrap"
-            onClick={handleProjectReportClick}
+          {/* ONE report action: the consolidated Project Report. Its own state
+              names what it can do — open, wait, or update. No dropdown, no
+              separate report choices. */}
+          <ProjectReportButton
+            readiness={reportReadiness}
             disabled={!effectiveProjectId}
-            style={{ whiteSpace: 'nowrap', flexShrink: 0 }}
-          >
-            <FileText className="w-4 h-4 mr-2" style={{ flexShrink: 0 }} />
-            Project Report
-          </Button>
+            onOpen={handleProjectReportClick}
+            onUpdate={handleProjectReportUpdate}
+          />
         </div>
       </div>
       {/* The prominent version identity block: project, client and reference,
