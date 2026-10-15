@@ -778,6 +778,18 @@ export default function AdiOptimisationJourney({
             <div className="text-[11px] text-[#3E4349] leading-relaxed">{journey.explanation}</div>
           )}
 
+          {/* The fresh run's exact engine reason is diagnostic evidence. Keep it
+              out of the default panel, but retain it here so a repeated failure
+              can be diagnosed without reconstructing the run. */}
+          {runError && (
+            <div
+              className="rounded-md border border-[#E7E5E0] bg-[#F8F7F4] px-3 py-2 text-[11px] text-[#3E4349] leading-relaxed"
+              data-adi-run-error="true"
+            >
+              <span className="font-semibold">Run detail: </span>{runError}
+            </div>
+          )}
+
           {journey.notes.length > 0 && (
             <div className="space-y-0.5 text-[11px] text-[#625143] leading-relaxed">
               {journey.notes.map((note) => <div key={note}>{note}</div>)}
