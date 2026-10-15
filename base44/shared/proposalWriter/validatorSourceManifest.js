@@ -1,7 +1,7 @@
 /** SHA-256 of the bundled validator sources; regenerated with every rules edit. */
 export const VALIDATOR_SOURCE_MANIFEST = Object.freeze({
   'base44/shared/proposalWriter/writerOutputValidator.js': '9abc142f30279dc77f186b95d430b6f13916997492e19f8b086f11bedca0284c',
-  'base44/shared/proposalWriter/writerProseScanner.js': '9e1ca6086f68f0e8405f378370b11c961578c214a47fd064b6b2dc0e317885a2',
+  'base44/shared/proposalWriter/writerProseScanner.js': '0e34d76e8edcb63ca17f76ef819a22e33965475a8c1e930be5ca050f295a9cbb',
   'base44/shared/proposalWriter/writerOutputTextRules.js': 'ab466312229102216109229586a07a9e6401820ba3a548f726ee6c5c2618ed74',
   // The established-principle register: which sentences are design reasoning (an
   // established principle, or the designer's recorded intention) rather than a claim
@@ -12,7 +12,7 @@ export const VALIDATOR_SOURCE_MANIFEST = Object.freeze({
   'base44/shared/proposalWriter/writerEditorialRules.js': '08776775a8a4bdd2f2a167804809d5db51d750c4a01a1ac8ee23830761475324',
   'base44/shared/proposalWriter/writerSalesPolishRules.js': '2e8d0a0c206141d99d9af0c48b24a565002bd7f63497dedffc431b14b4ae8825',
   'base44/shared/proposalWriter/writerProductScope.js': '7b15e264a35b8f7c1694c3e5c70c3d43e2d06c4a77e195a01cb9e0ec47e11749',
-  'base44/shared/proposalWriter/writerVocabulary.js': 'd15cdf9dea5742306b7940ae67c3bd97f85be5535378a3059f31237f4e7bd47c',
+  'base44/shared/proposalWriter/writerVocabulary.js': '53b036a5ffa43d63c12fdebac504562345ce40852869fc365f0321db46e792b5',
   'base44/shared/proposalWriter/writerClausePrecision.js': '0d7be2c8e2dd98c395c5bf999bd6c306cb48b9c15bc0ffae2d7f31fd31ddae94',
   'base44/shared/proposalWriter/writerViolationAudit.js': '4cc361d1c96a101fc29330d740cef2184ae5650fd3cc64e253892d004efdb0b9',
   'base44/shared/proposalWriter/writerDesignStageRules.js': 'a26d5ff98a2eaf4f6de929cc62cba7e7bc2632540f12d44ded72e8cb7f8bdbb7',
@@ -21,7 +21,7 @@ export const VALIDATOR_SOURCE_MANIFEST = Object.freeze({
   'base44/shared/proposalGeneration/generationStatuses.js': '2273b2e8408a426eeb137d9ae2f34c428a8e934dc0529134e9889aae75103b28',
   'base44/shared/proposalWriter/writerCabinetLanguage.js': '18e37edb21bd8422c6293c5fde809984d185e7188d0fe4a12fa2ff352d4b72c7',
   'base44/shared/proposalWriter/writerValidationRegister.js': '634502ab07c0bf1b13cfe0879d1e2ca2e85f0419c94f377b266a977c38c07b96',
-  'base44/shared/proposalWriter/writerInputBuilder.js': 'c4620182f02914be3818ff9811c4d4d4b333906998d05987822cd43c689d3ac8',
+  'base44/shared/proposalWriter/writerInputBuilder.js': '1473beee4cf24dbde1926defbe3f2d2e2cf4fa3d8116b47020b053d6439b65f3',
   // The client narrative register: the story the client is buying, never the
   // mechanism that produces it. It states the instruction the writer reads and the
   // phrasing the narrative sanitizer removes, so a draft can always be traced to the
@@ -45,7 +45,7 @@ export const VALIDATOR_SOURCE_MANIFEST = Object.freeze({
   // the word limit the section is written and validated under, so a draft can be
   // traced to the exact brief it was read against.
   'base44/shared/proposalWriter/designSummaryBrief.js': 'c95e0ad847dd6260f01c506e6254accdc22db186c3d1af147e117fb2e12b92ce',
-  'base44/shared/proposalWriter/writerPromptBuilder.js': 'a035addd8da17614ae2d555db201e75bd6a195cfde6400d1b5bc38c95c7ba143',
+  'base44/shared/proposalWriter/writerPromptBuilder.js': '06451e76ca85e4f53f197de4d539ffba863d839e8d14f9694a4f0e0dd2ab8a05',
   'base44/shared/proposalWriter/writerSectionMapping.js': 'f5a6d2a5fe974fbd5c16d810d95f99da72f629a4fb8cb33793aa472778ade2f0',
   'base44/shared/proposalWriter/writerDesignContext.js': '590a9f379bb28ebc54c14f97ae2b73070a8c8c6722c7be3fc548c95719f2d63b',
   'base44/shared/proposalEdit/completeDocumentValidation.js': 'cff20d7146ecbeb3a9c325e3147db41cab552f7ea950dd93385ee1d478683ddd',
