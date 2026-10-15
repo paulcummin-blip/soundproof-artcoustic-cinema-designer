@@ -149,7 +149,7 @@ export const ELEVATION_ART_AUTHORITY = Object.freeze({
   },
   evolve_8_4: {
     artwork: "EVOLVE 8-4 front",
-    href: "https://media.base44.com/images/public/6a1166c68ddc81e5ea2cdf6b/6f0f8bcb9_Evolve8-4front.png",
+    href: "https://media.base44.com/images/public/6a1166c68ddc81e5ea2cdf6b/29826d0f4_Evolve8-4front.png",
     native: { width: 748, height: 1024 },
     box: { x: 40, y: 24, width: 667, height: 978 },
     mode: ELEVATION_ART_MODE.MEASURED,
@@ -195,6 +195,30 @@ export const ELEVATION_ART_AUTHORITY = Object.freeze({
   },
 });
 
+/**
+ * Model key → artwork key, for the models whose elevation artwork this authority
+ * normalises. A model that is not listed draws artwork this authority does not
+ * crop, so it keeps the legacy enlargement — see elevationArtFitRatio().
+ */
+export const MODEL_TO_ARTWORK = Object.freeze({
+  "q4-3": "q43",
+  "q4-5": "q45",
+  "q8-5": "q85",
+  "q6-3": "q63",
+  "evolve-2-1": "evolve_2_1",
+  "evolve-3-1": "evolve_3_1",
+  "evolve-4-2": "evolve_4_2",
+  "evolve-6-3": "evolve_6_3",
+  "evolve-8-4": "evolve_8_4",
+  "c-1": "c1",
+});
+
+/** The artwork key a model draws, or null when it draws un-cropped artwork. */
+export function elevationArtworkKeyForModel(modelKey) {
+  if (!modelKey) return null;
+  return MODEL_TO_ARTWORK[String(modelKey)] || null;
+}
+
 // ─── Fallback reporting ──────────────────────────────────────────────────────
 // A fallback is a normal, correct outcome: an artwork this authority has no
 // trustworthy crop for is simply drawn unchanged. It is reported once per
@@ -229,7 +253,9 @@ export function resetNormalisationFallbackLog() {
 export function resolveElevationArtwork(key) {
   const entry = ELEVATION_ART_AUTHORITY[key] || null;
   if (!entry) {
-    logNormalisationFallback(key, "no-crop-metadata");
+    // A model that draws no normalised artwork at all (a null key) is not a
+    // fallback worth reporting; a named artwork with no entry is.
+    if (key) logNormalisationFallback(key, "no-crop-metadata");
     return {
       key,
       mode: ELEVATION_ART_MODE.FALLBACK,

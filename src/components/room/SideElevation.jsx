@@ -7,6 +7,7 @@ import {
   Q43FaceIcon, Q45FaceIcon, Q63FaceIcon, Q85FaceIcon,
 } from "../report/SpeakerFaceIcons";
 import ProductArtwork from "@/components/report/ProductArtwork";
+import { elevationArtFitRatio, elevationArtworkKeyForModel } from "@/components/report/elevation/elevationArtAuthority";
 import { useAppState } from "@/components/AppStateProvider";
 import { useResolvedSpeakerLayout } from "@/components/room/rv/utils/resolveActiveSpeakerLayout";
 import { resolveProjectorPosition } from "@/components/room/rv/utils/resolveProjectorPosition";
@@ -1159,7 +1160,12 @@ export default function SideElevation({
 
             const FaceIcon = FACE_ICON_MAP[normModelKey(spk.model)];
 
-            const FACE_ICON_VISIBLE_RATIO = 0.72;
+            // The same figure the front elevation reads, from the same ONE crop
+            // authority: a normalised artwork is drawn AT the cabinet's footprint,
+            // and artwork with no trustworthy crop keeps the legacy enlargement.
+            const FACE_ICON_VISIBLE_RATIO = elevationArtFitRatio(
+              elevationArtworkKeyForModel(normModelKey(spk.model)),
+            );
             const clipId = `spk-clip-${i}`;
 
             const cabinetX = ix;

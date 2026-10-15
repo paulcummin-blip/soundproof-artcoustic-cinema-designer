@@ -34,6 +34,8 @@
 // SPL, RP22 or impedance.
 // ---------------------------------------------------------------------------
 
+import ElevationArtworkIcon from '@/components/report/elevation/ElevationArtworkIcon';
+
 /**
  * Artcoustic C4-1 soundbar — the 1222 mm cabinet variant.
  *
@@ -48,26 +50,15 @@
  */
 export function C41_1222FaceIcon({ x, y, width, height }) {
   return (
-    <svg
+    <ElevationArtworkIcon
+      artworkKey="c41_1222"
+      href="https://media.base44.com/images/public/6a1166c68ddc81e5ea2cdf6b/0103ea1cc_ChatGPTImage9Oct202610_47_24.png"
       x={x}
       y={y}
       width={width}
       height={height}
-      viewBox="45 257 2083 208"
-      xmlns="http://www.w3.org/2000/svg"
-      preserveAspectRatio="xMidYMid meet"
-    >
-      {/* Native pixel size — 1 image pixel = 1 user unit, so the viewBox above
-          crops the white page instead of resizing the drawing onto the ink box. */}
-      <image
-        x="0"
-        y="0"
-        width="2172"
-        height="724"
-        href="https://media.base44.com/images/public/6a1166c68ddc81e5ea2cdf6b/0103ea1cc_ChatGPTImage9Oct202610_47_24.png"
-        preserveAspectRatio="xMidYMid meet"
-      />
-    </svg>
+      declared={{ box: "45 257 2083 208", width: 2172, height: 724 }}
+    />
   );
 }
 
@@ -89,26 +80,15 @@ export function C41_1222FaceIcon({ x, y, width, height }) {
  */
 export function C41_1441FaceIcon({ x, y, width, height }) {
   return (
-    <svg
+    <ElevationArtworkIcon
+      artworkKey="c41_1441"
+      href="https://media.base44.com/images/public/6a1166c68ddc81e5ea2cdf6b/40ad34db7_ChatGPTImage9Oct202610_49_42.png"
       x={x}
       y={y}
       width={width}
       height={height}
-      viewBox="36 275 2095 170"
-      xmlns="http://www.w3.org/2000/svg"
-      preserveAspectRatio="xMidYMid meet"
-    >
-      {/* Native pixel size — 1 image pixel = 1 user unit, so the viewBox above
-          crops the white page instead of resizing the drawing onto the ink box. */}
-      <image
-        x="0"
-        y="0"
-        width="2167"
-        height="726"
-        href="https://media.base44.com/images/public/6a1166c68ddc81e5ea2cdf6b/40ad34db7_ChatGPTImage9Oct202610_49_42.png"
-        preserveAspectRatio="xMidYMid meet"
-      />
-    </svg>
+      declared={{ box: "36 275 2095 170", width: 2167, height: 726 }}
+    />
   );
 }
 
@@ -129,25 +109,14 @@ export function C41_1441FaceIcon({ x, y, width, height }) {
  */
 export function C41_1711FaceIcon({ x, y, width, height }) {
   return (
-    <svg
+    <ElevationArtworkIcon
+      artworkKey="c41_1711"
+      href="https://media.base44.com/images/public/6a1166c68ddc81e5ea2cdf6b/7759b8f47_ChatGPTImage9Oct202610_54_00.png"
       x={x}
       y={y}
       width={width}
       height={height}
-      viewBox="35 277 2097 149"
-      xmlns="http://www.w3.org/2000/svg"
-      preserveAspectRatio="xMidYMid meet"
-    >
-      {/* Native pixel size — 1 image pixel = 1 user unit, so the viewBox above
-          crops the white page instead of resizing the drawing onto the ink box. */}
-      <image
-        x="0"
-        y="0"
-        width="2167"
-        height="726"
-        href="https://media.base44.com/images/public/6a1166c68ddc81e5ea2cdf6b/7759b8f47_ChatGPTImage9Oct202610_54_00.png"
-        preserveAspectRatio="xMidYMid meet"
-      />
-    </svg>
+      declared={{ box: "35 277 2097 149", width: 2167, height: 726 }}
+    />
   );
 }

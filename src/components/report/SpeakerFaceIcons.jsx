@@ -1,4 +1,5 @@
 import React from 'react';
+import ElevationArtworkIcon from '@/components/report/elevation/ElevationArtworkIcon';
 
 // Shared stroke — matches COLORS.speaker in ScreenWallConstructionGraphic
 const STROKE = '#111111';
@@ -51,20 +52,37 @@ function CentreBolts({ midX, topY, bottomY, r }) {
 // ─── Q-Series face icons ──────────────────────────────────────────────────────
 
 export function Q43FaceIcon({ x, y, width, height }) {
-  // Q4-3 cabinet is 4:3 (280×210mm). viewBox matches artwork aspect so the
-  // image fills the complete physical cabinet viewport without double aspect-fit.
+  // Q4-3 cabinet is 4:3 (280×210mm). The shared elevation renderer crops the
+  // page away and draws the drawing's own measured bounds inside the cabinet's
+  // footprint, so the artwork is never resized onto the cabinet's shape.
   return (
-    <svg x={x} y={y} width={width} height={height} viewBox="0 0 100 75" xmlns="http://www.w3.org/2000/svg">
-      <image x="0" y="0" width="100" height="75" href="https://media.base44.com/images/public/6a1166c68ddc81e5ea2cdf6b/689388d97_Q4-3front.png" preserveAspectRatio="xMidYMid meet" />
-    </svg>
+    <ElevationArtworkIcon
+      artworkKey="q43"
+      href="https://media.base44.com/images/public/6a1166c68ddc81e5ea2cdf6b/689388d97_Q4-3front.png"
+      x={x}
+      y={y}
+      width={width}
+      height={height}
+      declared={{ box: "0 0 100 75", width: 100, height: 75 }}
+    />
   );
 }
 
 export function Q45FaceIcon({ x, y, width, height }) {
+  // STALE VIEWBOX: this icon used to declare a square box, but the drawing is not
+  // square — letterboxed inside it, the speaker was drawn short with a band of
+  // white canvas around it. The shared renderer draws the measured drawing bounds
+  // instead of the declared box.
   return (
-    <svg x={x} y={y} width={width} height={height} viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
-      <image x="0" y="0" width="100" height="100" href="https://media.base44.com/images/public/6a1166c68ddc81e5ea2cdf6b/d1376c28d_Q4-5front.png" preserveAspectRatio="xMidYMid meet" />
-    </svg>
+    <ElevationArtworkIcon
+      artworkKey="q45"
+      href="https://media.base44.com/images/public/6a1166c68ddc81e5ea2cdf6b/d1376c28d_Q4-5front.png"
+      x={x}
+      y={y}
+      width={width}
+      height={height}
+      declared={{ box: "0 0 100 100", width: 100, height: 100 }}
+    />
   );
 }
 
@@ -73,17 +91,19 @@ export function Q45FaceIcon({ x, y, width, height }) {
  * Uses product sheet image.
  */
 export function Q85FaceIcon({ x, y, width, height }) {
+  // STALE VIEWBOX: this icon used to declare a square box for a portrait
+  // drawing, so the speaker was letterboxed with white canvas above and below it.
+  // The shared renderer draws the measured drawing bounds instead.
   return (
-    <svg x={x} y={y} width={width} height={height} viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
-      <image
-        x="0"
-        y="0"
-        width="100"
-        height="100"
-        href="https://media.base44.com/images/public/6a1166c68ddc81e5ea2cdf6b/8eb64d06e_Q8-5Front.png"
-        preserveAspectRatio="xMidYMid meet"
-      />
-    </svg>
+    <ElevationArtworkIcon
+      artworkKey="q85"
+      href="https://media.base44.com/images/public/6a1166c68ddc81e5ea2cdf6b/8eb64d06e_Q8-5Front.png"
+      x={x}
+      y={y}
+      width={width}
+      height={height}
+      declared={{ box: "0 0 100 100", width: 100, height: 100 }}
+    />
   );
 }
 
@@ -113,26 +133,20 @@ const Q63_ARTWORK = { width: 1024, height: 1021, cropX: 54, cropY: 52, cropW: 91
 export function Q63FaceIcon({ x, y, size, width, height }) {
   const w = width ?? size;
   const h = height ?? size;
-  const a = Q63_ARTWORK;
+  // The crop this icon used to hold inline now lives in the ONE elevation crop
+  // authority (measured, page frame and margin excluded, crop = the cabinet's own
+  // square outline) and is applied by the shared elevation renderer, so the live
+  // elevations and the exported pages crop identically.
   return (
-    <svg
+    <ElevationArtworkIcon
+      artworkKey="q63"
+      href="https://media.base44.com/images/public/6a1166c68ddc81e5ea2cdf6b/9a1ad66a6_Q6-3front.png"
       x={x}
       y={y}
       width={w}
       height={h}
-      viewBox={`${a.cropX} ${a.cropY} ${a.cropW} ${a.cropH}`}
-      preserveAspectRatio="xMidYMid meet"
-      xmlns="http://www.w3.org/2000/svg"
-    >
-      <image
-        x="0"
-        y="0"
-        width={a.width}
-        height={a.height}
-        href="https://media.base44.com/images/public/6a1166c68ddc81e5ea2cdf6b/9a1ad66a6_Q6-3front.png"
-        preserveAspectRatio="xMidYMid meet"
-      />
-    </svg>
+      declared={{ box: `${Q63_ARTWORK.cropX} ${Q63_ARTWORK.cropY} ${Q63_ARTWORK.cropW} ${Q63_ARTWORK.cropH}`, width: Q63_ARTWORK.width, height: Q63_ARTWORK.height }}
+    />
   );
 }
 
@@ -171,10 +185,19 @@ export function Evolve11FaceIcon({ x, y, width, height }) {
 }
 
 export function Evolve21FaceIcon({ x, y, width, height }) {
+  // STALE VIEWBOX: the square box was the whole page, and the drawing sits inside
+  // it with wide top and bottom margins. The shared renderer draws the measured
+  // drawing bounds instead.
   return (
-    <svg x={x} y={y} width={width} height={height} viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
-      <image x="0" y="0" width="100" height="100" href="https://media.base44.com/images/public/6a1166c68ddc81e5ea2cdf6b/bb66545fd_Evolve2-1front.png" preserveAspectRatio="xMidYMid meet" />
-    </svg>
+    <ElevationArtworkIcon
+      artworkKey="evolve_2_1"
+      href="https://media.base44.com/images/public/6a1166c68ddc81e5ea2cdf6b/bb66545fd_Evolve2-1front.png"
+      x={x}
+      y={y}
+      width={width}
+      height={height}
+      declared={{ box: "0 0 100 100", width: 100, height: 100 }}
+    />
   );
 }
 
@@ -198,42 +221,68 @@ export function Evolve21FaceIcon({ x, y, width, height }) {
  * acoustic centre is stated, inferred or changed here.
  */
 export function Evolve31FaceIcon({ x, y, width, height }) {
+  // STALE VIEWBOX: the file's declared box is the PAGE, which carries wide side
+  // margins, so the drawing appeared inset inside a band of white canvas. The
+  // shared renderer draws the measured drawing bounds instead — cropped, never
+  // resized, and fitted inside the cabinet's own footprint.
   return (
-    <svg
+    <ElevationArtworkIcon
+      artworkKey="evolve_3_1"
+      href="https://media.base44.com/images/public/6a1166c68ddc81e5ea2cdf6b/053510389_Evolve3-1front.png"
       x={x}
       y={y}
       width={width}
       height={height}
-      viewBox="0 0 751 1024"
-      xmlns="http://www.w3.org/2000/svg"
-      preserveAspectRatio="xMidYMid meet"
-    >
-      <image x="0" y="0" width="751" height="1024" href="https://media.base44.com/images/public/6a1166c68ddc81e5ea2cdf6b/053510389_Evolve3-1front.png" preserveAspectRatio="xMidYMid meet" />
-    </svg>
+      declared={{ box: "0 0 751 1024", width: 751, height: 1024 }}
+    />
   );
 }
 
 export function Evolve42FaceIcon({ x, y, width, height }) {
+  // STALE VIEWBOX: the square box was the whole page. The shared renderer draws
+  // the measured drawing bounds instead.
   return (
-    <svg x={x} y={y} width={width} height={height} viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
-      <image x="0" y="0" width="100" height="100" href="https://media.base44.com/images/public/6a1166c68ddc81e5ea2cdf6b/fa3b2393b_Evolve4-2front.png" preserveAspectRatio="xMidYMid meet" />
-    </svg>
+    <ElevationArtworkIcon
+      artworkKey="evolve_4_2"
+      href="https://media.base44.com/images/public/6a1166c68ddc81e5ea2cdf6b/fa3b2393b_Evolve4-2front.png"
+      x={x}
+      y={y}
+      width={width}
+      height={height}
+      declared={{ box: "0 0 100 100", width: 100, height: 100 }}
+    />
   );
 }
 
 export function Evolve63FaceIcon({ x, y, width, height }) {
+  // STALE VIEWBOX: the square box was the whole page. The shared renderer draws
+  // the measured drawing bounds instead.
   return (
-    <svg x={x} y={y} width={width} height={height} viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
-      <image x="0" y="0" width="100" height="100" href="https://media.base44.com/images/public/6a1166c68ddc81e5ea2cdf6b/3010c90e8_Evolve6-3front.png" preserveAspectRatio="xMidYMid meet" />
-    </svg>
+    <ElevationArtworkIcon
+      artworkKey="evolve_6_3"
+      href="https://media.base44.com/images/public/6a1166c68ddc81e5ea2cdf6b/3010c90e8_Evolve6-3front.png"
+      x={x}
+      y={y}
+      width={width}
+      height={height}
+      declared={{ box: "0 0 100 100", width: 100, height: 100 }}
+    />
   );
 }
 
 export function Evolve84FaceIcon({ x, y, width, height }) {
+  // STALE VIEWBOX: the square box was the whole page. The shared renderer draws
+  // the measured drawing bounds instead.
   return (
-    <svg x={x} y={y} width={width} height={height} viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
-      <image x="0" y="0" width="100" height="100" href="https://media.base44.com/images/public/6a1166c68ddc81e5ea2cdf6b/29826d0f4_Evolve8-4front.png" preserveAspectRatio="xMidYMid meet" />
-    </svg>
+    <ElevationArtworkIcon
+      artworkKey="evolve_8_4"
+      href="https://media.base44.com/images/public/6a1166c68ddc81e5ea2cdf6b/29826d0f4_Evolve8-4front.png"
+      x={x}
+      y={y}
+      width={width}
+      height={height}
+      declared={{ box: "0 0 100 100", width: 100, height: 100 }}
+    />
   );
 }
 
@@ -244,15 +293,20 @@ export function Evolve84FaceIcon({ x, y, width, height }) {
  * viewBox aspect ratio 1711:120 preserves exact proportions at all zoom levels.
  */
 export function C41FaceIcon({ x, y, width, height }) {
+  // The catalogue C4-1 drawing, used for the cabinet lengths that have no
+  // illustrated artwork of their own. Its own box is the authority's fallback:
+  // this one file serves several cabinet lengths, so there is no single face
+  // proportion to check a crop against and it is drawn unchanged — never
+  // over-cropped, never stretched — with the fallback reported.
   return (
-    <svg
+    <ElevationArtworkIcon
+      artworkKey="c41"
+      href="https://media.base44.com/images/public/6a1166c68ddc81e5ea2cdf6b/2adee2973_Screenshot2026-06-05at132314.png"
       x={x}
       y={y}
       width={width}
       height={height}
-      viewBox="0 0 1711 120"
-      xmlns="http://www.w3.org/2000/svg"
-      preserveAspectRatio="xMidYMid meet"
+      declared={{ box: "0 0 1711 120", width: 1711, height: 120 }}
     >
       <defs>
         <filter id="c41-white-artwork" colorInterpolationFilters="sRGB">
@@ -263,16 +317,7 @@ export function C41FaceIcon({ x, y, width, height }) {
           </feComponentTransfer>
         </filter>
       </defs>
-      <image
-        x="0"
-        y="0"
-        width="1711"
-        height="120"
-        href="https://media.base44.com/images/public/6a1166c68ddc81e5ea2cdf6b/2adee2973_Screenshot2026-06-05at132314.png"
-        preserveAspectRatio="xMidYMid meet"
-        filter="url(#c41-white-artwork)"
-      />
-    </svg>
+    </ElevationArtworkIcon>
   );
 }
 
@@ -301,15 +346,19 @@ export function C41FaceIcon({ x, y, width, height }) {
  * than thickening into blobs.
  */
 export function C1FaceIcon({ x, y, width, height }) {
+  // The C-1 crop is the approved, already-shipping box and now lives in the ONE
+  // elevation crop authority, so every drawing that places C-1 crops it the same
+  // way. Its own line-art treatment (the grayscale threshold filter, and the
+  // long-standing full-width box it has always been drawn into) is unchanged.
   return (
-    <svg
+    <ElevationArtworkIcon
+      artworkKey="c1"
+      href="https://media.base44.com/images/public/6a1166c68ddc81e5ea2cdf6b/634ab2ddc_Screenshot2026-10-09at094937.png"
       x={x}
       y={y}
       width={width}
       height={height}
-      viewBox="6 4 1240 312"
-      xmlns="http://www.w3.org/2000/svg"
-      preserveAspectRatio="none"
+      declared={{ box: "6 4 1240 312", width: 1240, height: 312 }}
     >
       <defs>
         <filter id="c1-line-art" colorInterpolationFilters="sRGB">
@@ -324,16 +373,7 @@ export function C1FaceIcon({ x, y, width, height }) {
           </feComponentTransfer>
         </filter>
       </defs>
-      <image
-        x="0"
-        y="0"
-        width="1250"
-        height="322"
-        href="https://media.base44.com/images/public/6a1166c68ddc81e5ea2cdf6b/634ab2ddc_Screenshot2026-10-09at094937.png"
-        preserveAspectRatio="none"
-        filter="url(#c1-line-art)"
-      />
-    </svg>
+    </ElevationArtworkIcon>
   );
 }
 

@@ -4,6 +4,7 @@ import { isRenderableSpeaker } from "@/components/room/rv/RenderPrimitives";
 import { Q43FaceIcon, Q45FaceIcon, Q85FaceIcon, Q63FaceIcon, Evolve11FaceIcon, Evolve21FaceIcon, Evolve31FaceIcon, Evolve42FaceIcon, Evolve63FaceIcon, Evolve84FaceIcon, C1FaceIcon, C41FaceIcon, MultiSoundbarArtworkFaceIcon, MultiSoundbar77ArtworkFaceIcon, MultiSoundbar65ArtworkFaceIcon, MultiSoundbar100ArtworkFaceIcon } from "@/components/report/SpeakerFaceIcons";
 import { C41_1222FaceIcon, C41_1441FaceIcon, C41_1711FaceIcon } from "@/components/report/C41ArtworkFaceIcons";
 import ProductArtwork from "@/components/report/ProductArtwork";
+import { elevationArtFitRatio } from "@/components/report/elevation/elevationArtAuthority";
 import { computeSpeakerAnnotation, speakerBBox } from "@/components/room/frontElevationAnnotationLayout";
 import { resolveEffectiveViewableDimsM, isManualOverrideActive } from "@/components/models/screen/resolveEffectiveScreen";
 import { detectFrontStageMode } from "@/components/roomdesigner/utils/lcrHeightAuthority";
@@ -686,7 +687,24 @@ export default function FrontElevation({ dimensions, screen, placedSpeakers = []
     // the crop, so the box is the cabinet's own footprint. Every other
     // Artcoustic PNG still carries internal page padding and is enlarged to
     // compensate.
-    const FACE_ICON_VISIBLE_RATIO = (isC41 || isC1 || isQ63) ? 1.0 : 0.72;
+    // The figure comes from the ONE elevation crop authority, read for the
+    // artwork this model actually draws: a normalised artwork is drawn AT the
+    // cabinet's footprint (its page is cropped away), while an artwork with no
+    // trustworthy crop keeps the long-standing enlargement (its page is still
+    // inside the box). It is not repeated at the draw site.
+    const faceIconArtworkKey = isC41 ? (isC41_1222 ? "c41_1222" : isC41_1441 ? "c41_1441" : isC41_1711 ? "c41_1711" : "c41")
+      : isC1 ? "c1"
+        : isQ63 ? "q63"
+          : isQ45 ? "q45"
+            : isQ85 ? "q85"
+              : isQ43 ? "q43"
+                : isEv21 ? "evolve_2_1"
+                  : isEv31 ? "evolve_3_1"
+                    : isEv42 ? "evolve_4_2"
+                      : isEv63 ? "evolve_6_3"
+                        : isEv84 ? "evolve_8_4"
+                          : null;
+    const FACE_ICON_VISIBLE_RATIO = elevationArtFitRatio(faceIconArtworkKey);
     // A vertically mounted cabinet draws the SAME face rotated a quarter turn:
     // the face icon's own long axis is the box's height, and the whole icon is
     // turned 90° about the cabinet centre, so the drawn footprint is the cabinet's
