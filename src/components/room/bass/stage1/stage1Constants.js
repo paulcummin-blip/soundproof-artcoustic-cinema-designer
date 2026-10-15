@@ -20,9 +20,14 @@ export const STAGE1_START_DELAY_MS = 600;
 export const STAGE1_DEBOUNCE_MS = 250;
 
 // Candidate budgets (normal hard caps).
+// Three sources have no canonical RP22 family set, so their budget is the
+// tightest of the multi-source budgets (64 normal / 96 fallback): it bounds the
+// added wall-position search rather than opening a combinatorial one. The family
+// set itself generates ~35 coarse candidates.
 export const STAGE1_CANDIDATE_BUDGETS = Object.freeze({
   1: { normal: 96, fallback: 160 },
   2: { normal: 128, fallback: 240, allocation: { C_FRONT_PAIR: 48, RP22_F: 40, RP22_G: 40 } },
+  3: { normal: 64, fallback: 96 },
   4: { normal: 192, fallback: 280, allocation: { RP22_C: 72, RP22_E: 60, RP22_D: 60 } },
 });
 
@@ -30,6 +35,7 @@ export const STAGE1_CANDIDATE_BUDGETS = Object.freeze({
 export const STAGE1_FINALIST_COUNT = Object.freeze({
   1: 5,
   2: 5,
+  3: 5,
   4: 5,
 });
 

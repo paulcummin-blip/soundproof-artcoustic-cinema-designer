@@ -23,10 +23,17 @@
 // SYMMETRIC PAIR RULE: a clear same-model mirrored pair on one wall stays ONE
 // group initially. It preserves symmetry, reflects normal calibration practice
 // and keeps the search bounded. Breaking a sensible pair into independent
-// settings is an escalation for later, never the first move.
+// settings is an escalation for later, never the first move. The band the pair
+// is read with is named in ONE place — practicalPairAuthority: the frozen
+// identical band for two sources, the 100 mm installation band for two of three.
 // ---------------------------------------------------------------------------
 
-/** Geometry tolerance (m) for "same wall" and "mirrored" tests. */
+import {
+  isPracticalSymmetricPair,
+  isIdenticalSymmetricPair,
+} from "./practicalPairAuthority.js";
+
+/** Geometry tolerance (m) for "same wall" and the centre-line singleton test. */
 export const GROUP_GEOMETRY_TOLERANCE_M = 0.01;
 
 export const SUBWOOFER_GROUP_STATUS = Object.freeze({
@@ -53,31 +60,18 @@ const wallRank = (role) => (Object.prototype.hasOwnProperty.call(WALL_ORDER, rol
   ? WALL_ORDER[role]
   : 2);
 
-/** The room's centre line, used for "left", "right" and "mirrored". */
-function mirroredAboutCentre(a, b, widthM) {
-  return Math.abs(a.position.y - b.position.y) <= GROUP_GEOMETRY_TOLERANCE_M
-    && Math.abs(a.position.x + b.position.x - widthM) <= GROUP_GEOMETRY_TOLERANCE_M;
-}
+// The mirror test itself lives in practicalPairAuthority — ONE authority, two
+// named bands: the frozen 10 mm "identical position" band for the two-source
+// rule, and the 100 mm installation band for the pair two of THREE sources were
+// built as. Grouping never invents its own tolerance.
 
 /**
- * Same model, and — when both state one — the SAME model. An unstated model on
- * both is not evidence against a mirrored pair; two different models are.
- */
-function sameModel(a, b) {
-  const modelA = String(a.model ?? a.modelKey ?? "").trim();
-  const modelB = String(b.model ?? b.modelKey ?? "").trim();
-  if (modelA && modelB && modelA !== modelB) return false;
-  return true;
-}
-
-/** A clear symmetric same-model pair on one wall. */
-function isSymmetricPair(a, b, widthM) {
-  return mirroredAboutCentre(a, b, widthM) && sameModel(a, b);
-}
-
-/**
- * Split one wall's sources into mirrored pairs (kept linked) and the sources
- * that stand alone. Greedy from the room's left edge, so the result is stable.
+ * Split one wall's sources into practical symmetric pairs (kept linked) and the
+ * sources that stand alone. Greedy from the room's left edge, so the result is
+ * stable. Two of three sources are tested with the PRACTICAL pair band — a pair
+ * that differs by an installation offset in depth is still the pair the designer
+ * built, and reading it as three unrelated sources is what made a real
+ * front-singleton / rear-pair design unsearchable.
  */
 function partitionIntoPairs(rows, widthM) {
   const pairs = [];
@@ -86,7 +80,7 @@ function partitionIntoPairs(rows, widthM) {
   while (remaining.length >= 2) {
     const first = remaining[0];
     const matchIndex = remaining.findIndex(
-      (other, index) => index > 0 && isSymmetricPair(first, other, widthM),
+      (other, index) => index > 0 && isPracticalSymmetricPair(first, other, { widthM }),
     );
     if (matchIndex < 0) {
       singles.push(remaining.shift());
@@ -205,11 +199,10 @@ export function detectSubwooferGroups(instances, roomDims) {
   }
 
   // Two sources: unchanged — one group each, unless they are one symmetric pair.
+  // Judged on the frozen identical band, so the two-source rule is not widened.
   if (active.length === 2) {
     const [a, b] = active;
-    if (side(a) && side(a) === side(b)
-      && Math.abs(a.position.y - b.position.y) <= GROUP_GEOMETRY_TOLERANCE_M
-      && Math.abs(a.position.x + b.position.x - widthM) <= GROUP_GEOMETRY_TOLERANCE_M) {
+    if (side(a) && side(a) === side(b) && isIdenticalSymmetricPair(a, b, { widthM })) {
       return skipped("Symmetric same-wall pair: differential grouped timing is disabled by default.");
     }
     const ordered = [...active].sort((a, b) => a.position.y - b.position.y || a.id.localeCompare(b.id));

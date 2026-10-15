@@ -19,7 +19,7 @@
 // ---------------------------------------------------------------------------
 
 import { validateCandidateSet } from "./positionCandidateGenerator.js";
-import { normaliseWallGroup, isOnPracticalWall } from "../best-layout/practicalPlacementAuthority.js";
+import { normaliseWallGroup, isInstalledOnPracticalWall } from "../best-layout/practicalPlacementAuthority.js";
 
 const MID_FRACTION = 0.5;
 
@@ -41,15 +41,19 @@ function clonePositions(positions) {
  * Which practical wall each subwoofer is currently on. Falls back to the
  * front/rear half of the room when no instance group is supplied, so a front
  * group can never be laddered onto the rear wall and vice versa.
+ *
+ * The test is "the wall this source is INSTALLED on" — a source whose installed
+ * depth is deeper than the nominal band is still on that wall, because the
+ * ladder only ever moves it ALONG the wall and never changes its depth. A
+ * mid-room source is never laddered.
  */
 function resolveWallIndexes(positions, roomDims, groups) {
-  const lengthM = Number(roomDims?.lengthM) || 0;
   const buckets = { front: [], rear: [] };
   positions.forEach((position, index) => {
-    if (!isOnPracticalWall(position, roomDims)) return;
+    const installed = isInstalledOnPracticalWall(position, roomDims);
+    if (!installed) return;
     const declared = normaliseWallGroup(groups?.[index]);
-    const derived = Number(position?.y) <= lengthM / 2 ? "front" : "rear";
-    buckets[declared || derived].push(index);
+    buckets[declared || installed].push(index);
   });
   return buckets;
 }
@@ -62,6 +66,9 @@ function resolveWallIndexes(positions, roomDims, groups) {
  * @param {{widthM:number,lengthM:number}} params.roomDims
  * @param {{widthM:number,depthM:number}} params.cabinetDims
  * @param {Array<string|null>} [params.groups] — "front"/"rear" per position
+ * @param {Array<{x:number,y:number}>} [params.baselinePositions] — the installed
+ *   positions each candidate is judged against (defaults to currentPositions):
+ *   a source that is not moved in depth keeps its installed depth
  * @returns {Array} candidates in the local position-search shape
  */
 export function generatePracticalWallLadderCandidates({
@@ -69,6 +76,7 @@ export function generatePracticalWallLadderCandidates({
   roomDims,
   cabinetDims,
   groups = [],
+  baselinePositions = null,
 }) {
   const positions = Array.isArray(currentPositions) ? currentPositions : [];
   const widthM = Number(roomDims?.widthM) || 0;
@@ -77,13 +85,14 @@ export function generatePracticalWallLadderCandidates({
 
   const subWidthM = cabinetDims?.widthM || 0.5;
   const subDepthM = cabinetDims?.depthM || 0.3;
+  const baseline = Array.isArray(baselinePositions) ? baselinePositions : positions;
   const buckets = resolveWallIndexes(positions, roomDims, groups);
 
   const candidates = [];
   const seen = new Set();
 
   function tryAdd(id, label, coordinates) {
-    if (!validateCandidateSet(coordinates, roomDims, subWidthM, subDepthM)) return;
+    if (!validateCandidateSet(coordinates, roomDims, subWidthM, subDepthM, { baselinePositions: baseline })) return;
     const key = coordinates.map((point) => `${point.x.toFixed(3)},${point.y.toFixed(3)}`).join("|");
     if (seen.has(key)) return;
     seen.add(key);

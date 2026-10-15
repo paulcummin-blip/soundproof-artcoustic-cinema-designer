@@ -28,6 +28,12 @@ import {
   splitPracticalCandidates,
 } from "./positionCandidateGenerator.js";
 import { generatePracticalWallLadderCandidates } from "./practicalWallSearch.js";
+import {
+  generateTriadSymmetricCandidates,
+  generateTriadAsymmetricCandidates,
+  generateTriadIndividualCandidates,
+  generateTriadWallLadderCandidates,
+} from "./triadPlacementSearch.js";
 import { describeTheoreticalCandidate } from "../best-layout/practicalPlacementAuthority.js";
 import { screenPositionCandidates, promoteScreenedCandidates } from "./positionScreeningEngine.js";
 import { isMaterialImprovement } from "./materialityGate.js";
@@ -47,18 +53,32 @@ export function runPositionScreenPhase(phase, currentPositions, roomDims, cabine
   const t0 = typeof performance !== "undefined" ? performance.now() : Date.now();
 
   let candidates = [];
+  // Three physical sources are not two pairs and not a quad: their candidates
+  // come from the three-source practical generators, which move the installed
+  // pair as ONE variable while writing all three coordinates explicitly.
+  const isTriad = currentPositions.length === 3;
   if (phase === "symmetric") {
     // Local refinement around the current positions PLUS the practical wall
     // ladder (horizontal positions along each subwoofer's own wall, centre →
     // quarter → third → near-corner).
-    candidates = [
-      ...generateSymmetricCandidates(currentPositions, roomDims, cabinetDims),
-      ...generatePracticalWallLadderCandidates({ currentPositions, roomDims, cabinetDims, groups }),
-    ];
+    candidates = isTriad
+      ? [
+        ...generateTriadSymmetricCandidates(currentPositions, roomDims, cabinetDims, groups),
+        ...generateTriadWallLadderCandidates({ currentPositions, roomDims, cabinetDims, groups }),
+        ...generatePracticalWallLadderCandidates({ currentPositions, roomDims, cabinetDims, groups }),
+      ]
+      : [
+        ...generateSymmetricCandidates(currentPositions, roomDims, cabinetDims),
+        ...generatePracticalWallLadderCandidates({ currentPositions, roomDims, cabinetDims, groups }),
+      ];
   } else if (phase === "asymmetric-pair") {
-    candidates = generateAsymmetricPairCandidates(currentPositions, roomDims, cabinetDims);
+    candidates = isTriad
+      ? generateTriadAsymmetricCandidates(currentPositions, roomDims, cabinetDims, groups)
+      : generateAsymmetricPairCandidates(currentPositions, roomDims, cabinetDims);
   } else if (phase === "individual") {
-    candidates = generateIndividualCandidatesForPhase(currentPositions, roomDims, cabinetDims);
+    candidates = isTriad
+      ? generateTriadIndividualCandidates(currentPositions, roomDims, cabinetDims)
+      : generateIndividualCandidatesForPhase(currentPositions, roomDims, cabinetDims);
   }
 
   // Geometry is a physical-source contract, not a grouping contract. A valid

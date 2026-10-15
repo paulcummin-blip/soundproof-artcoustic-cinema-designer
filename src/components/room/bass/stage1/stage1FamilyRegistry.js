@@ -3,6 +3,13 @@
 // A is prohibited. B is gated/disabled for normal Stage 1.
 
 import { STAGE1_FAMILY_POLICY_VERSION } from "./stage1Constants.js";
+import {
+  THREE_SUB_FAMILY_IDS,
+  THREE_SUB_DISPLAY_METADATA,
+  THREE_SUB_PREFERENCE_RANK,
+  THREE_SUB_FAMILY_SEEDS,
+  THREE_SUB_ENABLED_FAMILIES,
+} from "./stage1ThreeSubFamilies.js";
 
 // ── Family IDs ──────────────────────────────────────────────────────────
 export const FAMILY_IDS = Object.freeze({
@@ -24,6 +31,10 @@ export const FAMILY_IDS = Object.freeze({
   RP22_G: "RP22_G",
   TWO_SYMMETRIC_BOUNDARY_CUSTOM: "TWO_SYMMETRIC_BOUNDARY_CUSTOM",
   TWO_ASYMMETRIC_BOUNDARY_CUSTOM: "TWO_ASYMMETRIC_BOUNDARY_CUSTOM",
+
+  // Three subs — the four topologies a three-source room can have, plus the
+  // boundary fallback. Their arrangements live in stage1ThreeSubFamilies.js.
+  ...THREE_SUB_FAMILY_IDS,
 
   // Four subs
   RP22_C: "RP22_C",
@@ -101,6 +112,8 @@ export const FAMILY_DISPLAY_METADATA = Object.freeze({
   [FAMILY_IDS.TWO_ASYMMETRIC_BOUNDARY_CUSTOM]: { label: "Asymmetric boundary custom", description: "Custom asymmetric boundary pair" },
   [FAMILY_IDS.FOUR_SYMMETRIC_BOUNDARY_CUSTOM]: { label: "Symmetric boundary custom", description: "Custom symmetric boundary quad" },
   [FAMILY_IDS.FOUR_ASYMMETRIC_BOUNDARY_CUSTOM]: { label: "Asymmetric boundary custom", description: "Custom asymmetric boundary quad" },
+  // Three subs
+  ...THREE_SUB_DISPLAY_METADATA,
   // RP22_A has NO display metadata — it must never surface.
 });
 
@@ -134,6 +147,9 @@ export const FAMILY_PREFERENCE_RANK = Object.freeze({
   [FAMILY_IDS.ONE_REAR_MID]: 3,
   [FAMILY_IDS.ONE_SIDE_QUARTER]: 4,
   [FAMILY_IDS.ONE_BOUNDARY_CUSTOM]: 5,
+
+  // Three subs
+  ...THREE_SUB_PREFERENCE_RANK,
 });
 
 // ── Seed coordinates (normalised) ───────────────────────────────────────
@@ -219,6 +235,9 @@ export const FAMILY_SEEDS = Object.freeze({
     { xNorm: 0, yNorm: 0.50 },
     { xNorm: 1, yNorm: 0.50 },
   ],
+
+  // Three subs
+  ...THREE_SUB_FAMILY_SEEDS,
 });
 
 // ── Families enabled per quantity for normal Stage 1 search ─────────────
@@ -245,6 +264,7 @@ export const ENABLED_FAMILIES = Object.freeze({
     FAMILY_IDS.FOUR_THIRD_PAIRS,
     FAMILY_IDS.RP22_D,
   ],
+  3: [...THREE_SUB_ENABLED_FAMILIES],
 });
 
 // B is gated/disabled for normal Stage 1.

@@ -283,9 +283,11 @@ function extractStage2Finalists(stage2Result, quantity, roomDims) {
     ? stage2Result.one_sub_result
     : quantity === 2
       ? stage2Result.two_sub_result
-      : quantity === 4
-        ? stage2Result.four_sub_result
-        : null;
+      : quantity === 3
+        ? stage2Result.three_sub_result
+        : quantity === 4
+          ? stage2Result.four_sub_result
+          : null;
   // FIX: Stage 2 publishes `evaluatedFinalists` (canonical confirmation results),
   // not `finalists`. Reading `finalists` produced zero global challengers reaching
   // final optimisation. Map evaluatedFinalists to the {id, sources} format that
@@ -1172,6 +1174,10 @@ export async function runImproveBassV2(projectId, versionId, params, callbacks) 
       x: p.x,
       y: p.y,
       sourceId: snapshot.instanceIds?.[index] || null,
+      // The installed model travels with the position, so the pair authority used
+      // by the three-source placement search applies the same same-model rule the
+      // grouping authority applies.
+      model: (snapshot.allInstances || []).filter((instance) => instance?.enabled !== false)[index]?.model || null,
     }));
     const currentGroups = activeInstanceGroups(subwooferInstances);
 

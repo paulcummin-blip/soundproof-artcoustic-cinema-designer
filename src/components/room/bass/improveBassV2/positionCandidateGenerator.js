@@ -21,6 +21,7 @@
 import { subHalfExtents, deriveSubWallOrientation } from "../../rv/utils/subWallOrientation.js";
 import {
   classifyMovementPracticality,
+  INSTALLED_DEPTH_TOLERANCE_M,
   PLACEMENT_PRACTICALITY,
 } from "../best-layout/practicalPlacementAuthority.js";
 
@@ -32,7 +33,7 @@ const MIN_SUB_SEPARATION_M = 0.15; // minimum centre-to-centre distance
 
 // ── Geometry helpers ────────────────────────────────────────────────────
 
-function isPhysicallyValid(x, y, roomDims, subWidthM, subDepthM) {
+function isPhysicallyValid(x, y, roomDims, subWidthM, subDepthM, { installedDepth = false } = {}) {
   const W = Number(roomDims?.widthM) || 0;
   const L = Number(roomDims?.lengthM) || 0;
   if (W <= 0 || L <= 0) return false;
@@ -42,6 +43,10 @@ function isPhysicallyValid(x, y, roomDims, subWidthM, subDepthM) {
   const { halfX, halfY } = subHalfExtents(subWidthM, subDepthM, rotationDeg);
 
   if (x < halfX + CLEARANCE_M || x > W - halfX - CLEARANCE_M) return false;
+  // A source that is NOT moved in depth keeps the depth it is installed at: the
+  // room as built is not re-judged against a nominal clearance. A source whose
+  // depth does change must clear the wall, exactly as before.
+  if (installedDepth) return true;
   if (y < halfY + CLEARANCE_M || y > L - halfY - CLEARANCE_M) return false;
   return true;
 }
@@ -60,10 +65,27 @@ export function attachPhysicalSourceIdentity(coordinates, currentPositions) {
   }));
 }
 
-export function validateCandidateSet(positions, roomDims, subWidthM, subDepthM) {
+/**
+ * Validate a complete candidate set against the room and the cabinet.
+ *
+ * @param {Array<{x:number,y:number}>} positions — one coordinate per source
+ * @param {object} [options]
+ * @param {Array<{x:number,y:number}>} [options.baselinePositions] — the installed
+ *   positions. A source whose depth matches its baseline (it is not moved in
+ *   depth) keeps that installed depth and is not re-judged for wall clearance;
+ *   its lateral position is still validated. Omitted → every position is judged
+ *   against the wall, exactly as before.
+ */
+export function validateCandidateSet(positions, roomDims, subWidthM, subDepthM, { baselinePositions = null } = {}) {
   if (!Array.isArray(positions) || positions.length === 0) return false;
-  for (const pos of positions) {
-    if (!pos || !isPhysicallyValid(pos.x, pos.y, roomDims, subWidthM, subDepthM)) return false;
+  for (let index = 0; index < positions.length; index += 1) {
+    const pos = positions[index];
+    const baseline = Array.isArray(baselinePositions) ? baselinePositions[index] : null;
+    const installedDepth = Boolean(baseline)
+      && Number.isFinite(Number(baseline?.y))
+      && Number.isFinite(Number(pos?.y))
+      && Math.abs(Number(pos.y) - Number(baseline.y)) <= INSTALLED_DEPTH_TOLERANCE_M;
+    if (!pos || !isPhysicallyValid(pos.x, pos.y, roomDims, subWidthM, subDepthM, { installedDepth })) return false;
   }
   for (let i = 0; i < positions.length; i++) {
     for (let j = i + 1; j < positions.length; j++) {

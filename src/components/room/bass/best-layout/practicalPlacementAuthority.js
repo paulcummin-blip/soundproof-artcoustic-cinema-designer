@@ -40,6 +40,35 @@ export const THEORETICAL_PLACEMENT_LABEL = "Theoretical option — not normally 
  */
 export const PRACTICAL_WALL_TOLERANCE_M = 0.2;
 
+/**
+ * The depth a source is installed at, unchanged, within this tolerance (m).
+ * A source whose depth does not change is not moved in depth at all.
+ */
+export const INSTALLED_DEPTH_TOLERANCE_M = 0.001;
+
+/**
+ * A destination this close to the room's mid-length is a mid-room position.
+ * The same rule the placement-move copy states, kept in one number.
+ */
+export const MID_ROOM_ZONE_M = 0.2;
+
+/**
+ * THE INSTALLED-DEPTH RULE (movement classification only).
+ *
+ * A movement is practical when it runs ALONG the wall each source is mounted on.
+ * A source that is NOT moved in depth therefore keeps its own installed depth as
+ * its practical depth: the depth a cabinet is installed at is the room as built,
+ * not a proposal, and re-judging it against a nominal band refused to search
+ * layouts that are genuinely wall-mounted — a rear pair set 218 mm off the wall,
+ * or a front cabinet inside the nominal clearance, produced ZERO candidates for
+ * the whole design. Only a source whose depth IS changed must land inside the
+ * practical wall band. A source sitting at the room's mid-length stays
+ * theoretical either way.
+ */
+export const INSTALLED_DEPTH_BASIS =
+  "A source that is not moved in depth keeps its own installed depth: the placement search runs along the wall it "
+  + "is already mounted on. A source whose depth does change must land on a practical front or rear wall.";
+
 export const IMPRACTICAL_REASONS = Object.freeze({
   SIDE_WALL: "Side-wall position — not on a front or rear wall.",
   MID_ROOM: "Mid-room position — away from any practical wall.",
@@ -123,13 +152,26 @@ export function classifyPlacementPracticality({
   return { practical: true, reason: null, walls };
 }
 
+/** Which practical wall a depth sits on: the front or rear half of the room. */
+function installedWallSideOf(y, lengthM) {
+  const value = num(y);
+  if (value == null || !(lengthM > 0)) return null;
+  if (Math.abs(value - lengthM / 2) <= INSTALLED_DEPTH_TOLERANCE_M) return null;
+  return value < lengthM / 2 ? WALL_FRONT : WALL_REAR;
+}
+
 /**
  * Classify a MOVEMENT from the current positions as practical or theoretical.
  *
- * A default-search movement is practical only when every subwoofer stays on the
- * practical wall it started on — its wall depth does not change. That is the
- * product rule "y remains at the current front/rear wall depth"; it excludes
- * depth moves, side/interior moves and wall crossings in one test.
+ * A default-search movement is practical when every subwoofer stays on the wall
+ * it is mounted on — its wall depth does not change. That is the product rule
+ * "y remains at the current front/rear wall depth"; it excludes depth moves,
+ * side/interior moves and wall crossings in one test.
+ *
+ * INSTALLED-DEPTH RULE: a source whose depth is unchanged keeps its own
+ * installed depth (see INSTALLED_DEPTH_BASIS) — the room as built is not a
+ * proposal to be re-judged. A source whose depth DOES change must land inside
+ * the practical wall band, exactly as before.
  *
  * @param {object} params
  * @param {Array<{x:number,y:number}>} params.currentPositions
@@ -152,7 +194,28 @@ export function classifyMovementPracticality({
 
   const walls = [];
   for (let index = 0; index < after.length; index++) {
-    const wall = wallPlaneOf(num(after[index]?.y), lengthM, wallToleranceM);
+    const afterY = num(after[index]?.y);
+    const startY = num(before[index]?.y);
+    const sameInstalledDepth = afterY != null && startY != null
+      && Math.abs(afterY - startY) <= INSTALLED_DEPTH_TOLERANCE_M;
+
+    if (sameInstalledDepth) {
+      const startWall = installedWallSideOf(startY, lengthM);
+      if (!startWall) {
+        return { practical: false, reason: IMPRACTICAL_REASONS.MID_ROOM, walls };
+      }
+      if (Math.abs(startY - lengthM / 2) <= MID_ROOM_ZONE_M) {
+        return { practical: false, reason: IMPRACTICAL_REASONS.MID_ROOM, walls };
+      }
+      const assigned = normaliseWallGroup(groups?.[index]);
+      if (assigned && assigned !== startWall) {
+        return { practical: false, reason: IMPRACTICAL_REASONS.WRONG_WALL, walls };
+      }
+      walls.push(startWall);
+      continue;
+    }
+
+    const wall = wallPlaneOf(afterY, lengthM, wallToleranceM);
     if (!wall) {
       return {
         practical: false,
@@ -160,7 +223,7 @@ export function classifyMovementPracticality({
         walls,
       };
     }
-    const startWall = wallPlaneOf(num(before[index]?.y), lengthM, wallToleranceM);
+    const startWall = wallPlaneOf(startY, lengthM, wallToleranceM);
     if (startWall && startWall !== wall) {
       return { practical: false, reason: IMPRACTICAL_REASONS.OFF_WALL, walls };
     }
@@ -176,6 +239,23 @@ export function classifyMovementPracticality({
 /** True when a source sits on a practical (front or rear) wall plane. */
 export function isOnPracticalWall(position, roomDims, wallToleranceM = PRACTICAL_WALL_TOLERANCE_M) {
   return wallPlaneOf(num(position?.y), num(roomDims?.lengthM), wallToleranceM) != null;
+}
+
+/**
+ * The wall a source is INSTALLED on: its own front or rear half of the room, and
+ * not the room's mid-length. This is the test a movement which keeps the
+ * installed depth is judged by (see INSTALLED_DEPTH_BASIS), so "which wall is
+ * this source on" is answered once, for both the classification and the wall
+ * ladder that reaches along that wall.
+ *
+ * @returns {"front"|"rear"|null}
+ */
+export function isInstalledOnPracticalWall(position, roomDims) {
+  const lengthM = num(roomDims?.lengthM);
+  const y = num(position?.y);
+  if (!(lengthM > 0) || y == null) return null;
+  if (Math.abs(y - lengthM / 2) <= MID_ROOM_ZONE_M) return null;
+  return installedWallSideOf(y, lengthM);
 }
 
 function round(value, digits = 3) {
