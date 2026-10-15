@@ -11,8 +11,9 @@
 //   TEST 3  Calculated but unsaved → ONE "Ready to save" status, no repeated
 //           developer wording.
 //   TEST 4  Publication blocked by P4 only → the bass band stays in the bass
-//           domain: the completed bass result is current, the overall position
-//           is stated without naming P4, and no bass action is offered.
+//           domain: the completed bass result is current, no bass action is
+//           offered, and the real item the overall assessment is waiting for is
+//           named instead of a generic "not complete".
 //   TEST 5  Saved and acknowledged → "Performance Current" (the state a refresh
 //           restores from the durable publication).
 //
@@ -134,15 +135,18 @@ test('TEST 4 — a P4-only blocker is never named inside the bass band', () => {
     },
   });
 
-  // P4 is not a bass parameter: the completed bass result is saved and current,
-  // and the whole-design position is stated without naming P4.
+  // P4 is not a bass parameter, so the completed bass result stays current and no
+  // bass action is offered. What the band states instead is the real item the
+  // overall assessment is waiting for — named, never a generic "not complete" —
+  // and P4 is never presented as a bass problem.
   expect(state.code).toBe('current');
   expect(state.label).toBe('Performance Current');
   expect(state.attention).not.toBe(true);
   expect(state.message).toBeNull();
-  expect(state.note).toBe('Overall design assessment is not yet complete.');
   expect(state.actionLabel).toBeNull();
-  expect(JSON.stringify(state)).not.toMatch(/\bP4\b/);
+  expect(state.note).toBe('Waiting for P4 Maximum SPL difference between screen wall speakers.');
+  expect(state.waitingItems).toEqual(['P4 Maximum SPL difference between screen wall speakers']);
+  expect(JSON.stringify(state)).not.toMatch(/assessment needs updating/i);
 });
 
 test('TEST 5 — a saved and acknowledged assessment restores Performance Current', () => {

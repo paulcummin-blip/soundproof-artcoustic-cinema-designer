@@ -40,7 +40,20 @@ export default function BassAuthorityStateBar({ state = null, onPrimaryAction = 
       >
         {state.label}
       </span>
-      {(state.message || state.note) && (
+      {state.waitingItems?.length > 0 ? (
+        // The real items the overall project assessment is waiting for, named.
+        // One item arrives as a sentence in `message`; two or more are listed
+        // under the heading, so the band never says "not complete" without
+        // saying what is outstanding.
+        <span className="min-w-0 flex-1" style={{ fontSize: "11.5px", color: "#3E4349", lineHeight: 1.4 }}>
+          <span className="block font-semibold" style={{ fontSize: "11.5px" }}>{state.waitingHeading}</span>
+          <ul className="mt-0.5 space-y-0.5">
+            {state.waitingItems.map((item) => (
+              <li key={item}>• {item}</li>
+            ))}
+          </ul>
+        </span>
+      ) : (state.message || state.note) && (
         <span className="min-w-0 flex-1" style={{ fontSize: "11.5px", color: "#3E4349", lineHeight: 1.4 }}>
           {state.message || state.note}
         </span>

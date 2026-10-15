@@ -23,9 +23,15 @@
  * gate outside that domain (P1–P13, P15–P17, P21) is a whole-design position,
  * never a bass problem: the completed bass assessment then stays current and
  * the overall position is stated without naming a non-bass parameter.
+ *
+ * ASSUMED PARAMETERS — P15 (background noise floor) and P21 (early reflections)
+ * are assumptions the designer states, not calculations the app owes. They are
+ * terminal once the assumption exists, and they are never named as waiting,
+ * missing, not calculated or outstanding anywhere.
  */
 
 import { BASS_AUTHORITY_STATUS } from "./completedBassResultStore";
+import { resolveOverallProjectWaiting } from "./overallProjectWaiting";
 
 export const BASS_AUTHORITY_STATE = Object.freeze({
   CALCULATING: "calculating",
@@ -87,10 +93,15 @@ export const BASS_AUTHORITY_BLOCKED_COPY = Object.freeze({
 export const BASS_DOMAIN_PARAMETERS = Object.freeze([14, 18, 19, 20]);
 
 /**
- * The one global line the bass panel may show when the completed bass result is
- * current and only a non-bass gate is holding up the overall publication.
+ * The one line the bass panel shows when the completed bass result is current
+ * and nothing real is outstanding anywhere else either.
  */
-export const BASS_OVERALL_ASSESSMENT_NOTE = "Overall design assessment is not yet complete.";
+export const BASS_OVERALL_ASSESSMENT_COMPLETE_NOTE = "Overall project assessment complete.";
+
+/**
+ * The assumed design parameters, by number. They are never waiting items.
+ */
+export const ASSUMED_PROJECT_PARAMETERS = Object.freeze([15, 21]);
 
 /** Publication gates that are bass-domain facts, by the gate's own key. */
 const BASS_DOMAIN_GATES = Object.freeze([
@@ -165,7 +176,8 @@ const ATTEMPT = Object.freeze({
  * @param {string}  input.lifecycleState         — shared bass lifecycle state
  * @param {boolean} input.calculationInProgress
  * @param {boolean} input.placementPreviewActive
- * @returns {{ code: string, label: string, message: string|null, actionLabel: string|null }}
+ * @returns {{ code: string, label: string, message: string|null, actionLabel: string|null,
+ *   note?: string|null, waitingHeading?: string|null, waitingItems?: string[] }}
  */
 export function resolveBassAuthorityState({
   projectId = null,
@@ -243,13 +255,25 @@ export function resolveBassAuthorityState({
           attention: true,
         };
       }
-      // The completed bass assessment is saved and current; a non-bass gate is
-      // holding up the overall engineering publication. The bass band reports
-      // the bass assessment as current and states the overall position, without
-      // naming the parameter or offering a bass action for a non-bass blocker.
+      // The completed bass assessment is saved and current; a NON-BASS gate is
+      // holding up the overall engineering publication. The band reports the
+      // bass assessment as current, then names the real items the overall
+      // assessment is waiting for — read from the attempt's own failed gates,
+      // never invented and never a generic "not complete". P15 and P21 are
+      // assumed design values, so they are never among the items named, and
+      // when nothing real is outstanding the band says so.
+      const waiting = resolveOverallProjectWaiting({ attempt: matchingAttempt });
+      if (waiting.complete) {
+        return {
+          ...withCopy(BASS_AUTHORITY_STATE.CURRENT),
+          note: BASS_OVERALL_ASSESSMENT_COMPLETE_NOTE,
+        };
+      }
       return {
         ...withCopy(BASS_AUTHORITY_STATE.CURRENT),
-        note: BASS_OVERALL_ASSESSMENT_NOTE,
+        note: waiting.message,
+        waitingHeading: waiting.heading,
+        waitingItems: waiting.items,
       };
     }
     // Saved, current, but the publication has not acknowledged it yet: the values
