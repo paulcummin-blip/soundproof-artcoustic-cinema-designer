@@ -89,7 +89,7 @@ const ROOM_NAME_REWRITES = Object.freeze([
   [/\btelevision[- ]based\s+(?:cinema|media|screening)\s+room\b/gi, 'media lounge'],
 ]);
 
-export function useRoomOwnName(html) {
+export function nameRoomConsistently(html) {
   if (typeof html !== 'string' || !html.trim()) return html;
   return ROOM_NAME_REWRITES.reduce((out, [pattern, replacement]) => out.replace(pattern, replacement), html);
 }
@@ -134,7 +134,7 @@ const PROSE_ONLY_SECTIONS = new Set([
 ]);
 
 export function prepareSectionBody(html, section = {}) {
-  const deduped = stripDuplicateLeadingHeading(useRoomOwnName(html), section.title);
+  const deduped = stripDuplicateLeadingHeading(nameRoomConsistently(html), section.title);
   // A high-channel-count design never carries an added-speaker or spacing
   // upgrade, whatever an older stored body still says: the copy is cleaned on the
   // way to the page and the stored record is never rewritten.

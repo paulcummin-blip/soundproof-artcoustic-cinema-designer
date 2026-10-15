@@ -11,9 +11,12 @@
  *
  * The rows below are the real stored rows of the Marquee Home / Original Design
  * proposal. Nothing here recalculates a result: the selection reads the stored
- * rows and the one canonical ASDR importance table, and chooses at most one story
- * row per performance category — the design's own facts stay in the table and are
- * never counted as a highlight.
+ * rows and the one canonical ASDR importance table, and chooses one story row per
+ * performance category. The design's own facts stay in the table and are never
+ * counted as a highlight.
+ *
+ * Assertions are deliberately simple (toBe) so the focused-suite runner can run
+ * this file with its own expect stub.
  */
 import { describe, it, expect } from 'vitest';
 import {
@@ -40,41 +43,42 @@ const MARQUEE_ROWS = [
   { key: 'p6', area: 'Surround level consistency', result: 'L2 · 5 dB' },
 ];
 
-const keys = (rows) => rows.map((row) => String(row.key));
+const keysOf = (rows) => rows.map((row) => String(row.key)).join(',');
 
 describe('Key Performance Highlights curation', () => {
   it('selects the design’s own story: the front stage, the tonal character and the deep bass', () => {
     // One story row per performance category the design genuinely delivers in:
     // the front stage (p4, L4), the tonal character (p16, L4) and the bass
-    // extension the design is built around (p18, the heaviest weighted parameter).
-    expect(keys(selectKeyHighlights(MARQUEE_ROWS))).toEqual(['p4', 'p16', 'p18']);
+    // extension the project is built around (p18 — the heaviest weighted
+    // parameter in the canonical table).
+    expect(keysOf(selectKeyHighlights(MARQUEE_ROWS))).toBe('p4,p16,p18');
   });
 
   it('never presents a Level 1 result as a highlight', () => {
-    const selected = selectKeyHighlights(MARQUEE_ROWS);
-    expect(keys(selected)).not.toContain('p2');
-    expect(keys(selected)).not.toContain('p5');
-    expect(keys(selected)).not.toContain('p12');
-    expect(keys(selected)).not.toContain('p14');
-    selected.forEach((row) => expect(achievedLevel(row)).toBeGreaterThanOrEqual(2));
+    const keys = keysOf(selectKeyHighlights(MARQUEE_ROWS));
+    expect(keys.includes('p2')).toBe(false);
+    expect(keys.includes('p5')).toBe(false);
+    expect(keys.includes('p12')).toBe(false);
+    expect(keys.includes('p14')).toBe(false);
+    expect(selectKeyHighlights(MARQUEE_ROWS).every((row) => achievedLevel(row) >= 2)).toBe(true);
   });
 
   it('does not promote a quality reading over the story it qualifies', () => {
-    // p19 (bass control) and p20 (bass consistency) support the bass story the
-    // bass extension tells; neither becomes the row that carries the bass.
-    expect(keys(selectKeyHighlights(MARQUEE_ROWS))).not.toContain('p19');
+    // p19 (bass control) supports the bass story the bass extension tells; it
+    // never becomes the row that carries the bass.
+    expect(keysOf(selectKeyHighlights(MARQUEE_ROWS)).includes('p19')).toBe(false);
   });
 
   it('carries at most four highlights', () => {
     const many = ['p1', 'p2', 'p4', 'p6', 'p9', 'p12', 'p13', 'p16', 'p17', 'p18', 'p19']
       .map((key) => ({ key, area: key, result: 'L4 · 1 dB' }));
-    expect(selectKeyHighlights(many).length).toBeLessThanOrEqual(4);
+    expect(selectKeyHighlights(many).length <= 4).toBe(true);
   });
 
   it('keeps the design’s own facts in the table without counting them as highlights', () => {
-    const curated = curateSummaryHighlights(MARQUEE_ROWS);
-    expect(keys(curated)).toEqual(['screen_size', 'rp23_viewing', 'system_layout', 'p4', 'p16', 'p18']);
-    expect(keys(selectKeyHighlights(MARQUEE_ROWS))).not.toContain('screen_size');
+    expect(keysOf(curateSummaryHighlights(MARQUEE_ROWS)))
+      .toBe('screen_size,rp23_viewing,system_layout,p4,p16,p18');
+    expect(keysOf(selectKeyHighlights(MARQUEE_ROWS)).includes('screen_size')).toBe(false);
   });
 
   it('withdraws rows from the page only: the stored rows are never modified', () => {
@@ -85,13 +89,13 @@ describe('Key Performance Highlights curation', () => {
   });
 
   it('reads the brief when the designer’s own words name an area', () => {
-    // The brief asks about bass and dynamic range, so those areas are read in
-    // their own terms; nothing else about the selection changes.
+    // The brief asks about impact and headroom, so Dynamic Range is read on its
+    // own terms rather than being left out for sitting below a strength.
     const rows = [
       { key: 'p13', area: 'Non-screen Dynamic Range', result: 'L2 · 101 dBC' },
       { key: 'p6', area: 'Surround level consistency', result: 'L2 · 5 dB' },
     ];
-    expect(keys(selectKeyHighlights(rows, { briefText: 'Impact and headroom matter most' }))).toEqual(['p13']);
-    expect(keys(selectKeyHighlights(rows))).toEqual([]);
+    expect(keysOf(selectKeyHighlights(rows, { briefText: 'Impact and headroom matter most here' }))).toBe('p13');
+    expect(keysOf(selectKeyHighlights(rows))).toBe('');
   });
 });

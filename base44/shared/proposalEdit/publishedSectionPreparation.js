@@ -72,7 +72,7 @@ const ROOM_NAME_REWRITES = Object.freeze([
   [/\btelevision[- ]based\s+(?:cinema|media|screening)\s+room\b/gi, 'media lounge'],
 ]);
 
-export function useRoomOwnName(html) {
+export function nameRoomConsistently(html) {
   if (typeof html !== 'string' || !html.trim()) return html;
   return ROOM_NAME_REWRITES.reduce((out, [pattern, replacement]) => out.replace(pattern, replacement), html);
 }
@@ -250,7 +250,7 @@ export function stripHighChannelUpgradeCopy(html) {
  * @returns {string}
  */
 export function preparePublishedSectionBody(html, section = {}) {
-  const deduped = stripDuplicateLeadingHeading(useRoomOwnName(html), section.title);
+  const deduped = stripDuplicateLeadingHeading(nameRoomConsistently(html), section.title);
   const cleaned = section.highChannel ? stripHighChannelUpgradeCopy(deduped) : deduped;
   if (section.sectionType === 'key_performance_highlights') {
     // The calculated table is the only table in this section: a list or table
@@ -277,7 +277,7 @@ export function preparePublishedSectionBody(html, section = {}) {
  * paragraph is required to survive to the published page.
  */
 function permittedPreparation(html, section = {}) {
-  const deduped = stripDuplicateLeadingHeading(useRoomOwnName(html), section.title);
+  const deduped = stripDuplicateLeadingHeading(nameRoomConsistently(html), section.title);
   if (section.sectionType === 'key_performance_highlights') return stripListAndTableBlocks(deduped);
   if (section.proseOnly && PROSE_ONLY_SECTIONS.has(section.sectionType)) {
     const isComparisonSummary = section.proposalType === 'comparison'
