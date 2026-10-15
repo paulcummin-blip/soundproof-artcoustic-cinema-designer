@@ -9,33 +9,46 @@
  * design only just met, tells the client nothing about the design they are
  * buying and reads as a report rather than as a recommendation.
  *
- * THREE THINGS DECIDE A PLACE, and nothing else:
+ * FOUR THINGS DECIDE A PLACE, and nothing else:
  *
  *   1. ASDR IMPORTANCE — the parameter's own canonical weight (the one ASDR
  *      importance table, shared with the Project Report's highlights and the
- *      proposal writer's strength selection). A result at a parameter the rating
- *      considers central is worth more room than one at a peripheral parameter.
- *   2. ACHIEVED PERFORMANCE — the level the result actually reached, read from
+ *      proposal writer's strength selection).
+ *   2. BRIEF RELEVANCE — the areas the designer's own brief names. Where the
+ *      brief names an area, its result is preferred over an equally weighted
+ *      result the brief says nothing about, and a solid result in an area the
+ *      project is genuinely about earns a place at a level that would otherwise
+ *      not be enough.
+ *   3. ACHIEVED PERFORMANCE — the level the result actually reached, read from
  *      the row as it was calculated. Importance and achievement are read
  *      together: a strong result at a peripheral parameter and a moderate one at
  *      the heaviest parameter can each earn a place.
- *   3. BRIEF RELEVANCE — the areas the designer's own brief names. Where the
- *      brief names an area, its result is preferred over an equally weighted
- *      result the brief says nothing about.
+ *   4. CLIENT USEFULNESS — whether the result is one the client can picture.
+ *      Each performance category has the parameter that tells ITS story in the
+ *      client's own terms: how deep the bass reaches, how consistent the tonal
+ *      character is, how the front stage holds together. A reading that only
+ *      QUALIFIES another result — the bass control, the bass consistency — never
+ *      becomes the row that carries its category.
+ *
+ * A CATEGORY APPEARS ON ITS OWN MERIT, NEVER TO FILL A GAP. One row per
+ * performance category (Spatial Resolution, Dynamic Range, Timbre Matching, Bass
+ * Capability), and only where that category's own story result is a genuine
+ * strength (Level 3 or above), or where a heavily weighted parameter the project
+ * is built around reached a solid result. A category with nothing to say says
+ * nothing: the table is never padded with one result per area, and a design with
+ * three worthwhile results prints three.
  *
  * WHAT IS NEVER SELECTED
- *   · a Level 1 result: the lowest passing level is never presented as a
- *     highlight of the design, automatically or otherwise;
+ *   · a Level 1 result — the lowest passing level is never presented as a
+ *     highlight of the design, however heavily its parameter is weighted and
+ *     whatever else the table would carry;
+ *   · a quality qualifier as the row that carries its category (bass control,
+ *     bass consistency): they support the bass story the bass extension tells,
+ *     they do not replace it;
  *   · an assumed parameter (P8, P15, P21) and the internal Design Index;
- *   · a room fact (the screen, the layout, the viewing geometry) — those are
- *     stated on the document's own at-a-glance page, not claimed as performance.
- *
- * HOW THE PLACES ARE FILLED
- *   One place goes to each performance area whose strongest result is a genuine
- *   strength (Level 3 or above), so a design strong in several areas is
- *   represented in each. The remaining places go to the highest-scoring results
- *   by their own weight and achievement. The table carries at most four rows and
- *   is never padded: a design with two worthwhile results prints two.
+ *   · a room fact (the display, the viewing geometry, the system format) — the
+ *     facts stay in the table as the design's own facts, and are never claimed
+ *     as performance.
  *
  * Nothing is calculated, graded or re-measured here. Every level, weight and
  * figure is read from the row or from the canonical importance table, and a row
@@ -60,13 +73,22 @@ const LOWEST_PRESENTABLE_LEVEL = 2;
 const BRIEF_PREFERENCE = 1.25;
 
 /**
- * The areas the brief's own words can name, per parameter. Read from the brief
- * relevance authority's own vocabulary (base44/shared/briefRelevance.js) so a
- * brief is read the same way here as it is everywhere else.
+ * A parameter this heavy is one the project is built around: its own ASDR weight
+ * is at the top of the table (bass extension, bass control and consistency, the
+ * low-frequency output, the screen-channel and non-screen dynamic range, the
+ * discrete channel count). A solid result at one of these is part of what the
+ * design is for, rather than an incidental reading, so it earns a place where a
+ * moderate result at a peripheral parameter would not.
  */
-const PARAMETER_BRIEF_AREA = Object.freeze({
+const HEAVY_WEIGHT = 10;
+
+/**
+ * The performance category each assessed parameter belongs to. The categories
+ * are the three pillars plus the bass layer the pillars are told through.
+ */
+const PARAMETER_CATEGORY = Object.freeze({
   p1: 'spatial_resolution',
-  p2: 'loudspeaker_configuration',
+  p2: 'spatial_resolution',
   p3: 'spatial_resolution',
   p4: 'spatial_resolution',
   p5: 'spatial_resolution',
@@ -85,7 +107,30 @@ const PARAMETER_BRIEF_AREA = Object.freeze({
   p20: 'bass_capability',
 });
 
-/** Room and system facts: stated on the at-a-glance page, never a highlight. */
+/**
+ * THE STORY ROW OF EACH CATEGORY, in the order that category's own results are
+ * read for it. A category is represented by the first of these that reached a
+ * presentable result, so the row the client reads is the one that tells that
+ * part of the experience: how the front stage holds together, how the tonal
+ * character stays the same, how low the bass reaches. The readings that only
+ * qualify another result stand behind it.
+ */
+const CATEGORY_STORY_ORDER = Object.freeze({
+  spatial_resolution: Object.freeze(['p4', 'p6', 'p5', 'p9', 'p10', 'p7', 'p2', 'p1', 'p3', 'p11']),
+  dynamic_capability: Object.freeze(['p12', 'p13']),
+  timbre_matching: Object.freeze(['p16', 'p17']),
+  bass_capability: Object.freeze(['p18', 'p14']),
+});
+
+/** The reading order of the categories in the selected set. */
+const CATEGORY_ORDER = Object.freeze([
+  'spatial_resolution',
+  'dynamic_capability',
+  'timbre_matching',
+  'bass_capability',
+]);
+
+/** Room and system facts: stated as the design's own facts, never a highlight. */
 const ROOM_FACT_KEYS = Object.freeze([
   'screen_size',
   'system_layout',
@@ -130,73 +175,95 @@ export function rowImportance(key) {
   return Number(weight) || 0;
 }
 
+/** The key of a row, trimmed, and whether it is a room fact rather than a result. */
+function keyOf(row) {
+  return String(row?.key || '').trim();
+}
+
+function isRoomFact(row) {
+  return ROOM_FACT_KEYS.includes(keyOf(row));
+}
+
 /**
- * The rows that earn a highlight, strongest first.
+ * The rows that earn a highlight, in the reading order of their categories.
  *
  * @param {Array<{ key, area, level?, result? }>} rows the stored calculated rows
  * @param {{ limit?: number, briefText?: string }} [options]
- * @returns {Array} the selected rows, in the order they were read
+ * @returns {Array} the selected rows
  */
 export function selectKeyHighlights(rows, options = {}) {
   const limit = Number.isFinite(options.limit) ? options.limit : HIGHLIGHT_SELECTION_LIMIT;
   const areas = briefAreas(options.briefText);
   const list = (Array.isArray(rows) ? rows : []).filter((row) => row
-    && !ROOM_FACT_KEYS.includes(String(row.key || '').trim())
-    && !ASSUMED_PARAMETER_KEYS.includes(String(row.key || '').trim()));
+    && !isRoomFact(row)
+    && !ROOM_FACT_KEYS.includes(keyOf(row))
+    && !ASSUMED_PARAMETER_KEYS.includes(keyOf(row)));
 
-  const scored = [];
+  // Every presentable result, scored once: its canonical weight, the level it
+  // actually reached, and the preference the brief gives its area.
+  const scored = new Map();
   list.forEach((row, index) => {
-    const key = String(row.key || '').trim();
+    const key = keyOf(row);
+    if (!key || scored.has(key)) return;
     const level = achievedLevel(row);
     const weight = rowImportance(key);
-    // A result below the lowest presentable level, or one at a parameter the
-    // importance table does not carry, is never a highlight.
-    if (!level || level < LOWEST_PRESENTABLE_LEVEL || weight <= 0) return;
-    const area = PARAMETER_BRIEF_AREA[key] || null;
+    const category = PARAMETER_CATEGORY[key] || null;
+    if (!category || !level || level < LOWEST_PRESENTABLE_LEVEL || weight <= 0) return;
     const multiplier = LEVEL_MULTIPLIERS[`L${level}`] || 0;
-    const preferred = area && areas.includes(area) ? BRIEF_PREFERENCE : 1;
-    scored.push({
+    const preferred = areas.includes(category) ? BRIEF_PREFERENCE : 1;
+    scored.set(key, {
       row,
       index,
       key,
       level,
       weight,
-      area: row.area || null,
+      category,
+      brief_named: areas.includes(category),
       score: weight * multiplier * preferred,
     });
   });
 
-  if (scored.length === 0) return [];
-
   const chosen = [];
-  const taken = new Set();
-  // One place to each performance area whose strongest result is a strength, so
-  // an area the design genuinely delivers in is never crowded out.
-  const areasTaken = new Set();
-  scored
-    .filter((entry) => entry.level >= STRENGTH_LEVEL)
-    .sort((a, b) => b.score - a.score)
-    .forEach((entry) => {
-      const area = String(entry.row.area || entry.area || '');
-      if (chosen.length >= limit || areasTaken.has(area)) return;
-      areasTaken.add(area);
-      taken.add(entry.key);
-      chosen.push(entry);
-    });
-  // The remaining places go to the highest-scoring results; an equal score is
-  // settled by the heavier canonical parameter.
-  scored
-    .slice()
-    .sort((a, b) => (b.score - a.score) || (b.weight - a.weight) || (a.index - b.index))
-    .forEach((entry) => {
-      if (chosen.length >= limit || taken.has(entry.key)) return;
-      taken.add(entry.key);
-      chosen.push(entry);
-    });
+  for (const category of CATEGORY_ORDER) {
+    if (chosen.length >= limit) break;
+    const entry = CATEGORY_STORY_ORDER[category]
+      .map((key) => scored.get(key))
+      .find(Boolean);
+    if (!entry) continue;
+    // The category's own story result has to be worth reading on its own: a
+    // strength, or a solid result at a parameter this project is built around,
+    // or an area the brief asks about.
+    const earnsPlace = entry.level >= STRENGTH_LEVEL
+      || entry.brief_named
+      || entry.weight >= HEAVY_WEIGHT;
+    if (!earnsPlace) continue;
+    chosen.push(entry);
+  }
 
+  // The strongest result of the selected set reads first within its category.
   return chosen
-    .sort((a, b) => a.index - b.index)
+    .sort((a, b) => (CATEGORY_ORDER.indexOf(a.category) - CATEGORY_ORDER.indexOf(b.category))
+      || (b.score - a.score)
+      || (a.index - b.index))
     .map((entry) => entry.row);
+}
+
+/**
+ * The rows the Key Performance Highlights SUMMARY table carries: the design's own
+ * facts, then the results that earned a highlight. The facts are read exactly as
+ * they were calculated — they state what the room is, claim no performance, and
+ * are never counted as one of the highlights.
+ *
+ * @param {Array} rows the section's stored calculated rows
+ * @param {{ limit?: number, briefText?: string }} [options]
+ * @returns {Array} the rows to print, stored rows untouched
+ */
+export function curateSummaryHighlights(rows, options = {}) {
+  const list = (Array.isArray(rows) ? rows : []).filter(Boolean);
+  const facts = list.filter(isRoomFact);
+  const selected = selectKeyHighlights(list, options);
+  const taken = new Set(facts.map(keyOf));
+  return [...facts, ...selected.filter((row) => !taken.has(keyOf(row)))];
 }
 
 /**
@@ -206,7 +273,7 @@ export function selectKeyHighlights(rows, options = {}) {
  */
 export function fallbackHighlightRows(rows) {
   return (Array.isArray(rows) ? rows : [])
-    .filter((row) => row && ROOM_FACT_KEYS.includes(String(row.key || '').trim()))
+    .filter((row) => row && isRoomFact(row))
     .slice(0, 3);
 }
 
