@@ -193,12 +193,13 @@ export function buildOptimiserResultForSave({
   // improvement was or was not applied.
   calibrationDecision = null,
   decisionApplied = false,
+  runIdentity = null,
 } = {}) {
   const actionability = resolvePlanActionability({ plan, selection });
   const actionablePlan = actionability.actionable
     ? {
       ...plan,
-      run: buildActionableOptimiserRunSummary({ selection, diagnostics }),
+      run: buildActionableOptimiserRunSummary({ selection, diagnostics, runIdentity }),
     }
     : null;
 
@@ -213,6 +214,7 @@ export function buildOptimiserResultForSave({
       failureReason: actionability.reason,
       calibrationDecision,
       decisionApplied,
+      runIdentity,
     });
 
   return { actionability, actionablePlan, runEvidence };
