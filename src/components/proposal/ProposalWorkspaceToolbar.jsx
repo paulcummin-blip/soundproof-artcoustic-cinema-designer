@@ -21,6 +21,7 @@ import { FileText, Download, Eye, Loader2, AlertCircle, RotateCw } from 'lucide-
 
 import { REPORT_FONT_BODY as FONT } from '@/components/report/typography/reportTypography';
 import PaginationFailureDetails from '@/components/proposal/export/PaginationFailureDetails';
+import ProposalCopyReviewSummary from '@/components/proposal/editor/ProposalCopyReviewSummary';
 
 const SECONDARY_IDLE =
   'flex items-center gap-1.5 px-3 py-2 text-xs uppercase tracking-[0.12em] rounded-md border transition-colors border-[#DCDBD6] bg-white text-[#3E4349] hover:bg-[#F5F4F0]';
@@ -40,6 +41,11 @@ export default function ProposalWorkspaceToolbar({
   previewing = false,
   onPreview,
   blockedReason,
+  // The copy review state the server resolved with the copy layer: the document's
+  // own evidence check, and how much generated copy still awaits approval. It is
+  // shown as its own status so unapproved wording is never read as an engineering
+  // fault, and it is what tells the designer why an export click was stopped.
+  review = null,
   error,
   // A preparation failure the designer can simply retry: it restarts the whole
   // print preparation from the start, without reloading the app.
@@ -114,6 +120,12 @@ export default function ProposalWorkspaceToolbar({
           </button>
         </div>
       </div>
+
+      {review && (
+        <div className="px-6 pb-3">
+          <ProposalCopyReviewSummary review={review} />
+        </div>
+      )}
 
       {message && (
         <div className="px-6 pb-3">

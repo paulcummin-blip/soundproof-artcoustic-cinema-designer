@@ -1,6 +1,7 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.52';
 import { resolveAccountAccess } from '../../shared/accountAccessAuthority.js';
 import { resolveEditorLayer } from '../../shared/proposalEdit/proposalEditEditorModel.js';
+import { resolveProposalReview } from '../../shared/proposalEdit/proposalReviewAuthority.js';
 import { readCompleteDocument, readProposalRecords } from '../../shared/proposalEdit/readCompleteDocument.js';
 import { authorizeProposalExport } from '../../shared/proposalEdit/proposalExportAuthorization.js';
 import { GPT_WRITER_FLAG_FIELD, gptWriterClientState, resolveGptWriterFlag } from '../../shared/proposalWriter/proposalWriterFlag.js';
@@ -72,6 +73,13 @@ export default async function(req) {
       if (!proposal) return Response.json({ error: 'Proposal not found.' }, { status: 404 });
       const documentValidation = await readCompleteDocument(base44.entities, proposal, { generationRecords, editRecords });
       layer.document_validation = documentValidation;
+      // What still needs a human, classified for the editor: the document's own
+      // integrity (the evidence check) apart from the generated copy awaiting
+      // approval (the copy review), with each section named the way the client
+      // reads it. Presentation of the check above, which is unchanged — every
+      // sentence is the one the plain-language authority already states for that
+      // rejection, and no validation outcome is decided here.
+      layer.review = resolveProposalReview({ validation: documentValidation, fields: layer.fields });
       layer.ready = documentValidation.valid;
       layer.gate = { ...layer.gate, issuable: documentValidation.valid };
       layer.export_blocked_reason = documentValidation.blocked_reason;

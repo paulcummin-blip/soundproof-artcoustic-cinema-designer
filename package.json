@@ -12,7 +12,7 @@
     "test:p7": "node src/test/_p7-run.mjs src/test/p7-wall-markers.test.mjs src/test/p7-app-geometry-parity.test.mjs",
     "test:comparison": "node src/test/_p7-run.mjs test/comparison-persistence.test.mjs",
     "test:proposal-authority": "node --test test/proposal-authority-guardrails.test.mjs",
-    "verify:proposal-authority": "node --test test/proposal-authority-guardrails.test.mjs test/narrative-steer-wiring.test.mjs test/narrative-priority-authority.test.mjs test/p1-p20-narrative-rules.test.mjs test/client-benefit-writing-standard.test.mjs"
+    "verify:proposal-authority": "node --test test/proposal-authority-guardrails.test.mjs test/proposal-review-authority.test.mjs test/narrative-steer-wiring.test.mjs test/narrative-priority-authority.test.mjs test/p1-p20-narrative-rules.test.mjs test/client-benefit-writing-standard.test.mjs"
   },
   "dependencies": {
     "@base44/sdk": "^0.8.54",

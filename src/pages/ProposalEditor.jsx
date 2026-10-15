@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
-import { useSearchParams, useNavigate, Link, Navigate } from 'react-router-dom';
+import { useSearchParams, useNavigate, Navigate } from 'react-router-dom';
 import { base44 } from '@/api/base44Client';
 import { getSectionDef, getSectionLabel, resolveSectionTitle, getSectionsForProposalType } from '@/components/proposal/proposalSections';
 import KeyPerformanceHighlightsTable from '@/components/proposal/KeyPerformanceHighlightsTable';
@@ -11,7 +11,6 @@ import ComparisonEvidenceState from '@/components/proposal/ComparisonEvidenceSta
 import InlineRichTextEditor from '@/components/proposal/InlineRichTextEditor';
 import SectionToolbar from '@/components/proposal/SectionToolbar';
 import DealerNotesPanel from '@/components/proposal/DealerNotesPanel';
-import ProposalSectionNav from '@/components/proposal/ProposalSectionNav';
 import { isArchived, getRestoreStatus } from '@/components/proposal/proposalLifecycle';
 import {
   MANUAL_EDIT_LABEL,
@@ -48,10 +47,14 @@ import { resolveCoverAsset, resolvePackImages } from '@/components/library/image
 import { buildVersionNameMap } from '@/components/library/libraryVersionLabels';
 import { resolveReportFilenameDetails, logReportExportIdentity } from '@/components/report/reportFilenameIdentity';
 import { proposalReportTypeToken } from '@/components/report/reportPdfTitle';
-import { Loader2, ChevronLeft, Archive, RotateCcw } from 'lucide-react';
+import { Loader2, Archive, RotateCcw } from 'lucide-react';
 import ProposalEditorState from '@/components/proposal/editor/ProposalEditorState';
 import ProposalRenderBoundary from '@/components/proposal/editor/ProposalRenderBoundary';
 import ProposalGenerationPanel from '@/components/proposal/generation/ProposalGenerationPanel';
+import ProposalReviewRequiredDialog from '@/components/proposal/editor/ProposalReviewRequiredDialog';
+import ProposalSectionSidebar from '@/components/proposal/editor/ProposalSectionSidebar';
+import ProposalClientBriefPanel from '@/components/proposal/editor/ProposalClientBriefPanel';
+import useProposalReviewGate from '@/components/proposal/editor/useProposalReviewGate';
 import { validatedOptionsCopy } from '@/components/proposal/options/validatedOptionsCopy';
 import {
   PROPOSAL_EDITOR_STATE,
@@ -90,6 +93,12 @@ export default function ProposalEditor() {
   // when that section is part of the document, otherwise as the lead of the
   // options image page itself.
   const currentDocumentLayer = documentLayer?.proposal_id === proposal?.id ? documentLayer : null;
+  // ── Copy review — what still needs a human, from the document check ──
+  // The server resolves it beside the copy layer (proposalReviewAuthority), so the
+  // editor holds no second copy of the rule and the two statuses it shows — the
+  // evidence check and the copy review — are read from one authority. The layer is
+  // re-read after every saved section edit, so the count is never stale.
+  const copyReview = currentDocumentLayer?.review || null;
   // The publication assembly: the server's ordered, prepared sections. The local
   // fallback is ordered by the SAME authority, so the continuous Editor and the
   // printed PDF always read one document sequence.
@@ -793,6 +802,25 @@ export default function ProposalEditor() {
     },
   });
 
+  // ── The export click — a review block is never silent ──
+  // While copy is awaiting approval the issue gate holds the issued document back,
+  // so the click states the rule, names the sections that still need approval and
+  // offers the way to the first one. Every other block — missing evidence, a
+  // comparison still being read, a real print failure — goes straight to the
+  // export, which reports its own reason, so a genuine failure is never hidden
+  // behind the review.
+  const {
+    showDialog: showReviewDialog,
+    requestExport: handleExportClick,
+    reviewFirstSection: handleReviewCopy,
+    dismiss: dismissReviewDialog,
+  } = useProposalReviewGate({
+    review: copyReview,
+    sections,
+    onExport: handleExport,
+    setActiveSectionKey,
+  });
+
   // ── Render ──
   // The editor states its condition before it draws the document: it is loading,
   // waiting for the sections, or reporting why it cannot show the proposal. It is
@@ -847,51 +875,36 @@ export default function ProposalEditor() {
         showClientBrief={showClientBrief}
         onToggleClientBrief={() => setShowClientBrief((prev) => !prev)}
         exporting={exporting}
-        onExport={handleExport}
+        onExport={handleExportClick}
         previewing={previewing}
         onPreview={handlePreview}
-        blockedReason={comparisonBlockReason || exportBlockedReason || editLayerBlockReason}
+        blockedReason={comparisonBlockReason || exportBlockedReason || (copyReview ? null : editLayerBlockReason)}
+        review={copyReview}
         error={exportError}
         retryable={exportRetryable}
         errorDetail={exportErrorDetail}
       />
 
+      <ProposalReviewRequiredDialog
+        open={showReviewDialog}
+        review={copyReview}
+        onReviewCopy={handleReviewCopy}
+        onCancel={dismissReviewDialog}
+      />
+
       <div className="flex flex-1 min-h-0 overflow-hidden">
       {/* ── Left: Section navigation ── */}
-      <div className="w-56 border-r border-[#DCDBD6] bg-white flex flex-col overflow-hidden">
-        <div className="p-4 border-b border-[#DCDBD6]">
-          <Link
-            to="/ProposalCentre"
-            className="flex items-center gap-1 text-xs text-[#625143] hover:text-[#213428] mb-2"
-          >
-            <ChevronLeft className="w-3 h-3" />
-            Proposal Centre
-          </Link>
-          <div
-            className="text-[10px] uppercase tracking-[0.16em] text-[#A79E8C] mt-2"
-            style={{ fontFamily: 'Didact Gothic, sans-serif' }}
-          >
-            Sections
-          </div>
-          <button
-            onClick={() => setShowClientBrief(true)}
-            className="text-xs text-[#625143] hover:text-[#213428] text-left mt-1"
-          >
-            {clientBrief ? `${clientBrief.slice(0, 28)}${clientBrief.length > 28 ? '…' : ''}` : 'No client brief'}
-          </button>
-        </div>
-        <div className="flex-1 overflow-y-auto p-2">
-          <ProposalSectionNav
-            sections={sections}
-            activeSectionKey={activeSectionKey}
-            onSelect={setActiveSectionKey}
-            onToggleVisibility={handleToggleVisibility}
-            onReorder={handleReorder}
-            readOnly={archived}
-            proposalType={proposal?.proposal_type}
-          />
-        </div>
-      </div>
+      <ProposalSectionSidebar
+        clientBrief={clientBrief}
+        onShowClientBrief={() => setShowClientBrief(true)}
+        sections={sections}
+        activeSectionKey={activeSectionKey}
+        onSelect={setActiveSectionKey}
+        onToggleVisibility={handleToggleVisibility}
+        onReorder={handleReorder}
+        readOnly={archived}
+        proposalType={proposal?.proposal_type}
+      />
 
       {/* ── Centre: The document ── */}
       <div className="flex-1 overflow-y-auto">
@@ -1018,6 +1031,7 @@ export default function ProposalEditor() {
                 )}
               <div
                 className={`mb-12 ${isActive ? '' : 'opacity-60'}`}
+                data-proposal-section={section.section_type}
                 onClick={() => setActiveSectionKey(section.section_key)}
               >
                 {def.type !== 'cover' && (
@@ -1213,53 +1227,14 @@ export default function ProposalEditor() {
 
       {/* ── Right: Client Brief & Narrative Focus ── */}
       {showClientBrief && (
-        <div className="w-72 border-l border-[#DCDBD6] bg-white p-4 overflow-y-auto flex-shrink-0">
-          <div className="flex items-center justify-between mb-3">
-            <h3
-              className="text-sm font-semibold text-[#1B1A1A]"
-              style={{ fontFamily: 'Didact Gothic, sans-serif' }}
-            >
-              Client Brief &amp; Narrative Focus
-            </h3>
-            <button
-              onClick={() => setShowClientBrief(false)}
-              className="text-xs text-[#A79E8C] hover:text-[#625143]"
-            >
-              ✕
-            </button>
-          </div>
-          <p className="text-[11px] text-[#625143] leading-relaxed mb-3">
-            Describe anything you would like the report to emphasise. These notes guide the
-            narrative only and never alter the engineering results.
-          </p>
-          <textarea
-            value={clientBrief}
-            readOnly={archived}
-            onChange={(e) => setClientBrief(e.target.value)}
-            placeholder="Example: Large screen, compact room with four seats, strong timbre matching, explain why the front row is the priority."
-            rows={10}
-            className="w-full p-3 text-xs text-[#1B1A1A] bg-[#F5F4F0] border border-[#DCDBD6] rounded-lg resize-y focus:outline-none focus:border-[#213428] focus:ring-1 focus:ring-[#213428] transition-colors"
-            style={{ fontFamily: 'Inter, sans-serif', lineHeight: 1.6 }}
-          />
-          {!archived && (
-            <button
-              onClick={handleSaveClientBrief}
-              disabled={savingBrief}
-              className="w-full mt-3 px-4 py-2 text-xs uppercase tracking-[0.14em] text-white disabled:opacity-40 transition-colors hover:bg-[#3E4349]"
-              style={{ backgroundColor: '#213428', fontFamily: 'Didact Gothic, sans-serif' }}
-            >
-              {savingBrief ? 'Saving…' : 'Save Brief'}
-            </button>
-          )}
-          <div className="mt-4 p-2.5 bg-[#F5F4F0] border-l-2 border-[#213428] rounded-r">
-            <p className="text-[10px] text-[#625143] leading-relaxed">
-              <strong className="text-[#213428]">Note:</strong> Changing the Client Brief changes
-              the wording and emphasis of the report. It must never change any engineering result,
-              RP22 value, Design Rating, or recommendation. Use Refine to apply the brief to a
-              section.
-            </p>
-          </div>
-        </div>
+        <ProposalClientBriefPanel
+          clientBrief={clientBrief}
+          readOnly={archived}
+          onChange={setClientBrief}
+          onSave={handleSaveClientBrief}
+          saving={savingBrief}
+          onClose={() => setShowClientBrief(false)}
+        />
       )}
 
       </div>

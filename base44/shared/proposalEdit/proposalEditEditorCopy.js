@@ -82,7 +82,11 @@ const SENTENCES = Object.freeze({
   engineering_snapshot_missing: 'a saved engineering specification is required for this document.',
   engineering_snapshot_identity: 'the saved engineering specification belongs to a different project or version.',
   raw_dealer_notes: 'private design instructions cannot be published.',
-  unvalidated_document_text: 'this document contains wording that was not approved.',
+  // Copy, not engineering: the section holds generated wording a human has not
+  // approved yet, and the sentence is deliberately about review rather than about
+  // a fault, so it is never read as a technical failure. It names no section for
+  // the same reason the export dialog names them itself (proposalReviewAuthority).
+  unvalidated_document_text: 'this proposal contains generated copy that still needs your review.',
   document_section_missing: 'a required page of this document is missing or hidden.',
   published_content_missing: 'approved copy did not reach the published page.',
 });
