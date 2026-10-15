@@ -2,7 +2,10 @@
 // Grouped gain (trim) search — mirrors the grouped delay search but for
 // relative level adjustments between subwoofer groups.
 //
+// The grouping is the ONE grouping authority's (subwooferGroupAuthority), read
+// from the physical layout rather than the source count:
 // For four subs: front pair = Group A, rear pair = Group B.
+// For three subs: front + rear pair · front pair + rear · three groups.
 // For two subs: each sub is its own group (unless symmetric same-wall pair).
 // For one sub: no inter-sub gain search.
 //
@@ -23,8 +26,7 @@
 // later rejected.
 
 import { resumWithTuning } from "../stage2/stage2TuningSearch.js";
-
-const GEOMETRY_TOLERANCE_M = 0.01;
+import { adaptGroupingReason, detectSubwooferGroups, searchedGroupDirections } from "./subwooferGroupAuthority.js";
 /** The mandated sweep: ±6 dB, in 0.5 dB steps, for each group in turn. */
 const GAIN_MIN_DB = -6;
 const GAIN_MAX_DB = 6;
@@ -36,39 +38,14 @@ const now = () => performance.now();
 const compare = (a, b) => a.score - b.score || a.adjustmentDb - b.adjustmentDb || a.id.localeCompare(b.id);
 
 /**
- * Define gain groups — same grouping logic as defineDelayGroups.
- * Reuses the same front/rear classification.
+ * Define gain groups. The grouping is the ONE grouping authority's — the gain
+ * search never re-reads the layout — with the reason stated in the gain search's
+ * own words. Three-source layouts group exactly as the delay and phase searches
+ * group them.
  */
 export function defineGainGroups(instances, roomDims) {
-  const active = (instances || []).filter((s) => s.enabled !== false);
-  const skipped = (reason) => ({ status: "skipped", reason, groups: [] });
-  const ambiguous = (reason) => ({ status: "ambiguous", reason, groups: [] });
-  if (active.length <= 1) return skipped("One source: no inter-sub gain search.");
-  const W = Number(roomDims?.widthM), L = Number(roomDims?.lengthM);
-  if (!(W > 0 && L > 0) || new Set(active.map((s) => s.id)).size !== active.length ||
-      active.some((s) => !s.id || !Number.isFinite(s.position?.x) || !Number.isFinite(s.position?.y)))
-    return ambiguous("Missing or duplicate source identity/geometry.");
-  const side = (s) => s.position.y < L / 2 - GEOMETRY_TOLERANCE_M ? "front" : s.position.y > L / 2 + GEOMETRY_TOLERANCE_M ? "rear" : null;
-  for (const s of active) {
-    const declared = s.legacyGroup || s.group;
-    if (["front", "rear"].includes(declared) && declared !== side(s))
-      return ambiguous("Group metadata conflicts with source geometry: " + s.id);
-  }
-  const group = (id, label, rows) => ({ id, label, sourceIds: rows.map((s) => s.id).sort() });
-  if (active.length === 4) {
-    const front = active.filter((s) => side(s) === "front"), rear = active.filter((s) => side(s) === "rear");
-    if (front.length !== 2 || rear.length !== 2) return ambiguous("Four-source gain requires two front and two rear sources.");
-    return { status: "eligible", groups: [group("A", "Front pair", front), group("B", "Rear pair", rear)] };
-  }
-  if (active.length === 2) {
-    const [a, b] = active;
-    if (side(a) && side(a) === side(b) && Math.abs(a.position.y - b.position.y) <= GEOMETRY_TOLERANCE_M &&
-        Math.abs(a.position.x + b.position.x - W) <= GEOMETRY_TOLERANCE_M)
-      return skipped("Symmetric same-wall pair: differential grouped gain is disabled by default.");
-    const ordered = [...active].sort((a, b) => a.position.y - b.position.y || a.id.localeCompare(b.id));
-    return { status: "eligible", groups: [group("A", "First source", [ordered[0]]), group("B", "Second source", [ordered[1]])] };
-  }
-  return ambiguous("Grouped gain search supports one, two or four active sources.");
+  const grouping = detectSubwooferGroups(instances, roomDims);
+  return { ...grouping, reason: adaptGroupingReason(grouping.reason, "gain") };
 }
 
 /**
@@ -140,7 +117,9 @@ export function planGroupedGainRefinement(coarse) {
   const retained = new Set(), intervals = new Map(), reasons = {};
   const keep = (row, reason) => { retained.add(row.id); (reasons[row.id] ||= []).push(reason); };
   const refine = GAIN_STEP_DB > GAIN_RESOLUTION_DB;
-  for (const direction of ["A", "B"]) {
+  // Every searched group is refined, including a third group on a three-source
+  // design — read from the candidates themselves.
+  for (const direction of searchedGroupDirections(coarse)) {
     for (const metric of ["primaryRangeDb", "allSeatRangeDb"]) {
       const rows = coarse.filter((r) => r.direction === direction && !r.isCurrent && Number.isFinite(r.proxy?.[metric]));
       const ranked = rows.map((r) => ({ ...r, score: r.proxy[metric] })).sort(compare);

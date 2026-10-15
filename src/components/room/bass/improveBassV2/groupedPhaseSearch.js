@@ -9,6 +9,7 @@
 
 import { resumWithTuning } from "../stage2/stage2TuningSearch.js";
 import { defineDelayGroups } from "./groupedDelaySearch.js";
+import { adaptGroupingReason, searchedGroupDirections } from "./subwooferGroupAuthority.js";
 import {
   PHASE_CONTROL_MAX_DEG,
   PHASE_CONTROL_REFERENCE_HZ,
@@ -37,12 +38,14 @@ function tuningMatches(a, b) {
   });
 }
 
+/**
+ * Define phase groups. The grouping itself is the ONE grouping authority's — the
+ * phase search never re-reads the layout — with the reason stated in the phase
+ * search's own words.
+ */
 export function definePhaseGroups(instances, roomDims) {
   const grouping = defineDelayGroups(instances, roomDims);
-  if (grouping.status === "skipped" && grouping.groups.length === 0) {
-    return { ...grouping, reason: grouping.reason.replace(/delay|timing/gi, "phase") };
-  }
-  return grouping;
+  return { ...grouping, reason: adaptGroupingReason(grouping.reason, "phase") };
 }
 
 export function createGroupedPhaseCandidate(
@@ -171,7 +174,9 @@ export function planGroupedPhaseConfirmation(scored) {
     (reasons[row.id] ||= []).push(reason);
   };
 
-  for (const direction of ["A", "B"]) {
+  // Every searched group is confirmed, including a third group on a three-source
+  // design — read from the candidates themselves.
+  for (const direction of searchedGroupDirections(scored)) {
     for (const metric of ["primaryRangeDb", "allSeatRangeDb"]) {
       const rows = scored
         .filter((row) =>

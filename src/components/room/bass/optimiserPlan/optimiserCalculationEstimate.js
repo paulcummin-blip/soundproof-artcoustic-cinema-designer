@@ -14,9 +14,11 @@
 //   placement stage-1 candidate budget stage1Constants.js (per quantity)
 //   seating   11 offset positions     seatingPositionSearch.js (-500…+500 mm)
 //
-// Groups follow the engine's own grouping rule: four sources = front pair +
-// rear pair; two sources = one group each; one source = no inter-sub electronic
-// search (placement options remain).
+// Groups follow the engine's own grouping authority (subwooferGroupAuthority),
+// read from the physical layout rather than the source count alone: four sources
+// = front pair + rear pair; three sources = front + rear pair, front pair + rear,
+// or three independent groups; two sources = one group each; one source = no
+// inter-sub electronic search (placement options remain).
 //
 // This is an ESTIMATE, and it says so. It is deliberately conservative: it
 // counts the candidate options the searches generate, and states that finalists
@@ -26,6 +28,7 @@
 // ---------------------------------------------------------------------------
 
 import { STAGE1_CANDIDATE_BUDGETS } from "../stage1/stage1Constants.js";
+import { detectSubwooferGroups } from "../improveBassV2/subwooferGroupAuthority.js";
 import {
   PHASE_CONTROL_MAX_DEG,
   PHASE_CONTROL_STEP_DEG,
@@ -112,12 +115,21 @@ export function countActiveSources(instances = []) {
 
 /**
  * How many independent source groups the electronic searches run against.
- * Returns null when the quantity is one the grouped searches cannot split.
+ *
+ * The DETECTED grouping is the authority whenever it is available: the grouped
+ * searches act on one, two, three and four active sources, and the physical
+ * layout alone decides how many groups that is. The quantity table is the
+ * fallback for a layout whose grouping cannot be read, and it is conservative —
+ * three physical sources never form more than three groups. Null means the
+ * searches genuinely cannot split this design.
  */
-export function resolveSearchGroupCount(sourceCount) {
+export function resolveSearchGroupCount(sourceCount, detectedGroupCount = null) {
+  const detected = num(detectedGroupCount);
+  if (detected != null && detected > 0) return detected;
   if (sourceCount === 4) return 2;
   if (sourceCount === 2) return 2;
   if (sourceCount === 1) return 0;
+  if (sourceCount === 3) return 3;
   return null;
 }
 
@@ -139,9 +151,16 @@ function placementBudget(sourceCount) {
  *   basisNote: string, scopeNote: string, reason: string|null
  * }}
  */
-export function estimateOptimiserCalculations({ instances = [] } = {}) {
+export function estimateOptimiserCalculations({ instances = [], roomDims = null } = {}) {
   const sourceCount = countActiveSources(instances);
-  const groups = resolveSearchGroupCount(sourceCount);
+  const grouping = detectSubwooferGroups(instances, roomDims);
+  const groups = resolveSearchGroupCount(
+    sourceCount,
+    grouping.status === "eligible" ? grouping.groups.length : null,
+  );
+  // The stage-1 placement pool is a layout comparison (one, two and four
+  // sources), so a quantity it has no pool for contributes no placement family:
+  // the estimate then states exactly what IS searched for this design.
   const placement = placementBudget(sourceCount);
 
   const unavailable = {
@@ -155,7 +174,7 @@ export function estimateOptimiserCalculations({ instances = [] } = {}) {
     reason: ESTIMATE_UNAVAILABLE_REASON,
   };
 
-  if (groups == null || placement == null) return unavailable;
+  if (groups == null) return unavailable;
 
   const steps = OPTIMISER_SEARCH_STEPS;
   const counts = [

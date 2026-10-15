@@ -1,34 +1,18 @@
 import { resumWithTuning } from "../stage2/stage2TuningSearch.js";
+import { detectSubwooferGroups, searchedGroupDirections } from "./subwooferGroupAuthority.js";
 
-const GEOMETRY_TOLERANCE_M = 0.01;
 const now = () => performance.now();
 const compare = (a,b) => a.score-b.score || a.adjustmentMs-b.adjustmentMs || a.id.localeCompare(b.id);
 
+/**
+ * Define delay groups. The grouping itself is the ONE grouping authority's, so
+ * delay, phase and gain always group the same layout the same way — including a
+ * three-source layout (front + rear pair, front pair + rear, or three groups).
+ * The group objects it returns carry `role`, the group's physical side, so a
+ * signed rear-group offset can be stated honestly downstream.
+ */
 export function defineDelayGroups(instances, roomDims) {
-  const active=(instances || []).filter(s=>s.enabled!==false);
-  const skipped=reason=>({status:"skipped",reason,groups:[]});
-  const ambiguous=reason=>({status:"ambiguous",reason,groups:[]});
-  if(active.length<=1)return skipped("One source: no inter-sub delay search; position options remain available.");
-  const W=Number(roomDims?.widthM),L=Number(roomDims?.lengthM);
-  if(!(W>0&&L>0)||new Set(active.map(s=>s.id)).size!==active.length||active.some(s=>!s.id||!Number.isFinite(s.position?.x)||!Number.isFinite(s.position?.y)))return ambiguous("Missing or duplicate source identity/geometry.");
-  const side=s=>s.position.y<L/2-GEOMETRY_TOLERANCE_M?"front":s.position.y>L/2+GEOMETRY_TOLERANCE_M?"rear":null;
-  for(const s of active){const declared=s.legacyGroup || s.group;if(["front","rear"].includes(declared)&&declared!==side(s))return ambiguous("Group metadata conflicts with source geometry: "+s.id);}
-  // `role` records the group's physical side so a signed rear-group offset can
-  // be stated honestly downstream. Group A is always the screen-side group and
-  // group B the far-side group, so the sign never has to be guessed.
-  const group=(id,label,rows,role)=>({id,label,role,sourceIds:rows.map(s=>s.id).sort()});
-  if(active.length===4){
-    const front=active.filter(s=>side(s)==="front"),rear=active.filter(s=>side(s)==="rear");
-    if(front.length!==2||rear.length!==2)return ambiguous("Four-source timing requires two front and two rear sources.");
-    return {status:"eligible",groups:[group("A","Front pair",front,"front"),group("B","Rear pair",rear,"rear")]};
-  }
-  if(active.length===2){
-    const [a,b]=active;
-    if(side(a)&&side(a)===side(b)&&Math.abs(a.position.y-b.position.y)<=GEOMETRY_TOLERANCE_M&&Math.abs(a.position.x+b.position.x-W)<=GEOMETRY_TOLERANCE_M)return skipped("Symmetric same-wall pair: differential grouped timing is disabled by default.");
-    const ordered=[...active].sort((a,b)=>a.position.y-b.position.y||a.id.localeCompare(b.id));
-    return {status:"eligible",groups:[group("A","First source",[ordered[0]],"front"),group("B","Second source",[ordered[1]],"rear")]};
-  }
-  return ambiguous("Grouped delay search supports one, two or four active sources.");
+  return detectSubwooferGroups(instances, roomDims);
 }
 
 export function createGroupedDelayCandidate(grouping, baseline, direction, adjustmentMs, processorDelayLimitMs=null) {
@@ -80,7 +64,9 @@ export function scoreGroupedCandidate(rawTransfer, candidate) {
 export function planGroupedRefinement(coarse) {
   const retained=new Set(),intervals=new Map(),reasons={};
   const keep=(row,reason)=>{retained.add(row.id);(reasons[row.id] ||= []).push(reason);};
-  for(const direction of ["A","B"])for(const metric of ["primaryRangeDb","allSeatRangeDb"]){
+  // The searched directions are read from the candidates themselves: every group
+  // of this layout is refined, including a third group on a three-source design.
+  for(const direction of searchedGroupDirections(coarse))for(const metric of ["primaryRangeDb","allSeatRangeDb"]){
     const rows=coarse.filter(r=>r.direction===direction&&!r.rejection&&Number.isFinite(r.proxy?.[metric]));
     const ranked=rows.map(r=>({...r,score:r.proxy[metric]})).sort(compare),seed=ranked[0];
     if(!seed)continue;
