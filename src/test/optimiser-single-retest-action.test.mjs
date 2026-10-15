@@ -36,9 +36,10 @@ describe("one re-test control", () => {
     // The re-test STATE stands the calibration control down too: in the re-test
     // state the panel draws one control and nothing else.
     expect(journey).toMatch(
-      /onReoptimise=\{retestNeeded \|\| isRunning \|\| retestOwnsPrimary[\s\S]*?onReoptimiseCalibration\}/,
+      /onReoptimise=\{optimiserRunOwnsRetry \|\| isRunning \|\| retestOwnsPrimary[\s\S]*?onReoptimiseCalibration\}/,
     );
-    expect(journey).toMatch(/\|\| retestNeeded;/);
+    expect(journey).toMatch(/\|\| optimiserRunOwnsRetry;/);
+    expect(journey).toMatch(/const optimiserRunOwnsRetry = retestNeeded[\s\S]*?OPTIMISER_OUTCOME\.UNABLE_TO_EVALUATE;/);
     // The re-test is never a second primary for the layout model either.
     expect(journey).toMatch(/&& !retestOwnsPrimary,/);
   });
