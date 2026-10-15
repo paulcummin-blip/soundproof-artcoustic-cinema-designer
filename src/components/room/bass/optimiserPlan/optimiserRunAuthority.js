@@ -43,7 +43,6 @@ function notify() {
 function supersededIdentity(plan) {
   if (!plan) return null;
   return {
-    runId: plan.run?.runId || null,
     recordKind: plan.recordKind || null,
     terminalOutcome: plan.terminalOutcome || null,
     candidateId: plan.candidateId || null,
