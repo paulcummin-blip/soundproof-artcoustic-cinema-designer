@@ -64,6 +64,7 @@ export const OPTIMISER_UNEVALUABLE_REASON =
   "The optimisation did not finish, so no result could be confirmed.";
 
 const UNEVALUABLE_REASONS = Object.freeze([
+  { test: /cannot read properties of null|originalIndex|candidate geometry/i, reason: "Candidate geometry data was incomplete during the layout evaluation." },
   { test: /seat|listening position|response curve|per-seat/i, reason: "Required seat-response data is missing." },
   { test: /subwoofer configuration|subwoofer|instance/i, reason: "The current subwoofer configuration could not be evaluated." },
   { test: /band|response|spectrum|spl|frequency/i, reason: "Bass response data is incomplete." },
@@ -157,6 +158,9 @@ export function resolveOptimiserFailureCode({
   runBlockCode = null,
   baselineInvalid = false,
   recordedReasons = [],
+  // True only when this persisted record carries the id and evidence contract
+  // minted by the current run lifecycle. A legacy record has neither.
+  currentRunRecord = false,
 } = {}) {
   if (runBlockCode && BLOCK_HANDLED_ELSEWHERE.includes(runBlockCode)) return null;
   if (runBlockCode && BLOCK_REASON[runBlockCode]) return BLOCK_REASON[runBlockCode];
@@ -169,6 +173,11 @@ export function resolveOptimiserFailureCode({
     && recordedReasons.some((reason) => BASELINE_WORDS.test(String(reason || "")))) {
     return OPTIMISER_FAILURE_CODE.BASELINE_NOT_VALIDATED;
   }
+  // RE-TEST NEEDED is reserved for legacy/saved evidence that cannot establish
+  // its own provenance. A freshly identified run that reached a terminal record
+  // but could not finish is a technical failure of THAT run, not another request
+  // to repeat the same test indefinitely.
+  if (currentRunRecord) return OPTIMISER_FAILURE_CODE.WORKER_FAILED;
   return OPTIMISER_FAILURE_CODE.EVIDENCE_MISSING;
 }
 
