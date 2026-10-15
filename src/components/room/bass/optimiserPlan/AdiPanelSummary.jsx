@@ -40,6 +40,10 @@ export default function AdiPanelSummary({
   // The earlier design state a saved result belongs to, with the one action.
   staleCopy = null,
   previousBest = null,
+  // What a previous run evaluated, and why it is not on offer: stated in the
+  // re-test states INSTEAD of the candidate's own detail, which is read in
+  // Engineer details.
+  previousCandidateNotice = null,
   className = "",
 }) {
   return (
@@ -51,6 +55,14 @@ export default function AdiPanelSummary({
       {nextAction && (
         <div className="text-[11.5px] text-[#8A5A2B] leading-relaxed" data-adi-panel-next-action="true">
           {nextAction}
+        </div>
+      )}
+
+      {/* A previous run's candidate is never presented as a recommendation: the
+          main panel states only that it must be re-tested first. */}
+      {previousCandidateNotice && (
+        <div className="text-[11.5px] text-[#3E4349] leading-relaxed" data-adi-previous-candidate-notice="true">
+          {previousCandidateNotice}
         </div>
       )}
 

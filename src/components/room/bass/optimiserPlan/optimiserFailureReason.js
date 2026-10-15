@@ -49,9 +49,9 @@ export const OPTIMISER_FAILURE_FIX = Object.freeze({
  * or a run that kept no usable evidence.
  */
 export const OPTIMISER_RETEST_MESSAGE =
-  "This optimiser result needs to be checked again against the current design.";
+  "The previous optimiser result needs to be checked again against the current design.";
 export const OPTIMISER_RETEST_DETAIL =
-  "The previous run did not retain enough evidence to confirm its recommendation.";
+  "The saved run does not contain enough evidence to confirm its recommendation.";
 
 /**
  * THE REAL REASON an evaluation could not run, read from the facts the run

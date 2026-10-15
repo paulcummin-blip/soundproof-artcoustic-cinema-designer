@@ -157,6 +157,15 @@ export const OPTIMISER_RETEST_LABEL = "Re-test Bass Optimisation";
 export const OPTIMISER_RETEST_HELPER_SENTENCE =
   "ADI re-checks the current design and only proposes a change where it improves the result.";
 
+/**
+ * What the main panel states in the re-test states INSTEAD of the previous
+ * candidate's own detail. The old candidate is never presented as a current
+ * recommendation: its adjustment, the result it was measured on and the reason it
+ * was not applied are read in Engineer details, after the re-test.
+ */
+export const OPTIMISER_RETEST_PREVIOUS_CANDIDATE =
+  "A previous run found a possible improvement, but it must be re-tested before it can be recommended.";
+
 /** Status pill label for every state — exactly one label per state. */
 export const OPTIMISER_PRESENTATION_LABEL = Object.freeze({
   [OPTIMISER_PRESENTATION_STATE.NO_RUN]: "Optimisation required",
@@ -354,7 +363,13 @@ export function resolveOptimiserPresentationState({
   // ── STALE ── the saved plan no longer belongs to this design.
   if (status === OPTIMISER_PLAN_STATUS.STALE) {
     return build(OPTIMISER_PRESENTATION_STATE.STALE, {
-      message: planView?.staleReason || OPTIMISER_PRESENTATION_COPY.STALE,
+      // The re-test pair, the same one every re-test state states: the state asks
+      // for one thing, and its one control names it. WHY this result has to be
+      // checked again — which input moved — is the stale reason, and it is read in
+      // Engineer details beside the old candidate's own detail.
+      message: OPTIMISER_RETEST_MESSAGE,
+      nextAction: OPTIMISER_RETEST_DETAIL,
+      explanation: planView?.staleReason || OPTIMISER_PRESENTATION_COPY.STALE,
       action: OPTIMISER_PRESENTATION_ACTION.RERUN,
       actionLabel: OPTIMISER_PRESENTATION_ACTION.RERUN,
       showPlan: true,

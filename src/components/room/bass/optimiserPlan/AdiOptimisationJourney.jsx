@@ -54,6 +54,7 @@ import {
   OPTIMISER_PRESENTATION_STATE,
   OPTIMISER_RETEST_HELPER_SENTENCE,
   OPTIMISER_RETEST_LABEL,
+  OPTIMISER_RETEST_PREVIOUS_CANDIDATE,
 } from "./resolveOptimiserPresentationState.js";
 import AdiEngineerDetailsPanel from "./AdiEngineerDetailsPanel.jsx";
 import {
@@ -75,6 +76,9 @@ import { resolveBestCalibrationResult } from "./bestCalibrationResult.js";
 import AdiBestCalibrationResult from "./AdiBestCalibrationResult.jsx";
 import AdiDesignRecommendationSection from "./AdiDesignRecommendationSection.jsx";
 import AdiPanelSummary from "./AdiPanelSummary.jsx";
+import AdiPreviousCandidateDetails from "./AdiPreviousCandidateDetails.jsx";
+import AdiRecommendationEvidenceGroups from "./AdiRecommendationEvidenceGroups.jsx";
+import { resolvePreviousCandidate, resolveRetestNeeded } from "./resolveRetestPresentation.js";
 import AdiEngineerEvidenceBlock from "./AdiEngineerEvidenceBlock.jsx";
 import AdiCalibrationEvidenceBlock from "./AdiCalibrationEvidenceBlock.jsx";
 import AdiDesignerActionBar from "./AdiDesignerActionBar.jsx";
@@ -271,6 +275,21 @@ export default function AdiOptimisationJourney({
   const runEvidence = presentation?.evidence || null;
   const journeyStateKey = presentation?.state || resolved.state;
 
+  // ── RE-TEST NEEDED → ONE NEXT ACTION ──
+  // The re-test states say one thing: the saved result cannot be trusted and has
+  // to be checked again against the current design. So they draw ONE control for
+  // it — the panel's own run control, worded as the re-test itself — and every
+  // other control that starts the same or an overlapping flow stands down: the
+  // calibration re-test, the placement re-run, and the Apply/Undo of the old
+  // candidate. The old candidate's own detail is never stated on the main panel:
+  // it is read in Engineer details, where the designer goes after re-testing.
+  // Presentation only: which handler that one control calls is unchanged.
+  // Resolved by the re-test authority (resolveRetestPresentation.js).
+  const retestNeeded = resolveRetestNeeded({
+    outcome: journey.outcome,
+    journeyStateKey,
+  });
+
   // ── THE ONE OUTCOME ──
   // When the presentation authority resolved an outcome, the panel states THAT
   // — No Improvement Found · Improvement Found · Physical Change Recommended ·
@@ -363,7 +382,10 @@ export default function AdiOptimisationJourney({
     : planView?.levers?.[OPTIMISER_LEVER.DELAY] || null;
   const panelShowsApply = placement?.kind === "recommended" && placement.canApply === true;
   const panelShowsUndo = placement?.kind === "applied" && placement.canUndo === true;
-  const panelShowsRerun = placement?.kind === "previous";
+  // A previous placement result normally carries the panel's single re-run
+  // control. In the re-test state that job belongs to the panel's own re-test
+  // control, so the placement panel draws no second copy of it.
+  const panelShowsRerun = placement?.kind === "previous" && !retestNeeded;
   const handleApplyPlacement = panelShowsApply && placementLever && typeof onApplyLever === "function"
     ? () => onApplyLever(placementLever)
     : null;
@@ -373,19 +395,24 @@ export default function AdiOptimisationJourney({
 
   const showAction = !!journey.action && journey.canRun && !isRunning;
   // ── ONE RE-TEST ──
-  // In the re-test outcomes the panel's own run control is worded as the re-test
+  // In the re-test states the panel's own run control is worded as the re-test
   // itself. While that control is drawn it IS the re-test: it owns the primary
   // action, and the calibration control beside it draws no second copy of the
   // same button or its helper line.
-  // The run control IS the re-test whenever it carries the re-test action or the
-  // re-test wording: the calibration control below then draws no second copy of
-  // it, so two "Re-test Bass Optimisation" buttons can never appear together.
+  // The run control IS the re-test whenever the panel is in a re-test state or
+  // the control carries the re-test action or wording: the calibration control
+  // below then draws no second copy of it, so two "Re-test Bass Optimisation"
+  // buttons can never appear together — and "OPTIMISE BASS" is never offered
+  // beside a re-test.
   const runControlIsRetest = journey.action === OPTIMISER_PRESENTATION_ACTION.RETEST
-    || journey.actionLabel === OPTIMISER_RETEST_LABEL;
+    || journey.actionLabel === OPTIMISER_RETEST_LABEL
+    || retestNeeded;
   const retestOwnsPrimary = runControlIsRetest
     && showAction
     && !panelShowsRerun
-    && !reoptimiseBusy;
+    // In the re-test state the calibration control is not drawn at all, so a
+    // calibration run in flight cannot take the primary from this one control.
+    && (retestNeeded || !reoptimiseBusy);
   const showBlocked = !!journey.blockReason && !isRunning;
 
   // Before the run, the panel states how many design options ADI will test and
@@ -440,9 +467,13 @@ export default function AdiOptimisationJourney({
   const primaryAction = resolveAdiPrimaryAction({
     isRunning,
     stale: summary.stale === true,
-    designApplicable: summary.actions?.canApply === true || panelShowsApply === true,
+    // The re-test state offers its ONE control and nothing to apply: an old
+    // candidate is never applied before it has been re-tested.
+    designApplicable: !retestNeeded
+      && (summary.actions?.canApply === true || panelShowsApply === true),
     nothingTested: summary.noRun === true,
     calibrationOffered: typeof onReoptimiseCalibration === "function"
+      && !retestNeeded
       && !reoptimiseBusy
       && !retestOwnsPrimary,
     runOffered: showAction && !panelShowsRerun,
@@ -518,6 +549,20 @@ export default function AdiOptimisationJourney({
     // recorded reason is read in Engineer details.
     finding: noImprovementConfirmed ? panelFinding : null,
   });
+
+  // ── THE OLD CANDIDATE MOVES TO ENGINEER DETAILS ──
+  // The candidate a previous run evaluated is not a recommendation in this state:
+  // its adjustment, what it was measured on, the reason it was not applied and
+  // its own P20 pair are read in Engineer details, and the main panel states only
+  // that it has to be re-tested. The design's own APPLIED calibration is not an
+  // old candidate — it is what is in the processor now — so it keeps the main
+  // panel. Resolved by the re-test authority.
+  const previousCandidate = resolvePreviousCandidate({
+    retestNeeded,
+    headline,
+    summary,
+  });
+
   return (
     <div
       className={`rounded-lg border px-4 py-3 space-y-3 ${className}`}
@@ -549,16 +594,20 @@ export default function AdiOptimisationJourney({
       {/* ── THE DECISION ── one adjustment, one benefit and one comparable P20
           pair, under the one status in the header. Everything the decision was
           measured from is in Engineer details below. A failure states its own
-          next step here, so Engineer details are never required to understand it. */}
+          next step here, so Engineer details are never required to understand it.
+          In the re-test state the old candidate's detail is NOT stated here: the
+          panel states why it has to be checked again, and the candidate itself is
+          read in Engineer details after the re-test. */}
       <AdiPanelSummary
         message={journey.message}
         nextAction={presentation?.nextAction || null}
-        adjustment={headline.adjustment}
-        benefit={headline.benefit}
-        comparison={headline.comparison}
+        adjustment={previousCandidate ? null : headline.adjustment}
+        benefit={previousCandidate ? null : headline.benefit}
+        comparison={previousCandidate ? null : headline.comparison}
         designLimitation={designLimitation}
-        staleCopy={summary.staleCopy}
-        previousBest={summary.previousBest}
+        previousCandidateNotice={previousCandidate ? OPTIMISER_RETEST_PREVIOUS_CANDIDATE : null}
+        staleCopy={previousCandidate ? null : summary.staleCopy}
+        previousBest={previousCandidate ? null : summary.previousBest}
       />
 
       {/* ── THE ACTIONS ── one primary control for the state, decided by the
@@ -572,9 +621,9 @@ export default function AdiOptimisationJourney({
           placement={placement}
           busy={isRunning}
           primary={primaryAction === ADI_PRIMARY_ACTION.DESIGN}
-          onApply={handleApplyPlacement}
-          onUndo={handleUndoPlacement}
-          onRerun={onRunOptimisationPlan}
+          onApply={retestNeeded ? null : handleApplyPlacement}
+          onUndo={retestNeeded ? null : handleUndoPlacement}
+          onRerun={retestNeeded ? null : onRunOptimisationPlan}
           variant="actions"
         />
 
@@ -583,11 +632,12 @@ export default function AdiOptimisationJourney({
           busy={isRunning}
           primary={primaryAction === ADI_PRIMARY_ACTION.DESIGN}
           // An ignored recommendation stops being offered for this session, so
-          // its Apply stands down; re-testing offers it again.
-          onApply={recommendationIgnored
+          // its Apply stands down; re-testing offers it again. In the re-test
+          // state the old candidate is not applied at all.
+          onApply={retestNeeded || recommendationIgnored
             ? null
             : (panelShowsApply ? null : handleApplyRecommended)}
-          onUndo={panelShowsUndo ? null : handleUndoRecommended}
+          onUndo={retestNeeded || panelShowsUndo ? null : handleUndoRecommended}
         />
 
         {/* The designer's own "no" — offered only while a genuine improvement is
@@ -604,10 +654,13 @@ export default function AdiOptimisationJourney({
             </button>
           )}
 
-        {/* No handler while the run control is already stating this same re-test:
-            one action, one button, one helper line. */}
+        {/* No second copy of the re-test in the re-test state, and no handler
+            while the run control is already stating this same re-test: one
+            action, one button, one helper line. */}
         <ReoptimiseCalibrationAction
-          onReoptimise={isRunning || retestOwnsPrimary ? null : onReoptimiseCalibration}
+          onReoptimise={retestNeeded || isRunning || retestOwnsPrimary
+            ? null
+            : onReoptimiseCalibration}
           busy={reoptimiseBusy}
           disabledReason={reoptimiseDisabledReason}
           primary={primaryAction === ADI_PRIMARY_ACTION.CALIBRATION}
@@ -637,10 +690,12 @@ export default function AdiOptimisationJourney({
       )}
 
       {/* The panel's run control — "Bass Optimiser" in every state that offers
-          it, or the bass calculation when that calculation is the required
-          action. It stands down while the placement panel is already stating
-          that same single action, so two run buttons can never appear. It is
-          drawn as the primary only when no other layer has claimed the primary. */}
+          it, the re-test itself in the re-test state, or the bass calculation
+          when that calculation is the required action. It stands down while the
+          placement panel is already stating that same single action, so two run
+          buttons can never appear. It is drawn as the primary only when no other
+          layer has claimed the primary — and always in the re-test state, where
+          it is the panel's one action. */}
       {showAction && !panelShowsRerun && (
         <div className="space-y-1">
         <button
@@ -654,7 +709,9 @@ export default function AdiOptimisationJourney({
           className={runIsPrimary ? ADI_RUN_PRIMARY_CLASS : ADI_RUN_SECONDARY_CLASS}
         >
           <Sparkles className="h-3.5 w-3.5" />
-          {journey.actionLabel}
+          {retestNeeded && journey.action !== ADI_OPTIMISER_ACTION.CALCULATE
+            ? OPTIMISER_RETEST_LABEL
+            : journey.actionLabel}
           <ArrowRight className="h-3.5 w-3.5" />
         </button>
 
@@ -693,6 +750,19 @@ export default function AdiOptimisationJourney({
               ? "Why no improvement"
               : "Why the evaluation stopped"}
           >
+          {/* The old candidate the re-test state keeps off the main panel: what it
+              changes, what it was measured on, the reason it was not applied and
+              its own P20 pair. Read here, after the re-test. */}
+          {previousCandidate && (
+            <AdiPreviousCandidateDetails
+              adjustment={previousCandidate.adjustment}
+              benefit={previousCandidate.benefit}
+              comparison={previousCandidate.comparison}
+              staleCopy={previousCandidate.staleCopy}
+              previousBest={previousCandidate.previousBest}
+            />
+          )}
+
           {(assessment || why) && (
             <div className="space-y-0.5">
               <div className="text-[10px] font-semibold uppercase tracking-wide text-[#8A7B6A]">Diagnosis</div>
@@ -860,73 +930,15 @@ export default function AdiOptimisationJourney({
             variant="evidence"
           />
 
-          {/* Absorption evidence — the frequency, how many seats share it, and
-              which levers were evaluated without becoming the recommendation. */}
-          {summary.absorption && (
-            <div className="space-y-0.5 text-[11px] text-[#3E4349] leading-relaxed">
-              <div className="text-[10px] font-semibold uppercase tracking-wide text-[#8A7B6A]">
-                Low-frequency absorption evidence
-              </div>
-              {summary.absorption.headline && (
-                <div>{summary.absorption.headline}</div>
-              )}
-              {summary.absorption.location && (
-                <div>{summary.absorption.location}</div>
-              )}
-              {summary.absorption.frequencyText && (
-                <div>Limiting frequency: {summary.absorption.frequencyText}</div>
-              )}
-              {summary.absorption.affectedSeatCount > 0 && (
-                <div>Seats sharing this frequency: {summary.absorption.affectedSeatCount}</div>
-              )}
-              <div>Advice status: {summary.absorption.status}</div>
-              <div>
-                Placement already evaluated: {summary.absorption.placementEvaluated ? "yes" : "no"}
-                {" · "}
-                Seat-to-seat trade-off found: {summary.absorption.tradedOff ? "yes" : "no"}
-              </div>
-              {summary.attemptsWithoutGain.length > 0 && (
-                <div>Evaluated without becoming the recommendation: {summary.attemptsWithoutGain.join(", ")}</div>
-              )}
-            </div>
-          )}
-
-          {/* The seating recommendation's own evaluation evidence — the worst
-              seat, the other RP22 movements and whether every destination seat
-              position is legal. Kept out of the default panel. */}
-          {summary.seatingRecommendation && (
-            <div className="space-y-0.5 text-[11px] text-[#3E4349] leading-relaxed">
-              <div className="text-[10px] font-semibold uppercase tracking-wide text-[#8A7B6A]">
-                Seating recommendation evidence
-              </div>
-              {summary.seatingRecommendation.worstSeat && (
-                <div>Worst seat after the move: {summary.seatingRecommendation.worstSeat}</div>
-              )}
-              {summary.seatingRecommendation.p19Delta && (
-                <div>P19 {summary.seatingRecommendation.p19Delta}</div>
-              )}
-              {summary.seatingRecommendation.p14Delta && (
-                <div>P14 {summary.seatingRecommendation.p14Delta}</div>
-              )}
-              {summary.seatingRecommendation.p18DeltaHz != null
-                && Math.abs(Math.round(summary.seatingRecommendation.p18DeltaHz)) > 0 && (
-                  <div>
-                    P18 extension {summary.seatingRecommendation.p18DeltaHz >= 0 ? "+" : "−"}
-                    {Math.abs(Math.round(summary.seatingRecommendation.p18DeltaHz))} Hz
-                  </div>
-              )}
-              <div>
-                {summary.seatingRecommendation.destinationsValid === true
-                  ? `Every destination seat position checked: valid (${summary.seatingRecommendation.validationBasis}).`
-                  : summary.seatingRecommendation.destinationsValid === false
-                    ? `Destination positions not applied: ${summary.seatingRecommendation.validationReason || "a destination seat position is not legal in this room."}`
-                    : "Destination seat positions were validated by the optimiser before evaluation."}
-              </div>
-              {summary.seatingRecommendation.tradeOff && (
-                <div>Trade-off: {summary.seatingRecommendation.tradeOff}</div>
-              )}
-            </div>
-          )}
+          {/* The two evidence groups behind the recommendation — the absorption
+              the measurement points at, and the seating recommendation's own
+              evaluation. They render only when their evidence exists, and are
+              kept out of the default panel. */}
+          <AdiRecommendationEvidenceGroups
+            absorption={summary.absorption}
+            attemptsWithoutGain={summary.attemptsWithoutGain}
+            seatingRecommendation={summary.seatingRecommendation}
+          />
 
           {/* The missing on-plan preview is a limitation of the evidence, not a
               warning about the recommendation, so it is stated here. */}
