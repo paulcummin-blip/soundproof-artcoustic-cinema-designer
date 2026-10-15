@@ -8,8 +8,19 @@
 import React from 'react';
 import { proposalRoleStyle } from '@/components/proposal/typography/proposalTypography';
 
-/** A stated physical count, or null when the row carries none. */
-const statedQty = (row) => (Number.isFinite(Number(row?.qty)) ? Number(row.qty) : null);
+/**
+ * A stated physical count, or null when the row carries none.
+ *
+ * AN UNREAD COUNT IS NOT A ZERO. Number(null) is 0 and would print a false Qty 0
+ * beside a real model, so a row that carries no count is read as carrying none and
+ * leaves its cell empty; only a stated, positive count is printed.
+ */
+const statedQty = (row) => {
+  const value = row?.qty;
+  if (value === null || value === undefined || value === '') return null;
+  const qty = Number(value);
+  return Number.isFinite(qty) && qty > 0 ? qty : null;
+};
 
 export default function ProposalProductTable({ rows = [], compact = false, className = '' }) {
   const list = (rows || []).filter((row) => row && (row.role || row.model));

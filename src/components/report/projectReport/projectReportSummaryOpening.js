@@ -263,7 +263,9 @@ export function buildProjectReportSummaryOpening({
     const focus = [
       productParts(productsSelected?.lcr).length > 0 && 'clear dialogue from the screen',
       surroundCount > 0 && 'surround movement around the seating',
-      subwooferSchedule.length > 0 && `useful bass support ${statedBassPhrase(subwooferSchedule)}`,
+      // Never "useful bass support": the shared writing authority bans that hedge,
+      // and the subwoofers' own contribution is stated without qualifier.
+      subwooferSchedule.length > 0 && `bass support ${statedBassPhrase(subwooferSchedule)}`,
     ].filter(Boolean);
     if (focus.length > 0) reasoning.push(`The system gives ${joinList(focus)}.`);
   } else {

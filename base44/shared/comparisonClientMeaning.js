@@ -17,6 +17,8 @@
  * Pure: no React, no side effects, no runtime APIs.
  */
 
+import { PERFORMANCE_AREAS, performanceSentence } from './performanceLanguageAuthority.js';
+
 /** A row whose values state a Level 1 or Level 2 result is not a strength. */
 const LOW_GRADE = /\bL[12]\b/i;
 
@@ -57,7 +59,9 @@ const MODEST = Object.freeze({
   p14: 'Low-frequency output supports the room, with less spare capacity than the main channels.',
   p16: 'The screen channels keep a broadly consistent tonal character, with some variation across the screen.',
   p17: 'Surround and overhead tone stays reasonably consistent, with some variation as effects move around the room.',
-  p18: 'Bass extension is useful for film effects without reaching the deepest content.',
+  // P18 is deliberately absent: bass extension is never stated from a hedge, and never
+  // as what the system does not reach. It is read from the shared register at the level
+  // the result states (see comparisonClientMeaning below).
   p19: 'Bass response is set at the reference seating position, with the variation the response shows there.',
   p20: 'Bass level varies between seats as the room and the subwoofer positions allow.',
   p2: 'The channel count follows the format the room is designed to, built from the positions this room allows.',
@@ -91,6 +95,17 @@ const SHARED = Object.freeze({
 const GENERAL_GAIN = 'Part of how this option performs as a whole in the room.';
 
 /**
+ * BASS EXTENSION IS STATED IN THE SHARED REGISTER, at the level the values state.
+ * A moderate extension is the depth it gives the soundtrack, in the authority's own
+ * words for that level, and the copy never says what the system fails to reach. Where
+ * no level can be read, the lowest level's wording stands, so a claim is never upgraded.
+ */
+function bassExtensionLine(stated) {
+  const level = /\bL4\b/i.test(stated) ? 'L4' : /\bL3\b/i.test(stated) ? 'L3' : /\bL2\b/i.test(stated) ? 'L2' : 'L1';
+  return performanceSentence(PERFORMANCE_AREAS.BASS_EXTENSION, level);
+}
+
+/**
  * @param {{ key?: string, values?: string[], identical?: boolean }} row
  * @returns {string}
  */
@@ -104,7 +119,9 @@ export default function comparisonClientMeaning(row) {
 
   // A difference the evidence states at Level 1 or Level 2 is described as the
   // real capability it is, with what limits it. It is never sold as a strength.
-  if (LOW_GRADE.test(stated)) return MODEST[key] || gain;
+  // P18 takes its line from the shared register rather than from a hedge: the depth
+  // the system reached is stated, and nothing is said about what it does not reach.
+  if (LOW_GRADE.test(stated)) return (key === 'p18' ? bassExtensionLine(stated) : MODEST[key]) || gain;
 
   return gain;
 }

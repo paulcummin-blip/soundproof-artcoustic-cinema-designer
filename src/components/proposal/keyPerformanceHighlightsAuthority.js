@@ -23,6 +23,9 @@
 
 import { DISPLAY_UNIT, formatResultText } from './displayValueFormat';
 import { excludeClientFacingRows } from './designIndexRowAuthority';
+// The bass-extension register is the writing authority's own (see the mirror's
+// header): the depth a result reached is told in the approved words for its level.
+import { bassExtensionSentence } from '@/shared/bassExtensionLanguage';
 
 /** The performance areas a client-facing row may belong to, in table order. */
 export const HIGHLIGHT_AREA = Object.freeze({
@@ -375,7 +378,10 @@ const MODEST_GAIN = Object.freeze({
   p14: 'Low-frequency output supports the room, with less spare capacity than the main channels.',
   p16: 'The screen channels keep a broadly consistent tonal character, with some variation across the screen.',
   p17: 'Surround and overhead tone stays reasonably consistent, with some variation as effects move around the room.',
-  p18: 'Bass extension is useful for film effects without reaching the deepest low-frequency content.',
+  // P18 is deliberately absent: bass extension is never stated from a hedge. It is
+  // told in the shared register at the level the result states (bassExtensionSentence),
+  // so a moderate result is stated as the depth it gives the soundtrack and the copy
+  // never tells the client what the system does not reach.
   // P19 is the response AT the reference seating position: its line never
   // claims evenness across the seats, which is P20's result to state.
   p19: 'Bass response is set at the reference seating position, with the variation the response shows there.',
@@ -423,7 +429,12 @@ export function comparisonClientMeaning(row) {
   // never described as a strength, and an evenness claim needs a stated level
   // that supports it.
   const unsupportedClaim = CONSISTENCY_ROW_KEYS.includes(key) && !SUPPORTED_GRADE.test(stated);
-  return low || unsupportedClaim ? (MODEST_GAIN[key] || approved) : approved;
+  if (!(low || unsupportedClaim)) return approved;
+  // BASS EXTENSION COMES FROM THE SHARED REGISTER, at the level the result states:
+  // Level 1 and Level 2 keep their own approved wording rather than a hedge, and
+  // nothing is said about the depth the system does not reach.
+  if (key === 'p18') return bassExtensionSentence(stated);
+  return MODEST_GAIN[key] || approved;
 }
 
 /** The performance area for a row. */
@@ -500,7 +511,9 @@ export function buildHighlightDisplayRows(rows, options = {}) {
         // The column is never blank: the approved line for the parameter stands
         // in whenever the generated sentence is missing or too thin to use.
         gain: (consistencyClaimUnsupported || (lowGrade && (!short || oversold)))
-          ? (MODEST_GAIN[key] || proposed)
+          // The same rule as the comparison column: a bass-extension row is stated in
+          // the shared register at its own level, never in a hedge.
+          ? (key === 'p18' ? bassExtensionSentence(stated) : (MODEST_GAIN[key] || proposed))
           : proposed,
       };
     })

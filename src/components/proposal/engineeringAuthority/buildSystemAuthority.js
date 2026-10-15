@@ -94,7 +94,10 @@ export function buildSystemAuthority(project, _version, placedSpeakers) {
   // version's own placed speakers with the Current Speaker Design schedule's own
   // rule — the equipment checklist the proposal states. The front stage states its
   // own counts above, position by position.
-  const roleQuantities = speakerRoleQuantities(placedSpeakers);
+  // Read from the SAME speakers the roles and the front stage are read from: the
+  // version's own placed loudspeakers. Reading a separately passed placements array
+  // here is what let a position state a model beside a count of 0.
+  const roleQuantities = speakerRoleQuantities(designSpeakers);
   if (frontStageByPosition) productRoles.push(...frontStageProductRoles(frontStage));
   for (const [role, model] of Object.entries(speakersByRole)) {
     if (!model) continue;
@@ -112,7 +115,10 @@ export function buildSystemAuthority(project, _version, placedSpeakers) {
       // The physical loudspeakers this role holds, for the package's own Qty
       // column. Null when the count cannot be read, so a row states no figure
       // rather than an invented one.
-      quantity: roleQuantities[role] ?? null,
+      // A count of zero is no count, and is never stated as one: a row either carries
+      // the physical loudspeakers it holds or leaves the figure unstated. Defaulting a
+      // missing quantity to 0 is an authority failure, and the Qty column never prints it.
+      quantity: Number(roleQuantities[role]) > 0 ? roleQuantities[role] : null,
     });
   }
 
