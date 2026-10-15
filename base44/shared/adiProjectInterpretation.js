@@ -131,7 +131,9 @@ function hasModelMatching(productRoles, pattern) {
 // ─────────────────────────────────────────────────────────────────────────────
 
 function deriveRoomType({ volumeM3, rowCount, totalSeats, projection, tv }) {
-  if (tv) return 'TV-based cinema room';
+  // A television design is a media lounge: the room's name never rises to cinema
+  // language because of a format, a channel count or a capability.
+  if (tv) return 'Media lounge';
   // More than one seating row defines the room's nature, so multi-row wins over
   // the generic dedicated-cinema classification.
   if (rowCount >= 2) return 'Multi-row cinema';

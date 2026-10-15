@@ -54,6 +54,29 @@ export function stripDuplicateLeadingHeading(html, title) {
   return out;
 }
 
+// ── The room's own name ─────────────────────────────────────────────────────
+
+/**
+ * A television design is a media lounge, and the published page names the room
+ * the way the project is used. A stored body written under an older vocabulary
+ * still calls it a "TV-based cinema room", which reads as a different project:
+ * the wording is corrected on the way to the page. Wording only — the stored
+ * record is never modified, and no level, figure, product or claim is touched.
+ *
+ * The same rewrite is applied to the approved copy the published page is checked
+ * against (see permittedPreparation), so the check compares like with like and a
+ * corrected room name can never be reported as missing copy.
+ */
+const ROOM_NAME_REWRITES = Object.freeze([
+  [/\bTV[- ]based\s+(?:cinema|media|screening)\s+room\b/gi, 'media lounge'],
+  [/\btelevision[- ]based\s+(?:cinema|media|screening)\s+room\b/gi, 'media lounge'],
+]);
+
+export function useRoomOwnName(html) {
+  if (typeof html !== 'string' || !html.trim()) return html;
+  return ROOM_NAME_REWRITES.reduce((out, [pattern, replacement]) => out.replace(pattern, replacement), html);
+}
+
 // ── Blocks, sentences and paragraphs ────────────────────────────────────────
 
 /** Drop whole list and table blocks from a section body. */
@@ -227,7 +250,7 @@ export function stripHighChannelUpgradeCopy(html) {
  * @returns {string}
  */
 export function preparePublishedSectionBody(html, section = {}) {
-  const deduped = stripDuplicateLeadingHeading(html, section.title);
+  const deduped = stripDuplicateLeadingHeading(useRoomOwnName(html), section.title);
   const cleaned = section.highChannel ? stripHighChannelUpgradeCopy(deduped) : deduped;
   if (section.sectionType === 'key_performance_highlights') {
     // The calculated table is the only table in this section: a list or table
@@ -254,7 +277,7 @@ export function preparePublishedSectionBody(html, section = {}) {
  * paragraph is required to survive to the published page.
  */
 function permittedPreparation(html, section = {}) {
-  const deduped = stripDuplicateLeadingHeading(html, section.title);
+  const deduped = stripDuplicateLeadingHeading(useRoomOwnName(html), section.title);
   if (section.sectionType === 'key_performance_highlights') return stripListAndTableBlocks(deduped);
   if (section.proseOnly && PROSE_ONLY_SECTIONS.has(section.sectionType)) {
     const isComparisonSummary = section.proposalType === 'comparison'

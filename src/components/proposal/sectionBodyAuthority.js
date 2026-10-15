@@ -75,6 +75,25 @@ export function stripListAndTableBlocks(html) {
     .trim();
 }
 
+/**
+ * THE ROOM KEEPS ITS OWN NAME. A stored body written under an older room
+ * vocabulary calls a television design a "TV-based cinema room"; the page names
+ * the room the way the project is used. Wording only: the stored record is never
+ * modified, and no level, figure, product or claim is touched. The published page
+ * is prepared with this same rule on the server
+ * (base44/shared/proposalEdit/publishedSectionPreparation.js), so the document
+ * the dealer reads on screen is the document that prints.
+ */
+const ROOM_NAME_REWRITES = Object.freeze([
+  [/\bTV[- ]based\s+(?:cinema|media|screening)\s+room\b/gi, 'media lounge'],
+  [/\btelevision[- ]based\s+(?:cinema|media|screening)\s+room\b/gi, 'media lounge'],
+]);
+
+export function useRoomOwnName(html) {
+  if (typeof html !== 'string' || !html.trim()) return html;
+  return ROOM_NAME_REWRITES.reduce((out, [pattern, replacement]) => out.replace(pattern, replacement), html);
+}
+
 /** Plain text of a body: tags, entities and extra spaces removed. */
 export function plainTextOf(html) {
   if (html === null || html === undefined) return '';
@@ -115,7 +134,7 @@ const PROSE_ONLY_SECTIONS = new Set([
 ]);
 
 export function prepareSectionBody(html, section = {}) {
-  const deduped = stripDuplicateLeadingHeading(html, section.title);
+  const deduped = stripDuplicateLeadingHeading(useRoomOwnName(html), section.title);
   // A high-channel-count design never carries an added-speaker or spacing
   // upgrade, whatever an older stored body still says: the copy is cleaned on the
   // way to the page and the stored record is never rewritten.

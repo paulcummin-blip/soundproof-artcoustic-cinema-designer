@@ -54,7 +54,7 @@ export const DESIGN_SUMMARY_SHORT_FORM = Object.freeze({
  * everyday use come from this project's own frozen evidence.
  */
 const SHORT_FORM_REQUIREMENT = [
-  'This is a TV-based media room with a listener-level surround layout, so make the point and stop.',
+  'This is a media lounge with a listener-level surround layout, so make the point and stop.',
   'Write two short paragraphs, 80 to 120 words in total, three or four sentences at most, and never more than the word limit. A simple, well-designed 5.1 system performs extremely well here, and the client does not need the reasoning behind that.',
   'First paragraph: name the display exactly as the frozen evidence names it, say in one sentence how the system is arranged, and state plainly that a well-designed layout of this kind delivers excellent performance.',
   'Second paragraph: what that arrangement gives the room day to day, with the display anchoring it and the front speakers, the side surrounds and the subwoofers working together around the main seating area: clear dialogue, proper surround movement and strong bass support when the content calls for it, and relaxed everyday use for sport, box sets, films and music.',
@@ -83,8 +83,8 @@ export const DESIGN_OVERVIEW_SHORT_FORM = Object.freeze({
  * naming the phrases the writer is refused so the refusal is unambiguous.
  */
 const OVERVIEW_SHORT_FORM_REQUIREMENT = [
-  'This is a TV-based media room, so write the arrangement and what it gives the client, and stop there: two short paragraphs, 80 to 130 words in total and no more than five sentences.',
-  'First paragraph: the system as the client will experience it. A relaxed high-performance TV room built around the display, named exactly as the frozen evidence names it, and a simple, well-executed 5.1 system: the front speakers keeping dialogue and screen sound locked to the picture, and the side surrounds adding movement and space around the seating.',
+  'This is a media lounge, so write the arrangement and what it gives the client, and stop there: two short paragraphs, 80 to 130 words in total and no more than five sentences.',
+  'First paragraph: the system as the client will experience it. A relaxed high-performance media lounge built around the display, named exactly as the frozen evidence names it, and a simple, well-executed 5.1 system: the front speakers keeping dialogue and screen sound locked to the picture, and the side surrounds adding movement and space around the seating.',
   'Second paragraph: the bass support the subwoofers give the soundtrack, the acoustic treatment the frozen evidence states, and what that gives the client day to day: films, box sets, sport and music, with the room staying clear and controlled without feeling over-treated.',
   'Write it as the designer explaining the room in person, plain and confident, and do not repeat the Design Summary.',
   'Never list a channel count and never write "5 discrete channels": say what the system is and what it does for the room. Never name a layer, a format or a loudspeaker the design does not include, and never write "no overhead channels are specified".',

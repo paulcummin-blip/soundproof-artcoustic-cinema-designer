@@ -7,6 +7,7 @@ import {
   changeCellText,
   comparisonClientMeaning,
 } from '@/components/proposal/keyPerformanceHighlightsAuthority';
+import { curateSummaryHighlights } from '@/components/proposal/highlightsSelectionAuthority';
 
 /**
  * KeyPerformanceHighlightsTable
@@ -157,7 +158,11 @@ export default function KeyPerformanceHighlightsTable({
     );
   }
 
-  const list = buildHighlightDisplayRows(rows, { viewingResult });
+  // The summary table states what this design does well, not everything that was
+  // assessed: the design's own facts, then the results that earned a highlight by
+  // their ASDR importance, their area's relevance and the result they reached.
+  // The selection is a presentation decision — the stored rows are never modified.
+  const list = buildHighlightDisplayRows(curateSummaryHighlights(rows), { viewingResult });
   if (list.length === 0) return null;
 
   return (

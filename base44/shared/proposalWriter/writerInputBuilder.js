@@ -51,6 +51,7 @@ import {
 import {
   CLIENT_NARRATIVE_REGISTER_RULE,
   PROPOSAL_PARAMETER_RESTRAINT_RULE,
+  PROJECT_VOCABULARY_RULE,
 } from '../clientNarrativeRegister.js';
 import { clientStoryPillarRules } from '../narrativePillarGrouping.js';
 
@@ -344,9 +345,10 @@ export function buildWriterInput({
       display: 'name the display exactly as the frozen evidence names it; where it is a TV write the TV and never a screen size, aspect ratio, viewable width or projector word',
       report_voice: 'never write assessed at, published result, results are derived from, technical evaluation of, engineering model, performance results, stated on its own result or according to the report in main prose; Appendix is concise source attribution only',
       duplication: 'no sentence of ten or more words repeated across sections; no near-verbatim evidence-sentence reuse; a repeated fact must do a different editorial job',
-      figures: 'normally use each figure once: benefit-led Highlights, proof in Dynamic Range, experience-led closing without figures',
+      figures: 'normally use each figure once: benefit-led Highlights, the capability itself explained in Dynamic Range with every exact value left to the evidence table, experience-led closing without figures; no dBC value is written into narrative prose as the point of a sentence',
       tonal_scope: 'all-seat tonal consistency is only tonal character, not whole-experience equality, balanced seats, bass consistency or placement consistency',
       plain_language: 'no raw L1/L2/L3/L4 or RP22 Level language in prose; no (OH), write overhead channels',
+      project_vocabulary: PROJECT_VOCABULARY_RULE,
       comparative: single
         ? 'single-option proposal: never compare to a baseline or another option (no increase, greater, improved, more capable, additional headroom, higher output, upgrade or compared to)'
         : 'comparison proposal: comparing the options is the point, so state the differences directly',

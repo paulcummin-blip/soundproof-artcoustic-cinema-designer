@@ -51,7 +51,17 @@ export const CLIENT_NARRATIVE_REGISTER_RULE = [
  * The proposal's own evidence-use rule: evidence supports the story, it is never
  * the story.
  */
-export const PROPOSAL_PARAMETER_RESTRAINT_RULE = 'EVIDENCE SUPPORTS THE STORY, IT IS NEVER THE STORY: the main proposal narrative carries the high-level facts the client is choosing between (the display, the system, the products, and a strong result stated naturally) and leaves the measurements to the sections and the report that carry them. Never bring an exact boundary distance, a loudspeaker spacing, an angle or a parameter number into the Design Summary, the Design Overview, Key Performance Highlights or the closing narrative, and never write a parameter-by-parameter account of the design. A figure earns its place in the story only where it states a key result the client asked about or a result the section exists to prove.';
+/**
+ * WHAT THE ROOM IS CALLED. The room keeps one name through the whole document,
+ * and the name is the one the project's own use supports: a television design is
+ * a media lounge, and the wording changes only between the natural alternatives
+ * ("media lounge", "TV room", a "high-performance TV system") where repetition
+ * needs avoiding. It never drifts into cinema language the project does not have
+ * — not in the summary, not in the pillars, not in the closing.
+ */
+export const PROJECT_VOCABULARY_RULE = 'THE ROOM KEEPS ONE NAME, AND THE NAME IS THE PROJECT\'S OWN: a television design is a media lounge. Write "media lounge" as the room\'s name, and where the wording needs a change use "TV room" or the "high-performance TV system"; the room is never "TV-based cinema room", never a "dedicated cinema", a "screening room" or a "theatre" unless the designer\'s own brief asks for cinema-room language, and never "home cinema room" as a label for a lounge. The name never changes from section to section, never changes with the strength of a result, and never rises to cinema language because a component is capable: a media lounge with exceptional bass is still a media lounge. Where the evidence names the display, state the display by its own name (the TV, the screen size); the display\'s name and the room\'s name are different things.';
+
+export const PROPOSAL_PARAMETER_RESTRAINT_RULE = 'EVIDENCE SUPPORTS THE STORY, IT IS NEVER THE STORY: the main proposal narrative carries the high-level facts the client is choosing between (the display, the system, the products, and a strong result stated naturally) and leaves the measurements to the sections and the report that carry them. Never bring an exact boundary distance, a loudspeaker spacing, an angle or a parameter number into the Design Summary, the Design Overview, Key Performance Highlights or the closing narrative, and never write a parameter-by-parameter account of the design. A figure earns its place in the story only where it states a key result the client asked about or a result the section exists to prove. NO MEASUREMENT STANDS IN FOR THE EXPERIENCE: no output figure — no dBC value, however strong — is written into the narrative as the point of a sentence. The evidence table prints every exact figure the client can read, so the prose says what that capability gives the room and leaves the number to the table. A figure appears in the narrative only where the number itself genuinely helps the client understand the design, such as how low the bass system reaches.';
 
 /**
  * Clause-level rewrites: plain client wording, with no meaning invented. The

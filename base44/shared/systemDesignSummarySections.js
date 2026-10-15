@@ -153,7 +153,7 @@ Do not list parameters mechanically and do not include a table.
 
 Choose the results that matter most for this room from the Dynamic Range results present in the supplied Sound Proof calculated data, for example screen dynamic range, non-screen dynamic range and the subwoofer system output. Do not work through them all, and use no more than one parameter code in the section.
 
-Use the dBC values and the RP22 levels exactly as supplied as supporting evidence, and let the listening experience carry the section: how quiet detail is resolved, how a powerful soundtrack moment arrives, and the contrast between the two in this room. Lead with what the client hears and place the figures where they explain it; the numbers support that account and are never the whole story.
+Let the listening experience carry the section: how quiet detail is resolved, how a powerful soundtrack moment arrives, and the contrast between the two in this room. Lead with what the client hears, then with what each part of the system gives that experience — the front stage for dialogue and screen action, the surrounds as the mix becomes demanding, the bass system underneath those moments — and leave the numbers to the evidence table, which prints every dBC value and RP22 level the client can read for themselves. Do not write an output figure into the prose: no sentence makes "99 dBC" or "109 dBC" its point. A measurement appears here only where the number itself genuinely helps the client understand the design, such as how low the bass system reaches.
 
 Explain in plain language how that headroom benefits dialogue, music and film effects at the listening level the design assumes.
 
