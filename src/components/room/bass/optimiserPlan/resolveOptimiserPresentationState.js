@@ -27,6 +27,7 @@ import {
   resolveOptimiserFailure,
 } from "./optimiserFailureReason.js";
 import { CALIBRATION_LEVER_KEYS } from "./adiPanelSections.js";
+import { TRADE_OFF_HEADLINE } from "./optimiserTradeOffState.js";
 
 /** The complete set of optimiser presentation states. */
 export const OPTIMISER_PRESENTATION_STATE = Object.freeze({
@@ -37,6 +38,13 @@ export const OPTIMISER_PRESENTATION_STATE = Object.freeze({
   EVALUATION_INCOMPLETE: "evaluation_incomplete",
   STALE: "stale",
   FAILED: "failed",
+  /**
+   * The completed run's best change improves the overall result but worsens a
+   * protected primary seat (or materially damages the other protected
+   * objective). A designer decision, never an optimiser success — so it is never
+   * badged "Improvement Found" and never applied on ADI's own authority.
+   */
+  TRADE_OFF: "trade_off",
 });
 
 /**
@@ -62,6 +70,12 @@ export const OPTIMISER_OUTCOME = Object.freeze({
   NO_IMPROVEMENTS: "no_improvements",
   IMPROVEMENTS_FOUND: "improvements_found",
   PHYSICAL_CHANGE: "physical_change",
+  /**
+   * The overall result improves but a protected primary seat (or the other
+   * protected objective) gets worse. Not an actionable improvement: the designer
+   * approves the trade-off deliberately, or keeps the current design.
+   */
+  TRADE_OFF: "trade_off",
   RETEST_NEEDED: "retest_needed",
   BASS_UPDATE_REQUIRED: "bass_update_required",
   UNABLE_TO_EVALUATE: "unable_to_evaluate",
@@ -76,6 +90,7 @@ export const OPTIMISER_OUTCOME_LABEL = Object.freeze({
   [OPTIMISER_OUTCOME.NO_IMPROVEMENTS]: "No Improvement Found",
   [OPTIMISER_OUTCOME.IMPROVEMENTS_FOUND]: "Improvement Found",
   [OPTIMISER_OUTCOME.PHYSICAL_CHANGE]: "Physical Change Recommended",
+  [OPTIMISER_OUTCOME.TRADE_OFF]: "Trade-off Found",
   [OPTIMISER_OUTCOME.RETEST_NEEDED]: "Re-test Needed",
   [OPTIMISER_OUTCOME.BASS_UPDATE_REQUIRED]: "Bass Performance Needs Updating",
   [OPTIMISER_OUTCOME.UNABLE_TO_EVALUATE]: "Unable To Evaluate",
@@ -98,6 +113,7 @@ export const OPTIMISER_OUTCOME_BY_STATE = Object.freeze({
   [OPTIMISER_PRESENTATION_STATE.EVALUATION_INCOMPLETE]: OPTIMISER_OUTCOME.RETEST_NEEDED,
   [OPTIMISER_PRESENTATION_STATE.STALE]: OPTIMISER_OUTCOME.RETEST_NEEDED,
   [OPTIMISER_PRESENTATION_STATE.FAILED]: OPTIMISER_OUTCOME.UNABLE_TO_EVALUATE,
+  [OPTIMISER_PRESENTATION_STATE.TRADE_OFF]: OPTIMISER_OUTCOME.TRADE_OFF,
 });
 
 /**
@@ -120,6 +136,12 @@ export const OPTIMISER_OUTCOME_COPY = Object.freeze({
     // The change itself is stated with its own Apply/Undo controls below, and it
     // is never applied by ADI.
     detail: "The change is stated below. ADI has not applied it.",
+  },
+  [OPTIMISER_OUTCOME.TRADE_OFF]: {
+    message: TRADE_OFF_HEADLINE,
+    // The protected seat and its own change are stated below the headline, and
+    // the deliberate Apply lives inside the review — never on this card.
+    detail: null,
   },
   [OPTIMISER_OUTCOME.RETEST_NEEDED]: {
     message: OPTIMISER_RETEST_MESSAGE,
