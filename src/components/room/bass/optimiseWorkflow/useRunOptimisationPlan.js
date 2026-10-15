@@ -232,8 +232,10 @@ export default function useRunOptimisationPlan({
       });
 
       if (!persistedPlan && !runEvidence) {
+        const reason = "The optimiser returned no usable result for this design. Re-run the Optimisation Plan.";
+        saveRunFailure(reason);
         setStatus("failed");
-        setError("The optimiser returned no usable result for this design. Re-run the Optimisation Plan.");
+        setError(reason);
         return;
       }
 
