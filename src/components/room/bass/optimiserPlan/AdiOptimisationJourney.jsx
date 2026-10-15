@@ -66,6 +66,7 @@ import OptimisationPlanStatus from "./OptimisationPlanStatus.jsx";
 import OptimiserRunEvidenceBlock from "./OptimiserRunEvidenceBlock.jsx";
 import OptimiserCalculationEstimateLine from "./OptimiserCalculationEstimateLine.jsx";
 import OptimiserCalculationDetail from "./OptimiserCalculationDetail.jsx";
+import AdiSubwooferGroupingBlock from "./AdiSubwooferGroupingBlock.jsx";
 import AdiTestedOptionsTable from "./AdiTestedOptionsTable.jsx";
 import AdiTestedSection from "./AdiTestedSection.jsx";
 import AdiCalibrationSection from "./AdiCalibrationSection.jsx";
@@ -934,6 +935,12 @@ export default function AdiOptimisationJourney({
               On-plan preview: not yet available for this change.
             </div>
           )}
+
+          {/* How the physical subwoofer layout was grouped for the electronic
+              searches — one, two, three or four active sources, grouped from
+              where each source actually sits. Stated here, in Engineer details,
+              because the grouped results below are read against it. */}
+          <AdiSubwooferGroupingBlock instances={instances} roomDims={roomDims} />
 
           {/* The pre-run statement of the work: how many design options ADI will
               evaluate and the acoustic calculations behind them. Stated ONCE, in
