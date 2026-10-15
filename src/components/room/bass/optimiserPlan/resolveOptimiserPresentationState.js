@@ -65,6 +65,10 @@ export const OPTIMISER_OUTCOME_BY_STATE = Object.freeze({
 /** The one control the re-test outcomes offer, worded as the next step. */
 export const OPTIMISER_RETEST_LABEL = "Re-test Bass Optimisation";
 
+/** The one helper line under that control: what pressing it may write. */
+export const OPTIMISER_RETEST_HELPER_SENTENCE =
+  "ADI re-checks the current design and only proposes a change where it improves the result.";
+
 /** Status pill label for every state — exactly one label per state. */
 export const OPTIMISER_PRESENTATION_LABEL = Object.freeze({
   [OPTIMISER_PRESENTATION_STATE.NO_RUN]: "Optimisation required",

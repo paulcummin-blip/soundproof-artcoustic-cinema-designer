@@ -48,7 +48,12 @@ import {
   ADI_OPTIMISER_JOURNEY_STATE,
   resolveAdiOptimiserJourney,
 } from "./resolveAdiOptimiserJourney.js";
-import { OPTIMISER_OUTCOME, OPTIMISER_PRESENTATION_STATE } from "./resolveOptimiserPresentationState.js";
+import {
+  OPTIMISER_OUTCOME,
+  OPTIMISER_PRESENTATION_ACTION,
+  OPTIMISER_PRESENTATION_STATE,
+  OPTIMISER_RETEST_HELPER_SENTENCE,
+} from "./resolveOptimiserPresentationState.js";
 import AdiEngineerDetailsPanel from "./AdiEngineerDetailsPanel.jsx";
 import {
   ignoreOptimiserRecommendation,
@@ -350,6 +355,15 @@ export default function AdiOptimisationJourney({
     : null;
 
   const showAction = !!journey.action && journey.canRun && !isRunning;
+  // ── ONE RE-TEST ──
+  // In the re-test outcomes the panel's own run control is worded as the re-test
+  // itself. While that control is drawn it IS the re-test: it owns the primary
+  // action, and the calibration control beside it draws no second copy of the
+  // same button or its helper line.
+  const retestOwnsPrimary = journey.action === OPTIMISER_PRESENTATION_ACTION.RETEST
+    && showAction
+    && !panelShowsRerun
+    && !reoptimiseBusy;
   const showBlocked = !!journey.blockReason && !isRunning;
   const statusMessage = runStatus === "failed" && runError ? runError : journey.blockReason?.message;
 
@@ -407,13 +421,17 @@ export default function AdiOptimisationJourney({
     stale: summary.stale === true,
     designApplicable: summary.actions?.canApply === true || panelShowsApply === true,
     nothingTested: summary.noRun === true,
-    calibrationOffered: typeof onReoptimiseCalibration === "function" && !reoptimiseBusy,
+    calibrationOffered: typeof onReoptimiseCalibration === "function"
+      && !reoptimiseBusy
+      && !retestOwnsPrimary,
     runOffered: showAction && !panelShowsRerun,
   });
   // The run control stays prominent whenever neither the design recommendation
-  // nor the calibration action has claimed the primary.
-  const runIsPrimary = primaryAction !== ADI_PRIMARY_ACTION.DESIGN
-    && primaryAction !== ADI_PRIMARY_ACTION.CALIBRATION;
+  // nor the calibration action has claimed the primary — and always when it is
+  // the one control stating the re-test.
+  const runIsPrimary = retestOwnsPrimary
+    || (primaryAction !== ADI_PRIMARY_ACTION.DESIGN
+      && primaryAction !== ADI_PRIMARY_ACTION.CALIBRATION);
 
   // A recommendation sentence belongs to the layer whose change it describes: an
   // electronic change to calibration, a physical change to the design
@@ -572,8 +590,10 @@ export default function AdiOptimisationJourney({
             </button>
           )}
 
+        {/* No handler while the run control is already stating this same re-test:
+            one action, one button, one helper line. */}
         <ReoptimiseCalibrationAction
-          onReoptimise={isRunning ? null : onReoptimiseCalibration}
+          onReoptimise={isRunning || retestOwnsPrimary ? null : onReoptimiseCalibration}
           busy={reoptimiseBusy}
           disabledReason={reoptimiseDisabledReason}
           primary={primaryAction === ADI_PRIMARY_ACTION.CALIBRATION}
@@ -608,6 +628,7 @@ export default function AdiOptimisationJourney({
           that same single action, so two run buttons can never appear. It is
           drawn as the primary only when no other layer has claimed the primary. */}
       {showAction && !panelShowsRerun && (
+        <div className="space-y-1">
         <button
           type="button"
           onClick={journey.action === ADI_OPTIMISER_ACTION.CALCULATE
@@ -622,6 +643,19 @@ export default function AdiOptimisationJourney({
           {journey.actionLabel}
           <ArrowRight className="h-3.5 w-3.5" />
         </button>
+
+        {/* The helper line sits directly under the control the designer presses,
+            so the action and what it may do are read together. */}
+        {retestOwnsPrimary && (
+          <div className="text-[11px] text-[#625143] leading-relaxed">
+            {OPTIMISER_RETEST_HELPER_SENTENCE}
+          </div>
+        )}
+
+        {retestOwnsPrimary && reoptimiseDisabledReason && (
+          <div className="text-[11px] text-[#8A5A2B] leading-relaxed">{reoptimiseDisabledReason}</div>
+        )}
+        </div>
       )}
 
       {/* ── LAYER 4 — ENGINEER DETAILS ── collapsed by default, and below the
