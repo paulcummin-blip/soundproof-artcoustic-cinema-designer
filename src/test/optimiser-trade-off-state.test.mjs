@@ -156,6 +156,9 @@ test("a displayed-level regression is stated as worsening even when no raw value
   const tradeOff = resolveTradeOffState({
     decision: {
       ...REAL_CASE,
+      // The run recorded the level drop but did not retain that seat's own
+      // proposed row: the level itself is the evidence.
+      after: { ...REAL_CASE.after, perSeatP20: REAL_CASE.after.perSeatP20.filter((seat) => seat.seatId !== "r1-c2") },
       regression: { regressed: true, seatId: "r1-c2", parameter: "P20", currentLevel: 1, candidateLevel: 2 },
     },
   });
@@ -258,7 +261,7 @@ test("the seat-regression evidence is recorded on the decision the run saves", (
   // The evidence the protection already computed is recorded with the decision,
   // in both places a held primary-seat regression is stated. This is additive:
   // no rule, threshold or statement changed.
-  const recordings = authority.match(/\{ \.\.\.context, regression \}|\{ \\.\.\.tradeOffContext, regression \}/g) || [];
+  const recordings = authority.match(/\{ \.\.\.(?:context|tradeOffContext), regression \}/g) || [];
   assert.equal(recordings.length, 2, "both held-regression branches record the seat evidence");
   assert.match(authority, /PRIMARY_RAW_REGRESSION_THRESHOLD_DB = 1\.0/);
 });
@@ -275,7 +278,8 @@ test("a saved decision alone recreates the same trade-off after refresh or reope
   // The kept decision is remembered per project version and candidate.
   const store = read(`${PLAN_DIR}/optimiserKeepTradeOffStore.js`);
   assert.match(store, /b44_adi_tradeoff_kept_v1/);
-  assert.match(store, /projectId\}\}::\$\{versionId/);
+  // The record is scoped to the project AND the design version, never global.
+  assert.match(store, /STORAGE_PREFIX\}\}::\$\{projectId/);
   assert.match(store, /candidateId/);
 });
 
