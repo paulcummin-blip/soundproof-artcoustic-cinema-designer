@@ -411,6 +411,10 @@ export function buildClientStoryPillars({
             .filter((part) => !part.supporting && part.available)
             .map((part) => ({ part: part.part, label: part.label, level: part.level, caps_claim: part.caps_claim })),
         ],
+        // THE ROOM'S OWN LANGUAGE. The project's intent selects the VOCABULARY of the
+        // opening — never its strength, which stays the tier's: the same achieved tier
+        // is told in the language the brief supports.
+        intent: context?.intent ?? null,
       })
       : null;
     // THE LAYER THE OPENING EMPHASISES IS TOLD. The results decide which part of the

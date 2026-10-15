@@ -81,6 +81,9 @@ const rowsFor = (project, intentOverride) => buildNarrativePriorityRows({
 
 const dynamicOf = (project, intentOverride) => buildClientStoryPillars({
   rows: rowsFor(project, intentOverride),
+  // THE ROOM'S OWN INTENT REACHES THE STORY, exactly as it does in the app: the opening
+  // is told in the language the brief supports, at the strength the tier earned.
+  context: { intent: intentOf(project, intentOverride) },
 }).byPillar[PILLAR.DYNAMIC_RANGE];
 
 /** The readings that carry the story: the screen channels, the surrounds, the output, the depth. */
@@ -187,6 +190,30 @@ test('the Dynamic Range story the real projects actually produce', () => {
         // A strong or exceptional system is told ACROSS the whole system: all three
         // parts are named together as one, and none of them is singled out alone.
         assert.equal(layers.length, 3, `the whole system is named as one: ${dynamic.opening.claim}`);
+      }
+    });
+
+    check(`BRIEF VOCABULARY (${project.key})`, () => {
+      // THE TIER DECIDES THE STRENGTH; THE PROJECT'S INTENT DECIDES THE LANGUAGE. Both
+      // rooms open at the strength their own results earned, and neither is told in the
+      // other's words: the vocabulary never raises or lowers the claim.
+      const intent = intentOf(project);
+      if (dynamic.opening.tier !== 'standard') {
+        // A strong or exceptional system is told across the whole system in one language
+        // whatever room it stands in, and it never reaches for everyday-viewing words.
+        assert.equal(/everyday viewing/.test(dynamic.opening.claim), false,
+          'a flagship opening is never told in media-lounge words');
+        return;
+      }
+      assert.equal(dynamic.opening.vocabulary, intent, 'the standard opening speaks the room\'s own language');
+      if (intent === BRIEF_INTENT.MEDIA_LOUNGE) {
+        assert.match(dynamic.opening.claim, /everyday viewing/,
+          'a media room is opened in media-room terms');
+      } else {
+        assert.equal(/everyday viewing/.test(dynamic.opening.claim), false,
+          `${project.key} is a dedicated cinema and is never told in media-lounge words`);
+        assert.match(dynamic.opening.claim, /through quieter passages/,
+          'a dedicated cinema is opened in cinema terms');
       }
     });
 
