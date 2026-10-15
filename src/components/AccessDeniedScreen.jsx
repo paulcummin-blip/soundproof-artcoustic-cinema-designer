@@ -9,7 +9,8 @@ export default function AccessDeniedScreen({
   reason = null,
   identity = null,
 }) {
-  const { user } = useAuth();
+  const { user, logout } = useAuth();
+  const signedInAs = identity || user?.email || null;
   const destination = defaultPathForUser(user);
   const destinationLabel = destination === "/PriceList"
     ? "Go to Price List"
@@ -28,8 +29,10 @@ export default function AccessDeniedScreen({
             <div className="text-[10px] font-semibold uppercase tracking-wide text-[#625143]">
               Access check
             </div>
-            {identity && (
-              <p className="mt-1 text-xs text-[#3E4349]">Signed in as {identity}</p>
+            {signedInAs && (
+              <p className="mt-1 text-xs text-[#3E4349]">
+                Signed in as: <span className="font-semibold">{signedInAs}</span>
+              </p>
             )}
             {reason && (
               <p className="mt-1 text-xs text-[#3E4349]">
@@ -38,14 +41,27 @@ export default function AccessDeniedScreen({
             )}
           </div>
         )}
-        {destination !== "/" && (
-          <a
-            href={destination}
-            className="mt-5 inline-flex rounded-lg bg-[#213428] px-5 py-2.5 text-sm font-semibold text-white no-underline"
+        <div className="mt-6 flex flex-col gap-3">
+          {destination !== "/" && (
+            <a
+              href={destination}
+              className="inline-flex justify-center rounded-lg bg-[#213428] px-5 py-2.5 text-sm font-semibold text-white no-underline"
+            >
+              {destinationLabel}
+            </a>
+          )}
+          <button
+            type="button"
+            onClick={() => logout(true)}
+            className="inline-flex justify-center rounded-lg border border-[#DCDBD6] bg-white px-5 py-2.5 text-sm font-semibold text-[#213428] transition-colors hover:bg-[rgb(248,248,247)]"
           >
-            {destinationLabel}
-          </a>
-        )}
+            Sign out / switch account
+          </button>
+        </div>
+        <p className="mt-4 text-xs leading-5 text-[#625143]">
+          This signs out the session shown above and returns you to the login screen so a different
+          identity can sign in. No project data is changed.
+        </p>
       </div>
     </div>
   );
