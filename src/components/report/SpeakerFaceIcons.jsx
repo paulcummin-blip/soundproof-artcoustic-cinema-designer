@@ -87,12 +87,51 @@ export function Q85FaceIcon({ x, y, width, height }) {
   );
 }
 
+/**
+ * Spitfire Q 6-3 — 280 × 280 mm square cabinet face.
+ *
+ * The source PNG is a page screenshot, not a bare drawing: it carries a dark
+ * frame around the image edge, then a wide white page margin, and only then the
+ * cabinet's own line drawing inset inside it. Drawn whole, that page presented
+ * the cabinet as a small drawing inside an image tile, with the page's frame
+ * and margin around it — not as the loudspeaker.
+ *
+ * The drawing is therefore cropped to the cabinet's own outline. The crop was
+ * measured in the asset's own pixel space (1024 × 1021): the outline's outer
+ * edge sits at x 54, y 52 and spans 916 × 916 px — square, matching the
+ * cabinet's 280 × 280 mm face, so the crop fills the cabinet's box without
+ * distorting the speaker. The crop lies inside the page's edge frame (which
+ * runs out to ~0.8% of the frame) and inside its white margin, so neither the
+ * frame nor the margin is drawn at all. The drawing itself is untouched: same
+ * line art, same line weights, same proportions, drawn larger only because the
+ * page around it is gone.
+ *
+ * The `size` form is kept for callers that pass a single dimension.
+ */
+const Q63_ARTWORK = { width: 1024, height: 1021, cropX: 54, cropY: 52, cropW: 916, cropH: 916 };
+
 export function Q63FaceIcon({ x, y, size, width, height }) {
   const w = width ?? size;
   const h = height ?? size;
+  const a = Q63_ARTWORK;
   return (
-    <svg x={x} y={y} width={w} height={h} viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
-      <image x="0" y="0" width="100" height="100" href="https://media.base44.com/images/public/6a1166c68ddc81e5ea2cdf6b/9a1ad66a6_Q6-3front.png" preserveAspectRatio="xMidYMid meet" />
+    <svg
+      x={x}
+      y={y}
+      width={w}
+      height={h}
+      viewBox={`${a.cropX} ${a.cropY} ${a.cropW} ${a.cropH}`}
+      preserveAspectRatio="xMidYMid meet"
+      xmlns="http://www.w3.org/2000/svg"
+    >
+      <image
+        x="0"
+        y="0"
+        width={a.width}
+        height={a.height}
+        href="https://media.base44.com/images/public/6a1166c68ddc81e5ea2cdf6b/9a1ad66a6_Q6-3front.png"
+        preserveAspectRatio="xMidYMid meet"
+      />
     </svg>
   );
 }

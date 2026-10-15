@@ -532,6 +532,6 @@ test('TEST 23 A vertical cabinet is the whole artwork turned 90°, not re-fitted
     'a centre cabinet passes its installed orientation through');
   // The cabinet rectangle itself is untouched: the catalogue footprint is used
   // as-is, so no stored dimension had to change to suit the artwork.
-  assert.ok(frontElevation.includes('const FACE_ICON_VISIBLE_RATIO = (isC41 || isC1) ? 1.0 : 0.72;'),
+  assert.match(frontElevation, /const FACE_ICON_VISIBLE_RATIO = \(isC41 \|\| isC1( \|\| isQ63)?\) \? 1\.0 : 0\.72;/,
     'the C4-1 keeps its catalogue footprint with no artwork padding');
 });

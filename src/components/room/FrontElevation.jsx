@@ -679,14 +679,14 @@ export default function FrontElevation({ dimensions, screen, placedSpeakers = []
 
     const hasFaceIcon = isQ43 || isQ45 || isQ85 || isQ63 || isEv11 || isEv21 || isEv31 || isEv42 || isEv63 || isEv84 || isC41 || isC1;
 
-    // C4-1 and Multi Soundbar vector icons fill edge-to-edge — no transparent padding, so ratio = 1.0.
-    // All other Artcoustic PNG assets have internal transparent padding; enlarge them so
-    // the visible cabinet drawing fills the speaker boundary box with ~2–4px clearance.
     // C4-1, C-1 and Multi Soundbar icons are cropped to their own cabinet edges,
-    // so their drawing fills the boundary box exactly (ratio 1.0). Every other
-    // Artcoustic PNG carries internal transparent padding and is enlarged to
+    // so their drawing fills the boundary box exactly (ratio 1.0). The Q 6-3
+    // artwork is cropped to its cabinet outline in the same way, so it also
+    // fills the box exactly: its cabinet face is square (280 × 280 mm) and so is
+    // the crop, so the box is the cabinet's own footprint. Every other
+    // Artcoustic PNG still carries internal page padding and is enlarged to
     // compensate.
-    const FACE_ICON_VISIBLE_RATIO = (isC41 || isC1) ? 1.0 : 0.72;
+    const FACE_ICON_VISIBLE_RATIO = (isC41 || isC1 || isQ63) ? 1.0 : 0.72;
     // A vertically mounted cabinet draws the SAME face rotated a quarter turn:
     // the face icon's own long axis is the box's height, and the whole icon is
     // turned 90° about the cabinet centre, so the drawn footprint is the cabinet's
@@ -710,7 +710,9 @@ export default function FrontElevation({ dimensions, screen, placedSpeakers = []
       if (isQ43) return <Q43FaceIcon x={adjustedX} y={adjustedY} width={adjustedW} height={adjustedH} />;
       if (isQ45) return <Q45FaceIcon x={adjustedX} y={adjustedY} width={adjustedW} height={adjustedH} />;
       if (isQ85) return <Q85FaceIcon x={adjustedX} y={adjustedY} width={adjustedW} height={adjustedH} />;
-      if (isQ63) return <Q63FaceIcon x={adjustedX} y={adjustedY} size={Math.min(adjustedW, adjustedH)} />;
+      // The Q 6-3 artwork is cropped to its cabinet outline, so it is drawn at
+      // the cabinet's own footprint — the face fills the box edge to edge.
+      if (isQ63) return <Q63FaceIcon x={adjustedX} y={adjustedY} width={adjustedW} height={adjustedH} />;
       if (isEv11) return <Evolve11FaceIcon x={adjustedX} y={adjustedY} width={adjustedW} height={adjustedH} />;
       if (isEv21) return <Evolve21FaceIcon x={adjustedX} y={adjustedY} width={adjustedW} height={adjustedH} />;
       if (isEv31) return <Evolve31FaceIcon x={adjustedX} y={adjustedY} width={adjustedW} height={adjustedH} />;
