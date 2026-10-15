@@ -363,7 +363,10 @@ export function resolveOptimiserPresentationState({
   // panel states why it failed and what to do next; the engine's own error text
   // stays in the state and in Engineer details. Persisted failure status owns the
   // same outcome after refresh/reopen even though transient runStatus is idle.
-  if (runStatus === "failed" || status === OPTIMISER_PLAN_STATUS.FAILED) {
+  if (runStatus === "failed"
+    || status === OPTIMISER_PLAN_STATUS.FAILED
+    || (status === OPTIMISER_PLAN_STATUS.INCOMPLETE
+      && failure?.code === OPTIMISER_FAILURE_CODE.WORKER_FAILED)) {
     return build(OPTIMISER_PRESENTATION_STATE.FAILED, {
       // The mapped reason names the REAL cause. The engine's own error text is
       // never the main panel's sentence: it stays in the state (runError) and in
