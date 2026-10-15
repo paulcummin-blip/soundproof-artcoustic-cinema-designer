@@ -1168,7 +1168,11 @@ export async function runImproveBassV2(projectId, versionId, params, callbacks) 
       };
     } catch { /* registry lookup failed — use defaults */ }
 
-    const currentPositions = (snapshot.positions || []).map((p) => ({ x: p.x, y: p.y }));
+    const currentPositions = (snapshot.positions || []).map((p, index) => ({
+      x: p.x,
+      y: p.y,
+      sourceId: snapshot.instanceIds?.[index] || null,
+    }));
     const currentGroups = activeInstanceGroups(subwooferInstances);
 
     const escalationPhases = [
