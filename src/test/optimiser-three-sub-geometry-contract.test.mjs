@@ -13,6 +13,7 @@ import {
   identifyLayout,
 } from "../components/room/bass/improveBassV2/positionCandidateGenerator.js";
 import { generatePracticalWallLadderCandidates } from "../components/room/bass/improveBassV2/practicalWallSearch.js";
+import { runPositionScreenPhase } from "../components/room/bass/improveBassV2/improveBassV2Escalation.js";
 
 const ROOM = { widthM: 4.22, lengthM: 5, heightM: 2.4 };
 const CABINET = { widthM: 0.2, depthM: 0.2, heightM: 0.5 };
@@ -79,6 +80,38 @@ test("individual three-source candidates remain complete and bind to source ids 
     complete(candidate, 3);
     const identified = attachPhysicalSourceIdentity(candidate.coordinates, THREE);
     expect(identified.map((point) => point.sourceId)).toEqual([
+      "sub-front-1",
+      "sub-rear-1",
+      "sub-rear-2",
+    ]);
+  }
+});
+
+test("the live three-source wall topology screens and promotes only complete identified candidates", () => {
+  const result = runPositionScreenPhase(
+    "symmetric",
+    THREE,
+    ROOM,
+    CABINET,
+    [
+      { id: "seat-primary", x: 1.8, y: 2.55, z: 1.2, priority: "primary" },
+      { id: "seat-secondary", x: 3.0, y: 4.35, z: 1.5, priority: "secondary" },
+    ],
+    { x: 2.11, y: 2.55, z: 1.2 },
+    0.05,
+    GROUPS,
+  );
+  expect(result.funnel.generated).toBeGreaterThan(0);
+  expect(result.funnel.geometryRejected).toBe(0);
+  expect(result.promoted.length).toBeGreaterThan(0);
+  for (const candidate of result.promoted) {
+    complete(candidate, 3);
+    expect(candidate.coordinates.map((point) => point.sourceId)).toEqual([
+      "sub-front-1",
+      "sub-rear-1",
+      "sub-rear-2",
+    ]);
+    expect(candidate.finalist.sources.map((source) => source.sourceId)).toEqual([
       "sub-front-1",
       "sub-rear-1",
       "sub-rear-2",
