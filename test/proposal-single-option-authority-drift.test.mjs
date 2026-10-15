@@ -80,6 +80,19 @@ function marqueeSingleOptionInput() {
       wording_class: 'strength',
       wording: 'Excellent tonal consistency',
     },
+    {
+      claim_id: 'claim_story_low-frequency-extension_01',
+      area: 'bass_extension',
+      label: 'Low-frequency extension',
+      kind: 'strength_story',
+      statement: 'The system reaches 26 Hz in the room: deep bass that adds scale, impact and excitement to films and music.',
+      option: { version_id: 'a', version_name: 'Original Design', label: 'Option A' },
+      favours: false,
+      scope: null,
+      level: 'L2',
+      wording_class: 'strength',
+      wording: 'Deep bass that adds scale, impact and excitement to films and music.',
+    },
   );
   return buildWriterInput({ pack });
 }
@@ -103,7 +116,7 @@ const codes = (result, section) => result.violations
   .filter((entry) => entry.section === section)
   .map((entry) => entry.code);
 
-test('the six Marquee sentences are grounded by a strength story plus its precise scoped result', () => {
+test('the eight Marquee sentences are grounded by a strength story plus its precise scoped result', () => {
   const input = marqueeSingleOptionInput();
   const cases = [
     {
@@ -135,6 +148,16 @@ test('the six Marquee sentences are grounded by a strength story plus its precis
       section: 'dynamic_range',
       sentence: 'Deep bass adds scale to the score, while the modelled response at the reference position keeps that depth remarkably composed.',
       claims: ['claim_story_bass-extension-and-response_01', 'claim_p20_primary_consistency_01'],
+    },
+    {
+      section: 'key_performance_highlights',
+      sentence: 'Deep bass adds scale to music and effects, supported by a remarkably composed modelled response at the reference position.',
+      claims: ['claim_story_tonal-consistency_01', 'claim_story_bass-extension-and-response_01', 'claim_p20_primary_consistency_01', 'claim_p6_primary_performance_01'],
+    },
+    {
+      section: 'dynamic_range',
+      sentence: 'Deep bass adds scale to those moments, with a remarkably controlled modelled response at the reference position.',
+      claims: ['claim_story_bass-extension-and-response_01', 'claim_story_low-frequency-extension_01', 'claim_p20_primary_consistency_01'],
     },
   ];
 
