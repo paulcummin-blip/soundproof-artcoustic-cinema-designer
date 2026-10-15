@@ -65,6 +65,7 @@ export default function AdiTradeOffActions({
         open={reviewing}
         tradeOff={tradeOff}
         onOpenChange={setReviewing}
+        onKeep={onKeep}
         applyBusy={applyBusy}
         onApply={onApply
           ? () => {

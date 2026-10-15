@@ -227,15 +227,22 @@ test("Apply lives inside the review only, stated with the seat it would cost", (
   const dialog = read(`${PLAN_DIR}/AdiTradeOffReviewDialog.jsx`);
   assert.match(dialog, /data-adi-trade-off-apply="true"/);
   assert.match(dialog, /TRADE_OFF_ACTIONS\.APPLY/);
-  assert.match(dialog, /tradeOffApplySentence\(seatLabel\)/);
+  // The Apply sentence names the gain, the exact seat AND the exact amount that
+  // seat loses — never a neutral "Apply change".
+  assert.match(dialog, /tradeOffApplySentence\(seatLabel, amountText\)/);
   assert.match(dialog, /data-adi-trade-off-apply-note="true"/);
   // The review marks every row.
   assert.match(dialog, /Improves/);
   assert.match(dialog, /Unchanged/);
   assert.match(dialog, /Worsens/);
   assert.equal(
+    tradeOffApplySentence("Row 1 - Seat 2", "1.2 dB"),
+    "This change improves overall bass consistency, but makes Row 1 - Seat 2 worse by 1.2 dB.",
+  );
+  // Without a retained amount it still states the seat, and invents no figure.
+  assert.equal(
     tradeOffApplySentence("Row 1 - Seat 2"),
-    "This change improves overall consistency but worsens Row 1 - Seat 2.",
+    "This change improves overall bass consistency, but makes Row 1 - Seat 2 worse.",
   );
 });
 
@@ -351,10 +358,11 @@ test("no optimiser calculation, threshold or apply logic changed", () => {
   assert.match(journey, /onApply=\{handleApplyTradeOff\}/);
 });
 
-test("the presentation actions constant names the review and the keep", () => {
+test("the presentation actions constant names the review, the keep and the trade-off Apply", () => {
   assert.equal(TRADE_OFF_ACTIONS.REVIEW, "Review Trade-off");
   assert.equal(TRADE_OFF_ACTIONS.KEEP, "Keep Current Design");
-  assert.equal(TRADE_OFF_ACTIONS.APPLY, "Apply Change");
+  // The Apply names the decision it is: a change with a known downside.
+  assert.equal(TRADE_OFF_ACTIONS.APPLY, "Apply Trade-off");
 });
 
 // ── 7. The live saved record — Barton Solutions, V1, run 19:46:28Z ──
@@ -478,4 +486,120 @@ test("the review draws a partial row with its amount alone", () => {
   const dialog = read(`${PLAN_DIR}/AdiTradeOffReviewDialog.jsx`);
   assert.match(dialog, /const pairKnown = row\.pairKnown !== false;/);
   assert.match(dialog, /\{pairKnown \? \(/);
+});
+
+// ── 9. THE DECISION, STATED PLAINLY ──
+// The review states the trade-off itself — one sentence, what the change buys and
+// what it costs — before any metric detail. The metric that is NOT the trade-off is
+// stated separately and lightly, and P20 stays the seat-to-seat consistency measure.
+
+test("the review states the whole decision in one sentence, naming the exact seat", () => {
+  const live = resolveTradeOffState({ decision: LIVE_SAVED });
+  assert.equal(
+    live.decisionSentence,
+    "Overall bass consistency improves, but Row 1 - Seat 2 gets worse.",
+  );
+  // The same sentence whichever form the seat id takes: the label is always the
+  // canonical one the rest of the app prints.
+  const real = resolveRealCase();
+  assert.equal(
+    real.decisionSentence,
+    `Overall bass consistency improves, but ${real.seat.label} gets worse.`,
+  );
+  // A record that named no seat states the decision without naming one.
+  const unnamed = resolveTradeOffState({
+    decision: {
+      ...LIVE_SAVED,
+      statement: "The candidate worsens a protected measure. This is a trade-off, so it has not been applied.",
+      regression: null,
+    },
+  });
+  assert.equal(unnamed.decisionSentence, "Overall bass consistency improves, but one protected measure gets worse.");
+});
+
+test("what the change buys is stated as its own block, in whole dB", () => {
+  const live = resolveTradeOffState({ decision: LIVE_SAVED });
+  assert.equal(live.gain.title, "Overall bass consistency");
+  assert.equal(live.gain.pair, "±15 dB → ±12 dB");
+  // 2.3 dB recorded → floored, so the gain is never overstated.
+  assert.equal(live.gain.delta, "Approximately 2 dB better");
+  const real = resolveRealCase();
+  assert.equal(real.gain.pair, "±15 dB → ±12 dB");
+  assert.equal(real.gain.delta, "Approximately 3 dB better");
+});
+
+test("what the change costs is stated as its own block, with the exact amount", () => {
+  const live = resolveTradeOffState({ decision: LIVE_SAVED });
+  assert.equal(live.giveUp.label, "Row 1 - Seat 2");
+  assert.equal(live.giveUp.amount, "Worsens by 1.2 dB");
+  assert.equal(live.amountText, "1.2 dB");
+
+  const real = resolveRealCase();
+  assert.equal(real.giveUp.label, real.seat.label);
+  assert.equal(real.giveUp.amount, "Worsens by 1.2 dB");
+  assert.equal(real.amountText, "1.2 dB");
+
+  // No amount is ever invented: a record without one states the seat and stops.
+  const noAmount = resolveTradeOffState({
+    decision: { ...LIVE_SAVED, statement: "The candidate regresses P20 at seat-r1-c2. This is a trade-off." },
+  });
+  assert.equal(noAmount.giveUp.label, "Row 1 - Seat 2");
+  assert.equal(noAmount.giveUp.amount, "Worsens");
+  assert.equal(noAmount.amountText, null);
+});
+
+test("P19 is stated separately as an unchanged protected metric, never a second benefit", () => {
+  const live = resolveTradeOffState({ decision: LIVE_SAVED });
+  assert.equal(live.protectedMetric.text, "P19 response quality — Unchanged · L4");
+  assert.equal(live.protectedMetric.unchanged, true);
+  assert.equal(live.protectedMetric.level, "L4");
+  // It is not part of the cost: the protected metric is never the give-up block.
+  assert.notEqual(live.protectedMetric.text, live.giveUp.amount);
+});
+
+test("P20 is the seat-to-seat consistency metric and P19 is never mislabelled as it", () => {
+  const tradeOff = resolveRealCase();
+  const p20 = tradeOff.overall.find((row) => row.key === "p20");
+  const p19 = tradeOff.overall.find((row) => row.key === "p19");
+  assert.equal(p20.label, "Seat-to-seat level consistency (P20)");
+  assert.equal(p19.label, "Response quality (P19)");
+  assert.ok(!/seat-to-seat/i.test(p19.label), "P19 is never labelled seat-to-seat consistency");
+  const source = read(`${PLAN_DIR}/optimiserTradeOffState.js`);
+  assert.ok(!/Seat-to-seat level consistency \(P19\)/.test(source),
+    "the mislabelled P19 row is gone from the authority itself");
+  assert.match(source, /TRADE_OFF_METRIC\.P20_LABEL/);
+  // The decision's own blocks are stated on P20, the consistency measure.
+  assert.equal(tradeOff.gain.metric, "Seat-to-seat level consistency (P20)");
+  assert.equal(tradeOff.giveUp.metric, "Seat-to-seat level consistency (P20)");
+});
+
+test("the review draws the decision first and the supporting detail below it", () => {
+  const dialog = read(`${PLAN_DIR}/AdiTradeOffReviewDialog.jsx`);
+  assert.match(dialog, /data-adi-trade-off-title="true"/);
+  assert.match(dialog, /AdiTradeOffDecisionSummary/);
+  assert.match(dialog, /sentence=\{tradeOff\.decisionSentence\}/);
+  assert.match(dialog, /gain=\{tradeOff\.gain\}/);
+  assert.match(dialog, /giveUp=\{tradeOff\.giveUp\}/);
+  assert.match(dialog, /protectedMetric=\{tradeOff\.protectedMetric\}/);
+
+  // The plain-language decision is stated ABOVE the engineering detail.
+  const decisionAt = dialog.indexOf("sentence={tradeOff.decisionSentence}");
+  const detailAt = dialog.indexOf("Engineering detail");
+  assert.ok(decisionAt > -1 && detailAt > -1 && decisionAt < detailAt,
+    "the decision is stated before the supporting detail");
+
+  // Both actions are named, and the designer's own no is available in the review.
+  assert.match(dialog, /\{TRADE_OFF_ACTIONS\.APPLY\}/);
+  assert.match(dialog, /\{TRADE_OFF_ACTIONS\.KEEP\}/);
+  assert.match(dialog, /data-adi-trade-off-dialog-keep="true"/);
+
+  const summary = read(`${PLAN_DIR}/AdiTradeOffDecisionSummary.jsx`);
+  assert.match(summary, /You gain/);
+  assert.match(summary, /You give up/);
+  assert.match(summary, /data-adi-trade-off-gain-pair="true"/);
+  assert.match(summary, /data-adi-trade-off-give-up-seat="true"/);
+  assert.match(summary, /data-adi-trade-off-give-up-amount="true"/);
+  assert.match(summary, /data-adi-trade-off-protected-metric="true"/);
+  // The blocks print resolved values only: the summary computes no figure itself.
+  assert.ok(!/Math\.|parseFloat|parseInt/.test(summary), "the decision summary computes no figure itself");
 });

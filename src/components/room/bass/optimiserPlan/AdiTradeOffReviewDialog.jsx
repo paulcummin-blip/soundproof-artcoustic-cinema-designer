@@ -1,10 +1,14 @@
 // AdiTradeOffReviewDialog.jsx
 // ---------------------------------------------------------------------------
-// REVIEW TRADE-OFF — the compact CURRENT vs PROPOSED comparison.
+// REVIEW TRADE-OFF — the decision first, the evidence below it.
 //
-// The designer sees the protected seat's own regression BEFORE any Apply is
-// offered: the comparison states what improves, what is unchanged and what
-// worsens, and only then is the deliberate Apply available.
+// The designer sees the DECISION before any Apply is offered, in this order:
+//   • TRADE-OFF — the decision in one sentence, naming the seat it costs
+//   • YOU GAIN / YOU GIVE UP — two blocks: the measure that improves and the
+//     exact seat that gets worse, with the exact amount it loses
+//   • the protected metric that is NOT the trade-off (P19), stated lightly
+//   • ENGINEERING DETAIL — the CURRENT vs PROPOSED rows, as supporting evidence
+// and only then is the deliberate Apply available.
 //
 // Presentation only: every row and every figure arrives already resolved by
 // optimiserTradeOffState.js. Nothing here calculates, grades or applies
@@ -13,7 +17,13 @@
 
 import React from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { TRADE_OFF_ACTIONS, TRADE_OFF_DIRECTION, tradeOffApplySentence } from "./optimiserTradeOffState.js";
+import AdiTradeOffDecisionSummary from "./AdiTradeOffDecisionSummary.jsx";
+import {
+  TRADE_OFF_ACTIONS,
+  TRADE_OFF_DIRECTION,
+  TRADE_OFF_TITLE,
+  tradeOffApplySentence,
+} from "./optimiserTradeOffState.js";
 
 const DIRECTION_STYLE = {
   [TRADE_OFF_DIRECTION.IMPROVES]: { color: "#213428", label: "Improves" },
@@ -62,22 +72,35 @@ export default function AdiTradeOffReviewDialog({
   tradeOff = null,
   onOpenChange = null,
   onApply = null,
+  onKeep = null,
   applyBusy = false,
   className = "",
 }) {
   if (!tradeOff) return null;
   const rows = Array.isArray(tradeOff.rows) ? tradeOff.rows : [];
   const seatLabel = tradeOff.seat?.label || null;
+  // The exact amount the affected seat loses — the same figure the give-up block
+  // states, used to make the Apply sentence explicit.
+  const amountText = tradeOff.amountText || null;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className={`max-w-2xl ${className}`} data-adi-trade-off-review="true">
         <DialogHeader>
-          <DialogTitle className="text-[16px] text-[#1B1A1A]">Review trade-off</DialogTitle>
+          <DialogTitle className="text-[13px] font-semibold uppercase tracking-[0.14em] text-[#8A5A2B]" data-adi-trade-off-title="true">
+            {TRADE_OFF_TITLE}
+          </DialogTitle>
         </DialogHeader>
 
         <div className="space-y-3">
-          <p className="text-[12.5px] text-[#3E4349] leading-relaxed">{tradeOff.headline}</p>
+          {/* THE DECISION FIRST: one sentence, then what the change buys and what
+              it costs. Everything below it is supporting evidence. */}
+          <AdiTradeOffDecisionSummary
+            sentence={tradeOff.decisionSentence}
+            gain={tradeOff.gain}
+            giveUp={tradeOff.giveUp}
+            protectedMetric={tradeOff.protectedMetric}
+          />
 
           {tradeOff.adjustment && (
             <div className="text-[13px] font-semibold text-[#1B1A1A]" data-adi-trade-off-adjustment="true">
@@ -85,7 +108,10 @@ export default function AdiTradeOffReviewDialog({
             </div>
           )}
 
-          <div className="space-y-3 rounded-md border border-[#E7E5E0] bg-[#FBFBF9] px-3 py-2.5">
+          <div className="space-y-2 rounded-md border border-[#E7E5E0] bg-[#FBFBF9] px-3 py-2.5">
+            <div className="text-[10px] font-semibold uppercase tracking-wide text-[#8A7B6A]" data-adi-trade-off-detail-title="true">
+              Engineering detail
+            </div>
             <div className="flex flex-wrap items-baseline gap-x-2 text-[10px] font-semibold uppercase tracking-wide text-[#8A7B6A]">
               <span className="min-w-[180px] flex-1">Measure</span>
               <span>Current</span>
@@ -104,7 +130,7 @@ export default function AdiTradeOffReviewDialog({
           {/* The regression is stated beside the Apply itself, so the designer's
               own approval is always given with it in view. */}
           <p className="text-[12px] font-semibold text-[#8A5A2B] leading-relaxed" data-adi-trade-off-apply-note="true">
-            {tradeOffApplySentence(seatLabel)}
+            {tradeOffApplySentence(seatLabel, amountText)}
           </p>
 
           <div className="flex flex-wrap items-center gap-2 pt-1">
@@ -119,9 +145,26 @@ export default function AdiTradeOffReviewDialog({
                 {TRADE_OFF_ACTIONS.APPLY}
               </button>
             )}
-            <button type="button" onClick={() => onOpenChange?.(false)} className={BUTTON_SECONDARY}>
-              Close
-            </button>
+            {/* The designer's own no. Chosen inside the review it means exactly
+                what it means on the card: the candidate is dismissed for this
+                run, and nothing is applied or written. */}
+            {onKeep ? (
+              <button
+                type="button"
+                onClick={() => {
+                  onKeep();
+                  onOpenChange?.(false);
+                }}
+                data-adi-trade-off-dialog-keep="true"
+                className={BUTTON_SECONDARY}
+              >
+                {TRADE_OFF_ACTIONS.KEEP}
+              </button>
+            ) : (
+              <button type="button" onClick={() => onOpenChange?.(false)} className={BUTTON_SECONDARY}>
+                Close
+              </button>
+            )}
           </div>
         </div>
       </DialogContent>

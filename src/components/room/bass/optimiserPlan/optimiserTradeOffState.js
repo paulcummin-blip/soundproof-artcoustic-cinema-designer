@@ -33,18 +33,35 @@ import {
   CALIBRATION_APPLY_REASON,
 } from "../optimiseWorkflow/adiCalibrationAutoApplyAuthority.js";
 import { formatSeatLabel } from "@/components/utils/seatLabel";
-import { floorP19P20Deviation } from "@/components/utils/rp22/resolveRp22DesignValue";
+import { floorP19P20Delta, floorP19P20Deviation } from "@/components/utils/rp22/resolveRp22DesignValue";
 import { deltaText, deviationText, levelText, wholeDbImprovement } from "./optimiserWholeNumberDb.js";
 
 /** The one headline a trade-off states. */
 export const TRADE_OFF_HEADLINE =
   "ADI found a change that improves overall bass consistency, but one primary seat would get worse.";
 
-/** The one action per role in this state. */
+/** The one word the review is headed with. */
+export const TRADE_OFF_TITLE = "Trade-off";
+
+/**
+ * The one action per role in this state. The Apply names the DECISION it is — a
+ * change with a known downside — never the neutral "Apply change".
+ */
 export const TRADE_OFF_ACTIONS = Object.freeze({
   REVIEW: "Review Trade-off",
   KEEP: "Keep Current Design",
-  APPLY: "Apply Change",
+  APPLY: "Apply Trade-off",
+});
+
+/**
+ * WHAT EACH METRIC IS. P20 is the seat-to-seat level consistency parameter, and
+ * it is the measure the trade-off is stated on. P19 is response quality: it is
+ * stated separately and lightly, and never as a second competing benefit or cost.
+ */
+export const TRADE_OFF_METRIC = Object.freeze({
+  P20_LABEL: "Seat-to-seat level consistency (P20)",
+  P19_LABEL: "Response quality (P19)",
+  P19_PROTECTED: "P19 response quality",
 });
 
 /** The terminal state of a trade-off the designer did not take. */
@@ -74,11 +91,28 @@ export const TRADE_OFF_DIRECTION = Object.freeze({
   WORSENS: "worsens",
 });
 
-/** The sentence stated beside the deliberate Apply of a trade-off. */
-export function tradeOffApplySentence(seatLabel) {
-  return seatLabel
-    ? `This change improves overall consistency but worsens ${seatLabel}.`
-    : "This change improves overall consistency but worsens a protected measure.";
+/**
+ * The sentence stated beside the deliberate Apply of a trade-off: it names the
+ * change's own gain, the exact seat it costs and the exact amount that seat
+ * loses, so the approval is never given to a neutral "Apply".
+ */
+export function tradeOffApplySentence(seatLabel, amountText = null) {
+  if (!seatLabel) {
+    return "This change improves overall bass consistency, but makes a protected measure worse.";
+  }
+  return amountText
+    ? `This change improves overall bass consistency, but makes ${seatLabel} worse by ${amountText}.`
+    : `This change improves overall bass consistency, but makes ${seatLabel} worse.`;
+}
+
+/**
+ * "Approximately 2 dB better" — the improvement the run recorded, in whole dB.
+ * The magnitude is floored, so a gain is never overstated; a gain of under a
+ * whole decibel states no figure at all.
+ */
+function approximateGainText(deltaDb) {
+  const whole = floorP19P20Delta(deltaDb);
+  return whole != null && whole > 0 ? `Approximately ${whole} dB better` : null;
 }
 
 /**
@@ -181,12 +215,18 @@ function deltaPhrase(direction, delta) {
 }
 
 /** One comparison row of the review. */
-function row({ key, group, label, before, after, direction, delta, deltaLabel, force = false, pairKnown = true }) {
+function row({ key, group, label, before, after, pair = null, levelBefore = null, levelAfter = null, direction, delta, deltaLabel, force = false, pairKnown = true }) {
   if (!before && !after && !force) return null;
   return {
     key,
     group,
     label,
+    // The two deviations alone ("±15 dB → ±12 dB") and the two levels alone
+    // ("L1"), so the decision's plain-language blocks state the same evidence
+    // the detail table shows, without re-reading its display text.
+    pair,
+    levelBefore,
+    levelAfter,
     // A row whose pair the run never retained states NO values at all: an absent
     // pair is never printed as two placeholder dashes.
     before: pairKnown ? (before || "—") : null,
@@ -195,6 +235,13 @@ function row({ key, group, label, before, after, direction, delta, deltaLabel, f
     direction: direction || TRADE_OFF_DIRECTION.UNCHANGED,
     delta: deltaLabel != null ? deltaLabel : deltaPhrase(direction, delta),
   };
+}
+
+/** "±15 dB → ±12 dB" — the two deviations alone, with no level suffix. */
+function deviationPair(beforeDb, afterDb) {
+  const from = deviationText(beforeDb);
+  const to = deviationText(afterDb);
+  return from && to ? `${from} → ${to}` : null;
 }
 
 /** The overall P20 and P19 rows, from the pair the decision was decided on. */
@@ -208,18 +255,24 @@ function overallRows(decision) {
     row({
       key: "p20",
       group: "Overall",
-      label: "Bass consistency (P20 variation)",
+      label: TRADE_OFF_METRIC.P20_LABEL,
       before: valueText(before?.p20?.deviationDb, before?.p20?.level),
       after: valueText(after?.p20?.deviationDb, after?.p20?.level),
+      pair: deviationPair(before?.p20?.deviationDb, after?.p20?.deviationDb),
+      levelBefore: levelText(before?.p20?.level),
+      levelAfter: levelText(after?.p20?.level),
       direction: directionFor(before?.p20?.deviationDb, after?.p20?.deviationDb),
       delta: finite(improvement?.p20DeltaDb) ?? finite(damage?.p20WorseDb),
     }),
     row({
       key: "p19",
       group: "Overall",
-      label: "Seat-to-seat level consistency (P19)",
+      label: TRADE_OFF_METRIC.P19_LABEL,
       before: valueText(before?.p19?.deviationDb, before?.p19?.level),
       after: valueText(after?.p19?.deviationDb, after?.p19?.level),
+      pair: deviationPair(before?.p19?.deviationDb, after?.p19?.deviationDb),
+      levelBefore: levelText(before?.p19?.level),
+      levelAfter: levelText(after?.p19?.level),
       direction: directionFor(before?.p19?.deviationDb, after?.p19?.deviationDb),
       delta: finite(improvement?.p19DeltaDb) ?? finite(damage?.p19WorseDb),
     }),
@@ -410,12 +463,78 @@ export function resolveTradeOffState({ decision = null, kept = false } = {}) {
       ? `${worsenedMetric.label}: ${worsenedMetric.before} → ${worsenedMetric.after}${worsenedMetric.delta ? ` (${worsenedMetric.delta})` : ""}`
       : TRADE_OFF_METRIC_NOTE);
 
+  // ── THE DECISION, STATED PLAINLY ───────────────────────────────────────────
+  // The review opens with the decision itself rather than with two metric rows:
+  // what the change buys, what it costs, and — separately and lightly — the
+  // metric that is NOT the trade-off. Every figure here is the same one the
+  // detail rows already carry; nothing is calculated a second time.
+  const p20Row = overall.find((line) => line.key === "p20") || null;
+  const p19Row = overall.find((line) => line.key === "p19") || null;
+  const amountText = seat?.delta != null ? recordedAmountText(seat.delta) : null;
+  const protectedLevel = p19Row?.levelAfter || p19Row?.levelBefore || null;
+
+  const decisionSentence = seat
+    ? `Overall bass consistency improves, but ${seat.label} gets worse.`
+    : "Overall bass consistency improves, but one protected measure gets worse.";
+
+  // The recorded improvement in whole dB, floored so a gain is never overstated.
+  // The run's own recorded delta is preferred; a record that kept only the two
+  // deviations states the difference between them.
+  const p20GainDb = finite(improvement?.p20DeltaDb)
+    ?? (finite(record.before?.p20?.deviationDb) != null && finite(record.after?.p20?.deviationDb) != null
+      ? Number(record.after.p20.deviationDb) - Number(record.before.p20.deviationDb)
+      : null);
+
+  const gain = p20Row && p20Row.direction === TRADE_OFF_DIRECTION.IMPROVES
+    ? {
+      title: "Overall bass consistency",
+      metric: TRADE_OFF_METRIC.P20_LABEL,
+      pair: p20Row.pair,
+      delta: approximateGainText(p20GainDb),
+    }
+    : null;
+
+  const giveUp = seat
+    ? {
+      label: seat.label,
+      metric: TRADE_OFF_METRIC.P20_LABEL,
+      // The amount the run recorded, never rounded away and never invented.
+      amount: amountText ? `Worsens by ${amountText}` : "Worsens",
+    }
+    : null;
+
+  const protectedMetric = p19Row
+    ? {
+      label: TRADE_OFF_METRIC.P19_PROTECTED,
+      direction: p19Row.direction,
+      unchanged: p19Row.direction === TRADE_OFF_DIRECTION.UNCHANGED,
+      level: protectedLevel,
+      text: `${TRADE_OFF_METRIC.P19_PROTECTED} — ${
+        p19Row.direction === TRADE_OFF_DIRECTION.IMPROVES
+          ? "Improves"
+          : p19Row.direction === TRADE_OFF_DIRECTION.WORSENS
+            ? "Worsens"
+            : "Unchanged"
+      }${protectedLevel ? ` · ${protectedLevel}` : ""}`,
+    }
+    : null;
+
   return {
     isTradeOff: true,
     kept: kept === true,
     headline: kept === true ? TRADE_OFF_KEPT_SENTENCE : TRADE_OFF_HEADLINE,
     label: kept === true ? TRADE_OFF_KEPT_LABEL : null,
     adjustment: adjustmentLine(record),
+    // THE DECISION, IN ONE SENTENCE — the first thing the review states.
+    decisionSentence,
+    // What the change BUYS and what it COSTS, as the two blocks of the decision.
+    gain,
+    giveUp,
+    // The exact amount the affected seat loses ("1.2 dB"): the give-up block and
+    // the Apply sentence both state this same figure.
+    amountText,
+    // The metric that is NOT the trade-off, stated separately and lightly.
+    protectedMetric,
     seat,
     impact,
     overall,
