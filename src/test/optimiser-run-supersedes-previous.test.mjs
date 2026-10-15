@@ -225,8 +225,8 @@ describe("ONE RUNNING CONTROL ONLY", () => {
     // The panel's own run control is not drawn while a run is in flight.
     expect(journey).toMatch(/const showAction = !!journey\.action && journey\.canRun && !isRunning;/);
     // The placement panel's re-run and the calibration control stand down.
-    expect(journey).toMatch(/onRerun=\{isRunning \|\| retestNeeded \? null : onRunOptimisationPlan\}/);
-    expect(journey).toMatch(/onReoptimise=\{retestNeeded \|\| isRunning \|\| retestOwnsPrimary/);
+    expect(journey).toMatch(/onRerun=\{isRunning \|\| optimiserRunOwnsRetry \? null : onRunOptimisationPlan\}/);
+    expect(journey).toMatch(/onReoptimise=\{optimiserRunOwnsRetry \|\| isRunning \|\| retestOwnsPrimary/);
 
     // ONE control is rendered in that state: the disabled progress control.
     const runningBranch = journey.slice(
