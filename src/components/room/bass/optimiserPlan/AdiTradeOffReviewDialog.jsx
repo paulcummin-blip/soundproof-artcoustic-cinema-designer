@@ -1,0 +1,123 @@
+// AdiTradeOffReviewDialog.jsx
+// ---------------------------------------------------------------------------
+// REVIEW TRADE-OFF — the compact CURRENT vs PROPOSED comparison.
+//
+// The designer sees the protected seat's own regression BEFORE any Apply is
+// offered: the comparison states what improves, what is unchanged and what
+// worsens, and only then is the deliberate Apply available.
+//
+// Presentation only: every row and every figure arrives already resolved by
+// optimiserTradeOffState.js. Nothing here calculates, grades or applies
+// anything by itself — the Apply it draws calls the existing lever apply path.
+// ---------------------------------------------------------------------------
+
+import React from "react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { TRADE_OFF_ACTIONS, TRADE_OFF_DIRECTION, tradeOffApplySentence } from "./optimiserTradeOffState.js";
+
+const DIRECTION_STYLE = {
+  [TRADE_OFF_DIRECTION.IMPROVES]: { color: "#213428", label: "Improves" },
+  [TRADE_OFF_DIRECTION.UNCHANGED]: { color: "#625143", label: "Unchanged" },
+  [TRADE_OFF_DIRECTION.WORSENS]: { color: "#B45309", label: "Worsens" },
+};
+
+const BUTTON_PRIMARY = "inline-flex items-center rounded-md bg-[#213428] px-5 py-2.5 text-[13px] font-semibold text-white transition-colors hover:bg-[#3E4349]";
+const BUTTON_SECONDARY = "inline-flex items-center rounded-md border border-[#D9D5CE] bg-white px-5 py-2.5 text-[13px] font-semibold text-[#213428] transition-colors hover:border-[#213428]";
+
+/** The rows of one group, stated current → proposed with their direction. */
+function GroupRows({ group, rows }) {
+  const groupRows = rows.filter((row) => row.group === group);
+  if (!groupRows.length) return null;
+  return (
+    <div className="space-y-1">
+      <div className="text-[10px] font-semibold uppercase tracking-wide text-[#8A7B6A]">{group}</div>
+      {groupRows.map((row) => {
+        const style = DIRECTION_STYLE[row.direction] || DIRECTION_STYLE[TRADE_OFF_DIRECTION.UNCHANGED];
+        return (
+          <div key={row.key} className="flex flex-wrap items-baseline gap-x-2 text-[12px]" data-adi-trade-off-row={row.key}>
+            <span className="min-w-[180px] flex-1 text-[#3E4349]">{row.label}</span>
+            <span className="text-[#3E4349]">{row.before}</span>
+            <span className="text-[#8A7B6A]">→</span>
+            <span className="font-semibold text-[#1B1A1A]">{row.after}</span>
+            <span className="font-semibold" style={{ color: style.color }}>
+              {style.label}
+              {row.delta ? ` · ${row.delta}` : ""}
+            </span>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+export default function AdiTradeOffReviewDialog({
+  open = false,
+  tradeOff = null,
+  onOpenChange = null,
+  onApply = null,
+  applyBusy = false,
+  className = "",
+}) {
+  if (!tradeOff) return null;
+  const rows = Array.isArray(tradeOff.rows) ? tradeOff.rows : [];
+  const seatLabel = tradeOff.seat?.label || null;
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className={`max-w-2xl ${className}`} data-adi-trade-off-review="true">
+        <DialogHeader>
+          <DialogTitle className="text-[16px] text-[#1B1A1A]">Review trade-off</DialogTitle>
+        </DialogHeader>
+
+        <div className="space-y-3">
+          <p className="text-[12.5px] text-[#3E4349] leading-relaxed">{tradeOff.headline}</p>
+
+          {tradeOff.adjustment && (
+            <div className="text-[13px] font-semibold text-[#1B1A1A]" data-adi-trade-off-adjustment="true">
+              {tradeOff.adjustment}
+            </div>
+          )}
+
+          <div className="space-y-3 rounded-md border border-[#E7E5E0] bg-[#FBFBF9] px-3 py-2.5">
+            <div className="flex flex-wrap items-baseline gap-x-2 text-[10px] font-semibold uppercase tracking-wide text-[#8A7B6A]">
+              <span className="min-w-[180px] flex-1">Measure</span>
+              <span>Current</span>
+              <span className="w-4" />
+              <span>Proposed</span>
+            </div>
+            <GroupRows group="Overall" rows={rows} />
+            <GroupRows group="Primary seats" rows={rows} />
+            <GroupRows group="Secondary seats" rows={rows} />
+          </div>
+
+          {tradeOff.scopeNote && (
+            <p className="text-[11px] text-[#625143] leading-relaxed">{tradeOff.scopeNote}</p>
+          )}
+
+          {/* The regression is stated beside the Apply itself, so the designer's
+              own approval is always given with it in view. */}
+          <p className="text-[12px] font-semibold text-[#8A5A2B] leading-relaxed" data-adi-trade-off-apply-note="true">
+            {tradeOffApplySentence(seatLabel)}
+          </p>
+
+          <div className="flex flex-wrap items-center gap-2 pt-1">
+            {onApply && (
+              <button
+                type="button"
+                onClick={onApply}
+                disabled={applyBusy}
+                data-adi-trade-off-apply="true"
+                className={`${BUTTON_PRIMARY} ${applyBusy ? "cursor-not-allowed opacity-70" : ""}`}
+              >
+                {TRADE_OFF_ACTIONS.APPLY}
+              </button>
+            )}
+            <button type="button" onClick={() => onOpenChange?.(false)} className={BUTTON_SECONDARY}>
+              Close
+            </button>
+          </div>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
