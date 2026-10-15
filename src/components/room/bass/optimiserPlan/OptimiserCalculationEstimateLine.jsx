@@ -17,13 +17,16 @@ import { ADI_OPTIMISER_COPY } from "./resolveAdiOptimiserJourney.js";
 export default function OptimiserCalculationEstimateLine({
   instances = [],
   seatCount = null,
+  // The room dimensions: the grouping authority reads the physical layout from
+  // them, so a three-source design is estimated from its own groups.
+  roomDims = null,
   // The calculation count is stated ONCE, near the top of the card. When the
   // card has already stated it, this line carries only the short summary, so
   // the same amount is never repeated above the button.
   showSentence = true,
   className = "",
 }) {
-  const estimate = estimateOptimiserCalculations({ instances });
+  const estimate = estimateOptimiserCalculations({ instances, roomDims });
   const sentence = estimateSentence(estimate, { seatCount });
 
   return (

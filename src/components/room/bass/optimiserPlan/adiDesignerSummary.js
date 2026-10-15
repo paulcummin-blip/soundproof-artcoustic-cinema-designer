@@ -680,7 +680,7 @@ export function buildAdiDesignerSummary({
   // The estimate authority states the design options ADI evaluates and the
   // acoustic work underneath them. The sentence is produced by that authority,
   // never assembled here, so the two counts can never disagree.
-  const estimate = estimateOptimiserCalculations({ instances });
+  const estimate = estimateOptimiserCalculations({ instances, roomDims });
   const designOptions = estimate?.available === true ? Number(estimate.total) : NaN;
   const testedSentence = Number.isFinite(designOptions) && designOptions > 0
     ? resultSentence(designOptions, { seatCount, activeSubwooferCount: estimate.sourceCount })

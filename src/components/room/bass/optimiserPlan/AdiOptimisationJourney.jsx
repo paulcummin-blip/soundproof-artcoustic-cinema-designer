@@ -704,20 +704,6 @@ export default function AdiOptimisationJourney({
             <div className="text-[11px] text-[#3E4349] leading-relaxed">{journey.explanation}</div>
           )}
 
-          {/* The engine's own error text is a DIAGNOSTIC: it is read here and
-              never in the main panel, whose state line stays in the designer's
-              words and names the real reason. */}
-          {runError && (
-            <div className="space-y-0.5">
-              <div className="text-[10px] font-semibold uppercase tracking-wide text-[#8A7B6A]">
-                Run error (technical)
-              </div>
-              <div className="text-[11px] text-[#3E4349] leading-relaxed" data-adi-run-error="true">
-                {runError}
-              </div>
-            </div>
-          )}
-
           {journey.notes.length > 0 && (
             <div className="space-y-0.5 text-[11px] text-[#625143] leading-relaxed">
               {journey.notes.map((note) => <div key={note}>{note}</div>)}
@@ -957,9 +943,10 @@ export default function AdiOptimisationJourney({
               <OptimiserCalculationEstimateLine
                 instances={instances}
                 seatCount={seatCount}
+                roomDims={roomDims}
                 className="rounded-md border border-[#E7E5E0] bg-white px-3 py-2"
               />
-              <OptimiserCalculationDetail instances={instances} seatCount={seatCount} />
+              <OptimiserCalculationDetail instances={instances} seatCount={seatCount} roomDims={roomDims} />
             </div>
           )}
           </AdiEngineerDetailsPanel>

@@ -22,8 +22,13 @@ import {
 import { OPTIMISER_FAMILY_SEQUENCE, leverLabel } from "./optimiserLeverOrder.js";
 import { ADI_OPTIMISER_COPY } from "./resolveAdiOptimiserJourney.js";
 
-export default function OptimiserCalculationDetail({ instances = [], seatCount = null, className = "" }) {
-  const estimate = estimateOptimiserCalculations({ instances });
+export default function OptimiserCalculationDetail({
+  instances = [],
+  seatCount = null,
+  roomDims = null,
+  className = "",
+}) {
+  const estimate = estimateOptimiserCalculations({ instances, roomDims });
 
   // The acoustic work underneath the design options. This is counting detail, so
   // it is explained here and never in the default card.
