@@ -396,6 +396,40 @@ const PACKAGE_GROUP_ORDER = Object.freeze([
 ]);
 
 /**
+ * The physical loudspeaker count behind each specified model, read from the
+ * snapshot's own resolved product specification (products_selected_by_layer) —
+ * the same layer rows the version's equipment checklist prints.
+ *
+ * A role states its own count where the snapshot carries one. A snapshot frozen
+ * before the roles carried it still states what the version is specified with,
+ * so the Qty column reads the count from the version's own specification rather
+ * than printing a blank cell beside a real model. Nothing is invented: a model
+ * with no resolved count anywhere leaves its cell unstated, and the equipment
+ * quantity invariant refuses the document.
+ */
+function layerQuantityByModel(system) {
+  const byModel = new Map();
+  const layer = system?.products_selected_by_layer || {};
+  for (const rows of Object.values(layer)) {
+    for (const row of Array.isArray(rows) ? rows : []) {
+      const model = row?.model ? String(row.model).trim() : '';
+      const quantity = Number(row?.quantity) || 0;
+      if (!model || quantity <= 0) continue;
+      byModel.set(model, (byModel.get(model) || 0) + quantity);
+    }
+  }
+  return byModel;
+}
+
+/** The package row a subwoofer side is stated as, from its own recorded side. */
+function subwooferSideRole(side) {
+  const value = String(side || '').toLowerCase();
+  if (value === 'front') return 'Front subwoofers';
+  if (value === 'rear') return 'Rear subwoofers';
+  return 'Subwoofers';
+}
+
+/**
  * The selected package, one row per group of channel roles: what each group is,
  * and the model chosen for it. The subwoofers are stated once, as the count and
  * the model in the design.
@@ -403,6 +437,7 @@ const PACKAGE_GROUP_ORDER = Object.freeze([
 export function buildPackageRows(snapshot) {
   const system = snapshot?.system || {};
   const groups = new Map();
+  const layerQuantities = layerQuantityByModel(system);
 
   for (const role of Array.isArray(system.product_roles) ? system.product_roles : []) {
     if (isSubwooferRole(role)) continue;
@@ -434,7 +469,13 @@ export function buildPackageRows(snapshot) {
     .flatMap((label) => {
       const entry = groups.get(label);
       const model = entry.models.join(' · ');
-      const qty = entry.quantity > 0 ? entry.quantity : null;
+      // The position's own count leads; where the roles carry none, the count is
+      // read from the version's own specified layer rows for the model chosen
+      // there. A position with no resolved count anywhere stays unstated.
+      const stated = entry.quantity > 0
+        ? entry.quantity
+        : entry.models.reduce((sum, each) => sum + (layerQuantities.get(String(each).trim()) || 0), 0);
+      const qty = stated > 0 ? stated : null;
       // The left/right pair is stated as the two positions it is, one cabinet
       // each — the rows the version's equipment checklist prints.
       if (label === 'Front Left / Right') {
@@ -489,12 +530,24 @@ function subwooferPackageRows(system) {
   if (entries.length > 0) {
     return entries
       .map((entry) => ({
-        role: entry.side === 'front' ? 'Front subwoofers'
-          : entry.side === 'rear' ? 'Rear subwoofers' : 'Subwoofers',
+        role: subwooferSideRole(entry.side),
         model: [...new Set(entry.models.map(({ name }) => name))].join(' · '),
         qty: entry.total,
       }))
       .filter((row) => row.model);
+  }
+
+  // No instance on this snapshot: the version's own specified subwoofer layer
+  // states each side with its model and its count, so the row is read from there
+  // rather than stating a count with no side to claim.
+  const layerSubwoofers = (system?.products_selected_by_layer?.subwoofers || [])
+    .filter((row) => row?.model && Number(row?.quantity) > 0);
+  if (layerSubwoofers.length > 0) {
+    return layerSubwoofers.map((row) => ({
+      role: subwooferSideRole(row.position),
+      model: String(row.model).toUpperCase(),
+      qty: Number(row.quantity),
+    }));
   }
 
   const count = Number(strategy.count) || Number(layout.subwoofer_count) || 0;
