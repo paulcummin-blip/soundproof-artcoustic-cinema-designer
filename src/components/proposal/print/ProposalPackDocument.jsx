@@ -623,7 +623,14 @@ export default function ProposalPackDocument({
           data-editorial-block={isPillarSection(section.section_type) ? 'pillar' : 'section'}
           style={{ display: 'flow-root' }}
         >
-          <div className="pp-composition" data-editorial-composition="opening">
+          {/* The section identity travels with the composition, so a composed
+              sheet still states which structure it carries — the evidence the
+              export's image trace and the three-pillar composition read. */}
+          <div
+            className="pp-composition"
+            data-editorial-composition="opening"
+            data-editorial-section={section.section_type}
+          >
             {opensPillarGroup ? <h2 className="pp-pillars__title">{PILLAR_GROUP_HEADING}</h2> : null}
             {header}
             {leadingMedia}
@@ -653,7 +660,11 @@ export default function ProposalPackDocument({
             {alternativeImages}
           </div>
           {continuingBlocks.length > 0 ? (
-            <div className="pp-composition" data-editorial-composition="continuing">
+            <div
+              className="pp-composition"
+              data-editorial-composition="continuing"
+              data-editorial-section={section.section_type}
+            >
               {blockCopy(continuingBlocks)}
             </div>
           ) : null}

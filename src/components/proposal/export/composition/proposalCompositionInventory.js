@@ -1,3 +1,12 @@
+import { imageRoleRecord, imageRoleOf } from '@/components/proposal/export/composition/proposalImageRoleAuthority';
+
+/** The editorial sections a composed page carries, in document order. */
+function pageSections(page) {
+  return [...page.querySelectorAll('[data-editorial-section]')]
+    .map((node) => node.dataset.editorialSection)
+    .filter((value, position, list) => value && list.indexOf(value) === position);
+}
+
 /** Read-only content and page-boundary evidence shared by print and capture. */
 export function proposalContentSignature(root) {
   const clone = root.cloneNode(true);
@@ -17,6 +26,12 @@ export function proposalPageInventory(root, measure) {
     text: page.textContent.replace(/\s+/g, ' ').trim(),
     images: [...page.querySelectorAll('img')].map((image) => image.getAttribute('src')),
     rows: [...page.querySelectorAll('tbody tr')].map((row) => row.textContent),
+    // The Library role each photograph on this sheet was composed under, with the
+    // geometry the composition gave it, plus the editorial sections and image
+    // roles the sheet carries. Read-only image-trace evidence for the export.
+    imageRoles: [...page.querySelectorAll('img')].map((image) => imageRoleRecord(image, index + 1)),
+    roles: [...page.querySelectorAll('.pp-media')].map((frame) => imageRoleOf(frame) || 'unstated'),
+    sections: pageSections(page),
     ...(page.matches('.pp-page') && measure ? measure(page) : {}),
     size: '210 × 297 mm',
   }));

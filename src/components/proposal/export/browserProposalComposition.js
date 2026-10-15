@@ -4,7 +4,8 @@ import { proposalContentSignature, proposalPageInventory, assertSelectedImages }
 import { proposalContentUnits, markCompositionOrigins } from '@/components/proposal/export/composition/proposalContentUnits';
 import { fragmentTextUnit } from '@/components/proposal/export/composition/proposalTextFragments';
 import { measuredPartition } from '@/components/proposal/export/composition/proposalMeasuredPartition';
-import { fitMediaUnit, isMediaUnit } from '@/components/proposal/export/composition/proposalMediaFitting';
+import { reserveMediaUnit, isMediaUnit } from '@/components/proposal/export/composition/proposalMediaFitting';
+import { classifyPillarComposition } from '@/components/proposal/export/composition/pillarCompositionAuthority';
 import { normalizeGalleryPage } from '@/components/proposal/print/galleryPageComposition';
 import { fitHighlightsSection } from '@/components/proposal/export/composition/highlightsFitting';
 
@@ -59,14 +60,18 @@ export function composeProposalFrames(pages) {
       const candidate = [...chain, unit];
       let measured = measureUnits(candidate);
       // A photograph and its caption are indivisible: the photograph is reduced
-      // proportionally, and only as far as its own sheet requires.
+      // proportionally, and only as far as the area its own Library role reserves.
       if (!measured.fits && isMediaUnit(unit)) {
-        fitMediaUnit(unit, chain, measureUnits);
+        reserveMediaUnit(unit, chain, measureUnits);
         measured = measureUnits(candidate);
       }
       if (!measured.fits && unit.tableId) throw new Error('A complete table row and its required introduction exceed printable A4 height. Export stopped without splitting the row.');
-      if (!measured.fits && unit.atomic) throw new Error('A photograph block exceeds one printable A4 page even at its smallest height. Export stopped without cropping or omitting it.');
-      const fragments = measured.fits ? [unit] : fragmentTextUnit(unit, chain, measureUnits, {
+      // A photograph that cannot sit beside the copy it was measured with MOVES to
+      // the next sheet at its reserved size; it is never fragmented, which would
+      // print the same photograph twice, and never reduced below its reserved area.
+      const mediaMovesWhole = !measured.fits && isMediaUnit(unit) && measureUnits([unit]).fits;
+      if (!measured.fits && unit.atomic && !mediaMovesWhole) throw new Error('A photograph block exceeds one printable A4 page even at its reserved size. Export stopped without cropping or omitting it.');
+      const fragments = measured.fits || mediaMovesWhole ? [unit] : fragmentTextUnit(unit, chain, measureUnits, {
         index: allocationIndex,
         total: units.length,
         frame: original.dataset.paginationFrame,
@@ -115,6 +120,15 @@ export function composeBrowserProposal(doc) {
   root.dataset.compositionVersion = 'universal-measured-1';
   const inventory = proposalPageInventory(root, pageMeasurement);
   root.dataset.compositionInventory = JSON.stringify(inventory);
+  // The export's own image trace: which Library role every photograph was
+  // composed under, the geometry the composition gave it, and which approved
+  // three-pillar composition the measured allocation produced. Read-only evidence
+  // — it decides nothing and changes no value.
+  const pillar = classifyPillarComposition(inventory);
+  root.dataset.pillarComposition = pillar.composition || 'none';
+  root.dataset.pillarCompositionNote = pillar.note || '';
+  root.dataset.imageLayoutTrace = JSON.stringify(inventory.flatMap((entry) => entry.imageRoles || []));
   doc.defaultView.__PROPOSAL_PAGE_INVENTORY__ = inventory;
+  doc.defaultView.__PROPOSAL_IMAGE_TRACE__ = JSON.parse(root.dataset.imageLayoutTrace);
   return root;
 }

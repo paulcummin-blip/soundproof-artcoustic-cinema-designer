@@ -1,5 +1,6 @@
-import { fitMediaUnit } from '@/components/proposal/export/composition/proposalMediaFitting';
+import { reserveMediaUnit } from '@/components/proposal/export/composition/proposalMediaFitting';
 import { unitIdentityOf } from '@/components/proposal/export/composition/paginationFailureDiagnostics';
+import { isFullWidthMedia } from '@/components/proposal/export/composition/proposalImageRoleAuthority';
 
 /** Semantic units within the measured browser compositor; original DOM order is authoritative. */
 const PROSE = '.pp-body,.pp-endnote__body,.proposal-print-section__body';
@@ -117,16 +118,21 @@ export function proposalContentUnits(page, measureUnits) {
   // enough does the composition fall back to its own blocks, and a block, in
   // turn, to its paragraphs: the explicit overflow for copy that cannot be
   // presented on one sheet.
+  // A block or composition carrying a photograph is reduced only as far as that
+  // photograph's own Library role reserves. Where it cannot reach its reserved
+  // size, the composition falls back to its blocks and the photograph is measured
+  // as a block of its own at full size — so the COPY moves and the image keeps its
+  // area, rather than the image shrinking to fit the copy.
   const blockUnits = (block) => {
     const whole = atom(block, []);
     if (measureUnits([whole]).fits) return marked([whole], 'block-whole');
-    if (fitMediaUnit(whole, [], measureUnits)) return marked([whole], 'block-media-fitted');
+    if (reserveMediaUnit(whole, [], measureUnits)) return marked([whole], 'block-media-fitted');
     return marked(collect(block, [], true), 'block-fragments');
   };
   const compositionUnits = (composition) => {
     const whole = atom(composition, []);
     if (measureUnits([whole]).fits) return marked([whole], 'composition-whole');
-    if (fitMediaUnit(whole, [], measureUnits)) return marked([whole], 'composition-media-fitted');
+    if (reserveMediaUnit(whole, [], measureUnits)) return marked([whole], 'composition-media-fitted');
     return [...composition.children].flatMap((child) => (
       child.matches?.(COMPOSITION_BLOCK)
         ? blockUnits(child)
@@ -157,7 +163,14 @@ export function proposalContentUnits(page, measureUnits) {
     // A heading keeps its first image with it. A gallery photograph is content in
     // its own right, so it never drags the next photograph onto its own sheet.
     const galleryPhotograph = Boolean(unit.source.matches?.('figure') && unit.source.closest?.(GALLERY));
-    if (unit.source.matches?.('figure,.pp-media') && !galleryPhotograph && index > 0 && units[index - 1].keepNext && index + 1 < units.length) unit.keepNext = true;
+    // A FULL WIDTH image is a page element in its own right. It never chains the
+    // heading above it to the copy below it: chaining all three is what forced a
+    // hero image to be shrunk until the sheet accepted it. The heading keeps the
+    // image (one link), the copy follows where it fits, and the image keeps its
+    // reserved area.
+    const roleReservedImage = Boolean(unit.source.matches?.('figure,.pp-media') && isFullWidthMedia(unit.source));
+    if (unit.source.matches?.('figure,.pp-media') && !galleryPhotograph && !roleReservedImage
+        && index > 0 && units[index - 1].keepNext && index + 1 < units.length) unit.keepNext = true;
     // A tiny opening paragraph keeps a second paragraph instead of opening a section on a single sentence.
     if (unit.source.matches?.('p') && index > 0 && units[index - 1].keepNext
         && unit.source.textContent.trim().length < 160 && units[index + 1]?.source.matches?.('p')) unit.keepNext = true;
