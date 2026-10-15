@@ -244,7 +244,14 @@ export function useEngineeringPublicationEffect({
             snapshot_version: ENGINEERING_SNAPSHOT_VERSION,
             instance_authority_version: INSTANCE_AUTHORITY_VERSION,
             summary_schema_version: ENGINEERING_SUMMARY_SCHEMA_VERSION,
-            bass_fingerprint: bassFingerprint || null,
+            // The publication carries the authority the report is judged
+            // against: the current authoritative bass contract's own result
+            // fingerprint when one exists, otherwise the readiness fingerprint.
+            // Publishing one identity and comparing against another a moment
+            // later is what made a fresh report read as stale.
+            bass_fingerprint: bassFingerprint
+              || completedBassAuthority?.contract?.job?.resultFingerprint
+              || null,
           },
         });
         // The acknowledgement is the server's audit of the STORED publication,

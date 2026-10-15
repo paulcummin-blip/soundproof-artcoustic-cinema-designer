@@ -46,6 +46,7 @@ import {
   setFingerprintInputDigest,
 } from "./p14TargetCache";
 import { reconcileBassAuthorityWithPersisted } from "./completedBassResultStore";
+import { describeBassFreshnessDelta } from "./bassFreshnessAuthority";
 import { publishBassReconciliationStatus } from "./bassReconciliationStatus";
 
 export function useBassAuthorityReconciliation({
@@ -228,6 +229,13 @@ export function useBassAuthorityReconciliation({
         publishBassReconciliationStatus(scopeId, versionId, {
           source: reconciliationSource,
           identityReady: true,
+          // Every differing identity field, classified by whether it may
+          // legitimately stale the published report (physical design,
+          // calculation authority, applied calibration) or never can by itself
+          // (unapplied candidate, optimiser run metadata, diagnostics,
+          // presentation). This is the field-by-field delta behind a stale
+          // verdict, not just the hash.
+          fingerprintDelta: describeBassFreshnessDelta(differences),
           inputsValid: inputsValid === true,
           cacheKeyBuilt: true,
           cacheKey,

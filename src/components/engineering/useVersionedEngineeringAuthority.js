@@ -34,6 +34,10 @@ import { useSharedBassAuthorityReconciliation } from '@/components/room/bass/use
 import { useBassReconciliationStatus } from '@/components/room/bass/bassReconciliationStatus';
 import { auditFinalReportAuthority } from '@/components/report/finalReportAuthorityGate';
 import { auditDurablePublication } from './publicationGateAuthority';
+import {
+  buildBassStaleReason,
+  resolvePublishedBassFreshness,
+} from '@/components/room/bass/bassFreshnessAuthority';
 import { usePublicationAttempt } from './publicationAcknowledgementStore';
 
 export function useVersionedEngineeringAuthority(projectId, versionId, { finalReport = false, engineeringFingerprint = null } = {}) {
@@ -130,9 +134,21 @@ export function useVersionedEngineeringAuthority(projectId, versionId, { finalRe
   useBassReconciliationStatus(projectId, versionId);
   const composedSnapshot = composeAuthoritySnapshot({ localSnapshot, durableSnapshot, finalReport });
   const composedSummary = extractEngineeringSummary(composedSnapshot);
+  // Bass freshness is judged by the one product rule: the published bass
+  // authority still describes the version when its fingerprint is the current
+  // authoritative design fingerprint, or when the store still holds the
+  // PUBLISHED contract as the authoritative bass authority for this version.
+  // A transient result key stamped while the optimiser evaluates candidates is
+  // not a design change and must never stale the report on its own.
+  const publishedBassFreshness = resolvePublishedBassFreshness({
+    publishedFingerprint: durable?.publication?.provenance?.bass_fingerprint || null,
+    authorityCurrentFingerprint: completedBassAuthority?.currentFingerprint || null,
+    authorityStatus: completedBassAuthority?.authorityStatus || null,
+    publishedContractFingerprint: completedBassAuthority?.contract?.job?.resultFingerprint || null,
+  });
   const publishedBassMatches = !finalReport || !durable?.publication
     || !!engineeringFingerprint
-    || durable.publication.provenance?.bass_fingerprint === completedBassAuthority?.currentFingerprint;
+    || publishedBassFreshness.matches;
   const restoredSummary = publishedBassMatches && !engineeringFingerprint ? applyRestoredBassAuthority(
     composedSummary,
     { projectId, versionId, completedBassAuthority },
@@ -165,7 +181,7 @@ export function useVersionedEngineeringAuthority(projectId, versionId, { finalRe
   const summaryCompleteness = assessEngineeringReportCompleteness(extractEngineeringSummary(snapshot));
   const finalAuthorityGate = finalReport ? auditFinalReportAuthority(durable?.publication) : { allowed: true };
   const reportCompleteness = !publishedBassMatches
-    ? { ...summaryCompleteness, complete:false, reason:'The saved engineering publication is stale. The bass fingerprint no longer matches the current version.' }
+    ? { ...summaryCompleteness, complete:false, reason: buildBassStaleReason(publishedBassFreshness.differs) }
     : finalAuthorityGate.allowed ? summaryCompleteness
       : { ...summaryCompleteness, complete:false, reason:finalAuthorityGate.reason };
 
