@@ -147,8 +147,8 @@ export default function ProposalReviewRequiredDialog({
         )}
 
         <p style={{ fontFamily: FONT_BODY, fontSize: 12, color: '#8A8477', margin: '4px 0 0', lineHeight: 1.6 }}>
-          Preview Document stays available while the copy is under review. Export unlocks
-          once every section above has been approved.
+          The PDF is created only when the checks above pass and every generated
+          section has been approved.
         </p>
 
         <DialogFooter style={{ gap: 8, marginTop: 12 }}>

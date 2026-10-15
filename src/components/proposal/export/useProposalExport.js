@@ -14,21 +14,19 @@
  *   - wait for fonts and layout, then print
  *   - clean up on afterprint (with a timeout fallback)
  *
- * Two modes, ONE document. `handleExport` issues: it passes the
- * complete-document gate and stores the composition it printed in the Project
- * Library. `handlePreview` is genuinely read-only: the same pack, the same print
- * window, the same readiness authority and the same A4 composition, but it
- * creates no issued-export record, changes no proposal status or history, writes
- * no section and regenerates no text — so the document can be inspected before
- * the designer decides to issue or export it. The decision itself lives in
- * ./proposalExportMode, so the non-issuing guarantee is testable on its own.
+ * ONE action, ONE document. There is no read-only preview: the editor's only
+ * document action is Export Proposal PDF, and a PDF may only be created once
+ * every generated narrative section has been explicitly approved, with the
+ * evidence check passed. So this hook has a single entry point, `handleExport`,
+ * and every gate below applies to it — there is no second, ungated print path
+ * through which a PDF could be produced.
  *
- * Readiness is asked in two parts, because the two actions do not have the same
- * permission: what a document needs to be COMPOSED at all (the proposal loaded,
- * its written sections present, its comparison evidence in hand, its print
- * resources ready) withholds both actions, while the copy layer's own editorial
- * block withholds the ISSUED document alone. A genuine editorial problem is shown
- * as a warning and never stops the designer inspecting the real A4 document.
+ * Readiness is asked in two parts: what a document needs to be COMPOSED at all
+ * (the proposal loaded, its written sections present, its comparison evidence in
+ * hand, its print resources ready), and the editorial gates that decide whether
+ * an issued document may be produced — the copy's own review state and the
+ * designer's approval of every generated narrative section. A genuine editorial
+ * problem is stated on the click and never silently fails.
  */
 
 import { useCallback, useEffect, useRef, useState } from 'react';
@@ -53,13 +51,6 @@ import {
   snapshotIssuedComposition,
 } from '@/components/library/issuedDocument/recordIssuedExport';
 import {
-  EXPORT_MODE,
-  PREVIEW_MODE,
-  readLayerAction,
-  requiresIssueGate,
-  shouldRecordIssuedExport,
-} from './proposalExportMode';
-import {
   PRINT_NOT_READY_MESSAGE,
   PRINT_READINESS_REASON,
   describePrintReadinessFailure,
@@ -75,6 +66,9 @@ import { prepareBrowserProposalFallback } from '@/components/proposal/export/bro
 
 const PRINT_TIMEOUT_MS = 60000;
 const EXPORT_BODY_CLASS = 'proposal-export-mode';
+// The one action this hook performs, and the action the read-only copy layer is
+// asked to authorize: an issued export.
+const EXPORT_ACTION = 'export';
 
 /**
  * "The document was not ready" — a failure the designer can act on. It is a real
@@ -97,21 +91,19 @@ function stripHtml(value) {
 }
 
 /**
- * Resolve whether this proposal can reach the printer in this mode.
+ * Resolve whether this proposal may be exported.
+ *
+ * Every reason below is a reason no PDF is produced — there is no read-only
+ * preview for a block to be a mere warning on instead.
  *
  * @param {Object} options
- * @param {string} [options.mode] — the action being prepared
  * @param {string|null} [options.comparisonBlockReason] — a reason the document
  *   cannot be composed at all (comparison evidence missing or still being read).
- *   It withholds BOTH actions.
  * @param {string|null} [options.issueBlockReason] — the copy layer's own editorial
- *   block: the copy still needs review, so the document may not be issued. It
- *   withholds the EXPORT only.
+ *   block: the copy still needs review, so the document may not be issued.
  * @param {string|null} [options.approvalBlockReason] — the human approval rule:
- *   generated sections that no one has approved yet. Also an issue gate, and so
- *   also withheld from the EXPORT alone — previewing under review is what the
- *   preview is for.
- * @returns {string|null} a blocking reason, or null when this mode may proceed
+ *   generated narrative sections that no one has approved yet.
+ * @returns {string|null} a blocking reason, or null when the export may proceed
  */
 export function resolveProposalExportReadiness({
   proposal,
@@ -119,14 +111,11 @@ export function resolveProposalExportReadiness({
   comparisonBlockReason = null,
   issueBlockReason = null,
   approvalBlockReason = null,
-  mode = EXPORT_MODE,
 }) {
-  // The issue gates are export requirements and nothing else: a preview exists so
-  // the designer can inspect the document before it is fit to issue, so a genuine
-  // editorial problem is a warning on that document rather than a reason to
-  // withhold it.
-  if (requiresIssueGate(mode) && issueBlockReason) return issueBlockReason;
-  if (requiresIssueGate(mode) && approvalBlockReason) return approvalBlockReason;
+  // The approval rule is asked first: it is the gate the designer acts on, and the
+  // one that names the sections still to be read.
+  if (approvalBlockReason) return approvalBlockReason;
+  if (issueBlockReason) return issueBlockReason;
   if (comparisonBlockReason) return comparisonBlockReason;
   if (!proposal) {
     return 'This proposal could not be loaded. Reopen it from the Proposal Centre and try again.';
@@ -150,12 +139,11 @@ export function resolveProposalExportReadiness({
 /**
  * Whether the real A4 composition can be mounted on the page.
  *
- * The pack is composed from the proposal's own loaded sections, and it is mounted
- * for BOTH actions: it is the document the designer inspects and the document that
- * is issued. The issue gate decides whether an EXPORT may print it — it never
- * decides whether the document exists on the page, because a preview that cannot
- * show the document is not a preview. When the composition cannot be prepared the
- * attempt fails visibly; the application interface is never printed in its place.
+ * The pack is composed from the proposal's own loaded sections. The gates decide
+ * whether the export may print it — they never decide whether the document exists
+ * on the page, because the export prints the real A4 pack. When the composition
+ * cannot be prepared the attempt fails visibly; the application interface is never
+ * printed in its place.
  *
  * @param {{proposal: Object|null, sections: Array}} options
  * @returns {boolean}
@@ -169,12 +157,10 @@ export function useProposalExport({
   proposal,
   sections,
   comparisonBlockReason = null,
-  // The copy layer's own editorial block. It withholds the issued export, and
-  // never the read-only preview.
+  // The copy layer's own editorial block: it withholds the export.
   issueBlockReason = null,
-  // The human approval rule: generated sections nobody has approved yet. It is an
-  // issue gate too — the PDF may not be created before every generated section has
-  // been read and approved — and so it never withholds the read-only preview.
+  // The human approval rule: generated narrative sections nobody has approved yet.
+  // The PDF may not be created before every one of them has been read and approved.
   approvalBlockReason = null,
   projectName,
   // Optional filename segments: the shared helper omits them when unavailable.
@@ -195,9 +181,6 @@ export function useProposalExport({
   resolveExportIdentity = null,
 }) {
   const [exporting, setExporting] = useState(false);
-  // The read-only preview: the same preparation and printing, no issue and no
-  // storage. Kept separate only so the toolbar can say which action is running.
-  const [previewing, setPreviewing] = useState(false);
   const [error, setError] = useState(null);
   const [blockedReason, setBlockedReason] = useState(null);
   // Whether the last failure was "the document was not ready", which the designer
@@ -223,7 +206,6 @@ export function useProposalExport({
     if (printingRef.current) {
       printingRef.current = false;
       setExporting(false);
-      setPreviewing(false);
     }
     if (typeof document !== 'undefined') {
       document.body.classList.remove(EXPORT_BODY_CLASS);
@@ -255,10 +237,14 @@ export function useProposalExport({
     };
   }, [cleanup]);
 
-  const runPrint = useCallback(async (mode = EXPORT_MODE) => {
+  const runPrint = useCallback(async () => {
     if (printingRef.current) return;
 
-    const reason = resolveProposalExportReadiness({ proposal, sections, comparisonBlockReason, issueBlockReason, approvalBlockReason, mode });
+    // Whether THIS attempt stores the composition it prints in the Project
+    // Library: only an export carrying an issued document does.
+    const shouldRecordIssued = Boolean(issuedDocument?.documentType);
+
+    const reason = resolveProposalExportReadiness({ proposal, sections, comparisonBlockReason, issueBlockReason, approvalBlockReason });
     if (reason) {
       setBlockedReason(reason);
       setError(null);
@@ -274,7 +260,7 @@ export function useProposalExport({
     attemptRef.current = attemptId;
     const isCurrent = () => attemptRef.current === attemptId;
     const diagnostics = createExportDiagnostics({ scope: 'proposal-export-attempt' });
-    diagnostics.start('attempt', { mode });
+    diagnostics.start('attempt', { mode: EXPORT_ACTION });
 
     setBlockedReason(null);
     setError(null);
@@ -282,7 +268,6 @@ export function useProposalExport({
     setErrorDetail(null);
     printingRef.current = true;
     setExporting(true);
-    setPreviewing(mode === PREVIEW_MODE);
 
     // The shared filename helper, with the report type this proposal is —
     // System Design Summary / System Design Comparison / Proposal — and the
@@ -308,20 +293,19 @@ export function useProposalExport({
     diagnostics.done('print_window', { opened: Boolean(printWindow) });
 
     try {
-      // The same read-only edit layer, under the same access controls, is asked
-      // first in BOTH modes, so a preview cannot show a document this login may
-      // not open. An issued export must additionally pass the complete-document
-      // gate; a preview deliberately does not, because inspecting the real print
-      // document before it is ready to issue is what a preview is for.
+      // The read-only edit layer, under the same access controls, is asked first:
+      // the export is authorized server-side against exactly the document about to
+      // be printed — access, evidence and the approval of every generated section —
+      // and nothing is printed before that answer arrives.
       diagnostics.start('edit_layer');
       const authorization = await authorizePrint(
         (payload) => base44.functions.invoke('readProposalEditLayer', payload),
-        { proposal_id: proposal.id, action: readLayerAction(mode), rendered_sections: sections, engineering_snapshot: proposal.engineering_snapshot },
+        { proposal_id: proposal.id, action: EXPORT_ACTION, rendered_sections: sections, engineering_snapshot: proposal.engineering_snapshot },
       );
       if (!isCurrent()) return;
       diagnostics.done('edit_layer');
       const validation = authorization?.data?.layer?.document_validation;
-      if (requiresIssueGate(mode) && !validation?.valid) {
+      if (!validation?.valid) {
         diagnostics.fail('edit_layer', { gate: 'complete_document' });
         throw new Error(authorization?.data?.error || 'The complete proposal must pass validation before export.');
       }
@@ -329,15 +313,10 @@ export function useProposalExport({
       // EQUIPMENT QUANTITY IS AN INVARIANT, NOT A PREFERENCE (equipmentQuantityAuthority.js).
       // A package row whose count cannot be resolved is an equipment-authority failure,
       // so no document is issued with it: the positions are named and nothing is printed.
-      // A PREVIEW deliberately is not held to it, exactly as it is not held to the
-      // complete-document gate — inspecting the document before it is fit to issue is
-      // what a preview is for.
-      if (requiresIssueGate(mode)) {
-        const unresolved = unresolvedPackageQuantities(proposal?.engineering_snapshot);
-        if (unresolved.length > 0) {
-          diagnostics.fail('edit_layer', { gate: 'equipment_quantity', positions: unresolved });
-          throw new Error(equipmentQuantityMessage(unresolved));
-        }
+      const unresolved = unresolvedPackageQuantities(proposal?.engineering_snapshot);
+      if (unresolved.length > 0) {
+        diagnostics.fail('edit_layer', { gate: 'equipment_quantity', positions: unresolved });
+        throw new Error(equipmentQuantityMessage(unresolved));
       }
 
       // 1. The document's OWN inputs are resolved before anything is prepared:
@@ -388,7 +367,7 @@ export function useProposalExport({
       let printed = false;
       let issuedSnapshot = null;
       const preserveCompletedPages = (root) => {
-        if (shouldRecordIssuedExport({ mode, issuedDocument })) {
+        if (shouldRecordIssued) {
           issuedSnapshot = snapshotIssuedComposition(issuedDocument.documentType, root);
         }
       };
@@ -414,7 +393,6 @@ export function useProposalExport({
             if (!isCurrent()) return;
             printingRef.current = false;
             setExporting(false);
-            setPreviewing(false);
           }, PRINT_TIMEOUT_MS);
         } else if (result.reason !== 'window_unavailable') {
           // The document did not become ready: NOTHING was printed, and the
@@ -461,10 +439,8 @@ export function useProposalExport({
         window.print();
       }
 
-      // The issued copy is taken from the SAME composition this export printed —
-      // and only for an issued export. A preview never reaches this: nothing is
-      // stored, no issued-export record is created and no proposal state changes.
-      if (isCurrent() && shouldRecordIssuedExport({ mode, issuedDocument })) {
+      // The issued copy is taken from the SAME composition this export printed.
+      if (isCurrent() && shouldRecordIssued) {
         if (!issuedSnapshot) throw new Error('The completed proposal pages were not preserved for Project Library.');
         recordIssuedExportInBackground({ identity: { ...issuedDocument, filename: settledTitle }, snapshot: issuedSnapshot });
       }
@@ -495,29 +471,24 @@ export function useProposalExport({
         notReady
           ? err.message
           : (err?.response?.data?.error || err?.message
-            || (mode === PREVIEW_MODE
-              ? 'The document preview could not be prepared for printing.'
-              : 'The proposal PDF could not be prepared for printing.'))
+            || 'The proposal PDF could not be prepared for printing.')
       );
       setRetryable(notReady);
       cleanup(printWindow);
     }
   }, [proposal, sections, comparisonBlockReason, issueBlockReason, approvalBlockReason, projectName, dealerName, clientName, projectReference, versionNames, issuedDocument, resolveExportIdentity, cleanup]);
 
-  // The two entry points. Both prepare and print the SAME document; only the
-  // issued export stores the composition it printed.
-  const handleExport = useCallback(() => runPrint(EXPORT_MODE), [runPrint]);
-  const handlePreview = useCallback(() => runPrint(PREVIEW_MODE), [runPrint]);
+  // The one entry point: the export prepares and prints the real A4 document, and
+  // stores the composition it printed in the Project Library.
+  const handleExport = useCallback(() => runPrint(), [runPrint]);
 
   return {
     exporting,
-    previewing,
     error,
     // The technical record of a pagination stop, rendered only for a master admin.
     errorDetail,
     blockedReason,
     retryable,
     handleExport,
-    handlePreview,
   };
 }

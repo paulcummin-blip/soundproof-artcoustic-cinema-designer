@@ -781,30 +781,23 @@ export default function ProposalEditor() {
   // not implemented, so it is deliberately not exposed.
   const {
     exporting,
-    // The read-only preview of the exact print document.
-    previewing,
     error: exportError,
     blockedReason: exportBlockedReason,
     retryable: exportRetryable,
     // The technical record of a pagination stop, for a master-admin login only.
     errorDetail: exportErrorDetail,
     handleExport,
-    handlePreview,
   } = useProposalExport({
     proposal,
     sections: documentSections,
-    // Composition availability: what must be in hand before ANY document is
-    // composed, preview included — the comparison evidence and the proposal's own
-    // copy. It withholds both actions.
+    // Composition availability: what must be in hand before the document can be
+    // composed at all — the comparison evidence and the proposal's own copy.
     comparisonBlockReason,
-    // The copy layer's own editorial block, which is an ISSUE gate: it withholds
-    // the issued document and never the read-only preview of it.
+    // The copy layer's own editorial block: it withholds the export.
     issueBlockReason: editLayerBlockReason,
-    // The approval rule, as an issue gate of its own: no PDF is created before
-    // every generated section has been read and approved. It withholds the issued
-    // export only — previewing the document while it is under review is what the
-    // preview is for — and the export click is routed to the approval dialog
-    // before it ever reaches here.
+    // The approval rule: no PDF is created before every generated narrative
+    // section has been read and approved. The export click is routed to the
+    // approval dialog before it ever reaches here.
     approvalBlockReason,
     projectName: projectContext.projectName,
     dealerName: projectContext.filenameDealerName,
@@ -907,8 +900,6 @@ export default function ProposalEditor() {
         onToggleClientBrief={() => setShowClientBrief((prev) => !prev)}
         exporting={exporting}
         onExport={handleExportClick}
-        previewing={previewing}
-        onPreview={handlePreview}
         blockedReason={comparisonBlockReason || exportBlockedReason || (copyReview ? null : editLayerBlockReason)}
         review={copyReview}
         approval={approval}

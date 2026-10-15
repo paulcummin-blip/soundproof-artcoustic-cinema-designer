@@ -7,17 +7,16 @@
  * the branding.
  *
  * Left:  proposal identity (title, project, proposal type)
- * Right: Client Brief, Preview Document (read-only),
- *        Export Proposal PDF (primary)
+ * Right: Client Brief, Export Proposal PDF (primary)
  *
- * Preview Document prepares the SAME print document as the export — same pack,
- * same images, same print styles, same A4 composition — and opens it for
- * inspection without issuing anything: no issued-export record, no stored file,
- * no proposal status or history change.
+ * Export Proposal PDF is the ONLY document action. There is no preview: the PDF
+ * is prepared from the same A4 pack, printed, and stored in the Project Library
+ * as the issued document — and it may only be created once every generated
+ * narrative section has been explicitly approved and the evidence check passes.
  */
 
 import React from 'react';
-import { FileText, Download, Eye, Loader2, AlertCircle, RotateCw } from 'lucide-react';
+import { FileText, Download, Loader2, AlertCircle, RotateCw } from 'lucide-react';
 
 import { REPORT_FONT_BODY as FONT } from '@/components/report/typography/reportTypography';
 import PaginationFailureDetails from '@/components/proposal/export/PaginationFailureDetails';
@@ -36,10 +35,6 @@ export default function ProposalWorkspaceToolbar({
   onToggleClientBrief,
   exporting,
   onExport,
-  // The read-only preview: the same print document, opened for inspection
-  // without issuing or storing anything.
-  previewing = false,
-  onPreview,
   blockedReason,
   // The copy review state the server resolved with the copy layer: the document's
   // own evidence check, and how much generated copy still awaits approval. It is
@@ -95,23 +90,8 @@ export default function ProposalWorkspaceToolbar({
 
           <button
             type="button"
-            onClick={onPreview}
-            disabled={exporting || previewing}
-            className={`${SECONDARY_IDLE} disabled:opacity-60 disabled:cursor-not-allowed`}
-            style={{ fontFamily: FONT }}
-          >
-            {previewing ? (
-              <Loader2 className="w-3.5 h-3.5 animate-spin" />
-            ) : (
-              <Eye className="w-3.5 h-3.5" />
-            )}
-            {previewing ? 'Preparing preview…' : 'Preview Document'}
-          </button>
-
-          <button
-            type="button"
             onClick={onExport}
-            disabled={exporting || previewing}
+            disabled={exporting}
             className="flex items-center gap-1.5 px-4 py-2 text-xs uppercase tracking-[0.12em] rounded-md text-white transition-colors hover:bg-[#3E4349] disabled:opacity-60 disabled:cursor-not-allowed"
             style={{ backgroundColor: '#213428', fontFamily: FONT }}
           >

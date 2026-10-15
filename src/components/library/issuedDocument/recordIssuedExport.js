@@ -6,7 +6,7 @@
  *
  * Rules this module exists to hold:
  *   - Only an explicit export stores anything. Background generation and
- *     previewing never reach here.
+ *     a read-only pass never reach here.
  *   - The export itself is never delayed or put at risk. The composition is
  *     cloned synchronously at click time and everything else happens in the
  *     background; if storage fails the designer keeps the exported PDF and is

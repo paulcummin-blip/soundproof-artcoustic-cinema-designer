@@ -1,5 +1,5 @@
 /**
- * Acceptance: the published proposal and its read-only preview.
+ * Acceptance: the published proposal and the one action that issues it.
  * ------------------------------------------------------------
  * The request's acceptance cases, as deterministic checks against the real
  * Genesis proposal's frozen approved copy (test/fixtures/genesisProposalFixture.mjs):
@@ -15,8 +15,8 @@
  *   H  cover first, and the document closes with the design: no Appendix
  *   I  Editor and print carry identical approved text
  *   J  Ready to Issue is blocked when required published content disappears
- *   K  Preview Document makes no database write
- *   L  preview and export compose the same document, from one code path
+ *   K  Export Proposal PDF is the only document action, and writes nothing of its own
+ *   L  one preparation path composes the document, and only approval issues it
  *   M  saved proposals are never rewritten
  */
 import { describe, it, expect } from 'vitest';
@@ -30,13 +30,6 @@ import {
   preparePublishedSectionBody,
   missingPublishedContent,
 } from '../base44/shared/proposalEdit/publishedSectionPreparation.js';
-import {
-  EXPORT_MODE,
-  PREVIEW_MODE,
-  readLayerAction,
-  requiresIssueGate,
-  shouldRecordIssuedExport,
-} from '../src/components/proposal/export/proposalExportMode.js';
 import {
   canonicalSectionTypes,
   orderPublicationSections,
@@ -332,19 +325,18 @@ describe('J. Ready to Issue is blocked when published content disappears', () =>
   });
 });
 
-describe('K. the read-only preview makes no database write', () => {
-  it('never asks for the issue gate and never stores an issued copy', () => {
-    expect(readLayerAction(PREVIEW_MODE)).toBe(PREVIEW_MODE);
-    expect(readLayerAction(EXPORT_MODE)).toBe(EXPORT_MODE);
-    expect(requiresIssueGate(PREVIEW_MODE)).toBe(false);
-    expect(requiresIssueGate(EXPORT_MODE)).toBe(true);
-    expect(shouldRecordIssuedExport({ mode: PREVIEW_MODE, issuedDocument: { documentType: 'proposal' } })).toBe(false);
-    expect(shouldRecordIssuedExport({ mode: EXPORT_MODE, issuedDocument: { documentType: 'proposal' } })).toBe(true);
-    expect(shouldRecordIssuedExport({ mode: PREVIEW_MODE })).toBe(false);
+describe('K. the export is the only document action, and it writes nothing of its own', () => {
+  it('carries no preview path: the export is the one entry point', () => {
+    expect(HOOK_SOURCE).not.toContain('handlePreview');
+    expect(HOOK_SOURCE).not.toContain('previewing');
+    expect(HOOK_SOURCE).toContain('const handleExport = useCallback(() => runPrint(), [runPrint]);');
+    // The editor offers no second document action.
+    expect(EDITOR_SOURCE).not.toContain('onPreview=');
+    expect(EDITOR_SOURCE).not.toContain('Preview Document');
   });
 
   it('reaches the only issued-copy write through that decision', () => {
-    const guarded = HOOK_SOURCE.indexOf('shouldRecordIssuedExport({ mode, issuedDocument })) {');
+    const guarded = HOOK_SOURCE.indexOf('if (isCurrent() && shouldRecordIssued) {');
     const write = HOOK_SOURCE.indexOf('recordIssuedExportInBackground({');
     expect(guarded).toBeGreaterThan(-1);
     expect(write).toBeGreaterThan(guarded);
@@ -353,17 +345,16 @@ describe('K. the read-only preview makes no database write', () => {
   it('writes no record, no status and no section from the export hook', () => {
     ['base44.entities.', 'transitionProposalStatus', 'persistProposalSectionEdit', 'appendProposalEdit']
       .forEach((write) => expect(HOOK_SOURCE).not.toContain(write));
-    // The one server call the hook makes is the read-only edit layer, in both modes.
+    // The one server call the hook makes is the read-only edit layer.
     expect(countOf(HOOK_SOURCE, 'base44.functions.invoke(')).toBe(1);
     expect(HOOK_SOURCE).toContain("base44.functions.invoke('readProposalEditLayer'");
   });
 
   it('reads the document through the read-only layer, never a write path', () => {
-    // One read path for the whole document: the export path reads the record
-    // layer through the read-only server action, and the action it asks for is
-    // the one the mode dictates.
+    // One read path for the whole document: the export reads the record layer
+    // through the read-only server action, asking for the export authorization.
     expect(HOOK_SOURCE).toContain("base44.functions.invoke('readProposalEditLayer'");
-    expect(HOOK_SOURCE).toContain('readLayerAction(mode)');
+    expect(HOOK_SOURCE).toContain('action: EXPORT_ACTION');
     // The editor consumes that one path rather than opening its own.
     expect(EDITOR_SOURCE).toContain('useProposalExport');
     // The same read-only layer the rest of the app reads a proposal through.
@@ -386,10 +377,12 @@ describe('L. preview and export compose the same document', () => {
     expect(typeof ProposalPrintDocument).toBe('function');
   });
 
-  it('runs one preparation path, with the mode deciding only whether it issues', () => {
-    expect(HOOK_SOURCE).toContain('handleExport = useCallback(() => runPrint(EXPORT_MODE)');
-    expect(HOOK_SOURCE).toContain('handlePreview = useCallback(() => runPrint(PREVIEW_MODE)');
+  it('runs one preparation path, which only approval lets issue', () => {
+    expect(HOOK_SOURCE).toContain('const handleExport = useCallback(() => runPrint(), [runPrint]);');
     expect(countOf(HOOK_SOURCE, 'const runPrint = useCallback(')).toBe(1);
+    // The approval of every generated section is a condition of the PDF on that
+    // one path.
+    expect(HOOK_SOURCE).toContain('if (approvalBlockReason) return approvalBlockReason;');
   });
 
   it('composes an identical document every time', () => {

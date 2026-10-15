@@ -96,7 +96,7 @@ export default function ProposalApprovalRequiredDialog({
           <DialogDescription
             style={{ fontFamily: FONT_BODY, fontSize: 13, color: '#625143', lineHeight: 1.6, marginTop: 6 }}
           >
-            This proposal still contains generated copy that has not been approved.
+            This proposal still contains sections that have not been approved.
           </DialogDescription>
         </DialogHeader>
 
@@ -144,8 +144,8 @@ export default function ProposalApprovalRequiredDialog({
         )}
 
         <p style={{ fontFamily: FONT_BODY, fontSize: 12, color: '#8A8477', margin: '4px 0 0', lineHeight: 1.6 }}>
-          Preview Document stays available while the copy is under review. Export unlocks
-          once every section above has been approved.
+          The PDF is created only when every section above has been approved and the
+          evidence check has passed.
         </p>
 
         <DialogFooter style={{ gap: 8, marginTop: 12 }}>

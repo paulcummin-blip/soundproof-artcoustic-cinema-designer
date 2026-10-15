@@ -55,14 +55,6 @@ import {
   readLastExportDiagnostics,
   recordExportDiagnostics,
 } from '@/components/proposal/export/proposalExportDiagnostics';
-import {
-  EXPORT_MODE,
-  PREVIEW_MODE,
-  readLayerAction,
-  requiresIssueGate,
-  shouldRecordIssuedExport,
-} from '@/components/proposal/export/proposalExportMode';
-
 /* ── Fixtures (safe, in-memory only) ──────────────────────────────────────── */
 
 const VERSION_A = 'aaaaaaaaaaaaaaaaaaaaaaaa';
@@ -373,44 +365,57 @@ test('G. Retry is a clean attempt and picks up the name that has since arrived',
   assert.notEqual(second.names, first.names, 'each attempt has its own resolved state');
 });
 
-/* ── H. Preview records nothing ─────────────────────────────────────────── */
+/* ── H. No issued record without an issued document ─────────────────────── */
 
-test('H. Preview never records an issued export, whatever it is handed', async () => {
-  assert.equal(shouldRecordIssuedExport({ mode: PREVIEW_MODE, issuedDocument: { documentType: 'proposal' } }), false);
-  assert.equal(shouldRecordIssuedExport({ mode: PREVIEW_MODE, issuedDocument: { documentType: 'system_design_summary' } }), false);
-  assert.equal(shouldRecordIssuedExport({ mode: PREVIEW_MODE }), false);
-  assert.equal(requiresIssueGate(PREVIEW_MODE), false, 'a preview is not gated on the complete-document check');
-  assert.equal(readLayerAction(PREVIEW_MODE), 'preview');
-
-  // The recording call sits behind that decision, and behind the attempt guard.
+test('H. no issued export is recorded without an issued document', async () => {
+  // The guard is the document itself, and Preview Document no longer exists, so
+  // there is no read-only pass that could reach the issued-copy write.
   const source = readFileSync(new URL('../src/components/proposal/export/useProposalExport.js', import.meta.url), 'utf8');
-  assert.ok(/if \(isCurrent\(\) && shouldRecordIssuedExport\(\{ mode, issuedDocument \}\)\) \{/.test(source));
+  assert.ok(/const shouldRecordIssued = Boolean\(issuedDocument\?\.documentType\);/.test(source));
+  assert.ok(/if \(isCurrent\(\) && shouldRecordIssued\) \{/.test(source));
+  assert.equal(source.includes('handlePreview'), false);
+  assert.equal(source.includes('previewing'), false);
 });
 
 /* ── I. Export keeps its issue-recording behaviour ──────────────────────── */
 
 test('I. Export still records the composition it printed — and only with a document', async () => {
-  assert.equal(shouldRecordIssuedExport({ mode: EXPORT_MODE, issuedDocument: { documentType: 'system_design_summary' } }), true);
-  assert.equal(shouldRecordIssuedExport({ mode: EXPORT_MODE, issuedDocument: { documentType: 'proposal' } }), true);
-  assert.equal(shouldRecordIssuedExport({ mode: EXPORT_MODE, issuedDocument: null }), false);
-  assert.equal(requiresIssueGate(EXPORT_MODE), true, 'an issued export still passes the complete-document gate');
-  assert.equal(readLayerAction(EXPORT_MODE), 'export');
+  const source = readFileSync(new URL('../src/components/proposal/export/useProposalExport.js', import.meta.url), 'utf8');
+  // The decision is taken from the document, and it is the only route to the write.
+  assert.ok(/const shouldRecordIssued = Boolean\(issuedDocument\?\.documentType\);/.test(source));
+  assert.ok(/issuedSnapshot = snapshotIssuedComposition\(issuedDocument\.documentType, root\);/.test(source));
+  assert.ok(/if \(isCurrent\(\) && shouldRecordIssued\) \{/.test(source));
+  const guarded = source.indexOf('if (isCurrent() && shouldRecordIssued) {');
+  const write = source.indexOf('recordIssuedExportInBackground({');
+  assert.ok(guarded > -1 && write > guarded, 'the only issued-copy write sits behind that decision');
+  // And the export is authorized as an issued export, so the approval rule and the
+  // evidence check are enforced server-side before anything is prepared.
+  assert.equal(source.includes("action: EXPORT_ACTION"), true);
 });
 
 /* ── J. The fallback uses the same readiness rules ──────────────────────── */
 
 test('J. the popup-blocked fallback is prepared by the SAME readiness authority', async () => {
   const exportSource = readFileSync(new URL('../src/components/proposal/export/useProposalExport.js', import.meta.url), 'utf8');
-  const windowSource = readFileSync(new URL('../src/components/report/reportPrintWindow.js', import.meta.url), 'utf8');
+  const windowSource = readFileSync(new URL('../src/components/proposal/export/proposalPrintWindow.js', import.meta.url), 'utf8');
   // The in-page fallback… resolves the pack node ONCE and refuses to prepare when
   // there is none, so the application interface can never be printed in the pack's
   // place. It is still the one shared authority that prepares it.
   assert.ok(/const fallbackNode = findPrintNode\(\);/.test(exportSource));
-  assert.ok(/preparePrintDocument\(\{ doc: document, root: fallbackNode \}\)/.test(exportSource));
+  // The fallback is prepared by the ONE shared readiness authority, through the
+  // fallback helper — never by a bare animation-frame delay.
+  assert.ok(/prepareBrowserProposalFallback\(fallbackNode/.test(exportSource));
   assert.ok(!/preparePrintDocument\(\{ doc: document, root: findPrintNode\(\) \}\)/.test(exportSource));
   assert.ok(/COMPOSITION_UNAVAILABLE/.test(exportSource));
-  // …and the app-owned print window run the one shared authority.
-  assert.ok(/preparePrintDocument\(\{ win, root: win\.document\.body \}\)/.test(windowSource));
+  const fallbackSource = readFileSync(new URL('../src/components/proposal/export/browserProposalFallback.js', import.meta.url), 'utf8');
+  assert.ok(/preparePrintDocument\(\{ doc, root: clone, trace \}\)/.test(fallbackSource),
+    'the fallback runs the same readiness authority as the print window');
+  // …and the app-owned print window resolves the pack node and prints that same
+  // composed document, through the app's own window helper.
+  assert.ok(/export function findPrintNode\(/.test(windowSource));
+  assert.ok(/export async function printProposalInWindow/.test(windowSource));
+  assert.ok(/printProposalInWindow\(printWindow, \{/.test(exportSource));
+  assert.ok(/node: printNode/.test(exportSource));
 
   // And that authority still refuses a document whose image has not arrived.
   const pendingImage = { src: 'fixture://image', complete: false, naturalWidth: 0, naturalHeight: 0 };
