@@ -297,6 +297,11 @@ export default function AdiOptimisationJourney({
   // rather than the engine state behind it.
   const outcome = journey.outcome || null;
   const outcomeLabel = journey.outcomeLabel || null;
+  // Re-test Needed and Unable To Evaluate are both retry states for the evidence-
+  // only optimiser run. The calibration auto-apply workflow must never own this
+  // button: it does not mint/persist the run identity used by terminal authority.
+  const optimiserRunOwnsRetry = retestNeeded
+    || outcome === OPTIMISER_OUTCOME.UNABLE_TO_EVALUATE;
   // A physical change is an improvement too: the panel offers Apply for both,
   // and only the badge distinguishes them.
   const improvementsFound = outcome === OPTIMISER_OUTCOME.IMPROVEMENTS_FOUND
@@ -385,7 +390,7 @@ export default function AdiOptimisationJourney({
   // A previous placement result normally carries the panel's single re-run
   // control. In the re-test state that job belongs to the panel's own re-test
   // control, so the placement panel draws no second copy of it.
-  const panelShowsRerun = placement?.kind === "previous" && !retestNeeded;
+  const panelShowsRerun = placement?.kind === "previous" && !optimiserRunOwnsRetry;
   const handleApplyPlacement = panelShowsApply && placementLever && typeof onApplyLever === "function"
     ? () => onApplyLever(placementLever)
     : null;
@@ -406,13 +411,13 @@ export default function AdiOptimisationJourney({
   // beside a re-test.
   const runControlIsRetest = journey.action === OPTIMISER_PRESENTATION_ACTION.RETEST
     || journey.actionLabel === OPTIMISER_RETEST_LABEL
-    || retestNeeded;
+    || optimiserRunOwnsRetry;
   const retestOwnsPrimary = runControlIsRetest
     && showAction
     && !panelShowsRerun
     // In the re-test state the calibration control is not drawn at all, so a
     // calibration run in flight cannot take the primary from this one control.
-    && (retestNeeded || !reoptimiseBusy);
+    && (optimiserRunOwnsRetry || !reoptimiseBusy);
   const showBlocked = !!journey.blockReason && !isRunning;
 
   // Before the run, the panel states how many design options ADI will test and
@@ -469,11 +474,11 @@ export default function AdiOptimisationJourney({
     stale: summary.stale === true,
     // The re-test state offers its ONE control and nothing to apply: an old
     // candidate is never applied before it has been re-tested.
-    designApplicable: !retestNeeded
+    designApplicable: !optimiserRunOwnsRetry
       && (summary.actions?.canApply === true || panelShowsApply === true),
     nothingTested: summary.noRun === true,
     calibrationOffered: typeof onReoptimiseCalibration === "function"
-      && !retestNeeded
+      && !optimiserRunOwnsRetry
       && !reoptimiseBusy
       && !retestOwnsPrimary,
     runOffered: showAction && !panelShowsRerun,
@@ -621,12 +626,12 @@ export default function AdiOptimisationJourney({
           placement={placement}
           busy={isRunning}
           primary={primaryAction === ADI_PRIMARY_ACTION.DESIGN}
-          onApply={retestNeeded ? null : handleApplyPlacement}
-          onUndo={retestNeeded ? null : handleUndoPlacement}
+          onApply={optimiserRunOwnsRetry ? null : handleApplyPlacement}
+          onUndo={optimiserRunOwnsRetry ? null : handleUndoPlacement}
           // While a run is in flight this panel offers no run control of its own:
           // the run in progress is the panel's single control, so a second
           // overlapping run cannot be launched from here either.
-          onRerun={isRunning || retestNeeded ? null : onRunOptimisationPlan}
+          onRerun={isRunning || optimiserRunOwnsRetry ? null : onRunOptimisationPlan}
           variant="actions"
         />
 
@@ -637,10 +642,10 @@ export default function AdiOptimisationJourney({
           // An ignored recommendation stops being offered for this session, so
           // its Apply stands down; re-testing offers it again. In the re-test
           // state the old candidate is not applied at all.
-          onApply={retestNeeded || recommendationIgnored
+          onApply={optimiserRunOwnsRetry || recommendationIgnored
             ? null
             : (panelShowsApply ? null : handleApplyRecommended)}
-          onUndo={retestNeeded || panelShowsUndo ? null : handleUndoRecommended}
+          onUndo={optimiserRunOwnsRetry || panelShowsUndo ? null : handleUndoRecommended}
         />
 
         {/* The designer's own "no" — offered only while a genuine improvement is
@@ -661,7 +666,7 @@ export default function AdiOptimisationJourney({
             while the run control is already stating this same re-test: one
             action, one button, one helper line. */}
         <ReoptimiseCalibrationAction
-          onReoptimise={retestNeeded || isRunning || retestOwnsPrimary
+          onReoptimise={optimiserRunOwnsRetry || isRunning || retestOwnsPrimary
             ? null
             : onReoptimiseCalibration}
           busy={reoptimiseBusy}
@@ -712,7 +717,7 @@ export default function AdiOptimisationJourney({
           className={runIsPrimary ? ADI_RUN_PRIMARY_CLASS : ADI_RUN_SECONDARY_CLASS}
         >
           <Sparkles className="h-3.5 w-3.5" />
-          {retestNeeded && journey.action !== ADI_OPTIMISER_ACTION.CALCULATE
+          {optimiserRunOwnsRetry && journey.action !== ADI_OPTIMISER_ACTION.CALCULATE
             ? OPTIMISER_RETEST_LABEL
             : journey.actionLabel}
           <ArrowRight className="h-3.5 w-3.5" />
