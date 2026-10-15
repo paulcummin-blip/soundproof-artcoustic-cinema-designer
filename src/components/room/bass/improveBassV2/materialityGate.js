@@ -31,6 +31,10 @@ export const MATERIALITY_RULE = Object.freeze({
   SAME_LEVEL_SEAT_DEVIATION: "same-level-seat-deviation",
   SEVERE_NULL_REDUCED: "severe-null-reduced",
   P20_AGGREGATE_IMPROVED: "p20-aggregate-improved",
+  // A required metric made materially worse. Named so the refusal states the
+  // figure that actually held the change, and a worsening candidate can never
+  // be reported as a plain improvement.
+  P19_AGGREGATE_WORSENED: "p19-aggregate-worsened",
   // The final refusal: displayed levels did not move, and the seat-level
   // deviation improvement did not clear the same-level rule (or the severe-null
   // rule). The rule that held it is the seat-level rule, and `details.seatScope`
@@ -274,6 +278,28 @@ export function isMaterialImprovement(currentResult, candidateResult) {
   // A regression is deliberately NOT rejected here: the trade-off classifier
   // and the P14/P18 safety gate own that decision.
   const rspP19 = compareRspP19(currentResult, candidateResult, WITHIN_LEVEL_THRESHOLD_DB);
+  // ── Required-metric veto ────────────────────────────────────────────────
+  // A change is a plain improvement only when nothing required was given away
+  // to get it. A P19 level drop, or a deviation worse than the SAME canonical
+  // 1.0 dB figure the rules below apply, is never stated as an improvement. The
+  // candidate is not thrown away: the trade-off classifier owns that decision
+  // and surfaces it to the designer as a choice they make deliberately.
+  if (rspP19 && !rspP19.improved) {
+    const p19LevelDrop = Number.isFinite(Number(rspP19.before?.level))
+      && Number.isFinite(Number(rspP19.after?.level))
+      && Number(rspP19.after.level) < Number(rspP19.before.level);
+    const p19WorseByDb = -Number(rspP19.deviationDeltaDb);
+    if (p19LevelDrop || (Number.isFinite(p19WorseByDb) && p19WorseByDb > WITHIN_LEVEL_THRESHOLD_DB)) {
+      return {
+        material: false,
+        rule: MATERIALITY_RULE.P19_AGGREGATE_WORSENED,
+        reason: p19LevelDrop
+          ? `P19 aggregate RSP level dropped: L${rspP19.before.level} -> L${rspP19.after.level}`
+          : `P19 aggregate RSP deviation worsened by ${floorP19P20Deviation(p19WorseByDb)} dB`,
+        details: { rspP19, p19WorseByDb },
+      };
+    }
+  }
   if (rspP19?.improved) {
     return {
       material: true,

@@ -71,9 +71,10 @@ describe("a confirmed improvement is recognised without a level crossing", () =>
   it("still refuses a candidate that worsens a required metric", () => {
     const worse = result([["seat-r1-c1", 12.0], ["seat-r1-c2", 11.0], ["seat-r2-c1", 10.5]], 12.0, 3.4);
     const verdict = isMaterialImprovement(current, worse);
-    // P20 improves, but the aggregate RSP P19 worsens materially: the trade-off
-    // classifier owns that decision, and it is never called a plain win.
-    expect(verdict.material === false || verdict.rule !== MATERIALITY_RULE.P20_AGGREGATE_IMPROVED).toBe(true);
+    // P20 improves, but the aggregate RSP P19 worsens materially: this is never
+    // stated as a plain improvement on seat-to-seat consistency.
+    expect(verdict.material).toBe(false);
+    expect(verdict.rule).not.toBe(MATERIALITY_RULE.P20_AGGREGATE_IMPROVED);
   });
 });
 
