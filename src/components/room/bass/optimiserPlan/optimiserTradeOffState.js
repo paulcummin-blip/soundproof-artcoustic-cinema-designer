@@ -12,8 +12,9 @@
 //   IS THIS A TRADE-OFF   the decision the run itself recorded held a real
 //                         improvement that worsens something protected
 //   WHICH SEAT / METRIC   the exact seat, its own current and proposed result
-//                         and the amount it worsens — read from the decision's
-//                         own recorded evidence, never re-derived from copy
+//                         where the run retained them, and the exact amount it
+//                         worsens by — read from the decision's own recorded
+//                         evidence, never re-derived from copy, never invented
 //   WHAT IT COMPARES      the current vs proposed rows the designer reviews:
 //                         overall P20, overall P19 and every seat the run kept
 //
@@ -59,6 +60,13 @@ export const TRADE_OFF_METRIC_NOTE =
 export const TRADE_OFF_SCOPE_NOTE =
   "The run retained the affected seat's own result; the remaining seats' proposed values were not saved with it.";
 
+/**
+ * Stated when the run retained the affected seat and the amount it loses, but
+ * not that seat's own before/after values — the older evidence shape.
+ */
+export const TRADE_OFF_AFFECTED_VALUES_NOTE =
+  "This earlier optimiser run retained the affected seat and deterioration amount, but not the full per-seat before/after values.";
+
 /** Whether the change is better than, the same as, or worse than the current design. */
 export const TRADE_OFF_DIRECTION = Object.freeze({
   IMPROVES: "improves",
@@ -99,6 +107,12 @@ function finite(value) {
 function round1(value) {
   const number = finite(value);
   return number == null ? null : Math.round(number * 10) / 10;
+}
+
+/** "1.2 dB" — the exact amount the run recorded, never rounded away. */
+function recordedAmountText(value) {
+  const number = round1(value);
+  return number == null ? null : `${number} dB`;
 }
 
 /** "L2" → 2, so a displayed level can be compared with the one before it. */
@@ -167,14 +181,17 @@ function deltaPhrase(direction, delta) {
 }
 
 /** One comparison row of the review. */
-function row({ key, group, label, before, after, direction, delta, deltaLabel }) {
-  if (!before && !after) return null;
+function row({ key, group, label, before, after, direction, delta, deltaLabel, force = false, pairKnown = true }) {
+  if (!before && !after && !force) return null;
   return {
     key,
     group,
     label,
-    before: before || "—",
-    after: after || "—",
+    // A row whose pair the run never retained states NO values at all: an absent
+    // pair is never printed as two placeholder dashes.
+    before: pairKnown ? (before || "—") : null,
+    after: pairKnown ? (after || "—") : null,
+    pairKnown,
     direction: direction || TRADE_OFF_DIRECTION.UNCHANGED,
     delta: deltaLabel != null ? deltaLabel : deltaPhrase(direction, delta),
   };
@@ -262,15 +279,34 @@ function seatRows(decision, regression) {
     const direction = directionFor(current?.db, proposed?.db);
     // A DISPLAYED LEVEL that drops is a regression in its own right, recorded as
     // the level pair itself: it is stated as worsening even when the raw value
-    // behind it was not retained.
+    // behind it was not retained. So is a seat the run recorded a deterioration
+    // amount for: the direction is the run's own recorded fact, never re-derived.
     const levelDrop = isAffected
       && levelNumber(regression.levelAfter) != null
       && levelNumber(regression.levelBefore) != null
       && levelNumber(regression.levelAfter) > levelNumber(regression.levelBefore);
+    const recordedWorsening = isAffected
+      && finite(regression.rawDeltaDb) != null
+      && finite(regression.rawDeltaDb) > 0;
     const resolvedDirection = direction
-      || (levelDrop ? TRADE_OFF_DIRECTION.WORSENS : null);
+      || (levelDrop || recordedWorsening ? TRADE_OFF_DIRECTION.WORSENS : null);
     const levelPair = levelDrop
       ? `${regression.levelBefore} → ${regression.levelAfter}`
+      : null;
+
+    const beforeText = valueText(current?.db, current?.level ?? (isAffected ? regression.levelBefore : null));
+    // With no raw value retained, the recorded level itself is the proposed
+    // result — stated as the level, never as an invented deviation.
+    const afterText = proposed?.db != null
+      ? valueText(proposed.db, proposed.level ?? null)
+      : (isAffected ? levelText(regression.levelAfter) : null);
+    // THE AFFECTED SEAT IS ALWAYS STATED. A run that recorded which seat loses
+    // performance and by how much, but retained neither of that seat's own values,
+    // still states the seat and the exact amount it loses: the row is never
+    // dropped, and no absolute value is ever invented to fill the pair.
+    const pairKnown = Boolean(beforeText || afterText);
+    const recordedAmount = isAffected && !pairKnown && regression.rawDeltaDb != null
+      ? recordedAmountText(regression.rawDeltaDb)
       : null;
 
     rows.push(
@@ -280,15 +316,13 @@ function seatRows(decision, regression) {
           ? "Primary seats"
           : "Secondary seats",
         label: formatSeatLabel(seatId),
-        before: valueText(current?.db, current?.level ?? (isAffected ? regression.levelBefore : null)),
-        // With no raw value retained, the recorded level itself is the proposed
-        // result — stated as the level, never as an invented deviation.
-        after: proposed?.db != null
-          ? valueText(proposed.db, proposed.level ?? null)
-          : (isAffected ? levelText(regression.levelAfter) : null),
+        before: beforeText,
+        after: afterText,
         direction: resolvedDirection,
         delta: proposed?.db != null && current?.db != null ? proposed.db - current.db : null,
-        deltaLabel: levelPair,
+        deltaLabel: levelPair || recordedAmount,
+        force: isAffected,
+        pairKnown,
       }),
     );
   });
@@ -348,17 +382,30 @@ export function resolveTradeOffState({ decision = null, kept = false } = {}) {
       parameter: regression.parameter,
       before: affected?.before || null,
       after: affected?.after || null,
-      delta: affected?.delta ?? regression.rawDeltaDb ?? null,
-      deltaText: affected?.delta || null,
+      // The amount itself stays the NUMBER the run recorded — the row's own display
+      // text states it beside the values, and never replaces the figure.
+      delta: finite(affected?.delta) ?? regression.rawDeltaDb ?? null,
+      deltaText: affected?.delta ?? null,
       direction: TRADE_OFF_DIRECTION.WORSENS,
     }
     : null;
 
   // The one impact line stated on the main panel: WHICH protected measure moves,
-  // ITS current → proposed result, and by approximately how much.
+  // ITS current → proposed result where the run retained them, and by exactly how
+  // much. Where the run retained no pair for that seat, the amount it recorded is
+  // stated instead — the seat is never described by two empty dashes.
   const worsenedMetric = overall.find((line) => line.direction === TRADE_OFF_DIRECTION.WORSENS) || null;
+  const seatPair = seat && (seat.before || seat.after) ? `${seat.before || "—"} → ${seat.after || "—"}` : null;
+  const seatAmount = seat?.delta != null ? recordedAmountText(seat.delta) : null;
+  const seatClause = !seat
+    ? null
+    : seatPair
+      ? `${seat.parameter} ${seatPair}${seat.deltaText ? ` (${seat.deltaText})` : ""}`
+      : seatAmount
+        ? `${seat.parameter} worsens by ${seatAmount}`
+        : `${seat.parameter} worsens`;
   const impact = seat
-    ? `Primary seat ${seat.label}: ${seat.parameter} ${seat.before || "—"} → ${seat.after || "—"}${seat.deltaText ? ` (${seat.deltaText})` : ""}`
+    ? `Primary seat ${seat.label}: ${seatClause}`
     : (worsenedMetric
       ? `${worsenedMetric.label}: ${worsenedMetric.before} → ${worsenedMetric.after}${worsenedMetric.delta ? ` (${worsenedMetric.delta})` : ""}`
       : TRADE_OFF_METRIC_NOTE);
@@ -377,6 +424,8 @@ export function resolveTradeOffState({ decision = null, kept = false } = {}) {
     candidateId: record.candidateId || null,
     objective: record.objective || null,
     objectiveLabel: record.objectiveLabel || null,
-    scopeNote: seats.length > 1 ? null : TRADE_OFF_SCOPE_NOTE,
+    scopeNote: seats.length > 1
+      ? null
+      : (seat?.before || seat?.after ? TRADE_OFF_SCOPE_NOTE : TRADE_OFF_AFFECTED_VALUES_NOTE),
   };
 }

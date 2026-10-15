@@ -33,12 +33,19 @@ function GroupRows({ group, rows }) {
       <div className="text-[10px] font-semibold uppercase tracking-wide text-[#8A7B6A]">{group}</div>
       {groupRows.map((row) => {
         const style = DIRECTION_STYLE[row.direction] || DIRECTION_STYLE[TRADE_OFF_DIRECTION.UNCHANGED];
+        const pairKnown = row.pairKnown !== false;
         return (
           <div key={row.key} className="flex flex-wrap items-baseline gap-x-2 text-[12px]" data-adi-trade-off-row={row.key}>
             <span className="min-w-[180px] flex-1 text-[#3E4349]">{row.label}</span>
-            <span className="text-[#3E4349]">{row.before}</span>
-            <span className="text-[#8A7B6A]">→</span>
-            <span className="font-semibold text-[#1B1A1A]">{row.after}</span>
+            {/* A row whose pair this run never retained states no values at all:
+                its direction and the exact amount it loses are the whole row. */}
+            {pairKnown ? (
+              <>
+                <span className="text-[#3E4349]">{row.before}</span>
+                <span className="text-[#8A7B6A]">→</span>
+                <span className="font-semibold text-[#1B1A1A]">{row.after}</span>
+              </>
+            ) : null}
             <span className="font-semibold" style={{ color: style.color }}>
               {style.label}
               {row.delta ? ` · ${row.delta}` : ""}

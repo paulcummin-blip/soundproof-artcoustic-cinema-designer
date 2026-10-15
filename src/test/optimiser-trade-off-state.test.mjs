@@ -378,30 +378,27 @@ const LIVE_SAVED = {
 
 test("the live saved Barton record states Trade-off Found with its own seat and amount", () => {
   const tradeOff = resolveTradeOffState({ decision: LIVE_SAVED });
-  console.log("LIVE-BARTON-DIAG", JSON.stringify({
-    resolved: !!tradeOff,
-    seat: tradeOff?.seat || null,
-    impact: tradeOff?.impact || null,
-    adjustment: tradeOff?.adjustment || null,
-    overall: tradeOff?.overall || null,
-    rows: (tradeOff?.rows || []).map((row) => [row.key, row.group, row.before, row.after, row.direction, row.delta]),
-  }));
   assert.ok(tradeOff, "the live saved decision must resolve as a trade-off");
   assert.equal(tradeOff.isTradeOff, true);
   assert.equal(tradeOff.headline, TRADE_OFF_HEADLINE);
   assert.equal(tradeOff.seat.seatId, "seat-r1-c2");
   assert.equal(tradeOff.seat.direction, TRADE_OFF_DIRECTION.WORSENS);
-  // The seat and the amount it loses are stated even though this run retained no
-  // per-seat rows: the run's own statement is the evidence.
-  assert.match(tradeOff.impact, /Row 1 - Seat 2|seat-r1-c2/);
-  assert.match(tradeOff.impact, /1 dB worse/);
-  // The run's own recorded adjustment, and the overall pair it bought.
+  // This run retained no per-seat rows and no structured regression: the seat and the
+  // exact amount it loses are read from the run's own recorded statement.
+  assert.equal(tradeOff.seat.delta, 1.2);
+  assert.match(tradeOff.impact, /Row 1 - Seat 2/);
+  assert.match(tradeOff.impact, /worsens by 1\.2 dB/);
+  assert.ok(!tradeOff.impact.includes("—"), "the live seat is never stated as — → —");
+  // The run's own recorded adjustment, and the overall pair it bought — as displayed.
   assert.match(tradeOff.adjustment, /\+5\.4 ms/);
   const p20 = tradeOff.overall.find((row) => row.key === "p20");
   assert.equal(p20.before, "±15 dB · L1");
-  assert.equal(p20.after, "±13 dB · L1");
+  assert.equal(p20.after, "±12 dB · L1");
   assert.equal(p20.direction, TRADE_OFF_DIRECTION.IMPROVES);
-  assert.equal(tradeOff.overall.find((row) => row.key === "p19").before, "±1 dB · L4");
+  const p19 = tradeOff.overall.find((row) => row.key === "p19");
+  assert.equal(p19.before, "±0 dB · L4");
+  assert.equal(p19.after, "±0 dB · L4");
+  assert.equal(p19.direction, TRADE_OFF_DIRECTION.UNCHANGED);
 
   // Presented through the same authority the panel uses: Trade-off Found, with no
   // Apply on the card and the two designer controls.
@@ -415,4 +412,70 @@ test("the live saved Barton record states Trade-off Found with its own seat and 
   assert.equal(state.showApply, false);
   assert.equal(state.action, null);
   assert.equal(state.canRun, false);
+});
+
+// ── 8. Partial seat evidence — the fallback for older saved runs ──
+// The strongest evidence the run actually retained is stated. Where the seat and the
+// amount it loses were recorded but that seat's own before/after values were not, the
+// row states the seat and the amount alone: no absolute value is invented, an absent
+// pair is never printed as placeholder dashes, and the trade-off stays valid.
+const LIVE_WITH_PAIR = {
+  ...LIVE_SAVED,
+  regression: {
+    seatId: "seat-r1-c2",
+    parameter: "P20",
+    rawDeltaDb: 1.2,
+    currentLevel: 1,
+    candidateLevel: 1,
+  },
+  before: {
+    ...LIVE_SAVED.before,
+    perSeatP20: [{ seatId: "seat-r1-c2", variationDbRaw: 8.6, level: 1, isPrimary: true }],
+  },
+  after: {
+    ...LIVE_SAVED.after,
+    perSeatP20: [{ seatId: "seat-r1-c2", variationDbRaw: 9.8, level: 1, isPrimary: true }],
+  },
+};
+
+test("the affected seat is stated with the exact amount it loses, never a placeholder pair", () => {
+  const tradeOff = resolveTradeOffState({ decision: LIVE_SAVED });
+  const seatRow = tradeOff.rows.find((row) => row.key === "seat:seat-r1-c2");
+  assert.ok(seatRow, "the affected primary seat is always stated, even with no pair retained");
+  assert.equal(seatRow.pairKnown, false);
+  assert.equal(seatRow.before, null);
+  assert.equal(seatRow.after, null);
+  assert.equal(seatRow.direction, TRADE_OFF_DIRECTION.WORSENS);
+  // The run's own recorded amount, at the precision it recorded it.
+  assert.equal(seatRow.delta, "1.2 dB");
+  assert.match(tradeOff.impact, /^Primary seat Row 1 - Seat 2: P20 worsens by 1\.2 dB$/);
+  const rendered = [tradeOff.impact, ...tradeOff.rows.flatMap((row) => [row.before, row.after, row.delta])];
+  assert.ok(!rendered.some((value) => typeof value === "string" && value.includes("—")),
+    "no dash ever stands in for a value this run never retained");
+  // The review states exactly why the pair is absent.
+  assert.equal(tradeOff.scopeNote,
+    "This earlier optimiser run retained the affected seat and deterioration amount, but not the full per-seat before/after values.");
+  // A partial record is still a trade-off the designer decides: never a re-test.
+  assert.equal(resolveOptimiserPresentationState({
+    planView: { status: "current", run: { runId: "run-live" } },
+    runStatus: "idle",
+    tradeOff,
+  }).state, OPTIMISER_PRESENTATION_STATE.TRADE_OFF);
+});
+
+test("a run that retained the seat's own values keeps its current → proposed pair", () => {
+  const tradeOff = resolveTradeOffState({ decision: LIVE_WITH_PAIR });
+  const seatRow = tradeOff.rows.find((row) => row.key === "seat:seat-r1-c2");
+  assert.notEqual(seatRow.pairKnown, false);
+  assert.match(seatRow.before, /^±\d+ dB · L1$/);
+  assert.match(seatRow.after, /^±\d+ dB · L1$/);
+  assert.equal(seatRow.direction, TRADE_OFF_DIRECTION.WORSENS);
+  assert.match(tradeOff.impact, /^Primary seat Row 1 - Seat 2: P20 ±\d+ dB · L1 → ±\d+ dB · L1 \(1 dB worse\)$/);
+  assert.equal(tradeOff.scopeNote, "The run retained the affected seat's own result; the remaining seats' proposed values were not saved with it.");
+});
+
+test("the review draws a partial row with its amount alone", () => {
+  const dialog = read(`${PLAN_DIR}/AdiTradeOffReviewDialog.jsx`);
+  assert.match(dialog, /const pairKnown = row\.pairKnown !== false;/);
+  assert.match(dialog, /\{pairKnown \? \(/);
 });
