@@ -69,21 +69,49 @@ export default function useRunOptimisationPlan({
     // panel states this run — what it is doing, and then what IT found — and
     // nothing of the earlier result. The earlier record is neither cleared nor
     // rewritten, so it stays readable for history, diagnostics and audit.
-    beginOptimiserRun(projectId, versionId);
+    const activeRun = beginOptimiserRun(projectId, versionId);
+
+    // Every fresh run gets a durable terminal record, including early or thrown
+    // failures. Without this, refresh could discard the in-memory run authority
+    // and restore the previous re-test artifact as though the new run never
+    // happened.
+    const saveRunFailure = (reason, extra = {}) => {
+      const current = sharedRef.current;
+      const evidence = buildOptimiserRunEvidence({
+        identity: {
+          projectId,
+          versionId,
+          designFingerprint: current?.cacheKey || null,
+          resultFingerprint: current?.completedBassAuthority?.contract?.job?.resultFingerprint
+            || current?.currentFingerprint || null,
+          cacheKey: current?.cacheKey || null,
+          baseDesignFingerprint: current?.baseDesignFingerprint || null,
+          baselineParity: extra.baselineParity || null,
+        },
+        baselineParity: extra.baselineParity || null,
+        failureReason: reason,
+        runIdentity: activeRun,
+      });
+      if (evidence) setOptimiserPlanAuthority(projectId, versionId, evidence);
+    };
 
     try {
       const live = sharedRef.current;
       if (live?.hasCurrentResult !== true) {
         if (typeof live?.onCalculate !== "function" || live?.canCalculate !== true) {
+          const reason = "The design has no current bass result. Calculate Performance, then run the Optimisation Plan.";
+          saveRunFailure(reason);
           setStatus("failed");
-          setError("The design has no current bass result. Calculate Performance, then run the Optimisation Plan.");
+          setError(reason);
           return;
         }
         phaseRef.current = "calculating";
         live.onCalculate();
         if (!(await waitForCurrentPublication(sharedRef, phaseRef))) {
+          const reason = "The bass calculation did not publish a current result. Retry Calculate Performance, then run the Optimisation Plan.";
+          saveRunFailure(reason);
           setStatus("failed");
-          setError("The bass calculation did not publish a current result. Retry Calculate Performance, then run the Optimisation Plan.");
+          setError(reason);
           return;
         }
       }
@@ -108,8 +136,10 @@ export default function useRunOptimisationPlan({
         return;
       }
       if (result.status === "error" || result.status === "stale") {
+        const reason = result.error || "The optimiser could not complete. Re-run the Optimisation Plan.";
+        saveRunFailure(reason, { baselineParity: result.baselineParity || null });
         setStatus("failed");
-        setError(result.error || "The optimiser could not complete. Re-run the Optimisation Plan.");
+        setError(reason);
         return;
       }
       if (result.status === "blocked") {
@@ -131,6 +161,7 @@ export default function useRunOptimisationPlan({
             baselineParity: result.baselineParity || null,
           },
           baselineParity: result.baselineParity || null,
+          runIdentity: activeRun,
         });
         if (blockedEvidence) setOptimiserPlanAuthority(projectId, versionId, blockedEvidence);
         setStatus("failed");
@@ -197,6 +228,7 @@ export default function useRunOptimisationPlan({
         diagnostics: result.optimisationDiagnostics || null,
         identity: planIdentity,
         calibrationDecision,
+        runIdentity: activeRun,
       });
 
       if (!persistedPlan && !runEvidence) {
@@ -220,8 +252,10 @@ export default function useRunOptimisationPlan({
 
       setStatus("complete");
     } catch (err) {
+      const reason = err?.message || "The optimiser could not complete. Re-run the Optimisation Plan.";
+      saveRunFailure(reason);
       setStatus("failed");
-      setError(err?.message || "The optimiser could not complete. Re-run the Optimisation Plan.");
+      setError(reason);
     } finally {
       runningRef.current = false;
       phaseRef.current = "idle";
