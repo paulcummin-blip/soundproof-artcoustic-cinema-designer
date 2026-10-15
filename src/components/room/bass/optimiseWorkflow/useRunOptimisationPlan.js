@@ -26,7 +26,6 @@
 
 import { useCallback, useRef, useState } from "react";
 import { runOptimisation } from "./optimiseWorkflowOrchestrator";
-import { publishRecommendation } from "@/components/recommendationEngine";
 import { buildOptimiserPlan } from "@/components/room/bass/optimiserPlan/buildOptimiserPlan.js";
 import { buildOptimiserResultForSave } from "@/components/room/bass/optimiserPlan/optimiserPlanSave.js";
 import { buildOptimiserRunEvidence } from "@/components/room/bass/optimiserPlan/buildOptimiserRunEvidence.js";
