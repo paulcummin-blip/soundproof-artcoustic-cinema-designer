@@ -3,33 +3,34 @@
 // THE TRADE-OFF DECISION STATE — presentation only.
 //
 // A COMPLETED run whose best change improves the overall result but worsens a
-// PROTECTED primary seat (or materially damages the other protected objective)
-// has found a TRADE-OFF. That is a designer decision, never an optimiser
-// success: "Improvement Found" may only be stated where the change is genuinely
-// actionable under the normal protection rules.
+// PROTECTED primary seat has found a TRADE-OFF. That is a designer decision,
+// never an optimiser success: "Improvement Found" may only be stated where the
+// change is genuinely actionable under the normal protection rules.
 //
 // This module answers three questions, and nothing else:
 //
 //   IS THIS A TRADE-OFF   the decision the run itself recorded held a real
 //                         improvement that worsens something protected
-//   WHICH SEAT / METRIC   the exact seat and the approximate amount, read from
-//                         the decision's own recorded evidence
-//   WHAT IT COMPARES      the current vs proposed rows the designer reviews —
-//                         overall P20, overall P19 and the per-seat rows the
-//                         run retained
+//   WHICH SEAT / METRIC   the exact seat, its own current and proposed result
+//                         and the amount it worsens — read from the decision's
+//                         own recorded evidence, never re-derived from copy
+//   WHAT IT COMPARES      the current vs proposed rows the designer reviews:
+//                         overall P20, overall P19 and every seat the run kept
 //
-// It reads the run's own recorded decision and the values already saved with it.
 // It calculates no optimisation, re-ranks nothing, re-applies no threshold,
 // changes no P19/P20 grade and touches no apply logic. Where the evidence is not
-// recorded, it states less rather than inventing a value — it never fabricates a
+// recorded it states less rather than inventing a value — it never fabricates a
 // seat, a delta or a proposed result.
+//
+// The recorded evidence is durable: it is written on the decision the run saved
+// with the plan, so a refresh or a project reopen recreates this exact state —
+// the same candidate, the same seat and the same values.
 // ---------------------------------------------------------------------------
 
 import {
   CALIBRATION_APPLY_DECISION,
   CALIBRATION_APPLY_REASON,
 } from "../optimiseWorkflow/adiCalibrationAutoApplyAuthority.js";
-import { getScopedSeatIds } from "@/components/utils/seatScopeAuthority";
 import { formatSeatLabel } from "@/components/utils/seatLabel";
 import { floorP19P20Deviation } from "@/components/utils/rp22/resolveRp22DesignValue";
 import { deltaText, deviationText, levelText, wholeDbImprovement } from "./optimiserWholeNumberDb.js";
@@ -45,15 +46,16 @@ export const TRADE_OFF_ACTIONS = Object.freeze({
   APPLY: "Apply Change",
 });
 
-/** Why the trade-off was not taken: stated once, and nothing was written. */
+/** The terminal state of a trade-off the designer did not take. */
+export const TRADE_OFF_KEPT_LABEL = "Current Design Kept";
 export const TRADE_OFF_KEPT_SENTENCE =
-  "The trade-off was not taken. Nothing has been applied and the current design is unchanged.";
+  "The trade-off was not taken. Nothing has been applied, and the current design, its published bass result and its saved calibration are unchanged.";
 
 /** The protected metric that worsens when no single seat is named. */
 export const TRADE_OFF_METRIC_NOTE =
   "The change improves one protected measure and worsens another.";
 
-/** Stated when the candidate's own per-seat results were not retained. */
+/** Stated when the run's own per-seat rows were not retained. */
 export const TRADE_OFF_SCOPE_NOTE =
   "The run retained the affected seat's own result; the remaining seats' proposed values were not saved with it.";
 
@@ -84,9 +86,8 @@ const TRADE_OFF_REASONS = Object.freeze([
 
 /**
  * The seat regression as the decision authority writes it into its own recorded
- * sentence ("… candidate regresses P20 at seat-r1-c2 by 1.2 dB …"). Read only
- * when a saved record predates the structured evidence — the template is this
- * codebase's own, so the read is exact rather than guessed.
+ * sentence — read only when a saved record predates the structured evidence.
+ * The template is this codebase's own, so the read is exact rather than guessed.
  */
 const REGRESSION_IN_STATEMENT = /regresses\s+(P\d+)\s+at\s+([A-Za-z0-9_-]+)(?:\s+by\s+([\d.]+)\s+dB)?/i;
 
@@ -100,9 +101,15 @@ function round1(value) {
   return number == null ? null : Math.round(number * 10) / 10;
 }
 
+/** "L2" → 2, so a displayed level can be compared with the one before it. */
+function levelNumber(level) {
+  const label = levelText(level);
+  return label ? Number(label.slice(1)) : null;
+}
+
 /**
- * The seat the change would worsen: the structured regression when the record
- * carries one, otherwise the decision's own recorded statement.
+ * The seat the change would worsen: the structured regression recorded on the
+ * decision, otherwise the decision's own recorded statement.
  */
 export function readRecordedSeatRegression(decision) {
   const structured = decision?.regression;
@@ -160,7 +167,7 @@ function deltaPhrase(direction, delta) {
 }
 
 /** One comparison row of the review. */
-function row({ key, group, label, before, after, direction, delta }) {
+function row({ key, group, label, before, after, direction, delta, deltaLabel }) {
   if (!before && !after) return null;
   return {
     key,
@@ -169,7 +176,7 @@ function row({ key, group, label, before, after, direction, delta }) {
     before: before || "—",
     after: after || "—",
     direction: direction || TRADE_OFF_DIRECTION.UNCHANGED,
-    delta: deltaPhrase(direction, delta),
+    delta: deltaLabel != null ? deltaLabel : deltaPhrase(direction, delta),
   };
 }
 
@@ -180,9 +187,6 @@ function overallRows(decision) {
   const improvement = decision?.improvement || null;
   const damage = decision?.damage || null;
 
-  const p20Direction = directionFor(before?.p20?.deviationDb, after?.p20?.deviationDb);
-  const p19Direction = directionFor(before?.p19?.deviationDb, after?.p19?.deviationDb);
-
   return [
     row({
       key: "p20",
@@ -190,7 +194,7 @@ function overallRows(decision) {
       label: "Bass consistency (P20 variation)",
       before: valueText(before?.p20?.deviationDb, before?.p20?.level),
       after: valueText(after?.p20?.deviationDb, after?.p20?.level),
-      direction: p20Direction,
+      direction: directionFor(before?.p20?.deviationDb, after?.p20?.deviationDb),
       delta: finite(improvement?.p20DeltaDb) ?? finite(damage?.p20WorseDb),
     }),
     row({
@@ -199,96 +203,122 @@ function overallRows(decision) {
       label: "Seat-to-seat level consistency (P19)",
       before: valueText(before?.p19?.deviationDb, before?.p19?.level),
       after: valueText(after?.p19?.deviationDb, after?.p19?.level),
-      direction: p19Direction,
+      direction: directionFor(before?.p19?.deviationDb, after?.p19?.deviationDb),
       delta: finite(improvement?.p19DeltaDb) ?? finite(damage?.p19WorseDb),
     }),
   ].filter(Boolean);
 }
 
-/** Current per-seat P20 by seat id, from the run's own recorded baseline. */
-function baselineSeats(planView) {
-  const rows = Array.isArray(planView?.baseline?.seats) ? planView.baseline.seats : [];
+/** The per-seat values the run recorded, by seat id. */
+function perSeatMap(result, key) {
+  const seats = Array.isArray(result?.[key]) ? result[key] : [];
   const map = new Map();
-  rows.forEach((seat) => {
+  seats.forEach((seat) => {
     const id = String(seat?.seatId || "");
-    const db = finite(seat?.p20VariationDb);
-    if (id && db != null) map.set(id, { db, level: seat?.p20Level ?? null });
+    if (!id) return;
+    map.set(id, {
+      db: finite(seat?.variationDbRaw),
+      level: seat?.level ?? null,
+      isPrimary: seat?.isPrimary === true,
+    });
   });
   return map;
 }
 
-/** The candidate's own retained per-seat P20 rows, when the run kept them. */
-function candidateSeats(planView, decision) {
-  const levers = planView?.calibrationEvidence?.levers || {};
-  const wanted = String(decision?.candidateId || "");
+/**
+ * The per-seat rows the designer reviews, from the run's OWN recorded per-seat
+ * results — the same rows the protection read when it held the candidate. The
+ * affected seat's proposed value is the recorded regression applied to its own
+ * recorded current value whenever the retained rows do not already carry it.
+ */
+function seatRows(decision, regression) {
+  const currentP20 = perSeatMap(decision?.before, "perSeatP20");
+  const proposedP20 = perSeatMap(decision?.after, "perSeatP20");
+  const currentP19 = perSeatMap(decision?.before, "perSeatP19");
+  const proposedP19 = perSeatMap(decision?.after, "perSeatP19");
+
+  const ids = new Set([
+    ...proposedP20.keys(),
+    ...currentP20.keys(),
+    ...proposedP19.keys(),
+  ]);
+  if (regression?.seatId) ids.add(regression.seatId);
+
   const rows = [];
-  Object.values(levers).forEach((lever) => {
-    const candidate = lever?.bestCandidate || null;
-    if (!Array.isArray(candidate?.perSeatP20)) return;
-    if (wanted && candidate.candidateId && String(candidate.candidateId) !== wanted) return;
-    candidate.perSeatP20.forEach((seat) => {
-      const id = String(seat?.seatId || "");
-      const db = finite(seat?.variationDbRaw);
-      if (id && db != null) rows.push({ seatId: id, db, level: seat?.level ?? null, isPrimary: seat?.isPrimary === true });
-    });
+  ids.forEach((seatId) => {
+    const usesP20 = proposedP20.has(seatId) || currentP20.has(seatId) || regression?.parameter !== "P19";
+    const current = (usesP20 ? currentP20 : currentP19).get(seatId) || null;
+    let proposed = (usesP20 ? proposedP20 : proposedP19).get(seatId) || null;
+    const isAffected = regression?.seatId === seatId;
+
+    if (isAffected && regression.rawDeltaDb != null && current?.db != null) {
+      proposed = {
+        db: current.db + regression.rawDeltaDb,
+        level: regression.levelAfter ?? proposed?.level ?? null,
+        isPrimary: true,
+      };
+    }
+
+    const direction = directionFor(current?.db, proposed?.db);
+    // A DISPLAYED LEVEL that drops is a regression in its own right, recorded as
+    // the level pair itself: it is stated as worsening even when the raw value
+    // behind it was not retained.
+    const levelDrop = isAffected
+      && levelNumber(regression.levelAfter) != null
+      && levelNumber(regression.levelBefore) != null
+      && levelNumber(regression.levelAfter) > levelNumber(regression.levelBefore);
+    const resolvedDirection = direction
+      || (levelDrop ? TRADE_OFF_DIRECTION.WORSENS : null);
+    const levelPair = levelDrop
+      ? `${regression.levelBefore} → ${regression.levelAfter}`
+      : null;
+
+    rows.push(
+      row({
+        key: `seat:${seatId}`,
+        group: (proposed?.isPrimary || current?.isPrimary || isAffected)
+          ? "Primary seats"
+          : "Secondary seats",
+        label: formatSeatLabel(seatId),
+        before: valueText(current?.db, current?.level ?? (isAffected ? regression.levelBefore : null)),
+        // With no raw value retained, the recorded level itself is the proposed
+        // result — stated as the level, never as an invented deviation.
+        after: proposed?.db != null
+          ? valueText(proposed.db, proposed.level ?? null)
+          : (isAffected ? levelText(regression.levelAfter) : null),
+        direction: resolvedDirection,
+        delta: proposed?.db != null && current?.db != null ? proposed.db - current.db : null,
+        deltaLabel: levelPair,
+      }),
+    );
   });
-  return rows;
+
+  return rows.filter(Boolean);
 }
 
 /**
- * The per-seat rows the designer reviews: the seats the run retained, plus the
- * affected seat itself (whose proposed value is the recorded regression).
+ * The change this candidate is. The run's own recorded offset statement names a
+ * delay change in installer words; otherwise the first sentence of its own
+ * statement names the candidate. Never re-worded, never invented.
  */
-function seatRows({ planView, decision, regression, seatingPositions }) {
-  const current = baselineSeats(planView);
-  const proposed = candidateSeats(planView, decision);
-  const proposedById = new Map(proposed.map((seat) => [seat.seatId, seat]));
-
-  const { primarySeatIds, secondarySeatIds } = getScopedSeatIds(seatingPositions);
-  const scoped = primarySeatIds.length + secondarySeatIds.length > 0;
-  const groupFor = (seatId, fallbackPrimary) => {
-    if (scoped) return primarySeatIds.includes(seatId) ? "Primary seats" : "Secondary seats";
-    return fallbackPrimary ? "Primary seats" : "Secondary seats";
-  };
-
-  const ids = new Set([...proposed.map((seat) => seat.seatId), regression?.seatId].filter(Boolean));
-  const seats = [];
-  ids.forEach((seatId) => {
-    const before = current.get(seatId) || null;
-    const afterRow = proposedById.get(seatId) || null;
-    // The affected seat's own proposed value is the recorded regression applied
-    // to its recorded current value when the run did not retain its own row.
-    const derivedAfter = !afterRow && regression?.seatId === seatId
-      && before && regression.rawDeltaDb != null
-      ? before.db + regression.rawDeltaDb
-      : null;
-    const afterDb = afterRow ? afterRow.db : derivedAfter;
-    const direction = directionFor(before?.db, afterDb);
-    seats.push(row({
-      key: `seat:${seatId}`,
-      group: groupFor(seatId, afterRow?.isPrimary === true || regression?.seatId === seatId),
-      label: formatSeatLabel(seatId),
-      before: valueText(before?.db, before?.level),
-      after: valueText(afterDb, afterRow?.level ?? null),
-      direction,
-      delta: afterDb != null && before ? afterDb - before.db : null,
-    }));
-  });
-
-  return seats.filter(Boolean);
+function adjustmentLine(decision) {
+  const offset = typeof decision?.offsetStatement === "string" ? decision.offsetStatement.trim() : "";
+  if (offset) return offset;
+  const statement = typeof decision?.statement === "string" ? decision.statement.trim() : "";
+  if (!statement) return null;
+  const cut = statement.indexOf(". ");
+  return cut > 0 ? statement.slice(0, cut + 1) : statement;
 }
 
 /**
  * Resolve the trade-off state for the open design version.
  *
  * @param {object} params
- * @param {object|null} params.planView - the resolved plan / run evidence view
- * @param {object|null} params.decision - the run's calibration decision
- * @param {Array} [params.seatingPositions] - live seating positions (Primary /
- *   Secondary scope, the one shared authority)
+ * @param {object|null} params.decision - the decision the run saved with its plan
+ * @param {boolean} [params.kept] - the designer kept the current design
  * @returns {object|null} the trade-off the designer must decide, or null
  */
-export function resolveTradeOffState({ planView = null, decision = null, seatingPositions = [] } = {}) {
+export function resolveTradeOffState({ decision = null, kept = false } = {}) {
   const record = decision && typeof decision === "object" ? decision : null;
   if (!record || record.decision !== CALIBRATION_APPLY_DECISION.HOLD) return null;
   if (!TRADE_OFF_REASONS.includes(record.reason)) return null;
@@ -303,44 +333,50 @@ export function resolveTradeOffState({ planView = null, decision = null, seating
   if (!improved) return null;
 
   const regression = readRecordedSeatRegression(record);
-  const seats = seatRows({ planView, decision: record, regression, seatingPositions });
   const overall = overallRows(record);
-  const protectedRow = seats.find((seat) => seat.key === `seat:${regression?.seatId}`) || null;
+  const seats = seatRows(record, regression);
+  const affected = regression?.seatId
+    ? seats.find((seat) => seat.key === `seat:${regression.seatId}`) || null
+    : null;
 
   const seatLabel = regression?.seatId ? formatSeatLabel(regression.seatId) : null;
   const seat = regression?.seatId
     ? {
       seatId: regression.seatId,
       label: seatLabel,
+      scope: "primary",
       parameter: regression.parameter,
-      before: protectedRow?.before || null,
-      after: protectedRow?.after || null,
-      delta: protectedRow?.delta || null,
+      before: affected?.before || null,
+      after: affected?.after || null,
+      delta: affected?.delta ?? regression.rawDeltaDb ?? null,
+      deltaText: affected?.delta || null,
       direction: TRADE_OFF_DIRECTION.WORSENS,
     }
     : null;
 
-  // The one impact line stated on the main panel, below the headline: WHICH
-  // protected measure moves and by approximately how much.
+  // The one impact line stated on the main panel: WHICH protected measure moves,
+  // ITS current → proposed result, and by approximately how much.
   const worsenedMetric = overall.find((line) => line.direction === TRADE_OFF_DIRECTION.WORSENS) || null;
   const impact = seat
-    ? `Primary seat ${seat.label}: ${seat.parameter} ${seat.before || "—"} → ${seat.after || "—"}${protectedRow?.delta ? ` (${protectedRow.delta})` : ""}`
+    ? `Primary seat ${seat.label}: ${seat.parameter} ${seat.before || "—"} → ${seat.after || "—"}${seat.deltaText ? ` (${seat.deltaText})` : ""}`
     : (worsenedMetric
       ? `${worsenedMetric.label}: ${worsenedMetric.before} → ${worsenedMetric.after}${worsenedMetric.delta ? ` (${worsenedMetric.delta})` : ""}`
       : TRADE_OFF_METRIC_NOTE);
 
   return {
     isTradeOff: true,
-    headline: TRADE_OFF_HEADLINE,
-    adjustment: null,
+    kept: kept === true,
+    headline: kept === true ? TRADE_OFF_KEPT_SENTENCE : TRADE_OFF_HEADLINE,
+    label: kept === true ? TRADE_OFF_KEPT_LABEL : null,
+    adjustment: adjustmentLine(record),
     seat,
     impact,
     overall,
     rows: [...overall, ...seats],
-    // The change this decision held is the change the designer may deliberately
-    // apply — named by the decision's own lever, never guessed from the plan.
-    leverKey: typeof record.lever === "string" && record.lever ? record.lever : null,
+    // The change's own identity, so the review and Apply name the same candidate.
     candidateId: record.candidateId || null,
+    objective: record.objective || null,
+    objectiveLabel: record.objectiveLabel || null,
     scopeNote: seats.length > 1 ? null : TRADE_OFF_SCOPE_NOTE,
   };
 }

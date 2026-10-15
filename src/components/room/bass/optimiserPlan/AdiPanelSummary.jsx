@@ -44,8 +44,18 @@ export default function AdiPanelSummary({
   // re-test states INSTEAD of the candidate's own detail, which is read in
   // Engineer details.
   previousCandidateNotice = null,
+  // THE TRADE-OFF the run recorded: what the change is, the protected primary
+  // seat it would cost, that seat's own current → proposed result, how much it
+  // worsens by, and the overall P20 and P19 pairs. Already resolved by
+  // optimiserTradeOffState.js — nothing is calculated here.
+  tradeOff = null,
   className = "",
 }) {
+  const overallLine = (key) => {
+    const line = (tradeOff?.overall || []).find((row) => row.key === key);
+    if (!line) return null;
+    return `${line.label}: ${line.before} → ${line.after}${line.delta ? ` (${line.delta})` : ""}`;
+  };
   return (
     <div className={`space-y-1 ${className}`} data-adi-panel-summary="true">
       {message && (
@@ -55,6 +65,34 @@ export default function AdiPanelSummary({
       {nextAction && (
         <div className="text-[11.5px] text-[#8A5A2B] leading-relaxed" data-adi-panel-next-action="true">
           {nextAction}
+        </div>
+      )}
+
+      {/* THE TRADE-OFF: the change, the protected seat it would cost and the
+          measurable trade itself. The decision — review it, or keep the current
+          design — is made by the designer on the controls below. */}
+      {tradeOff && (
+        <div className="space-y-1" data-adi-trade-off-summary="true">
+          {tradeOff.adjustment && (
+            <div className="text-[14px] font-semibold text-[#1B1A1A] leading-snug" data-adi-trade-off-adjustment="true">
+              {tradeOff.adjustment}
+            </div>
+          )}
+          {tradeOff.impact && (
+            <div className="text-[12.5px] font-semibold text-[#8A5A2B] leading-relaxed" data-adi-trade-off-impact="true">
+              {tradeOff.impact}
+            </div>
+          )}
+          {overallLine("p20") && (
+            <div className="text-[12.5px] text-[#213428] leading-relaxed" data-adi-trade-off-p20="true">
+              {overallLine("p20")}
+            </div>
+          )}
+          {overallLine("p19") && (
+            <div className="text-[12.5px] text-[#3E4349] leading-relaxed" data-adi-trade-off-p19="true">
+              {overallLine("p19")}
+            </div>
+          )}
         </div>
       )}
 

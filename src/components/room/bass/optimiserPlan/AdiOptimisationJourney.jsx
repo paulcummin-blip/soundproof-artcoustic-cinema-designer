@@ -76,6 +76,8 @@ import { resolveBestCalibrationResult } from "./bestCalibrationResult.js";
 import AdiBestCalibrationResult from "./AdiBestCalibrationResult.jsx";
 import AdiDesignRecommendationSection from "./AdiDesignRecommendationSection.jsx";
 import AdiPanelSummary from "./AdiPanelSummary.jsx";
+import AdiTradeOffActions from "./AdiTradeOffActions.jsx";
+import { TRADE_OFF_KEPT_LABEL, TRADE_OFF_KEPT_SENTENCE } from "./optimiserTradeOffState.js";
 import AdiPreviousCandidateDetails from "./AdiPreviousCandidateDetails.jsx";
 import AdiRecommendationEvidenceGroups from "./AdiRecommendationEvidenceGroups.jsx";
 import { resolvePreviousCandidate, resolveRetestNeeded } from "./resolveRetestPresentation.js";
@@ -166,6 +168,9 @@ const PRESENTATION_THEME_KEY = Object.freeze({
   [OPTIMISER_PRESENTATION_STATE.NO_RUN]: ADI_OPTIMISER_JOURNEY_STATE.OPTIMISATION_REQUIRED,
   [OPTIMISER_PRESENTATION_STATE.RUNNING]: ADI_OPTIMISER_JOURNEY_STATE.OPTIMISATION_REQUIRED,
   [OPTIMISER_PRESENTATION_STATE.STALE]: ADI_OPTIMISER_JOURNEY_STATE.REEVALUATION_REQUIRED,
+  // A trade-off is a decision waiting on the designer: the same attention tone a
+  // re-evaluation uses, never the "improvement" tone.
+  [OPTIMISER_PRESENTATION_STATE.TRADE_OFF]: ADI_OPTIMISER_JOURNEY_STATE.REEVALUATION_REQUIRED,
   [OPTIMISER_PRESENTATION_STATE.PLAN_AVAILABLE]: ADI_OPTIMISER_JOURNEY_STATE.PLAN_AVAILABLE,
   [OPTIMISER_PRESENTATION_STATE.EVALUATION_INCOMPLETE]: ADI_OPTIMISER_JOURNEY_STATE.EVALUATION_INCOMPLETE,
   [OPTIMISER_PRESENTATION_STATE.NO_USEFUL_IMPROVEMENT]: ADI_OPTIMISER_JOURNEY_STATE.NO_USEFUL_IMPROVEMENT,
@@ -202,6 +207,12 @@ export default function AdiOptimisationJourney({
   assessment = null,
   why = null,
   presentation = null,
+  // THE TRADE-OFF the run itself recorded. The decision, its candidate identity
+  // and the seat it would cost arrive already resolved in `presentation`; this
+  // flag states the designer's own "keep current design".
+  tradeOffKept = false,
+  onKeepTradeOff = null,
+  tradeOffApplyBusy = false,
   // What ADI applied on its own this run, and the physical changes it confirmed
   // but must not apply. Both are stated on the panel, in two separate layers.
   appliedCalibrationEvidence = null,
@@ -398,7 +409,33 @@ export default function AdiOptimisationJourney({
     ? () => onUndoLever(placementLever)
     : null;
 
-  const showAction = !!journey.action && journey.canRun && !isRunning;
+  // ── THE TRADE-OFF STATE ──
+  // A completed run whose best change improves the overall result but worsens a
+  // protected primary seat. Nothing on this card may offer that change as an
+  // improvement, and no run or re-test control is drawn: the run has finished and
+  // its result is trustworthy, so there is nothing to re-run. The designer reviews
+  // the trade-off or keeps the current design.
+  const tradeOff = presentation?.tradeOff || null;
+  const tradeOffSettled = !!tradeOff?.isTradeOff && tradeOffKept;
+  const tradeOffActive = !!tradeOff?.isTradeOff && !isRunning && !tradeOffKept;
+  // The change the designer may deliberately approve: the plan's own evaluated
+  // lever, applied through the SAME lever apply path every other Apply uses. No
+  // new apply logic, no re-ranking and no threshold is introduced here.
+  const tradeOffLever = (() => {
+    const levers = Array.isArray(planView?.levers) ? planView.levers : [];
+    const applicable = levers.filter((lever) => lever?.canApply !== false
+      && Array.isArray(lever?.changes) && lever.changes.length > 0);
+    const wanted = summary.recommendedLever || null;
+    return (wanted && applicable.find((lever) => (lever?.key ?? lever?.lever) === wanted))
+      || applicable[0]
+      || null;
+  })();
+  const handleApplyTradeOff = tradeOffLever && typeof onApplyLever === "function"
+    ? () => onApplyLever(tradeOffLever)
+    : null;
+
+  const showAction = !!journey.action && journey.canRun && !isRunning
+    && !tradeOffActive && !tradeOffSettled;
   // ── ONE RE-TEST ──
   // In the re-test states the panel's own run control is worded as the re-test
   // itself. While that control is drawn it IS the re-test: it owns the primary
@@ -606,13 +643,17 @@ export default function AdiOptimisationJourney({
       <AdiPanelSummary
         message={journey.message}
         nextAction={presentation?.nextAction || null}
-        adjustment={previousCandidate ? null : headline.adjustment}
-        benefit={previousCandidate ? null : headline.benefit}
-        comparison={previousCandidate ? null : headline.comparison}
+        // In the trade-off state the decision IS the trade-off: the change, the
+        // seat it would cost and the measurable trade replace the ordinary
+        // adjustment/benefit/comparison lines, which would state it as an offer.
+        tradeOff={tradeOff?.isTradeOff ? tradeOff : null}
+        adjustment={previousCandidate || tradeOff ? null : headline.adjustment}
+        benefit={previousCandidate || tradeOff ? null : headline.benefit}
+        comparison={previousCandidate || tradeOff ? null : headline.comparison}
         designLimitation={designLimitation}
-        previousCandidateNotice={previousCandidate ? OPTIMISER_RETEST_PREVIOUS_CANDIDATE : null}
-        staleCopy={previousCandidate ? null : summary.staleCopy}
-        previousBest={previousCandidate ? null : summary.previousBest}
+        previousCandidateNotice={previousCandidate && !tradeOff ? OPTIMISER_RETEST_PREVIOUS_CANDIDATE : null}
+        staleCopy={previousCandidate || tradeOff ? null : summary.staleCopy}
+        previousBest={previousCandidate || tradeOff ? null : summary.previousBest}
       />
 
       {/* ── THE ACTIONS ── one primary control for the state, decided by the
@@ -622,6 +663,20 @@ export default function AdiOptimisationJourney({
           held or evaluated is read in Engineer details below, so nothing here
           explains a calculation and no control is drawn twice. */}
       <div className="flex flex-wrap items-center gap-2">
+        {/* THE TRADE-OFF'S OWN TWO CONTROLS — the review, which owns the ONE
+            deliberate Apply, and the designer's own "no". While the trade-off is
+            live no other control is drawn: the run has completed, so there is
+            nothing to re-run, and the change is never applied from this card. */}
+        {tradeOffActive && (
+          <AdiTradeOffActions
+            tradeOff={tradeOff}
+            onApply={handleApplyTradeOff}
+            applyBusy={tradeOffApplyBusy}
+            onKeep={onKeepTradeOff}
+          />
+        )}
+
+        {!tradeOffActive && !tradeOffSettled && (<>
         <PlacementRecommendationPanel
           placement={placement}
           busy={isRunning}
@@ -673,7 +728,23 @@ export default function AdiOptimisationJourney({
           disabledReason={reoptimiseDisabledReason}
           primary={primaryAction === ADI_PRIMARY_ACTION.CALIBRATION}
         />
+        </>)}
       </div>
+
+      {/* THE DESIGNER KEPT THE CURRENT DESIGN — the terminal state of this run.
+          Stated once, calmly, with no action beside it: the candidate is dismissed
+          for this run, nothing was applied, and a re-test is not offered again
+          until the design itself changes. */}
+      {tradeOffSettled && (
+        <div className="space-y-0.5" data-adi-trade-off-kept="true">
+          <div className="text-[12.5px] font-semibold text-[#213428]">
+            {tradeOff?.label || TRADE_OFF_KEPT_LABEL}
+          </div>
+          <div className="text-[11px] text-[#625143] leading-relaxed">
+            {TRADE_OFF_KEPT_SENTENCE}
+          </div>
+        </div>
+      )}
 
       {/* An ignored recommendation is stated once, calmly, and is not asked again
           for this run: re-testing is always available. */}

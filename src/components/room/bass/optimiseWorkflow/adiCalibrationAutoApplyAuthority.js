@@ -693,9 +693,13 @@ export function resolveCalibrationAutoApply({
     // A primary seat that regresses is a real seat losing performance: a good
     // ratio never overrules it.
     if (regression?.regressed) {
+      // THE SEAT-REGRESSION EVIDENCE TRAVELS WITH THE DECISION: which seat, on
+      // which parameter, its displayed levels and the raw amount it worsens by.
+      // Recorded here so the panel, the review and a reopened project all state
+      // the same seat and the same values without reconstructing them later.
       return outcome(CALIBRATION_APPLY_DECISION.HOLD, CALIBRATION_APPLY_REASON.PRIMARY_SEAT_REGRESSION,
         `The ${objectiveLabel} candidate regresses ${regression.parameter} at ${regression.seatId}${regression.rawDeltaDb ? ` by ${round1(regression.rawDeltaDb)} dB` : ""}. This is a trade-off, so it has not been applied — your approval is required.`,
-        tradeOffContext);
+        { ...tradeOffContext, regression });
     }
 
     // A displayed level that drops is a hard failure, not a ratio to trade.
@@ -761,9 +765,11 @@ export function resolveCalibrationAutoApply({
   // applied silently, whatever the aggregate improves. (Already assessed above,
   // so no ratio can carry it through.)
   if (regression?.regressed) {
+    // The same recorded evidence as the ratio-assessed branch above: the run's
+    // own seat, parameter, levels and raw regression, kept with the decision.
     return outcome(CALIBRATION_APPLY_DECISION.HOLD, CALIBRATION_APPLY_REASON.PRIMARY_SEAT_REGRESSION,
       `The ${objectiveLabel} candidate regresses ${regression.parameter} at ${regression.seatId}${regression.rawDeltaDb ? ` by ${round1(regression.rawDeltaDb)} dB` : ""}. This is a trade-off, so it has not been applied — your approval is required.`,
-      context);
+      { ...context, regression });
   }
 
   // Calibration a human set by hand is the designer's own work: ADI states the

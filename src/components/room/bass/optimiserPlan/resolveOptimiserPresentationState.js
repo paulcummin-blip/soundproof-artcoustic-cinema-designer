@@ -256,6 +256,9 @@ export function hasApplicableEvaluatedLever(planView) {
  * @param {boolean} [params.runBlocked]
  * @param {object|string|null} [params.runBlockReason] - why the run is blocked
  * @param {boolean} [params.planPersisted] - false when saving the result failed
+ * @param {object|null} [params.tradeOff] - the trade-off the completed run itself
+ *   recorded (optimiserTradeOffState.js): an overall improvement that worsens a
+ *   protected primary seat, which only the designer may decide
  * @returns {object} one resolved presentation state
  */
 export function resolveOptimiserPresentationState({
@@ -266,6 +269,7 @@ export function resolveOptimiserPresentationState({
   runBlocked = false,
   runBlockReason = null,
   planPersisted = true,
+  tradeOff = null,
 } = {}) {
   const status = planView?.status || OPTIMISER_PLAN_STATUS.ABSENT;
   const evidence = planView?.run || null;
@@ -415,6 +419,30 @@ export function resolveOptimiserPresentationState({
       actionLabel: OPTIMISER_PRESENTATION_ACTION.RERUN,
       showPlan: true,
       showApply: false,
+    });
+  }
+
+  // ── TRADE_OFF ── the run's best change improves the overall result but worsens
+  // a protected primary seat (or materially damages the other protected
+  // objective). A DESIGNER DECISION, never an optimiser success: the badge never
+  // states "Improvement Found", the change is never applied on ADI's own
+  // authority, and no run or re-test control is offered until the designer has
+  // decided. The seat, its own current → proposed result and how much it worsens
+  // by are stated from the decision's own recorded evidence.
+  if (tradeOff?.isTradeOff) {
+    return build(OPTIMISER_PRESENTATION_STATE.TRADE_OFF, {
+      message: tradeOff.headline,
+      // The resolved decision travels with the state, so the card's seat line, the
+      // review and the two controls all read ONE resolution.
+      tradeOff,
+      evidence,
+      showPlan: true,
+      showApply: false,
+      // No run control in this state: the run has completed and its result is
+      // trustworthy, so there is nothing to re-run.
+      action: null,
+      actionLabel: null,
+      canRun: false,
     });
   }
 

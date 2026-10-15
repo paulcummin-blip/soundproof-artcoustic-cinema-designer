@@ -18,7 +18,7 @@
 // reasoning authority; the optimiser is the engineer.
 // ---------------------------------------------------------------------------
 
-import React, { useCallback, useMemo, useState } from "react";
+import React, { useCallback, useMemo, useState, useSyncExternalStore } from "react";
 import { runEngineeringDecisionModel } from "@/components/adi";
 import { buildAdiDecisionFromPersistedRecommendation } from "@/components/adi/persistedRecommendationAdapter";
 import { buildAdiBassEvidence } from "@/components/adi/adiBassEvidenceBuilder";
@@ -37,6 +37,14 @@ import AdiOptimisationJourney from "@/components/room/bass/optimiserPlan/AdiOpti
 import { firstSentence } from "@/components/room/bass/optimiserPlan/resolveAdiOptimiserJourney.js";
 import { useOptimiserPlanView } from "@/components/room/bass/optimiserPlan/useOptimiserPlanView.js";
 import { resolveOptimiserPresentationState } from "@/components/room/bass/optimiserPlan/resolveOptimiserPresentationState.js";
+import { resolveTradeOffState } from "@/components/room/bass/optimiserPlan/optimiserTradeOffState.js";
+import savedCalibrationDecision from "@/components/room/bass/optimiserPlan/savedCalibrationDecision.js";
+import {
+  keepTradeOff,
+  optimiserTradeOffKeptKey,
+  readTradeOffKept,
+  subscribeTradeOffKept,
+} from "@/components/room/bass/optimiserPlan/optimiserKeepTradeOffStore.js";
 import { buildDesignChangeRecommendations } from "@/components/room/bass/optimiseWorkflow/adiCalibrationAutoApplyAuthority.js";
 
 // ── Displacement helpers ──
@@ -187,6 +195,33 @@ export default function AdiRecommendation({
     seatingPositions,
   });
 
+  // ── THE TRADE-OFF THE RUN ITSELF RECORDED ──
+  // Read from the decision saved with the plan, so a refresh or a project reopen
+  // states the same candidate, the same seat and the same values. Presentation
+  // only: nothing is calculated, applied or written here.
+  // This session's own decision record wins while it exists — a change this
+  // session DID apply is no longer a trade-off to decide.
+  const savedDecision = savedCalibrationDecision(optimiserPlanView);
+  const tradeOffDecision = autoApplied?.calibration || savedDecision || null;
+  const tradeOffKeptKey = optimiserTradeOffKeptKey({
+    projectId,
+    versionId,
+    candidateId: tradeOffDecision?.candidateId || null,
+  });
+  const tradeOffKept = useSyncExternalStore(
+    subscribeTradeOffKept,
+    () => readTradeOffKept(tradeOffKeptKey),
+  );
+  const tradeOff = useMemo(
+    () => resolveTradeOffState({ decision: tradeOffDecision, kept: tradeOffKept }),
+    [tradeOffDecision, tradeOffKept],
+  );
+  // The designer's own "no": the candidate is dismissed for this run and NOTHING
+  // is applied — no design field, no saved calibration, no published result.
+  const handleKeepTradeOff = useCallback(() => {
+    keepTradeOff(tradeOffKeptKey);
+  }, [tradeOffKeptKey]);
+
   // ── Apply handlers (preserved from FurtherImprovements) ──
 
   // ── Individual lever apply / undo ──
@@ -316,6 +351,9 @@ export default function AdiRecommendation({
     actionable: actionableEvaluation,
     runBlocked: !!optimisationRunBlockReason,
     runBlockReason: optimisationRunBlockReason || null,
+    // A trade-off is stated as a trade-off and never as an improvement: the state
+    // owns the badge, the seat line and the two designer controls.
+    tradeOff,
   });
 
   // A design that cannot meet its selected target states the remaining
@@ -351,6 +389,10 @@ export default function AdiRecommendation({
       assessment={recommendation?.assessment || null}
       why={recommendation?.why || null}
       presentation={optimiserPresentation}
+      // The designer's own decision on the trade-off this run found.
+      tradeOffKept={tradeOffKept}
+      onKeepTradeOff={handleKeepTradeOff}
+      tradeOffApplyBusy={!!leverApplyBusy}
       // What ADI applied on its own this run (settings, objective, canonical
       // before/after) and the physical changes that remain the designer's call.
       appliedCalibrationEvidence={autoApplied?.calibration || null}
