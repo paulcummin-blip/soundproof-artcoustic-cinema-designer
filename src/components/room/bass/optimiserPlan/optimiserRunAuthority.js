@@ -78,10 +78,13 @@ export function beginOptimiserRun(projectId, versionId) {
     // ever presented on the panel.
     history: [
       ...(previousRun?.history || []),
-      ...(run.superseded
+      // A run that was itself started this session, together with the record it
+      // superseded. A record saved in an earlier session has no run id to enter
+      // here — what this run superseded is stated on `superseded` above.
+      ...(previousRun
         ? [{
-          runId: previousRun?.runId || null,
-          startedAt: previousRun?.startedAt || null,
+          runId: previousRun.runId,
+          startedAt: previousRun.startedAt,
           ...run.superseded,
         }]
         : []),

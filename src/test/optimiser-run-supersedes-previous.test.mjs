@@ -66,7 +66,12 @@ const VERSION = "version-1";
 const DESIGN = "design-fp";
 
 const TOLD = "2026-10-15T10:00:00.000Z"; // the old run saved its result
-const TNEW = "2026-10-15T11:04:00.000Z"; // the new run saved its result
+
+/**
+ * A save time for the newest run's OWN result: after that run started, so the
+ * record it wrote is its own result and not the previous run's.
+ */
+const afterRun = (run) => new Date(Date.parse(run.startedAt) + 60000).toISOString();
 
 /** The OLD run: it retained no usable comparison, so it asks for a re-test. */
 const oldIncompleteRun = {
@@ -90,15 +95,15 @@ const oldUnsupportedRun = {
 };
 
 /** The NEW run: a completed search that found nothing worth applying. */
-const newNoImprovementRun = {
+const noImprovementRun = (savedAt) => ({
   planVersion: OPTIMISER_PLAN_VERSION,
-  savedAt: TNEW,
+  savedAt,
   recordKind: "run_evidence",
   terminalOutcome: "no_useful_improvement",
   designFingerprint: DESIGN,
   resultFingerprint: "result-new",
   run: { rejectionReasons: [] },
-};
+});
 
 const storedPlan = () => getOptimiserPlanAuthority(PROJECT, VERSION);
 const view = (plan) => resolveOptimiserPlanStatus({ plan, currentDesignFingerprint: DESIGN });
@@ -243,11 +248,12 @@ describe("NEW COMPLETED RUN BECOMES PRESENTATION AUTHORITY", () => {
     const run = beginOptimiserRun(PROJECT, VERSION);
 
     // The new run finished and saved its own record.
-    setOptimiserPlanAuthority(PROJECT, VERSION, newNoImprovementRun);
+    const newRecord = noImprovementRun(afterRun(run));
+    setOptimiserPlanAuthority(PROJECT, VERSION, newRecord);
 
     const presentation = resolvePresentationPlan({ plan: storedPlan(), run });
     expect(presentation.superseded).toBe(false);
-    expect(presentation.plan).toBe(newNoImprovementRun);
+    expect(presentation.plan).toBe(newRecord);
 
     const state = stateForRun(run);
     expect(state.state).toBe(OPTIMISER_PRESENTATION_STATE.NO_USEFUL_IMPROVEMENT);
@@ -268,7 +274,7 @@ describe("OLD RUN CANNOT FORCE RE-TEST AFTER NEW SUCCESSFUL RUN", () => {
   it("states NO IMPROVEMENT FOUND, never the old run's re-test", () => {
     setOptimiserPlanAuthority(PROJECT, VERSION, oldIncompleteRun);
     const run = beginOptimiserRun(PROJECT, VERSION);
-    setOptimiserPlanAuthority(PROJECT, VERSION, newNoImprovementRun);
+    setOptimiserPlanAuthority(PROJECT, VERSION, noImprovementRun(afterRun(run)));
 
     const state = stateForRun(run);
     expect(state.outcome).toBe(OPTIMISER_OUTCOME.NO_IMPROVEMENTS);
@@ -280,28 +286,38 @@ describe("OLD RUN CANNOT FORCE RE-TEST AFTER NEW SUCCESSFUL RUN", () => {
   });
 
   it("cannot loop: the newest run's own outcome always wins", () => {
-    // Run 1 leaves an incomplete result, run 2 supersedes it, run 3 supersedes
-    // that. Each time, the newest record is the one presented.
+    // An incomplete result is superseded by the run that follows it...
     setOptimiserPlanAuthority(PROJECT, VERSION, oldIncompleteRun);
     const first = beginOptimiserRun(PROJECT, VERSION);
     expect(resolvePresentationPlan({ plan: storedPlan(), run: first }).plan).toBeNull();
 
-    setOptimiserPlanAuthority(PROJECT, VERSION, { ...newNoImprovementRun, savedAt: TNEW });
-    const second = beginOptimiserRun(PROJECT, VERSION);
-    expect(resolvePresentationPlan({ plan: storedPlan(), run: second }).plan).toBeNull();
+    // ...and that run's OWN result is superseded by the next run in turn, so no
+    // new run is ever judged through the run before it. Checked on the rule
+    // itself so the sequence does not depend on the wall clock.
+    const firstResult = noImprovementRun(afterRun(first));
+    const second = {
+      runId: "optimiser-run-2",
+      startedAt: new Date(Date.parse(firstResult.savedAt) + 1000).toISOString(),
+    };
+    expect(planIsSupersededByRun(firstResult, second)).toBe(true);
+    expect(resolvePresentationPlan({ plan: firstResult, run: second }).plan).toBeNull();
 
-    const secondResult = { ...newNoImprovementRun, savedAt: "2026-10-15T12:00:00.000Z", resultFingerprint: "result-3" };
-    setOptimiserPlanAuthority(PROJECT, VERSION, secondResult);
-    const presentation = resolvePresentationPlan({ plan: storedPlan(), run: second });
-    expect(presentation.plan).toBe(secondResult);
-    expect(stateForRun(second).outcome).toBe(OPTIMISER_OUTCOME.NO_IMPROVEMENTS);
+    // The second run's own result becomes the authority, and states its own
+    // outcome — nothing of the run before it.
+    const secondResult = {
+      ...noImprovementRun(new Date(Date.parse(second.startedAt) + 1000).toISOString()),
+      resultFingerprint: "result-3",
+    };
+    expect(resolvePresentationPlan({ plan: secondResult, run: second }).plan).toBe(secondResult);
+    expect(resolveOptimiserPresentationState({ planView: view(secondResult) }).outcome)
+      .toBe(OPTIMISER_OUTCOME.NO_IMPROVEMENTS);
   });
 });
 
 describe("NEW RESULT OUTCOMES THE NEWEST RUN PRODUCES", () => {
   it("shows IMPROVEMENT FOUND for the newest run's confirmed adjustment", () => {
     const run = beginOptimiserRun(PROJECT, VERSION);
-    const improvedRecord = { ...newNoImprovementRun, terminalOutcome: null, individualEffectsEvaluated: true, baseline: { p20VariationDb: 12 } };
+    const improvedRecord = { ...noImprovementRun(afterRun(run)), terminalOutcome: null, individualEffectsEvaluated: true, baseline: { p20VariationDb: 12 } };
     setOptimiserPlanAuthority(PROJECT, VERSION, improvedRecord);
 
     const presentation = resolvePresentationPlan({ plan: storedPlan(), run });
@@ -331,7 +347,7 @@ describe("NEW RESULT OUTCOMES THE NEWEST RUN PRODUCES", () => {
 
   it("shows PHYSICAL CHANGE RECOMMENDED for the newest run's physical move", () => {
     const run = beginOptimiserRun(PROJECT, VERSION);
-    setOptimiserPlanAuthority(PROJECT, VERSION, { ...newNoImprovementRun, terminalOutcome: null });
+    setOptimiserPlanAuthority(PROJECT, VERSION, { ...noImprovementRun(afterRun(run)), terminalOutcome: null });
 
     const presentation = resolvePresentationPlan({ plan: storedPlan(), run });
     expect(presentation.superseded).toBe(false);
@@ -431,7 +447,8 @@ describe("RUN HISTORY PRESERVED", () => {
   it("records each superseded run in order, oldest first", () => {
     setOptimiserPlanAuthority(PROJECT, VERSION, oldIncompleteRun);
     const first = beginOptimiserRun(PROJECT, VERSION);
-    setOptimiserPlanAuthority(PROJECT, VERSION, newNoImprovementRun);
+    const firstResult = noImprovementRun(afterRun(first));
+    setOptimiserPlanAuthority(PROJECT, VERSION, firstResult);
     const second = beginOptimiserRun(PROJECT, VERSION);
 
     expect(second.runId).not.toBe(first.runId);
@@ -440,7 +457,7 @@ describe("RUN HISTORY PRESERVED", () => {
     expect(history[0].runId).toBe(first.runId);
     expect(history[0].startedAt).toBe(first.startedAt);
     expect(history[0].terminalOutcome).toBe("no_useful_improvement");
-    expect(history[0].savedAt).toBe(TNEW);
+    expect(history[0].savedAt).toBe(firstResult.savedAt);
   });
 });
 
@@ -448,9 +465,10 @@ describe("NO OPTIMISER MATHS CHANGE", () => {
   it("writes nothing and reaches no engineering module", () => {
     expect(/setOptimiserPlanAuthority|commitInstances|commitSeating|bulkUpdate|applyCalibrationTuning|localStorage/.test(runAuthority))
       .toBe(false);
-    expect(/optimiseWorkflowOrchestrator|improveBassV2Engine|groupedDelaySearch|groupedGainSearch|groupedPhaseSearch|materialityGate|resolveLeverVerdict/)
-      .toBe(/optimiseWorkflowOrchestrator|improveBassV2Engine|groupedDelaySearch|groupedGainSearch|groupedPhaseSearch|materialityGate|resolveLeverVerdict/.test(runAuthority));
-    expect(runAuthority).not.toMatch(/optimiseWorkflowOrchestrator/);
+    // It reads the saved record and nothing else: no engine, no ranking, no
+    // grouping, no materiality verdict.
+    expect(runAuthority).not.toMatch(/optimiseWorkflowOrchestrator|improveBassV2Engine|groupedDelaySearch|groupedGainSearch|groupedPhaseSearch|materialityGate/);
+    expect(runAuthority).toMatch(/from "\.\/optimiserPlanStore\.js"/);
   });
 
   it("records the run before any work starts", () => {
