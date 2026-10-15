@@ -19,7 +19,14 @@
 // crossings — are never searched by default; they are returned as labelled
 // theoretical options for Engineer Details.
 
-import { generateSymmetricCandidates, generateAsymmetricPairCandidates, generateIndividualCandidatesForPhase, splitPracticalCandidates } from "./positionCandidateGenerator.js";
+import {
+  attachPhysicalSourceIdentity,
+  generateSymmetricCandidates,
+  generateAsymmetricPairCandidates,
+  generateIndividualCandidatesForPhase,
+  hasCompletePhysicalGeometry,
+  splitPracticalCandidates,
+} from "./positionCandidateGenerator.js";
 import { generatePracticalWallLadderCandidates } from "./practicalWallSearch.js";
 import { describeTheoreticalCandidate } from "../best-layout/practicalPlacementAuthority.js";
 import { screenPositionCandidates, promoteScreenedCandidates } from "./positionScreeningEngine.js";
@@ -54,15 +61,31 @@ export function runPositionScreenPhase(phase, currentPositions, roomDims, cabine
     candidates = generateIndividualCandidatesForPhase(currentPositions, roomDims, cabinetDims);
   }
 
+  // Geometry is a physical-source contract, not a grouping contract. A valid
+  // candidate has one explicit finite x/y coordinate for every active source.
+  // Reject malformed rows before screening; never reconstruct a missing source
+  // from a group label or allow one bad row to poison the whole family.
+  const expectedSourceCount = currentPositions.length;
+  const completeCandidates = candidates.filter(
+    (candidate) => hasCompletePhysicalGeometry(candidate, expectedSourceCount),
+  );
+  const geometryRejected = candidates.length - completeCandidates.length;
+
   // Only practical candidates enter the default search. Theoretical candidates
   // are retained as labelled options — they are never searched or recommendable.
-  const { practical, theoretical } = splitPracticalCandidates(candidates);
+  const { practical, theoretical } = splitPracticalCandidates(completeCandidates);
   const theoreticalExcluded = theoretical.map((candidate) => describeTheoreticalCandidate(candidate));
   const generated = practical.length;
   if (generated === 0) {
     return {
       promoted: [],
-      funnel: { generated: 0, screened: 0, promotedToV2: 0, theoreticalExcluded: theoreticalExcluded.length },
+      funnel: {
+        generated: 0,
+        screened: 0,
+        promotedToV2: 0,
+        theoreticalExcluded: theoreticalExcluded.length,
+        geometryRejected,
+      },
       timingMs: (typeof performance !== "undefined" ? performance.now() : Date.now()) - t0,
       theoreticalExcluded,
     };
@@ -87,10 +110,12 @@ export function runPositionScreenPhase(phase, currentPositions, roomDims, cabine
 
   const promoted = [];
   for (const c of promotedRaw) {
+    const physicalCoordinates = attachPhysicalSourceIdentity(c.coordinates, currentPositions);
     const finalist = {
       id: c.id,
       familyId: `position-${phase}`,
-      sources: c.coordinates.map((coord) => ({
+      sources: physicalCoordinates.map((coord) => ({
+        sourceId: coord.sourceId,
         xNorm: W > 0 ? coord.x / W : 0,
         yNorm: L > 0 ? coord.y / L : 0,
       })),
@@ -109,7 +134,7 @@ export function runPositionScreenPhase(phase, currentPositions, roomDims, cabine
         : "local-individual",
       phase,
       movement: c.movement,
-      coordinates: c.coordinates,
+      coordinates: physicalCoordinates,
     });
   }
 
@@ -120,6 +145,7 @@ export function runPositionScreenPhase(phase, currentPositions, roomDims, cabine
       screened: generated, // every practical candidate is screened
       promotedToV2: promoted.length,
       theoreticalExcluded: theoreticalExcluded.length,
+      geometryRejected,
     },
     timingMs: (typeof performance !== "undefined" ? performance.now() : Date.now()) - t0,
     theoreticalExcluded,
