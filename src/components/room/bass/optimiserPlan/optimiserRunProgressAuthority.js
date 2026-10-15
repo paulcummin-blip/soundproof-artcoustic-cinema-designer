@@ -30,6 +30,7 @@
 // ---------------------------------------------------------------------------
 
 import { buildStageDisplay } from "../improveBassV2/improveBassV2StageMapping.js";
+import { resolveRunPublicationPhase } from "./optimiserRunTimings.js";
 
 /** The wording of the control while the run is in flight. */
 export const ADI_OPTIMISER_RUNNING_LABEL = "OPTIMISING BASS…";
@@ -167,6 +168,7 @@ export function buildOptimiserRunProgress({
   run = null,
   runStatus = "idle",
   nowMs = Date.now(),
+  runTimings = null,
 } = {}) {
   const running = runStatus === "running";
   const liveStatus = live?.status || "idle";
@@ -181,11 +183,21 @@ export function buildOptimiserRunProgress({
 
   const stage = resolveOptimiserRunningStage({ state: live, running });
 
+  // ── THE HANDOFF PHASE ──────────────────────────────────────────────────
+  // The acoustic search has ended and what remains is saving the result and
+  // then publishing it. EVALUATION COUNTS BELONG ONLY TO ACOUSTIC EVALUATION
+  // STAGES: during the handoff no job counter is shown at all, however many the
+  // engine published for its last search. A publication that is separately
+  // observable states itself instead.
+  const isHandoff = stage.key === "persistence";
+  const publication = isHandoff ? resolveRunPublicationPhase(runTimings) : null;
+  const handoffPhase = isHandoff ? (publication?.key || "saving") : null;
+
   const jobsCompleted = seconds(live?.progressCurrent) ?? 0;
   const jobsTotal = seconds(live?.progressTotal) ?? 0;
   // A job count is stated ONLY when the engine has published one for the
   // search in flight. No published count = no count, never an estimate.
-  const hasJobProgress = running && jobsTotal > 0;
+  const hasJobProgress = running && jobsTotal > 0 && !isHandoff;
   const jobLine = hasJobProgress
     ? `${jobsCompleted} of ${jobsTotal} evaluation jobs complete`
     : null;
@@ -214,12 +226,17 @@ export function buildOptimiserRunProgress({
     stageKey: stage.key,
     stageLabel: stage.label,
     engineStageKey: stage.engineStageKey,
-    stageLine: `${stage.label}…`,
+    // During the handoff the line states the real phase — saving, or publishing
+    // when the publication is separately observable — and never a job count.
+    handoffPhase,
+    stageLine: publication?.label || `${stage.label}…`,
     jobsCompleted,
     jobsTotal,
     hasJobProgress,
     jobLine,
-    progressLine: jobLine ? `${stage.label}… ${jobLine}` : `${stage.label}…`,
+    jobCountVisible: hasJobProgress,
+    progressLine: publication?.label
+      || (jobLine ? `${stage.label}… ${jobLine}` : `${stage.label}…`),
     lastProgressAtMs,
     secondsSinceProgress,
     sinceProgressText: formatOptimiserElapsed(secondsSinceProgress),

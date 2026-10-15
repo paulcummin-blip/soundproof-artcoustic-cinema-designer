@@ -29,10 +29,15 @@ import {
   buildOptimiserRunProgress,
   describeOptimiserStatusCheck,
 } from "./optimiserRunProgressAuthority.js";
+import { useRunTimings } from "./optimiserRunTimings.js";
 
 export default function useOptimiserRunProgress({ projectId = null, versionId = null, runStatus = "idle" } = {}) {
   const live = useImproveBassV2State(projectId, versionId);
   const run = useLatestOptimiserRun(projectId, versionId);
+  // The run's own timing ledger, so the handoff phase can state whether the run
+  // is still saving its result or already publishing it. It is the ONLY thing
+  // read from the ledger here, and it states no job count of its own.
+  const runTimings = useRunTimings(projectId, versionId);
   const running = runStatus === "running";
 
   const [nowMs, setNowMs] = useState(() => Date.now());
@@ -51,8 +56,8 @@ export default function useOptimiserRunProgress({ projectId = null, versionId = 
   }, [running]);
 
   const progress = useMemo(
-    () => buildOptimiserRunProgress({ live, run, runStatus, nowMs }),
-    [live, run, runStatus, nowMs],
+    () => buildOptimiserRunProgress({ live, run, runStatus, nowMs, runTimings }),
+    [live, run, runStatus, nowMs, runTimings],
   );
 
   // ── Observed stage timing ──

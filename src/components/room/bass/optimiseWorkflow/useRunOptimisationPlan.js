@@ -37,6 +37,14 @@ import {
   setOptimiserPlanAuthority,
 } from "@/components/room/bass/optimiserPlan/optimiserPlanStore.js";
 import { beginOptimiserRun } from "@/components/room/bass/optimiserPlan/optimiserRunAuthority.js";
+import {
+  RUN_TIMING,
+  beginRunTimings,
+  buildPersistedRunTimings,
+  getRunTimings,
+  recordRunTiming,
+} from "@/components/room/bass/optimiserPlan/optimiserRunTimings.js";
+import { publishOptimiserRecommendation } from "@/components/room/bass/optimiserPlan/optimiserRecommendationPublication.js";
 
 export default function useRunOptimisationPlan({
   projectId,
@@ -70,6 +78,10 @@ export default function useRunOptimisationPlan({
     // nothing of the earlier result. The earlier record is neither cleared nor
     // rewritten, so it stays readable for history, diagnostics and audit.
     const activeRun = beginOptimiserRun(projectId, versionId);
+    // Durable timing instrumentation for this run: the milestones it reaches are
+    // written into its own saved record, so a run that took far longer than it
+    // should can be diagnosed from the record later instead of guessed at.
+    beginRunTimings(projectId, versionId, activeRun.runId);
 
     // Every fresh run gets a durable terminal record, including early or thrown
     // failures. Without this, refresh could discard the in-memory run authority
@@ -116,6 +128,8 @@ export default function useRunOptimisationPlan({
         }
       }
 
+      recordRunTiming(projectId, versionId, RUN_TIMING.CALCULATION_COMPLETE);
+
       phaseRef.current = "optimising";
       const result = await runOptimisation({
         projectId,
@@ -129,6 +143,14 @@ export default function useRunOptimisationPlan({
         amplifierPowerPerSubW,
         subwooferBottomHeightM: frontSubsCfg?.bottomHeightM ?? rearSubsCfg?.bottomHeightM ?? 0,
         appState,
+        // THIS RUN OWNS ITS OWN PUBLICATION. It saves the evaluated plan, so the
+        // recommendation is published ONCE — by the step below, with the plan
+        // attached — instead of the run publishing it and this step publishing it
+        // again against the same snapshot. The fingerprint the run itself would
+        // have used is returned on the result, so a genuinely different snapshot
+        // is still written when the two keys differ (see
+        // optimiserRecommendationPublication.js).
+        deferRecommendationPublication: true,
       });
 
       if (result.status === "cancelled") {
@@ -170,6 +192,8 @@ export default function useRunOptimisationPlan({
       }
 
       const currentShared = sharedRef.current;
+      // The run's search is over and its verdict is settled from here on.
+      recordRunTiming(projectId, versionId, RUN_TIMING.TERMINAL_VERDICT_READY);
       const fingerprint = currentShared?.completedBassAuthority?.contract?.job?.resultFingerprint
         || currentShared?.currentFingerprint
         || null;
@@ -239,18 +263,40 @@ export default function useRunOptimisationPlan({
         return;
       }
 
-      setOptimiserPlanAuthority(projectId, versionId, persistedPlan || runEvidence);
+      // ── THE SAVE, THEN THE ONE PUBLICATION ──
+      // The record is saved first, exactly as before, so the result is durable
+      // the moment the run has a verdict. Its own run timing ledger travels with
+      // it, and is completed once the publication has finished.
+      recordRunTiming(projectId, versionId, RUN_TIMING.SAVE_STARTED);
+      const runRecord = persistedPlan || runEvidence;
+      setOptimiserPlanAuthority(projectId, versionId, {
+        ...runRecord,
+        timings: buildPersistedRunTimings(getRunTimings(projectId, versionId)),
+      });
+      recordRunTiming(projectId, versionId, RUN_TIMING.SAVE_COMPLETED);
 
-      // Only an actionable plan is published with the recommendation. A rejected
-      // candidate is never published as an available recommendation.
-      if (persistedPlan && fingerprint && result.recommendation) {
-        await publishRecommendation(
-          projectId,
-          versionId,
-          { ...result.recommendation, optimiserPlan: persistedPlan },
-          fingerprint,
-        );
-      }
+      // ONE publication operation, however many snapshots genuinely need it: the
+      // evaluated plan is published with the recommendation, and the fingerprint
+      // the run itself would have used is preserved when it is a different one.
+      // A publication failure is not a run failure — the saved result stands.
+      await publishOptimiserRecommendation({
+        projectId,
+        versionId,
+        recommendation: result.recommendation,
+        plan: persistedPlan,
+        runFingerprint: result.recommendationPublication?.fingerprint || null,
+        // The saving step publishes against the plan only: exactly the condition
+        // under which it has always published.
+        savedFingerprint: persistedPlan ? fingerprint : null,
+      });
+
+      // The UI-ready authority: the same record, now carrying the completed run
+      // timings — including the publication and its retry count.
+      recordRunTiming(projectId, versionId, RUN_TIMING.UI_READY_WRITTEN);
+      setOptimiserPlanAuthority(projectId, versionId, {
+        ...runRecord,
+        timings: buildPersistedRunTimings(getRunTimings(projectId, versionId)),
+      });
 
       setStatus("complete");
     } catch (err) {

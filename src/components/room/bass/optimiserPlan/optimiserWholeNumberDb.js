@@ -18,6 +18,9 @@ import {
   formatP19P20DeltaText,
   resolveRp22DesignValue,
 } from "../../../utils/rp22/resolveRp22DesignValue.js";
+// The displayed delta has ONE authority. This module keeps its own improvement
+// helper for backward compatibility, delegating the rule itself.
+import { displayDeltaDb } from "./optimiserDisplayDelta.js";
 
 /** "±12 dB" — the only P19/P20 deviation form allowed in the card. */
 export function deviationText(value) {
@@ -84,8 +87,9 @@ export function frequencyText(value) {
  * value, or when either value was not measured.
  */
 export function wholeDbImprovement(beforeValue, afterValue) {
-  const before = floorP19P20Deviation(beforeValue);
-  const after = floorP19P20Deviation(afterValue);
-  if (before == null || after == null || after >= before) return null;
-  return before - after;
+  // DELEGATED: the displayed delta has ONE authority (optimiserDisplayDelta.js).
+  // This name is kept for its callers and its own meaning: the size of the
+  // improvement, or null when the change is not an improvement at all.
+  const delta = displayDeltaDb(beforeValue, afterValue);
+  return delta != null && delta > 0 ? delta : null;
 }

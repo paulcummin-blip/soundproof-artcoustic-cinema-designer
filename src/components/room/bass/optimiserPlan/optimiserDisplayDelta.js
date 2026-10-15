@@ -26,15 +26,17 @@
 // PURE, READ-ONLY formatting. No calculation, no grading, no store.
 // ---------------------------------------------------------------------------
 
-import { floorP19P20Deviation } from "../../../utils/rp22/resolveRp22DesignValue.js";
-import { deltaText, deviationText } from "./optimiserWholeNumberDb.js";
+import {
+  floorP19P20Deviation,
+  formatP19P20DeviationText,
+} from "../../../utils/rp22/resolveRp22DesignValue.js";
 
 /** Stated when the two displayed values are the same whole number. */
 export const DISPLAY_NO_MEANINGFUL_CHANGE = "no meaningful change";
 
 /** "±15 dB" — the displayed form of one endpoint. Null when not measured. */
 export function displayEndpointText(value) {
-  return deviationText(value);
+  return formatP19P20DeviationText(value);
 }
 
 /**
@@ -57,7 +59,9 @@ export function displayDeltaDb(beforeValue, afterValue) {
 export function displayDeltaText(beforeValue, afterValue) {
   const delta = displayDeltaDb(beforeValue, afterValue);
   if (delta == null) return null;
-  return delta === 0 ? DISPLAY_NO_MEANINGFUL_CHANGE : deltaText(delta);
+  // The delta of two whole numbers is already whole: it is stated exactly, and a
+  // change too small to state (0 dB) is stated as no meaningful change.
+  return delta === 0 ? DISPLAY_NO_MEANINGFUL_CHANGE : `${delta} dB`;
 }
 
 /**

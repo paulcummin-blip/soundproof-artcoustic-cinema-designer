@@ -50,6 +50,14 @@ import { classifyCorrectability } from "../improveBassV2/correctabilityClassifie
  *   - runImproveBassV2 call with correct params
  *   - Result handling (winner, error, etc.)
  *
+ * A caller that saves its own evaluated plan (the evidence-only Optimisation
+ * Plan run) may pass deferRecommendationPublication: true, so the ONE
+ * publication of the recommendation is made by the saving step — with the plan
+ * attached — instead of twice in a row against the same result snapshot. The
+ * fingerprint the run itself would have used is handed back on the result, so
+ * the saving step can still preserve a write to a different snapshot when the
+ * two keys genuinely differ. Every other caller is unchanged.
+ *
  * @param {object} opts
  * @returns {Promise<object>} { status, selection, runtimeMetrics, optimisationDiagnostics }
  */
@@ -57,6 +65,7 @@ export async function runOptimisation(opts) {
   const {
     projectId,
     versionId,
+    deferRecommendationPublication = false,
     shared,
     subwooferInstances,
     roomDims,
@@ -307,7 +316,13 @@ export async function runOptimisation(opts) {
         const resultFingerprint = selection?.currentResult?.inputIdentity
           || shared?.completedBassAuthority?.currentFingerprint
           || startFingerprint;
-        if (resultFingerprint) {
+        if (resultFingerprint && generatedRecommendation) {
+          result.recommendationPublication = {
+            fingerprint: resultFingerprint,
+            recommendation: generatedRecommendation,
+          };
+        }
+        if (deferRecommendationPublication !== true && resultFingerprint) {
           publishRecommendation(projectId, versionId, generatedRecommendation, resultFingerprint);
         }
       } catch {

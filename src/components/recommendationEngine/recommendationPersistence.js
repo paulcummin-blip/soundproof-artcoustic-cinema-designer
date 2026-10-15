@@ -21,7 +21,18 @@ import { readProjectAnalysisCacheRecord, invalidateProjectAnalysisCacheRead } fr
 const memoryByProject = new Map();
 const listeners = new Set();
 const persistenceWrites = new Map();
+// How many attempts the last write for a project+version needed. Read by the
+// optimiser run diagnostic instrumentation — never a claim about the record.
+const attemptsByProject = new Map();
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+/**
+ * How many attempts the most recent publication for this project+version took.
+ * 0 when nothing has been published yet. Diagnostic only.
+ */
+export function getPublicationAttempts(projectId, versionId) {
+  return attemptsByProject.get(`${projectId}::${versionId}`) || 0;
+}
 
 function notify() {
   listeners.forEach((l) => l());
@@ -54,7 +65,9 @@ export async function publishRecommendation(projectId, versionId, recommendation
 
   const previousWrite = persistenceWrites.get(key) || Promise.resolve();
   const write = previousWrite.catch(() => {}).then(async () => {
+    attemptsByProject.set(key, 0);
     for (let attempt = 0; attempt < 20; attempt += 1) {
+      attemptsByProject.set(key, attempt + 1);
       try {
         const record = await readProjectAnalysisCacheRecord(projectId, versionId, { force: true });
         const completedByFingerprint = record?.completed_by_fingerprint || {};

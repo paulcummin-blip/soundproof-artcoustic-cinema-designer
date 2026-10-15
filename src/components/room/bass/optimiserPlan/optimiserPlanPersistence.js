@@ -67,6 +67,12 @@ export function serializeOptimiserPlan(plan) {
     individualEffectsEvaluated: plan.individualEffectsEvaluated === true,
     leverDecisions: plan.leverDecisions || {},
     applied: plan.applied || {},
+    // Durable run timing instrumentation: when the run was started, when its
+    // verdict was ready, when it saved and published, and how many publication
+    // attempts that took. Read only inside the developer diagnostics level, and
+    // kept so a slow run can be diagnosed later instead of guessed at. Absent on
+    // records saved before this existed — those are never reinterpreted.
+    timings: plan.timings || null,
     notes: Array.isArray(plan.notes) ? plan.notes : [],
   };
 }
