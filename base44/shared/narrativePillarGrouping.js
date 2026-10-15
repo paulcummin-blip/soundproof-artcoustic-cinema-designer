@@ -232,6 +232,10 @@ function partOf(part, members) {
     vocabulary: [...part.vocabulary],
     notices: part.notices,
     supporting: Boolean(part.supporting),
+    // Whether this part's own result holds the whole-system headroom claim down: the
+    // layers that produce the headroom do; a supporting layer (the bass depth) is told
+    // and emphasised at its own earned level and never caps that claim.
+    caps_claim: part.caps_claim !== false,
     level,
     emphasis: excluded ? EVIDENCE_EMPHASIS.EXCLUDED : emphasis,
     values: present.map((member) => member.value).filter((value) => value != null),
@@ -385,28 +389,44 @@ export function buildClientStoryPillars({
     // Dynamic Range is read across the WHOLE system: the four bass parts, plus the
     // readings its screen channels and surrounds give the same story. The other
     // pillars are one story each, with no part list of their own.
-    const systemParts = pillarKey === PILLAR.DYNAMIC_RANGE
+    const systemPartsRead = pillarKey === PILLAR.DYNAMIC_RANGE
       ? DYNAMIC_RANGE_SYSTEM_PARTS.map((part) => partOf(part, members))
       : [];
-    const parts = pillarKey === PILLAR.DYNAMIC_RANGE ? BASS_PARTS.map((part) => partOf(part, members)) : [];
+    const partsRead = pillarKey === PILLAR.DYNAMIC_RANGE ? BASS_PARTS.map((part) => partOf(part, members)) : [];
     // HOW THE PILLAR OPENS. Dynamic Range opens on the client experience, at the
-    // strength its CARRYING results have earned: the screen channels, the surrounds,
-    // the low-frequency output and the bass depth. The levels scale the opening claim
-    // and decide which layer is emphasised — they never decide the sentence order, so
-    // the strongest result is never the opening line by right. A qualifier (the bass
-    // control) carries no claim of its own and is never read into the opening.
+    // strength its CLAIM-CARRYING layers have earned: the screen channels, the surrounds
+    // and the low-frequency output — the layers that carry the system's dynamic headroom.
+    // The levels scale the opening claim and decide which layer is emphasised; they never
+    // decide the sentence order, so the strongest result is never the opening line by
+    // right. The bass depth is a supporting layer (extension, not headroom) and the bass
+    // control qualifies the response: each is told and emphasised at its own earned level,
+    // and neither holds the headroom claim down.
     const opening = pillarKey === PILLAR.DYNAMIC_RANGE
       ? dynamicRangeOpening({
         carryingParts: [
-          ...systemParts
+          ...systemPartsRead
             .filter((part) => part.available)
-            .map((part) => ({ part: part.part, label: part.label, level: part.level })),
-          ...parts
+            .map((part) => ({ part: part.part, label: part.label, level: part.level, caps_claim: part.caps_claim })),
+          ...partsRead
             .filter((part) => !part.supporting && part.available)
-            .map((part) => ({ part: part.part, label: part.label, level: part.level })),
+            .map((part) => ({ part: part.part, label: part.label, level: part.level, caps_claim: part.caps_claim })),
         ],
       })
       : null;
+    // THE LAYER THE OPENING EMPHASISES IS TOLD. The results decide which part of the
+    // system the story leans on, and a story cannot lean on a layer it may not tell: where
+    // the system's strongest carrying result is a layer ASDR kept in the engineering
+    // evidence, that layer is told at the level its own result earned. A designer-silenced
+    // part is never told, and neither is one with no published result.
+    const emphasisedKeys = new Set(opening?.emphasis?.keys || []);
+    const toldAtEmphasis = (part) => (
+      emphasisedKeys.has(part.part) && part.available
+      && part.emphasis !== EVIDENCE_EMPHASIS.EXCLUDED && !part.told
+        ? { ...part, told: true }
+        : part
+    );
+    const systemParts = systemPartsRead.map(toldAtEmphasis);
+    const parts = partsRead.map(toldAtEmphasis);
     const clauses = [...new Set([
       ...systemParts.map((part) => part.clause).filter(Boolean),
       ...parts.map((part) => part.clause).filter(Boolean),

@@ -184,6 +184,12 @@ export const BASS_PARTS = Object.freeze([
     vocabulary: Object.freeze(['depth', 'scale', 'physical impact']),
     notices: 'the deepest moments have scale and physical weight rather than simply getting louder',
     allows_infrasonic: true,
+    // THE DEPTH READING NEVER CAPS THE WHOLE-SYSTEM CLAIM. How low the system reaches is
+    // a different dimension from how much dynamic headroom it has, so a depth result
+    // beneath the system's headroom is told and emphasised at its own earned level and
+    // never holds the Dynamic Range opening claim down. Read through
+    // narrativePillarGrouping.js by narrativeDynamicRangeOpening.js.
+    caps_claim: false,
   }),
   Object.freeze({
     part: 'control',

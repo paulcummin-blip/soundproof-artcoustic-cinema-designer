@@ -12,8 +12,9 @@
  * It proves, on real designs:
  *   - an absent / unassessed carrying result opens no generic performance claim;
  *   - the pillar opens on the client experience, never on a layer or a figure;
- *   - the opening claim is read at the WEAKEST carrying result, so it is honest for
- *     the whole system;
+ *   - the opening claim is read at the WEAKEST layer that carries the system's dynamic
+ *     headroom, so it is honest for the whole system, while the bass supports it at its
+ *     own earned level and never caps it;
  *   - a stronger contributor keeps the language its own result earned (no flattening);
  *   - ASDR still decides emphasis inside the story;
  *   - the brief still decides what the results mean for the project;
@@ -86,6 +87,16 @@ const dynamicOf = (project, intentOverride) => buildClientStoryPillars({
 const carryingOf = (dynamic) => [
   ...dynamic.system_parts.filter((part) => part.available).map((part) => ({ part: part.part, level: part.level })),
   ...dynamic.parts.filter((part) => part.available && !part.supporting).map((part) => ({ part: part.part, level: part.level })),
+];
+
+/** The layers that carry the system's headroom: the whole-system claim is read across these. */
+const cappingOf = (dynamic) => [
+  ...dynamic.system_parts
+    .filter((part) => part.available)
+    .map((part) => ({ part: part.part, level: part.level })),
+  ...dynamic.parts
+    .filter((part) => part.available && !part.supporting && part.caps_claim !== false)
+    .map((part) => ({ part: part.part, level: part.level })),
 ];
 
 const ranked = (list) => list.filter((entry) => levelRank(entry.level) != null);
@@ -180,14 +191,16 @@ test('the Dynamic Range story the real projects actually produce', () => {
     });
 
     check(`OPENING STRENGTH PROPORTIONATE (${project.key})`, () => {
-      const carrying = carryingOf(dynamic);
-      const weakest = weakestOf(carrying);
-      const strongest = rankOf(carrying);
-      assert.equal(dynamic.opening.strength_level, weakest.level, 'the claim is read at the weakest carrying result');
+      // HOW STRONG THE CLAIM MAY BE: read at the weakest layer that carries the system's
+      // headroom — the screen channels, the surrounds and the low-frequency output.
+      const weakest = weakestOf(cappingOf(dynamic));
+      // WHICH LAYER IS EMPHASISED: the strongest carrying result of the whole story,
+      // the bass depth included.
+      const strongest = rankOf(carryingOf(dynamic));
+      assert.equal(dynamic.opening.strength_level, weakest.level, 'the claim is read at the weakest headroom layer');
       assert.equal(dynamic.opening.tier, dynamicRangeOpeningTier(weakest.level)?.tier ?? null);
       assert.equal(dynamic.opening.strongest_level, strongest.level, 'emphasis follows the strongest carrying result');
       assert.equal(dynamic.opening.emphasis.level, strongest.level);
-      // The one system that reaches L4 everywhere is the one that opens exceptionally.
       assert.equal(dynamic.opening.tier === 'exceptional', weakest.level === 'L4');
       assert.equal(dynamic.opening.tier === 'strong', weakest.level === 'L3');
     });
@@ -230,7 +243,69 @@ test('the Dynamic Range story the real projects actually produce', () => {
       // A qualifier never becomes the lead.
       assert.equal(dynamic.lead_evidence.ids.includes('P19'), false);
     });
+
+    check(`EMPHASIS IS TELLABLE (${project.key})`, () => {
+      // THE LAYER THE STORY'S OWN EMPHASIS NAMES IS THE LAYER IT LEANS ON, so it is told
+      // at the level its own result earned: the emphasis and the telling never disagree.
+      const emphasised = new Set(dynamic.opening.emphasis.keys);
+      const named = [...dynamic.system_parts, ...dynamic.parts]
+        .filter((part) => emphasised.has(part.part) && part.available);
+      assert.ok(named.length > 0, 'the emphasis names a published layer');
+      for (const part of named) {
+        assert.equal(part.told, true, `${part.label} is emphasised, so it is told`);
+        assert.equal(part.clause, performancePhrase(AREA_OF.get(part.part), part.level),
+          `${part.label} is told in its own ${part.level} language`);
+      }
+    });
+
+    check(`BASS SUPPORTS THE CLAIM, NEVER CAPS IT (${project.key})`, () => {
+      // The depth result is told at its own earned level, so the bass can add underneath
+      // the peaks; it is never one of the layers the headroom claim is read at.
+      assert.equal(cappingOf(dynamic).some((part) => part.part === 'depth'), false,
+        'the depth result never holds the whole-system headroom claim down');
+      const depth = dynamic.parts.find((part) => part.part === 'depth');
+      if (depth?.available) {
+        assert.equal(depth.told, true, 'the depth result is told inside the story');
+        assert.equal(depth.clause, performancePhrase(AREA_OF.get('depth'), depth.level),
+          'the depth keeps the language its own result earned');
+      }
+    });
   }
+
+  /* ── 2b · THE HEADROOM LAYERS CARRY THE CLAIM IN BOTH DIRECTIONS ───────── */
+
+  const synthetic = (levels) => dynamicOf({
+    key: 'synthetic', name: 'Synthetic evidence', intent_expected: 'DEDICATED_CINEMA',
+    parameters: [12, 13, 14, 18].map((id) => ({ id, level: levels[id] ?? null, value: null })),
+  });
+
+  check('AN EXCEPTIONAL HEADROOM SYSTEM IS NOT CAPPED BY ITS DEPTH RESULT', () => {
+    // Marquee Home's Level 4 version: P12/P13/P14 all L4 with an L3 depth result. The
+    // headroom claim is exceptional, and the depth is told at its own earned level.
+    const dynamic = synthetic({ 12: 'L4', 13: 'L4', 14: 'L4', 18: 'L3' });
+    assert.equal(dynamic.opening.tier, 'exceptional');
+    assert.equal(dynamic.opening.strength_level, 'L4');
+    assert.equal(dynamic.opening.strongest_level, 'L4');
+    const depth = dynamic.parts.find((part) => part.part === 'depth');
+    assert.equal(depth.level, 'L3');
+    assert.equal(depth.clause, performancePhrase(AREA_OF.get('depth'), 'L3'), 'the depth keeps its own wording');
+  });
+
+  check('A DEEP BASS NEVER ESCALATES A MODEST FRONT STAGE', () => {
+    const dynamic = synthetic({ 12: 'L1', 13: 'L1', 14: 'L1', 18: 'L4' });
+    assert.equal(dynamic.opening.tier, 'standard');
+    assert.equal(dynamic.opening.strongest_level, 'L4');
+    assert.deepEqual(dynamic.opening.emphasis.parts, ['bass depth'], 'the strong bass is emphasised, never the opening');
+  });
+
+  check('NO HEADROOM LAYER, NO WHOLE-SYSTEM CLAIM', () => {
+    // Only the depth is published: there is no headroom layer to carry a whole-system
+    // claim, so none is opened.
+    const dynamic = synthetic({ 18: 'L4' });
+    assert.equal(dynamic.opening.tier, null);
+    assert.equal(dynamic.opening.claim, null);
+    assert.match(dynamic.opening.emphasis.wording, /open on what the evidence genuinely supports/);
+  });
 
   /* ── 3 · THE BRIEF STILL DECIDES WHAT THE RESULTS MEAN ─────────────────── */
   check('BRIEF CONTEXT PRESERVED', () => {

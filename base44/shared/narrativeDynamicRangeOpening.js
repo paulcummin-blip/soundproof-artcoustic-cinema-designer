@@ -5,11 +5,17 @@
  *
  * The pillar opens with ONE whole-system statement of what the system does as the
  * soundtrack moves from quiet detail to a major peak, and only then is that statement
- * supported by the system's own evidence. The claim's STRENGTH is read at the WEAKEST
- * carrying result — a whole-system statement is only as strong as the least capable
- * part of the system that carries it — so an L4 bass behind an L1 front stage never
- * opens with an exceptional claim, and the emphasis is read at the STRONGEST carrying
- * result, so the layer that earned the most is the one given it inside the story.
+ * supported by the system's own evidence.
+ *
+ * THE CLAIM IS READ ACROSS THE LAYERS THAT CARRY DYNAMIC HEADROOM — the screen channels,
+ * the surrounds and the low-frequency output — at the WEAKEST of them, so a whole-system
+ * statement is never stronger than the least capable layer that carries it. The bass
+ * depth and the bass control are SUPPORTING LAYERS: how low the system reaches is a
+ * different dimension from how much headroom it has, and the control reading qualifies
+ * how the response behaves, so each is told and emphasised at the level its own result
+ * earned and neither holds the headroom claim down. EMPHASIS is read at the STRONGEST
+ * carrying result of the whole story, including a strong bass depth, so the layer that
+ * earned the most is the one given it inside the story.
  *
  * THE LEVELS DECIDE HOW STRONG THE CLAIM MAY BE AND WHICH LAYER IS EMPHASISED. They
  * never decide the sentence order: the highest-level result is never the opening
@@ -65,7 +71,7 @@ export const DYNAMIC_RANGE_EVIDENCE_ORDER = Object.freeze([
   'the bass control',
 ]);
 
-export const DYNAMIC_RANGE_OPENING_RULE = `DYNAMIC RANGE OPENS ON THE CLIENT EXPERIENCE, NEVER ON A RESULT. The pillar opens with ONE whole-system statement of what the system does as the soundtrack moves from quiet detail to a major peak — the consequence the client hears — and only then is that statement supported by the system's own evidence: the screen-channel capability, the surround capability, the low-frequency output, the bass depth and the bass control, woven into the story as they naturally arise rather than listed one after another. The opening is read from Dynamic Range's own opening claim, at the strength the system's carrying results have earned. THE RESULT LEVELS DECIDE HOW STRONG THAT CLAIM MAY BE — a whole-system claim is only as strong as the least capable part of the system that carries it — AND WHICH LAYER IS EMPHASISED; THEY NEVER DECIDE THE SENTENCE ORDER. The highest-level result never automatically becomes the opening sentence, the bass never opens the pillar by default, and the front stage never opens it by default: where one layer carries the strongest result, it is given the greatest EMPHASIS inside the story rather than the first sentence by right. Where the system is modest for its brief, the opening says so positively, in the language that brief supports.`;
+export const DYNAMIC_RANGE_OPENING_RULE = `DYNAMIC RANGE OPENS ON THE CLIENT EXPERIENCE, NEVER ON A RESULT. The pillar opens with ONE whole-system statement of what the system does as the soundtrack moves from quiet detail to a major peak — the consequence the client hears — and only then is that statement supported by the system's own evidence: the screen-channel capability, the surround capability, the low-frequency output, the bass depth and the bass control, woven into the story as they naturally arise rather than listed one after another. The opening is read from Dynamic Range's own opening claim, at the strength the system's carrying results have earned. THE RESULT LEVELS DECIDE HOW STRONG THAT CLAIM MAY BE AND WHICH LAYER IS EMPHASISED; THEY NEVER DECIDE THE SENTENCE ORDER. The whole-system claim is a claim about the system's dynamic headroom, so it is read at the WEAKEST of the layers that carry that headroom — the screen channels, the surrounds and the low-frequency output: a whole-system claim is only as strong as the least capable part of the system that carries it, and no single strong layer escalates it. The bass depth and the bass control are TOLD AND EMPHASISED AT THE LEVEL THEIR OWN RESULTS EARNED, and they never hold the headroom claim down. The highest-level result never automatically becomes the opening sentence, the bass never opens the pillar by default, and the front stage never opens it by default: where one layer carries the strongest result, it is given the greatest EMPHASIS inside the story rather than the first sentence by right. Where the system is modest for its brief, the opening says so positively, in the language that brief supports.`;
 
 /**
  * THE SUPPORTING EVIDENCE IS WOVEN IN, NEVER LISTED MECHANICALLY. The system parts and
@@ -90,10 +96,12 @@ export function dynamicRangeOpeningTier(level) {
  * HOW ONE DYNAMIC RANGE STORY OPENS, from the system's own carrying results.
  *
  * @param {Object} input
- * @param {Array<{part: string, label?: string, level: string|null}>} [input.carryingParts]
+ * @param {Array<{part: string, label?: string, level: string|null, caps_claim?: boolean}>} [input.carryingParts]
  *   the readings that give the story its strength: the screen channels, the surrounds,
- *   the low-frequency output and the bass depth. A qualifier (the bass control) carries
- *   no claim of its own and is never read here.
+ *   the low-frequency output and the bass depth. A part given `caps_claim: false` is told
+ *   and emphasised at its own earned level but never holds the whole-system headroom
+ *   claim down — the bass depth, whose result is extension rather than headroom. A
+ *   qualifier (the bass control) carries no claim of its own and is never read here.
  * @returns {{tier: string|null, claim: string|null, strength_level: string|null,
  *   strongest_level: string|null, read_from: string, emphasis: Object, evidence_order: Array<string>,
  *   rule: string, weave_rule: string}}
@@ -105,15 +113,25 @@ export function dynamicRangeOpening({ carryingParts = [] } = {}) {
       part: part.part,
       label: part.label || part.part,
       level: String(part.level).toUpperCase(),
+      // THE CLAIM-CARRYING LAYERS. The whole-system claim is a claim about DYNAMIC
+      // HEADROOM, and only the layers that produce that headroom hold it down: the
+      // screen channels, the surrounds and the low-frequency output. The bass depth is
+      // the system's EXTENSION and the bass control qualifies how the response behaves,
+      // so each is told and emphasised at its own earned level and neither caps the
+      // headroom claim: an L4 headroom system with an L3 depth result still opens
+      // exceptionally, and a deep bass behind a modest front stage never escalates it.
+      caps_claim: part.caps_claim !== false,
     }));
   const strongest = list.reduce((acc, part) => (
     acc == null || (levelRank(part.level) ?? 0) > (levelRank(acc.level) ?? 0) ? part : acc
   ), null);
   // HOW STRONG THE CLAIM MAY BE. A whole-system statement is only as strong as the
   // least capable part of the system that carries it, so the opening is read at the
-  // WEAKEST carrying result — never at the best one. A system with an L4 bass behind
-  // an L1 front stage does not open with an exceptional whole-system claim.
-  const weakest = list.reduce((acc, part) => (
+  // WEAKEST CLAIM-CARRYING layer — never at the best one. Where none of those layers is
+  // published there is no whole-system headroom claim to make at all: the pillar is then
+  // opened from the evidence it genuinely holds rather than from the bass depth alone.
+  const capping = list.filter((part) => part.caps_claim);
+  const weakest = capping.reduce((acc, part) => (
     acc == null || (levelRank(part.level) ?? 99) < (levelRank(acc.level) ?? 99) ? part : acc
   ), null);
   const level = strongest?.level ?? null;
@@ -129,13 +147,16 @@ export function dynamicRangeOpening({ carryingParts = [] } = {}) {
     // The strength the claim is read at, and the strongest carrying result beneath it.
     strength_level: strengthLevel,
     strongest_level: level,
-    read_from: 'the WEAKEST carrying result across the screen channels, the surrounds, the low-frequency output and the bass depth, with the strongest of them emphasised',
-    // WHICH LAYER IS EMPHASISED, never which sentence comes first.
+    read_from: 'the WEAKEST claim-carrying layer across the screen channels, the surrounds and the low-frequency output — the layers that carry the system\'s dynamic headroom — with the strongest carrying result of the whole story emphasised',
+    // WHICH LAYER IS EMPHASISED, never which sentence comes first. Every carrying part
+    // is read here, so a strong bass depth is emphasised inside the story even though
+    // it never caps the claim.
     emphasis: {
       level,
       parts: labels,
-      wording: level == null
-        ? 'No carrying result is published: open on what the evidence genuinely supports, briefly and honestly.'
+      keys: carriers.map((part) => part.part),
+      wording: tier == null
+        ? 'No whole-system carrying result is published: open on what the evidence genuinely supports, briefly and honestly.'
         : shared
           ? 'The strongest carrying result is shared across every part of the system that carries one, so no single layer dominates the telling: the opening claim is the whole system\'s.'
           : `Give ${labels.join(' and ')} the strongest emphasis inside the story, because ${labels.length > 1 ? 'they carry' : 'it carries'} the system's strongest carrying result — as emphasis, never as the opening sentence.`,
