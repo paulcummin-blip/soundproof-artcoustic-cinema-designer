@@ -24,6 +24,7 @@
 
 import React from 'react';
 import { AlertTriangle, CheckCircle2 } from 'lucide-react';
+import { approvalCountSentence } from '@/components/proposal/editor/sectionApprovalPresentation';
 import {
   REPORT_FONT_BODY as FONT_BODY,
   REPORT_FONT_HEADING as FONT_HEADING,
@@ -65,12 +66,25 @@ function Line({ label, ok, children }) {
   );
 }
 
-export default function ProposalCopyReviewSummary({ review = null, style = null }) {
+export default function ProposalCopyReviewSummary({ review = null, approval = null, style = null }) {
   if (!review?.checked) return null;
 
   const awaiting = review.copy?.awaiting || 0;
   const evidenceBlockers = review.evidence?.blockers || [];
   const evidencePassed = review.evidence?.passed !== false;
+
+  // The copy line is the designer's own approval count wherever the document has
+  // generated copy to approve: how many sections they have actually read and
+  // approved, out of the sections that carry generated wording. Where there is
+  // nothing generated to approve, the line falls back to what the document check
+  // already reported.
+  const approvalSentence = approvalCountSentence(approval);
+  const copyOk = approval ? approval.all_approved === true : awaiting === 0;
+  const copyLine = approval
+    ? (approvalSentence || 'All copy approved')
+    : (awaiting === 0
+      ? 'All copy approved'
+      : `${awaiting} ${awaiting === 1 ? 'section' : 'sections'} awaiting approval`);
 
   return (
     <div
@@ -89,10 +103,8 @@ export default function ProposalCopyReviewSummary({ review = null, style = null 
           : (evidenceBlockers[0] || 'This document’s saved evidence could not be checked.')}
       </Line>
 
-      <Line label="Copy Review" ok={awaiting === 0}>
-        {awaiting === 0
-          ? 'All copy approved'
-          : `${awaiting} ${awaiting === 1 ? 'section' : 'sections'} awaiting approval`}
+      <Line label="Copy Review" ok={copyOk}>
+        {copyLine}
       </Line>
     </div>
   );

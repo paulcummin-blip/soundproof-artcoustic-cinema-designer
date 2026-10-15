@@ -47,14 +47,17 @@ import { resolveCoverAsset, resolvePackImages } from '@/components/library/image
 import { buildVersionNameMap } from '@/components/library/libraryVersionLabels';
 import { resolveReportFilenameDetails, logReportExportIdentity } from '@/components/report/reportFilenameIdentity';
 import { proposalReportTypeToken } from '@/components/report/reportPdfTitle';
-import { Loader2, Archive, RotateCcw } from 'lucide-react';
+import { Loader2 } from 'lucide-react';
 import ProposalEditorState from '@/components/proposal/editor/ProposalEditorState';
 import ProposalRenderBoundary from '@/components/proposal/editor/ProposalRenderBoundary';
 import ProposalGenerationPanel from '@/components/proposal/generation/ProposalGenerationPanel';
 import ProposalReviewRequiredDialog from '@/components/proposal/editor/ProposalReviewRequiredDialog';
 import ProposalSectionSidebar from '@/components/proposal/editor/ProposalSectionSidebar';
+import ProposalEditorNotices from '@/components/proposal/editor/ProposalEditorNotices';
 import ProposalClientBriefPanel from '@/components/proposal/editor/ProposalClientBriefPanel';
 import useProposalReviewGate from '@/components/proposal/editor/useProposalReviewGate';
+import ProposalApprovalRequiredDialog from '@/components/proposal/editor/ProposalApprovalRequiredDialog';
+import useProposalApproval from '@/components/proposal/editor/useProposalApproval';
 import { validatedOptionsCopy } from '@/components/proposal/options/validatedOptionsCopy';
 import {
   PROPOSAL_EDITOR_STATE,
@@ -99,6 +102,22 @@ export default function ProposalEditor() {
   // evidence check and the copy review — are read from one authority. The layer is
   // re-read after every saved section edit, so the count is never stale.
   const copyReview = currentDocumentLayer?.review || null;
+
+  // ── Human approval of the generated copy ──
+  // A separate answer from the evidence check, and deliberately so: a document can
+  // pass every check and still not be fit to send, because nobody has read the
+  // generated wording of each section. Which sections those are, and whether an
+  // approval still matches the wording it was given for, is resolved on the server
+  // (base44/shared/proposalApproval/sectionApprovalAuthority.js) — the editor reads
+  // that state and renders it, and holds no rule of its own.
+  const {
+    approval,
+    approvalByType,
+    approvalBlockReason,
+    approveSection: handleApproveSection,
+    approvingSectionId,
+    refreshSignal: layerRefreshSignal,
+  } = useProposalApproval({ proposal, layer: currentDocumentLayer });
   // The publication assembly: the server's ordered, prepared sections. The local
   // fallback is ordered by the SAME authority, so the continuous Editor and the
   // printed PDF always read one document sequence.
@@ -781,6 +800,12 @@ export default function ProposalEditor() {
     // The copy layer's own editorial block, which is an ISSUE gate: it withholds
     // the issued document and never the read-only preview of it.
     issueBlockReason: editLayerBlockReason,
+    // The approval rule, as an issue gate of its own: no PDF is created before
+    // every generated section has been read and approved. It withholds the issued
+    // export only — previewing the document while it is under review is what the
+    // preview is for — and the export click is routed to the approval dialog
+    // before it ever reaches here.
+    approvalBlockReason,
     projectName: projectContext.projectName,
     dealerName: projectContext.filenameDealerName,
     clientName: projectContext.filenameClientName,
@@ -811,11 +836,18 @@ export default function ProposalEditor() {
   // behind the review.
   const {
     showDialog: showReviewDialog,
+    showApprovalDialog,
     requestExport: handleExportClick,
     reviewFirstSection: handleReviewCopy,
+    reviewNextApproval,
     dismiss: dismissReviewDialog,
+    dismissApproval: dismissApprovalDialog,
   } = useProposalReviewGate({
     review: copyReview,
+    // The approval rule is asked first: a document whose generated sections have
+    // not all been approved is not issuable, and the way forward is to read the
+    // next one rather than to argue with the evidence check.
+    approval,
     sections,
     onExport: handleExport,
     setActiveSectionKey,
@@ -863,7 +895,6 @@ export default function ProposalEditor() {
   });
 
   const typeLabel = getProposalTypeLabel(proposal?.proposal_type);
-  const hasUnsavedChanges = dirtySections.size > 0;
 
   return (
     <ProposalRenderBoundary onReturn={goToProposalCentre}>
@@ -880,6 +911,7 @@ export default function ProposalEditor() {
         onPreview={handlePreview}
         blockedReason={comparisonBlockReason || exportBlockedReason || (copyReview ? null : editLayerBlockReason)}
         review={copyReview}
+        approval={approval}
         error={exportError}
         retryable={exportRetryable}
         errorDetail={exportErrorDetail}
@@ -890,6 +922,14 @@ export default function ProposalEditor() {
         review={copyReview}
         onReviewCopy={handleReviewCopy}
         onCancel={dismissReviewDialog}
+      />
+
+      {/* The approval rule, stated on the click that tried to issue the document */}
+      <ProposalApprovalRequiredDialog
+        open={showApprovalDialog}
+        approval={approval}
+        onReviewNext={reviewNextApproval}
+        onCancel={dismissApprovalDialog}
       />
 
       <div className="flex flex-1 min-h-0 overflow-hidden">
@@ -904,6 +944,7 @@ export default function ProposalEditor() {
         onReorder={handleReorder}
         readOnly={archived}
         proposalType={proposal?.proposal_type}
+        approvalByType={approvalByType}
       />
 
       {/* ── Centre: The document ── */}
@@ -920,49 +961,21 @@ export default function ProposalEditor() {
           onBlockedReasonChange={setEditLayerBlockReason}
           onLayerChange={setDocumentLayer}
           documentRevision={JSON.stringify(sections.map(section => [section.id, section.body, section.is_enabled, section.order_index, section.dealer_notes]))}
+          refreshSignal={layerRefreshSignal}
         />
         {/* Proposal typography scope — cover, section headings and body copy
             follow the Artcoustic rule: Futura PT Light headings, Didact Gothic
             body, Century Gothic fallback. */}
         <ProposalTypographyStyles />
         <div className="proposal-preview max-w-3xl mx-auto px-12 py-16">
-          {contextNotice && (
-            <div className="mb-4 text-xs text-[#7A6640] flex items-start gap-1.5">
-              <span className="w-1.5 h-1.5 rounded-full bg-[#A79E8C] mt-1" />
-              {contextNotice}
-            </div>
-          )}
-          {archived && (
-            <div className="mb-8 rounded-lg border border-[#A79E8C] bg-[#F5F4F0] px-6 py-4 flex items-center justify-between">
-              <div>
-                <div className="flex items-center gap-2 text-sm font-semibold text-[#625143]" style={{ fontFamily: 'Didact Gothic, sans-serif' }}>
-                  <Archive className="w-4 h-4" />
-                  Archived proposal — restore to edit.
-                </div>
-                <p className="text-xs text-[#8A8477] mt-1">This proposal is read-only. Restore it to make changes.</p>
-              </div>
-              <button
-                onClick={handleRestore}
-                disabled={restoring}
-                className="flex items-center gap-1.5 px-4 py-2 text-xs uppercase tracking-[0.14em] text-white disabled:opacity-40 transition-colors hover:bg-[#3E4349]"
-                style={{ backgroundColor: '#213428', fontFamily: 'Didact Gothic, sans-serif' }}
-              >
-                <RotateCcw className="w-3.5 h-3.5" />
-                {restoring ? 'Restoring…' : 'Restore'}
-              </button>
-            </div>
-          )}
-          {editingSectionId && !archived ? (
-            <div className="mb-4 text-xs text-[#213428] flex items-center gap-1.5">
-              <span className="w-1.5 h-1.5 rounded-full bg-[#213428]" />
-              Manual edit in progress — Save commits this section, Cancel restores the previous text.
-            </div>
-          ) : hasUnsavedChanges && !archived && (
-            <div className="mb-4 text-xs text-amber-700 flex items-center gap-1.5">
-              <span className="w-1.5 h-1.5 rounded-full bg-amber-500" />
-              Unsaved changes — {dirtySections.size} {dirtySections.size === 1 ? 'section' : 'sections'} pending. Do not close this tab until saved.
-            </div>
-          )}
+          <ProposalEditorNotices
+            contextNotice={contextNotice}
+            archived={archived}
+            restoring={restoring}
+            onRestore={handleRestore}
+            manualEditInProgress={Boolean(editingSectionId)}
+            unsavedSectionCount={dirtySections.size}
+          />
           {visibleSections.map((section) => {
             const def = getSectionDef(section.section_type);
             if (!def) return null;
@@ -1068,6 +1081,12 @@ export default function ProposalEditor() {
                       onStartEdit={() => handleStartEdit(section)}
                       onSaveEdit={() => handleSaveEdit(section)}
                       onCancelEdit={() => handleCancelEdit(section)}
+                      // The approval of THIS section's generated wording, and the
+                      // one action that gives it. Null for a section that carries
+                      // nothing to approve.
+                      approvalStatus={approvalByType?.[section.section_type] || null}
+                      isApproving={approvingSectionId === section.id}
+                      onApprove={() => handleApproveSection(section)}
                     />
                   </div>
                 )}

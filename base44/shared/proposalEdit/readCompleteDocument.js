@@ -22,8 +22,13 @@ export async function readCompleteDocument(entities, proposal, history = {}) {
   ]);
   const ids = proposal.selected_version_ids?.length ? proposal.selected_version_ids : [proposal.version_id].filter(Boolean);
   const eligible = assets.filter(asset => asset.scope !== 'version' || ids.includes(asset.version_id));
-  return validateCompleteDocument({ proposal, sections, generationRecords, editRecords,
+  const validation = validateCompleteDocument({ proposal, sections, generationRecords, editRecords,
     optionGuidance: buildOptionGuidance(eligible), privateNotes: eligible.map(asset => asset.comparison_note),
     publishedAssetText: eligible.filter(asset => asset.usage !== 'do_not_use' && asset.proposal_importance !== 'Do Not Use')
       .flatMap(asset => [asset.caption, asset.comparison_option_label, asset.comparison_group]) });
+  // The stored rows travel with the validation. Whether a section's approval still
+  // counts is judged against BOTH the wording the document publishes and the wording
+  // the editor shows, and only the stored record carries the second of those — so
+  // the approval authority is given it here rather than re-reading the rows.
+  return { ...validation, sections };
 }

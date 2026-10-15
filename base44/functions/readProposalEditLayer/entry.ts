@@ -3,6 +3,7 @@ import { resolveAccountAccess } from '../../shared/accountAccessAuthority.js';
 import { resolveEditorLayer } from '../../shared/proposalEdit/proposalEditEditorModel.js';
 import { resolveProposalReview } from '../../shared/proposalEdit/proposalReviewAuthority.js';
 import { readCompleteDocument, readProposalRecords } from '../../shared/proposalEdit/readCompleteDocument.js';
+import { resolveSectionApproval } from '../../shared/proposalApproval/sectionApprovalAuthority.js';
 import { authorizeProposalExport } from '../../shared/proposalEdit/proposalExportAuthorization.js';
 import { GPT_WRITER_FLAG_FIELD, gptWriterClientState, resolveGptWriterFlag } from '../../shared/proposalWriter/proposalWriterFlag.js';
 
@@ -72,6 +73,19 @@ export default async function(req) {
       const proposal = await base44.entities.Proposal.get(proposal_id);
       if (!proposal) return Response.json({ error: 'Proposal not found.' }, { status: 404 });
       const documentValidation = await readCompleteDocument(base44.entities, proposal, { generationRecords, editRecords });
+      // The HUMAN approval state, resolved from the same document check: which
+      // sections the client reads generated narrative in, and whether each one's
+      // approval still matches the wording it was given for. It is a separate
+      // answer from the evidence check on purpose — a document can pass every
+      // check and still be unapproved — and the stored rows it was resolved from
+      // are not sent to the editor: the editor is given the state, not a second
+      // copy of every body.
+      const approval = resolveSectionApproval({
+        sections: documentValidation.sections || [],
+        publishedSections: documentValidation.document_sections || [],
+      });
+      delete documentValidation.sections;
+      layer.approval = approval;
       layer.document_validation = documentValidation;
       // What still needs a human, classified for the editor: the document's own
       // integrity (the evidence check) apart from the generated copy awaiting
@@ -85,7 +99,10 @@ export default async function(req) {
       layer.export_blocked_reason = documentValidation.blocked_reason;
       layer.status_label = documentValidation.valid ? 'Ready to issue' : 'Needs review';
       if (body.action === 'export') {
-        const authorization = authorizeProposalExport({ validation: documentValidation, proposal, request: body, copy: layer.export_sections });
+        // Enforcement of the approval rule, server-side, where no client can skip
+        // it: nothing carrying the generated copy is issued before a person has
+        // approved every section that carries it.
+        const authorization = authorizeProposalExport({ validation: documentValidation, proposal, request: body, copy: layer.export_sections, approval });
         if (!authorization.allowed) return Response.json({ error: authorization.reason }, { status: 409 });
       }
     }

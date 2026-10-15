@@ -75,7 +75,7 @@ const TOGGLE = {
   cursor: 'pointer',
 };
 
-export default function ProposalGenerationPanel({ proposal, readOnly = false, onBlockedReasonChange, onLayerChange, documentRevision = '' }) {
+export default function ProposalGenerationPanel({ proposal, readOnly = false, onBlockedReasonChange, onLayerChange, documentRevision = '', refreshSignal = 0 }) {
   const {
     layer,
     writer,
@@ -111,6 +111,16 @@ export default function ProposalGenerationPanel({ proposal, readOnly = false, on
     previousRevision.current = documentRevision;
     refresh();
   }, [documentRevision, refresh]);
+
+  // Approving a section writes that section's own record, not the sections the
+  // editor holds: the workspace asks for a re-read here rather than the panel
+  // guessing what an approval changed.
+  const previousRefreshSignal = React.useRef(refreshSignal);
+  useEffect(() => {
+    if (previousRefreshSignal.current === refreshSignal) return;
+    previousRefreshSignal.current = refreshSignal;
+    refresh();
+  }, [refreshSignal, refresh]);
 
   useEffect(() => {
     if (typeof onBlockedReasonChange === 'function') onBlockedReasonChange(blockReason);

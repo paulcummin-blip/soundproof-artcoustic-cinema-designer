@@ -37,6 +37,10 @@ export default function ProposalSectionSidebar({
   onReorder,
   readOnly = false,
   proposalType = null,
+  // section_type → approval status, for the sections that carry generated copy.
+  // The section list shows it beside each one so what still needs reading is
+  // obvious without opening anything.
+  approvalByType = null,
 }) {
   return (
     <div className="w-56 border-r border-[#DCDBD6] bg-white flex flex-col overflow-hidden">
@@ -70,6 +74,7 @@ export default function ProposalSectionSidebar({
           onReorder={onReorder}
           readOnly={readOnly}
           proposalType={proposalType}
+          approvalByType={approvalByType}
         />
       </div>
     </div>

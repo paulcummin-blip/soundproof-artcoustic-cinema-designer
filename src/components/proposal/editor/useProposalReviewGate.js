@@ -28,19 +28,36 @@
 
 import { useCallback, useState } from 'react';
 
-export default function useProposalReviewGate({ review = null, sections = [], onExport, setActiveSectionKey }) {
+export default function useProposalReviewGate({
+  review = null,
+  // The human approval state of the generated sections. It is asked FIRST, before
+  // the copy layer's own review items: the product rule is that no PDF is created
+  // until every generated section has been read and approved, so that is the block
+  // a click on Export has to name, with the way to the next unapproved section.
+  approval = null,
+  sections = [],
+  onExport,
+  setActiveSectionKey,
+}) {
   const [showDialog, setShowDialog] = useState(false);
+  const [showApprovalDialog, setShowApprovalDialog] = useState(false);
   const awaiting = review?.copy?.awaiting || 0;
+  const approvalPending = approval && approval.all_approved !== true ? approval : null;
 
   const requestExport = useCallback(() => {
+    if (approvalPending) {
+      setShowApprovalDialog(true);
+      return;
+    }
     if (awaiting > 0) {
       setShowDialog(true);
       return;
     }
     onExport?.();
-  }, [awaiting, onExport]);
+  }, [approvalPending, awaiting, onExport]);
 
   const dismiss = useCallback(() => setShowDialog(false), []);
+  const dismissApproval = useCallback(() => setShowApprovalDialog(false), []);
 
   /**
    * Take the designer to the first section that still needs approval: the one
@@ -48,23 +65,49 @@ export default function useProposalReviewGate({ review = null, sections = [], on
    * resolved in document order. Where a block names no single section, the dialog
    * has nothing to open and simply closes.
    */
-  const reviewFirstSection = useCallback(() => {
-    setShowDialog(false);
-    const target = (review?.copy?.items || []).find((item) => item.target_section_type);
-    const section = target && (sections || []).find((row) => row.section_type === target.target_section_type);
+  /**
+   * Open one section of the document: activate it, then bring it into view. One
+   * settled frame, so the section the click activated is the one that is scrolled
+   * to rather than the one that was active before it.
+   */
+  const activateSection = useCallback((sectionType) => {
+    const section = (sections || []).find((row) => row.section_type === sectionType);
     if (!section) return;
     setActiveSectionKey?.(section.section_key);
     const scroll = () => document
-      .querySelector(`[data-proposal-section="${target.target_section_type}"]`)
+      .querySelector(`[data-proposal-section="${sectionType}"]`)
       ?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-    // One settled frame, so the section the click activated is the one brought
-    // into view rather than the one that was active before it.
     if (typeof window !== 'undefined' && typeof window.requestAnimationFrame === 'function') {
       window.requestAnimationFrame(scroll);
     } else {
       scroll();
     }
-  }, [review, sections, setActiveSectionKey]);
+  }, [sections, setActiveSectionKey]);
 
-  return { awaiting, showDialog, requestExport, reviewFirstSection, dismiss };
+  const reviewFirstSection = useCallback(() => {
+    setShowDialog(false);
+    const target = (review?.copy?.items || []).find((item) => item.target_section_type);
+    if (target) activateSection(target.target_section_type);
+  }, [review, activateSection]);
+
+  /**
+   * Take the designer to the first section that still needs approval, in document
+   * order — the first one they would meet reading the proposal.
+   */
+  const reviewNextApproval = useCallback(() => {
+    setShowApprovalDialog(false);
+    const next = (approval?.awaiting || []).find((row) => row.section_type);
+    if (next) activateSection(next.section_type);
+  }, [approval, activateSection]);
+
+  return {
+    awaiting,
+    showDialog,
+    showApprovalDialog,
+    requestExport,
+    reviewFirstSection,
+    reviewNextApproval,
+    dismiss,
+    dismissApproval,
+  };
 }

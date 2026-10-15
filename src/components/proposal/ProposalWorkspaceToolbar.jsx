@@ -46,6 +46,10 @@ export default function ProposalWorkspaceToolbar({
   // shown as its own status so unapproved wording is never read as an engineering
   // fault, and it is what tells the designer why an export click was stopped.
   review = null,
+  // The human approval state of the document's generated sections, resolved with
+  // the copy layer. It is what the copy line reports — how many sections a person
+  // has read and approved — and it is a different answer from the evidence check.
+  approval = null,
   error,
   // A preparation failure the designer can simply retry: it restarts the whole
   // print preparation from the start, without reloading the app.
@@ -123,7 +127,7 @@ export default function ProposalWorkspaceToolbar({
 
       {review && (
         <div className="px-6 pb-3">
-          <ProposalCopyReviewSummary review={review} />
+          <ProposalCopyReviewSummary review={review} approval={approval} />
         </div>
       )}
 

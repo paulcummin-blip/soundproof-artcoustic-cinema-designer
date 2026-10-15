@@ -107,6 +107,10 @@ function stripHtml(value) {
  * @param {string|null} [options.issueBlockReason] — the copy layer's own editorial
  *   block: the copy still needs review, so the document may not be issued. It
  *   withholds the EXPORT only.
+ * @param {string|null} [options.approvalBlockReason] — the human approval rule:
+ *   generated sections that no one has approved yet. Also an issue gate, and so
+ *   also withheld from the EXPORT alone — previewing under review is what the
+ *   preview is for.
  * @returns {string|null} a blocking reason, or null when this mode may proceed
  */
 export function resolveProposalExportReadiness({
@@ -114,13 +118,15 @@ export function resolveProposalExportReadiness({
   sections,
   comparisonBlockReason = null,
   issueBlockReason = null,
+  approvalBlockReason = null,
   mode = EXPORT_MODE,
 }) {
-  // The issue gate is an export requirement and nothing else: a preview exists so
+  // The issue gates are export requirements and nothing else: a preview exists so
   // the designer can inspect the document before it is fit to issue, so a genuine
   // editorial problem is a warning on that document rather than a reason to
   // withhold it.
   if (requiresIssueGate(mode) && issueBlockReason) return issueBlockReason;
+  if (requiresIssueGate(mode) && approvalBlockReason) return approvalBlockReason;
   if (comparisonBlockReason) return comparisonBlockReason;
   if (!proposal) {
     return 'This proposal could not be loaded. Reopen it from the Proposal Centre and try again.';
@@ -166,6 +172,10 @@ export function useProposalExport({
   // The copy layer's own editorial block. It withholds the issued export, and
   // never the read-only preview.
   issueBlockReason = null,
+  // The human approval rule: generated sections nobody has approved yet. It is an
+  // issue gate too — the PDF may not be created before every generated section has
+  // been read and approved — and so it never withholds the read-only preview.
+  approvalBlockReason = null,
   projectName,
   // Optional filename segments: the shared helper omits them when unavailable.
   dealerName = null,
@@ -248,7 +258,7 @@ export function useProposalExport({
   const runPrint = useCallback(async (mode = EXPORT_MODE) => {
     if (printingRef.current) return;
 
-    const reason = resolveProposalExportReadiness({ proposal, sections, comparisonBlockReason, issueBlockReason, mode });
+    const reason = resolveProposalExportReadiness({ proposal, sections, comparisonBlockReason, issueBlockReason, approvalBlockReason, mode });
     if (reason) {
       setBlockedReason(reason);
       setError(null);
@@ -492,7 +502,7 @@ export function useProposalExport({
       setRetryable(notReady);
       cleanup(printWindow);
     }
-  }, [proposal, sections, comparisonBlockReason, issueBlockReason, projectName, dealerName, clientName, projectReference, versionNames, issuedDocument, resolveExportIdentity, cleanup]);
+  }, [proposal, sections, comparisonBlockReason, issueBlockReason, approvalBlockReason, projectName, dealerName, clientName, projectReference, versionNames, issuedDocument, resolveExportIdentity, cleanup]);
 
   // The two entry points. Both prepare and print the SAME document; only the
   // issued export stores the composition it printed.

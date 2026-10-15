@@ -1,6 +1,11 @@
 import React, { useState } from 'react';
 import { Eye, EyeOff, GripVertical } from 'lucide-react';
 import { getSectionDef, getSectionLabel } from '@/components/proposal/proposalSections';
+import {
+  APPROVAL_STATUS,
+  approvalLabel,
+  approvalMarker,
+} from '@/components/proposal/editor/sectionApprovalPresentation';
 
 /**
  * Left navigation panel for the Proposal Editor.
@@ -13,8 +18,12 @@ import { getSectionDef, getSectionLabel } from '@/components/proposal/proposalSe
  * - onToggleVisibility: (section_id) => void
  * - onReorder: (reorderedSections) => void
  * - readOnly: boolean
+ * - approvalByType: { [section_type]: 'approved' | 'needs_review' } for the
+ *   sections that carry generated copy, shown beside each one so what still has
+ *   to be read is obvious from the list. Sections with nothing to approve show
+ *   no state at all.
  */
-export default function ProposalSectionNav({ sections, activeSectionKey, onSelect, onToggleVisibility, onReorder, readOnly = false, proposalType = null }) {
+export default function ProposalSectionNav({ sections, activeSectionKey, onSelect, onToggleVisibility, onReorder, readOnly = false, proposalType = null, approvalByType = null }) {
   const sorted = [...sections].sort((a, b) => (a.order_index || 0) - (b.order_index || 0));
   const [dragIndex, setDragIndex] = useState(null);
 
@@ -64,6 +73,29 @@ export default function ProposalSectionNav({ sections, activeSectionKey, onSelec
             <span className="flex-1 text-sm" style={{ fontFamily: 'Didact Gothic, sans-serif' }}>
               {getSectionLabel(section.section_type, proposalType)}
             </span>
+            {approvalByType?.[section.section_type] && (
+              <span
+                title={
+                  approvalByType[section.section_type] === APPROVAL_STATUS.APPROVED
+                    ? 'This section’s generated wording is approved'
+                    : 'This section’s generated wording still has to be read and approved'
+                }
+                data-approval-status={approvalByType[section.section_type]}
+                style={{
+                  fontFamily: 'Didact Gothic, sans-serif',
+                  fontSize: 9.5,
+                  letterSpacing: '0.06em',
+                  textTransform: 'uppercase',
+                  whiteSpace: 'nowrap',
+                  textAlign: 'right',
+                  color: isActive
+                    ? '#E8EDE9'
+                    : (approvalByType[section.section_type] === APPROVAL_STATUS.APPROVED ? '#213428' : '#8B4A2B'),
+                }}
+              >
+                {approvalMarker(approvalByType[section.section_type])} {approvalLabel(approvalByType[section.section_type])}
+              </span>
+            )}
             {def.canHide && !readOnly && (
               <button
                 type="button"
