@@ -258,7 +258,10 @@ export default function OptimiserRunEvidenceBlock({
 
       <div className="mt-1.5 space-y-0.5 text-[11px]">
         <div className="text-[#1B1A1A]">
-          <span className="text-[#8B7F76]">Current P20 (canonical): </span>
+          {/* The aggregate P20 variation IS the worst-seat figure, so it is stated
+              with that scope. The per-seat breakdown below it carries each seat's
+              own scope. */}
+          <span className="text-[#8B7F76]">Worst-seat P20 (all seats): </span>
           {currentP20 || UNAVAILABLE}
           {current?.worstSeatId ? ` · worst seat ${current.worstSeatId}` : ""}
           {frequencyText(current?.worstFrequencyHz) ? ` at ${frequencyText(current.worstFrequencyHz)}` : ""}

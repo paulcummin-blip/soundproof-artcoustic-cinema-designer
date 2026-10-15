@@ -42,6 +42,7 @@ import {
   RECOMMENDATION_NOT_CURRENT_SENTENCE,
 } from "./recommendationCurrency.js";
 import { deviationText, levelText, wholeDbImprovement } from "./optimiserWholeNumberDb.js";
+import { NEUTRAL_IMPROVEMENT_SENTENCE } from "./optimiserP20SeatScope.js";
 
 /** The ONE status the panel states when a decision has been reached. */
 export const ADI_PANEL_STATUS = Object.freeze({
@@ -50,12 +51,29 @@ export const ADI_PANEL_STATUS = Object.freeze({
   REJECTED: "Rejected — regression",
 });
 
-/** The one benefit sentence per improvement kind — no figure is ever stated. */
+/**
+ * The one benefit sentence per improvement kind — no figure is ever stated.
+ *
+ * The P20 sentence makes NO breadth claim: P20 is seat-scoped, so the panel
+ * states the scope the seat-level evidence actually supports (the primary seats,
+ * or the seating area when every seat carries its own improvement), and falls
+ * back to this neutral sentence when that evidence was not retained. See
+ * optimiserP20SeatScope.js.
+ */
 export const ADI_PANEL_BENEFIT = Object.freeze({
-  P20: "Improved predicted bass consistency across the seating area.",
+  P20: NEUTRAL_IMPROVEMENT_SENTENCE,
   P19: "Improved predicted seat-to-seat level consistency.",
   TRADE_OFF: "A larger improvement in bass consistency, with a trade-off for you to approve.",
 });
+
+/**
+ * The benefit, stated with the seat scope the evidence supports when the
+ * decision's own improvement is a P20 one. A P19 or trade-off sentence is left
+ * exactly as the decision authority stated it.
+ */
+function scopedBenefit(benefit, claim) {
+  return benefit === ADI_PANEL_BENEFIT.P20 && claim ? claim : benefit;
+}
 
 /** The label the P20 comparison always carries. */
 export const ADI_P20_VARIATION_LABEL = "P20 variation";
@@ -148,7 +166,13 @@ function decisionBenefit(decision) {
  * result it measured is stated — the pair is not, and the distinction is named
  * in Engineer details.
  */
-function recommendationHeadline({ recommendation, recommendedRow = null, baseline = null, currentP20 = null }) {
+function recommendationHeadline({
+  recommendation,
+  recommendedRow = null,
+  baseline = null,
+  currentP20 = null,
+  improvementClaim = null,
+}) {
   const effect = recommendedRow?.effect || null;
   const afterP20 = {
     deviationDb: effect?.p20VariationDb ?? null,
@@ -161,7 +185,7 @@ function recommendationHeadline({ recommendation, recommendedRow = null, baselin
     kind: "recommendation",
     statusLabel: ADI_PANEL_STATUS.CONSIDER,
     adjustment: recommendation || null,
-    benefit: p20Gain ? ADI_PANEL_BENEFIT.P20 : (p19Gain ? ADI_PANEL_BENEFIT.P19 : null),
+    benefit: p20Gain ? (improvementClaim || ADI_PANEL_BENEFIT.P20) : (p19Gain ? ADI_PANEL_BENEFIT.P19 : null),
     comparison: currentP20?.runBaselineDiffers === true
       ? p20VariationText(null, afterP20)
       : p20VariationText(beforeP20, afterP20),
@@ -187,6 +211,10 @@ function recommendationHeadline({ recommendation, recommendedRow = null, baselin
  * @param {boolean} [params.isRunning] - a run is in progress
  * @param {string|null} [params.finding] - the state sentence the panel already
  *   resolves for the states that have no decision to state
+ * @param {string|null} [params.improvementClaim] - the scoped improvement
+ *   sentence the seat-level evidence supports for an OFFERED change
+ * @param {string|null} [params.appliedImprovementClaim] - the same for a change
+ *   already in the design
  * @returns {{kind: string, statusLabel: string|null, adjustment: string|null,
  *   benefit: string|null, comparison: string|null}}
  */
@@ -204,6 +232,14 @@ export function resolveAdiPanelHeadline({
   stale = false,
   isRunning = false,
   finding = null,
+  // The scoped improvement sentence the seat-level evidence supports, for a
+  // change that is OFFERED: stated instead of the neutral P20 sentence when the
+  // evidence covers a scope, and never broader than it. Null when the seats that
+  // would support a claim were not retained.
+  improvementClaim = null,
+  // The same, for a change already IN the design: its seat-level result is the
+  // design's own published per-seat P20, so the scope is evidenced from that.
+  appliedImprovementClaim = null,
 } = {}) {
   // A run in progress, or a result that belongs to an earlier design state, owns
   // the panel's own state copy: no adjustment is offered from either.
@@ -232,7 +268,9 @@ export function resolveAdiPanelHeadline({
   // ── 1. The change the designer has to decide leads the panel ──
   // A physical change ADI may never apply is stated as the move itself, because
   // that IS the decision in front of the designer.
-  if (recommendation) return recommendationHeadline({ recommendation, recommendedRow, baseline, currentP20 });
+  if (recommendation) {
+    return recommendationHeadline({ recommendation, recommendedRow, baseline, currentP20, improvementClaim });
+  }
 
   // ── 2. Calibration ADI applied on its own ──
   // APPLIED is stated only for settings that really are in the design: a
@@ -242,7 +280,7 @@ export function resolveAdiPanelHeadline({
       kind: "applied",
       statusLabel: ADI_PANEL_STATUS.APPLIED,
       adjustment: calibrationAdjustmentText({ decision, relativeDelay }),
-      benefit: decisionBenefit(decision),
+      benefit: scopedBenefit(decisionBenefit(decision), appliedImprovementClaim),
       comparison: p20VariationText(decision?.before?.p20, decision?.after?.p20),
     };
   }
@@ -270,7 +308,7 @@ export function resolveAdiPanelHeadline({
       kind: "consider",
       statusLabel: ADI_PANEL_STATUS.CONSIDER,
       adjustment: calibrationAdjustmentText({ decision, relativeDelay }),
-      benefit: decisionBenefit(decision),
+      benefit: scopedBenefit(decisionBenefit(decision), improvementClaim),
       comparison: p20VariationText(decision?.before?.p20, decision?.after?.p20),
     };
   }

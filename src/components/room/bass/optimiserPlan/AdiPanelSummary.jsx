@@ -4,11 +4,16 @@
 //
 // It states the decision, in this order and nothing more:
 //   • the RECOMMENDED ADJUSTMENT — one line, in installer words
-//   • what it BUYS — one benefit sentence, no figure
+//   • what it BUYS — one benefit sentence, scoped to the seats that support it
 //   • where it LANDS — one P20 comparison, displayed whole dB, with its level
 //   • a target the design cannot reach, when the decision authority says so
 //   • for a design that has moved on, that the result belongs to an earlier
 //     design and the instruction to re-run
+//
+// P20 is a SEAT-SCOPED result, so the panel never states one bare "Current P20":
+// a single aggregate figure would read as a room-wide parameter result beside
+// P14, P18 and P19, which are not shown here. The per-seat P20 result, with the
+// scope each seat belongs to, belongs to Engineer details.
 //
 // Everything the decision was measured from — settings, seats, thresholds,
 // candidate counts, acceptance rules, fingerprints — is Engineer details' job
@@ -27,9 +32,6 @@ export default function AdiPanelSummary({
   adjustment = null,
   benefit = null,
   comparison = null,
-  // The design's OWN published result, stated on its own only when the decision
-  // above is not already comparing against it — the current result appears once.
-  currentResult = null,
   // A target this design cannot reach, stated in one line.
   designLimitation = null,
   // The ONE next step for a failure the designer has to act on. It belongs here,
@@ -68,12 +70,6 @@ export default function AdiPanelSummary({
       {comparison && (
         <div className="pt-0.5 text-[12.5px] font-semibold text-[#213428] leading-relaxed" data-adi-panel-comparison="true">
           {comparison}
-        </div>
-      )}
-
-      {currentResult && (
-        <div className="pt-0.5 text-[12.5px] font-semibold text-[#213428] leading-relaxed" data-adi-panel-current-result="true">
-          {currentResult}
         </div>
       )}
 

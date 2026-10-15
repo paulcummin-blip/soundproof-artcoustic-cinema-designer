@@ -180,6 +180,24 @@ export function readAuthoritativeP20Headline(completedBassAuthority) {
   };
 }
 
+/**
+ * The published authority's OWN per-seat P20 rows: one entry per seat the result
+ * carries, with its own variation, level and limiting frequency. Read only —
+ * never recalculated, never estimated, and no seat is ever invented.
+ */
+export function readAuthoritativeP20Seats(completedBassAuthority) {
+  const rows = completedBassAuthority?.contract?.selectedCandidate?.perSeatP20Results;
+  if (!Array.isArray(rows)) return [];
+  return rows
+    .map((row) => ({
+      seatId: row?.seatId ?? null,
+      variationDbRaw: num(row?.variationDbRaw ?? row?.displayVariationDb),
+      level: num(row?.level),
+      worstFrequencyHz: num(row?.worstFrequencyHz),
+    }))
+    .filter((row) => row.seatId && row.variationDbRaw != null);
+}
+
 /** The verified trade-off already classified for a candidate, or null. */
 export function existingTradeOff(result) {
   const tradeOff = result?.tradeOff;
