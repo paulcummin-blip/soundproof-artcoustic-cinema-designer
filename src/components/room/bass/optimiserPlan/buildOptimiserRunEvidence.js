@@ -107,6 +107,7 @@ function resolveEvaluatedCount(diagnostics, rows) {
 export function buildActionableOptimiserRunSummary({
   selection = null,
   diagnostics = null,
+  runIdentity = null,
 } = {}) {
   if (!selection?.winner) return null;
   const rows = Array.isArray(selection.confirmedResults) ? selection.confirmedResults : [];
@@ -127,8 +128,14 @@ export function buildActionableOptimiserRunSummary({
         ?? null,
     },
   });
+  const completedAt = new Date().toISOString();
   return {
-    completedAt: new Date().toISOString(),
+    runId: runIdentity?.runId || null,
+    startedAt: runIdentity?.startedAt || null,
+    supersededRunId: runIdentity?.supersededRunId || null,
+    evidenceContractVersion: OPTIMISER_PLAN_VERSION,
+    terminal: true,
+    completedAt,
     outcome: "actionable_plan_produced",
     families,
     canonicalJobsRun: num(selection.canonicalJobsRun
@@ -197,12 +204,16 @@ export function buildOptimiserRunEvidence({
   // The run's own calibration decision: what ADI applied, or held and why.
   calibrationDecision = null,
   decisionApplied = false,
+  // Identity minted at click time. It is persisted with every terminal record so
+  // refresh/reopen can distinguish a fresh run's own technical failure from a
+  // legacy saved artifact that genuinely needs a re-test.
+  runIdentity = null,
 } = {}) {
   // The baseline-parity record travels with the evidence: a run that stopped for
   // want of a matching published authority still saves WHY, so the block is
   // diagnosable and nothing can be applied from it.
   const parityRecord = baselineParity || identity?.baselineParity || null;
-  if (!selection && !diagnostics && !parityRecord) return null;
+  if (!selection && !diagnostics && !parityRecord && !failureReason && !runIdentity) return null;
 
   const savedAt = new Date().toISOString();
   const currentSummary = summariseResult(selection?.currentResult || null);
@@ -325,6 +336,11 @@ export function buildOptimiserRunEvidence({
     terminalOutcome: outcome,
     baselineParity: parityRecord,
     run: {
+      runId: runIdentity?.runId || null,
+      startedAt: runIdentity?.startedAt || null,
+      supersededRunId: runIdentity?.supersededRunId || null,
+      evidenceContractVersion: OPTIMISER_PLAN_VERSION,
+      terminal: true,
       completedAt: savedAt,
       outcome,
       canonicalJobsRun: num(selection?.canonicalJobsRun
