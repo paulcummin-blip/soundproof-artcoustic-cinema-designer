@@ -12,6 +12,7 @@
     "test:p7": "node src/test/_p7-run.mjs src/test/p7-wall-markers.test.mjs src/test/p7-app-geometry-parity.test.mjs",
     "test:three-sub": "node src/test/_p7-run.mjs src/test/three-sub-stage1-stage2.test.mjs",
     "test:panel-hierarchy": "node src/test/_p7-run.mjs src/test/optimiser-panel-hierarchy.test.mjs",
+    "test:electronic-safety": "node src/test/_p7-run.mjs src/test/electronic-safety-authority.test.mjs",
     "test:comparison": "node src/test/_p7-run.mjs test/comparison-persistence.test.mjs",
     "test:proposal-composition": "node src/test/_p7-run.mjs src/test/proposal-image-first-composition.test.mjs",
     "test:proposal-authority": "node --test test/proposal-authority-guardrails.test.mjs",
