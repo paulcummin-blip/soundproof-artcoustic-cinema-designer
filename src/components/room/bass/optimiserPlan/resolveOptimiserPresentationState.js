@@ -484,14 +484,19 @@ export function resolveOptimiserPresentationState({
     });
   }
 
-  // ── NO_RUN ── nothing evaluated and saved for this design. When the bass
-  // result itself is what is missing or stale the panel states that, with the
-  // recalculation as its ONE action, rather than inviting a run that cannot
-  // start until that result exists.
+  // ── NO_RUN ── nothing evaluated and saved for this design.
+  // With no saved result there is nothing to re-test, so the panel states the
+  // one thing that stands between the design and a run: a bass result that does
+  // not exist yet is stated as a bass update, with the recalculation as its ONE
+  // action. Any other block carries its own message and the panel stays out of
+  // the way.
+  const bassUpdateOnly = failure?.fix === OPTIMISER_FAILURE_FIX.BASS_CALCULATION
+    ? failureExtras
+    : {};
   return build(OPTIMISER_PRESENTATION_STATE.NO_RUN, {
     action: OPTIMISER_PRESENTATION_ACTION.RUN,
     actionLabel: OPTIMISER_PRESENTATION_ACTION.RUN,
     showApply: false,
-    ...failureExtras,
+    ...bassUpdateOnly,
   });
 }

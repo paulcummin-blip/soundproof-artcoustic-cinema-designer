@@ -1,9 +1,10 @@
 // optimiser-failure-reason.test.mjs
 // ---------------------------------------------------------------------------
-// The Bass Optimiser panel must state WHY a run could not complete, in the
-// designer's words, with the next step beside it and ONE button that actually
-// fixes that state — never only "Evaluation Could Not Complete" with a pointer
-// to Engineer details, and never a button that cannot fix the failure.
+// The Bass Optimiser panel must state an ACTIONABLE outcome in the designer's
+// words, with the next step beside it and ONE button that actually resolves that
+// state — never a bare "could not complete" badge with a pointer to Engineer
+// details, never a button that cannot fix the failure, and never a state that
+// contradicts its own badge.
 //
 // Presentation only: no bass maths, no optimiser search, no P19/P20 scoring.
 // ---------------------------------------------------------------------------
@@ -16,6 +17,9 @@ import { fileURLToPath } from "node:url";
 import {
   OPTIMISER_FAILURE_CODE,
   OPTIMISER_FAILURE_FIX,
+  OPTIMISER_RETEST_DETAIL,
+  OPTIMISER_RETEST_MESSAGE,
+  OPTIMISER_UNEVALUABLE_REASON,
   resolveOptimiserFailureCode,
 } from "../components/room/bass/optimiserPlan/optimiserFailureReason.js";
 import { OPTIMISER_PLAN_STATUS } from "../components/room/bass/optimiserPlan/optimiserPlanConstants.js";
@@ -56,10 +60,11 @@ describe("the reason a run could not complete is mapped, never dumped", () => {
     });
 
     expect(state.state).toBe(OPTIMISER_PRESENTATION_STATE.EVALUATION_INCOMPLETE);
-    expect(state.statusLabel).toBe("Evaluation Could Not Complete");
+    // A bass result that is the present blocker is badged as a bass update.
+    expect(state.statusLabel).toBe("Bass Performance Needs Updating");
     expect(state.failureCode).toBe(OPTIMISER_FAILURE_CODE.BASELINE_NOT_VALIDATED);
     expect(state.message).toMatch(/current bass result could not be validated/);
-    expect(state.nextAction).toBe("Recalculate Bass Performance, then run Bass Optimiser again.");
+    expect(state.nextAction).toBe("Recalculate Bass Performance before running the optimiser.");
     expect(state.actionLabel).toBe("Recalculate Bass Performance");
     // The bass calculation is the action that fixes THIS state, so the panel's
     // one button runs it — and it is offered even while the run is blocked.
@@ -74,9 +79,9 @@ describe("the reason a run could not complete is mapped, never dumped", () => {
     });
 
     expect(state.failureCode).toBe(OPTIMISER_FAILURE_CODE.BASS_NOT_CALCULATED);
-    expect(state.message).toMatch(/bass performance has not been calculated/);
-    expect(state.nextAction).toBe("Calculate Bass Performance.");
-    expect(state.actionLabel).toBe("Calculate Bass Performance");
+    expect(state.message).toMatch(/has not been calculated/);
+    expect(state.nextAction).toBe("Recalculate Bass Performance before running the optimiser.");
+    expect(state.actionLabel).toBe("Recalculate Bass Performance");
     expect(state.action).toBe(ADI_OPTIMISER_ACTION.CALCULATE);
   });
 
@@ -88,8 +93,8 @@ describe("the reason a run could not complete is mapped, never dumped", () => {
 
     expect(state.failureCode).toBe(OPTIMISER_FAILURE_CODE.BASS_STALE);
     expect(state.message).toMatch(/room or subwoofer setup has changed/);
-    expect(state.nextAction).toBe("Update Bass Performance.");
-    expect(state.actionLabel).toBe("Update Bass Performance");
+    expect(state.nextAction).toBe("Recalculate Bass Performance before running the optimiser.");
+    expect(state.actionLabel).toBe("Recalculate Bass Performance");
     expect(state.action).toBe(ADI_OPTIMISER_ACTION.CALCULATE);
   });
 
@@ -101,9 +106,12 @@ describe("the reason a run could not complete is mapped, never dumped", () => {
     });
 
     expect(state.state).toBe(OPTIMISER_PRESENTATION_STATE.FAILED);
+    // A genuine technical failure is badged as one, and it names the real reason
+    // rather than a bare "could not complete".
+    expect(state.statusLabel).toBe("Unable To Evaluate");
     expect(state.failureCode).toBe(OPTIMISER_FAILURE_CODE.WORKER_FAILED);
-    expect(state.message).toBe("ADI could not complete the optimisation run.");
-    expect(state.nextAction).toBe("Try again. If it repeats, check Engineer Details.");
+    expect(state.message).toBe(OPTIMISER_UNEVALUABLE_REASON);
+    expect(state.nextAction).toBe("Try again. If it repeats, check Engineer details.");
     expect(state.actionLabel).toBe("Re-test Bass Optimisation");
     // Never the bass calculation: recalculation cannot fix a failed run.
     expect(state.action).not.toBe(ADI_OPTIMISER_ACTION.CALCULATE);
@@ -117,28 +125,33 @@ describe("the reason a run could not complete is mapped, never dumped", () => {
     });
 
     expect(state.failureCode).toBe(OPTIMISER_FAILURE_CODE.EVIDENCE_MISSING);
-    expect(state.message).toMatch(/did not retain enough evidence to explain the result/);
-    expect(state.nextAction).toBe("Re-test Bass Optimisation.");
+    // The mandated re-test pair: what to do, then why the saved result cannot be
+    // trusted to support its own recommendation.
+    expect(state.statusLabel).toBe("Re-test Needed");
+    expect(state.message).toBe(OPTIMISER_RETEST_MESSAGE);
+    expect(state.nextAction).toBe(OPTIMISER_RETEST_DETAIL);
     expect(state.actionLabel).toBe("Re-test Bass Optimisation");
+    // Never the two claims that do not describe this state.
+    expect(state.message).not.toMatch(/no useful improvement|could not complete/i);
     expect(state.action).not.toBe(ADI_OPTIMISER_ACTION.CALCULATE);
   });
 });
 
 describe("the panel never shows only the outcome label", () => {
   const CASES = [
-    { name: "baseline", input: { planView: incompletePlan({ baselineValidation: { valid: false } }) } },
-    { name: "not calculated", input: { planView: incompletePlan(null), runBlockReason: { code: OPTIMISER_PLAN_RUN_BLOCK.CALCULATION_REQUIRED } } },
-    { name: "stale", input: { planView: incompletePlan(null), runBlockReason: { code: OPTIMISER_PLAN_RUN_BLOCK.DESIGN_STALE } } },
-    { name: "worker failed", input: { planView: null, runStatus: "failed" } },
-    { name: "no evidence", input: { planView: incompletePlan({ rejectionReasons: [] }) } },
+    { name: "baseline", label: "Bass Performance Needs Updating", input: { planView: incompletePlan({ baselineValidation: { valid: false } }) } },
+    { name: "not calculated", label: "Bass Performance Needs Updating", input: { planView: incompletePlan(null), runBlockReason: { code: OPTIMISER_PLAN_RUN_BLOCK.CALCULATION_REQUIRED } } },
+    { name: "stale", label: "Bass Performance Needs Updating", input: { planView: incompletePlan(null), runBlockReason: { code: OPTIMISER_PLAN_RUN_BLOCK.DESIGN_STALE } } },
+    { name: "worker failed", label: "Unable To Evaluate", input: { planView: null, runStatus: "failed" } },
+    { name: "no evidence", label: "Re-test Needed", input: { planView: incompletePlan({ rejectionReasons: [] }) } },
   ];
 
-  it.each(CASES)("$name: states a reason and a next step", ({ input }) => {
+  it.each(CASES)("$name: states a real reason and a next step", ({ input, label }) => {
     const state = resolveOptimiserPresentationState(input);
-    expect(state.statusLabel).toBe("Evaluation Could Not Complete");
-    // Not the generic line, and never a bare pointer to Engineer details.
-    expect(state.message).not.toBe(OPTIMISER_PRESENTATION_COPY.INCOMPLETE);
-    expect(state.message).toMatch(/ADI could not complete the optimisation/);
+    expect(state.statusLabel).toBe(label);
+    // Never the banned wording — neither as the badge nor as the sentence — and
+    // never a bare pointer to Engineer details.
+    expect(state.message).not.toMatch(/evaluation could not complete|could not complete the optimi[sz]ation/i);
     expect(state.nextAction).toBeTruthy();
     expect(state.actionLabel).toBeTruthy();
     // The technical wording stays out of the main panel.

@@ -18,6 +18,7 @@ import {
   resolveOptimiserPresentationState,
 } from "../components/room/bass/optimiserPlan/resolveOptimiserPresentationState.js";
 
+
 const read = (relative) => fs.readFileSync(path.join(process.cwd(), relative), "utf8");
 
 const journey = read("src/components/room/bass/optimiserPlan/AdiOptimisationJourney.jsx");
@@ -25,8 +26,12 @@ const control = read("src/components/room/bass/optimiserPlan/ReoptimiseCalibrati
 
 describe("one re-test control", () => {
   it("stands the calibration control down while the run control is the re-test", () => {
+    // The rule reads the re-test WORDING as well as the action, so a run control
+    // that says "Re-test Bass Optimisation" always owns that one re-test.
+    expect(journey).toMatch(/const runControlIsRetest = journey\.action === OPTIMISER_PRESENTATION_ACTION\.RETEST/);
+    expect(journey).toMatch(/\|\| journey\.actionLabel === OPTIMISER_RETEST_LABEL/);
     expect(journey).toMatch(
-      /const retestOwnsPrimary = journey\.action === OPTIMISER_PRESENTATION_ACTION\.RETEST[\s\S]*?showAction[\s\S]*?!panelShowsRerun/,
+      /const retestOwnsPrimary = runControlIsRetest[\s\S]*?showAction[\s\S]*?!panelShowsRerun/,
     );
     expect(journey).toMatch(
       /onReoptimise=\{isRunning \|\| retestOwnsPrimary \? null : onReoptimiseCalibration\}/,

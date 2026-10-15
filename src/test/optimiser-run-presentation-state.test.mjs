@@ -33,6 +33,10 @@ import {
   hasApplicableEvaluatedLever,
   resolveOptimiserPresentationState,
 } from '../components/room/bass/optimiserPlan/resolveOptimiserPresentationState.js';
+import {
+  OPTIMISER_RETEST_DETAIL,
+  OPTIMISER_RETEST_MESSAGE,
+} from '../components/room/bass/optimiserPlan/optimiserFailureReason.js';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const SRC = join(here, '..');
@@ -175,7 +179,7 @@ describe('TEST 2: completed run with no credible winner', () => {
 
     expect(planView.status).toBe(OPTIMISER_PLAN_STATUS.NO_USEFUL_IMPROVEMENT);
     expect(state.state).toBe(OPTIMISER_PRESENTATION_STATE.NO_USEFUL_IMPROVEMENT);
-    expect(state.statusLabel).toBe('No Improvements Found');
+    expect(state.statusLabel).toBe('No Improvement Found');
     expect(state.showApply).toBe(false);
 
     const evidence = state.evidence;
@@ -243,12 +247,14 @@ describe('TEST 3: incomplete or unsaved run', () => {
       planPersisted: false,
     });
     expect(unsaved.state).toBe(OPTIMISER_PRESENTATION_STATE.EVALUATION_INCOMPLETE);
-    expect(unsaved.statusLabel).toBe('Evaluation Could Not Complete');
-    // The main panel states the reason in the designer's words, with the next
-    // step beside it — never the engine's own diagnosis and never a pointer to
-    // Engineer details as the only guidance.
-    expect(unsaved.message).toMatch(/did not retain enough evidence/);
-    expect(unsaved.nextAction).toMatch(/Re-test Bass Optimisation/);
+    // A result that cannot support a recommendation is RE-TEST NEEDED — never a
+    // completed search and never a bare "could not complete".
+    expect(unsaved.statusLabel).toBe('Re-test Needed');
+    // The main panel states what to do and why, in the designer's words — never
+    // the engine's own diagnosis and never a pointer to Engineer details as the
+    // only guidance.
+    expect(unsaved.message).toBe(OPTIMISER_RETEST_MESSAGE);
+    expect(unsaved.nextAction).toBe(OPTIMISER_RETEST_DETAIL);
     expect(unsaved.actionLabel).toBe('Re-test Bass Optimisation');
     expect(unsaved.showApply).toBe(false);
 
@@ -260,7 +266,7 @@ describe('TEST 3: incomplete or unsaved run', () => {
       actionable: { available: false },
     });
     expect(unreadable.state).toBe(OPTIMISER_PRESENTATION_STATE.EVALUATION_INCOMPLETE);
-    expect(unreadable.statusLabel).toBe('Evaluation Could Not Complete');
+    expect(unreadable.statusLabel).toBe('Re-test Needed');
     expect(unreadable.statusLabel).not.toBe('Recommendation available');
   });
 
@@ -332,11 +338,13 @@ describe('TEST 3B: baseline failure and unavailable metrics', () => {
 
     const state = resolveOptimiserPresentationState({ planView, actionable: { available: true } });
     expect(state.state).toBe(OPTIMISER_PRESENTATION_STATE.EVALUATION_INCOMPLETE);
-    expect(state.statusLabel).toBe('Evaluation Could Not Complete');
+    // The bass result is the present blocker, so the panel is badged as a bass
+    // update and its ONE action is the recalculation that lifts the block.
+    expect(state.statusLabel).toBe('Bass Performance Needs Updating');
     // The panel says WHY — the baseline could not be validated — and gives the
     // one action that fixes it, both without opening Engineer details.
     expect(state.message).toMatch(/current bass result could not be validated/);
-    expect(state.nextAction).toMatch(/Recalculate Bass Performance, then run Bass Optimiser again\./);
+    expect(state.nextAction).toMatch(/Recalculate Bass Performance before running the optimiser\./);
     expect(state.actionLabel).toBe('Recalculate Bass Performance');
     // The run's own diagnosis is not lost: it travels with the evidence, which
     // Engineer details reads.

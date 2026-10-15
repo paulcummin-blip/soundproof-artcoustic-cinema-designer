@@ -103,9 +103,11 @@ describe("the presentation state offers the run action after a result", () => {
 
   it("offers it after a failed run too", () => {
     const failed = resolveOptimiserPresentationState({ planView: null, runStatus: "failed" });
-    // One control, worded as the outcome's own next step.
+    // One control, worded as the outcome's own next step. A technical failure is
+    // badged as one — never as a completed search and never as a bare
+    // "could not complete".
     expect(failed.action).toBe(OPTIMISER_PRESENTATION_ACTION.RETEST);
-    expect(failed.statusLabel).toBe("Evaluation Could Not Complete");
+    expect(failed.statusLabel).toBe("Unable To Evaluate");
   });
 });
 
