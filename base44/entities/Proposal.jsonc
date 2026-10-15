@@ -148,6 +148,33 @@
           "default": "professional",
           "nullable": true
         },
+        "narrative_steer": {
+          "type": "object",
+          "description": "The designer's frozen Narrative Steer for this proposal. Soft preferences only; exclusions affect client-facing narrative, never evidence or technical results.",
+          "properties": {
+            "preferred_topics": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "default": []
+            },
+            "excluded_topics": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "default": []
+            },
+            "excluded_topic_keys": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "default": []
+            }
+          }
+        },
         "project_interpretation": {
           "type": "object",
           "additionalProperties": true
