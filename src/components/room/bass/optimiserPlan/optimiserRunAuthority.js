@@ -43,6 +43,7 @@ function notify() {
 function supersededIdentity(plan) {
   if (!plan) return null;
   return {
+    runId: plan.run?.runId || null,
     recordKind: plan.recordKind || null,
     terminalOutcome: plan.terminalOutcome || null,
     candidateId: plan.candidateId || null,
@@ -65,9 +66,14 @@ export function beginOptimiserRun(projectId, versionId) {
 
   runSequence += 1;
   const startedAt = new Date().toISOString();
+  const runId = `optimiser-run-${startedAt}-${runSequence}`;
   const run = {
-    runId: `optimiser-run-${startedAt}-${runSequence}`,
+    runId,
     startedAt,
+    // Durable provenance for the record this run eventually saves. Prefer the
+    // prior record's own persisted run id; fall back to the latest in-memory run
+    // when the older record predates durable run identity.
+    supersededRunId: savedPlan?.run?.runId || previousRun?.runId || null,
     superseded: supersededIdentity(savedPlan),
   };
 
@@ -131,6 +137,13 @@ export function resetOptimiserRunAuthority(projectId, versionId) {
  */
 export function planIsSupersededByRun(plan, run) {
   if (!plan || !run) return false;
+
+  // A fresh record names the run that wrote it. Identity wins over timestamps:
+  // the current run's own record is authoritative; every other identified run is
+  // history. The timestamp fallback remains only for legacy records.
+  const savedRunId = plan.run?.runId || null;
+  if (savedRunId) return savedRunId !== run.runId;
+
   const startedAt = Date.parse(run.startedAt || "");
   if (!Number.isFinite(startedAt)) return false;
   const savedAt = Date.parse(plan.savedAt || "");
