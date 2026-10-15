@@ -106,7 +106,8 @@ test('F. prompt 12 gives positive, evidence-scoped Dynamic Range guidance', () =
   const dynamic = f.input.section_requirements.find(row => row.section === 'dynamic_range');
   const requirement = dynamic.requirement_single;
   assert(dynamic.requirement.includes('frozen dynamic-range evidence'));
-  for (const phrase of ['headroom', 'dynamic peaks', 'confident', 'P14', 'P18', 'P19', 'P20']) assert(requirement.includes(phrase), phrase);
+  for (const phrase of ['quiet end', 'dynamic peaks', 'frozen output figures', 'P14', 'P18', 'P19', 'P20']) assert(requirement.includes(phrase), phrase);
+  assert.match(requirement, /output capability alone says nothing about how quietly detail is resolved/i);
   assert(!/not a claim about|Do not claim bass response quality/i.test(requirement));
   assert(prompt.includes(f.input.multi_cabinet_channels.rule));
   replace(f, 'Demanding soundtracks have headroom for dynamic peaks, with a clear, confident presentation at the designed listening levels.', 'dynamic_range');
