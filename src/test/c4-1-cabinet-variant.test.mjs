@@ -222,7 +222,7 @@ test('TEST 10 The 1222 mm artwork is cropped to its ink and keeps the cabinet pr
 
   // Measured from the source file: 2172 × 724 px, ink at x 45–2127, y 257–464.
   // That ink box is the viewBox, so the white page around the drawing is gone.
-  assert.ok(c41Artwork.includes('viewBox="45 257 2083 208"'), 'the surrounding whitespace is cropped');
+  assert.ok(c41Artwork.includes('box: "45 257 2083 208"'), 'the surrounding whitespace is cropped');
 
   const inkAspect = 2083 / 208;
   const cabinetAspect = 1222 / 120;
@@ -307,7 +307,7 @@ test('TEST 15 The 1222 mm artwork is unchanged by the 1441 mm addition', () => {
   assert.ok(c41Artwork.includes('export function C41_1222FaceIcon'), 'the 1222 mm icon is still published');
   assert.ok(c41Artwork.includes('https://media.base44.com/images/public/6a1166c68ddc81e5ea2cdf6b/0103ea1cc_ChatGPTImage9Oct202610_47_24.png'),
     'the approved 1222 mm illustration is untouched');
-  assert.ok(c41Artwork.includes('viewBox="45 257 2083 208"'), 'the 1222 mm crop is untouched');
+  assert.ok(c41Artwork.includes('box: "45 257 2083 208"'), 'the 1222 mm crop is untouched');
   assert.ok(frontElevation.includes('if (isC41 && isC41_1222) return <C41_1222FaceIcon'),
     'the 1222 mm cabinet still draws its own artwork');
 });
@@ -320,7 +320,7 @@ test('TEST 16 The 1441 mm artwork is cropped to its ink and keeps the cabinet pr
   // Measured from the source file: 2167 × 726 px, ink at x 36–2130, y 275–444 —
   // the same measurement basis as the 1222 mm artwork. That ink box is the
   // viewBox, so the white page around the drawing is cropped away.
-  assert.ok(c41Artwork.includes('viewBox="36 275 2095 170"'), 'the surrounding whitespace is cropped');
+  assert.ok(c41Artwork.includes('box: "36 275 2095 170"'), 'the surrounding whitespace is cropped');
 
   const inkAspect = 2095 / 170;
   const cabinetAspect = 1441 / 120;
@@ -401,7 +401,7 @@ test('TEST 20 The 1711 mm artwork is cropped to its ink and used for its variant
 
   // Measured from the source file: 2167 × 726 px, ink at x 35–2131, y 277–425 —
   // the same measurement basis as the other C4-1 artworks.
-  assert.ok(c41Artwork.includes('viewBox="35 277 2097 149"'), 'the surrounding whitespace is cropped');
+  assert.ok(c41Artwork.includes('box: "35 277 2097 149"'), 'the surrounding whitespace is cropped');
 
   const inkAspect = 2097 / 149;
   const cabinetAspect = 1711 / 120;
@@ -412,8 +412,8 @@ test('TEST 20 The 1711 mm artwork is cropped to its ink and used for its variant
   // are untouched.
   assert.ok(frontElevation.includes('const isC41_1711 = isC41 && Number(cabinetLengthMm) === 1711;'));
   assert.ok(frontElevation.includes('if (isC41 && isC41_1711) return <C41_1711FaceIcon'));
-  assert.ok(c41Artwork.includes('viewBox="45 257 2083 208"'), 'the 1222 mm crop is unchanged');
-  assert.ok(c41Artwork.includes('viewBox="36 275 2095 170"'), 'the 1441 mm crop is unchanged');
+  assert.ok(c41Artwork.includes('box: "45 257 2083 208"'), 'the 1222 mm crop is unchanged');
+  assert.ok(c41Artwork.includes('box: "36 275 2095 170"'), 'the 1441 mm crop is unchanged');
   assert.ok(frontElevation.includes('if (isC41) return <C41FaceIcon'), 'the other lengths keep the catalogue drawing');
 });
 
@@ -471,6 +471,23 @@ function iconGeometry(name) {
   };
 }
 
+// The crop, the native asset size and the fit of one C4-1 artwork, read from the
+// ONE elevation crop authority — the single place the crop is recorded now that
+// the icons draw through the shared elevation renderer.
+const ELEVATION_AUTHORITY_SOURCE = fs.readFileSync(
+  path.join(process.cwd(), 'src/components/report/elevation/elevationArtAuthority.js'),
+  'utf8'
+);
+
+const authorityGeometry = (mm) => {
+  const key = { 1222: 'c41_1222', 1441: 'c41_1441', 1711: 'c41_1711' }[mm];
+  const entry = ELEVATION_AUTHORITY_SOURCE.slice(ELEVATION_AUTHORITY_SOURCE.indexOf(`  ${key}: {`));
+  const box = entry.match(/box: \{ x: (\d+), y: (\d+), width: (\d+), height: (\d+) \}/);
+  const native = entry.match(/native: \{ width: (\d+), height: (\d+) \}/);
+  assert.ok(box && native, `${mm} mm: the crop and the native asset size are recorded`);
+  return { imageW: Number(native[1]), imageH: Number(native[2]), fit: 'xMidYMid meet' };
+};
+
 test('TEST 22 The artwork is cropped and fitted proportionally — never stretched', () => {
   // No icon may scale its artwork differently on the two axes: a stretched
   // drawing is exactly what turned the C4-1 drivers into slivers.
@@ -480,7 +497,7 @@ test('TEST 22 The artwork is cropped and fitted proportionally — never stretch
   const ICONS = { 1222: 'C41_1222FaceIcon', 1441: 'C41_1441FaceIcon', 1711: 'C41_1711FaceIcon' };
 
   Object.entries(ICONS).forEach(([mm, name]) => {
-    const g = iconGeometry(name);
+    const g = authorityGeometry(mm);
     const [pngW, pngH] = PNG_PX[mm];
 
     // The crop: the source is drawn at its NATIVE pixel size inside the ink-box
@@ -532,6 +549,6 @@ test('TEST 23 A vertical cabinet is the whole artwork turned 90°, not re-fitted
     'a centre cabinet passes its installed orientation through');
   // The cabinet rectangle itself is untouched: the catalogue footprint is used
   // as-is, so no stored dimension had to change to suit the artwork.
-  assert.match(frontElevation, /const FACE_ICON_VISIBLE_RATIO = \(isC41 \|\| isC1( \|\| isQ63)?\) \? 1\.0 : 0\.72;/,
-    'the C4-1 keeps its catalogue footprint with no artwork padding');
+  assert.match(frontElevation, /const FACE_ICON_VISIBLE_RATIO = elevationArtFitRatio\(faceIconArtworkKey\);/,
+    'the C4-1 keeps its catalogue footprint, with the fit figure read from the crop authority');
 });

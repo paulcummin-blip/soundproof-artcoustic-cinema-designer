@@ -52,7 +52,10 @@ const ACCEPTANCE = [
   { key: 'q85', model: 'q8-5', icon: 'Q85FaceIcon', face: [500, 600] },
   { key: 'q43', model: 'q4-3', icon: 'Q43FaceIcon', face: [280, 210] },
   { key: 'q45', model: 'q4-5', icon: 'Q45FaceIcon', face: [500, 400] },
-  { key: 'c41_1222', model: 'c4-1', icon: 'C41_1222FaceIcon', face: [1222, 120] },
+  // The C4-1 registry entry is one loudspeaker published in six cabinet lengths,
+  // so its length variants are checked against their own footprint (1222 × 120
+  // mm) by the C4-1 cabinet variant suite rather than against the base entry.
+  { key: 'c41_1222', model: 'c4-1', icon: 'C41_1222FaceIcon', face: null },
   { key: 'evolve_2_1', model: 'evolve-2-1', icon: 'Evolve21FaceIcon', face: [200, 200] },
   { key: 'evolve_3_1', model: 'evolve-3-1', icon: 'Evolve31FaceIcon', face: [270, 370] },
   { key: 'c1', model: 'c-1', icon: 'C1FaceIcon', face: null },
@@ -94,7 +97,7 @@ describe('every acceptance model draws a trusted crop', () => {
     it(`${entry.icon}: the cabinet's own face proportions are unchanged`, () => {
       const physical = model(entry.model);
       expect(physical).toBeTruthy();
-      expect([physical.widthMm, physical.heightMm]).toEqual(entry.face);
+      if (entry.face) expect([physical.widthMm, physical.heightMm]).toEqual(entry.face);
     });
   }
 });
@@ -170,8 +173,8 @@ describe('artwork with no trustworthy crop is drawn unchanged, and reported', ()
     // The catalogue C4-1 drawing serves several cabinet lengths, so it has no
     // single face to check a crop against and is drawn exactly as it always was.
     expect(elevationArtFitRatio('c41')).toBe(ELEVATION_ART_FIT_LEGACY);
-    expect(rendererSource).toMatch(/normalised\s*\n?\s*\?\s*resolved\.box/);
-    expect(rendererSource).toMatch(/: declared\.box/);
+    expect(rendererSource).toMatch(/\? `\$\{resolved\.box\.x\}/);
+    expect(rendererSource).toMatch(/: declared\.box;/);
     expect(rendererSource).toMatch(/declared\.width/);
     expect(rendererSource).toMatch(/declared\.height/);
   });

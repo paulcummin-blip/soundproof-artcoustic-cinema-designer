@@ -117,7 +117,11 @@ function readCatalogue() {
       const name = part.match(/^(\w+)/)?.[1];
       if (!name) continue;
       const href = part.match(/href="([^"]+)"/)?.[1] || null;
-      const viewBox = part.match(/viewBox="([^"]+)"/)?.[1] || null;
+      // Each icon states its own box as the fallback the renderer draws when an
+      // artwork has no recorded crop, so the declared box is read from either.
+      const viewBox = part.match(/viewBox="([^"]+)"/)?.[1]
+        || part.match(/declared=\{\{ box: "([^"]+)"/)?.[1]
+        || null;
       entries.push({ name, href, viewBox });
     }
   }

@@ -23,6 +23,9 @@ const FRONT = read('src/components/room/FrontElevation.jsx');
 const SIDE = read('src/components/room/SideElevation.jsx');
 const REGISTRY = read('src/components/models/speakers/registry.jsx');
 const REPORT_GRAPHIC = read('src/components/report/ScreenWallConstructionGraphic.jsx');
+// The crop itself now lives in the ONE elevation crop authority, which the shared
+// renderer applies for every elevation drawing.
+const AUTHORITY = read('src/components/report/elevation/elevationArtAuthority.js');
 
 const q63Block = () => {
   const start = ICONS.indexOf('const Q63_ARTWORK');
@@ -34,9 +37,13 @@ const q63Block = () => {
 test('A. the Q6-3 asset is traced to its source and cropped to the cabinet outline', () => {
   const block = q63Block();
   assert.match(block, /9a1ad66a6_Q6-3front\.png/, 'the Q6-3 source artwork is named');
+  assert.match(block, /artworkKey="q63"/, 'the icon draws through the ONE shared elevation renderer');
   assert.match(block, /cropX: 54, cropY: 52, cropW: 916, cropH: 916/, 'the measured cabinet crop is recorded');
-  assert.match(block, /viewBox=\{`\$\{a\.cropX\} \$\{a\.cropY\} \$\{a\.cropW\} \$\{a\.cropH\}`\}/, 'the crop drives the rendered viewBox');
-  assert.match(block, /width: 1024, height: 1021/, 'the crop is expressed in the asset\'s own pixel space');
+  // The crop now drives the drawing from the ONE crop authority, so the live
+  // elevations and the exported pages crop identically.
+  assert.match(AUTHORITY, /q63: \{[\s\S]*?box: \{ x: 54, y: 52, width: 916, height: 916 \}/,
+    'the crop is the authority for what is drawn');
+  assert.match(AUTHORITY, /native: \{ width: 1024, height: 1021 \}/, 'the crop is expressed in the asset\'s own pixel space');
 });
 
 test('B. the crop excludes the page frame and its white margin', () => {
@@ -74,8 +81,8 @@ test('C. the crop is square, matching the cabinet face, so nothing is distorted'
 });
 
 test('D. the elevation draws it at the cabinet footprint, with no inset square', () => {
-  assert.match(FRONT, /const FACE_ICON_VISIBLE_RATIO = \(isC41 \|\| isC1 \|\| isQ63\) \? 1\.0 : 0\.72;/,
-    'Q6-3 draws at its own footprint: the crop needs no padding compensation');
+  assert.match(FRONT, /const FACE_ICON_VISIBLE_RATIO = elevationArtFitRatio\(faceIconArtworkKey\);/,
+    'Q6-3 draws at its own footprint: the fit figure comes from the crop authority');
   assert.match(FRONT, /if \(isQ63\) return <Q63FaceIcon x=\{adjustedX\} y=\{adjustedY\} width=\{adjustedW\} height=\{adjustedH\} \/>;/,
     'the icon is given the cabinet box in both dimensions');
   assert.equal(/isQ63\) return <Q63FaceIcon[^\n]*size=\{Math\.min\(/.test(FRONT), false,
@@ -92,15 +99,37 @@ test('E. the Q6-3 model and the elevation geometry are unchanged', () => {
   assert.match(q63, /label: "Q6-3"/, 'model identity unchanged');
 });
 
-test('F. the other speaker models are untouched', () => {
-  assert.match(ICONS, /export function Q43FaceIcon[\s\S]*?viewBox="0 0 100 75"/, 'Q4-3 artwork unchanged');
-  assert.match(ICONS, /export function Q45FaceIcon[\s\S]*?689388d97|export function Q45FaceIcon[\s\S]*?d1376c28d_Q4-5front\.png/, 'Q4-5 artwork unchanged');
-  assert.match(ICONS, /export function Q85FaceIcon[\s\S]*?8eb64d06e_Q8-5Front\.png[\s\S]*?viewBox="0 0 100 100"/, 'Q8-5 artwork unchanged');
+test('F. every other face icon draws through the same renderer', () => {
+  const body = (name) => {
+    const start = ICONS.indexOf(`export function ${name}(`);
+    const next = ICONS.indexOf('\nexport function ', start + 1);
+    return ICONS.slice(start, next < 0 ? ICONS.length : next);
+  };
+  for (const [name, key] of [
+    ['Q43FaceIcon', 'q43'],
+    ['Q45FaceIcon', 'q45'],
+    ['Q85FaceIcon', 'q85'],
+    ['Evolve21FaceIcon', 'evolve_2_1'],
+    ['Evolve31FaceIcon', 'evolve_3_1'],
+    ['Evolve42FaceIcon', 'evolve_4_2'],
+    ['Evolve63FaceIcon', 'evolve_6_3'],
+    ['Evolve84FaceIcon', 'evolve_8_4'],
+  ]) {
+    // Cropped by the ONE crop authority, never by a box written into the icon:
+    // the original asset is untouched and no icon states its own viewBox.
+    assert.match(body(name), new RegExp(`artworkKey="${key}"`), `${name} draws the cropped artwork`);
+    assert.equal(/viewBox=/.test(body(name)), false, `${name} keeps no box of its own`);
+  }
+  assert.equal(
+    /<image/.test(ICONS.slice(ICONS.indexOf('export function Q43FaceIcon('), ICONS.indexOf('export function C1FaceIcon('))),
+    false,
+    'no raster icon draws its own image any more'
+  );
   assert.match(ICONS, /export function Evolve11FaceIcon[\s\S]*?viewBox="0 0 150 150"/, 'the vector icons are unchanged');
 });
 
 test('G. the side elevation keeps its own geometry, clipped to the cabinet', () => {
-  assert.match(SIDE, /const FACE_ICON_VISIBLE_RATIO = 0\.72;/, 'the side view\'s own scale is untouched');
+  assert.match(SIDE, /const FACE_ICON_VISIBLE_RATIO = elevationArtFitRatio\(/, 'the side view takes its scale from the same authority');
   assert.match(SIDE, /<clipPath id=\{clipId\}>\s*<rect x=\{cabinetX\} y=\{cabinetY\} width=\{svgW\} height=\{svgH\} \/>/, 'the artwork stays clipped to the cabinet profile');
   assert.match(SIDE, /'q6-3': Q63FaceIcon,/, 'the side view still resolves the Q6-3 icon');
 });
