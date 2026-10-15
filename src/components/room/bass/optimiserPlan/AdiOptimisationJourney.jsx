@@ -53,6 +53,7 @@ import {
   OPTIMISER_PRESENTATION_ACTION,
   OPTIMISER_PRESENTATION_STATE,
   OPTIMISER_RETEST_HELPER_SENTENCE,
+  OPTIMISER_RETEST_LABEL,
 } from "./resolveOptimiserPresentationState.js";
 import AdiEngineerDetailsPanel from "./AdiEngineerDetailsPanel.jsx";
 import {
@@ -385,7 +386,6 @@ export default function AdiOptimisationJourney({
     && !panelShowsRerun
     && !reoptimiseBusy;
   const showBlocked = !!journey.blockReason && !isRunning;
-  const statusMessage = runStatus === "failed" && runError ? runError : journey.blockReason?.message;
 
   // Before the run, the panel states how many design options ADI will test and
   // the acoustic work behind them. After the run, the confirmed count is stated
@@ -964,12 +964,6 @@ export default function AdiOptimisationJourney({
           <div className="mt-1 text-[11px] text-[#8A5A2B] leading-relaxed">
             {journey.blockReason.message}
           </div>
-        </div>
-      )}
-
-      {runStatus === "failed" && runError && (
-        <div className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-[11px] text-red-700 leading-relaxed">
-          {statusMessage}
         </div>
       )}
 
