@@ -46,9 +46,24 @@ function isPhysicallyValid(x, y, roomDims, subWidthM, subDepthM) {
   return true;
 }
 
+export function hasCompletePhysicalGeometry(candidate, expectedSourceCount) {
+  const coordinates = Array.isArray(candidate?.coordinates) ? candidate.coordinates : [];
+  return coordinates.length === expectedSourceCount
+    && coordinates.every((point) => Number.isFinite(Number(point?.x)) && Number.isFinite(Number(point?.y)));
+}
+
+export function attachPhysicalSourceIdentity(coordinates, currentPositions) {
+  return (Array.isArray(coordinates) ? coordinates : []).map((point, index) => ({
+    x: Number(point.x),
+    y: Number(point.y),
+    sourceId: currentPositions?.[index]?.sourceId || null,
+  }));
+}
+
 export function validateCandidateSet(positions, roomDims, subWidthM, subDepthM) {
+  if (!Array.isArray(positions) || positions.length === 0) return false;
   for (const pos of positions) {
-    if (!isPhysicallyValid(pos.x, pos.y, roomDims, subWidthM, subDepthM)) return false;
+    if (!pos || !isPhysicallyValid(pos.x, pos.y, roomDims, subWidthM, subDepthM)) return false;
   }
   for (let i = 0; i < positions.length; i++) {
     for (let j = i + 1; j < positions.length; j++) {
@@ -135,8 +150,18 @@ function identifyLayout(positions) {
     };
   }
 
+  // Three physical sources are not a quad. Their complete geometry is handled
+  // by the practical wall ladder (linked wall groups) and individual movement
+  // phases. Never manufacture a missing fourth slot: grouping may link two
+  // sources, but it must not replace either physical source in the geometry.
+  if (positions.length === 3) {
+    return { type: "triad", subs: indexed };
+  }
+
+  if (positions.length !== 4) return null;
+
   // 4 subs: split by Y into front/rear pairs
-  const halfCount = Math.ceil(sortedByY.length / 2);
+  const halfCount = 2;
   const frontSubs = sortedByY.slice(0, halfCount).sort((a, b) => a.x - b.x);
   const rearSubs = sortedByY.slice(halfCount).sort((a, b) => a.x - b.x);
 
@@ -387,7 +412,10 @@ export function generateSymmetricCandidates(currentPositions, roomDims, cabinetD
 
   if (layout.type === "quad") return generateSymmetricQuad(layout, roomDims, subWidthM, subDepthM);
   if (layout.type === "pair") return generateSymmetricPair(layout, roomDims, subWidthM, subDepthM);
-  return []; // single sub — no symmetric movement
+  // A triad has one linked wall group plus a singleton, not two complete pairs.
+  // Its full three-source candidates come from the practical wall ladder and
+  // individual phases; this local pair generator must not invent a fourth sub.
+  return [];
 }
 
 export function generateAsymmetricPairCandidates(currentPositions, roomDims, cabinetDims) {
@@ -397,7 +425,9 @@ export function generateAsymmetricPairCandidates(currentPositions, roomDims, cab
   if (!layout) return [];
 
   if (layout.type === "quad") return generateAsymmetricPairQuad(layout, roomDims, subWidthM, subDepthM);
-  return []; // pair/single — no asymmetric pair movement
+  // Asymmetric-pair means two complete physical pairs. A three-source topology
+  // is covered by the individual phase without collapsing its linked pair.
+  return [];
 }
 
 export function generateIndividualCandidatesForPhase(currentPositions, roomDims, cabinetDims) {
