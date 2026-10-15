@@ -78,7 +78,9 @@ describe('PRE-RUN ESTIMATED COUNT SHOWN', () => {
   });
 
   it('falls back to the sequence sentence when the count cannot be derived', () => {
-    const estimate = estimateOptimiserCalculations({ instances: subs(3) });
+    // Three sources ARE searchable (see three-subwoofer-optimiser-support). The
+    // honest fallback is for a layout whose grouping genuinely cannot be read.
+    const estimate = estimateOptimiserCalculations({ instances: subs(5) });
 
     expect(estimate.available).toBe(false);
     expect(estimate.total).toBeNull();
@@ -107,7 +109,12 @@ describe('COUNT DERIVED FROM SEARCH SPACE', () => {
     expect(resolveSearchGroupCount(1)).toBe(0);
     expect(resolveSearchGroupCount(2)).toBe(2);
     expect(resolveSearchGroupCount(4)).toBe(2);
-    expect(resolveSearchGroupCount(3)).toBeNull();
+    // Three sources are a supported layout: the fallback never denies them a
+    // search space, and a detected grouping always wins over the fallback.
+    expect(resolveSearchGroupCount(3)).toBe(3);
+    expect(resolveSearchGroupCount(3, 2)).toBe(2);
+    expect(resolveSearchGroupCount(3, 3)).toBe(3);
+    expect(resolveSearchGroupCount(5)).toBeNull();
     expect(countActiveSources([...subs(2), { id: 'off', enabled: false }])).toBe(2);
   });
 
