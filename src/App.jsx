@@ -90,6 +90,8 @@ const AuthenticatedApp = () => {
         <AccessDeniedScreen
           title="Account access not available"
           message={authError.message}
+          reason={authError.reason}
+          identity={authError.identity}
         />
       );
     } else if (authError.type === 'auth_required') {

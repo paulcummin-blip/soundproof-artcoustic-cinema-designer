@@ -109,11 +109,17 @@ export async function resolveAccountAccess(base44, sessionUser, {
 
   const service = base44.asServiceRole;
   const authoritativeUser = await getSingle(service, 'User', { id: sessionUser.id });
-  if (!authoritativeUser) {
-    return { allowed: false, reason: 'USER_NOT_FOUND' };
-  }
 
-  if (authoritativeUser.role === 'admin') {
+  // Platform administration is resolved FIRST, from the authenticated Base44
+  // session role (and the authoritative record when it is readable), so an
+  // administrator can never be denied by any dealer-side requirement below.
+  // An administrator is not an account member: direct access must not depend on
+  // a Sound Proof account linkage, an AccountMembership, a dealer_account_id or
+  // a Partner Portal / PortalIdentity launch. Evaluating this before the record
+  // read means a User-read miss can no longer turn an admin into USER_NOT_FOUND,
+  // and every dealer rejection (ACCOUNT_NOT_LINKED, MEMBERSHIP_*, the iCubed
+  // portal gate) is reached only by non-admin sessions.
+  if (sessionUser.role === 'admin' || authoritativeUser?.role === 'admin') {
     const accessLevel = ACCESS_LEVELS.FULL_ACCESS;
     return {
       allowed: true,
@@ -127,7 +133,7 @@ export async function resolveAccountAccess(base44, sessionUser, {
         accessLevel,
       }),
       user: {
-        ...publicUser(authoritativeUser),
+        ...publicUser(authoritativeUser || sessionUser),
         access_level: accessLevel,
         account_role: 'admin',
         app_role: 'Super Admin',
@@ -135,6 +141,10 @@ export async function resolveAccountAccess(base44, sessionUser, {
       account: null,
       membership: null,
     };
+  }
+
+  if (!authoritativeUser) {
+    return { allowed: false, reason: 'USER_NOT_FOUND' };
   }
 
   if (authoritativeUser.disabled === true) {

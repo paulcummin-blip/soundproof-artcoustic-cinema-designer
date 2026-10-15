@@ -1,6 +1,7 @@
 import React, { createContext, useState, useContext, useEffect } from 'react';
 import { base44 } from '@/api/base44Client';
 import { portalLaunchRejectionMessage } from '@/components/account/portalLaunchFailureCopy';
+import { buildPlatformAdminAccessContext } from '@/lib/platformAdminAccessContext';
 import { appParams } from '@/lib/app-params';
 import { createAxiosClient } from '@base44/sdk/dist/utils/axios-client';
 
@@ -104,6 +105,25 @@ export const AuthProvider = ({ children }) => {
       setIsLoadingAuth(true);
       const currentUser = await base44.auth.me();
 
+      // A platform administrator opens Sound Proof directly. Admin authority is
+      // the authenticated Base44 session role alone (the same authority the
+      // server resolver applies), so it never waits on — and can never be
+      // rejected by — the dealer path below: Sound Proof account linkage,
+      // AccountMembership / dealer_account_id, or a Partner Portal launch. A
+      // launch pass in the URL belongs to the dealer flow and is discarded
+      // unread for an admin session.
+      if (currentUser?.role === 'admin') {
+        takePortalLaunchPass();
+        setUser({
+          ...currentUser,
+          access_context: buildPlatformAdminAccessContext(currentUser),
+        });
+        setIsAuthenticated(true);
+        setAuthError(null);
+        setIsLoadingAuth(false);
+        return;
+      }
+
       // A launch pass is consumed only after Base44 has established the SSO
       // session. It is removed from browser history immediately and never used
       // as account authority; the server verifies the provider subject, live
@@ -122,6 +142,8 @@ export const AuthProvider = ({ children }) => {
           setIsAuthenticated(false);
           setAuthError({
             type: 'access_denied',
+            reason,
+            identity: currentUser?.email || null,
             message: reason === 'PORTAL_ACCOUNT_ASSIGNMENT_REQUIRED'
               ? 'The verified iCubed login is ready, but its Sound Proof administrator seat still needs to be assigned.'
               : portalLaunchRejectionMessage(reason),
@@ -145,6 +167,8 @@ export const AuthProvider = ({ children }) => {
         setIsAuthenticated(false);
         setAuthError({
           type: reason === 'ACCOUNT_SUSPENDED' ? 'account_suspended' : 'access_denied',
+          reason,
+          identity: currentUser?.email || null,
           message: payload?.message || 'This login is not linked to an active Sound Proof account.'
         });
         setIsLoadingAuth(false);
@@ -152,11 +176,14 @@ export const AuthProvider = ({ children }) => {
       }
 
       if (!accessContext?.allowed) {
+        const reason = accessContext?.reason || 'ACCOUNT_ACCESS_DENIED';
         setUser(currentUser);
         setIsAuthenticated(false);
         setAuthError({
-          type: accessContext?.reason === 'ACCOUNT_SUSPENDED' ? 'account_suspended' : 'access_denied',
-          message: 'This login is not linked to an active Sound Proof account.'
+          type: reason === 'ACCOUNT_SUSPENDED' ? 'account_suspended' : 'access_denied',
+          reason,
+          identity: currentUser?.email || null,
+          message: accessContext?.message || 'This login is not linked to an active Sound Proof account.'
         });
         setIsLoadingAuth(false);
         return;
