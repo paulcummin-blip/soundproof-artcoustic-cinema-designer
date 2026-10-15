@@ -13,7 +13,7 @@
 // satisfy candidate-confirmation requirements it can never carry.
 import { describe, it, expect } from "vitest";
 import { readFileSync } from "node:fs";
-import { validateConfirmedCandidate } from "../components/room/bass/improveBassV2/confirmedCandidateValidity.js";
+import { validateConfirmedCandidate, validatePublishedBaseline } from "../components/room/bass/improveBassV2/confirmedCandidateValidity.js";
 import { extractAuthorityForComparison } from "../components/room/bass/improveBassV2/currentAuthorityComparison.js";
 import { STAGE2_CANONICAL_VERSION } from "../components/room/bass/stage2/stage2Constants.js";
 import {
@@ -79,15 +79,26 @@ describe("published Current is an acceptable optimiser baseline", () => {
       startFingerprint: fixture.cacheKey,
     });
     expect(baseline).toBeTruthy();
-    const check = validateConfirmedCandidate(baseline, {
+    const context = {
       seats: seatIds.map((id) => ({ id, isPrimary: true })),
       sourceIds: (contractSources || []).map((source) => source.id),
       inputIdentity: fixture.cacheKey,
-    });
-    // The published result is the designer-facing authority. It is not required
-    // to be rediscovered as a candidate in order to serve as the baseline.
+    };
+    // The published result is read by the published-baseline rules.
+    const check = validatePublishedBaseline(baseline, context);
     expect(check.issues).toEqual([]);
     expect(check.valid).toBe(true);
+
+    // The identified failure predicate, recorded as evidence: the CANDIDATE
+    // contract is what refused this baseline. Each of these is a requirement a
+    // published, designer-facing result can never carry.
+    const asCandidate = validateConfirmedCandidate(baseline, context);
+    expect(asCandidate.valid).toBe(false);
+    expect(asCandidate.issues).toEqual([
+      "Missing output/capability authority",
+      "Physical validation did not pass",
+      "Invalid effective source tuning",
+    ]);
   });
 
   it("never reports an unvalidated baseline when the published result matches", () => {

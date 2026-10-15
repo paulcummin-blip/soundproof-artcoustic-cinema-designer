@@ -50,6 +50,7 @@ import {
   calibrationEvidenceFor,
   describeCalibrationLever,
 } from "./optimiserCalibrationEvidence.js";
+import { resolveAdiLeverStatus } from "./adiLeverStatusAuthority.js";
 
 /**
  * The action column's own words. A change that cannot be applied says what to do
@@ -396,9 +397,16 @@ function rowFor(key, entry, families, baseline, runComplete = false, calibration
   // none — that the groups can be trimmed and one re-run evaluates them.
   if (key === "gain" && !tested) {
     if (entry?.gainAdjustable === false) {
+      // ONE status authority words this, with the run's REAL reason — why the
+      // groups could not be formed — never a vague capability claim that read as
+      // "not applicable" here while Engineer details said the lever was tested.
+      const gainStatus = resolveAdiLeverStatus({
+        applicable: false,
+        notApplicableReason: familyReason(entry),
+      });
       return {
         status: ADI_ROW_STATUS.NOT_YET_SUPPORTED,
-        outcome: familyReason(entry) || ADI_ROW_OUTCOME.GAIN_NOT_ADJUSTABLE,
+        outcome: gainStatus.notApplicable ? gainStatus.label : ADI_ROW_OUTCOME.GAIN_NOT_ADJUSTABLE,
       };
     }
     // The pass completed and covered gain: the row states what came of it —

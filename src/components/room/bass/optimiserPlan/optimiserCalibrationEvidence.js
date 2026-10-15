@@ -40,6 +40,7 @@ import {
   MATERIALITY_DISPOSITION,
   classifyCalibrationDisposition,
 } from "../improveBassV2/materialityGate.js";
+import { resolveAdiLeverStatus } from "./adiLeverStatusAuthority.js";
 
 export const CALIBRATION_EVIDENCE_SCHEMA_VERSION = 1;
 
@@ -621,9 +622,26 @@ function buildGainEvidence({ selection, baseline, appliedLevers }) {
 
   const tested = num(diagnostics?.coarseCount) != null || num(diagnostics?.retained) != null
     || num(diagnostics?.confirmed) != null || Boolean(attempt) || Boolean(accepted);
-  const notApplicableReason = gainAdjustable === false
-    ? (typeof diagnostics?.reason === "string" ? diagnostics.reason : null)
-    : null;
+  // The lever's REAL reason the grouping could not be formed. The run's own
+  // reason is read first, then the grouping record's — a layout whose source
+  // count the grouped sweep cannot group states exactly which count it needs,
+  // instead of the vague capability claim it used to state.
+  const groupingReason = typeof diagnostics?.reason === "string"
+    ? diagnostics.reason
+    : (typeof diagnostics?.grouping?.reason === "string" ? diagnostics.grouping.reason : null);
+  const notApplicableReason = gainAdjustable === false ? groupingReason : null;
+  // ONE status authority for the lever, so the panel, the ledger row and the run
+  // summary can never state different things about the same search. NOT
+  // APPLICABLE is used only with the real reason above — a search that ran and
+  // found nothing useful is TESTED — NO IMPROVEMENT.
+  const leverStatus = resolveAdiLeverStatus({
+    applicable: gainAdjustable === false ? false : null,
+    notApplicableReason,
+    tested,
+    candidateCount: num(diagnostics?.retained) ?? num(diagnostics?.confirmed) ?? 0,
+    confirmed: Boolean(accepted),
+    selected: appliedLevers.includes("gain"),
+  });
 
   return leverRecord({
     lever: "gain",
@@ -656,7 +674,9 @@ function buildGainEvidence({ selection, baseline, appliedLevers }) {
       tested,
     }),
     reason: tested ? reason : notApplicableReason,
-    scope: gainAdjustable === false ? "Gain cannot be adjusted for this layout" : null,
+    // The canonical state word for this lever, carried with its evidence.
+    status: leverStatus.label,
+    scope: gainAdjustable === false ? leverStatus.label : null,
   });
 }
 

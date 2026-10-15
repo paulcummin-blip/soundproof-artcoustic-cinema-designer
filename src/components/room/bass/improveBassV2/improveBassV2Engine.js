@@ -1,4 +1,4 @@
-import { validateConfirmedCandidate, effectiveConfigurationKey } from "./confirmedCandidateValidity.js";
+import { validateConfirmedCandidate, validatePublishedBaseline, effectiveConfigurationKey } from "./confirmedCandidateValidity.js";
 import { extractAuthorityForComparison } from "./currentAuthorityComparison.js";
 import { selectConfirmedRecommendations } from "./confirmedRecommendationSelection.js";
 import { bindTuningToSourceIds } from "./improveBassV2ApplyCalibration.js";
@@ -594,7 +594,11 @@ export async function runImproveBassV2(projectId, versionId, params, callbacks) 
     snapshot.validationContext = validationContext;
     if (existingAuthority) {
       existingAuthority.inputIdentity=startFingerprint;
-      const check=validateConfirmedCandidate(existingAuthority,validationContext);
+      // The Current design is the PUBLISHED baseline, not a candidate: it is
+      // read by the published-baseline rules. Requiring it to carry the
+      // candidate-confirmation contract is what threw away a Current the
+      // optimiser had just displayed, and with it every comparison against it.
+      const check=validatePublishedBaseline(existingAuthority,validationContext);
       existingAuthority=check.valid?check.result:null;
     }
     if (!existingAuthority) {

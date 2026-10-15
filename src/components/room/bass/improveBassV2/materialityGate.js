@@ -30,6 +30,7 @@ export const MATERIALITY_RULE = Object.freeze({
   SEAT_LEVEL_IMPROVED: "seat-level-improved",
   SAME_LEVEL_SEAT_DEVIATION: "same-level-seat-deviation",
   SEVERE_NULL_REDUCED: "severe-null-reduced",
+  P20_AGGREGATE_IMPROVED: "p20-aggregate-improved",
   // The final refusal: displayed levels did not move, and the seat-level
   // deviation improvement did not clear the same-level rule (or the severe-null
   // rule). The rule that held it is the seat-level rule, and `details.seatScope`
@@ -281,6 +282,30 @@ export function isMaterialImprovement(currentResult, candidateResult) {
         ? `P19 aggregate RSP level improved: L${rspP19.before.level} -> L${rspP19.after.level}`
         : `P19 aggregate RSP deviation improved by ${floorP19P20Deviation(rspP19.deviationDeltaDb)} dB`,
       details: { rspP19 },
+    };
+  }
+
+  // ── Same-level CONTINUOUS improvement on the aggregate P20 ──────────────
+  // A candidate does NOT have to cross an RP22 level boundary to be valuable.
+  // P20 ±15 dB · L1 -> P20 ±11 dB · L1 is a real improvement in seat-to-seat
+  // consistency, measured on the same figure the designer reads. The figure is
+  // the SAME canonical 1.0 dB action threshold this gate already applies to a
+  // same-level seat improvement — no new threshold and no new comparison — and
+  // no displayed level is required to move. A level crossing is still the
+  // strongest result; it is simply no longer the only one that counts.
+  const p20Before = aggregateDeviation(currentResult);
+  const p20After = aggregateDeviation(candidateResult);
+  const p20Improvement = p20Before - p20After;
+  if (p20Improvement >= WITHIN_LEVEL_THRESHOLD_DB) {
+    const levelHeld = aggregateLevel(currentResult) !== null
+      && aggregateLevel(currentResult) === aggregateLevel(candidateResult);
+    return {
+      material: true,
+      rule: MATERIALITY_RULE.P20_AGGREGATE_IMPROVED,
+      reason: levelHeld
+        ? `Seat-to-seat consistency improved by ${floorP19P20Deviation(p20Improvement)} dB without changing the achieved level`
+        : `Seat-to-seat consistency improved by ${floorP19P20Deviation(p20Improvement)} dB`,
+      details: { p20Before, p20After, improvement: p20Improvement, levelHeld },
     };
   }
 

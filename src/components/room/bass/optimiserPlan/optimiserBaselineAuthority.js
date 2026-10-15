@@ -277,14 +277,19 @@ export function buildPublishedBaseline({
   const endHz = finiteOrNull(envelope.assessmentEndHz);
   if (startHz == null || endHz == null || endHz <= startHz) return null;
 
-  // The installed effective tuning of each source, read from the live
-  // authoritative sources — the same source the canonical validation uses.
+  // The installed effective tuning of each source. The live authoritative
+  // sources are preferred — the same source the canonical validation uses — and
+  // the published contract's own recorded tuning is used when they are not
+  // supplied. Neither is REQUIRED: the published result is the baseline whether
+  // or not its tuning can be re-stated, and demanding it here is what left a
+  // matching published Current with no usable baseline at all. A tuning this
+  // authority cannot state is recorded as null, never invented.
   const ids = (Array.isArray(sourceIds) ? sourceIds : []).map((id) => String(id));
+  const contractTuning = contract.appliedTuning || contract.effectiveTuning || null;
   const appliedTuning = ids.length && Array.isArray(sources)
       && ids.every((id) => sources.some((source) => String(source?.id) === id))
     ? ids.map((id) => ({ ...(sources.find((source) => String(source?.id) === id)?.tuning || {}), sourceId: id }))
-    : null;
-  if (!appliedTuning) return null;
+    : (Array.isArray(contractTuning) && contractTuning.length ? contractTuning : null);
 
   const selectedCandidate = contract.selectedCandidate || {};
   return {

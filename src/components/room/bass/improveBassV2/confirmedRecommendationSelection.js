@@ -1,4 +1,4 @@
-import { validateConfirmedCandidate, effectiveConfigurationKey } from "./confirmedCandidateValidity.js";
+import { validateConfirmedCandidate, validatePublishedBaseline, effectiveConfigurationKey } from "./confirmedCandidateValidity.js";
 import { isMaterialImprovement } from "./materialityGate.js";
 import { rankRecommendations } from "./recommendationRanker.js";
 import { extractAuthoritativeMetrics, detectMutedSubs } from "../best-layout/authoritativeFinalistSelection.js";
@@ -15,7 +15,11 @@ export function selectConfirmedRecommendations(results, snapshot, current) {
   const context = snapshot.validationContext || {
     seats: current?.perSeatP20?.map(s=>({id:s.seatId,isPrimary:s.isPrimary})),
   };
-  const baselineCheck = validateConfirmedCandidate(current, context);
+  // The baseline is the PUBLISHED Current result, read by the published-baseline
+  // rules. It is never required to be rediscovered as an optimiser candidate in
+  // order to be compared against: a published Current whose fingerprint matches
+  // the live design IS the comparison baseline.
+  const baselineCheck = validatePublishedBaseline(current, context);
   const evaluations = [];
   const eligible = [];
   const tradeOffs = [];

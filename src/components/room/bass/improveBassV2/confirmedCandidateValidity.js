@@ -120,6 +120,49 @@ export function validateConfirmedCandidate(result, context = {}) {
   } : null;
   return { valid: issues.length === 0, issues, result: value };
 }
+
+/**
+ * Baseline validation — the CURRENT design a candidate is compared against.
+ *
+ * The baseline IS the published bass result the designer is looking at. It is
+ * NOT a candidate: it was never produced by the optimiser's candidate pipeline,
+ * so it can never carry the candidate-confirmation contract — a canonical
+ * receipt for a candidate that was selected in this run, a
+ * physical-validation round-trip, or a reproduction of the source tuning from
+ * the live sources. Requiring those of it is what refused a confirmed
+ * improvement against a Current the optimiser had itself just displayed.
+ *
+ * What IS required is exactly what the published authority publishes: the
+ * per-seat P20 set for every applicable seat, the aggregate RSP P19 headline,
+ * the assessment band, and — when identity is being checked — the same design
+ * fingerprint. Everything the record does carry is validated as written; a
+ * value it does not publish is a stated absence, never invented and never a
+ * fabricated pass. P18/P14 are read when published so the safety comparison can
+ * use them, and are not demanded of a baseline that does not state them.
+ */
+export function validatePublishedBaseline(result, context = {}) {
+  if (!result) {
+    return { valid: false, publishedBaseline: true, issues: ["No published baseline result"], result: null };
+  }
+  const issues = [
+    ...validateSeatResults(result, context.seats).issues,
+    ...validateAggregateP19(result).issues,
+  ];
+  if (!finite(result?.assessmentStartHz) || !finite(result?.assessmentEndHz) ||
+      result.assessmentStartHz <= 0 || result.assessmentEndHz <= result.assessmentStartHz) issues.push("Invalid assessment band");
+  if (context.inputIdentity && result?.inputIdentity !== context.inputIdentity) issues.push("Stale input identity");
+  // Validated as written, never required: a level that IS present must be
+  // canonical, so a garbled published level still fails.
+  if (result?.p14AchievedLevel != null && canonicalLevel(result.p14AchievedLevel) == null) issues.push("Invalid achieved capability level");
+  if (result?.p18AchievedLevel != null && canonicalLevel(result.p18AchievedLevel) == null) issues.push("Invalid P18 level");
+  if (result?.achievedP20Level != null && canonicalLevel(result.achievedP20Level) == null) issues.push("Invalid P20 level");
+  const priority = new Map(requiredSeats(context.seats).map(s => [s.id, s.isPrimary]));
+  const value = { ...result,
+    perSeatP19: (result.perSeatP19 || []).map(s => ({ ...s, isPrimary: priority.get(String(s.seatId)) })),
+    perSeatP20: (result.perSeatP20 || []).map(s => ({ ...s, isPrimary: priority.get(String(s.seatId)) })),
+  };
+  return { valid: issues.length === 0, publishedBaseline: true, issues, result: value };
+}
 export function effectiveConfigurationKey(instances, tuning) {
   const byId = new Map((tuning || []).map(t=>[t.sourceId,t]));
   return JSON.stringify((instances || []).filter(s=>s.enabled!==false).map((s,i)=>{
