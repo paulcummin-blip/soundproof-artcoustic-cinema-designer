@@ -36,6 +36,7 @@ import {
   OPTIMISER_OUTCOME,
   OPTIMISER_OUTCOME_LABEL,
   OPTIMISER_PRESENTATION_ACTION,
+  OPTIMISER_PRESENTATION_STATE,
   OPTIMISER_RETEST_LABEL,
   resolveOptimiserPresentationState,
 } from "../components/room/bass/optimiserPlan/resolveOptimiserPresentationState.js";
@@ -242,13 +243,16 @@ describe("ACCEPTANCE 6: a genuine technical failure names its real reason", () =
     expect(state.actionLabel).toBeTruthy();
   });
 
-  it("keeps the engine's own words in the state and in the run evidence", () => {
+  it("keeps the engine's own words on the state, where Engineer details reads them", () => {
     const state = stateFor(
       { status: OPTIMISER_PLAN_STATUS.FAILED, run: { rejectionReasons: ["worker failed"] } },
       { runStatus: "failed", runError: "worker failed" },
     );
     expect(state.failureCode).toBe(OPTIMISER_FAILURE_CODE.WORKER_FAILED);
-    expect(state.evidence.rejectionReasons.join(" ")).toBe("worker failed");
+    // The technical text still travels with the state, so Engineer details can
+    // print it — it is simply never the main panel's sentence.
+    expect(state.runError).toBe("worker failed");
+    expect(state.message).not.toContain("worker failed");
   });
 });
 
