@@ -45,6 +45,10 @@
       "type": "object",
       "description": "Stage 2 result for 2-sub quantity: evaluated finalists, best finalist, ranking, runtime."
     },
+    "three_sub_result": {
+      "type": "object",
+      "description": "Stage 2 result for the three-source quantity: evaluated finalists, best finalist, ranking, runtime. A three-source design's own quantity is evaluated first, and its finalists are ranked by the same canonical comparator as the one-, two- and four-sub quantities. Null when the design's quantity ordering did not include three sources."
+    },
     "four_sub_result": {
       "type": "object",
       "description": "Stage 2 result for 4-sub quantity: evaluated finalists, best finalist, ranking, runtime. Includes B last-resort candidate if evaluated."

@@ -97,13 +97,18 @@ export function shouldEvaluateThirdFinalist(evaluatedResults, remainingFinalists
 /**
  * Build the full promotion plan for all quantities.
  *
- * @param {object} stage1Results — { one_sub_result, two_sub_result, four_sub_result }
- * @returns {object} { 1: [...], 2: [...], 4: [...] } promoted finalists per quantity
+ * @param {object} stage1Results — { one_sub_result, two_sub_result, three_sub_result, four_sub_result }
+ * @returns {object} { 1: [...], 2: [...], 3: [...], 4: [...] } promoted finalists per quantity
  */
 export function buildPromotionPlan(stage1Results) {
   const plan = {};
-  const quantityMap = { 1: "one_sub_result", 2: "two_sub_result", 4: "four_sub_result" };
-  for (const qty of [1, 2, 4]) {
+  const quantityMap = {
+    1: "one_sub_result",
+    2: "two_sub_result",
+    3: "three_sub_result",
+    4: "four_sub_result",
+  };
+  for (const qty of [1, 2, 3, 4]) {
     const result = stage1Results?.[quantityMap[qty]];
     plan[qty] = promoteFinalistsForQuantity(result?.finalists || []);
   }

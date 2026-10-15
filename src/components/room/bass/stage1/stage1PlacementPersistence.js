@@ -25,10 +25,12 @@ function buildPersistedCache(existing, fingerprint, results, status) {
       : existing?.completed_by_fingerprint || {},
     one_sub_result: results?.one_sub_result || null,
     two_sub_result: results?.two_sub_result || null,
+    three_sub_result: results?.three_sub_result || null,
     four_sub_result: results?.four_sub_result || null,
     a_prohibition_validation: results
       ? (results.one_sub_result?.aProhibitionValidation === "PASS" &&
          results.two_sub_result?.aProhibitionValidation === "PASS" &&
+         results.three_sub_result?.aProhibitionValidation === "PASS" &&
          results.four_sub_result?.aProhibitionValidation === "PASS" ? "PASS" : "FAIL")
       : "PASS",
     b_evaluated: false,
@@ -57,6 +59,7 @@ export async function hydrateStage1PlacementCache(projectId, versionId) {
       completed_by_fingerprint: record.completed_by_fingerprint || {},
       one_sub_result: record.one_sub_result || null,
       two_sub_result: record.two_sub_result || null,
+      three_sub_result: record.three_sub_result || null,
       four_sub_result: record.four_sub_result || null,
       a_prohibition_validation: record.a_prohibition_validation || "PASS",
       b_evaluated: record.b_evaluated || false,
@@ -83,6 +86,7 @@ export function isStage1CacheValid(hydrated, fingerprint) {
   const requiredResults = [
     hydrated.one_sub_result,
     hydrated.two_sub_result,
+    hydrated.three_sub_result,
     hydrated.four_sub_result,
   ];
   if (requiredResults.some((result) =>
@@ -99,7 +103,7 @@ export function isStage1CacheValid(hydrated, fingerprint) {
  * Persist Stage 1 results to the database.
  * @param {string} projectId
  * @param {string} fingerprint
- * @param {object} results — { one_sub_result, two_sub_result, four_sub_result }
+ * @param {object} results — { one_sub_result, two_sub_result, three_sub_result, four_sub_result }
  * @param {string|null} existingRecordId
  * @returns {Promise<object|null>}
  */

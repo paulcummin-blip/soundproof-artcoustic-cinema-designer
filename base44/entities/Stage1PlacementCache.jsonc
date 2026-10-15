@@ -22,7 +22,7 @@
     },
     "family_policy_version": {
       "type": "string",
-      "description": "Stage 1 family policy version (A-prohibition, B-gating, hierarchy)."
+      "description": "Stage 1 family policy version (A-prohibition, B-gating, hierarchy, and the family sets for one, two, three and four sources)."
     },
     "modal_physics_version": {
       "type": "string",
@@ -52,6 +52,10 @@
     "two_sub_result": {
       "type": "object",
       "description": "Stage 1 result for 2-sub search: status, family coverage, candidate count, finalists, screening metrics, timing."
+    },
+    "three_sub_result": {
+      "type": "object",
+      "description": "Stage 1 result for the three-source search: status, family coverage, candidate count, finalists, screening metrics, timing. Every finalist carries three explicit coordinates \u2014 one per physical source \u2014 for the front-singleton/rear-pair, front-pair/rear-singleton, asymmetric-pair and distributed families. Three sources have no canonical RP22 family set; the families are the practical wall arrangements those topologies can have."
     },
     "four_sub_result": {
       "type": "object",

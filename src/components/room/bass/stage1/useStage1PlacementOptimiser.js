@@ -78,6 +78,7 @@ export function useStage1PlacementOptimiser({ projectId, versionId = "free", roo
     publishHydratedStage1(projectId, versionId, fingerprint, {
       one_sub_result: hydratedCache.one_sub_result,
       two_sub_result: hydratedCache.two_sub_result,
+      three_sub_result: hydratedCache.three_sub_result,
       four_sub_result: hydratedCache.four_sub_result,
     });
   }, [hydrationDone, hydratedCache, fingerprint, projectId]);

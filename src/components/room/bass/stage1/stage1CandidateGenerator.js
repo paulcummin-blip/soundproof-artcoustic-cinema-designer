@@ -4,6 +4,13 @@
 // All coordinates are normalised (xNorm, yNorm).
 
 import { FAMILY_IDS, FAMILY_SEEDS, ENABLED_FAMILIES } from "./stage1FamilyRegistry";
+import {
+  THREE_SUB_FAMILY_IDS,
+  THREE_SUB_FAMILY_SEEDS,
+  isThreeSubFamily,
+  threeSubFamilyPoints,
+  threeSubFineFamilyPoints,
+} from "./stage1ThreeSubFamilies.js";
 import { STAGE1_LOCAL_SEARCH, STAGE1_CANDIDATE_BUDGETS } from "./stage1Constants";
 import { filterAProhibited } from "./stage1GeometryValidator";
 
@@ -331,6 +338,70 @@ function generateTwoSubFallback() {
   return candidates;
 }
 
+// ── Three-sub generation ────────────────────────────────────────────────
+
+/** How each three-source family's arrangement reads. */
+const THREE_SUB_SYMMETRY_STATE = Object.freeze({
+  [THREE_SUB_FAMILY_IDS.THREE_FRONT_SINGLE_REAR_PAIR]: "symmetric",
+  [THREE_SUB_FAMILY_IDS.THREE_FRONT_PAIR_REAR_SINGLE]: "symmetric",
+  [THREE_SUB_FAMILY_IDS.THREE_ASYMMETRIC_REAR_PAIR]: "asymmetric",
+  [THREE_SUB_FAMILY_IDS.THREE_DISTRIBUTED_POSITIONS]: "distributed",
+  [THREE_SUB_FAMILY_IDS.THREE_BOUNDARY_CUSTOM]: "symmetric",
+});
+
+/** How far an arrangement stands from its family's canonical seed. */
+function threeSubSeedDisplacement(familyId, sources) {
+  const seed = THREE_SUB_FAMILY_SEEDS[familyId];
+  if (!Array.isArray(seed) || seed.length !== sources.length) return 0;
+  return Math.max(...sources.map((point, index) =>
+    Math.hypot(point.xNorm - seed[index].xNorm, point.yNorm - seed[index].yNorm)));
+}
+
+/**
+ * One three-source family: every candidate carries three explicit points — one
+ * per physical source. Never a quad with a missing slot, never a pair standing
+ * in for the two real sources it links.
+ */
+function generateThreeSubFamily(familyId, searchTier = 1) {
+  return threeSubFamilyPoints(familyId).map((points) => {
+    const sources = points.map((point) => makeSource(point.xNorm, point.yNorm));
+    return makeCandidate(
+      familyId, sources, searchTier,
+      THREE_SUB_SYMMETRY_STATE[familyId] || "symmetric",
+      threeSubSeedDisplacement(familyId, sources),
+    );
+  });
+}
+
+/** Three sources: the topologies a three-source room can have, plus the fallback. */
+function generateThreeSub() {
+  const candidates = [];
+  for (const familyId of ENABLED_FAMILIES[3]) {
+    candidates.push(...generateThreeSubFamily(familyId));
+  }
+  candidates.push(...generateThreeSubFamily(THREE_SUB_FAMILY_IDS.THREE_BOUNDARY_CUSTOM, 2));
+  const seen = new Map();
+  for (const c of candidates) seen.set(c.id, c);
+  return Array.from(seen.values());
+}
+
+/**
+ * The fine search of a three-source family: the arrangement that was found, with
+ * its mirrored pair's spread refined. Families without a mirrored pair return
+ * nothing — there is no single parameter to refine.
+ */
+function generateThreeSubFine(familyId, bestParam) {
+  if (!bestParam || !Number.isFinite(Number(bestParam.spread))) return [];
+  return threeSubFineFamilyPoints(familyId, bestParam).map((points) => {
+    const sources = points.map((point) => makeSource(point.xNorm, point.yNorm));
+    return makeCandidate(
+      familyId, sources, 1,
+      THREE_SUB_SYMMETRY_STATE[familyId] || "symmetric",
+      threeSubSeedDisplacement(familyId, sources),
+    );
+  });
+}
+
 // ── Four-sub fallback ────────────────────────────────────────────────────
 
 function generateFourSubFallback() {
@@ -362,7 +433,7 @@ const FAMILY_GENERATORS = {
 /**
  * Generate all coarse candidates for a given quantity.
  * Applies A-prohibition filter and budget caps.
- * @param {number} quantity — 1, 2, or 4
+ * @param {number} quantity — 1, 2, 3 or 4
  * @returns {{ candidates: Array, rejected: Array, familyCoverage: object }}
  */
 export function generateStage1Candidates(quantity) {
@@ -377,6 +448,8 @@ export function generateStage1Candidates(quantity) {
       if (gen) candidates.push(...gen());
     }
     candidates.push(...generateTwoSubFallback());
+  } else if (quantity === 3) {
+    candidates = generateThreeSub();
   } else if (quantity === 4) {
     for (const familyId of ENABLED_FAMILIES[4]) {
       const gen = FAMILY_GENERATORS[familyId];
@@ -405,10 +478,12 @@ export function generateStage1Candidates(quantity) {
 /**
  * Generate fine-search candidates around the best parameterised family candidate.
  * @param {string} familyId — family to fine-search
- * @param {number} bestParam — best parameterised value (q)
+ * @param {number|object} bestParam — best parameterised value (q), or a
+ *   three-source family's pair parameter ({ spread, singletons })
  * @returns {Array} fine candidates
  */
 export function generateFineCandidates(familyId, bestParam) {
+  if (isThreeSubFamily(familyId)) return generateThreeSubFine(familyId, bestParam);
   if (familyId === FAMILY_IDS.C_FRONT_PAIR) return generateC_FRONT_PAIR_Fine(bestParam);
   if (familyId === FAMILY_IDS.FRONT_THIRD_PAIR) return generateFRONT_THIRD_PAIR_Fine(bestParam);
   if (familyId === FAMILY_IDS.REAR_QUARTER_PAIR) return generateREAR_QUARTER_PAIR_Fine(bestParam);

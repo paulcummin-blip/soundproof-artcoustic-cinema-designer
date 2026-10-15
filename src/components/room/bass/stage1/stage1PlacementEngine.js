@@ -16,6 +16,7 @@ import {
 import { generateStage1Candidates, generateFineCandidates } from "./stage1CandidateGenerator";
 import { screenCandidate, compareScreeningResults } from "./stage1Screening";
 import { FAMILY_IDS } from "./stage1FamilyRegistry";
+import { isThreeSubFamily, threeSubFamilyBestParam } from "./stage1ThreeSubFamilies.js";
 import { validateAProhibition } from "./stage1GeometryValidator";
 
 const round = (v, d = 3) => Number(Number(v || 0).toFixed(d));
@@ -155,6 +156,9 @@ export function runStage1SearchForQuantity({ roomDims, rspPosition, seatingPosit
     FAMILY_IDS.RP22_C,
     FAMILY_IDS.FOUR_THIRD_PAIRS,
     FAMILY_IDS.RP22_D,
+    // Three-source families refine the mirrored pair they were built around.
+    FAMILY_IDS.THREE_FRONT_SINGLE_REAR_PAIR,
+    FAMILY_IDS.THREE_FRONT_PAIR_REAR_SINGLE,
   ];
   for (const familyId of parameterisedFamilies) {
     if (generationId && generationId.cancelled) return null;
@@ -163,7 +167,11 @@ export function runStage1SearchForQuantity({ roomDims, rspPosition, seatingPosit
     if (!hasFamily) continue;
     const bestInFamily = coarseResults.find((r) => r.familyId === familyId);
     if (!bestInFamily) continue;
-    const bestParam = extractBestParam(bestInFamily);
+    // A three-source family is refined on the pair it was built around; every
+    // other family refines its single parameter q.
+    const bestParam = isThreeSubFamily(familyId)
+      ? threeSubFamilyBestParam(bestInFamily)
+      : extractBestParam(bestInFamily);
     const fineCandidates = generateFineCandidates(familyId, bestParam);
     for (const candidate of fineCandidates) {
       if (generationId && generationId.cancelled) return null;
@@ -233,16 +241,19 @@ export function runStage1SearchForQuantity({ roomDims, rspPosition, seatingPosit
 }
 
 /**
- * Run full Stage 1 search for all quantities (1, 2, 4).
+ * Run full Stage 1 search for all quantities (1, 2, 3, 4).
  * Suggested order: 2-sub, 4-sub, 1-sub.
  */
 export function runFullStage1Search({ roomDims, rspPosition, seatingPositions, physicsOptions, generationId }) {
   const overallStart = performance.now();
   const physics = physicsOptions || DEFAULT_BEST_SUB_LAYOUT_PHYSICS;
-  const quantities = [2, 4, 1];
+  // The three-source quantity is appended, never inserted: the order the existing
+  // quantities are searched in is unchanged.
+  const quantities = [2, 4, 1, 3];
   const quantityResultKeys = {
     1: "one_sub_result",
     2: "two_sub_result",
+    3: "three_sub_result",
     4: "four_sub_result",
   };
   const results = {};

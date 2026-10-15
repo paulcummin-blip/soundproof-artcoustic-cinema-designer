@@ -41,6 +41,7 @@ function emptyState(projectId, versionId) {
     placementFingerprint: null,
     one_sub_result: null,
     two_sub_result: null,
+    three_sub_result: null,
     four_sub_result: null,
     overall_best: null,
     canonicalJobsRun: 0,
@@ -96,6 +97,7 @@ export function publishHydratedStage2(projectId, versionId, fingerprint, results
     placementFingerprint: results?.placement_fingerprint || null,
     one_sub_result: results?.one_sub_result || null,
     two_sub_result: results?.two_sub_result || null,
+    three_sub_result: results?.three_sub_result || null,
     four_sub_result: results?.four_sub_result || null,
     overall_best: results?.overall_best || null,
     canonicalJobsRun: results?.canonical_jobs_run || 0,
@@ -119,6 +121,7 @@ export function markStage2Updating(projectId, versionId, fingerprint, progress =
     fingerprint,
     one_sub_result: null,
     two_sub_result: null,
+    three_sub_result: null,
     four_sub_result: null,
     overall_best: null,
     canonicalJobsRun: 0,
@@ -162,6 +165,7 @@ function publishStage2Progress(projectId, versionId, fingerprint, results, place
     placementFingerprint: placementFingerprint || null,
     one_sub_result: results?.one_sub_result || null,
     two_sub_result: results?.two_sub_result || null,
+    three_sub_result: results?.three_sub_result || null,
     four_sub_result: results?.four_sub_result || null,
     overall_best: results?.overall_best || null,
     canonicalJobsRun: results?.canonical_jobs_run || 0,
@@ -183,6 +187,7 @@ function publishStage2Complete(projectId, versionId, fingerprint, results, place
     placementFingerprint: placementFingerprint || null,
     one_sub_result: results?.one_sub_result || null,
     two_sub_result: results?.two_sub_result || null,
+    three_sub_result: results?.three_sub_result || null,
     four_sub_result: results?.four_sub_result || null,
     overall_best: results?.overall_best || null,
     canonicalJobsRun: results?.canonical_jobs_run || 0,
@@ -939,10 +944,15 @@ export class Stage2PlacementController {
 
   buildResultsSnapshot() {
     const snapshot = {};
-    const quantityMap = { 1: "one_sub_result", 2: "two_sub_result", 4: "four_sub_result" };
+    const quantityMap = {
+      1: "one_sub_result",
+      2: "two_sub_result",
+      3: "three_sub_result",
+      4: "four_sub_result",
+    };
     let overallBest = null;
 
-    for (const qty of [1, 2, 4]) {
+    for (const qty of [1, 2, 3, 4]) {
       const evaluated = this.completedResults[qty] || [];
       if (!evaluated.length) {
         snapshot[quantityMap[qty]] = null;

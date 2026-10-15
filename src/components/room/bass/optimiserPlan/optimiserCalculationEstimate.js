@@ -158,7 +158,7 @@ export function estimateOptimiserCalculations({ instances = [], roomDims = null 
     sourceCount,
     grouping.status === "eligible" ? grouping.groups.length : null,
   );
-  // The stage-1 placement pool is a layout comparison (one, two and four
+  // The stage-1 placement pool is a layout comparison (one, two, three and four
   // sources), so a quantity it has no pool for contributes no placement family:
   // the estimate then states exactly what IS searched for this design.
   const placement = placementBudget(sourceCount);

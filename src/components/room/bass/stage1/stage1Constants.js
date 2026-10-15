@@ -3,7 +3,9 @@
 // Product-independent, P14-independent, EQ-independent geometric search.
 
 export const STAGE1_PLACEMENT_ALGORITHM_VERSION = "stage1-placement-v1";
-export const STAGE1_FAMILY_POLICY_VERSION = "stage1-family-policy-v2";
+// v3: the three-source family set was added, so a cached Stage 1 result written
+// under v2 has no three_sub_result and is not a current family policy.
+export const STAGE1_FAMILY_POLICY_VERSION = "stage1-family-policy-v3-three-source";
 export const STAGE1_CACHE_VERSION = 2;
 
 // Frequency domain for positional consistency screening (RP22 §7.1).

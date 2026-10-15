@@ -11,7 +11,7 @@
 import { compareStage2Results } from "./stage2Ranking.js";
 
 /** The quantities Stage 2 evaluates, in processing order. */
-export const STAGE2_QUANTITY_ORDER = Object.freeze([1, 2, 4]);
+export const STAGE2_QUANTITY_ORDER = Object.freeze([1, 2, 3, 4]);
 
 /**
  * The better-ranked of two candidates. Returns `current` when the candidate is

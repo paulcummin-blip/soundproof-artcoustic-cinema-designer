@@ -73,6 +73,14 @@ export function computeStage2Fingerprint({
       .map((f) => ({ id: f?.id, family: f?.familyId }))
       .sort((a, b) => (a.id || "").localeCompare(b.id || ""));
   }
+  // Three-source finalists are part of the identity only when they exist, so a
+  // design without them keeps the fingerprint it already had.
+  const threeFinalists = stage1Finalists?.[3] || [];
+  if (threeFinalists.length) {
+    finalistIdentity[3] = threeFinalists
+      .map((f) => ({ id: f?.id, family: f?.familyId }))
+      .sort((a, b) => (a.id || "").localeCompare(b.id || ""));
+  }
 
   const canonical = {
     cacheVersion: STAGE2_CACHE_VERSION,

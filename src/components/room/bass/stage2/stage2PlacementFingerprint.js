@@ -53,6 +53,16 @@ function buildFinalistIdentity(stage1Finalists) {
       .map((f) => ({ id: f?.id, family: f?.familyId }))
       .sort((a, b) => (a.id || "").localeCompare(b.id || ""));
   }
+  // The three-source quantity appears only when the design actually has
+  // three-source finalists. A design with none keeps the exact identity — and so
+  // the exact fingerprint — it had before the three-source families existed, so
+  // no existing placement cache is invalidated by their arrival.
+  const threeFinalists = stage1Finalists?.[3] || [];
+  if (threeFinalists.length) {
+    finalistIdentity[3] = threeFinalists
+      .map((f) => ({ id: f?.id, family: f?.familyId }))
+      .sort((a, b) => (a.id || "").localeCompare(b.id || ""));
+  }
   return finalistIdentity;
 }
 

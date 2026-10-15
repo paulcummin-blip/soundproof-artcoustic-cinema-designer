@@ -274,9 +274,11 @@ export default function BassPostCalculationActions({
     ? stage2.one_sub_result
     : currentQuantity === 2
       ? stage2.two_sub_result
-      : currentQuantity === 4
-        ? stage2.four_sub_result
-        : null;
+      : currentQuantity === 3
+        ? stage2.three_sub_result
+        : currentQuantity === 4
+          ? stage2.four_sub_result
+          : null;
   const recommendation = useMemo(() => buildStage2RecommendationLayout({
     quantityResult,
     roomDims: canonical.roomDims,

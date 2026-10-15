@@ -53,7 +53,7 @@ function buildSeatPriorityMap(seatingPositions) {
 }
 
 function resolveQuantityOrder(currentQuantity) {
-  if (currentQuantity === 1 || currentQuantity === 2 || currentQuantity === 4) {
+  if (currentQuantity === 1 || currentQuantity === 2 || currentQuantity === 3 || currentQuantity === 4) {
     return [currentQuantity, ...STAGE2_DEFAULT_QUANTITY_ORDER.filter((q) => q !== currentQuantity)];
   }
   return STAGE2_DEFAULT_QUANTITY_ORDER;
@@ -136,9 +136,10 @@ export function useStage2PlacementOptimiser({
     return {
       1: stage1State.one_sub_result?.finalists || [],
       2: stage1State.two_sub_result?.finalists || [],
+      3: stage1State.three_sub_result?.finalists || [],
       4: stage1State.four_sub_result?.finalists || [],
     };
-  }, [stage1State?.status, stage1State?.one_sub_result, stage1State?.two_sub_result, stage1State?.four_sub_result]);
+  }, [stage1State?.status, stage1State?.one_sub_result, stage1State?.two_sub_result, stage1State?.three_sub_result, stage1State?.four_sub_result]);
 
   const stage1Fingerprint = stage1State?.fingerprint || null;
 
@@ -221,6 +222,7 @@ export function useStage2PlacementOptimiser({
       placement_fingerprint: hydratedCache.placement_fingerprint,
       one_sub_result: hydratedCache.one_sub_result,
       two_sub_result: hydratedCache.two_sub_result,
+      three_sub_result: hydratedCache.three_sub_result,
       four_sub_result: hydratedCache.four_sub_result,
       overall_best: hydratedCache.overall_best,
       canonical_jobs_run: hydratedCache.canonical_jobs_run,
@@ -307,6 +309,7 @@ export function useStage2PlacementOptimiser({
     const promotionPlan = buildPromotionPlan({
       one_sub_result: { finalists: stage1Finalists?.[1] || [] },
       two_sub_result: { finalists: stage1Finalists?.[2] || [] },
+      three_sub_result: { finalists: stage1Finalists?.[3] || [] },
       four_sub_result: { finalists: stage1Finalists?.[4] || [] },
     });
 
