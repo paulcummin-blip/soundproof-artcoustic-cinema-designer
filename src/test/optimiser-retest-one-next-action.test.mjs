@@ -105,23 +105,26 @@ describe("RE-TEST NEEDED HAS ONE CTA", () => {
     // The state rule is part of the one-re-test rule, so a re-test can never be
     // drawn beside an "OPTIMISE BASS" run control.
     expect(journey).toMatch(
-      /const runControlIsRetest = journey\.action === OPTIMISER_PRESENTATION_ACTION\.RETEST[\s\S]*?journey\.actionLabel === OPTIMISER_RETEST_LABEL[\s\S]*?retestNeeded;/,
+      /const runControlIsRetest = journey\.action === OPTIMISER_PRESENTATION_ACTION\.RETEST[\s\S]*?journey\.actionLabel === OPTIMISER_RETEST_LABEL[\s\S]*?optimiserRunOwnsRetry;/,
     );
     expect(journey).toMatch(
-      /retestNeeded && journey\.action !== ADI_OPTIMISER_ACTION\.CALCULATE\s*\n\s*\? OPTIMISER_RETEST_LABEL\s*\n\s*: journey\.actionLabel\}/,
+      /optimiserRunOwnsRetry && journey\.action !== ADI_OPTIMISER_ACTION\.CALCULATE\s*\n\s*\? OPTIMISER_RETEST_LABEL\s*\n\s*: journey\.actionLabel\}/,
     );
+    // Both legacy re-test and fresh technical-failure retry states are owned by
+    // the evidence-only run path, never calibration auto-apply.
+    expect(journey).toMatch(/const optimiserRunOwnsRetry = retestNeeded[\s\S]*?OPTIMISER_OUTCOME\.UNABLE_TO_EVALUATE;/);
     // The calibration re-test, the placement re-run and the placement Apply/Undo
     // are the controls that start the same or an overlapping flow.
-    expect(journey).toMatch(/onReoptimise=\{retestNeeded \|\| isRunning \|\| retestOwnsPrimary/);
-    expect(journey).toMatch(/onRerun=\{isRunning \|\| retestNeeded \? null : onRunOptimisationPlan\}/);
-    expect(journey).toMatch(/onApply=\{retestNeeded \? null : handleApplyPlacement\}/);
-    expect(journey).toMatch(/onUndo=\{retestNeeded \? null : handleUndoPlacement\}/);
+    expect(journey).toMatch(/onReoptimise=\{optimiserRunOwnsRetry \|\| isRunning \|\| retestOwnsPrimary/);
+    expect(journey).toMatch(/onRerun=\{isRunning \|\| optimiserRunOwnsRetry \? null : onRunOptimisationPlan\}/);
+    expect(journey).toMatch(/onApply=\{optimiserRunOwnsRetry \? null : handleApplyPlacement\}/);
+    expect(journey).toMatch(/onUndo=\{optimiserRunOwnsRetry \? null : handleUndoPlacement\}/);
     // Nothing is applied from an unconfirmed candidate.
-    expect(journey).toMatch(/onApply=\{retestNeeded \|\| recommendationIgnored/);
-    expect(journey).toMatch(/onUndo=\{retestNeeded \|\| panelShowsUndo \? null : handleUndoRecommended\}/);
-    expect(journey).toMatch(/designApplicable: !retestNeeded/);
+    expect(journey).toMatch(/onApply=\{optimiserRunOwnsRetry \|\| recommendationIgnored/);
+    expect(journey).toMatch(/onUndo=\{optimiserRunOwnsRetry \|\| panelShowsUndo \? null : handleUndoRecommended\}/);
+    expect(journey).toMatch(/designApplicable: !optimiserRunOwnsRetry/);
     // The placement panel cannot claim the re-run while the re-test owns it.
-    expect(journey).toMatch(/panelShowsRerun = placement\?\.kind === "previous" && !retestNeeded;/);
+    expect(journey).toMatch(/panelShowsRerun = placement\?\.kind === "previous" && !optimiserRunOwnsRetry;/);
   });
 
   it("takes the re-test state from the outcome, or from the journey's own badge", () => {
