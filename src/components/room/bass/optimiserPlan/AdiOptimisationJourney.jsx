@@ -76,6 +76,9 @@ import { resolveBestCalibrationResult } from "./bestCalibrationResult.js";
 import AdiBestCalibrationResult from "./AdiBestCalibrationResult.jsx";
 import AdiDesignRecommendationSection from "./AdiDesignRecommendationSection.jsx";
 import AdiPanelSummary from "./AdiPanelSummary.jsx";
+import AdiImprovementResult from "./AdiImprovementResult.jsx";
+import AdiImprovementActions from "./AdiImprovementActions.jsx";
+import { IMPROVEMENT_CASE, resolveImprovementResult } from "./improvementResultAuthority.js";
 import AdiTradeOffActions from "./AdiTradeOffActions.jsx";
 import { TRADE_OFF_KEPT_LABEL, TRADE_OFF_KEPT_SENTENCE } from "./optimiserTradeOffState.js";
 import AdiPreviousCandidateDetails from "./AdiPreviousCandidateDetails.jsx";
@@ -434,8 +437,17 @@ export default function AdiOptimisationJourney({
     ? () => onApplyLever(tradeOffLever)
     : null;
 
+  // A COMPLETED, SUCCESSFUL RUN IS NOT A STARTING POINT. While the panel states a
+  // confirmed improvement — one ADI applied, or one the designer approves — no
+  // run and no re-test control belongs on the card: those are the actions for "no
+  // result yet", "the design has changed" and "a re-test is genuinely required",
+  // and this state is none of them. Read from the outcome authority, so the
+  // trade-off, the physical move and every retry state keep their own controls.
+  const improvementOwnsPanel = presentation?.outcome === OPTIMISER_OUTCOME.IMPROVEMENTS_FOUND;
+
   const showAction = !!journey.action && journey.canRun && !isRunning
-    && !tradeOffActive && !tradeOffSettled;
+    && !tradeOffActive && !tradeOffSettled
+    && !improvementOwnsPanel;
   // ── ONE RE-TEST ──
   // In the re-test states the panel's own run control is worded as the re-test
   // itself. While that control is drawn it IS the re-test: it owns the primary
@@ -592,6 +604,28 @@ export default function AdiOptimisationJourney({
     finding: noImprovementConfirmed ? panelFinding : null,
   });
 
+  // ── WHAT THE COMPLETED RUN FOUND, AND WHAT TO DO ABOUT IT ──
+  // The badge, the sentence, the result block and the ONE deliberate Apply for a
+  // confirmed improvement all come from this one resolver. It reads authorities
+  // already resolved above — the headline, the run's own saved calibration
+  // decision, the trade-off and the physical-change test — and decides nothing
+  // about the engineering: no lever is ranked, no threshold is re-applied and no
+  // value is recalculated. A trade-off and a physical move are claimed by their
+  // own workflows and are never restated here as a clean improvement.
+  const improvementResult = resolveImprovementResult({
+    planView,
+    headline,
+    summary,
+    calibrationDecision: calibrationApplyEvidence,
+    calibrationKind,
+    tradeOffActive: tradeOffActive || tradeOffSettled,
+    physicalOnly: presentation?.outcome === OPTIMISER_OUTCOME.PHYSICAL_CHANGE,
+    applied: calibrationKind === ADI_CALIBRATION_KIND.APPLIED,
+  });
+  // The improvement the DESIGNER approves: the review owns the only Apply for it,
+  // and its own "keep current design" applies nothing at all.
+  const improvementReviewActive = improvementResult.caseKey === IMPROVEMENT_CASE.REVIEW;
+
   // ── THE OLD CANDIDATE MOVES TO ENGINEER DETAILS ──
   // The candidate a previous run evaluated is not a recommendation in this state:
   // its adjustment, what it was measured on, the reason it was not applied and
@@ -641,7 +675,9 @@ export default function AdiOptimisationJourney({
           panel states why it has to be checked again, and the candidate itself is
           read in Engineer details after the re-test. */}
       <AdiPanelSummary
-        message={journey.message}
+        // A confirmed improvement states its own sentence — found, or already
+        // applied — in place of the generic evaluation line.
+        message={improvementResult.headlineSentence || journey.message}
         nextAction={presentation?.nextAction || null}
         // In the trade-off state the decision IS the trade-off: the change, the
         // seat it would cost and the measurable trade replace the ordinary
@@ -655,6 +691,13 @@ export default function AdiOptimisationJourney({
         staleCopy={previousCandidate || tradeOff ? null : summary.staleCopy}
         previousBest={previousCandidate || tradeOff ? null : summary.previousBest}
       />
+
+      {/* THE ACTUAL RESULT — the exact adjustment, what it improves, its own P19
+          line and whether any protected seat gets worse — stated here, on the
+          main panel. The designer never opens Engineer details to discover the
+          basic answer. Rendered only for a confirmed improvement: a trade-off and
+          a physical move keep their own presentation. */}
+      {improvementResult.found && <AdiImprovementResult result={improvementResult} />}
 
       {/* ── THE ACTIONS ── one primary control for the state, decided by the
           layout model, beside the controls of the change being offered. The
@@ -690,22 +733,38 @@ export default function AdiOptimisationJourney({
           variant="actions"
         />
 
+        {/* THE IMPROVEMENT'S OWN TWO CONTROLS — the review, which owns the ONE
+            deliberate Apply for this change, and the designer's own "keep current
+            design". While the review is live the plain Apply below stands down, so
+            the same change is never offered twice. */}
+        {improvementReviewActive && (
+          <AdiImprovementActions
+            result={improvementResult}
+            onApply={handleApplyRecommended}
+            onKeep={() => ignoreOptimiserRecommendation(ignoreKey)}
+            applyBusy={isRunning}
+          />
+        )}
+
         <AdiDesignerActionBar
           summary={summary}
           busy={isRunning}
           primary={primaryAction === ADI_PRIMARY_ACTION.DESIGN}
           // An ignored recommendation stops being offered for this session, so
           // its Apply stands down; re-testing offers it again. In the re-test
-          // state the old candidate is not applied at all.
-          onApply={optimiserRunOwnsRetry || recommendationIgnored
+          // state the old candidate is not applied at all. The review owns the
+          // Apply for a confirmed improvement, so the bar stands down there too.
+          onApply={optimiserRunOwnsRetry || recommendationIgnored || improvementReviewActive
             ? null
             : (panelShowsApply ? null : handleApplyRecommended)}
           onUndo={optimiserRunOwnsRetry || panelShowsUndo ? null : handleUndoRecommended}
         />
 
         {/* The designer's own "no" — offered only while a genuine improvement is
-            on the table, session-scoped, and never a change to the design. */}
-        {improvementsFound && !recommendationIgnored && !isRunning
+            on the table, session-scoped, and never a change to the design. The
+            improvement's own KEEP CURRENT DESIGN speaks for it in the review
+            state, so it is not drawn twice. */}
+        {improvementsFound && !recommendationIgnored && !isRunning && !improvementReviewActive
           && (summary.actions?.canApply === true || panelShowsApply === true) && (
             <button
               type="button"
@@ -719,9 +778,10 @@ export default function AdiOptimisationJourney({
 
         {/* No second copy of the re-test in the re-test state, and no handler
             while the run control is already stating this same re-test: one
-            action, one button, one helper line. */}
+            action, one button, one helper line. A completed improvement is not a
+            re-test state either. */}
         <ReoptimiseCalibrationAction
-          onReoptimise={optimiserRunOwnsRetry || isRunning || retestOwnsPrimary
+          onReoptimise={optimiserRunOwnsRetry || isRunning || retestOwnsPrimary || improvementOwnsPanel
             ? null
             : onReoptimiseCalibration}
           busy={reoptimiseBusy}
