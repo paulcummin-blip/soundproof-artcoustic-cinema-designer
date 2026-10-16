@@ -23,9 +23,58 @@
  * WIRING and the IDENTITY rather than about prose quality or model behaviour.
  */
 
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
+
+/*
+ * TEST ENVIRONMENT ONLY — no production file is touched by this block.
+ *
+ * The Project Summary screen reaches the app's SDK, and src/lib/app-params.js reads
+ * `window` as it loads. vitest runs in node here and no DOM environment is installed
+ * (no jsdom, no happy-dom), so the browser boundary is stubbed and the two modules
+ * that need it — the auth context and the SDK client — are replaced. This test
+ * inspects one page's PRESENTATION of already-accepted words: it must not reach a
+ * network, a session or a model, so stubbing them is also the honesty of the test.
+ * Nothing about how the report renders changes.
+ */
+vi.mock('@/lib/AuthContext', () => ({
+  useAuth: () => ({ user: { id: 'user-1', role: 'admin', email: 'designer@soundproof.test' } }),
+}));
+
+vi.mock('@/api/base44Client', () => ({
+  base44: {
+    entities: {},
+    functions: { invoke: async () => ({ data: {} }) },
+  },
+}));
+
+vi.hoisted(() => {
+  const storage = () => {
+    const map = new Map();
+    return {
+      getItem: (key) => (map.has(key) ? map.get(key) : null),
+      setItem: (key, value) => map.set(key, String(value)),
+      removeItem: (key) => map.delete(key),
+      clear: () => map.clear(),
+    };
+  };
+  const noop = () => {};
+
+  globalThis.window = globalThis.window || {
+    location: { href: 'https://app.test/RP22Report', search: '', pathname: '/RP22Report', hash: '' },
+    history: { replaceState: noop },
+    localStorage: storage(),
+    sessionStorage: storage(),
+    addEventListener: noop,
+    removeEventListener: noop,
+    matchMedia: () => ({ matches: false, addEventListener: noop, removeEventListener: noop }),
+  };
+  globalThis.localStorage = globalThis.localStorage || globalThis.window.localStorage;
+  globalThis.sessionStorage = globalThis.sessionStorage || globalThis.window.sessionStorage;
+  globalThis.addEventListener = globalThis.addEventListener || noop;
+  globalThis.removeEventListener = globalThis.removeEventListener || noop;
+});
 
 import { buildProposalEvidence } from '../base44/shared/proposalEvidence/proposalEvidenceBuilder.js';
 import { marqueeVersion, MARQUEE_GENERATED_AT } from './fixtures/marqueeOriginalGuardFixture.mjs';
