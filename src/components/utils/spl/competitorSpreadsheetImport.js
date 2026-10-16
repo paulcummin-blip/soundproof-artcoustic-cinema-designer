@@ -3,7 +3,7 @@ import { competitorIdentityKey } from './manufacturerIdentity.js';
 // Excel is a repeatable update, not a replacement of the whole library.
 export function planCompetitorImport(preview, existing) {
   const seen = new Set();
-  return preview.map(({ record, rowNumber }) => {
+  return preview.map(({ record, rowNumber, warnings = [] }) => {
     if (!record.manufacturer || !record.model) throw new Error(`Row ${rowNumber}: manufacturer and model are required.`);
     if (String(record.manufacturer).trim().toLowerCase() === 'artcoustic') throw new Error('Artcoustic uses the shared Sound Proof registry and cannot be replaced by this import.');
     const key = competitorIdentityKey(record);
@@ -11,7 +11,7 @@ export function planCompetitorImport(preview, existing) {
     seen.add(key);
     const matches = existing.filter(r => competitorIdentityKey(r) === key);
     if (matches.length > 1) throw new Error(`Multiple stored records match ${record.manufacturer} ${record.model}; resolve them before importing.`);
-    return { record, rowNumber, existingId: matches[0]?.id || null, action: matches.length ? 'Update' : 'Add' };
+    return { record, rowNumber, warnings, existingId: matches[0]?.id || null, action: matches.length ? 'Update' : 'Add' };
   });
 }
 
