@@ -38,7 +38,12 @@ import {
   withoutClaimIds,
 } from './fixtures/proposalWriterFixtures.mjs';
 
-/** The recorded Marquee pack fingerprint, from the Phase 1 audit. */
+/**
+ * The recorded Marquee pack fingerprint, from the Phase 1 audit, re-recorded when
+ * the ADI Highlights editorial refinement changed the approved bass wording the
+ * pack's own rules carry: the fingerprint covers the pack's whole content, so an
+ * editorial change to that wording moves it by design.
+ */
 // The Marquee pack's own content fingerprint. It moved from 87e62fb7 when every
 // option gained its ranked strength stories (strength_stories / omitted_stories):
 // the ranked story authority is part of the pack, so it is part of what the
@@ -48,7 +53,7 @@ import {
 // (7135f66f). The writer's writing rules are not part of the pack, so this is a
 // change to the evidence the pack carries and not to the agreement the draft is
 // written under: the draft's own values are still read against it.
-const MARQUEE_PACK_FINGERPRINT = 'b40b898b';
+const MARQUEE_PACK_FINGERPRINT = '761a2c63';
 
 const pack = (versions = twoOptions()) => buildProposalEvidence({ versions, generatedAt: AT });
 const writerInput = (versions) => buildWriterInput({ pack: pack(versions) });

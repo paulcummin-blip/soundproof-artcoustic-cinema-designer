@@ -107,23 +107,23 @@ export function performanceLevelRank(level) {
 export const PERFORMANCE_LANGUAGE = Object.freeze({
   [PERFORMANCE_AREAS.BASS_EXTENSION]: {
     L1: {
-      sentence: 'Solid bass depth that gives films and music real weight and scale.',
-      clause: 'solid bass depth that gives films and music real weight and scale',
+      sentence: 'Solid bass depth that gives films and music a fuller foundation.',
+      clause: 'solid bass depth that gives films and music a fuller foundation',
     },
     L2: {
-      sentence: 'Deep bass that adds scale, impact and excitement to films and music.',
-      clause: 'deep bass that adds scale, impact and excitement to films and music',
+      sentence: 'Deep bass that adds body and atmosphere to films and music.',
+      clause: 'deep bass that adds body and atmosphere to films and music',
     },
-    // L3 states what the depth gives the film rather than the standard it is
-    // measured against: the register describes an achieved result, never what a
-    // system of this class might be expected to do.
+    // Extension states the depth the design reaches and never the output behind
+    // it: how loud the system can play is a different result, stated by its own
+    // parameter, so no level here infers output capability from extension.
     L3: {
-      sentence: 'Very deep, powerful bass with the scale and impact of a serious cinema system.',
-      clause: 'very deep, powerful bass with the scale and impact of a serious cinema system',
+      sentence: 'Very deep bass, extending into the lowest notes of a soundtrack.',
+      clause: 'very deep bass, extending into the lowest notes of a soundtrack',
     },
     L4: {
-      sentence: 'Exceptional low-frequency performance, reaching into the deepest parts of the soundtrack with huge scale, physical impact and authority.',
-      clause: 'exceptional low-frequency performance, reaching into the deepest parts of the soundtrack with huge scale, physical impact and authority',
+      sentence: 'Exceptional low-frequency extension, into the very deepest parts of a soundtrack.',
+      clause: 'exceptional low-frequency extension, into the very deepest parts of a soundtrack',
     },
   },
   [PERFORMANCE_AREAS.BASS_OUTPUT]: {

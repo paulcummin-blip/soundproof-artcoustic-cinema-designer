@@ -76,8 +76,10 @@ const FORBIDDEN_CLIENT_WORDS = [
   "asdr",
   "weight",
   "weighted",
-  "score",
+  // Performance-grade language only. "score" on its own is ordinary English for a
+  // musical or film score, so only the grading words are refused.
   "scored",
+  "scorecard",
   "higher-spec",
   "mid-spec",
   "lower-spec",

@@ -441,14 +441,19 @@ export function seatingBoundaryHighlightCopy(geometry) {
  * @param {Object} geometry — readSeatBoundaryGeometry output, or null
  * @returns {string} the card-length statement
  */
-export function seatingBoundaryHighlightSummary(geometry) {
+export function seatingBoundaryHighlightSummary(geometry, { confirmed = false } = {}) {
   const explanation = buildSeatingBoundaryExplanation(geometry);
 
   if (!explanation || explanation.available !== true) {
     return 'Where the seating sits is part of the acoustic design, not a matter of fitting seats into the room.';
   }
 
-  return explanation.favourable === true
+  // The clearance the card states always agrees with the published P1 result
+  // beside it: where that result is a genuine strength the seating is stated as
+  // held clear, and where it is not, the geometry's own band decides.
+  const favourable = confirmed === true || explanation.favourable === true;
+
+  return favourable
     ? 'The seating is held clear of the room\'s walls, which keeps low-frequency behaviour further from the listeners.'
     : 'The seating comes nearer a boundary here, so those seats hear more of the wall\'s low-frequency behaviour.';
 }
@@ -457,7 +462,7 @@ export function seatingBoundaryHighlightSummary(geometry) {
  * The one-line statement of where the seating sits, for a surface that has room
  * for a clause rather than a paragraph.
  */
-export function seatingBoundaryHighlightHeading(geometry) {
+export function seatingBoundaryHighlightHeading(geometry, { confirmed = false } = {}) {
   const explanation = buildSeatingBoundaryExplanation(geometry);
 
   if (!explanation || explanation.available !== true) {
@@ -465,9 +470,13 @@ export function seatingBoundaryHighlightHeading(geometry) {
   }
 
   // Where the seating is genuinely held clear of the boundaries the heading says
-  // so; where the room leaves less space, it states what the seating does instead,
-  // so the heading always matches the clearance the geometry actually shows.
-  return explanation.favourable === true
+  // so, and where the published P1 result confirms that clearance it says so too;
+  // where the room leaves less space and no result confirms it, it states what the
+  // seating does instead, so the heading always matches the clearance this design
+  // actually holds.
+  const favourable = confirmed === true || explanation.favourable === true;
+
+  return favourable
     ? 'Seating held clear of the room\'s boundaries'
     : 'Seating set as clear of the boundaries as the room allows';
 }

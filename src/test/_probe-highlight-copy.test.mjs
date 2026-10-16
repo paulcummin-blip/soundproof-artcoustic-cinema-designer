@@ -33,10 +33,14 @@ const MARQUEE_PRODUCTS = {
 const genesis = read('genesisAdiEvidence.json');
 const marquee = read('marqueeLiveAdiEvidence.json');
 
+// The evidence fixture carries no room dimensions; the project record does, and the
+// report page supplies them to the highlights builder, so the room is supplied here
+// too and the seating card is composed by its real geometry-aware path.
 const GENESIS_SOURCES = {
   engineeringSummary: genesis.engineeringSummary,
   productsSelected: GENESIS_PRODUCTS,
   seatingPositions: genesis.seatingPositions,
+  roomDims: { widthM: 4.64, lengthM: 5.09, heightM: 2.4 },
   dolbyConfig: genesis.project?.dolby_config || '9.1.6',
   displayType: genesis.screen?.display_type,
 };
@@ -44,6 +48,7 @@ const MARQUEE_SOURCES = {
   engineeringSummary: marquee.engineeringSummary,
   productsSelected: MARQUEE_PRODUCTS,
   seatingPositions: marquee.seatingPositions,
+  roomDims: { widthM: 5.42, lengthM: 5.25, heightM: 2.4 },
   dolbyConfig: marquee.project?.dolby_config || '9.1.6',
   displayType: marquee.screen?.display_type,
 };

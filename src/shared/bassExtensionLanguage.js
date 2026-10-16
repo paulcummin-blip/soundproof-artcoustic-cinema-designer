@@ -19,10 +19,10 @@
 
 /** The authority's own bass-extension sentences, by achieved level. */
 export const BASS_EXTENSION_LANGUAGE = Object.freeze({
-  L1: 'Solid bass depth that gives films and music real weight and scale.',
-  L2: 'Deep bass that adds scale, impact and excitement to films and music.',
-  L3: 'Very deep, powerful bass with the scale and impact of a serious cinema system.',
-  L4: 'Exceptional low-frequency performance, reaching into the deepest parts of the soundtrack with huge scale, physical impact and authority.',
+  L1: 'Solid bass depth that gives films and music a fuller foundation.',
+  L2: 'Deep bass that adds body and atmosphere to films and music.',
+  L3: 'Very deep bass, extending into the lowest notes of a soundtrack.',
+  L4: 'Exceptional low-frequency extension, into the very deepest parts of a soundtrack.',
 });
 
 /**

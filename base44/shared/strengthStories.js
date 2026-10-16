@@ -241,7 +241,7 @@ export function buildCandidates(sources, { byKey, floor, connections, brief = nu
       // states what that consistency gives the listener rather than describing how
       // the results were read, so nothing here says what a model predicts and no
       // single result is stretched across both groups.
-      explanation: `the tonal balance holds${seats ? ` across all ${seats} assessed seating positions` : ' across the assessed seating positions'}: the screen channels keep ${performancePhrase(PERFORMANCE_AREAS.TIMBRE, p16.level) || 'a stable tonal character'} from seat to seat, and the ${nonScreenLayer} channels do the same in their own right, so dialogue and music keep the same character wherever you sit rather than one seat sounding brighter or darker than the one beside it.`,
+      explanation: `the tonal balance holds${seats ? ` across all ${seats} assessed seating positions` : ' across the assessed seating positions'}: the screen channels keep ${performancePhrase(PERFORMANCE_AREAS.TIMBRE, p16.level) || 'a stable tonal character'} from seat to seat, and the ${nonScreenLayer} channels hold their own balance across the same seats. That is what keeps a voice or an instrument sounding the same wherever you sit in the room, so no seat is brighter or darker than the one beside it.`,
       sources: ['P16', 'P17'],
     }));
   }
@@ -262,7 +262,7 @@ export function buildCandidates(sources, { byKey, floor, connections, brief = nu
       evidence: [evidence('P14', p14.level, p14.value ? `LFE output · ${p14.value}` : 'LFE output at the reference seating position')],
       // WHAT the result is belongs to the pill beside this paragraph. The paragraph
       // states WHY it matters: what the client hears and feels in the room.
-      explanation: `the subwoofers provide ${p14.value ? `${p14.value} of low-frequency output` : 'the low-frequency output'} at the reference seating position, so ${performancePhrase(PERFORMANCE_AREAS.BASS_OUTPUT, p14.level) || 'explosions carry real impact and the low end of a soundtrack arrives at the scale the cinema deserves'}: the deepest effects are felt as well as heard, and the bass under a soundtrack keeps its power at the level a film asks for.`,
+      explanation: `the subwoofers provide ${p14.value ? `${p14.value} of low-frequency output` : 'the low-frequency output'} at the reference seating position: ${performancePhrase(PERFORMANCE_AREAS.BASS_OUTPUT, p14.level) || 'there is real impact behind the low end'}. That is what makes a demanding soundtrack exciting to watch, because the low end holds its level through the biggest moments a film has.`,
       sources: ['P14'],
     }));
   }
@@ -284,7 +284,7 @@ export function buildCandidates(sources, { byKey, floor, connections, brief = nu
       // soundtrack, and neither is ever flattened into "useful".
       // The paragraph states what the depth does for the film rather than
       // restating the published figure the pill already carries.
-      explanation: `the system reaches ${p18.value || 'the published limit'} in the room: ${performancePhrase(PERFORMANCE_AREAS.BASS_EXTENSION, p18.level) || 'the deepest notes of a soundtrack arrive at their full depth'}, so the lowest notes of a soundtrack and the rumble beneath an action scene are there to be heard and felt rather than thinning away underneath the picture.`,
+      explanation: `the system reaches ${p18.value || 'the published limit'} in the room: ${performancePhrase(PERFORMANCE_AREAS.BASS_EXTENSION, p18.level) || 'the lowest notes of a soundtrack are reproduced in the room'}. Lower frequencies like these are what give a film its scale and its atmosphere, so a low organ note, a bass line or the tension in a quiet scene are all reproduced in the room instead of being lost from the bottom of the mix.`,
       sources: ['P18'],
     }));
   }
@@ -309,7 +309,7 @@ export function buildCandidates(sources, { byKey, floor, connections, brief = nu
       // position is P19. The paragraph claims no measured outcome beyond those two
       // results and no improvement in consistency anywhere else in the room: it
       // states what the combination is for, not what it achieved.
-      explanation: `the system reaches ${p18.value || 'the published limit'} in the room, and at the reference seating position ${performancePhrase(PERFORMANCE_AREAS.BASS_CONTROL, p19.level) || 'the response stays composed'}: depth and composure together are what let the biggest moments of a film arrive at full scale without the low end turning thick underneath them.`,
+      explanation: `the system reaches ${p18.value || 'the published limit'} in the room, and at the reference seating position ${performancePhrase(PERFORMANCE_AREAS.BASS_CONTROL, p19.level) || 'the response stays composed'}. Depth and response quality are the two halves of bass a film relies on: the depth carries the low notes a soundtrack is built on, and the response tells you how evenly those notes arrive at the seat the design is built around.`,
       sources: ['P18', 'P19'],
     }));
   }
@@ -343,7 +343,7 @@ export function buildCandidates(sources, { byKey, floor, connections, brief = nu
       // The placement measures themselves belong to the pills beside this
       // paragraph. The copy explains what the placement buys the listener: where a
       // sound comes from, and how convincingly it moves across and around the room.
-      explanation: `the speakers are placed where the soundtrack needs its sounds to come from rather than where they are easiest to fit: an effect crossing the front of the room stays anchored to the picture, and the sound travelling around or above the audience arrives from the direction the scene is coming from, so ${performancePhrase(PERFORMANCE_AREAS.SPATIAL_RESOLUTION, placementLevel) || 'convincing positioning and movement'} rather than a smear between channels.`,
+      explanation: `each speaker is positioned for the direction it has to deliver: an effect crossing the front of the room stays anchored to the picture, and sound moving around or above the audience travels naturally from speaker to speaker, giving ${performancePhrase(PERFORMANCE_AREAS.SPATIAL_RESOLUTION, placementLevel) || 'convincing positioning and movement'}.`,
       sources: placementMembers.map((member) => String(member.key).toUpperCase()),
     }));
   }
@@ -396,7 +396,7 @@ export function buildCandidates(sources, { byKey, floor, connections, brief = nu
       // The geometry belongs to each row's own pill. The paragraph states what the
       // angle gives the viewer, and never claims the film was composed or framed
       // for that angle: the viewing angle is this design's own decision.
-      explanation: `${joinList(described)}${allRows ? ', so the picture fills the field of view from every row in the room and the whole audience watches from inside the image rather than from a distance.' : ', so those rows watch the film from inside the picture, with the screen filling the field of view rather than sitting at a distance.'}`,
+      explanation: `${joinList(described)}${allRows ? `, so the picture fills the eye from every row: close enough for the ${displayNoun} to hold the attention, and far enough back that the whole image is read at once.` : ', so the picture fills the eye from those seats rather than being watched from across the room.'}`,
       sources: claimedRows.map((row) => `RP23:${row.rowNumber}:${row.level}`),
     }));
   }
@@ -421,7 +421,7 @@ export function buildCandidates(sources, { byKey, floor, connections, brief = nu
         p2IsStrength ? evidence('P2', p2.level, p2.value || 'discrete speakers') : null,
         evidence(`${overheadCount} overheads`, null, subCount > 0 ? `${subCount} subwoofers` : null),
       ].filter(Boolean),
-      explanation: `the design is built as a ${dolbyConfig} system with ${overheadCount} overhead speakers${subCount > 0 ? ` and ${subCount} subwoofers` : ''}, so a score, rain or a helicopter moves above and around the audience instead of staying pinned to the picture.`,
+      explanation: `the design is built as a ${dolbyConfig} system with ${overheadCount} overhead speakers${subCount > 0 ? ` and ${subCount} subwoofers` : ''}, so music, rain or a helicopter moves above and around the audience instead of staying pinned to the picture.`,
       sources: p2IsStrength ? ['P2', 'architecture'] : ['architecture'],
     });
     if (p2IsStrength) candidates.push(layoutStory);
@@ -517,10 +517,12 @@ export function buildSeatingClearanceStory(sources = {}, { byKey = {} } = {}) {
 
   const geometry = sources.seatBoundaryGeometry
     || readSeatBoundaryGeometry({ seats: sources.seatingPositions, roomDims: sources.roomDims });
-  const explanation = seatingBoundaryHighlightSummary(geometry);
-  if (!explanation) return null;
-
   const positive = isStrength(p1.level);
+  // Where the published P1 result is a genuine strength, the card states the
+  // clearance that result records rather than the geometry band alone, so the
+  // heading, the paragraph and the result beside them always agree.
+  const explanation = seatingBoundaryHighlightSummary(geometry, { confirmed: positive });
+  if (!explanation) return null;
   return story({
     id: 'seating-clearance',
     order: 9,
@@ -529,7 +531,7 @@ export function buildSeatingClearanceStory(sources = {}, { byKey = {} } = {}) {
     // and where the room leaves less space it states what the seating actually
     // does, so the heading never contradicts the published P1 result or the
     // paragraph beside it.
-    title: seatingBoundaryHighlightHeading(geometry),
+    title: seatingBoundaryHighlightHeading(geometry, { confirmed: positive }),
     category: 'Seating Position',
     members: positive ? [p1] : [],
     level: p1.level ?? null,

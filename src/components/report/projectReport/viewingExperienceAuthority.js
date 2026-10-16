@@ -46,18 +46,18 @@ export function buildViewingExperienceNarrative({
   const severalRows = rows.length > 1;
 
   const fromTheSeats = severalRows
-    ? 'The seating is arranged so the picture fills the eye from every row: the front row sits inside the field of view the film was framed for without the image crowding it, and the rows behind keep a proper viewing angle rather than watching from the far end of a long room.'
-    : 'The seating sits inside the field of view the film was framed for: close enough for the picture to fill the eye, and far enough back that the image is read as a whole rather than scanned.';
+    ? 'The seating is arranged so the picture fills the eye from every row: the front row is close enough for the image to hold the attention without crowding it, and the rows behind keep a comfortable viewing distance rather than watching from the far end of a long room.'
+    : 'The seating is positioned so the picture fills the eye: close enough for the image to hold the attention, and far enough back that the whole frame is read at once rather than scanned.';
 
   const screen = !projection
     ? 'The display is sized to the seating rather than the seating fitted around the display, so the picture reads with the same presence across the room.'
     : widescreen
-      ? 'The 2.35:1 screen takes widescreen presentations edge to edge, so the films that use the full frame are seen as they were composed instead of inside a black border.'
+      ? 'The 2.35:1 screen takes widescreen presentations edge to edge, so the films that use the full frame fill the screen instead of sitting inside a black border.'
       : 'The screen is sized to the seating, so the picture carries the same presence in either framing and the image is never pushed below the height the rows are set for.';
 
   const wholeAudience = severalRows
-    ? 'The result is a room judged on how the whole audience sees the film: every row watches the picture at an angle the format was designed around, and no seat is treated as the compromise.'
-    : 'The result is a viewing position the format was designed around rather than one chosen by eye, so what the audience sees matches how the film was composed.';
+    ? 'The result is a room judged on how the whole audience sees the film: every row keeps a viewing distance that suits the screen, and no seat is treated as the compromise.'
+    : 'The result is a viewing distance worked out from the screen size and the seating rather than chosen by eye, so the picture reads at its intended scale from the seats.';
 
   return [fromTheSeats, screen, wholeAudience].join(' ');
 }
