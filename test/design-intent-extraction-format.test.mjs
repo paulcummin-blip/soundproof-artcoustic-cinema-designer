@@ -31,8 +31,7 @@ import {
   canonicalDesignIntentDraft,
   runReportDesignIntent,
 } from '../base44/shared/reportDesignIntent/reportDesignIntentRunner.js';
-import {
-  DESIGN_INTENT_SECTION } from '../base44/shared/reportDesignIntent/designIntentBrief.js';
+import { DESIGN_INTENT_SECTION } from '../base44/shared/reportDesignIntent/designIntentBrief.js';
 import {
   DESIGN_INTENT_STATUS,
   readAcceptedDesignIntent,
@@ -119,6 +118,27 @@ describe('the canonical draft', () => {
     expect(canonicalDesignIntentDraft('')).toBe(null);
     expect(canonicalDesignIntentDraft(null)).toBe(null);
     expect(canonicalDesignIntentDraft([draftObject()])).toBe(null);
+  });
+
+  it('reproduces the live failure: the retired read returned null for a valid object draft', () => {
+    // The gateway is asked for a JSON schema, so the draft arrives as an OBJECT.
+    const parsed = draftObject();
+    const validation = validateWriterOutput({ input: writerInput(), output: parsed });
+
+    // The validator reads that object and passes it cleanly: nothing is wrong with
+    // the draft, and no rule is relaxed by the correction.
+    expect(validation.valid).toBe(true);
+    expect(validation.violations).toEqual([]);
+    expect(validation.sections).toHaveLength(1);
+
+    // The string-only fallback the acceptance path used reads nothing at all from
+    // the very same object — so the retired expression below produced null for a
+    // draft that had passed every gate, which is `accepted_text_missing` exactly.
+    expect(parseWriterOutput(parsed).output).toBe(null);
+    expect(validation.output ?? parseWriterOutput(parsed).output).toBe(null);
+
+    // And the canonical draft reads it, which is the whole correction.
+    expect(canonicalDesignIntentDraft(parsed)).toBe(parsed);
   });
 });
 
