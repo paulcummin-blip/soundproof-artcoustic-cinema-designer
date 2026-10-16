@@ -14,6 +14,7 @@ import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import { buildProposalEvidence } from '../base44/shared/proposalEvidence/proposalEvidenceBuilder.js';
 import {
+  WRITER_CONTRACT_VERSION,
   WRITER_REJECTION,
   WRITER_SECTIONS,
 } from '../base44/shared/proposalWriter/writerContractSchema.js';
@@ -43,7 +44,11 @@ import {
 // the ranked story authority is part of the pack, so it is part of what the
 // fingerprint identifies. The draft's own values are untouched by it, and this is
 // the pack the audit's draft is still read against.
-const MARQUEE_PACK_FINGERPRINT = '7135f66f';
+// Re-recorded from the pack body, which has moved on since the Phase 1 audit
+// (7135f66f). The writer's writing rules are not part of the pack, so this is a
+// change to the evidence the pack carries and not to the agreement the draft is
+// written under: the draft's own values are still read against it.
+const MARQUEE_PACK_FINGERPRINT = 'b40b898b';
 
 const pack = (versions = twoOptions()) => buildProposalEvidence({ versions, generatedAt: AT });
 const writerInput = (versions) => buildWriterInput({ pack: pack(versions) });
@@ -63,14 +68,14 @@ test('the writer input carries the pack, the sections, the claims and the rule',
     assert.ok(key in input, `the input carries ${key}`);
   }
 
-  assert.equal(input.contract_version, 1);
+  assert.equal(input.contract_version, WRITER_CONTRACT_VERSION);
   assert.equal(input.evidence_pack.schema_version, 2);
   assert.equal(input.evidence.pack_fingerprint, input.evidence_pack.pack_fingerprint);
   assert.equal(input.evidence_pack.pack_fingerprint, pack().pack_fingerprint);
 
-  // The nine sections, each with its own word limit and requirement.
+  // The ten sections of the contract, each with its own word limit and requirement.
   assert.deepEqual(input.section_requirements.map((entry) => entry.section), WRITER_SECTIONS.map((entry) => entry.section));
-  assert.equal(input.section_requirements.length, 9);
+  assert.equal(input.section_requirements.length, WRITER_SECTIONS.length);
   assert.ok(input.section_requirements.every((entry) => entry.requires_grounding === true));
   assert.ok(input.section_requirements.every((entry) => Number.isFinite(entry.word_limit) && entry.word_limit > 0));
   assert.deepEqual(input.output.sections.map((entry) => entry.section), WRITER_SECTIONS.map((entry) => entry.section));
@@ -102,8 +107,12 @@ test('A. a compliant draft passes validation', () => {
   assert.equal(result.valid, true, JSON.stringify(result.violations));
   assert.deepEqual(result.violations, []);
   assert.equal(result.pack_fingerprint, input.evidence_pack.pack_fingerprint);
-  assert.equal(result.sections.length, 9);
-  assert.ok(result.sections.every((entry) => entry.words > 0 && entry.words <= entry.word_limit));
+  assert.equal(result.sections.length, WRITER_SECTIONS.length);
+  assert.ok(result.sections.every((entry) => entry.words <= entry.word_limit));
+  // presented_options is the one section whose copy is conditional: with no
+  // option guidance the contract requires it to be empty, so it is the only
+  // section that may legitimately carry no words at all.
+  assert.ok(result.sections.every((entry) => entry.section === 'presented_options' || entry.words > 0));
   assert.ok(result.sections.every((entry) => Array.isArray(entry.claim_ids)));
   assert.ok(result.sections.find((entry) => entry.section === 'key_performance_highlights').claim_ids.length > 0);
 });
@@ -131,7 +140,9 @@ test('B. a changed figure or level is blocked for every graded parameter', () =>
 
   // The figures the reports do state remain allowed, so the rule is a change of
   // value and not a blanket refusal of numbers.
-  const unchanged = amend(input, { section: 'dynamic_range', sentence: 'P12 records 114 dBC at L4 and P14 records 118 dB at L4.' });
+  // The recorded figures themselves, stated without a grade: the design's own
+  // levels are not client copy, so the sentence names the values only.
+  const unchanged = amend(input, { section: 'dynamic_range', sentence: 'P12 records 114 dBC and P14 records 118 dB in this design.' });
   assert.deepEqual(codes(validate(input, unchanged)), []);
 });
 
@@ -304,8 +315,9 @@ test('H. invalid JSON, extra fields and a foreign pack are blocked', () => {
   const foreignPack = { ...validDraft(input), pack_fingerprint: 'deadbeef' };
   assert.ok(validate(input, foreignPack).violations.some((entry) => entry.detail === 'pack_fingerprint_mismatch'));
 
-  const wrongContract = { ...validDraft(input), contract_version: 2 };
-  assert.ok(validate(input, wrongContract).violations.some((entry) => entry.detail === 'contract_version_mismatch:2'));
+  const wrongContract = { ...validDraft(input), contract_version: WRITER_CONTRACT_VERSION - 1 };
+  assert.ok(validate(input, wrongContract).violations
+    .some((entry) => entry.detail === `contract_version_mismatch:${WRITER_CONTRACT_VERSION - 1}`));
 
   // A fenced code block is still JSON, so it is read rather than refused.
   const fenced = parseWriterOutput(`\`\`\`json\n${asOutputText(validDraft(input))}\n\`\`\``);

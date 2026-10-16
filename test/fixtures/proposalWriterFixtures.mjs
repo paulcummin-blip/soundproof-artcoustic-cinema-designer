@@ -96,6 +96,22 @@ const SECTION_FALLBACK = {
  * claim's sentence is stated once in the document rather than in every section
  * that cites it.
  */
+/** The claim kinds a section may fall back on: what every option shares. */
+const NEUTRAL_KINDS = ['shared_result', 'credibility'];
+
+/**
+ * A section the pack records nothing specific for is still grounded: it cites a
+ * shared result or a credibility claim of the pack, whose own wording another
+ * section of the draft already carries.
+ */
+const groundingClaimId = (input) => {
+  const claim = NEUTRAL_KINDS
+    .flatMap((kind) => claimsOfKind(input, kind))
+    .find((entry) => entry.statement);
+  return claim ? claim.claim_id : null;
+};
+
+/** A compliant draft: each section states the pack's own claim wording, once. */
 export function validDraft(input) {
   const stated = new Set();
   return {
@@ -110,11 +126,17 @@ export function validDraft(input) {
         : (spec.section === 'presented_options'
           ? presentedOptionsText(input)
           : SECTION_FALLBACK[spec.section] || APPENDIX_NOTE);
-      return {
-        section: spec.section,
-        text,
-        claim_ids: claims.map((claim) => claim.claim_id),
-      };
+      const claim_ids = claims.map((claim) => claim.claim_id);
+      // A main section carries copy, so it cites a claim even where the pack
+      // records nothing specific for it. presented_options and the appendix are
+      // the two sections that legitimately carry no claim at all.
+      if (claim_ids.length === 0
+        && spec.section !== 'presented_options'
+        && spec.section !== 'appendix_notes') {
+        const grounding = groundingClaimId(input);
+        if (grounding) claim_ids.push(grounding);
+      }
+      return { section: spec.section, text, claim_ids };
     }),
   };
 }
@@ -161,7 +183,9 @@ export function marqueeDraft(input) {
       },
       {
         section: 'key_performance_highlights',
-        text: 'P12 records 116 dBC at L4, P13 records 112 dBC at L4 and P14 records 120 dB at L4.',
+        // The recorded values, stated without the design's internal grade: the
+        // levels are not client copy, and these are the same figures.
+        text: 'P12 records 116 dBC, P13 records 112 dBC and P14 records 120 dB in this design.',
         claim_ids: idsOf(gain('p12'), gain('p13'), gain('p14')),
       },
       {
