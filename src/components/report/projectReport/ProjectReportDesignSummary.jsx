@@ -25,6 +25,8 @@ import ProjectReportSummaryOpening from '@/components/report/projectReport/Proje
 import ProjectReportOpeningBlock from '@/components/report/projectReport/ProjectReportOpeningBlock';
 import ProjectReportFactsGrid from '@/components/report/projectReport/ProjectReportFactsGrid';
 import { groupSeatsIntoRows } from '@/components/report/client/seatRowGrouping';
+import DesignIntentGenerationAction from '@/components/report/projectReport/DesignIntentGenerationAction';
+import { DESIGN_INTENT_SOURCE } from '@/components/report/projectReport/designIntentAuthority';
 import {
   displayFactLabel,
   displayPhrase,
@@ -89,6 +91,12 @@ export default function ProjectReportDesignSummary({
   summaryOpening = null,
   opening = null,
   print = false,
+  // Which Design Intent is on the page — the report's own, or a validated Astra
+  // narrative — and the optional on-screen action that asks the writer for one.
+  intentSource = null,
+  projectId = null,
+  versionId = null,
+  onIntentGenerated = null,
 }) {
   const seatRows = groupSeatsIntoRows(seatingPositions);
   const seatCount = Array.isArray(seatingPositions) ? seatingPositions.length : 0;
@@ -174,6 +182,19 @@ export default function ProjectReportDesignSummary({
         }}>
           <ProjectReportSummaryOpening sentence={summaryOpening} print={print} />
         </div>
+      )}
+
+      {/* The Astra Design Intent is OPTIONAL and is never part of the printed
+          document: the action is shown on screen only, so no page, no pagination
+          and no figure of the PDF depends on whether it exists or what state it is
+          in. Whatever it reports, the page above it is already complete. */}
+      {!print && (
+        <DesignIntentGenerationAction
+          projectId={projectId}
+          versionId={versionId}
+          hasNarrative={intentSource === DESIGN_INTENT_SOURCE.ASTRA}
+          onGenerated={onIntentGenerated}
+        />
       )}
     </div>
   );

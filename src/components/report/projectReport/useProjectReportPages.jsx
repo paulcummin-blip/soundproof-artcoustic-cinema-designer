@@ -49,6 +49,8 @@ import { planSeatRowPages } from "@/components/report/client/perSeatCardLayout";
 import { isAssessedLevel } from "@/components/report/client/visualReportSeatStyle";
 import { buildProjectReportSummaryOpening } from "@/components/report/projectReport/projectReportSummaryOpening";
 import { buildProjectReportOpening } from "@/components/report/projectReport/projectReportOpening";
+import { resolveDesignIntent } from "@/components/report/projectReport/designIntentAuthority";
+import { useReportDesignIntent } from "@/components/report/projectReport/useReportDesignIntent";
 import ProjectReportDesignSummary from "@/components/report/projectReport/ProjectReportDesignSummary";
 import AdiDesignHighlightsPage from "@/components/report/projectReport/AdiDesignHighlightsPage";
 import ProjectReportSystemOverview from "@/components/report/projectReport/ProjectReportSystemOverview";
@@ -109,6 +111,19 @@ export function useProjectReportPages({
     productsSelected,
     seatingPositions,
   }), [projectDetails, roomDims, productsSelected, seatingPositions]);
+
+  // THE DESIGN INTENT THE REPORT SHOWS. The report's own composed paragraph is the
+  // floor; an Astra narrative that was validated for THIS report, and written
+  // against the evidence this report still stands on, is shown instead. Reading is
+  // all that happens here — opening a report never generates anything.
+  const { saved: savedDesignIntent, sourceFingerprints: reportEvidenceFingerprints, reload: reloadDesignIntent } =
+    useReportDesignIntent({ projectId, versionId });
+
+  const designIntent = useMemo(() => resolveDesignIntent({
+    deterministic: summaryOpening,
+    saved: savedDesignIntent,
+    currentSourceFingerprints: reportEvidenceFingerprints,
+  }), [summaryOpening, savedDesignIntent, reportEvidenceFingerprints]);
 
   // Page 1's own opening statement: the project-specific headline and the single
   // supporting line of facts beneath it, composed by the report's opening
@@ -654,7 +669,7 @@ export function useProjectReportPages({
         seatingPositions,
         screenWidthM,
         productsSelected,
-        summaryOpening,
+        summaryOpening: designIntent.text,
         opening,
       },
       visual: (
@@ -664,8 +679,12 @@ export function useProjectReportPages({
           seatingPositions={seatingPositions}
           screenWidthM={screenWidthM}
           productsSelected={productsSelected}
-          summaryOpening={summaryOpening}
+          summaryOpening={designIntent.text}
           opening={opening}
+          intentSource={designIntent.source}
+          projectId={projectId}
+          versionId={versionId}
+          onIntentGenerated={reloadDesignIntent}
         />
       ),
     };
@@ -724,5 +743,5 @@ export function useProjectReportPages({
     // where the complete P1–P21 parameter-card sequence, the drawing set, the
     // bass curves and the single closing About Sound Proof page print.
     return [projectSummaryPage, adiHighlightsPage, systemProductsPage, ...pageList];
-  }, [activePages, summaryOpening, opening, projectDetails, roomDims, seatingPositions, screenWidthM, productsSelected, adiHighlights, screenSeating, engineeringSummary]);
+  }, [activePages, summaryOpening, designIntent, opening, projectDetails, roomDims, seatingPositions, screenWidthM, productsSelected, adiHighlights, screenSeating, engineeringSummary]);
 }
