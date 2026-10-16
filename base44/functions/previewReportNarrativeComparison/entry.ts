@@ -4,6 +4,11 @@ import { buildProposalEvidence, proposalEvidenceFingerprint } from '../../shared
 import { buildProjectInterpretation, formatInterpretationForPrompt } from '../../shared/adiProjectInterpretation.js';
 import { buildEngineeringEvidence, selectHighlightRows } from '../../shared/engineeringSnapshotEvidence.js';
 import { buildProposalWritingAuthority } from '../../shared/soundProofWritingAuthority.js';
+import { GPT_WRITER_FLAG_FIELD, resolveGptWriterFlag } from '../../shared/proposalWriter/proposalWriterFlag.js';
+import { buildReportGeometryContext } from '../../shared/reportDesignIntent/reportGeometryContext.js';
+import { buildReportVisualContext } from '../../shared/reportDesignIntent/reportVisualContext.js';
+import { runDesignIntentVisualComparison } from '../../shared/reportDesignIntent/designIntentComparison.js';
+import { readOnlyEntities } from '../../shared/reportDesignIntent/readOnlyEntities.js';
 import {
   NATURAL_ALOUD_RULE,
   NATURAL_PRINCIPLE_EXPLANATION_RULE,
@@ -229,6 +234,108 @@ async function runModel({ base44, model, prompt, fingerprint, part = null }) {
   }
 }
 
+/**
+ * THE DESIGN INTENT VISUAL COMPARISON (read-only).
+ *
+ * Runs the ONE existing production Design Intent attempt twice against the same
+ * frozen evidence: engineering only, then engineering plus the Project Library's
+ * selected renders. Every entity read goes through a guard that REFUSES every write
+ * method, so the preview is incapable of creating, updating or deleting a record, and
+ * the response reports every write that was attempted (always none). It never calls
+ * generateReportDesignIntent, never saves a narrative and never returns an image
+ * address.
+ */
+async function designIntentVisualComparison({ base44, user, projectId, versionId }) {
+  // Both the user client and the service client are wrapped: the service role is used
+  // ONLY to read the writer's own switch and the published-engineering authority, and
+  // through this guard it cannot write either.
+  const guarded = readOnlyEntities(base44.entities);
+  const guardedService = readOnlyEntities(base44.asServiceRole.entities);
+
+  const project = await guarded.entities.Project.get(projectId);
+  const version = await guarded.entities.ProjectVersion.get(versionId);
+  if (!project || !version || version.project_id !== projectId) {
+    return Response.json({ dry_run: true, persisted: false, error: 'Project/version not found' }, { status: 404 });
+  }
+
+  const snapshotPage = await guarded.entities.ReportSnapshot.filter(
+    { project_id: projectId, version_id: versionId, report_type: 'project' },
+    { limit: 1 },
+  );
+  const snapshot = (snapshotPage?.items || [])[0] || null;
+  if (!snapshot) {
+    return Response.json({
+      dry_run: true, persisted: false,
+      error: 'The Project Report has not been generated for this version, so there is no frozen evidence.',
+    }, { status: 409 });
+  }
+
+  // The writer's own switch, resolved exactly as production resolves it (master admin).
+  const configPage = await guardedService.entities.SystemConfig.filter({}, { limit: 1 });
+  const configRecord = (Array.isArray(configPage) ? configPage : (configPage?.items || []))[0] || null;
+  const flag = resolveGptWriterFlag({
+    config: configRecord?.[GPT_WRITER_FLAG_FIELD] || null,
+    accountId: project.account_id || null,
+    email: user.email || null,
+    isMasterAdmin: true,
+  });
+
+  // The Project Library's image METADATA, read with the designer's own session.
+  const assetPage = await guarded.entities.ProposalAsset
+    .filter({ project_id: projectId }, { limit: 100 })
+    .catch(() => null);
+  const libraryImages = assetPage?.items || [];
+
+  const result = await runDesignIntentVisualComparison({
+    flag,
+    versionIds: [version.id],
+    project,
+    sourceFingerprints: snapshot.source_fingerprints || null,
+    now: new Date().toISOString(),
+    readEvidence: async ({ versionIds }) => {
+      const page = await guarded.entities.ProjectVersion.filter(
+        { project_id: projectId, id: { $in: versionIds } },
+        { limit: 50 },
+      );
+      const rows = page?.items || [];
+      const versions = versionIds.map((id) => rows.find((row) => row.id === id));
+      if (versions.some((row) => !row)) throw new Error('That design version could not be read.');
+      return readProposalReportEvidence(guarded.entities, projectId, versions, {
+        authorityEntities: guardedService.entities,
+      });
+    },
+    readGeometryContext: async ({ evidence }) => buildReportGeometryContext({
+      reportEvidence: evidence?.[0]?.evidence?.project || null,
+      version,
+      projectId,
+      versionId: version.id,
+      reportSnapshotId: snapshot.id,
+    }),
+    readVisualContext: async () => buildReportVisualContext({ assets: libraryImages, versionId: version.id }),
+    // The one provider call, the same integration the production writer uses.
+    invokeLLM: (request) => base44.integrations.Core.InvokeLLM(request),
+  });
+
+  const attempts = [...guarded.attempts, ...guardedService.attempts];
+  return Response.json({
+    dry_run: true,
+    persisted: false,
+    notice: 'READ-ONLY. The existing Design Intent writer was run twice against the same frozen evidence. '
+      + 'No report, snapshot, narrative, proposal or library record was created, modified or deleted.',
+    project_id: projectId,
+    version_id: versionId,
+    project_name: project.name || null,
+    version_name: version.version_name || null,
+    writer_flag: { enabled: flag.enabled, mode: flag.mode, model_override: flag.model },
+    boundary: {
+      write_attempts: attempts,
+      write_attempt_count: attempts.length,
+      reads: guarded.reads.length + guardedService.reads.length,
+    },
+    comparison: result,
+  });
+}
+
 export default async function (req) {
   try {
     const base44 = createClientFromRequest(req);
@@ -241,6 +348,11 @@ export default async function (req) {
     const versionId = body.version_id;
     if (!projectId || !versionId) {
       return Response.json({ error: 'project_id and version_id are required' }, { status: 400 });
+    }
+
+    // The Design Intent visual comparison: the existing writer, with and without images.
+    if (body.mode === 'design_intent_visual') {
+      return await designIntentVisualComparison({ base44, user, projectId, versionId });
     }
 
     const project = await base44.entities.Project.get(projectId);
