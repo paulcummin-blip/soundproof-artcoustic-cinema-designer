@@ -111,6 +111,22 @@ function buildIntentDesignContext({ engineeringSnapshot, project, versions, clie
   };
 }
 
+/**
+ * ONE canonical parsed draft, from whatever the provider returned: an
+ * already-parsed object is used exactly as it stands, and JSON text (fenced or
+ * not) is parsed with the validator's own parser. No second parser exists here,
+ * and nothing in this function validates, accepts or writes anything — it only
+ * decides which single representation both the validator and the acceptance read
+ * are given, so the two can never disagree about the same response.
+ *
+ * @param {string|Object|null} output — the provider's own returned output
+ * @returns {Object|null} the draft, or null when it is not a usable draft
+ */
+export function canonicalDesignIntentDraft(output) {
+  if (output && typeof output === 'object' && !Array.isArray(output)) return output;
+  return parseWriterOutput(output).output;
+}
+
 /** The accepted section text, or null when the draft carries none. */
 export function designIntentTextFromOutput(output) {
   const sections = Array.isArray(output?.sections) ? output.sections : [];
@@ -214,16 +230,22 @@ export async function runReportDesignIntent({
     };
   }
 
-  // 5. The existing validator, against the exact input the writer was given.
-  const validation = validate({ input: writerInput, output: provider.output });
-  // The accepted text is read from the DRAFT THAT WAS VALIDATED, parsed exactly as
-  // the validator parsed it (a draft arrives as JSON text, sometimes fenced). The
-  // validator reports the sections it READ — their word counts and citations — and
-  // hands no prose back, so `validation.output` does not exist and reading the
-  // narrative from that field refused a draft that had passed every gate. A
-  // validator that does normalise an output is still honoured first, exactly as the
-  // proposal path reads it.
-  const acceptedDraft = validation?.output ?? parseWriterOutput(provider.output).output;
+  // 5. ONE canonical parsed draft, made once and then used by BOTH the validator
+  // and the acceptance read. The provider may return its draft as JSON text
+  // (sometimes fenced) or as an already-parsed object, and the validator accepts
+  // either — so a second, string-only parse at acceptance read null for a
+  // perfectly good object draft and refused it as `accepted_text_missing`. The
+  // draft is normalised here, the validator is given that normalised draft, and
+  // the accepted text is read from the SAME object, so one response can never be
+  // read two ways.
+  const canonicalDraft = canonicalDesignIntentDraft(provider.output);
+  const validation = validate({ input: writerInput, output: canonicalDraft });
+  // The validator reports the sections it READ — their word counts and citations —
+  // and hands no prose back, so `validation.output` does not exist. A validator
+  // that does normalise an output is still honoured first, exactly as before.
+  const acceptedDraft = validation?.output ?? canonicalDraft;
+  // Read only after the draft has passed every gate: the presence of a text field
+  // is never on its own an acceptance.
   const text = validation?.valid === true ? designIntentTextFromOutput(acceptedDraft) : null;
   const provenance = validatorProvenance();
 
