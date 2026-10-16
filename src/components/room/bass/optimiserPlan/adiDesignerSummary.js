@@ -64,6 +64,11 @@ import {
 } from "./recommendationCurrency.js";
 import { OPTIMISER_PRESENTATION_STATE } from "./resolveOptimiserPresentationState.js";
 import { resolveOptimiserCurrentP20 } from "./optimiserCurrentP20.js";
+import {
+  OPTIMISER_APPLIED_STATE,
+  OPTIMISER_DECISION_TYPE,
+  buildOptimiserResultViewModel,
+} from "./optimiserResultViewModel.js";
 import { parityBlocksApply } from "./optimiserBaselineAuthority.js";
 import { buildFutureCapabilityNotes, liveFamilyKeys } from "./optimiserLiveFamilies.js";
 import {
@@ -658,6 +663,13 @@ export function buildAdiDesignerSummary({
   appliedLever = null,
   appliedDirection = null,
   roomDims = null,
+  // The canonical published Bass result, the run's identity and the resolved
+  // trade-off state. With these the card's ONE result view model is built here,
+  // so every surface below reads the same decision, the same winner, the same
+  // current/proposed pair and the same limiting frequency.
+  completedBassAuthority = null,
+  identity = null,
+  tradeOffState = null,
 } = {}) {
   const state = presentation?.state || null;
   const stale = state === OPTIMISER_PRESENTATION_STATE.STALE;
@@ -746,6 +758,39 @@ export function buildAdiDesignerSummary({
     runComplete,
   });
 
+  // ── THE ONE RESULT VIEW MODEL ──
+  // Resolved here, once, and returned with the summary, so the panel, Technical
+  // details, the review dialogs, Other options and the failure/kept-current
+  // states all describe this run the same way. It decides nothing new: it reads
+  // the persisted terminal decision, the persisted winning candidate and the
+  // canonical published Bass result. No surface below may choose a winner, decide
+  // applied/held, or select the limiting frequency for itself.
+  const placementRecommendation = resolvePlacementRecommendation({
+    planView,
+    roomDims,
+    presentation,
+    appliedLever,
+    appliedDirection,
+    currentP20,
+    parityBlocked,
+    layoutCounts,
+    recommendationNotCurrent,
+  });
+  const resultViewModel = buildOptimiserResultViewModel({
+    planView,
+    identity,
+    completedBassAuthority,
+    presentation,
+    placement: placementRecommendation,
+    appliedLever,
+    tradeOffState,
+    currentP20,
+  });
+  // The limiting frequency has ONE authority: the view model's. Every surface
+  // that states it — including the absorption advice below — reads this value,
+  // and a value that is not a frequency reads "Not identified", never "0 Hz".
+  const limitingFrequency = resultViewModel.limitingFrequency;
+
   const baselineDeviation = wholeNumberDeviation(planView?.baseline?.p20VariationDb ?? null);
   const baselineLevel = planView?.baseline?.p20Level ?? null;
   const recommendedRow = evaluatedRow;
@@ -769,7 +814,9 @@ export function buildAdiDesignerSummary({
       ?? null,
     seats: planView?.baseline?.seats,
     leverRows: absorptionLeverRows(planView),
-    limitingFrequencyHz,
+    // The view model's own resolved frequency (null when no credible frequency
+    // was identified), so the advice and the evidence block cannot disagree.
+    limitingFrequencyHz: limitingFrequency.hz,
   });
   const rows = absorption
     ? [
@@ -835,18 +882,20 @@ export function buildAdiDesignerSummary({
     rows,
     // The placement recommendation, resolved once: the physical move in
     // installer words, what it is expected to do, and whether it can be applied
-    // or undone. Null when there is nothing to state about placement.
-    placementRecommendation: resolvePlacementRecommendation({
-      planView,
-      roomDims,
-      presentation,
-      appliedLever,
-      appliedDirection,
-      currentP20,
-      parityBlocked,
-      layoutCounts,
-      recommendationNotCurrent,
-    }),
+    // or undone. Null when there is nothing to state about placement. Whether a
+    // placement may be PRESENTED as a recommendation at all is decided by the
+    // view model's physicalRecommendation below.
+    placementRecommendation,
+    // ── THE ONE RESULT VIEW MODEL ──
+    // Everything a surface needs to describe this run: the one decision, the one
+    // winner, the one applied/held state, the labelled current and proposed
+    // sides, the affected seat and its recorded regression, the one limiting
+    // frequency, and the one physical recommendation.
+    resultViewModel,
+    decisionType: resultViewModel.decisionType,
+    appliedState: resultViewModel.appliedState,
+    appliedStateLabel: resultViewModel.appliedStateLabel,
+    limitingFrequency,
     actions: {
       canApply: apply.allowed,
       applyLabel: apply.label,

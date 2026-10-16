@@ -181,6 +181,30 @@ export function readAuthoritativeP20Headline(completedBassAuthority) {
 }
 
 /**
+ * The authoritative headline of ONE published RP22 bass parameter (P14, P18,
+ * P19, P20), read from the completed bass authority. Read only — never
+ * recalculated, never estimated. P14 keeps its own unit (dBC), so a capability
+ * figure is never printed as a bare dB.
+ *
+ * A parameter the published result does not carry returns null; the caller
+ * states nothing rather than inventing a value.
+ */
+export function readAuthoritativeParameterHeadline(completedBassAuthority, key) {
+  const parameters = completedBassAuthority?.contract?.productAnalysis?.parameters || {};
+  const parameter = parameters?.[String(key || "").toLowerCase()] || null;
+  if (!parameter) return null;
+  const value = num(parameter.value);
+  return {
+    parameter: parameter.parameter || String(key || "").toUpperCase(),
+    status: parameter.status ?? null,
+    value,
+    level: num(parameter.level),
+    unit: parameter.unit || null,
+    targetBasis: parameter.targetBasis || null,
+  };
+}
+
+/**
  * The published authority's OWN per-seat P20 rows: one entry per seat the result
  * carries, with its own variation, level and limiting frequency. Read only —
  * never recalculated, never estimated, and no seat is ever invented.
