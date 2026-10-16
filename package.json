@@ -23,6 +23,8 @@
     "test:adi-actions": "node src/test/_p7-run.mjs src/test/optimiser-rerun-availability.test.mjs src/test/optimiser-retest-one-next-action.test.mjs src/test/optimiser-trade-off-state.test.mjs src/test/optimiser-single-retest-action.test.mjs src/test/optimiser-actionable-states.test.mjs src/test/optimiser-run-supersedes-previous.test.mjs src/test/optimiser-failure-reason.test.mjs",
     "test:optimiser-progress": "node src/test/_p7-run.mjs src/test/optimiser-run-progress.test.mjs",
     "test:comparison": "node src/test/_p7-run.mjs test/comparison-persistence.test.mjs",
+    "test:suite": "node src/test/_p7-run.mjs",
+    "test:highlights": "node src/test/_p7-run.mjs src/test/adi-weighted-highlight-selection.test.mjs src/test/strength-authority-parity.test.mjs src/test/proposal-strength-parity.test.mjs src/test/frozen-strength-prechange-regression.test.mjs src/test/project-report-presentation-fixes.test.mjs src/test/highlights-curation.test.mjs src/test/highlights-one-sheet-fitting.test.mjs src/test/frozen-strength-capture-state.test.mjs",
     "test:proposal-composition": "node src/test/_p7-run.mjs src/test/proposal-image-first-composition.test.mjs",
     "test:proposal-authority": "node --test test/proposal-authority-guardrails.test.mjs",
     "verify:proposal-authority": "node --test test/proposal-authority-guardrails.test.mjs test/proposal-review-authority.test.mjs test/narrative-steer-wiring.test.mjs test/narrative-priority-authority.test.mjs test/p1-p20-narrative-rules.test.mjs test/client-benefit-writing-standard.test.mjs",
