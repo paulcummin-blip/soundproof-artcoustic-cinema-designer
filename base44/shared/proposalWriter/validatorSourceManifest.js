@@ -21,7 +21,7 @@ export const VALIDATOR_SOURCE_MANIFEST = Object.freeze({
   'base44/shared/proposalGeneration/generationStatuses.js': '2273b2e8408a426eeb137d9ae2f34c428a8e934dc0529134e9889aae75103b28',
   'base44/shared/proposalWriter/writerCabinetLanguage.js': '18e37edb21bd8422c6293c5fde809984d185e7188d0fe4a12fa2ff352d4b72c7',
   'base44/shared/proposalWriter/writerValidationRegister.js': '634502ab07c0bf1b13cfe0879d1e2ca2e85f0419c94f377b266a977c38c07b96',
-  'base44/shared/proposalWriter/writerInputBuilder.js': '9ea40f652770bbfe816e6317ead85104281c3077eec02f1f3753479f7d0ebf79',
+  'base44/shared/proposalWriter/writerInputBuilder.js': '0eb9628212716a8074c35809e950de93fdaf5e73c0acb5149bf7d4250c57189e',
   // The client narrative register: the story the client is buying, never the
   // mechanism that produces it. It states the instruction the writer reads and the
   // phrasing the narrative sanitizer removes, so a draft can always be traced to the
@@ -32,7 +32,7 @@ export const VALIDATOR_SOURCE_MANIFEST = Object.freeze({
   // the shared strength statements are composed from and the rules the writer is
   // held to, so a draft can always be traced to the exact language authority it was
   // written under.
-  'base44/shared/performanceLanguageAuthority.js': '64b1951d577f983dcb7c315b8bf0196a3324efc0e88509e9ff634e95e6e184db',
+  'base44/shared/performanceLanguageAuthority.js': '93f6a812943474559aa98402466ba68cacf743c112b7d7926cade11883b03698',
   // The narrative steer: the designer's three-state preference over the topics ADI
   // offers. It carries the rule the writer reads — a preference is an ingredient,
   // never a section plan — so a draft can always be traced to the exact steer it was
@@ -44,7 +44,7 @@ export const VALIDATOR_SOURCE_MANIFEST = Object.freeze({
   // The Design Summary brief for a TV media room: it states the requirement and
   // the word limit the section is written and validated under, so a draft can be
   // traced to the exact brief it was read against.
-  'base44/shared/proposalWriter/designSummaryBrief.js': 'b49b1ca24bc8a0c8df82196faabfa8723b61419d89509466b622e3528e75464c',
+  'base44/shared/proposalWriter/designSummaryBrief.js': '9b300ce91d14fbada0065ccbdf9458b01f4cd7253d5ca687c9f753ddb8e57a95',
   'base44/shared/proposalWriter/writerPromptBuilder.js': '66260e1422cf0b145b491047912e7cdff07297295fdb2643c738f208c53266a3',
   'base44/shared/proposalWriter/writerSectionMapping.js': 'f5a6d2a5fe974fbd5c16d810d95f99da72f629a4fb8cb33793aa472778ade2f0',
   'base44/shared/proposalWriter/writerDesignContext.js': '590a9f379bb28ebc54c14f97ae2b73070a8c8c6722c7be3fc548c95719f2d63b',
