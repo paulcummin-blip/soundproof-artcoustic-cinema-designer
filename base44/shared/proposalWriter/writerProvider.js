@@ -59,16 +59,26 @@ function outcome({
 }
 
 /**
+ * The most images one writer call is ever sent. The same ceiling the visual context
+ * authority applies, restated here as the boundary's own limit: whatever a caller
+ * hands over, no request ever carries more.
+ */
+export const MAX_WRITER_IMAGES = 4;
+
+/**
  * Make one provider call.
  *
  * @param {Object} input
  * @param {Function} input.invokeLLM — the caller's own server-side integration call
  * @param {Object} input.input — the Phase 2 writer input
  * @param {string} [input.model] — the flag's model override
+ * @param {Array<string>} [input.fileUrls] — fetch addresses of images to attach.
+ *   Omitted or empty sends the text-only request the writer has always sent.
  * @returns {Promise<Object>} { output, provider_error, provider, model, duration_ms, received }
  */
-export async function callWriterProvider({ invokeLLM, input, model = null } = {}) {
+export async function callWriterProvider({ invokeLLM, input, model = null, fileUrls = null } = {}) {
   const resolvedModel = writerModelFor(model);
+  const images = (Array.isArray(fileUrls) ? fileUrls : []).slice(0, MAX_WRITER_IMAGES);
 
   if (typeof invokeLLM !== 'function') {
     return outcome({ model: resolvedModel, providerError: 'No writer provider is available in this environment.' });
@@ -76,7 +86,7 @@ export async function callWriterProvider({ invokeLLM, input, model = null } = {}
 
   let request = null;
   try {
-    request = buildWriterProviderRequest({ input, model: resolvedModel });
+    request = buildWriterProviderRequest({ input, model: resolvedModel, fileUrls: images });
   } catch (error) {
     return outcome({ model: resolvedModel, providerError: cleanError(error) });
   }

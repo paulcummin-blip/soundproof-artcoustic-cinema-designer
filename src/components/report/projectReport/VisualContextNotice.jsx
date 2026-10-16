@@ -16,9 +16,10 @@
  * version's images is what the writing actually sees. When usable images are
  * already there it shows a simple confirmation instead of the invitation.
  *
- * HONEST WORDING. The visual-context writing is not yet wired into the writer, so
- * this notice describes images as PREPARATION for enhanced ADI writing. It never
- * claims that ADI is already reading them.
+ * HONEST WORDING. The visual-context writing is wired: the writer is shown these
+ * images when a Design Intent is written for this report. So this notice states
+ * plainly that ADI writing draws on them, and never that a picture is required —
+ * the report, its engineering and its assessment are complete without one.
  */
 
 import React, { useMemo } from 'react';
@@ -64,17 +65,17 @@ const ACTION = {
 
 /** The invite, when this version has no images the writing could use yet. */
 const INVITE = [
-  'For a more personalised and engaging Project Report, add your cinema renders, floor plans and other '
-  + 'relevant images to the Project Library before generating the report.',
-  'These prepare this project for enhanced ADI writing, which draws on the visual character of the room, '
-  + 'the seating arrangements and the design intentions to explain the cinema more naturally.',
+  'For a more personalised and engaging Project Report, add your cinema renders and other room images '
+  + 'to the Project Library before generating the report.',
+  'ADI writing draws on the visual character of the room, the way the seating is arranged and the design '
+  + 'intentions, so it can explain your cinema in the terms you would use yourself.',
   'Your engineering results and RP22 assessments remain unchanged.',
 ];
 
 /** The confirmation, when usable images are already there. */
 const CONFIRMED = [
-  'This version already holds images ADI writing can draw on — the visual character of the room, '
-  + 'the seating arrangements and the design intentions.',
+  'ADI writing will draw on the images this version holds — the visual character of the room, the way '
+  + 'the seating is arranged and the design intentions.',
   'Your engineering results and RP22 assessments remain unchanged.',
 ];
 

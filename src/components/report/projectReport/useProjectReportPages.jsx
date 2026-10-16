@@ -51,6 +51,8 @@ import { buildProjectReportSummaryOpening } from "@/components/report/projectRep
 import { buildProjectReportOpening } from "@/components/report/projectReport/projectReportOpening";
 import { resolveDesignIntent } from "@/components/report/projectReport/designIntentAuthority";
 import { liveGeometryFingerprint } from "@/shared/reportGeometryContext";
+import { buildReportVisualContext } from "@/shared/reportVisualContext";
+import { useProjectLibraryImages } from "@/components/library/useProjectLibraryImages";
 import { useReportDesignIntent } from "@/components/report/projectReport/useReportDesignIntent";
 import ProjectReportDesignSummary from "@/components/report/projectReport/ProjectReportDesignSummary";
 import AdiDesignHighlightsPage from "@/components/report/projectReport/AdiDesignHighlightsPage";
@@ -129,12 +131,26 @@ export function useProjectReportPages({
     [roomDims, seatingPositions],
   );
 
+  // The pictures that represent this design NOW, from the same shared visual context
+  // authority the narrative's own frozen image identity is built from — this project's
+  // images, this version's selection. An Astra narrative is shown only while the images
+  // it was written from are still the images standing for the design. This is a record
+  // read and nothing more: opening a report still calls no model, and a read that fails
+  // states no fingerprint, so a narrative is never hidden for a reason the page cannot
+  // state.
+  const { assets: libraryImages } = useProjectLibraryImages({ projectId });
+  const currentVisualFingerprint = useMemo(
+    () => buildReportVisualContext({ assets: libraryImages, versionId })?.fingerprint ?? null,
+    [libraryImages, versionId],
+  );
+
   const designIntent = useMemo(() => resolveDesignIntent({
     deterministic: summaryOpening,
     saved: savedDesignIntent,
     currentSourceFingerprints: reportEvidenceFingerprints,
     currentGeometryFingerprint,
-  }), [summaryOpening, savedDesignIntent, reportEvidenceFingerprints, currentGeometryFingerprint]);
+    currentVisualFingerprint,
+  }), [summaryOpening, savedDesignIntent, reportEvidenceFingerprints, currentGeometryFingerprint, currentVisualFingerprint]);
 
   // Page 1's own opening statement: the project-specific headline and the single
   // supporting line of facts beneath it, composed by the report's opening

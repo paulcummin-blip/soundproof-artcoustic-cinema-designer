@@ -7,6 +7,7 @@ import {
   runReportDesignIntent,
 } from '../../shared/reportDesignIntent/reportDesignIntentRunner.js';
 import { buildReportGeometryContext } from '../../shared/reportDesignIntent/reportGeometryContext.js';
+import { buildReportVisualContext } from '../../shared/reportDesignIntent/reportVisualContext.js';
 
 /**
  * Generate the Project Report's Design Intent with the Astra writer — OPTIONAL.
@@ -67,6 +68,18 @@ export default async function(req) {
       }, { status: 409 });
     }
 
+    // ── THE PROJECT LIBRARY'S OWN PICTURES, for the writer's visual context ──
+    // Read with the DESIGNER'S OWN session, never the service role, so the same
+    // record-level access that governs the Library governs this read: only this
+    // project's images are visible to this login, and one dealer's images can never
+    // reach another dealer's narrative. A library that cannot be read is simply no
+    // visual context at all — the attempt continues and writes the text-only
+    // narrative it has always written.
+    const assetPage = await base44.entities.ProposalAsset
+      .filter({ project_id }, { limit: 100 })
+      .catch(() => null);
+    const libraryImages = assetPage?.items || [];
+
     // ── The writer's own switch, before any evidence is read ──
     const configResult = await base44.asServiceRole.entities.SystemConfig.filter({}, { limit: 1 });
     const configRecord = (Array.isArray(configResult) ? configResult : (configResult?.items || []))[0] || null;
@@ -116,6 +129,22 @@ export default async function(req) {
         versionId: version.id,
         reportSnapshotId: snapshot.id,
       }),
+      // ── THE PROJECT LIBRARY'S OWN IMAGES, AS VISUAL CONTEXT ──
+      // The pictures the designer has already uploaded, chosen by the shared
+      // selection authority: whole-room views first, never an image the designer has
+      // hidden, never an option the client is being offered (a seating or comparison
+      // alternative is not the selected design), and never a plan or dimensioned
+      // drawing. At most four, and only from this project and this version. They are
+      // EDITORIAL context — atmosphere, interior character, visual scale, seating
+      // style — and never engineering evidence: no figure, distance, loudspeaker
+      // position, capability or RP22 result is ever read from a photograph, and the
+      // frozen evidence remains the only authority for every claim. The fetch
+      // addresses are attached to the ONE existing writer call; nothing is uploaded,
+      // copied or re-stored, and no second model analyses the images.
+      readVisualContext: async () => buildReportVisualContext({
+        assets: libraryImages,
+        versionId: version.id,
+      }),
     });
 
     // ── The one write, and only for an accepted narrative ──
@@ -143,6 +172,9 @@ export default async function(req) {
           provider: attempt.provider_identity || null,
           source_fingerprints: snapshot.source_fingerprints || null,
           input_fingerprint: attempt.input_fingerprint ?? attempt.record?.input_fingerprint ?? null,
+          // Which pictures the refused attempt was shown, when it was shown any:
+          // identity only, and never a storage address.
+          visual_context: attempt.visual_context || null,
         }
         : null;
 
@@ -170,7 +202,8 @@ export default async function(req) {
       `[generateReportDesignIntent] accepted project=${project_id} version=${version_id} `
       + `provider=${attempt.provider || 'none'} model=${attempt.model || 'none'} prompt=${attempt.prompt_version} `
       + `contract=${attempt.contract_version} pack=${attempt.evidence_pack_fingerprint} `
-      + `geometry=${attempt.geometry_fingerprint || 'none'} by=${user.email || user.id}`,
+      + `geometry=${attempt.geometry_fingerprint || 'none'} images=${attempt.visual_fingerprint || 'none'} `
+      + `by=${user.email || user.id}`,
     );
 
     return Response.json({
@@ -183,6 +216,13 @@ export default async function(req) {
       // The geometry the narrative was written from, where one was confirmed against
       // this saved report. Null states honestly that no geometry was used.
       geometry_fingerprint: attempt.geometry_fingerprint ?? null,
+      // The image selection the narrative was written from, where it was shown one.
+      // Null states honestly that this attempt read no pictures, and the record saved
+      // beside the report carries the identity of the selection: each image's own id,
+      // the revision of its file, its role and the designer's caption. Never a
+      // storage address.
+      visual_fingerprint: attempt.visual_fingerprint ?? null,
+      visual_context: attempt.visual_context ?? null,
       validation_errors: attempt.validation_errors || [],
     });
   } catch (error) {

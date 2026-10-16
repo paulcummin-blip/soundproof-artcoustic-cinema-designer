@@ -71,6 +71,10 @@ function fingerprintsOf(value) {
  *   holds now, from the shared report geometry authority. A narrative whose frozen
  *   geometry has moved explains a seating position the design no longer has, so it is
  *   not shown and the report's deterministic intent stands instead.
+ * @param {string|null} [input.currentVisualFingerprint] — the pictures that represent
+ *   the design now, from the shared report visual context authority. A narrative whose
+ *   frozen image identity has moved was written while a different set of images stood
+ *   for this design, so it is not shown and the deterministic intent stands instead.
  * @returns {{ text: string|null, source: string, reason: string|null }}
  */
 export function resolveDesignIntent({
@@ -78,6 +82,7 @@ export function resolveDesignIntent({
   saved = null,
   currentSourceFingerprints = null,
   currentGeometryFingerprint = null,
+  currentVisualFingerprint = null,
 } = {}) {
   const fallback = asText(deterministic);
   const record = (saved && typeof saved === 'object' && !Array.isArray(saved)) ? saved : null;
@@ -110,6 +115,17 @@ export function resolveDesignIntent({
   const currentGeometry = asText(currentGeometryFingerprint);
   if (savedGeometry && currentGeometry && savedGeometry !== currentGeometry) {
     return asDeterministic('geometry_moved');
+  }
+
+  // THE PICTURES, on the same rule again. The narrative was written having been shown
+  // one set of images, so it is current only while that selection is still the one
+  // representing this design. Replacing a render changes the visual identity, and the
+  // narrative falls back to the report's own deterministic intent rather than
+  // describing a cinema whose pictures have moved on.
+  const savedVisual = asText(record.visual_fingerprint);
+  const currentVisual = asText(currentVisualFingerprint);
+  if (savedVisual && currentVisual && savedVisual !== currentVisual) {
+    return asDeterministic('visual_moved');
   }
 
   return { text, source: DESIGN_INTENT_SOURCE.ASTRA, reason: null };

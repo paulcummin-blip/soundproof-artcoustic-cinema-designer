@@ -26,6 +26,7 @@
 import { buildWriterInput } from '../proposalWriter/writerInputBuilder.js';
 import { proposalEvidenceFingerprint } from '../proposalEvidence/proposalEvidenceBuilder.js';
 import { writerGeometryBlock } from './reportGeometryContext.js';
+import { writerVisualBlock } from './reportVisualContext.js';
 import {
   DESIGN_INTENT_SCOPE_RULE,
   DESIGN_INTENT_SECTION,
@@ -48,6 +49,13 @@ import {
  *   where the writer reads its design context — never inside the frozen evidence —
  *   and it is omitted entirely when none is supplied, so an input built without one
  *   is unchanged, fingerprint included.
+ * @param {Object|null} [input.visualContext] — the frozen report visual context
+ *   (buildReportVisualContext output): the Project Library pictures this design is
+ *   represented by, chosen by the shared selection authority. It is carried BESIDE
+ *   the pack as the writer's one block of visual context, and it is omitted entirely
+ *   when none is supplied, so an input built without one is unchanged, fingerprint
+ *   included. The pictures themselves are attached to the provider request; this
+ *   block states what they are for and what they may never be used for.
  * @returns {Object} the writer input, carrying its own content fingerprint
  */
 export function buildDesignIntentWriterInput({
@@ -56,6 +64,7 @@ export function buildDesignIntentWriterInput({
   promptVersion = undefined,
   reportLabel = 'Project Report',
   geometryContext = null,
+  visualContext = null,
 } = {}) {
   const full = buildWriterInput({
     pack,
@@ -70,10 +79,16 @@ export function buildDesignIntentWriterInput({
   // seating decision can be explained in THIS room's own terms: the frozen pack
   // carries the published results, not the seat coordinates behind them.
   const geometryBlock = geometryContext?.available === true ? writerGeometryBlock(geometryContext) : null;
+  // THE PROJECT LIBRARY'S OWN PICTURES, where the designer's selection produced a
+  // usable set: the one place the writer is told what it is looking at, and what
+  // it may never read out of a photograph. Visual context only — it adds no fact,
+  // changes no rule, and states no figure, level, product or result.
+  const visualBlock = writerVisualBlock(visualContext);
 
   const scoped = {
     ...core,
     ...(geometryBlock ? { design_geometry_context: geometryBlock } : {}),
+    ...(visualBlock ? { design_visual_context: visualBlock } : {}),
     // The scope, stated where the writer reads its contract: one section, this
     // report's Design Intent, and nothing else in the draft.
     design_intent_scope: {

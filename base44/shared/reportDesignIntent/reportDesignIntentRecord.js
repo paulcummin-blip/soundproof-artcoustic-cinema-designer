@@ -65,9 +65,16 @@ export function designIntentEvidenceFingerprints(sourceFingerprints = null) {
  *   holds now, from the same shared geometry authority. A narrative whose frozen
  *   geometry no longer matches is not shown: an explanation of a seating position is
  *   only true of the room it was written in.
+ * @param {string|null} [options.currentVisualFingerprint] — the pictures that represent
+ *   the design now, from the same shared visual context authority. A narrative whose
+ *   frozen selection no longer matches was written while a different set of images
+ *   stood for this design, so it is not presented as current.
  * @returns {{ displayable: boolean, reason: string|null, text: string|null }}
  */
-export function readAcceptedDesignIntent(saved, currentFingerprints = null, { currentGeometryFingerprint = null } = {}) {
+export function readAcceptedDesignIntent(saved, currentFingerprints = null, {
+  currentGeometryFingerprint = null,
+  currentVisualFingerprint = null,
+} = {}) {
   const record = (saved && typeof saved === 'object' && !Array.isArray(saved)) ? saved : null;
   if (!record) return { displayable: false, reason: 'no_saved_narrative', text: null };
   if (record.status !== DESIGN_INTENT_STATUS.ACCEPTED) {
@@ -95,6 +102,16 @@ export function readAcceptedDesignIntent(saved, currentFingerprints = null, { cu
   const currentGeometry = asText(currentGeometryFingerprint);
   if (savedGeometry && currentGeometry && savedGeometry !== currentGeometry) {
     return { displayable: false, reason: 'geometry_moved', text: null };
+  }
+
+  // THE PICTURES, on the same rule again. A narrative written while one set of
+  // images represented this design describes the cinema those images showed, so once
+  // the selection changes it is not presented as current: replacing a render is a
+  // change of visual identity, and the design now reads differently on the page.
+  const savedVisual = asText(record.visual_fingerprint);
+  const currentVisual = asText(currentVisualFingerprint);
+  if (savedVisual && currentVisual && savedVisual !== currentVisual) {
+    return { displayable: false, reason: 'visual_context_moved', text: null };
   }
 
   return { displayable: true, reason: null, text };
@@ -125,6 +142,13 @@ export function isCompleteNarrative(text) {
  *   was written from, where the writer was given one. Null when no usable geometry was
  *   supplied, which is honest: a narrative that explains no seating position is pinned
  *   to no room.
+ * @param {string|null} [input.visualFingerprint] — the identity of the image selection
+ *   the narrative was written from, where the writer was shown pictures. Null when no
+ *   usable selection was supplied, which is honest: a narrative written from the frozen
+ *   evidence alone is pinned to no image set and is never hidden when images change.
+ * @param {Object|null} [input.visualContext] — the compact identity of that selection:
+ *   which pictures, each with the revision of its own file and the designer's own
+ *   metadata describing it. No storage address appears in it.
  * @param {Object} [input.providerIdentity] — provider, model, versions, durations
  * @param {string} [input.generatedBy]
  * @param {string} [input.generatedAt]
@@ -138,6 +162,8 @@ export function buildDesignIntentRecord({
   evidencePackFingerprint = null,
   inputFingerprint = null,
   geometryFingerprint = null,
+  visualFingerprint = null,
+  visualContext = null,
   providerIdentity = {},
   generatedBy = null,
   generatedAt = null,
@@ -152,6 +178,11 @@ export function buildDesignIntentRecord({
     evidence_pack_fingerprint: asText(evidencePackFingerprint),
     input_fingerprint: asText(inputFingerprint),
     geometry_fingerprint: asText(geometryFingerprint),
+    // THE PICTURES the words were written from, and which revision of each file:
+    // the identity of the selection, never a storage address, so nothing saved here
+    // can depend on a link that expires or moves.
+    visual_fingerprint: asText(visualFingerprint),
+    visual_context: visualContext && typeof visualContext === 'object' ? visualContext : null,
     provider: providerIdentity.provider ?? null,
     model: providerIdentity.model ?? null,
     prompt_version: providerIdentity.promptVersion ?? null,

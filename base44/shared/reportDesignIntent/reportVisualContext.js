@@ -359,6 +359,33 @@ export function visualContextSources(context) {
 }
 
 /**
+ * The compact identity of a selection, for the record saved beside a narrative:
+ * WHICH pictures the words were written from, each with the revision of its own
+ * file and the designer's own metadata describing it. No address appears here, so
+ * a saved record can never depend on a link and never carries where a file is
+ * kept. Null when the selection states nothing usable.
+ */
+export function visualContextIdentity(context) {
+  if (context?.available !== true) return null;
+  const images = asItems(context.images);
+  if (images.length === 0) return null;
+
+  return {
+    version: context.version ?? REPORT_VISUAL_CONTEXT_VERSION,
+    fingerprint: context.fingerprint ?? null,
+    image_count: images.length,
+    images: images.map((image) => ({
+      id: image?.id ?? null,
+      file: image?.identity?.file ?? null,
+      role: image?.role ?? 'other',
+      purpose: image?.identity?.purpose ?? null,
+      caption: image?.caption ?? null,
+      slot: image?.slot ?? null,
+    })),
+  };
+}
+
+/**
  * The visual block the writer reads, or null when there is nothing to show. It
  * states what the images are for, what they may never be used for, and what the
  * writer is being asked to write about — and it carries no address, because the

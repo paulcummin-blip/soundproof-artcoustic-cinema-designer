@@ -44,6 +44,10 @@ import { validatorProvenance } from '../proposalWriter/validatorProvenance.js';
 import { DESIGN_INTENT_SECTION } from './designIntentBrief.js';
 import { buildDesignIntentWriterInput } from './buildDesignIntentWriterInput.js';
 import {
+  visualContextIdentity,
+  visualContextSources,
+} from './reportVisualContext.js';
+import {
   DESIGN_INTENT_STATUS,
   buildDesignIntentRecord,
 } from './reportDesignIntentRecord.js';
@@ -69,6 +73,15 @@ export const DESIGN_INTENT_REFUSAL = Object.freeze({
  * narrative is pinned to.
  */
 function geometryFingerprintOf(context) {
+  return context?.available === true ? (context.fingerprint ?? null) : null;
+}
+
+/**
+ * The frozen visual identity a record is saved against, or null where the writer was
+ * shown no pictures. Only an AVAILABLE selection carries one: a library with no usable
+ * image never becomes the image set a narrative is pinned to.
+ */
+function visualFingerprintOf(context) {
   return context?.available === true ? (context.fingerprint ?? null) : null;
 }
 
@@ -163,6 +176,15 @@ export function designIntentTextFromOutput(output) {
  *   or one whose context cannot be confirmed, writes exactly as before.
  * @param {Object} [input.geometryContext] — a context the caller already holds, used
  *   instead of the reader.
+ * @param {Function} [input.readVisualContext] — async ({ evidence, versionIds }) =>
+ *   the frozen report visual context (buildReportVisualContext output): the Project
+ *   Library pictures this design is represented by, chosen by the shared selection
+ *   authority. The pictures are attached to the provider request and described to the
+ *   writer as visual context only. Optional and failure-isolated, exactly as the
+ *   geometry is: a caller that supplies no reader, or one whose selection is empty or
+ *   unavailable, writes the text-only narrative the writer has always written.
+ * @param {Object} [input.visualContext] — a context the caller already holds, used
+ *   instead of the reader.
  * @param {Object} [input.user]
  * @param {string} [input.now]
  * @param {Function} [input.validate] — injected for tests; the shared validator otherwise
@@ -180,6 +202,8 @@ export async function runReportDesignIntent({
   designerNotes = null,
   readGeometryContext = null,
   geometryContext = null,
+  readVisualContext = null,
+  visualContext = null,
   user = null,
   now = null,
   validate = validateWriterOutput,
@@ -209,6 +233,7 @@ export async function runReportDesignIntent({
   let pack = null;
   let writerInput = null;
   let geometry = geometryContext || null;
+  let visual = visualContext || null;
   try {
     pack = buildProposalEvidence({ versions: evidence, generatedAt: now });
 
@@ -227,6 +252,21 @@ export async function runReportDesignIntent({
       }
     }
 
+    // 3b. THE PROJECT LIBRARY'S OWN PICTURES, where this project already holds any:
+    // what the cinema is actually meant to look like, so the writer explains a room
+    // it has been shown. Read on its own account, exactly as the geometry is, so a
+    // library that cannot be read, or a design with no usable image, leaves the
+    // attempt writing from the frozen evidence alone. The pictures are EDITORIAL
+    // context: the engineering remains the only source of every figure, level,
+    // product and result.
+    if (!visual && typeof readVisualContext === 'function') {
+      try {
+        visual = await readVisualContext({ evidence, versionIds: versions });
+      } catch (error) {
+        visual = null;
+      }
+    }
+
     writerInput = buildDesignIntentWriterInput({
       pack,
       designContext: buildIntentDesignContext({
@@ -237,6 +277,7 @@ export async function runReportDesignIntent({
         designerNotes,
       }),
       geometryContext: geometry,
+      visualContext: visual,
     });
     assertWriterInputCarriesNoLiveState(writerInput);
   } catch (error) {
@@ -244,16 +285,28 @@ export async function runReportDesignIntent({
   }
 
   // 4. The provider call. A timeout, a refusal or an empty answer is a result.
-  const provider = await callWriterProvider({ invokeLLM, input: writerInput, model: flag?.model ?? null });
+  // 4. The provider call. A timeout, a refusal or an empty answer is a result. The
+  // pictures, where there are any, are attached to this one call: no second model is
+  // asked to look at them, and no image is ever uploaded, copied or re-stored.
+  const provider = await callWriterProvider({
+    invokeLLM,
+    input: writerInput,
+    model: flag?.model ?? null,
+    fileUrls: visualContextSources(visual),
+  });
   if (provider.provider_error || !provider.received) {
     return {
       ...refusal(DESIGN_INTENT_REFUSAL.PROVIDER_FAILED, provider.provider_error || 'The provider returned no output.'),
+      visual_fingerprint: visualFingerprintOf(visual),
+      visual_context: visualContextIdentity(visual),
       record: buildDesignIntentRecord({
         status: DESIGN_INTENT_STATUS.FAILED,
         sourceFingerprints,
         evidencePackFingerprint: pack.pack_fingerprint ?? null,
         inputFingerprint: writerInput.input_fingerprint ?? null,
         geometryFingerprint: geometryFingerprintOf(geometry),
+        visualFingerprint: visualFingerprintOf(visual),
+        visualContext: visualContextIdentity(visual),
         providerIdentity: {
           provider: provider.provider ?? null,
           model: provider.model ?? null,
@@ -323,6 +376,8 @@ export async function runReportDesignIntent({
       validation: validation || null,
       draft: provider.output ?? null,
       provider_identity: providerIdentity,
+      visual_fingerprint: visualFingerprintOf(visual),
+      visual_context: visualContextIdentity(visual),
       evidence_pack_fingerprint: pack.pack_fingerprint ?? null,
       input_fingerprint: writerInput.input_fingerprint ?? null,
       record: buildDesignIntentRecord({
@@ -333,6 +388,8 @@ export async function runReportDesignIntent({
         // The geometry this attempt was written from, recorded even where the draft
         // was refused: what an attempt read is part of what happened.
         geometryFingerprint: geometryFingerprintOf(geometry),
+        visualFingerprint: visualFingerprintOf(visual),
+        visualContext: visualContextIdentity(visual),
         providerIdentity,
         generatedAt: now,
         generatedBy: user?.full_name || user?.email || null,
@@ -351,6 +408,12 @@ export async function runReportDesignIntent({
     // coordinates the explanation of this design's seating was written from. A
     // narrative written before a seat or a wall moved is never presented as current.
     geometryFingerprint: geometryFingerprintOf(geometry),
+    // THE PICTURES the narrative was written from, frozen with the words: which
+    // renders, at which revision of each file, stood for this design when it was
+    // written. A narrative written from an earlier image set is never presented as
+    // current once the designer has replaced them.
+    visualFingerprint: visualFingerprintOf(visual),
+    visualContext: visualContextIdentity(visual),
     providerIdentity,
     generatedAt: now,
     generatedBy: user?.full_name || user?.email || null,
@@ -367,6 +430,8 @@ export async function runReportDesignIntent({
     evidence_pack_fingerprint: pack.pack_fingerprint ?? null,
     input_fingerprint: writerInput.input_fingerprint ?? null,
     geometry_fingerprint: geometryFingerprintOf(geometry),
+    visual_fingerprint: visualFingerprintOf(visual),
+    visual_context: visualContextIdentity(visual),
     prompt_version: writerInput.prompt_version ?? null,
     contract_version: writerInput.contract_version ?? null,
     provider: provider.provider ?? null,

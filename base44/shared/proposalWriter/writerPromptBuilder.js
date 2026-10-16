@@ -369,11 +369,21 @@ export function buildWriterPrompt({ input, briefRevision = null } = {}) {
  * @param {Object} input.input — buildWriterInput output
  * @param {string} [input.model]
  */
-export function buildWriterProviderRequest({ input, model = null, briefRevision = null } = {}) {
+export function buildWriterProviderRequest({ input, model = null, briefRevision = null, fileUrls = null } = {}) {
+  const images = Array.isArray(fileUrls)
+    ? fileUrls.filter((url) => typeof url === 'string' && url.trim().length > 0)
+    : [];
+
   return {
     prompt: buildWriterPrompt({ input, briefRevision }),
     response_json_schema: writerOutputJsonSchema(),
     model: typeof model === 'string' && model.trim().length > 0 ? model.trim() : WRITER_DEFAULT_MODEL,
+    // THE MULTIMODAL IMAGE INPUT, where the caller has pictures to attach: the
+    // fetch addresses of the images the writer's own visual block describes. The
+    // field is omitted entirely when there are none, so a request with no images is
+    // byte-identical to the request that predates this — a proposal, and a report
+    // with no usable library images, are unchanged.
+    ...(images.length > 0 ? { file_urls: images } : {}),
   };
 }
 
