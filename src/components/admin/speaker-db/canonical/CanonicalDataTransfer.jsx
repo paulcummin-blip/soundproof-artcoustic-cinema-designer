@@ -45,10 +45,11 @@ function Card({ title, description, children }) {
   );
 }
 
-export default function CanonicalDataTransfer() {
+export default function CanonicalDataTransfer({ initialAction = null, onActionHandled = null }) {
   const { user } = useAuth();
   const actorName = user?.full_name || user?.email || "Admin";
   const fileInputRef = useRef(null);
+  const uploadCardRef = useRef(null);
 
   const [exporting, setExporting] = useState(false);
   const [exportStatus, setExportStatus] = useState("");
@@ -73,6 +74,16 @@ export default function CanonicalDataTransfer() {
   }, []);
 
   useEffect(() => { loadBatches(); }, [loadBatches]);
+
+  // "Import speaker data" in the page header lands here: bring the upload card
+  // into view and open the picker, then hand the one-shot intent back so it is
+  // cleared and never reopens by itself on a later visit to this section.
+  useEffect(() => {
+    if (initialAction !== "import") return;
+    uploadCardRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+    fileInputRef.current?.click();
+    onActionHandled?.();
+  }, [initialAction, onActionHandled]);
 
   const handleExport = async () => {
     setExporting(true);
@@ -181,6 +192,7 @@ export default function CanonicalDataTransfer() {
           )}
         </Card>
 
+        <div ref={uploadCardRef}>
         <Card
           title="Import updated speaker data"
           description={`Upload the edited workbook (.xlsx). A blank cell leaves the existing value unchanged; ${CLEAR_TOKEN} deliberately removes a value. Nothing is written until you confirm Apply import.`}
@@ -207,6 +219,7 @@ export default function CanonicalDataTransfer() {
             version marker.
           </div>
         </Card>
+        </div>
       </div>
 
       {readErrors.length > 0 && (

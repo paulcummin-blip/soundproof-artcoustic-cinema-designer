@@ -898,7 +898,7 @@ export default function SPLCalculatorPage() {
         {canManageCompetitors && (
         <div style={{ marginTop: 14, background: BRAND.panel, border: `1px solid ${BRAND.border}`, borderRadius: 14 }}>
           <button type="button" onClick={() => setAdminOpen((v) => !v)} style={{ width: "100%", border: 0, background: "transparent", padding: "14px 18px", display: "flex", alignItems: "center", justifyContent: "space-between", cursor: "pointer", color: BRAND.text }}>
-            <span style={{ fontWeight: 700 }}>Admin · Competitor comparison data (legacy direct import)</span>
+            <span style={{ fontWeight: 700 }}>Admin · Competitor comparison data (legacy direct comparison import)</span>
             {adminOpen ? <ChevronUp size={17} /> : <ChevronDown size={17} />}
           </button>
           {adminOpen && (

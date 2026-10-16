@@ -15,6 +15,7 @@ import SpeakerDbDataQuality from "@/components/admin/speaker-db/SpeakerDbDataQua
 import SpeakerDbChangeHistory from "@/components/admin/speaker-db/SpeakerDbChangeHistory";
 import SpeakerDbSettings from "@/components/admin/speaker-db/SpeakerDbSettings";
 import CanonicalDataTransfer from "@/components/admin/speaker-db/canonical/CanonicalDataTransfer";
+import SpeakerDbDataTransferActions from "@/components/admin/speaker-db/SpeakerDbDataTransferActions";
 
 const BRAND = {
   text: "#1B1A1A",
@@ -29,6 +30,10 @@ export default function AdminSpeakerDatabase() {
   const { user, isLoadingAuth } = useAuth();
   const isAdmin = user?.role === "admin";
   const [section, setSection] = useState("dashboard");
+  // Header "Import speaker data" intent: opens the canonical import workflow in
+  // the Export / Import section, then clears itself once that screen has
+  // handled it, so returning to the section never reopens the upload on its own.
+  const [transferIntent, setTransferIntent] = useState(null);
   // Drill-in filter: when set, the Products tab shows only the specified
   // manufacturer's incomplete products. Set by the Manufacturer Health page.
   const [productsDrillFilter, setProductsDrillFilter] = useState(null);
@@ -40,6 +45,11 @@ export default function AdminSpeakerDatabase() {
 
   const handleClearDrillFilter = () => {
     setProductsDrillFilter(null);
+  };
+
+  const handleImportSpeakerData = () => {
+    setTransferIntent("import");
+    setSection("dataTransfer");
   };
 
   if (isLoadingAuth) {
@@ -63,17 +73,21 @@ export default function AdminSpeakerDatabase() {
         <a href="/admin" style={{ fontSize: 13, color: BRAND.subtext, textDecoration: "none" }}>← Back to Admin Dashboard</a>
       </div>
 
-      <div style={{ marginBottom: 8 }}>
-        <h1 style={{ margin: 0, fontSize: 26, color: BRAND.text }}>Speaker Database</h1>
-        <div style={{ fontSize: 13, color: BRAND.subtext, marginTop: 4 }}>
-          A structured catalogue of loudspeaker specifications and sources. Capability is derived downstream by the RP22 engine.
+      <div style={{ display: "flex", flexWrap: "wrap", alignItems: "flex-start", justifyContent: "space-between", gap: 16, marginBottom: 20 }}>
+        <div style={{ flex: "1 1 420px", minWidth: 260 }}>
+          <h1 style={{ margin: 0, fontSize: 26, color: BRAND.text }}>Speaker Database</h1>
+          <div style={{ fontSize: 13, color: BRAND.subtext, marginTop: 4 }}>
+            A structured catalogue of loudspeaker specifications and sources. Capability is derived downstream by the RP22 engine.
+          </div>
+          <a
+            href="/admin/speaker-database/model-first"
+            style={{ display: "inline-block", marginTop: 12, padding: "9px 14px", borderRadius: 10, background: BRAND.text, color: BRAND.btnText, fontSize: 13, fontWeight: 600, textDecoration: "none" }}
+          >
+            Add competitor model by name
+          </a>
         </div>
-        <a
-          href="/admin/speaker-database/model-first"
-          style={{ display: "inline-block", marginTop: 12, padding: "9px 14px", borderRadius: 10, background: BRAND.text, color: BRAND.btnText, fontSize: 13, fontWeight: 600, textDecoration: "none" }}
-        >
-          Add competitor model by name
-        </a>
+
+        <SpeakerDbDataTransferActions onImport={handleImportSpeakerData} />
       </div>
 
       <SpeakerDbNav active={section} onChange={setSection} />
@@ -84,7 +98,9 @@ export default function AdminSpeakerDatabase() {
       {section === "products" && <SpeakerDbProducts drillFilter={productsDrillFilter} onClearDrillFilter={handleClearDrillFilter} />}
       {section === "dataQuality" && <SpeakerDbDataQuality />}
       {section === "history" && <SpeakerDbChangeHistory />}
-      {section === "dataTransfer" && <CanonicalDataTransfer />}
+      {section === "dataTransfer" && (
+        <CanonicalDataTransfer initialAction={transferIntent} onActionHandled={() => setTransferIntent(null)} />
+      )}
       {section === "settings" && <SpeakerDbSettings />}
     </div>
   );
