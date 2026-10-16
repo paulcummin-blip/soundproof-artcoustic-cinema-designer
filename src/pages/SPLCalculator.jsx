@@ -898,7 +898,7 @@ export default function SPLCalculatorPage() {
         {canManageCompetitors && (
         <div style={{ marginTop: 14, background: BRAND.panel, border: `1px solid ${BRAND.border}`, borderRadius: 14 }}>
           <button type="button" onClick={() => setAdminOpen((v) => !v)} style={{ width: "100%", border: 0, background: "transparent", padding: "14px 18px", display: "flex", alignItems: "center", justifyContent: "space-between", cursor: "pointer", color: BRAND.text }}>
-            <span style={{ fontWeight: 700 }}>Admin · Competitor speaker data</span>
+            <span style={{ fontWeight: 700 }}>Admin · Competitor comparison data (legacy direct import)</span>
             {adminOpen ? <ChevronUp size={17} /> : <ChevronDown size={17} />}
           </button>
           {adminOpen && (
@@ -924,7 +924,7 @@ export default function SPLCalculatorPage() {
                   ))}
                 </div>
               )}
-              <div style={{ marginTop: 10, fontSize: 12, color: BRAND.hint }}>Upload the prepared specifications sheet. Matching manufacturer/model records are updated; other models are kept. Excel values replace the comparison values for that model, including any published database snapshot. Blank cells clear that field. Prices are per speaker, including VAT. Website links are stored as sources, not automatically read.</div>
+              <div style={{ marginTop: 10, fontSize: 12, color: BRAND.hint }}>Legacy direct comparison import: this writes the published comparison library only, not the Speaker Database, and it replaces the comparison values for a matching model. Maintain canonical speaker data through Speaker Database → Export / Import instead. Upload the prepared specifications sheet. Matching manufacturer/model records are updated; other models are kept. Blank cells clear that field. Prices are per speaker, including VAT. Website links are stored as sources, not automatically read.</div>
             </div>
           )}
         </div>

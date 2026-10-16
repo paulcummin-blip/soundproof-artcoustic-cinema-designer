@@ -1,0 +1,92 @@
+{
+  "name": "SpeakerImportBatch",
+  "type": "object",
+  "description": "One applied canonical Speaker Database import batch: the durable record that makes a spreadsheet import reversible. It stores who applied it, when, the uploaded filename, the schema version of the workbook, the counts it reported, and a per-record entry list carrying the before values, the after values and what the batch created. Rollback reads this record and restores canonical data only - it never deletes a record the batch did not create, and it refuses to touch a record that has been published to RP22 or modified since the import. This is an audit and recovery record, not a second authority: no engineering value is ever read from it.",
+  "properties": {
+    "batch_id": {
+      "type": "string",
+      "description": "Stable identity of this import batch. One row per applied batch."
+    },
+    "applied_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "When the batch was applied."
+    },
+    "applied_by": {
+      "type": "string",
+      "description": "Name or email of the admin who applied the batch."
+    },
+    "file_name": {
+      "type": "string",
+      "description": "The uploaded workbook's filename, so a batch is traceable to the file that produced it."
+    },
+    "schema_version": {
+      "type": "string",
+      "description": "The workbook schema version the batch was read from (e.g. speaker-database-schema-v1)."
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "applied",
+        "rolled_back"
+      ],
+      "default": "applied",
+      "description": "Whether the batch's changes are in place, or have been rolled back."
+    },
+    "row_count": {
+      "type": "number",
+      "default": 0,
+      "description": "Number of data rows read from the workbook."
+    },
+    "summary": {
+      "type": "object",
+      "description": "The counts the batch reported when it was applied: new manufacturers, new products, updated products, new specifications, unchanged rows, warnings and errors."
+    },
+    "entries": {
+      "type": "array",
+      "description": "One entry per record the batch touched, carrying the before values, the after values and what it created. Untouched rows are not listed. Rollback restores exactly these values.",
+      "items": {
+        "type": "object"
+      }
+    },
+    "rolled_back_at": {
+      "type": "string",
+      "format": "date-time",
+      "nullable": true,
+      "description": "When the batch was rolled back. Null = still applied."
+    },
+    "rolled_back_by": {
+      "type": "string",
+      "nullable": true,
+      "description": "Name or email of the admin who rolled the batch back."
+    },
+    "rollback_notes": {
+      "type": "string",
+      "nullable": true,
+      "description": "What the rollback actually did, including any record it refused to touch and why."
+    }
+  },
+  "required": [
+    "batch_id",
+    "applied_at",
+    "status"
+  ],
+  "rls": {
+    "read": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "create": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "update": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "delete": false
+  }
+}

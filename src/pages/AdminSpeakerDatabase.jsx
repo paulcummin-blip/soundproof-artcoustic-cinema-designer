@@ -14,6 +14,7 @@ import SpeakerDbProducts from "@/components/admin/speaker-db/SpeakerDbProducts";
 import SpeakerDbDataQuality from "@/components/admin/speaker-db/SpeakerDbDataQuality";
 import SpeakerDbChangeHistory from "@/components/admin/speaker-db/SpeakerDbChangeHistory";
 import SpeakerDbSettings from "@/components/admin/speaker-db/SpeakerDbSettings";
+import CanonicalDataTransfer from "@/components/admin/speaker-db/canonical/CanonicalDataTransfer";
 
 const BRAND = {
   text: "#1B1A1A",
@@ -83,6 +84,7 @@ export default function AdminSpeakerDatabase() {
       {section === "products" && <SpeakerDbProducts drillFilter={productsDrillFilter} onClearDrillFilter={handleClearDrillFilter} />}
       {section === "dataQuality" && <SpeakerDbDataQuality />}
       {section === "history" && <SpeakerDbChangeHistory />}
+      {section === "dataTransfer" && <CanonicalDataTransfer />}
       {section === "settings" && <SpeakerDbSettings />}
     </div>
   );

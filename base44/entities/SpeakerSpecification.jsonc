@@ -1,7 +1,7 @@
 {
   "name": "SpeakerSpecification",
   "type": "object",
-  "description": "A versioned specification record for a SpeakerProduct. Product \u2192 Current Specification \u2192 Specification History. The SpeakerProduct.current_specification_id pointer selects the active specification; older specifications remain archived with is_current=false. Contains all physical, electrical, acoustic, and metadata specification fields. Separated from Product so product identity remains stable while specifications can evolve over time. The database knows nothing about RP22; derived values like estimated max SPL or P12 capability are computed downstream by the RP22 engine, never stored here.",
+  "description": "A versioned specification record for a SpeakerProduct. Product \u2192 Current Specification \u2192 Specification History. The SpeakerProduct.current_specification_id pointer selects the active specification; older specifications remain archived with is_current=false. Contains all physical, electrical, acoustic, and metadata specification fields. Separated from Product so product identity remains stable while specifications can evolve over time. The database knows nothing about RP22; derived values like estimated max SPL or P12 capability are computed downstream by the RP22 engine, never stored here. Every field here is either published manufacturer data or the provenance of that data: the canonical export/import workbook carries these fields so a specification can be recreated exactly, with no derived Sound Proof calculation treated as an authority.",
   "properties": {
     "product_id": {
       "type": "string",
@@ -24,6 +24,11 @@
     "mounting_type": {
       "type": "string",
       "description": "Physical: Mounting type (e.g. Freestanding, On Wall, In Wall, In Ceiling)."
+    },
+    "open_back": {
+      "type": "string",
+      "nullable": true,
+      "description": "Published product data: whether the speaker is an open-back design (Y/N). Open-back in-wall speakers are subject to inconsistent installed results and are flagged as such wherever the product is compared. Stated from the manufacturer's own documentation; never inferred from the mounting type."
     },
     "woofer_count": {
       "type": "number",
@@ -83,6 +88,21 @@
       "default": "unknown",
       "description": "RP22 comparison: the reference basis the published sensitivity was quoted on. Required for correct 1 W / 1 m normalisation. 'unknown' is honest \u2014 the comparison assumes half space and records an assumed-basis warning. Never guessed from the value itself."
     },
+    "sensitivity_impedance_used_ohm": {
+      "type": "number",
+      "nullable": true,
+      "description": "Published product data: the impedance the sensitivity figure was quoted at, where the manufacturer states it separately from the nominal impedance. Used to normalise a 2.83 V figure to 1 W. Null = not stated; the comparison then falls back to the nominal impedance."
+    },
+    "sensitivity_measurement_basis": {
+      "type": "string",
+      "nullable": true,
+      "description": "Published product data: the acoustic space the sensitivity was measured in \u2014 Full Space or Half Space. Blank means the manufacturer did not state it, which is treated as unstated and assumed half space downstream. Never inferred."
+    },
+    "sensitivity_band_conditions": {
+      "type": "string",
+      "nullable": true,
+      "description": "Published product data: the band and conditions the sensitivity figure was quoted under (e.g. '300 Hz \u2013 3 kHz, 2.83 V, 1 m, anechoic')."
+    },
     "nominal_impedance_ohm": {
       "type": "number",
       "description": "Electrical: Nominal impedance in ohms. Valid range 2-16 \u03a9."
@@ -110,6 +130,11 @@
     "aes_power_w": {
       "type": "number",
       "description": "Electrical: AES power handling in watts."
+    },
+    "program_power_w": {
+      "type": "number",
+      "nullable": true,
+      "description": "Published product data: program power handling where the manufacturer states one. Recorded as published; it is never substituted for the continuous rating."
     },
     "peak_power_w": {
       "type": "number",
@@ -139,6 +164,11 @@
       "type": "number",
       "description": "RP22 comparison: numeric tolerance in dB (e.g. 6 for '-6 dB'). Blank when the manufacturer states no tolerance."
     },
+    "usable_lf_minus6db_hz": {
+      "type": "number",
+      "nullable": true,
+      "description": "Published product data: the usable low-frequency point in Hz where the manufacturer states one explicitly, as distinct from the frequency response lower limit. Blank when the manufacturer states no separate usable figure."
+    },
     "max_continuous_spl_db": {
       "type": "number",
       "description": "Acoustic: Maximum continuous SPL in dB. Valid range 85-140 dB."
@@ -160,6 +190,16 @@
       ],
       "default": "unknown",
       "description": "RP22 comparison: the basis behind the published max SPL figure. Drives the comparison's max-SPL basis declaration and its confidence grading. Never inferred \u2014 'manufacturer unspecified' and 'unknown' are honest answers."
+    },
+    "max_spl_measurement_basis": {
+      "type": "string",
+      "nullable": true,
+      "description": "Published product data: the acoustic space the max SPL figure was measured in \u2014 Full Space or Half Space. Independent of the sensitivity basis. Blank means unstated, which is assumed half space downstream. Never inferred."
+    },
+    "max_spl_test_conditions": {
+      "type": "string",
+      "nullable": true,
+      "description": "Published product data: the standard and conditions the max SPL figure was quoted under (e.g. 'IEC 60268-5, 1 m, half space')."
     },
     "measurement_space": {
       "type": "string",
@@ -242,7 +282,7 @@
         "Archived"
       ],
       "default": "Draft",
-      "description": "Approval workflow status. Draft = entered but not yet submitted for review. Awaiting Review = submitted, waiting for a reviewer. Approved = signed off by an approver. Superseded = replaced by a newer specification version (the data was not wrong, just outdated). Archived = retired from active use. SEPARATE from Confidence (data quality) and Import Status (pipeline origin). 'Rejected' is intentionally absent \u2014 in practice data is rarely wrong; it is superseded when newer data arrives. Accepting secondary evidence never changes this."
+      "description": "Approval workflow status. Draft = entered but not yet submitted for review. Awaiting Review = submitted, waiting for a reviewer. Approved = signed off by an approver. Superseded = replaced by a newer specification version (the data was not wrong, just outdated). Archived = retired from active use. SEPARATE from Confidence (data quality) and Import Status (pipeline origin). 'Rejected' is intentionally absent \u2014 in practice data is rarely wrong; it is superseded when newer data arrives. Accepting secondary evidence never changes this. A canonical spreadsheet import never sets Approved: newly imported or newly changed data arrives as Awaiting Review."
     },
     "reviewed_by": {
       "type": "string",
