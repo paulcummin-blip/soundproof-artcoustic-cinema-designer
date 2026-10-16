@@ -76,7 +76,11 @@ function baseAttempt(overrides = {}) {
 
 describe('the Design Intent brief', () => {
   it('states the report requirements and never a treatment product', () => {
-    expect(DESIGN_INTENT_REQUIREMENT).toMatch(/professional recommendation/i);
+    // The Design Intent is not a recommendation: the block is written as the
+    // design team's own account of the design, and no opening phrase is mandated.
+    expect(DESIGN_INTENT_REQUIREMENT).toMatch(/design intent/i);
+    expect(DESIGN_INTENT_REQUIREMENT).not.toMatch(/Begin with a professional recommendation/i);
+    expect(DESIGN_INTENT_REQUIREMENT).toMatch(/never announce a recommendation/i);
     expect(DESIGN_INTENT_REQUIREMENT).toMatch(/why it suits this room/i);
     expect(DESIGN_INTENT_REQUIREMENT).toMatch(/picture, the seating and the loudspeaker arrangement/i);
     expect(DESIGN_INTENT_REQUIREMENT).toMatch(/translate the established engineering principles/i);

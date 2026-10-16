@@ -106,7 +106,7 @@ test('the standard forbids recitation, protects the compromise protocol and hold
 
   assert.ok(standard.includes('The parameters are not a list to be mentioned.'));
   assert.ok(standard.includes('Never insert a generic educational paragraph'));
-  assert.ok(standard.includes('Explain the selected considerations naturally, as part of one coherent professional recommendation'));
+  assert.ok(standard.includes('Explain the selected considerations naturally, as one coherent professional account of the design'));
 
   assert.ok(standard.includes('Explain the design principle that is affected.'));
   assert.ok(standard.includes('Acknowledge the practical constraint plainly, and never hide it.'));

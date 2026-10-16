@@ -201,7 +201,7 @@ Where the design is strongest, say so plainly. State any clear limitation honest
 
 For a modest system, explain the benefits clearly, do not claim more than the evidence shows, and point to sensible upgrades. For a high performance system, state the quality clearly and do not undersell it.
 
-End with a confident professional recommendation for this particular cinema: why these elements work together here, and what that gives the client. Do not repeat the previous sections, do not summarise the equipment again, and do not end with a generic closing phrase. The final paragraphs should leave the reader confident that the design decisions are deliberate.
+Close by bringing the design together for this particular cinema: why these elements work together here, and what that gives the client. Do not repeat the previous sections, do not summarise the equipment again, and do not end with a generic closing phrase. The final paragraphs should leave the reader confident that the design decisions are deliberate.
 
 This section is prose only. Never repeat the Key Performance Highlights table, never list its rows, and do not write a list, a table or a second performance summary: that table is the report's one structured evidence section. Name the strongest part of the design and the main compromise in the prose instead.
 2 to 4 short paragraphs.`,

@@ -104,7 +104,7 @@ describe('A. The standard the proposal is written to', () => {
 
   it('allows the design team its own first-person judgement, used selectively', () => {
     expect(NATURAL_RECOMMENDATION_RULE).toMatch(/write we or our, naturally and selectively/);
-    expect(NATURAL_RECOMMENDATION_RULE).toMatch(/Never repeat we recommend from section to section/);
+    expect(NATURAL_RECOMMENDATION_RULE).toMatch(/Never announce a recommendation/);
     expect(NATURAL_RECOMMENDATION_RULE).toMatch(/never invent a conversation, a meeting, a site visit, a budget or a client wish/);
   });
 
@@ -118,7 +118,7 @@ describe('A. The standard the proposal is written to', () => {
 
   it('asks the whole-document review, and prints none of it', () => {
     const review = NATURAL_WRITING_REVIEW.join(' ');
-    for (const question of ['sound like a real cinema designer', 'Is the wording natural', 'Does it explain this actual project', 'Does every sentence add useful information', 'Is anything repetitive', 'Are there generic marketing phrases', 'Are the qualifications excessive', 'Does the writing flow naturally', 'Is the recommendation clear', 'read this aloud']) {
+    for (const question of ['sound like a real cinema designer', 'Is the wording natural', 'Does it explain this actual project', 'Does every sentence add useful information', 'Is anything repetitive', 'Are there generic marketing phrases', 'Are the qualifications excessive', 'Does the writing flow naturally', 'Is the design intent clear', 'read this aloud']) {
       expect(review).toContain(question);
     }
     expect(review).toMatch(/never print the review, a note about a change or any explanation of your own editing/);
@@ -151,7 +151,7 @@ describe('B. It reaches the prompt the writer is really called with', () => {
   });
 
   it('is the natural-writing generation, with the contract unchanged', () => {
-    expect(WRITER_PROMPT_VERSION).toBe('proposal-writer-prompt-24');
+    expect(WRITER_PROMPT_VERSION).toBe('proposal-writer-prompt-25');
     expect(WRITER_CONTRACT_VERSION).toBe(2);
     // The prompt carries the input it was built from, so a historical input is
     // still written under the generation it was filed under.

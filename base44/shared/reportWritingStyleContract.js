@@ -32,7 +32,7 @@
 
 import { PROPOSAL_STAGE_BOUNDARY } from './proposalStageBoundary.js';
 import { P20_USE_RULE, P20_OMIT_RULE } from './adiReportEvidenceRules.js';
-import { SOUND_PROOF_WRITING_AUTHORITY, WRITING_AUTHORITY_SELF_CHECK } from './soundProofWritingAuthority.js';
+import { SOUND_PROOF_WRITING_AUTHORITY, WRITING_AUTHORITY_SELF_CHECK, DESIGN_INTENT_WRITING } from './soundProofWritingAuthority.js';
 import { buildHighChannelContractBlock } from './highChannelDensityRule.js';
 
 /** Banned words and phrases. Never used in generated prose. */
@@ -502,6 +502,8 @@ export function buildWritingStyleContract(options = {}) {
     '=== WRITING STYLE CONTRACT (applies to every sentence of generated prose) ===',
     '',
     SOUND_PROOF_WRITING_AUTHORITY,
+    '',
+    DESIGN_INTENT_WRITING,
     '',
     TONE_REFERENCE,
     '',

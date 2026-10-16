@@ -108,7 +108,18 @@ const VERSION_3 = 'proposal-writer-prompt-3';
 // in the main narrative). A TV media room's Design Summary and Design Overview are
 // briefed short and plain by their own authority. No section identity, word limit,
 // claim-grounding or validation rule changed.
-const CURRENT = 'proposal-writer-prompt-24';
+// Generation 25 is the Design Intent pass: the mandatory recommendation opening
+// is removed from the report and proposal writing contracts. The copy is design
+// intent instead, an experienced cinema designer explaining a system they believe
+// in: no mandatory opening phrase, no fixed narrative structure, no "Our
+// recommendation is" and no "We recommend", and the closing Overall Design brings
+// the design together as the designer's own judgement rather than announcing a
+// recommendation. The Design Intent philosophy is a section of the shared writing
+// authority, so the reports, the summary and the proposals read one guide, and the
+// validator is untouched: a recommendation the evidence does not support is still
+// refused. No section identity, word limit, figure, level, product,
+// claim-grounding or validation rule changed.
+const CURRENT = 'proposal-writer-prompt-25';
 
 test('the writer prompt version is the current one', () => {
   assert.equal(WRITER_PROMPT_VERSION, CURRENT);

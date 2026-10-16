@@ -58,8 +58,8 @@ const SHORT_FORM_REQUIREMENT = [
   'Write two short paragraphs, 80 to 120 words in total, three or four sentences at most, and never more than the word limit. A simple, well-designed 5.1 system performs extremely well here, and the client does not need the reasoning behind that.',
   'First paragraph: name the display exactly as the frozen evidence names it, say in one sentence how the system is arranged, and state plainly that a well-designed layout of this kind delivers excellent performance.',
   'Second paragraph: what that arrangement gives the room day to day, with the display anchoring it and the front speakers, the side surrounds and the subwoofers working together around the main seating area: clear dialogue, proper surround movement and strong bass support when the content calls for it, and relaxed everyday use for sport, box sets, films and music.',
-  'Write it as a designer or salesperson explaining the recommendation in person in plain, confident language, with no repetition and no padding.',
-  'Do not explain the seating arrangement, the prioritised listening positions or the theory behind the layout, and do not justify the design against anything it does not have. Never write "the basis of the viewing experience", "listener-level surround arrangement", "the relationship between the TV, the front stage and the seating" or "tonal assessment". The engineering evidence belongs in the sections that carry it, so keep this one to the recommendation itself.',
+  'Write it as the designer explaining the design in person, in plain, confident language, with no repetition and no padding.',
+  'Do not explain the seating arrangement, the prioritised listening positions or the theory behind the layout, and do not justify the design against anything it does not have. Never write "the basis of the viewing experience", "listener-level surround arrangement", "the relationship between the TV, the front stage and the seating" or "tonal assessment". The engineering evidence belongs in the sections that carry it, so keep this one to the design itself.',
 ].join(' ');
 
 /**

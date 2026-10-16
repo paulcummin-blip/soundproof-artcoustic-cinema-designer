@@ -102,7 +102,7 @@ export const SOUND_PROOF_WRITING_AUTHORITY = [
   '',
   'TONE',
   '- Be confident, never arrogant. Be positive, never exaggerated.',
-  '- Support every recommendation with reasoning.',
+  '- Support every design decision with reasoning.',
   '',
   'ENGINEERING REMAINS FACTUAL',
   '- Never invent performance. Never exaggerate capability. Never ignore a constraint.',
@@ -132,6 +132,57 @@ export const SOUND_PROOF_WRITING_AUTHORITY = [
  * contract\'s quality check so every generated section is tested against the
  * designer-in-a-client\'s-home standard before it is returned.
  */
+/**
+ * THE DESIGN INTENT PHILOSOPHY.
+ *
+ * What the client-facing copy IS, stated once for every surface that reads this
+ * authority: an experienced cinema designer explaining a system they believe in,
+ * rather than a document that announces a recommendation. It removes no factual
+ * check and weakens nothing: every evidence, grounding, blocked-claim, product and
+ * validation rule above, below and in the writer contract still stands, and the
+ * validator still refuses a recommendation the evidence does not support.
+ *
+ * It is a section of this authority, not a second writing system.
+ */
+export const DESIGN_INTENT_WRITING = [
+  '=== WRITING DESIGN INTENT (what this copy is) ===',
+  '',
+  'This copy is design intent: an experienced cinema designer explaining a system they believe in.',
+  '',
+  'It is never offered as a recommendation and it never opens on one. There is no mandatory opening phrase, no fixed narrative structure and no section shape carried from project to project: explain this design in the order that reads best for it.',
+  '',
+  'WHAT THE COPY COMMUNICATES',
+  '- What makes this particular cinema special.',
+  '- Why the important design choices make sense.',
+  '- How the picture, the seating and the sound work together.',
+  '- What the engineering brings to the experience.',
+  '- Why the finished cinema will be enjoyable to watch films in.',
+  '',
+  'Write in confident, natural British English, positive, engaging and professional. Explain the benefit of each design decision, so the reader understands why this is the right system without being repeatedly told that it is recommended.',
+  '',
+  'Never write "Our recommendation is", "We recommend" or "We have carefully designed". Where the copy states a professional judgement, it states it once, as the designer\'s own reasoning, and never as an announcement that a recommendation has been made.',
+  '',
+  'THE PLEASURE OF CINEMA, EXPLAINED NATURALLY',
+  'Where the frozen evidence supports it, explain the enjoyment of cinema in these terms:',
+  '- convincing movement around the audience;',
+  '- the excitement of immersive overhead sound;',
+  '- the impact and depth of a film soundtrack;',
+  '- the scale and presence of the picture;',
+  '- the consistency and character of the sound;',
+  '- the pleasure of watching films in this room.',
+  'Connect each one to an actual design feature and the engineering principle behind it, and never invent a performance result the evidence does not state.',
+  '',
+  'THE DESIGNER\'S OWN EXPLANATION IS SEMANTIC INPUT',
+  '- Understand what the designer means, then explain it professionally and naturally: never merely paraphrase their wording.',
+  '- An established engineering principle may be discussed confidently without a higher Performance Level behind it.',
+  '- Do not add a defensive qualification after every positive statement.',
+  '',
+  'EVERY FACTUAL CHECK STILL STANDS',
+  '- Never claim a measured improvement, perfect consistency, unlimited headroom or an assessed comparison the evidence does not state.',
+  '- P16 and P17 seat-to-seat consistency stays distinct from inter-speaker-group matching.',
+  '- Acoustic treatment products and quantities stay out of the narrative, as the rule above states.',
+].join('\n');
+
 export const WRITING_AUTHORITY_SELF_CHECK = [
   'Would an experienced cinema designer actually say this in a client\'s home?',
   'Does this sound like software, or like marketing? If it does, rewrite it.',
@@ -622,7 +673,7 @@ export const CLIENT_BENEFIT_WRITING_STANDARD = [
   '- The parameters are not a list to be mentioned. Select the design considerations that matter most to this project and explain those.',
   '- Never insert a generic educational paragraph, and never explain how RP22 itself works.',
   '- Do not force every parameter into the opening summary, the design intent or the highlights. A parameter earns a sentence when it carries evidence for something the client will notice.',
-  '- Explain the selected considerations naturally, as part of one coherent professional recommendation, not as a sequence of parameter summaries.',
+  '- Explain the selected considerations naturally, as one coherent professional account of the design, not as a sequence of parameter summaries.',
   '- Where two parameters make the same point, make it once, from whichever carries the stronger evidence.',
   '',
   'WHEN THE DESIGN INVOLVES A COMPROMISE',
@@ -644,7 +695,7 @@ export const CLIENT_BENEFIT_WRITING_STANDARD = [
   '- No parameter recitation, no formulaic structure, and no repeated paragraph shape.',
   '- No exaggerated sales claims and no unsupported acoustic guarantees.',
   '- No em dashes.',
-  '- The document should read as one recommendation with a reason behind it, and leave the client thinking about the experience they are buying.',
+  '- The document should read as one considered design with a reason behind every decision, and leave the client thinking about the experience they are buying.',
 ].join('\n');
 
 /**
@@ -671,5 +722,5 @@ export function buildProposalWritingAuthority() {
   }
   const head = SOUND_PROOF_WRITING_AUTHORITY.slice(0, at);
   const tail = SOUND_PROOF_WRITING_AUTHORITY.slice(at + 1);
-  return `${head}\n\n${PROPOSAL_SALES_WRITING_AUTHORITY}\n\n${WRITING_KNOWLEDGE_CLASSES}\n\n${CLIENT_BENEFIT_WRITING_STANDARD}\n\n${absentFeatureFramingRule()}\n\n${tail}`;
+  return `${head}\n\n${PROPOSAL_SALES_WRITING_AUTHORITY}\n\n${WRITING_KNOWLEDGE_CLASSES}\n\n${CLIENT_BENEFIT_WRITING_STANDARD}\n\n${DESIGN_INTENT_WRITING}\n\n${absentFeatureFramingRule()}\n\n${tail}`;
 }

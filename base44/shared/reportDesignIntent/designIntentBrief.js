@@ -4,7 +4,7 @@
  * THE Project Report's Design Intent, as the Astra writer is briefed to write it.
  *
  * The Design Intent is the paragraph block that opens the report above the facts
- * sheet: the recommendation, why it suits this particular room, and what the
+ * sheet: the design intent, why it suits this particular room, and what the
  * picture, the seating and the loudspeaker arrangement give the client. It is the
  * report's own `decision_summary` section — the contract already carries that
  * section, its requirement and its word limit — so this module does not declare a
@@ -47,8 +47,8 @@ export const DESIGN_INTENT_WORD_LIMIT = 200;
  * frozen evidence.
  */
 export const DESIGN_INTENT_REQUIREMENT = [
-  'This block is the report\'s Design Intent: it opens the Project Report above its facts sheet, and it is written for the client as the design team\'s own recommendation.',
-  'Begin with a professional recommendation: name the cinema being proposed and state plainly that this is the right approach for this particular room, in the design team\'s own voice.',
+  'This block is the report\'s Design Intent: it opens the Project Report above its facts sheet, and it is written for the client as the design team\'s own account of the design.',
+  'Open on the design intent itself: name the cinema being proposed and explain why this design is the right approach for this particular room, in the design team\'s own voice. Never announce a recommendation and never open on a formulaic phrase such as "Our recommendation is" or "We recommend": the design is explained and reasoned rather than offered as an opinion, and the opening states what this cinema is and why it suits this room.',
   'Then explain why it suits this room, and what the picture, the seating and the loudspeaker arrangement give the client: what they will see, where they will sit, how the sound is carried around and across the room, and what that arrangement is intended to deliver for them.',
   'Translate the established engineering principles this design rests on into client benefits, confidently and in plain language. A principle may be explained confidently without a high Performance Level behind it. An intention is never written as an achieved result, and a measured or calculated result is never written as an intention.',
   'Where recorded designer intent is supplied, understand the engineering principle it explains and state it professionally in your own words. It is semantic input, never finished prose: never paraphrase the designer, and never reproduce a note, a brief, an instruction or a filename.',
