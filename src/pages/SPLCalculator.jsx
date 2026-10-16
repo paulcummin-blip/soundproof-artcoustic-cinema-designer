@@ -789,7 +789,7 @@ export default function SPLCalculatorPage() {
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
             <div>
               <div style={{ fontSize: 15, fontWeight: 700 }}>Other speakers</div>
-              <div style={{ fontSize: 12, color: BRAND.subtext }}>Up to five speakers, all assessed at the same distance, power and RP22 basis, graded from design SPL after the Sound Proof {RP22_EQ_HEADROOM_LABEL} headroom.</div>
+              <div style={{ fontSize: 12, color: BRAND.subtext }}>All speakers, including Artcoustic, are compared using the same conditions and RP22 grading method.</div>
             </div>
             <button type="button" onClick={addCompetitor} disabled={selectedCompetitorIds.length >= 5 || competitorRows.length === 0} style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "8px 11px", borderRadius: 9, border: `1px solid ${BRAND.border}`, background: "#FFF", color: BRAND.text, cursor: competitorRows.length ? "pointer" : "not-allowed", opacity: selectedCompetitorIds.length >= 5 || competitorRows.length === 0 ? 0.45 : 1 }}><Plus size={15} /> Add speaker</button>
           </div>
