@@ -44,8 +44,8 @@ export const VALIDATOR_SOURCE_MANIFEST = Object.freeze({
   // The Design Summary brief for a TV media room: it states the requirement and
   // the word limit the section is written and validated under, so a draft can be
   // traced to the exact brief it was read against.
-  'base44/shared/proposalWriter/designSummaryBrief.js': 'c95e0ad847dd6260f01c506e6254accdc22db186c3d1af147e117fb2e12b92ce',
-  'base44/shared/proposalWriter/writerPromptBuilder.js': '06451e76ca85e4f53f197de4d539ffba863d839e8d14f9694a4f0e0dd2ab8a05',
+  'base44/shared/proposalWriter/designSummaryBrief.js': 'b49b1ca24bc8a0c8df82196faabfa8723b61419d89509466b622e3528e75464c',
+  'base44/shared/proposalWriter/writerPromptBuilder.js': 'cd314a27cbb0f73c92b5bfa1621ab200bddd7b3dac4f46303d0b523a196f6216',
   'base44/shared/proposalWriter/writerSectionMapping.js': 'f5a6d2a5fe974fbd5c16d810d95f99da72f629a4fb8cb33793aa472778ade2f0',
   'base44/shared/proposalWriter/writerDesignContext.js': '590a9f379bb28ebc54c14f97ae2b73070a8c8c6722c7be3fc548c95719f2d63b',
   'base44/shared/proposalEdit/completeDocumentValidation.js': 'cff20d7146ecbeb3a9c325e3147db41cab552f7ea950dd93385ee1d478683ddd',

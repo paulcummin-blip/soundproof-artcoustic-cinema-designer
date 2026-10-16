@@ -115,6 +115,16 @@ export const SOUND_PROOF_WRITING_AUTHORITY = [
   'THE GUIDING PRINCIPLE',
   '- The client is buying the experience. The specifications and engineering give them confidence that the experience can actually be delivered.',
   '- The report should leave them thinking: "I understand why this has been designed this way, and I trust the reasoning behind it."',
+  '',
+  '=== ACOUSTIC TREATMENT IS SUPPORTING EVIDENCE, NOT A SELLING POINT ===',
+  '',
+  'Acoustic treatment is a supporting engineering detail. The Artcoustic Abfuser, acoustic panels and treatment quantities are not selling points, and they are not routinely raised in client-facing narrative: not in the design intent, the design summary, the highlights, the overall design recommendation or any other part of the copy.',
+  '',
+  'The narrative leads on what the client is buying: spatial resolution, dynamic range, timbre matching, bass performance, viewing immersion and the experience of the complete cinema.',
+  '',
+  'Treatment earns a sentence only where the client\'s own brief raises acoustics, or where the treatment is an important design decision in its own right. Where it is stated, explain the listening benefit it brings to the room, and never list treatment products or quantities.',
+  '',
+  'Treatment products, quantities and placement stay stated in full in the technical specification, the product schedule and the engineering sections of the report. This rule governs the narrative only: it changes no figure, no specification, no product and no page layout.',
 ].join('\n');
 
 /**

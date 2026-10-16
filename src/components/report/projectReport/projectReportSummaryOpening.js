@@ -17,6 +17,12 @@
  * subject; this paragraph carries the vision and the reasoning instead, so the
  * two pages read as complementary parts of one document.
  *
+ * ACOUSTIC TREATMENT IS SUPPORTING EVIDENCE. Treatment is a supporting engineering
+ * detail rather than a selling point, so it is named only where the client's own
+ * brief raises acoustics, and then as the listening benefit it brings rather than
+ * as a product or a quantity. The report's own specification states the products,
+ * the quantities and their placement in full.
+ *
  * Read-only and pure. Every element comes from evidence the report already
  * carries: the saved project (display and its presentation, architecture, layout
  * choices, reference position), the room's dimensions, the design's own seating,
@@ -65,10 +71,20 @@ export function isCompactRoom(roomDims) {
   return width * length <= COMPACT_FLOOR_AREA_M2;
 }
 
-/** A count as the sentence's opening word: "Six Abfuser panels…". */
-function countWord(count) {
-  const text = word(count);
-  return `${text.charAt(0).toUpperCase()}${text.slice(1)}`;
+/**
+ * Whether the designer's own recorded text raises acoustics. It is the only signal
+ * the report holds that a client has asked about the room's acoustics, so the
+ * intent names acoustic treatment only where that signal is present. Absent it,
+ * the intent stays on the experience the design delivers.
+ */
+const ACOUSTICS_IN_BRIEF = /\b(?:acoustic|acoustics|treatment|treatments|abfuser|absorption|absorber|reflection|reflections|echo|reverb|reverberation)\b/i;
+
+function acousticsRaisedInBrief(projectDetails) {
+  const stated = ['notes', 'client_brief', 'narrative_brief', 'brief']
+    .map((field) => projectDetails?.[field])
+    .filter((value) => typeof value === 'string' && value.trim())
+    .join(' \n ');
+  return ACOUSTICS_IN_BRIEF.test(stated);
 }
 
 /**
@@ -293,14 +309,16 @@ export function buildProjectReportSummaryOpening({
       reasoning.push(`${layerLabel} concentrates on ${joinList(focus)}.`);
     }
   }
-  if (treated) {
-    const treatmentParts = productParts(productsSelected?.acoustic_treatment);
-    const treatmentModel = partModel(treatmentParts[0]) || 'acoustic treatment';
-    const treatmentQty = totalCount(productsSelected?.acoustic_treatment);
-    const panels = `${countWord(treatmentQty)} ${treatmentModel} panel${treatmentQty === 1 ? '' : 's'}`;
+  // ACOUSTIC TREATMENT IS SUPPORTING EVIDENCE, NOT A SELLING POINT. It is a
+  // supporting engineering detail, so it is not routinely raised here: the intent
+  // states it only where the client's own brief raises acoustics, and then as the
+  // listening benefit the room gains, never as a treatment product or a quantity.
+  // The products, the quantities and their placement stay stated in full in the
+  // report's own specification, which this paragraph never duplicates.
+  if (treated && acousticsRaisedInBrief(projectDetails)) {
     reasoning.push(mediaRoom
-      ? `${panels} help control the strongest reflections, keeping the room clear, natural and inviting.`
-      : `${panels} ${treatmentQty === 1 ? 'is' : 'are'} included to manage the strongest early reflections, so the room stays clear and comfortable rather than overly live.`);
+      ? 'Acoustic treatment is included to keep the room clear and natural, so dialogue and detail stay easy to follow.'
+      : 'Acoustic treatment is included to control the strongest early reflections, so the room stays clear and comfortable rather than overly live.');
   }
 
   const paragraphs = [vision.join(' '), reasoning.join(' ')].filter(Boolean);
