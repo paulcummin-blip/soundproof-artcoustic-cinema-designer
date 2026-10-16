@@ -65,7 +65,7 @@ import { useSeatMetricsCacheEffect } from "@/components/room/rv/hooks/useSeatMet
 import { useMouseUpHandler } from "@/components/room/rv/hooks/useMouseUpHandler";
 import { useMouseDownHandler } from "@/components/room/rv/hooks/useMouseDownHandler";
 import { useSeatGesture } from "@/components/room/rv/hooks/useSeatGesture";
-import { finishPointerDrag, isDragPointer, primaryButtonHeld, releaseDragCapture } from "@/components/room/rv/utils/rvDragGesture";
+import { finishPointerDrag, isDragPointer, primaryButtonHeld, releaseDragCapture, markSeatDragCompleted, consumeCompletedSeatDragClick } from "@/components/room/rv/utils/rvDragGesture";
 import { useSpeakerDragUpdate } from "@/components/room/rv/hooks/useSpeakerDragUpdate";
 import { useRoomCanvasMouseMove } from "@/components/room/rv/hooks/useRoomCanvasMouseMove";
 import { useSubDragHandler } from "@/components/room/rv/hooks/useSubDragHandler";
@@ -1581,6 +1581,10 @@ const byId = useEntitiesById({
   const handleMouseUp = useCallback((e) => {
     const gesture = finishPointerDrag(activeDragRef, e);
     if (!gesture) return;
+    // The drag's completion is the one authority for the click the browser then
+    // dispatches at the release point. A seat drag's own completion arms it, so
+    // that click is read as the end of the drag and never as a click-away.
+    markSeatDragCompleted(gesture);
     isAnyDraggingRef.current = false;
     if (!getMlpGrab()) mlpDragActiveRef.current = false;
     try {
@@ -1710,12 +1714,13 @@ const byId = useEntitiesById({
     // A drag across the plan panned the drawing: it is not a click, so it must
     // not dismiss the pinned HUD or clear the active seat.
     if (consumePanClick()) return;
-    // A seat that was dragged and released is not a click-away either. The seat
-    // gesture owns whether its own pointer gesture became a drag, and this
-    // consumes that one release — so the HUD stays open through the drag and
-    // after the release, even when the seat ends up outside its original seating
-    // block, and only a later genuine click on empty plan closes it.
-    if (seatGesture.consumeDragClick()) return;
+    // A seat that was dragged and released is not a click-away either. The drag
+    // lifecycle owns whether the gesture that just completed was a seat drag,
+    // and this consumes that one click — so the HUD and the active seat stay
+    // exactly as they were through the drag and after the release, even when the
+    // seat ends up outside its original seating block, and only a later genuine
+    // click on empty plan closes them.
+    if (consumeCompletedSeatDragClick()) return;
     if (!justSelectedOverheadRef.current) {
       setSelectedOverheadRow(null);
     }
@@ -1724,7 +1729,7 @@ const byId = useEntitiesById({
     // pinned HUD and the active seat's dimensions both go.
     dismissSeatHud();
     clearSeatSelection();
-  }, [dismissSeatHud, clearSeatSelection, seatGesture]);
+  }, [consumePanClick, dismissSeatHud, clearSeatSelection]);
 
   // Dimensions mode: the three measurements for the active seat only, taken from
   // that seat's own listening position through the same authorities the seat drag

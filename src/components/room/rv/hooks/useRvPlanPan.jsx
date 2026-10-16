@@ -2,6 +2,7 @@
 
 import { useCallback, useRef, useState } from "react";
 import { getMlpGrab } from "@/components/state/mlpGrabStore";
+import { clearCompletedSeatDrag } from "@/components/room/rv/utils/rvDragGesture";
 import { usePanZoomHandlers, PAN_CLICK_SLOP_PX } from "@/components/room/rv/hooks/usePanZoomHandlers";
 
 /**
@@ -46,6 +47,11 @@ export function useRvPlanPan({
   });
 
   const onPanPointerDown = useCallback((e) => {
+    // A fresh press on the plan begins a new gesture, so any suppression left by
+    // a seat drag whose release produced no click is cleared here: a stale token
+    // must never swallow this press's own click-away.
+    clearCompletedSeatDrag();
+
     // Never pan if the event was already handled (sub/speaker drag)
     if (e.defaultPrevented) return;
 

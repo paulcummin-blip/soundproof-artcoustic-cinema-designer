@@ -10,10 +10,6 @@ export function useSeatGesture({ handleMouseDown, handleMouseMove, handleMouseUp
   const pendingRef = useRef(null);
   const listenersRef = useRef(null);
   const activeSeatRef = useRef(null);
-  // Whether the pointer gesture in play became a seat drag. A drag changes the
-  // seat's position and never its selection, so the click the browser dispatches
-  // after the release must never be read as a click-away.
-  const seatDragMovedRef = useRef(false);
   const previousModeRef = useRef(mode);
   const handlersRef = useRef(null);
   handlersRef.current = { handleMouseDown, handleMouseMove, handleMouseUp };
@@ -38,10 +34,6 @@ export function useSeatGesture({ handleMouseDown, handleMouseMove, handleMouseUp
     if (!seat?.id || !isPrimaryDragStart(e) || pendingRef.current) return;
     e.preventDefault();
     e.stopPropagation();
-    // A new seat gesture starts with no drag behind it: the previous release's
-    // click has already been through the plan handler, so nothing stale is left
-    // to suppress.
-    seatDragMovedRef.current = false;
     const pending = {
       seat, seatId: seat.id, startX: e.clientX, startY: e.clientY,
       pointerId: e.pointerId, pointerType: e.pointerType,
@@ -63,8 +55,10 @@ export function useSeatGesture({ handleMouseDown, handleMouseMove, handleMouseUp
       const dy = moveEvent.clientY - pending.startY;
       if (dx * dx + dy * dy <= SEAT_DRAG_THRESHOLD_PX * SEAT_DRAG_THRESHOLD_PX) return;
       pending.dragStarted = true;
-      seatDragMovedRef.current = true;
       setDimensionSeatId(null);
+      // The shared drag lifecycle owns the gesture from here. On completion it
+      // arms the one-shot suppression for the click the browser dispatches after
+      // the release — this hook keeps no drag authority of its own.
       // Freeze the baseline at the original press, not the threshold-crossing
       // frame, and preserve pointer identity. Capture belongs to the shared SVG.
       handlersRef.current.handleMouseDown?.({
@@ -110,21 +104,6 @@ export function useSeatGesture({ handleMouseDown, handleMouseMove, handleMouseUp
     activeSeatRef.current = null;
   }, []);
 
-  /**
-   * True once, when the click that follows a release belongs to a seat drag that
-   * actually moved a seat. The plan asks before it treats a release as a
-   * click-away, so a drag can never dismiss the seat HUD or clear the active
-   * seat: the move itself is committed by the shared pointer path and selection
-   * is left exactly as it was. Consumed once, and cleared at the start of the
-   * next seat gesture, so a stale suppression can never swallow a genuine click
-   * on empty plan later.
-   */
-  const consumeSeatDragClick = useCallback(() => {
-    if (!seatDragMovedRef.current) return false;
-    seatDragMovedRef.current = false;
-    return true;
-  }, []);
-
   // Switching modes keeps the active seat and immediately shows the matching
   // information for it: the HUD in HUD mode, that seat's dimensions in
   // Dimensions mode. No second click is required.
@@ -146,14 +125,14 @@ export function useSeatGesture({ handleMouseDown, handleMouseMove, handleMouseUp
     if (pending?.dragStarted) handlersRef.current.handleMouseUp?.({});
   }, [endGesture]);
 
+  // The gesture surface the plan wires to each seat. Whether that gesture became
+  // a drag — and therefore whether the click the browser dispatches after the
+  // release is a click-away — belongs to the shared drag lifecycle
+  // (beginPointerDrag / finishPointerDrag in rvDragGesture), never to a second
+  // authority kept here.
   const seatGesture = useMemo(() => ({
     onSeatPointerDown: handleSeatPointerDown,
-    // The gesture's own answer to "was that a drag, or a click?". The plan asks
-    // this before it reads a release as a click-away, so a seat drag can never
-    // dismiss the seat HUD or clear the active seat, while a genuine click on
-    // empty plan still closes it.
-    consumeDragClick: consumeSeatDragClick,
-  }), [handleSeatPointerDown, consumeSeatDragClick]);
+  }), [handleSeatPointerDown]);
 
   return {
     selectedSeatId,
