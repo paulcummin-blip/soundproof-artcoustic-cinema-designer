@@ -1710,6 +1710,12 @@ const byId = useEntitiesById({
     // A drag across the plan panned the drawing: it is not a click, so it must
     // not dismiss the pinned HUD or clear the active seat.
     if (consumePanClick()) return;
+    // A seat that was dragged and released is not a click-away either. The seat
+    // gesture owns whether its own pointer gesture became a drag, and this
+    // consumes that one release — so the HUD stays open through the drag and
+    // after the release, even when the seat ends up outside its original seating
+    // block, and only a later genuine click on empty plan closes it.
+    if (seatGesture.consumeDragClick()) return;
     if (!justSelectedOverheadRef.current) {
       setSelectedOverheadRow(null);
     }
@@ -1718,7 +1724,7 @@ const byId = useEntitiesById({
     // pinned HUD and the active seat's dimensions both go.
     dismissSeatHud();
     clearSeatSelection();
-  }, [dismissSeatHud, clearSeatSelection]);
+  }, [dismissSeatHud, clearSeatSelection, seatGesture]);
 
   // Dimensions mode: the three measurements for the active seat only, taken from
   // that seat's own listening position through the same authorities the seat drag
