@@ -2,9 +2,12 @@
 // ---------------------------------------------------------------------------
 // FOCUSED TESTS — the Bass Optimiser's RUN LIFECYCLE and RESULT AUTHORITY.
 //
-//   1. A publication that fails is TERMINAL: the run stops, states
-//      "ADI completed its analysis but could not save the result." and offers
-//      RETRY ADI and KEEP CURRENT BASS RESULT. It never stays in flight.
+//   1. A PLAN SAVE THAT FAILS IS TERMINAL: the run stops, states "ADI finished
+//      its analysis but could not save the optimiser plan for this design." and
+//      offers RETRY ADI and KEEP CURRENT BASS RESULT. It never stays in flight.
+//      Saving the plan is the USER-TERMINAL boundary; the recommendation
+//      publication that follows it is SECONDARY work, so a refused publication is
+//      recorded as a diagnostic and never turns a saved plan into a failed run.
 //   2. A new run resets its own timestamps: it never inherits an elapsed time or
 //      a "no progress for…" figure from the run it replaced.
 //   3. A refused publication is not retried into a write-traffic storm, and one
@@ -38,6 +41,7 @@ import {
   buildOptimiserRunProgress,
   describeOptimiserStatusCheck,
 } from "../components/room/bass/optimiserPlan/optimiserRunProgressAuthority.js";
+import { OPTIMISER_FAILURE_STATUS } from "../components/room/bass/optimiserPlan/optimiserPlanConstants.js";
 import {
   LIMITING_FREQUENCY_NOT_IDENTIFIED,
   resolveLimitingFrequency,
@@ -76,6 +80,21 @@ const PUBLICATION_FAILURE = {
   runId: "optimiser-run-2026-10-16T08:59:00.000Z-7",
 };
 
+/**
+ * THE PLAN-SAVE FAILURE — the optimiser's own real failure: the analysis ran and
+ * no result could be saved for this design. It is the ONE failure that may be
+ * stated as a failed run, and it is persisted with the record it belongs to.
+ */
+const PLAN_SAVE_FAILURE = {
+  status: OPTIMISER_FAILURE_STATUS.PLAN_SAVE_FAILED,
+  category: OPTIMISER_FAILURE_STATUS.PLAN_SAVE_FAILED,
+  message: "The optimiser returned no usable result for this design. Re-run the Optimisation Plan.",
+  publicationError: null,
+  attempts: null,
+  at: "2026-10-16T09:00:00.000Z",
+  runId: PUBLICATION_FAILURE.runId,
+};
+
 /** A saved plan that belongs to the open design and resolved as a real result. */
 const CURRENT_PLAN = {
   planVersion: OPTIMISER_PLAN_VERSION,
@@ -86,22 +105,27 @@ const CURRENT_PLAN = {
   run: { runId: PUBLICATION_FAILURE.runId, terminal: true },
 };
 
-const planViewWithFailure = () => resolveOptimiserPlanStatus({
-  plan: { ...CURRENT_PLAN, failure: PUBLICATION_FAILURE },
+const planViewWithFailure = (failure = PUBLICATION_FAILURE) => resolveOptimiserPlanStatus({
+  plan: { ...CURRENT_PLAN, failure },
   currentDesignFingerprint: "design-1",
 });
 
-describe("1 · a failed publication is terminal", () => {
+describe("1 · a failed plan save is terminal, a failed secondary publication is not", () => {
   it("states UNABLE TO COMPLETE OPTIMISATION with the required copy and two actions", () => {
     const journey = resolveAdiOptimiserJourney({
-      planView: planViewWithFailure(),
-      publicationFailure: PUBLICATION_FAILURE,
+      planView: planViewWithFailure(PLAN_SAVE_FAILURE),
+      publicationFailure: PLAN_SAVE_FAILURE,
     });
 
     assert.equal(journey.state, ADI_OPTIMISER_JOURNEY_STATE.PUBLICATION_FAILED);
     assert.equal(journey.statusLabel, "Unable To Complete Optimisation");
-    assert.equal(journey.message, "ADI completed its analysis but could not save the result.");
-    assert.equal(ADI_PUBLICATION_FAILURE_MESSAGE, "ADI completed its analysis but could not save the result.");
+    // The analysis finished and the PLAN is what could not be saved, so the
+    // failure is stated for exactly what it is.
+    assert.equal(journey.message, ADI_PLAN_SAVE_FAILURE_MESSAGE);
+    assert.equal(
+      ADI_PLAN_SAVE_FAILURE_MESSAGE,
+      "ADI finished its analysis but could not save the optimiser plan for this design.",
+    );
 
     // RETRY ADI is the ONE primary control, and the designer keeps their own way
     // out beside it. The run is never left without a next action.
@@ -111,6 +135,16 @@ describe("1 · a failed publication is terminal", () => {
     assert.equal(journey.keepAction.label, "KEEP CURRENT BASS RESULT");
     assert.equal(ADI_PUBLICATION_FAILURE_KEEP_LABEL, "KEEP CURRENT BASS RESULT");
     assert.equal(journey.showPlan, false);
+    assert.equal(journey.explanation, ADI_PLAN_SAVE_FAILURE_DETAIL);
+  });
+
+  it("keeps the legacy wording for a record written before the publication became secondary", () => {
+    const journey = resolveAdiOptimiserJourney({
+      planView: planViewWithFailure(),
+      publicationFailure: PUBLICATION_FAILURE,
+    });
+    assert.equal(journey.state, ADI_OPTIMISER_JOURNEY_STATE.PUBLICATION_FAILED);
+    assert.equal(journey.message, ADI_PUBLICATION_FAILURE_MESSAGE);
     assert.equal(journey.explanation, ADI_PUBLICATION_FAILURE_DETAIL);
   });
 
@@ -168,19 +202,36 @@ describe("1 · a failed publication is terminal", () => {
     assert.equal(failure.keepActionLabel, "KEEP CURRENT BASS RESULT");
   });
 
-  it("is wired in the run: a failed publication sets a terminal status and returns", () => {
+  it("is wired in the run: the terminal status comes from the PLAN SAVE, not the publication", () => {
     const hook = source(RUN_HOOK);
-    const guard = hook.indexOf("if (!publication.ok)");
-    assert.ok(guard > -1, "the run must check the publication's own outcome");
-    const failureBlock = hook.slice(guard, guard + 1700);
-    // The failure is recorded on the run's own record...
-    assert.ok(failureBlock.includes('status: "publication_failed"'));
-    assert.ok(failureBlock.includes("publicationError:"));
-    // ...the run is ended...
-    assert.ok(failureBlock.includes('setStatus("failed")'));
-    assert.ok(failureBlock.includes("return;"));
-    // ...and the success path can no longer be reached from the failure.
-    assert.ok(guard < hook.indexOf('setStatus("complete")'));
+    const terminalMark = hook.indexOf("RUN_TIMING.USER_TERMINAL)");
+    const complete = hook.indexOf('setStatus("complete")');
+    const publicationStart = hook.indexOf("await publishOptimiserRecommendation({");
+
+    assert.ok(terminalMark > -1, "the run must record its own user-terminal instant");
+    assert.ok(complete > terminalMark, "the run is terminal at the plan save");
+    assert.ok(publicationStart > complete, "the publication is attempted AFTER the terminal boundary");
+    // Nothing after the boundary can end this run as a failure.
+    const afterBoundary = hook.slice(publicationStart);
+    assert.equal(afterBoundary.includes('setStatus("failed")'), false);
+    assert.equal(afterBoundary.includes("if (!publication.ok)"), false);
+  });
+
+  it("is wired in the run: a failed PLAN SAVE sets a terminal status and returns", () => {
+    const hook = source(RUN_HOOK);
+    const guard = hook.indexOf("saveRunFailure(reason, { planSaveFailed: true })");
+    assert.ok(guard > -1, "a result that cannot be saved is the run's own failure");
+    const block = hook.slice(guard, guard + 700);
+    assert.ok(block.includes('setStatus("failed")'));
+    assert.ok(block.includes("return;"));
+  });
+
+  it("records a refused secondary publication as its own diagnostic", () => {
+    const hook = source(RUN_HOOK);
+    assert.ok(hook.includes("buildRecommendationPublicationRecord({"));
+    assert.ok(hook.includes("recommendationPublication,"));
+    // The record's failure field is only ever written by a failed plan save.
+    assert.equal(hook.includes('status: "publication_failed"'), false);
   });
 
   it("reports whether the publication actually persisted, instead of always succeeding", () => {

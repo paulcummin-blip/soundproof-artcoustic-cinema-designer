@@ -550,8 +550,12 @@ describe('TEST 8: no mutation during evaluation', () => {
     for (const mutator of ['commitInstances', 'commitSeating', 'applyCalibrationTuning', 'buildOptimisedInstances', 'applyCalibration']) {
       expect(hook.includes(mutator)).toBe(false);
     }
-    // The only writes are the saved result and the published recommendation.
-    expect((hook.match(/^\s+setOptimiserPlanAuthority\(/gm) || []).length).toBe(1);
+    // The only writes are the run's own plan-authority writes: the saved plan at
+    // the terminal boundary, the terminal authority carrying the save and
+    // user-terminal milestones, and ONE further write after the secondary
+    // recommendation publication recording what it did. Nothing else is written,
+    // and nothing here writes the design.
+    expect((hook.match(/^\s+setOptimiserPlanAuthority\(/gm) || []).length).toBe(3);
     expect((hook.match(/await publishRecommendation\(/g) || []).length).toBe(1);
     expect(hook.includes('buildLeverApplyInstances')).toBe(false);
   });
