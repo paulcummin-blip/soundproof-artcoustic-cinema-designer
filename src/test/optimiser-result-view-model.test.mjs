@@ -381,7 +381,7 @@ describe("every surface reads the one result view model", () => {
     const source = read(JOURNEY);
     assert.ok(source.includes("buildAdiDesignerSummary({"));
     assert.ok(source.includes("completedBassAuthority,"));
-    assert.ok(source.includes("tradeOffState: presentation?.tradeOff || null,"));
+    assert.ok(source.includes("tradeOffState: presentation?.tradeOff?.isTradeOff"));
     assert.ok(source.includes("const resultModel = summary.resultViewModel || null;"));
   });
 
