@@ -1,8 +1,8 @@
 // speakerDbComparisonCandidates.js
 // ---------------------------------------------------------------------------
 // The candidate list behind "Add speaker" on RP22 Speaker Capability — built
-// from the admin Speaker Database, which is the source of truth. Legacy
-// spreadsheet-only rows are not offered here.
+// from explicitly imported Excel records and published Speaker Database rows.
+// Untouched legacy rows remain excluded; re-uploaded sheets are authoritative.
 //
 // Two sources, one list, one grading path:
 //   1. Comparison-library rows PUBLISHED from the Speaker Database (readable by
@@ -28,6 +28,7 @@ import { normalizeCompetitor } from "@/components/utils/spl/competitorNormalizat
 import { ASSUMED_SENSITIVITY_BASIS, applySensitivityBasisAssumption } from "@/components/utils/spl/sensitivityBasisAssumption";
 import { installedSpaceAssumptionForRow } from "@/components/utils/spl/installedSpaceAssumption";
 import { competitorIdentityKey } from "@/components/utils/spl/manufacturerIdentity";
+import { selectComparisonLibraryRows, comparisonDataQuality } from "./competitorSpreadsheetImport.js";
 import { RP22_EQ_HEADROOM_LABEL } from "@/components/utils/spl/rp22HeadroomPolicy";
 import {
   documentTypeLabel,
@@ -166,7 +167,7 @@ export function buildCandidate({
     : null;
   const secondaryCapped = Boolean(secondary) && secondary.is_official !== true;
   const trustedSecondary = secondaryCapped && isTrustedEvidence(secondary);
-  const badgeLabel = secondaryCapped ? evidenceBadgeLabel(secondary) : klass.badgeLabel;
+  const badgeLabel = comparisonDataQuality(record, assumptions);
   const basisLabel = secondaryCapped ? (secondary.basis || klass.basis) : klass.basis;
   const evidenceSourceLine = trustedSecondary ? trustedSourceLine(secondary.host || secondary.url) : "";
 
@@ -182,7 +183,7 @@ export function buildCandidate({
     label: klass.label,
     badgeLabel,
     basisLabel,
-    pillLabel: klass.pill,
+    pillLabel: null,
     tone: klass.tone,
     meaning: klass.meaning,
     statusLabel,
@@ -205,7 +206,7 @@ export function buildCandidate({
     secondaryStatement: secondaryCapped ? evidenceStatement(secondary) : null,
     sourceUrl: withId.source_url || product?.official_product_url || "",
     datasheetUrl: withId.datasheet_url || product?.official_pdf_url || "",
-    optionLabel: `${manufacturer} · ${model} — ${statusLabel} · ${badgeLabel}`,
+    optionLabel: `${manufacturer} · ${model} — ${badgeLabel}`,
   };
 }
 
@@ -225,9 +226,9 @@ export function sortComparisonCandidates(candidates) {
 export async function loadComparisonCandidates({ includeUnpublished = false } = {}) {
   const rows = await base44.entities.CompetitorSpeaker.list("manufacturer", 500);
   const live = (rows || []).filter((r) => r.active !== false);
-  // Represented in the admin Speaker Database: published from an approved
-  // specification. Legacy spreadsheet-only rows are not comparison candidates.
-  const publishedRows = live.filter((r) => r.publish_source === "speaker_database" && r.published === true);
+  // Explicitly imported Excel rows and approved database snapshots share the
+  // same candidate builder and grader. An Excel row wins a matching identity.
+  const publishedRows = selectComparisonLibraryRows(live);
 
   const candidates = publishedRows.map((row) => buildCandidate({
     row,
@@ -236,7 +237,7 @@ export async function loadComparisonCandidates({ includeUnpublished = false } = 
     specificationId: row.source_specification_id || null,
     approvalStatus: row.approval_status || "Approved",
     published: true,
-    sourceLabel: "Speaker Database · published",
+    sourceLabel: row.publish_source === "spreadsheet" ? "Excel import" : "Speaker Database · published",
   }));
 
   if (!includeUnpublished) return sortComparisonCandidates(candidates);
