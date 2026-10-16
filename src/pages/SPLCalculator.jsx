@@ -345,6 +345,10 @@ function normalizeImportedRow(row, index) {
   const maxSplBasis = String(firstValue(row, ["Max SPL Measurement Basis", "max_spl_measurement_basis", "Max SPL Space Basis", "SPL Measurement Basis", "SPL Full/Half Space", "SPL Full Space", "Max SPL Space", "SPL Basis", "Max SPL Basis"]) ?? "").trim();
   const legacyMeasurementSpace = String(firstValue(row, ["Measurement Space Basis", "Measurement Basis", "Measurement Space", "Full Space / Half Space", "measurement_space_basis"]) ?? "").trim();
   const recAmpRange = parseRecommendedAmpRange(firstValue(row, ["Recommended Amplifier Power W", "recommended_amplifier_power_w", "Recommended Amplifier Range", "Recommended Amp Power", "Recommended Amplifier"]));
+  const checkedDate = firstValue(row, ["Date Checked", "date_checked"]);
+  const dateChecked = typeof checkedDate === "number" && checkedDate > 0 && checkedDate < 100000
+    ? new Date(Date.UTC(1899, 11, 30) + checkedDate * 86400000).toISOString().slice(0, 10)
+    : String(checkedDate || "").trim();
   const normalized = normalizeCompetitor({
       manufacturer,
       model,
@@ -374,7 +378,7 @@ function normalizeImportedRow(row, index) {
       recommended_amp_max_w: recAmpRange.max,
       source_url: String(firstValue(row, ["Source URL", "source_url"]) || "").trim(),
       datasheet_url: String(firstValue(row, ["Datasheet URL", "datasheet_url"]) || "").trim(),
-      date_checked: String(firstValue(row, ["Date Checked", "date_checked"]) || "").trim(),
+      date_checked: dateChecked,
       notes: String(firstValue(row, ["Notes", "notes"]) || "").trim(),
       measurement_space_basis: legacyMeasurementSpace,
       sensitivity_measurement_basis: sensitivityBasis,
