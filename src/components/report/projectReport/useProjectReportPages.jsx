@@ -50,6 +50,7 @@ import { isAssessedLevel } from "@/components/report/client/visualReportSeatStyl
 import { buildProjectReportSummaryOpening } from "@/components/report/projectReport/projectReportSummaryOpening";
 import { buildProjectReportOpening } from "@/components/report/projectReport/projectReportOpening";
 import { resolveDesignIntent } from "@/components/report/projectReport/designIntentAuthority";
+import { liveGeometryFingerprint } from "@/shared/reportGeometryContext";
 import { useReportDesignIntent } from "@/components/report/projectReport/useReportDesignIntent";
 import ProjectReportDesignSummary from "@/components/report/projectReport/ProjectReportDesignSummary";
 import AdiDesignHighlightsPage from "@/components/report/projectReport/AdiDesignHighlightsPage";
@@ -119,11 +120,21 @@ export function useProjectReportPages({
   const { saved: savedDesignIntent, sourceFingerprints: reportEvidenceFingerprints, reload: reloadDesignIntent } =
     useReportDesignIntent({ projectId, versionId });
 
+  // The geometry the design holds NOW, from the same shared geometry authority the
+  // narrative's own frozen fingerprint is built from — this room and these seat
+  // coordinates, and nothing about a performance result. An Astra narrative is shown
+  // only while it still describes the seating this design has.
+  const currentGeometryFingerprint = useMemo(
+    () => liveGeometryFingerprint({ roomDims, seatingPositions }),
+    [roomDims, seatingPositions],
+  );
+
   const designIntent = useMemo(() => resolveDesignIntent({
     deterministic: summaryOpening,
     saved: savedDesignIntent,
     currentSourceFingerprints: reportEvidenceFingerprints,
-  }), [summaryOpening, savedDesignIntent, reportEvidenceFingerprints]);
+    currentGeometryFingerprint,
+  }), [summaryOpening, savedDesignIntent, reportEvidenceFingerprints, currentGeometryFingerprint]);
 
   // Page 1's own opening statement: the project-specific headline and the single
   // supporting line of facts beneath it, composed by the report's opening

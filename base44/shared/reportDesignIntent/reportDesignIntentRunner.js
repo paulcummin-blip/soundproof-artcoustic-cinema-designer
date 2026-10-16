@@ -62,6 +62,16 @@ export const DESIGN_INTENT_REFUSAL = Object.freeze({
   ACCEPTED_TEXT_MISSING: 'accepted_text_missing',
 });
 
+/**
+ * The frozen geometry fingerprint a record is saved against, or null where no
+ * usable geometry was supplied. Only an AVAILABLE context carries one: a context
+ * that could not be confirmed against the saved report never becomes the geometry a
+ * narrative is pinned to.
+ */
+function geometryFingerprintOf(context) {
+  return context?.available === true ? (context.fingerprint ?? null) : null;
+}
+
 /** A refused attempt: no text, no write. */
 function refusal(code, detail) {
   return {
@@ -146,6 +156,13 @@ export function designIntentTextFromOutput(output) {
  * @param {Object} [input.project] — the saved project, for its recorded notes
  * @param {Object} [input.engineeringSnapshot] — the frozen engineering snapshot
  * @param {Object} [input.sourceFingerprints] — the evidence the report stands on
+ * @param {Function} [input.readGeometryContext] — async ({ evidence, versionIds }) =>
+ *   the frozen report geometry context (buildReportGeometryContext output). It is
+ *   read AFTER the evidence, because the geometry is confirmed against the saved
+ *   report itself. Optional and failure-isolated: a caller that supplies no reader,
+ *   or one whose context cannot be confirmed, writes exactly as before.
+ * @param {Object} [input.geometryContext] — a context the caller already holds, used
+ *   instead of the reader.
  * @param {Object} [input.user]
  * @param {string} [input.now]
  * @param {Function} [input.validate] — injected for tests; the shared validator otherwise
@@ -161,6 +178,8 @@ export async function runReportDesignIntent({
   sourceFingerprints = null,
   clientBrief = null,
   designerNotes = null,
+  readGeometryContext = null,
+  geometryContext = null,
   user = null,
   now = null,
   validate = validateWriterOutput,
@@ -189,8 +208,25 @@ export async function runReportDesignIntent({
   // 3. The frozen pack and the scoped writer input.
   let pack = null;
   let writerInput = null;
+  let geometry = geometryContext || null;
   try {
     pack = buildProposalEvidence({ versions: evidence, generatedAt: now });
+
+    // 3a. THE FROZEN GEOMETRY that produced the saved report and its drawings:
+    // where the seating actually sits in this room, so the seating decision can be
+    // explained in the room's own terms rather than in general ones. It is read
+    // AFTER the evidence, because it is confirmed against that saved report, and it
+    // is read on its own so a geometry problem can never fail a writing attempt the
+    // frozen evidence already supports: with none, the writer is given the pack and
+    // the interpretation exactly as before.
+    if (!geometry && typeof readGeometryContext === 'function') {
+      try {
+        geometry = await readGeometryContext({ evidence, versionIds: versions });
+      } catch (error) {
+        geometry = null;
+      }
+    }
+
     writerInput = buildDesignIntentWriterInput({
       pack,
       designContext: buildIntentDesignContext({
@@ -200,6 +236,7 @@ export async function runReportDesignIntent({
         clientBrief,
         designerNotes,
       }),
+      geometryContext: geometry,
     });
     assertWriterInputCarriesNoLiveState(writerInput);
   } catch (error) {
@@ -216,6 +253,7 @@ export async function runReportDesignIntent({
         sourceFingerprints,
         evidencePackFingerprint: pack.pack_fingerprint ?? null,
         inputFingerprint: writerInput.input_fingerprint ?? null,
+        geometryFingerprint: geometryFingerprintOf(geometry),
         providerIdentity: {
           provider: provider.provider ?? null,
           model: provider.model ?? null,
@@ -292,6 +330,9 @@ export async function runReportDesignIntent({
         sourceFingerprints,
         evidencePackFingerprint: pack.pack_fingerprint ?? null,
         inputFingerprint: writerInput.input_fingerprint ?? null,
+        // The geometry this attempt was written from, recorded even where the draft
+        // was refused: what an attempt read is part of what happened.
+        geometryFingerprint: geometryFingerprintOf(geometry),
         providerIdentity,
         generatedAt: now,
         generatedBy: user?.full_name || user?.email || null,
@@ -306,6 +347,10 @@ export async function runReportDesignIntent({
     sourceFingerprints,
     evidencePackFingerprint: pack.pack_fingerprint ?? null,
     inputFingerprint: writerInput.input_fingerprint ?? null,
+    // THE FROZEN GEOMETRY, saved with the accepted narrative: the room and the seat
+    // coordinates the explanation of this design's seating was written from. A
+    // narrative written before a seat or a wall moved is never presented as current.
+    geometryFingerprint: geometryFingerprintOf(geometry),
     providerIdentity,
     generatedAt: now,
     generatedBy: user?.full_name || user?.email || null,
@@ -321,6 +366,7 @@ export async function runReportDesignIntent({
     validation_errors: validation?.violations || [],
     evidence_pack_fingerprint: pack.pack_fingerprint ?? null,
     input_fingerprint: writerInput.input_fingerprint ?? null,
+    geometry_fingerprint: geometryFingerprintOf(geometry),
     prompt_version: writerInput.prompt_version ?? null,
     contract_version: writerInput.contract_version ?? null,
     provider: provider.provider ?? null,

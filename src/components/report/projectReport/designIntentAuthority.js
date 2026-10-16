@@ -67,12 +67,17 @@ function fingerprintsOf(value) {
  * @param {Object|null} [input.saved] — the saved Astra narrative metadata
  * @param {Object|null} [input.currentSourceFingerprints] — the evidence the saved
  *   report stands on now
+ * @param {string|null} [input.currentGeometryFingerprint] — the geometry the design
+ *   holds now, from the shared report geometry authority. A narrative whose frozen
+ *   geometry has moved explains a seating position the design no longer has, so it is
+ *   not shown and the report's deterministic intent stands instead.
  * @returns {{ text: string|null, source: string, reason: string|null }}
  */
 export function resolveDesignIntent({
   deterministic = null,
   saved = null,
   currentSourceFingerprints = null,
+  currentGeometryFingerprint = null,
 } = {}) {
   const fallback = asText(deterministic);
   const record = (saved && typeof saved === 'object' && !Array.isArray(saved)) ? saved : null;
@@ -96,6 +101,15 @@ export function resolveDesignIntent({
   for (const key of FINGERPRINT_KEYS) {
     if (!savedFp[key] || !currentFp[key]) continue;
     if (savedFp[key] !== currentFp[key]) return asDeterministic(`evidence_moved:${key}`);
+  }
+
+  // THE GEOMETRY, on the same rule: a fingerprint either side cannot state is never
+  // treated as a difference, and a difference is decisive. The narrative may explain
+  // where the seating sits, so it is only current while the seating is still there.
+  const savedGeometry = asText(record.geometry_fingerprint);
+  const currentGeometry = asText(currentGeometryFingerprint);
+  if (savedGeometry && currentGeometry && savedGeometry !== currentGeometry) {
+    return asDeterministic('geometry_moved');
   }
 
   return { text, source: DESIGN_INTENT_SOURCE.ASTRA, reason: null };

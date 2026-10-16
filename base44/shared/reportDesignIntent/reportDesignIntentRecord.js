@@ -60,9 +60,14 @@ export function designIntentEvidenceFingerprints(sourceFingerprints = null) {
  *
  * @param {Object|null} saved — the saved narrative metadata
  * @param {Object|null} currentFingerprints — the evidence the report stands on now
+ * @param {Object} [options]
+ * @param {string|null} [options.currentGeometryFingerprint] — the geometry the design
+ *   holds now, from the same shared geometry authority. A narrative whose frozen
+ *   geometry no longer matches is not shown: an explanation of a seating position is
+ *   only true of the room it was written in.
  * @returns {{ displayable: boolean, reason: string|null, text: string|null }}
  */
-export function readAcceptedDesignIntent(saved, currentFingerprints = null) {
+export function readAcceptedDesignIntent(saved, currentFingerprints = null, { currentGeometryFingerprint = null } = {}) {
   const record = (saved && typeof saved === 'object' && !Array.isArray(saved)) ? saved : null;
   if (!record) return { displayable: false, reason: 'no_saved_narrative', text: null };
   if (record.status !== DESIGN_INTENT_STATUS.ACCEPTED) {
@@ -81,6 +86,15 @@ export function readAcceptedDesignIntent(saved, currentFingerprints = null) {
     if (savedFp[key] !== currentFp[key]) {
       return { displayable: false, reason: `evidence_moved:${key}`, text: null };
     }
+  }
+
+  // THE GEOMETRY, on the same rule as the evidence: a fingerprint either side cannot
+  // state is never treated as a difference, so a narrative written before the
+  // geometry was frozen is not hidden for a reason nobody can state.
+  const savedGeometry = asText(record.geometry_fingerprint);
+  const currentGeometry = asText(currentGeometryFingerprint);
+  if (savedGeometry && currentGeometry && savedGeometry !== currentGeometry) {
+    return { displayable: false, reason: 'geometry_moved', text: null };
   }
 
   return { displayable: true, reason: null, text };
@@ -107,6 +121,10 @@ export function isCompleteNarrative(text) {
  * @param {string} input.status — DESIGN_INTENT_STATUS
  * @param {string|null} [input.text] — the accepted narrative, or null
  * @param {Object} [input.sourceFingerprints] — the evidence the report stands on
+ * @param {string|null} [input.geometryFingerprint] — the frozen geometry the narrative
+ *   was written from, where the writer was given one. Null when no usable geometry was
+ *   supplied, which is honest: a narrative that explains no seating position is pinned
+ *   to no room.
  * @param {Object} [input.providerIdentity] — provider, model, versions, durations
  * @param {string} [input.generatedBy]
  * @param {string} [input.generatedAt]
@@ -119,6 +137,7 @@ export function buildDesignIntentRecord({
   sourceFingerprints = null,
   evidencePackFingerprint = null,
   inputFingerprint = null,
+  geometryFingerprint = null,
   providerIdentity = {},
   generatedBy = null,
   generatedAt = null,
@@ -132,6 +151,7 @@ export function buildDesignIntentRecord({
     evidence_fingerprints: designIntentEvidenceFingerprints(sourceFingerprints),
     evidence_pack_fingerprint: asText(evidencePackFingerprint),
     input_fingerprint: asText(inputFingerprint),
+    geometry_fingerprint: asText(geometryFingerprint),
     provider: providerIdentity.provider ?? null,
     model: providerIdentity.model ?? null,
     prompt_version: providerIdentity.promptVersion ?? null,

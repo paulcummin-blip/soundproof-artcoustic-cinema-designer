@@ -6,6 +6,7 @@ import {
   DESIGN_INTENT_REFUSAL,
   runReportDesignIntent,
 } from '../../shared/reportDesignIntent/reportDesignIntentRunner.js';
+import { buildReportGeometryContext } from '../../shared/reportDesignIntent/reportGeometryContext.js';
 
 /**
  * Generate the Project Report's Design Intent with the Astra writer — OPTIONAL.
@@ -100,6 +101,21 @@ export default async function(req) {
         });
       },
       invokeLLM: (request) => base44.integrations.Core.InvokeLLM(request),
+      // ── THE REPORT'S OWN GEOMETRY, CONFIRMED ──
+      // The room and the seat coordinates that produced this saved report and its
+      // drawings, read from the report's own frozen geometry and confirmed against
+      // the saved design version. It is design context for explaining where the
+      // seating sits, and never engineering evidence. Where the saved version has
+      // moved to a different room, it is not used at all: the writer is then given
+      // the pack and the interpretation exactly as before, and the report keeps its
+      // own deterministic Design Intent.
+      readGeometryContext: async ({ evidence }) => buildReportGeometryContext({
+        reportEvidence: evidence?.[0]?.evidence?.project || null,
+        version,
+        projectId: project_id,
+        versionId: version.id,
+        reportSnapshotId: snapshot.id,
+      }),
     });
 
     // ── The one write, and only for an accepted narrative ──
@@ -153,7 +169,8 @@ export default async function(req) {
     console.log(
       `[generateReportDesignIntent] accepted project=${project_id} version=${version_id} `
       + `provider=${attempt.provider || 'none'} model=${attempt.model || 'none'} prompt=${attempt.prompt_version} `
-      + `contract=${attempt.contract_version} pack=${attempt.evidence_pack_fingerprint} by=${user.email || user.id}`,
+      + `contract=${attempt.contract_version} pack=${attempt.evidence_pack_fingerprint} `
+      + `geometry=${attempt.geometry_fingerprint || 'none'} by=${user.email || user.id}`,
     );
 
     return Response.json({
@@ -163,6 +180,9 @@ export default async function(req) {
       text: attempt.text,
       metadata: attempt.record,
       snapshot_id: saved?.id || snapshot.id,
+      // The geometry the narrative was written from, where one was confirmed against
+      // this saved report. Null states honestly that no geometry was used.
+      geometry_fingerprint: attempt.geometry_fingerprint ?? null,
       validation_errors: attempt.validation_errors || [],
     });
   } catch (error) {

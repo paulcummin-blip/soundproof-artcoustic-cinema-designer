@@ -25,6 +25,7 @@
 
 import { buildWriterInput } from '../proposalWriter/writerInputBuilder.js';
 import { proposalEvidenceFingerprint } from '../proposalEvidence/proposalEvidenceBuilder.js';
+import { writerGeometryBlock } from './reportGeometryContext.js';
 import {
   DESIGN_INTENT_SCOPE_RULE,
   DESIGN_INTENT_SECTION,
@@ -41,6 +42,12 @@ import {
  *   the designer's recorded intent, carried as instructions and never as copy
  * @param {string} [input.promptVersion]
  * @param {string} [input.reportLabel] — the report identity the scope states
+ * @param {Object|null} [input.geometryContext] — the frozen report geometry context
+ *   (buildReportGeometryContext output): where the seating actually sits in the room
+ *   that produced the saved report and its drawings. It is carried BESIDE the pack,
+ *   where the writer reads its design context — never inside the frozen evidence —
+ *   and it is omitted entirely when none is supplied, so an input built without one
+ *   is unchanged, fingerprint included.
  * @returns {Object} the writer input, carrying its own content fingerprint
  */
 export function buildDesignIntentWriterInput({
@@ -48,6 +55,7 @@ export function buildDesignIntentWriterInput({
   designContext = null,
   promptVersion = undefined,
   reportLabel = 'Project Report',
+  geometryContext = null,
 } = {}) {
   const full = buildWriterInput({
     pack,
@@ -57,9 +65,15 @@ export function buildDesignIntentWriterInput({
 
   const section = designIntentSection(full.section_requirements);
   const { input_fingerprint: _ignored, ...core } = full;
+  // The report's own saved geometry, where the caller holds it. It states no
+  // result and no level and it is design context only, but it is the only way the
+  // seating decision can be explained in THIS room's own terms: the frozen pack
+  // carries the published results, not the seat coordinates behind them.
+  const geometryBlock = geometryContext?.available === true ? writerGeometryBlock(geometryContext) : null;
 
   const scoped = {
     ...core,
+    ...(geometryBlock ? { design_geometry_context: geometryBlock } : {}),
     // The scope, stated where the writer reads its contract: one section, this
     // report's Design Intent, and nothing else in the draft.
     design_intent_scope: {
