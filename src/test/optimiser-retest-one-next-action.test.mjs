@@ -26,6 +26,7 @@ import {
   OPTIMISER_RETEST_PREVIOUS_CANDIDATE,
   resolveOptimiserPresentationState,
 } from "../components/room/bass/optimiserPlan/resolveOptimiserPresentationState.js";
+import { ADI_RERUN_AGAIN_LABEL } from "../components/room/bass/optimiserPlan/adiRerunAgainAuthority.js";
 import {
   ADI_BASS_OPTIMISER_LABEL,
   ADI_OPTIMISER_JOURNEY_STATE,
@@ -98,6 +99,10 @@ describe("RE-TEST NEEDED HAS ONE CTA", () => {
     expect(state.action).toBe(OPTIMISER_PRESENTATION_ACTION.RETEST);
     expect(state.actionLabel).toBe(OPTIMISER_RETEST_LABEL);
     expect(state.actionLabel).not.toBe(ADI_BASS_OPTIMISER_LABEL);
+    // A re-test is NOT a completed evaluation: it keeps its own wording and is
+    // never offered as a deliberate re-run of a finished result.
+    expect(state.actionLabel).not.toBe(ADI_RERUN_AGAIN_LABEL);
+    expect(state.rerunAgain).toBe(false);
     expect(state.showApply).toBe(false);
     // The main panel states the re-test: what it needs and why.
     expect(state.message).toBe(OPTIMISER_RETEST_MESSAGE);
@@ -111,7 +116,9 @@ describe("RE-TEST NEEDED HAS ONE CTA", () => {
       /const runControlIsRetest = journey\.action === OPTIMISER_PRESENTATION_ACTION\.RETEST[\s\S]*?journey\.actionLabel === OPTIMISER_RETEST_LABEL[\s\S]*?optimiserRunOwnsRetry;/,
     );
     expect(journey).toMatch(
-      /optimiserRunOwnsRetry && journey\.action !== ADI_OPTIMISER_ACTION\.CALCULATE\s*\n\s*\? OPTIMISER_RETEST_LABEL\s*\n\s*: journey\.actionLabel\}/,
+      // The wording precedence is unchanged: a state's own label (RETRY ADI on a
+      // failed publication) wins, then the re-test wording, then the state label.
+      /journey\.primaryLabel \|\| \(optimiserRunOwnsRetry && journey\.action !== ADI_OPTIMISER_ACTION\.CALCULATE\s*\n\s*\? OPTIMISER_RETEST_LABEL\s*\n\s*: journey\.actionLabel\)\}/,
     );
     // Both legacy re-test and fresh technical-failure retry states are owned by
     // the evidence-only run path, never calibration auto-apply.
@@ -186,11 +193,13 @@ describe("STALE CANDIDATE DETAILS MOVED TO ENGINEER DETAILS", () => {
   });
 
   it("keeps the old candidate off the main panel and inside the disclosure", () => {
-    expect(journey).toMatch(/adjustment=\{previousCandidate \? null : headline\.adjustment\}/);
-    expect(journey).toMatch(/benefit=\{previousCandidate \? null : headline\.benefit\}/);
-    expect(journey).toMatch(/comparison=\{previousCandidate \? null : headline\.comparison\}/);
-    expect(journey).toMatch(/staleCopy=\{previousCandidate \? null : summary\.staleCopy\}/);
-    expect(journey).toMatch(/previousBest=\{previousCandidate \? null : summary\.previousBest\}/);
+    // The old candidate — or a trade-off, which states the decision itself —
+    // never reaches these lines on the main panel.
+    expect(journey).toMatch(/adjustment=\{previousCandidate \|\| tradeOff \? null : headline\.adjustment\}/);
+    expect(journey).toMatch(/benefit=\{previousCandidate \|\| tradeOff \? null : headline\.benefit\}/);
+    expect(journey).toMatch(/comparison=\{previousCandidate \|\| tradeOff \? null : headline\.comparison\}/);
+    expect(journey).toMatch(/staleCopy=\{previousCandidate \|\| tradeOff \? null : summary\.staleCopy\}/);
+    expect(journey).toMatch(/previousBest=\{previousCandidate \|\| tradeOff \? null : summary\.previousBest\}/);
 
     const detailsAt = journey.indexOf("data-adi-engineer-details");
     const candidateAt = journey.indexOf("<AdiPreviousCandidateDetails");
@@ -236,7 +245,7 @@ describe("MAIN PANEL EXPLAINS WHY RE-TEST IS NEEDED", () => {
       "A previous run found a possible improvement, but it must be re-tested before it can be recommended.",
     );
     expect(journey).toMatch(
-      /previousCandidateNotice=\{previousCandidate \? OPTIMISER_RETEST_PREVIOUS_CANDIDATE : null\}/,
+      /previousCandidateNotice=\{previousCandidate && !tradeOff \? OPTIMISER_RETEST_PREVIOUS_CANDIDATE : null\}/,
     );
     expect(summaryPanel).toContain("previousCandidateNotice");
     expect(summaryPanel).toContain("data-adi-previous-candidate-notice");
@@ -264,7 +273,11 @@ describe("AFTER RE-TEST NORMAL RESULT STATES RETURN", () => {
     expect(state.outcome).toBe(OPTIMISER_OUTCOME.IMPROVEMENTS_FOUND);
     expect(state.showApply).toBe(true);
     expect(resolveRetestNeeded({ outcome: state.outcome })).toBe(false);
-    expect(state.actionLabel).toBe(ADI_BASS_OPTIMISER_LABEL);
+    // The completed evaluation is worded as the deliberate re-run, and it is
+    // offered beside the Apply — never instead of it.
+    expect(state.actionLabel).toBe(ADI_RERUN_AGAIN_LABEL);
+    expect(state.rerunAgain).toBe(true);
+    expect(state.showApply).toBe(true);
     // Nothing is moved into the details for a live improvement.
     expect(resolvePreviousCandidate({ retestNeeded: false, headline: { kind: "consider" } })).toBeNull();
   });
@@ -276,7 +289,8 @@ describe("AFTER RE-TEST NORMAL RESULT STATES RETURN", () => {
     expect(state.outcome).toBe(OPTIMISER_OUTCOME.NO_IMPROVEMENTS);
     expect(state.statusLabel).toBe(OPTIMISER_OUTCOME_LABEL[OPTIMISER_OUTCOME.NO_IMPROVEMENTS]);
     expect(resolveRetestNeeded({ outcome: state.outcome })).toBe(false);
-    expect(state.actionLabel).toBe(ADI_BASS_OPTIMISER_LABEL);
+    expect(state.actionLabel).toBe(ADI_RERUN_AGAIN_LABEL);
+    expect(state.rerunAgain).toBe(true);
   });
 });
 

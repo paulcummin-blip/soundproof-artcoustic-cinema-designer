@@ -182,8 +182,12 @@ test("the presentation state is Trade-off Found, with no plan action and no Appl
   assert.equal(state.outcomeLabel, "Trade-off Found");
   assert.notEqual(state.outcomeLabel, OPTIMISER_OUTCOME_LABEL[OPTIMISER_OUTCOME.IMPROVEMENTS_FOUND]);
   assert.equal(state.showApply, false);
+  // No PRIMARY run control: the decision is the trade-off. The completed
+  // evaluation stays deliberately re-runnable beside it (RUN ADI AGAIN), so the
+  // state may be run again without changing the design.
   assert.equal(state.action, null);
-  assert.equal(state.canRun, false);
+  assert.equal(state.canRun, true);
+  assert.equal(state.rerunAgain, true);
   assert.equal(state.tradeOff.seat.seatId, "r1-c2");
 });
 
@@ -211,8 +215,12 @@ test("the main card offers Review Trade-off and Keep Current Design, and draws n
   const journey = read(`${PLAN_DIR}/AdiOptimisationJourney.jsx`);
   assert.match(journey, /tradeOffActive && \(\s*<AdiTradeOffActions/);
   assert.match(journey, /onKeep=\{onKeepTradeOff\}/);
-  // No run control and no plan control while the trade-off is live.
-  assert.match(journey, /const showAction = !!journey\.action && journey\.canRun && !isRunning\s*\n\s*&& !tradeOffActive && !tradeOffSettled;/);
+  // No PRIMARY run control while the trade-off is live — the decision owns the
+  // card. The completed evaluation is still deliberately re-runnable, quietly,
+  // through its own control and authority.
+  assert.match(journey, /const showAction = !!journey\.action && journey\.canRun && !isRunning\s*\n\s*&& !tradeOffActive && !tradeOffSettled\s*\n\s*&& !improvementOwnsPanel;/);
+  assert.match(journey, /const showRerunAgain = rerunAgain\.offered && !isRunning/);
+  assert.match(journey, /<AdiRerunAgainAction/);
   assert.match(journey, /\{!tradeOffActive && !tradeOffSettled && \(<>/);
 
   const actions = read(`${PLAN_DIR}/AdiTradeOffActions.jsx`);
@@ -419,7 +427,9 @@ test("the live saved Barton record states Trade-off Found with its own seat and 
   assert.equal(state.outcomeLabel, "Trade-off Found");
   assert.equal(state.showApply, false);
   assert.equal(state.action, null);
-  assert.equal(state.canRun, false);
+  // Still no primary run control — and the quiet deliberate re-run is offered.
+  assert.equal(state.canRun, true);
+  assert.equal(state.rerunAgain, true);
 });
 
 // ── 8. Partial seat evidence — the fallback for older saved runs ──

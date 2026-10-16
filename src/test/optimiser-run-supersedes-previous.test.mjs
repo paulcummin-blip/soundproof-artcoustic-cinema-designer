@@ -223,7 +223,10 @@ describe("RUNNING STATE DOES NOT SHOW OLD RUN COPY", () => {
 describe("ONE RUNNING CONTROL ONLY", () => {
   it("draws the progress control and no run or re-test control while running", () => {
     // The panel's own run control is not drawn while a run is in flight.
-    expect(journey).toMatch(/const showAction = !!journey\.action && journey\.canRun && !isRunning;/);
+    // No run control at all while a run is in flight — the decision gates stand
+    // beside the running check, and the quiet deliberate re-run stands down too.
+    expect(journey).toMatch(/const showAction = !!journey\.action && journey\.canRun && !isRunning\s*\n\s*&& !tradeOffActive && !tradeOffSettled\s*\n\s*&& !improvementOwnsPanel;/);
+    expect(journey).toMatch(/const showRerunAgain = rerunAgain\.offered && !isRunning/);
     // The placement panel's re-run and the calibration control stand down.
     expect(journey).toMatch(/onRerun=\{isRunning \|\| optimiserRunOwnsRetry \? null : onRunOptimisationPlan\}/);
     expect(journey).toMatch(/onReoptimise=\{optimiserRunOwnsRetry \|\| isRunning \|\| retestOwnsPrimary/);

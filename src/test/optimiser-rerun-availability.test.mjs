@@ -4,7 +4,12 @@
 //
 // Product rule verified here:
 //   • every journey state except a run in progress offers the run action
-//   • the wording is "OPTIMISE BASS" in every state that offers it
+//   • the journey's own fallback wording is "OPTIMISE BASS" wherever it offers
+//     that action; a COMPLETED evaluation is worded as the deliberate re-run it
+//     now is — "RUN ADI AGAIN" — by the presentation authority, and a failed or
+//     incomplete one keeps its own wording (RETRY ADI / RE-TEST BASS
+//     OPTIMISATION). Which states get which is decided in
+//     adiRerunAgainAuthority.js.
 //   • a completed run (plan available) still offers it — the re-run action is
 //     never hidden after a result
 //   • Apply and run remain different actions: a plan available state shows both
@@ -29,6 +34,7 @@ import {
   OPTIMISER_PRESENTATION_STATE,
   resolveOptimiserPresentationState,
 } from "@/components/room/bass/optimiserPlan/resolveOptimiserPresentationState.js";
+import { ADI_RERUN_AGAIN_LABEL } from "@/components/room/bass/optimiserPlan/adiRerunAgainAuthority.js";
 
 /** A saved plan whose lever-level evidence is complete and applicable. */
 const COMPLETE_PLAN = {
@@ -88,7 +94,10 @@ describe("the presentation state offers the run action after a result", () => {
     expect(presentation.state).toBe(OPTIMISER_PRESENTATION_STATE.PLAN_AVAILABLE);
     expect(presentation.showApply).toBe(true);
     expect(presentation.action).toBe(OPTIMISER_PRESENTATION_ACTION.RERUN);
-    expect(presentation.actionLabel).toBe(ADI_BASS_OPTIMISER_LABEL);
+    // A COMPLETED evaluation is worded as the deliberate re-run it is: the same
+    // action, stated for what it does on a finished result.
+    expect(presentation.actionLabel).toBe(ADI_RERUN_AGAIN_LABEL);
+    expect(presentation.rerunAgain).toBe(true);
   });
 
   it("never offers it while a run is in progress", () => {
@@ -137,7 +146,7 @@ describe("the card renders one run control", () => {
     // Apply stands down for an ignored recommendation, and — in the re-test state
     // — for an old candidate that is not a recommendation yet. The run control
     // stays the one action either way.
-    expect(card).toMatch(/onApply=\{retestNeeded \|\| recommendationIgnored[\s\S]*?panelShowsApply \? null : handleApplyRecommended\)\}/);
+    expect(card).toMatch(/onApply=\{optimiserRunOwnsRetry \|\| recommendationIgnored \|\| improvementReviewActive\s*\n\s*\? null\s*\n\s*: \(panelShowsApply \? null : handleApplyRecommended\)\}/);
     expect(card).toMatch(/onClick=\{journey\.action === ADI_OPTIMISER_ACTION\.CALCULATE/);
   });
 });

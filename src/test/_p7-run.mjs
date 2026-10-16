@@ -9,7 +9,7 @@ register('../../test/_alias-loader.mjs', import.meta.url);
 register('./_p7-vitest-loader.mjs', import.meta.url);
 
 const files = process.argv.slice(2);
-const { results } = await import('./_p7-vitest-stub.mjs');
+const { results, settle } = await import('./_p7-vitest-stub.mjs');
 
 let failed = 0;
 let passed = 0;
@@ -17,6 +17,9 @@ for (const file of files) {
   results.length = 0;
   try {
     await import(pathToFileURL(path.resolve(process.cwd(), file)).href);
+    // An async test is awaited before its result is read, so a suite can never
+    // report a pass for an assertion that has not run yet.
+    await settle();
   } catch (error) {
     failed += 1;
     console.log(`ERROR ${file}: ${error?.message || error}`);

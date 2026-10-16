@@ -18,6 +18,7 @@
 
 import { OPTIMISER_PLAN_STATUS } from "./optimiserPlanConstants.js";
 import { ADI_BASS_OPTIMISER_LABEL, ADI_OPTIMISER_ACTION } from "./resolveAdiOptimiserJourney.js";
+import { ADI_RERUN_AGAIN_LABEL } from "./adiRerunAgainAuthority.js";
 import {
   OPTIMISER_FAILURE_CODE,
   OPTIMISER_FAILURE_FIX,
@@ -26,7 +27,6 @@ import {
   OPTIMISER_UNEVALUABLE_REASON,
   resolveOptimiserFailure,
 } from "./optimiserFailureReason.js";
-import { CALIBRATION_LEVER_KEYS } from "./adiPanelSections.js";
 import { TRADE_OFF_HEADLINE } from "./optimiserTradeOffState.js";
 
 /** The complete set of optimiser presentation states. */
@@ -149,28 +149,12 @@ export const OPTIMISER_OUTCOME_COPY = Object.freeze({
   },
 });
 
-/**
- * Is the change this plan offers a PHYSICAL one — a move of seats, subwoofers or
- * layout — rather than an electronic adjustment?
- *
- * Read from the plan's own lever records: the offered change is physical when
- * every applicable, evaluated change is a non-calibration lever. When a
- * calibration change is also applicable the panel presents the adjustment first
- * (least intrusive first), so that is not this outcome.
- *
- * Presentation only: no lever is ranked, scored or re-evaluated here.
- */
-export function offersPhysicalChangeOnly(planView) {
-  if (!planView || planView.status !== OPTIMISER_PLAN_STATUS.CURRENT) return false;
-  const levers = Array.isArray(planView.levers) ? planView.levers : [];
-  const offered = levers.filter((lever) => lever.canApply === true
-    && lever.evaluated === true
-    && lever.effect != null
-    && Array.isArray(lever.changes)
-    && lever.changes.length > 0);
-  if (!offered.length) return false;
-  return offered.every((lever) => !CALIBRATION_LEVER_KEYS.includes(String(lever?.key ?? lever?.lever ?? "")));
-}
+// "Does the plan offer a usable change, and is it a physical one?" — the two
+// applicability predicates. They live in their own module (extracted, so this
+// authority stays one decision tree) and are re-exported here, so every existing
+// reader keeps this file as its import path.
+import { hasApplicableEvaluatedLever, offersPhysicalChangeOnly } from "./optimiserPlanApplicability.js";
+export { hasApplicableEvaluatedLever, offersPhysicalChangeOnly };
 
 /** The one control the re-test outcomes offer, worded as the next step. */
 export const OPTIMISER_RETEST_LABEL = "Re-test Bass Optimisation";
@@ -229,20 +213,6 @@ export const OPTIMISER_PRESENTATION_COPY = Object.freeze({
   // This is the honest fallback when nothing was recorded to name.
   FAILED: OPTIMISER_UNEVALUABLE_REASON,
 });
-
-/**
- * Is there at least one lever row that was genuinely evaluated, whose current
- * and proposed values are visible, and whose own Apply action is usable?
- */
-export function hasApplicableEvaluatedLever(planView) {
-  if (!planView || planView.status !== OPTIMISER_PLAN_STATUS.CURRENT) return false;
-  const levers = Array.isArray(planView.levers) ? planView.levers : [];
-  return levers.some((lever) => lever.canApply === true
-    && lever.evaluated === true
-    && lever.effect != null
-    && Array.isArray(lever.changes)
-    && lever.changes.length > 0);
-}
 
 /**
  * Resolve the complete presentation state.
@@ -356,6 +326,11 @@ export function resolveOptimiserPresentationState({
       showPlan: false,
       // A state is only ever actionable from this one authority.
       showApply: state === OPTIMISER_PRESENTATION_STATE.PLAN_AVAILABLE,
+      // Whether this state's COMPLETED evaluation may be deliberately run again,
+      // and the one wording that control carries (adiRerunAgainAuthority.js).
+      // A failed or incomplete evaluation leaves this false and keeps its own
+      // wording: there, finishing the run is the next step, not repeating it.
+      rerunAgain: false,
       action: null,
       actionLabel: null,
       // The reason's own next step, stated beside it in the main panel, and the
@@ -438,11 +413,15 @@ export function resolveOptimiserPresentationState({
       evidence,
       showPlan: true,
       showApply: false,
-      // No run control in this state: the run has completed and its result is
-      // trustworthy, so there is nothing to re-run.
+      // No PRIMARY run control in this state: the decision in front of the
+      // designer is the trade-off, and the review and the keep own the controls.
+      // A deliberate re-run IS offered — quietly, under the decision, as RUN ADI
+      // AGAIN — because verifying a completed evaluation must never require
+      // changing the design first (adiRerunAgainAuthority.js).
+      rerunAgain: true,
       action: null,
       actionLabel: null,
-      canRun: false,
+      canRun: true,
     });
   }
 
@@ -454,8 +433,11 @@ export function resolveOptimiserPresentationState({
       message: OPTIMISER_OUTCOME_COPY[OPTIMISER_OUTCOME.NO_IMPROVEMENTS].message,
       explanation: "Nothing is offered for application. The evidence below is what the run evaluated.",
       evidence,
+      // The search COMPLETED and confirmed nothing. That result is the designer's
+      // to re-check deliberately at any time: RUN ADI AGAIN, on this same design.
+      rerunAgain: true,
       action: OPTIMISER_PRESENTATION_ACTION.RERUN,
-      actionLabel: OPTIMISER_PRESENTATION_ACTION.RERUN,
+      actionLabel: ADI_RERUN_AGAIN_LABEL,
       showApply: false,
     });
   }
@@ -500,9 +482,12 @@ export function resolveOptimiserPresentationState({
       showApply: true,
       // The run control stays available after a result: the designer can always
       // re-evaluate the design. Apply and re-run are different actions, and the
-      // run control is never a second Apply.
+      // run control is never a second Apply. It is worded as the deliberate
+      // re-run it now is — RUN ADI AGAIN — so a verification run is offered as
+      // its own step rather than read as a second Apply.
+      rerunAgain: true,
       action: OPTIMISER_PRESENTATION_ACTION.RERUN,
-      actionLabel: OPTIMISER_PRESENTATION_ACTION.RERUN,
+      actionLabel: ADI_RERUN_AGAIN_LABEL,
     });
   }
 
@@ -511,8 +496,9 @@ export function resolveOptimiserPresentationState({
       message: actionable.summary || "An evaluated change is available for this design.",
       explanation: actionable.reason || null,
       showApply: true,
+      rerunAgain: true,
       action: OPTIMISER_PRESENTATION_ACTION.RERUN,
-      actionLabel: OPTIMISER_PRESENTATION_ACTION.RERUN,
+      actionLabel: ADI_RERUN_AGAIN_LABEL,
     });
   }
 

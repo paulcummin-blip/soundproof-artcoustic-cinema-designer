@@ -17,6 +17,8 @@
     "test:optimiser-history": "node src/test/_p7-run.mjs src/test/optimiser-run-history-and-authority.test.mjs",
     "test:optimiser-result-model": "node src/test/_p7-run.mjs src/test/optimiser-result-view-model.test.mjs",
     "test:optimiser-presentation": "node src/test/_p7-run.mjs src/test/optimiser-run-presentation-state.test.mjs",
+    "test:run-again": "node src/test/_p7-run.mjs src/test/adi-run-again.test.mjs",
+    "test:adi-actions": "node src/test/_p7-run.mjs src/test/optimiser-rerun-availability.test.mjs src/test/optimiser-retest-one-next-action.test.mjs src/test/optimiser-trade-off-state.test.mjs src/test/optimiser-single-retest-action.test.mjs src/test/optimiser-actionable-states.test.mjs src/test/optimiser-run-supersedes-previous.test.mjs src/test/optimiser-failure-reason.test.mjs",
     "test:optimiser-progress": "node src/test/_p7-run.mjs src/test/optimiser-run-progress.test.mjs",
     "test:comparison": "node src/test/_p7-run.mjs test/comparison-persistence.test.mjs",
     "test:proposal-composition": "node src/test/_p7-run.mjs src/test/proposal-image-first-composition.test.mjs",

@@ -1,28 +1,22 @@
 // Minimal in-process stand-in for the parts of `vitest` these suites use, so the
-// focused P7 suites can be run in this workspace (vitest is not installed here).
-// `test` / `it` / `describe` run immediately, and the assertion helpers the
-// suites actually call are implemented on top of node:assert — a suite that
-// reaches for a matcher this stub does not implement used to report a FAILURE
-// for something that had not been asserted at all, which is worse than useless:
-// it hides the real state of the code behind a tooling gap.
+// focused suites can be run in this workspace (vitest is not installed here).
+//
+// `test` / `it` / `describe` run immediately. `it.each` / `test.each` /
+// `describe.each` expand their cases. The lifecycle hooks (`beforeEach`,
+// `afterEach`, `beforeAll`, `afterAll`) are honoured: a `beforeEach` failure
+// fails the test it precedes.
+//
+// A suite whose helpers this stub does not implement used to report an ERROR for
+// the whole FILE — every test in it silently unprotected — so the harness is
+// completed rather than trimmed, and an async test is awaited (`settle`) instead
+// of being reported as a pass before it has finished.
 import assert from "node:assert/strict";
 
 export const results = [];
 
-export function test(name, fn) {
-  try {
-    fn();
-    results.push({ name, error: null });
-  } catch (error) {
-    results.push({ name, error: error?.message || String(error) });
-  }
-}
-
-export const it = test;
-
-export function describe(_name, fn) {
-  fn();
-}
+const pending = [];
+const beforeEachHooks = [];
+const afterEachHooks = [];
 
 const show = (value) => {
   try {
@@ -84,4 +78,99 @@ function matchers(value, negated) {
 
 export function expect(value) {
   return matchers(value, false);
+}
+
+/** "$name" · "$0" · "%s" — the case-name template forms the suites use. */
+function interpolate(template, value) {
+  let out = String(template ?? "");
+  if (value && typeof value === "object" && !Array.isArray(value)) {
+    Object.entries(value).forEach(([key, entry]) => {
+      out = out.split(`$${key}`).join(String(entry));
+    });
+  }
+  const args = Array.isArray(value) ? value : [value];
+  let index = 0;
+  out = out.replace(/%[sdifjo]/g, () => show(args[index++]));
+  out = out.replace(/\$(\d+)/g, (_, position) => show(args[Number(position)]));
+  return out;
+}
+
+export function test(name, fn) {
+  const record = { name: String(name), error: null };
+  results.push(record);
+
+  try {
+    beforeEachHooks.forEach((hook) => hook());
+  } catch (error) {
+    record.error = error?.message || String(error);
+    return;
+  }
+
+  const runAfterEach = () => {
+    afterEachHooks.forEach((hook) => {
+      try { hook(); } catch { /* an afterEach failure never rewrites a result */ }
+    });
+  };
+
+  try {
+    const returned = fn();
+    if (returned && typeof returned.then === "function") {
+      pending.push(returned.then(
+        () => { runAfterEach(); },
+        (error) => { record.error = error?.message || String(error); runAfterEach(); },
+      ));
+      return;
+    }
+  } catch (error) {
+    record.error = error?.message || String(error);
+  }
+  runAfterEach();
+}
+
+export const it = test;
+
+/** `it.each(cases)` (and `test.each`) — one test per case. */
+function each(cases) {
+  const list = Array.isArray(cases) ? cases : [];
+  return (name, fn) => {
+    list.forEach((entry) => {
+      const title = typeof name === "function" ? String(name(entry)) : interpolate(name, entry);
+      test(title, () => fn(entry));
+    });
+  };
+}
+
+test.each = each;
+it.each = each;
+
+export function describe(name, fn) {
+  if (typeof name === "function") {
+    name();
+    return;
+  }
+  fn();
+}
+
+describe.each = (cases) => (name, fn) => {
+  const list = Array.isArray(cases) ? cases : [];
+  list.forEach((entry) => {
+    const title = typeof name === "function" ? String(name(entry)) : interpolate(name, entry);
+    describe(title, () => fn(entry));
+  });
+};
+
+test.skip = () => {};
+it.skip = () => {};
+test.only = test;
+it.only = test;
+
+export function beforeEach(fn) { beforeEachHooks.push(fn); }
+export function afterEach(fn) { afterEachHooks.push(fn); }
+export function beforeAll(fn) { try { fn(); } catch { /* setup failures surface on the tests themselves */ } }
+export function afterAll(fn) { try { fn(); } catch { /* teardown is never a result */ } }
+
+/** Await every async test of the file just imported, so nothing prints early. */
+export async function settle() {
+  await Promise.allSettled(pending.slice());
+  pending.length = 0;
 }

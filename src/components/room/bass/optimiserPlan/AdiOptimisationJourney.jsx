@@ -29,6 +29,12 @@
 // available action stays visible as a secondary control, so two green buttons
 // can never compete for attention.
 //
+// A COMPLETED evaluation always stays re-runnable: RUN ADI AGAIN is offered
+// quietly beside the decision (and as the run control's own wording where it is
+// the only control), so a result can be verified or the run measured again
+// without changing the design first. Which states offer it, and its wording, is
+// decided once in adiRerunAgainAuthority.js.
+//
 // The run button is evidence-only: it runs the existing optimiser against the
 // current design and saves the evaluated result. It never applies a lever, and
 // never alters placement, delay, gain or polarity.
@@ -61,6 +67,8 @@ import {
   OPTIMISER_RETEST_LABEL,
   OPTIMISER_RETEST_PREVIOUS_CANDIDATE,
 } from "./resolveOptimiserPresentationState.js";
+import { resolveAdiRerunAgain } from "./adiRerunAgainAuthority.js";
+import AdiRerunAgainAction from "./AdiRerunAgainAction.jsx";
 import AdiEngineerDetailsPanel from "./AdiEngineerDetailsPanel.jsx";
 import {
   ignoreOptimiserRecommendation,
@@ -416,9 +424,10 @@ export default function AdiOptimisationJourney({
   // ── THE TRADE-OFF STATE ──
   // A completed run whose best change improves the overall result but worsens a
   // protected primary seat. Nothing on this card may offer that change as an
-  // improvement, and no run or re-test control is drawn: the run has finished and
-  // its result is trustworthy, so there is nothing to re-run. The designer reviews
-  // the trade-off or keeps the current design.
+  // improvement, and no run or re-test control is drawn as the PRIMARY: the
+  // decision is the trade-off. The designer reviews it or keeps the current
+  // design, and the completed evaluation can still be run again deliberately
+  // (RUN ADI AGAIN) without touching the design.
   const tradeOff = presentation?.tradeOff || null;
   const tradeOffSettled = !!tradeOff?.isTradeOff && tradeOffKept;
   const tradeOffActive = !!tradeOff?.isTradeOff && !isRunning && !tradeOffKept;
@@ -439,17 +448,39 @@ export default function AdiOptimisationJourney({
     : null;
 
   // A COMPLETED, SUCCESSFUL RUN IS NOT A STARTING POINT. While the panel states a
-  // confirmed improvement — one ADI applied, or one the designer approves — no
-  // run and no re-test control belongs on the card: those are the actions for "no
-  // result yet", "the design has changed" and "a re-test is genuinely required",
-  // and this state is none of them. Read from the outcome authority, so the
-  // trade-off, the physical move and every retry state keep their own controls.
+  // confirmed improvement — one ADI applied, or one the designer approves — the
+  // decision owns the card, so the panel's PRIMARY run control and every re-test
+  // control stand down: those are the actions for "no result yet", "the design has
+  // changed" and "a re-test is genuinely required", and this state is none of
+  // them. Read from the outcome authority, so the trade-off, the physical move and
+  // every retry state keep their own controls.
   const improvementOwnsPanel = !publicationFailureActive
     && presentation?.outcome === OPTIMISER_OUTCOME.IMPROVEMENTS_FOUND;
 
   const showAction = !!journey.action && journey.canRun && !isRunning
     && !tradeOffActive && !tradeOffSettled
     && !improvementOwnsPanel;
+
+  // ── RUN ADI AGAIN ──
+  // A COMPLETED evaluation is never a dead end: verifying the result, repeating
+  // the test or measuring the run again must never require changing the design
+  // first. ONE authority decides when that deliberate re-run is offered and what
+  // it says (adiRerunAgainAuthority.js): a completed evaluation offers it, a
+  // failed or incomplete one keeps its own wording, and it is never the primary.
+  // The card still keeps ONE run control per state — where the run control above,
+  // or the placement panel, already states this same action, this quiet control
+  // is not drawn at all, and while a run is in flight it is not drawn either.
+  const rerunAgain = resolveAdiRerunAgain({
+    outcome,
+    journeyStateKey,
+    running: isRunning,
+    canRun: journey.canRun,
+    blockedReason: journey.blockReason?.message || null,
+  });
+  const showRerunAgain = rerunAgain.offered && !isRunning
+    && !(showAction && !panelShowsRerun)
+    && !panelShowsRerun
+    && !publicationFailureActive;
   // ── ONE RE-TEST ──
   // In the re-test states the panel's own run control is worded as the re-test
   // itself. While that control is drawn it IS the re-test: it owns the primary
@@ -838,8 +869,9 @@ export default function AdiOptimisationJourney({
       <div className="flex flex-wrap items-center gap-2">
         {/* THE TRADE-OFF'S OWN TWO CONTROLS — the review, which owns the ONE
             deliberate Apply, and the designer's own "no". While the trade-off is
-            live no other control is drawn: the run has completed, so there is
-            nothing to re-run, and the change is never applied from this card. */}
+            live no other control of the DECISION is drawn, and the change is
+            never applied from this card. The completed evaluation's own quiet
+            re-run is drawn below the decision, never as a competing primary. */}
         {tradeOffActive && (
           <AdiTradeOffActions
             tradeOff={tradeOff}
@@ -944,6 +976,28 @@ export default function AdiOptimisationJourney({
         <div className="text-[11px] text-[#625143] leading-relaxed" data-adi-recommendation-ignored="true">
           Recommendation ignored for this session. Re-test bass optimisation at any time to review it again.
         </div>
+      )}
+
+      {/* ── RUN ADI AGAIN ── the deliberate re-run of a COMPLETED evaluation.
+          The control itself is a self-contained component; WHICH states offer it,
+          what it says and whether it is pressable is decided once, above, by
+          adiRerunAgainAuthority.js. It runs the SAME run action the card's own run
+          control runs — a new run identity with its own timers, against the
+          current design and the current bass result — so a verification run, a
+          repeated test or a runtime measurement needs no design change, no bass
+          recalculation and no publication. Quiet by design: the decision above
+          (Apply · Review trade-off · Keep) owns the primary, and this never
+          competes with it.
+          One run control per state: it is drawn only where no other control is
+          already stating this same action, and never while a run is in flight. */}
+      {showRerunAgain && (
+        <AdiRerunAgainAction
+          label={rerunAgain.label}
+          helper={rerunAgain.helper}
+          disabled={!rerunAgain.available}
+          disabledReason={rerunAgain.disabledReason}
+          onRunAgain={onRunOptimisationPlan}
+        />
       )}
 
       {/* Primary action. Running: the same button, disabled, with the spinner
