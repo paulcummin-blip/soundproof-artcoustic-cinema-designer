@@ -13,10 +13,19 @@
  * page, and states the reason beside the button; nothing incomplete is ever shown.
  * While the writer is working the button reports that it is working, and the
  * report underneath stays fully readable throughout.
+ *
+ * A refusal is also READABLE afterwards, for a master admin: the diagnostic the
+ * backend returned with it is held for the session and shown in the expandable
+ * technical detail below the button, so the reason, the offending sentence, the
+ * evidence it cited and the refused draft survive the notice being dismissed.
+ * That detail is presentation only and master-admin only; a dealer keeps the
+ * plain reason and the safe fallback, and a refused draft is never published.
  */
 
 import React, { useState } from 'react';
 import { base44 } from '@/api/base44Client';
+import DesignIntentDiagnosticsPanel from '@/components/report/projectReport/DesignIntentDiagnosticsPanel';
+import { saveDesignIntentDiagnostics } from '@/components/report/projectReport/designIntentDiagnosticStore';
 
 const LABEL_COLOR = '#625143';
 const BODY_FONT = 'Didact Gothic, sans-serif';
@@ -52,6 +61,12 @@ export default function DesignIntentGenerationAction({
         if (typeof onGenerated === 'function') await onGenerated();
         return;
       }
+
+      // The refused attempt's diagnostic is held for the session, so dismissing
+      // the notice below does not take the reason, the offending sentence or the
+      // refused draft with it. A response carrying no diagnostic — an ordinary
+      // dealer's attempt — replaces nothing and shows nothing.
+      saveDesignIntentDiagnostics(projectId, versionId, data.diagnostics || null);
 
       setState({
         busy: false,
@@ -95,10 +110,40 @@ export default function DesignIntentGenerationAction({
           : hasNarrative ? 'Rewrite Design Intent' : 'Write Design Intent'}
       </button>
       {state.message && (
-        <div style={{ fontFamily: BODY_FONT, fontSize: 11, color: LABEL_COLOR, marginTop: 6 }}>
-          {state.message}
+        <div
+          className="flex items-center gap-2"
+          style={{ fontFamily: BODY_FONT, fontSize: 11, color: LABEL_COLOR, marginTop: 6 }}
+        >
+          <span>{state.message}</span>
+          <button
+            type="button"
+            onClick={() => setState((previous) => ({ ...previous, message: null }))}
+            style={{
+              fontFamily: BODY_FONT,
+              fontSize: 11,
+              color: LABEL_COLOR,
+              background: 'transparent',
+              border: 'none',
+              padding: 0,
+              textDecoration: 'underline',
+              cursor: 'pointer',
+            }}
+          >
+            Dismiss
+          </button>
         </div>
       )}
+
+      {/* The refused attempt read back in full, for a master admin only. It reads
+          what this session holds for THIS report, so the technical detail stays
+          available after the notice above is dismissed. It renders nothing for a
+          dealer, and nothing when no attempt was refused. Screen only: it is
+          never part of the printed document. */}
+      <DesignIntentDiagnosticsPanel
+        projectId={projectId}
+        versionId={versionId}
+        className="mt-1"
+      />
     </div>
   );
 }

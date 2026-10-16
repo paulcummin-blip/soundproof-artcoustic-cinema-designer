@@ -230,6 +230,18 @@ export async function runReportDesignIntent({
         first ? `${first.rejection || first.code || 'rejected'}${first.detail ? `: ${first.detail}` : ''}` : 'The draft was not validated.',
       ),
       validation_errors: validation?.violations || [],
+      // ── The refused attempt, kept whole so it can be read back ──
+      // The exact validation response and the draft it refused travel back with
+      // the refusal, so a later reading of it states the rule, the offending
+      // sentence, the evidence reference and the draft itself rather than a
+      // summary of them. Diagnostics only: neither is stored, neither is
+      // displayed, nothing is read back out of either, and the caller alone
+      // decides who may be shown them.
+      validation: validation || null,
+      draft: provider.output ?? null,
+      provider_identity: providerIdentity,
+      evidence_pack_fingerprint: pack.pack_fingerprint ?? null,
+      input_fingerprint: writerInput.input_fingerprint ?? null,
       record: buildDesignIntentRecord({
         status: DESIGN_INTENT_STATUS.REJECTED,
         sourceFingerprints,

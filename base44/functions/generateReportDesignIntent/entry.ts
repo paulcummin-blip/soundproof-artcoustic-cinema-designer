@@ -108,11 +108,36 @@ export default async function(req) {
         `[generateReportDesignIntent] refused reason=${attempt.reason} project=${project_id} version=${version_id} `
         + `by=${user.email || user.id} detail=${attempt.detail || 'none'}`,
       );
+      // ── The refused attempt's diagnostic, for a MASTER ADMIN alone ──
+      // A refusal is never silent: the reason, the exact validation response and
+      // the draft it refused travel back with the attempt, so the next refusal is
+      // diagnosable from the response itself instead of being reconstructed from
+      // a console line. An ordinary dealer is given the reason and the safe
+      // fallback, and no violation, claim ID, sentence or draft reaches them.
+      // Nothing is stored: this is the response to the attempt, not a record.
+      const diagnostics = accessContext.isMasterAdmin === true
+        ? {
+          reason: attempt.reason,
+          detail: attempt.detail || null,
+          project_id,
+          version_id,
+          attempted_at: new Date().toISOString(),
+          validation: attempt.validation || null,
+          draft: attempt.draft ?? null,
+          provider: attempt.provider_identity || null,
+          source_fingerprints: snapshot.source_fingerprints || null,
+          input_fingerprint: attempt.input_fingerprint ?? attempt.record?.input_fingerprint ?? null,
+        }
+        : null;
+
       return Response.json({
         ok: false,
         reason: attempt.reason,
         detail: attempt.detail,
-        validation_errors: attempt.validation_errors || [],
+        // The complete violation list belongs to the diagnostic response and is
+        // returned to a master admin alone.
+        validation_errors: diagnostics ? (attempt.validation_errors || []) : [],
+        diagnostics,
         // The report keeps its own deterministic Design Intent: nothing was
         // written, and nothing incomplete is ever displayed.
         fallback: 'deterministic',
