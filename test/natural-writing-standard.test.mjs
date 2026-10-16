@@ -156,7 +156,7 @@ describe('A. The standard the proposal is written to', () => {
       expect(NATURAL_PRINCIPLE_EXPLANATION_RULE.toLowerCase()).toContain(principle);
     }
     expect(NATURAL_PRINCIPLE_EXPLANATION_RULE).toMatch(/never wait for a high Performance Level/);
-    expect(NATURAL_PRINCIPLE_EXPLANATION_RULE).toMatch(/never turn a principle into a promise/);
+    expect(NATURAL_PRINCIPLE_EXPLANATION_RULE).toMatch(/Never turn a principle into a promise/);
     expect(NATURAL_PRINCIPLE_EXPLANATION_RULE).toMatch(/never invent an improvement/);
     expect(NATURAL_PRINCIPLE_EXPLANATION_RULE).toMatch(/stated once, at its own scope/);
 
