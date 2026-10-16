@@ -39,6 +39,7 @@ import PlacementRecommendationPanel from "./PlacementRecommendationPanel.jsx";
 import AdiRecommendationEvidenceGroups from "./AdiRecommendationEvidenceGroups.jsx";
 import AdiJourneyRunWorkloadBlock from "./AdiJourneyRunWorkloadBlock.jsx";
 import AdiJourneyRuntimeCostBlock from "./AdiJourneyRuntimeCostBlock.jsx";
+import AdiRecommendationPublicationStatus from "./AdiRecommendationPublicationStatus.jsx";
 import { FUTURE_CAPABILITY_TITLE } from "./optimiserLiveFamilies.js";
 import { PLACEMENT_PREVIEW_UNAVAILABLE } from "./placementMoveAuthority.js";
 import { OPTIMISER_TESTED_PLACEMENT_LABEL } from "./optimiserResultViewModel.js";
@@ -91,6 +92,9 @@ export default function AdiJourneyEngineerDetailsSections({ view = {} }) {
     attemptsWithoutGain = null,
     workload = null,
     runtimeCost = [],
+    // The secondary recommendation publication's own outcome, as the run recorded
+    // it. Developer diagnostics only: it is never a run outcome.
+    recommendationPublication = null,
     // THE ONE RESULT VIEW MODEL, built by the card. Every value below that
     // describes the result is read from it, so this evidence cannot state a
     // different decision, winner or current value than the card does.
@@ -349,6 +353,12 @@ export default function AdiJourneyEngineerDetailsSections({ view = {} }) {
           electronic search and its canonical confirmations cost, beside the
           physical placement work that must never sit inside Calculate Bass. */}
       <AdiJourneyRuntimeCostBlock rows={runtimeCost} />
+
+      {/* THE SECONDARY RECOMMENDATION PUBLICATION'S OWN OUTCOME — DEVELOPER
+          DIAGNOSTICS ONLY. The run was terminal when its plan was saved, so this
+          is the AFTERMATH of that save: it is recorded for diagnosis, and it is
+          never stated as the run's result or its failure. */}
+      <AdiRecommendationPublicationStatus publication={recommendationPublication} />
     </>
   );
 }

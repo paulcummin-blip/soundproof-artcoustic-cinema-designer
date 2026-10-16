@@ -52,6 +52,50 @@ export const RECOMMENDATION_PUBLICATION_MODE = Object.freeze({
   SEPARATE: "separate",
 });
 
+/**
+ * WHAT BECAME OF THE SECONDARY RECOMMENDATION PUBLICATION.
+ *
+ * The validated plan is saved BEFORE this publication is attempted, and saving it
+ * is what makes the run terminal for the designer. These three values therefore
+ * describe background work only: none of them is a run outcome, and none of them
+ * can turn a saved optimiser plan into a failed run.
+ */
+export const RECOMMENDATION_PUBLICATION_STATUS = Object.freeze({
+  PUBLISHED: "published",
+  REFUSED: "refused",
+  NOT_ATTEMPTED: "not_attempted",
+});
+
+/**
+ * WHAT THE SECONDARY PUBLICATION DID, in the shape the run records and persists.
+ *
+ * Recorded as its own diagnostic — never as the run's failure — so a refused
+ * publication leaves the saved plan, the current bass result, report readiness
+ * and the terminal card exactly as they were.
+ */
+export function buildRecommendationPublicationRecord({
+  publication = null,
+  runId = null,
+  at = new Date().toISOString(),
+} = {}) {
+  const results = Array.isArray(publication?.results) ? publication.results : [];
+  const attempted = results.length > 0;
+  const ok = publication?.ok === true && attempted;
+  const attempts = Number(publication?.failure?.attempts);
+  return {
+    status: !attempted
+      ? RECOMMENDATION_PUBLICATION_STATUS.NOT_ATTEMPTED
+      : (ok ? RECOMMENDATION_PUBLICATION_STATUS.PUBLISHED : RECOMMENDATION_PUBLICATION_STATUS.REFUSED),
+    category: ok ? null : (publication?.failure?.category || null),
+    error: ok ? null : (publication?.failure?.publicationError || publication?.failure?.message || null),
+    attempts: Number.isFinite(attempts) ? attempts : null,
+    mode: publication?.mode || null,
+    fingerprints: results.map((entry) => entry.fingerprint).filter(Boolean),
+    at,
+    runId: runId || null,
+  };
+}
+
 const usable = (value) => (typeof value === "string" && value.trim() ? value : null);
 
 /**

@@ -798,6 +798,10 @@ export default function AdiOptimisationJourney({
     // breakdown SAVED WITH THE RUN; empty when no breakdown was recorded, so the
     // block is simply not drawn and no missing stage is ever shown as zero.
     runtimeCost: buildElectronicTimingRows(planView?.runtimeBreakdown || null),
+    // THE SECONDARY PUBLICATION'S OWN OUTCOME, read from the saved record. The run
+    // is terminal from its saved plan, so this only states what happened to the
+    // recommendation publication afterwards — developer diagnostics only.
+    recommendationPublication: planView?.recommendationPublication || null,
   };
 
   return (

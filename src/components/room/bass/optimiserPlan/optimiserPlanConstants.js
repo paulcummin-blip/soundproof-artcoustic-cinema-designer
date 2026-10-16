@@ -18,6 +18,20 @@
 export const OPTIMISER_PLAN_VERSION = 3;
 
 /**
+ * WHAT KIND of terminal failure a run recorded.
+ *
+ * PLAN_SAVE_FAILED: the run finished its analysis and the result could not be
+ * saved for this design. That is the ONE failure the optimiser now owns — the
+ * recommendation publication that follows a saved plan is secondary work and is
+ * never reported as a failed run. It is shared vocabulary (this constant is read
+ * by both the run and the card) so the recorded failure and the stated card can
+ * never disagree.
+ */
+export const OPTIMISER_FAILURE_STATUS = Object.freeze({
+  PLAN_SAVE_FAILED: "plan_save_failed",
+});
+
+/**
  * Evidence status of a single lever. This is the honest classification of what
  * the optimiser actually evaluated — it is persisted, not inferred on read.
  */
