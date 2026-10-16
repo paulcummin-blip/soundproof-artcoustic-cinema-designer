@@ -45,7 +45,7 @@ vi.mock('@/lib/AuthContext', () => ({
 vi.mock('@/api/base44Client', () => ({
   base44: {
     entities: {},
-    functions: { invoke: async () => ({ data: {} }) },
+    functions: { invoke: vi.fn(async () => ({ data: {} })) },
   },
 }));
 
@@ -101,6 +101,9 @@ import {
   DESIGN_INTENT_SOURCE,
   resolveDesignIntent,
 } from '../src/components/report/projectReport/designIntentAuthority.js';
+// The stubbed SDK client: composing the report page must ask for nothing, and this
+// suite proves it by watching the one call the page could make.
+import { base44 } from '@/api/base44Client';
 import ProjectReportDesignSummary from '../src/components/report/projectReport/ProjectReportDesignSummary.jsx';
 
 const AT = MARQUEE_GENERATED_AT;
@@ -532,6 +535,14 @@ describe('Stage 4 — the accepted words are bound to the images they were writt
     const replaced = assets.map((asset) => (asset.id === 'g-cover'
       ? { ...asset, file_url: `${HOST}/public/77aa88bb_genesis-cover.jpg` }
       : asset));
+    // The two files carry the SAME original filename: the designer replaced the cover
+    // render with a new one they had named identically. Identity follows the FILE,
+    // never the name — a different upload is stored under a different name, so the
+    // narrative moves with the picture the words were actually written from.
+    expect(assets[0].file_url.endsWith('genesis-cover.jpg')).toBe(true);
+    expect(replaced[0].file_url.endsWith('genesis-cover.jpg')).toBe(true);
+    expect(replaced[0].file_url).not.toBe(assets[0].file_url);
+
     const moved = contextFor(replaced).fingerprint;
     expect(moved).not.toBe(written);
 
@@ -576,11 +587,45 @@ describe('Stage 4 — the accepted words are bound to the images they were writt
       engineeringFingerprint: 'eng:changed',
     }, { currentVisualFingerprint: withImages.record.visual_fingerprint }))
       .toMatchObject({ displayable: false, reason: 'evidence_moved:engineeringFingerprint' });
-    // The geometry rule still decides on its own.
+
+    // Geometry follows the same honesty rule in the other direction: a narrative
+    // written WITHOUT geometry context made no geometry claim, so geometry moving
+    // cannot invalidate it. (The bound case — a narrative written from geometry —
+    // is asserted in the geometry-context suite.)
     expect(readAcceptedDesignIntent(withImages.record, FINGERPRINTS, {
       currentGeometryFingerprint: 'rg1-changed-00',
       currentVisualFingerprint: withImages.record.visual_fingerprint,
-    })).toMatchObject({ displayable: false, reason: 'geometry_moved' });
+    })).toMatchObject({ displayable: true, reason: null, text: ACCEPTED_TEXT });
+    expect(withImages.record.geometry_fingerprint).toBeNull();
+  });
+
+  it('lets the dealer generate an improved narrative when renders arrive after a text-only one', async () => {
+    const pack = packFor();
+
+    // 1. WRITTEN BEFORE PICTURES EXISTED: the report's own text-only narrative.
+    const textOnly = await attemptWith({ pack, assets: [] });
+    expect(textOnly.ok).toBe(true);
+    expect(textOnly.record.visual_fingerprint).toBeNull();
+
+    // 2. RENDERS ARE ADDED. The saved narrative is NOT hidden, because it claims
+    //    nothing about any picture: the dealer keeps the words they already have.
+    const context = contextFor(genesisLibrary());
+    expect(readAcceptedDesignIntent(textOnly.record, FINGERPRINTS, {
+      currentVisualFingerprint: context.fingerprint,
+    })).toMatchObject({ displayable: true, reason: null, text: ACCEPTED_TEXT });
+
+    // 3. THE IMPROVED VERSION IS NOT BLOCKED EITHER. The same engineering evidence,
+    //    now with the design's own renders attached, is a new attempt the dealer can
+    //    simply ask for: nothing about the saved text-only narrative stands in its way.
+    const improved = await attemptWith({ pack, assets: genesisLibrary() });
+    expect(improved.ok).toBe(true);
+    expect(improved.text).toBe(ACCEPTED_TEXT);
+    expect(improved.record.visual_fingerprint).toBe(context.fingerprint);
+
+    // Only the visual context differs, so the writer's agreement changed while the
+    // engineering it was written against did not.
+    expect(improved.input_fingerprint).not.toBe(textOnly.input_fingerprint);
+    expect(improved.record.text).toBe(ACCEPTED_TEXT);
   });
 });
 
@@ -649,6 +694,10 @@ describe('Stage 3 + 4 — the accepted words reach the report and the printed do
   };
 
   it('prints the accepted narrative in exactly one intent block, on screen and on paper', async () => {
+    // REQUIREMENT 9 — opening the report asks Astra for NOTHING. Watch the one call
+    // the page could make, and clear it before composing anything.
+    base44.functions.invoke.mockClear();
+
     const pack = packFor();
     const attempt = await attemptWith({ pack, assets: genesisLibrary() });
     const saved = JSON.parse(JSON.stringify(attempt.record));
@@ -662,10 +711,14 @@ describe('Stage 3 + 4 — the accepted words reach the report and the printed do
     expect(resolved.source).toBe(DESIGN_INTENT_SOURCE.ASTRA);
 
     const screen = renderToStaticMarkup(
-      React.createElement(ProjectReportDesignSummary, { ...summaryProps, summaryOpening: resolved.text, print: false }),
+      React.createElement(ProjectReportDesignSummary, {
+        ...summaryProps, summaryOpening: resolved.text, intentSource: resolved.source, print: false,
+      }),
     );
     const paper = renderToStaticMarkup(
-      React.createElement(ProjectReportDesignSummary, { ...summaryProps, summaryOpening: resolved.text, print: true }),
+      React.createElement(ProjectReportDesignSummary, {
+        ...summaryProps, summaryOpening: resolved.text, intentSource: resolved.source, print: true,
+      }),
     );
 
     // The accepted words are on the page the designer reads AND in the document
@@ -673,12 +726,16 @@ describe('Stage 3 + 4 — the accepted words reach the report and the printed do
     expect(screen).toContain(ACCEPTED_TEXT);
     expect(paper).toContain(ACCEPTED_TEXT);
 
-    // ONE block, in both: the visual context adds no page, no heading and no repeat.
-    expect(screen.split('Design Intent').length - 1).toBe(1);
-    expect(paper.split('Design Intent').length - 1).toBe(1);
+    // ONE intent block, in both. On paper the words appear once, under the page's one
+    // heading. On screen the same single block is joined by the optional action, which
+    // is the only other place the phrase appears — no extra page, heading or repeat.
     expect(paper.split(ACCEPTED_TEXT).length - 1).toBe(1);
+    expect(screen.split(ACCEPTED_TEXT).length - 1).toBe(1);
+    expect(paper.split('Design Intent').length - 1).toBe(1);
+    expect(screen.split('Design Intent').length - 1).toBe(2);
 
-    // The screen-only generation action is never part of the printed document.
+    // The screen-only generation action is never part of the printed document, and it
+    // offers an IMPROVED version here, because a narrative already exists.
     expect(screen).toContain('Rewrite Design Intent');
     expect(paper).not.toContain('Rewrite Design Intent');
     expect(paper).not.toContain('Help ADI understand your design');
@@ -688,6 +745,7 @@ describe('Stage 3 + 4 — the accepted words reach the report and the printed do
       React.createElement(ProjectReportDesignSummary, {
         ...summaryProps,
         summaryOpening: 'The report’s own Design Intent.',
+        intentSource: DESIGN_INTENT_SOURCE.DETERMINISTIC,
         print: true,
       }),
     );
@@ -695,5 +753,10 @@ describe('Stage 3 + 4 — the accepted words reach the report and the printed do
     expect(withDeterministic).toContain('5.18 × 7.29 × 2.80 m (W × L × H)');
     expect(paper).toContain('5.18 × 7.29 × 2.80 m (W × L × H)');
     expect(paper.split('Project Summary').length).toBe(withDeterministic.split('Project Summary').length);
+
+    // Composing the report — twice, screen and paper, with accepted words saved —
+    // reached no model and no endpoint at all. The pictures are attached when the
+    // dealer ASKS for a narrative, never when the report is opened.
+    expect(base44.functions.invoke).not.toHaveBeenCalled();
   });
 });
