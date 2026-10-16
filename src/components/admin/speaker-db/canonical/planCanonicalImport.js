@@ -178,8 +178,12 @@ export function planCanonicalImport({ rows, data, changeLog = [] }) {
       continue;
     }
 
-    if (!manufacturer || !modelCell) {
-      const message = !manufacturer
+    // A row naming a manufacturer that is not in the database yet is a
+    // legitimate new-manufacturer row (createsManufacturer), not an
+    // unidentifiable one. Only a row with neither a usable manufacturer nor a
+    // name to create one is an error.
+    if ((!manufacturer && !createsManufacturer) || !modelCell) {
+      const message = !manufacturer && !createsManufacturer
         ? "No manufacturer could be identified for this row."
         : "The model is blank, so no product can be identified.";
       errors.push({ rowNumber: row.rowNumber, message });
@@ -201,12 +205,12 @@ export function planCanonicalImport({ rows, data, changeLog = [] }) {
       spec = specById.get(specificationId) || null;
       if (!spec) {
         errors.push({ rowNumber: row.rowNumber, message: `specification_id ${specificationId} does not exist. Clear it to write to the current specification, or correct it.` });
-        entries.push({ rowNumber: row.rowNumber, kind: ENTRY_KINDS.error, manufacturerName: manufacturer.name, model: modelCell, messages: [`specification_id ${specificationId} does not exist.`], changes: [] });
+        entries.push({ rowNumber: row.rowNumber, kind: ENTRY_KINDS.error, manufacturerName: manufacturer?.name || manufacturerNameCell, model: modelCell, messages: [`specification_id ${specificationId} does not exist.`], changes: [] });
         continue;
       }
       if (product && spec.product_id !== product.id) {
         errors.push({ rowNumber: row.rowNumber, message: `specification_id ${specificationId} belongs to a different product.` });
-        entries.push({ rowNumber: row.rowNumber, kind: ENTRY_KINDS.error, manufacturerName: manufacturer.name, model: modelCell, messages: ["That specification belongs to a different product."], changes: [] });
+        entries.push({ rowNumber: row.rowNumber, kind: ENTRY_KINDS.error, manufacturerName: manufacturer?.name || manufacturerNameCell, model: modelCell, messages: ["That specification belongs to a different product."], changes: [] });
         continue;
       }
     } else if (product) {
@@ -230,7 +234,7 @@ export function planCanonicalImport({ rows, data, changeLog = [] }) {
       entries.push({
         rowNumber: row.rowNumber,
         kind: ENTRY_KINDS.error,
-        manufacturerName: manufacturer.name,
+        manufacturerName: manufacturer?.name || manufacturerNameCell,
         model: modelCell,
         messages: resolved.errors.map((cellError) => `${cellError.label}: ${cellError.message}`),
         changes: [],
@@ -245,7 +249,9 @@ export function planCanonicalImport({ rows, data, changeLog = [] }) {
     const proposedSpec = { ...resolved.proposed.spec };
 
     const protectedSpecification = isProtectedSpecification(spec);
-    const createsNewVersion = specChanges.length > 0 && (!spec || protectedSpecification);
+    // A brand-new specification has no previous version to keep as history, so
+    // versioning only applies when a specification already exists.
+    const createsNewVersion = specChanges.length > 0 && Boolean(spec) && protectedSpecification;
     const createsSpecification = !spec && (specChanges.length > 0 || createsProduct);
     const createsNewSpecificationVersion = createsSpecification || createsNewVersion;
 
@@ -270,7 +276,7 @@ export function planCanonicalImport({ rows, data, changeLog = [] }) {
     }
 
     const manufacturerNameProposed = String(cells.manufacturer ?? "").trim();
-    const manufacturerRename = manufacturer.id && manufacturerChanges.length > 0 && manufacturerNameProposed
+    const manufacturerRename = manufacturer?.id && manufacturerChanges.length > 0 && manufacturerNameProposed
       ? { id: manufacturer.id, from: manufacturer.name, to: manufacturerNameProposed }
       : null;
     if (manufacturerRename) {
@@ -291,7 +297,7 @@ export function planCanonicalImport({ rows, data, changeLog = [] }) {
       kind,
       manufacturerKey: normaliseManufacturerIdentity(manufacturerNameCell || manufacturer.name),
       manufacturerName: String(cells.manufacturer ?? "").trim() || manufacturer.name,
-      manufacturerIdResolved: manufacturer.id,
+      manufacturerIdResolved: manufacturer?.id ?? null,
       model: modelCell || product?.model || "",
       adminNote: noteFor(product?.id || "", modelCell),
       matchedByName,
@@ -300,11 +306,11 @@ export function planCanonicalImport({ rows, data, changeLog = [] }) {
       createsSpecification,
       createsNewSpecificationVersion,
       identities: {
-        manufacturer_id: manufacturer.id,
+        manufacturer_id: manufacturer?.id ?? null,
         product_id: product?.id || null,
         specification_id: spec?.id || null,
       },
-      previousSpecificationId: createsNewVersion ? spec.id : null,
+      previousSpecificationId: createsNewVersion && spec ? spec.id : null,
       productChanges,
       specChanges,
       manufacturerChanges,
@@ -313,7 +319,7 @@ export function planCanonicalImport({ rows, data, changeLog = [] }) {
       manufacturerRename,
       // exactly what rollback needs to put back
       before: {
-        manufacturer: manufacturerChanges.length ? { name: manufacturer.name } : null,
+        manufacturer: manufacturerChanges.length ? { name: manufacturer?.name || manufacturerNameCell } : null,
         product: pick(product, beforeProductFields),
         specification: spec
           ? { ...pick(spec, beforeSpecFields), ...(specChanges.length && !createsNewVersion ? { approval_status: spec.approval_status } : {}) }
