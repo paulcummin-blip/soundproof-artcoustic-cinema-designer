@@ -38,9 +38,11 @@ import {
   NATURAL_SELECTION_RULE,
   NATURAL_SENTENCE_RULE,
   NATURAL_VOICE_RULE,
+  NATURAL_WRITING_REFERENCE_PASSAGES,
   NATURAL_WRITING_REVIEW,
   NATURAL_WRITING_STANDARD_VERSION,
   STOCK_CONNECTIVES,
+  naturalWritingReferenceBlock,
 } from '../base44/shared/proposalWriter/writerNaturalWritingStandard.js';
 import {
   emDashAt,
@@ -93,7 +95,7 @@ describe('A. The standard the proposal is written to', () => {
     expect(STANDARD_TEXT).toMatch(/natural, confident, professional British English/);
     expect(STANDARD_TEXT).toMatch(/never as an engineering report, a marketing brochure, a software generated assessment, a technical validator or an assistant/);
     expect(STANDARD_TEXT).toMatch(/never forcing a contraction into a formal passage/);
-    expect(NATURAL_WRITING_STANDARD_VERSION).toBe(2);
+    expect(NATURAL_WRITING_STANDARD_VERSION).toBe(3);
   });
 
   it('states the sentence craft and the connectives it refuses', () => {
@@ -138,15 +140,24 @@ describe('A. The standard the proposal is written to', () => {
     expect(NATURAL_SELECTION_RULE).toMatch(/This copy is a brief overview/);
     expect(NATURAL_SELECTION_RULE).toMatch(/the specifications are stated in the Project Summary and in the evidence pages beside this copy/);
 
-    // THE REGISTER: the abstract constructions the operator named are rewritten aloud.
-    for (const abstract of [
+    // THE REGISTER: the standard states the principle and the approved passages
+    // show it. No sentence is ever displayed in order to be avoided, so the
+    // standard carries no example of wording to steer away from.
+    for (const avoided of [
+      'is written "',
       'the rear row retaining an involving view',
       'substantial musical weight',
       "preserving each layer's character",
       "the film's setting extend beyond the front wall",
     ]) {
-      expect(NATURAL_ALOUD_RULE).toContain(abstract);
+      expect(NATURAL_ALOUD_RULE).not.toContain(avoided);
     }
+    expect(NATURAL_WRITING_REFERENCE_PASSAGES.length).toBe(3);
+    expect(NATURAL_WRITING_REFERENCE_PASSAGES[0]).toMatch(/brings the scale and excitement of the big screen into a compact room/);
+    expect(NATURAL_WRITING_REFERENCE_PASSAGES[1]).toMatch(/creates a convincing sense of space and movement/);
+    expect(NATURAL_WRITING_REFERENCE_PASSAGES[2]).toMatch(/make demanding film soundtracks so enjoyable/);
+    expect(naturalWritingReferenceBlock()).toMatch(/references and never templates/);
+    expect(naturalWritingReferenceBlock()).toContain(NATURAL_WRITING_REFERENCE_PASSAGES[2]);
     expect(NATURAL_ALOUD_RULE).toMatch(/anything that would not be said aloud is rewritten/);
     expect(NATURAL_ALOUD_RULE).toMatch(/the confidence of someone who believes in it/);
     expect(NATURAL_ALOUD_RULE).toMatch(/the pleasure of watching films in this room/);
@@ -192,6 +203,10 @@ describe('B. It reaches the prompt the writer is really called with', () => {
   it('carries the whole standard, and the refusal is stated in the contract the input fingerprints', () => {
     expect(prompt).toContain(NATURAL_VOICE_RULE);
     expect(prompt).toContain(NATURAL_SENTENCE_RULE);
+    // The approved references reach the prompt the writer is really called with,
+    // and no example of wording to avoid is carried anywhere in it.
+    expect(prompt).toContain(NATURAL_WRITING_REFERENCE_PASSAGES[0]);
+    expect(prompt).not.toContain('is written "');
     expect(prompt).toContain(NATURAL_RECOMMENDATION_RULE);
     expect(prompt).toContain(NATURAL_REPETITION_RULE);
     expect(prompt).toContain('THE NATURAL WRITING REVIEW');
@@ -201,7 +216,7 @@ describe('B. It reaches the prompt the writer is really called with', () => {
   });
 
   it('is the natural-writing generation, with the contract unchanged', () => {
-    expect(WRITER_PROMPT_VERSION).toBe('proposal-writer-prompt-26');
+    expect(WRITER_PROMPT_VERSION).toBe('proposal-writer-prompt-27');
     expect(WRITER_CONTRACT_VERSION).toBe(2);
     // The natural language refinement reaches the prompt the writer is really
     // called with, so the refinement is not merely documented.

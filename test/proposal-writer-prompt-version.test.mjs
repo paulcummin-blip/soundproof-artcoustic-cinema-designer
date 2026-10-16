@@ -127,7 +127,13 @@ const VERSION_3 = 'proposal-writer-prompt-3';
 // promised result, and reviews its own copy with the designer's ear. No section
 // identity, word limit, figure, level, product, claim-grounding or validation rule
 // changed.
-const CURRENT = 'proposal-writer-prompt-26';
+// Generation 27 is the editorial-reference refinement: the natural writing
+// standard no longer shows the writer any example of awkward language, and it
+// carries short approved passages instead, as editorial references that show the
+// register at its best. Every principle the standard stated is unchanged. No
+// section identity, word limit, figure, level, product, claim-grounding or
+// validation rule changed.
+const CURRENT = 'proposal-writer-prompt-27';
 
 test('the writer prompt version is the current one', () => {
   assert.equal(WRITER_PROMPT_VERSION, CURRENT);

@@ -47,6 +47,7 @@ import {
   NATURAL_SENTENCE_RULE,
   NATURAL_VOICE_RULE,
   NATURAL_WRITING_REVIEW,
+  naturalWritingReferenceBlock,
 } from './writerNaturalWritingStandard.js';
 import {
   WRITER_CONTRACT_VERSION,
@@ -292,6 +293,10 @@ export function buildWriterPrompt({ input, briefRevision = null } = {}) {
     NATURAL_SELECTION_RULE,
     NATURAL_ALOUD_RULE,
     NATURAL_PRINCIPLE_EXPLANATION_RULE,
+    // THE APPROVED REFERENCE PASSAGES: the standard shown at its best, carried as
+    // editorial references and never as templates. No negative example of wording
+    // to avoid is shown anywhere in this prompt.
+    naturalWritingReferenceBlock(),
     'ONE PRIMARY SECTION PER CHARACTERISTIC: each significant design characteristic is developed in one section. Another section may refer to it only to add new information, never to restate it in different adjectives, and never to repeat the same paragraph.',
     'DO NOT OVER-EXPLAIN A SIMPLE SPECIFICATION: state a simple fact once and move on. A centre channel built from two cabinets, such as 2 x C4-1 (mono), is stated in the specification; its design significance is explained at most once in the narrative, and never by repeatedly explaining that two cabinets are not two independent logical channels.',
     'CLIENT BRIEF RESPONSIBILITY: address every substantive supported request in the section where it belongs, not all of them in the Design Summary. Never silently ignore a supported request, never restate one for the sake of coverage, and where a request is not supported by the frozen evidence, leave it out rather than inventing support for it.',

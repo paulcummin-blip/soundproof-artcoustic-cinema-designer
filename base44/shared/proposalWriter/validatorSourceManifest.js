@@ -16,7 +16,7 @@ export const VALIDATOR_SOURCE_MANIFEST = Object.freeze({
   'base44/shared/proposalWriter/writerClausePrecision.js': '0d7be2c8e2dd98c395c5bf999bd6c306cb48b9c15bc0ffae2d7f31fd31ddae94',
   'base44/shared/proposalWriter/writerViolationAudit.js': '4cc361d1c96a101fc29330d740cef2184ae5650fd3cc64e253892d004efdb0b9',
   'base44/shared/proposalWriter/writerDesignStageRules.js': 'a26d5ff98a2eaf4f6de929cc62cba7e7bc2632540f12d44ded72e8cb7f8bdbb7',
-  'base44/shared/proposalWriter/writerContractSchema.js': 'cfe4d4825375e3216e5366af18cd88bb447804bbb2934c3d7ef9473c30fb02fb',
+  'base44/shared/proposalWriter/writerContractSchema.js': 'c4c0df7c2e3c823774ee5ee4085bf18b783adc2938bffe1e2c3a555adf8cb5e4',
   'base44/shared/proposalWriter/writerMultiCabinetRules.js': '3712df21bd72353af0a9d8ab75a1efa20755856d65229887a1f8dc5bad29b172',
   'base44/shared/proposalGeneration/generationStatuses.js': '2273b2e8408a426eeb137d9ae2f34c428a8e934dc0529134e9889aae75103b28',
   'base44/shared/proposalWriter/writerCabinetLanguage.js': '18e37edb21bd8422c6293c5fde809984d185e7188d0fe4a12fa2ff352d4b72c7',
@@ -45,7 +45,7 @@ export const VALIDATOR_SOURCE_MANIFEST = Object.freeze({
   // the word limit the section is written and validated under, so a draft can be
   // traced to the exact brief it was read against.
   'base44/shared/proposalWriter/designSummaryBrief.js': 'b49b1ca24bc8a0c8df82196faabfa8723b61419d89509466b622e3528e75464c',
-  'base44/shared/proposalWriter/writerPromptBuilder.js': '8f53f2f268a37b4c8deab132a0409b5edbe77e7700476a98b5fb20258231506c',
+  'base44/shared/proposalWriter/writerPromptBuilder.js': '66260e1422cf0b145b491047912e7cdff07297295fdb2643c738f208c53266a3',
   'base44/shared/proposalWriter/writerSectionMapping.js': 'f5a6d2a5fe974fbd5c16d810d95f99da72f629a4fb8cb33793aa472778ade2f0',
   'base44/shared/proposalWriter/writerDesignContext.js': '590a9f379bb28ebc54c14f97ae2b73070a8c8c6722c7be3fc548c95719f2d63b',
   'base44/shared/proposalEdit/completeDocumentValidation.js': 'cff20d7146ecbeb3a9c325e3147db41cab552f7ea950dd93385ee1d478683ddd',
@@ -75,9 +75,10 @@ export const VALIDATOR_SOURCE_MANIFEST = Object.freeze({
   // written against.
   'base44/shared/clientFacingCalibrationLanguage.js': 'd11e628655ac5efec828f303a6a5361996c409226ceeae424def051d752f4578',
   // The Sound Proof Natural Writing Standard: the editorial instructions the
-  // proposal is written to. Hashed so a draft can always be traced to the
-  // standard it was written under.
-  'base44/shared/proposalWriter/writerNaturalWritingStandard.js': '19743eed0ecfe9daf2d7622e147aa8b888b026c441ffbbf5e1eb6dd278075430',
+  // proposal is written to, and the approved reference passages it shows instead
+  // of any example of wording to avoid. Hashed so a draft can always be traced to
+  // the standard it was written under.
+  'base44/shared/proposalWriter/writerNaturalWritingStandard.js': '499a974b496eb402c14487f6245793f5f3078a91d97a68a9c282241ac5a57aa8',
   // The deterministic half of that standard: the punctuation rule, the stock
   // connectives, the mechanical repeated opener and the generic claim phrases.
   'base44/shared/proposalWriter/writerNaturalWritingRules.js': 'e1ea352c89ca451359785e853d46345c2c8b9cb3ec146a98b2946b36f9c99aa5',

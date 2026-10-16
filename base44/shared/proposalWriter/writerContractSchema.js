@@ -221,7 +221,15 @@ export const WRITER_CONTRACT_VERSION = 2;
 // Section identities, every word limit, the claim grounding rule and every
 // validation rule are unchanged, so a draft filed under an earlier generation is
 // still read against the agreement it was written under.
-export const WRITER_PROMPT_VERSION = 'proposal-writer-prompt-26';
+// Bumped to 27 for the editorial-reference refinement: the natural writing
+// standard no longer shows the writer any example of awkward language, and it
+// carries short approved passages instead, as editorial references that show the
+// register at its best and are never templates. Every principle the standard
+// stated is unchanged, the deterministic readings are untouched, and no section
+// identity, word limit, claim ground, figure, level, product or validation rule
+// moved, so a draft filed under an earlier generation is still read against the
+// agreement it was written under.
+export const WRITER_PROMPT_VERSION = 'proposal-writer-prompt-27';
 
 /** The only pack generation a draft may be written from. */
 export const WRITER_ACCEPTED_PACK_SCHEMA_VERSION = 2;

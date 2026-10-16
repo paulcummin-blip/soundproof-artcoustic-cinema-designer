@@ -36,8 +36,15 @@
  * confidently without waiting for a high Performance Level, and the writer's own
  * review asks whether a professional designer would actually say it. No word
  * limit, section identity, claim ground or validation rule changed.
+ *
+ * v3 is the editorial-reference refinement: the standard no longer shows the
+ * writer any example of awkward language, and it carries two or three short
+ * approved passages instead, as editorial references that demonstrate the voice
+ * at its best. Every principle the earlier generations stated is unchanged, the
+ * deterministic readings are untouched, and no word limit, section identity,
+ * claim ground or validation rule moved.
  */
-export const NATURAL_WRITING_STANDARD_VERSION = 2;
+export const NATURAL_WRITING_STANDARD_VERSION = 3;
 
 /** The character the punctuation rule refuses: never written in client copy. */
 export const EM_DASH_CHARACTER = '\u2014';
@@ -69,7 +76,47 @@ export const NATURAL_SELECTION_RULE = 'THREE OR FOUR THINGS, NOT EVERYTHING: fin
  * register the copy is written in, with the abstract constructions it replaces.
  * The quoted rewrites are illustrations of the movement, never wording to reuse.
  */
-export const NATURAL_ALOUD_RULE = 'SAY IT THE WAY YOU WOULD SAY IT: this copy is an experienced designer explaining the cinema to the client in the room, so anything that would not be said aloud is rewritten. Keep the actor and the action visible (who or what does something, and what the client notices because of it), use concrete subjects and active verbs, and never dress a plain point up as an abstract phrase or let a noun do the work a sentence should do: "the rear row retaining an involving view" is written "the back row still gets a proper view of the screen"; "substantial musical weight" is written "the score has real scale and power"; "preserving each layer\'s character" is written "dialogue stays clear and natural while effects move around the room, so nothing in the mix gets lost"; "making the film\'s setting extend beyond the front wall" is written "the sound reaches out from the screen and surrounds the audience". Avoid the restrained and unnecessarily technical register as well: write the design with the confidence of someone who believes in it, say why each important choice matters to the person watching the film, and explain plainly what the finished cinema gives them, the scale of the picture, movement around and above the audience, the weight of a soundtrack and the pleasure of watching films in this room.';
+export const NATURAL_ALOUD_RULE = 'SAY IT THE WAY YOU WOULD SAY IT: this copy is an experienced designer explaining the cinema to the client in the room, so anything that would not be said aloud is rewritten. Keep the actor and the action visible (who or what does something, and what the client notices because of it), use concrete subjects and active verbs, and never dress a plain point up as an abstract phrase or let a noun do the work a sentence should do. Avoid the restrained and unnecessarily technical register as well: write the design with the confidence of someone who believes in it, say why each important choice matters to the person watching the film, and explain plainly what the finished cinema gives them, the scale of the picture, movement around and above the audience, the weight of a soundtrack and the pleasure of watching films in this room.';
+
+/**
+ * THE APPROVED REFERENCE PASSAGES.
+ *
+ * Short passages of Sound Proof writing at its best, shown to the writer as
+ * EDITORIAL REFERENCES. They demonstrate the natural British English, the
+ * confidence, the sentence rhythm, the professional design reasoning and the
+ * enjoyment of the cinema that the standard asks for, so the register is shown
+ * rather than described.
+ *
+ * They are references and never templates. Their project-specific detail is
+ * never carried into another design, and their wording and their structure are
+ * never required.
+ *
+ * The standard states the principles; these passages show what the principles
+ * produce. NO negative example is carried anywhere: the writer is never handed a
+ * sentence in order to avoid it.
+ */
+export const NATURAL_WRITING_REFERENCE_PASSAGES = Object.freeze([
+  'This dedicated cinema brings the scale and excitement of the big screen into a compact room, with a spectacular projection image providing the centrepiece.',
+  'The loudspeaker arrangement creates a convincing sense of space and movement. Front-wide and surround speakers extend the action beyond the screen, while dedicated overhead loudspeakers bring another dimension to the experience.',
+  'Positioning subwoofers at the front and rear helps manage the room\'s low-frequency behaviour, while providing the depth and impact that make demanding film soundtracks so enjoyable.',
+]);
+
+/**
+ * The reference passages as the writer reads them, as ONE prompt block: the
+ * standard shown at its best, with the two limits that keep them references
+ * rather than templates.
+ *
+ * @returns {string} the block, carried as a single prompt entry
+ */
+export function naturalWritingReferenceBlock() {
+  return [
+    '=== EDITORIAL REFERENCES (the standard, written at its best) ===',
+    'These passages show how Sound Proof writing reads when the standard above is met: confident, natural British English, professional design reasoning, and a clear enjoyment of the cinema being described. Read them for their voice, their rhythm and the way each one reasons about the design.',
+    'They are references and never templates. Never carry their project-specific detail into another design, and never copy their wording or their structure: what they demonstrate is how this project\'s own copy should read, not what it should say.',
+    ...NATURAL_WRITING_REFERENCE_PASSAGES.map((passage) => `- ${passage}`),
+    '',
+  ].join('\n');
+}
 
 /**
  * EXPLAIN THE PRINCIPLE, DO NOT WAIT FOR THE RESULT. An established engineering

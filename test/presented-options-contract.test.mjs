@@ -167,7 +167,7 @@ test('D. a fresh attempt under the corrected contract is written, grounded and i
   assert.match(options.requirement, /identical, unchanged or equivalent acoustic performance/);
   assert.equal(WRITER_SECTIONS.find((entry) => entry.section === 'presented_options').optional_without_guidance, true);
   assert.equal(fresh.prompt_version, WRITER_PROMPT_VERSION);
-  assert.equal(WRITER_PROMPT_VERSION, 'proposal-writer-prompt-26');
+  assert.equal(WRITER_PROMPT_VERSION, 'proposal-writer-prompt-27');
   assert.equal(fresh.contract_version, input.contract_version, 'the contract generation did not move');
 
   // The seating options the designer selected are still presented, and every other
