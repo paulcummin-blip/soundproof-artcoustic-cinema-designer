@@ -16,6 +16,7 @@ import { resolveRp22DesignValue } from "@/components/utils/rp22/resolveRp22Desig
 import { useAuth } from "@/lib/AuthContext";
 import { isMasterAdmin } from "@/lib/accountAccess";
 import { shouldShowDataWarning, shouldShowOpenBackWarning } from "@/components/spl/ComparisonWarnings";
+import ComparisonDataQualitySection from "@/components/spl/ComparisonDataQualitySection";
 import { planCompetitorImport, applyCompetitorImport } from "@/components/utils/spl/competitorSpreadsheetImport";
 import { loadComparisonCandidates } from "@/components/utils/spl/speakerDbComparisonCandidates";
 
@@ -262,7 +263,7 @@ function competitorInfoRows(record, result = null, candidate = null) {
   ];
 }
 
-function SpeakerInfo({ rows, sourceUrl = null, datasheetUrl = null }) {
+function SpeakerInfo({ rows, sourceUrl = null, datasheetUrl = null, dataQuality = null }) {
   const [open, setOpen] = useState(false);
   if (!Array.isArray(rows) || rows.length === 0) return <div />;
   return (
@@ -284,6 +285,7 @@ function SpeakerInfo({ rows, sourceUrl = null, datasheetUrl = null }) {
       {open && (
         <div style={{ position: "absolute", zIndex: 100, right: 0, top: 32, width: 390, maxHeight: 500, overflowY: "auto", background: "#FFF", border: `1px solid ${BRAND.border}`, borderRadius: 12, padding: 14, boxShadow: "0 12px 30px rgba(0,0,0,0.14)", color: BRAND.text }}>
           <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 8 }}>Published / comparison data</div>
+          {dataQuality}
           <div style={{ display: "grid", gap: 0 }}>
             {rows.map(([label, value], idx) => (
               <div key={`${label}-${idx}`} style={{ display: "grid", gridTemplateColumns: "1.15fr 1fr", gap: 10, padding: "6px 0", borderTop: idx === 0 ? 0 : `1px solid ${BRAND.soft}`, fontSize: 11, lineHeight: 1.35 }}>
@@ -824,7 +826,14 @@ export default function SPLCalculatorPage() {
                       <Rp22Pill parameter="P12" level={item?.result?.grades?.p12} subLabel={candidate?.pillLabel} />
                       <Rp22Pill parameter="P13" level={item?.result?.grades?.p13} subLabel={candidate?.pillLabel} />
                       <div style={{ display: "flex", alignItems: "center", justifyContent: "flex-end", gap: 6 }}>
-                        {record && <SpeakerInfo rows={competitorInfoRows(record, item?.result, candidate)} sourceUrl={candidate?.sourceUrl || record.source_url} datasheetUrl={candidate?.datasheetUrl || record.datasheet_url} />}
+                        {record && (
+                          <SpeakerInfo
+                            rows={competitorInfoRows(record, item?.result, candidate)}
+                            sourceUrl={candidate?.sourceUrl || record.source_url}
+                            datasheetUrl={candidate?.datasheetUrl || record.datasheet_url}
+                            dataQuality={<ComparisonDataQualitySection record={record} badgeLabel={candidate?.badgeLabel} />}
+                          />
+                        )}
                         <button type="button" onClick={() => setSelectedCompetitorIds((prev) => prev.filter((_, i) => i !== index))} aria-label="Remove comparison" style={{ border: 0, background: "transparent", cursor: "pointer", color: BRAND.hint, padding: 4 }}><Trash2 size={16} /></button>
                       </div>
                       {compShowDataNote && <div style={{ gridColumn: "4 / 6", fontSize: 11, color: "#7A5C00" }}>Open-back design — installed results vary.</div>}

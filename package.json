@@ -25,7 +25,9 @@
     "test:comparison": "node src/test/_p7-run.mjs test/comparison-persistence.test.mjs",
     "test:proposal-composition": "node src/test/_p7-run.mjs src/test/proposal-image-first-composition.test.mjs",
     "test:proposal-authority": "node --test test/proposal-authority-guardrails.test.mjs",
-    "verify:proposal-authority": "node --test test/proposal-authority-guardrails.test.mjs test/proposal-review-authority.test.mjs test/narrative-steer-wiring.test.mjs test/narrative-priority-authority.test.mjs test/p1-p20-narrative-rules.test.mjs test/client-benefit-writing-standard.test.mjs"
+    "verify:proposal-authority": "node --test test/proposal-authority-guardrails.test.mjs test/proposal-review-authority.test.mjs test/narrative-steer-wiring.test.mjs test/narrative-priority-authority.test.mjs test/p1-p20-narrative-rules.test.mjs test/client-benefit-writing-standard.test.mjs",
+    "tmp:limited-data": "node src/test/_p7-run.mjs src/test/tmp-limited-data-explanation.test.mjs",
+    "tmp:regression": "node --test test/competitor-spreadsheet-import.test.mjs test/competitor-space-normalization.test.mjs test/product-master-authority.test.mjs"
   },
   "dependencies": {
     "@base44/sdk": "^0.8.54",
