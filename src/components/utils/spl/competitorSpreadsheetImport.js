@@ -55,7 +55,7 @@ export function comparisonDataQuality(record, assumptions = []) {
   const ratedPower = positive(record.continuous_power_w) && !/peak|program|recommended/i.test(record.power_rating_type || '');
   const measuredCap = positive(record.published_max_continuous_spl_db_1m);
   const good = record.p12_p13_eligible === true && source && hasSensitivity &&
-    (ratedPower || measuredCap) && assumptions.length === 0 &&
-    record.data_confidence !== 'C' && !record.secondary_evidence;
+    (ratedPower || measuredCap) && !assumptions.some(note => /sensitivity basis/i.test(note)) &&
+    !record.secondary_evidence;
   return good ? 'Good Data' : 'Limited Data';
 }
