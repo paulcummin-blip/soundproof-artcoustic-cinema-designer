@@ -8,8 +8,9 @@
 //
 //   run start                    calculation complete
 //   terminal verdict ready       save started
-//   save completed               publication started
-//   publication completed        UI-ready authority written
+//   save completed               user-terminal (plan saved)
+//   publication started          publication completed
+//   UI-ready authority written
 //   publication retry count
 //
 // WHAT THIS MODULE IS NOT:
@@ -36,6 +37,12 @@ export const RUN_TIMING = Object.freeze({
   TERMINAL_VERDICT_READY: "terminal_verdict_ready",
   SAVE_STARTED: "save_started",
   SAVE_COMPLETED: "save_completed",
+  /**
+   * THE USER-TERMINAL BOUNDARY: the instant the validated plan was saved and the
+   * run became terminal FOR THE DESIGNER. Everything after it — the secondary
+   * recommendation publication — is background work the user never waits for.
+   */
+  USER_TERMINAL: "user_terminal",
   PUBLICATION_STARTED: "publication_started",
   PUBLICATION_COMPLETED: "publication_completed",
   UI_READY_WRITTEN: "ui_ready_written",
@@ -48,6 +55,7 @@ export const RUN_TIMING_LABEL = Object.freeze({
   [RUN_TIMING.TERMINAL_VERDICT_READY]: "Terminal verdict ready",
   [RUN_TIMING.SAVE_STARTED]: "Save started",
   [RUN_TIMING.SAVE_COMPLETED]: "Save completed",
+  [RUN_TIMING.USER_TERMINAL]: "User-terminal (plan saved)",
   [RUN_TIMING.PUBLICATION_STARTED]: "Publication started",
   [RUN_TIMING.PUBLICATION_COMPLETED]: "Publication completed",
   [RUN_TIMING.UI_READY_WRITTEN]: "UI-ready authority written",
@@ -62,6 +70,7 @@ const PERSISTED_FIELD = Object.freeze({
   [RUN_TIMING.TERMINAL_VERDICT_READY]: "terminalVerdictReady",
   [RUN_TIMING.SAVE_STARTED]: "saveStarted",
   [RUN_TIMING.SAVE_COMPLETED]: "saveCompleted",
+  [RUN_TIMING.USER_TERMINAL]: "userTerminalAt",
   [RUN_TIMING.PUBLICATION_STARTED]: "publicationStarted",
   [RUN_TIMING.PUBLICATION_COMPLETED]: "publicationCompleted",
   [RUN_TIMING.UI_READY_WRITTEN]: "uiReadyWritten",
@@ -197,7 +206,12 @@ export function buildPersistedRunTimings(ledger) {
       save: millisecondsBetween(ledger, RUN_TIMING.SAVE_STARTED, RUN_TIMING.SAVE_COMPLETED),
       saveAndPublish: millisecondsBetween(ledger, RUN_TIMING.SAVE_STARTED, RUN_TIMING.PUBLICATION_COMPLETED),
       publication: millisecondsBetween(ledger, RUN_TIMING.PUBLICATION_STARTED, RUN_TIMING.PUBLICATION_COMPLETED),
-      total: millisecondsBetween(ledger, RUN_TIMING.RUN_START, RUN_TIMING.UI_READY_WRITTEN),
+      // What the secondary publication costs AFTER the designer already has the
+      // result. This is the figure that must never appear in the user's wait.
+      publicationAfterTerminal: millisecondsBetween(ledger, RUN_TIMING.USER_TERMINAL, RUN_TIMING.PUBLICATION_COMPLETED),
+      // THE USER'S WAIT: run start → the instant the saved plan made the run
+      // terminal. The publication is deliberately not part of this figure.
+      total: millisecondsBetween(ledger, RUN_TIMING.RUN_START, RUN_TIMING.USER_TERMINAL),
     },
   };
   Object.entries(PERSISTED_FIELD).forEach(([milestone, field]) => {
@@ -252,7 +266,8 @@ export function buildRunTimingRows(source) {
     ["evaluation", "Verdict stage (search)"],
     ["save", "Save"],
     ["publication", "Publication"],
-    ["total", "Total to UI-ready"],
+    ["publicationAfterTerminal", "Publication (after terminal)"],
+    ["total", "Total to terminal (user wait)"],
   ]
     .map(([key, label]) => {
       const value = durationOf(key);

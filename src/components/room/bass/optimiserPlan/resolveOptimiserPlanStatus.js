@@ -188,6 +188,10 @@ export function resolveOptimiserPlanStatus({
       // { status, category, message, publicationError, at }. Null for a run that
       // finished and saved.
       failure: plan.failure || plan.run?.failure || null,
+      // The secondary recommendation publication's own outcome. Diagnostic only:
+      // it never decides this state, and a refused publication is never a failure
+      // of a run whose plan is saved here.
+      recommendationPublication: plan.recommendationPublication || null,
       baselineParity: savedBaselineParity(plan),
       run: plan.run || null,
       planVersion: savedVersion,
@@ -344,6 +348,9 @@ export function resolveOptimiserPlanStatus({
     // A publication the run could not complete travels with the record it belongs
     // to, so the panel states the failure rather than a silent success.
     failure: plan.failure || plan.run?.failure || null,
+    // The secondary recommendation publication's own outcome — diagnostic only,
+    // never a run failure and never a readiness input.
+    recommendationPublication: plan.recommendationPublication || null,
     run: plan.run || null,
     planVersion: savedVersion,
     projectId: plan.projectId || null,

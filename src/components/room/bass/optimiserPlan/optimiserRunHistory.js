@@ -12,7 +12,7 @@
 // most recent few rows per project version. It stores LIFECYCLE FACTS ONLY:
 //
 //   run id · project · version · design/result fingerprints
-//   started · terminal · plan saved · publication started/completed
+//   started · terminal · plan saved · user-terminal · publication started/completed
 //   terminal status · publication status, error and attempt count
 //   the fingerprints the publication wrote · worker calls · runtime breakdown
 //
@@ -103,6 +103,10 @@ export function buildOptimiserRunHistoryRecord({
   resultFingerprint = null,
   startedAt = null,
   terminalAt = null,
+  // The instant the run became terminal FOR THE DESIGNER — the saved plan. It is
+  // never the instant the secondary publication finished: that is a separate
+  // figure, and the two stay separable when a run is diagnosed afterwards.
+  userTerminalAt = null,
   planSavedAt = null,
   publicationStartedAt = null,
   publicationCompletedAt = null,
@@ -128,6 +132,7 @@ export function buildOptimiserRunHistoryRecord({
     result_fingerprint: text(resultFingerprint),
     started_at: text(startedAt),
     terminal_at: text(terminalAt),
+    user_terminal_at: text(userTerminalAt),
     plan_saved_at: text(planSavedAt),
     publication_started_at: text(publicationStartedAt),
     publication_completed_at: text(publicationCompletedAt),
