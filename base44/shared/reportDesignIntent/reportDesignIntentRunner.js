@@ -39,7 +39,7 @@ import {
 } from '../proposalWriter/writerDesignContext.js';
 import { assertWriterInputCarriesNoLiveState } from '../proposalWriter/writerPromptBuilder.js';
 import { callWriterProvider } from '../proposalWriter/writerProvider.js';
-import { validateWriterOutput } from '../proposalWriter/writerOutputValidator.js';
+import { validateWriterOutput, parseWriterOutput } from '../proposalWriter/writerOutputValidator.js';
 import { validatorProvenance } from '../proposalWriter/validatorProvenance.js';
 import { DESIGN_INTENT_SECTION } from './designIntentBrief.js';
 import { buildDesignIntentWriterInput } from './buildDesignIntentWriterInput.js';
@@ -216,13 +216,14 @@ export async function runReportDesignIntent({
 
   // 5. The existing validator, against the exact input the writer was given.
   const validation = validate({ input: writerInput, output: provider.output });
-  // The accepted text is read from the DRAFT THAT WAS VALIDATED. The validator
-  // reports the sections it read — their word counts and the claim IDs they cited —
-  // and hands no prose back, so `validation.output` does not exist and reading the
-  // narrative from it refused a draft that had passed every gate. A validator that
-  // does normalise an output is still honoured first, exactly as the proposal path
-  // reads it.
-  const acceptedDraft = validation?.output ?? provider.output;
+  // The accepted text is read from the DRAFT THAT WAS VALIDATED, parsed exactly as
+  // the validator parsed it (a draft arrives as JSON text, sometimes fenced). The
+  // validator reports the sections it READ — their word counts and citations — and
+  // hands no prose back, so `validation.output` does not exist and reading the
+  // narrative from that field refused a draft that had passed every gate. A
+  // validator that does normalise an output is still honoured first, exactly as the
+  // proposal path reads it.
+  const acceptedDraft = validation?.output ?? parseWriterOutput(provider.output).output;
   const text = validation?.valid === true ? designIntentTextFromOutput(acceptedDraft) : null;
   const provenance = validatorProvenance();
 
