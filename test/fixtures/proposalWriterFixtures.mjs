@@ -63,16 +63,56 @@ const SECTION_CLAIMS = {
   appendix_notes: () => [],
 };
 
-/** A compliant draft: each section states the pack's own claim wording. */
+/**
+ * presented_options is the one section whose copy is conditional. The contract
+ * requires an empty string where the pack supplies no option guidance; where it
+ * does supply guidance the fixture writes its own copy rather than reproducing
+ * the designer's notes.
+ */
+const presentedOptionsText = (input) => (input?.option_guidance?.supplied === true
+  ? 'Each alternative is stated on its own evidence, and this document states every figure once.'
+  : '');
+
+/**
+ * Where every claim a section cites is already stated verbatim in an earlier
+ * section, the section still carries wording of its own: a compliant document
+ * never repeats a sentence, so the same claim is cited again without its
+ * sentence being restated.
+ */
+const SECTION_FALLBACK = {
+  decision_summary: 'The design is introduced here in its own terms.',
+  what_stays_same: 'The arrangement every option shares is stated once in this document.',
+  what_changes: 'The differences the evidence records are stated once in this document.',
+  key_performance_highlights: 'The recorded results are stated once, where they belong.',
+  spatial_resolution: 'The seating and the arrangement are read from the results stated above.',
+  dynamic_range: 'The headroom behind the loud moments is read from the result stated above.',
+  timbre_matching: 'The tonal character of this design is read from the results stated above.',
+  overall_design: 'The design reads as one whole, and every point it rests on is stated once in this document.',
+  appendix_notes: APPENDIX_NOTE,
+};
+
+/**
+ * A compliant draft: each section states the pack's own claim wording, and a
+ * claim's sentence is stated once in the document rather than in every section
+ * that cites it.
+ */
 export function validDraft(input) {
+  const stated = new Set();
   return {
     contract_version: input.contract_version,
     pack_fingerprint: input.evidence_pack.pack_fingerprint,
     sections: WRITER_SECTIONS.map((spec) => {
       const claims = (SECTION_CLAIMS[spec.section] || (() => []))(input).filter(Boolean);
+      const fresh = claims.filter((claim) => claim.statement && !stated.has(claim.statement));
+      for (const claim of fresh) stated.add(claim.statement);
+      const text = fresh.length > 0
+        ? fresh.map((claim) => claim.statement).join(' ')
+        : (spec.section === 'presented_options'
+          ? presentedOptionsText(input)
+          : SECTION_FALLBACK[spec.section] || APPENDIX_NOTE);
       return {
         section: spec.section,
-        text: claims.length > 0 ? claims.map((claim) => claim.statement).join(' ') : APPENDIX_NOTE,
+        text,
         claim_ids: claims.map((claim) => claim.claim_id),
       };
     }),
@@ -145,6 +185,9 @@ export function marqueeDraft(input) {
         text: `${bassNote} ${statementsOf(gain('p14'), credibility)}`.trim(),
         claim_ids: idsOf(p20, gain('p14'), credibility),
       },
+      // The contract asks for presented_options in every draft: an empty string
+      // where the pack carries no option guidance, copy where it does.
+      { section: 'presented_options', text: presentedOptionsText(input), claim_ids: [] },
       { section: 'appendix_notes', text: APPENDIX_NOTE, claim_ids: [] },
     ],
   };
