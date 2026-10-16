@@ -13,6 +13,7 @@ import { layoutVisibilityFilter } from "@/components/report/reportProductsSelect
 import { REPORT_ROUTE } from "@/components/report/reportLibraryContext";
 import { REPORT_UPDATE_PARAM } from "@/components/report/reportActionIntent";
 import ProjectReportButton from "@/components/roomdesigner/reportReadiness/ProjectReportButton";
+import VisualContextNotice from "@/components/report/projectReport/VisualContextNotice";
 import { useProjectReportReadiness } from "@/components/roomdesigner/reportReadiness/useProjectReportReadiness";
 
 // External resource — Artcoustic product CAD files (Dropbox folder).
@@ -207,6 +208,19 @@ export default function RoomDesignerHeader({
           autosaveStatus={autosaveStatus}
           onSaveProject={handleSaveProject}
           disabled={loadState?.phase !== "loaded"}
+        />
+      )}
+
+      {/* BEFORE the Project Report is generated: the images already in this
+          project's Project Library are what the ADI writing draws on. It is
+          information only — it never gates the report, never asks for an upload,
+          and disappears once a report exists for this version. It lives on this
+          screen alone, so it can never reach an exported PDF. */}
+      {effectiveProjectId && reportReadiness?.hasReport !== true && (
+        <VisualContextNotice
+          projectId={effectiveProjectId}
+          versionId={reportVersionId}
+          className="mt-2"
         />
       )}
 

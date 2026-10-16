@@ -38,8 +38,6 @@
  * ever sent anywhere by itself; the caller decides what reaches the provider.
  */
 
-import { proposalEvidenceFingerprint } from '../proposalEvidence/proposalEvidenceBuilder.js';
-
 /** The identity generation of this context. A context from another generation is not read. */
 export const REPORT_VISUAL_CONTEXT_VERSION = 1;
 
@@ -317,16 +315,40 @@ export function buildReportVisualContext({ assets = [], versionId = null, limit 
 }
 
 /**
+ * Deterministic key order, so the same selection always fingerprints identically.
+ * Carried here rather than reached for from another authority, so this module stays
+ * dependency-free and safely importable from a report component in the browser as
+ * well as from a backend function.
+ */
+function canonicalise(value) {
+  if (value === null || value === undefined) return 'null';
+  if (Array.isArray(value)) return `[${value.map(canonicalise).join(',')}]`;
+  if (typeof value === 'object') {
+    const keys = Object.keys(value).sort().filter((key) => value[key] !== undefined);
+    return `{${keys.map((key) => `${JSON.stringify(key)}:${canonicalise(value[key])}`).join(',')}}`;
+  }
+  return JSON.stringify(value);
+}
+
+function fnv1a(text) {
+  let hash = 0x811c9dc5;
+  for (let index = 0; index < text.length; index += 1) {
+    hash ^= text.charCodeAt(index);
+    hash = Math.imul(hash, 0x01000193) >>> 0;
+  }
+  return hash.toString(16).padStart(8, '0');
+}
+
+/**
  * The fingerprint of a chosen selection: every image's own identity, in order,
  * under this context's generation. Built from identities, so it survives a moved
  * or re-signed storage URL and changes the moment the picture itself is replaced,
  * a caption is rewritten, or a different image is chosen.
  */
 export function visualContextFingerprint(images) {
-  const parts = asItems(images)
-    .map((image) => image?.identity || visualImageIdentity(image))
-    .map((identity) => JSON.stringify(identity));
-  return `vc${REPORT_VISUAL_CONTEXT_VERSION}-${proposalEvidenceFingerprint(parts)}`;
+  const identities = asItems(images).map((image) => image?.identity || visualImageIdentity(image));
+  const text = canonicalise(identities);
+  return `vc${REPORT_VISUAL_CONTEXT_VERSION}-${fnv1a(text)}-${text.length.toString(16)}`;
 }
 
 /** The fetch addresses for one call. Runtime only: never stored, never in a fingerprint. */
