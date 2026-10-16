@@ -22,7 +22,9 @@ import { buildProposalEvidence } from '../base44/shared/proposalEvidence/proposa
 import { buildWriterInput } from '../base44/shared/proposalWriter/writerInputBuilder.js';
 import { buildWriterPrompt } from '../base44/shared/proposalWriter/writerPromptBuilder.js';
 import { validateWriterOutput } from '../base44/shared/proposalWriter/writerOutputValidator.js';
-import { WRITER_REJECTION, WRITER_WRITING_RULES } from '../base44/shared/proposalWriter/writerContractSchema.js';
+import {
+  WRITER_PROMPT_VERSION, WRITER_REJECTION, WRITER_WRITING_RULES,
+} from '../base44/shared/proposalWriter/writerContractSchema.js';
 import { DESIGN_STAGE_RULES } from '../base44/shared/proposalWriter/writerDesignStageRules.js';
 import { WRITER_SECTIONS } from '../base44/shared/proposalWriter/writerContractSchema.js';
 import {
@@ -135,15 +137,17 @@ test('B and C. a Great Level 3 and a Good Level 2 primary result read the same w
 });
 
 test('the same rule carries every parameter: spacing, overhead consistency and bass', () => {
+  // P19 is RSP-only: it states one reference-seat result and mints no seat-scope
+  // claim at all, so the bass row is carried by P20 seat-to-seat consistency.
   const pack = packFor({
-    primary: { p5: 'L2', p10: 'L3', p19: 'L4' },
-    secondary: { p5: 'L1', p10: 'L1', p19: 'L1' },
+    primary: { p5: 'L2', p10: 'L3', p20: 'L4' },
+    secondary: { p5: 'L1', p10: 'L1', p20: 'L1' },
   });
 
   const expected = [
     ['p5', 'Good spacing across the primary seats.'],
     ['p10', 'Great overhead consistency across the primary seats.'],
-    ['p19', 'Excellent bass consistency across the primary seats.'],
+    ['p20', 'Excellent bass consistency across the primary seats.'],
   ].map(([area, sentence]) => {
     const claim = scopedOf(pack, area).find((entry) => entry.scope === 'primary');
     assert.ok(claim, `${area} states a primary-seat result: ${JSON.stringify(scopedOf(pack, area).map((e) => e.claim_id))}`);
@@ -285,15 +289,17 @@ test('the proposal prompt sells scoped strengths and asks for no design-stage ca
 /* ── G: the scoped claim is the sentence the copy writes ───────────────────── */
 
 test('G. each scoped claim states its own parameter as a client sentence', () => {
+  // P19 (reference-seat bass response) is RSP-only and carries no seat-scope
+  // claim; the bass sentence is the P20 consistency claim that does.
   const pack = packFor({
-    primary: { p5: 'L2', p10: 'L3', p19: 'L4' },
-    secondary: { p5: 'L1', p10: 'L1', p19: 'L1' },
+    primary: { p5: 'L2', p10: 'L3', p20: 'L4' },
+    secondary: { p5: 'L1', p10: 'L1', p20: 'L1' },
   });
 
   const expected = {
     p5: 'Speaker spacing is good across the primary seats, supporting clear movement between the screen and side channels.',
     p10: 'Overhead level consistency is great across the primary seats, helping the height layer remain balanced across the main listening positions.',
-    p19: 'Bass response is excellent across the primary seats.',
+    p20: 'Bass consistency is excellent across the primary seats.',
   };
 
   for (const [area, sentence] of Object.entries(expected)) {

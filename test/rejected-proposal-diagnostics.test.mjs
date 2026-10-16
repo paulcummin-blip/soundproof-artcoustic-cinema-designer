@@ -61,19 +61,23 @@ const OPTION_GUIDANCE = {
 
 /**
  * The rejected draft the Genesis attempt produced: the Presented Options section
- * states a result drawn from the pack's own evidence and grounds nothing at all,
- * so the validator reports missing_claim_id in presented_options.
+ * states a result in the headroom the pack's own evidence records, and grounds
+ * nothing at all, so the validator reports missing_claim_id in presented_options.
+ *
+ * The offending copy is the writer's own single sentence rather than a sentence
+ * copied out of the pack: the document states each recorded sentence once, so a
+ * copied one would be refused twice over — as ungrounded copy AND as a repeated
+ * sentence — and the attempt under test is the ungrounded one alone.
  *
  * @returns {{draft: Object, sentence: string}} the draft and the sentence it states
  */
 function ungroundedOptionsDraft(input) {
   const draft = validDraft(input);
+  const sentence = 'More front-stage headroom is available in this arrangement.';
   const target = draft.sections.find((entry) => entry.section === 'presented_options');
-  const claim = input.allowed_claims.find((entry) => entry.kind === 'material_gain')
-    || input.allowed_claims[0];
-  target.text = claim.statement;
+  target.text = sentence;
   target.claim_ids = [];
-  return { draft, sentence: claim.statement };
+  return { draft, sentence };
 }
 
 /**

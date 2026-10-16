@@ -70,7 +70,10 @@ const SECTION_CLAIMS = {
  * the designer's notes.
  */
 const presentedOptionsText = (input) => (input?.option_guidance?.supplied === true
-  ? 'Each alternative is stated on its own evidence, and this document states every figure once.'
+  // The writer's own prose for the alternatives the designer stated. It names
+  // the seating the guidance supplies, asserts no result of any kind, and so
+  // needs no claim of its own.
+  ? 'Seating can be arranged as a relaxed sofa or as individual cinema recliners.'
   : '');
 
 /**
