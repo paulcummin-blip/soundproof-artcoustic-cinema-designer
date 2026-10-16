@@ -104,7 +104,11 @@ export default function AdiEngineerDetailsPanel({
   const checked = adiTestedSummaryLines(rows);
   const p19 = lowFrequency?.p19 || null;
   const p20Pair = p20PairText(lowFrequency?.p20Before, lowFrequency?.p20After);
+  // The limiting region, already resolved by the ONE limiting-frequency
+  // authority: a real frequency, or the Not-identified statement. "0 Hz" is
+  // impossible here — the value was never a frequency to begin with.
   const limiting = lowFrequency?.limiting || null;
+  const limitingIdentified = lowFrequency?.limitingIdentified === true;
   const hasLowFrequency = Boolean(p19 || p20Pair || limiting);
 
   return (
@@ -131,7 +135,11 @@ export default function AdiEngineerDetailsPanel({
           <div className={GROUP_TITLE_CLASS}>Low-frequency result</div>
           {p19 && <div className={LINE_CLASS}>P19: {p19}</div>}
           {p20Pair && <div className={LINE_CLASS}>P20: {p20Pair}</div>}
-          {limiting && <div className={LINE_CLASS}>Limiting region: Approximately {limiting}</div>}
+          {limiting && (
+            <div className={LINE_CLASS}>
+              Limiting region: {limitingIdentified ? `Approximately ${limiting}` : limiting}
+            </div>
+          )}
         </div>
       )}
 

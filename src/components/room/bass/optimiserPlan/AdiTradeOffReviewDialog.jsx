@@ -18,6 +18,7 @@
 import React from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import AdiTradeOffDecisionSummary from "./AdiTradeOffDecisionSummary.jsx";
+import AdiAppliedStateLine from "./AdiAppliedStateLine.jsx";
 import {
   TRADE_OFF_ACTIONS,
   TRADE_OFF_DIRECTION,
@@ -70,6 +71,11 @@ function GroupRows({ group, rows }) {
 export default function AdiTradeOffReviewDialog({
   open = false,
   tradeOff = null,
+  // THE ONE RESULT. The seat the change costs, the exact amount it loses and
+  // whether the change is held or applied are read from the view model when it
+  // is present, so this review can never name a different seat, a different
+  // amount or a different applied state from the card that opened it.
+  resultModel = null,
   onOpenChange = null,
   onApply = null,
   onKeep = null,
@@ -78,10 +84,12 @@ export default function AdiTradeOffReviewDialog({
 }) {
   if (!tradeOff) return null;
   const rows = Array.isArray(tradeOff.rows) ? tradeOff.rows : [];
-  const seatLabel = tradeOff.seat?.label || null;
+  const seatLabel = resultModel?.affectedSeat?.label || tradeOff.seat?.label || null;
   // The exact amount the affected seat loses — the same figure the give-up block
   // states, used to make the Apply sentence explicit.
-  const amountText = tradeOff.amountText || null;
+  const amountText = resultModel?.affectedSeatRegression?.amountText
+    || tradeOff.amountText
+    || null;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -101,6 +109,12 @@ export default function AdiTradeOffReviewDialog({
             giveUp={tradeOff.giveUp}
             protectedMetric={tradeOff.protectedMetric}
           />
+
+          {/* HELD / APPLIED — the persisted terminal decision, in the same words
+              every other surface states it. This review never applies anything
+              of its own: the deliberate Apply below calls the existing lever
+              apply path. */}
+          <AdiAppliedStateLine resultModel={resultModel} />
 
           {tradeOff.adjustment && (
             <div className="text-[13px] font-semibold text-[#1B1A1A]" data-adi-trade-off-adjustment="true">

@@ -836,6 +836,7 @@ export default function AdiOptimisationJourney({
         {tradeOffActive && (
           <AdiTradeOffActions
             tradeOff={tradeOff}
+            resultModel={resultModel}
             onApply={handleApplyTradeOff}
             applyBusy={tradeOffApplyBusy}
             onKeep={onKeepTradeOff}
@@ -863,6 +864,7 @@ export default function AdiOptimisationJourney({
         {improvementReviewActive && (
           <AdiImprovementActions
             result={improvementResult}
+            resultModel={resultModel}
             onApply={handleApplyRecommended}
             onKeep={() => ignoreOptimiserRecommendation(ignoreKey)}
             applyBusy={isRunning}

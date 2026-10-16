@@ -63,6 +63,12 @@ import {
 import { PLACEMENT_KIND } from "./placementRecommendationAuthority.js";
 import { CALIBRATION_APPLY_DECISION } from "../optimiseWorkflow/adiCalibrationAutoApplyAuthority.js";
 import { readRecordedSeatRegression } from "./optimiserTradeOffState.js";
+import {
+  EVIDENCE_SCOPE,
+  HISTORICAL_EVIDENCE_LABEL,
+  scopeCandidateEvidence,
+  scopeOptimiserEvidence,
+} from "./optimiserResultIdentity.js";
 
 /**
  * WHAT THE RESULT IS. Exactly one of these describes any terminated run, so a
@@ -335,9 +341,30 @@ export function buildOptimiserResultViewModel({
   const planStatus = planView?.status || OPTIMISER_PLAN_STATUS.ABSENT;
   const presentationState = presentation?.state || null;
   const decision = planView?.calibrationDecision || planView?.decision || null;
-  const stale = planStatus === OPTIMISER_PLAN_STATUS.STALE || presentationState === "stale";
   const failed = planStatus === OPTIMISER_PLAN_STATUS.FAILED || presentationState === "failed";
   const hasEvidence = Boolean(planView && (planView.recordKind || planView.run || planView.candidateId || planView.levers));
+
+  // ── ONE FULL RESULT IDENTITY ──
+  // The identity the ACTIVE TERMINAL RESULT must carry: the open project, the
+  // open version, the run the panel is describing, the design it was evaluated
+  // on, and the published bass result it belongs to. Evidence that declares a
+  // different one is HISTORICAL — it may exist as diagnostics, but it is never
+  // presented as this design's current result, and no candidate value from it
+  // (P14 above all) is ever stated as current or proposed.
+  const publishedResultFingerprint = completedBassAuthority?.contract?.job?.resultFingerprint || null;
+  const activeResultIdentity = {
+    projectId: identity?.projectId ?? planView?.projectId ?? null,
+    versionId: identity?.versionId ?? planView?.versionId ?? null,
+    runId: identity?.runId ?? planView?.run?.runId ?? null,
+    designFingerprint: planView?.designFingerprint ?? null,
+    resultFingerprint: publishedResultFingerprint ?? planView?.resultFingerprint ?? null,
+  };
+  const resultScope = scopeOptimiserEvidence({ evidence: planView, active: activeResultIdentity });
+  const identityMismatch = resultScope.scope === EVIDENCE_SCOPE.HISTORICAL;
+
+  const stale = planStatus === OPTIMISER_PLAN_STATUS.STALE
+    || presentationState === "stale"
+    || identityMismatch;
 
   // The current-P20 authority is resolved ONCE per render: a caller that has
   // already resolved it (the card, for its placement gate) passes it in, so the
@@ -368,8 +395,27 @@ export function buildOptimiserResultViewModel({
   const current = hasEvidence
     ? buildCurrentSide({ completedBassAuthority, currentP20: resolvedCurrentP20, planView, readers })
     : null;
-  const proposed = hasEvidence ? buildProposedSide({ decision, winner }) : null;
+  // A candidate may only be shown as PROPOSED while the result really belongs to
+  // the design in front of the designer. A stale or identity-mismatched result
+  // states NO candidate value at all — a proposed P14 capability above all.
+  const proposed = hasEvidence && !stale ? buildProposedSide({ decision, winner }) : null;
   const seat = affectedSeat({ decision, tradeOffState });
+
+  // ── THE ONE CURRENT WINNER, AND EVERY OTHER CANDIDATE'S SCOPE ──
+  // A candidate block is only ever part of the current result when it belongs to
+  // this run AND describes this run's winner. Anything else is historical /
+  // alternative-tested evidence, and is labelled as such.
+  const winnerId = winner?.candidateId || planView?.candidateId || null;
+  const candidateEvidence = {
+    winnerId,
+    combined: planView?.combined
+      ? scopeCandidateEvidence({
+        evidence: planView.combined,
+        active: activeResultIdentity,
+        winnerId,
+      })
+      : null,
+  };
 
   const isTradeOff = stale ? false : (
     tradeOffState?.isTradeOff === true
@@ -431,6 +477,22 @@ export function buildOptimiserResultViewModel({
     failed,
     hasTerminalRun: hasEvidence && !stale,
 
+    // ── the one full result identity ──
+    // Every surface that needs to know whether a piece of evidence belongs to
+    // the current result reads THIS, never its own comparison.
+    identity: {
+      projectId: activeResultIdentity.projectId,
+      versionId: activeResultIdentity.versionId,
+      runId: activeResultIdentity.runId,
+      designFingerprint: activeResultIdentity.designFingerprint,
+      resultFingerprint: activeResultIdentity.resultFingerprint,
+      scope: resultScope.scope,
+      isCurrent: resultScope.isCurrent,
+      mismatchedFields: resultScope.mismatchedFields,
+      comparedFields: resultScope.comparedFields,
+      evidenceLabel: resultScope.isCurrent ? null : HISTORICAL_EVIDENCE_LABEL,
+    },
+
     // ── the one decision ──
     decisionType,
     appliedState,
@@ -469,7 +531,10 @@ export function buildOptimiserResultViewModel({
     physicalRecommendation: physical,
 
     // ── supporting alternatives, never the best result ──
-    otherUsefulOptions: hasEvidence ? otherUsefulOptions({ planView, winner }) : [],
+    otherUsefulOptions: hasEvidence && !stale ? otherUsefulOptions({ planView, winner }) : [],
+
+    // ── every candidate block's OWN scope ──
+    candidateEvidence,
 
     // ── displayed pairs, from displayed endpoints ──
     comparison: {

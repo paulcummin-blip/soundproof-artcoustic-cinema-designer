@@ -20,6 +20,9 @@ const KEEP_SECONDARY_CLASS = "inline-flex items-center gap-1.5 rounded-md border
 
 export default function AdiImprovementActions({
   result = null,
+  // The one result view model: the review states the current/proposed pair and
+  // the applied state from it, so the review cannot disagree with the card.
+  resultModel = null,
   onApply = null,
   onKeep = null,
   applyBusy = false,
@@ -56,6 +59,7 @@ export default function AdiImprovementActions({
         open={reviewOpen}
         onOpenChange={setReviewOpen}
         result={result}
+        resultModel={resultModel}
         onApply={onApply}
         onKeep={onKeep}
         applyBusy={applyBusy}

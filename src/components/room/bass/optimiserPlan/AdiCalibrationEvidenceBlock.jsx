@@ -35,7 +35,16 @@ function Row({ label, text, scope }) {
   );
 }
 
-export default function AdiCalibrationEvidenceBlock({ evidence = null, className = "" }) {
+export default function AdiCalibrationEvidenceBlock({
+  evidence = null,
+  // THE ONE CURRENT WINNER and the active result identity, so the combined
+  // calibration block beside these lines can scope itself: a combined result
+  // from an earlier run, or one describing a different candidate, is stated as
+  // an alternative that was tested — never as a second current result.
+  winnerId = null,
+  activeIdentity = null,
+  className = "",
+}) {
   const rows = CALIBRATION_EVIDENCE_LEVERS
     .map((key) => calibrationEvidenceFor(evidence, key))
     .filter(Boolean)
@@ -71,7 +80,12 @@ export default function AdiCalibrationEvidenceBlock({ evidence = null, className
 
       {/* The combined calibration result beside the isolated levers, with every
           confirmed calibration result and the decision taken on it. */}
-      <AdiCombinedCalibrationEvidence evidence={evidence} className="pt-0.5" />
+      <AdiCombinedCalibrationEvidence
+        evidence={evidence}
+        winnerId={winnerId}
+        activeIdentity={activeIdentity}
+        className="pt-0.5"
+      />
     </div>
   );
 }

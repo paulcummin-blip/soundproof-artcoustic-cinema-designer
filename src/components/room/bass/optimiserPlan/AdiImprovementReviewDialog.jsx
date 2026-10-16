@@ -19,6 +19,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { IMPROVEMENT_COPY } from "./improvementResultAuthority.js";
+import AdiAppliedStateLine from "./AdiAppliedStateLine.jsx";
 
 const BUTTON_PRIMARY = "inline-flex items-center rounded-md bg-[#213428] px-5 py-2.5 text-[13px] font-semibold text-white transition-colors hover:bg-[#3E4349]";
 const BUTTON_SECONDARY = "inline-flex items-center rounded-md border border-[#D9D5CE] bg-white px-5 py-2.5 text-[13px] font-semibold text-[#213428] transition-colors hover:border-[#213428]";
@@ -37,12 +38,24 @@ export default function AdiImprovementReviewDialog({
   open = false,
   onOpenChange = null,
   result = null,
+  // THE ONE RESULT. The current and proposed values and the applied state are
+  // read from the view model when it is present: the review states the PUBLISHED
+  // current result and the EVALUATED candidate, each labelled, and never the
+  // candidate on its own. A stale or identity-mismatched result carries no
+  // proposed values at all, so the review states no candidate figure.
+  resultModel = null,
   onApply = null,
   onKeep = null,
   applyBusy = false,
   className = "",
 }) {
   if (!result?.found) return null;
+
+  const proposedP20 = resultModel?.proposed?.p20?.text || null;
+  const proposedP19 = resultModel?.proposed?.p19?.text || null;
+  const proposedP14 = resultModel?.proposed?.p14?.text || null;
+  const currentP20 = resultModel?.current?.p20?.text || null;
+  const currentP14 = resultModel?.current?.p14?.text || null;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -62,16 +75,28 @@ export default function AdiImprovementReviewDialog({
           <div className="space-y-1.5 rounded-md border border-[#E7E5E0] bg-[#FBFBF9] px-3 py-2.5">
             <Row label="RESULT" value={result.result?.line} />
             <Row
-              label={result.p20?.title || IMPROVEMENT_COPY.P20_TITLE}
-              value={result.p20?.text}
+              label={proposedP20 ? "PROPOSED P20" : (result.p20?.title || IMPROVEMENT_COPY.P20_TITLE)}
+              value={proposedP20 || result.p20?.text}
               emphasis
             />
-            <Row label={result.p19?.title || IMPROVEMENT_COPY.P19_TITLE} value={result.p19?.text} />
+            <Row
+              label={proposedP19 ? "PROPOSED P19" : (result.p19?.title || IMPROVEMENT_COPY.P19_TITLE)}
+              value={proposedP19 || result.p19?.text}
+            />
+            {/* The candidate's capability figure is only ever stated as the
+                candidate's — never as the design's current capability. */}
+            <Row label="PROPOSED P14" value={proposedP14} />
+            <Row label="CURRENT (PUBLISHED RESULT)" value={currentP20} />
+            <Row label="CURRENT P14 (PUBLISHED RESULT)" value={currentP14} />
             <Row label={result.seats?.title || IMPROVEMENT_COPY.SEATS_TITLE} value={result.seats?.text} />
             {result.p20?.scope && (
               <p className="pt-0.5 text-[11px] text-[#625143] leading-relaxed">{result.p20.scope}</p>
             )}
           </div>
+
+          {/* HELD / APPLIED — the persisted terminal decision, in the same words
+              every other surface states it. */}
+          <AdiAppliedStateLine resultModel={resultModel} />
 
           {/* The candidate behind the change, so the designer knows what they are
               approving. Stated only when the run recorded it. */}

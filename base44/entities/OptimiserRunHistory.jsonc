@@ -1,0 +1,264 @@
+{
+  "name": "OptimiserRunHistory",
+  "type": "object",
+  "description": "One durable diagnostic record per Bass Optimiser run, appended when the run reaches its terminal state. It exists so a run that behaved badly in production can be diagnosed afterwards from the database instead of reconstructed from a console log: when the plan was ready, when its publication started and finished, what the terminal status and publication status were, the publication error if one occurred, how many attempts that took and which fingerprints were written. It deliberately carries NO candidate payloads, no per-seat results, no curves and no ranking evidence - those stay on the run's own saved record (design_state.optimiser_plan) and on the published recommendation. This is a lifecycle log, not a second result authority: nothing in it may be read as a current engineering value, and it never decides readiness of anything. Records are append-only per run; the most recent few runs per project version are retained and older rows are pruned.",
+  "properties": {
+    "run_id": {
+      "type": "string",
+      "description": "The run's own identity, minted when the run started (optimiserRunAuthority). One row per run id."
+    },
+    "project_id": {
+      "type": "string",
+      "description": "Project identifier the run was made for."
+    },
+    "version_id": {
+      "type": "string",
+      "description": "ProjectVersion identifier the run was made for."
+    },
+    "account_id": {
+      "type": "string",
+      "nullable": true,
+      "description": "Denormalized account_id from the parent Project, used for RLS. Absent (never fabricated) when the owning project has no account."
+    },
+    "design_fingerprint": {
+      "type": "string",
+      "nullable": true,
+      "description": "The design fingerprint the run evaluated (the full calibration/cache key)."
+    },
+    "result_fingerprint": {
+      "type": "string",
+      "nullable": true,
+      "description": "The published bass result fingerprint the run evaluated against."
+    },
+    "started_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "When the run started (the run's own minted start time)."
+    },
+    "terminal_at": {
+      "type": "string",
+      "format": "date-time",
+      "nullable": true,
+      "description": "When the run reached its terminal state."
+    },
+    "plan_saved_at": {
+      "type": "string",
+      "format": "date-time",
+      "nullable": true,
+      "description": "When the evaluated plan/evidence was written to the version's design_state."
+    },
+    "publication_started_at": {
+      "type": "string",
+      "format": "date-time",
+      "nullable": true,
+      "description": "When the recommendation publication was started."
+    },
+    "publication_completed_at": {
+      "type": "string",
+      "format": "date-time",
+      "nullable": true,
+      "description": "When the recommendation publication finished (successfully or not)."
+    },
+    "terminal_status": {
+      "type": "string",
+      "description": "How the run ended: actionable_plan, no_useful_improvement, evaluation_incomplete, failed, blocked, or publication_failed."
+    },
+    "publication_status": {
+      "type": "string",
+      "nullable": true,
+      "description": "What became of the recommendation publication: published, refused, snapshot_missing, not_attempted or not_applicable."
+    },
+    "publication_error": {
+      "type": "string",
+      "nullable": true,
+      "description": "The publication failure verbatim, when the publication did not succeed."
+    },
+    "publication_attempt_count": {
+      "type": "number",
+      "default": 0,
+      "description": "How many write attempts the publication needed before it succeeded or was reported. 0 = no write was attempted."
+    },
+    "fingerprints_published": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "default": [],
+      "description": "The exact snapshot fingerprints the publication wrote (one entry per fingerprint actually written). Diagnostic identity only."
+    },
+    "worker_calls": {
+      "type": "object",
+      "nullable": true,
+      "description": "The run's own worker/job call counts, when the engine published them. Measurement only; absent when the run did not record them."
+    },
+    "runtime_breakdown": {
+      "type": "array",
+      "description": "The run's measured runtime cost, in the budget's named stages (electronic search vs physical/seating advisory work), as compact rows. Measurement only.",
+      "items": {
+        "type": "object"
+      },
+      "default": []
+    }
+  },
+  "required": [
+    "run_id",
+    "project_id",
+    "version_id",
+    "started_at",
+    "terminal_status"
+  ],
+  "rls": {
+    "read": {
+      "$or": [
+        {
+          "$and": [
+            {
+              "data.account_id": "{{user.data.account_id}}"
+            },
+            {
+              "data.account_id": {
+                "$nin": [
+                  null,
+                  ""
+                ]
+              }
+            },
+            {
+              "$or": [
+                {
+                  "user_condition": {
+                    "data.access_level": "FULL_ACCESS"
+                  }
+                },
+                {
+                  "user_condition": {
+                    "data.access_level": "SOUND_PROOF_ONLY"
+                  }
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        }
+      ]
+    },
+    "create": {
+      "$or": [
+        {
+          "$and": [
+            {
+              "data.account_id": "{{user.data.account_id}}"
+            },
+            {
+              "data.account_id": {
+                "$nin": [
+                  null,
+                  ""
+                ]
+              }
+            },
+            {
+              "$or": [
+                {
+                  "user_condition": {
+                    "data.access_level": "FULL_ACCESS"
+                  }
+                },
+                {
+                  "user_condition": {
+                    "data.access_level": "SOUND_PROOF_ONLY"
+                  }
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        }
+      ]
+    },
+    "update": {
+      "$or": [
+        {
+          "$and": [
+            {
+              "data.account_id": "{{user.data.account_id}}"
+            },
+            {
+              "data.account_id": {
+                "$nin": [
+                  null,
+                  ""
+                ]
+              }
+            },
+            {
+              "$or": [
+                {
+                  "user_condition": {
+                    "data.access_level": "FULL_ACCESS"
+                  }
+                },
+                {
+                  "user_condition": {
+                    "data.access_level": "SOUND_PROOF_ONLY"
+                  }
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        }
+      ]
+    },
+    "delete": {
+      "$or": [
+        {
+          "$and": [
+            {
+              "data.account_id": "{{user.data.account_id}}"
+            },
+            {
+              "data.account_id": {
+                "$nin": [
+                  null,
+                  ""
+                ]
+              }
+            },
+            {
+              "$or": [
+                {
+                  "user_condition": {
+                    "data.access_level": "FULL_ACCESS"
+                  }
+                },
+                {
+                  "user_condition": {
+                    "data.access_level": "SOUND_PROOF_ONLY"
+                  }
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        }
+      ]
+    }
+  }
+}

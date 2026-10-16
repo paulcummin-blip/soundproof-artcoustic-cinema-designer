@@ -48,8 +48,13 @@ export function buildOptimiserOtherOptions({
   planView = null,
   summary = null,
   running = false,
+  // The one result view model, so these options can only ever come from the
+  // CURRENT terminal result: an identity-mismatched record offers nothing, and
+  // the option that IS the decision is never repeated.
+  resultModel = null,
 } = {}) {
   if (running || !summary) return [];
+  if (resultModel && resultModel.identity?.isCurrent === false) return [];
 
   const levers = Array.isArray(planView?.levers) ? planView.levers : [];
   const leverRow = (key) => levers.find((row) => (row?.key ?? row?.lever) === key) || null;
@@ -77,6 +82,9 @@ export function buildOptimiserOtherOptions({
         evaluatedDeviation ? `Evaluated result: P20 ${evaluatedDeviation}` : null,
         shortPhrase(seating?.reason || seatingRow?.reason, 140),
       ].filter(Boolean),
+      // Every option is current-result evidence, and none of them is the winner.
+      scope: "current",
+      isWinner: false,
     });
   }
 
@@ -91,6 +99,8 @@ export function buildOptimiserOtherOptions({
       headline: absorption.reason,
       support: OTHER_OPTION_SUPPORT.TREATMENT,
       detail: [absorption.location || null].filter(Boolean),
+      scope: "current",
+      isWinner: false,
     });
   }
 

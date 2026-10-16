@@ -23,6 +23,17 @@ import {
   formatCalibrationComposition,
   calibrationValuePairText,
 } from "./bestCalibrationResult.js";
+import { EVIDENCE_SCOPE, isWinningCandidate, scopeCandidateEvidence } from "./optimiserResultIdentity.js";
+
+/** The one title the combined block carries while it IS the current result. */
+export const COMBINED_CALIBRATION_TITLE = "Combined calibration";
+
+/**
+ * The one label a combined result that is NOT the terminal winner — or that
+ * belongs to an earlier run — is stated with. It is a tested alternative, never
+ * a second current winner.
+ */
+export const ALTERNATIVE_TESTED_LABEL = "Alternative tested";
 
 /** "Applied" / "Held" / the run's own outcome word, as the decision recorded it. */
 function outcomeWord(entry) {
@@ -41,12 +52,24 @@ function Line({ label, text, scope }) {
   );
 }
 
-export default function AdiCombinedCalibrationEvidence({ evidence = null, className = "" }) {
+export default function AdiCombinedCalibrationEvidence({
+  evidence = null,
+  // THE ONE CURRENT WINNER, and the identity of the active terminal result. A
+  // combined result that belongs to a different run — or describes a different
+  // candidate from that winner — is never shown as a parallel current-result
+  // section: it is stated as an alternative that was tested.
+  winnerId = null,
+  activeIdentity = null,
+  className = "",
+}) {
   const combined = combinedCalibrationEvidence(evidence);
   const decisions = Array.isArray(evidence?.candidateDecisions) ? evidence.candidateDecisions : [];
   if (!combined && decisions.length === 0) return null;
 
   const retained = combined?.evidenceStatus === CALIBRATION_EVIDENCE_STATUS.RETAINED;
+  const combinedScope = scopeCandidateEvidence({ evidence: combined, active: activeIdentity, winnerId });
+  const combinedIsWinner = combinedScope.scope === EVIDENCE_SCOPE.CURRENT
+    && combinedScope.isWinner !== false;
   const composition = combined ? formatCalibrationComposition(
     [
       combined.bestCandidate?.phaseRetuned === true ? "phase" : null,
@@ -59,11 +82,16 @@ export default function AdiCombinedCalibrationEvidence({ evidence = null, classN
     <div className={`space-y-0.5 ${className}`} data-adi-combined-calibration-evidence="true">
       {retained ? (
         <>
-          <div className="text-[10px] font-semibold uppercase tracking-wide text-[#8A7B6A]">
-            Combined calibration
+          <div
+            className="text-[10px] font-semibold uppercase tracking-wide text-[#8A7B6A]"
+            {...(combinedIsWinner
+              ? { "data-adi-combined-calibration-title": "true" }
+              : { "data-adi-alternative-tested": "true" })}
+          >
+            {combinedIsWinner ? COMBINED_CALIBRATION_TITLE : ALTERNATIVE_TESTED_LABEL}
           </div>
           <Line
-            label={composition || combined.label || "Combined calibration"}
+            label={composition || combined.label || COMBINED_CALIBRATION_TITLE}
             text={[
               describeCombinedCalibration(combined) || null,
               combined.bestCandidate?.candidateId || "candidate id not recorded",
@@ -81,10 +109,17 @@ export default function AdiCombinedCalibrationEvidence({ evidence = null, classN
             const record = entry?.decisionRecord || null;
             const values = calibrationValuePairText(record?.before, record?.after);
             const key = `${entry?.lever || "result"}:${entry?.candidateId || index}`;
+            // ONE CURRENT WINNER: a confirmed result that is not the terminal
+            // winner keeps its evidence but is named an alternative that was
+            // tested — it is never left to read as a second current result.
+            const entryWinner = isWinningCandidate({ candidateId: entry?.candidateId, winnerId });
             return (
               <div key={key} className="text-[11px] leading-relaxed" data-adi-calibration-candidate-decision={outcomeWord(entry)}>
                 <span className="text-[#1B1A1A]">{entry?.candidateId || "candidate id not recorded"}</span>
                 <span className="text-[#8A7B6A]"> · {entry?.lever || "result"} · {outcomeWord(entry)}</span>
+                {entryWinner === false ? (
+                  <span className="text-[#8A7B6A]"> · {ALTERNATIVE_TESTED_LABEL}</span>
+                ) : null}
                 {values ? <span className="text-[#3E4349]"> · {values}</span> : null}
                 {entry?.reason ? <span className="text-[#8A7B6A]"> · {entry.reason}</span> : null}
                 {entry?.statement ? <span className="text-[#625143]"> · {entry.statement}</span> : null}

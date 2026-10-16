@@ -18,8 +18,9 @@
 // maths, no P19/P20 definition, no materiality rule and no saved evidence.
 // ---------------------------------------------------------------------------
 
-import { deviationText, frequencyText, levelText } from "./optimiserWholeNumberDb.js";
+import { deviationText, levelText } from "./optimiserWholeNumberDb.js";
 import { buildOptimiserOtherOptions } from "./optimiserOtherOptions.js";
+import { resolveLimitingFrequency } from "./optimiserLimitingFrequency.js";
 
 /**
  * THE LOW-FREQUENCY RESULT — the three facts the decision rests on, in the
@@ -32,16 +33,34 @@ import { buildOptimiserOtherOptions } from "./optimiserOtherOptions.js";
  * @param {object|null} params.recommendedRow - the evaluated row behind the
  *   change being offered (its effect carries the proposed P20)
  */
-export function buildLowFrequencyResult({ calibrationDecision = null, p20Headline = null, recommendedRow = null } = {}) {
+export function buildLowFrequencyResult({
+  calibrationDecision = null,
+  p20Headline = null,
+  recommendedRow = null,
+  // THE ONE LIMITING FREQUENCY. When the caller already holds the result view
+  // model's resolved value, that value is used verbatim — so this block can
+  // never state a different frequency from the card. Without it the same ONE
+  // authority (resolveLimitingFrequency) is applied here, which is why "0 Hz"
+  // is impossible on this path: a value that is not a frequency is stated as
+  // Not identified.
+  limitingFrequency = null,
+} = {}) {
   const before = levelText(calibrationDecision?.before?.p19?.level);
   const after = levelText(calibrationDecision?.after?.p19?.level);
+  const frequency = limitingFrequency
+    ? resolveLimitingFrequency(limitingFrequency.hz ?? null)
+    : resolveLimitingFrequency(p20Headline?.worstFrequencyHz ?? null);
   return {
     p19: before && after
       ? (before === after ? `Unchanged · ${after}` : `${before} → ${after}`)
       : (after || before || null),
     p20Before: deviationText(p20Headline?.variationDb),
     p20After: deviationText(recommendedRow?.effect?.p20VariationDb),
-    limiting: frequencyText(p20Headline?.worstFrequencyHz),
+    limiting: frequency.text,
+    // Whether that text is a real frequency or the Not-identified statement, so
+    // a surface states "Approximately 95 Hz" or "Not identified" — never
+    // "Approximately Not identified".
+    limitingIdentified: frequency.identified === true,
   };
 }
 
@@ -56,9 +75,18 @@ export function buildOptimiserPanelHierarchy({
   p20Headline = null,
   recommendedRow = null,
   running = false,
+  // The result view model, and the limiting frequency it resolved. Both are read
+  // so this level states nothing the card does not.
+  resultModel = null,
+  limitingFrequency = null,
 } = {}) {
   return {
-    otherOptions: buildOptimiserOtherOptions({ planView, summary, running }),
-    lowFrequency: buildLowFrequencyResult({ calibrationDecision, p20Headline, recommendedRow }),
+    otherOptions: buildOptimiserOtherOptions({ planView, summary, running, resultModel }),
+    lowFrequency: buildLowFrequencyResult({
+      calibrationDecision,
+      p20Headline,
+      recommendedRow,
+      limitingFrequency,
+    }),
   };
 }

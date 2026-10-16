@@ -26,6 +26,9 @@ const BUTTON_SECONDARY = "inline-flex items-center gap-1.5 rounded-md border bor
 
 export default function AdiTradeOffActions({
   tradeOff = null,
+  // The one result view model: the review reads the seat it costs, the amount
+  // and the applied state from it, so the dialog cannot disagree with the card.
+  resultModel = null,
   kept = false,
   primary = true,
   applyBusy = false,
@@ -64,6 +67,7 @@ export default function AdiTradeOffActions({
       <AdiTradeOffReviewDialog
         open={reviewing}
         tradeOff={tradeOff}
+        resultModel={resultModel}
         onOpenChange={setReviewing}
         onKeep={onKeep}
         applyBusy={applyBusy}

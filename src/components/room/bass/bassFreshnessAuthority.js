@@ -59,6 +59,27 @@ const STALING_CLASSES = new Set([
 ]);
 
 /**
+ * The authority statuses that mean the DESIGN ITSELF moved on — the one thing
+ * that may break the agreement between the saved publication and the design.
+ *
+ * Everything else the store can report is a statement about CALCULATION, not
+ * about the design: UPDATING while the bass engine is working, NOT_VERIFIED
+ * while a fresh contract is being checked, ERROR when a recalculation failed,
+ * LOADING on a cold start. None of those change the design, so the saved
+ * publication still describes the version and report readiness must hold.
+ *
+ * This is the boundary the ADI recommendation publication must not be able to
+ * cross: marking the bass authority UPDATING and then failing to publish a
+ * recommendation leaves no design change behind, so an optimiser publication
+ * failure can never make a report "stale".
+ */
+const DESIGN_MOVED_ON_STATUSES = new Set([
+  BASS_AUTHORITY_STATUS.STALE,
+  BASS_AUTHORITY_STATUS.UNCALCULATED,
+  BASS_AUTHORITY_STATUS.BLOCKED,
+]);
+
+/**
  * Field-by-field classification of everything that can appear on either side of
  * the bass identity comparison. Keys are the canonical field names used by the
  * fingerprint input digest; unknown keys read as OTHER (never staling).
@@ -200,9 +221,16 @@ export function resolvePublishedBassFreshness({
   // it, so the published result is the result for the design as it stands. A
   // transient result key stamped while an optimiser run is evaluated is not a
   // design change.
-  if (authorityStatus === BASS_AUTHORITY_STATUS.AUTHORITATIVE
-    && publishedContractFingerprint === publishedFingerprint) {
-    return { matches: true, basis: 'published_contract_authoritative_for_design', differs: [] };
+  //
+  // An authority that is currently AUTHORITATIVE matches. So does one that is
+  // mid-recalculation or failed to recalculate (UPDATING / NOT_VERIFIED /
+  // LOADING / ERROR): those describe calculation activity, not a design change,
+  // and the saved publication is still the publication for this design. Only a
+  // status that means the design moved on breaks the agreement — and only when
+  // the contract the store holds is not the published one.
+  if (publishedContractFingerprint === publishedFingerprint
+    && !DESIGN_MOVED_ON_STATUSES.has(authorityStatus)) {
+    return { matches: true, basis: 'published_contract_still_held_for_design', differs: [] };
   }
 
   // The design itself moved on (or a different result was published): the report

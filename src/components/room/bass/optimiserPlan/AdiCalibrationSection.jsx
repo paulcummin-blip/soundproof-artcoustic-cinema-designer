@@ -42,6 +42,15 @@ import {
   CALIBRATION_TRADE_OFF_MESSAGE,
 } from "./optimiserCalibrationEvidence.js";
 
+/**
+ * THE ONE HELD STATE LINE. A result ADI HELD is held: the settings it would
+ * change are stated under this decision, so a block of tuning values can never
+ * read as a calibration that was applied. Whatever any other evidence block
+ * contains — including a combined calibration result with its own settings —
+ * it cannot turn a held decision into an applied one.
+ */
+export const ADI_HELD_NOT_APPLIED_SENTENCE = "Held — not applied";
+
 export default function AdiCalibrationSection({
   kind = ADI_CALIBRATION_KIND.NOT_TESTED,
   appliedEvidence = null,
@@ -136,6 +145,19 @@ export default function AdiCalibrationSection({
           )}
         </div>
       ))}
+
+      {/* A HELD result states its own state before its settings. The persisted
+          terminal decision is the only authority for applied/held: a held
+          change is never presented as an applied calibration merely because its
+          tuning values are readable. */}
+      {kind === ADI_CALIBRATION_KIND.HELD && (
+        <div
+          className="text-[11px] font-semibold text-[#8A5A2B] leading-relaxed"
+          data-adi-calibration-held-not-applied="true"
+        >
+          {ADI_HELD_NOT_APPLIED_SENTENCE}
+        </div>
+      )}
 
       {/* The settings themselves — the one presentation the whole app uses for
           an applied calibration. Design changes are never rendered here. */}

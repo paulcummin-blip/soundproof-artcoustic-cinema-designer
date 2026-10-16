@@ -247,8 +247,15 @@ export default function AdiJourneyEngineerDetailsSections({ view = {} }) {
       {/* The calibration evidence the saved run kept: per lever, the candidate
           count, the best confirmed candidate with its canonical P19/P20
           before → after, and the run's own reason for accepting nothing.
-          Without it the panel never claims a lever was tested. */}
-      <AdiCalibrationEvidenceBlock evidence={calibrationEvidence} />
+          Without it the panel never claims a lever was tested. The winner and
+          the active identity are handed over, so any combined result that is
+          NOT this run's winner is scoped as a tested alternative instead of
+          competing with it. */}
+      <AdiCalibrationEvidenceBlock
+        evidence={calibrationEvidence}
+        winnerId={resultModel?.candidateEvidence?.winnerId ?? null}
+        activeIdentity={resultModel?.identity ?? null}
+      />
 
       {/* A calibration result ADI HELD that makes P20 worse: its candidate,
           its canonical P19/P20 before → after and its settings are stated
