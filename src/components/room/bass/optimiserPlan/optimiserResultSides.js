@@ -58,6 +58,19 @@ export function metric(db, level, { format }) {
 }
 
 /**
+ * A CAPABILITY FIGURE STATES ITS OWN UNIT. P14's capability is published in dBC,
+ * so "115 dB · L3" reads "115 dBC · L3" — never a bare "dB", which would read as
+ * a sound-pressure figure rather than a capability. The unit is only ever the one
+ * the published result itself carries: nothing is invented here, and a value with
+ * no published unit keeps its plain form.
+ */
+function withUnit(value, unit) {
+  const stated = unit == null ? null : String(unit).trim();
+  if (!value?.text || !stated) return value;
+  return { ...value, text: value.text.replace(/\bdB\b/, stated), unit: stated };
+}
+
+/**
  * The CURRENT side: the canonical published bass result.
  *
  * `source` states which authority the value came from — 'published' for the
@@ -80,9 +93,10 @@ export function buildCurrentSide({ completedBassAuthority, currentP20, planView,
     p14: {
       // The published P14 capability is the authority; the run's own baseline is
       // the fallback only when nothing is published.
-      ...metric(p14?.value ?? baseline?.p14AchievedDb, p14?.level, { format: p14DbText }),
-      // P14's own unit and published basis, so a capability figure is never
-      // printed as a bare "dB".
+      ...withUnit(
+        metric(p14?.value ?? baseline?.p14AchievedDb, p14?.level, { format: p14DbText }),
+        p14?.unit,
+      ),
       unit: p14?.unit || null,
       status: p14?.status ?? null,
       targetBasis: p14?.targetBasis || null,
@@ -126,7 +140,10 @@ export function buildProposedSide({ decision, winner }) {
     side: OPTIMISER_RESULT_SIDE.PROPOSED,
     source: after ? "decision-candidate" : "lever-effect",
     p14: {
-      ...metric(p14Db, after?.p14?.level, { format: p14DbText }),
+      ...withUnit(
+        metric(p14Db, after?.p14?.level, { format: p14DbText }),
+        after?.p14?.unit,
+      ),
       unit: after?.p14?.unit || null,
       status: null,
       targetBasis: null,

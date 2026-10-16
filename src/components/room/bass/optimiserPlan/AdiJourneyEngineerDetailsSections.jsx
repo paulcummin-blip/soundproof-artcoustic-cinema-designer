@@ -104,15 +104,12 @@ export default function AdiJourneyEngineerDetailsSections({ view = {} }) {
   // is the card's own pair.
   const currentSide = resultModel?.current || null;
   const proposedSide = resultModel?.proposed || null;
-  const sideText = (side, key) => {
-    const value = side?.[key];
-    if (!value?.text) return null;
-    return value.unit ? `${value.text} ${value.unit}` : value.text;
-  };
+  // Each value already carries its own side label and its own unit — P14's
+  // capability reads "115 dBC", never a bare "dB" — so nothing is appended here.
   const currentP20Line = currentSide?.p20?.text || currentP20Text;
   const proposedP20Line = proposedSide?.p20?.text || recommendedP20Text;
-  const currentP14Line = sideText(currentSide, "p14");
-  const proposedP14Line = sideText(proposedSide, "p14");
+  const currentP14Line = currentSide?.p14?.text || null;
+  const proposedP14Line = proposedSide?.p14?.text || null;
   const regression = resultModel?.affectedSeatRegression || null;
 
   return (

@@ -183,6 +183,19 @@ function resolveWinner({ planView, decision, suppressedLevers = [] }) {
  */
 function resolveAppliedState({ planView, decision, appliedLever, decisionType }) {
   const decisionKind = decision?.decision || null;
+
+  // A result that describes no CURRENT design state has no applied state of its
+  // own. A stale result's decision, a failed run's, a search that confirmed
+  // nothing and a run that never happened all belong to something other than the
+  // design in front of the designer, so none of them may be stated here as
+  // "Held" or "Applied" — that would report an earlier run's outcome as this one.
+  if (decisionType === OPTIMISER_DECISION_TYPE.RETEST_NEEDED
+    || decisionType === OPTIMISER_DECISION_TYPE.FAILED
+    || decisionType === OPTIMISER_DECISION_TYPE.NO_IMPROVEMENT
+    || decisionType === OPTIMISER_DECISION_TYPE.NOT_RUN) {
+    return OPTIMISER_APPLIED_STATE.NOT_APPLICABLE;
+  }
+
   const persistedApplied = decisionKind === CALIBRATION_APPLY_DECISION.APPLIED
     && planView?.decisionApplied === true;
 
@@ -192,12 +205,6 @@ function resolveAppliedState({ planView, decision, appliedLever, decisionType })
   // trade-off and a held improvement are both HELD, never REJECTED: a rejection
   // is a candidate the run itself discarded.
   if (decisionKind === CALIBRATION_APPLY_DECISION.HOLD) return OPTIMISER_APPLIED_STATE.HELD;
-  if (decisionType === OPTIMISER_DECISION_TYPE.NO_IMPROVEMENT
-    || decisionType === OPTIMISER_DECISION_TYPE.FAILED
-    || decisionType === OPTIMISER_DECISION_TYPE.RETEST_NEEDED
-    || decisionType === OPTIMISER_DECISION_TYPE.NOT_RUN) {
-    return OPTIMISER_APPLIED_STATE.NOT_APPLICABLE;
-  }
   return OPTIMISER_APPLIED_STATE.REJECTED;
 }
 
@@ -397,8 +404,11 @@ export function buildOptimiserResultViewModel({
   const p20PairText = current?.p20?.display != null && proposed?.p20?.display != null
     ? `${current.p20.display} \u2192 ${proposed.p20.display}`
     : null;
-  const p20PairDeltaText = displayDeltaPhrase(current?.p20?.display ?? null, proposed?.p20?.display ?? null);
-  const p19DeltaText = displayDeltaPhrase(current?.p19?.display ?? null, proposed?.p19?.display ?? null);
+  const p20PairDeltaText = displayDeltaPhrase(current?.p20?.raw ?? null, proposed?.p20?.raw ?? null);
+  // The P19 pair's own direction phrase. Both take the RAW measurement: the
+  // displayed string is already formatted ("±15 dB"), and comparing formatted
+  // text would state nothing at all.
+  const p19DeltaText = displayDeltaPhrase(current?.p19?.raw ?? null, proposed?.p19?.raw ?? null);
   const p14DeltaText = deltaText(
     current?.p14?.raw != null && proposed?.p14?.raw != null
       ? proposed.p14.raw - current.p14.raw

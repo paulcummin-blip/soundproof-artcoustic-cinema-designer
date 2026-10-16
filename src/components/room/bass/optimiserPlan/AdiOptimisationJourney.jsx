@@ -366,7 +366,12 @@ export default function AdiOptimisationJourney({
       versionId,
       runId: planView?.run?.runId || planView?.failure?.runId || null,
     },
-    tradeOffState: presentation?.tradeOff || null,
+    // The resolved trade-off state, with the designer's own "keep the current
+    // design" carried on it, so the model states KEPT CURRENT rather than
+    // reporting a live trade-off the designer has already settled.
+    tradeOffState: presentation?.tradeOff?.isTradeOff
+      ? { ...presentation.tradeOff, kept: tradeOffKept === true }
+      : null,
   });
   // THE ONE RESULT VIEW MODEL, as resolved by the card summary. Every surface on
   // this panel — the Engineer details evidence, the placement evidence, Other
@@ -715,7 +720,14 @@ export default function AdiOptimisationJourney({
     // THE ONE LIMITING FREQUENCY, from the result view model: null when the run
     // identified no credible frequency, so a surface states "Not identified" and
     // never "0 Hz".
-    limitingFrequencyHz: resultModel?.limitingFrequency?.hz ?? null,
+    // THE ONE LIMITING FREQUENCY, from the result view model. When the model
+    // identified a credible frequency that value is stated; when it did not, the
+    // run's own recorded value is passed through so the evidence block's own
+    // authority states "Not identified" — a result that recorded no value at all
+    // still contributes nothing.
+    limitingFrequencyHz: resultModel?.limitingFrequency?.identified
+      ? resultModel.limitingFrequency.hz
+      : (p20Headline?.worstFrequencyHz ?? null),
     limitingSeatId: resultModel?.currentP20?.seatId ?? p20Headline?.worstSeatId ?? null,
     resultModel,
     designFingerprint: currentDesignFingerprint,
