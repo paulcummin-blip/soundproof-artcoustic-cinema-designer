@@ -556,7 +556,7 @@ describe('TEST 8: no mutation during evaluation', () => {
     // recommendation publication recording what it did. Nothing else is written,
     // and nothing here writes the design.
     expect((hook.match(/^\s+setOptimiserPlanAuthority\(/gm) || []).length).toBe(3);
-    expect((hook.match(/await publishRecommendation\(/g) || []).length).toBe(1);
+    expect((hook.match(/await publishOptimiserRecommendation\(/g) || []).length).toBe(1);
     expect(hook.includes('buildLeverApplyInstances')).toBe(false);
   });
 

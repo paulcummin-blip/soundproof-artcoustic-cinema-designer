@@ -1,7 +1,7 @@
 {
   "name": "OptimiserRunHistory",
   "type": "object",
-  "description": "One durable diagnostic record per Bass Optimiser run, appended when the run reaches its terminal state. It exists so a run that behaved badly in production can be diagnosed afterwards from the database instead of reconstructed from a console log: when the plan was ready, when its publication started and finished, what the terminal status and publication status were, the publication error if one occurred, how many attempts that took and which fingerprints were written. It deliberately carries NO candidate payloads, no per-seat results, no curves and no ranking evidence - those stay on the run's own saved record (design_state.optimiser_plan) and on the published recommendation. This is a lifecycle log, not a second result authority: nothing in it may be read as a current engineering value, and it never decides readiness of anything. Records are append-only per run; the most recent few runs per project version are retained and older rows are pruned.",
+  "description": "One durable diagnostic record per Bass Optimiser run, appended when the run reaches its terminal state. It exists so a run that behaved badly in production can be diagnosed afterwards from the database instead of reconstructed from a console log: when the plan was ready, when it became terminal for the designer, when its publication started and finished, what the terminal status and publication status were, the publication error if one occurred, how many attempts that took and which fingerprints were written. Saving the plan is the designer's terminal boundary, so user_terminal_at is the instant the run ended for them and is never the instant the secondary publication finished. It deliberately carries NO candidate payloads, no per-seat results, no curves and no ranking evidence - those stay on the run's own saved record (design_state.optimiser_plan) and on the published recommendation. This is a lifecycle log, not a second result authority: nothing in it may be read as a current engineering value, and it never decides readiness of anything. Records are append-only per run; the most recent few runs per project version are retained and older rows are pruned.",
   "properties": {
     "run_id": {
       "type": "string",
@@ -41,6 +41,12 @@
       "nullable": true,
       "description": "When the run reached its terminal state."
     },
+    "user_terminal_at": {
+      "type": "string",
+      "format": "date-time",
+      "nullable": true,
+      "description": "When the run became terminal FOR THE DESIGNER: the instant the saved plan landed, which is the boundary the run's own user wait is measured to. It is deliberately NOT the instant the secondary recommendation publication finished - that is recorded separately in publication_completed_at - so the two remain separable when a run is diagnosed afterwards."
+    },
     "plan_saved_at": {
       "type": "string",
       "format": "date-time",
@@ -66,7 +72,7 @@
     "publication_status": {
       "type": "string",
       "nullable": true,
-      "description": "What became of the recommendation publication: published, refused, snapshot_missing, not_attempted or not_applicable."
+      "description": "What became of the secondary recommendation publication: published, refused, or not_attempted. Diagnostic only - it never turns a saved plan into a failed run."
     },
     "publication_error": {
       "type": "string",

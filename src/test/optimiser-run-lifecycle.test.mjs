@@ -26,6 +26,8 @@ import { readFileSync } from "node:fs";
 
 import {
   ADI_OPTIMISER_JOURNEY_STATE,
+  ADI_PLAN_SAVE_FAILURE_DETAIL,
+  ADI_PLAN_SAVE_FAILURE_MESSAGE,
   ADI_PUBLICATION_FAILURE_DETAIL,
   ADI_PUBLICATION_FAILURE_KEEP_LABEL,
   ADI_PUBLICATION_FAILURE_MESSAGE,
@@ -211,8 +213,12 @@ describe("1 · a failed plan save is terminal, a failed secondary publication is
     assert.ok(terminalMark > -1, "the run must record its own user-terminal instant");
     assert.ok(complete > terminalMark, "the run is terminal at the plan save");
     assert.ok(publicationStart > complete, "the publication is attempted AFTER the terminal boundary");
-    // Nothing after the boundary can end this run as a failure.
-    const afterBoundary = hook.slice(publicationStart);
+    // Nothing after the boundary can end this run as a failure. The remainder is
+    // the publication block and the record it writes, up to the run's own error
+    // handling.
+    const catchAt = hook.indexOf("} catch (err) {", publicationStart);
+    assert.ok(catchAt > publicationStart, "the publication block is bounded by the run's error handling");
+    const afterBoundary = hook.slice(publicationStart, catchAt);
     assert.equal(afterBoundary.includes('setStatus("failed")'), false);
     assert.equal(afterBoundary.includes("if (!publication.ok)"), false);
   });

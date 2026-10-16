@@ -117,7 +117,7 @@ describe("Bass Optimiser run history — one lifecycle row per run", () => {
     const allowed = new Set([
       "run_id", "project_id", "version_id", "account_id",
       "design_fingerprint", "result_fingerprint",
-      "started_at", "terminal_at", "plan_saved_at",
+      "started_at", "terminal_at", "user_terminal_at", "plan_saved_at",
       "publication_started_at", "publication_completed_at",
       "terminal_status", "publication_status", "publication_error",
       "publication_attempt_count", "fingerprints_published",
@@ -158,12 +158,16 @@ describe("Bass Optimiser run history — one lifecycle row per run", () => {
         `terminal status not recorded: ${status}`,
       );
     });
+    // The publication's outcome is recorded for every terminal path, and it is
+    // taken from the publication's OWN record rather than a status the run
+    // hard-codes. Saving the plan is the terminal boundary, so the secondary
+    // publication is a diagnostic: it is never stated as the run's failure.
     assert.ok(
-      source.includes("publicationStatus: \"refused\"")
-        && source.includes("publicationStatus: \"published\"")
-        && source.includes("publicationStatus: \"not_attempted\""),
+      source.includes("publicationStatus: recommendationPublication.status")
+        && source.includes("publicationError: recommendationPublication.error"),
       "the publication outcome must be recorded on both sides",
     );
+    assert.equal(source.includes('terminalStatus: "publication_failed"'), false);
     // A diagnostic row must never delay the run: the write is dispatched, not awaited.
     assert.ok(source.includes(".catch(() => {})"), "the history write must not be awaited");
   });
