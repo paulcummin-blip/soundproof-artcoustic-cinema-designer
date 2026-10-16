@@ -21,12 +21,12 @@ export const VALIDATOR_SOURCE_MANIFEST = Object.freeze({
   'base44/shared/proposalGeneration/generationStatuses.js': '2273b2e8408a426eeb137d9ae2f34c428a8e934dc0529134e9889aae75103b28',
   'base44/shared/proposalWriter/writerCabinetLanguage.js': '18e37edb21bd8422c6293c5fde809984d185e7188d0fe4a12fa2ff352d4b72c7',
   'base44/shared/proposalWriter/writerValidationRegister.js': '634502ab07c0bf1b13cfe0879d1e2ca2e85f0419c94f377b266a977c38c07b96',
-  'base44/shared/proposalWriter/writerInputBuilder.js': '1473beee4cf24dbde1926defbe3f2d2e2cf4fa3d8116b47020b053d6439b65f3',
+  'base44/shared/proposalWriter/writerInputBuilder.js': '9ea40f652770bbfe816e6317ead85104281c3077eec02f1f3753479f7d0ebf79',
   // The client narrative register: the story the client is buying, never the
   // mechanism that produces it. It states the instruction the writer reads and the
   // phrasing the narrative sanitizer removes, so a draft can always be traced to the
   // exact register it was written and read under.
-  'base44/shared/clientNarrativeRegister.js': 'f80e55c41e0089c85c6dfd256fc09dd0a41f32bb09278e1b7b57ffec8747c700',
+  'base44/shared/clientNarrativeRegister.js': '0b8a572d3c594ecc91c2396940cc96685f9b48282197db6e2a245fbed1adb7d9',
   // The performance language register: the strength of the client-facing language
   // is decided by the Performance Level the evidence states. It holds the register
   // the shared strength statements are composed from and the rules the writer is
@@ -62,7 +62,7 @@ export const VALIDATOR_SOURCE_MANIFEST = Object.freeze({
   // reasoning authority it was written under.
   'base44/shared/designPhilosophyAuthority.js': '1a4ba9bfd86d5bd17cabac52e6dab78359f601f92b14e0a63703d679915179fc',
   'base44/shared/adiDesignPhilosophy.js': 'cd275e6c1ba1c768378b701e5494f10042b550727e806ca1f24716d0c06103cc',
-  'base44/shared/adiProjectInterpretation.js': 'eab0626ec08674ce7127104c92c9846f1cd8ab536c9e53e6730ce962e282ae7e',
+  'base44/shared/adiProjectInterpretation.js': '833506221843bbc8f76a43b3a24072e6a83bd72a41acf1a3198e861837c9b886',
   // The check between the saved interpretation and the frozen evidence, which now
   // also holds the design philosophy's own statements to it.
   'base44/shared/proposalWriter/writerInterpretationEvidenceCheck.js': '2e88d5c9c5b3bc2e9000adaf528dc98e52c073c7c92fecc02c2030199fc412a0',
