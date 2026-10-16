@@ -14,10 +14,10 @@
  *
  * The rules:
  *
- *   TELEVISION — a television has no screen for a loudspeaker to sit behind, so
- *   "Behind screen" is never stated. A left or right loudspeaker whose own saved
- *   position places it clear of the television's image width is stated as sitting
- *   OUTSIDE the television, which is what flanking a television means.
+ *   TELEVISION — a television is flanked, not hidden, and flanking it is already
+ *   evident from the drawing itself: the schedule states NO placement note for a
+ *   television-based front stage at all. "Behind screen" is never stated either,
+ *   because a television has no screen for a loudspeaker to sit behind.
  *
  *   PROJECTION SCREEN — "Behind screen" is stated only when the construction puts
  *   the front stage behind the screen surface (a baffle wall, or a floating screen
@@ -109,26 +109,6 @@ function allBehindFrontPlane(speakers, frontPlaneM) {
 }
 
 /**
- * Whether the stated left/right loudspeakers sit clear of the display's own image
- * width. The pair's own midpoint is the display's centreline: the loudspeaker's
- * own saved coordinate decides the answer, and a single stated side is judged
- * against the pair it belongs to.
- */
-function pairSitsOutsideDisplay(speakers, pairSpeakers, imageWidthM) {
-  if (!Number.isFinite(imageWidthM) || imageWidthM <= 0) return false;
-  const stated = (Array.isArray(speakers) ? speakers : []).map(speakerPositionOf).filter(Boolean);
-  if (stated.length === 0 || stated.some((p) => p.x === null)) return false;
-  const pair = (Array.isArray(pairSpeakers) && pairSpeakers.length >= 2 ? pairSpeakers : speakers)
-    .map(speakerPositionOf)
-    .filter(Boolean);
-  if (pair.length < 2 || pair.some((p) => p.x === null)) return false;
-  const xs = pair.map((p) => p.x);
-  const centreX = (Math.min(...xs) + Math.max(...xs)) / 2;
-  const half = imageWidthM / 2;
-  return stated.every((p) => Math.abs(p.x - centreX) > half);
-}
-
-/**
  * The placement note for one front-stage row, or null.
  *
  * @param {Object}   input
@@ -142,7 +122,6 @@ export function frontStagePlacementNote({
   screen = null,
   rowKey = null,
   speakers = [],
-  pairSpeakers = null,
   frontPlaneM = null,
 } = {}) {
   if (!screen || typeof screen !== 'object') return null;
@@ -151,12 +130,11 @@ export function frontStagePlacementNote({
   const list = Array.isArray(speakers) ? speakers : [];
 
   if (display === DISPLAY_TYPE_TV) {
-    // A television is flanked, never hidden: only a left/right position that the
-    // design's own coordinates place clear of the image is stated.
-    if (rowKey !== 'FL' && rowKey !== 'FR') return null;
-    return pairSitsOutsideDisplay(list, pairSpeakers, resolveDisplayImageWidthM(screen))
-      ? 'Outside the TV'
-      : null;
+    // A television is flanked, not hidden, and flanking it is already evident from
+    // the drawing: the schedule states no placement note for a television-based
+    // front stage. A note that repeats what the drawing shows only clutters the
+    // equipment schedule.
+    return null;
   }
 
   // Only the front stage sits in the screen construction; a surround or overhead
