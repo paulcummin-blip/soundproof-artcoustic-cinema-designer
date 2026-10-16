@@ -34,6 +34,7 @@ const REASON_COPY = {
   writer_flag_off: 'The Astra writer is not switched on for this login, so the report keeps its own Design Intent.',
   provider_failed: 'The writer could not be reached, so the report keeps its own Design Intent.',
   validation_failed: 'The draft was not accepted, so the report keeps its own Design Intent.',
+  accepted_text_missing: 'The draft passed validation but no text could be read from it, so the report keeps its own Design Intent.',
   report_evidence_unavailable: 'The saved report evidence could not be read, so nothing was written.',
 };
 

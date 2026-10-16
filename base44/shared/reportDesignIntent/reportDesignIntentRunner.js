@@ -54,6 +54,12 @@ export const DESIGN_INTENT_REFUSAL = Object.freeze({
   NO_EVIDENCE: 'report_evidence_unavailable',
   PROVIDER_FAILED: 'provider_failed',
   VALIDATION_FAILED: 'validation_failed',
+  /**
+   * The validator PASSED the draft, but no section text could be read from it.
+   * A refusal the validator did not make is never filed as a validation failure:
+   * this is an acceptance failure, and it is stated as one.
+   */
+  ACCEPTED_TEXT_MISSING: 'accepted_text_missing',
 });
 
 /** A refused attempt: no text, no write. */
@@ -210,7 +216,14 @@ export async function runReportDesignIntent({
 
   // 5. The existing validator, against the exact input the writer was given.
   const validation = validate({ input: writerInput, output: provider.output });
-  const text = validation?.valid === true ? designIntentTextFromOutput(validation.output) : null;
+  // The accepted text is read from the DRAFT THAT WAS VALIDATED. The validator
+  // reports the sections it read — their word counts and the claim IDs they cited —
+  // and hands no prose back, so `validation.output` does not exist and reading the
+  // narrative from it refused a draft that had passed every gate. A validator that
+  // does normalise an output is still honoured first, exactly as the proposal path
+  // reads it.
+  const acceptedDraft = validation?.output ?? provider.output;
+  const text = validation?.valid === true ? designIntentTextFromOutput(acceptedDraft) : null;
   const provenance = validatorProvenance();
 
   const providerIdentity = {
@@ -223,12 +236,21 @@ export async function runReportDesignIntent({
   };
 
   if (!text) {
+    // WHICH GATE REFUSED IT is stated by the refusal code itself. A draft that
+    // passed with no violations and carried no readable section text is an
+    // acceptance failure, not a validation failure — so a record can never again
+    // read "validation failed" beside a validation that passed.
+    const passedValidation = validation?.valid === true;
     const first = Array.isArray(validation?.violations) ? validation.violations[0] : null;
+    const code = passedValidation
+      ? DESIGN_INTENT_REFUSAL.ACCEPTED_TEXT_MISSING
+      : DESIGN_INTENT_REFUSAL.VALIDATION_FAILED;
+    const detail = passedValidation
+      ? `The validator passed this draft with no violations, but no text could be read for the ${DESIGN_INTENT_SECTION} section, so nothing was saved.`
+      : (first ? `${first.rejection || first.code || 'rejected'}${first.detail ? `: ${first.detail}` : ''}` : 'The draft was not validated.');
+
     return {
-      ...refusal(
-        DESIGN_INTENT_REFUSAL.VALIDATION_FAILED,
-        first ? `${first.rejection || first.code || 'rejected'}${first.detail ? `: ${first.detail}` : ''}` : 'The draft was not validated.',
-      ),
+      ...refusal(code, detail),
       validation_errors: validation?.violations || [],
       // ── The refused attempt, kept whole so it can be read back ──
       // The exact validation response and the draft it refused travel back with
@@ -250,7 +272,7 @@ export async function runReportDesignIntent({
         providerIdentity,
         generatedAt: now,
         generatedBy: user?.full_name || user?.email || null,
-        rejection: { code: DESIGN_INTENT_REFUSAL.VALIDATION_FAILED, detail: first?.detail ?? null },
+        rejection: { code, detail },
       }),
     };
   }

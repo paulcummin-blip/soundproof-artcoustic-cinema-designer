@@ -93,6 +93,38 @@ export function designIntentDiagnosticViolations(diagnostics) {
   });
 }
 
+/**
+ * WHICH GATE ended the attempt. This is read against the validator's own answer
+ * rather than against the refusal code, because the two can only be read together:
+ * a reason of "validation failed" beside a validation that passed is the one
+ * reading that must never be believed, and it is stated here for what it is.
+ */
+export function designIntentAcceptanceGate(diagnostics) {
+  const reason = text(diagnostics?.reason);
+  const response = designIntentValidationResponse(diagnostics);
+
+  if (reason === 'validation_failed') {
+    if (!response) {
+      return 'Acceptance — no validation result was returned, so the draft could not be accepted.';
+    }
+    if (response.valid === true) {
+      return 'Acceptance — the validator passed this draft with no violations, so the refusal was made after validation, not by it.';
+    }
+    return `Validation — the validator refused the draft (${designIntentDiagnosticViolations(diagnostics).length} violation(s)).`;
+  }
+
+  return REFUSAL_GATE_LABEL[reason] || 'Acceptance — the attempt ended at an unclassified gate.';
+}
+
+/** The gate each non-validation refusal ended at. */
+const REFUSAL_GATE_LABEL = Object.freeze({
+  writer_flag_off: 'Writer switch — the Astra writer is not enabled for this login.',
+  report_evidence_unavailable: 'Evidence — the frozen report evidence could not be read.',
+  provider_failed: 'Provider — no draft was received, so there was nothing to validate.',
+  accepted_text_missing:
+    'Acceptance — the validator passed the draft with no violations, but no section text could be read from it.',
+});
+
 /** The draft the writer returned, verbatim, in a form that can be read. */
 export function designIntentDraftText(diagnostics) {
   const draft = diagnostics?.draft;
@@ -129,6 +161,9 @@ export function buildDesignIntentDiagnosticRows(diagnostics) {
   const rows = [
     { key: 'reason', label: 'Refusal reason', value: text(diagnostics.reason) || 'Unclassified refusal' },
     { key: 'detail', label: 'Reported detail', value: text(diagnostics.detail) || DESIGN_INTENT_DIAGNOSTIC_NONE_REPORTED },
+    // The gate that actually ended the attempt, so the reason and the validation
+    // outcome are never read against each other and misbelieved.
+    { key: 'acceptance_gate', label: 'Acceptance gate', value: designIntentAcceptanceGate(diagnostics) },
     {
       key: 'validation_outcome',
       label: 'Validation outcome',
