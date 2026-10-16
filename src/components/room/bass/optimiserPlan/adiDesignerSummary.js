@@ -791,6 +791,25 @@ export function buildAdiDesignerSummary({
   // and a value that is not a frequency reads "Not identified", never "0 Hz".
   const limitingFrequency = resultViewModel.limitingFrequency;
 
+  // THE ONE APPLIED STATE decides whether an Apply is offered at all. The
+  // persisted terminal decision is authoritative: a HELD result — including a
+  // held trade-off — is never offered as an applyable improvement, and a result
+  // already in the design is never offered a second time. The reason stated is
+  // the run's own recorded sentence. This changes no apply logic: what Apply
+  // DOES is untouched, and the trade-off's own deliberate approval is a separate
+  // action that does not read this gate.
+  const applyOutcome = resultViewModel.appliedState === OPTIMISER_APPLIED_STATE.HELD
+    || resultViewModel.appliedState === OPTIMISER_APPLIED_STATE.APPLIED
+    ? {
+      allowed: false,
+      label: apply.label,
+      reason: resultViewModel.decisionReason
+        || (resultViewModel.appliedState === OPTIMISER_APPLIED_STATE.APPLIED
+          ? "This change is already in the design."
+          : "This change was held and is not applied."),
+    }
+    : apply;
+
   const baselineDeviation = wholeNumberDeviation(planView?.baseline?.p20VariationDb ?? null);
   const baselineLevel = planView?.baseline?.p20Level ?? null;
   const recommendedRow = evaluatedRow;
@@ -897,9 +916,9 @@ export function buildAdiDesignerSummary({
     appliedStateLabel: resultViewModel.appliedStateLabel,
     limitingFrequency,
     actions: {
-      canApply: apply.allowed,
-      applyLabel: apply.label,
-      applyReason: apply.allowed ? null : apply.reason,
+      canApply: applyOutcome.allowed,
+      applyLabel: applyOutcome.label || apply.label,
+      applyReason: applyOutcome.allowed ? null : applyOutcome.reason,
       canUndo: undo.allowed,
       undoLabel: undo.label,
       undoLever: undo.lever,

@@ -355,7 +355,24 @@ export default function AdiOptimisationJourney({
     limitingFrequencyHz: p20Headline?.worstFrequencyHz ?? null,
     appliedLever: leverOutcome?.appliedLever ?? null,
     appliedDirection: leverOutcome?.direction ?? null,
+    // The one result view model is built inside the card summary from the SAME
+    // evidence this panel already reads: the canonical published bass result (so
+    // CURRENT is a real measured value, not the run's own baseline), the run's
+    // identity, and the resolved trade-off state (so a held trade-off is HELD,
+    // never Applied). Nothing new is calculated here.
+    completedBassAuthority,
+    identity: {
+      projectId,
+      versionId,
+      runId: planView?.run?.runId || planView?.failure?.runId || null,
+    },
+    tradeOffState: presentation?.tradeOff || null,
   });
+  // THE ONE RESULT VIEW MODEL, as resolved by the card summary. Every surface on
+  // this panel — the Engineer details evidence, the placement evidence, Other
+  // options and the review dialogs — reads this object rather than deciding the
+  // result for itself.
+  const resultModel = summary.resultViewModel || null;
   const handleApplyRecommended = summary.actions.canApply && typeof onApplyLever === "function"
     ? () => onApplyLever(summary.recommendedLever)
     : null;
@@ -695,8 +712,12 @@ export default function AdiOptimisationJourney({
     runBaselineDeviation: currentP20.runBaselineDeviation,
     runEvidence,
     seatCount,
-    limitingFrequencyHz: p20Headline?.worstFrequencyHz ?? null,
-    limitingSeatId: p20Headline?.worstSeatId ?? null,
+    // THE ONE LIMITING FREQUENCY, from the result view model: null when the run
+    // identified no credible frequency, so a surface states "Not identified" and
+    // never "0 Hz".
+    limitingFrequencyHz: resultModel?.limitingFrequency?.hz ?? null,
+    limitingSeatId: resultModel?.currentP20?.seatId ?? p20Headline?.worstSeatId ?? null,
+    resultModel,
     designFingerprint: currentDesignFingerprint,
     resultFingerprint: p20Headline?.fingerprint ?? null,
     parityStatus: planView?.baselineParity?.status ?? null,

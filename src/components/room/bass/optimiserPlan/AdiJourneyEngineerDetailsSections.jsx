@@ -41,6 +41,7 @@ import AdiJourneyRunWorkloadBlock from "./AdiJourneyRunWorkloadBlock.jsx";
 import AdiJourneyRuntimeCostBlock from "./AdiJourneyRuntimeCostBlock.jsx";
 import { FUTURE_CAPABILITY_TITLE } from "./optimiserLiveFamilies.js";
 import { PLACEMENT_PREVIEW_UNAVAILABLE } from "./placementMoveAuthority.js";
+import { OPTIMISER_TESTED_PLACEMENT_LABEL } from "./optimiserResultViewModel.js";
 
 export default function AdiJourneyEngineerDetailsSections({ view = {} }) {
   const {
@@ -90,7 +91,29 @@ export default function AdiJourneyEngineerDetailsSections({ view = {} }) {
     attemptsWithoutGain = null,
     workload = null,
     runtimeCost = [],
+    // THE ONE RESULT VIEW MODEL, built by the card. Every value below that
+    // describes the result is read from it, so this evidence cannot state a
+    // different decision, winner or current value than the card does.
+    resultModel = null,
   } = view;
+
+  // The labelled CURRENT and PROPOSED values. They are two different things and
+  // are never printed without their side: CURRENT is the canonical published
+  // result for the design as it stands, PROPOSED is the candidate the run
+  // evaluated. Sourced from the view model when it is present, so the pair here
+  // is the card's own pair.
+  const currentSide = resultModel?.current || null;
+  const proposedSide = resultModel?.proposed || null;
+  const sideText = (side, key) => {
+    const value = side?.[key];
+    if (!value?.text) return null;
+    return value.unit ? `${value.text} ${value.unit}` : value.text;
+  };
+  const currentP20Line = currentSide?.p20?.text || currentP20Text;
+  const proposedP20Line = proposedSide?.p20?.text || recommendedP20Text;
+  const currentP14Line = sideText(currentSide, "p14");
+  const proposedP14Line = sideText(proposedSide, "p14");
+  const regression = resultModel?.affectedSeatRegression || null;
 
   return (
     <>
@@ -184,6 +207,32 @@ export default function AdiJourneyEngineerDetailsSections({ view = {} }) {
         </div>
       )}
 
+      {/* CURRENT AND PROPOSED ARE NEVER MIXED. The capability pair and the seat
+          the change costs, each named for the side it belongs to: the published
+          current result is stated as the current result, the evaluated candidate
+          only ever as the evaluated candidate. */}
+      {(currentP14Line || proposedP14Line || regression) && (
+        <div className="space-y-0.5 text-[11px] text-[#3E4349] leading-relaxed" data-adi-current-vs-proposed="true">
+          <div className="text-[10px] font-semibold uppercase tracking-wide text-[#8A7B6A]">
+            P14 capability compared
+          </div>
+          {currentP14Line && (
+            <div>Current design (published result): {currentP14Line}</div>
+          )}
+          {proposedP14Line && (
+            <div>Evaluated result with the recommended change: {proposedP14Line}</div>
+          )}
+          {regression && (
+            <div className="text-[#8A5A2B]" data-adi-seat-regression="true">
+              Trade-off: {resultModel?.affectedSeat?.label || regression.seatId}{" "}
+              {regression.direction} by {regression.amountText}
+              {regression.parameter ? ` (${regression.parameter})` : ""}. The change is not
+              applied.
+            </div>
+          )}
+        </div>
+      )}
+
       <OptimiserRunEvidenceBlock evidence={runEvidence} seatCount={seatCount} instances={instances} />
 
       {/* The limits every other number on this panel depends on, and the
@@ -260,6 +309,12 @@ export default function AdiJourneyEngineerDetailsSections({ view = {} }) {
         placement={placement}
         busy={isRunning}
         variant="evidence"
+        // Only the view model decides whether this placement may be presented
+        // as a recommendation. When it may not, the evidence names it as what
+        // it is instead of leaving the move to read as a recommendation.
+        testedNotRecommendedLabel={resultModel?.physicalRecommendation?.testedNotRecommended
+          ? `${OPTIMISER_TESTED_PLACEMENT_LABEL} — evaluated, not recommended`
+          : null}
       />
 
       {/* The two evidence groups behind the recommendation — the absorption

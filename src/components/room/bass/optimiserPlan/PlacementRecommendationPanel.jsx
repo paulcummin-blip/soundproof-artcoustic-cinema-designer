@@ -56,6 +56,11 @@ export default function PlacementRecommendationPanel({
   // renders exactly one of the two, so a control is never duplicated.
   variant = "full",
   className = "",
+  // The result view model's own statement about this placement. When the run
+  // TESTED a placement but did not recommend it, the label is supplied here so
+  // the evidence can never read as a recommendation. Null = the placement IS the
+  // recommendation (or is already applied) and nothing extra is stated.
+  testedNotRecommendedLabel = null,
 }) {
   if (!placement || !placement.kind) return null;
 
@@ -115,6 +120,18 @@ export default function PlacementRecommendationPanel({
           {placement.status}
         </span>
       </div>
+
+      {/* A placement the run evaluated but did NOT recommend is never presented
+          as a recommendation: it is named for what it is, before any of its
+          measured detail. */}
+      {testedNotRecommendedLabel && (
+        <div
+          className="text-[10px] leading-relaxed text-[#625143]"
+          data-placement-tested-not-recommended="true"
+        >
+          {testedNotRecommendedLabel}
+        </div>
+      )}
 
       {placement.definition && (
         <div className="text-[10px] text-[#8B7F76] leading-relaxed">{placement.definition}</div>
