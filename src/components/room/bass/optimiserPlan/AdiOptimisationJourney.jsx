@@ -668,6 +668,13 @@ export default function AdiOptimisationJourney({
     p20Headline,
     recommendedRow,
     running: isRunning,
+    // THE ONE RESULT MODEL AND THE ONE LIMITING FREQUENCY. Technical details
+    // therefore states the same result and the same frequency as the card: the
+    // direct frequencyText(p20Headline.worstFrequencyHz) path is gone, a
+    // non-winning or historical record is scoped out instead of presented as
+    // current, and 0 Hz can never reach a surface.
+    resultModel,
+    limitingFrequency: resultModel?.limitingFrequency ?? null,
   });
 
   // ── LEVEL 3 — THE DEVELOPER GATE ──

@@ -42,7 +42,9 @@ import {
   buildPersistedRunTimings,
   getRunTimings,
   recordRunTiming,
+  runTimingAt,
 } from "@/components/room/bass/optimiserPlan/optimiserRunTimings.js";
+import { persistOptimiserRunHistory } from "@/components/room/bass/optimiserPlan/optimiserRunHistory.js";
 import { summariseElectronicStageBreakdown } from "@/components/room/bass/electronicSafety/electronicTimingLedger.js";
 import { publishOptimiserRecommendation } from "@/components/room/bass/optimiserPlan/optimiserRecommendationPublication.js";
 
@@ -83,6 +85,41 @@ export default function useRunOptimisationPlan({
     // should can be diagnosed from the record later instead of guessed at.
     beginRunTimings(projectId, versionId, activeRun.runId);
 
+    // ── THE RUN'S DURABLE LIFECYCLE ROW ──
+    // One lightweight row per run, appended when the run reaches its terminal
+    // state. It answers from the database, rather than from a console log that is
+    // gone by the time anyone asks: when the plan was ready, when the publication
+    // started and finished, what the terminal status and publication status were,
+    // the publication error verbatim, how many attempts that took, and which
+    // fingerprints were written.
+    //
+    // It stores NO candidate payload — the result itself stays on the run's own
+    // saved record, and the run history is never read as a current engineering
+    // value or as a readiness input. A failure to write it is reported and
+    // swallowed: a diagnostic row must never break, delay or alter a run, so the
+    // write is dispatched without being awaited.
+    const logRunHistory = (facts = {}) => {
+      const timings = getRunTimings(projectId, versionId);
+      const live = sharedRef.current;
+      Promise.resolve(persistOptimiserRunHistory({
+        runId: activeRun.runId,
+        projectId,
+        versionId,
+        designFingerprint: live?.cacheKey || null,
+        resultFingerprint: live?.completedBassAuthority?.contract?.job?.resultFingerprint
+          || live?.currentFingerprint || null,
+        startedAt: activeRun.startedAt,
+        planSavedAt: runTimingAt(timings, RUN_TIMING.SAVE_COMPLETED),
+        publicationStartedAt: runTimingAt(timings, RUN_TIMING.PUBLICATION_STARTED),
+        publicationCompletedAt: runTimingAt(timings, RUN_TIMING.PUBLICATION_COMPLETED),
+        terminalAt: new Date().toISOString(),
+        publicationAttemptCount: Number.isFinite(timings?.publicationRetries)
+          ? timings.publicationRetries
+          : 0,
+        ...facts,
+      })).catch(() => {});
+    };
+
     // Every fresh run gets a durable terminal record, including early or thrown
     // failures. Without this, refresh could discard the in-memory run authority
     // and restore the previous re-test artifact as though the new run never
@@ -113,6 +150,11 @@ export default function useRunOptimisationPlan({
         if (typeof live?.onCalculate !== "function" || live?.canCalculate !== true) {
           const reason = "The design has no current bass result. Calculate Performance, then run the Optimisation Plan.";
           saveRunFailure(reason);
+          logRunHistory({
+            terminalStatus: "failed",
+            publicationStatus: "not_attempted",
+            publicationError: reason,
+          });
           setStatus("failed");
           setError(reason);
           return;
@@ -122,6 +164,11 @@ export default function useRunOptimisationPlan({
         if (!(await waitForCurrentPublication(sharedRef, phaseRef))) {
           const reason = "The bass calculation did not publish a current result. Retry Calculate Performance, then run the Optimisation Plan.";
           saveRunFailure(reason);
+          logRunHistory({
+            terminalStatus: "failed",
+            publicationStatus: "not_attempted",
+            publicationError: reason,
+          });
           setStatus("failed");
           setError(reason);
           return;
@@ -154,12 +201,18 @@ export default function useRunOptimisationPlan({
       });
 
       if (result.status === "cancelled") {
+        logRunHistory({ terminalStatus: "cancelled", publicationStatus: "not_attempted" });
         setStatus("idle");
         return;
       }
       if (result.status === "error" || result.status === "stale") {
         const reason = result.error || "The optimiser could not complete. Re-run the Optimisation Plan.";
         saveRunFailure(reason, { baselineParity: result.baselineParity || null });
+        logRunHistory({
+          terminalStatus: "failed",
+          publicationStatus: "not_attempted",
+          publicationError: reason,
+        });
         setStatus("failed");
         setError(reason);
         return;
@@ -186,6 +239,11 @@ export default function useRunOptimisationPlan({
           runIdentity: activeRun,
         });
         if (blockedEvidence) setOptimiserPlanAuthority(projectId, versionId, blockedEvidence);
+        logRunHistory({
+          terminalStatus: "blocked",
+          publicationStatus: "not_attempted",
+          publicationError: result.error || null,
+        });
         setStatus("failed");
         setError(result.error || "Bass calculation required before optimisation.");
         return;
@@ -258,6 +316,11 @@ export default function useRunOptimisationPlan({
       if (!persistedPlan && !runEvidence) {
         const reason = "The optimiser returned no usable result for this design. Re-run the Optimisation Plan.";
         saveRunFailure(reason);
+        logRunHistory({
+          terminalStatus: "evaluation_incomplete",
+          publicationStatus: "not_attempted",
+          publicationError: reason,
+        });
         setStatus("failed");
         setError(reason);
         return;
@@ -324,6 +387,16 @@ export default function useRunOptimisationPlan({
           timings: buildPersistedRunTimings(getRunTimings(projectId, versionId)),
           runtimeBreakdown,
         });
+        logRunHistory({
+          terminalStatus: "publication_failed",
+          publicationStatus: "refused",
+          publicationError: failure.publicationError || failure.message,
+          // The attempt count the record itself reported, when it reported one:
+          // the ledger's own count otherwise.
+          ...(failure.attempts != null ? { publicationAttemptCount: failure.attempts } : {}),
+          fingerprintsPublished: [],
+          runtimeBreakdown,
+        });
         setStatus("failed");
         setError(failure.message);
         return;
@@ -338,10 +411,26 @@ export default function useRunOptimisationPlan({
         runtimeBreakdown,
       });
 
+      logRunHistory({
+        terminalStatus: persistedPlan ? "actionable_plan" : "no_useful_improvement",
+        publicationStatus: "published",
+        // The fingerprints the publication actually wrote, from its own result —
+        // diagnostic identity only.
+        fingerprintsPublished: (publication.results || [])
+          .map((entry) => entry.fingerprint)
+          .filter(Boolean),
+        runtimeBreakdown,
+      });
+
       setStatus("complete");
     } catch (err) {
       const reason = err?.message || "The optimiser could not complete. Re-run the Optimisation Plan.";
       saveRunFailure(reason);
+      logRunHistory({
+        terminalStatus: "failed",
+        publicationStatus: "not_attempted",
+        publicationError: reason,
+      });
       setStatus("failed");
       setError(reason);
     } finally {
