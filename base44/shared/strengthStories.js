@@ -60,6 +60,7 @@ import { story } from './strengthStoryShape.js';
 
 import {
   readSeatBoundaryGeometry,
+  seatingBoundaryHighlightHeading,
   seatingBoundaryHighlightSummary,
 } from './seatingBoundaryPrinciple.js';
 
@@ -235,7 +236,12 @@ export function buildCandidates(sources, { byKey, floor, connections, brief = nu
           ? `${hasOverheadLayer ? 'Surround and overhead' : 'Surround channels'} across the seats · ${p17.value}`
           : `${hasOverheadLayer ? 'Surround and overhead' : 'Surround channels'} across the assessed seats`),
       ],
-      explanation: `the tonal balance holds${seats ? ` across all ${seats} assessed seating positions` : ' across the assessed seating positions'}, each result read for its own speaker group: within the screen channels, and within the ${nonScreenLayer} channels, the model predicts ${performancePhrase(PERFORMANCE_AREAS.TIMBRE, levelRank(p16.level) <= levelRank(p17.level) ? p16.level : p17.level) || 'a stable tonal character'} across the assessed seats.`,
+      // Each result is stated for ITS OWN speaker group and for its own level: P16
+      // for the screen channels, P17 for the non-screen channels. The paragraph
+      // states what that consistency gives the listener rather than describing how
+      // the results were read, so nothing here says what a model predicts and no
+      // single result is stretched across both groups.
+      explanation: `the tonal balance holds${seats ? ` across all ${seats} assessed seating positions` : ' across the assessed seating positions'}: the screen channels keep ${performancePhrase(PERFORMANCE_AREAS.TIMBRE, p16.level) || 'a stable tonal character'} from seat to seat, and the ${nonScreenLayer} channels do the same in their own right, so dialogue and music keep the same character wherever you sit rather than one seat sounding brighter or darker than the one beside it.`,
       sources: ['P16', 'P17'],
     }));
   }
@@ -246,12 +252,17 @@ export function buildCandidates(sources, { byKey, floor, connections, brief = nu
     candidates.push(story({
       id: 'bass-output',
       order: 3,
-      title: 'Bass output with genuine authority',
+      // The heading names the subject this result is about, weight, depth and
+      // impact, rather than the word "authority", which the register uses only
+      // where a result has genuinely earned it.
+      title: 'Bass with scale and impact',
       category: 'Bass Performance',
       members: [p14],
       scope: 'room',
       evidence: [evidence('P14', p14.level, p14.value ? `LFE output · ${p14.value}` : 'LFE output at the reference seating position')],
-      explanation: `the subwoofers deliver ${p14.value ? `${p14.value} of low-frequency output` : 'the low-frequency output'} at the reference seating position, so ${performancePhrase(PERFORMANCE_AREAS.BASS_OUTPUT, p14.level) || 'the weight of an explosion or a bass line is reproduced rather than thinning out as the level rises'}.`,
+      // WHAT the result is belongs to the pill beside this paragraph. The paragraph
+      // states WHY it matters: what the client hears and feels in the room.
+      explanation: `the subwoofers provide ${p14.value ? `${p14.value} of low-frequency output` : 'the low-frequency output'} at the reference seating position, so ${performancePhrase(PERFORMANCE_AREAS.BASS_OUTPUT, p14.level) || 'explosions carry real impact and the low end of a soundtrack arrives at the scale the cinema deserves'}: the deepest effects are felt as well as heard, and the bass under a soundtrack keeps its power at the level a film asks for.`,
       sources: ['P14'],
     }));
   }
@@ -271,7 +282,9 @@ export function buildCandidates(sources, { byKey, floor, connections, brief = nu
       // language that result has earned: a deepest-octave claim belongs to a
       // genuinely deep result, a moderate one is stated as the depth it gives the
       // soundtrack, and neither is ever flattened into "useful".
-      explanation: `the system reaches ${p18.value || 'the published limit'} in the room: ${performancePhrase(PERFORMANCE_AREAS.BASS_EXTENSION, p18.level) || 'low-frequency extension for film effects'}.`,
+      // The paragraph states what the depth does for the film rather than
+      // restating the published figure the pill already carries.
+      explanation: `the system reaches ${p18.value || 'the published limit'} in the room: ${performancePhrase(PERFORMANCE_AREAS.BASS_EXTENSION, p18.level) || 'the deepest notes of a soundtrack arrive at their full depth'}, so the lowest notes of a soundtrack and the rumble beneath an action scene are there to be heard and felt rather than thinning away underneath the picture.`,
       sources: ['P18'],
     }));
   }
@@ -291,7 +304,12 @@ export function buildCandidates(sources, { byKey, floor, connections, brief = nu
         evidence('P18', p18.level, p18.value ? `Extension to ${p18.value}` : 'In-room bass extension'),
         evidence('P19', p19.level, p19.value ? `At the reference seating position · ${p19.value}` : 'At the reference seating position'),
       ],
-      explanation: `the system reaches ${p18.value || 'the published limit'} and the corrected response at the reference seating position sits ${p19.value || 'within the target window'} of the design target, so the deep end has both reach and control: ${performancePhrase(PERFORMANCE_AREAS.BASS_EXTENSION, p18.level) || 'real weight'}, without the boom that would smear the dialogue above it.`,
+      // Each half is stated on its OWN result and in its OWN area's language: the
+      // depth is P18, and the composure of the response at the reference seating
+      // position is P19. The paragraph claims no measured outcome beyond those two
+      // results and no improvement in consistency anywhere else in the room: it
+      // states what the combination is for, not what it achieved.
+      explanation: `the system reaches ${p18.value || 'the published limit'} in the room, and at the reference seating position ${performancePhrase(PERFORMANCE_AREAS.BASS_CONTROL, p19.level) || 'the response stays composed'}: depth and composure together are what let the biggest moments of a film arrive at full scale without the low end turning thick underneath them.`,
       sources: ['P18', 'P19'],
     }));
   }
@@ -322,7 +340,10 @@ export function buildCandidates(sources, { byKey, floor, connections, brief = nu
         member.level,
         PLACEMENT_PHRASES[member.key],
       )),
-      explanation: `placement is held to the recommended geometry: ${joinList(strongest.map((member) => PLACEMENT_PHRASES[member.key]))}, giving ${performancePhrase(PERFORMANCE_AREAS.SPATIAL_RESOLUTION, placementLevel) || 'convincing positioning and movement'}, so effects cross the room the way the film was mixed instead of smearing between channels.`,
+      // The placement measures themselves belong to the pills beside this
+      // paragraph. The copy explains what the placement buys the listener: where a
+      // sound comes from, and how convincingly it moves across and around the room.
+      explanation: `the speakers are placed where the soundtrack needs its sounds to come from rather than where they are easiest to fit: an effect crossing the front of the room stays anchored to the picture, and the sound travelling around or above the audience arrives from the direction the scene is coming from, so ${performancePhrase(PERFORMANCE_AREAS.SPATIAL_RESOLUTION, placementLevel) || 'convincing positioning and movement'} rather than a smear between channels.`,
       sources: placementMembers.map((member) => String(member.key).toUpperCase()),
     }));
   }
@@ -372,7 +393,10 @@ export function buildCandidates(sources, { byKey, floor, connections, brief = nu
           `${row.seats} seat${row.seats === 1 ? '' : 's'}`,
         ].filter(Boolean).join(' · '),
       )),
-      explanation: `${joinList(described)}${allRows ? ', so the picture fills the field of view it was framed for from every row in the room.' : ', so those rows watch the picture at the angle it was composed for.'}`,
+      // The geometry belongs to each row's own pill. The paragraph states what the
+      // angle gives the viewer, and never claims the film was composed or framed
+      // for that angle: the viewing angle is this design's own decision.
+      explanation: `${joinList(described)}${allRows ? ', so the picture fills the field of view from every row in the room and the whole audience watches from inside the image rather than from a distance.' : ', so those rows watch the film from inside the picture, with the screen filling the field of view rather than sitting at a distance.'}`,
       sources: claimedRows.map((row) => `RP23:${row.rowNumber}:${row.level}`),
     }));
   }
@@ -500,7 +524,12 @@ export function buildSeatingClearanceStory(sources = {}, { byKey = {} } = {}) {
   return story({
     id: 'seating-clearance',
     order: 9,
-    title: 'Seating placed clear of the room\'s boundaries',
+    // The heading follows THIS design's own clearance, from its own seating and
+    // room geometry: where the seating is held clear of the boundaries it says so,
+    // and where the room leaves less space it states what the seating actually
+    // does, so the heading never contradicts the published P1 result or the
+    // paragraph beside it.
+    title: seatingBoundaryHighlightHeading(geometry),
     category: 'Seating Position',
     members: positive ? [p1] : [],
     level: p1.level ?? null,

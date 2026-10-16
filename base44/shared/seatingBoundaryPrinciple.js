@@ -457,6 +457,25 @@ export function seatingBoundaryHighlightSummary(geometry) {
  * The one-line statement of where the seating sits, for a surface that has room
  * for a clause rather than a paragraph.
  */
+export function seatingBoundaryHighlightHeading(geometry) {
+  const explanation = buildSeatingBoundaryExplanation(geometry);
+
+  if (!explanation || explanation.available !== true) {
+    return 'Where the seating sits in the room';
+  }
+
+  // Where the seating is genuinely held clear of the boundaries the heading says
+  // so; where the room leaves less space, it states what the seating does instead,
+  // so the heading always matches the clearance the geometry actually shows.
+  return explanation.favourable === true
+    ? 'Seating held clear of the room\'s boundaries'
+    : 'Seating set as clear of the boundaries as the room allows';
+}
+
+/**
+ * The one-line statement of where the seating sits, for a surface that has room
+ * for a clause rather than a paragraph.
+ */
 export function seatingBoundaryClause(geometry) {
   if (!geometry || geometry.available !== true || geometry.nearest_boundary_m == null) return null;
   const wall = geometry.nearest_boundary_label || 'nearest wall';

@@ -114,9 +114,12 @@ export const PERFORMANCE_LANGUAGE = Object.freeze({
       sentence: 'Deep bass that adds scale, impact and excitement to films and music.',
       clause: 'deep bass that adds scale, impact and excitement to films and music',
     },
+    // L3 states what the depth gives the film rather than the standard it is
+    // measured against: the register describes an achieved result, never what a
+    // system of this class might be expected to do.
     L3: {
-      sentence: 'Very deep, powerful bass with the weight and authority expected from a serious cinema system.',
-      clause: 'very deep, powerful bass with the weight and authority expected from a serious cinema system',
+      sentence: 'Very deep, powerful bass with the scale and impact of a serious cinema system.',
+      clause: 'very deep, powerful bass with the scale and impact of a serious cinema system',
     },
     L4: {
       sentence: 'Exceptional low-frequency performance, reaching into the deepest parts of the soundtrack with huge scale, physical impact and authority.',
@@ -132,9 +135,11 @@ export const PERFORMANCE_LANGUAGE = Object.freeze({
       sentence: 'Substantial low-frequency output that gives explosions and score real impact.',
       clause: 'the low end carries substantial output, giving explosions and score real impact',
     },
+    // As with bass extension, L3 states the scale and impact the output gives the
+    // soundtrack, not a standard the system is expected to meet.
     L3: {
-      sentence: 'Powerful low-frequency output with the authority a serious cinema system is expected to deliver.',
-      clause: 'the low end is powerful, with the authority a serious cinema system is expected to deliver',
+      sentence: 'Powerful low-frequency output with the scale and impact a film soundtrack asks for.',
+      clause: 'the low end is powerful, with the scale and impact a film soundtrack asks for',
     },
     L4: {
       sentence: 'Exceptional low-frequency authority, with huge scale and genuine physical impact.',
